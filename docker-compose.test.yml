@@ -1,22 +1,55 @@
-version: "3.9"
-
 services:
   frontend:
+    image: nginx:1.27-alpine
     ports:
       - "18080:80"
+    depends_on:
+      - backend
+    volumes:
+      - ./frontend/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./frontend/dist/homelab-frontend/browser:/usr/share/nginx/html:ro
+    networks:
+      - homelab-test-net
 
   backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: homelab-backend:test
+    ports:
+      - "13000:3000"
     environment:
       NODE_ENV: test
+      PORT: 3000
+      POSTGRES_DB: homelab_test
+      POSTGRES_USER: homelab
+      POSTGRES_PASSWORD: homelab_test_pw
       JWT_SECRET: test-jwt-secret-phase-f
       JWT_REFRESH_SECRET: test-jwt-refresh-secret-phase-f
       CORS_ORIGIN: http://localhost:18080
       REQUEST_BODY_LIMIT: 32kb
-    ports:
-      - "13000:3000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - homelab-test-net
 
   database:
+    image: postgres:16-alpine
     environment:
       POSTGRES_DB: homelab_test
       POSTGRES_USER: homelab
       POSTGRES_PASSWORD: homelab_test_pw
+    volumes:
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - homelab-test-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U homelab -d homelab_test"]
+      interval: 10s
+      timeout: 5s
+      retries: 8
+
+networks:
+  homelab-test-net:
+    driver: bridge

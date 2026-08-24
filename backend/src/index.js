@@ -1,6 +1,10 @@
 'use strict';
 
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch {
+  // dotenv is optional in containerized runtime where env vars are injected directly.
+}
 
 const express = require('express');
 const cors = require('cors');

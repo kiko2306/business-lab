@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-COMPOSE_FILES=(-f "${ROOT_DIR}/docker-compose.yml" -f "${ROOT_DIR}/docker-compose.test.yml")
+COMPOSE_FILES=(-f "${ROOT_DIR}/docker-compose.test.yml")
 
 cleanup() {
   docker compose "${COMPOSE_FILES[@]}" down -v --remove-orphans || true
@@ -27,6 +27,11 @@ wait_for_http() {
 }
 
 echo "Building and starting dockerized stack"
+echo "Building frontend static assets"
+(
+  cd "${ROOT_DIR}/frontend"
+  npm run build
+)
 docker compose "${COMPOSE_FILES[@]}" up -d --build
 
 wait_for_http "http://localhost:13000/health" "backend"
