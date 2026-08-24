@@ -6,6 +6,7 @@ const express = require('express');
 const cors = require('cors');
 
 const authRouter = require('./routes/auth');
+const servicesRouter = require('./routes/services');
 const authMiddleware = require('./middleware/auth');
 const setupModeMiddleware = require('./middleware/setupMode');
 const rateLimit = require('express-rate-limit');
@@ -40,6 +41,9 @@ app.use('/api', apiLimiter, setupModeMiddleware(false), authMiddleware);
 app.get('/api', (_req, res) => {
   res.json({ message: 'Homelab API v1' });
 });
+
+// Services routes
+app.use('/api/services', servicesRouter);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars
