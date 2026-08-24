@@ -8,6 +8,8 @@
         </div>
       </div>
       <div class="d-flex gap-2">
+        <a class="btn btn-outline-secondary btn-sm" routerLink="/audit-logs">Audit logs</a>
+        <a class="btn btn-outline-warning btn-sm" routerLink="/recovery">Recovery</a>
         <a class="btn btn-outline-secondary btn-sm" href="#settings">Settings</a>
         <button type="button" class="btn btn-outline-danger btn-sm" (click)="logout()">Logout</button>
       </div>
@@ -55,7 +57,8 @@
       </div>
     </section>
 
-    <section class="mb-4 small text-body-secondary" *ngIf="serviceState.lastUpdated$ | async as lastUpdated">
+    <section class="mb-4 small text-body-secondary d-flex align-items-center gap-2" *ngIf="serviceState.lastUpdated$ | async as lastUpdated">
+      <span class="badge text-bg-light border text-capitalize">{{ serviceState.connectionStatus$ | async }}</span>
       Last refresh {{ lastUpdated | date: 'medium' }}
     </section>
 
@@ -79,6 +82,56 @@
         </p>
       </div>
       <app-settings-panel></app-settings-panel>
+    </section>
+
+    <section id="backups" class="mt-5 pt-4 border-top">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h2 class="h4 mb-1">Backups</h2>
+          <p class="text-body-secondary mb-0">Create, download, and restore compressed backups.</p>
+        </div>
+        <button class="btn btn-primary" (click)="createBackup()">Create backup</button>
+      </div>
+      <div class="list-group">
+        <div class="list-group-item d-flex justify-content-between align-items-center" *ngFor="let backup of backups">
+          <div>
+            <div class="fw-semibold">{{ backup.name }}</div>
+            <div class="small text-body-secondary">
+              {{ backup.createdAt | date:'short' }} · {{ backup.size / 1024 | number:'1.0-0' }} KB
+            </div>
+          </div>
+          <div class="d-flex gap-2">
+            <button class="btn btn-sm btn-outline-secondary" (click)="downloadBackup(backup.name)">Download</button>
+            <button class="btn btn-sm btn-outline-danger" (click)="restoreBackup(backup.name)">Restore</button>
+          </div>
+        </div>
+        <div class="list-group-item text-body-secondary" *ngIf="!backups.length">
+          No backups found yet.
+        </div>
+      </div>
+    </section>
+
+    <section id="health" class="mt-5 pt-4 border-top">
+      <div class="d-flex justify-content-between align-items-center mb-3">
+        <div>
+          <h2 class="h4 mb-1">Health checks</h2>
+          <p class="text-body-secondary mb-0">Database, disk, memory, and system load monitoring.</p>
+        </div>
+        <button class="btn btn-outline-primary" (click)="loadHealth()">Refresh health</button>
+      </div>
+      <div class="card" *ngIf="health">
+        <div class="card-body">
+          <div class="mb-3">
+            <span class="badge" [class.text-bg-success]="health.status === 'ok'" [class.text-bg-warning]="health.status !== 'ok'">
+              {{ health.status }}
+            </span>
+          </div>
+          <div class="small">Database: {{ health.database }}</div>
+          <div class="small">Disk usage: {{ health.disk.percentUsed }}%</div>
+          <div class="small">Memory usage: {{ health.memory.percentUsed }}%</div>
+          <div class="small">Load per CPU: {{ health.load.loadPerCpu | number:'1.2-2' }}</div>
+        </div>
+      </div>
     </section>
   </main>
 </div>
