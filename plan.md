@@ -167,20 +167,20 @@ Preferred update strategies, in order:
 - [ ] Basic dashboard shell
 
 ### Milestone 2: Service Management
-- [ ] Service config loading
-- [ ] Start/stop script execution
-- [ ] Service status API
+- [x] Service config loading
+- [x] Start/stop script execution
+- [x] Service status API
 - [ ] Frontend service grid
 - [ ] Loading and error states
 
 ### Milestone 3: Administration
+- [x] Audit logs
 - [ ] User management
-- [ ] Audit logs
 - [ ] Permission checks
 - [ ] Backup/export features
 
 ### Milestone 4: Reliability and UX
-- [ ] Health checks
+- [x] Health checks
 - [ ] Real-time updates
 - [ ] Recovery workflows
 - [ ] UI polish and mobile refinement
@@ -222,11 +222,11 @@ Preferred update strategies, in order:
 - [x] Create middleware for checking whether setup mode is still enabled. **Priority: P0** — **Estimate: M**
 
 ### Phase C: Service Management Backend
-- [ ] Create an allowlisted service registry. **Priority: P0** — **Estimate: M**
-- [ ] Implement start/stop endpoints using asynchronous `child_process` execution. **Priority: P0** — **Estimate: L**
-- [ ] Add status aggregation logic for Docker container state and service metadata. **Priority: P0** — **Estimate: L**
-- [ ] Normalize error handling and return consistent API responses. **Priority: P1** — **Estimate: S**
-- [ ] Add structured logging for service operations. **Priority: P1** — **Estimate: M**
+- [x] Create an allowlisted service registry. **Priority: P0** — **Estimate: M**
+- [x] Implement start/stop endpoints using asynchronous `child_process` execution. **Priority: P0** — **Estimate: L**
+- [x] Add status aggregation logic for Docker container state and service metadata. **Priority: P0** — **Estimate: L**
+- [x] Normalize error handling and return consistent API responses. **Priority: P1** — **Estimate: S**
+- [x] Add structured logging for service operations. **Priority: P1** — **Estimate: M**
 
 ### Phase D: Frontend Dashboard
 - [ ] Build the login and first-time setup pages. **Priority: P0** — **Estimate: L**
