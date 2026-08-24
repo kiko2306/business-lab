@@ -1,0 +1,68 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        API_URL: ${API_URL:-http://localhost:3000}
+    image: homelab-frontend
+    ports:
+      - "${FRONTEND_PORT:-80}:80"
+    depends_on:
+      - backend
+    networks:
+      - homelab-net
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    image: homelab-backend
+    ports:
+      - "${BACKEND_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3000
+      DATABASE_URL: ${DATABASE_URL:-postgresql://homelab:${POSTGRES_PASSWORD:-changeme}@database:5432/homelab}
+      JWT_SECRET: ${JWT_SECRET}
+      SCRIPTS_DIR: /scripts
+    volumes:
+      - scripts-data:/scripts:ro
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - homelab-net
+    restart: unless-stopped
+
+  database:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-homelab}
+      POSTGRES_USER: ${POSTGRES_USER:-homelab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+    volumes:
+      - db-data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - homelab-net
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-homelab} -d ${POSTGRES_DB:-homelab}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    # database is NOT exposed on host ports intentionally
+
+volumes:
+  db-data:
+    driver: local
+  scripts-data:
+    driver: local
+
+networks:
+  homelab-net:
+    driver: bridge

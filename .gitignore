@@ -1,0 +1,20 @@
+# Environment secrets — never commit these
+.env
+
+# Node modules
+node_modules/
+*/node_modules/
+
+# Build artifacts
+dist/
+*/dist/
+.angular/
+*/.angular/
+
+# Logs
+*.log
+logs/
+
+# OS files
+.DS_Store
+Thumbs.db
