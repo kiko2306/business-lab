@@ -1,0 +1,64 @@
+<main class="auth-page container py-5">
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-9 col-lg-6">
+      <section class="card border-0 shadow auth-card">
+        <div class="card-body p-4 p-lg-5">
+          <div class="text-center mb-4">
+            <span class="auth-kicker">Initial setup</span>
+            <h1 class="h3 mt-2 mb-2">Create the first administrator</h1>
+            <p class="text-body-secondary mb-0">
+              Set up the initial account before anyone can access the dashboard.
+            </p>
+          </div>
+
+          <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+
+          <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="setupUsername">Username</label>
+              <input
+                id="setupUsername"
+                type="text"
+                class="form-control form-control-lg"
+                formControlName="username"
+                autocomplete="username"
+              />
+            </div>
+
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="setupPassword">Password</label>
+              <input
+                id="setupPassword"
+                type="password"
+                class="form-control form-control-lg"
+                formControlName="password"
+                autocomplete="new-password"
+              />
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label fw-semibold" for="confirmPassword">Confirm password</label>
+              <input
+                id="confirmPassword"
+                type="password"
+                class="form-control form-control-lg"
+                formControlName="confirmPassword"
+                autocomplete="new-password"
+              />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting">
+              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+              Create administrator
+            </button>
+          </form>
+
+          <p class="text-center text-body-secondary small mt-4 mb-0">
+            Already completed setup?
+            <a routerLink="/login">Go to sign in</a>.
+          </p>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>

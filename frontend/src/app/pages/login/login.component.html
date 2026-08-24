@@ -1,0 +1,53 @@
+<main class="auth-page container py-5">
+  <div class="row justify-content-center">
+    <div class="col-12 col-md-8 col-lg-5">
+      <section class="card border-0 shadow auth-card">
+        <div class="card-body p-4 p-lg-5">
+          <div class="text-center mb-4">
+            <span class="auth-kicker">Homelab Manager</span>
+            <h1 class="h3 mt-2 mb-2">Sign in</h1>
+            <p class="text-body-secondary mb-0">
+              Use your administrator credentials to manage services.
+            </p>
+          </div>
+
+          <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
+
+          <form [formGroup]="form" (ngSubmit)="submit()" novalidate>
+            <div class="mb-3">
+              <label class="form-label fw-semibold" for="username">Email / username</label>
+              <input
+                id="username"
+                type="text"
+                class="form-control form-control-lg"
+                formControlName="username"
+                autocomplete="username"
+              />
+            </div>
+
+            <div class="mb-4">
+              <label class="form-label fw-semibold" for="password">Password</label>
+              <input
+                id="password"
+                type="password"
+                class="form-control form-control-lg"
+                formControlName="password"
+                autocomplete="current-password"
+              />
+            </div>
+
+            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting">
+              <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+              Sign in
+            </button>
+          </form>
+
+          <p class="text-center text-body-secondary small mt-4 mb-0">
+            First time here?
+            <a routerLink="/setup">Create the initial administrator account</a>.
+          </p>
+        </div>
+      </section>
+    </div>
+  </div>
+</main>

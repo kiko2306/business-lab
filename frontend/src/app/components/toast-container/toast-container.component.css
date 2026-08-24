@@ -1,0 +1,11 @@
+.toast-stack {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 1080;
+  width: min(24rem, calc(100vw - 2rem));
+}
+
+.toast-card {
+  margin-bottom: 0.75rem;
+}

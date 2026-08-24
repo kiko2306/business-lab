@@ -1,0 +1,14 @@
+<div class="toast-stack">
+  <div
+    *ngFor="let toast of toastService.toasts$ | async"
+    class="toast-card alert alert-dismissible show shadow-sm border-0"
+    [ngClass]="'alert-' + toast.variant"
+    role="alert"
+  >
+    <div class="d-flex align-items-start gap-3">
+      <span class="fw-semibold text-capitalize">{{ toast.variant }}</span>
+      <span class="flex-grow-1">{{ toast.text }}</span>
+      <button type="button" class="btn-close" aria-label="Close" (click)="dismiss(toast.id)"></button>
+    </div>
+  </div>
+</div>
