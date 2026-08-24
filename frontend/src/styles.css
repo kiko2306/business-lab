@@ -18,3 +18,22 @@ a {
 .card {
   border-radius: 1rem;
 }
+
+.auth-page {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+}
+
+.auth-card {
+  border-radius: 1rem;
+}
+
+.auth-kicker {
+  display: inline-block;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #0d6efd;
+  font-weight: 700;
+}

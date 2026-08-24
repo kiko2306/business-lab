@@ -11,6 +11,12 @@ import { ToastService } from '../../core/toast.service';
 })
 export class ToastContainerComponent {
   protected readonly toastService = inject(ToastService);
+  protected readonly labels: Record<string, string> = {
+    success: 'Success',
+    danger: 'Error',
+    warning: 'Warning',
+    info: 'Info',
+  };
 
   dismiss(id: number): void {
     this.toastService.dismiss(id);

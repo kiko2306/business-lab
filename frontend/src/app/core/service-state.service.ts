@@ -13,7 +13,7 @@ export class ServiceStateService {
   private readonly http = inject(HttpClient);
   private readonly toast = inject(ToastService);
 
-  private readonly servicesSubject = new BehaviorSubject<ServiceStatus[]>([]);
+  private readonly servicesSubject = new BehaviorSubject<ServiceStatus[] | null>(null);
   private readonly summarySubject = new BehaviorSubject<ServiceSummary>({
     total: 0,
     running: 0,
