@@ -1,0 +1,75 @@
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h3 mb-1">Audit logs</h1>
+      <p class="text-body-secondary mb-0">Track user actions and system operations.</p>
+    </div>
+    <div class="d-flex gap-2">
+      <a class="btn btn-outline-secondary btn-sm" routerLink="/dashboard">Back to dashboard</a>
+      <button class="btn btn-outline-primary btn-sm" (click)="downloadCsv()">Export CSV</button>
+    </div>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-body row g-2">
+      <div class="col-12 col-md-3">
+        <input class="form-control" placeholder="Action" [(ngModel)]="action" />
+      </div>
+      <div class="col-12 col-md-2">
+        <select class="form-select" [(ngModel)]="result">
+          <option value="">All results</option>
+          <option value="success">Success</option>
+          <option value="failure">Failure</option>
+        </select>
+      </div>
+      <div class="col-12 col-md-3">
+        <input class="form-control" type="datetime-local" [(ngModel)]="startDate" />
+      </div>
+      <div class="col-12 col-md-3">
+        <input class="form-control" type="datetime-local" [(ngModel)]="endDate" />
+      </div>
+      <div class="col-12 col-md-1 d-grid">
+        <button class="btn btn-primary" (click)="load(1)">Go</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Time</th>
+            <th>User</th>
+            <th>Action</th>
+            <th>Resource</th>
+            <th>Result</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr *ngFor="let item of items">
+            <td>{{ item.created_at | date:'short' }}</td>
+            <td>{{ item.username || 'system' }}</td>
+            <td>{{ item.action }}</td>
+            <td>{{ item.resource || '—' }}</td>
+            <td>
+              <span class="badge" [class.text-bg-success]="item.result === 'success'" [class.text-bg-danger]="item.result !== 'success'">
+                {{ item.result }}
+              </span>
+            </td>
+          </tr>
+          <tr *ngIf="!items.length && !loading">
+            <td colspan="5" class="text-center text-body-secondary py-4">No audit logs found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="card-footer d-flex justify-content-between align-items-center">
+      <div class="small text-body-secondary">Showing {{ items.length }} of {{ total }}</div>
+      <div class="btn-group">
+        <button class="btn btn-sm btn-outline-secondary" [disabled]="page <= 1" (click)="load(page - 1)">Previous</button>
+        <button class="btn btn-sm btn-outline-secondary" [disabled]="(page * pageSize) >= total" (click)="load(page + 1)">Next</button>
+      </div>
+    </div>
+  </div>
+</div>

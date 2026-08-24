@@ -3,6 +3,7 @@
 const https = require('https');
 const { Router } = require('express');
 const { query } = require('../utils/database');
+const { writeAuditLog } = require('../utils/audit');
 
 const router = Router();
 
@@ -102,6 +103,12 @@ router.put('/cloudflare-token', async (req, res) => {
        DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
       [CLOUDFLARE_TOKEN_KEY, token]
     );
+    await writeAuditLog({
+      userId: req.user?.id ?? null,
+      action: 'settings_change',
+      resource: CLOUDFLARE_TOKEN_KEY,
+      result: 'success',
+    }).catch(() => {});
 
     return res.json({
       configured: true,

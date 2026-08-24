@@ -7,6 +7,7 @@ const { hashPassword, verifyPassword } = require('../utils/password');
 const { signAccessToken, signRefreshToken, verifyRefreshToken, refreshTokenExpiryMs } = require('../utils/jwt');
 const setupModeMiddleware = require('../middleware/setupMode');
 const authMiddleware = require('../middleware/auth');
+const { writeAuditLog } = require('../utils/audit');
 
 const router = Router();
 
@@ -83,6 +84,11 @@ router.post('/login', authLimiter, async (req, res) => {
     const user = result.rows[0];
 
     if (!user || !(await verifyPassword(password, user.password_hash))) {
+      await writeAuditLog({
+        action: 'login',
+        resource: 'auth',
+        result: 'failure',
+      }).catch(() => {});
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
@@ -95,10 +101,7 @@ router.post('/login', authLimiter, async (req, res) => {
       [user.id, refreshToken, refreshExpiry]
     );
 
-    await query(
-      'INSERT INTO audit_logs (user_id, action, resource, result) VALUES ($1, $2, $3, $4)',
-      [user.id, 'login', 'auth', 'success']
-    );
+    await writeAuditLog({ userId: user.id, action: 'login', resource: 'auth', result: 'success' });
 
     return res.json({ accessToken, refreshToken, user: { id: user.id, username: user.username, role: user.role } });
   } catch (err) {
@@ -125,10 +128,7 @@ router.post('/logout', authLimiter, authMiddleware, async (req, res) => {
   }
 
   try {
-    await query(
-      'INSERT INTO audit_logs (user_id, action, resource, result) VALUES ($1, $2, $3, $4)',
-      [req.user.id, 'logout', 'auth', 'success']
-    );
+    await writeAuditLog({ userId: req.user.id, action: 'logout', resource: 'auth', result: 'success' });
   } catch (err) {
     console.error('Audit log error:', err.message);
   }

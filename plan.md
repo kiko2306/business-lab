@@ -177,12 +177,12 @@ Preferred update strategies, in order:
 - [x] Audit logs
 - [ ] User management
 - [ ] Permission checks
-- [ ] Backup/export features
+- [x] Backup/export features
 
 ### Milestone 4: Reliability and UX
 - [x] Health checks
-- [ ] Real-time updates
-- [ ] Recovery workflows
+- [x] Real-time updates
+- [x] Recovery workflows
 - [ ] UI polish and mobile refinement
 
 ## 13.1 Priority and Estimate Reference
@@ -237,11 +237,11 @@ Preferred update strategies, in order:
 - [ ] Add admin user management screens. **Priority: P1** — **Estimate: L**
 
 ### Phase E: Operational Features
-- [ ] Add audit logging. **Priority: P1** — **Estimate: M**
-- [ ] Add backup and restore workflows. **Priority: P1** — **Estimate: L**
-- [ ] Add optional health checks. **Priority: P2** — **Estimate: L**
-- [ ] Add WebSocket or SSE support for live updates. **Priority: P2** — **Estimate: XL**
-- [ ] Add recovery mode and admin reset tooling. **Priority: P2** — **Estimate: M**
+- [x] Add audit logging. **Priority: P1** — **Estimate: M**
+- [x] Add backup and restore workflows. **Priority: P1** — **Estimate: L**
+- [x] Add optional health checks. **Priority: P2** — **Estimate: L**
+- [x] Add WebSocket or SSE support for live updates. **Priority: P2** — **Estimate: XL**
+- [x] Add recovery mode and admin reset tooling. **Priority: P2** — **Estimate: M**
 
 ### Phase F: Hardening and Delivery
 - [ ] Add validation and security checks for all inputs. **Priority: P0** — **Estimate: M**
@@ -256,4 +256,4 @@ Preferred update strategies, in order:
 - [x] Service status is visible and refreshes correctly.
 - [x] Cloudflare token settings can be saved and updated.
 - [ ] The frontend, API, and database run in Docker containers.
-- [ ] The system is structured for backups and recovery.
+- [x] The system is structured for backups and recovery.

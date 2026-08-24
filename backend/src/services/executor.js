@@ -6,8 +6,8 @@
 
 const { exec } = require('child_process');
 const path = require('path');
-const db = require('../utils/database');
 const logger = require('../utils/logger');
+const { writeAuditLog } = require('../utils/audit');
 
 /**
  * Execute a shell command with timeout and error handling
@@ -160,11 +160,13 @@ async function stopService(serviceName, userId) {
  */
 async function logAuditEvent(userId, action, resource, result, metadata = {}) {
   try {
-    const query = `
-      INSERT INTO audit_logs (user_id, action, resource, result, metadata, created_at)
-      VALUES ($1, $2, $3, $4, $5, NOW())
-    `;
-    await db.query(query, [userId, action, resource, result, JSON.stringify(metadata)]);
+    await writeAuditLog({
+      userId,
+      action,
+      resource,
+      result,
+      metadata,
+    });
   } catch (error) {
     // Don't throw; audit logging is non-critical
     logger.error('Failed to write audit log', {
