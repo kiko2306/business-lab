@@ -1,7 +1,7 @@
 # Homelab Management System Specification
 
 ## 1. Overview
-This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, viewing live status, managing users, and configuring Cloudflare Tunnel settings.
+This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, viewing their status, and managing runtime settings.
 
 The frontend, API, and database should all run as Docker containers, while the host continues to run Docker and Bash scripts that manage the individual homelab apps.
 
@@ -175,6 +175,27 @@ Preferred update strategies, in order:
 - [ ] Real-time updates
 - [ ] Recovery workflows
 - [ ] UI polish and mobile refinement
+
+## 13.1 Priority and Estimate Reference
+
+### Priority Levels
+
+| Level | Description |
+|-------|-------------|
+| **P0** | Critical path — must complete before MVP release. Blocks other work or is essential to core functionality. |
+| **P1** | High value — planned for MVP or shortly after. Important for usability, reliability, or security. |
+| **P2** | Nice-to-have — deferred to Phase 2 or later. Improves experience but not blocking. |
+
+### Estimate Sizes
+
+| Size | Duration | Effort |
+|------|----------|--------|
+| **S** (Small) | 1–2 hours | Straightforward, isolated task. Low risk of unknowns. |
+| **M** (Medium) | 3–8 hours | Moderate complexity. May require coordination across a few areas. |
+| **L** (Large) | 1–3 days | Significant scope. Likely spans multiple components or requires design review. |
+| **XL** (Extra Large) | 3+ days | Major undertaking. Requires architecture changes, extensive testing, or significant learning curve. |
+
+---
 
 ## 14. Implementation Tasks
 
