@@ -3,17 +3,20 @@
 ## 1. Overview
 This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, viewing live status, managing users, and configuring Cloudflare Tunnel settings.
 
+The frontend, API, and database should all run as Docker containers, while the host continues to run Docker and Bash scripts that manage the individual homelab apps.
+
 ## 2. Goals
 - Provide a simple dashboard for managing common homelab services.
 - Support secure first-time admin setup and JWT-based authentication.
 - Allow service lifecycle control through safe host-level scripts.
 - Offer clear status visibility and basic operational feedback.
 - Store configuration locally with easy backup and recovery.
+- Run the frontend, API, and database in containers for easier deployment and portability.
 
 ## 3. Technology Stack
-- **Frontend**: Angular (latest stable)
-- **Backend**: Node.js + Express
-- **Database**: SQLite or PostgreSQL
+- **Frontend**: Angular (latest stable), containerized with Docker
+- **Backend**: Node.js + Express, containerized with Docker
+- **Database**: SQLite or PostgreSQL, containerized with Docker
 - **Runtime Environment**: Linux host with Docker and Bash
 
 ## 4. Proposed Directory Structure
@@ -31,7 +34,9 @@ The project should follow a predictable layout:
 │   ├── stop-container.sh
 │   └── update-container.sh
 ├── /backend
-└── /frontend
+├── /frontend
+├── /database
+└── docker-compose.yml
 ```
 
 ## 5. Product Scope
@@ -43,6 +48,7 @@ The project should follow a predictable layout:
 - Start/stop service actions
 - Live service status refresh
 - Cloudflare Tunnel token settings
+- Docker containerization for frontend, API, and database
 
 ### Phase 2
 - Audit logging
@@ -145,6 +151,7 @@ Preferred update strategies, in order:
 
 ### Milestone 1: Core Platform
 - Project scaffold
+- Docker Compose setup for frontend, API, and database
 - Database schema
 - Authentication flow
 - First-time admin setup
@@ -169,10 +176,54 @@ Preferred update strategies, in order:
 - Recovery workflows
 - UI polish and mobile refinement
 
-## 14. Acceptance Criteria
+## 14. Implementation Tasks
+
+### Phase A: Infrastructure and Containerization
+- Create a root `docker-compose.yml` for frontend, backend, and database.
+- Add Dockerfiles for the Angular app and Node.js API.
+- Define persistent volumes for the database and configuration data.
+- Add container networking so the frontend can reach the API and the API can reach the database.
+- Add environment variable handling for secrets, API URLs, and database connection settings.
+
+### Phase B: Database and Auth Foundation
+- Design the database schema for users, roles, settings, and service definitions.
+- Implement the first-admin bootstrap flow.
+- Add JWT login, logout, and route protection.
+- Create middleware for checking whether setup mode is still enabled.
+
+### Phase C: Service Management Backend
+- Create an allowlisted service registry.
+- Implement start/stop endpoints using asynchronous `child_process` execution.
+- Add status aggregation logic for Docker container state and service metadata.
+- Normalize error handling and return consistent API responses.
+- Add structured logging for service operations.
+
+### Phase D: Frontend Dashboard
+- Build the login and first-time setup pages.
+- Build the dashboard shell and service grid.
+- Add start/stop buttons with loading states.
+- Add status indicators and refresh behavior.
+- Create the Cloudflare token settings panel.
+- Add admin user management screens.
+
+### Phase E: Operational Features
+- Add audit logging.
+- Add backup and restore workflows.
+- Add optional health checks.
+- Add WebSocket or SSE support for live updates.
+- Add recovery mode and admin reset tooling.
+
+### Phase F: Hardening and Delivery
+- Add validation and security checks for all inputs.
+- Test Dockerized deployment end-to-end.
+- Document setup, deployment, and recovery steps.
+- Add smoke tests for the startup flow and service control APIs.
+
+## 15. Acceptance Criteria
 - A new installation can create its first admin account safely.
 - An authenticated admin can view and manage services.
 - Start and stop actions run asynchronously without blocking the API.
 - Service status is visible and refreshes correctly.
 - Cloudflare token settings can be saved and updated.
+- The frontend, API, and database run in Docker containers.
 - The system is structured for backups and recovery.
