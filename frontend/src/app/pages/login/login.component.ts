@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
+import { sanitizePastedText } from '../../core/input-sanitize';
 import { ToastService } from '../../core/toast.service';
 
 @Component({
@@ -21,12 +22,20 @@ export class LoginComponent {
   private readonly toastService = inject(ToastService);
 
   protected readonly form = this.formBuilder.nonNullable.group({
-    username: ['', [Validators.required]],
-    password: ['', [Validators.required]],
+    username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
+    password: ['', [Validators.required, Validators.maxLength(128)]],
   });
 
   protected submitting = false;
   protected errorMessage = '';
+
+  sanitizePaste(event: ClipboardEvent, controlName: 'username' | 'password', maxLength: number): void {
+    const pasted = event.clipboardData?.getData('text') ?? '';
+    const sanitized = sanitizePastedText(pasted, maxLength, controlName !== 'password');
+    event.preventDefault();
+    this.form.controls[controlName].setValue(sanitized);
+    this.form.controls[controlName].markAsDirty();
+  }
 
   submit(): void {
     if (this.form.invalid) {

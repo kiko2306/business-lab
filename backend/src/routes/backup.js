@@ -7,6 +7,7 @@ const os = require('os');
 const { execFile } = require('child_process');
 const { query } = require('../utils/database');
 const { writeAuditLog } = require('../utils/audit');
+const { schemas, validateBody, validateParams } = require('../middleware/validation');
 const logger = require('../utils/logger');
 
 const router = Router();
@@ -36,21 +37,21 @@ function runCommand(command, args, options = {}) {
         reject(new Error(stderr || error.message));
         return;
       }
-
-      function pgConnectionEnv() {
-        const dbUrl = new URL(process.env.DATABASE_URL);
-        return {
-          ...process.env,
-          PGHOST: dbUrl.hostname,
-          PGPORT: dbUrl.port || '5432',
-          PGUSER: decodeURIComponent(dbUrl.username),
-          PGPASSWORD: decodeURIComponent(dbUrl.password),
-          PGDATABASE: dbUrl.pathname.replace(/^\//, ''),
-        };
-      }
       resolve(stdout);
     });
   });
+}
+
+function pgConnectionEnv() {
+  const dbUrl = new URL(process.env.DATABASE_URL);
+  return {
+    ...process.env,
+    PGHOST: dbUrl.hostname,
+    PGPORT: dbUrl.port || '5432',
+    PGUSER: decodeURIComponent(dbUrl.username),
+    PGPASSWORD: decodeURIComponent(dbUrl.password),
+    PGDATABASE: dbUrl.pathname.replace(/^\//, ''),
+  };
 }
 
 async function ensureBackupDir() {
@@ -133,7 +134,7 @@ router.post('/create', async (req, res) => {
   }
 });
 
-router.get('/download/:fileName', async (req, res) => {
+router.get('/download/:fileName', validateParams(schemas.backupDownloadParams), async (req, res) => {
   const fileName = req.params.fileName;
   let backupPath = '';
 
@@ -151,9 +152,9 @@ router.get('/download/:fileName', async (req, res) => {
   }
 });
 
-router.post('/restore', async (req, res) => {
+router.post('/restore', validateBody(schemas.backupRestore), async (req, res) => {
   const userId = req.user.id;
-  const fileName = typeof req.body?.fileName === 'string' ? req.body.fileName : '';
+  const fileName = req.body.fileName;
   let tmpDir = '';
 
   if (!safeBackupFileName(fileName)) {
@@ -181,13 +182,13 @@ router.post('/restore', async (req, res) => {
     const settings = JSON.parse(settingsRaw);
     if (Array.isArray(settings)) {
       for (const entry of settings) {
-        if (typeof entry.key !== 'string') {
+        if (typeof entry.key !== 'string' || !/^[a-z0-9_]+$/.test(entry.key)) {
           continue;
         }
         await query(
           `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-          [entry.key, String(entry.value ?? '')]
+          [entry.key, String(entry.value ?? '').slice(0, 4096)]
         );
       }
     }

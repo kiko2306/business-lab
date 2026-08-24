@@ -6,6 +6,7 @@ const { query } = require('../utils/database');
 const { hashPassword } = require('../utils/password');
 const { writeAuditLog } = require('../utils/audit');
 const { isRecoveryModeEnabled, isLocalRequest, setRecoveryMode } = require('../utils/recovery');
+const { schemas, validateBody } = require('../middleware/validation');
 
 const router = Router();
 
@@ -27,12 +28,9 @@ router.get('/status', async (_req, res) => {
   }
 });
 
-router.post('/enable', async (req, res) => {
+router.post('/enable', validateBody(schemas.recoveryEnable), async (req, res) => {
   if (!isLocalRequest(req)) {
     return res.status(403).json({ error: 'Recovery mode can only be enabled from localhost.' });
-  }
-  if (req.body?.confirm !== 'ENABLE_RECOVERY_MODE') {
-    return res.status(400).json({ error: 'Invalid confirmation value.' });
   }
 
   try {
@@ -44,9 +42,9 @@ router.post('/enable', async (req, res) => {
   }
 });
 
-router.post('/reset-admin-password', async (req, res) => {
-  const username = typeof req.body?.username === 'string' ? req.body.username.trim() : '';
-  const password = typeof req.body?.password === 'string' ? req.body.password : '';
+router.post('/reset-admin-password', validateBody(schemas.recoveryResetAdminPassword), async (req, res) => {
+  const username = req.body.username;
+  const password = req.body.password;
 
   if (!isLocalRequest(req)) {
     return res.status(403).json({ error: 'Recovery actions are localhost only.' });
@@ -54,10 +52,6 @@ router.post('/reset-admin-password', async (req, res) => {
 
   if (!(await isRecoveryModeEnabled())) {
     return res.status(403).json({ error: 'Recovery mode is not enabled.' });
-  }
-
-  if (!username || password.length < 8) {
-    return res.status(400).json({ error: 'Username and a password of at least 8 characters are required.' });
   }
 
   try {

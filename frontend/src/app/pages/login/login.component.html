@@ -22,7 +22,12 @@
                 class="form-control form-control-lg"
                 formControlName="username"
                 autocomplete="username"
+                maxlength="64"
+                (paste)="sanitizePaste($event, 'username', 64)"
               />
+              <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1">
+                Username must be 3-64 characters.
+              </div>
             </div>
 
             <div class="mb-4">
@@ -33,10 +38,15 @@
                 class="form-control form-control-lg"
                 formControlName="password"
                 autocomplete="current-password"
+                maxlength="128"
+                (paste)="sanitizePaste($event, 'password', 128)"
               />
+              <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1">
+                Password is required and must be at most 128 characters.
+              </div>
             </div>
 
-            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting">
+            <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || form.invalid">
               <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
               Sign in
             </button>

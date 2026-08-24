@@ -1,0 +1,185 @@
+openapi: 3.0.3
+info:
+  title: Homelab Management API
+  version: 1.0.0
+servers:
+  - url: /api
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+  schemas:
+    Error:
+      type: object
+      properties:
+        error:
+          type: string
+        details:
+          type: array
+          items:
+            type: string
+paths:
+  /auth/setup:
+    post:
+      summary: Create first admin account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string, minLength: 3, maxLength: 64 }
+                password: { type: string, minLength: 8, maxLength: 128 }
+      responses:
+        '201': { description: Setup complete }
+        '422': { description: Invalid input }
+  /auth/login:
+    post:
+      summary: Login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [username, password]
+              properties:
+                username: { type: string }
+                password: { type: string }
+      responses:
+        '200': { description: Logged in }
+        '401': { description: Invalid credentials }
+        '422': { description: Invalid input }
+  /auth/refresh:
+    post:
+      summary: Refresh access token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refreshToken]
+              properties:
+                refreshToken: { type: string }
+      responses:
+        '200': { description: Refreshed }
+        '401': { description: Invalid refresh token }
+  /auth/logout:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Logout and revoke refresh token
+      responses:
+        '200': { description: Logged out }
+  /services/status:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get service status map
+      responses:
+        '200': { description: Service status }
+  /services/{name}/start:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Start a service
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200': { description: Start requested }
+        '400': { description: Invalid service name }
+        '422': { description: Validation error }
+  /services/{name}/stop:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Stop a service
+      parameters:
+        - in: path
+          name: name
+          required: true
+          schema:
+            type: string
+      responses:
+        '200': { description: Stop requested }
+        '400': { description: Invalid service name }
+        '422': { description: Validation error }
+  /settings/cloudflare-token:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get Cloudflare token status
+      responses:
+        '200': { description: Current config }
+    put:
+      security:
+        - bearerAuth: []
+      summary: Save Cloudflare token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [token]
+              properties:
+                token: { type: string, minLength: 20, maxLength: 4096 }
+      responses:
+        '200': { description: Token saved }
+        '422': { description: Validation error }
+  /settings/cloudflare-token/test:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Test Cloudflare token
+      responses:
+        '200': { description: Test successful }
+        '400': { description: Invalid token or test failed }
+  /health:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Get health status and thresholds
+      responses:
+        '200': { description: Health payload }
+  /health/thresholds:
+    put:
+      security:
+        - bearerAuth: []
+      summary: Update health thresholds
+      responses:
+        '200': { description: Updated }
+        '422': { description: Validation error }
+  /audit-logs:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List audit logs
+      responses:
+        '200': { description: Audit log page }
+  /recovery/status:
+    get:
+      summary: Check recovery mode status
+      responses:
+        '200': { description: Recovery status }
+  /recovery/enable:
+    post:
+      summary: Enable recovery mode (localhost only)
+      responses:
+        '200': { description: Enabled }
+        '403': { description: Not localhost }
+  /recovery/reset-admin-password:
+    post:
+      summary: Reset admin password (localhost + recovery mode)
+      responses:
+        '200': { description: Password reset }
+        '422': { description: Validation error }

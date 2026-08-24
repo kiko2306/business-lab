@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  frontend:
+    ports:
+      - "18080:80"
+
+  backend:
+    environment:
+      NODE_ENV: test
+      JWT_SECRET: test-jwt-secret-phase-f
+      JWT_REFRESH_SECRET: test-jwt-refresh-secret-phase-f
+      CORS_ORIGIN: http://localhost:18080
+      REQUEST_BODY_LIMIT: 32kb
+    ports:
+      - "13000:3000"
+
+  database:
+    environment:
+      POSTGRES_DB: homelab_test
+      POSTGRES_USER: homelab
+      POSTGRES_PASSWORD: homelab_test_pw

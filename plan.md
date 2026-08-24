@@ -246,10 +246,10 @@ Preferred update strategies, in order:
 - [x] Add recovery mode and admin reset tooling. **Priority: P2** — **Estimate: M**
 
 ### Phase F: Hardening and Delivery
-- [ ] Add validation and security checks for all inputs. **Priority: P0** — **Estimate: M**
-- [ ] Test Dockerized deployment end-to-end. **Priority: P0** — **Estimate: L**
-- [ ] Document setup, deployment, and recovery steps. **Priority: P1** — **Estimate: M**
-- [ ] Add smoke tests for the startup flow and service control APIs. **Priority: P1** — **Estimate: M**
+- [x] Add validation and security checks for all inputs. **Priority: P0** — **Estimate: M**
+- [x] Test Dockerized deployment end-to-end. **Priority: P0** — **Estimate: L**
+- [x] Document setup, deployment, and recovery steps. **Priority: P1** — **Estimate: M**
+- [x] Add smoke tests for the startup flow and service control APIs. **Priority: P1** — **Estimate: M**
 
 ## 15. Acceptance Criteria
 - [x] A new installation can create its first admin account safely.
@@ -257,5 +257,5 @@ Preferred update strategies, in order:
 - [x] Start and stop actions run asynchronously without blocking the API.
 - [x] Service status is visible and refreshes correctly.
 - [x] Cloudflare token settings can be saved and updated.
-- [ ] The frontend, API, and database run in Docker containers.
+- [x] The frontend, API, and database run in Docker containers.
 - [x] The system is structured for backups and recovery.

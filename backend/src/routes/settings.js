@@ -4,6 +4,7 @@ const https = require('https');
 const { Router } = require('express');
 const { query } = require('../utils/database');
 const { writeAuditLog } = require('../utils/audit');
+const { schemas, validateBody } = require('../middleware/validation');
 
 const router = Router();
 
@@ -88,12 +89,8 @@ router.get('/cloudflare-token', async (_req, res) => {
   }
 });
 
-router.put('/cloudflare-token', async (req, res) => {
-  const token = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
-
-  if (!isValidToken(token)) {
-    return res.status(400).json({ error: 'Cloudflare token must be at least 20 characters.' });
-  }
+router.put('/cloudflare-token', validateBody(schemas.cloudflareTokenUpdate), async (req, res) => {
+  const token = req.body.token;
 
   try {
     await query(
@@ -121,9 +118,9 @@ router.put('/cloudflare-token', async (req, res) => {
   }
 });
 
-router.post('/cloudflare-token/test', async (req, res) => {
+router.post('/cloudflare-token/test', validateBody(schemas.cloudflareTokenTest), async (req, res) => {
   try {
-    const providedToken = typeof req.body?.token === 'string' ? req.body.token.trim() : '';
+    const providedToken = req.body.token || '';
     const token = providedToken || (await getStoredToken());
 
     if (!isValidToken(token)) {
