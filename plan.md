@@ -1,12 +1,12 @@
 # Homelab Management System Specification
 
 ## 1. Overview
-This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, vi[..[...]
+This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, vi[...]
 
 The frontend, API, and database should all run as Docker containers, while the host continues to run Docker and Bash scripts that manage the individual homelab apps.
 
 ## 2. Goals
-- Provide a simple dashboard for managing common homelab services, including: nginx-proxy-manager, netbird-vpn, home-assistant, cloudflare-tunnel, code-server, book-stack, file-browser, home-page, n8n[...]
+- Provide a simple dashboard for managing common homelab services, including: nginx-proxy-manager, netbird-vpn, home-assistant, cloudflare-tunnel, code-server, book-stack, file-browser, home-page, [...]
 - Support secure first-time admin setup and JWT-based authentication.
 - Allow service lifecycle control through safe host-level scripts.
 - Offer clear status visibility and basic operational feedback.
@@ -161,9 +161,9 @@ Preferred update strategies, in order:
 ### Milestone 1: Core Platform
 - [x] Project scaffold
 - [x] Docker Compose setup for frontend, API, and database
-- [ ] Database schema
-- [ ] Authentication flow
-- [ ] First-time admin setup
+- [x] Database schema
+- [x] Authentication flow
+- [x] First-time admin setup
 - [ ] Basic dashboard shell
 
 ### Milestone 2: Service Management
@@ -216,10 +216,10 @@ Preferred update strategies, in order:
 - [x] Add environment variable handling for secrets, API URLs, and database connection settings. **Priority: P0** — **Estimate: M**
 
 ### Phase B: Database and Auth Foundation
-- [ ] Design the database schema for users, roles, settings, and service definitions. **Priority: P0** — **Estimate: M**
-- [ ] Implement the first-admin bootstrap flow. **Priority: P0** — **Estimate: L**
-- [ ] Add JWT login, logout, and route protection. **Priority: P0** — **Estimate: L**
-- [ ] Create middleware for checking whether setup mode is still enabled. **Priority: P0** — **Estimate: M**
+- [x] Design the database schema for users, roles, settings, and service definitions. **Priority: P0** — **Estimate: M**
+- [x] Implement the first-admin bootstrap flow. **Priority: P0** — **Estimate: L**
+- [x] Add JWT login, logout, and route protection. **Priority: P0** — **Estimate: L**
+- [x] Create middleware for checking whether setup mode is still enabled. **Priority: P0** — **Estimate: M**
 
 ### Phase C: Service Management Backend
 - [ ] Create an allowlisted service registry. **Priority: P0** — **Estimate: M**
@@ -250,7 +250,7 @@ Preferred update strategies, in order:
 - [ ] Add smoke tests for the startup flow and service control APIs. **Priority: P1** — **Estimate: M**
 
 ## 15. Acceptance Criteria
-- [ ] A new installation can create its first admin account safely.
+- [x] A new installation can create its first admin account safely.
 - [ ] An authenticated admin can view and manage services.
 - [ ] Start and stop actions run asynchronously without blocking the API.
 - [ ] Service status is visible and refreshes correctly.
