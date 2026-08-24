@@ -102,5 +102,5 @@ Error Catching: If Step 4 fails (e.g., the script returns an exit code other tha
 To configure the Cloudflare Tunnel securely, the token used in the input field requires specific API permissions. Ensure the generated setup script uses these scoped permissions:
 *   **Account -> Cloudflare Tunnel -> Edit** (To create and manage the tunnel configuration).
 *   **Zone -> DNS -> Edit** (To automatically point your public domains to the tunnel).
-
+(add this info to frontend where the admin setups the token)
 
