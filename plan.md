@@ -1,12 +1,12 @@
 # Homelab Management System Specification
 
 ## 1. Overview
-This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, vi[...]
+This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, vi[..[...]
 
 The frontend, API, and database should all run as Docker containers, while the host continues to run Docker and Bash scripts that manage the individual homelab apps.
 
 ## 2. Goals
-- Provide a simple dashboard for managing common homelab services, including: nginx-proxy-manager, netbird-vpn, home-assistant, cloudflare-tunnel, code-server, book-stack, file-browser, home-page, n8n, paperless, pihole, speedtest, and tailscale.
+- Provide a simple dashboard for managing common homelab services, including: nginx-proxy-manager, netbird-vpn, home-assistant, cloudflare-tunnel, code-server, book-stack, file-browser, home-page, n8n[...]
 - Support secure first-time admin setup and JWT-based authentication.
 - Allow service lifecycle control through safe host-level scripts.
 - Offer clear status visibility and basic operational feedback.
@@ -159,8 +159,8 @@ Preferred update strategies, in order:
 ## 13. Suggested Roadmap
 
 ### Milestone 1: Core Platform
-- [ ] Project scaffold
-- [ ] Docker Compose setup for frontend, API, and database
+- [x] Project scaffold
+- [x] Docker Compose setup for frontend, API, and database
 - [ ] Database schema
 - [ ] Authentication flow
 - [ ] First-time admin setup
@@ -209,11 +209,11 @@ Preferred update strategies, in order:
 ## 14. Implementation Tasks
 
 ### Phase A: Infrastructure and Containerization
-- [ ] Create a root `docker-compose.yml` for frontend, backend, and database. **Priority: P0** — **Estimate: L**
-- [ ] Add Dockerfiles for the Angular app and Node.js API. **Priority: P0** — **Estimate: M**
-- [ ] Define persistent volumes for the database and configuration data. **Priority: P0** — **Estimate: M**
-- [ ] Add container networking so the frontend can reach the API and the API can reach the database. **Priority: P0** — **Estimate: S**
-- [ ] Add environment variable handling for secrets, API URLs, and database connection settings. **Priority: P0** — **Estimate: M**
+- [x] Create a root `docker-compose.yml` for frontend, backend, and database. **Priority: P0** — **Estimate: L**
+- [x] Add Dockerfiles for the Angular app and Node.js API. **Priority: P0** — **Estimate: M**
+- [x] Define persistent volumes for the database and configuration data. **Priority: P0** — **Estimate: M**
+- [x] Add container networking so the frontend can reach the API and the API can reach the database. **Priority: P0** — **Estimate: S**
+- [x] Add environment variable handling for secrets, API URLs, and database connection settings. **Priority: P0** — **Estimate: M**
 
 ### Phase B: Database and Auth Foundation
 - [ ] Design the database schema for users, roles, settings, and service definitions. **Priority: P0** — **Estimate: M**
