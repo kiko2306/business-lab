@@ -1,0 +1,64 @@
+<section class="card border-0 shadow-sm">
+  <div class="card-body p-4">
+    <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start mb-3">
+      <div>
+        <h2 class="h4 mb-1">Cloudflare Tunnel token</h2>
+        <p class="text-body-secondary mb-0">
+          Store a scoped token for Cloudflare Tunnel operations and DNS updates.
+        </p>
+      </div>
+      <span class="badge" [ngClass]="configuredSettings?.configured ? 'text-bg-success' : 'text-bg-secondary'">
+        {{ configuredSettings?.configured ? 'Configured' : 'Not configured' }}
+      </span>
+    </div>
+
+    <div *ngIf="loading" class="d-flex align-items-center gap-2 text-body-secondary">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      Loading settings...
+    </div>
+
+    <ng-container *ngIf="!loading">
+      <div *ngIf="feedback" class="alert" [ngClass]="'alert-' + feedback.type">
+        {{ feedback.message }}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold" for="cloudflareToken">API token</label>
+        <div class="input-group">
+          <input
+            id="cloudflareToken"
+            class="form-control"
+            [type]="showToken ? 'text' : 'password'"
+            [placeholder]="configuredSettings?.tokenMasked ?? 'Enter Cloudflare API token'"
+            [formControl]="form.controls.token"
+            autocomplete="off"
+          />
+          <button type="button" class="btn btn-outline-secondary" (click)="showToken = !showToken">
+            {{ showToken ? 'Hide' : 'Show' }}
+          </button>
+        </div>
+        <div class="form-text">
+          {{ configuredSettings?.permissionExplanation }}
+        </div>
+        <div *ngIf="validationMessage() && (form.controls.token.touched || form.controls.token.dirty)" class="text-danger small mt-2">
+          {{ validationMessage() }}
+        </div>
+      </div>
+
+      <div class="current-token" *ngIf="configuredSettings?.configured">
+        Current saved token: <span>{{ configuredSettings?.tokenMasked }}</span>
+      </div>
+
+      <div class="d-flex flex-wrap gap-2 mt-3">
+        <button type="button" class="btn btn-primary" [disabled]="saving" (click)="save()">
+          <span *ngIf="saving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          Save token
+        </button>
+        <button type="button" class="btn btn-outline-primary" [disabled]="testing" (click)="testConnection()">
+          <span *ngIf="testing" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          Test connection
+        </button>
+      </div>
+    </ng-container>
+  </div>
+</section>

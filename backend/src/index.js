@@ -7,6 +7,7 @@ const cors = require('cors');
 
 const authRouter = require('./routes/auth');
 const servicesRouter = require('./routes/services');
+const settingsRouter = require('./routes/settings');
 const authMiddleware = require('./middleware/auth');
 const setupModeMiddleware = require('./middleware/setupMode');
 const rateLimit = require('express-rate-limit');
@@ -44,6 +45,7 @@ app.get('/api', (_req, res) => {
 
 // Services routes
 app.use('/api/services', servicesRouter);
+app.use('/api/settings', settingsRouter);
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars

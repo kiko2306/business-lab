@@ -164,14 +164,14 @@ Preferred update strategies, in order:
 - [x] Database schema
 - [x] Authentication flow
 - [x] First-time admin setup
-- [ ] Basic dashboard shell
+- [x] Basic dashboard shell
 
 ### Milestone 2: Service Management
 - [x] Service config loading
 - [x] Start/stop script execution
 - [x] Service status API
-- [ ] Frontend service grid
-- [ ] Loading and error states
+- [x] Frontend service grid
+- [x] Loading and error states
 
 ### Milestone 3: Administration
 - [x] Audit logs
@@ -229,11 +229,11 @@ Preferred update strategies, in order:
 - [x] Add structured logging for service operations. **Priority: P1** — **Estimate: M**
 
 ### Phase D: Frontend Dashboard
-- [ ] Build the login and first-time setup pages. **Priority: P0** — **Estimate: L**
-- [ ] Build the dashboard shell and service grid. **Priority: P0** — **Estimate: L**
-- [ ] Add start/stop buttons with loading states. **Priority: P0** — **Estimate: M**
-- [ ] Add status indicators and refresh behavior. **Priority: P0** — **Estimate: M**
-- [ ] Create the Cloudflare token settings panel. **Priority: P0** — **Estimate: M**
+- [x] Build the login and first-time setup pages. **Priority: P0** — **Estimate: L**
+- [x] Build the dashboard shell and service grid. **Priority: P0** — **Estimate: L**
+- [x] Add start/stop buttons with loading states. **Priority: P0** — **Estimate: M**
+- [x] Add status indicators and refresh behavior. **Priority: P0** — **Estimate: M**
+- [x] Create the Cloudflare token settings panel. **Priority: P0** — **Estimate: M**
 - [ ] Add admin user management screens. **Priority: P1** — **Estimate: L**
 
 ### Phase E: Operational Features
@@ -251,9 +251,9 @@ Preferred update strategies, in order:
 
 ## 15. Acceptance Criteria
 - [x] A new installation can create its first admin account safely.
-- [ ] An authenticated admin can view and manage services.
-- [ ] Start and stop actions run asynchronously without blocking the API.
-- [ ] Service status is visible and refreshes correctly.
-- [ ] Cloudflare token settings can be saved and updated.
+- [x] An authenticated admin can view and manage services.
+- [x] Start and stop actions run asynchronously without blocking the API.
+- [x] Service status is visible and refreshes correctly.
+- [x] Cloudflare token settings can be saved and updated.
 - [ ] The frontend, API, and database run in Docker containers.
 - [ ] The system is structured for backups and recovery.

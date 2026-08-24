@@ -1,0 +1,46 @@
+<article class="card h-100 border-0 shadow-sm service-card">
+  <div class="card-body d-flex flex-column">
+    <div class="d-flex align-items-start gap-3">
+      <div class="service-icon">{{ serviceIcon(service.icon) }}</div>
+      <div class="flex-grow-1">
+        <div class="d-flex flex-wrap align-items-center gap-2">
+          <h2 class="h5 mb-0">{{ service.label }}</h2>
+          <span class="badge text-bg-{{ stateBadge(service.state) }}">{{ service.state }}</span>
+          <span class="badge bg-white border" [ngClass]="healthClass()">{{ healthLabel() }}</span>
+        </div>
+        <p class="small text-body-secondary mt-2 mb-0">
+          {{ service.description }}
+        </p>
+      </div>
+    </div>
+
+    <div class="small text-body-secondary mt-3">
+      Last updated {{ service.lastChecked | date: 'shortTime' }}
+    </div>
+
+    <div *ngIf="service.error" class="alert alert-danger py-2 px-3 mt-3 mb-0 small">
+      {{ service.error }}
+    </div>
+
+    <div class="mt-auto d-flex gap-2 pt-3">
+      <button
+        type="button"
+        class="btn btn-success flex-grow-1"
+        [disabled]="loadingAction !== null || service.state === 'running' || service.state === 'starting'"
+        (click)="requestAction('start')"
+      >
+        <span *ngIf="loadingAction === 'start'" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        Start
+      </button>
+      <button
+        type="button"
+        class="btn btn-outline-danger flex-grow-1"
+        [disabled]="loadingAction !== null || service.state !== 'running'"
+        (click)="requestAction('stop')"
+      >
+        <span *ngIf="loadingAction === 'stop'" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        Stop
+      </button>
+    </div>
+  </div>
+</article>
