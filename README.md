@@ -1,1 +1,1 @@
-# home-lab-management
+# homelab-management
