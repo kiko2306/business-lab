@@ -7,6 +7,7 @@ const os = require('os');
 const { execFile } = require('child_process');
 const { query } = require('../utils/database');
 const { writeAuditLog } = require('../utils/audit');
+const logger = require('../utils/logger');
 
 const router = Router();
 
@@ -16,12 +17,36 @@ function safeBackupFileName(name) {
   return /^[a-zA-Z0-9._-]+$/.test(name);
 }
 
+function resolveBackupPath(fileName) {
+  if (!safeBackupFileName(fileName)) {
+    throw new Error('Invalid backup name.');
+  }
+  const basePath = path.resolve(BACKUP_DIR) + path.sep;
+  const resolvedPath = path.resolve(BACKUP_DIR, fileName);
+  if (!resolvedPath.startsWith(basePath)) {
+    throw new Error('Invalid backup path.');
+  }
+  return resolvedPath;
+}
+
 function runCommand(command, args, options = {}) {
   return new Promise((resolve, reject) => {
     execFile(command, args, { timeout: 120000, maxBuffer: 50 * 1024 * 1024, ...options }, (error, stdout, stderr) => {
       if (error) {
         reject(new Error(stderr || error.message));
         return;
+      }
+
+      function pgConnectionEnv() {
+        const dbUrl = new URL(process.env.DATABASE_URL);
+        return {
+          ...process.env,
+          PGHOST: dbUrl.hostname,
+          PGPORT: dbUrl.port || '5432',
+          PGUSER: decodeURIComponent(dbUrl.username),
+          PGPASSWORD: decodeURIComponent(dbUrl.password),
+          PGDATABASE: dbUrl.pathname.replace(/^\//, ''),
+        };
       }
       resolve(stdout);
     });
@@ -58,19 +83,20 @@ router.get('/', async (_req, res) => {
 
 router.post('/create', async (req, res) => {
   const userId = req.user.id;
+  let tmpDir = '';
 
   try {
     await ensureBackupDir();
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'homelab-backup-'));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'homelab-backup-'));
+    const pgEnv = pgConnectionEnv();
 
     const dbDumpPath = path.join(tmpDir, 'database.sql');
     const settingsPath = path.join(tmpDir, 'settings.json');
     const usersPath = path.join(tmpDir, 'users.json');
 
-    await runCommand('pg_dump', ['--no-owner', '--no-privileges', process.env.DATABASE_URL], {
-      env: process.env,
+    await runCommand('pg_dump', ['--no-owner', '--no-privileges', '--dbname', pgEnv.PGDATABASE], {
+      env: pgEnv,
       shell: false,
-      stdio: 'ignore',
     }).then((stdout) => fs.writeFile(dbDumpPath, stdout, 'utf8'));
 
     const settingsResult = await query(
@@ -89,7 +115,6 @@ router.post('/create', async (req, res) => {
     const archivePath = path.join(BACKUP_DIR, fileName);
     await runCommand('tar', ['-czf', archivePath, '-C', tmpDir, '.']);
 
-    await fs.rm(tmpDir, { recursive: true, force: true });
     await writeAuditLog({ userId, action: 'backup_create', resource: fileName, result: 'success' });
 
     return res.status(201).json({
@@ -99,17 +124,25 @@ router.post('/create', async (req, res) => {
     });
   } catch (error) {
     await writeAuditLog({ userId, action: 'backup_create', resource: 'backup', result: 'failure' }).catch(() => {});
-    return res.status(500).json({ error: 'Unable to create backup.', details: error.message });
+    logger.error('Backup creation failed', { error: error.message, userId });
+    return res.status(500).json({ error: 'Unable to create backup.' });
+  } finally {
+    if (tmpDir) {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 });
 
 router.get('/download/:fileName', async (req, res) => {
   const fileName = req.params.fileName;
-  if (!safeBackupFileName(fileName)) {
+  let backupPath = '';
+
+  try {
+    backupPath = resolveBackupPath(fileName);
+  } catch {
     return res.status(400).json({ error: 'Invalid backup name.' });
   }
 
-  const backupPath = path.join(BACKUP_DIR, fileName);
   try {
     await fs.access(backupPath);
     return res.download(backupPath, fileName);
@@ -121,21 +154,27 @@ router.get('/download/:fileName', async (req, res) => {
 router.post('/restore', async (req, res) => {
   const userId = req.user.id;
   const fileName = typeof req.body?.fileName === 'string' ? req.body.fileName : '';
+  let tmpDir = '';
 
   if (!safeBackupFileName(fileName)) {
     return res.status(400).json({ error: 'Invalid backup name.' });
   }
-
-  const backupPath = path.join(BACKUP_DIR, fileName);
+  let backupPath = '';
+  try {
+    backupPath = resolveBackupPath(fileName);
+  } catch {
+    return res.status(400).json({ error: 'Invalid backup name.' });
+  }
 
   try {
     await fs.access(backupPath);
+    const pgEnv = pgConnectionEnv();
 
-    const tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'homelab-restore-'));
+    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'homelab-restore-'));
     await runCommand('tar', ['-xzf', backupPath, '-C', tmpDir]);
 
     const sqlPath = path.join(tmpDir, 'database.sql');
-    await runCommand('psql', [process.env.DATABASE_URL, '-f', sqlPath], { env: process.env });
+    await runCommand('psql', ['--dbname', pgEnv.PGDATABASE, '-f', sqlPath], { env: pgEnv });
 
     const settingsPath = path.join(tmpDir, 'settings.json');
     const settingsRaw = await fs.readFile(settingsPath, 'utf8').catch(() => '[]');
@@ -153,12 +192,16 @@ router.post('/restore', async (req, res) => {
       }
     }
 
-    await fs.rm(tmpDir, { recursive: true, force: true });
     await writeAuditLog({ userId, action: 'backup_restore', resource: fileName, result: 'success' });
     return res.json({ message: 'Backup restored successfully.' });
   } catch (error) {
     await writeAuditLog({ userId, action: 'backup_restore', resource: fileName, result: 'failure' }).catch(() => {});
-    return res.status(500).json({ error: 'Unable to restore backup.', details: error.message });
+    logger.error('Backup restore failed', { error: error.message, userId, fileName });
+    return res.status(500).json({ error: 'Unable to restore backup.' });
+  } finally {
+    if (tmpDir) {
+      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
+    }
   }
 });
 

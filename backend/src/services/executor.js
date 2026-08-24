@@ -165,6 +165,7 @@ async function logAuditEvent(userId, action, resource, result, metadata = {}) {
       action,
       resource,
       result,
+      metadata,
     });
   } catch (error) {
     // Don't throw; audit logging is non-critical

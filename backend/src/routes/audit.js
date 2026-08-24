@@ -101,13 +101,15 @@ router.get('/export.csv', async (req, res) => {
   const { whereSql, values } = buildFilters(req.query);
 
   try {
+    const limit = 100000;
     const result = await query(
       `SELECT a.id, a.action, a.resource, a.result, a.created_at, u.username
        FROM audit_logs a
        LEFT JOIN users u ON u.id = a.user_id
        ${whereSql}
-       ORDER BY a.created_at DESC`,
-      values
+       ORDER BY a.created_at DESC
+       LIMIT $${values.length + 1}`,
+      [...values, limit]
     );
 
     const csv = toCsv(result.rows);

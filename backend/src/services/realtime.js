@@ -6,6 +6,7 @@ const { getAllServiceStatus } = require('./status');
 
 const STREAM_INTERVAL_MS = 15000;
 const wsClients = new Set();
+const streamTickets = new Map();
 
 function getTokenFromRequest(req) {
   const authHeader = req.headers['authorization'];
@@ -19,9 +20,27 @@ function getTokenFromRequest(req) {
 }
 
 function authenticateStreamRequest(req) {
+  if (typeof req.query?.ticket === 'string') {
+    const ticket = streamTickets.get(req.query.ticket);
+    if (ticket && ticket.expiresAt > Date.now()) {
+      return { id: ticket.userId };
+    }
+  }
+
   const token = getTokenFromRequest(req);
   if (!token) {
     return null;
+  }
+
+  function createStreamTicket(userId) {
+    for (const [key, value] of streamTickets.entries()) {
+      if (value.expiresAt <= Date.now()) {
+        streamTickets.delete(key);
+      }
+    }
+    const ticket = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+    streamTickets.set(ticket, { userId, expiresAt: Date.now() + 60 * 1000 });
+    return ticket;
   }
   try {
     return verifyAccessToken(token);
@@ -62,10 +81,9 @@ function initWebSocket(server) {
 
   wss.on('connection', async (socket, req) => {
     const query = new URL(req.url, 'http://localhost').searchParams;
-    const token = query.get('token');
-    try {
-      verifyAccessToken(token);
-    } catch {
+    const ticket = query.get('ticket');
+    const ticketPayload = ticket ? streamTickets.get(ticket) : null;
+    if (!ticketPayload || ticketPayload.expiresAt <= Date.now()) {
       socket.close(1008, 'Unauthorized');
       return;
     }
@@ -122,6 +140,7 @@ async function sseHandler(req, res) {
 }
 
 module.exports = {
+  createStreamTicket,
   initWebSocket,
   sseHandler,
 };

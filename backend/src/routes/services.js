@@ -4,17 +4,28 @@
  */
 
 const express = require('express');
-const router = express.Router();
+const rateLimit = require('express-rate-limit');
 const auth = require('../middleware/auth');
 const executor = require('../services/executor');
 const status = require('../services/status');
+const { createStreamTicket } = require('../services/realtime');
 const logger = require('../utils/logger');
+
+const router = express.Router();
+
+const serviceLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many service requests, please try again later.' },
+});
 
 /**
  * GET /api/services/status
  * Get status of all services
  */
-router.get('/status', auth, async (req, res) => {
+router.get('/status', serviceLimiter, auth, async (req, res) => {
   try {
     const serviceStatus = await status.getAllServiceStatus();
     res.json(serviceStatus);
@@ -30,11 +41,16 @@ router.get('/status', auth, async (req, res) => {
   }
 });
 
+router.post('/stream-ticket', serviceLimiter, auth, (req, res) => {
+  const ticket = createStreamTicket(req.user.id);
+  res.json({ ticket, expiresInSeconds: 60 });
+});
+
 /**
  * POST /api/services/:name/start
  * Start a service
  */
-router.post('/:name/start', auth, async (req, res) => {
+router.post('/:name/start', serviceLimiter, auth, async (req, res) => {
   const serviceName = req.params.name;
   const userId = req.user.id;
 
@@ -63,7 +79,7 @@ router.post('/:name/start', auth, async (req, res) => {
  * POST /api/services/:name/stop
  * Stop a service
  */
-router.post('/:name/stop', auth, async (req, res) => {
+router.post('/:name/stop', serviceLimiter, auth, async (req, res) => {
   const serviceName = req.params.name;
   const userId = req.user.id;
 

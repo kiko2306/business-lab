@@ -1,6 +1,6 @@
 import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { BehaviorSubject, EMPTY, Subscription, catchError, finalize, retry, switchMap, tap, timer } from 'rxjs';
+import { BehaviorSubject, EMPTY, Subscription, catchError, finalize, firstValueFrom, retry, switchMap, tap, timer } from 'rxjs';
 import { API_BASE_URL, extractErrorMessage } from './api';
 import { SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
 import { ConnectionStatus, ServiceStatus, ServiceStatusResponse, ServiceSummary } from './models';
@@ -33,6 +33,7 @@ export class ServiceStateService {
   private reconnectAttempt = 0;
   private websocket?: WebSocket;
   private eventSource?: EventSource;
+  private stopped = true;
 
   readonly services$ = this.servicesSubject.asObservable();
   readonly summary$ = this.summarySubject.asObservable();
@@ -42,12 +43,15 @@ export class ServiceStateService {
   readonly connectionStatus$ = this.connectionStatusSubject.asObservable();
 
   startPolling(): void {
+    this.stopped = false;
     this.stopPolling();
+    this.stopped = false;
     this.connectionStatusSubject.next('connecting');
-    this.connectWebSocket();
+    void this.connectWebSocket();
   }
 
   stopPolling(): void {
+    this.stopped = true;
     this.websocket?.close();
     this.websocket = undefined;
     this.eventSource?.close();
@@ -103,9 +107,13 @@ export class ServiceStateService {
     this.lastUpdatedSubject.next(response.timestamp);
   }
 
-  private connectWebSocket(): void {
-    const token = this.auth.getAccessToken();
-    if (!token) {
+  private async connectWebSocket(): Promise<void> {
+    if (this.stopped) {
+      return;
+    }
+
+    const ticket = await this.getStreamTicket();
+    if (!ticket) {
       this.startPollingFallback();
       return;
     }
@@ -116,10 +124,16 @@ export class ServiceStateService {
       ? API_BASE_URL.replace(/^http/, 'ws').replace(/\/api$/, '')
       : `${wsProtocol}//${loc.host}`;
 
-    this.websocket = new WebSocket(`${wsBase}/ws/services?token=${encodeURIComponent(token)}`);
+    this.websocket = new WebSocket(`${wsBase}/ws/services?ticket=${encodeURIComponent(ticket)}`);
 
     this.websocket.onopen = () => {
       this.reconnectAttempt = 0;
+      this.pollingSubscription?.unsubscribe();
+      this.pollingSubscription = undefined;
+      if (this.reconnectTimer) {
+        clearTimeout(this.reconnectTimer);
+        this.reconnectTimer = undefined;
+      }
       this.connectionStatusSubject.next('connected');
     };
 
@@ -137,20 +151,26 @@ export class ServiceStateService {
     };
 
     this.websocket.onclose = () => {
+      if (this.stopped) {
+        return;
+      }
       this.websocket = undefined;
-      this.connectSse();
+      void this.connectSse();
     };
   }
 
-  private connectSse(): void {
-    const token = this.auth.getAccessToken();
-    if (!token) {
+  private async connectSse(): Promise<void> {
+    if (this.stopped) {
+      return;
+    }
+    const ticket = await this.getStreamTicket();
+    if (!ticket) {
       this.startPollingFallback();
       return;
     }
 
     this.connectionStatusSubject.next('sse');
-    this.eventSource = new EventSource(`${API_BASE_URL}/services/stream?token=${encodeURIComponent(token)}`);
+    this.eventSource = new EventSource(`${API_BASE_URL}/services/stream?ticket=${encodeURIComponent(ticket)}`);
 
     const handler = (event: MessageEvent<string>) => {
       try {
@@ -189,8 +209,27 @@ export class ServiceStateService {
     this.reconnectAttempt += 1;
     this.reconnectTimer = setTimeout(() => {
       this.reconnectTimer = undefined;
-      this.connectWebSocket();
+      void this.connectWebSocket();
     }, delayMs);
+  }
+
+  private async getStreamTicket(): Promise<string | null> {
+    if (!this.auth.getAccessToken()) {
+      return null;
+    }
+
+    try {
+      const response = await firstValueFrom(
+        this.http.post<{ ticket: string }>(
+          `${API_BASE_URL}/services/stream-ticket`,
+          {},
+          { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+        )
+      );
+      return response.ticket;
+    } catch {
+      return null;
+    }
   }
 
   private runServiceAction(serviceName: string, action: 'start' | 'stop'): void {
