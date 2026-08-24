@@ -8,6 +8,15 @@ const cors = require('cors');
 const authRouter = require('./routes/auth');
 const authMiddleware = require('./middleware/auth');
 const setupModeMiddleware = require('./middleware/setupMode');
+const rateLimit = require('express-rate-limit');
+
+const apiLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -25,7 +34,7 @@ app.get('/health', (_req, res) => {
 app.use('/api/auth', authRouter);
 
 // All remaining /api routes require setup to be complete and a valid JWT
-app.use('/api', setupModeMiddleware(false), authMiddleware);
+app.use('/api', apiLimiter, setupModeMiddleware(false), authMiddleware);
 
 // API root
 app.get('/api', (_req, res) => {

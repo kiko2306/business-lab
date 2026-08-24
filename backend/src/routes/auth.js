@@ -1,6 +1,7 @@
 'use strict';
 
 const { Router } = require('express');
+const rateLimit = require('express-rate-limit');
 const { query } = require('../utils/database');
 const { hashPassword, verifyPassword } = require('../utils/password');
 const { signAccessToken, signRefreshToken, verifyRefreshToken, refreshTokenExpiryMs } = require('../utils/jwt');
@@ -9,10 +10,18 @@ const authMiddleware = require('../middleware/auth');
 
 const router = Router();
 
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000, // 15 minutes
+  max: 20,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
 // ---------------------------------------------------------------------------
 // POST /api/auth/setup — create the first admin user
 // ---------------------------------------------------------------------------
-router.post('/setup', setupModeMiddleware(true), async (req, res) => {
+router.post('/setup', authLimiter, setupModeMiddleware(true), async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || typeof username !== 'string' || username.trim().length < 3) {
@@ -59,7 +68,7 @@ router.post('/setup', setupModeMiddleware(true), async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/login
 // ---------------------------------------------------------------------------
-router.post('/login', async (req, res) => {
+router.post('/login', authLimiter, async (req, res) => {
   const { username, password } = req.body;
 
   if (!username || !password) {
@@ -101,7 +110,7 @@ router.post('/login', async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
-router.post('/logout', authMiddleware, async (req, res) => {
+router.post('/logout', authLimiter, authMiddleware, async (req, res) => {
   const { refreshToken } = req.body;
 
   if (refreshToken) {
@@ -130,7 +139,7 @@ router.post('/logout', authMiddleware, async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/refresh
 // ---------------------------------------------------------------------------
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', authLimiter, async (req, res) => {
   const { refreshToken } = req.body;
 
   if (!refreshToken) {
