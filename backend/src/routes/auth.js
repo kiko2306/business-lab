@@ -3,7 +3,7 @@
 const { Router } = require('express');
 const { query } = require('../utils/database');
 const { hashPassword, verifyPassword } = require('../utils/password');
-const { signAccessToken, signRefreshToken, verifyRefreshToken } = require('../utils/jwt');
+const { signAccessToken, signRefreshToken, verifyRefreshToken, refreshTokenExpiryMs } = require('../utils/jwt');
 const setupModeMiddleware = require('../middleware/setupMode');
 const authMiddleware = require('../middleware/auth');
 
@@ -35,7 +35,7 @@ router.post('/setup', setupModeMiddleware(true), async (req, res) => {
     const accessToken = signAccessToken({ id: user.id, username: user.username, role: user.role });
     const refreshToken = signRefreshToken({ id: user.id });
 
-    const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
     await query(
       'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
       [user.id, refreshToken, refreshExpiry]
@@ -80,7 +80,7 @@ router.post('/login', async (req, res) => {
     const accessToken = signAccessToken({ id: user.id, username: user.username, role: user.role });
     const refreshToken = signRefreshToken({ id: user.id });
 
-    const refreshExpiry = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
     await query(
       'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
       [user.id, refreshToken, refreshExpiry]
