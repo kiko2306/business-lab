@@ -65,9 +65,18 @@ auth_invalid_status=$(echo "$auth_invalid" | extract_status)
 assert_status "$auth_invalid_status" "422" "Auth validation rejects invalid input"
 
 setup_payload=$(printf '{"username":"%s","password":"%s"}' "$SMOKE_USER" "$SMOKE_PASSWORD")
-setup_response=$(request POST "/api/auth/setup" "$setup_payload")
-setup_status=$(echo "$setup_response" | extract_status)
-setup_body=$(echo "$setup_response" | extract_body)
+setup_response=""
+setup_status=""
+setup_body=""
+for _ in 1 2 3 4 5; do
+  setup_response=$(request POST "/api/auth/setup" "$setup_payload")
+  setup_status=$(echo "$setup_response" | extract_status)
+  setup_body=$(echo "$setup_response" | extract_body)
+  if [[ "$setup_status" != "500" ]]; then
+    break
+  fi
+  sleep 2
+done
 
 if [[ "$setup_status" == "201" ]]; then
   echo "✅ Setup flow created first admin"

@@ -27,6 +27,11 @@ wait_for_http() {
 }
 
 echo "Building and starting dockerized stack"
+echo "Installing backend runtime dependencies"
+(
+  cd "${ROOT_DIR}/backend"
+  npm install
+)
 echo "Building frontend static assets"
 (
   cd "${ROOT_DIR}/frontend"
