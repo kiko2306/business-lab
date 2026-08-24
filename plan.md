@@ -150,80 +150,80 @@ Preferred update strategies, in order:
 ## 13. Suggested Roadmap
 
 ### Milestone 1: Core Platform
-- Project scaffold
-- Docker Compose setup for frontend, API, and database
-- Database schema
-- Authentication flow
-- First-time admin setup
-- Basic dashboard shell
+- [ ] Project scaffold
+- [ ] Docker Compose setup for frontend, API, and database
+- [ ] Database schema
+- [ ] Authentication flow
+- [ ] First-time admin setup
+- [ ] Basic dashboard shell
 
 ### Milestone 2: Service Management
-- Service config loading
-- Start/stop script execution
-- Service status API
-- Frontend service grid
-- Loading and error states
+- [ ] Service config loading
+- [ ] Start/stop script execution
+- [ ] Service status API
+- [ ] Frontend service grid
+- [ ] Loading and error states
 
 ### Milestone 3: Administration
-- User management
-- Audit logs
-- Permission checks
-- Backup/export features
+- [ ] User management
+- [ ] Audit logs
+- [ ] Permission checks
+- [ ] Backup/export features
 
 ### Milestone 4: Reliability and UX
-- Health checks
-- Real-time updates
-- Recovery workflows
-- UI polish and mobile refinement
+- [ ] Health checks
+- [ ] Real-time updates
+- [ ] Recovery workflows
+- [ ] UI polish and mobile refinement
 
 ## 14. Implementation Tasks
 
 ### Phase A: Infrastructure and Containerization
-- Create a root `docker-compose.yml` for frontend, backend, and database.
-- Add Dockerfiles for the Angular app and Node.js API.
-- Define persistent volumes for the database and configuration data.
-- Add container networking so the frontend can reach the API and the API can reach the database.
-- Add environment variable handling for secrets, API URLs, and database connection settings.
+- [ ] Create a root `docker-compose.yml` for frontend, backend, and database. **Priority: P0** — **Estimate: L**
+- [ ] Add Dockerfiles for the Angular app and Node.js API. **Priority: P0** — **Estimate: M**
+- [ ] Define persistent volumes for the database and configuration data. **Priority: P0** — **Estimate: M**
+- [ ] Add container networking so the frontend can reach the API and the API can reach the database. **Priority: P0** — **Estimate: S**
+- [ ] Add environment variable handling for secrets, API URLs, and database connection settings. **Priority: P0** — **Estimate: M**
 
 ### Phase B: Database and Auth Foundation
-- Design the database schema for users, roles, settings, and service definitions.
-- Implement the first-admin bootstrap flow.
-- Add JWT login, logout, and route protection.
-- Create middleware for checking whether setup mode is still enabled.
+- [ ] Design the database schema for users, roles, settings, and service definitions. **Priority: P0** — **Estimate: M**
+- [ ] Implement the first-admin bootstrap flow. **Priority: P0** — **Estimate: L**
+- [ ] Add JWT login, logout, and route protection. **Priority: P0** — **Estimate: L**
+- [ ] Create middleware for checking whether setup mode is still enabled. **Priority: P0** — **Estimate: M**
 
 ### Phase C: Service Management Backend
-- Create an allowlisted service registry.
-- Implement start/stop endpoints using asynchronous `child_process` execution.
-- Add status aggregation logic for Docker container state and service metadata.
-- Normalize error handling and return consistent API responses.
-- Add structured logging for service operations.
+- [ ] Create an allowlisted service registry. **Priority: P0** — **Estimate: M**
+- [ ] Implement start/stop endpoints using asynchronous `child_process` execution. **Priority: P0** — **Estimate: L**
+- [ ] Add status aggregation logic for Docker container state and service metadata. **Priority: P0** — **Estimate: L**
+- [ ] Normalize error handling and return consistent API responses. **Priority: P1** — **Estimate: S**
+- [ ] Add structured logging for service operations. **Priority: P1** — **Estimate: M**
 
 ### Phase D: Frontend Dashboard
-- Build the login and first-time setup pages.
-- Build the dashboard shell and service grid.
-- Add start/stop buttons with loading states.
-- Add status indicators and refresh behavior.
-- Create the Cloudflare token settings panel.
-- Add admin user management screens.
+- [ ] Build the login and first-time setup pages. **Priority: P0** — **Estimate: L**
+- [ ] Build the dashboard shell and service grid. **Priority: P0** — **Estimate: L**
+- [ ] Add start/stop buttons with loading states. **Priority: P0** — **Estimate: M**
+- [ ] Add status indicators and refresh behavior. **Priority: P0** — **Estimate: M**
+- [ ] Create the Cloudflare token settings panel. **Priority: P0** — **Estimate: M**
+- [ ] Add admin user management screens. **Priority: P1** — **Estimate: L**
 
 ### Phase E: Operational Features
-- Add audit logging.
-- Add backup and restore workflows.
-- Add optional health checks.
-- Add WebSocket or SSE support for live updates.
-- Add recovery mode and admin reset tooling.
+- [ ] Add audit logging. **Priority: P1** — **Estimate: M**
+- [ ] Add backup and restore workflows. **Priority: P1** — **Estimate: L**
+- [ ] Add optional health checks. **Priority: P2** — **Estimate: L**
+- [ ] Add WebSocket or SSE support for live updates. **Priority: P2** — **Estimate: XL**
+- [ ] Add recovery mode and admin reset tooling. **Priority: P2** — **Estimate: M**
 
 ### Phase F: Hardening and Delivery
-- Add validation and security checks for all inputs.
-- Test Dockerized deployment end-to-end.
-- Document setup, deployment, and recovery steps.
-- Add smoke tests for the startup flow and service control APIs.
+- [ ] Add validation and security checks for all inputs. **Priority: P0** — **Estimate: M**
+- [ ] Test Dockerized deployment end-to-end. **Priority: P0** — **Estimate: L**
+- [ ] Document setup, deployment, and recovery steps. **Priority: P1** — **Estimate: M**
+- [ ] Add smoke tests for the startup flow and service control APIs. **Priority: P1** — **Estimate: M**
 
 ## 15. Acceptance Criteria
-- A new installation can create its first admin account safely.
-- An authenticated admin can view and manage services.
-- Start and stop actions run asynchronously without blocking the API.
-- Service status is visible and refreshes correctly.
-- Cloudflare token settings can be saved and updated.
-- The frontend, API, and database run in Docker containers.
-- The system is structured for backups and recovery.
+- [ ] A new installation can create its first admin account safely.
+- [ ] An authenticated admin can view and manage services.
+- [ ] Start and stop actions run asynchronously without blocking the API.
+- [ ] Service status is visible and refreshes correctly.
+- [ ] Cloudflare token settings can be saved and updated.
+- [ ] The frontend, API, and database run in Docker containers.
+- [ ] The system is structured for backups and recovery.
