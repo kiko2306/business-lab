@@ -1,12 +1,12 @@
 # Homelab Management System Specification
 
 ## 1. Overview
-This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, viewing their status, and managing runtime settings.
+This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, vi[...]
 
 The frontend, API, and database should all run as Docker containers, while the host continues to run Docker and Bash scripts that manage the individual homelab apps.
 
 ## 2. Goals
-- Provide a simple dashboard for managing common homelab services.
+- Provide a simple dashboard for managing common homelab services, including: nginx-proxy-manager, netbird-vpn, home-assistant, cloudflare-tunnel, code-server, book-stack, file-browser, home-page, n8n, paperless, pihole, speedtest, and tailscale.
 - Support secure first-time admin setup and JWT-based authentication.
 - Allow service lifecycle control through safe host-level scripts.
 - Offer clear status visibility and basic operational feedback.
@@ -28,7 +28,16 @@ The project should follow a predictable layout:
 │   ├── /nginx-proxy-manager
 │   ├── /netbird-vpn
 │   ├── /home-assistant
-│   └── /cloudflare-tunnel
+│   ├── /cloudflare-tunnel
+│   ├── /code-server
+│   ├── /book-stack
+│   ├── /file-browser
+│   ├── /home-page
+│   ├── /n8n
+│   ├── /paperless
+│   ├── /pihole
+│   ├── /speedtest
+│   └── /tailscale
 ├── /scripts
 │   ├── start-container.sh
 │   ├── stop-container.sh
