@@ -38,7 +38,7 @@ Service Start Sequence Diagram
           |                             |  3. Run:                 |
           |                             |     start-container.sh   |
           |                             |     [app-name]           |
-          |                             |---------\                |
+          |                             |---------\\                |
           |                             |         | (Docker Spins  |
           |                             |         |  Up Container) |
           |                             |         |< /             |
@@ -50,8 +50,8 @@ Service Start Sequence Diagram
           |  5. HTTP 200 OK Response    |                          |
           |<----------------------------|                          |
           |                             |                          |
-          |  6. Trigger Status Refresh  |                          |
-          |---------\                   |                          |
+          |  6. Trigger Status Refresh  |
+          |---------\\                   |                          |
           |         | (Polling / WS)    |                          |
           |         |< /                |                          |
           |                             |                          |
@@ -67,16 +67,15 @@ Service Start Sequence Diagram
           |<----------------------------|                          |
           |                             |                          |
           |  11. Update UI Grid         |                          |
-          |      (Green Indicator)      |                          |
-          |---------\                   |                          |
+          |      (Green Indicator)      |
+          |---------\\                   |                          |
           |         |                   |                          |
           |         |< /                |                          |
           |                             |                          |
 
 
 Asynchronous Handling: Step 2 must use an asynchronous execution method (like exec or spawn) so the API doesn't lock up or timeout if the Docker container takes a few seconds to initialize.
-Error Catching: If Step 4 fails (e.g., the script returns an exit code other than 0), the API should catch the stderr stream and return an HTTP 500 Internal Server Error containing the exact Docker error message to display on the frontend.
-
+Error Catching: If Step 4 fails (e.g., the script returns an exit code other than 0), the API should catch the stderr stream and return an HTTP 500 Internal Server Error containing the exact Docker error message for debugging.
 
 ## Functional Requirements & User Flows
 
@@ -102,5 +101,104 @@ Error Catching: If Step 4 fails (e.g., the script returns an exit code other tha
 To configure the Cloudflare Tunnel securely, the token used in the input field requires specific API permissions. Ensure the generated setup script uses these scoped permissions:
 *   **Account -> Cloudflare Tunnel -> Edit** (To create and manage the tunnel configuration).
 *   **Zone -> DNS -> Edit** (To automatically point your public domains to the tunnel).
-(add this info to frontend where the admin setups the token)
 
+
+## Suggested Improvements to Add
+
+### 1. MVP Scope
+Split the project into phases:
+- **MVP**: admin bootstrap, login/logout, service list, start/stop actions, status refresh, Cloudflare token settings.
+- **Phase 2**: audit logs, health checks, WebSocket updates, backups, and export/import.
+- **Nice-to-have**: service templates, theming, mobile layout refinements.
+
+### 2. Service Metadata Configuration
+Instead of hardcoding services, define a config file per service with:
+- service name
+- folder path
+- docker compose file
+- display label
+- icon
+- healthcheck method
+
+### 3. Better Status Model
+Use richer service states:
+- `running`
+- `stopped`
+- `starting`
+- `error`
+- `unknown`
+
+### 4. Health Checks
+Do not rely only on `docker ps`. Prefer:
+- Docker API/container status
+- app-level health endpoint
+- optional uptime and restart count
+
+### 5. Command Safety
+Because scripts will be executed from the API:
+- use an allowlist of service names
+- validate and normalize paths
+- never pass raw user input directly to shell commands
+- log every command execution
+
+### 6. UI Feedback for Actions
+When a user starts/stops a service:
+- disable the button while the action runs
+- show a spinner/progress indicator
+- show success/failure toast messages
+- auto-refresh status after the action completes
+
+### 7. Audit Logging
+Track:
+- who started/stopped which service
+- time of action
+- success/failure
+- error output summary
+
+### 8. Setup Flow Isolation
+Make first-time setup explicit:
+- middleware checks if an admin exists
+- if not, only allow `/setup`
+- after setup, lock it down or require an emergency recovery mode for re-entry
+
+### 9. Backup and Persistence Plan
+Add support for:
+- database backups
+- config backups
+- export/import of settings
+- recovery steps if the host fails
+
+### 10. Cloudflare Token UX
+Improve the settings panel with:
+- masked token input
+- show/hide toggle
+- test connection button
+- validation feedback
+- explanation of required permissions
+
+### 11. API Design Details
+Specify:
+- request/response format
+- error format
+- auth requirements per endpoint
+- rate limiting on auth endpoints
+
+### 12. Docker Compose Standardization
+If each app folder contains a `compose.yml`, scripts can standardize on:
+- `docker compose up -d`
+- `docker compose down`
+- `docker compose pull && docker compose up -d`
+
+### 13. Recovery / Admin Reset
+Add a local recovery path:
+- reset admin password from CLI
+- re-enable setup mode if no users exist
+- emergency local-only access mode
+
+### 14. Real-Time Updates
+Use:
+- WebSockets
+- Server-Sent Events
+- polling fallback
+
+That gives a smoother dashboard experience.
