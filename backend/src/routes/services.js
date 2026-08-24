@@ -9,6 +9,8 @@ const auth = require('../middleware/auth');
 const executor = require('../services/executor');
 const status = require('../services/status');
 const { createStreamTicket } = require('../services/realtime');
+const { isValidServiceName } = require('../config/services');
+const { schemas, validateParams } = require('../middleware/validation');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -20,6 +22,13 @@ const serviceLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many service requests, please try again later.' },
 });
+
+function validateServiceAllowlist(req, res, next) {
+  if (!isValidServiceName(req.params.name)) {
+    return res.status(400).json({ error: 'Invalid service name' });
+  }
+  return next();
+}
 
 /**
  * GET /api/services/status
@@ -50,7 +59,7 @@ router.post('/stream-ticket', serviceLimiter, auth, (req, res) => {
  * POST /api/services/:name/start
  * Start a service
  */
-router.post('/:name/start', serviceLimiter, auth, async (req, res) => {
+router.post('/:name/start', serviceLimiter, auth, validateParams(schemas.serviceNameParam), validateServiceAllowlist, async (req, res) => {
   const serviceName = req.params.name;
   const userId = req.user.id;
 
@@ -79,7 +88,7 @@ router.post('/:name/start', serviceLimiter, auth, async (req, res) => {
  * POST /api/services/:name/stop
  * Stop a service
  */
-router.post('/:name/stop', serviceLimiter, auth, async (req, res) => {
+router.post('/:name/stop', serviceLimiter, auth, validateParams(schemas.serviceNameParam), validateServiceAllowlist, async (req, res) => {
   const serviceName = req.params.name;
   const userId = req.user.id;
 

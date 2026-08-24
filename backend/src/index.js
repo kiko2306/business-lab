@@ -1,9 +1,14 @@
 'use strict';
 
-require('dotenv').config();
+try {
+  require('dotenv').config();
+} catch {
+  // dotenv is optional in containerized runtime where env vars are injected directly.
+}
 
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
 
 const authRouter = require('./routes/auth');
 const servicesRouter = require('./routes/services');
@@ -35,9 +40,46 @@ const streamLimiter = rateLimit({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-const allowedOrigin = process.env.CORS_ORIGIN || process.env.API_URL || 'http://localhost:4200';
-app.use(cors({ origin: allowedOrigin }));
-app.use(express.json());
+const allowedOrigins = (process.env.CORS_ORIGIN || process.env.API_URL || 'http://localhost:4200')
+  .split(',')
+  .map((origin) => origin.trim())
+  .filter(Boolean);
+
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin || allowedOrigins.includes(origin)) {
+      callback(null, true);
+      return;
+    }
+    callback(new Error('Origin not allowed by CORS policy'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Authorization', 'Content-Type'],
+  credentials: false,
+};
+
+const mutationLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 60,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => !['POST', 'PUT', 'PATCH', 'DELETE'].includes(req.method),
+  message: { error: 'Too many mutation requests, please try again later' },
+});
+
+app.use(helmet({
+  contentSecurityPolicy: {
+    useDefaults: false,
+    directives: {
+      defaultSrc: ["'none'"],
+      frameAncestors: ["'none'"],
+    },
+  },
+  crossOriginResourcePolicy: { policy: 'cross-origin' },
+}));
+app.use(cors(corsOptions));
+app.use(express.json({ limit: process.env.REQUEST_BODY_LIMIT || '32kb' }));
+app.use(mutationLimiter);
 
 // Health check — always available
 app.get('/health', (_req, res) => {
@@ -67,8 +109,11 @@ app.use('/api/health', healthRouter);
 // Global error handler
 // eslint-disable-next-line no-unused-vars
 app.use((err, _req, res, _next) => {
+  if (err?.message === 'Origin not allowed by CORS policy') {
+    return res.status(403).json({ error: 'CORS origin denied' });
+  }
   console.error('Unhandled error:', err.message);
-  res.status(500).json({ error: 'Internal server error' });
+  return res.status(500).json({ error: 'Internal server error' });
 });
 
 const server = app.listen(PORT, () => {

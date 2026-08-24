@@ -32,6 +32,8 @@
             [placeholder]="configuredSettings?.tokenMasked ?? 'Enter Cloudflare API token'"
             [formControl]="form.controls.token"
             autocomplete="off"
+            maxlength="4096"
+            (paste)="sanitizeTokenPaste($event)"
           />
           <button type="button" class="btn btn-outline-secondary" (click)="showToken = !showToken">
             {{ showToken ? 'Hide' : 'Show' }}
@@ -50,7 +52,7 @@
       </div>
 
       <div class="d-flex flex-wrap gap-2 mt-3">
-        <button type="button" class="btn btn-primary" [disabled]="saving" (click)="save()">
+        <button type="button" class="btn btn-primary" [disabled]="saving || form.invalid" (click)="save()">
           <span *ngIf="saving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
           Save token
         </button>

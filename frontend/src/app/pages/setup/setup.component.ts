@@ -5,6 +5,7 @@ import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
+import { sanitizePastedText } from '../../core/input-sanitize';
 import { ToastService } from '../../core/toast.service';
 
 @Component({
@@ -21,13 +22,21 @@ export class SetupComponent {
   private readonly toastService = inject(ToastService);
 
   protected readonly form = this.formBuilder.nonNullable.group({
-    username: ['', [Validators.required, Validators.minLength(3)]],
-    password: ['', [Validators.required, Validators.minLength(8)]],
-    confirmPassword: ['', [Validators.required]],
+    username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
+    password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(128)]],
+    confirmPassword: ['', [Validators.required, Validators.maxLength(128)]],
   });
 
   protected submitting = false;
   protected errorMessage = '';
+
+  sanitizePaste(event: ClipboardEvent, controlName: 'username' | 'password' | 'confirmPassword', maxLength: number): void {
+    const pasted = event.clipboardData?.getData('text') ?? '';
+    const sanitized = sanitizePastedText(pasted, maxLength, controlName === 'username');
+    event.preventDefault();
+    this.form.controls[controlName].setValue(sanitized);
+    this.form.controls[controlName].markAsDirty();
+  }
 
   submit(): void {
     if (this.form.invalid) {

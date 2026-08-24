@@ -4,6 +4,7 @@ const { Router } = require('express');
 const os = require('os');
 const { execFile } = require('child_process');
 const { query } = require('../utils/database');
+const { schemas, validateBody } = require('../middleware/validation');
 
 const router = Router();
 
@@ -55,14 +56,8 @@ router.get('/thresholds', async (_req, res) => {
   }
 });
 
-router.put('/thresholds', async (req, res) => {
-  const diskPercent = Number.parseFloat(req.body?.diskPercent);
-  const memoryPercent = Number.parseFloat(req.body?.memoryPercent);
-  const loadPerCpu = Number.parseFloat(req.body?.loadPerCpu);
-
-  if (!Number.isFinite(diskPercent) || !Number.isFinite(memoryPercent) || !Number.isFinite(loadPerCpu)) {
-    return res.status(400).json({ error: 'All thresholds must be numeric values.' });
-  }
+router.put('/thresholds', validateBody(schemas.healthThresholds), async (req, res) => {
+  const { diskPercent, memoryPercent, loadPerCpu } = req.body;
 
   try {
     await Promise.all([

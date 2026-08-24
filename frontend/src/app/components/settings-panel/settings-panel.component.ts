@@ -3,6 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
+import { sanitizePastedText } from '../../core/input-sanitize';
 import { CloudflareSettings } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
@@ -20,7 +21,7 @@ export class SettingsPanelComponent implements OnInit {
   private readonly toastService = inject(ToastService);
 
   protected readonly form = this.formBuilder.nonNullable.group({
-    token: ['', [Validators.minLength(20)]],
+    token: ['', [Validators.minLength(20), Validators.maxLength(4096)]],
   });
 
   protected configuredSettings: CloudflareSettings | null = null;
@@ -29,6 +30,14 @@ export class SettingsPanelComponent implements OnInit {
   protected saving = false;
   protected testing = false;
   protected feedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+
+  sanitizeTokenPaste(event: ClipboardEvent): void {
+    const pasted = event.clipboardData?.getData('text') ?? '';
+    const sanitized = sanitizePastedText(pasted, 4096);
+    event.preventDefault();
+    this.form.controls.token.setValue(sanitized);
+    this.form.controls.token.markAsDirty();
+  }
 
   ngOnInit(): void {
     this.loadSettings();
@@ -97,6 +106,9 @@ export class SettingsPanelComponent implements OnInit {
 
     if (control.hasError('minlength')) {
       return 'Use the full Cloudflare API token.';
+    }
+    if (control.hasError('maxlength')) {
+      return 'Token is too long.';
     }
 
     return null;

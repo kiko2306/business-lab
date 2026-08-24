@@ -7,6 +7,7 @@ const { hashPassword, verifyPassword } = require('../utils/password');
 const { signAccessToken, signRefreshToken, verifyRefreshToken, refreshTokenExpiryMs } = require('../utils/jwt');
 const setupModeMiddleware = require('../middleware/setupMode');
 const authMiddleware = require('../middleware/auth');
+const { schemas, validateBody } = require('../middleware/validation');
 const { writeAuditLog } = require('../utils/audit');
 
 const router = Router();
@@ -22,15 +23,8 @@ const authLimiter = rateLimit({
 // ---------------------------------------------------------------------------
 // POST /api/auth/setup — create the first admin user
 // ---------------------------------------------------------------------------
-router.post('/setup', authLimiter, setupModeMiddleware(true), async (req, res) => {
+router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schemas.authSetup), async (req, res) => {
   const { username, password } = req.body;
-
-  if (!username || typeof username !== 'string' || username.trim().length < 3) {
-    return res.status(400).json({ error: 'Username must be at least 3 characters' });
-  }
-  if (!password || typeof password !== 'string' || password.length < 8) {
-    return res.status(400).json({ error: 'Password must be at least 8 characters' });
-  }
 
   try {
     const passwordHash = await hashPassword(password);
@@ -69,12 +63,8 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), async (req, res) =
 // ---------------------------------------------------------------------------
 // POST /api/auth/login
 // ---------------------------------------------------------------------------
-router.post('/login', authLimiter, async (req, res) => {
+router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req, res) => {
   const { username, password } = req.body;
-
-  if (!username || !password) {
-    return res.status(400).json({ error: 'Username and password are required' });
-  }
 
   try {
     const result = await query(
@@ -113,7 +103,7 @@ router.post('/login', authLimiter, async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
-router.post('/logout', authLimiter, authMiddleware, async (req, res) => {
+router.post('/logout', authLimiter, authMiddleware, validateBody(schemas.authLogout), async (req, res) => {
   const { refreshToken } = req.body;
 
   if (refreshToken) {
@@ -139,12 +129,8 @@ router.post('/logout', authLimiter, authMiddleware, async (req, res) => {
 // ---------------------------------------------------------------------------
 // POST /api/auth/refresh
 // ---------------------------------------------------------------------------
-router.post('/refresh', authLimiter, async (req, res) => {
+router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (req, res) => {
   const { refreshToken } = req.body;
-
-  if (!refreshToken) {
-    return res.status(400).json({ error: 'Refresh token is required' });
-  }
 
   try {
     const decoded = verifyRefreshToken(refreshToken);

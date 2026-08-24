@@ -8,6 +8,17 @@ const STREAM_INTERVAL_MS = 15000;
 const wsClients = new Set();
 const streamTickets = new Map();
 
+function createStreamTicket(userId) {
+  for (const [key, value] of streamTickets.entries()) {
+    if (value.expiresAt <= Date.now()) {
+      streamTickets.delete(key);
+    }
+  }
+  const ticket = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
+  streamTickets.set(ticket, { userId, expiresAt: Date.now() + 60 * 1000 });
+  return ticket;
+}
+
 function getTokenFromRequest(req) {
   const authHeader = req.headers['authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) {
@@ -32,16 +43,6 @@ function authenticateStreamRequest(req) {
     return null;
   }
 
-  function createStreamTicket(userId) {
-    for (const [key, value] of streamTickets.entries()) {
-      if (value.expiresAt <= Date.now()) {
-        streamTickets.delete(key);
-      }
-    }
-    const ticket = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 14)}`;
-    streamTickets.set(ticket, { userId, expiresAt: Date.now() + 60 * 1000 });
-    return ticket;
-  }
   try {
     return verifyAccessToken(token);
   } catch {

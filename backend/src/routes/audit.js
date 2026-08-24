@@ -2,6 +2,7 @@
 
 const { Router } = require('express');
 const { query } = require('../utils/database');
+const { schemas, validateQuery } = require('../middleware/validation');
 
 const router = Router();
 
@@ -62,7 +63,7 @@ function toCsv(rows) {
   return lines.join('\n');
 }
 
-router.get('/', async (req, res) => {
+router.get('/', validateQuery(schemas.auditQuery), async (req, res) => {
   const page = parsePaging(req.query.page, 1);
   const pageSize = Math.min(parsePaging(req.query.pageSize, 20), 100);
   const offset = (page - 1) * pageSize;
@@ -97,7 +98,7 @@ router.get('/', async (req, res) => {
   }
 });
 
-router.get('/export.csv', async (req, res) => {
+router.get('/export.csv', validateQuery(schemas.auditQuery), async (req, res) => {
   const { whereSql, values } = buildFilters(req.query);
 
   try {
