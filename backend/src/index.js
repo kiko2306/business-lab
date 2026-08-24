@@ -8,7 +8,8 @@ const cors = require('cors');
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-app.use(cors());
+const allowedOrigin = process.env.CORS_ORIGIN || process.env.API_URL || 'http://localhost:4200';
+app.use(cors({ origin: allowedOrigin }));
 app.use(express.json());
 
 // Health check

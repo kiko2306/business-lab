@@ -9,7 +9,6 @@ RUN npm ci
 
 # Copy source and build
 COPY . .
-ARG API_URL=http://localhost:3000
 RUN npx ng build --configuration production --base-href /
 
 # ---- Runtime stage ----

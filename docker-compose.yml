@@ -5,8 +5,6 @@ services:
     build:
       context: ./frontend
       dockerfile: Dockerfile
-      args:
-        API_URL: ${API_URL:-http://localhost:3000}
     image: homelab-frontend
     ports:
       - "${FRONTEND_PORT:-80}:80"
@@ -26,8 +24,9 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 3000
-      DATABASE_URL: ${DATABASE_URL:-postgresql://homelab:${POSTGRES_PASSWORD:-changeme}@database:5432/homelab}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://homelab:${POSTGRES_PASSWORD}@database:5432/homelab}
       JWT_SECRET: ${JWT_SECRET}
+      CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:80}
       SCRIPTS_DIR: /scripts
     volumes:
       - scripts-data:/scripts:ro
@@ -43,7 +42,7 @@ services:
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-homelab}
       POSTGRES_USER: ${POSTGRES_USER:-homelab}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
     volumes:
       - db-data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
