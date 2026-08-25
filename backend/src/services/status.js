@@ -8,23 +8,62 @@ const { exec } = require('child_process');
 const https = require('https');
 const http = require('http');
 const logger = require('../utils/logger');
-const { getAllServices, getService } = require('../config/services');
+const { getAllServices, getService, getProjectName, resolveComposeFile } = require('../config/services');
 
 /**
- * Get container status from docker ps
+ * Get the aggregated state of a compose project's containers.
+ * Matching is done on the compose project label rather than container names,
+ * because compose prefixes/suffixes the names it generates.
  */
-function getContainerStatus(containerName) {
+function getContainerStatus(projectName) {
   return new Promise((resolve) => {
-    const command = `docker ps -a --filter "name=${containerName}" --format "{{.State}}" 2>/dev/null | head -n1`;
+    const command = `docker ps -a --filter "label=com.docker.compose.project=${projectName}" --format "{{.State}}"`;
     exec(command, (error, stdout) => {
       if (error) {
         resolve('unknown');
+        return;
+      }
+
+      const states = stdout
+        .trim()
+        .split('\n')
+        .map((line) => line.trim().toLowerCase())
+        .filter(Boolean);
+
+      if (!states.length) {
+        resolve('unknown');
+      } else if (states.every((state) => state === 'running')) {
+        resolve('running');
+      } else if (states.some((state) => ['running', 'restarting', 'created'].includes(state))) {
+        // Partially up, e.g. a dependency is still coming online.
+        resolve('starting');
       } else {
-        const state = stdout.trim().toLowerCase();
-        resolve(state || 'unknown');
+        resolve('stopped');
       }
     });
   });
+}
+
+/**
+ * Health check URLs in the service registry are written from the host's point
+ * of view (localhost:PORT). The backend runs in a container, where localhost is
+ * the backend itself, so the host must be substituted.
+ */
+function resolveHealthUrl(rawUrl) {
+  const healthHost = process.env.SERVICE_HEALTH_HOST;
+  if (!healthHost) {
+    return rawUrl;
+  }
+
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+      url.hostname = healthHost;
+    }
+    return url.toString();
+  } catch {
+    return rawUrl;
+  }
 }
 
 /**
@@ -68,27 +107,19 @@ async function getServiceStatus(serviceName) {
 
   try {
     // Get container state
-    const containerName = serviceName.replace(/[_-]/g, '_');
-    const containerState = await getContainerStatus(containerName);
+    const containerState = await getContainerStatus(getProjectName(serviceName));
 
-    // Normalize Docker state to our status enum
-    let state = containerState;
-    if (containerState === 'running') {
-      state = 'running';
-    } else if (containerState === 'exited') {
-      state = 'stopped';
-    } else if (containerState === 'restarting') {
-      state = 'starting';
-    } else {
-      state = 'unknown';
-    }
+    // `compose down` removes containers, so an installed app with no containers
+    // is stopped rather than unknown. Uninstalled apps stay unknown.
+    const installed = Boolean(resolveComposeFile(serviceName)?.composeFile);
+    const state = containerState === 'unknown' && installed ? 'stopped' : containerState;
 
     // Check health if enabled
     let healthy = false;
     if (service.healthCheck && service.healthCheck.enabled && state === 'running') {
       if (service.healthCheck.type === 'http') {
         healthy = await checkHealthHttp(
-          service.healthCheck.url,
+          resolveHealthUrl(service.healthCheck.url),
           service.healthCheck.timeout
         );
       }

@@ -83,7 +83,7 @@ router.put('/thresholds', validateBody(schemas.healthThresholds), async (req, re
   }
 });
 
-router.get('/', async (_req, res) => {
+async function systemHealthHandler(_req, res) {
   try {
     const [dbResult, thresholds, diskPercent] = await Promise.all([
       query('SELECT 1 AS ok'),
@@ -122,6 +122,12 @@ router.get('/', async (_req, res) => {
   } catch {
     return res.status(500).json({ error: 'Unable to run health checks.' });
   }
-});
+}
+
+// `/` keeps the legacy /api/health contract working, while `/system` is the
+// path used when the router is mounted at the root (where GET /health is the
+// public liveness probe).
+router.get('/', systemHealthHandler);
+router.get('/system', systemHealthHandler);
 
 module.exports = router;

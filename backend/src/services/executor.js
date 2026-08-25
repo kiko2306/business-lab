@@ -5,7 +5,6 @@
  */
 
 const { exec } = require('child_process');
-const path = require('path');
 const logger = require('../utils/logger');
 const { writeAuditLog } = require('../utils/audit');
 
@@ -37,7 +36,7 @@ function executeCommand(command, timeout = 30000) {
  * Start a service using docker compose up
  */
 async function startService(serviceName, userId) {
-  const { getService, isValidServiceName } = require('../config/services');
+  const { isValidServiceName, resolveComposeFile } = require('../config/services');
 
   if (!isValidServiceName(serviceName)) {
     throw {
@@ -46,15 +45,21 @@ async function startService(serviceName, userId) {
     };
   }
 
-  const service = getService(serviceName);
-  const composePath = path.join(process.cwd(), service.composePath);
+  const { projectName, appDir, composeFile } = resolveComposeFile(serviceName);
+
+  if (!composeFile) {
+    throw {
+      statusCode: 404,
+      message: `Service ${serviceName} is not installed: no compose file found in ${appDir}`,
+    };
+  }
 
   try {
     const startTime = new Date();
     logger.info(`Starting service: ${serviceName}`, { userId, service: serviceName });
 
     // Execute docker compose up -d
-    const command = `cd ${path.dirname(composePath)} && docker compose -f ${path.basename(composePath)} up -d`;
+    const command = `docker compose -p ${projectName} -f ${composeFile} up -d`;
     const result = await executeCommand(command, 60000); // 60s timeout for startup
 
     // Log the successful operation
@@ -98,7 +103,7 @@ async function startService(serviceName, userId) {
  * Stop a service using docker compose down
  */
 async function stopService(serviceName, userId) {
-  const { getService, isValidServiceName } = require('../config/services');
+  const { isValidServiceName, resolveComposeFile } = require('../config/services');
 
   if (!isValidServiceName(serviceName)) {
     throw {
@@ -107,15 +112,21 @@ async function stopService(serviceName, userId) {
     };
   }
 
-  const service = getService(serviceName);
-  const composePath = path.join(process.cwd(), service.composePath);
+  const { projectName, appDir, composeFile } = resolveComposeFile(serviceName);
+
+  if (!composeFile) {
+    throw {
+      statusCode: 404,
+      message: `Service ${serviceName} is not installed: no compose file found in ${appDir}`,
+    };
+  }
 
   try {
     const startTime = new Date();
     logger.info(`Stopping service: ${serviceName}`, { userId, service: serviceName });
 
     // Execute docker compose down
-    const command = `cd ${path.dirname(composePath)} && docker compose -f ${path.basename(composePath)} down`;
+    const command = `docker compose -p ${projectName} -f ${composeFile} down`;
     const result = await executeCommand(command, 60000); // 60s timeout for shutdown
 
     // Log the successful operation

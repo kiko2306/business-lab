@@ -9,6 +9,8 @@ RUN npm install
 
 # Copy source and build
 COPY . .
+ARG API_URL
+RUN node -e "const fs = require('fs'); const apiUrl = process.env.API_URL || ''; fs.writeFileSync('src/environments/environment.production.ts', 'export const environment = ' + JSON.stringify({ apiUrl }) + ' as const;\n');"
 RUN npm run build -- --configuration production --base-href /
 
 # ---- Runtime stage ----

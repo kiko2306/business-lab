@@ -15,12 +15,43 @@ Homelab Management is a Dockerized Angular + Node.js/PostgreSQL system for opera
 ## Quick start
 
 1. Copy `.env.example` to `.env` and set secure values (`JWT_SECRET`, `JWT_REFRESH_SECRET`, `POSTGRES_PASSWORD`).
-2. Start services:
+2. Set `APPS_DIR` to the **absolute** path of this repository's `apps/` directory, and `DOCKER_GID` to the host's docker group id:
+   ```bash
+   echo "APPS_DIR=$PWD/apps" >> .env
+   echo "DOCKER_GID=$(getent group docker | cut -d: -f3)" >> .env
+   ```
+3. Start services:
    ```bash
    docker compose up -d --build
    ```
-3. Open the frontend at `http://localhost:${FRONTEND_PORT:-80}`.
-4. If first run, complete `/setup` to create the first admin account.
+4. Open the frontend at `http://localhost:${FRONTEND_PORT:-80}`.
+5. If first run, complete `/setup` to create the first admin account.
+
+## Managed app stacks
+
+Each app under `apps/<name>/` is an independent Docker Compose stack that the
+backend starts and stops on your behalf.
+
+- `APPS_DIR` is bind-mounted read-only into the backend at the *same absolute
+  path* as on the host, so relative paths inside an app's compose file resolve
+  identically inside and outside the container.
+- The host Docker socket is mounted into the backend so it can drive the daemon.
+  **This grants the backend root-equivalent control of the host** — only expose
+  the API to trusted users.
+- Apps with required secrets ship a `.env.example`. Copy it to `.env` in the same
+  directory; Compose loads it automatically:
+  ```bash
+  cp apps/nginx-proxy-manager/.env.example apps/nginx-proxy-manager/.env
+  # then edit the placeholder values
+  ```
+  The backend runs as a non-root user, so that file must be readable by the
+  docker group:
+  ```bash
+  chgrp "$(getent group docker | cut -d: -f3)" apps/nginx-proxy-manager/.env
+  chmod 640 apps/nginx-proxy-manager/.env
+  ```
+- Apps listed in the registry without a directory in `apps/` report as `unknown`
+  and return HTTP 404 when started.
 
 ## Validation and smoke tests
 
@@ -32,3 +63,30 @@ Homelab Management is a Dockerized Angular + Node.js/PostgreSQL system for opera
   ```bash
   ./scripts/docker-e2e-test.sh
   ```
+
+## Known issues / TODO
+
+- [ ] **Backups are broken** — `POST /backups/create` fails with `spawn pg_dump ENOENT`.
+      `pg_dump`/`pg_restore` are not installed in the backend image; add
+      `postgresql-client` to `backend/Dockerfile`.
+- [ ] **Rate limiting keys on the proxy IP** — behind Cloudflare the backend logs
+      `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`. Express `trust proxy` is unset, so
+      `express-rate-limit` cannot identify real clients and limits are applied to
+      the proxy rather than per user.
+- [ ] **Docker socket exposure** — the backend mounts `/var/run/docker.sock`,
+      granting it root-equivalent control of the host. Consider a socket proxy
+      restricted to the required endpoints, and keep the API off the public
+      internet or behind strict authentication.
+- [ ] **Registry lists apps that are not installed** — 11 of the 13 entries in
+      `backend/src/config/services.js` have no directory under `apps/`. They render
+      as `unknown` tiles and return HTTP 404 when started. Either add the compose
+      stacks or trim the registry.
+- [ ] **Health check URLs assume host ports** — entries use `localhost:<port>` and
+      are rewritten via `SERVICE_HEALTH_HOST`. Apps published on a non-default
+      port, or not published to the host at all, will report `check failed`.
+- [ ] **Per-app secrets are managed manually** — each `apps/<name>/.env` must be
+      created from its `.env.example` and made readable by the docker group.
+      Compose silently substitutes empty strings for missing variables, which
+      surfaces as a confusing container start failure.
+- [ ] **`version:` key is obsolete** — the root and app compose files still declare
+      `version:`, which Docker Compose warns about on every invocation.

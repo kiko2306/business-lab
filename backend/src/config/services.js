@@ -4,6 +4,18 @@
  * Only services in this allowlist can be controlled via the API.
  */
 
+const fs = require('fs');
+const path = require('path');
+
+// Compose files are named inconsistently across upstream projects, so each
+// app directory is probed for any of the filenames Docker Compose accepts.
+const COMPOSE_FILENAMES = [
+  'compose.yaml',
+  'compose.yml',
+  'docker-compose.yml',
+  'docker-compose.yaml',
+];
+
 const SERVICES = {
   'nginx-proxy-manager': {
     name: 'nginx-proxy-manager',
@@ -182,9 +194,53 @@ function isValidServiceName(name) {
   return name && typeof name === 'string' && SERVICES.hasOwnProperty(name);
 }
 
+/**
+ * Root directory holding the managed app stacks. Mounted at the same absolute
+ * path inside the container as on the host.
+ */
+function getAppsDir() {
+  return process.env.APPS_DIR || path.join(process.cwd(), 'apps');
+}
+
+/**
+ * Compose project name for a service, derived from its app directory so that
+ * containers can be matched back to the service via compose labels.
+ */
+function getProjectName(name) {
+  const service = getService(name);
+  return service ? path.basename(path.dirname(service.composePath)) : null;
+}
+
+/**
+ * Locate a service's compose file on disk.
+ * Returns `composeFile: null` when the app is not installed.
+ */
+function resolveComposeFile(name) {
+  const service = getService(name);
+  if (!service) {
+    return null;
+  }
+
+  const projectName = path.basename(path.dirname(service.composePath));
+  const appDir = path.join(getAppsDir(), projectName);
+  const configured = path.basename(service.composePath);
+
+  for (const candidate of [configured, ...COMPOSE_FILENAMES]) {
+    const composeFile = path.join(appDir, candidate);
+    if (fs.existsSync(composeFile)) {
+      return { projectName, appDir, composeFile };
+    }
+  }
+
+  return { projectName, appDir, composeFile: null };
+}
+
 module.exports = {
   SERVICES,
   getAllServices,
   getService,
   isValidServiceName,
+  getAppsDir,
+  getProjectName,
+  resolveComposeFile,
 };

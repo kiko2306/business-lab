@@ -48,7 +48,7 @@ export class OperationsService {
   }
 
   getHealth(): Observable<HealthStatus> {
-    return this.http.get<HealthStatus>(`${API_BASE_URL}/health`);
+    return this.http.get<HealthStatus>(`${API_BASE_URL}/health/system`);
   }
 
   getRecoveryStatus(): Observable<{ enabled: boolean }> {

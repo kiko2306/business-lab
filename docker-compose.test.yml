@@ -1,3 +1,5 @@
+name: homelab-test
+
 services:
   frontend:
     image: nginx:1.27-alpine

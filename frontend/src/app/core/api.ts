@@ -1,9 +1,12 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { environment } from '../../environments/environment';
 
-const browserLocation = globalThis.location;
-const apiOrigin = browserLocation?.port === '4200' ? 'http://localhost:3000' : '';
+const configuredApiUrl = environment.apiUrl.trim().replace(/\/+$/, '');
 
-export const API_BASE_URL = `${apiOrigin}/api`;
+// When an absolute API URL is configured the backend is addressed directly, so
+// routes live at its root (e.g. https://api.example.com/auth/login). Without
+// one, requests are same-origin and go through the nginx /api/ proxy.
+export const API_BASE_URL = configuredApiUrl || '/api';
 
 export function extractErrorMessage(
   error: unknown,

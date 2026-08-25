@@ -86,25 +86,45 @@ app.get('/health', (_req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
-// Auth routes (setup/login are partially gated inside the router)
-app.use('/api/auth', authRouter);
-app.use('/api/recovery', recoveryRouter);
-app.get('/api/services/stream', streamLimiter, sseHandler);
-
-// All remaining /api routes require setup to be complete and a valid JWT
-app.use('/api', apiLimiter, setupModeMiddleware(false), authMiddleware);
-
-// API root
-app.get('/api', (_req, res) => {
-  res.json({ message: 'Homelab API v1' });
+// Ping check — always available, unauthenticated
+app.get('/ping', (_req, res) => {
+  res.status(200).json({ statusCode: 200, message: 'Pong' });
 });
 
-// Services routes
-app.use('/api/services', servicesRouter);
-app.use('/api/settings', settingsRouter);
-app.use('/api/audit-logs', auditRouter);
-app.use('/api/backups', backupRouter);
-app.use('/api/health', healthRouter);
+// Ping check — always available, unauthenticated
+app.get('/ping', (_req, res) => {
+  res.status(200).json({ statusCode: 200, message: 'Pong' });
+});
+
+// Every router is served both at the root (e.g. /auth/login) and under the
+// legacy /api prefix (e.g. /api/auth/login) so that deployments pointing a
+// dedicated API hostname at this server do not need the redundant /api segment.
+const ROUTE_PREFIXES = ['', '/api'];
+
+const protectedGate = () => [apiLimiter, setupModeMiddleware(false), authMiddleware];
+
+for (const prefix of ROUTE_PREFIXES) {
+  // Auth routes (setup/login are partially gated inside the router)
+  app.use(`${prefix}/auth`, authRouter);
+  app.use(`${prefix}/recovery`, recoveryRouter);
+  // The SSE stream authenticates via a short-lived ticket, so it must be
+  // registered before the JWT gate below.
+  app.get(`${prefix}/services/stream`, streamLimiter, sseHandler);
+
+  // API root
+  app.get(prefix || '/', ...protectedGate(), (_req, res) => {
+    res.json({ message: 'Homelab API v1' });
+  });
+
+  // Remaining routes require setup to be complete and a valid JWT
+  app.use(`${prefix}/services`, ...protectedGate(), servicesRouter);
+  app.use(`${prefix}/settings`, ...protectedGate(), settingsRouter);
+  app.use(`${prefix}/audit-logs`, ...protectedGate(), auditRouter);
+  app.use(`${prefix}/backups`, ...protectedGate(), backupRouter);
+  // Mounted after the public liveness probe above, so GET /health stays public
+  // while GET /health/system and /health/thresholds remain protected.
+  app.use(`${prefix}/health`, ...protectedGate(), healthRouter);
+}
 
 // Global error handler
 // eslint-disable-next-line no-unused-vars
