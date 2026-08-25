@@ -261,3 +261,96 @@ Preferred update strategies, in order:
 - [x] Cloudflare token settings can be saved and updated.
 - [x] The frontend, API, and database run in Docker containers.
 - [x] The system is structured for backups and recovery.
+
+## 16. Planned: First-Start Public Exposure Provisioning
+
+### 16.1 Goal
+When a user starts a managed container from the frontend for the first time, the
+backend should automatically expose it through Nginx Proxy Manager and ensure
+Cloudflare Tunnel has a matching public hostname route pointing traffic to
+Nginx.
+
+Because the homelab uses a dynamic public IP, the first implementation should
+use Cloudflare Tunnel public hostnames instead of public `A`/`AAAA` DNS records.
+Service hostnames should be derived as `<service>.<base-domain>`, for example
+`paperless.example.com`.
+
+### 16.2 Current State
+- The Angular dashboard starts services through `ServiceStateService` and
+  `POST /api/services/:name/start`.
+- The backend service route calls `executor.startService(serviceName, userId)`.
+- Services are defined in `backend/src/config/services.js`.
+- Cloudflare API token storage and verification already exists in
+  `backend/src/routes/settings.js`.
+- Nginx Proxy Manager has a compose stack under `apps/nginx-proxy-manager/`.
+- `cloudflare-tunnel` exists in the backend service registry, but
+  `apps/cloudflare-tunnel/` still needs to be added.
+
+### 16.3 Required Configuration
+- Cloudflare account ID, zone ID, and tunnel ID/name, or permission to discover
+  them from the API token and base domain.
+- Base domain used to derive public hostnames as `<service>.<base-domain>`.
+- Cloudflare Tunnel token stored/configured from the dashboard.
+- Nginx Proxy Manager admin API URL reachable from the backend.
+- Nginx Proxy Manager credentials or API token.
+- Cloudflare Tunnel origin URL for Nginx Proxy Manager, for example
+  `http://nginx-proxy-manager:80` or another URL reachable by `cloudflared`.
+- Per-service upstream scheme, host, port, websocket support, and whether
+  exposure is enabled by default.
+- TLS/certificate preference for Nginx Proxy Manager.
+
+### 16.4 Implementation Plan
+1. Fix and verify service start prerequisites.
+   - Check `backend/src/services/executor.js` helper scoping before wiring
+     provisioning into service starts.
+   - Preserve current validation, error handling, and audit logging patterns.
+2. Add exposure metadata.
+   - Add a DB-backed or registry-backed exposure config with base domain,
+     derived hostname, upstream scheme/host/port, exposure enabled flag, and
+     optional TLS settings.
+   - Validate hostnames, ports, URLs, and policy fields.
+3. Add the Cloudflare Tunnel app stack and dashboard configuration.
+   - Add `apps/cloudflare-tunnel/compose.yaml` and `.env.example` for running
+     `cloudflared` in Docker using a tunnel token.
+   - Add backend settings endpoints for base domain, account/zone/tunnel
+     identifiers, tunnel token, and Nginx origin URL.
+   - Add dashboard controls to configure, mask, save, and test the tunnel
+     settings.
+4. Add a Nginx Proxy Manager client.
+   - Authenticate to Nginx Proxy Manager.
+   - Idempotently find, create, or update proxy hosts for service hostnames.
+   - Store NPM endpoint and credentials safely in settings.
+5. Add a Cloudflare Tunnel client.
+   - Reuse the stored Cloudflare token.
+   - Discover or use configured account, zone, and tunnel identifiers.
+   - Idempotently ensure Cloudflare Tunnel public hostname routes so
+     `<service>.<base-domain>` routes to the Nginx Proxy Manager origin.
+6. Add provisioning orchestration.
+   - After `docker compose up -d` succeeds, run provisioning once for services
+     with exposure enabled.
+   - Persist provisioning state in Postgres with service name, hostname, NPM
+     object ID, Cloudflare object IDs, status, last error, and timestamps.
+   - Return provisioning details or warnings in the start-service response and
+     audit log the outcome.
+7. Update frontend service feedback.
+   - Show exposure/provisioning status on service cards or in a details panel.
+   - Surface warnings if the container starts but provisioning is incomplete.
+8. Update API and operational documentation.
+   - Document new settings endpoints, service exposure fields, Cloudflare/NPM
+     permissions, and failure modes.
+9. Validate.
+   - Add targeted backend or smoke coverage for provisioning idempotency and
+     validation.
+   - Build the Angular frontend when UI changes are made.
+   - Test against mocked or dry-run external APIs before using live credentials.
+
+### 16.5 Default Behavior
+- Exposure should be opt-in per service.
+- Public hostnames should use `<service>.<base-domain>`.
+- Provisioning should be idempotent and look up existing Nginx Proxy Manager and
+  Cloudflare Tunnel objects by hostname before creating anything.
+- A container start should succeed if Docker starts successfully, even when
+  external provisioning fails. The API should return a warning and store/audit
+  the provisioning failure instead of silently ignoring it.
+- Cloudflare Access and dynamic DNS updates are deferred until after the
+  Cloudflare Tunnel + Nginx Proxy Manager flow is working.

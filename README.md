@@ -66,6 +66,30 @@ backend starts and stops on your behalf.
 
 ## Known issues / TODO
 
+- [ ] **First-start exposure provisioning** — when a service is started from the
+      frontend for the first time, provision the matching Nginx Proxy Manager
+      host and Cloudflare Tunnel public hostname route. See
+      [`plan.md`](./plan.md#16-planned-first-start-public-exposure-provisioning).
+      - [ ] Fix and verify `backend/src/services/executor.js` service-start
+            prerequisite helper scoping before adding provisioning.
+      - [ ] Add exposure metadata for base domain, derived
+            `<service>.<base-domain>` hostname, upstream scheme/host/port,
+            exposure enabled flag, and TLS settings.
+      - [ ] Add `apps/cloudflare-tunnel/compose.yaml` and `.env.example` for a
+            dashboard-configured Cloudflare Tunnel token.
+      - [ ] Add dashboard/backend settings for Cloudflare account, zone, tunnel,
+            tunnel token, base domain, and Nginx origin URL.
+      - [ ] Add dashboard/backend settings for Nginx Proxy Manager API URL and
+            credentials.
+      - [ ] Add a Nginx Proxy Manager client that idempotently finds, creates,
+            or updates proxy hosts.
+      - [ ] Add a Cloudflare Tunnel client that idempotently ensures public
+            hostname routes to Nginx Proxy Manager.
+      - [ ] Persist provisioning state and return/audit provisioning warnings
+            when Docker startup succeeds but external provisioning fails.
+      - [ ] Show exposure/provisioning status and warnings in the frontend.
+      - [ ] Document new API/settings fields and add targeted smoke or backend
+            coverage for idempotent provisioning.
 - [ ] **Backups are broken** — `POST /backups/create` fails with `spawn pg_dump ENOENT`.
       `pg_dump`/`pg_restore` are not installed in the backend image; add
       `postgresql-client` to `backend/Dockerfile`.
