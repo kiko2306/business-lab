@@ -84,9 +84,8 @@ backend starts and stops on your behalf.
 - [ ] **Health check URLs assume host ports** — entries use `localhost:<port>` and
       are rewritten via `SERVICE_HEALTH_HOST`. Apps published on a non-default
       port, or not published to the host at all, will report `check failed`.
-- [ ] **Per-app secrets are managed manually** — each `apps/<name>/.env` must be
-      created from its `.env.example` and made readable by the docker group.
-      Compose silently substitutes empty strings for missing variables, which
-      surfaces as a confusing container start failure.
+- [x] **Per-app secrets are validated before service actions** — the backend now
+      checks each service `apps/<name>/.env` and required compose variables
+      before `start`/`stop`, returning a clear 400 error listing missing keys.
 - [ ] **`version:` key is obsolete** — the root and app compose files still declare
       `version:`, which Docker Compose warns about on every invocation.

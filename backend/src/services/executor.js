@@ -5,6 +5,8 @@
  */
 
 const { exec } = require('child_process');
+const fs = require('fs');
+const path = require('path');
 const logger = require('../utils/logger');
 const { writeAuditLog } = require('../utils/audit');
 
@@ -27,6 +29,65 @@ function executeCommand(command, timeout = 30000) {
           stdout: stdout || '',
           stderr: stderr || '',
         });
+      }
+
+      function requiredSecretsFromCompose(composeFilePath) {
+        const composeContent = fs.readFileSync(composeFilePath, 'utf8');
+        const matches = composeContent.match(/\$\{([A-Z0-9_]+)\}/g) || [];
+        return [...new Set(matches.map((token) => token.slice(2, -1)))];
+      }
+
+      function parseEnvFile(envFilePath) {
+        const envContent = fs.readFileSync(envFilePath, 'utf8');
+        const lines = envContent.split(/\r?\n/);
+        const values = {};
+
+        for (const line of lines) {
+          const trimmed = line.trim();
+          if (!trimmed || trimmed.startsWith('#')) {
+            continue;
+          }
+          const eqIndex = trimmed.indexOf('=');
+          if (eqIndex <= 0) {
+            continue;
+          }
+          const key = trimmed.slice(0, eqIndex).trim();
+          const value = trimmed.slice(eqIndex + 1).trim();
+          values[key] = value;
+        }
+
+        return values;
+      }
+
+      function ensureServiceSecrets(serviceName, appDir, composeFile) {
+        const envFilePath = path.join(appDir, '.env');
+        const requiredSecrets = requiredSecretsFromCompose(composeFile).filter((name) => !name.includes(':-'));
+
+        if (!requiredSecrets.length) {
+          return;
+        }
+
+        if (!fs.existsSync(envFilePath)) {
+          throw {
+            statusCode: 400,
+            message: `Service ${serviceName} is missing ${envFilePath}. Copy .env.example to .env and set required values.`,
+            details: `Missing .env for ${serviceName}`,
+          };
+        }
+
+        const envValues = parseEnvFile(envFilePath);
+        const missing = requiredSecrets.filter((key) => {
+          const value = envValues[key];
+          return value === undefined || value === '';
+        });
+
+        if (missing.length) {
+          throw {
+            statusCode: 400,
+            message: `Service ${serviceName} has missing required secrets in .env`,
+            details: `Unset keys: ${missing.join(', ')}`,
+          };
+        }
       }
     });
   });
@@ -53,6 +114,8 @@ async function startService(serviceName, userId) {
       message: `Service ${serviceName} is not installed: no compose file found in ${appDir}`,
     };
   }
+
+  ensureServiceSecrets(serviceName, appDir, composeFile);
 
   try {
     const startTime = new Date();
@@ -120,6 +183,8 @@ async function stopService(serviceName, userId) {
       message: `Service ${serviceName} is not installed: no compose file found in ${appDir}`,
     };
   }
+
+  ensureServiceSecrets(serviceName, appDir, composeFile);
 
   try {
     const startTime = new Date();
