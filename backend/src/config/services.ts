@@ -205,6 +205,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     healthCheck: {
       enabled: false,
     },
+    // Portainer prints a one-time initial-admin setup token to its logs on
+    // first start (`setup_token=<value>`), valid for 5 minutes.
+    setupToken: {
+      logPattern: 'setup_token=(\\S+)',
+    },
   },
   'vaultwarden': {
     name: 'vaultwarden',

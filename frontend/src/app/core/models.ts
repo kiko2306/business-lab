@@ -18,6 +18,7 @@ export interface ServiceStatus {
   healthy: boolean;
   lastChecked: string;
   error?: string;
+  setupTokenSupported?: boolean;
 }
 
 export interface ServiceSummary {

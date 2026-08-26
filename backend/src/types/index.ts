@@ -24,6 +24,13 @@ export interface ServiceExposureEnvKeys {
   allowedHosts?: string[];
 }
 
+export interface ServiceSetupToken {
+  // Regex with one capture group, applied to the container's full logs, to
+  // pull out a one-time first-run setup token/password some images print
+  // (e.g. Portainer's `setup_token=<value>`).
+  logPattern: string;
+}
+
 export interface ServiceDefinition {
   name: string;
   label: string;
@@ -32,6 +39,7 @@ export interface ServiceDefinition {
   composePath: string;
   healthCheck: ServiceHealthCheck;
   exposureEnvKeys?: ServiceExposureEnvKeys;
+  setupToken?: ServiceSetupToken;
 }
 
 export type ServiceState = 'running' | 'stopped' | 'starting' | 'error' | 'unknown';
@@ -45,6 +53,7 @@ export interface ServiceStatusPayload {
   healthy: boolean;
   lastChecked?: Date;
   error?: string;
+  setupTokenSupported?: boolean;
 }
 
 export interface ServiceStatusSummary {

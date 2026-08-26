@@ -85,6 +85,10 @@ export class OperationsService {
     return this.http.get<ServiceEnvStatus>(`${API_BASE_URL}/services/${serviceName}/env`);
   }
 
+  getServiceSetupToken(serviceName: string): Observable<{ token: string | null }> {
+    return this.http.get<{ token: string | null }>(`${API_BASE_URL}/services/${serviceName}/setup-token`);
+  }
+
   updateServiceEnv(serviceName: string, values: Record<string, string>): Observable<{ message: string } & ServiceEnvStatus> {
     return this.http.put<{ message: string } & ServiceEnvStatus>(`${API_BASE_URL}/services/${serviceName}/env`, {
       values,

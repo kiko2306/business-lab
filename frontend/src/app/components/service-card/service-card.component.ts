@@ -37,6 +37,10 @@ export class ServiceCardComponent {
   protected env: ServiceEnvStatus | null = null;
   protected envValues: Record<string, string> = {};
 
+  protected setupTokenLoading = false;
+  protected setupToken: string | null = null;
+  protected setupTokenCopied = false;
+
   requestAction(action: 'start' | 'stop'): void {
     this.actionRequested.emit(action);
   }
@@ -101,6 +105,30 @@ export class ServiceCardComponent {
     if (this.envPanelOpen && !this.env) {
       this.loadEnv();
     }
+    if (this.envPanelOpen && this.service.setupTokenSupported && this.setupToken === null) {
+      this.loadSetupToken();
+    }
+  }
+
+  loadSetupToken(): void {
+    this.setupTokenLoading = true;
+    this.operations
+      .getServiceSetupToken(this.service.name)
+      .pipe(finalize(() => (this.setupTokenLoading = false)))
+      .subscribe({
+        next: (result) => (this.setupToken = result.token),
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load setup token.')),
+      });
+  }
+
+  copySetupToken(): void {
+    if (!this.setupToken) {
+      return;
+    }
+    navigator.clipboard.writeText(this.setupToken).then(() => {
+      this.setupTokenCopied = true;
+      setTimeout(() => (this.setupTokenCopied = false), 2000);
+    });
   }
 
   loadEnv(): void {

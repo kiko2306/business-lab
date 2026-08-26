@@ -13,6 +13,7 @@ import { isValidServiceName } from '../config/services';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
+import { getServiceSetupToken } from '../services/setupToken';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
 import { HttpError } from '../types';
@@ -287,6 +288,29 @@ router.put(
       logger.error(`Failed to save env config: ${req.params.name}`, { error: httpError.message });
       const statusCode = httpError.statusCode || 500;
       return res.status(statusCode).json({ error: httpError.message || 'Unable to save configuration.' });
+    }
+  }
+);
+
+/**
+ * GET /api/services/:name/setup-token
+ * Read a service's one-time first-run setup token from its container logs
+ * (currently only Portainer — see setupToken in config/services.ts). Returns
+ * { token: null } for services that don't support this or have no token
+ * available right now (setup already done, container not running, etc.).
+ */
+router.get(
+  '/:name/setup-token',
+  auth,
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  async (req: Request, res: Response) => {
+    try {
+      const token = await getServiceSetupToken(req.params.name);
+      return res.json({ token });
+    } catch (error) {
+      logger.error(`Failed to read setup token: ${req.params.name}`, { error: (error as Error).message });
+      return res.status(500).json({ error: 'Unable to read setup token.' });
     }
   }
 );
