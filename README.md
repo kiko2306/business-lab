@@ -101,7 +101,7 @@ backend starts and stops on your behalf.
       granting it root-equivalent control of the host. Consider a socket proxy
       restricted to the required endpoints, and keep the API off the public
       internet or behind strict authentication.
-- [ ] **Registry lists apps that are not installed** — 11 of the 13 entries in
+- [x] **Registry lists apps that are not installed** — 11 of the 13 entries in
       `backend/src/config/services.js` have no directory under `apps/`. They render
       as `unknown` tiles and return HTTP 404 when started. Either add the compose
       stacks or trim the registry.
