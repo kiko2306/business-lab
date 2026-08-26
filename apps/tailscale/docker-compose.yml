@@ -1,0 +1,19 @@
+version: "3.9"
+
+services:
+  tailscale:
+    image: tailscale/tailscale:latest
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TAILSCALE_AUTH_KEY}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_USERSPACE: "true"
+    volumes:
+      - tailscale-data:/var/lib/tailscale
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+
+volumes:
+  tailscale-data:
+    driver: local
