@@ -1,0 +1,25 @@
+
+services:
+  vikunja:
+    image: vikunja/vikunja:latest
+    restart: unless-stopped
+    ports:
+      - "${VIKUNJA_PORT:-3456}:3456"
+    environment:
+      VIKUNJA_SERVICE_PUBLICURL: ${VIKUNJA_PUBLIC_URL:-http://localhost:3456}
+      VIKUNJA_SERVICE_JWTSECRET: ${VIKUNJA_JWT_SECRET}
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=Vikunja"
+      - "homepage.icon=vikunja.png"
+      - "homepage.href=http://localhost:${VIKUNJA_PORT:-3456}"
+      - "homepage.description=Task and project management"
+    volumes:
+      - ./data/db:/db
+      - ./data/files:/app/vikunja/files
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3456/api/v1/info || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

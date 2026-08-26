@@ -1,0 +1,23 @@
+
+services:
+  watchtower:
+    image: containrrr/watchtower:latest
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+      # Checks for new images on this interval (seconds). Default: daily.
+      WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
+      # Pulls the new image, recreates the container with it, then removes
+      # the old image — otherwise old versions pile up on disk forever.
+      WATCHTOWER_CLEANUP: "true"
+      # Only updates containers that don't opt out (see below) — everything
+      # this dashboard manages is watched by default.
+      WATCHTOWER_LABEL_ENABLE: "false"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Watchtower"
+      - "homepage.icon=watchtower.png"
+      - "homepage.href=#"
+      - "homepage.description=Automatic container image updates (no web UI)"

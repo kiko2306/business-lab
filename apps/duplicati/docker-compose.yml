@@ -1,0 +1,30 @@
+
+services:
+  duplicati:
+    image: lscr.io/linuxserver/duplicati:latest
+    restart: unless-stopped
+    ports:
+      - "${DUPLICATI_PORT:-8200}:8200"
+    environment:
+      PUID: ${PUID:-1000}
+      PGID: ${PGID:-1000}
+      TZ: ${TZ:-UTC}
+      SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_SETTINGS_ENCRYPTION_KEY}
+      DUPLICATI__WEBSERVICE_PASSWORD: ${DUPLICATI_WEB_PASSWORD}
+    labels:
+      - "homepage.group=Monitoring & Backup"
+      - "homepage.name=Duplicati"
+      - "homepage.icon=duplicati.png"
+      - "homepage.href=http://localhost:${DUPLICATI_PORT:-8200}"
+      - "homepage.description=Encrypted offsite/cloud backup"
+    volumes:
+      - ./data/config:/config
+      - ./data/backups:/backups
+      # Add read-only mounts of whatever you actually want backed up, e.g.:
+      # - ${APPS_DIR}:/source/apps:ro
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8200"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s

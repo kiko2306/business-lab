@@ -14,6 +14,11 @@ services:
     networks:
       - homelab-net
     restart: unless-stopped
+    # Opt out of Watchtower (apps/watchtower): this is the dashboard managing
+    # everything else, and it shouldn't get auto-updated/restarted out from
+    # under itself. Also a locally built image with no upstream tag to pull.
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
   backend:
     build:
@@ -52,6 +57,7 @@ services:
       # Compose files themselves are only ever read, never written, by
       # backend code.
       - ${APPS_DIR:?APPS_DIR must be set to an absolute path in .env}:${APPS_DIR}
+      - backups-data:/app/backups
     depends_on:
       database:
         condition: service_healthy
@@ -60,6 +66,9 @@ services:
     networks:
       - homelab-net
     restart: unless-stopped
+    # See the frontend service above — same reasoning.
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
   # Scopes the backend's Docker access instead of mounting the raw host
   # socket into it directly. Only the categories `docker ps` and
@@ -91,6 +100,10 @@ services:
     restart: unless-stopped
     # Not published to the host — only reachable from other containers on
     # homelab-net, by service name.
+    # Opt out of Watchtower (apps/watchtower): recreating this mid-request
+    # would break the backend's active Docker API connection.
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
   database:
     image: postgres:16-alpine
@@ -110,11 +123,17 @@ services:
       timeout: 5s
       retries: 5
     # database is NOT exposed on host ports intentionally
+    # Opt out of Watchtower (apps/watchtower): unattended Postgres image
+    # swaps are not something to run without reviewing release notes first.
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
 volumes:
   db-data:
     driver: local
   scripts-data:
+    driver: local
+  backups-data:
     driver: local
 
 networks:

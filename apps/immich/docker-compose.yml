@@ -1,0 +1,77 @@
+
+services:
+  immich-server:
+    image: ghcr.io/immich-app/immich-server:release
+    restart: unless-stopped
+    ports:
+      - "${IMMICH_PORT:-2283}:2283"
+    environment:
+      DB_HOSTNAME: immich-db
+      DB_USERNAME: ${IMMICH_DB_USER:-immich}
+      DB_PASSWORD: ${IMMICH_DB_PASSWORD}
+      DB_DATABASE_NAME: ${IMMICH_DB_NAME:-immich}
+      REDIS_HOSTNAME: immich-redis
+    labels:
+      - "homepage.group=Media & Files"
+      - "homepage.name=Immich"
+      - "homepage.icon=immich.png"
+      - "homepage.href=http://localhost:${IMMICH_PORT:-2283}"
+      - "homepage.description=Photo and video backup with mobile auto-upload"
+    volumes:
+      - ./data/upload:/data
+      - /etc/localtime:/etc/localtime:ro
+    depends_on:
+      immich-db:
+        condition: service_healthy
+      immich-redis:
+        condition: service_started
+    networks:
+      - immich-net
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:2283/api/server/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # CPU/RAM-hungry (face recognition, smart search). On modest hardware this
+  # is the first thing to disable if the stack is too heavy — the server
+  # still runs without it, those two features just stop working.
+  immich-machine-learning:
+    image: ghcr.io/immich-app/immich-machine-learning:release
+    restart: unless-stopped
+    volumes:
+      - ./data/model-cache:/cache
+    networks:
+      - immich-net
+
+  immich-redis:
+    image: docker.io/valkey/valkey:9-alpine
+    restart: unless-stopped
+    networks:
+      - immich-net
+
+  # Immich-maintained Postgres image with the vector-search extensions it
+  # requires baked in — a generic postgres image will not work here.
+  immich-db:
+    image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${IMMICH_DB_NAME:-immich}
+      POSTGRES_USER: ${IMMICH_DB_USER:-immich}
+      POSTGRES_PASSWORD: ${IMMICH_DB_PASSWORD}
+      POSTGRES_INITDB_ARGS: '--data-checksums'
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    networks:
+      - immich-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${IMMICH_DB_USER:-immich}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    shm_size: 128mb
+
+networks:
+  immich-net:
+    driver: bridge

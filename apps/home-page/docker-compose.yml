@@ -5,15 +5,20 @@ services:
     restart: unless-stopped
     ports:
       - "${HOMEPAGE_PORT:-3000}:3000"
+    environment:
+      # Required to reach the dashboard from anything other than
+      # localhost:3000 — comma-separated, no spaces, e.g. your LAN IP.
+      HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS:-localhost:3000}
     volumes:
-      - homepage-config:/app/config
+      - ./data:/app/config
+      # Read-only Docker access for label-based service discovery: every
+      # other app in apps/*/docker-compose.yml carries homepage.* labels, and
+      # Homepage only lists a labeled container while it's actually running
+      # (docker.yaml below wires the socket up as a provider).
+      - /var/run/docker.sock:/var/run/docker.sock:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 30s
-
-volumes:
-  homepage-config:
-    driver: local

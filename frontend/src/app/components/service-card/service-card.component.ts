@@ -154,6 +154,14 @@ export class ServiceCardComponent {
       document: '📄',
       shield: '🛡️',
       speed: '⚡',
+      lock: '🔒',
+      pulse: '📈',
+      key: '🔑',
+      backup: '💾',
+      photo: '📷',
+      media: '🎬',
+      tasks: '✅',
+      update: '🔄',
     };
 
     return icons[icon] ?? '🖥️';

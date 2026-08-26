@@ -1,0 +1,27 @@
+
+services:
+  jellyfin:
+    image: jellyfin/jellyfin:latest
+    restart: unless-stopped
+    ports:
+      - "${JELLYFIN_PORT:-8096}:8096"
+    environment:
+      TZ: ${TZ:-UTC}
+    labels:
+      - "homepage.group=Media & Files"
+      - "homepage.name=Jellyfin"
+      - "homepage.icon=jellyfin.png"
+      - "homepage.href=http://localhost:${JELLYFIN_PORT:-8096}"
+      - "homepage.description=Home media server"
+    volumes:
+      - ./data/config:/config
+      - ./data/cache:/cache
+      # Point this at your actual media library on the host — defaults to a
+      # folder inside this app's own data dir if left unset.
+      - ${JELLYFIN_MEDIA_DIR:-./data/media}:/media
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8096/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
