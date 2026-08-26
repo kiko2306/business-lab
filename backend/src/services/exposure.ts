@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * First-start public exposure provisioning orchestration (plan.md section 16).
  *
@@ -10,23 +8,29 @@
  * start that already succeeded — failures are stored and audited instead.
  */
 
-const { query } = require('../utils/database');
-const { getExposureConfig } = require('../utils/exposureSettings');
-const { ensureProxyHost } = require('./npmClient');
-const { ensureIngressRoute } = require('./cloudflareTunnelClient');
-const { writeAuditLog } = require('../utils/audit');
-const logger = require('../utils/logger');
+import { query } from '../utils/database';
+import { getExposureConfig } from '../utils/exposureSettings';
+import { ensureProxyHost } from './npmClient';
+import { ensureIngressRoute } from './cloudflareTunnelClient';
+import { writeAuditLog } from '../utils/audit';
+import logger from '../utils/logger';
+import { ExposureProvisionResult, ServiceExposureInput, ServiceExposureRow } from '../types';
 
-async function getServiceExposureRow(serviceName) {
-  const result = await query('SELECT * FROM service_exposure WHERE service_name = $1', [serviceName]);
+export async function getServiceExposureRow(serviceName: string): Promise<ServiceExposureRow | null> {
+  const result = await query<ServiceExposureRow>('SELECT * FROM service_exposure WHERE service_name = $1', [
+    serviceName,
+  ]);
   return result.rows[0] ?? null;
 }
 
-async function upsertServiceExposureConfig(serviceName, { enabled, upstreamScheme, upstreamHost, upstreamPort, websocket }) {
+export async function upsertServiceExposureConfig(
+  serviceName: string,
+  { enabled, upstreamScheme, upstreamHost, upstreamPort, websocket }: ServiceExposureInput
+): Promise<ServiceExposureRow> {
   const globalConfig = await getExposureConfig();
   const hostname = globalConfig ? `${serviceName}.${globalConfig.baseDomain}` : null;
 
-  const result = await query(
+  const result = await query<ServiceExposureRow>(
     `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, upstream_host, upstream_port, websocket, status, updated_at)
      VALUES ($1, $2, $3, $4, $5, $6, $7, 'not_provisioned', NOW())
      ON CONFLICT (service_name)
@@ -44,7 +48,17 @@ async function upsertServiceExposureConfig(serviceName, { enabled, upstreamSchem
   return result.rows[0];
 }
 
-async function recordProvisioningResult(serviceName, { status, npmHostId, cfHostnameId, lastError }) {
+interface ProvisioningResult {
+  status: string;
+  npmHostId?: number | null;
+  cfHostnameId?: string | null;
+  lastError?: string | null;
+}
+
+async function recordProvisioningResult(
+  serviceName: string,
+  { status, npmHostId, cfHostnameId, lastError }: ProvisioningResult
+): Promise<void> {
   await query(
     `UPDATE service_exposure
      SET status = $2, npm_host_id = COALESCE($3, npm_host_id), cf_hostname_id = COALESCE($4, cf_hostname_id),
@@ -59,7 +73,7 @@ async function recordProvisioningResult(serviceName, { status, npmHostId, cfHost
  * — callers get a result object describing what happened, suitable for
  * merging into a start-service API response as a warning.
  */
-async function provisionServiceIfEnabled(serviceName, userId) {
+export async function provisionServiceIfEnabled(serviceName: string, userId: number): Promise<ExposureProvisionResult> {
   const exposureRow = await getServiceExposureRow(serviceName);
   if (!exposureRow || !exposureRow.enabled) {
     return { attempted: false };
@@ -82,8 +96,8 @@ async function provisionServiceIfEnabled(serviceName, userId) {
       npmPassword: globalConfig.npmPassword,
       hostname,
       forwardScheme: exposureRow.upstream_scheme,
-      forwardHost: exposureRow.upstream_host,
-      forwardPort: exposureRow.upstream_port,
+      forwardHost: exposureRow.upstream_host ?? '',
+      forwardPort: exposureRow.upstream_port ?? 0,
       websocket: exposureRow.websocket,
     });
 
@@ -112,27 +126,22 @@ async function provisionServiceIfEnabled(serviceName, userId) {
 
     return { attempted: true, success: true, hostname };
   } catch (error) {
-    logger.error(`Exposure provisioning failed for ${serviceName}`, { error: error.message });
-    await recordProvisioningResult(serviceName, { status: 'failed', lastError: error.message });
+    const message = (error as Error).message;
+    logger.error(`Exposure provisioning failed for ${serviceName}`, { error: message });
+    await recordProvisioningResult(serviceName, { status: 'failed', lastError: message });
 
     await writeAuditLog({
       userId,
       action: 'exposure_provision',
       resource: serviceName,
       result: 'failure',
-      metadata: { hostname, error: error.message },
+      metadata: { hostname, error: message },
     }).catch(() => {});
 
     return {
       attempted: true,
       success: false,
-      warning: `Service started, but exposure provisioning failed: ${error.message}`,
+      warning: `Service started, but exposure provisioning failed: ${message}`,
     };
   }
 }
-
-module.exports = {
-  getServiceExposureRow,
-  upsertServiceExposureConfig,
-  provisionServiceIfEnabled,
-};

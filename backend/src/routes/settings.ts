@@ -1,28 +1,16 @@
-'use strict';
-
-const https = require('https');
-const { Router } = require('express');
-const { query } = require('../utils/database');
-const { writeAuditLog } = require('../utils/audit');
-const { schemas, validateBody } = require('../middleware/validation');
+import https from 'https';
+import { Router, Request, Response } from 'express';
+import { query } from '../utils/database';
+import { writeAuditLog } from '../utils/audit';
+import { schemas, validateBody } from '../middleware/validation';
+import { EXPOSURE_SETTINGS_KEYS } from '../utils/exposureSettings';
 
 const router = Router();
 
 const CLOUDFLARE_TOKEN_KEY = 'cloudflare_tunnel_token';
-const PERMISSION_EXPLANATION =
-  'Required permissions: Account → Cloudflare Tunnel → Edit, Zone → DNS → Edit.';
+const PERMISSION_EXPLANATION = 'Required permissions: Account → Cloudflare Tunnel → Edit, Zone → DNS → Edit.';
 
-const EXPOSURE_SETTINGS_KEYS = {
-  baseDomain: 'exposure_base_domain',
-  npmApiUrl: 'exposure_npm_api_url',
-  npmEmail: 'exposure_npm_email',
-  npmPassword: 'exposure_npm_password',
-  cloudflareAccountId: 'exposure_cloudflare_account_id',
-  cloudflareZoneId: 'exposure_cloudflare_zone_id',
-  cloudflareTunnelId: 'exposure_cloudflare_tunnel_id',
-};
-
-function maskToken(token) {
+function maskToken(token: string | null): string | null {
   if (!token) {
     return null;
   }
@@ -34,16 +22,21 @@ function maskToken(token) {
   return `${token.slice(0, 4)}••••••${token.slice(-4)}`;
 }
 
-function isValidToken(token) {
+function isValidToken(token: unknown): token is string {
   return typeof token === 'string' && token.trim().length >= 20;
 }
 
-async function getStoredToken() {
-  const result = await query('SELECT value FROM settings WHERE key = $1', [CLOUDFLARE_TOKEN_KEY]);
+async function getStoredToken(): Promise<string | null> {
+  const result = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [CLOUDFLARE_TOKEN_KEY]);
   return result.rows[0]?.value ?? null;
 }
 
-function verifyCloudflareToken(token) {
+interface CloudflareVerifyResult {
+  success: boolean;
+  message: string;
+}
+
+function verifyCloudflareToken(token: string): Promise<CloudflareVerifyResult> {
   return new Promise((resolve, reject) => {
     const request = https.request(
       'https://api.cloudflare.com/client/v4/user/tokens/verify',
@@ -70,8 +63,7 @@ function verifyCloudflareToken(token) {
               return;
             }
 
-            const errorMessage =
-              parsed?.errors?.[0]?.message || 'Cloudflare rejected the supplied token.';
+            const errorMessage = parsed?.errors?.[0]?.message || 'Cloudflare rejected the supplied token.';
             resolve({ success: false, message: errorMessage });
           } catch {
             reject(new Error('Unable to parse Cloudflare verification response.'));
@@ -86,7 +78,7 @@ function verifyCloudflareToken(token) {
   });
 }
 
-router.get('/cloudflare-token', async (_req, res) => {
+router.get('/cloudflare-token', async (_req: Request, res: Response) => {
   try {
     const token = await getStoredToken();
     return res.json({
@@ -94,12 +86,12 @@ router.get('/cloudflare-token', async (_req, res) => {
       tokenMasked: maskToken(token),
       permissionExplanation: PERMISSION_EXPLANATION,
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Unable to load Cloudflare settings.' });
   }
 });
 
-router.put('/cloudflare-token', validateBody(schemas.cloudflareTokenUpdate), async (req, res) => {
+router.put('/cloudflare-token', validateBody(schemas.cloudflareTokenUpdate), async (req: Request, res: Response) => {
   const token = req.body.token;
 
   try {
@@ -123,12 +115,12 @@ router.put('/cloudflare-token', validateBody(schemas.cloudflareTokenUpdate), asy
       permissionExplanation: PERMISSION_EXPLANATION,
       message: 'Cloudflare token saved successfully.',
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Unable to save Cloudflare token.' });
   }
 });
 
-router.post('/cloudflare-token/test', validateBody(schemas.cloudflareTokenTest), async (req, res) => {
+router.post('/cloudflare-token/test', validateBody(schemas.cloudflareTokenTest), async (req: Request, res: Response) => {
   try {
     const providedToken = req.body.token || '';
     const token = providedToken || (await getStoredToken());
@@ -146,7 +138,7 @@ router.post('/cloudflare-token/test', validateBody(schemas.cloudflareTokenTest),
       success: true,
       message: result.message,
     });
-  } catch (error) {
+  } catch {
     return res.status(502).json({ error: 'Unable to reach Cloudflare to verify the token.' });
   }
 });
@@ -154,9 +146,9 @@ router.post('/cloudflare-token/test', validateBody(schemas.cloudflareTokenTest),
 // ---------------------------------------------------------------------------
 // GET /api/settings/exposure — read first-start exposure provisioning config
 // ---------------------------------------------------------------------------
-router.get('/exposure', async (_req, res) => {
+router.get('/exposure', async (_req: Request, res: Response) => {
   try {
-    const result = await query('SELECT key, value FROM settings WHERE key = ANY($1)', [
+    const result = await query<{ key: string; value: string }>('SELECT key, value FROM settings WHERE key = ANY($1)', [
       Object.values(EXPOSURE_SETTINGS_KEYS),
     ]);
     const values = Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
@@ -179,7 +171,7 @@ router.get('/exposure', async (_req, res) => {
       cloudflareZoneId: values[EXPOSURE_SETTINGS_KEYS.cloudflareZoneId] ?? null,
       cloudflareTunnelId: values[EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId] ?? null,
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Unable to load exposure settings.' });
   }
 });
@@ -187,8 +179,8 @@ router.get('/exposure', async (_req, res) => {
 // ---------------------------------------------------------------------------
 // PUT /api/settings/exposure — save first-start exposure provisioning config
 // ---------------------------------------------------------------------------
-router.put('/exposure', validateBody(schemas.exposureGlobalSettings), async (req, res) => {
-  const values = {
+router.put('/exposure', validateBody(schemas.exposureGlobalSettings), async (req: Request, res: Response) => {
+  const values: Record<string, string> = {
     [EXPOSURE_SETTINGS_KEYS.baseDomain]: req.body.baseDomain,
     [EXPOSURE_SETTINGS_KEYS.npmApiUrl]: req.body.npmApiUrl.replace(/\/+$/, ''),
     [EXPOSURE_SETTINGS_KEYS.npmEmail]: req.body.npmEmail,
@@ -222,9 +214,9 @@ router.put('/exposure', validateBody(schemas.exposureGlobalSettings), async (req
     }).catch(() => {});
 
     return res.json({ message: 'Exposure settings saved successfully.' });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Unable to save exposure settings.' });
   }
 });
 
-module.exports = router;
+export default router;

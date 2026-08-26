@@ -1,28 +1,21 @@
-'use strict';
+import './loadEnv';
+import express, { NextFunction, Request, Response } from 'express';
+import cors from 'cors';
+import helmet from 'helmet';
+import rateLimit from 'express-rate-limit';
 
-try {
-  require('dotenv').config();
-} catch {
-  // dotenv is optional in containerized runtime where env vars are injected directly.
-}
-
-const express = require('express');
-const cors = require('cors');
-const helmet = require('helmet');
-
-const authRouter = require('./routes/auth');
-const servicesRouter = require('./routes/services');
-const settingsRouter = require('./routes/settings');
-const auditRouter = require('./routes/audit');
-const backupRouter = require('./routes/backup');
-const healthRouter = require('./routes/health');
-const recoveryRouter = require('./routes/recovery');
-const usersRouter = require('./routes/users');
-const { dropLegacyRoleColumn, ensureServiceExposureTable } = require('./utils/database');
-const authMiddleware = require('./middleware/auth');
-const setupModeMiddleware = require('./middleware/setupMode');
-const rateLimit = require('express-rate-limit');
-const { initWebSocket, sseHandler } = require('./services/realtime');
+import authRouter from './routes/auth';
+import servicesRouter from './routes/services';
+import settingsRouter from './routes/settings';
+import auditRouter from './routes/audit';
+import backupRouter from './routes/backup';
+import healthRouter from './routes/health';
+import recoveryRouter from './routes/recovery';
+import usersRouter from './routes/users';
+import { dropLegacyRoleColumn, ensureServiceExposureTable } from './utils/database';
+import authMiddleware from './middleware/auth';
+import setupModeMiddleware from './middleware/setupMode';
+import { initWebSocket, sseHandler } from './services/realtime';
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -49,16 +42,19 @@ const PORT = process.env.PORT || 3000;
 // values must be passed as an actual Number — express-rate-limit treats a
 // numeric *string* as a trusted IP/subnet rather than a hop count.
 const trustProxySetting = process.env.TRUST_PROXY;
-app.set('trust proxy', trustProxySetting !== undefined && trustProxySetting !== '' && !Number.isNaN(Number(trustProxySetting))
-  ? Number(trustProxySetting)
-  : trustProxySetting || 1);
+app.set(
+  'trust proxy',
+  trustProxySetting !== undefined && trustProxySetting !== '' && !Number.isNaN(Number(trustProxySetting))
+    ? Number(trustProxySetting)
+    : trustProxySetting || 1
+);
 
 const allowedOrigins = (process.env.CORS_ORIGIN || process.env.API_URL || 'http://localhost:4200')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-const corsOptions = {
+const corsOptions: cors.CorsOptions = {
   origin(origin, callback) {
     if (!origin || allowedOrigins.includes(origin)) {
       callback(null, true);
@@ -80,27 +76,29 @@ const mutationLimiter = rateLimit({
   message: { error: 'Too many mutation requests, please try again later' },
 });
 
-app.use(helmet({
-  contentSecurityPolicy: {
-    useDefaults: false,
-    directives: {
-      defaultSrc: ["'none'"],
-      frameAncestors: ["'none'"],
+app.use(
+  helmet({
+    contentSecurityPolicy: {
+      useDefaults: false,
+      directives: {
+        defaultSrc: ["'none'"],
+        frameAncestors: ["'none'"],
+      },
     },
-  },
-  crossOriginResourcePolicy: { policy: 'cross-origin' },
-}));
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 app.use(cors(corsOptions));
 app.use(express.json({ limit: process.env.REQUEST_BODY_LIMIT || '32kb' }));
 app.use(mutationLimiter);
 
 // Health check — always available
-app.get('/health', (_req, res) => {
+app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Ping check — always available, unauthenticated
-app.get('/ping', (_req, res) => {
+app.get('/ping', (_req: Request, res: Response) => {
   res.status(200).json({ statusCode: 200, message: 'Pong' });
 });
 
@@ -120,7 +118,7 @@ for (const prefix of ROUTE_PREFIXES) {
   app.get(`${prefix}/services/stream`, streamLimiter, sseHandler);
 
   // API root
-  app.get(prefix || '/', ...protectedGate(), (_req, res) => {
+  app.get(prefix || '/', ...protectedGate(), (_req: Request, res: Response) => {
     res.json({ message: 'Homelab API v1' });
   });
 
@@ -136,8 +134,7 @@ for (const prefix of ROUTE_PREFIXES) {
 }
 
 // Global error handler
-// eslint-disable-next-line no-unused-vars
-app.use((err, _req, res, _next) => {
+app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   if (err?.message === 'Origin not allowed by CORS policy') {
     return res.status(403).json({ error: 'CORS origin denied' });
   }
@@ -145,10 +142,10 @@ app.use((err, _req, res, _next) => {
   return res.status(500).json({ error: 'Internal server error' });
 });
 
-dropLegacyRoleColumn().catch((err) => {
+dropLegacyRoleColumn().catch((err: Error) => {
   console.error('Unable to drop legacy users.role column:', err.message);
 });
-ensureServiceExposureTable().catch((err) => {
+ensureServiceExposureTable().catch((err: Error) => {
   console.error('Unable to ensure service_exposure table:', err.message);
 });
 

@@ -1,12 +1,10 @@
-'use strict';
-
-const { Router } = require('express');
-const rateLimit = require('express-rate-limit');
-const { query } = require('../utils/database');
-const { hashPassword } = require('../utils/password');
-const { writeAuditLog } = require('../utils/audit');
-const { isRecoveryModeEnabled, isLocalRequest, setRecoveryMode } = require('../utils/recovery');
-const { schemas, validateBody } = require('../middleware/validation');
+import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
+import { query } from '../utils/database';
+import { hashPassword } from '../utils/password';
+import { writeAuditLog } from '../utils/audit';
+import { isRecoveryModeEnabled, isLocalRequest, setRecoveryMode } from '../utils/recovery';
+import { schemas, validateBody } from '../middleware/validation';
 
 const router = Router();
 
@@ -20,7 +18,7 @@ const recoveryLimiter = rateLimit({
 
 router.use(recoveryLimiter);
 
-router.get('/status', async (_req, res) => {
+router.get('/status', async (_req: Request, res: Response) => {
   try {
     return res.json({ enabled: await isRecoveryModeEnabled() });
   } catch {
@@ -28,7 +26,7 @@ router.get('/status', async (_req, res) => {
   }
 });
 
-router.post('/enable', validateBody(schemas.recoveryEnable), async (req, res) => {
+router.post('/enable', validateBody(schemas.recoveryEnable), async (req: Request, res: Response) => {
   if (!isLocalRequest(req)) {
     return res.status(403).json({ error: 'Recovery mode can only be enabled from localhost.' });
   }
@@ -42,7 +40,7 @@ router.post('/enable', validateBody(schemas.recoveryEnable), async (req, res) =>
   }
 });
 
-router.post('/reset-admin-password', validateBody(schemas.recoveryResetAdminPassword), async (req, res) => {
+router.post('/reset-admin-password', validateBody(schemas.recoveryResetAdminPassword), async (req: Request, res: Response) => {
   const username = req.body.username;
   const password = req.body.password;
 
@@ -56,7 +54,7 @@ router.post('/reset-admin-password', validateBody(schemas.recoveryResetAdminPass
 
   try {
     const passwordHash = await hashPassword(password);
-    const result = await query(
+    const result = await query<{ id: number }>(
       `UPDATE users
        SET password_hash = $2
        WHERE username = $1
@@ -81,7 +79,7 @@ router.post('/reset-admin-password', validateBody(schemas.recoveryResetAdminPass
   }
 });
 
-router.post('/disable', async (req, res) => {
+router.post('/disable', async (req: Request, res: Response) => {
   if (!isLocalRequest(req)) {
     return res.status(403).json({ error: 'Recovery mode can only be disabled from localhost.' });
   }
@@ -95,4 +93,4 @@ router.post('/disable', async (req, res) => {
   }
 });
 
-module.exports = router;
+export default router;

@@ -1,6 +1,6 @@
 # Homelab Management
 
-Homelab Management is a Dockerized Angular + Node.js/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
+Homelab Management is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
 ## Documentation
 
@@ -89,7 +89,7 @@ backend starts and stops on your behalf.
       restricted to the required endpoints, and keep the API off the public
       internet or behind strict authentication.
 - [x] **Registry lists apps that are not installed** — all 17 entries in
-      `backend/src/config/services.js` now have a `docker-compose.yml` and
+      `backend/src/config/services.ts` now have a `docker-compose.yml` and
       `.env.example` (where secrets are required) under their respective `apps/`
       directory, including the previously-missing `dozzle`, `beszel`, `mealie`,
       and `portainer` stacks.

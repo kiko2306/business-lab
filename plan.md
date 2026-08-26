@@ -1,7 +1,7 @@
 # Homelab Management System Specification
 
 ## 1. Overview
-This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, viewing logs, and monitoring system resources.
+This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express (TypeScript) backend. It provides a dashboard for starting and stopping Docker-based services, viewing logs, and monitoring system resources.
 
 The frontend, API, and database should all run as Docker containers, while the host continues to run Docker and Bash scripts that manage the individual homelab apps.
 
@@ -15,7 +15,7 @@ The frontend, API, and database should all run as Docker containers, while the h
 
 ## 3. Technology Stack
 - **Frontend**: Angular (latest stable), containerized with Docker
-- **Backend**: Node.js + Express, containerized with Docker
+- **Backend**: Node.js + Express + TypeScript, containerized with Docker
 - **Database**: SQLite or PostgreSQL, containerized with Docker
 - **Runtime Environment**: Linux host with Docker and Bash
 
@@ -268,7 +268,7 @@ Preferred update strategies, in order:
 
 ### 16.0 Implementation Status
 Implemented per the plan below:
-- `backend/src/services/executor.js` — fixed the secrets-validation helper
+- `backend/src/services/executor.ts` — fixed the secrets-validation helper
   scoping bug that made `ensureServiceSecrets` unreachable (it was nested
   inside an unrelated `exec()` callback).
 - `service_exposure` table (`database/init.sql`, with a startup migration in
@@ -311,7 +311,7 @@ Service hostnames should be derived as `<service>.<base-domain>`, for example
 - The Angular dashboard starts services through `ServiceStateService` and
   `POST /api/services/:name/start`.
 - The backend service route calls `executor.startService(serviceName, userId)`.
-- Services are defined in `backend/src/config/services.js`.
+- Services are defined in `backend/src/config/services.ts`.
 - Cloudflare API token storage and verification already exists in
   `backend/src/routes/settings.js`.
 - Nginx Proxy Manager has a compose stack under `apps/nginx-proxy-manager/`.
@@ -333,7 +333,7 @@ Service hostnames should be derived as `<service>.<base-domain>`, for example
 
 ### 16.4 Implementation Plan
 1. Fix and verify service start prerequisites.
-   - Check `backend/src/services/executor.js` helper scoping before wiring
+   - Check `backend/src/services/executor.ts` helper scoping before wiring
      provisioning into service starts.
    - Preserve current validation, error handling, and audit logging patterns.
 2. Add exposure metadata.

@@ -1,10 +1,8 @@
-'use strict';
+import { Pool, QueryResult, QueryResultRow } from 'pg';
 
-const { Pool } = require('pg');
+let pool: Pool | undefined;
 
-let pool;
-
-function getConnectionString() {
+function getConnectionString(): string {
   if (process.env.DATABASE_URL) {
     return process.env.DATABASE_URL;
   }
@@ -17,7 +15,7 @@ function getConnectionString() {
   return `postgresql://${encodeURIComponent(user)}:${encodeURIComponent(password)}@${host}:${port}/${dbName}`;
 }
 
-function getPool() {
+export function getPool(): Pool {
   if (!pool) {
     pool = new Pool({
       connectionString: getConnectionString(),
@@ -35,13 +33,14 @@ function getPool() {
 
 /**
  * Run a parameterised query and return the pg Result object.
- * @param {string} text - SQL query string
- * @param {Array}  params - Query parameters
  */
-async function query(text, params) {
+export async function query<T extends QueryResultRow = QueryResultRow>(
+  text: string,
+  params?: unknown[]
+): Promise<QueryResult<T>> {
   const client = await getPool().connect();
   try {
-    return await client.query(text, params);
+    return await client.query<T>(text, params);
   } finally {
     client.release();
   }
@@ -52,7 +51,7 @@ async function query(text, params) {
  * roles were removed from the project. No-op on fresh installs, since
  * init.sql no longer creates that column.
  */
-async function dropLegacyRoleColumn() {
+export async function dropLegacyRoleColumn(): Promise<void> {
   await query('ALTER TABLE users DROP COLUMN IF EXISTS role');
 }
 
@@ -61,7 +60,7 @@ async function dropLegacyRoleColumn() {
  * exposure provisioning was added. No-op on fresh installs, since init.sql
  * already creates it.
  */
-async function ensureServiceExposureTable() {
+export async function ensureServiceExposureTable(): Promise<void> {
   await query(`
     CREATE TABLE IF NOT EXISTS service_exposure (
         service_name    VARCHAR(100) PRIMARY KEY,
@@ -79,5 +78,3 @@ async function ensureServiceExposureTable() {
     )
   `);
 }
-
-module.exports = { getPool, query, dropLegacyRoleColumn, ensureServiceExposureTable };

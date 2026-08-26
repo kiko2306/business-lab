@@ -1,6 +1,5 @@
-'use strict';
-
-const Joi = require('joi');
+import { NextFunction, Request, Response } from 'express';
+import Joi, { ObjectSchema, ValidationError } from 'joi';
 
 const validationOptions = {
   abortEarly: false,
@@ -23,7 +22,7 @@ const domainSchema = Joi.string()
   .max(255)
   .pattern(/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/);
 
-const schemas = {
+export const schemas = {
   authSetup: Joi.object({
     username: usernameSchema.required(),
     password: passwordSchema.required(),
@@ -102,28 +101,27 @@ const schemas = {
   }),
 };
 
-function validationError(res, error) {
+type ValidationSource = 'body' | 'params' | 'query';
+
+function validationError(res: Response, error: ValidationError) {
   return res.status(422).json({
     error: 'Invalid request input',
     details: error.details.map((detail) => detail.message),
   });
 }
 
-function validate(schema, source) {
-  return (req, res, next) => {
-    const payload = req[source] || {};
+function validate(schema: ObjectSchema, source: ValidationSource) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const payload = (req[source] as Record<string, unknown>) || {};
     const { error, value } = schema.validate(payload, validationOptions);
     if (error) {
       return validationError(res, error);
     }
-    req[source] = value;
+    (req as unknown as Record<ValidationSource, unknown>)[source] = value;
     return next();
   };
 }
 
-module.exports = {
-  schemas,
-  validateBody: (schema) => validate(schema, 'body'),
-  validateParams: (schema) => validate(schema, 'params'),
-  validateQuery: (schema) => validate(schema, 'query'),
-};
+export const validateBody = (schema: ObjectSchema) => validate(schema, 'body');
+export const validateParams = (schema: ObjectSchema) => validate(schema, 'params');
+export const validateQuery = (schema: ObjectSchema) => validate(schema, 'query');

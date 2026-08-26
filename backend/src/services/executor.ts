@@ -4,17 +4,24 @@
  * Uses child_process to execute shell commands safely.
  */
 
-const { exec } = require('child_process');
-const fs = require('fs');
-const path = require('path');
-const logger = require('../utils/logger');
-const { writeAuditLog } = require('../utils/audit');
-const { provisionServiceIfEnabled } = require('./exposure');
+import { exec } from 'child_process';
+import fs from 'fs';
+import path from 'path';
+import logger from '../utils/logger';
+import { writeAuditLog } from '../utils/audit';
+import { provisionServiceIfEnabled } from './exposure';
+import { isValidServiceName, resolveComposeFile } from '../config/services';
+import { HttpError } from '../types';
+
+interface CommandResult {
+  stdout: string;
+  stderr: string;
+}
 
 /**
  * Execute a shell command with timeout and error handling
  */
-function executeCommand(command, timeout = 30000) {
+function executeCommand(command: string, timeout = 30000): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
     exec(command, { timeout }, (error, stdout, stderr) => {
       if (error) {
@@ -24,7 +31,7 @@ function executeCommand(command, timeout = 30000) {
           message: error.message,
           stderr: stderr || '',
           stdout: stdout || '',
-        });
+        } as HttpError);
       } else {
         resolve({
           stdout: stdout || '',
@@ -35,16 +42,16 @@ function executeCommand(command, timeout = 30000) {
   });
 }
 
-function requiredSecretsFromCompose(composeFilePath) {
+function requiredSecretsFromCompose(composeFilePath: string): string[] {
   const composeContent = fs.readFileSync(composeFilePath, 'utf8');
   const matches = composeContent.match(/\$\{([A-Z0-9_]+)\}/g) || [];
   return [...new Set(matches.map((token) => token.slice(2, -1)))];
 }
 
-function parseEnvFile(envFilePath) {
+function parseEnvFile(envFilePath: string): Record<string, string> {
   const envContent = fs.readFileSync(envFilePath, 'utf8');
   const lines = envContent.split(/\r?\n/);
-  const values = {};
+  const values: Record<string, string> = {};
 
   for (const line of lines) {
     const trimmed = line.trim();
@@ -63,7 +70,7 @@ function parseEnvFile(envFilePath) {
   return values;
 }
 
-function ensureServiceSecrets(serviceName, appDir, composeFile) {
+function ensureServiceSecrets(serviceName: string, appDir: string, composeFile: string): void {
   const envFilePath = path.join(appDir, '.env');
   const requiredSecrets = requiredSecretsFromCompose(composeFile).filter((name) => !name.includes(':-'));
 
@@ -76,7 +83,7 @@ function ensureServiceSecrets(serviceName, appDir, composeFile) {
       statusCode: 400,
       message: `Service ${serviceName} is missing ${envFilePath}. Copy .env.example to .env and set required values.`,
       details: `Missing .env for ${serviceName}`,
-    };
+    } as HttpError;
   }
 
   const envValues = parseEnvFile(envFilePath);
@@ -90,30 +97,37 @@ function ensureServiceSecrets(serviceName, appDir, composeFile) {
       statusCode: 400,
       message: `Service ${serviceName} has missing required secrets in .env`,
       details: `Unset keys: ${missing.join(', ')}`,
-    };
+    } as HttpError;
   }
+}
+
+interface ServiceActionResult {
+  success: boolean;
+  service: string;
+  message: string;
+  timestamp: Date;
+  exposure?: unknown;
 }
 
 /**
  * Start a service using docker compose up
  */
-async function startService(serviceName, userId) {
-  const { isValidServiceName, resolveComposeFile } = require('../config/services');
-
+export async function startService(serviceName: string, userId: number): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
     throw {
       statusCode: 400,
       message: `Invalid service name: ${serviceName}`,
-    };
+    } as HttpError;
   }
 
-  const { projectName, appDir, composeFile } = resolveComposeFile(serviceName);
+  const resolved = resolveComposeFile(serviceName);
+  const { projectName, appDir, composeFile } = resolved ?? { projectName: null, appDir: '', composeFile: null };
 
   if (!composeFile) {
     throw {
       statusCode: 404,
       message: `Service ${serviceName} is not installed: no compose file found in ${appDir}`,
-    };
+    } as HttpError;
   }
 
   ensureServiceSecrets(serviceName, appDir, composeFile);
@@ -130,12 +144,12 @@ async function startService(serviceName, userId) {
     await logAuditEvent(userId, 'SERVICE_START', serviceName, 'success', {
       stdout: result.stdout,
       stderr: result.stderr,
-      duration: new Date() - startTime,
+      duration: new Date().getTime() - startTime.getTime(),
     });
 
     logger.info(`Service started successfully: ${serviceName}`, { userId });
 
-    const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error) => {
+    const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error: Error) => {
       logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
       return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };
     });
@@ -148,47 +162,47 @@ async function startService(serviceName, userId) {
       ...(exposure.attempted ? { exposure } : {}),
     };
   } catch (error) {
+    const httpError = error as HttpError;
     logger.error(`Failed to start service: ${serviceName}`, {
       userId,
-      error: error.message,
-      stderr: error.stderr,
+      error: httpError.message,
+      stderr: httpError.stderr,
     });
 
     // Log the failed operation
     await logAuditEvent(userId, 'SERVICE_START', serviceName, 'failure', {
-      error: error.message,
-      stderr: error.stderr,
-      code: error.code,
-    }).catch(err => logger.error('Failed to log audit event', { error: err }));
+      error: httpError.message,
+      stderr: httpError.stderr,
+      code: httpError.code,
+    }).catch((err: Error) => logger.error('Failed to log audit event', { error: err.message }));
 
     throw {
       statusCode: 500,
-      message: `Failed to start service ${serviceName}: ${error.message}`,
-      details: error.stderr,
-    };
+      message: `Failed to start service ${serviceName}: ${httpError.message}`,
+      details: httpError.stderr,
+    } as HttpError;
   }
 }
 
 /**
  * Stop a service using docker compose down
  */
-async function stopService(serviceName, userId) {
-  const { isValidServiceName, resolveComposeFile } = require('../config/services');
-
+export async function stopService(serviceName: string, userId: number): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
     throw {
       statusCode: 400,
       message: `Invalid service name: ${serviceName}`,
-    };
+    } as HttpError;
   }
 
-  const { projectName, appDir, composeFile } = resolveComposeFile(serviceName);
+  const resolved = resolveComposeFile(serviceName);
+  const { projectName, appDir, composeFile } = resolved ?? { projectName: null, appDir: '', composeFile: null };
 
   if (!composeFile) {
     throw {
       statusCode: 404,
       message: `Service ${serviceName} is not installed: no compose file found in ${appDir}`,
-    };
+    } as HttpError;
   }
 
   ensureServiceSecrets(serviceName, appDir, composeFile);
@@ -205,7 +219,7 @@ async function stopService(serviceName, userId) {
     await logAuditEvent(userId, 'SERVICE_STOP', serviceName, 'success', {
       stdout: result.stdout,
       stderr: result.stderr,
-      duration: new Date() - startTime,
+      duration: new Date().getTime() - startTime.getTime(),
     });
 
     logger.info(`Service stopped successfully: ${serviceName}`, { userId });
@@ -217,31 +231,38 @@ async function stopService(serviceName, userId) {
       timestamp: new Date(),
     };
   } catch (error) {
+    const httpError = error as HttpError;
     logger.error(`Failed to stop service: ${serviceName}`, {
       userId,
-      error: error.message,
-      stderr: error.stderr,
+      error: httpError.message,
+      stderr: httpError.stderr,
     });
 
     // Log the failed operation
     await logAuditEvent(userId, 'SERVICE_STOP', serviceName, 'failure', {
-      error: error.message,
-      stderr: error.stderr,
-      code: error.code,
-    }).catch(err => logger.error('Failed to log audit event', { error: err }));
+      error: httpError.message,
+      stderr: httpError.stderr,
+      code: httpError.code,
+    }).catch((err: Error) => logger.error('Failed to log audit event', { error: err.message }));
 
     throw {
       statusCode: 500,
-      message: `Failed to stop service ${serviceName}: ${error.message}`,
-      details: error.stderr,
-    };
+      message: `Failed to stop service ${serviceName}: ${httpError.message}`,
+      details: httpError.stderr,
+    } as HttpError;
   }
 }
 
 /**
  * Log an audit event to the database
  */
-async function logAuditEvent(userId, action, resource, result, metadata = {}) {
+export async function logAuditEvent(
+  userId: number,
+  action: string,
+  resource: string,
+  result: string,
+  metadata: Record<string, unknown> = {}
+): Promise<void> {
   try {
     await writeAuditLog({
       userId,
@@ -253,17 +274,10 @@ async function logAuditEvent(userId, action, resource, result, metadata = {}) {
   } catch (error) {
     // Don't throw; audit logging is non-critical
     logger.error('Failed to write audit log', {
-      error: error.message,
+      error: (error as Error).message,
       userId,
       action,
       resource,
     });
   }
 }
-
-module.exports = {
-  startService,
-  stopService,
-  executeCommand,
-  logAuditEvent,
-};

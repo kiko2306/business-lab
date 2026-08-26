@@ -1,14 +1,12 @@
-'use strict';
-
-const { Router } = require('express');
-const rateLimit = require('express-rate-limit');
-const { query } = require('../utils/database');
-const { hashPassword, verifyPassword } = require('../utils/password');
-const { signAccessToken, signRefreshToken, verifyRefreshToken, refreshTokenExpiryMs } = require('../utils/jwt');
-const setupModeMiddleware = require('../middleware/setupMode');
-const authMiddleware = require('../middleware/auth');
-const { schemas, validateBody } = require('../middleware/validation');
-const { writeAuditLog } = require('../utils/audit');
+import { Router, Request, Response } from 'express';
+import rateLimit from 'express-rate-limit';
+import { query } from '../utils/database';
+import { hashPassword, verifyPassword } from '../utils/password';
+import { signAccessToken, signRefreshToken, verifyRefreshToken, refreshTokenExpiryMs } from '../utils/jwt';
+import setupModeMiddleware from '../middleware/setupMode';
+import authMiddleware from '../middleware/auth';
+import { schemas, validateBody } from '../middleware/validation';
+import { writeAuditLog } from '../utils/audit';
 
 const router = Router();
 
@@ -20,15 +18,21 @@ const authLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later' },
 });
 
+interface UserRow {
+  id: number;
+  username: string;
+  password_hash?: string;
+}
+
 // ---------------------------------------------------------------------------
 // POST /api/auth/setup — create the first admin user
 // ---------------------------------------------------------------------------
-router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schemas.authSetup), async (req, res) => {
+router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schemas.authSetup), async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
   try {
     const passwordHash = await hashPassword(password);
-    const result = await query(
+    const result = await query<UserRow>(
       `INSERT INTO users (username, password_hash, is_setup_complete)
        VALUES ($1, $2, TRUE)
        RETURNING id, username`,
@@ -40,22 +44,26 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
     const refreshToken = signRefreshToken({ id: user.id });
 
     const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
-    await query(
-      'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [user.id, refreshToken, refreshExpiry]
-    );
+    await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [
+      user.id,
+      refreshToken,
+      refreshExpiry,
+    ]);
 
-    await query(
-      'INSERT INTO audit_logs (user_id, action, resource, result) VALUES ($1, $2, $3, $4)',
-      [user.id, 'setup', 'users', 'success']
-    );
+    await query('INSERT INTO audit_logs (user_id, action, resource, result) VALUES ($1, $2, $3, $4)', [
+      user.id,
+      'setup',
+      'users',
+      'success',
+    ]);
 
     return res.status(201).json({ accessToken, refreshToken, user: { id: user.id, username: user.username } });
   } catch (err) {
-    if (err.code === '23505') {
+    const error = err as { code?: string; message: string };
+    if (error.code === '23505') {
       return res.status(409).json({ error: 'Username already exists' });
     }
-    console.error('Setup error:', err.message);
+    console.error('Setup error:', error.message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -63,17 +71,16 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
 // ---------------------------------------------------------------------------
 // POST /api/auth/login
 // ---------------------------------------------------------------------------
-router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req, res) => {
+router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: Request, res: Response) => {
   const { username, password } = req.body;
 
   try {
-    const result = await query(
-      'SELECT id, username, password_hash FROM users WHERE username = $1',
-      [username]
-    );
+    const result = await query<UserRow>('SELECT id, username, password_hash FROM users WHERE username = $1', [
+      username,
+    ]);
     const user = result.rows[0];
 
-    if (!user || !(await verifyPassword(password, user.password_hash))) {
+    if (!user || !(await verifyPassword(password, user.password_hash ?? ''))) {
       await writeAuditLog({
         action: 'login',
         resource: 'auth',
@@ -86,16 +93,17 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req, 
     const refreshToken = signRefreshToken({ id: user.id });
 
     const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
-    await query(
-      'INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)',
-      [user.id, refreshToken, refreshExpiry]
-    );
+    await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [
+      user.id,
+      refreshToken,
+      refreshExpiry,
+    ]);
 
     await writeAuditLog({ userId: user.id, action: 'login', resource: 'auth', result: 'success' });
 
     return res.json({ accessToken, refreshToken, user: { id: user.id, username: user.username } });
   } catch (err) {
-    console.error('Login error:', err.message);
+    console.error('Login error:', (err as Error).message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });
@@ -103,24 +111,25 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req, 
 // ---------------------------------------------------------------------------
 // POST /api/auth/logout
 // ---------------------------------------------------------------------------
-router.post('/logout', authLimiter, authMiddleware, validateBody(schemas.authLogout), async (req, res) => {
+router.post('/logout', authLimiter, authMiddleware, validateBody(schemas.authLogout), async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
+  const userId = req.user!.id;
 
   if (refreshToken) {
     try {
-      await query(
-        'UPDATE refresh_tokens SET revoked = TRUE WHERE token = $1 AND user_id = $2',
-        [refreshToken, req.user.id]
-      );
+      await query('UPDATE refresh_tokens SET revoked = TRUE WHERE token = $1 AND user_id = $2', [
+        refreshToken,
+        userId,
+      ]);
     } catch (err) {
-      console.error('Logout token revoke error:', err.message);
+      console.error('Logout token revoke error:', (err as Error).message);
     }
   }
 
   try {
-    await writeAuditLog({ userId: req.user.id, action: 'logout', resource: 'auth', result: 'success' });
+    await writeAuditLog({ userId, action: 'logout', resource: 'auth', result: 'success' });
   } catch (err) {
-    console.error('Audit log error:', err.message);
+    console.error('Audit log error:', (err as Error).message);
   }
 
   return res.json({ message: 'Logged out successfully' });
@@ -129,13 +138,13 @@ router.post('/logout', authLimiter, authMiddleware, validateBody(schemas.authLog
 // ---------------------------------------------------------------------------
 // POST /api/auth/refresh
 // ---------------------------------------------------------------------------
-router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (req, res) => {
+router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (req: Request, res: Response) => {
   const { refreshToken } = req.body;
 
   try {
     const decoded = verifyRefreshToken(refreshToken);
 
-    const result = await query(
+    const result = await query<{ id: number; user_id: number; revoked: boolean; expires_at: string; username: string }>(
       `SELECT rt.id, rt.user_id, rt.revoked, rt.expires_at,
               u.username
        FROM refresh_tokens rt
@@ -156,4 +165,4 @@ router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (r
   }
 });
 
-module.exports = router;
+export default router;

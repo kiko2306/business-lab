@@ -1,20 +1,24 @@
-'use strict';
-
-const { Router } = require('express');
-const os = require('os');
-const { execFile } = require('child_process');
-const { query } = require('../utils/database');
-const { schemas, validateBody } = require('../middleware/validation');
+import { Router, Request, Response } from 'express';
+import os from 'os';
+import { execFile } from 'child_process';
+import { query } from '../utils/database';
+import { schemas, validateBody } from '../middleware/validation';
 
 const router = Router();
 
-const DEFAULT_THRESHOLDS = {
+interface Thresholds {
+  diskPercent: number;
+  memoryPercent: number;
+  loadPerCpu: number;
+}
+
+const DEFAULT_THRESHOLDS: Thresholds = {
   diskPercent: 85,
   memoryPercent: 90,
   loadPerCpu: 1.5,
 };
 
-function runCommand(cmd, args) {
+function runCommand(cmd: string, args: string[]): Promise<string> {
   return new Promise((resolve, reject) => {
     execFile(cmd, args, { timeout: 5000 }, (error, stdout) => {
       if (error) {
@@ -26,8 +30,8 @@ function runCommand(cmd, args) {
   });
 }
 
-async function getThresholds() {
-  const result = await query(
+async function getThresholds(): Promise<Thresholds> {
+  const result = await query<{ key: string; value: string }>(
     'SELECT key, value FROM settings WHERE key IN ($1, $2, $3)',
     ['health_disk_threshold', 'health_memory_threshold', 'health_load_threshold']
   );
@@ -40,7 +44,7 @@ async function getThresholds() {
   };
 }
 
-async function getDiskPercent() {
+async function getDiskPercent(): Promise<number> {
   const stdout = await runCommand('df', ['-Pk', '/']);
   const lines = stdout.trim().split('\n');
   const parts = lines[1]?.split(/\s+/) || [];
@@ -48,7 +52,7 @@ async function getDiskPercent() {
   return Number.parseInt(percentRaw.replace('%', ''), 10) || 0;
 }
 
-router.get('/thresholds', async (_req, res) => {
+router.get('/thresholds', async (_req: Request, res: Response) => {
   try {
     return res.json(await getThresholds());
   } catch {
@@ -56,7 +60,7 @@ router.get('/thresholds', async (_req, res) => {
   }
 });
 
-router.put('/thresholds', validateBody(schemas.healthThresholds), async (req, res) => {
+router.put('/thresholds', validateBody(schemas.healthThresholds), async (req: Request, res: Response) => {
   const { diskPercent, memoryPercent, loadPerCpu } = req.body;
 
   try {
@@ -83,10 +87,10 @@ router.put('/thresholds', validateBody(schemas.healthThresholds), async (req, re
   }
 });
 
-async function systemHealthHandler(_req, res) {
+async function systemHealthHandler(_req: Request, res: Response) {
   try {
     const [dbResult, thresholds, diskPercent] = await Promise.all([
-      query('SELECT 1 AS ok'),
+      query<{ ok: number }>('SELECT 1 AS ok'),
       getThresholds(),
       getDiskPercent(),
     ]);
@@ -98,7 +102,7 @@ async function systemHealthHandler(_req, res) {
     const cpuCount = os.cpus().length || 1;
     const loadPerCpu = oneMinuteLoad / cpuCount;
 
-    const alerts = [];
+    const alerts: { metric: string; value: number; threshold: number }[] = [];
     if (diskPercent >= thresholds.diskPercent) {
       alerts.push({ metric: 'disk', value: diskPercent, threshold: thresholds.diskPercent });
     }
@@ -130,4 +134,4 @@ async function systemHealthHandler(_req, res) {
 router.get('/', systemHealthHandler);
 router.get('/system', systemHealthHandler);
 
-module.exports = router;
+export default router;

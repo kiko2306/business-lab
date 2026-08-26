@@ -1,30 +1,52 @@
-'use strict';
-
 /**
  * Nginx Proxy Manager API client.
  * Idempotently finds, creates, or updates proxy hosts for exposed services.
  * https://nginxproxymanager.com/api/
  */
 
-const { requestJson } = require('../utils/httpJson');
+import { requestJson } from '../utils/httpJson';
 
-async function login(npmApiUrl, email, password) {
-  const response = await requestJson(`${npmApiUrl}/api/tokens`, {
+interface NpmProxyHost {
+  id: number;
+  domain_names: string[];
+  forward_scheme: string;
+  forward_host: string;
+  forward_port: number;
+  websocket_upgrade?: boolean;
+}
+
+interface EnsureProxyHostOptions {
+  npmApiUrl: string;
+  npmEmail: string;
+  npmPassword: string;
+  hostname: string;
+  forwardScheme: string;
+  forwardHost: string;
+  forwardPort: number;
+  websocket: boolean;
+}
+
+interface EnsureProxyHostResult {
+  id: number;
+  created: boolean;
+  updated: boolean;
+}
+
+async function login(npmApiUrl: string, email: string, password: string): Promise<string> {
+  const response = await requestJson<{ token?: string; error?: { message?: string } }>(`${npmApiUrl}/api/tokens`, {
     method: 'POST',
     body: { identity: email, secret: password },
   });
 
   if (response.statusCode !== 200 || !response.body?.token) {
-    throw new Error(
-      `Nginx Proxy Manager login failed: ${response.body?.error?.message || response.statusCode}`
-    );
+    throw new Error(`Nginx Proxy Manager login failed: ${response.body?.error?.message || response.statusCode}`);
   }
 
   return response.body.token;
 }
 
-async function findProxyHostByDomain(npmApiUrl, token, hostname) {
-  const response = await requestJson(`${npmApiUrl}/api/nginx/proxy-hosts`, {
+async function findProxyHostByDomain(npmApiUrl: string, token: string, hostname: string): Promise<NpmProxyHost | null> {
+  const response = await requestJson<NpmProxyHost[]>(`${npmApiUrl}/api/nginx/proxy-hosts`, {
     headers: { Authorization: `Bearer ${token}` },
   });
 
@@ -35,7 +57,13 @@ async function findProxyHostByDomain(npmApiUrl, token, hostname) {
   return response.body.find((host) => (host.domain_names || []).includes(hostname)) ?? null;
 }
 
-function buildProxyHostPayload({ hostname, forwardScheme, forwardHost, forwardPort, websocket }) {
+function buildProxyHostPayload({
+  hostname,
+  forwardScheme,
+  forwardHost,
+  forwardPort,
+  websocket,
+}: Pick<EnsureProxyHostOptions, 'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket'>) {
   return {
     domain_names: [hostname],
     forward_scheme: forwardScheme,
@@ -54,8 +82,12 @@ function buildProxyHostPayload({ hostname, forwardScheme, forwardHost, forwardPo
   };
 }
 
-async function createProxyHost(npmApiUrl, token, options) {
-  const response = await requestJson(`${npmApiUrl}/api/nginx/proxy-hosts`, {
+async function createProxyHost(
+  npmApiUrl: string,
+  token: string,
+  options: Pick<EnsureProxyHostOptions, 'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket'>
+): Promise<NpmProxyHost> {
+  const response = await requestJson<NpmProxyHost & { error?: { message?: string } }>(`${npmApiUrl}/api/nginx/proxy-hosts`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
     body: buildProxyHostPayload(options),
@@ -67,15 +99,23 @@ async function createProxyHost(npmApiUrl, token, options) {
     );
   }
 
-  return response.body;
+  return response.body as NpmProxyHost;
 }
 
-async function updateProxyHost(npmApiUrl, token, id, options) {
-  const response = await requestJson(`${npmApiUrl}/api/nginx/proxy-hosts/${id}`, {
-    method: 'PUT',
-    headers: { Authorization: `Bearer ${token}` },
-    body: buildProxyHostPayload(options),
-  });
+async function updateProxyHost(
+  npmApiUrl: string,
+  token: string,
+  id: number,
+  options: Pick<EnsureProxyHostOptions, 'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket'>
+): Promise<NpmProxyHost> {
+  const response = await requestJson<NpmProxyHost & { error?: { message?: string } }>(
+    `${npmApiUrl}/api/nginx/proxy-hosts/${id}`,
+    {
+      method: 'PUT',
+      headers: { Authorization: `Bearer ${token}` },
+      body: buildProxyHostPayload(options),
+    }
+  );
 
   if (response.statusCode !== 200) {
     throw new Error(
@@ -83,7 +123,7 @@ async function updateProxyHost(npmApiUrl, token, id, options) {
     );
   }
 
-  return response.body;
+  return response.body as NpmProxyHost;
 }
 
 /**
@@ -91,7 +131,16 @@ async function updateProxyHost(npmApiUrl, token, id, options) {
  * to the given upstream. Creates it if missing, updates it if the upstream
  * has changed, and leaves it untouched otherwise.
  */
-async function ensureProxyHost({ npmApiUrl, npmEmail, npmPassword, hostname, forwardScheme, forwardHost, forwardPort, websocket }) {
+export async function ensureProxyHost({
+  npmApiUrl,
+  npmEmail,
+  npmPassword,
+  hostname,
+  forwardScheme,
+  forwardHost,
+  forwardPort,
+  websocket,
+}: EnsureProxyHostOptions): Promise<EnsureProxyHostResult> {
   const baseUrl = npmApiUrl.replace(/\/+$/, '');
   const token = await login(baseUrl, npmEmail, npmPassword);
   const existing = await findProxyHostByDomain(baseUrl, token, hostname);
@@ -116,5 +165,3 @@ async function ensureProxyHost({ npmApiUrl, npmEmail, npmPassword, hostname, for
 
   return { id: existing.id, created: false, updated: false };
 }
-
-module.exports = { ensureProxyHost };

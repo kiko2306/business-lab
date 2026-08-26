@@ -1,5 +1,3 @@
-'use strict';
-
 /**
  * Cloudflare Tunnel API client.
  * Idempotently ensures a public hostname route exists on the configured
@@ -7,16 +5,33 @@
  * https://developers.cloudflare.com/api/operations/cloudflare-tunnel-configuration-properties
  */
 
-const { requestJson } = require('../utils/httpJson');
+import { requestJson } from '../utils/httpJson';
+
+interface IngressRule {
+  hostname?: string;
+  service: string;
+  [key: string]: unknown;
+}
+
+interface TunnelConfig {
+  ingress: IngressRule[];
+  [key: string]: unknown;
+}
+
+interface CloudflareApiEnvelope<T> {
+  success: boolean;
+  errors?: { message?: string }[];
+  result?: T;
+}
 
 const API_BASE = 'https://api.cloudflare.com/client/v4';
 
-function configUrl(accountId, tunnelId) {
+function configUrl(accountId: string, tunnelId: string): string {
   return `${API_BASE}/accounts/${accountId}/cfd_tunnel/${tunnelId}/configurations`;
 }
 
-async function getTunnelConfiguration(apiToken, accountId, tunnelId) {
-  const response = await requestJson(configUrl(accountId, tunnelId), {
+async function getTunnelConfiguration(apiToken: string, accountId: string, tunnelId: string): Promise<TunnelConfig> {
+  const response = await requestJson<CloudflareApiEnvelope<{ config?: TunnelConfig }>>(configUrl(accountId, tunnelId), {
     headers: { Authorization: `Bearer ${apiToken}` },
   });
 
@@ -29,8 +44,13 @@ async function getTunnelConfiguration(apiToken, accountId, tunnelId) {
   return response.body.result?.config ?? { ingress: [] };
 }
 
-async function putTunnelConfiguration(apiToken, accountId, tunnelId, config) {
-  const response = await requestJson(configUrl(accountId, tunnelId), {
+async function putTunnelConfiguration(
+  apiToken: string,
+  accountId: string,
+  tunnelId: string,
+  config: TunnelConfig
+): Promise<unknown> {
+  const response = await requestJson<CloudflareApiEnvelope<unknown>>(configUrl(accountId, tunnelId), {
     method: 'PUT',
     headers: { Authorization: `Bearer ${apiToken}` },
     body: { config },
@@ -45,17 +65,31 @@ async function putTunnelConfiguration(apiToken, accountId, tunnelId, config) {
   return response.body.result;
 }
 
+interface EnsureIngressRouteOptions {
+  apiToken: string;
+  accountId: string;
+  tunnelId: string;
+  hostname: string;
+  originUrl: string;
+}
+
 /**
  * Idempotently ensure the tunnel's ingress rules route `hostname` to
  * `originUrl`. The catch-all rule (a rule with no hostname) is always kept
  * last, as Cloudflare requires.
  */
-async function ensureIngressRoute({ apiToken, accountId, tunnelId, hostname, originUrl }) {
+export async function ensureIngressRoute({
+  apiToken,
+  accountId,
+  tunnelId,
+  hostname,
+  originUrl,
+}: EnsureIngressRouteOptions): Promise<{ updated: boolean }> {
   const config = await getTunnelConfiguration(apiToken, accountId, tunnelId);
   const ingress = Array.isArray(config.ingress) ? [...config.ingress] : [];
 
   const existingIndex = ingress.findIndex((rule) => rule.hostname === hostname);
-  const desiredRule = { hostname, service: originUrl };
+  const desiredRule: IngressRule = { hostname, service: originUrl };
 
   if (existingIndex >= 0) {
     if (ingress[existingIndex].service === originUrl) {
@@ -74,5 +108,3 @@ async function ensureIngressRoute({ apiToken, accountId, tunnelId, hostname, ori
   await putTunnelConfiguration(apiToken, accountId, tunnelId, { ...config, ingress });
   return { updated: true };
 }
-
-module.exports = { ensureIngressRoute };
