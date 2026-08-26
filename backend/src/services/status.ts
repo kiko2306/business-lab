@@ -77,7 +77,12 @@ function checkHealthHttp(url: string, timeout = 5000): Promise<boolean> {
       resolve(false);
     }, timeout);
 
-    const request = protocol.get(url, { timeout }, (response) => {
+    // Health checks target the app's own container on localhost/the host
+    // gateway; several images (e.g. code-server) self-sign their cert the
+    // same way their own Docker healthcheck does (curl -k), so verification
+    // is skipped here rather than failing checks that are otherwise healthy.
+    const options = { timeout, rejectUnauthorized: false };
+    const request = protocol.get(url, options, (response) => {
       clearTimeout(timeoutHandle);
       // Consider 2xx and 3xx as healthy
       resolve((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 400);

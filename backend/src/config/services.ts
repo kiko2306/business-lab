@@ -61,7 +61,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     healthCheck: {
       enabled: true,
       type: 'http',
-      url: 'http://localhost:8443/health',
+      url: 'https://localhost:8443/health',
       interval: 30000,
       timeout: 5000,
     },
@@ -75,7 +75,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     healthCheck: {
       enabled: true,
       type: 'http',
-      url: 'http://localhost:80/health',
+      url: 'http://localhost:80/login',
       interval: 30000,
       timeout: 5000,
     },
