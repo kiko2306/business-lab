@@ -1,0 +1,22 @@
+version: "3.9"
+
+services:
+  home-assistant:
+    image: ghcr.io/home-assistant/home-assistant:stable
+    restart: unless-stopped
+    ports:
+      - "${HA_PORT:-8123}:8123"
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      - ha-config:/config
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8123/api/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  ha-config:
+    driver: local

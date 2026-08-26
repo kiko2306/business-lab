@@ -101,10 +101,9 @@ backend starts and stops on your behalf.
       granting it root-equivalent control of the host. Consider a socket proxy
       restricted to the required endpoints, and keep the API off the public
       internet or behind strict authentication.
-- [x] **Registry lists apps that are not installed** — 11 of the 13 entries in
-      `backend/src/config/services.js` have no directory under `apps/`. They render
-      as `unknown` tiles and return HTTP 404 when started. Either add the compose
-      stacks or trim the registry.
+- [x] **Registry lists apps that are not installed** — all 13 entries in
+      `backend/src/config/services.js` now have a `docker-compose.yml` and
+      `.env.example` under their respective `apps/` directory.
 - [ ] **Health check URLs assume host ports** — entries use `localhost:<port>` and
       are rewritten via `SERVICE_HEALTH_HOST`. Apps published on a non-default
       port, or not published to the host at all, will report `check failed`.

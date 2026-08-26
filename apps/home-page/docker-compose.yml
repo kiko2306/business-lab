@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  homepage:
+    image: ghcr.io/gethomepage/homepage:latest
+    restart: unless-stopped
+    ports:
+      - "${HOMEPAGE_PORT:-3000}:3000"
+    volumes:
+      - homepage-config:/app/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+volumes:
+  homepage-config:
+    driver: local
