@@ -13,9 +13,15 @@ services:
       DB_MYSQL_USER: ${NPM_DB_USER:-npm}
       DB_MYSQL_PASSWORD: ${NPM_DB_PASSWORD}
       DB_MYSQL_NAME: ${NPM_DB_NAME:-npm}
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Nginx Proxy Manager"
+      - "homepage.icon=nginx-proxy-manager.png"
+      - "homepage.href=http://localhost:${NPM_ADMIN_PORT:-81}"
+      - "homepage.description=Reverse proxy and certificate management"
     volumes:
-      - npm-data:/data
-      - npm-letsencrypt:/etc/letsencrypt
+      - ./data/app:/data
+      - ./data/letsencrypt:/etc/letsencrypt
     depends_on:
       npm-db:
         condition: service_healthy
@@ -39,7 +45,7 @@ services:
       MYSQL_USER: ${NPM_DB_USER:-npm}
       MYSQL_PASSWORD: ${NPM_DB_PASSWORD}
     volumes:
-      - npm-db-data:/var/lib/mysql
+      - ./data/db:/var/lib/mysql
     networks:
       - npm-net
     healthcheck:
@@ -47,14 +53,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-volumes:
-  npm-data:
-    driver: local
-  npm-letsencrypt:
-    driver: local
-  npm-db-data:
-    driver: local
 
 networks:
   npm-net:

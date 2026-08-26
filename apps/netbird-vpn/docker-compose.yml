@@ -4,7 +4,7 @@ services:
     image: netbirdio/signal:latest
     restart: unless-stopped
     volumes:
-      - netbird-data:/var/lib/netbird
+      - ./data/signal:/var/lib/netbird
     networks:
       - netbird-net
 
@@ -13,16 +13,16 @@ services:
     restart: unless-stopped
     ports:
       - "${NETBIRD_MGMT_PORT:-8080}:8080"
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Netbird VPN"
+      - "homepage.icon=netbird.png"
+      - "homepage.href=http://localhost:${NETBIRD_MGMT_PORT:-8080}"
+      - "homepage.description=Zero-trust VPN and network access"
     volumes:
-      - netbird-mgmt-data:/var/lib/netbird
+      - ./data/management:/var/lib/netbird
     networks:
       - netbird-net
-
-volumes:
-  netbird-data:
-    driver: local
-  netbird-mgmt-data:
-    driver: local
 
 networks:
   netbird-net:

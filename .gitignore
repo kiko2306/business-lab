@@ -3,6 +3,13 @@
 .env.*
 !.env.example
 
+# Per-app persistent data (bind-mounted from each app's own folder)
+apps/*/data/
+# ...except Home Page's, which is just its checked-in dashboard config
+# (services.yaml, docker.yaml, etc.), not runtime state.
+!apps/home-page/data/
+!apps/home-page/data/**
+
 # Node modules
 node_modules/
 */node_modules/

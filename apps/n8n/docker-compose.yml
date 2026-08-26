@@ -17,8 +17,14 @@ services:
       N8N_PORT: 5678
       N8N_PROTOCOL: ${N8N_PROTOCOL:-http}
       WEBHOOK_URL: ${N8N_WEBHOOK_URL:-http://localhost:5678/}
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=n8n"
+      - "homepage.icon=n8n.png"
+      - "homepage.href=http://localhost:${N8N_PORT:-5678}"
+      - "homepage.description=Workflow automation platform"
     volumes:
-      - n8n-data:/home/node/.n8n
+      - ./data/n8n:/home/node/.n8n
     depends_on:
       n8n-db:
         condition: service_healthy
@@ -39,7 +45,7 @@ services:
       POSTGRES_USER: ${N8N_DB_USER:-n8n}
       POSTGRES_PASSWORD: ${N8N_DB_PASSWORD}
     volumes:
-      - n8n-db-data:/var/lib/postgresql/data
+      - ./data/db:/var/lib/postgresql/data
     networks:
       - n8n-net
     healthcheck:
@@ -47,12 +53,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-volumes:
-  n8n-data:
-    driver: local
-  n8n-db-data:
-    driver: local
 
 networks:
   n8n-net:

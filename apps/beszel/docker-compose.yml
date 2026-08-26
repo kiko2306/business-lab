@@ -4,15 +4,17 @@ services:
     restart: unless-stopped
     ports:
       - "${BESZEL_PORT:-8090}:8090"
+    labels:
+      - "homepage.group=Monitoring & Backup"
+      - "homepage.name=Beszel"
+      - "homepage.icon=beszel.png"
+      - "homepage.href=http://localhost:${BESZEL_PORT:-8090}"
+      - "homepage.description=Lightweight server monitoring hub"
     volumes:
-      - beszel-data:/beszel_data
+      - ./data:/beszel_data
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:8090/api/health || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
-
-volumes:
-  beszel-data:
-    driver: local

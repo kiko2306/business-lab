@@ -10,9 +10,11 @@ services:
       PGID: ${PGID:-1000}
       TZ: ${TZ:-UTC}
       APP_KEY: ${SPEEDTEST_APP_KEY}
+    labels:
+      - "homepage.group=Monitoring & Backup"
+      - "homepage.name=Speedtest"
+      - "homepage.icon=speedtest-tracker.png"
+      - "homepage.href=http://localhost:${SPEEDTEST_PORT:-80}"
+      - "homepage.description=Internet speed testing tool"
     volumes:
-      - speedtest-data:/config
-
-volumes:
-  speedtest-data:
-    driver: local
+      - ./data:/config

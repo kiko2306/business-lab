@@ -7,15 +7,17 @@ services:
       - "${HA_PORT:-8123}:8123"
     environment:
       TZ: ${TZ:-UTC}
+    labels:
+      - "homepage.group=Home Automation"
+      - "homepage.name=Home Assistant"
+      - "homepage.icon=home-assistant.png"
+      - "homepage.href=http://localhost:${HA_PORT:-8123}"
+      - "homepage.description=Home automation platform"
     volumes:
-      - ha-config:/config
+      - ./data:/config
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8123/api/"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-
-volumes:
-  ha-config:
-    driver: local

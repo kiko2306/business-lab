@@ -10,14 +10,14 @@ services:
     environment:
       TZ: ${TZ:-UTC}
       WEBPASSWORD: ${PIHOLE_WEB_PASSWORD}
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Pi-hole"
+      - "homepage.icon=pi-hole.png"
+      - "homepage.href=http://localhost:${PIHOLE_WEB_PORT:-8080}"
+      - "homepage.description=DNS ad blocker"
     volumes:
-      - pihole-data:/etc/pihole
-      - pihole-dnsmasq:/etc/dnsmasq.d
+      - ./data/pihole:/etc/pihole
+      - ./data/dnsmasq:/etc/dnsmasq.d
     cap_add:
       - NET_ADMIN
-
-volumes:
-  pihole-data:
-    driver: local
-  pihole-dnsmasq:
-    driver: local

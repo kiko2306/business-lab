@@ -5,12 +5,12 @@ services:
     restart: unless-stopped
     ports:
       - "${FILEBROWSER_PORT:-8080}:80"
+    labels:
+      - "homepage.group=Media & Files"
+      - "homepage.name=File Browser"
+      - "homepage.icon=filebrowser.png"
+      - "homepage.href=http://localhost:${FILEBROWSER_PORT:-8080}"
+      - "homepage.description=Web-based file manager"
     volumes:
-      - filebrowser-data:/database
-      - filebrowser-srv:/srv
-
-volumes:
-  filebrowser-data:
-    driver: local
-  filebrowser-srv:
-    driver: local
+      - ./data/database:/database
+      - ./data/files:/srv

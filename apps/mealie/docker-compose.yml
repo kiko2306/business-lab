@@ -7,15 +7,17 @@ services:
     environment:
       TZ: ${TZ:-UTC}
       BASE_URL: ${MEALIE_BASE_URL:-http://localhost:9925}
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=Mealie"
+      - "homepage.icon=mealie.png"
+      - "homepage.href=http://localhost:${MEALIE_PORT:-9925}"
+      - "homepage.description=Recipe manager and meal planner"
     volumes:
-      - mealie-data:/app/data
+      - ./data:/app/data
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:9000/api/app/about"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 60s
-
-volumes:
-  mealie-data:
-    driver: local

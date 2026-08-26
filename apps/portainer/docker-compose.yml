@@ -6,16 +6,18 @@ services:
     ports:
       - "${PORTAINER_HTTP_PORT:-9000}:9000"
       - "${PORTAINER_HTTPS_PORT:-9443}:9443"
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Portainer"
+      - "homepage.icon=portainer.png"
+      - "homepage.href=https://localhost:${PORTAINER_HTTPS_PORT:-9443}"
+      - "homepage.description=Docker container management UI"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - portainer-data:/data
+      - ./data:/data
     healthcheck:
       test: ["CMD", "wget", "-qO-", "--no-check-certificate", "https://localhost:9443/api/system/status"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
-
-volumes:
-  portainer-data:
-    driver: local

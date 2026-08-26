@@ -7,12 +7,14 @@ services:
       TS_AUTHKEY: ${TAILSCALE_AUTH_KEY}
       TS_STATE_DIR: /var/lib/tailscale
       TS_USERSPACE: "true"
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Tailscale"
+      - "homepage.icon=tailscale.png"
+      - "homepage.href=#"
+      - "homepage.description=Mesh VPN service (no web UI)"
     volumes:
-      - tailscale-data:/var/lib/tailscale
+      - ./data:/var/lib/tailscale
     cap_add:
       - NET_ADMIN
       - NET_RAW
-
-volumes:
-  tailscale-data:
-    driver: local

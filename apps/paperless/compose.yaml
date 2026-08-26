@@ -22,11 +22,17 @@ services:
       PAPERLESS_ENABLE_COMPRESSION: "true"
       PAPERLESS_TASK_WORKERS: 2
       PAPERLESS_THREADS_PER_WORKER: 1
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=Paperless"
+      - "homepage.icon=paperless-ngx.png"
+      - "homepage.href=http://localhost:${PAPERLESS_PORT:-8000}"
+      - "homepage.description=Document management system"
     volumes:
-      - paperless-data:/usr/src/paperless/data
-      - paperless-media:/usr/src/paperless/media
-      - paperless-export:/usr/src/paperless/export
-      - paperless-consume:/usr/src/paperless/consume
+      - ./data/data:/usr/src/paperless/data
+      - ./data/media:/usr/src/paperless/media
+      - ./data/export:/usr/src/paperless/export
+      - ./data/consume:/usr/src/paperless/consume
     depends_on:
       paperless-db:
         condition: service_healthy
@@ -49,7 +55,7 @@ services:
       POSTGRES_USER: ${PAPERLESS_DB_USER:-paperless}
       POSTGRES_PASSWORD: ${PAPERLESS_DB_PASSWORD}
     volumes:
-      - paperless-db-data:/var/lib/postgresql/data
+      - ./data/db:/var/lib/postgresql/data
     networks:
       - paperless-net
     healthcheck:
@@ -62,7 +68,7 @@ services:
     image: redis:7-alpine
     restart: unless-stopped
     volumes:
-      - paperless-redis-data:/data
+      - ./data/redis:/data
     networks:
       - paperless-net
     healthcheck:
@@ -70,20 +76,6 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
-
-volumes:
-  paperless-data:
-    driver: local
-  paperless-media:
-    driver: local
-  paperless-export:
-    driver: local
-  paperless-consume:
-    driver: local
-  paperless-db-data:
-    driver: local
-  paperless-redis-data:
-    driver: local
 
 networks:
   paperless-net:
