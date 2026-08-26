@@ -624,11 +624,15 @@ Numbers below double as the reference used elsewhere in this log (e.g.
    (validation, success/error submit, paste sanitization) — 14 tests, all
    verified passing headless via `node:20-slim` + puppeteer deps in this
    session. **Priority: P1** — **Estimate: M**
-4. [ ] **"Test connection" action for exposure settings** — validate NPM
-   credentials and Cloudflare account/zone/tunnel IDs on demand instead of
-   only discovering misconfiguration the next time a service starts (as
-   happened repeatedly in §17.1's live validation). Natural follow-on to
-   item 3's coverage of the same subsystem. **Priority: P2** — **Estimate: M**
+4. [x] **"Test connection" action for exposure settings** — added
+   `npmClient.testNpmConnection` / `cloudflareTunnelClient.
+   testCloudflareTunnelAccess` (read-only login/config/zone checks,
+   nothing created or changed), `POST /api/settings/exposure/test`
+   (tests the currently saved global config, same one a service start
+   uses), and a "Test connection" button in the settings panel showing a
+   pass/fail alert per service (NPM, Cloudflare). 5 new backend tests
+   (46 total); frontend build + full spec suite (14 tests) verified
+   passing. **Priority: P2** — **Estimate: M**
 5. [ ] **Exposure drift detection** — periodic reconciliation or a
    "re-verify" button for when NPM's/Cloudflare's live state diverges from
    `service_exposure` (e.g. hand-edited proxy host). Builds on item 4's
