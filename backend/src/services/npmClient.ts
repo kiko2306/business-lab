@@ -13,6 +13,7 @@ interface NpmProxyHost {
   forward_host: string;
   forward_port: number;
   allow_websocket_upgrade?: boolean;
+  advanced_config?: string;
 }
 
 interface EnsureProxyHostOptions {
@@ -25,7 +26,21 @@ interface EnsureProxyHostOptions {
   forwardHost: string;
   forwardPort: number;
   websocket: boolean;
+  autheliaProtected: boolean;
 }
+
+// Gates a proxy host behind Authelia's forward-auth — see the snippet files
+// this references (mounted into the NPM container, apps/nginx-proxy-manager/
+// snippets/) and apps/authelia/config/configuration.yml for the other half.
+const AUTHELIA_ADVANCED_CONFIG = [
+  'include /snippets/authelia-location.conf;',
+  '',
+  'location / {',
+  '    include /snippets/proxy.conf;',
+  '    include /snippets/authelia-authrequest.conf;',
+  '    proxy_pass $forward_scheme://$server:$port;',
+  '}',
+].join('\n');
 
 interface EnsureProxyHostResult {
   id: number;
@@ -73,7 +88,11 @@ export function buildProxyHostPayload({
   forwardHost,
   forwardPort,
   websocket,
-}: Pick<EnsureProxyHostOptions, 'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket'>) {
+  autheliaProtected,
+}: Pick<
+  EnsureProxyHostOptions,
+  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected'
+>) {
   return {
     domain_names: [hostname],
     forward_scheme: forwardScheme,
@@ -88,14 +107,16 @@ export function buildProxyHostPayload({
     http2_support: false,
     hsts_enabled: false,
     hsts_subdomains: false,
+    advanced_config: autheliaProtected ? AUTHELIA_ADVANCED_CONFIG : '',
   };
 }
 
-async function createProxyHost(
-  npmApiUrl: string,
-  token: string,
-  options: Pick<EnsureProxyHostOptions, 'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket'>
-): Promise<NpmProxyHost> {
+type ProxyHostWriteOptions = Pick<
+  EnsureProxyHostOptions,
+  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected'
+>;
+
+async function createProxyHost(npmApiUrl: string, token: string, options: ProxyHostWriteOptions): Promise<NpmProxyHost> {
   const response = await requestJson<NpmProxyHost & { error?: { message?: string } }>(`${npmApiUrl}/api/nginx/proxy-hosts`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}` },
@@ -115,7 +136,7 @@ async function updateProxyHost(
   npmApiUrl: string,
   token: string,
   id: number,
-  options: Pick<EnsureProxyHostOptions, 'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket'>
+  options: ProxyHostWriteOptions
 ): Promise<NpmProxyHost> {
   const response = await requestJson<NpmProxyHost & { error?: { message?: string } }>(
     `${npmApiUrl}/api/nginx/proxy-hosts/${id}`,
@@ -150,12 +171,13 @@ export async function ensureProxyHost({
   forwardHost,
   forwardPort,
   websocket,
+  autheliaProtected,
 }: EnsureProxyHostOptions): Promise<EnsureProxyHostResult> {
   const baseUrl = npmApiUrl.replace(/\/+$/, '');
   const token = await login(baseUrl, npmEmail, npmPassword);
   const existing = await findProxyHostByDomain(baseUrl, token, hostname);
 
-  const options = { hostname, forwardScheme, forwardHost, forwardPort, websocket };
+  const options = { hostname, forwardScheme, forwardHost, forwardPort, websocket, autheliaProtected };
 
   if (!existing) {
     const created = await createProxyHost(baseUrl, token, options);
@@ -169,11 +191,13 @@ export async function ensureProxyHost({
     throw new Error(`Nginx Proxy Manager host for ${hostname} already exists and is not managed by this service.`);
   }
 
+  const expectedAdvancedConfig = autheliaProtected ? AUTHELIA_ADVANCED_CONFIG : '';
   const needsUpdate =
     existing.forward_scheme !== forwardScheme ||
     existing.forward_host !== forwardHost ||
     existing.forward_port !== forwardPort ||
-    Boolean(existing.allow_websocket_upgrade) !== Boolean(websocket);
+    Boolean(existing.allow_websocket_upgrade) !== Boolean(websocket) ||
+    (existing.advanced_config ?? '') !== expectedAdvancedConfig;
 
   if (needsUpdate) {
     await updateProxyHost(baseUrl, token, existing.id, options);

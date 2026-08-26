@@ -69,6 +69,7 @@ export const schemas = {
   }),
   serviceExposureUpdate: Joi.object({
     enabled: Joi.boolean().required(),
+    autheliaProtected: Joi.boolean().optional(),
   }),
   serviceEnvUpdate: Joi.object({
     values: Joi.object().pattern(/^[A-Z][A-Z0-9_]*$/, Joi.string().allow('').max(2000)).required(),

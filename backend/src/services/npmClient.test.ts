@@ -17,6 +17,7 @@ const baseOptions = {
   forwardHost: '172.17.0.1',
   forwardPort: 8000,
   websocket: true,
+  autheliaProtected: false,
 };
 
 function mockLogin() {
@@ -35,6 +36,7 @@ describe('buildProxyHostPayload', () => {
       forwardHost: '172.17.0.1',
       forwardPort: 8000,
       websocket: true,
+      autheliaProtected: false,
     });
 
     expect(payload).toMatchObject({
@@ -46,6 +48,7 @@ describe('buildProxyHostPayload', () => {
       block_exploits: true,
       caching_enabled: false,
       ssl_forced: false,
+      advanced_config: '',
     });
   });
 
@@ -56,8 +59,23 @@ describe('buildProxyHostPayload', () => {
       forwardHost: 'h',
       forwardPort: 80,
       websocket: undefined as unknown as boolean,
+      autheliaProtected: false,
     });
     expect(payload.allow_websocket_upgrade).toBe(false);
+  });
+
+  it('includes the Authelia forward-auth snippet includes when protected', () => {
+    const payload = buildProxyHostPayload({
+      hostname: 'paperless.example.com',
+      forwardScheme: 'http',
+      forwardHost: '172.17.0.1',
+      forwardPort: 8000,
+      websocket: true,
+      autheliaProtected: true,
+    });
+
+    expect(payload.advanced_config).toContain('include /snippets/authelia-location.conf;');
+    expect(payload.advanced_config).toContain('include /snippets/authelia-authrequest.conf;');
   });
 });
 
@@ -103,6 +121,30 @@ describe('ensureProxyHost', () => {
     mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { id: 9 }, raw: '' }); // update
 
     const result = await ensureProxyHost({ ...baseOptions, expectedHostId: 9 });
+
+    expect(result).toEqual({ id: 9, created: false, updated: true });
+  });
+
+  it('updates an owned host when Authelia protection was turned on', async () => {
+    mockLogin();
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: [
+        {
+          id: 9,
+          domain_names: ['paperless.example.com'],
+          forward_scheme: 'http',
+          forward_host: '172.17.0.1',
+          forward_port: 8000,
+          allow_websocket_upgrade: true,
+          advanced_config: '',
+        },
+      ],
+      raw: '',
+    });
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { id: 9 }, raw: '' }); // update
+
+    const result = await ensureProxyHost({ ...baseOptions, expectedHostId: 9, autheliaProtected: true });
 
     expect(result).toEqual({ id: 9, created: false, updated: true });
   });

@@ -12,7 +12,7 @@ import backupRouter from './routes/backup';
 import healthRouter from './routes/health';
 import recoveryRouter from './routes/recovery';
 import usersRouter from './routes/users';
-import { dropLegacyRoleColumn, ensureServiceExposureTable } from './utils/database';
+import { dropLegacyRoleColumn, ensureServiceExposureTable, ensureServiceExposureAutheliaColumn } from './utils/database';
 import authMiddleware from './middleware/auth';
 import setupModeMiddleware from './middleware/setupMode';
 import { initWebSocket, sseHandler } from './services/realtime';
@@ -148,6 +148,9 @@ dropLegacyRoleColumn().catch((err: Error) => {
 });
 ensureServiceExposureTable().catch((err: Error) => {
   console.error('Unable to ensure service_exposure table:', err.message);
+});
+ensureServiceExposureAutheliaColumn().catch((err: Error) => {
+  console.error('Unable to ensure service_exposure.authelia_protected column:', err.message);
 });
 startBackupScheduler();
 

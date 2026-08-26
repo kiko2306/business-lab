@@ -137,6 +137,19 @@
             </label>
           </div>
 
+          <div *ngIf="service.name !== 'authelia'" class="form-check form-switch mb-2">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              id="exposureAuthelia-{{ service.name }}"
+              [(ngModel)]="exposureAutheliaProtected"
+              [disabled]="!exposureEnabled"
+            />
+            <label class="form-check-label small" for="exposureAuthelia-{{ service.name }}">
+              Require Authelia login
+            </label>
+          </div>
+
           <div *ngIf="exposure.hostname" class="small text-body-secondary mb-2">
             Public hostname:
             <a [href]="'https://' + exposure.hostname" target="_blank" rel="noopener noreferrer"><code>{{ exposure.hostname }}</code></a>

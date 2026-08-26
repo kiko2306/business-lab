@@ -26,8 +26,11 @@ services:
       AUTH_CLIENT_ID: netbird-dashboard
       AUTH_AUTHORITY: https://authelia.tx-home-utils.com
       AUTH_SUPPORTED_SCOPES: "openid profile email"
-      AUTH_REDIRECT_URI: https://netbird-vpn.tx-home-utils.com/nb-auth
-      AUTH_SILENT_REDIRECT_URI: https://netbird-vpn.tx-home-utils.com/nb-silent-auth
+      # Relative — the dashboard's own JS prepends its origin, so an absolute
+      # URL here doubles up into "https://...comhttps://...com/nb-auth" and
+      # Authelia rejects it as not matching the registered redirect_uris.
+      AUTH_REDIRECT_URI: /nb-auth
+      AUTH_SILENT_REDIRECT_URI: /nb-silent-auth
       NETBIRD_TOKEN_SOURCE: accessToken
       USE_AUTH0: "false"
     labels:
@@ -46,8 +49,20 @@ services:
     restart: unless-stopped
     ports:
       - "${NETBIRD_MGMT_PORT:-8080}:8080"
+    # Fetches Authelia's OIDC config over the public internet at startup —
+    # bypass the host's resolver (Docker forwards to it by default) since a
+    # stale negative-cached lookup there otherwise crash-loops this container
+    # for as long as that cache takes to expire.
+    dns:
+      - 1.1.1.1
+      - 1.0.0.1
     volumes:
-      - ./config/management.json:/etc/netbird/management.json:ro
+      # data/management.json (gitignored) is the real working copy, generated
+      # from config/management.json.example with a real DataStoreEncryptionKey
+      # filled in — see .env.example for how to regenerate it. Kept read-only
+      # so management can't silently rewrite it into a state that isn't
+      # backed up alongside the rest of this app's config.
+      - ./data/management.json:/etc/netbird/management.json:ro
       - ./data/management:/var/lib/netbird
     networks:
       - netbird-net

@@ -9,8 +9,7 @@ users:
   authelia:
     disabled: false
     displayname: 'Authelia Admin'
-    # Placeholder hash for the password "authelia" — CHANGE THIS.
-    password: '$argon2id$v=19$m=65536,t=3,p=4$BpLnfgDsc2WD8F2q$o/vzA4myCqZZ36bUGsDY//8mKUYNZZaR0t4MFFSs+iM'
+    password: '$argon2id$v=19$m=65536,t=3,p=4$55n0xVn2J7LmEmoTdQpUmA$TdtMN/UVRWw9P1NwSOT3etXN3j/bt4BuFZMTk7+tWGM'
     email: admin@localhost
     groups:
       - admins

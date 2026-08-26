@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS service_exposure (
     upstream_host   VARCHAR(255),
     upstream_port   INTEGER,
     websocket       BOOLEAN NOT NULL DEFAULT FALSE,
+    authelia_protected BOOLEAN NOT NULL DEFAULT FALSE,
     npm_host_id     INTEGER,
     cf_hostname_id  TEXT,
     status          VARCHAR(50) NOT NULL DEFAULT 'not_provisioned',

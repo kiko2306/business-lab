@@ -31,6 +31,7 @@ export class ServiceCardComponent {
   protected exposure: ServiceExposureConfig | null = null;
 
   protected exposureEnabled = false;
+  protected exposureAutheliaProtected = false;
 
   protected envPanelOpen = false;
   protected envLoading = false;
@@ -80,6 +81,7 @@ export class ServiceCardComponent {
         next: (config) => {
           this.exposure = config;
           this.exposureEnabled = config.enabled;
+          this.exposureAutheliaProtected = config.autheliaProtected;
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load exposure configuration.')),
       });
@@ -90,6 +92,7 @@ export class ServiceCardComponent {
     this.operations
       .updateServiceExposure(this.service.name, {
         enabled: this.exposureEnabled,
+        autheliaProtected: this.exposureAutheliaProtected,
       })
       .pipe(finalize(() => (this.exposureSaving = false)))
       .subscribe({

@@ -35,7 +35,7 @@ export async function getServiceExposureRow(serviceName: string): Promise<Servic
 
 export async function upsertServiceExposureConfig(
   serviceName: string,
-  { enabled }: ServiceExposureInput
+  { enabled, autheliaProtected }: ServiceExposureInput
 ): Promise<ServiceExposureRow> {
   const globalConfig = await getExposureConfig();
   const hostname = globalConfig ? `${serviceName}.${globalConfig.baseDomain}` : null;
@@ -44,15 +44,16 @@ export async function upsertServiceExposureConfig(
   // provisionServiceIfEnabled) rather than entered by the user; left
   // unset here and populated on the next successful service start.
   const result = await query<ServiceExposureRow>(
-    `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, status, updated_at)
-     VALUES ($1, $2, $3, $4, $5, 'not_provisioned', NOW())
+    `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, authelia_protected, status, updated_at)
+     VALUES ($1, $2, $3, $4, $5, $6, 'not_provisioned', NOW())
      ON CONFLICT (service_name)
      DO UPDATE SET
        enabled = EXCLUDED.enabled,
        hostname = EXCLUDED.hostname,
+       authelia_protected = EXCLUDED.authelia_protected,
        updated_at = NOW()
      RETURNING *`,
-    [serviceName, enabled, hostname, UPSTREAM_SCHEME, ALLOW_WEBSOCKET_UPGRADE]
+    [serviceName, enabled, hostname, UPSTREAM_SCHEME, ALLOW_WEBSOCKET_UPGRADE, Boolean(autheliaProtected)]
   );
   return result.rows[0];
 }
@@ -143,6 +144,9 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
       forwardHost: upstreamHost,
       forwardPort: upstreamPort,
       websocket: ALLOW_WEBSOCKET_UPGRADE,
+      // Authelia can't gate itself — the auth_request call would loop back
+      // into its own unauthenticated login page.
+      autheliaProtected: serviceName === 'authelia' ? false : exposureRow.authelia_protected,
     });
     npmHostId = npmResult.id;
 

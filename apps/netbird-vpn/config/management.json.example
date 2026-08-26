@@ -15,7 +15,9 @@
   "ReverseProxy": {
     "TrustedHTTPProxies": [],
     "TrustedHTTPProxiesCount": 0,
-    "TrustedPeers": ["0.0.0.0/0"]
+    "TrustedPeers": [
+      "0.0.0.0/0"
+    ]
   },
   "DataStoreEncryptionKey": "",
   "StoreConfig": {

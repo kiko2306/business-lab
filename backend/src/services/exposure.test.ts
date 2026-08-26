@@ -46,6 +46,7 @@ function exposureRow(overrides: Partial<ServiceExposureRow> = {}): ServiceExposu
     upstream_host: null,
     upstream_port: null,
     websocket: true,
+    authelia_protected: false,
     npm_host_id: null,
     cf_hostname_id: null,
     status: 'not_provisioned',

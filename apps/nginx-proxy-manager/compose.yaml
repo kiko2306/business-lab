@@ -22,6 +22,10 @@ services:
     volumes:
       - ./data/app:/data
       - ./data/letsencrypt:/etc/letsencrypt
+      # Authelia forward-auth snippets — `include /snippets/...;` in a proxy
+      # host's Advanced config to put it behind Authelia. See
+      # apps/authelia/config/configuration.yml for the SSO side of this.
+      - ./snippets:/snippets:ro
     depends_on:
       npm-db:
         condition: service_healthy

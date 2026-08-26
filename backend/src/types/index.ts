@@ -109,6 +109,7 @@ export interface ServiceExposureRow {
   upstream_host: string | null;
   upstream_port: number | null;
   websocket: boolean;
+  authelia_protected: boolean;
   npm_host_id: number | null;
   cf_hostname_id: string | null;
   status: string;
@@ -118,6 +119,7 @@ export interface ServiceExposureRow {
 
 export interface ServiceExposureInput {
   enabled: boolean;
+  autheliaProtected?: boolean;
 }
 
 export interface ExposureProvisionResult {

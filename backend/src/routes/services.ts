@@ -154,6 +154,7 @@ router.get(
           upstreamHost: null,
           upstreamPort: null,
           websocket: false,
+          autheliaProtected: false,
           status: 'not_provisioned',
           lastError: null,
         });
@@ -166,6 +167,7 @@ router.get(
         upstreamHost: row.upstream_host,
         upstreamPort: row.upstream_port,
         websocket: row.websocket,
+        autheliaProtected: row.authelia_protected,
         status: row.status,
         lastError: row.last_error,
       });
