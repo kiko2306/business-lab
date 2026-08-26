@@ -1,14 +1,15 @@
-'use strict';
-
-const { WebSocket, WebSocketServer } = require('ws');
-const { verifyAccessToken } = require('../utils/jwt');
-const { getAllServiceStatus } = require('./status');
+import { Request, Response } from 'express';
+import { WebSocket, WebSocketServer } from 'ws';
+import { Server } from 'http';
+import { verifyAccessToken } from '../utils/jwt';
+import { getAllServiceStatus } from './status';
+import { ServiceStatusResponse } from '../types';
 
 const STREAM_INTERVAL_MS = 15000;
-const wsClients = new Set();
-const streamTickets = new Map();
+const wsClients = new Set<WebSocket>();
+const streamTickets = new Map<string, { userId: number; expiresAt: number }>();
 
-function createStreamTicket(userId) {
+export function createStreamTicket(userId: number): string {
   for (const [key, value] of streamTickets.entries()) {
     if (value.expiresAt <= Date.now()) {
       streamTickets.delete(key);
@@ -19,7 +20,7 @@ function createStreamTicket(userId) {
   return ticket;
 }
 
-function getTokenFromRequest(req) {
+function getTokenFromRequest(req: Request): string | null {
   const authHeader = req.headers['authorization'];
   if (authHeader && authHeader.startsWith('Bearer ')) {
     return authHeader.slice(7);
@@ -30,7 +31,7 @@ function getTokenFromRequest(req) {
   return null;
 }
 
-function authenticateStreamRequest(req) {
+function authenticateStreamRequest(req: Request): { id: number } | null {
   if (typeof req.query?.ticket === 'string') {
     const ticket = streamTickets.get(req.query.ticket);
     if (ticket && ticket.expiresAt > Date.now()) {
@@ -50,17 +51,17 @@ function authenticateStreamRequest(req) {
   }
 }
 
-function sendJson(socket, payload) {
+function sendJson(socket: WebSocket, payload: ServiceStatusResponse): void {
   if (socket.readyState === WebSocket.OPEN) {
     socket.send(JSON.stringify(payload));
   }
 }
 
-async function getStatusPayload() {
+async function getStatusPayload(): Promise<ServiceStatusResponse> {
   return getAllServiceStatus();
 }
 
-function startStatusBroadcaster() {
+function startStatusBroadcaster(): ReturnType<typeof setInterval> {
   return setInterval(async () => {
     if (!wsClients.size) {
       return;
@@ -76,13 +77,13 @@ function startStatusBroadcaster() {
   }, STREAM_INTERVAL_MS);
 }
 
-function initWebSocket(server) {
+export function initWebSocket(server: Server): void {
   const wss = new WebSocketServer({ server, path: '/ws/services' });
   const broadcaster = startStatusBroadcaster();
 
-  wss.on('connection', async (socket, req) => {
-    const query = new URL(req.url, 'http://localhost').searchParams;
-    const ticket = query.get('ticket');
+  wss.on('connection', async (socket: WebSocket, req) => {
+    const searchParams = new URL(req.url || '', 'http://localhost').searchParams;
+    const ticket = searchParams.get('ticket');
     const ticketPayload = ticket ? streamTickets.get(ticket) : null;
     if (!ticketPayload || ticketPayload.expiresAt <= Date.now()) {
       socket.close(1008, 'Unauthorized');
@@ -104,7 +105,7 @@ function initWebSocket(server) {
   });
 }
 
-async function sseHandler(req, res) {
+export async function sseHandler(req: Request, res: Response): Promise<Response | void> {
   if (!authenticateStreamRequest(req)) {
     return res.status(401).json({ error: 'Unauthorized stream access.' });
   }
@@ -116,7 +117,7 @@ async function sseHandler(req, res) {
   });
   res.flushHeaders?.();
 
-  const sendEvent = (payload) => {
+  const sendEvent = (payload: ServiceStatusResponse) => {
     res.write(`event: status\n`);
     res.write(`data: ${JSON.stringify(payload)}\n\n`);
   };
@@ -139,9 +140,3 @@ async function sseHandler(req, res) {
     clearInterval(interval);
   });
 }
-
-module.exports = {
-  createStreamTicket,
-  initWebSocket,
-  sseHandler,
-};

@@ -1,7 +1,7 @@
 # Homelab Management System Specification
 
 ## 1. Overview
-This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express backend. It provides a dashboard for starting and stopping Docker-based services, viewing logs, and monitoring system resources.
+This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express (TypeScript) backend. It provides a dashboard for starting and stopping Docker-based services, viewing logs, and monitoring system resources.
 
 The frontend, API, and database should all run as Docker containers, while the host continues to run Docker and Bash scripts that manage the individual homelab apps.
 
@@ -15,7 +15,7 @@ The frontend, API, and database should all run as Docker containers, while the h
 
 ## 3. Technology Stack
 - **Frontend**: Angular (latest stable), containerized with Docker
-- **Backend**: Node.js + Express, containerized with Docker
+- **Backend**: Node.js + Express + TypeScript, containerized with Docker
 - **Database**: SQLite or PostgreSQL, containerized with Docker
 - **Runtime Environment**: Linux host with Docker and Bash
 
@@ -179,8 +179,10 @@ Preferred update strategies, in order:
 
 ### Milestone 3: Administration
 - [x] Audit logs
-- [ ] User management
-- [ ] Permission checks
+- [x] User management
+- [x] Permission checks — every account is an administrator, so there is no
+      restricted role tier to gate; all `/users`, `/settings`, `/backups`, etc.
+      routes require a valid JWT.
 - [x] Backup/export features
 
 ### Milestone 4: Reliability and UX
@@ -238,7 +240,7 @@ Preferred update strategies, in order:
 - [x] Add start/stop buttons with loading states. **Priority: P0** — **Estimate: M**
 - [x] Add status indicators and refresh behavior. **Priority: P0** — **Estimate: M**
 - [x] Create the Cloudflare token settings panel. **Priority: P0** — **Estimate: M**
-- [ ] Add admin user management screens. **Priority: P1** — **Estimate: L**
+- [x] Add admin user management screens. **Priority: P1** — **Estimate: L**
 
 ### Phase E: Operational Features
 - [x] Add audit logging. **Priority: P1** — **Estimate: M**
@@ -262,7 +264,37 @@ Preferred update strategies, in order:
 - [x] The frontend, API, and database run in Docker containers.
 - [x] The system is structured for backups and recovery.
 
-## 16. Planned: First-Start Public Exposure Provisioning
+## 16. Implemented: First-Start Public Exposure Provisioning
+
+### 16.0 Implementation Status
+Implemented per the plan below:
+- `backend/src/services/executor.ts` — fixed the secrets-validation helper
+  scoping bug that made `ensureServiceSecrets` unreachable (it was nested
+  inside an unrelated `exec()` callback).
+- `service_exposure` table (`database/init.sql`, with a startup migration in
+  `backend/src/utils/database.js` for existing databases).
+- `backend/src/routes/settings.js` — `GET`/`PUT /api/settings/exposure` for
+  base domain, Cloudflare account/zone/tunnel IDs, and Nginx Proxy Manager
+  URL/credentials (reuses the existing Cloudflare API token).
+- `backend/src/routes/services.js` — `GET`/`PUT /api/services/:name/exposure`
+  for per-service opt-in, upstream host/port/scheme, and websocket support.
+- `backend/src/services/npmClient.js` — idempotent Nginx Proxy Manager proxy
+  host client.
+- `backend/src/services/cloudflareTunnelClient.js` — idempotent Cloudflare
+  Tunnel ingress route client.
+- `backend/src/services/exposure.js` — orchestrates provisioning after a
+  successful `docker compose up -d`; never fails the start, records
+  status/errors on `service_exposure`, and audits the outcome.
+- Frontend: an "Exposure provisioning" section in the settings panel for the
+  global config, and a per-service "Exposure settings" panel on each service
+  card for enabling/configuring and viewing provisioning status.
+
+**Not yet done / needs live validation**: this was built and syntax/type
+checked, but not exercised against a real Nginx Proxy Manager or Cloudflare
+account (none were available in this environment). Before relying on it,
+test against a real NPM instance and Cloudflare tunnel, and confirm the
+`nginx-proxy-manager:80` origin URL assumption matches your Docker network
+setup.
 
 ### 16.1 Goal
 When a user starts a managed container from the frontend for the first time, the
@@ -279,7 +311,7 @@ Service hostnames should be derived as `<service>.<base-domain>`, for example
 - The Angular dashboard starts services through `ServiceStateService` and
   `POST /api/services/:name/start`.
 - The backend service route calls `executor.startService(serviceName, userId)`.
-- Services are defined in `backend/src/config/services.js`.
+- Services are defined in `backend/src/config/services.ts`.
 - Cloudflare API token storage and verification already exists in
   `backend/src/routes/settings.js`.
 - Nginx Proxy Manager has a compose stack under `apps/nginx-proxy-manager/`.
@@ -301,7 +333,7 @@ Service hostnames should be derived as `<service>.<base-domain>`, for example
 
 ### 16.4 Implementation Plan
 1. Fix and verify service start prerequisites.
-   - Check `backend/src/services/executor.js` helper scoping before wiring
+   - Check `backend/src/services/executor.ts` helper scoping before wiring
      provisioning into service starts.
    - Preserve current validation, error handling, and audit logging patterns.
 2. Add exposure metadata.

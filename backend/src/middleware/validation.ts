@@ -1,6 +1,5 @@
-'use strict';
-
-const Joi = require('joi');
+import { NextFunction, Request, Response } from 'express';
+import Joi, { ObjectSchema, ValidationError } from 'joi';
 
 const validationOptions = {
   abortEarly: false,
@@ -17,8 +16,13 @@ const usernameSchema = Joi.string()
 const passwordSchema = Joi.string().min(8).max(128);
 const serviceNameSchema = Joi.string().trim().min(1).max(64).pattern(/^[a-z0-9-]+$/);
 const backupNameSchema = Joi.string().trim().max(255).pattern(/^[a-zA-Z0-9._-]+$/);
+const domainSchema = Joi.string()
+  .trim()
+  .min(1)
+  .max(255)
+  .pattern(/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/);
 
-const schemas = {
+export const schemas = {
   authSetup: Joi.object({
     username: usernameSchema.required(),
     password: passwordSchema.required(),
@@ -48,6 +52,23 @@ const schemas = {
   backupDownloadParams: Joi.object({
     fileName: backupNameSchema.required(),
   }),
+  exposureGlobalSettings: Joi.object({
+    baseDomain: domainSchema.required(),
+    npmApiUrl: Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(500).required(),
+    npmEmail: Joi.string().trim().email().max(255).required(),
+    // Optional: omit to keep the previously saved password unchanged.
+    npmPassword: Joi.string().min(1).max(255).optional(),
+    cloudflareAccountId: Joi.string().trim().alphanum().length(32).required(),
+    cloudflareZoneId: Joi.string().trim().alphanum().length(32).required(),
+    cloudflareTunnelId: Joi.string().trim().min(1).max(255).required(),
+  }),
+  serviceExposureUpdate: Joi.object({
+    enabled: Joi.boolean().required(),
+    upstreamScheme: Joi.string().valid('http', 'https').default('http'),
+    upstreamHost: Joi.string().trim().min(1).max(255).required(),
+    upstreamPort: Joi.number().integer().min(1).max(65535).required(),
+    websocket: Joi.boolean().default(false),
+  }),
   healthThresholds: Joi.object({
     diskPercent: Joi.number().min(1).max(100).required(),
     memoryPercent: Joi.number().min(1).max(100).required(),
@@ -55,6 +76,16 @@ const schemas = {
   }),
   recoveryEnable: Joi.object({
     confirm: Joi.string().valid('ENABLE_RECOVERY_MODE').required(),
+  }),
+  userCreate: Joi.object({
+    username: usernameSchema.required(),
+    password: passwordSchema.required(),
+  }),
+  userIdParam: Joi.object({
+    id: Joi.number().integer().positive().required(),
+  }),
+  userPasswordUpdate: Joi.object({
+    password: passwordSchema.required(),
   }),
   recoveryResetAdminPassword: Joi.object({
     username: usernameSchema.required(),
@@ -70,28 +101,27 @@ const schemas = {
   }),
 };
 
-function validationError(res, error) {
+type ValidationSource = 'body' | 'params' | 'query';
+
+function validationError(res: Response, error: ValidationError) {
   return res.status(422).json({
     error: 'Invalid request input',
     details: error.details.map((detail) => detail.message),
   });
 }
 
-function validate(schema, source) {
-  return (req, res, next) => {
-    const payload = req[source] || {};
+function validate(schema: ObjectSchema, source: ValidationSource) {
+  return (req: Request, res: Response, next: NextFunction) => {
+    const payload = (req[source] as Record<string, unknown>) || {};
     const { error, value } = schema.validate(payload, validationOptions);
     if (error) {
       return validationError(res, error);
     }
-    req[source] = value;
+    (req as unknown as Record<ValidationSource, unknown>)[source] = value;
     return next();
   };
 }
 
-module.exports = {
-  schemas,
-  validateBody: (schema) => validate(schema, 'body'),
-  validateParams: (schema) => validate(schema, 'params'),
-  validateQuery: (schema) => validate(schema, 'query'),
-};
+export const validateBody = (schema: ObjectSchema) => validate(schema, 'body');
+export const validateParams = (schema: ObjectSchema) => validate(schema, 'params');
+export const validateQuery = (schema: ObjectSchema) => validate(schema, 'query');

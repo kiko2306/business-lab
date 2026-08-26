@@ -3,6 +3,16 @@ FROM node:20-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
+COPY tsconfig.json ./
+RUN npm ci
+COPY src ./src
+RUN npm run build
+
+FROM node:20-alpine AS deps
+
+WORKDIR /app
+
+COPY package*.json ./
 RUN npm ci --omit=dev
 
 FROM node:20-alpine AS runtime
@@ -11,7 +21,8 @@ FROM node:20-alpine AS runtime
 ARG DOCKER_GID=999
 
 # docker CLI + compose plugin are required to start/stop the managed app stacks.
-RUN apk add --no-cache docker-cli docker-cli-compose
+# postgresql16-client provides pg_dump/pg_restore, matching the postgres:16-alpine database image.
+RUN apk add --no-cache docker-cli docker-cli-compose postgresql16-client
 
 RUN set -eux; \
     addgroup -S appgroup; \
@@ -22,12 +33,12 @@ RUN set -eux; \
 WORKDIR /app
 
 COPY package*.json ./
-COPY --from=build /app/node_modules ./node_modules
-COPY src ./src
+COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/dist ./dist
 RUN chown -R appuser:appgroup /app
 
 USER appuser
 
 EXPOSE 3000
 
-CMD ["node", "src/index.js"]
+CMD ["node", "dist/index.js"]

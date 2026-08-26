@@ -1,22 +1,36 @@
-'use strict';
-
-const { Router } = require('express');
-const { query } = require('../utils/database');
-const { schemas, validateQuery } = require('../middleware/validation');
+import { Router, Request, Response } from 'express';
+import { query } from '../utils/database';
+import { schemas, validateQuery } from '../middleware/validation';
 
 const router = Router();
 
-function parsePaging(value, fallback) {
-  const num = Number.parseInt(value, 10);
+interface AuditLogRow {
+  id: number;
+  username: string | null;
+  action: string;
+  resource: string | null;
+  result: string;
+  created_at: string;
+}
+
+function parsePaging(value: unknown, fallback: number): number {
+  const num = Number.parseInt(String(value), 10);
   if (!Number.isFinite(num) || num <= 0) {
     return fallback;
   }
   return num;
 }
 
-function buildFilters(params) {
-  const clauses = [];
-  const values = [];
+interface AuditFilterParams {
+  action?: string;
+  result?: string;
+  startDate?: string;
+  endDate?: string;
+}
+
+function buildFilters(params: AuditFilterParams): { whereSql: string; values: unknown[] } {
+  const clauses: string[] = [];
+  const values: unknown[] = [];
 
   const { action, result, startDate, endDate } = params;
 
@@ -43,7 +57,7 @@ function buildFilters(params) {
   };
 }
 
-function toCsv(rows) {
+function toCsv(rows: AuditLogRow[]): string {
   const header = ['id', 'username', 'action', 'resource', 'result', 'created_at'];
   const lines = [header.join(',')];
 
@@ -63,11 +77,12 @@ function toCsv(rows) {
   return lines.join('\n');
 }
 
-router.get('/', validateQuery(schemas.auditQuery), async (req, res) => {
-  const page = parsePaging(req.query.page, 1);
-  const pageSize = Math.min(parsePaging(req.query.pageSize, 20), 100);
+router.get('/', validateQuery(schemas.auditQuery), async (req: Request, res: Response) => {
+  const params = req.query as AuditFilterParams & { page?: string; pageSize?: string };
+  const page = parsePaging(params.page, 1);
+  const pageSize = Math.min(parsePaging(params.pageSize, 20), 100);
   const offset = (page - 1) * pageSize;
-  const { whereSql, values } = buildFilters(req.query);
+  const { whereSql, values } = buildFilters(params);
 
   try {
     const listQuery = `
@@ -83,8 +98,8 @@ router.get('/', validateQuery(schemas.auditQuery), async (req, res) => {
     const countQuery = `SELECT COUNT(*)::int AS total FROM audit_logs a ${whereSql}`;
 
     const [listResult, countResult] = await Promise.all([
-      query(listQuery, [...values, pageSize, offset]),
-      query(countQuery, values),
+      query<AuditLogRow>(listQuery, [...values, pageSize, offset]),
+      query<{ total: number }>(countQuery, values),
     ]);
 
     return res.json({
@@ -93,17 +108,17 @@ router.get('/', validateQuery(schemas.auditQuery), async (req, res) => {
       pageSize,
       total: countResult.rows[0]?.total ?? 0,
     });
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Unable to load audit logs.' });
   }
 });
 
-router.get('/export.csv', validateQuery(schemas.auditQuery), async (req, res) => {
-  const { whereSql, values } = buildFilters(req.query);
+router.get('/export.csv', validateQuery(schemas.auditQuery), async (req: Request, res: Response) => {
+  const { whereSql, values } = buildFilters(req.query as AuditFilterParams);
 
   try {
     const limit = 100000;
-    const result = await query(
+    const result = await query<AuditLogRow>(
       `SELECT a.id, a.action, a.resource, a.result, a.created_at, u.username
        FROM audit_logs a
        LEFT JOIN users u ON u.id = a.user_id
@@ -117,9 +132,9 @@ router.get('/export.csv', validateQuery(schemas.auditQuery), async (req, res) =>
     res.setHeader('Content-Type', 'text/csv; charset=utf-8');
     res.setHeader('Content-Disposition', 'attachment; filename="audit-logs.csv"');
     return res.send(csv);
-  } catch (error) {
+  } catch {
     return res.status(500).json({ error: 'Unable to export audit logs.' });
   }
 });
 
-module.exports = router;
+export default router;

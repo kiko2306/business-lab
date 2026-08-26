@@ -4,19 +4,15 @@
  * Only services in this allowlist can be controlled via the API.
  */
 
-const fs = require('fs');
-const path = require('path');
+import fs from 'fs';
+import path from 'path';
+import { ResolvedComposeFile, ServiceDefinition } from '../types';
 
 // Compose files are named inconsistently across upstream projects, so each
 // app directory is probed for any of the filenames Docker Compose accepts.
-const COMPOSE_FILENAMES = [
-  'compose.yaml',
-  'compose.yml',
-  'docker-compose.yml',
-  'docker-compose.yaml',
-];
+const COMPOSE_FILENAMES = ['compose.yaml', 'compose.yml', 'docker-compose.yml', 'docker-compose.yaml'];
 
-const SERVICES = {
+export const SERVICES: Record<string, ServiceDefinition> = {
   'nginx-proxy-manager': {
     name: 'nginx-proxy-manager',
     label: 'Nginx Proxy Manager',
@@ -171,34 +167,69 @@ const SERVICES = {
       enabled: false,
     },
   },
+  'dozzle': {
+    name: 'dozzle',
+    label: 'Dozzle',
+    description: 'Real-time Docker container log viewer',
+    icon: 'logs',
+    composePath: 'apps/dozzle/docker-compose.yml',
+    healthCheck: {
+      enabled: false,
+    },
+  },
+  'beszel': {
+    name: 'beszel',
+    label: 'Beszel',
+    description: 'Lightweight server monitoring hub',
+    icon: 'monitor',
+    composePath: 'apps/beszel/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8090/api/health',
+      interval: 30000,
+      timeout: 5000,
+    },
+  },
+  'mealie': {
+    name: 'mealie',
+    label: 'Mealie',
+    description: 'Recipe manager and meal planner',
+    icon: 'food',
+    composePath: 'apps/mealie/docker-compose.yml',
+    healthCheck: {
+      enabled: false,
+    },
+  },
+  'portainer': {
+    name: 'portainer',
+    label: 'Portainer',
+    description: 'Docker container management UI',
+    icon: 'container',
+    composePath: 'apps/portainer/docker-compose.yml',
+    healthCheck: {
+      enabled: false,
+    },
+  },
 };
 
-/**
- * Get all services
- */
-function getAllServices() {
+export function getAllServices(): ServiceDefinition[] {
   return Object.values(SERVICES);
 }
 
-/**
- * Get a service by name
- */
-function getService(name) {
+export function getService(name: string): ServiceDefinition | undefined {
   return SERVICES[name];
 }
 
-/**
- * Check if a service name is valid and in the allowlist
- */
-function isValidServiceName(name) {
-  return name && typeof name === 'string' && SERVICES.hasOwnProperty(name);
+export function isValidServiceName(name: unknown): name is string {
+  return typeof name === 'string' && Object.prototype.hasOwnProperty.call(SERVICES, name);
 }
 
 /**
  * Root directory holding the managed app stacks. Mounted at the same absolute
  * path inside the container as on the host.
  */
-function getAppsDir() {
+export function getAppsDir(): string {
   return process.env.APPS_DIR || path.join(process.cwd(), 'apps');
 }
 
@@ -206,7 +237,7 @@ function getAppsDir() {
  * Compose project name for a service, derived from its app directory so that
  * containers can be matched back to the service via compose labels.
  */
-function getProjectName(name) {
+export function getProjectName(name: string): string | null {
   const service = getService(name);
   return service ? path.basename(path.dirname(service.composePath)) : null;
 }
@@ -215,7 +246,7 @@ function getProjectName(name) {
  * Locate a service's compose file on disk.
  * Returns `composeFile: null` when the app is not installed.
  */
-function resolveComposeFile(name) {
+export function resolveComposeFile(name: string): ResolvedComposeFile | null {
   const service = getService(name);
   if (!service) {
     return null;
@@ -234,13 +265,3 @@ function resolveComposeFile(name) {
 
   return { projectName, appDir, composeFile: null };
 }
-
-module.exports = {
-  SERVICES,
-  getAllServices,
-  getService,
-  isValidServiceName,
-  getAppsDir,
-  getProjectName,
-  resolveComposeFile,
-};

@@ -64,3 +64,82 @@
     </ng-container>
   </div>
 </section>
+
+<section class="card border-0 shadow-sm mt-4">
+  <div class="card-body p-4">
+    <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start mb-3">
+      <div>
+        <h2 class="h4 mb-1">First-start exposure provisioning</h2>
+        <p class="text-body-secondary mb-0">
+          When a service with exposure enabled starts, automatically create a matching Nginx Proxy Manager
+          host and Cloudflare Tunnel route at <code>&lt;service&gt;.&lt;base-domain&gt;</code>.
+        </p>
+      </div>
+      <span class="badge" [ngClass]="exposureSettings?.configured ? 'text-bg-success' : 'text-bg-secondary'">
+        {{ exposureSettings?.configured ? 'Configured' : 'Not configured' }}
+      </span>
+    </div>
+
+    <div *ngIf="exposureLoading" class="d-flex align-items-center gap-2 text-body-secondary">
+      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      Loading settings...
+    </div>
+
+    <ng-container *ngIf="!exposureLoading">
+      <div *ngIf="exposureFeedback" class="alert" [ngClass]="'alert-' + exposureFeedback.type">
+        {{ exposureFeedback.message }}
+      </div>
+
+      <form [formGroup]="exposureForm" (ngSubmit)="saveExposure()">
+        <div class="row g-3">
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Base domain</label>
+            <input class="form-control" placeholder="example.com" formControlName="baseDomain" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Cloudflare Tunnel ID</label>
+            <input class="form-control" formControlName="cloudflareTunnelId" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Cloudflare account ID</label>
+            <input class="form-control" formControlName="cloudflareAccountId" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Cloudflare zone ID</label>
+            <input class="form-control" formControlName="cloudflareZoneId" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Nginx Proxy Manager URL</label>
+            <input class="form-control" placeholder="http://nginx-proxy-manager:81" formControlName="npmApiUrl" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Nginx Proxy Manager admin email</label>
+            <input class="form-control" type="email" formControlName="npmEmail" />
+          </div>
+          <div class="col-12 col-md-6">
+            <label class="form-label fw-semibold">Nginx Proxy Manager admin password</label>
+            <input
+              class="form-control"
+              type="password"
+              autocomplete="off"
+              [placeholder]="exposureSettings?.npmPasswordConfigured ? 'Leave blank to keep current password' : ''"
+              formControlName="npmPassword"
+            />
+          </div>
+        </div>
+
+        <div class="d-flex flex-wrap gap-2 mt-3">
+          <button type="submit" class="btn btn-primary" [disabled]="savingExposure">
+            <span *ngIf="savingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            Save exposure settings
+          </button>
+        </div>
+      </form>
+
+      <p class="form-text mt-3 mb-0">
+        Cloudflare Tunnel API calls reuse the token configured above. Per-service exposure (enable/disable,
+        upstream host/port) is configured from each service card on the dashboard.
+      </p>
+    </ng-container>
+  </div>
+</section>

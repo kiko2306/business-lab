@@ -1,0 +1,92 @@
+<div class="container py-4">
+  <div class="d-flex justify-content-between align-items-center mb-3">
+    <div>
+      <h1 class="h3 mb-1">Users</h1>
+      <p class="text-body-secondary mb-0">Manage administrator accounts. Every account has full access.</p>
+    </div>
+    <a class="btn btn-outline-secondary btn-sm" routerLink="/dashboard">Back to dashboard</a>
+  </div>
+
+  <div class="card mb-3">
+    <div class="card-header">Add user</div>
+    <div class="card-body">
+      <form class="row g-2 align-items-start" [formGroup]="createForm" (ngSubmit)="createUser()">
+        <div class="col-12 col-md-4">
+          <input class="form-control" placeholder="Username" formControlName="username" autocomplete="off" />
+          <div class="form-text text-danger" *ngIf="createForm.controls.username.touched && createForm.controls.username.invalid">
+            Username must be 3-64 characters.
+          </div>
+        </div>
+        <div class="col-12 col-md-4">
+          <input class="form-control" type="password" placeholder="Password" formControlName="password" autocomplete="new-password" />
+          <div class="form-text text-danger" *ngIf="createForm.controls.password.touched && createForm.controls.password.invalid">
+            Password must be at least 8 characters.
+          </div>
+        </div>
+        <div class="col-12 col-md-2 d-grid">
+          <button class="btn btn-primary" type="submit" [disabled]="creating">
+            {{ creating ? 'Creating…' : 'Create user' }}
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="table-responsive">
+      <table class="table table-sm align-middle mb-0">
+        <thead>
+          <tr>
+            <th>Username</th>
+            <th>Created</th>
+            <th class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <ng-container *ngFor="let user of items">
+            <tr>
+              <td>
+                {{ user.username }}
+                <span class="badge text-bg-secondary ms-1" *ngIf="user.id === currentUserId">you</span>
+              </td>
+              <td>{{ user.created_at | date:'short' }}</td>
+              <td class="text-end">
+                <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-secondary" (click)="startPasswordReset(user.id)">Reset password</button>
+                  <button
+                    class="btn btn-outline-danger"
+                    (click)="deleteUser(user)"
+                    [disabled]="user.id === currentUserId"
+                    title="You cannot delete your own account while signed in as it."
+                  >
+                    Delete
+                  </button>
+                </div>
+              </td>
+            </tr>
+            <tr *ngIf="resetPasswordId === user.id">
+              <td colspan="3">
+                <div class="d-flex gap-2 align-items-center">
+                  <input
+                    class="form-control form-control-sm"
+                    type="password"
+                    style="max-width: 240px"
+                    placeholder="New password"
+                    [(ngModel)]="resetPasswordValue"
+                    [ngModelOptions]="{ standalone: true }"
+                    autocomplete="new-password"
+                  />
+                  <button class="btn btn-sm btn-primary" [disabled]="resetting" (click)="submitPasswordReset()">Save</button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="cancelPasswordReset()">Cancel</button>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+          <tr *ngIf="!items.length && !loading">
+            <td colspan="3" class="text-center text-body-secondary py-4">No users found.</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>

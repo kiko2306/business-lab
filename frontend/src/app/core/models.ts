@@ -1,7 +1,6 @@
 export interface User {
   id: number;
   username: string;
-  role: string;
 }
 
 export interface AuthResponse {
@@ -47,6 +46,51 @@ export interface CloudflareTestResponse {
   message: string;
 }
 
+export interface ExposureSettings {
+  configured: boolean;
+  baseDomain: string | null;
+  npmApiUrl: string | null;
+  npmEmail: string | null;
+  npmPasswordConfigured: boolean;
+  cloudflareAccountId: string | null;
+  cloudflareZoneId: string | null;
+  cloudflareTunnelId: string | null;
+}
+
+export interface ExposureSettingsInput {
+  baseDomain: string;
+  npmApiUrl: string;
+  npmEmail: string;
+  npmPassword?: string;
+  cloudflareAccountId: string;
+  cloudflareZoneId: string;
+  cloudflareTunnelId: string;
+}
+
+export interface ServiceExposureConfig {
+  enabled: boolean;
+  hostname: string | null;
+  upstreamScheme: 'http' | 'https';
+  upstreamHost: string | null;
+  upstreamPort: number | null;
+  websocket: boolean;
+  status: string;
+  lastError: string | null;
+}
+
+export interface ServiceExposureUpdate {
+  enabled: boolean;
+  upstreamScheme: 'http' | 'https';
+  upstreamHost: string;
+  upstreamPort: number;
+  websocket: boolean;
+}
+
+export interface ServiceActionResponse {
+  message: string;
+  exposure?: { attempted: boolean; success?: boolean; warning?: string; hostname?: string };
+}
+
 export interface ToastMessage {
   id: number;
   variant: 'success' | 'danger' | 'warning' | 'info';
@@ -85,6 +129,16 @@ export interface HealthAlert {
   metric: string;
   value: number;
   threshold: number;
+}
+
+export interface AdminUser {
+  id: number;
+  username: string;
+  created_at: string;
+}
+
+export interface AdminUserListResponse {
+  items: AdminUser[];
 }
 
 export interface HealthStatus {

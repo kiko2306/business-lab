@@ -1,6 +1,5 @@
-'use strict';
-
-const { query } = require('../utils/database');
+import { NextFunction, Request, Response } from 'express';
+import { query } from '../utils/database';
 
 /**
  * Returns a middleware that checks whether the application has been set up.
@@ -13,10 +12,10 @@ const { query } = require('../utils/database');
  *   Return 503 when setup has not yet been completed so the client knows
  *   to redirect to the setup screen.
  */
-function setupModeMiddleware(allowWhenSetupIncomplete = false) {
-  return async (req, res, next) => {
+export default function setupModeMiddleware(allowWhenSetupIncomplete = false) {
+  return async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const result = await query(
+      const result = await query<{ cnt: string }>(
         'SELECT COUNT(*) AS cnt FROM users WHERE is_setup_complete = TRUE',
         []
       );
@@ -39,10 +38,8 @@ function setupModeMiddleware(allowWhenSetupIncomplete = false) {
       }
       return next();
     } catch (err) {
-      console.error('setupMode middleware error:', err.message);
+      console.error('setupMode middleware error:', (err as Error).message);
       return res.status(500).json({ error: 'Internal server error' });
     }
   };
 }
-
-module.exports = setupModeMiddleware;

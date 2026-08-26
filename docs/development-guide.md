@@ -19,7 +19,8 @@ npm start
 ## Build validation
 
 - Frontend build: `cd frontend && npm run build`
-- Backend syntax check: `node --check backend/src/index.js`
+- Backend type check: `cd backend && npm run typecheck`
+- Backend build: `cd backend && npm run build` (compiles TypeScript to `backend/dist`)
 
 ## Smoke validation
 

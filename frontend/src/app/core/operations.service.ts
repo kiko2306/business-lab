@@ -3,7 +3,15 @@ import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
 import { API_BASE_URL } from './api';
 import { SKIP_AUTH, SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
-import { AuditLogResponse, BackupListResponse, HealthStatus } from './models';
+import {
+  AdminUser,
+  AdminUserListResponse,
+  AuditLogResponse,
+  BackupListResponse,
+  HealthStatus,
+  ServiceExposureConfig,
+  ServiceExposureUpdate,
+} from './models';
 
 @Injectable({
   providedIn: 'root'
@@ -47,6 +55,17 @@ export class OperationsService {
     });
   }
 
+  getServiceExposure(serviceName: string): Observable<ServiceExposureConfig> {
+    return this.http.get<ServiceExposureConfig>(`${API_BASE_URL}/services/${serviceName}/exposure`);
+  }
+
+  updateServiceExposure(serviceName: string, update: ServiceExposureUpdate): Observable<{ message: string; hostname: string | null }> {
+    return this.http.put<{ message: string; hostname: string | null }>(
+      `${API_BASE_URL}/services/${serviceName}/exposure`,
+      update
+    );
+  }
+
   getHealth(): Observable<HealthStatus> {
     return this.http.get<HealthStatus>(`${API_BASE_URL}/health/system`);
   }
@@ -72,6 +91,22 @@ export class OperationsService {
       {},
       { context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
+  }
+
+  listUsers(): Observable<AdminUserListResponse> {
+    return this.http.get<AdminUserListResponse>(`${API_BASE_URL}/users`);
+  }
+
+  createUser(username: string, password: string): Observable<{ user: AdminUser }> {
+    return this.http.post<{ user: AdminUser }>(`${API_BASE_URL}/users`, { username, password });
+  }
+
+  updateUserPassword(id: number, password: string): Observable<{ message: string }> {
+    return this.http.put<{ message: string }>(`${API_BASE_URL}/users/${id}/password`, { password });
+  }
+
+  deleteUser(id: number): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(`${API_BASE_URL}/users/${id}`);
   }
 
   resetAdminPassword(username: string, password: string): Observable<{ message: string }> {
