@@ -149,6 +149,15 @@ proof case:
       connection — the available browser tooling only captures HTTP
       requests, not raw WebSocket frames, so this needs either browser
       DevTools directly or instrumenting the dashboard bundle.
+- [ ] **Verify the NetBird Android app can actually enroll a peer** — the
+      `netbird-cli` OIDC client (device authorization / device-code flow,
+      audience `netbird-cli`) is configured in Authelia and management.json
+      but has never been exercised end-to-end. Install the NetBird Android
+      app, point it at this management server, and confirm the device-code
+      login flow completes and the phone shows up as a connected peer in
+      the dashboard. Do this only after the `/peers` loading hang above is
+      fixed, since that page is how you'd confirm the peer actually
+      registered.
 - [ ] **CI pipeline** — there's no `.github/workflows/`, so `smoke-tests.sh`,
       `docker-e2e-test.sh`, and both `tsc` builds only ever run manually.
       Wire them into a workflow that runs on every push/PR.
