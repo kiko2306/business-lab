@@ -106,3 +106,11 @@ backend starts and stops on your behalf.
       password/delete) plus a `/users` dashboard screen now cover multi-admin
       management. There is a single account tier (every user is an administrator);
       the previously-unused `role` column has been removed.
+- [ ] **Docker-based validation not yet run** — `./scripts/smoke-tests.sh` and
+      `./scripts/docker-e2e-test.sh` haven't been run against the TypeScript
+      backend rebuild (no Docker daemon was available in the environment that
+      made these changes). Run both before relying on this in production.
+- [ ] **Exposure provisioning not yet validated live** — the Nginx Proxy Manager
+      and Cloudflare Tunnel clients haven't been exercised against a real NPM
+      instance or Cloudflare account. Test end-to-end before enabling exposure
+      on any service.
