@@ -1,5 +1,7 @@
-# Environment secrets — never commit these
+# Environment secrets — never commit these (but keep .env.example templates)
 .env
+.env.*
+!.env.example
 
 # Node modules
 node_modules/
