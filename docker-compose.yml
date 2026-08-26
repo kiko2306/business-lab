@@ -27,28 +27,70 @@ services:
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 3000
-      DATABASE_URL: ${DATABASE_URL:-postgresql://homelab:${POSTGRES_PASSWORD}@database:5432/homelab}
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-homelab}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-homelab}}
       JWT_SECRET: ${JWT_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES:-1h}
+      JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES:-7d}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:80}
       SCRIPTS_DIR: /scripts
       APPS_DIR: ${APPS_DIR:?APPS_DIR must be set to an absolute path in .env}
       # Health check URLs target the host, which is not "localhost" in here.
       SERVICE_HEALTH_HOST: ${SERVICE_HEALTH_HOST:-host.docker.internal}
+      # The docker CLI (used for `docker ps` / `docker compose up|down`)
+      # honors this instead of the local socket — see docker-socket-proxy
+      # below for why the raw socket isn't mounted here anymore.
+      DOCKER_HOST: tcp://docker-socket-proxy:2375
     extra_hosts:
       - "host.docker.internal:host-gateway"
     volumes:
       - scripts-data:/scripts:ro
-      # Lets the backend drive the host Docker daemon to start/stop app stacks.
-      - /var/run/docker.sock:/var/run/docker.sock
       # Mounted at the same absolute path as on the host so that any relative
       # paths inside an app's compose file resolve identically in both places.
-      - ${APPS_DIR:?APPS_DIR must be set to an absolute path in .env}:${APPS_DIR}:ro
+      # Read-write: the backend creates/updates each app's .env from the
+      # dashboard (see appEnv.ts) so secrets never need manual editing.
+      # Compose files themselves are only ever read, never written, by
+      # backend code.
+      - ${APPS_DIR:?APPS_DIR must be set to an absolute path in .env}:${APPS_DIR}
     depends_on:
       database:
         condition: service_healthy
+      docker-socket-proxy:
+        condition: service_started
     networks:
       - homelab-net
     restart: unless-stopped
+
+  # Scopes the backend's Docker access instead of mounting the raw host
+  # socket into it directly. Only the categories `docker ps` and
+  # `docker compose up|down` actually need are enabled — notably EXEC,
+  # BUILD, SECRETS, SWARM, and PLUGINS stay off; the backend never uses them.
+  # This narrows things like arbitrary `docker exec` into any container on
+  # the host, but can't fully sandbox compose itself: CONTAINERS+POST is
+  # inherently enough to create a container with its own bind mounts, so
+  # this is a reduction in blast radius, not a full jail — the backend is
+  # still meant for trusted operators only.
+  docker-socket-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      POST: 1
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      INFO: 1
+      VERSION: 1
+      PING: 1
+      EVENTS: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - homelab-net
+    restart: unless-stopped
+    # Not published to the host — only reachable from other containers on
+    # homelab-net, by service name.
 
   database:
     image: postgres:16-alpine

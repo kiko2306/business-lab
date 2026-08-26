@@ -16,15 +16,6 @@ CREATE TABLE IF NOT EXISTS settings (
     updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
-CREATE TABLE IF NOT EXISTS service_configs (
-    name        VARCHAR(100) PRIMARY KEY,
-    label       VARCHAR(200),
-    description TEXT,
-    compose_path TEXT,
-    icon        VARCHAR(100),
-    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-
 CREATE TABLE IF NOT EXISTS refresh_tokens (
     id         SERIAL PRIMARY KEY,
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,

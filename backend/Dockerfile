@@ -17,7 +17,10 @@ RUN npm ci --omit=dev
 
 FROM node:20-alpine AS runtime
 
-# GID of the host's docker group, so the non-root app user can use the mounted socket.
+# GID of the host's docker group, so the non-root app user can read/write
+# the apps/ directory (bind-mounted with that group ownership) to manage
+# each app's compose files and .env config. Docker API access itself goes
+# through docker-socket-proxy over TCP, not a mounted socket.
 ARG DOCKER_GID=999
 
 # docker CLI + compose plugin are required to start/stop the managed app stacks.
