@@ -30,9 +30,15 @@ access_control:
 
 session:
   cookies:
-    - domain: 'localhost'
-      authelia_url: 'http://localhost:9091'
-      default_redirection_url: 'http://localhost:9091'
+    # Authelia's own listener stays plain HTTP (server.address above) — NPM /
+    # Cloudflare Tunnel terminate TLS in front of it, same as every other app
+    # in apps/*/, and that public HTTPS hostname is what these need to match.
+    # If your setup doesn't already expose Authelia at this hostname via the
+    # dashboard's Exposure settings, update this to whatever domain it will
+    # actually be reachable at first.
+    - domain: 'tx-home-utils.com'
+      authelia_url: 'https://authelia.tx-home-utils.com'
+      default_redirection_url: 'https://netbird-vpn.tx-home-utils.com'
 
 storage:
   local:
@@ -41,3 +47,61 @@ storage:
 notifier:
   filesystem:
     filename: /data/notification.txt
+
+# OIDC provider — lets other apps (currently: NetBird VPN's management
+# service, see apps/netbird-vpn/) authenticate against Authelia instead of
+# rolling their own login. hmac_secret comes from AUTHELIA_OIDC_HMAC_SECRET
+# in .env; the JWKS signing key is generated to data/oidc-jwks.pem (gitignored
+# — see .env.example for the generation command) rather than checked in here.
+#
+# Both clients below are "public" (no client_secret) since NetBird's
+# dashboard (PKCE) and CLI (device code) are exactly the kind of clients
+# that can't safely hold a static secret. redirect_uris point at NetBird's
+# real exposed hostname (netbird-vpn.tx-home-utils.com) — update them if
+# yours differs.
+#
+# The jwks signing key itself is NOT in this file: Authelia's config schema
+# doesn't support a key_file reference or env-var override for it (jwks is a
+# list, same restriction as clients below), so the actual PEM content has to
+# live inline in YAML — which would mean committing a private key to git.
+# Instead it's merged in at startup from data/oidc-secrets.yml — gitignored,
+# generated once by `openssl genrsa`, never checked in. See docker-compose.yml
+# (the "--config" arg lists both files) and .env.example for the exact command.
+identity_providers:
+  oidc:
+    clients:
+      - client_id: 'netbird-dashboard'
+        client_name: 'NetBird Dashboard'
+        public: true
+        authorization_policy: 'one_factor'
+        consent_mode: 'implicit'
+        redirect_uris:
+          - 'https://netbird-vpn.tx-home-utils.com/nb-auth'
+          - 'https://netbird-vpn.tx-home-utils.com/nb-silent-auth'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+        grant_types:
+          - 'authorization_code'
+          - 'refresh_token'
+        response_types:
+          - 'code'
+        token_endpoint_auth_method: 'none'
+        require_pkce: true
+        pkce_challenge_method: 'S256'
+      - client_id: 'netbird-cli'
+        client_name: 'NetBird CLI / Peer Login'
+        public: true
+        authorization_policy: 'one_factor'
+        consent_mode: 'implicit'
+        scopes:
+          - 'openid'
+          - 'profile'
+          - 'email'
+          - 'offline_access'
+        grant_types:
+          - 'urn:ietf:params:oauth:grant-type:device_code'
+          - 'refresh_token'
+        response_types: []
+        token_endpoint_auth_method: 'none'

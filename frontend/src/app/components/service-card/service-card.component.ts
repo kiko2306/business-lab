@@ -19,6 +19,7 @@ export class ServiceCardComponent {
   private readonly toast = inject(ToastService);
 
   @Input({ required: true }) service!: ServiceStatus;
+  @Input() allServices: ServiceStatus[] = [];
   @Input() loadingAction: 'start' | 'stop' | null = null;
 
   @Output() actionRequested = new EventEmitter<'start' | 'stop'>();
@@ -43,6 +44,24 @@ export class ServiceCardComponent {
 
   requestAction(action: 'start' | 'stop'): void {
     this.actionRequested.emit(action);
+  }
+
+  dependencyStates(): { label: string; running: boolean }[] {
+    return (this.service.dependsOn ?? []).map((name) => {
+      const dep = this.allServices.find((s) => s.name === name);
+      return { label: dep?.label ?? name, running: dep?.state === 'running' };
+    });
+  }
+
+  dependenciesSatisfied(): boolean {
+    return this.dependencyStates().every((d) => d.running);
+  }
+
+  startBlockedTitle(): string {
+    const notRunning = this.dependencyStates()
+      .filter((d) => !d.running)
+      .map((d) => d.label);
+    return notRunning.length ? `Start ${notRunning.join(', ')} first` : '';
   }
 
   toggleExposurePanel(): void {

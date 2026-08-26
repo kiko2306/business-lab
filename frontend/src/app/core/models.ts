@@ -19,6 +19,7 @@ export interface ServiceStatus {
   lastChecked: string;
   error?: string;
   setupTokenSupported?: boolean;
+  dependsOn?: string[];
 }
 
 export interface ServiceSummary {

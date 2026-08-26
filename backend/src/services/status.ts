@@ -133,6 +133,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       healthy,
       lastChecked: new Date(),
       setupTokenSupported: Boolean(service.setupToken),
+      dependsOn: service.dependsOn,
     };
   } catch (error) {
     const message = (error as Error).message;

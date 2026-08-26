@@ -40,6 +40,10 @@ export interface ServiceDefinition {
   healthCheck: ServiceHealthCheck;
   exposureEnvKeys?: ServiceExposureEnvKeys;
   setupToken?: ServiceSetupToken;
+  // Other SERVICES keys (separate compose projects) that must already be
+  // running before this one can start — e.g. an app that authenticates
+  // against Authelia's OIDC provider needs Authelia up first.
+  dependsOn?: string[];
 }
 
 export type ServiceState = 'running' | 'stopped' | 'starting' | 'error' | 'unknown';
@@ -54,6 +58,7 @@ export interface ServiceStatusPayload {
   lastChecked?: Date;
   error?: string;
   setupTokenSupported?: boolean;
+  dependsOn?: string[];
 }
 
 export interface ServiceStatusSummary {

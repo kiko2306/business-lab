@@ -37,6 +37,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     healthCheck: {
       enabled: false,
     },
+    // Its dashboard/management containers authenticate against Authelia's
+    // OIDC provider — starting before Authelia is up just crash-loops.
+    dependsOn: ['authelia'],
   },
   'home-assistant': {
     name: 'home-assistant',

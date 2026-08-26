@@ -13,7 +13,30 @@ import { provisionServiceIfEnabled, getServiceExposureRow } from './exposure';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
+import { getServiceStatus } from './status';
 import { HttpError } from '../types';
+
+/**
+ * Refuse to start a service whose declared dependsOn services aren't already
+ * running — e.g. an app that authenticates against Authelia's OIDC provider
+ * would otherwise start into a broken/crash-looping state.
+ */
+async function assertDependenciesRunning(serviceName: string): Promise<void> {
+  const dependsOn = getService(serviceName)?.dependsOn ?? [];
+  if (!dependsOn.length) {
+    return;
+  }
+
+  const statuses = await Promise.all(dependsOn.map((dep) => getServiceStatus(dep)));
+  const notRunning = statuses.filter((s) => s.state !== 'running').map((s) => s.label ?? s.name);
+
+  if (notRunning.length) {
+    throw {
+      statusCode: 409,
+      message: `Cannot start ${getService(serviceName)?.label ?? serviceName}: dependency not running — ${notRunning.join(', ')}.`,
+    } as HttpError;
+  }
+}
 
 interface CommandResult {
   stdout: string;
@@ -162,6 +185,7 @@ export async function startService(serviceName: string, userId: number): Promise
   }
 
   ensureServiceSecrets(serviceName, appDir, composeFile);
+  await assertDependenciesRunning(serviceName);
 
   try {
     const startTime = new Date();

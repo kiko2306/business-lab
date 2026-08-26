@@ -8,18 +8,46 @@ services:
     networks:
       - netbird-net
 
+  # The actual web UI, and what gets exposed publicly — its bundled nginx
+  # proxies /api and the gRPC-web management calls through to
+  # netbird-management internally, so only this one container needs a public
+  # hostname. Requires Authelia (see the dashboard's Depends-on / start-order
+  # enforcement) since login goes through its OIDC clients — see
+  # apps/authelia/config/configuration.yml.
+  netbird-dashboard:
+    image: netbirdio/dashboard:latest
+    restart: unless-stopped
+    ports:
+      - "${NETBIRD_DASHBOARD_PORT:-8081}:80"
+    environment:
+      NETBIRD_MGMT_API_ENDPOINT: http://netbird-management:8080
+      NETBIRD_MGMT_GRPC_API_ENDPOINT: http://netbird-management:8080
+      AUTH_AUDIENCE: netbird-dashboard
+      AUTH_CLIENT_ID: netbird-dashboard
+      AUTH_AUTHORITY: https://authelia.tx-home-utils.com
+      AUTH_SUPPORTED_SCOPES: "openid profile email"
+      AUTH_REDIRECT_URI: https://netbird-vpn.tx-home-utils.com/nb-auth
+      AUTH_SILENT_REDIRECT_URI: https://netbird-vpn.tx-home-utils.com/nb-silent-auth
+      NETBIRD_TOKEN_SOURCE: accessToken
+      USE_AUTH0: "false"
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Netbird VPN"
+      - "homepage.icon=netbird.png"
+      - "homepage.href=https://netbird-vpn.tx-home-utils.com"
+      - "homepage.description=Zero-trust VPN and network access"
+    depends_on:
+      - netbird-management
+    networks:
+      - netbird-net
+
   netbird-management:
     image: netbirdio/management:latest
     restart: unless-stopped
     ports:
       - "${NETBIRD_MGMT_PORT:-8080}:8080"
-    labels:
-      - "homepage.group=Infrastructure"
-      - "homepage.name=Netbird VPN"
-      - "homepage.icon=netbird.png"
-      - "homepage.href=http://localhost:${NETBIRD_MGMT_PORT:-8080}"
-      - "homepage.description=Zero-trust VPN and network access"
     volumes:
+      - ./config/management.json:/etc/netbird/management.json:ro
       - ./data/management:/var/lib/netbird
     networks:
       - netbird-net

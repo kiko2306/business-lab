@@ -1,0 +1,58 @@
+{
+  "Stuns": [],
+  "TURNConfig": {
+    "Turns": [],
+    "CredentialsTTL": "12h",
+    "Secret": "",
+    "TimeBasedCredentials": false
+  },
+  "Signal": {
+    "Proto": "http",
+    "URI": "netbird-vpn:80",
+    "Username": "",
+    "Password": null
+  },
+  "ReverseProxy": {
+    "TrustedHTTPProxies": [],
+    "TrustedHTTPProxiesCount": 0,
+    "TrustedPeers": ["0.0.0.0/0"]
+  },
+  "DataStoreEncryptionKey": "",
+  "StoreConfig": {
+    "Engine": "sqlite"
+  },
+  "HttpConfig": {
+    "Address": "0.0.0.0:8080",
+    "AuthIssuer": "https://authelia.tx-home-utils.com",
+    "AuthAudience": "netbird-dashboard",
+    "AuthKeysLocation": "https://authelia.tx-home-utils.com/jwks.json",
+    "AuthUserIDClaim": "sub",
+    "OIDCConfigEndpoint": "https://authelia.tx-home-utils.com/.well-known/openid-configuration"
+  },
+  "DeviceAuthorizationFlow": {
+    "Provider": "",
+    "ProviderConfig": {
+      "Audience": "netbird-cli",
+      "ClientID": "netbird-cli",
+      "TokenEndpoint": "https://authelia.tx-home-utils.com/api/oidc/token",
+      "DeviceAuthEndpoint": "https://authelia.tx-home-utils.com/api/oidc/device-authorization",
+      "Scope": "openid profile email offline_access",
+      "UseIDToken": false
+    }
+  },
+  "PKCEAuthorizationFlow": {
+    "ProviderConfig": {
+      "Audience": "netbird-dashboard",
+      "ClientID": "netbird-dashboard",
+      "Domain": "",
+      "AuthorizationEndpoint": "https://authelia.tx-home-utils.com/api/oidc/authorization",
+      "TokenEndpoint": "https://authelia.tx-home-utils.com/api/oidc/token",
+      "Scope": "openid profile email",
+      "RedirectURLs": [
+        "https://netbird-vpn.tx-home-utils.com/nb-auth",
+        "https://netbird-vpn.tx-home-utils.com/nb-silent-auth"
+      ],
+      "UseIDToken": false
+    }
+  }
+}

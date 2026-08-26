@@ -11,6 +11,12 @@
         <p class="small text-body-secondary mt-2 mb-0">
           {{ service.description }}
         </p>
+        <div *ngIf="service.dependsOn?.length" class="small mt-1">
+          <span class="text-body-secondary">Depends on:</span>
+          <span *ngFor="let dep of dependencyStates()" class="badge ms-1" [class.text-bg-success]="dep.running" [class.text-bg-secondary]="!dep.running">
+            {{ dep.label }}
+          </span>
+        </div>
       </div>
     </div>
 
@@ -26,7 +32,8 @@
       <button
         type="button"
         class="btn btn-success flex-grow-1"
-        [disabled]="loadingAction !== null || service.state === 'running' || service.state === 'starting'"
+        [disabled]="loadingAction !== null || service.state === 'running' || service.state === 'starting' || !dependenciesSatisfied()"
+        [title]="dependenciesSatisfied() ? '' : startBlockedTitle()"
         (click)="requestAction('start')"
       >
         <span *ngIf="loadingAction === 'start'" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>

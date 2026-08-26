@@ -68,6 +68,7 @@
         <div class="col-12 col-md-6 col-xl-4 col-xxl-3" *ngFor="let service of services; trackBy: trackByService">
           <app-service-card
             [service]="service"
+            [allServices]="services"
             [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
             (actionRequested)="handleAction(service.name, $event)"
           ></app-service-card>
