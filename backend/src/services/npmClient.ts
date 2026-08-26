@@ -32,12 +32,20 @@ interface EnsureProxyHostOptions {
 // Gates a proxy host behind Authelia's forward-auth — see the snippet files
 // this references (mounted into the NPM container, apps/nginx-proxy-manager/
 // snippets/) and apps/authelia/config/configuration.yml for the other half.
+// This location block replaces NPM's own auto-generated one entirely, which
+// is otherwise what adds WebSocket upgrade support when a host has
+// allow_websocket_upgrade on (true for every app here) — so it has to be
+// re-added here too, or apps that depend on it (e.g. code-server's
+// workbench) break with a WebSocket close code 1006.
 const AUTHELIA_ADVANCED_CONFIG = [
   'include /snippets/authelia-location.conf;',
   '',
   'location / {',
   '    include /snippets/proxy.conf;',
   '    include /snippets/authelia-authrequest.conf;',
+  '    proxy_http_version 1.1;',
+  '    proxy_set_header Upgrade $http_upgrade;',
+  '    proxy_set_header Connection "upgrade";',
   '    proxy_pass $forward_scheme://$server:$port;',
   '}',
 ].join('\n');
