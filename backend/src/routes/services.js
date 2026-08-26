@@ -10,7 +10,8 @@ const executor = require('../services/executor');
 const status = require('../services/status');
 const { createStreamTicket } = require('../services/realtime');
 const { isValidServiceName } = require('../config/services');
-const { schemas, validateParams } = require('../middleware/validation');
+const { schemas, validateParams, validateBody } = require('../middleware/validation');
+const { getServiceExposureRow, upsertServiceExposureConfig } = require('../services/exposure');
 const logger = require('../utils/logger');
 
 const router = express.Router();
@@ -112,5 +113,67 @@ router.post('/:name/stop', serviceLimiter, auth, validateParams(schemas.serviceN
     });
   }
 });
+
+/**
+ * GET /api/services/:name/exposure
+ * Read public exposure provisioning config and status for a service
+ */
+router.get('/:name/exposure', auth, validateParams(schemas.serviceNameParam), validateServiceAllowlist, async (req, res) => {
+  try {
+    const row = await getServiceExposureRow(req.params.name);
+    if (!row) {
+      return res.json({
+        enabled: false,
+        hostname: null,
+        upstreamScheme: 'http',
+        upstreamHost: null,
+        upstreamPort: null,
+        websocket: false,
+        status: 'not_provisioned',
+        lastError: null,
+      });
+    }
+
+    return res.json({
+      enabled: row.enabled,
+      hostname: row.hostname,
+      upstreamScheme: row.upstream_scheme,
+      upstreamHost: row.upstream_host,
+      upstreamPort: row.upstream_port,
+      websocket: row.websocket,
+      status: row.status,
+      lastError: row.last_error,
+    });
+  } catch (error) {
+    logger.error(`Failed to load exposure config: ${req.params.name}`, { error: error.message });
+    return res.status(500).json({ error: 'Unable to load exposure configuration.' });
+  }
+});
+
+/**
+ * PUT /api/services/:name/exposure
+ * Configure public exposure provisioning for a service. Opt-in per service;
+ * provisioning itself happens on the next successful service start.
+ */
+router.put(
+  '/:name/exposure',
+  auth,
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  validateBody(schemas.serviceExposureUpdate),
+  async (req, res) => {
+    try {
+      const row = await upsertServiceExposureConfig(req.params.name, req.body);
+      return res.json({
+        message: 'Exposure configuration saved. It will be applied on the next service start.',
+        enabled: row.enabled,
+        hostname: row.hostname,
+      });
+    } catch (error) {
+      logger.error(`Failed to save exposure config: ${req.params.name}`, { error: error.message });
+      return res.status(500).json({ error: 'Unable to save exposure configuration.' });
+    }
+  }
+);
 
 module.exports = router;

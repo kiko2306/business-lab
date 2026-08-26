@@ -58,7 +58,7 @@ router.post('/reset-admin-password', validateBody(schemas.recoveryResetAdminPass
     const passwordHash = await hashPassword(password);
     const result = await query(
       `UPDATE users
-       SET password_hash = $2, role = 'admin'
+       SET password_hash = $2
        WHERE username = $1
        RETURNING id`,
       [username, passwordHash]

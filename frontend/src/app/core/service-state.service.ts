@@ -3,7 +3,7 @@ import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, EMPTY, Subscription, catchError, finalize, firstValueFrom, retry, switchMap, tap, timer } from 'rxjs';
 import { API_BASE_URL, extractErrorMessage } from './api';
 import { SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
-import { ConnectionStatus, ServiceStatus, ServiceStatusResponse, ServiceSummary } from './models';
+import { ConnectionStatus, ServiceActionResponse, ServiceStatus, ServiceStatusResponse, ServiceSummary } from './models';
 import { ToastService } from './toast.service';
 import { AuthService } from './auth.service';
 
@@ -239,14 +239,19 @@ export class ServiceStateService {
     });
 
     this.http
-      .post<{ message: string }>(
+      .post<ServiceActionResponse>(
         `${API_BASE_URL}/services/${serviceName}/${action}`,
         {},
         { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
       )
       .pipe(
         retry({ count: 1, delay: 500 }),
-        tap((response) => this.toast.success(response.message)),
+        tap((response) => {
+          this.toast.success(response.message);
+          if (response.exposure?.attempted && !response.exposure.success && response.exposure.warning) {
+            this.toast.error(response.exposure.warning);
+          }
+        }),
         switchMap(() => this.fetchServices(false)),
         finalize(() => {
           this.operatingSubject.next({

@@ -66,49 +66,43 @@ backend starts and stops on your behalf.
 
 ## Known issues / TODO
 
-- [ ] **First-start exposure provisioning** — when a service is started from the
-      frontend for the first time, provision the matching Nginx Proxy Manager
+- [x] **Service start/stop was broken** — `executor.js` declared its secrets-validation
+      helpers (`ensureServiceSecrets`, `parseEnvFile`, `requiredSecretsFromCompose`)
+      inside an unrelated callback, so calling them from `startService`/`stopService`
+      threw a `ReferenceError` on every start or stop. The helpers are now defined at
+      module scope.
+- [x] **First-start exposure provisioning** — when a service starts with
+      exposure enabled, the backend provisions a matching Nginx Proxy Manager
       host and Cloudflare Tunnel public hostname route. See
-      [`plan.md`](./plan.md#16-planned-first-start-public-exposure-provisioning).
-      - [ ] Fix and verify `backend/src/services/executor.js` service-start
-            prerequisite helper scoping before adding provisioning.
-      - [ ] Add exposure metadata for base domain, derived
-            `<service>.<base-domain>` hostname, upstream scheme/host/port,
-            exposure enabled flag, and TLS settings.
-      - [ ] Add `apps/cloudflare-tunnel/compose.yaml` and `.env.example` for a
-            dashboard-configured Cloudflare Tunnel token.
-      - [ ] Add dashboard/backend settings for Cloudflare account, zone, tunnel,
-            tunnel token, base domain, and Nginx origin URL.
-      - [ ] Add dashboard/backend settings for Nginx Proxy Manager API URL and
-            credentials.
-      - [ ] Add a Nginx Proxy Manager client that idempotently finds, creates,
-            or updates proxy hosts.
-      - [ ] Add a Cloudflare Tunnel client that idempotently ensures public
-            hostname routes to Nginx Proxy Manager.
-      - [ ] Persist provisioning state and return/audit provisioning warnings
-            when Docker startup succeeds but external provisioning fails.
-      - [ ] Show exposure/provisioning status and warnings in the frontend.
-      - [ ] Document new API/settings fields and add targeted smoke or backend
-            coverage for idempotent provisioning.
-- [ ] **Backups are broken** — `POST /backups/create` fails with `spawn pg_dump ENOENT`.
-      `pg_dump`/`pg_restore` are not installed in the backend image; add
-      `postgresql-client` to `backend/Dockerfile`.
-- [ ] **Rate limiting keys on the proxy IP** — behind Cloudflare the backend logs
-      `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`. Express `trust proxy` is unset, so
-      `express-rate-limit` cannot identify real clients and limits are applied to
-      the proxy rather than per user.
+      [`plan.md`](./plan.md#16-implemented-first-start-public-exposure-provisioning)
+      for the full implementation summary. **Not yet validated against a real
+      Nginx Proxy Manager or Cloudflare account** — test before relying on it
+      in production.
+- [x] **Backups are broken** — `POST /backups/create` failed with `spawn pg_dump ENOENT`.
+      `postgresql16-client` (matching the `postgres:16-alpine` database image) is now
+      installed in `backend/Dockerfile`.
+- [x] **Rate limiting keys on the proxy IP** — behind Cloudflare the backend logged
+      `ERR_ERL_UNEXPECTED_X_FORWARDED_FOR`. `app.set('trust proxy', ...)` is now
+      configured (default: trust one hop), overridable via `TRUST_PROXY`.
 - [ ] **Docker socket exposure** — the backend mounts `/var/run/docker.sock`,
       granting it root-equivalent control of the host. Consider a socket proxy
       restricted to the required endpoints, and keep the API off the public
       internet or behind strict authentication.
-- [x] **Registry lists apps that are not installed** — all 13 entries in
+- [x] **Registry lists apps that are not installed** — all 17 entries in
       `backend/src/config/services.js` now have a `docker-compose.yml` and
-      `.env.example` under their respective `apps/` directory.
+      `.env.example` (where secrets are required) under their respective `apps/`
+      directory, including the previously-missing `dozzle`, `beszel`, `mealie`,
+      and `portainer` stacks.
 - [ ] **Health check URLs assume host ports** — entries use `localhost:<port>` and
       are rewritten via `SERVICE_HEALTH_HOST`. Apps published on a non-default
       port, or not published to the host at all, will report `check failed`.
 - [x] **Per-app secrets are validated before service actions** — the backend now
       checks each service `apps/<name>/.env` and required compose variables
       before `start`/`stop`, returning a clear 400 error listing missing keys.
-- [ ] **`version:` key is obsolete** — the root and app compose files still declare
-      `version:`, which Docker Compose warns about on every invocation.
+      (This validation was previously unreachable — see the executor.js fix above.)
+- [x] **`version:` key is obsolete** — removed from the root and all app compose
+      files.
+- [x] **User accounts have no management UI** — `/api/users` (list/create/reset
+      password/delete) plus a `/users` dashboard screen now cover multi-admin
+      management. There is a single account tier (every user is an administrator);
+      the previously-unused `role` column has been removed.

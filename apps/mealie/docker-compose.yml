@@ -1,0 +1,21 @@
+services:
+  mealie:
+    image: ghcr.io/mealie-recipes/mealie:latest
+    restart: unless-stopped
+    ports:
+      - "${MEALIE_PORT:-9925}:9000"
+    environment:
+      TZ: ${TZ:-UTC}
+      BASE_URL: ${MEALIE_BASE_URL:-http://localhost:9925}
+    volumes:
+      - mealie-data:/app/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/api/app/about"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+volumes:
+  mealie-data:
+    driver: local

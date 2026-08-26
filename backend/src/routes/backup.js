@@ -108,7 +108,7 @@ router.post('/create', async (req, res) => {
     await fs.writeFile(settingsPath, JSON.stringify(settingsResult.rows, null, 2), 'utf8');
 
     const usersResult = await query(
-      'SELECT id, username, role, is_setup_complete, created_at FROM users ORDER BY id ASC'
+      'SELECT id, username, is_setup_complete, created_at FROM users ORDER BY id ASC'
     );
     await fs.writeFile(usersPath, JSON.stringify(usersResult.rows, null, 2), 'utf8');
 

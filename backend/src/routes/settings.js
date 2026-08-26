@@ -12,6 +12,16 @@ const CLOUDFLARE_TOKEN_KEY = 'cloudflare_tunnel_token';
 const PERMISSION_EXPLANATION =
   'Required permissions: Account → Cloudflare Tunnel → Edit, Zone → DNS → Edit.';
 
+const EXPOSURE_SETTINGS_KEYS = {
+  baseDomain: 'exposure_base_domain',
+  npmApiUrl: 'exposure_npm_api_url',
+  npmEmail: 'exposure_npm_email',
+  npmPassword: 'exposure_npm_password',
+  cloudflareAccountId: 'exposure_cloudflare_account_id',
+  cloudflareZoneId: 'exposure_cloudflare_zone_id',
+  cloudflareTunnelId: 'exposure_cloudflare_tunnel_id',
+};
+
 function maskToken(token) {
   if (!token) {
     return null;
@@ -138,6 +148,82 @@ router.post('/cloudflare-token/test', validateBody(schemas.cloudflareTokenTest),
     });
   } catch (error) {
     return res.status(502).json({ error: 'Unable to reach Cloudflare to verify the token.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/settings/exposure — read first-start exposure provisioning config
+// ---------------------------------------------------------------------------
+router.get('/exposure', async (_req, res) => {
+  try {
+    const result = await query('SELECT key, value FROM settings WHERE key = ANY($1)', [
+      Object.values(EXPOSURE_SETTINGS_KEYS),
+    ]);
+    const values = Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
+
+    return res.json({
+      configured: Boolean(
+        values[EXPOSURE_SETTINGS_KEYS.baseDomain] &&
+          values[EXPOSURE_SETTINGS_KEYS.npmApiUrl] &&
+          values[EXPOSURE_SETTINGS_KEYS.npmEmail] &&
+          values[EXPOSURE_SETTINGS_KEYS.npmPassword] &&
+          values[EXPOSURE_SETTINGS_KEYS.cloudflareAccountId] &&
+          values[EXPOSURE_SETTINGS_KEYS.cloudflareZoneId] &&
+          values[EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId]
+      ),
+      baseDomain: values[EXPOSURE_SETTINGS_KEYS.baseDomain] ?? null,
+      npmApiUrl: values[EXPOSURE_SETTINGS_KEYS.npmApiUrl] ?? null,
+      npmEmail: values[EXPOSURE_SETTINGS_KEYS.npmEmail] ?? null,
+      npmPasswordConfigured: Boolean(values[EXPOSURE_SETTINGS_KEYS.npmPassword]),
+      cloudflareAccountId: values[EXPOSURE_SETTINGS_KEYS.cloudflareAccountId] ?? null,
+      cloudflareZoneId: values[EXPOSURE_SETTINGS_KEYS.cloudflareZoneId] ?? null,
+      cloudflareTunnelId: values[EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId] ?? null,
+    });
+  } catch (error) {
+    return res.status(500).json({ error: 'Unable to load exposure settings.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/settings/exposure — save first-start exposure provisioning config
+// ---------------------------------------------------------------------------
+router.put('/exposure', validateBody(schemas.exposureGlobalSettings), async (req, res) => {
+  const values = {
+    [EXPOSURE_SETTINGS_KEYS.baseDomain]: req.body.baseDomain,
+    [EXPOSURE_SETTINGS_KEYS.npmApiUrl]: req.body.npmApiUrl.replace(/\/+$/, ''),
+    [EXPOSURE_SETTINGS_KEYS.npmEmail]: req.body.npmEmail,
+    [EXPOSURE_SETTINGS_KEYS.cloudflareAccountId]: req.body.cloudflareAccountId,
+    [EXPOSURE_SETTINGS_KEYS.cloudflareZoneId]: req.body.cloudflareZoneId,
+    [EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId]: req.body.cloudflareTunnelId,
+  };
+
+  // Only overwrite the stored password when a new one was supplied, so a
+  // save with the password field left blank keeps the existing value.
+  if (req.body.npmPassword) {
+    values[EXPOSURE_SETTINGS_KEYS.npmPassword] = req.body.npmPassword;
+  }
+
+  try {
+    for (const [key, value] of Object.entries(values)) {
+      await query(
+        `INSERT INTO settings (key, value, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (key)
+         DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [key, value]
+      );
+    }
+
+    await writeAuditLog({
+      userId: req.user?.id ?? null,
+      action: 'settings_change',
+      resource: 'exposure_config',
+      result: 'success',
+    }).catch(() => {});
+
+    return res.json({ message: 'Exposure settings saved successfully.' });
+  } catch (error) {
+    return res.status(500).json({ error: 'Unable to save exposure settings.' });
   }
 });
 

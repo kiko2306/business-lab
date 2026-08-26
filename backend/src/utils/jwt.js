@@ -34,7 +34,7 @@ function getRefreshSecret() {
 
 /**
  * Sign an access token for the given user payload.
- * @param {{ id: number, username: string, role: string }} payload
+ * @param {{ id: number, username: string }} payload
  * @returns {string}
  */
 function signAccessToken(payload) {

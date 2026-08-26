@@ -11,7 +11,8 @@ FROM node:20-alpine AS runtime
 ARG DOCKER_GID=999
 
 # docker CLI + compose plugin are required to start/stop the managed app stacks.
-RUN apk add --no-cache docker-cli docker-cli-compose
+# postgresql16-client provides pg_dump/pg_restore, matching the postgres:16-alpine database image.
+RUN apk add --no-cache docker-cli docker-cli-compose postgresql16-client
 
 RUN set -eux; \
     addgroup -S appgroup; \

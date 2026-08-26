@@ -9,13 +9,14 @@ const fs = require('fs');
 const path = require('path');
 const logger = require('../utils/logger');
 const { writeAuditLog } = require('../utils/audit');
+const { provisionServiceIfEnabled } = require('./exposure');
 
 /**
  * Execute a shell command with timeout and error handling
  */
 function executeCommand(command, timeout = 30000) {
   return new Promise((resolve, reject) => {
-    const process = exec(command, { timeout }, (error, stdout, stderr) => {
+    exec(command, { timeout }, (error, stdout, stderr) => {
       if (error) {
         reject({
           code: error.code,
@@ -30,67 +31,67 @@ function executeCommand(command, timeout = 30000) {
           stderr: stderr || '',
         });
       }
-
-      function requiredSecretsFromCompose(composeFilePath) {
-        const composeContent = fs.readFileSync(composeFilePath, 'utf8');
-        const matches = composeContent.match(/\$\{([A-Z0-9_]+)\}/g) || [];
-        return [...new Set(matches.map((token) => token.slice(2, -1)))];
-      }
-
-      function parseEnvFile(envFilePath) {
-        const envContent = fs.readFileSync(envFilePath, 'utf8');
-        const lines = envContent.split(/\r?\n/);
-        const values = {};
-
-        for (const line of lines) {
-          const trimmed = line.trim();
-          if (!trimmed || trimmed.startsWith('#')) {
-            continue;
-          }
-          const eqIndex = trimmed.indexOf('=');
-          if (eqIndex <= 0) {
-            continue;
-          }
-          const key = trimmed.slice(0, eqIndex).trim();
-          const value = trimmed.slice(eqIndex + 1).trim();
-          values[key] = value;
-        }
-
-        return values;
-      }
-
-      function ensureServiceSecrets(serviceName, appDir, composeFile) {
-        const envFilePath = path.join(appDir, '.env');
-        const requiredSecrets = requiredSecretsFromCompose(composeFile).filter((name) => !name.includes(':-'));
-
-        if (!requiredSecrets.length) {
-          return;
-        }
-
-        if (!fs.existsSync(envFilePath)) {
-          throw {
-            statusCode: 400,
-            message: `Service ${serviceName} is missing ${envFilePath}. Copy .env.example to .env and set required values.`,
-            details: `Missing .env for ${serviceName}`,
-          };
-        }
-
-        const envValues = parseEnvFile(envFilePath);
-        const missing = requiredSecrets.filter((key) => {
-          const value = envValues[key];
-          return value === undefined || value === '';
-        });
-
-        if (missing.length) {
-          throw {
-            statusCode: 400,
-            message: `Service ${serviceName} has missing required secrets in .env`,
-            details: `Unset keys: ${missing.join(', ')}`,
-          };
-        }
-      }
     });
   });
+}
+
+function requiredSecretsFromCompose(composeFilePath) {
+  const composeContent = fs.readFileSync(composeFilePath, 'utf8');
+  const matches = composeContent.match(/\$\{([A-Z0-9_]+)\}/g) || [];
+  return [...new Set(matches.map((token) => token.slice(2, -1)))];
+}
+
+function parseEnvFile(envFilePath) {
+  const envContent = fs.readFileSync(envFilePath, 'utf8');
+  const lines = envContent.split(/\r?\n/);
+  const values = {};
+
+  for (const line of lines) {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      continue;
+    }
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex <= 0) {
+      continue;
+    }
+    const key = trimmed.slice(0, eqIndex).trim();
+    const value = trimmed.slice(eqIndex + 1).trim();
+    values[key] = value;
+  }
+
+  return values;
+}
+
+function ensureServiceSecrets(serviceName, appDir, composeFile) {
+  const envFilePath = path.join(appDir, '.env');
+  const requiredSecrets = requiredSecretsFromCompose(composeFile).filter((name) => !name.includes(':-'));
+
+  if (!requiredSecrets.length) {
+    return;
+  }
+
+  if (!fs.existsSync(envFilePath)) {
+    throw {
+      statusCode: 400,
+      message: `Service ${serviceName} is missing ${envFilePath}. Copy .env.example to .env and set required values.`,
+      details: `Missing .env for ${serviceName}`,
+    };
+  }
+
+  const envValues = parseEnvFile(envFilePath);
+  const missing = requiredSecrets.filter((key) => {
+    const value = envValues[key];
+    return value === undefined || value === '';
+  });
+
+  if (missing.length) {
+    throw {
+      statusCode: 400,
+      message: `Service ${serviceName} has missing required secrets in .env`,
+      details: `Unset keys: ${missing.join(', ')}`,
+    };
+  }
 }
 
 /**
@@ -134,11 +135,17 @@ async function startService(serviceName, userId) {
 
     logger.info(`Service started successfully: ${serviceName}`, { userId });
 
+    const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error) => {
+      logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
+      return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };
+    });
+
     return {
       success: true,
       service: serviceName,
       message: `Service ${serviceName} started successfully`,
       timestamp: new Date(),
+      ...(exposure.attempted ? { exposure } : {}),
     };
   } catch (error) {
     logger.error(`Failed to start service: ${serviceName}`, {

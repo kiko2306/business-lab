@@ -17,6 +17,8 @@ const auditRouter = require('./routes/audit');
 const backupRouter = require('./routes/backup');
 const healthRouter = require('./routes/health');
 const recoveryRouter = require('./routes/recovery');
+const usersRouter = require('./routes/users');
+const { dropLegacyRoleColumn, ensureServiceExposureTable } = require('./utils/database');
 const authMiddleware = require('./middleware/auth');
 const setupModeMiddleware = require('./middleware/setupMode');
 const rateLimit = require('express-rate-limit');
@@ -39,6 +41,17 @@ const streamLimiter = rateLimit({
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Behind Cloudflare Tunnel / Nginx Proxy Manager there is exactly one reverse
+// proxy hop in front of this container, so express-rate-limit and req.ip can
+// trust the single nearest X-Forwarded-For entry. Override via TRUST_PROXY if
+// the deployment adds more hops (e.g. an additional load balancer). Numeric
+// values must be passed as an actual Number — express-rate-limit treats a
+// numeric *string* as a trusted IP/subnet rather than a hop count.
+const trustProxySetting = process.env.TRUST_PROXY;
+app.set('trust proxy', trustProxySetting !== undefined && trustProxySetting !== '' && !Number.isNaN(Number(trustProxySetting))
+  ? Number(trustProxySetting)
+  : trustProxySetting || 1);
 
 const allowedOrigins = (process.env.CORS_ORIGIN || process.env.API_URL || 'http://localhost:4200')
   .split(',')
@@ -91,11 +104,6 @@ app.get('/ping', (_req, res) => {
   res.status(200).json({ statusCode: 200, message: 'Pong' });
 });
 
-// Ping check — always available, unauthenticated
-app.get('/ping', (_req, res) => {
-  res.status(200).json({ statusCode: 200, message: 'Pong' });
-});
-
 // Every router is served both at the root (e.g. /auth/login) and under the
 // legacy /api prefix (e.g. /api/auth/login) so that deployments pointing a
 // dedicated API hostname at this server do not need the redundant /api segment.
@@ -121,6 +129,7 @@ for (const prefix of ROUTE_PREFIXES) {
   app.use(`${prefix}/settings`, ...protectedGate(), settingsRouter);
   app.use(`${prefix}/audit-logs`, ...protectedGate(), auditRouter);
   app.use(`${prefix}/backups`, ...protectedGate(), backupRouter);
+  app.use(`${prefix}/users`, ...protectedGate(), usersRouter);
   // Mounted after the public liveness probe above, so GET /health stays public
   // while GET /health/system and /health/thresholds remain protected.
   app.use(`${prefix}/health`, ...protectedGate(), healthRouter);
@@ -134,6 +143,13 @@ app.use((err, _req, res, _next) => {
   }
   console.error('Unhandled error:', err.message);
   return res.status(500).json({ error: 'Internal server error' });
+});
+
+dropLegacyRoleColumn().catch((err) => {
+  console.error('Unable to drop legacy users.role column:', err.message);
+});
+ensureServiceExposureTable().catch((err) => {
+  console.error('Unable to ensure service_exposure table:', err.message);
 });
 
 const server = app.listen(PORT, () => {

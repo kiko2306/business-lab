@@ -47,4 +47,37 @@ async function query(text, params) {
   }
 }
 
-module.exports = { getPool, query };
+/**
+ * Drop the legacy `role` column from `users` on databases created before
+ * roles were removed from the project. No-op on fresh installs, since
+ * init.sql no longer creates that column.
+ */
+async function dropLegacyRoleColumn() {
+  await query('ALTER TABLE users DROP COLUMN IF EXISTS role');
+}
+
+/**
+ * Create the `service_exposure` table on databases created before first-start
+ * exposure provisioning was added. No-op on fresh installs, since init.sql
+ * already creates it.
+ */
+async function ensureServiceExposureTable() {
+  await query(`
+    CREATE TABLE IF NOT EXISTS service_exposure (
+        service_name    VARCHAR(100) PRIMARY KEY,
+        enabled         BOOLEAN NOT NULL DEFAULT FALSE,
+        hostname        VARCHAR(255),
+        upstream_scheme VARCHAR(10) NOT NULL DEFAULT 'http',
+        upstream_host   VARCHAR(255),
+        upstream_port   INTEGER,
+        websocket       BOOLEAN NOT NULL DEFAULT FALSE,
+        npm_host_id     INTEGER,
+        cf_hostname_id  TEXT,
+        status          VARCHAR(50) NOT NULL DEFAULT 'not_provisioned',
+        last_error      TEXT,
+        updated_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+}
+
+module.exports = { getPool, query, dropLegacyRoleColumn, ensureServiceExposureTable };

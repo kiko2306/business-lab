@@ -171,6 +171,50 @@ const SERVICES = {
       enabled: false,
     },
   },
+  'dozzle': {
+    name: 'dozzle',
+    label: 'Dozzle',
+    description: 'Real-time Docker container log viewer',
+    icon: 'logs',
+    composePath: 'apps/dozzle/docker-compose.yml',
+    healthCheck: {
+      enabled: false,
+    },
+  },
+  'beszel': {
+    name: 'beszel',
+    label: 'Beszel',
+    description: 'Lightweight server monitoring hub',
+    icon: 'monitor',
+    composePath: 'apps/beszel/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8090/api/health',
+      interval: 30000,
+      timeout: 5000,
+    },
+  },
+  'mealie': {
+    name: 'mealie',
+    label: 'Mealie',
+    description: 'Recipe manager and meal planner',
+    icon: 'food',
+    composePath: 'apps/mealie/docker-compose.yml',
+    healthCheck: {
+      enabled: false,
+    },
+  },
+  'portainer': {
+    name: 'portainer',
+    label: 'Portainer',
+    description: 'Docker container management UI',
+    icon: 'container',
+    composePath: 'apps/portainer/docker-compose.yml',
+    healthCheck: {
+      enabled: false,
+    },
+  },
 };
 
 /**

@@ -29,14 +29,14 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
   try {
     const passwordHash = await hashPassword(password);
     const result = await query(
-      `INSERT INTO users (username, password_hash, role, is_setup_complete)
-       VALUES ($1, $2, 'admin', TRUE)
-       RETURNING id, username, role`,
+      `INSERT INTO users (username, password_hash, is_setup_complete)
+       VALUES ($1, $2, TRUE)
+       RETURNING id, username`,
       [username.trim(), passwordHash]
     );
     const user = result.rows[0];
 
-    const accessToken = signAccessToken({ id: user.id, username: user.username, role: user.role });
+    const accessToken = signAccessToken({ id: user.id, username: user.username });
     const refreshToken = signRefreshToken({ id: user.id });
 
     const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
@@ -50,7 +50,7 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
       [user.id, 'setup', 'users', 'success']
     );
 
-    return res.status(201).json({ accessToken, refreshToken, user: { id: user.id, username: user.username, role: user.role } });
+    return res.status(201).json({ accessToken, refreshToken, user: { id: user.id, username: user.username } });
   } catch (err) {
     if (err.code === '23505') {
       return res.status(409).json({ error: 'Username already exists' });
@@ -68,7 +68,7 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req, 
 
   try {
     const result = await query(
-      'SELECT id, username, password_hash, role FROM users WHERE username = $1',
+      'SELECT id, username, password_hash FROM users WHERE username = $1',
       [username]
     );
     const user = result.rows[0];
@@ -82,7 +82,7 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req, 
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    const accessToken = signAccessToken({ id: user.id, username: user.username, role: user.role });
+    const accessToken = signAccessToken({ id: user.id, username: user.username });
     const refreshToken = signRefreshToken({ id: user.id });
 
     const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
@@ -93,7 +93,7 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req, 
 
     await writeAuditLog({ userId: user.id, action: 'login', resource: 'auth', result: 'success' });
 
-    return res.json({ accessToken, refreshToken, user: { id: user.id, username: user.username, role: user.role } });
+    return res.json({ accessToken, refreshToken, user: { id: user.id, username: user.username } });
   } catch (err) {
     console.error('Login error:', err.message);
     return res.status(500).json({ error: 'Internal server error' });
@@ -137,7 +137,7 @@ router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (r
 
     const result = await query(
       `SELECT rt.id, rt.user_id, rt.revoked, rt.expires_at,
-              u.username, u.role
+              u.username
        FROM refresh_tokens rt
        JOIN users u ON u.id = rt.user_id
        WHERE rt.token = $1`,
@@ -149,7 +149,7 @@ router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (r
       return res.status(401).json({ error: 'Refresh token is invalid or expired' });
     }
 
-    const accessToken = signAccessToken({ id: decoded.id, username: row.username, role: row.role });
+    const accessToken = signAccessToken({ id: decoded.id, username: row.username });
     return res.json({ accessToken });
   } catch {
     return res.status(401).json({ error: 'Refresh token is invalid or expired' });

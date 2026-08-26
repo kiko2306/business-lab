@@ -17,6 +17,11 @@ const usernameSchema = Joi.string()
 const passwordSchema = Joi.string().min(8).max(128);
 const serviceNameSchema = Joi.string().trim().min(1).max(64).pattern(/^[a-z0-9-]+$/);
 const backupNameSchema = Joi.string().trim().max(255).pattern(/^[a-zA-Z0-9._-]+$/);
+const domainSchema = Joi.string()
+  .trim()
+  .min(1)
+  .max(255)
+  .pattern(/^[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/);
 
 const schemas = {
   authSetup: Joi.object({
@@ -48,6 +53,23 @@ const schemas = {
   backupDownloadParams: Joi.object({
     fileName: backupNameSchema.required(),
   }),
+  exposureGlobalSettings: Joi.object({
+    baseDomain: domainSchema.required(),
+    npmApiUrl: Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(500).required(),
+    npmEmail: Joi.string().trim().email().max(255).required(),
+    // Optional: omit to keep the previously saved password unchanged.
+    npmPassword: Joi.string().min(1).max(255).optional(),
+    cloudflareAccountId: Joi.string().trim().alphanum().length(32).required(),
+    cloudflareZoneId: Joi.string().trim().alphanum().length(32).required(),
+    cloudflareTunnelId: Joi.string().trim().min(1).max(255).required(),
+  }),
+  serviceExposureUpdate: Joi.object({
+    enabled: Joi.boolean().required(),
+    upstreamScheme: Joi.string().valid('http', 'https').default('http'),
+    upstreamHost: Joi.string().trim().min(1).max(255).required(),
+    upstreamPort: Joi.number().integer().min(1).max(65535).required(),
+    websocket: Joi.boolean().default(false),
+  }),
   healthThresholds: Joi.object({
     diskPercent: Joi.number().min(1).max(100).required(),
     memoryPercent: Joi.number().min(1).max(100).required(),
@@ -55,6 +77,16 @@ const schemas = {
   }),
   recoveryEnable: Joi.object({
     confirm: Joi.string().valid('ENABLE_RECOVERY_MODE').required(),
+  }),
+  userCreate: Joi.object({
+    username: usernameSchema.required(),
+    password: passwordSchema.required(),
+  }),
+  userIdParam: Joi.object({
+    id: Joi.number().integer().positive().required(),
+  }),
+  userPasswordUpdate: Joi.object({
+    password: passwordSchema.required(),
   }),
   recoveryResetAdminPassword: Joi.object({
     username: usernameSchema.required(),

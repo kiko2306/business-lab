@@ -166,6 +166,69 @@ paths:
       summary: List audit logs
       responses:
         '200': { description: Audit log page }
+  /users:
+    get:
+      security:
+        - bearerAuth: []
+      summary: List admin accounts
+      responses:
+        '200': { description: List of users }
+    post:
+      security:
+        - bearerAuth: []
+      summary: Create a new admin account
+      responses:
+        '201': { description: User created }
+        '409': { description: Username already exists }
+        '422': { description: Validation error }
+  /users/{id}/password:
+    put:
+      security:
+        - bearerAuth: []
+      summary: Reset an admin account's password
+      responses:
+        '200': { description: Password updated }
+        '404': { description: User not found }
+        '422': { description: Validation error }
+  /users/{id}:
+    delete:
+      security:
+        - bearerAuth: []
+      summary: Delete an admin account
+      responses:
+        '200': { description: User deleted }
+        '400': { description: Cannot delete own account or last remaining admin }
+        '404': { description: User not found }
+  /settings/exposure:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Read first-start exposure provisioning settings (base domain, NPM, Cloudflare)
+      responses:
+        '200': { description: Exposure settings }
+    put:
+      security:
+        - bearerAuth: []
+      summary: Save first-start exposure provisioning settings
+      responses:
+        '200': { description: Saved }
+        '422': { description: Validation error }
+  /services/{name}/exposure:
+    get:
+      security:
+        - bearerAuth: []
+      summary: Read per-service exposure configuration and provisioning status
+      responses:
+        '200': { description: Exposure configuration }
+        '400': { description: Invalid service name }
+    put:
+      security:
+        - bearerAuth: []
+      summary: Configure per-service exposure (enable/disable, upstream host/port)
+      responses:
+        '200': { description: Saved }
+        '400': { description: Invalid service name }
+        '422': { description: Validation error }
   /recovery/status:
     get:
       summary: Check recovery mode status

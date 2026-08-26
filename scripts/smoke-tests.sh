@@ -141,6 +141,35 @@ sse_body=$(curl -sS --max-time 8 "${API_BASE_URL}/api/services/stream?ticket=${s
 echo "$sse_body" | grep -q 'event: status'
 echo "✅ SSE stream endpoint"
 
+users_list=$(request GET "/api/users" "" "$access_token")
+users_list_status=$(echo "$users_list" | extract_status)
+users_list_body=$(echo "$users_list" | extract_body)
+assert_status "$users_list_status" "200" "User listing endpoint"
+echo "$users_list_body" | grep -q '"items"'
+
+users_create=$(request POST "/api/users" '{"username":"smoke-secondary-user","password":"another-strong-pass"}' "$access_token")
+users_create_status=$(echo "$users_create" | extract_status)
+users_create_body=$(echo "$users_create" | extract_body)
+if [[ "$users_create_status" == "201" ]]; then
+  echo "✅ User creation endpoint"
+  secondary_user_id=$(echo "$users_create_body" | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); process.stdout.write(String(d.user.id));")
+elif [[ "$users_create_status" == "409" ]]; then
+  echo "ℹ️ Smoke secondary user already exists from a previous run, reusing it"
+  secondary_user_id=$(echo "$users_list_body" | node -e "const fs=require('fs'); const d=JSON.parse(fs.readFileSync(0,'utf8')); const u=d.items.find((x)=>x.username==='smoke-secondary-user'); process.stdout.write(u?String(u.id):'');")
+else
+  echo "❌ Unexpected user creation response status: ${users_create_status}"
+  echo "$users_create_body"
+  exit 1
+fi
+
+users_delete_secondary=$(request DELETE "/api/users/${secondary_user_id}" "" "$access_token")
+users_delete_secondary_status=$(echo "$users_delete_secondary" | extract_status)
+assert_status "$users_delete_secondary_status" "200" "User deletion endpoint"
+
+users_self_delete=$(request DELETE "/api/users/999999" "" "$access_token")
+users_self_delete_status=$(echo "$users_self_delete" | extract_status)
+assert_status "$users_self_delete_status" "400" "Cannot delete the last remaining admin"
+
 logout_payload=$(printf '{"refreshToken":"%s"}' "$refresh_token")
 logout_response=$(request POST "/api/auth/logout" "$logout_payload" "$access_token")
 logout_status=$(echo "$logout_response" | extract_status)

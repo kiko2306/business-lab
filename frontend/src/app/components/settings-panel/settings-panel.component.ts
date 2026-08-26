@@ -4,7 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { sanitizePastedText } from '../../core/input-sanitize';
-import { CloudflareSettings } from '../../core/models';
+import { CloudflareSettings, ExposureSettings, ExposureSettingsInput } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
 
@@ -24,12 +24,26 @@ export class SettingsPanelComponent implements OnInit {
     token: ['', [Validators.minLength(20), Validators.maxLength(4096)]],
   });
 
+  protected readonly exposureForm = this.formBuilder.nonNullable.group({
+    baseDomain: ['', [Validators.required, Validators.maxLength(255)]],
+    npmApiUrl: ['', [Validators.required, Validators.maxLength(500)]],
+    npmEmail: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
+    npmPassword: ['', [Validators.maxLength(255)]],
+    cloudflareAccountId: ['', [Validators.required, Validators.maxLength(32)]],
+    cloudflareZoneId: ['', [Validators.required, Validators.maxLength(32)]],
+    cloudflareTunnelId: ['', [Validators.required, Validators.maxLength(255)]],
+  });
+
   protected configuredSettings: CloudflareSettings | null = null;
+  protected exposureSettings: ExposureSettings | null = null;
   protected showToken = false;
   protected loading = true;
+  protected exposureLoading = true;
   protected saving = false;
+  protected savingExposure = false;
   protected testing = false;
   protected feedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  protected exposureFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
 
   sanitizeTokenPaste(event: ClipboardEvent): void {
     const pasted = event.clipboardData?.getData('text') ?? '';
@@ -41,6 +55,72 @@ export class SettingsPanelComponent implements OnInit {
 
   ngOnInit(): void {
     this.loadSettings();
+    this.loadExposureSettings();
+  }
+
+  saveExposure(): void {
+    if (this.exposureForm.invalid) {
+      this.exposureForm.markAllAsTouched();
+      return;
+    }
+
+    const value = this.exposureForm.getRawValue();
+    if (!value.npmPassword && !this.exposureSettings?.npmPasswordConfigured) {
+      this.exposureForm.controls.npmPassword.setErrors({ required: true });
+      this.exposureFeedback = { type: 'info', message: 'Enter the Nginx Proxy Manager admin password.' };
+      return;
+    }
+
+    this.savingExposure = true;
+    const payload: ExposureSettingsInput = {
+      baseDomain: value.baseDomain.trim(),
+      npmApiUrl: value.npmApiUrl.trim(),
+      npmEmail: value.npmEmail.trim(),
+      cloudflareAccountId: value.cloudflareAccountId.trim(),
+      cloudflareZoneId: value.cloudflareZoneId.trim(),
+      cloudflareTunnelId: value.cloudflareTunnelId.trim(),
+    };
+    if (value.npmPassword) {
+      payload.npmPassword = value.npmPassword;
+    }
+
+    this.settingsService
+      .saveExposureSettings(payload)
+      .pipe(finalize(() => (this.savingExposure = false)))
+      .subscribe({
+        next: (response) => {
+          this.exposureFeedback = { type: 'success', message: response.message };
+          this.toastService.success('Exposure settings saved.');
+          this.exposureForm.controls.npmPassword.reset('');
+          this.loadExposureSettings();
+        },
+        error: (error) => {
+          this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save exposure settings.') };
+        },
+      });
+  }
+
+  private loadExposureSettings(): void {
+    this.exposureLoading = true;
+    this.settingsService
+      .loadExposureSettings()
+      .pipe(finalize(() => (this.exposureLoading = false)))
+      .subscribe({
+        next: (settings) => {
+          this.exposureSettings = settings;
+          this.exposureForm.patchValue({
+            baseDomain: settings.baseDomain ?? '',
+            npmApiUrl: settings.npmApiUrl ?? '',
+            npmEmail: settings.npmEmail ?? '',
+            cloudflareAccountId: settings.cloudflareAccountId ?? '',
+            cloudflareZoneId: settings.cloudflareZoneId ?? '',
+            cloudflareTunnelId: settings.cloudflareTunnelId ?? '',
+          });
+        },
+        error: (error) => {
+          this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to load exposure settings.') };
+        },
+      });
   }
 
   save(): void {
