@@ -135,6 +135,20 @@ proof case:
 
 ### Add
 
+- [ ] **Fix: NetBird VPN dashboard hangs loading `/peers` after a successful
+      login** — Authelia SSO login for NetBird VPN is fully working now
+      (verified end-to-end: token exchange, userinfo, and the redirect to
+      `/peers` all return 200), but the peers page itself never finishes
+      loading — stuck on the spinner indefinitely. The browser console logs
+      a plain object every ~2s with no matching HTTP request in the network
+      panel, which points at a stuck WebSocket or gRPC-Web streaming
+      connection for live peer data rather than a REST call. CSP
+      (`connect-src`/`wss:`) and NPM's `allow_websocket_upgrade` are both
+      already correctly configured for the `netbird-vpn-api.<base-domain>`
+      host, so the next step is identifying the actual failing
+      connection — the available browser tooling only captures HTTP
+      requests, not raw WebSocket frames, so this needs either browser
+      DevTools directly or instrumenting the dashboard bundle.
 - [ ] **CI pipeline** — there's no `.github/workflows/`, so `smoke-tests.sh`,
       `docker-e2e-test.sh`, and both `tsc` builds only ever run manually.
       Wire them into a workflow that runs on every push/PR.
