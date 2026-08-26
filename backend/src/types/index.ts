@@ -15,6 +15,15 @@ export interface ServiceHealthCheck {
   timeout?: number;
 }
 
+export interface ServiceExposureEnvKeys {
+  // Compose env var(s) that should receive the service's public URL
+  // (e.g. PAPERLESS_URL) when exposure is enabled.
+  url?: string[];
+  // Compose env var(s) holding a comma-separated allowed-hosts list that the
+  // public hostname must be appended to (e.g. PAPERLESS_ALLOWED_HOSTS).
+  allowedHosts?: string[];
+}
+
 export interface ServiceDefinition {
   name: string;
   label: string;
@@ -22,6 +31,7 @@ export interface ServiceDefinition {
   icon: string;
   composePath: string;
   healthCheck: ServiceHealthCheck;
+  exposureEnvKeys?: ServiceExposureEnvKeys;
 }
 
 export type ServiceState = 'running' | 'stopped' | 'starting' | 'error' | 'unknown';
@@ -94,10 +104,6 @@ export interface ServiceExposureRow {
 
 export interface ServiceExposureInput {
   enabled: boolean;
-  upstreamScheme: string;
-  upstreamHost: string;
-  upstreamPort: number;
-  websocket: boolean;
 }
 
 export interface ExposureProvisionResult {

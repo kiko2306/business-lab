@@ -3,7 +3,7 @@ import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
-import { ServiceExposureConfig, ServiceStatus } from '../../core/models';
+import { ServiceEnvStatus, ServiceExposureConfig, ServiceStatus } from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
 
@@ -29,10 +29,12 @@ export class ServiceCardComponent {
   protected exposure: ServiceExposureConfig | null = null;
 
   protected exposureEnabled = false;
-  protected exposureUpstreamHost = '';
-  protected exposureUpstreamPort: number | null = null;
-  protected exposureUpstreamScheme: 'http' | 'https' = 'http';
-  protected exposureWebsocket = false;
+
+  protected envPanelOpen = false;
+  protected envLoading = false;
+  protected envSaving = false;
+  protected env: ServiceEnvStatus | null = null;
+  protected envValues: Record<string, string> = {};
 
   requestAction(action: 'start' | 'stop'): void {
     this.actionRequested.emit(action);
@@ -54,29 +56,16 @@ export class ServiceCardComponent {
         next: (config) => {
           this.exposure = config;
           this.exposureEnabled = config.enabled;
-          this.exposureUpstreamHost = config.upstreamHost ?? '';
-          this.exposureUpstreamPort = config.upstreamPort;
-          this.exposureUpstreamScheme = config.upstreamScheme;
-          this.exposureWebsocket = config.websocket;
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load exposure configuration.')),
       });
   }
 
   saveExposure(): void {
-    if (this.exposureEnabled && (!this.exposureUpstreamHost.trim() || !this.exposureUpstreamPort)) {
-      this.toast.error('Upstream host and port are required to enable exposure.');
-      return;
-    }
-
     this.exposureSaving = true;
     this.operations
       .updateServiceExposure(this.service.name, {
         enabled: this.exposureEnabled,
-        upstreamScheme: this.exposureUpstreamScheme,
-        upstreamHost: this.exposureUpstreamHost.trim(),
-        upstreamPort: this.exposureUpstreamPort ?? 0,
-        websocket: this.exposureWebsocket,
       })
       .pipe(finalize(() => (this.exposureSaving = false)))
       .subscribe({
@@ -85,6 +74,50 @@ export class ServiceCardComponent {
           this.loadExposure();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save exposure configuration.')),
+      });
+  }
+
+  toggleEnvPanel(): void {
+    this.envPanelOpen = !this.envPanelOpen;
+    if (this.envPanelOpen && !this.env) {
+      this.loadEnv();
+    }
+  }
+
+  loadEnv(): void {
+    this.envLoading = true;
+    this.operations
+      .getServiceEnv(this.service.name)
+      .pipe(finalize(() => (this.envLoading = false)))
+      .subscribe({
+        next: (env) => {
+          this.env = env;
+          this.envValues = {};
+          for (const field of env.fields) {
+            if (!field.secret) {
+              this.envValues[field.key] = field.value ?? '';
+            }
+          }
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load configuration.')),
+      });
+  }
+
+  missingRequiredCount(): number {
+    return this.env?.fields.filter((field) => field.required && !field.isSet).length ?? 0;
+  }
+
+  saveEnv(): void {
+    this.envSaving = true;
+    this.operations
+      .updateServiceEnv(this.service.name, this.envValues)
+      .pipe(finalize(() => (this.envSaving = false)))
+      .subscribe({
+        next: (response) => {
+          this.toast.success(response.message);
+          this.loadEnv();
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save configuration.')),
       });
   }
 

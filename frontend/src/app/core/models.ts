@@ -80,10 +80,20 @@ export interface ServiceExposureConfig {
 
 export interface ServiceExposureUpdate {
   enabled: boolean;
-  upstreamScheme: 'http' | 'https';
-  upstreamHost: string;
-  upstreamPort: number;
-  websocket: boolean;
+}
+
+export interface ServiceEnvField {
+  key: string;
+  required: boolean;
+  secret: boolean;
+  isSet: boolean;
+  value: string | null;
+  defaultValue: string | null;
+}
+
+export interface ServiceEnvStatus {
+  envFileExists: boolean;
+  fields: ServiceEnvField[];
 }
 
 export interface ServiceActionResponse {

@@ -64,10 +64,9 @@ export const schemas = {
   }),
   serviceExposureUpdate: Joi.object({
     enabled: Joi.boolean().required(),
-    upstreamScheme: Joi.string().valid('http', 'https').default('http'),
-    upstreamHost: Joi.string().trim().min(1).max(255).required(),
-    upstreamPort: Joi.number().integer().min(1).max(65535).required(),
-    websocket: Joi.boolean().default(false),
+  }),
+  serviceEnvUpdate: Joi.object({
+    values: Joi.object().pattern(/^[A-Z][A-Z0-9_]*$/, Joi.string().allow('').max(2000)).required(),
   }),
   healthThresholds: Joi.object({
     diskPercent: Joi.number().min(1).max(100).required(),

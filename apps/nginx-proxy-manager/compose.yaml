@@ -19,6 +19,8 @@ services:
     depends_on:
       npm-db:
         condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     networks:
       - npm-net
     healthcheck:

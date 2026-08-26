@@ -18,6 +18,13 @@ export function extractErrorMessage(
       return apiError;
     }
     if (apiError && typeof apiError === 'object' && 'error' in apiError && typeof apiError.error === 'string') {
+      if (
+        'details' in apiError &&
+        Array.isArray(apiError.details) &&
+        apiError.details.every((detail: unknown) => typeof detail === 'string')
+      ) {
+        return apiError.details.join(' ');
+      }
       return apiError.error;
     }
   }

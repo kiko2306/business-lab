@@ -12,7 +12,7 @@ interface NpmProxyHost {
   forward_scheme: string;
   forward_host: string;
   forward_port: number;
-  websocket_upgrade?: boolean;
+  allow_websocket_upgrade?: boolean;
 }
 
 interface EnsureProxyHostOptions {
@@ -20,6 +20,7 @@ interface EnsureProxyHostOptions {
   npmEmail: string;
   npmPassword: string;
   hostname: string;
+  expectedHostId?: number | null;
   forwardScheme: string;
   forwardHost: string;
   forwardPort: number;
@@ -57,7 +58,7 @@ async function findProxyHostByDomain(npmApiUrl: string, token: string, hostname:
   return response.body.find((host) => (host.domain_names || []).includes(hostname)) ?? null;
 }
 
-function buildProxyHostPayload({
+export function buildProxyHostPayload({
   hostname,
   forwardScheme,
   forwardHost,
@@ -69,7 +70,6 @@ function buildProxyHostPayload({
     forward_scheme: forwardScheme,
     forward_host: forwardHost,
     forward_port: forwardPort,
-    websocket_upgrade: Boolean(websocket),
     block_exploits: true,
     caching_enabled: false,
     allow_websocket_upgrade: Boolean(websocket),
@@ -136,6 +136,7 @@ export async function ensureProxyHost({
   npmEmail,
   npmPassword,
   hostname,
+  expectedHostId,
   forwardScheme,
   forwardHost,
   forwardPort,
@@ -152,11 +153,18 @@ export async function ensureProxyHost({
     return { id: created.id, created: true, updated: false };
   }
 
+  // Existing hosts must have been created by a previous provisioning run.
+  // This prevents a service setting from silently overwriting an administrator's
+  // manually maintained NPM host that uses the same domain.
+  if (!expectedHostId || existing.id !== expectedHostId) {
+    throw new Error(`Nginx Proxy Manager host for ${hostname} already exists and is not managed by this service.`);
+  }
+
   const needsUpdate =
     existing.forward_scheme !== forwardScheme ||
     existing.forward_host !== forwardHost ||
     existing.forward_port !== forwardPort ||
-    Boolean(existing.websocket_upgrade) !== Boolean(websocket);
+    Boolean(existing.allow_websocket_upgrade) !== Boolean(websocket);
 
   if (needsUpdate) {
     await updateProxyHost(baseUrl, token, existing.id, options);

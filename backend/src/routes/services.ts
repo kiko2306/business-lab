@@ -12,6 +12,8 @@ import { createStreamTicket } from '../services/realtime';
 import { isValidServiceName } from '../config/services';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { getServiceExposureRow, upsertServiceExposureConfig } from '../services/exposure';
+import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
+import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
 import { HttpError } from '../types';
 
@@ -195,6 +197,59 @@ router.put(
     } catch (error) {
       logger.error(`Failed to save exposure config: ${req.params.name}`, { error: (error as Error).message });
       return res.status(500).json({ error: 'Unable to save exposure configuration.' });
+    }
+  }
+);
+
+/**
+ * GET /api/services/:name/env
+ * Read a service's required/optional compose env vars and whether each is
+ * currently set. Secret-looking values (password/secret/token/key) are
+ * never returned, only whether they're set.
+ */
+router.get(
+  '/:name/env',
+  auth,
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  (req: Request, res: Response) => {
+    const envStatus = getServiceEnvStatus(req.params.name);
+    if (!envStatus) {
+      return res.status(404).json({ error: `Service ${req.params.name} is not installed.` });
+    }
+    return res.json(envStatus);
+  }
+);
+
+/**
+ * PUT /api/services/:name/env
+ * Save a service's .env values from the dashboard, creating the file from
+ * .env.example if it doesn't exist yet. Blank values are treated as "leave
+ * unchanged" so masked secret fields can be submitted without clearing them.
+ */
+router.put(
+  '/:name/env',
+  auth,
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  validateBody(schemas.serviceEnvUpdate),
+  async (req: Request, res: Response) => {
+    try {
+      const { status: envStatus, changedKeys } = saveServiceEnv(req.params.name, req.body.values);
+      await writeAuditLog({
+        userId: req.user!.id,
+        action: 'SERVICE_ENV_UPDATE',
+        resource: req.params.name,
+        result: 'success',
+        // Key names only — never the values.
+        metadata: { changedKeys },
+      }).catch(() => {});
+      return res.json({ message: 'Configuration saved.', ...envStatus });
+    } catch (error) {
+      const httpError = error as HttpError;
+      logger.error(`Failed to save env config: ${req.params.name}`, { error: httpError.message });
+      const statusCode = httpError.statusCode || 500;
+      return res.status(statusCode).json({ error: httpError.message || 'Unable to save configuration.' });
     }
   }
 );

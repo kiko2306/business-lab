@@ -1,0 +1,123 @@
+/**
+ * Per-app .env configuration, driven from the dashboard instead of manual
+ * file editing. Reads/writes apps/<name>/.env directly — the backend's
+ * APPS_DIR mount is read-write for exactly this purpose.
+ */
+
+import fs from 'fs';
+import path from 'path';
+import { extractComposeEnvVars, resolveComposeFile } from '../config/services';
+import { parseEnvFile } from '../utils/envFile';
+import { HttpError } from '../types';
+
+// Values for keys matching this are never echoed back to the client, only
+// whether they're currently set — same masking pattern as the NPM admin
+// password in the global exposure settings.
+const SECRET_KEY_PATTERN = /PASSWORD|SECRET|TOKEN|_KEY$|APIKEY/i;
+
+export interface ServiceEnvField {
+  key: string;
+  required: boolean;
+  secret: boolean;
+  isSet: boolean;
+  // Present only for non-secret fields; secret values are never returned.
+  value: string | null;
+  defaultValue: string | null;
+}
+
+export interface ServiceEnvStatus {
+  envFileExists: boolean;
+  fields: ServiceEnvField[];
+}
+
+function loadStatus(appDir: string, composeFile: string): ServiceEnvStatus {
+  const composeContent = fs.readFileSync(composeFile, 'utf8');
+  const envVars = extractComposeEnvVars(composeContent);
+  const envFilePath = path.join(appDir, '.env');
+  const envFileExists = fs.existsSync(envFilePath);
+  const currentValues = envFileExists ? parseEnvFile(envFilePath) : {};
+
+  const fields: ServiceEnvField[] = envVars.map((envVar) => {
+    const secret = SECRET_KEY_PATTERN.test(envVar.key);
+    const currentValue = currentValues[envVar.key];
+    const isSet = Boolean(currentValue);
+    return {
+      key: envVar.key,
+      required: envVar.required,
+      secret,
+      isSet,
+      value: secret ? null : currentValue ?? null,
+      defaultValue: envVar.defaultValue,
+    };
+  });
+
+  return { envFileExists, fields };
+}
+
+export function getServiceEnvStatus(serviceName: string): ServiceEnvStatus | null {
+  const resolved = resolveComposeFile(serviceName);
+  if (!resolved?.composeFile) {
+    return null;
+  }
+  return loadStatus(resolved.appDir, resolved.composeFile);
+}
+
+/**
+ * Merge `values` into the app's .env (creating it from .env.example if
+ * missing), preserving every other existing line untouched. Empty/blank
+ * values are skipped so a masked secret field can be left as-is by the
+ * client without clearing it.
+ */
+export function saveServiceEnv(serviceName: string, values: Record<string, string>): { status: ServiceEnvStatus; changedKeys: string[] } {
+  const resolved = resolveComposeFile(serviceName);
+  if (!resolved?.composeFile) {
+    throw { statusCode: 404, message: `Service ${serviceName} is not installed.` } as HttpError;
+  }
+
+  const envFilePath = path.join(resolved.appDir, '.env');
+  const exampleFilePath = path.join(resolved.appDir, '.env.example');
+
+  let baseContent = '';
+  if (fs.existsSync(envFilePath)) {
+    baseContent = fs.readFileSync(envFilePath, 'utf8');
+  } else if (fs.existsSync(exampleFilePath)) {
+    baseContent = fs.readFileSync(exampleFilePath, 'utf8');
+  }
+
+  const pendingUpdates = new Map(
+    Object.entries(values)
+      .map(([key, value]) => [key, value.trim()] as const)
+      .filter(([, value]) => value !== '')
+  );
+
+  const changedKeys: string[] = [];
+  const lines = baseContent.length ? baseContent.split(/\r?\n/) : [];
+  const updatedLines = lines.map((line) => {
+    const trimmed = line.trim();
+    if (!trimmed || trimmed.startsWith('#')) {
+      return line;
+    }
+    const eqIndex = trimmed.indexOf('=');
+    if (eqIndex <= 0) {
+      return line;
+    }
+    const key = trimmed.slice(0, eqIndex).trim();
+    if (pendingUpdates.has(key)) {
+      changedKeys.push(key);
+      const value = pendingUpdates.get(key)!;
+      pendingUpdates.delete(key);
+      return `${key}=${value}`;
+    }
+    return line;
+  });
+
+  for (const [key, value] of pendingUpdates) {
+    changedKeys.push(key);
+    updatedLines.push(`${key}=${value}`);
+  }
+
+  const finalContent = updatedLines.join('\n').replace(/\n*$/, '\n');
+  fs.writeFileSync(envFilePath, finalContent, { mode: 0o640 });
+
+  return { status: loadStatus(resolved.appDir, resolved.composeFile), changedKeys };
+}

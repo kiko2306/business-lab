@@ -61,12 +61,17 @@ export class SettingsPanelComponent implements OnInit {
   saveExposure(): void {
     if (this.exposureForm.invalid) {
       this.exposureForm.markAllAsTouched();
+      this.exposureFeedback = {
+        type: 'info',
+        message: 'Complete all required exposure settings with valid values before saving.',
+      };
       return;
     }
 
     const value = this.exposureForm.getRawValue();
     if (!value.npmPassword && !this.exposureSettings?.npmPasswordConfigured) {
       this.exposureForm.controls.npmPassword.setErrors({ required: true });
+      this.exposureForm.controls.npmPassword.markAsTouched();
       this.exposureFeedback = { type: 'info', message: 'Enter the Nginx Proxy Manager admin password.' };
       return;
     }
@@ -121,6 +126,29 @@ export class SettingsPanelComponent implements OnInit {
           this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to load exposure settings.') };
         },
       });
+  }
+
+  exposureValidationMessage(
+    controlName: keyof typeof this.exposureForm.controls,
+    fieldName: string
+  ): string | null {
+    const control = this.exposureForm.controls[controlName];
+
+    if (!control.touched || control.valid) {
+      return null;
+    }
+
+    if (control.hasError('required')) {
+      return `${fieldName} is required.`;
+    }
+    if (control.hasError('email')) {
+      return 'Enter a valid email address.';
+    }
+    if (control.hasError('maxlength')) {
+      return `${fieldName} is too long.`;
+    }
+
+    return `Enter a valid ${fieldName.toLowerCase()}.`;
   }
 
   save(): void {

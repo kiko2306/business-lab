@@ -9,6 +9,7 @@ import {
   AuditLogResponse,
   BackupListResponse,
   HealthStatus,
+  ServiceEnvStatus,
   ServiceExposureConfig,
   ServiceExposureUpdate,
 } from './models';
@@ -64,6 +65,16 @@ export class OperationsService {
       `${API_BASE_URL}/services/${serviceName}/exposure`,
       update
     );
+  }
+
+  getServiceEnv(serviceName: string): Observable<ServiceEnvStatus> {
+    return this.http.get<ServiceEnvStatus>(`${API_BASE_URL}/services/${serviceName}/env`);
+  }
+
+  updateServiceEnv(serviceName: string, values: Record<string, string>): Observable<{ message: string } & ServiceEnvStatus> {
+    return this.http.put<{ message: string } & ServiceEnvStatus>(`${API_BASE_URL}/services/${serviceName}/env`, {
+      values,
+    });
   }
 
   getHealth(): Observable<HealthStatus> {

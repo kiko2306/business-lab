@@ -95,26 +95,44 @@
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Base domain</label>
             <input class="form-control" placeholder="example.com" formControlName="baseDomain" />
+            <div *ngIf="exposureValidationMessage('baseDomain', 'Base domain')" class="text-danger small mt-2">
+              {{ exposureValidationMessage('baseDomain', 'Base domain') }}
+            </div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Cloudflare Tunnel ID</label>
             <input class="form-control" formControlName="cloudflareTunnelId" />
+            <div *ngIf="exposureValidationMessage('cloudflareTunnelId', 'Cloudflare Tunnel ID')" class="text-danger small mt-2">
+              {{ exposureValidationMessage('cloudflareTunnelId', 'Cloudflare Tunnel ID') }}
+            </div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Cloudflare account ID</label>
             <input class="form-control" formControlName="cloudflareAccountId" />
+            <div *ngIf="exposureValidationMessage('cloudflareAccountId', 'Cloudflare account ID')" class="text-danger small mt-2">
+              {{ exposureValidationMessage('cloudflareAccountId', 'Cloudflare account ID') }}
+            </div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Cloudflare zone ID</label>
             <input class="form-control" formControlName="cloudflareZoneId" />
+            <div *ngIf="exposureValidationMessage('cloudflareZoneId', 'Cloudflare zone ID')" class="text-danger small mt-2">
+              {{ exposureValidationMessage('cloudflareZoneId', 'Cloudflare zone ID') }}
+            </div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Nginx Proxy Manager URL</label>
-            <input class="form-control" placeholder="http://nginx-proxy-manager:81" formControlName="npmApiUrl" />
+            <input class="form-control" placeholder="http://host.docker.internal:81" formControlName="npmApiUrl" />
+            <div *ngIf="exposureValidationMessage('npmApiUrl', 'Nginx Proxy Manager URL')" class="text-danger small mt-2">
+              {{ exposureValidationMessage('npmApiUrl', 'Nginx Proxy Manager URL') }}
+            </div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Nginx Proxy Manager admin email</label>
             <input class="form-control" type="email" formControlName="npmEmail" />
+            <div *ngIf="exposureValidationMessage('npmEmail', 'Nginx Proxy Manager admin email')" class="text-danger small mt-2">
+              {{ exposureValidationMessage('npmEmail', 'Nginx Proxy Manager admin email') }}
+            </div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Nginx Proxy Manager admin password</label>
@@ -125,6 +143,9 @@
               [placeholder]="exposureSettings?.npmPasswordConfigured ? 'Leave blank to keep current password' : ''"
               formControlName="npmPassword"
             />
+            <div *ngIf="exposureValidationMessage('npmPassword', 'Nginx Proxy Manager admin password')" class="text-danger small mt-2">
+              {{ exposureValidationMessage('npmPassword', 'Nginx Proxy Manager admin password') }}
+            </div>
           </div>
         </div>
 

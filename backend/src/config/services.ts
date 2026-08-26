@@ -7,6 +7,7 @@
 import fs from 'fs';
 import path from 'path';
 import { ResolvedComposeFile, ServiceDefinition } from '../types';
+import { parseEnvFile } from '../utils/envFile';
 
 // Compose files are named inconsistently across upstream projects, so each
 // app directory is probed for any of the filenames Docker Compose accepts.
@@ -49,16 +50,6 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       url: 'http://localhost:8123/api/',
       interval: 30000,
       timeout: 5000,
-    },
-  },
-  'cloudflare-tunnel': {
-    name: 'cloudflare-tunnel',
-    label: 'Cloudflare Tunnel',
-    description: 'Secure tunnel to Cloudflare',
-    icon: 'cloud',
-    composePath: 'apps/cloudflare-tunnel/docker-compose.yml',
-    healthCheck: {
-      enabled: false,
     },
   },
   'code-server': {
@@ -135,6 +126,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     composePath: 'apps/paperless/docker-compose.yml',
     healthCheck: {
       enabled: false,
+    },
+    exposureEnvKeys: {
+      url: ['PAPERLESS_URL'],
+      allowedHosts: ['PAPERLESS_ALLOWED_HOSTS'],
     },
   },
   'pihole': {
@@ -264,4 +259,68 @@ export function resolveComposeFile(name: string): ResolvedComposeFile | null {
   }
 
   return { projectName, appDir, composeFile: null };
+}
+
+export interface ComposeEnvVar {
+  key: string;
+  // No `:-default` anywhere it's referenced in the compose file — Compose
+  // itself will fail to start the service without it.
+  required: boolean;
+  defaultValue: string | null;
+}
+
+const ENV_VAR_PATTERN = /\$\{([A-Z0-9_]+)(?::-([^}]*))?\}/g;
+
+/**
+ * Every `${VAR}` / `${VAR:-default}` reference in a compose file, deduped by
+ * key. A key referenced without a default anywhere counts as required, even
+ * if another occurrence of the same key has one.
+ */
+export function extractComposeEnvVars(composeContent: string): ComposeEnvVar[] {
+  const byKey = new Map<string, ComposeEnvVar>();
+  for (const match of composeContent.matchAll(ENV_VAR_PATTERN)) {
+    const [, key, defaultValue] = match;
+    const hasDefault = defaultValue !== undefined;
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, { key, required: !hasDefault, defaultValue: hasDefault ? defaultValue : null });
+    } else if (!hasDefault) {
+      existing.required = true;
+    }
+  }
+  return [...byKey.values()];
+}
+
+// Matches a compose `ports:` entry's host-side value, e.g. "8000:8000" or
+// "${PAPERLESS_PORT:-8000}:8000". Captures either a literal port or a
+// ${VAR:-default} expression, to resolve against the app's .env file.
+const HOST_PORT_PATTERN = /-\s*["']?(?:\$\{([A-Z0-9_]+)(?::-([^}]*))?\}|(\d+)):\d+["']?/;
+
+/**
+ * Derive the host port a service's primary container publishes, by reading
+ * the first `ports:` mapping in its compose file. Used to auto-configure
+ * exposure upstream settings instead of requiring the user to enter them.
+ */
+export function getPublishedUpstreamPort(name: string): number | null {
+  const resolved = resolveComposeFile(name);
+  if (!resolved?.composeFile) {
+    return null;
+  }
+
+  const composeContent = fs.readFileSync(resolved.composeFile, 'utf8');
+  const match = HOST_PORT_PATTERN.exec(composeContent);
+  if (!match) {
+    return null;
+  }
+
+  const [, varName, varDefault, literalPort] = match;
+  let hostPortStr: string | undefined = literalPort;
+  if (varName) {
+    const envFilePath = path.join(resolved.appDir, '.env');
+    const envValues = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath) : {};
+    hostPortStr = envValues[varName] ?? varDefault;
+  }
+
+  const hostPort = hostPortStr ? Number.parseInt(hostPortStr, 10) : NaN;
+  return Number.isFinite(hostPort) ? hostPort : null;
 }

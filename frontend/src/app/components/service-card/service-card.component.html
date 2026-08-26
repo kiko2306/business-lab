@@ -44,6 +44,57 @@
     </div>
 
     <div class="pt-2">
+      <button type="button" class="btn btn-link btn-sm px-0" (click)="toggleEnvPanel()">
+        {{ envPanelOpen ? 'Hide configuration' : 'Configuration' }}
+      </button>
+
+      <div *ngIf="envPanelOpen" class="env-panel border-top pt-3 mt-1">
+        <div *ngIf="envLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
+          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+          Loading...
+        </div>
+
+        <ng-container *ngIf="!envLoading && env">
+          <div *ngIf="!env.fields.length" class="small text-body-secondary mb-2">
+            This app has no configurable settings — it starts as-is.
+          </div>
+
+          <div *ngIf="missingRequiredCount() > 0" class="alert alert-warning py-1 px-2 small mb-2">
+            {{ missingRequiredCount() }} required value(s) not set yet — this service won't start until they are.
+          </div>
+
+          <div *ngFor="let field of env.fields" class="mb-2">
+            <label class="form-label small mb-1" [for]="'env-' + service.name + '-' + field.key">
+              {{ field.key }}
+              <span *ngIf="field.required" class="text-danger">*</span>
+            </label>
+            <input
+              *ngIf="!field.secret"
+              class="form-control form-control-sm"
+              [id]="'env-' + service.name + '-' + field.key"
+              [(ngModel)]="envValues[field.key]"
+              [placeholder]="field.defaultValue ?? ''"
+            />
+            <input
+              *ngIf="field.secret"
+              type="password"
+              class="form-control form-control-sm"
+              [id]="'env-' + service.name + '-' + field.key"
+              [(ngModel)]="envValues[field.key]"
+              [placeholder]="field.isSet ? 'configured — leave blank to keep' : 'not set'"
+              autocomplete="new-password"
+            />
+          </div>
+
+          <button type="button" class="btn btn-outline-primary btn-sm mt-1" [disabled]="envSaving || !env.fields.length" (click)="saveEnv()">
+            <span *ngIf="envSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            Save configuration
+          </button>
+        </ng-container>
+      </div>
+    </div>
+
+    <div class="pt-2">
       <button type="button" class="btn btn-link btn-sm px-0" (click)="toggleExposurePanel()">
         {{ exposurePanelOpen ? 'Hide exposure settings' : 'Exposure settings' }}
       </button>
@@ -63,30 +114,17 @@
           </div>
 
           <div *ngIf="exposure.hostname" class="small text-body-secondary mb-2">
-            Public hostname: <code>{{ exposure.hostname }}</code>
+            Public hostname:
+            <a [href]="'https://' + exposure.hostname" target="_blank" rel="noopener noreferrer"><code>{{ exposure.hostname }}</code></a>
             <span class="badge ms-1" [class.text-bg-success]="exposure.status === 'provisioned'" [class.text-bg-secondary]="exposure.status === 'not_provisioned'" [class.text-bg-danger]="exposure.status === 'failed'">
               {{ exposure.status }}
             </span>
           </div>
           <div *ngIf="exposure.lastError" class="alert alert-danger py-1 px-2 small mb-2">{{ exposure.lastError }}</div>
 
-          <div class="row g-2">
-            <div class="col-7">
-              <input class="form-control form-control-sm" placeholder="Upstream host" [(ngModel)]="exposureUpstreamHost" />
-            </div>
-            <div class="col-5">
-              <input class="form-control form-control-sm" type="number" placeholder="Port" [(ngModel)]="exposureUpstreamPort" />
-            </div>
-          </div>
-          <div class="d-flex gap-3 align-items-center mt-2">
-            <select class="form-select form-select-sm w-auto" [(ngModel)]="exposureUpstreamScheme">
-              <option value="http">http</option>
-              <option value="https">https</option>
-            </select>
-            <div class="form-check">
-              <input class="form-check-input" type="checkbox" id="exposureWs-{{ service.name }}" [(ngModel)]="exposureWebsocket" />
-              <label class="form-check-label small" for="exposureWs-{{ service.name }}">Websocket</label>
-            </div>
+          <div *ngIf="exposure.upstreamHost && exposure.upstreamPort" class="small text-body-secondary mb-2">
+            Forwarding to <code>{{ exposure.upstreamScheme }}://{{ exposure.upstreamHost }}:{{ exposure.upstreamPort }}</code>
+            <span class="ms-1">(detected automatically)</span>
           </div>
 
           <button type="button" class="btn btn-outline-primary btn-sm mt-2" [disabled]="exposureSaving" (click)="saveExposure()">

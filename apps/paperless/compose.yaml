@@ -7,7 +7,7 @@ services:
       - "${PAPERLESS_PORT:-8000}:8000"
     environment:
       PAPERLESS_REDIS: redis://paperless-redis:6379
-      PAPERLESS_DBENGINE: django.db.backends.postgresql
+      PAPERLESS_DBENGINE: postgresql
       PAPERLESS_DBHOST: paperless-db
       PAPERLESS_DBPORT: 5432
       PAPERLESS_DBNAME: ${PAPERLESS_DB_NAME:-paperless}

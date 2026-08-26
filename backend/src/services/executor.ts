@@ -9,8 +9,10 @@ import fs from 'fs';
 import path from 'path';
 import logger from '../utils/logger';
 import { writeAuditLog } from '../utils/audit';
-import { provisionServiceIfEnabled } from './exposure';
-import { isValidServiceName, resolveComposeFile } from '../config/services';
+import { provisionServiceIfEnabled, getServiceExposureRow } from './exposure';
+import { getExposureConfig } from '../utils/exposureSettings';
+import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
+import { parseEnvFile } from '../utils/envFile';
 import { HttpError } from '../types';
 
 interface CommandResult {
@@ -19,11 +21,15 @@ interface CommandResult {
 }
 
 /**
- * Execute a shell command with timeout and error handling
+ * Execute a shell command with timeout and error handling. Extra env vars
+ * are merged over process.env — Docker Compose prefers the shell environment
+ * over the .env file for `${VAR}` substitution, so this can override
+ * per-start computed values (e.g. a service's public hostname) without
+ * having to persist them to that service's .env file.
  */
-function executeCommand(command: string, timeout = 30000): Promise<CommandResult> {
+function executeCommand(command: string, timeout = 30000, extraEnv: Record<string, string> = {}): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
-    exec(command, { timeout }, (error, stdout, stderr) => {
+    exec(command, { timeout, env: { ...process.env, ...extraEnv } }, (error, stdout, stderr) => {
       if (error) {
         reject({
           code: error.code,
@@ -44,30 +50,9 @@ function executeCommand(command: string, timeout = 30000): Promise<CommandResult
 
 function requiredSecretsFromCompose(composeFilePath: string): string[] {
   const composeContent = fs.readFileSync(composeFilePath, 'utf8');
-  const matches = composeContent.match(/\$\{([A-Z0-9_]+)\}/g) || [];
-  return [...new Set(matches.map((token) => token.slice(2, -1)))];
-}
-
-function parseEnvFile(envFilePath: string): Record<string, string> {
-  const envContent = fs.readFileSync(envFilePath, 'utf8');
-  const lines = envContent.split(/\r?\n/);
-  const values: Record<string, string> = {};
-
-  for (const line of lines) {
-    const trimmed = line.trim();
-    if (!trimmed || trimmed.startsWith('#')) {
-      continue;
-    }
-    const eqIndex = trimmed.indexOf('=');
-    if (eqIndex <= 0) {
-      continue;
-    }
-    const key = trimmed.slice(0, eqIndex).trim();
-    const value = trimmed.slice(eqIndex + 1).trim();
-    values[key] = value;
-  }
-
-  return values;
+  return extractComposeEnvVars(composeContent)
+    .filter((envVar) => envVar.required)
+    .map((envVar) => envVar.key);
 }
 
 function ensureServiceSecrets(serviceName: string, appDir: string, composeFile: string): void {
@@ -99,6 +84,52 @@ function ensureServiceSecrets(serviceName: string, appDir: string, composeFile: 
       details: `Unset keys: ${missing.join(', ')}`,
     } as HttpError;
   }
+}
+
+/**
+ * Compute PAPERLESS_URL/PAPERLESS_ALLOWED_HOSTS-style env overrides (per
+ * ServiceDefinition.exposureEnvKeys) so a service's own Host-header/CSRF
+ * checks stay in sync with its exposed public hostname automatically,
+ * without writing to the app's .env file.
+ */
+async function buildExposureEnvOverrides(serviceName: string, appDir: string): Promise<Record<string, string>> {
+  const exposureEnvKeys = getService(serviceName)?.exposureEnvKeys;
+  if (!exposureEnvKeys) {
+    return {};
+  }
+
+  const exposureRow = await getServiceExposureRow(serviceName);
+  if (!exposureRow?.enabled) {
+    return {};
+  }
+
+  const globalConfig = await getExposureConfig();
+  if (!globalConfig) {
+    return {};
+  }
+
+  const hostname = `${serviceName}.${globalConfig.baseDomain}`;
+  const envFilePath = path.join(appDir, '.env');
+  const existingValues = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath) : {};
+
+  const overrides: Record<string, string> = {};
+
+  for (const key of exposureEnvKeys.url ?? []) {
+    overrides[key] = `https://${hostname}`;
+  }
+
+  for (const key of exposureEnvKeys.allowedHosts ?? []) {
+    const hosts = (existingValues[key] ?? '')
+      .split(',')
+      .map((host) => host.trim())
+      .filter(Boolean);
+    if (!hosts.includes(hostname)) {
+      hosts.push(hostname);
+    }
+    overrides[key] = hosts.join(',');
+  }
+
+  return overrides;
 }
 
 interface ServiceActionResult {
@@ -137,8 +168,9 @@ export async function startService(serviceName: string, userId: number): Promise
     logger.info(`Starting service: ${serviceName}`, { userId, service: serviceName });
 
     // Execute docker compose up -d
+    const envOverrides = await buildExposureEnvOverrides(serviceName, appDir);
     const command = `docker compose -p ${projectName} -f ${composeFile} up -d`;
-    const result = await executeCommand(command, 60000); // 60s timeout for startup
+    const result = await executeCommand(command, 60000, envOverrides); // 60s timeout for startup
 
     // Log the successful operation
     await logAuditEvent(userId, 'SERVICE_START', serviceName, 'success', {
