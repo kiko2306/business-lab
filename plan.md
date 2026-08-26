@@ -633,10 +633,14 @@ Numbers below double as the reference used elsewhere in this log (e.g.
    pass/fail alert per service (NPM, Cloudflare). 5 new backend tests
    (46 total); frontend build + full spec suite (14 tests) verified
    passing. **Priority: P2** — **Estimate: M**
-5. [ ] **Exposure drift detection** — periodic reconciliation or a
-   "re-verify" button for when NPM's/Cloudflare's live state diverges from
-   `service_exposure` (e.g. hand-edited proxy host). Builds on item 4's
-   verification logic. **Priority: P2** — **Estimate: M**
+5. [x] **Exposure drift detection** — added a "re-verify" button rather than
+   periodic reconciliation: `POST /api/services/:name/exposure/verify`
+   re-runs `provisionServiceIfEnabled` on demand, which both detects *and*
+   fixes drift in one call since `ensureProxyHost`/`ensureIngressRoute` are
+   already idempotent — no separate detection logic needed. Service card
+   gained a "Re-verify" button next to Save (shown once a hostname exists).
+   Verified live: both new routes 401 unauthenticated, backend boots clean.
+   **Priority: P2** — **Estimate: M**
 6. [ ] **Extend `exposureEnvKeys` to other apps** — only `paperless`
    declares one today (see §17.1). Not schedulable as a single task; handle
    incrementally each time exposure is enabled for a new app, informed by
