@@ -563,3 +563,139 @@ docker run --rm -v "$PWD":/app -w /app node:20-alpine sh -c "npm install && npm 
 committed and wasn't left installed on disk outside the container — re-run
 `npm install` (in a container or wherever Node is available) before trying
 to run anything directly.
+
+## 18. Session Log — 2026-08-26 (cont.): live health-check fixes, TODO reordered
+
+### 18.1 code-server / bookstack health checks fixed live
+Both were live-deployed bugs, found and fixed against the real running stack
+(this environment has `docker` access to the actual deployment — see §17.2).
+
+- **`code-server`**: `services.ts` and the app's own
+  `apps/code-server/docker-compose.yml` healthcheck both assumed HTTPS with a
+  self-signed cert on 8443 (`curl -fk https://localhost:8443/health`). The
+  running container's own logs said otherwise: `HTTP server listening on
+  http://[::]:8443/` / `Not serving HTTPS` — confirmed live by `curl` failing
+  with `SSL routines::wrong version number` (client sent TLS, server spoke
+  plain HTTP). `/health` also doesn't exist (401); the real endpoint is the
+  public, unauthenticated `/healthz` (returns `{"status":"alive",...}`).
+  Fixed both files to `http://localhost:8443/healthz`. A first fix attempt
+  (switching to `https://` plus `rejectUnauthorized: false` in
+  `backend/src/services/status.ts`) was wrong and was reverted — worth
+  remembering: don't trust an app's own Docker healthcheck definition as
+  ground truth without confirming what the container is actually doing,
+  since that definition itself can be stale/copied-from-a-template.
+- **`bookstack`**: `services.ts` checked `/health` (doesn't exist on this
+  Laravel-based image, 404). Its own container healthcheck already correctly
+  probes `/login`; matched the registry entry to it.
+- Verified live: `code-server-code-server-1`'s own Docker healthcheck flipped
+  from `unhealthy` (`FailingStreak: 22`) to `healthy` after rebuilding
+  `code-server` (compose recreate) and the `homelab-management-backend-1`
+  image (`docker compose up -d --build backend`).
+- Committed as `1c4cffe` (first, wrong https attempt + correction squashed
+  into the session's work — see git log for the actual fix commit once this
+  session's remaining work is committed).
+
+### 18.2 TODO reordered by dependency/logic, not just priority label
+The flat P1/P2 list in §17.3 is superseded by this ordering — same items,
+sequenced so each one's output feeds the next rather than by label alone.
+Numbers below double as the reference used elsewhere in this log (e.g.
+"item 3").
+
+1. [x] **Scheduled/automated backups** — smallest, standalone. Implemented
+   this session — see §18.3 for what shipped.
+2. [ ] **CI pipeline** — wrap the existing manual `tsc`/`vitest`/`ng build`
+   checks (currently run by hand via `node:20-alpine`, see §17.4) into
+   `.github/workflows/`. Do this before further backend changes pile up
+   without automatic verification. **Priority: P1** — **Estimate: M**
+3. [ ] **`exposure.ts` + frontend test coverage** — the orchestration layer
+   tying `npmClient`/`cloudflareTunnelClient` together (needs DB mocking),
+   plus zero existing frontend `*.spec.ts` tests. Do before items 4 and 5
+   since both touch the same exposure/provisioning code paths and benefit
+   from the coverage. **Priority: P1** — **Estimate: M**
+4. [ ] **"Test connection" action for exposure settings** — validate NPM
+   credentials and Cloudflare account/zone/tunnel IDs on demand instead of
+   only discovering misconfiguration the next time a service starts (as
+   happened repeatedly in §17.1's live validation). Natural follow-on to
+   item 3's coverage of the same subsystem. **Priority: P2** — **Estimate: M**
+5. [ ] **Exposure drift detection** — periodic reconciliation or a
+   "re-verify" button for when NPM's/Cloudflare's live state diverges from
+   `service_exposure` (e.g. hand-edited proxy host). Builds on item 4's
+   verification logic. **Priority: P2** — **Estimate: M**
+6. [ ] **Extend `exposureEnvKeys` to other apps** — only `paperless`
+   declares one today (see §17.1). Not schedulable as a single task; handle
+   incrementally each time exposure is enabled for a new app, informed by
+   whatever that app actually needs. **Priority: P2** — **Estimate: S per app**
+7. [ ] **Health check host-port assumption cleanup** — deprioritized:
+   §18.1's real failures turned out to be protocol/path mismatches
+   (`http` vs `https`, wrong path), not the `SERVICE_HEALTH_HOST` host-port
+   issue this item originally assumed. Revisit generically only if another
+   service actually exhibits that specific pattern. **Priority: P2** —
+   **Estimate: M**
+8. [ ] **2FA for admin accounts** — labeled M but realistically the largest
+   lift here (TOTP enrollment, backup codes, login-flow changes, UI); do
+   last and with its own dedicated plan rather than folding it into a quick
+   pass. Still worth prioritizing given the dashboard is already
+   internet-facing via the tunnel (see §17.2). **Priority: P1** —
+   **Estimate: M (likely undersized)**
+
+### 18.3 Item 1 (backups) — implementation notes
+Implemented as an opt-in schedule (default off) rather than adding a cron
+library — a `setInterval` poll every hour, comparing "now" against a stored
+last-run timestamp against the configured frequency, is enough to cover the
+two frequencies offered and avoids a new dependency for something this
+small. `POST /backups/create` (manual trigger, pre-existing) was untouched
+in behavior; the new code sits alongside it.
+
+- **`backend/src/services/backup.ts`** (new) — pulled the shared backup
+  mechanics (`BACKUP_DIR`, `createBackupArchive()`, path/exec helpers) out of
+  `routes/backup.ts` so both the route and the new scheduler can call them.
+  Also owns the schedule settings: `BACKUP_SCHEDULE_SETTINGS_KEYS`
+  (`backup_schedule_enabled` / `_frequency` / `_retention_count` /
+  `_last_run_at`, stored as plain rows in the existing `settings`
+  key/value table — no new table needed), `getBackupScheduleConfig()` /
+  `saveBackupScheduleConfig()` / `setBackupScheduleLastRun()`, and
+  `pruneOldBackups(retentionCount)` (deletes oldest `.tar.gz` files beyond
+  the retention count, by mtime).
+- **`backend/src/services/backupScheduler.ts`** (new) — `shouldRunScheduledBackup(now, lastRunAt, frequency)`
+  is a pure function (unit tested, 6 cases in
+  `backupScheduler.test.ts`) so the due/not-due decision doesn't depend on
+  wall-clock timing in tests. `runScheduledBackupCheck()` loads config,
+  no-ops if disabled or not due, otherwise creates a backup, audit-logs it
+  (`userId: null`, `metadata: { trigger: 'scheduled' }` — the existing
+  `writeAuditLog` already supports a null user and the audit UI already
+  renders that as no username), then prunes. `startBackupScheduler()` runs
+  one check immediately at boot (catches up a missed run after a restart)
+  and then every hour.
+- **`backend/src/routes/backup.ts`** — trimmed to routing/HTTP-shape only;
+  added `GET /schedule` and `PUT /schedule` (Joi-validated via new
+  `backupScheduleUpdate` schema in `middleware/validation.ts`). The manual
+  `POST /create` route now also runs `pruneOldBackups()` after a successful
+  create, but only when the schedule is enabled — leaves today's
+  unlimited-accumulation behavior alone for anyone who doesn't opt in.
+- **`backend/src/index.ts`** — calls `startBackupScheduler()` at boot,
+  alongside the other fire-and-forget startup hooks (`dropLegacyRoleColumn`,
+  `ensureServiceExposureTable`).
+- Widened the backup archive's own settings-export filter
+  (`backup.ts` → now `services/backup.ts`) to `... OR key LIKE
+  'backup_schedule_%'` so the schedule config itself round-trips through
+  backup/restore. (Noted but out of scope: the same filter still does *not*
+  capture `exposure_*` settings — a pre-existing gap, not introduced here.)
+- **Frontend**: `operations.service.ts` gained `getBackupSchedule()` /
+  `updateBackupSchedule()`; `models.ts` gained `BackupScheduleConfig`. UI is
+  a small card inside the existing `#backups` section on the dashboard
+  (`dashboard.component.html`) — an "Automatic backups" toggle, a
+  frequency select (Daily/Weekly) and a retention-count number input shown
+  only when enabled, a "Last scheduled backup" timestamp, and a Save button.
+  No new page/route.
+- **Verified**: `tsc --noEmit` and `vitest run` clean (29 tests, up from 23
+  — 6 new for `shouldRunScheduledBackup`); `ng build` clean (same
+  pre-existing bundle-size budget warning as before, unrelated). Deployed
+  live (`docker compose up -d --build backend frontend`): backend booted
+  without error, the scheduler's immediate startup check correctly no-op'd
+  (feature defaults to disabled, confirmed zero `backup_schedule_%` rows in
+  the live `settings` table after boot), and `GET /api/backups/schedule`
+  returns `401` unauthenticated, confirming the route is live and gated
+  correctly. **Not verified**: the authenticated round-trip (toggling the
+  switch in the browser, confirming a scheduled run actually fires) — no
+  admin session was available in this environment to exercise it through
+  the UI. Worth a manual pass next time the dashboard is open.

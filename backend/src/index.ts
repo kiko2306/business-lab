@@ -16,6 +16,7 @@ import { dropLegacyRoleColumn, ensureServiceExposureTable } from './utils/databa
 import authMiddleware from './middleware/auth';
 import setupModeMiddleware from './middleware/setupMode';
 import { initWebSocket, sseHandler } from './services/realtime';
+import { startBackupScheduler } from './services/backupScheduler';
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -148,6 +149,7 @@ dropLegacyRoleColumn().catch((err: Error) => {
 ensureServiceExposureTable().catch((err: Error) => {
   console.error('Unable to ensure service_exposure table:', err.message);
 });
+startBackupScheduler();
 
 const server = app.listen(PORT, () => {
   console.log(`Homelab backend listening on port ${PORT}`);

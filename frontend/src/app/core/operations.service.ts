@@ -8,6 +8,7 @@ import {
   AdminUserListResponse,
   AuditLogResponse,
   BackupListResponse,
+  BackupScheduleConfig,
   HealthStatus,
   ServiceEnvStatus,
   ServiceExposureConfig,
@@ -54,6 +55,14 @@ export class OperationsService {
     return this.http.get(`${API_BASE_URL}/backups/download/${encodeURIComponent(fileName)}`, {
       responseType: 'blob'
     });
+  }
+
+  getBackupSchedule(): Observable<BackupScheduleConfig> {
+    return this.http.get<BackupScheduleConfig>(`${API_BASE_URL}/backups/schedule`);
+  }
+
+  updateBackupSchedule(config: Omit<BackupScheduleConfig, 'lastRunAt'>): Observable<{ message: string }> {
+    return this.http.put<{ message: string }>(`${API_BASE_URL}/backups/schedule`, config);
   }
 
   getServiceExposure(serviceName: string): Observable<ServiceExposureConfig> {

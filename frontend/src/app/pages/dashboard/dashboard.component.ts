@@ -1,19 +1,20 @@
 import { AsyncPipe, CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ServiceCardComponent } from '../../components/service-card/service-card.component';
 import { SettingsPanelComponent } from '../../components/settings-panel/settings-panel.component';
 import { OperationsService } from '../../core/operations.service';
-import { BackupFile, HealthStatus } from '../../core/models';
+import { BackupFile, BackupScheduleConfig, HealthStatus } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
 
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, AsyncPipe, RouterLink, ServiceCardComponent, SettingsPanelComponent],
+  imports: [CommonModule, AsyncPipe, FormsModule, RouterLink, ServiceCardComponent, SettingsPanelComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
@@ -26,11 +27,14 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly user$ = this.authService.user$;
   protected backups: BackupFile[] = [];
   protected health: HealthStatus | null = null;
+  protected schedule: BackupScheduleConfig = { enabled: false, frequency: 'daily', retentionCount: 14, lastRunAt: null };
+  protected savingSchedule = false;
 
   ngOnInit(): void {
     this.serviceState.startPolling();
     this.loadBackups();
     this.loadHealth();
+    this.loadSchedule();
   }
 
   ngOnDestroy(): void {
@@ -98,6 +102,31 @@ export class DashboardComponent implements OnInit, OnDestroy {
         URL.revokeObjectURL(url);
       },
       error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to download backup.')),
+    });
+  }
+
+  loadSchedule(): void {
+    this.operations.getBackupSchedule().subscribe({
+      next: (response) => {
+        this.schedule = response;
+      },
+      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load backup schedule.')),
+    });
+  }
+
+  saveSchedule(): void {
+    this.savingSchedule = true;
+    const { enabled, frequency, retentionCount } = this.schedule;
+    this.operations.updateBackupSchedule({ enabled, frequency, retentionCount }).subscribe({
+      next: (response) => {
+        this.toast.success(response.message);
+        this.savingSchedule = false;
+        this.loadSchedule();
+      },
+      error: (error) => {
+        this.toast.error(extractErrorMessage(error, 'Unable to update backup schedule.'));
+        this.savingSchedule = false;
+      },
     });
   }
 

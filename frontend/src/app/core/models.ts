@@ -135,6 +135,15 @@ export interface BackupListResponse {
   items: BackupFile[];
 }
 
+export type BackupScheduleFrequency = 'daily' | 'weekly';
+
+export interface BackupScheduleConfig {
+  enabled: boolean;
+  frequency: BackupScheduleFrequency;
+  retentionCount: number;
+  lastRunAt: string | null;
+}
+
 export interface HealthAlert {
   metric: string;
   value: number;

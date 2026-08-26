@@ -2,59 +2,24 @@ import { Router, Request, Response } from 'express';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
-import { execFile, ExecFileOptions } from 'child_process';
 import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { schemas, validateBody, validateParams } from '../middleware/validation';
 import logger from '../utils/logger';
+import {
+  BACKUP_DIR,
+  createBackupArchive,
+  ensureBackupDir,
+  getBackupScheduleConfig,
+  pgConnectionEnv,
+  pruneOldBackups,
+  resolveBackupPath,
+  runCommand,
+  safeBackupFileName,
+  saveBackupScheduleConfig,
+} from '../services/backup';
 
 const router = Router();
-
-const BACKUP_DIR = path.join(process.cwd(), 'backups');
-
-function safeBackupFileName(name: string): boolean {
-  return /^[a-zA-Z0-9._-]+$/.test(name);
-}
-
-function resolveBackupPath(fileName: string): string {
-  if (!safeBackupFileName(fileName)) {
-    throw new Error('Invalid backup name.');
-  }
-  const basePath = path.resolve(BACKUP_DIR) + path.sep;
-  const resolvedPath = path.resolve(BACKUP_DIR, fileName);
-  if (!resolvedPath.startsWith(basePath)) {
-    throw new Error('Invalid backup path.');
-  }
-  return resolvedPath;
-}
-
-function runCommand(command: string, args: string[], options: ExecFileOptions = {}): Promise<string> {
-  return new Promise((resolve, reject) => {
-    execFile(command, args, { timeout: 120000, maxBuffer: 50 * 1024 * 1024, ...options }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.toString() || error.message));
-        return;
-      }
-      resolve(stdout.toString());
-    });
-  });
-}
-
-function pgConnectionEnv(): NodeJS.ProcessEnv {
-  const dbUrl = new URL(process.env.DATABASE_URL as string);
-  return {
-    ...process.env,
-    PGHOST: dbUrl.hostname,
-    PGPORT: dbUrl.port || '5432',
-    PGUSER: decodeURIComponent(dbUrl.username),
-    PGPASSWORD: decodeURIComponent(dbUrl.password),
-    PGDATABASE: dbUrl.pathname.replace(/^\//, ''),
-  };
-}
-
-async function ensureBackupDir(): Promise<void> {
-  await fs.mkdir(BACKUP_DIR, { recursive: true });
-}
 
 router.get('/', async (_req: Request, res: Response) => {
   try {
@@ -82,36 +47,17 @@ router.get('/', async (_req: Request, res: Response) => {
 
 router.post('/create', async (req: Request, res: Response) => {
   const userId = req.user!.id;
-  let tmpDir = '';
 
   try {
-    await ensureBackupDir();
-    tmpDir = await fs.mkdtemp(path.join(os.tmpdir(), 'homelab-backup-'));
-    const pgEnv = pgConnectionEnv();
-
-    const dbDumpPath = path.join(tmpDir, 'database.sql');
-    const settingsPath = path.join(tmpDir, 'settings.json');
-    const usersPath = path.join(tmpDir, 'users.json');
-
-    await runCommand('pg_dump', ['--no-owner', '--no-privileges', '--dbname', pgEnv.PGDATABASE as string], {
-      env: pgEnv,
-    }).then((stdout) => fs.writeFile(dbDumpPath, stdout, 'utf8'));
-
-    const settingsResult = await query(
-      `SELECT key, value, updated_at
-       FROM settings
-       WHERE key LIKE 'cloudflare_%' OR key LIKE 'health_%' OR key = 'recovery_mode_enabled'`
-    );
-    await fs.writeFile(settingsPath, JSON.stringify(settingsResult.rows, null, 2), 'utf8');
-
-    const usersResult = await query('SELECT id, username, is_setup_complete, created_at FROM users ORDER BY id ASC');
-    await fs.writeFile(usersPath, JSON.stringify(usersResult.rows, null, 2), 'utf8');
-
-    const fileName = `backup-${new Date().toISOString().replace(/[:.]/g, '-')}.tar.gz`;
-    const archivePath = path.join(BACKUP_DIR, fileName);
-    await runCommand('tar', ['-czf', archivePath, '-C', tmpDir, '.']);
-
+    const fileName = await createBackupArchive();
     await writeAuditLog({ userId, action: 'backup_create', resource: fileName, result: 'success' });
+
+    const scheduleConfig = await getBackupScheduleConfig();
+    if (scheduleConfig.enabled) {
+      await pruneOldBackups(scheduleConfig.retentionCount).catch((error: Error) => {
+        logger.error('Backup retention cleanup failed', { error: error.message });
+      });
+    }
 
     return res.status(201).json({
       message: 'Backup created successfully.',
@@ -122,10 +68,6 @@ router.post('/create', async (req: Request, res: Response) => {
     await writeAuditLog({ userId, action: 'backup_create', resource: 'backup', result: 'failure' }).catch(() => {});
     logger.error('Backup creation failed', { error: (error as Error).message, userId });
     return res.status(500).json({ error: 'Unable to create backup.' });
-  } finally {
-    if (tmpDir) {
-      await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
-    }
   }
 });
 
@@ -198,6 +140,31 @@ router.post('/restore', validateBody(schemas.backupRestore), async (req: Request
     if (tmpDir) {
       await fs.rm(tmpDir, { recursive: true, force: true }).catch(() => {});
     }
+  }
+});
+
+router.get('/schedule', async (_req: Request, res: Response) => {
+  try {
+    return res.json(await getBackupScheduleConfig());
+  } catch {
+    return res.status(500).json({ error: 'Unable to load backup schedule.' });
+  }
+});
+
+router.put('/schedule', validateBody(schemas.backupScheduleUpdate), async (req: Request, res: Response) => {
+  const { enabled, frequency, retentionCount } = req.body;
+
+  try {
+    await saveBackupScheduleConfig({ enabled, frequency, retentionCount });
+    await writeAuditLog({
+      userId: req.user?.id ?? null,
+      action: 'settings_change',
+      resource: 'backup_schedule',
+      result: 'success',
+    }).catch(() => {});
+    return res.json({ message: 'Backup schedule updated.' });
+  } catch {
+    return res.status(500).json({ error: 'Unable to update backup schedule.' });
   }
 });
 

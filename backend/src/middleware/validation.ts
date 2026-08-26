@@ -52,6 +52,11 @@ export const schemas = {
   backupDownloadParams: Joi.object({
     fileName: backupNameSchema.required(),
   }),
+  backupScheduleUpdate: Joi.object({
+    enabled: Joi.boolean().required(),
+    frequency: Joi.string().valid('daily', 'weekly').required(),
+    retentionCount: Joi.number().integer().min(1).max(365).required(),
+  }),
   exposureGlobalSettings: Joi.object({
     baseDomain: domainSchema.required(),
     npmApiUrl: Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(500).required(),
