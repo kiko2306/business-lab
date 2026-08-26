@@ -9,7 +9,11 @@ services:
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
       TZ: ${TZ:-UTC}
-      PASSWORD: ${CODE_SERVER_PASSWORD}
+      # No PASSWORD/HASHED_PASSWORD set — code-server's own web login is
+      # disabled entirely; Authelia forward-auth (dashboard's Exposure
+      # settings → "Require Authelia login") is the only gate in front of
+      # it. Direct LAN access to this container's own port has no auth at
+      # all — restrict that at the network level if this box isn't trusted.
       SUDO_PASSWORD: ${CODE_SERVER_SUDO_PASSWORD}
     labels:
       - "homepage.group=Development"
