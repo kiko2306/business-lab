@@ -1,23 +1,82 @@
 #!/usr/bin/env bash
-# One-command bootstrap: generates .env with safe defaults/secrets if needed,
-# then builds and starts the full stack. Everything past this point (the
-# first admin account, per-app secrets, exposure settings) is configured
-# from the dashboard itself — see the printed URL at the end.
+# One-command bootstrap: installs Docker if missing, generates .env with
+# safe defaults/secrets if needed, then builds and starts the full stack.
+# Everything past this point (the first admin account, per-app secrets,
+# exposure settings) is configured from the dashboard itself — see the
+# printed URL at the end.
+#
+# Must be run with sudo (or as root): it installs system packages, manages
+# the docker system service, and adds the invoking user to the docker group.
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
 log() { printf '==> %s\n' "$1"; }
+warn() { printf 'warning: %s\n' "$1" >&2; }
 
-for bin in docker openssl; do
+if [ "$(id -u)" -ne 0 ]; then
+  echo "error: this script installs system packages and manages services — run it with sudo:" >&2
+  echo "  sudo ./start.sh" >&2
+  exit 1
+fi
+
+# The real, non-root user who ran `sudo ./start.sh` — added to the docker
+# group at the end so they don't need sudo for docker/compose afterwards.
+# Falls back to "root" if invoked directly as root (e.g. a root login shell),
+# in which case there is no separate user to add to the group.
+TARGET_USER="${SUDO_USER:-root}"
+
+if command -v apt-get >/dev/null 2>&1; then
+  APT_MISSING=()
+  for bin_pkg in "curl:curl" "openssl:openssl" "gnupg:gnupg" "ca-certificates:ca-certificates"; do
+    bin="${bin_pkg%%:*}"
+    pkg="${bin_pkg##*:}"
+    if ! command -v "$bin" >/dev/null 2>&1; then
+      APT_MISSING+=("$pkg")
+    fi
+  done
+  if [ "${#APT_MISSING[@]}" -gt 0 ]; then
+    log "Installing missing packages: ${APT_MISSING[*]}"
+    apt-get update -qq
+    apt-get install -y -qq "${APT_MISSING[@]}"
+  fi
+else
+  warn "No 'apt-get' found — this script only automates dependency installation on Ubuntu/Debian."
+  warn "Continuing on the assumption docker, docker compose, openssl, and curl are already installed."
+fi
+
+for bin in curl openssl; do
   if ! command -v "$bin" >/dev/null 2>&1; then
-    echo "error: '$bin' is required but not found on PATH." >&2
+    echo "error: '$bin' is required but not found on PATH, and could not be installed automatically." >&2
     exit 1
   fi
 done
+
+if ! command -v docker >/dev/null 2>&1; then
+  log "Docker not found — installing via the official Docker install script (get.docker.com)"
+  curl -fsSL https://get.docker.com | sh
+fi
+
+if command -v systemctl >/dev/null 2>&1; then
+  log "Enabling and starting the docker service"
+  systemctl enable --now docker >/dev/null 2>&1 || warn "couldn't enable/start the docker service via systemctl — is it running already under a different init system?"
+fi
+
 if ! docker compose version >/dev/null 2>&1; then
-  echo "error: 'docker compose' (the Compose plugin) is required." >&2
-  exit 1
+  if command -v apt-get >/dev/null 2>&1; then
+    log "Docker Compose plugin not found — installing docker-compose-plugin"
+    apt-get update -qq
+    apt-get install -y -qq docker-compose-plugin
+  fi
+  if ! docker compose version >/dev/null 2>&1; then
+    echo "error: 'docker compose' (the Compose plugin) is required and could not be installed automatically." >&2
+    exit 1
+  fi
+fi
+
+if [ "$TARGET_USER" != "root" ] && ! id -nG "$TARGET_USER" 2>/dev/null | grep -qw docker; then
+  log "Adding user '$TARGET_USER' to the docker group (log out and back in for this to take effect)"
+  usermod -aG docker "$TARGET_USER"
 fi
 
 ENV_FILE=".env"

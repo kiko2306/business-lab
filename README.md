@@ -16,14 +16,19 @@ Homelab Management is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL sys
 
 ```bash
 git clone <this repo> && cd homelab-management
-./start.sh
+sudo ./start.sh
 ```
 
-That's it — `start.sh` generates `.env` on first run (random `JWT_SECRET`,
+That's it — on Ubuntu/Debian, `start.sh` installs Docker (via the official
+`get.docker.com` script) and the Compose plugin if they're not already
+present, enables the docker service, and adds the user who ran `sudo` to the
+`docker` group. It then generates `.env` on first run (random `JWT_SECRET`,
 `JWT_REFRESH_SECRET`, `POSTGRES_PASSWORD`; `APPS_DIR` and `DOCKER_GID`
-auto-detected), builds the images, and starts the stack. It's safe to re-run
-any time (e.g. after `git pull`) — it never overwrites a secret that's
-already set.
+auto-detected), builds the images, and starts the stack. `sudo` is required
+because it installs system packages and manages the docker service. It's
+safe to re-run any time (e.g. after `git pull`) — it never overwrites a
+secret that's already set, and never reinstalls Docker if it's already
+there.
 
 Open the printed dashboard URL and complete `/setup` to create the first
 admin account. From there, every other configuration step — per-app secrets,
