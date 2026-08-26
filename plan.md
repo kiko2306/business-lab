@@ -603,10 +603,13 @@ Numbers below double as the reference used elsewhere in this log (e.g.
 
 1. [x] **Scheduled/automated backups** — smallest, standalone. Implemented
    this session — see §18.3 for what shipped.
-2. [ ] **CI pipeline** — wrap the existing manual `tsc`/`vitest`/`ng build`
-   checks (currently run by hand via `node:20-alpine`, see §17.4) into
-   `.github/workflows/`. Do this before further backend changes pile up
-   without automatic verification. **Priority: P1** — **Estimate: M**
+2. [x] **CI pipeline** — added `.github/workflows/ci.yml` with two jobs
+   (`backend`: `npm ci` + `typecheck` + `test`; `frontend`: `npm ci` +
+   `build`), triggered on push to `main` and on pull requests. No frontend
+   `ng test` step — zero spec files exist and karma/jasmine aren't even
+   installed (see item 3), so it would only fail. Verified both jobs pass
+   locally via the same `node:20-alpine` commands (see §17.4).
+   **Priority: P1** — **Estimate: M**
 3. [ ] **`exposure.ts` + frontend test coverage** — the orchestration layer
    tying `npmClient`/`cloudflareTunnelClient` together (needs DB mocking),
    plus zero existing frontend `*.spec.ts` tests. Do before items 4 and 5
