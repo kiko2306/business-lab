@@ -25,6 +25,10 @@ a {
   align-items: center;
 }
 
+.auth-page > .row {
+  width: 100%;
+}
+
 .auth-card {
   border-radius: 1rem;
 }
