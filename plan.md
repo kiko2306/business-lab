@@ -386,3 +386,180 @@ Service hostnames should be derived as `<service>.<base-domain>`, for example
   the provisioning failure instead of silently ignoring it.
 - Cloudflare Access and dynamic DNS updates are deferred until after the
   Cloudflare Tunnel + Nginx Proxy Manager flow is working.
+
+## 17. Session Log — 2026-08-26: Exposure validated live, security fix, one-command setup
+
+### 17.0 Status at start of session
+Section 16 above had been implemented but never exercised against a real NPM
+instance or Cloudflare account. This session validated it end-to-end against
+this deployment's real Nginx Proxy Manager and Cloudflare Tunnel, using
+`paperless` as the proof case, and fixed everything that broke along the way.
+
+**As of this entry, the changes below are uncommitted in the working tree**
+(last commit on `main` is `5e905a7`). Verified in this session:
+`backend`: `tsc --noEmit` clean, `vitest run` passing (6 tests in
+`services.test.ts`). `frontend`: `ng build` succeeds (pre-existing initial
+bundle-size budget warning only, unrelated to this session).
+
+### 17.1 Done this session
+- [x] **Exposure upstream auto-derivation** — removed the manual upstream
+      scheme/host/port/websocket fields from the per-service exposure API and
+      UI. `backend/src/services/exposure.ts` now derives them itself: scheme
+      is fixed `http`, port comes from `getPublishedUpstreamPort()` (parses
+      the app's compose file — see `backend/src/config/services.ts`), host is
+      `getHostGatewayIp()` (`backend/src/utils/network.ts`, resolves
+      `host.docker.internal` to a literal IP once and caches it), websocket
+      upgrade is always allowed. The exposure panel is now an enable toggle
+      plus a read-only "forwarding to..." line.
+- [x] **`exposureEnvKeys` mechanism** — a service can declare env keys in its
+      `services.ts` registry entry (see `paperless`) that get computed from
+      the exposed hostname and injected at every start, without writing to
+      the read-only `apps/` mount. Fixes apps (like Paperless) that need their
+      own public-URL/allowed-hosts env vars to accept traffic through the
+      tunnel.
+- [x] **NPM API bug** — `websocket_upgrade` is not a real Nginx Proxy Manager
+      field; the correct one is `allow_websocket_upgrade`. Silent no-op
+      before this fix.
+- [x] **`host.docker.internal` proxy_pass bug** — nginx's resolver for
+      variable-based `proxy_pass` upstreams is DNS-only and never consults
+      `/etc/hosts`, so the hostname resolved on the host but not from inside
+      nginx. Fixed by resolving to the literal gateway IP once, up front
+      (`getHostGatewayIp`), instead of passing the hostname through.
+- [x] **Health-status default bug** — services in the registry without a
+      configured health check (most of them) were reported as `check failed`
+      instead of `healthy` while their container was running, because the
+      `healthy` flag defaulted to `false` whenever no check was configured.
+      Now defaults to `true` for a running service with no check configured;
+      `check failed` is reserved for a check that actually ran and failed.
+- [x] **Secret leak: `.env.save`** — a file with a live, still-active
+      `JWT_SECRET` was committed to git (introduced in `5cafdfb`). Rotated the
+      secret, deleted the file from disk and tracking, broadened `.gitignore`
+      to `.env.*` (with `.env.example` explicitly re-allowed). The old value
+      is still visible in git history at `5cafdfb` — rotation makes it inert,
+      but scrubbing it fully would need a history rewrite.
+- [x] **Docker socket proxy** — the backend no longer mounts
+      `/var/run/docker.sock` directly. `tecnativa/docker-socket-proxy` now
+      holds the real socket; the backend talks to it over
+      `DOCKER_HOST=tcp://docker-socket-proxy:2375` on the internal network
+      only, scoped to containers/images/networks/volumes + start/stop —
+      `exec`/`build`/`secrets`/`swarm`/`plugins` stay off. Narrows blast
+      radius; does not sandbox what a compose file itself can bind-mount.
+- [x] **Removed `apps/cloudflare-tunnel/` Docker stack** — this deployment
+      runs `cloudflared` via host systemd, not the Docker stack shipped in
+      the repo; that stack had no `.env` and had never been started here. Its
+      registry entry was removed too.
+- [x] **Dropped `service_configs` table** — empty, zero code references
+      (`database/init.sql` and the live DB).
+- [x] **`start.sh`** — one-command bootstrap (`./start.sh`): generates
+      `.env` on first run (random `JWT_SECRET`/`JWT_REFRESH_SECRET`/
+      `POSTGRES_PASSWORD`, auto-detected `APPS_DIR`/`DOCKER_GID`), best-effort
+      `chgrp`/`chmod`s `apps/` so the dashboard can write per-app `.env`
+      files, then `docker compose up -d --build`. Safe to re-run (never
+      overwrites a secret already set).
+- [x] **Per-app `.env` editing moved into the dashboard** —
+      `backend/src/services/appEnv.ts` (new) + `backend/src/utils/envFile.ts`
+      (new, minimal `.env` parser) read/write `apps/<name>/.env` directly.
+      `APPS_DIR` is now mounted read-write (previously read-only) for this.
+      Secret-looking keys (`PASSWORD`/`SECRET`/`TOKEN`/`*_KEY`/`APIKEY`
+      pattern) are write-only in the UI — reported as "configured" or not,
+      never echoed back.
+- [x] Started backend test coverage — `backend/src/config/services.test.ts`
+      (new, 6 tests covering `extractComposeEnvVars`) and `vitest` added as a
+      dev dependency with a `test` script. First test file in the repo.
+
+### 17.1a Continued same session: expanded backend test coverage
+- [x] `services.test.ts` — added 6 tests for `getPublishedUpstreamPort`
+      (literal port, `${VAR:-default}` fallback, `.env` override of the
+      default, no `ports:` mapping, no compose file installed, unknown
+      service name). Uses a temp `APPS_DIR` + a real registry key
+      (`paperless`) so it doesn't depend on the checked-in `apps/` fixtures
+      staying in sync.
+- [x] `npmClient.test.ts` (new, 7 tests) — `buildProxyHostPayload` shape, and
+      `ensureProxyHost` create/update/no-op/ownership-conflict/login-failure
+      paths, with `requestJson` mocked via `vi.mock('../utils/httpJson')`.
+- [x] `cloudflareTunnelClient.test.ts` (new, 5 tests) — `ensureIngressRoute`
+      insert-before-catch-all, no-op when rule+DNS already correct, update
+      when hostname exists pointing elsewhere, DNS-ownership-conflict
+      rejection, and tunnel-config-read failure, same `requestJson` mocking
+      approach.
+- Backend suite is now 23 tests across 3 files; `tsc --noEmit` and
+  `vitest run` both verified clean (via `node:20-alpine` in Docker, since
+  this environment has no local Node/npm — see 17.4).
+- **Not yet covered**: `exposure.ts` itself (the orchestration layer —
+  needs DB mocking, more setup) and the frontend has zero `*.spec.ts` tests.
+  Both remain open in 17.3.
+
+### 17.2 Deployment fact worth remembering
+This deployment's real Cloudflare Tunnel runs as a **host-level systemd
+service**, not the `apps/cloudflare-tunnel/` compose stack (now removed
+anyway). Public hostnames already live: `homelab.tx-home-utils.com` (frontend)
+and `api-homelab.tx-home-utils.com` (backend) — meaning the dashboard itself
+is internet-facing independent of the per-service exposure feature it
+provides. Keep this in mind before assuming anything about the tunnel is
+driven by a Docker stack in this repo.
+
+### 17.3 Outstanding TODO (carried into future sessions)
+
+**Add**
+- [ ] **CI pipeline** — no `.github/workflows/` yet; `smoke-tests.sh`,
+      `docker-e2e-test.sh`, and both `tsc`/`ng build` checks only run
+      manually. **Priority: P1** — **Estimate: M**
+- [ ] **Automated tests, remaining gaps** — `npmClient.ts`,
+      `cloudflareTunnelClient.ts`, and `getPublishedUpstreamPort` now have
+      unit coverage (23 tests, see 17.1a). Still needed: `exposure.ts` itself
+      (the orchestration layer that ties them together — needs DB mocking)
+      and any frontend (`*.spec.ts`) tests at all — zero exist today.
+      **Priority: P1** — **Estimate: M**
+- [ ] **"Test connection" action for exposure settings** — NPM credentials
+      and Cloudflare account/zone/tunnel IDs are only exercised the next time
+      a service starts. A validate-now button in Settings would have caught
+      several of this session's misconfigurations immediately instead of
+      after a failed provisioning attempt. **Priority: P2** — **Estimate: M**
+- [ ] **Exposure drift detection** — nothing notices if NPM's or Cloudflare's
+      live state diverges from `service_exposure` (e.g. someone hand-edits
+      the proxy host in NPM's UI). Add periodic reconciliation, or at least a
+      "re-verify" button. **Priority: P2** — **Estimate: M**
+- [ ] **2FA for admin accounts** — worth prioritizing given the dashboard is
+      already internet-facing via the tunnel (see 17.2), independent of the
+      per-service exposure feature. **Priority: P1** — **Estimate: M**
+- [ ] **Scheduled/automated backups** — confirm whether `POST
+      /backups/create` is manual-trigger only; if so, add a cron-driven
+      schedule with retention. **Priority: P2** — **Estimate: S**
+- [ ] **Extend `exposureEnvKeys` to other apps** — only `paperless` declares
+      one today. Any other app with its own Host-header/CSRF allowlist will
+      hit the same bug class the first time exposure is enabled for it.
+      **Priority: P2** — **Estimate: S per app**
+- [ ] **Health check URLs still assume host ports** — entries use
+      `localhost:<port>`, rewritten via `SERVICE_HEALTH_HOST`. Apps not
+      published to the host, or published on a non-default port, will still
+      misreport `check failed`. Distinct from the no-check-configured default
+      bug fixed this session. **Priority: P2** — **Estimate: M**
+
+**Commit hygiene**
+- [ ] **This session's work is entirely uncommitted** — 32 modified files
+      plus new `backend/src/config/services.test.ts`,
+      `backend/src/services/appEnv.ts`, `backend/src/utils/envFile.ts`,
+      `backend/src/utils/network.ts`, `start.sh`. Review and commit (likely
+      as a few focused commits: security fix / docker-socket-proxy /
+      exposure auto-derivation / start.sh+appEnv / README+plan docs) before
+      starting new work, so it isn't sitting at risk of being lost or
+      tangled with whatever comes next.
+
+**Already done, kept for history**
+- [x] `.env.save` secret leak — removed, rotated, `.gitignore` broadened.
+- [x] `apps/cloudflare-tunnel/` Docker stack — removed (see 17.2).
+- [x] `service_configs` table — dropped.
+- [x] Manual upstream host/port/scheme/websocket exposure fields — removed
+      from API and UI; now auto-derived (see 17.1).
+- [x] Docker socket proxy — direct socket mount replaced.
+
+### 17.4 Environment note for future sessions
+This dev/agent environment has no local `node`/`npm` (only `docker`).
+Backend `typecheck`/`test` and the frontend `ng build` were run/verified via:
+```bash
+docker run --rm -v "$PWD":/app -w /app node:20-alpine sh -c "npm install && npm run typecheck && npm test"
+```
+(swap the command for `npx ng build` in `frontend/`). `node_modules` isn't
+committed and wasn't left installed on disk outside the container — re-run
+`npm install` (in a container or wherever Node is available) before trying
+to run anything directly.
