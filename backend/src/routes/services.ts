@@ -11,7 +11,7 @@ import * as status from '../services/status';
 import { createStreamTicket } from '../services/realtime';
 import { isValidServiceName } from '../config/services';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
-import { getServiceExposureRow, upsertServiceExposureConfig } from '../services/exposure';
+import { getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
@@ -197,6 +197,43 @@ router.put(
     } catch (error) {
       logger.error(`Failed to save exposure config: ${req.params.name}`, { error: (error as Error).message });
       return res.status(500).json({ error: 'Unable to save exposure configuration.' });
+    }
+  }
+);
+
+/**
+ * POST /api/services/:name/exposure/verify
+ * Re-verify (and reconcile, since ensureProxyHost/ensureIngressRoute are
+ * idempotent) a service's exposure against the live NPM/Cloudflare state —
+ * catches drift if either was hand-edited outside this app, without
+ * requiring a full service restart.
+ */
+router.post(
+  '/:name/exposure/verify',
+  serviceLimiter,
+  auth,
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  async (req: Request, res: Response) => {
+    const serviceName = req.params.name;
+
+    try {
+      const row = await getServiceExposureRow(serviceName);
+      if (!row || !row.enabled) {
+        return res.status(400).json({ error: 'Exposure is not enabled for this service.' });
+      }
+
+      const result = await provisionServiceIfEnabled(serviceName, req.user!.id);
+      const updated = await getServiceExposureRow(serviceName);
+
+      return res.json({
+        ...result,
+        status: updated?.status ?? null,
+        lastError: updated?.last_error ?? null,
+      });
+    } catch (error) {
+      logger.error(`Failed to verify exposure: ${serviceName}`, { error: (error as Error).message });
+      return res.status(500).json({ error: 'Unable to verify exposure configuration.' });
     }
   }
 );

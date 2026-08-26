@@ -26,6 +26,7 @@ export class ServiceCardComponent {
   protected exposurePanelOpen = false;
   protected exposureLoading = false;
   protected exposureSaving = false;
+  protected exposureVerifying = false;
   protected exposure: ServiceExposureConfig | null = null;
 
   protected exposureEnabled = false;
@@ -74,6 +75,24 @@ export class ServiceCardComponent {
           this.loadExposure();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save exposure configuration.')),
+      });
+  }
+
+  verifyExposure(): void {
+    this.exposureVerifying = true;
+    this.operations
+      .verifyServiceExposure(this.service.name)
+      .pipe(finalize(() => (this.exposureVerifying = false)))
+      .subscribe({
+        next: (result) => {
+          if (result.success) {
+            this.toast.success(`Exposure verified — reconciled with the live NPM/Cloudflare state.`);
+          } else if (result.warning) {
+            this.toast.error(result.warning);
+          }
+          this.loadExposure();
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to verify exposure configuration.')),
       });
   }
 

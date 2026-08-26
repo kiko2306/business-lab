@@ -127,10 +127,23 @@
             <span class="ms-1">(detected automatically)</span>
           </div>
 
-          <button type="button" class="btn btn-outline-primary btn-sm mt-2" [disabled]="exposureSaving" (click)="saveExposure()">
-            <span *ngIf="exposureSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            Save exposure settings
-          </button>
+          <div class="d-flex flex-wrap gap-2 mt-2">
+            <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="exposureSaving" (click)="saveExposure()">
+              <span *ngIf="exposureSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+              Save exposure settings
+            </button>
+            <button
+              *ngIf="exposure.enabled && exposure.hostname"
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              [disabled]="exposureVerifying"
+              title="Re-check the live Nginx Proxy Manager and Cloudflare state against what's configured here, and fix it if it has drifted."
+              (click)="verifyExposure()"
+            >
+              <span *ngIf="exposureVerifying" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+              Re-verify
+            </button>
+          </div>
         </ng-container>
       </div>
     </div>

@@ -93,6 +93,15 @@ export interface ServiceExposureUpdate {
   enabled: boolean;
 }
 
+export interface ServiceExposureVerifyResult {
+  attempted: boolean;
+  success?: boolean;
+  warning?: string;
+  hostname?: string;
+  status: string | null;
+  lastError: string | null;
+}
+
 export interface ServiceEnvField {
   key: string;
   required: boolean;

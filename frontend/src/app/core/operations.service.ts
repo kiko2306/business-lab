@@ -13,6 +13,7 @@ import {
   ServiceEnvStatus,
   ServiceExposureConfig,
   ServiceExposureUpdate,
+  ServiceExposureVerifyResult,
 } from './models';
 
 @Injectable({
@@ -74,6 +75,10 @@ export class OperationsService {
       `${API_BASE_URL}/services/${serviceName}/exposure`,
       update
     );
+  }
+
+  verifyServiceExposure(serviceName: string): Observable<ServiceExposureVerifyResult> {
+    return this.http.post<ServiceExposureVerifyResult>(`${API_BASE_URL}/services/${serviceName}/exposure/verify`, {});
   }
 
   getServiceEnv(serviceName: string): Observable<ServiceEnvStatus> {
