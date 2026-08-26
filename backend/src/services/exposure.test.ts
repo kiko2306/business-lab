@@ -2,7 +2,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
-import { getPublishedUpstreamPort } from '../config/services';
+import { getPublishedUpstreamPort, getService } from '../config/services';
 import { ensureProxyHost } from './npmClient';
 import { ensureIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
@@ -12,7 +12,7 @@ import { ServiceExposureRow, ExposureGlobalConfig } from '../types';
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
 vi.mock('../utils/exposureSettings', () => ({ getExposureConfig: vi.fn() }));
 vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn() }));
-vi.mock('../config/services', () => ({ getPublishedUpstreamPort: vi.fn() }));
+vi.mock('../config/services', () => ({ getPublishedUpstreamPort: vi.fn(), getService: vi.fn() }));
 vi.mock('./npmClient', () => ({ ensureProxyHost: vi.fn() }));
 vi.mock('./cloudflareTunnelClient', () => ({ ensureIngressRoute: vi.fn() }));
 vi.mock('../utils/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }));
@@ -22,6 +22,7 @@ const mockedQuery = vi.mocked(query);
 const mockedGetExposureConfig = vi.mocked(getExposureConfig);
 const mockedGetHostGatewayIp = vi.mocked(getHostGatewayIp);
 const mockedGetPublishedUpstreamPort = vi.mocked(getPublishedUpstreamPort);
+const mockedGetService = vi.mocked(getService);
 const mockedEnsureProxyHost = vi.mocked(ensureProxyHost);
 const mockedEnsureIngressRoute = vi.mocked(ensureIngressRoute);
 const mockedWriteAuditLog = vi.mocked(writeAuditLog);
@@ -66,6 +67,8 @@ beforeEach(() => {
   mockedGetExposureConfig.mockReset();
   mockedGetHostGatewayIp.mockReset();
   mockedGetPublishedUpstreamPort.mockReset();
+  mockedGetService.mockReset();
+  mockedGetService.mockReturnValue(undefined);
   mockedEnsureProxyHost.mockReset();
   mockedEnsureIngressRoute.mockReset();
   mockedWriteAuditLog.mockReset();
@@ -175,5 +178,81 @@ describe('provisionServiceIfEnabled', () => {
 
     expect(result.success).toBe(false);
     expect(result.warning).toMatch(/tunnel config read failed/);
+  });
+
+  it('also provisions a service\'s additionalExposures, each with its own hostname and port', async () => {
+    mockedQuery.mockImplementation(async (text: unknown) => {
+      const sql = String(text);
+      if (sql.includes('SELECT * FROM service_exposure')) {
+        return { rows: [exposureRow({ service_name: 'netbird-vpn', npm_host_id: 5 })] } as never;
+      }
+      if (sql.includes('DO UPDATE SET hostname = EXCLUDED.hostname')) {
+        // ensureSecondaryExposureRow upsert
+        return {
+          rows: [exposureRow({ service_name: 'netbird-vpn:api', hostname: 'netbird-vpn-api.example.com', npm_host_id: null })],
+        } as never;
+      }
+      return { rows: [] } as never;
+    });
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedGetService.mockReturnValue({
+      name: 'netbird-vpn',
+      label: 'NetBird VPN',
+      description: '',
+      icon: '',
+      composePath: '',
+      healthCheck: { enabled: false },
+      additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT' }],
+    });
+    mockedGetPublishedUpstreamPort.mockImplementation((_name, portEnvVar) => (portEnvVar ? 8080 : 8081));
+    mockedGetHostGatewayIp.mockResolvedValue('172.17.0.1');
+    mockedEnsureProxyHost.mockResolvedValue({ id: 5, created: false, updated: true });
+    mockedEnsureIngressRoute.mockResolvedValue({ dnsRecordId: 'dns-1', created: false, updated: true } as never);
+
+    const result = await provisionServiceIfEnabled('netbird-vpn', 1);
+
+    expect(result).toEqual({ attempted: true, success: true, hostname: 'netbird-vpn.example.com' });
+    expect(mockedEnsureProxyHost).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'netbird-vpn.example.com', forwardPort: 8081, expectedHostId: 5 })
+    );
+    expect(mockedEnsureProxyHost).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'netbird-vpn-api.example.com', forwardPort: 8080, expectedHostId: null })
+    );
+    expect(mockedGetPublishedUpstreamPort).toHaveBeenCalledWith('netbird-vpn', 'NETBIRD_MGMT_PORT');
+  });
+
+  it('does not let a secondary exposure failure affect the primary result', async () => {
+    mockedQuery.mockImplementation(async (text: unknown) => {
+      const sql = String(text);
+      if (sql.includes('SELECT * FROM service_exposure')) {
+        return { rows: [exposureRow({ service_name: 'netbird-vpn', npm_host_id: 5 })] } as never;
+      }
+      if (sql.includes('DO UPDATE SET hostname = EXCLUDED.hostname')) {
+        return {
+          rows: [exposureRow({ service_name: 'netbird-vpn:api', hostname: 'netbird-vpn-api.example.com', npm_host_id: null })],
+        } as never;
+      }
+      return { rows: [] } as never;
+    });
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedGetService.mockReturnValue({
+      name: 'netbird-vpn',
+      label: 'NetBird VPN',
+      description: '',
+      icon: '',
+      composePath: '',
+      healthCheck: { enabled: false },
+      additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT' }],
+    });
+    // Primary resolves fine; the secondary's port can't be determined.
+    mockedGetPublishedUpstreamPort.mockImplementation((_name, portEnvVar) => (portEnvVar ? null : 8081));
+    mockedGetHostGatewayIp.mockResolvedValue('172.17.0.1');
+    mockedEnsureProxyHost.mockResolvedValue({ id: 5, created: false, updated: true });
+    mockedEnsureIngressRoute.mockResolvedValue({ dnsRecordId: 'dns-1', created: false, updated: true } as never);
+
+    const result = await provisionServiceIfEnabled('netbird-vpn', 1);
+
+    expect(result).toEqual({ attempted: true, success: true, hostname: 'netbird-vpn.example.com' });
+    expect(mockedEnsureProxyHost).toHaveBeenCalledTimes(1);
   });
 });

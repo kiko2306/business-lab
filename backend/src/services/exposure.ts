@@ -6,17 +6,25 @@
  * hostname route exist, pointing `<service>.<base-domain>` at the service.
  * Provisioning is opt-in per service, idempotent, and never blocks a Docker
  * start that already succeeded — failures are stored and audited instead.
+ *
+ * A service can also declare `additionalExposures` (see config/services.ts)
+ * for secondary hostnames it needs beyond the primary one — e.g. NetBird
+ * VPN's dashboard is a static SPA with no server-side proxy for /api, so its
+ * management API needs its own directly browser-reachable hostname. Each one
+ * gets its own row in service_exposure, keyed as `<service>:<suffix>`, and
+ * is provisioned/reconciled the same way as the primary, automatically,
+ * whenever the parent service's exposure is enabled — no separate toggle.
  */
 
 import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
-import { getPublishedUpstreamPort } from '../config/services';
+import { getPublishedUpstreamPort, getService } from '../config/services';
 import { ensureProxyHost } from './npmClient';
 import { ensureIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
-import { ExposureProvisionResult, ServiceExposureInput, ServiceExposureRow } from '../types';
+import { ExposureGlobalConfig, ExposureProvisionResult, ServiceExposureInput, ServiceExposureRow } from '../types';
 
 // Every exposed service is forwarded to over plain HTTP on the host's
 // published port — TLS is terminated by NPM/Cloudflare, not the origin.
@@ -58,6 +66,24 @@ export async function upsertServiceExposureConfig(
   return result.rows[0];
 }
 
+/**
+ * Idempotently ensure a service_exposure row exists for a secondary
+ * exposure's synthetic key (`<service>:<suffix>`), always enabled — it
+ * rides along with the parent service's exposure rather than being
+ * independently toggleable.
+ */
+async function ensureSecondaryExposureRow(exposureKey: string, hostname: string): Promise<ServiceExposureRow> {
+  const result = await query<ServiceExposureRow>(
+    `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, authelia_protected, status, updated_at)
+     VALUES ($1, true, $2, $3, $4, false, 'not_provisioned', NOW())
+     ON CONFLICT (service_name)
+     DO UPDATE SET hostname = EXCLUDED.hostname, updated_at = NOW()
+     RETURNING *`,
+    [exposureKey, hostname, UPSTREAM_SCHEME, ALLOW_WEBSOCKET_UPGRADE]
+  );
+  return result.rows[0];
+}
+
 interface ProvisioningResult {
   status: string;
   npmHostId?: number | null;
@@ -81,7 +107,7 @@ function getNpmOriginUrl(npmApiUrl: string): string {
 }
 
 async function recordProvisioningResult(
-  serviceName: string,
+  exposureKey: string,
   { status, npmHostId, cfHostnameId, lastError }: ProvisioningResult
 ): Promise<void> {
   await query(
@@ -89,23 +115,131 @@ async function recordProvisioningResult(
      SET status = $2, npm_host_id = COALESCE($3, npm_host_id), cf_hostname_id = COALESCE($4, cf_hostname_id),
          last_error = $5, updated_at = NOW()
      WHERE service_name = $1`,
-    [serviceName, status, npmHostId ?? null, cfHostnameId ?? null, lastError ?? null]
+    [exposureKey, status, npmHostId ?? null, cfHostnameId ?? null, lastError ?? null]
   );
 }
 
-async function recordUpstreamConfig(serviceName: string, host: string, port: number): Promise<void> {
+async function recordUpstreamConfig(exposureKey: string, host: string, port: number): Promise<void> {
   await query(
     `UPDATE service_exposure
      SET upstream_scheme = $2, upstream_host = $3, upstream_port = $4, updated_at = NOW()
      WHERE service_name = $1`,
-    [serviceName, UPSTREAM_SCHEME, host, port]
+    [exposureKey, UPSTREAM_SCHEME, host, port]
   );
 }
 
+interface ProvisionHostnameOptions {
+  exposureKey: string;
+  hostname: string;
+  upstreamPort: number | null;
+  existingNpmHostId: number | null;
+  autheliaProtected: boolean;
+  globalConfig: ExposureGlobalConfig;
+  originUrl: string;
+  userId: number;
+  auditResource: string;
+}
+
 /**
- * Provision exposure for a service if it has exposure enabled. Never throws
- * — callers get a result object describing what happened, suitable for
- * merging into a start-service API response as a warning.
+ * Ensure one NPM proxy host + Cloudflare Tunnel ingress route exist for a
+ * single hostname (primary or secondary), recording status/errors against
+ * its own service_exposure row. Never throws.
+ */
+async function provisionHostname({
+  exposureKey,
+  hostname,
+  upstreamPort,
+  existingNpmHostId,
+  autheliaProtected,
+  globalConfig,
+  originUrl,
+  userId,
+  auditResource,
+}: ProvisionHostnameOptions): Promise<ExposureProvisionResult> {
+  if (!upstreamPort) {
+    const message = `Unable to determine the published port for ${hostname} from its compose file.`;
+    await recordProvisioningResult(exposureKey, { status: 'failed', lastError: message });
+    return { attempted: true, success: false, warning: message };
+  }
+
+  const upstreamHost = await getHostGatewayIp();
+  await recordUpstreamConfig(exposureKey, upstreamHost, upstreamPort);
+
+  try {
+    const npmResult = await ensureProxyHost({
+      npmApiUrl: globalConfig.npmApiUrl,
+      npmEmail: globalConfig.npmEmail,
+      npmPassword: globalConfig.npmPassword,
+      hostname,
+      expectedHostId: existingNpmHostId,
+      forwardScheme: UPSTREAM_SCHEME,
+      forwardHost: upstreamHost,
+      forwardPort: upstreamPort,
+      websocket: ALLOW_WEBSOCKET_UPGRADE,
+      autheliaProtected,
+    });
+
+    // Persist ownership before the Cloudflare call so a later retry can safely
+    // reconcile the host if tunnel provisioning fails after creation.
+    await recordProvisioningResult(exposureKey, {
+      status: 'provisioning',
+      npmHostId: npmResult.id,
+      lastError: null,
+    });
+
+    const cfResult = await ensureIngressRoute({
+      apiToken: globalConfig.cloudflareApiToken,
+      accountId: globalConfig.cloudflareAccountId,
+      zoneId: globalConfig.cloudflareZoneId,
+      tunnelId: globalConfig.cloudflareTunnelId,
+      hostname,
+      originUrl,
+    });
+
+    await recordProvisioningResult(exposureKey, {
+      status: 'provisioned',
+      npmHostId: npmResult.id,
+      cfHostnameId: cfResult.dnsRecordId,
+      lastError: null,
+    });
+
+    await writeAuditLog({
+      userId,
+      action: 'exposure_provision',
+      resource: auditResource,
+      result: 'success',
+      metadata: { hostname, npmResult, cfResult },
+    }).catch(() => {});
+
+    return { attempted: true, success: true, hostname };
+  } catch (error) {
+    const message = (error as Error).message;
+    logger.error(`Exposure provisioning failed for ${hostname}`, { error: message });
+    await recordProvisioningResult(exposureKey, { status: 'failed', npmHostId: existingNpmHostId, lastError: message });
+
+    await writeAuditLog({
+      userId,
+      action: 'exposure_provision',
+      resource: auditResource,
+      result: 'failure',
+      metadata: { hostname, error: message },
+    }).catch(() => {});
+
+    return {
+      attempted: true,
+      success: false,
+      warning: `Service started, but exposure provisioning failed: ${message}`,
+    };
+  }
+}
+
+/**
+ * Provision exposure for a service if it has exposure enabled — its primary
+ * hostname, plus any additionalExposures it declares. Never throws — callers
+ * get a result object describing what happened to the primary hostname
+ * (secondary failures are logged/audited but don't change the return value,
+ * matching the "never blocks a Docker start" contract), suitable for merging
+ * into a start-service API response as a warning.
  */
 export async function provisionServiceIfEnabled(serviceName: string, userId: number): Promise<ExposureProvisionResult> {
   const exposureRow = await getServiceExposureRow(serviceName);
@@ -122,84 +256,43 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
 
   const hostname = `${serviceName}.${globalConfig.baseDomain}`;
   const originUrl = getNpmOriginUrl(globalConfig.npmApiUrl);
-  let npmHostId: number | null = null;
 
-  const upstreamPort = getPublishedUpstreamPort(serviceName);
-  if (!upstreamPort) {
-    const message = `Unable to determine the published port for ${serviceName} from its compose file.`;
-    await recordProvisioningResult(serviceName, { status: 'failed', lastError: message });
-    return { attempted: true, success: false, warning: message };
-  }
-  const upstreamHost = await getHostGatewayIp();
-  await recordUpstreamConfig(serviceName, upstreamHost, upstreamPort);
+  const primaryResult = await provisionHostname({
+    exposureKey: serviceName,
+    hostname,
+    upstreamPort: getPublishedUpstreamPort(serviceName),
+    existingNpmHostId: exposureRow.npm_host_id,
+    // Authelia can't gate itself — the auth_request call would loop back
+    // into its own unauthenticated login page.
+    autheliaProtected: serviceName === 'authelia' ? false : exposureRow.authelia_protected,
+    globalConfig,
+    originUrl,
+    userId,
+    auditResource: serviceName,
+  });
 
-  try {
-    const npmResult = await ensureProxyHost({
-      npmApiUrl: globalConfig.npmApiUrl,
-      npmEmail: globalConfig.npmEmail,
-      npmPassword: globalConfig.npmPassword,
-      hostname,
-      expectedHostId: exposureRow.npm_host_id,
-      forwardScheme: UPSTREAM_SCHEME,
-      forwardHost: upstreamHost,
-      forwardPort: upstreamPort,
-      websocket: ALLOW_WEBSOCKET_UPGRADE,
-      // Authelia can't gate itself — the auth_request call would loop back
-      // into its own unauthenticated login page.
-      autheliaProtected: serviceName === 'authelia' ? false : exposureRow.authelia_protected,
-    });
-    npmHostId = npmResult.id;
+  const additionalExposures = getService(serviceName)?.additionalExposures ?? [];
+  for (const extra of additionalExposures) {
+    const exposureKey = `${serviceName}:${extra.suffix}`;
+    const extraHostname = `${serviceName}-${extra.suffix}.${globalConfig.baseDomain}`;
+    const extraRow = await ensureSecondaryExposureRow(exposureKey, extraHostname);
 
-    // Persist ownership before the Cloudflare call so a later retry can safely
-    // reconcile the host if tunnel provisioning fails after creation.
-    await recordProvisioningResult(serviceName, {
-      status: 'provisioning',
-      npmHostId,
-      lastError: null,
-    });
-
-    const cfResult = await ensureIngressRoute({
-      apiToken: globalConfig.cloudflareApiToken,
-      accountId: globalConfig.cloudflareAccountId,
-      zoneId: globalConfig.cloudflareZoneId,
-      tunnelId: globalConfig.cloudflareTunnelId,
-      hostname,
+    await provisionHostname({
+      exposureKey,
+      hostname: extraHostname,
+      upstreamPort: getPublishedUpstreamPort(serviceName, extra.portEnvVar),
+      existingNpmHostId: extraRow.npm_host_id,
+      autheliaProtected: false,
+      globalConfig,
       originUrl,
-    });
-
-    await recordProvisioningResult(serviceName, {
-      status: 'provisioned',
-      npmHostId: npmResult.id,
-      cfHostnameId: cfResult.dnsRecordId,
-      lastError: null,
-    });
-
-    await writeAuditLog({
       userId,
-      action: 'exposure_provision',
-      resource: serviceName,
-      result: 'success',
-      metadata: { hostname, npmResult, cfResult },
-    }).catch(() => {});
-
-    return { attempted: true, success: true, hostname };
-  } catch (error) {
-    const message = (error as Error).message;
-    logger.error(`Exposure provisioning failed for ${serviceName}`, { error: message });
-    await recordProvisioningResult(serviceName, { status: 'failed', npmHostId, lastError: message });
-
-    await writeAuditLog({
-      userId,
-      action: 'exposure_provision',
-      resource: serviceName,
-      result: 'failure',
-      metadata: { hostname, error: message },
-    }).catch(() => {});
-
-    return {
-      attempted: true,
-      success: false,
-      warning: `Service started, but exposure provisioning failed: ${message}`,
-    };
+      auditResource: `${serviceName} (${extra.label})`,
+    }).catch((error: Error) => {
+      // provisionHostname itself never throws, but guard anyway — a
+      // secondary exposure failure must never surface as a start failure.
+      logger.error(`Secondary exposure provisioning failed for ${exposureKey}`, { error: error.message });
+    });
   }
+
+  return primaryResult;
 }

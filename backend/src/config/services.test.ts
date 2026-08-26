@@ -93,4 +93,41 @@ describe('getPublishedUpstreamPort', () => {
   it('returns null for a name not in the registry', () => {
     expect(getPublishedUpstreamPort('not-a-real-service')).toBeNull();
   });
+
+  describe('with a portEnvVar (multi-port apps, e.g. additionalExposures)', () => {
+    it('picks the port mapping matching that specific env var, not the first one in the file', () => {
+      writeCompose(
+        'services:\n' +
+          '  dashboard:\n' +
+          '    ports:\n' +
+          '      - "${DASH_PORT:-8081}:80"\n' +
+          '  api:\n' +
+          '    ports:\n' +
+          '      - "${API_PORT:-8080}:8080"\n'
+      );
+      expect(getPublishedUpstreamPort('paperless', 'API_PORT')).toBe(8080);
+      expect(getPublishedUpstreamPort('paperless', 'DASH_PORT')).toBe(8081);
+      // Unqualified call still keeps its old "first port in file" behavior.
+      expect(getPublishedUpstreamPort('paperless')).toBe(8081);
+    });
+
+    it('respects an app .env override for that specific var', () => {
+      writeCompose(
+        'services:\n' +
+          '  dashboard:\n' +
+          '    ports:\n' +
+          '      - "${DASH_PORT:-8081}:80"\n' +
+          '  api:\n' +
+          '    ports:\n' +
+          '      - "${API_PORT:-8080}:8080"\n'
+      );
+      fs.writeFileSync(path.join(tmpDir, 'paperless', '.env'), 'API_PORT=9999\n');
+      expect(getPublishedUpstreamPort('paperless', 'API_PORT')).toBe(9999);
+    });
+
+    it('returns null when no port mapping uses that env var', () => {
+      writeCompose('services:\n  app:\n    ports:\n      - "${DASH_PORT:-8081}:80"\n');
+      expect(getPublishedUpstreamPort('paperless', 'API_PORT')).toBeNull();
+    });
+  });
 });

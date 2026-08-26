@@ -49,7 +49,7 @@
       "Domain": "",
       "AuthorizationEndpoint": "https://authelia.tx-home-utils.com/api/oidc/authorization",
       "TokenEndpoint": "https://authelia.tx-home-utils.com/api/oidc/token",
-      "Scope": "openid profile email",
+      "Scope": "openid profile email offline_access",
       "RedirectURLs": [
         "https://netbird-vpn.tx-home-utils.com/nb-auth",
         "https://netbird-vpn.tx-home-utils.com/nb-silent-auth"

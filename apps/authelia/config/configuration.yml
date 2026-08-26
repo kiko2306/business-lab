@@ -75,6 +75,11 @@ identity_providers:
         public: true
         authorization_policy: 'one_factor'
         consent_mode: 'implicit'
+        # NetBird's PKCEAuthorizationFlow sends this as the OIDC `audience`
+        # parameter (see apps/netbird-vpn/data/management.json) — Authelia
+        # rejects any audience the client hasn't explicitly whitelisted.
+        audience:
+          - 'netbird-dashboard'
         redirect_uris:
           - 'https://netbird-vpn.tx-home-utils.com/nb-auth'
           - 'https://netbird-vpn.tx-home-utils.com/nb-silent-auth'
@@ -82,6 +87,7 @@ identity_providers:
           - 'openid'
           - 'profile'
           - 'email'
+          - 'offline_access'
         grant_types:
           - 'authorization_code'
           - 'refresh_token'
@@ -95,6 +101,8 @@ identity_providers:
         public: true
         authorization_policy: 'one_factor'
         consent_mode: 'implicit'
+        audience:
+          - 'netbird-cli'
         scopes:
           - 'openid'
           - 'profile'

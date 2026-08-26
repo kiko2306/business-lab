@@ -31,6 +31,18 @@ export interface ServiceSetupToken {
   logPattern: string;
 }
 
+export interface ServiceAdditionalExposure {
+  // Appended to the base hostname: <service>-<suffix>.<base-domain>.
+  suffix: string;
+  // Shown in the dashboard UI (exposure status, audit logs).
+  label: string;
+  // The compose ${VAR} name whose published host port this hostname should
+  // forward to — required because a multi-container app publishes more than
+  // one port, so "first port in the file" (the single-hostname default)
+  // can't tell them apart. See getPublishedUpstreamPort.
+  portEnvVar: string;
+}
+
 export interface ServiceDefinition {
   name: string;
   label: string;
@@ -44,6 +56,11 @@ export interface ServiceDefinition {
   // running before this one can start — e.g. an app that authenticates
   // against Authelia's OIDC provider needs Authelia up first.
   dependsOn?: string[];
+  // Secondary public hostnames this service needs beyond its primary one —
+  // e.g. NetBird VPN's dashboard is a static SPA with no server-side proxy,
+  // so its management API needs its own directly-reachable hostname.
+  // Provisioned/torn down automatically alongside the primary exposure.
+  additionalExposures?: ServiceAdditionalExposure[];
 }
 
 export type ServiceState = 'running' | 'stopped' | 'starting' | 'error' | 'unknown';

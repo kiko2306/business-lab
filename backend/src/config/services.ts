@@ -40,6 +40,12 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // Its dashboard/management containers authenticate against Authelia's
     // OIDC provider — starting before Authelia is up just crash-loops.
     dependsOn: ['authelia'],
+    // The dashboard is a static SPA with no server-side proxy for /api —
+    // the browser calls the management API directly, so it needs its own
+    // reachable hostname (<name>-api.<base-domain>) rather than the
+    // internal container address. See NETBIRD_MGMT_API_ENDPOINT in
+    // apps/netbird-vpn/docker-compose.yml.
+    additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT' }],
   },
   'home-assistant': {
     name: 'home-assistant',
@@ -419,30 +425,44 @@ export function extractComposeEnvVars(composeContent: string): ComposeEnvVar[] {
 const HOST_PORT_PATTERN = /-\s*["']?(?:\$\{([A-Z0-9_]+)(?::-([^}]*))?\}|(\d+)):\d+["']?/;
 
 /**
- * Derive the host port a service's primary container publishes, by reading
- * the first `ports:` mapping in its compose file. Used to auto-configure
- * exposure upstream settings instead of requiring the user to enter them.
+ * Derive a service's published host port from its compose file, used to
+ * auto-configure exposure upstream settings instead of requiring the user to
+ * enter them. Without `portEnvVar`, returns the first `ports:` mapping found
+ * (the common single-port-per-app case). With it, returns the port whose
+ * mapping uses that specific `${VAR}` — needed once an app publishes more
+ * than one port (see `additionalExposures` on ServiceDefinition), since file
+ * order alone can't disambiguate which port belongs to which container.
  */
-export function getPublishedUpstreamPort(name: string): number | null {
+export function getPublishedUpstreamPort(name: string, portEnvVar?: string): number | null {
   const resolved = resolveComposeFile(name);
   if (!resolved?.composeFile) {
     return null;
   }
 
   const composeContent = fs.readFileSync(resolved.composeFile, 'utf8');
+  const envFilePath = path.join(resolved.appDir, '.env');
+  const envValues = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath) : {};
+
+  const resolvePort = (varName: string | undefined, varDefault: string | undefined, literalPort: string | undefined) => {
+    const hostPortStr = varName ? envValues[varName] ?? varDefault : literalPort;
+    const hostPort = hostPortStr ? Number.parseInt(hostPortStr, 10) : NaN;
+    return Number.isFinite(hostPort) ? hostPort : null;
+  };
+
+  if (portEnvVar) {
+    for (const match of composeContent.matchAll(new RegExp(HOST_PORT_PATTERN.source, 'g'))) {
+      const [, varName, varDefault, literalPort] = match;
+      if (varName === portEnvVar) {
+        return resolvePort(varName, varDefault, literalPort);
+      }
+    }
+    return null;
+  }
+
   const match = HOST_PORT_PATTERN.exec(composeContent);
   if (!match) {
     return null;
   }
-
   const [, varName, varDefault, literalPort] = match;
-  let hostPortStr: string | undefined = literalPort;
-  if (varName) {
-    const envFilePath = path.join(resolved.appDir, '.env');
-    const envValues = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath) : {};
-    hostPortStr = envValues[varName] ?? varDefault;
-  }
-
-  const hostPort = hostPortStr ? Number.parseInt(hostPortStr, 10) : NaN;
-  return Number.isFinite(hostPort) ? hostPort : null;
+  return resolvePort(varName, varDefault, literalPort);
 }

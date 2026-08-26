@@ -20,8 +20,15 @@ services:
     ports:
       - "${NETBIRD_DASHBOARD_PORT:-8081}:80"
     environment:
-      NETBIRD_MGMT_API_ENDPOINT: http://netbird-management:8080
-      NETBIRD_MGMT_GRPC_API_ENDPOINT: http://netbird-management:8080
+      # The dashboard image is a plain static file server — it has no
+      # internal reverse-proxy for /api, so these are fetched directly by
+      # the BROWSER. An internal container hostname (http://netbird-management:8080)
+      # is unreachable from there; management needs its own public hostname.
+      # See apps/netbird-vpn/.env.example for what provisions this.
+      # Matches the auto-provisioned secondary hostname: <service>-<suffix>
+      # (see additionalExposures on netbird-vpn in backend/src/config/services.ts).
+      NETBIRD_MGMT_API_ENDPOINT: https://netbird-vpn-api.tx-home-utils.com
+      NETBIRD_MGMT_GRPC_API_ENDPOINT: https://netbird-vpn-api.tx-home-utils.com
       AUTH_AUDIENCE: netbird-dashboard
       AUTH_CLIENT_ID: netbird-dashboard
       AUTH_AUTHORITY: https://authelia.tx-home-utils.com
@@ -48,7 +55,12 @@ services:
     image: netbirdio/management:latest
     restart: unless-stopped
     ports:
-      - "${NETBIRD_MGMT_PORT:-8080}:8080"
+      # Container port is 80, not 8080 — management.json's HttpConfig.Address
+      # doesn't actually control the main HTTP+gRPC listener (that's fixed
+      # unless overridden via a --port CLI flag, which the default command
+      # here doesn't set); confirmed via its own startup log line ("running
+      # HTTP server and gRPC server on the same port: [::]:80").
+      - "${NETBIRD_MGMT_PORT:-8080}:80"
     # Fetches Authelia's OIDC config over the public internet at startup —
     # bypass the host's resolver (Docker forwards to it by default) since a
     # stale negative-cached lookup there otherwise crash-loops this container
