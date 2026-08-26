@@ -1,6 +1,6 @@
 <div class="dashboard-shell">
   <header class="navbar navbar-expand border-bottom bg-white sticky-top">
-    <div class="container py-2">
+    <div class="container-fluid py-2">
       <div>
         <div class="navbar-brand fw-semibold mb-0">Homelab Manager</div>
         <div class="small text-body-secondary" *ngIf="user$ | async as user">
@@ -17,7 +17,7 @@
     </div>
   </header>
 
-  <main class="container py-4">
+  <main class="container-fluid py-4">
     <section class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
       <div>
         <h1 class="h3 mb-1">Service dashboard</h1>
@@ -65,7 +65,7 @@
 
     <section *ngIf="serviceState.services$ | async as services; else loadingState">
       <div *ngIf="services.length; else emptyState" class="row g-3">
-        <div class="col-12 col-md-6 col-xxl-4" *ngFor="let service of services; trackBy: trackByService">
+        <div class="col-12 col-md-6 col-xl-4 col-xxl-3" *ngFor="let service of services; trackBy: trackByService">
           <app-service-card
             [service]="service"
             [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
