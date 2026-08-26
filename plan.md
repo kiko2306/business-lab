@@ -610,11 +610,20 @@ Numbers below double as the reference used elsewhere in this log (e.g.
    installed (see item 3), so it would only fail. Verified both jobs pass
    locally via the same `node:20-alpine` commands (see §17.4).
    **Priority: P1** — **Estimate: M**
-3. [ ] **`exposure.ts` + frontend test coverage** — the orchestration layer
-   tying `npmClient`/`cloudflareTunnelClient` together (needs DB mocking),
-   plus zero existing frontend `*.spec.ts` tests. Do before items 4 and 5
-   since both touch the same exposure/provisioning code paths and benefit
-   from the coverage. **Priority: P1** — **Estimate: M**
+3. [x] **`exposure.ts` + frontend test coverage** — added
+   `backend/src/services/exposure.test.ts` (7 tests, DB/settings/network/
+   npmClient/cloudflareTunnelClient mocked, same pattern as
+   `npmClient.test.ts`/`cloudflareTunnelClient.test.ts`; backend suite now
+   36 tests). Frontend had zero test infrastructure at all — karma/jasmine
+   weren't even in `devDependencies`, so `ng test` only ever failed. Added
+   them plus `frontend/karma.conf.js` (launches Chrome via puppeteer's
+   bundled Chromium as `ChromeHeadlessCI`, `--no-sandbox`, so it doesn't
+   depend on a system Chrome install) and a `test:ci` script, wired into
+   the CI frontend job (commit `22f0a59`). First spec files: `authGuard`,
+   `guestGuard`, `AuthService` (login/session/refresh), `LoginComponent`
+   (validation, success/error submit, paste sanitization) — 14 tests, all
+   verified passing headless via `node:20-slim` + puppeteer deps in this
+   session. **Priority: P1** — **Estimate: M**
 4. [ ] **"Test connection" action for exposure settings** — validate NPM
    credentials and Cloudflare account/zone/tunnel IDs on demand instead of
    only discovering misconfiguration the next time a service starts (as
