@@ -77,6 +77,22 @@ describe('buildProxyHostPayload', () => {
     expect(payload.advanced_config).toContain('include /snippets/authelia-location.conf;');
     expect(payload.advanced_config).toContain('include /snippets/authelia-authrequest.conf;');
   });
+
+  it('forces allow_websocket_upgrade off when protected, even if requested on', () => {
+    // The Authelia block sets Upgrade/Connection itself — NPM's own
+    // auto-injection for the same headers would otherwise duplicate them
+    // and fail nginx's config reload entirely.
+    const payload = buildProxyHostPayload({
+      hostname: 'paperless.example.com',
+      forwardScheme: 'http',
+      forwardHost: '172.17.0.1',
+      forwardPort: 8000,
+      websocket: true,
+      autheliaProtected: true,
+    });
+
+    expect(payload.allow_websocket_upgrade).toBe(false);
+  });
 });
 
 describe('ensureProxyHost', () => {

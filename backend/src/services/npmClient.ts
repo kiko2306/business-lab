@@ -41,9 +41,11 @@ const AUTHELIA_ADVANCED_CONFIG = [
   'include /snippets/authelia-location.conf;',
   '',
   'location / {',
+  // proxy.conf already sets proxy_http_version 1.1 — do not redeclare it
+  // here, nginx treats a second copy in the same location as a fatal
+  // "duplicate directive" and refuses to reload the whole host.
   '    include /snippets/proxy.conf;',
   '    include /snippets/authelia-authrequest.conf;',
-  '    proxy_http_version 1.1;',
   '    proxy_set_header Upgrade $http_upgrade;',
   '    proxy_set_header Connection "upgrade";',
   '    proxy_pass $forward_scheme://$server:$port;',
@@ -108,7 +110,12 @@ export function buildProxyHostPayload({
     forward_port: forwardPort,
     block_exploits: true,
     caching_enabled: false,
-    allow_websocket_upgrade: Boolean(websocket),
+    // NPM auto-injects proxy_http_version/Upgrade/Connection itself when
+    // this is on, regardless of a custom advanced_config — the Authelia
+    // block below sets those directives itself (since it fully replaces
+    // NPM's own location /), so leaving this also on for a protected host
+    // means both add the same directive and nginx fails to reload at all.
+    allow_websocket_upgrade: autheliaProtected ? false : Boolean(websocket),
     access_list_id: '0',
     certificate_id: 0,
     ssl_forced: false,
@@ -200,11 +207,12 @@ export async function ensureProxyHost({
   }
 
   const expectedAdvancedConfig = autheliaProtected ? AUTHELIA_ADVANCED_CONFIG : '';
+  const expectedWebsocketUpgrade = autheliaProtected ? false : Boolean(websocket);
   const needsUpdate =
     existing.forward_scheme !== forwardScheme ||
     existing.forward_host !== forwardHost ||
     existing.forward_port !== forwardPort ||
-    Boolean(existing.allow_websocket_upgrade) !== Boolean(websocket) ||
+    Boolean(existing.allow_websocket_upgrade) !== expectedWebsocketUpgrade ||
     (existing.advanced_config ?? '') !== expectedAdvancedConfig;
 
   if (needsUpdate) {
