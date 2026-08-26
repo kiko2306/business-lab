@@ -115,8 +115,9 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
     const installed = Boolean(resolveComposeFile(serviceName)?.composeFile);
     const state: ServiceState = containerState === 'unknown' && installed ? 'stopped' : containerState;
 
-    // Check health if enabled
-    let healthy = false;
+    // Without a configured check there's nothing to fail, so a running
+    // service is reported healthy; only an actual check can mark it unhealthy.
+    let healthy = state === 'running';
     if (service.healthCheck?.enabled && state === 'running') {
       if (service.healthCheck.type === 'http' && service.healthCheck.url) {
         healthy = await checkHealthHttp(resolveHealthUrl(service.healthCheck.url), service.healthCheck.timeout);
