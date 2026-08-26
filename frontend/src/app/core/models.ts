@@ -57,6 +57,17 @@ export interface ExposureSettings {
   cloudflareTunnelId: string | null;
 }
 
+export interface ExposureTestCheckResult {
+  success: boolean;
+  message: string;
+}
+
+export interface ExposureTestResponse {
+  success: boolean;
+  npm: ExposureTestCheckResult;
+  cloudflare: ExposureTestCheckResult;
+}
+
 export interface ExposureSettingsInput {
   baseDomain: string;
   npmApiUrl: string;

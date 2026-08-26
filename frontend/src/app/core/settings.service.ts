@@ -3,7 +3,13 @@ import { Injectable, inject } from '@angular/core';
 import { Observable, retry } from 'rxjs';
 import { API_BASE_URL } from './api';
 import { SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
-import { CloudflareSettings, CloudflareTestResponse, ExposureSettings, ExposureSettingsInput } from './models';
+import {
+  CloudflareSettings,
+  CloudflareTestResponse,
+  ExposureSettings,
+  ExposureSettingsInput,
+  ExposureTestResponse,
+} from './models';
 
 @Injectable({
   providedIn: 'root'
@@ -48,5 +54,13 @@ export class SettingsService {
     return this.http.put<{ message: string }>(`${API_BASE_URL}/settings/exposure`, input, {
       context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
     });
+  }
+
+  testExposureConnection(): Observable<ExposureTestResponse> {
+    return this.http.post<ExposureTestResponse>(
+      `${API_BASE_URL}/settings/exposure/test`,
+      {},
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
   }
 }

@@ -73,6 +73,36 @@ async function putTunnelConfiguration(
   return response.body.result;
 }
 
+interface TestCloudflareTunnelAccessOptions {
+  apiToken: string;
+  accountId: string;
+  zoneId: string;
+  tunnelId: string;
+}
+
+/**
+ * Verify the configured token can read the tunnel's configuration (account +
+ * tunnel access) and the target zone (DNS access), without changing
+ * anything. Throws with a descriptive message identifying which check
+ * failed.
+ */
+export async function testCloudflareTunnelAccess({
+  apiToken,
+  accountId,
+  zoneId,
+  tunnelId,
+}: TestCloudflareTunnelAccessOptions): Promise<void> {
+  await getTunnelConfiguration(apiToken, accountId, tunnelId);
+
+  const response = await requestJson<CloudflareApiEnvelope<{ id: string }>>(`${API_BASE}/zones/${zoneId}`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  });
+
+  if (response.statusCode !== 200 || !response.body?.success) {
+    throw new Error(`Unable to access Cloudflare zone: ${response.body?.errors?.[0]?.message || response.statusCode}`);
+  }
+}
+
 interface EnsureIngressRouteOptions {
   apiToken: string;
   accountId: string;

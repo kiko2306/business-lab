@@ -4,7 +4,7 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { sanitizePastedText } from '../../core/input-sanitize';
-import { CloudflareSettings, ExposureSettings, ExposureSettingsInput } from '../../core/models';
+import { CloudflareSettings, ExposureSettings, ExposureSettingsInput, ExposureTestResponse } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
 
@@ -42,8 +42,10 @@ export class SettingsPanelComponent implements OnInit {
   protected saving = false;
   protected savingExposure = false;
   protected testing = false;
+  protected testingExposure = false;
   protected feedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected exposureFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  protected exposureTestResult: ExposureTestResponse | null = null;
 
   sanitizeTokenPaste(event: ClipboardEvent): void {
     const pasted = event.clipboardData?.getData('text') ?? '';
@@ -97,10 +99,35 @@ export class SettingsPanelComponent implements OnInit {
           this.exposureFeedback = { type: 'success', message: response.message };
           this.toastService.success('Exposure settings saved.');
           this.exposureForm.controls.npmPassword.reset('');
+          this.exposureTestResult = null;
           this.loadExposureSettings();
         },
         error: (error) => {
           this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save exposure settings.') };
+        },
+      });
+  }
+
+  testExposureConnection(): void {
+    if (!this.exposureSettings?.configured) {
+      this.exposureFeedback = { type: 'info', message: 'Save exposure settings before testing the connection.' };
+      return;
+    }
+
+    this.testingExposure = true;
+    this.exposureTestResult = null;
+    this.settingsService
+      .testExposureConnection()
+      .pipe(finalize(() => (this.testingExposure = false)))
+      .subscribe({
+        next: (result) => {
+          this.exposureTestResult = result;
+          if (result.success) {
+            this.toastService.success('Nginx Proxy Manager and Cloudflare are both reachable.');
+          }
+        },
+        error: (error) => {
+          this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to test exposure connection.') };
         },
       });
   }

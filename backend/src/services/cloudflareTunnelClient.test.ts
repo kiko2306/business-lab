@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { requestJson } from '../utils/httpJson';
-import { ensureIngressRoute } from './cloudflareTunnelClient';
+import { ensureIngressRoute, testCloudflareTunnelAccess } from './cloudflareTunnelClient';
 
 vi.mock('../utils/httpJson', () => ({
   requestJson: vi.fn(),
@@ -102,5 +102,38 @@ describe('ensureIngressRoute', () => {
     });
 
     await expect(ensureIngressRoute(baseOptions)).rejects.toThrow(/Unable to read Cloudflare Tunnel configuration/);
+  });
+});
+
+describe('testCloudflareTunnelAccess', () => {
+  const testOptions = { apiToken: 'token', accountId: 'account', zoneId: 'zone', tunnelId: 'tunnel-1' };
+
+  it('resolves when both the tunnel configuration and the zone are reachable', async () => {
+    mockConfig([{ service: 'http_status:404' }]);
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { success: true, result: { id: 'zone' } }, raw: '' });
+
+    await expect(testCloudflareTunnelAccess(testOptions)).resolves.toBeUndefined();
+    expect(mockedRequestJson).toHaveBeenCalledTimes(2);
+  });
+
+  it('throws when the tunnel configuration is not accessible', async () => {
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 403,
+      body: { success: false, errors: [{ message: 'forbidden' }] },
+      raw: '',
+    });
+
+    await expect(testCloudflareTunnelAccess(testOptions)).rejects.toThrow(/Unable to read Cloudflare Tunnel configuration/);
+  });
+
+  it('throws when the zone is not accessible', async () => {
+    mockConfig([{ service: 'http_status:404' }]);
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 403,
+      body: { success: false, errors: [{ message: 'zone forbidden' }] },
+      raw: '',
+    });
+
+    await expect(testCloudflareTunnelAccess(testOptions)).rejects.toThrow(/Unable to access Cloudflare zone: zone forbidden/);
   });
 });

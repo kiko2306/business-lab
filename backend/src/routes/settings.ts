@@ -3,7 +3,9 @@ import { Router, Request, Response } from 'express';
 import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { schemas, validateBody } from '../middleware/validation';
-import { EXPOSURE_SETTINGS_KEYS } from '../utils/exposureSettings';
+import { EXPOSURE_SETTINGS_KEYS, getExposureConfig } from '../utils/exposureSettings';
+import { testNpmConnection } from '../services/npmClient';
+import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
 
 const router = Router();
 
@@ -217,6 +219,44 @@ router.put('/exposure', validateBody(schemas.exposureGlobalSettings), async (req
   } catch {
     return res.status(500).json({ error: 'Unable to save exposure settings.' });
   }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/settings/exposure/test — validate the saved NPM credentials and
+// Cloudflare account/zone/tunnel access on demand, without provisioning
+// anything. Tests the currently saved config, same as what a service start
+// would use.
+// ---------------------------------------------------------------------------
+router.post('/exposure/test', async (_req: Request, res: Response) => {
+  let config;
+  try {
+    config = await getExposureConfig();
+  } catch {
+    return res.status(500).json({ error: 'Unable to load exposure settings.' });
+  }
+
+  if (!config) {
+    return res.status(400).json({ error: 'Exposure settings are incomplete — save all fields before testing.' });
+  }
+
+  const npmResult = await testNpmConnection(config.npmApiUrl, config.npmEmail, config.npmPassword)
+    .then(() => ({ success: true, message: 'Nginx Proxy Manager login succeeded.' }))
+    .catch((error: Error) => ({ success: false, message: error.message }));
+
+  const cloudflareResult = await testCloudflareTunnelAccess({
+    apiToken: config.cloudflareApiToken,
+    accountId: config.cloudflareAccountId,
+    zoneId: config.cloudflareZoneId,
+    tunnelId: config.cloudflareTunnelId,
+  })
+    .then(() => ({ success: true, message: 'Cloudflare account, zone, and tunnel access verified.' }))
+    .catch((error: Error) => ({ success: false, message: error.message }));
+
+  return res.json({
+    success: npmResult.success && cloudflareResult.success,
+    npm: npmResult,
+    cloudflare: cloudflareResult,
+  });
 });
 
 export default router;

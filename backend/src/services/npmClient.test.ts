@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { requestJson } from '../utils/httpJson';
-import { buildProxyHostPayload, ensureProxyHost } from './npmClient';
+import { buildProxyHostPayload, ensureProxyHost, testNpmConnection } from './npmClient';
 
 vi.mock('../utils/httpJson', () => ({
   requestJson: vi.fn(),
@@ -134,5 +134,20 @@ describe('ensureProxyHost', () => {
     mockedRequestJson.mockResolvedValueOnce({ statusCode: 401, body: { error: { message: 'bad creds' } }, raw: '' });
 
     await expect(ensureProxyHost(baseOptions)).rejects.toThrow(/login failed/);
+  });
+});
+
+describe('testNpmConnection', () => {
+  it('resolves when login succeeds, without listing or writing anything', async () => {
+    mockLogin();
+
+    await expect(testNpmConnection('http://npm:81', 'admin@example.com', 'secret')).resolves.toBeUndefined();
+    expect(mockedRequestJson).toHaveBeenCalledTimes(1);
+  });
+
+  it('throws when login fails', async () => {
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 401, body: { error: { message: 'bad creds' } }, raw: '' });
+
+    await expect(testNpmConnection('http://npm:81', 'admin@example.com', 'wrong')).rejects.toThrow(/login failed/);
   });
 });

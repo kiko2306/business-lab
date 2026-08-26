@@ -154,8 +154,27 @@
             <span *ngIf="savingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
             Save exposure settings
           </button>
+          <button
+            type="button"
+            class="btn btn-outline-secondary"
+            [disabled]="testingExposure || !exposureSettings?.configured"
+            [title]="!exposureSettings?.configured ? 'Save exposure settings before testing the connection.' : ''"
+            (click)="testExposureConnection()"
+          >
+            <span *ngIf="testingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            Test connection
+          </button>
         </div>
       </form>
+
+      <div *ngIf="exposureTestResult" class="mt-3">
+        <div class="alert mb-2" [ngClass]="exposureTestResult.npm.success ? 'alert-success' : 'alert-danger'">
+          <strong>Nginx Proxy Manager:</strong> {{ exposureTestResult.npm.message }}
+        </div>
+        <div class="alert mb-0" [ngClass]="exposureTestResult.cloudflare.success ? 'alert-success' : 'alert-danger'">
+          <strong>Cloudflare:</strong> {{ exposureTestResult.cloudflare.message }}
+        </div>
+      </div>
 
       <p class="form-text mt-3 mb-0">
         Cloudflare Tunnel API calls reuse the token configured above. Per-service exposure (enable/disable,

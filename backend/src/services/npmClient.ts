@@ -58,6 +58,15 @@ async function findProxyHostByDomain(npmApiUrl: string, token: string, hostname:
   return response.body.find((host) => (host.domain_names || []).includes(hostname)) ?? null;
 }
 
+/**
+ * Verify that the given credentials can log in to Nginx Proxy Manager,
+ * without creating or changing anything. Throws with a descriptive message
+ * on failure.
+ */
+export async function testNpmConnection(npmApiUrl: string, npmEmail: string, npmPassword: string): Promise<void> {
+  await login(npmApiUrl.replace(/\/+$/, ''), npmEmail, npmPassword);
+}
+
 export function buildProxyHostPayload({
   hostname,
   forwardScheme,
