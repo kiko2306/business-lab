@@ -129,7 +129,11 @@
           Loading...
         </div>
 
-        <ng-container *ngIf="!exposureLoading && exposure">
+        <div *ngIf="!exposureLoading && exposure && !exposure.exposable" class="small text-body-secondary mb-0">
+          This service has no published port, so it can't be publicly exposed.
+        </div>
+
+        <ng-container *ngIf="!exposureLoading && exposure && exposure.exposable">
           <div class="form-check form-switch mb-2">
             <input class="form-check-input" type="checkbox" id="exposureEnabled-{{ service.name }}" [(ngModel)]="exposureEnabled" />
             <label class="form-check-label small" for="exposureEnabled-{{ service.name }}">

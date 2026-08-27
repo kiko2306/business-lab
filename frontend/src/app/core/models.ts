@@ -115,6 +115,10 @@ export interface ExposureSettingsInput {
 
 export interface ServiceExposureConfig {
   enabled: boolean;
+  // False for services with no published port at all (e.g. a VPN client
+  // sidecar with no web UI) — nothing a reverse proxy could ever forward
+  // to. hostname/lastError are always null when this is false.
+  exposable: boolean;
   hostname: string | null;
   upstreamScheme: 'http' | 'https';
   upstreamHost: string | null;

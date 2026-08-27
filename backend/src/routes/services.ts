@@ -9,7 +9,7 @@ import auth from '../middleware/auth';
 import * as executor from '../services/executor';
 import * as status from '../services/status';
 import { createStreamTicket } from '../services/realtime';
-import { getService, isValidServiceName } from '../config/services';
+import { getPublishedUpstreamPort, getService, isValidServiceName } from '../config/services';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
@@ -153,10 +153,19 @@ router.get(
   validateServiceAllowlist,
   async (req: Request, res: Response) => {
     try {
+      // Services with no published port (e.g. tailscale — a VPN client
+      // sidecar, no web UI) have nothing a reverse proxy could ever
+      // forward to. Report that up front, and don't surface a stale
+      // hostname/error from a stored row for a service that was briefly
+      // (mis)configured before this check existed — see
+      // upsertServiceExposureConfig in exposure.ts for the write-side guard.
+      const exposable = getPublishedUpstreamPort(req.params.name) !== null;
+
       const row = await getServiceExposureRow(req.params.name);
       if (!row) {
         return res.json({
           enabled: false,
+          exposable,
           hostname: null,
           upstreamScheme: 'http',
           upstreamHost: null,
@@ -170,14 +179,15 @@ router.get(
 
       return res.json({
         enabled: row.enabled,
-        hostname: row.hostname,
+        exposable,
+        hostname: exposable ? row.hostname : null,
         upstreamScheme: row.upstream_scheme,
         upstreamHost: row.upstream_host,
         upstreamPort: row.upstream_port,
         websocket: row.websocket,
         autheliaProtected: row.authelia_protected,
         status: row.status,
-        lastError: row.last_error,
+        lastError: exposable ? row.last_error : null,
       });
     } catch (error) {
       logger.error(`Failed to load exposure config: ${req.params.name}`, { error: (error as Error).message });
