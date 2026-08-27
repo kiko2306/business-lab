@@ -6,10 +6,10 @@
 # then replace the example entry below (or add more users).
 
 users:
-  authelia:
+  mat:
     disabled: false
-    displayname: 'Authelia Admin'
-    password: '$argon2id$v=19$m=65536,t=3,p=4$55n0xVn2J7LmEmoTdQpUmA$TdtMN/UVRWw9P1NwSOT3etXN3j/bt4BuFZMTk7+tWGM'
-    email: admin@localhost
+    displayname: Miguel
+    password: $2b$12$I9p7AdX.OPifqmhV9h8EFeSf892xJfWAWvVwPr5UDjnw1W3MW8ZoG
+    email: miguelamtx@gmail.com
     groups:
       - admins

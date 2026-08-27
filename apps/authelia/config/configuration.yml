@@ -69,6 +69,22 @@ notifier:
 # (the "--config" arg lists both files) and .env.example for the exact command.
 identity_providers:
   oidc:
+    # Without this, Authelia sends no Access-Control-Allow-Origin on OIDC
+    # endpoints at all — a public/SPA client doing the token exchange
+    # directly from the browser (like NetBird's dashboard) gets a CORS
+    # failure even though the request succeeds server-side (NPM/Authelia
+    # both log 200; the browser's fetch() throws "Failed to fetch" anyway
+    # because the response lacks the header it requires). Deriving allowed
+    # origins from each client's own redirect_uris keeps this in sync
+    # automatically instead of listing origins twice.
+    cors:
+      endpoints:
+        - 'token'
+        - 'authorization'
+        - 'userinfo'
+        - 'revocation'
+        - 'introspection'
+      allowed_origins_from_client_redirect_uris: true
     clients:
       - client_id: 'netbird-dashboard'
         client_name: 'NetBird Dashboard'
