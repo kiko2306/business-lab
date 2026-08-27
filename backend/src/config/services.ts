@@ -166,6 +166,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     healthCheck: {
       enabled: false,
     },
+    // The compose file publishes DNS (53/tcp, 53/udp) before the web UI
+    // port — "first port in the file" would pick DNS, not the web UI, so
+    // exposure needs to be told explicitly which one is the actual upstream.
+    exposurePortEnvVar: 'PIHOLE_WEB_PORT',
   },
   'speedtest': {
     name: 'speedtest',

@@ -50,7 +50,7 @@ export async function upsertServiceExposureConfig(
   // could ever forward to. Reject enabling exposure for those outright,
   // rather than letting it silently fail on the next service start with
   // "unable to determine the published port".
-  if (enabled && getPublishedUpstreamPort(serviceName) === null) {
+  if (enabled && getPublishedUpstreamPort(serviceName, getService(serviceName)?.exposurePortEnvVar) === null) {
     const error: HttpError = {
       message: `${serviceName} has no published port in its compose file, so it can't be publicly exposed.`,
       statusCode: 400,
@@ -297,11 +297,12 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
 
   const hostname = `${serviceName}.${globalConfig.baseDomain}`;
   const originUrl = getNpmOriginUrl(globalConfig.npmApiUrl);
+  const serviceDef = getService(serviceName);
 
   const primaryResult = await provisionHostname({
     exposureKey: serviceName,
     hostname,
-    upstreamPort: getPublishedUpstreamPort(serviceName),
+    upstreamPort: getPublishedUpstreamPort(serviceName, serviceDef?.exposurePortEnvVar),
     existingNpmHostId: exposureRow.npm_host_id,
     // Authelia can't gate itself — the auth_request call would loop back
     // into its own unauthenticated login page.
@@ -313,7 +314,7 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
     auditResource: serviceName,
   });
 
-  const additionalExposures = getService(serviceName)?.additionalExposures ?? [];
+  const additionalExposures = serviceDef?.additionalExposures ?? [];
   for (const extra of additionalExposures) {
     const exposureKey = `${serviceName}:${extra.suffix}`;
     const extraHostname = `${serviceName}-${extra.suffix}.${globalConfig.baseDomain}`;

@@ -121,6 +121,34 @@ describe('provisionServiceIfEnabled', () => {
     expect(mockedEnsureProxyHost).not.toHaveBeenCalled();
   });
 
+  it("uses the service's exposurePortEnvVar to pick the primary upstream port, not the first port in the file", async () => {
+    // Regression: pihole publishes DNS (53/tcp, 53/udp) before its web
+    // port — without exposurePortEnvVar, "first port in the file" picks
+    // DNS and NPM ends up proxying HTTP at a DNS server (502s).
+    mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ service_name: 'pihole', npm_host_id: 5 })] } as never);
+    mockedGetExposureConfig.mockResolvedValueOnce(globalConfig);
+    mockedGetService.mockReturnValueOnce({
+      name: 'pihole',
+      label: 'Pi-hole',
+      description: '',
+      icon: '',
+      category: 'Networking & Security',
+      composePath: '',
+      healthCheck: { enabled: false },
+      exposurePortEnvVar: 'PIHOLE_WEB_PORT',
+    });
+    mockedGetPublishedUpstreamPort.mockReturnValueOnce(8080);
+    mockedGetHostGatewayIp.mockResolvedValueOnce('172.17.0.1');
+    mockedEnsureProxyHost.mockResolvedValueOnce({ id: 5, created: false, updated: true });
+    mockedEnsureIngressRoute.mockResolvedValueOnce({ dnsRecordId: 'dns-1', created: false, updated: true } as never);
+
+    const result = await provisionServiceIfEnabled('pihole', 1);
+
+    expect(result.success).toBe(true);
+    expect(mockedGetPublishedUpstreamPort).toHaveBeenCalledWith('pihole', 'PIHOLE_WEB_PORT');
+    expect(mockedEnsureProxyHost).toHaveBeenCalledWith(expect.objectContaining({ forwardPort: 8080 }));
+  });
+
   it('provisions NPM and Cloudflare and audits success', async () => {
     mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ npm_host_id: 5 })] } as never);
     mockedGetExposureConfig.mockResolvedValueOnce(globalConfig);

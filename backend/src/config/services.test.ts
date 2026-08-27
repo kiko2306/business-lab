@@ -129,5 +129,22 @@ describe('getPublishedUpstreamPort', () => {
       writeCompose('services:\n  app:\n    ports:\n      - "${DASH_PORT:-8081}:80"\n');
       expect(getPublishedUpstreamPort('paperless', 'API_PORT')).toBeNull();
     });
+
+    it('picks the web port over earlier non-web ports on the same service, given its env var (pihole-shaped)', () => {
+      // Regression: pihole publishes DNS (53/tcp, 53/udp) before its web
+      // port on the *same* service block — "first port in the file" (the
+      // unqualified call) picks DNS, which is why exposure needs
+      // exposurePortEnvVar for it (see services.ts).
+      writeCompose(
+        'services:\n' +
+          '  pihole:\n' +
+          '    ports:\n' +
+          '      - "${PIHOLE_DNS_PORT:-53}:53/tcp"\n' +
+          '      - "${PIHOLE_DNS_PORT:-53}:53/udp"\n' +
+          '      - "${PIHOLE_WEB_PORT:-8080}:80/tcp"\n'
+      );
+      expect(getPublishedUpstreamPort('paperless')).toBe(53);
+      expect(getPublishedUpstreamPort('paperless', 'PIHOLE_WEB_PORT')).toBe(8080);
+    });
   });
 });
