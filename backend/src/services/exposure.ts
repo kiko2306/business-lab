@@ -24,7 +24,7 @@ import { ensureProxyHost } from './npmClient';
 import { ensureIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
-import { ExposureGlobalConfig, ExposureProvisionResult, ServiceExposureInput, ServiceExposureRow } from '../types';
+import { ExposureGlobalConfig, ExposureProvisionResult, HttpError, ServiceExposureInput, ServiceExposureRow } from '../types';
 
 // Every exposed service is forwarded to over plain HTTP on the host's
 // published port — TLS is terminated by NPM/Cloudflare, not the origin.
@@ -45,6 +45,19 @@ export async function upsertServiceExposureConfig(
   serviceName: string,
   { enabled, autheliaProtected }: ServiceExposureInput
 ): Promise<ServiceExposureRow> {
+  // Some services (e.g. tailscale — a VPN client sidecar with no web UI,
+  // no `ports:` in its compose file at all) have nothing a reverse proxy
+  // could ever forward to. Reject enabling exposure for those outright,
+  // rather than letting it silently fail on the next service start with
+  // "unable to determine the published port".
+  if (enabled && getPublishedUpstreamPort(serviceName) === null) {
+    const error: HttpError = {
+      message: `${serviceName} has no published port in its compose file, so it can't be publicly exposed.`,
+      statusCode: 400,
+    };
+    throw error;
+  }
+
   const globalConfig = await getExposureConfig();
   const hostname = globalConfig ? `${serviceName}.${globalConfig.baseDomain}` : null;
 

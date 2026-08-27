@@ -6,7 +6,7 @@ import { getPublishedUpstreamPort, getService } from '../config/services';
 import { ensureProxyHost } from './npmClient';
 import { ensureIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
-import { provisionServiceIfEnabled } from './exposure';
+import { provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
 import { ServiceExposureRow, ExposureGlobalConfig } from '../types';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
@@ -273,5 +273,36 @@ describe('provisionServiceIfEnabled', () => {
 
     expect(result).toEqual({ attempted: true, success: true, hostname: 'netbird-vpn.example.com' });
     expect(mockedEnsureProxyHost).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('upsertServiceExposureConfig', () => {
+  it('refuses to enable exposure for a service with no published port at all', async () => {
+    // e.g. tailscale — a VPN client sidecar with no `ports:` in its
+    // compose file, nothing a reverse proxy could ever forward to.
+    mockedGetPublishedUpstreamPort.mockReturnValueOnce(null);
+
+    await expect(upsertServiceExposureConfig('tailscale', { enabled: true })).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringContaining("can't be publicly exposed"),
+    });
+    expect(mockedQuery).not.toHaveBeenCalled();
+  });
+
+  it('allows disabling exposure for a service with no published port (turning it back off)', async () => {
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ service_name: 'tailscale', enabled: false })] } as never);
+
+    await expect(upsertServiceExposureConfig('tailscale', { enabled: false })).resolves.toMatchObject({ enabled: false });
+    // The no-published-port check only blocks enabling, not disabling.
+    expect(mockedGetPublishedUpstreamPort).not.toHaveBeenCalled();
+  });
+
+  it('allows enabling exposure for a service that does have a published port', async () => {
+    mockedGetPublishedUpstreamPort.mockReturnValueOnce(8000);
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ enabled: true })] } as never);
+
+    await expect(upsertServiceExposureConfig('paperless', { enabled: true })).resolves.toMatchObject({ enabled: true });
   });
 });

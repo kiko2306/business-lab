@@ -206,8 +206,9 @@ router.put(
         hostname: row.hostname,
       });
     } catch (error) {
-      logger.error(`Failed to save exposure config: ${req.params.name}`, { error: (error as Error).message });
-      return res.status(500).json({ error: 'Unable to save exposure configuration.' });
+      const httpError = error as HttpError;
+      logger.error(`Failed to save exposure config: ${req.params.name}`, { error: httpError.message });
+      return res.status(httpError.statusCode || 500).json({ error: httpError.statusCode ? httpError.message : 'Unable to save exposure configuration.' });
     }
   }
 );
