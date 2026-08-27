@@ -96,6 +96,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return service.name;
   }
 
+  trackByCategory(_index: number, group: ServiceGroup): string {
+    return group.category;
+  }
+
   loadBackups(): void {
     this.operations.listBackups().subscribe({
       next: (response) => {

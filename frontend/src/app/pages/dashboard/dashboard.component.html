@@ -65,7 +65,7 @@
 
     <section *ngIf="serviceState.services$ | async as services; else loadingState">
       <ng-container *ngIf="services.length; else emptyState">
-        <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(services)">
+        <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(services); trackBy: trackByCategory">
           <h2 class="h5 mb-3">{{ group.category }}</h2>
           <div class="row g-3">
             <div class="col-12 col-md-6 col-xl-4 col-xxl-3" *ngFor="let service of group.services; trackBy: trackByService">
