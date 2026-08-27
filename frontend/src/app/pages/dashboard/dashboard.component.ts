@@ -31,18 +31,23 @@ interface ServiceGroup {
 interface ServicePortRow {
   serviceName: string;
   label: string;
+  url: string | null;
   ports: ServiceStatus['ports'];
 }
 
-// One row per running app for the "running app ports" table — all of an
-// app's published ports are listed together instead of one row each.
+// One row per running app for the "running apps" table — all of an app's
+// published ports are listed together instead of one row each. The URL is
+// the app's public hostname (no port — that's an internal implementation
+// detail Cloudflare/NPM strip away), and is null for apps that aren't
+// exposed publicly.
 function getRunningServicePorts(services: ServiceStatus[]): ServicePortRow[] {
   const rows: ServicePortRow[] = [];
   for (const service of services) {
     if (service.state !== 'running' || !service.ports?.length) {
       continue;
     }
-    rows.push({ serviceName: service.name, label: service.label, ports: service.ports });
+    const url = service.exposedHostname ? `https://${service.exposedHostname}` : null;
+    rows.push({ serviceName: service.name, label: service.label, url, ports: service.ports });
   }
 
   return rows.sort((a, b) => a.label.localeCompare(b.label));

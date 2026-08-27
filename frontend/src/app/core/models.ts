@@ -38,6 +38,7 @@ export interface ServiceStatus {
   adminUserManagementSupported?: boolean;
   dependsOn?: string[];
   ports?: ServicePortMapping[];
+  exposedHostname?: string | null;
 }
 
 export interface AutheliaAdminUser {

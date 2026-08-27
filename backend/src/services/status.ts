@@ -9,7 +9,23 @@ import https from 'https';
 import http from 'http';
 import logger from '../utils/logger';
 import { getAllServices, getService, getProjectName, resolveComposeFile } from '../config/services';
+import { getServiceExposureRow } from './exposure';
 import { ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
+
+/**
+ * The service's live public hostname, if exposure is enabled and was
+ * provisioned successfully. Swallows lookup failures — exposure status is
+ * secondary to the container status this call is really for.
+ */
+async function getExposedHostname(serviceName: string): Promise<string | null> {
+  try {
+    const row = await getServiceExposureRow(serviceName);
+    return row && row.enabled && row.status === 'provisioned' ? row.hostname : null;
+  } catch (error) {
+    logger.error(`Error loading exposure status for service ${serviceName}`, { error: (error as Error).message });
+    return null;
+  }
+}
 
 /**
  * Get the aggregated state of a compose project's containers.
@@ -173,6 +189,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
     }
 
     const ports = state === 'running' ? await getContainerPorts(getProjectName(serviceName)) : [];
+    const exposedHostname = state === 'running' ? await getExposedHostname(serviceName) : null;
 
     return {
       name: serviceName,
@@ -187,6 +204,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       adminUserManagementSupported: Boolean(service.supportsAdminUserManagement),
       dependsOn: service.dependsOn,
       ports,
+      exposedHostname,
     };
   } catch (error) {
     const message = (error as Error).message;

@@ -64,19 +64,24 @@
     </section>
 
     <section class="mb-4" *ngIf="serviceState.services$ | async as services">
-      <h2 class="h5 mb-3">Running app ports</h2>
+      <h2 class="h5 mb-3">Running apps</h2>
       <ng-container *ngIf="getRunningServicePorts(services) as portRows">
         <div class="table-responsive" *ngIf="portRows.length; else noPortsState">
           <table class="table table-sm table-striped align-middle mb-0">
             <thead>
               <tr>
                 <th scope="col">App</th>
+                <th scope="col">URL</th>
                 <th scope="col">Ports</th>
               </tr>
             </thead>
             <tbody>
               <tr *ngFor="let row of portRows; trackBy: trackByPortRow">
                 <td>{{ row.label }}</td>
+                <td>
+                  <a *ngIf="row.url; else notExposed" [href]="row.url" target="_blank" rel="noopener noreferrer">{{ row.url }}</a>
+                  <ng-template #notExposed><span class="text-body-secondary">Not exposed</span></ng-template>
+                </td>
                 <td>
                   <div class="d-flex flex-wrap gap-1">
                     <span class="badge text-bg-light border" *ngFor="let port of row.ports">

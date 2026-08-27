@@ -77,6 +77,13 @@ export interface ServiceDefinition {
   // running before this one can start — e.g. an app that authenticates
   // against Authelia's OIDC provider needs Authelia up first.
   dependsOn?: string[];
+  // Disambiguates which published port is the primary exposure's upstream,
+  // for services whose compose file publishes more than one port where the
+  // web UI isn't simply the first one listed — e.g. Pi-hole publishes DNS
+  // (53/tcp, 53/udp) before its web port, so "first port in the file" (the
+  // default getPublishedUpstreamPort behavior — see its docstring) would
+  // pick DNS instead. Unset for every service with just one published port.
+  exposurePortEnvVar?: string;
   // Secondary public hostnames this service needs beyond its primary one —
   // e.g. NetBird VPN's dashboard is a static SPA with no server-side proxy,
   // so its management API needs its own directly-reachable hostname.
@@ -109,6 +116,10 @@ export interface ServiceStatusPayload {
   adminUserManagementSupported?: boolean;
   dependsOn?: string[];
   ports?: ServicePortMapping[];
+  // The service's public hostname, only when exposure is enabled and
+  // provisioned successfully — null/absent otherwise, including for
+  // services with no published port to expose in the first place.
+  exposedHostname?: string | null;
 }
 
 export interface ServiceStatusSummary {
