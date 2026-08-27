@@ -45,13 +45,29 @@ hostname.
 1. In the NetBird app's "Change Server" screen, use:
    `https://netbird-vpn-api.tx-home-utils.com`
    (not `netbird-vpn.tx-home-utils.com`).
-2. If that still 403s, check Nginx Proxy Manager for the
-   `netbird-vpn-api.tx-home-utils.com` proxy host and confirm:
-   - `http2_support` is enabled on the listener, and
-   - the advanced config uses `grpc_pass grpc://netbird-management:80;`
-     rather than the default `proxy_pass`.
+2. **Update (confirmed 2026-08-27):** switching to the `-api` hostname
+   alone did *not* fix it — same 403/`text/html` error. This points at the
+   secondary cause: the NPM proxy host for `netbird-vpn-api.tx-home-utils.com`
+   isn't configured for gRPC/HTTP2.
+
+   In Nginx Proxy Manager → Proxy Hosts → `netbird-vpn-api.tx-home-utils.com`
+   → Edit, confirm:
+   - **Details tab** → "HTTP/2 Support" is **enabled**.
+   - **Advanced tab** → custom config is:
+     ```
+     location / {
+         grpc_pass grpc://netbird-management:80;
+     }
+     ```
+     A plain `proxy_pass http://...` (NPM's default) cannot speak gRPC to
+     the backend and causes nginx to reject the request with a 403 HTML
+     error page — the exact symptom seen here.
+
    This app's exposure automation (`additionalExposures` with `grpc: true`
-   in `backend/src/config/services.ts`) is supposed to create the proxy
-   host this way automatically — if it's missing, re-run/re-sync exposure
-   for the `netbird-vpn` service, or check NPM for a stale/manually-edited
-   proxy host that predates this config.
+   in `backend/src/config/services.ts`, built by `buildGrpcAdvancedConfig`
+   in `backend/src/services/npmClient.ts`) is supposed to create/maintain
+   the proxy host this way automatically. If it's still on plain
+   `proxy_pass`/HTTP1.1, the proxy host was likely created or edited by
+   hand before this automation existed, or the exposure sync hasn't been
+   re-run since. Re-sync exposure for the `netbird-vpn` service (or
+   manually fix the two settings above) and retry.
