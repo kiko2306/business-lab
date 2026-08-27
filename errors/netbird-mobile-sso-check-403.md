@@ -97,3 +97,12 @@ hostname.
    application/grpc`, landing correctly in NPM's access log. Not yet
    confirmed against the actual NetBird mobile app itself (only a synthetic
    `curl` reproduction) — that's the next thing to try.
+4. **Update (confirmed 2026-08-27, real mobile-app retry): the 403 is
+   fully gone, but a new, different error appears instead** —
+   **superseded by
+   [`errors/netbird-mobile-grpc-trailers-dropped.md`](./netbird-mobile-grpc-trailers-dropped.md)**,
+   which has the current investigation. Short version: this is now a
+   known, unresolved bug in `cloudflared` itself (dropped gRPC trailers
+   over the tunnel), not fixable by further NPM/Cloudflare config —
+   see `plan.md` §20.9–20.11 for the fix plan (bypassing the tunnel for
+   this one hostname, pending a router port-forward).

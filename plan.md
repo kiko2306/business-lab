@@ -1203,13 +1203,97 @@ exposures provisioned with no error. Confirmed on the actual infra:
   access log shows it landing correctly: `POST https ... 200 200 ...
   Sent-to 172.17.0.1`.
 
-### 20.9 Outstanding TODO
-- [ ] **Confirm a real peer actually enrolls and shows up** — this session's
-      fix was verified with a synthetic gRPC call (`curl`), not the actual
-      NetBird mobile app. Re-test the mobile app connection against
-      `https://netbird-vpn-api.tx-home-utils.com` and tail `docker logs
-      netbird-vpn-netbird-management-1` during the attempt. **Priority: P0**
-      — **Estimate: S**
+### 20.9 Real mobile-app retry: new failure — cloudflared drops gRPC trailers (upstream bug, not ours)
+20.7/20.8 were necessary but **not sufficient**. Retried with the actual
+NetBird Android app (not just synthetic `curl`) against
+`https://netbird-vpn-api.tx-home-utils.com` and got a *new*, different
+error:
+
+> failed to check SSO support: failed getting management service public
+> key: rpc error: code = Internal desc = server closed the stream without
+> sending trailers
+
+Live evidence pointed the same way before the app confirmed it: NPM's
+access log showed the real client (`grpc-go/1.80.0` user agent, not curl)
+successfully calling `GetServerKey` and getting `200` — repeatedly, every
+few seconds, in a tight loop, never progressing. That pattern (success
+status, no visible error, but no forward progress) is consistent with a
+gRPC client that never received a `grpc-status` trailer and is silently
+retrying. Re-ran the same call manually with `curl -v --http2`: got the
+`200` response headers and a correctly-framed protobuf body, but **no
+trailing HEADERS frame with `grpc-status` at all** — curl's verbose output
+ends right after the body, nothing further.
+
+**Root cause: this is an open, unresolved cloudflared bug, not a config
+problem.** Found
+https://github.com/cloudflare/cloudflared/issues/1641 ("gRPC response body
+and trailers stripped through tunnel even with TLS+ALPN+h2 origin") —
+symptom, setup, and error message match ours exactly:
+`code = Internal desc = server closed the stream without sending
+trailers`, reproduced with the exact same origin shape we now have
+(self-signed TLS origin, `http2Origin: true`, `noTLSVerify: true`).
+Reported against cloudflared 2025.8.1 and 2026.3.0, still open, no
+workaround documented. The dashboard (browser) works fine because it uses
+**grpc-web over HTTP/1.1** — a completely different, unaffected code path
+— not real gRPC. Real gRPC (what every native client — mobile, desktop,
+CLI — uses) apparently cannot complete a unary call through a Cloudflare
+Tunnel right now, regardless of origin config on our end.
+
+**Do not re-attempt more Cloudflare Tunnel / `http2Origin` / cert tuning
+next session** — 20.7/20.8's origin-TLS work is correct and necessary
+(confirmed: NPM correctly serves `grpc_pass` over real TLS+HTTP2 now,
+verified independently of this bug), but no amount of NPM/tunnel
+configuration fixes a bug in cloudflared's own frame handling.
+
+### 20.10 Proposed fix (not yet implemented — needs user's router): bypass the tunnel for this one host
+Only real way around a transport-level bug in cloudflared is to stop using
+cloudflared for this hostname. Plan, pending the user setting up a
+port-forward (can't be done remotely from here):
+
+1. **Router**: port-forward 443 (or a chosen public port) directly to the
+   NPM host's LAN IP. Needs a static public IP or DDNS if the ISP doesn't
+   give one — unconfirmed which the user has.
+2. **DNS**: switch `netbird-vpn-api.tx-home-utils.com` to **unproxied**
+   (grey-cloud) in Cloudflare, so traffic goes client → router → NPM
+   directly instead of through the tunnel. Every other exposure in this
+   app stays proxied/tunneled as-is — this would be the one exception.
+3. **Certificate**: the self-signed cert from 20.8 (`ensureGrpcCertificate`
+   in `npmClient.ts`) only worked because `noTLSVerify: true` on the tunnel
+   side skipped validation. A directly-exposed client (the real NetBird
+   app) will do normal CA validation, so this host needs a **real**
+   Let's Encrypt cert instead. NPM already supports DNS-01 issuance via a
+   Cloudflare plugin (`certbot-dns-cloudflare`, confirmed present in NPM's
+   `/app/certbot/dns-plugins.json` — needs
+   `dns_cloudflare_api_token=<token>`, and the app's existing stored
+   Cloudflare API token already has DNS edit rights, since it already
+   creates DNS records). This avoids needing port 80 exposed for an
+   HTTP-01 challenge. Implementation-wise: `ensureGrpcCertificate` needs a
+   second path (`provider: 'letsencrypt'`, `meta.dns_challenge: true`,
+   `meta.dns_provider: 'cloudflare'`) instead of the self-signed `'other'`
+   provider one, used only for hosts that go this direct-exposure route.
+4. **App code**: needs a way to mark a given `additionalExposures` entry
+   (or the primary exposure) as "direct" vs "tunneled" — right now
+   everything assumes the Cloudflare Tunnel unconditionally. This is a
+   bigger change than 20.7/20.8 was; size it up properly before starting,
+   don't rush it in like the gRPC flag was.
+5. Once live, retest the mobile app the same way as this session.
+
+**Alternative not yet explored**: whether NetBird's own `Relay`/`Signal`
+components (separate from the Management API) could stand in for direct
+enrollment instead of reworking exposure topology — lower priority, only
+worth a look if the router port-forward turns out to be impractical.
+
+### 20.11 Outstanding TODO
+- [ ] **User: confirm whether a router port-forward + (static IP or DDNS)
+      is feasible** for `netbird-vpn-api` before any of 20.10 is
+      implemented — this is the actual blocker, not more code.
+      **Priority: P0**
+- [ ] **Implement 20.10** once the above is confirmed feasible: DNS-01 cert
+      path in `ensureGrpcCertificate`, a "direct exposure" mode in the
+      exposure config/DB schema, grey-clouding the DNS record, and the
+      router-side port-forward (user). **Priority: P0** — **Estimate: L**
+- [ ] **Confirm a real peer actually enrolls and shows up** — blocked on
+      20.10. **Priority: P0** — **Estimate: S**
 - [ ] **Configure STUN/TURN** — `Stuns`/`TURNConfig.Turns` are both empty in
       `apps/netbird-vpn/data/management.json`. Won't block registration, but
       peers behind NAT likely can't connect to each other without it. Not
