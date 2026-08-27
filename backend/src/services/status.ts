@@ -9,7 +9,7 @@ import https from 'https';
 import http from 'http';
 import logger from '../utils/logger';
 import { getAllServices, getService, getProjectName, resolveComposeFile } from '../config/services';
-import { ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
+import { ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
 
 /**
  * Get the aggregated state of a compose project's containers.
@@ -41,6 +41,54 @@ function getContainerStatus(projectName: string | null): Promise<ServiceState> {
       } else {
         resolve('stopped');
       }
+    });
+  });
+}
+
+// Matches one `docker ps --format {{.Ports}}` entry, e.g.
+// "0.0.0.0:8080->80/tcp" or "0.0.0.0:80-81->80-81/tcp" (port ranges).
+// Unpublished container-only ports (e.g. "5432/tcp", no "->") don't match
+// and are skipped, since there's nothing reachable from the host to report.
+const PORT_MAPPING_PATTERN = /(?:\S+:)?(\d+(?:-\d+)?)->(\d+(?:-\d+)?)\/(tcp|udp)/g;
+
+/**
+ * Get the live published host ports for a compose project's containers,
+ * straight from `docker ps` rather than parsed from the compose file — this
+ * way it reflects what's actually bound right now and covers every
+ * container in a multi-container project, not just the first `ports:` entry.
+ */
+function getContainerPorts(projectName: string | null): Promise<ServicePortMapping[]> {
+  return new Promise((resolve) => {
+    if (!projectName) {
+      resolve([]);
+      return;
+    }
+
+    const command = `docker ps --filter "label=com.docker.compose.project=${projectName}" --format "{{.Ports}}"`;
+    exec(command, (error, stdout) => {
+      if (error) {
+        resolve([]);
+        return;
+      }
+
+      const ports = new Map<string, ServicePortMapping>();
+      for (const line of stdout.split('\n')) {
+        PORT_MAPPING_PATTERN.lastIndex = 0;
+        let match: RegExpExecArray | null;
+        while ((match = PORT_MAPPING_PATTERN.exec(line)) !== null) {
+          const [, hostPort, containerPort, protocol] = match;
+          const key = `${hostPort}/${protocol}`;
+          if (!ports.has(key)) {
+            ports.set(key, { hostPort, containerPort, protocol });
+          }
+        }
+      }
+
+      resolve(
+        [...ports.values()].sort(
+          (a, b) => Number(a.hostPort.split('-')[0]) - Number(b.hostPort.split('-')[0])
+        )
+      );
     });
   });
 }
@@ -124,6 +172,8 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       }
     }
 
+    const ports = state === 'running' ? await getContainerPorts(getProjectName(serviceName)) : [];
+
     return {
       name: serviceName,
       label: service.label,
@@ -136,6 +186,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       setupTokenSupported: Boolean(service.setupToken),
       adminUserManagementSupported: Boolean(service.supportsAdminUserManagement),
       dependsOn: service.dependsOn,
+      ports,
     };
   } catch (error) {
     const message = (error as Error).message;
@@ -172,4 +223,4 @@ export async function getAllServiceStatus(): Promise<ServiceStatusResponse> {
   };
 }
 
-export { getContainerStatus, checkHealthHttp };
+export { getContainerStatus, getContainerPorts, checkHealthHttp };

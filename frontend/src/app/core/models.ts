@@ -18,6 +18,12 @@ export type ServiceCategory =
   | 'Home Automation'
   | 'Development';
 
+export interface ServicePortMapping {
+  hostPort: string;
+  containerPort: string;
+  protocol: string;
+}
+
 export interface ServiceStatus {
   name: string;
   label: string;
@@ -31,6 +37,7 @@ export interface ServiceStatus {
   setupTokenSupported?: boolean;
   adminUserManagementSupported?: boolean;
   dependsOn?: string[];
+  ports?: ServicePortMapping[];
 }
 
 export interface AutheliaAdminUser {

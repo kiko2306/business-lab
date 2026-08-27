@@ -28,6 +28,38 @@ interface ServiceGroup {
   services: ServiceStatus[];
 }
 
+interface ServicePortRow {
+  serviceName: string;
+  label: string;
+  hostPort: string;
+  containerPort: string;
+  protocol: string;
+}
+
+// Flattened one-row-per-published-port list for the "running app ports"
+// table — only running services that actually publish a host port show up.
+function getRunningServicePorts(services: ServiceStatus[]): ServicePortRow[] {
+  const rows: ServicePortRow[] = [];
+  for (const service of services) {
+    if (service.state !== 'running') {
+      continue;
+    }
+    for (const port of service.ports ?? []) {
+      rows.push({
+        serviceName: service.name,
+        label: service.label,
+        hostPort: port.hostPort,
+        containerPort: port.containerPort,
+        protocol: port.protocol,
+      });
+    }
+  }
+
+  return rows.sort(
+    (a, b) => a.label.localeCompare(b.label) || Number(a.hostPort) - Number(b.hostPort)
+  );
+}
+
 function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
   const byCategory = new Map<string, ServiceStatus[]>();
   for (const service of services) {
@@ -59,6 +91,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   protected readonly user$ = this.authService.user$;
   protected readonly groupServicesByCategory = groupServicesByCategory;
+  protected readonly getRunningServicePorts = getRunningServicePorts;
   protected backups: BackupFile[] = [];
   protected health: HealthStatus | null = null;
   protected schedule: BackupScheduleConfig = { enabled: false, frequency: 'daily', retentionCount: 14, lastRunAt: null };
@@ -98,6 +131,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   trackByCategory(_index: number, group: ServiceGroup): string {
     return group.category;
+  }
+
+  trackByPortRow(_index: number, row: { serviceName: string; hostPort: string; protocol: string }): string {
+    return `${row.serviceName}:${row.hostPort}/${row.protocol}`;
   }
 
   loadBackups(): void {

@@ -831,3 +831,57 @@ this needed its own read/write path rather than reusing `appEnv.ts`.
   instead. Worth a manual pass through the browser next time the dashboard
   is open, using a throwaway password change to confirm the full
   save-then-login round trip.
+
+## 19. Session Log — 2026-08-27: Running-apps ports table
+
+### 19.1 Requested
+Add a table to the dashboard, positioned above the existing per-category
+service card list, showing every currently-running app and which host
+port(s) it's published on. Goal is an at-a-glance port map without having
+to open each service card or run `docker ps` by hand.
+
+- [x] Backend: derive live published ports per service from `docker ps`
+      (filtered by the same `com.docker.compose.project` label already
+      used for container state), not from static compose-file parsing —
+      catches every container in a project (e.g. NetBird's dashboard +
+      management containers) and reflects what's actually bound right now.
+      Surface as `ports: ServicePortMapping[]` on `ServiceStatusPayload`.
+- [x] Frontend: new table section in `dashboard.component.html`, placed
+      before the categorized service-card grid, listing app label + host
+      port + container port + protocol for every `running` service that
+      publishes at least one port.
+
+### 19.2 Implementation notes
+- **`backend/src/services/status.ts`** — new `getContainerPorts(projectName)`,
+  same `docker ps --filter label=com.docker.compose.project=...` pattern as
+  the existing `getContainerStatus`, format `{{.Ports}}`. A regex
+  (`PORT_MAPPING_PATTERN`) pulls host port, container port, and protocol out
+  of each comma-separated entry (e.g. `0.0.0.0:8080->80/tcp`), handling port
+  ranges (`80-81->80-81/tcp`) and skipping unpublished container-only ports
+  (no `->`, e.g. `5432/tcp`). Results are deduped by `hostPort/protocol`
+  (IPv4 and IPv6 both list the same port) and sorted numerically. Called
+  from `getServiceStatus()` only when `state === 'running'`.
+- **`backend/src/types/index.ts`** — new `ServicePortMapping` interface,
+  `ports?: ServicePortMapping[]` added to `ServiceStatusPayload`. Mirrored on
+  the frontend in `core/models.ts` (`ServicePortMapping`, `ServiceStatus.ports`).
+- **`frontend/src/app/pages/dashboard/dashboard.component.ts`** — new
+  `getRunningServicePorts()`, flattens all running services' `ports` into
+  one row per port mapping, sorted by app label then host port.
+- **`dashboard.component.html`** — new "Running app ports" table section,
+  placed directly above the categorized service-card grid as requested,
+  bound once via `*ngIf="getRunningServicePorts(services) as portRows"` so
+  the flatten only runs once per template check.
+- **Verified**: backend `tsc --noEmit` and `vitest run` clean (55 tests,
+  unchanged — no new tests added for the port-parsing regex; worth adding
+  if this logic grows more edge cases). Frontend `ng build` clean (same
+  pre-existing budget warning, unrelated). Deployed live
+  (`docker compose up -d --build backend frontend`); called
+  `getAllServiceStatus()` directly inside the running backend container
+  against the real Docker socket-proxy and confirmed correct output for
+  every currently-running app, including NetBird's two-container project
+  (ports 8080 + 8081), nginx-proxy-manager's port range (`80-81`) plus a
+  single port (`443`), and Portainer's two separate ports (9000, 9443).
+  **Not verified**: the rendered table in an actual browser — no browser
+  tool was available in this session and the dashboard's own login
+  credentials weren't on hand. Worth a quick visual pass next time the
+  dashboard is open.

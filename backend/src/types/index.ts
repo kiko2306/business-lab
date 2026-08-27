@@ -81,6 +81,15 @@ export interface ServiceDefinition {
 
 export type ServiceState = 'running' | 'stopped' | 'starting' | 'error' | 'unknown';
 
+// A container's published host port, read live from `docker ps` rather than
+// parsed from the compose file — so it reflects what's actually bound right
+// now and covers every container in a multi-container project.
+export interface ServicePortMapping {
+  hostPort: string;
+  containerPort: string;
+  protocol: string;
+}
+
 export interface ServiceStatusPayload {
   name: string;
   label?: string;
@@ -94,6 +103,7 @@ export interface ServiceStatusPayload {
   setupTokenSupported?: boolean;
   adminUserManagementSupported?: boolean;
   dependsOn?: string[];
+  ports?: ServicePortMapping[];
 }
 
 export interface ServiceStatusSummary {

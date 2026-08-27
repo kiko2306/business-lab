@@ -63,6 +63,35 @@
       Last refresh {{ lastUpdated | date: 'medium' }}
     </section>
 
+    <section class="mb-4" *ngIf="serviceState.services$ | async as services">
+      <h2 class="h5 mb-3">Running app ports</h2>
+      <ng-container *ngIf="getRunningServicePorts(services) as portRows">
+        <div class="table-responsive" *ngIf="portRows.length; else noPortsState">
+          <table class="table table-sm table-striped align-middle mb-0">
+            <thead>
+              <tr>
+                <th scope="col">App</th>
+                <th scope="col">Host port</th>
+                <th scope="col">Container port</th>
+                <th scope="col">Protocol</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr *ngFor="let row of portRows; trackBy: trackByPortRow">
+                <td>{{ row.label }}</td>
+                <td>{{ row.hostPort }}</td>
+                <td>{{ row.containerPort }}</td>
+                <td class="text-uppercase">{{ row.protocol }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <ng-template #noPortsState>
+          <p class="text-body-secondary mb-0">No running services currently publish a host port.</p>
+        </ng-template>
+      </ng-container>
+    </section>
+
     <section *ngIf="serviceState.services$ | async as services; else loadingState">
       <ng-container *ngIf="services.length; else emptyState">
         <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(services); trackBy: trackByCategory">
