@@ -1086,40 +1086,130 @@ above was already logged). This reframes things:
   thought — nginx's own protocol translation may make it unnecessary. Don't
   chase that lead first next session; chase the Cloudflare edge one below.
 
-### 20.6 Outstanding TODO
-- [ ] **First thing next session: get Claude access to Cloudflare Security
-      Events/WAF for this zone.** The API token currently stored in this
-      app's exposure settings is scoped to DNS + Tunnel config only, so the
-      investigation below had to be handed back to the user to check
-      manually in the dashboard. Widen the token's permissions (or provide
-      a separate one) to include Zone → Firewall Services/WAF → Read (and
-      ideally Edit, to add the exception in the next item too) so this can
-      be checked and fixed directly instead of relayed through the user.
-      **Priority: P0** — **Estimate: S**
-- [ ] **Check Cloudflare's zone security settings for `tx-home-utils.com`**
-      (Security → WAF managed rules, Bot Fight Mode / Super Bot Fight Mode,
-      Security Level) and check for a block/challenge event logged against
-      `netbird-vpn-api.tx-home-utils.com` in the Cloudflare dashboard's
-      Security Events log. This is the fastest way to confirm or rule out
-      the edge-blocking hypothesis in 20.5a — needs the Cloudflare
-      dashboard directly, since the API token this app stores is scoped to
-      DNS + Tunnel config, not WAF/security settings. **Priority: P0** —
+### 20.6 Outstanding TODO (superseded — see 20.7 for what actually happened)
+- [x] **Get Claude access to Cloudflare Security Events/WAF for this zone.**
+      Done — user widened the existing exposure API token's permissions
+      (Zone Settings, Firewall Services, Zone WAF, Analytics, all Read) in
+      the Cloudflare dashboard. The app reads the same stored token, so no
+      code change was needed.
+- [x] **Check Cloudflare's zone security settings.** Done — checked
+      `security_level` (medium, default), `/firewall/rules` (empty, 0
+      legacy rules), and `/rulesets` (only the 3 stock managed rulesets,
+      no custom ones). Security Events (`firewallEventsAdaptive` via
+      GraphQL) came back empty even for requests that were actively being
+      403'd live — the block turned out not to be a WAF/Bot Fight Mode
+      event at all, hence nothing logged there. See 20.7.
+- [x] **~~Add a WAF/Bot Fight Mode exception~~ — not applicable.** The real
+      cause wasn't WAF/bot related. See 20.7.
+- [ ] **Debug-log cloudflared during a live mobile-app retry** — no longer
+      needed; root cause found without it (20.7). Leaving unchecked only in
+      case the HTTPS-origin work in 20.7's TODO surfaces something new that
+      needs it.
+- [x] **Determine whether `http2Origin` needs an HTTPS origin.** Confirmed
+      yes — `http2Origin` sets Go's `http.Transport.ForceAttemptHTTP2`,
+      which only affects TLS (ALPN) connections and is a no-op against a
+      plain `http://` origin. See 20.7 for the fix this implies.
+- [ ] **Confirm a real peer actually enrolls and shows up** — still open,
+      blocked on the HTTPS-origin work in 20.7. **Priority: P0** —
       **Estimate: S**
-- [ ] **If confirmed, add a WAF/Bot Fight Mode exception for
-      `netbird-vpn-api.tx-home-utils.com`** (a Configuration Rule or WAF
-      custom rule skipping bot checks for that one hostname, since it's a
-      machine-to-machine API that will never solve a JS/managed challenge).
-      **Priority: P0** — **Estimate: S**, once the above confirms it.
-- [ ] **Debug-log cloudflared during a live mobile-app retry** — only if the
-      Cloudflare-edge lead above doesn't pan out. See 20.5 item 1.
-      **Priority: P1** — **Estimate: S**
-- [ ] **Determine whether `http2Origin` needs an HTTPS origin** — now the
-      weaker lead (see 20.5a) — only chase this after the above two are
-      ruled out. **Priority: P2** — **Estimate: M**
-- [ ] **Confirm a real peer actually enrolls and shows up** — once the
-      above is resolved, re-test the mobile app connection and tail
-      `docker logs netbird-vpn-netbird-management-1` during the attempt.
-      **Priority: P0** — **Estimate: S**
+- [ ] **Configure STUN/TURN** — `Stuns`/`TURNConfig.Turns` are both empty in
+      `apps/netbird-vpn/data/management.json`. Won't block registration, but
+      peers behind NAT likely can't connect to each other without it. Not
+      worth touching until enrollment itself works. **Priority: P1** —
+      **Estimate: S–M**
+
+### 20.7 Session continued (2026-08-27, same day): real root cause found — Cloudflare's zone-level gRPC toggle was off
+With Security Events access in hand, the WAF/Bot Fight Mode lead from 20.5a
+turned out to be a dead end — `firewallEventsAdaptive` was empty even
+seconds after reproducing the 403 live, meaning nothing was logging it as a
+WAF/bot decision at all. That absence was the actual clue.
+
+**Root cause, confirmed by isolation testing:** Cloudflare has a dedicated,
+dashboard-only **gRPC toggle** per zone (**Network tab → gRPC**). When it's
+off, the edge itself rejects *any* request carrying a
+`content-type: application/grpc` (or `application/grpc+proto`) header with
+a bare `403 Forbidden` / `text/html` body — before the request ever reaches
+the tunnel or origin, and without generating a WAF/Bot Fight Mode event.
+This is documented behavior
+(https://developers.cloudflare.com/network/grpc-connections/), not a
+misconfiguration on our side.
+
+Proved this two ways:
+1. Sent a POST with `content-type: application/grpc` (real gRPC framing,
+   no `te: trailers` even needed to trigger it) directly to
+   `netbird-vpn-api.tx-home-utils.com` — got the exact 403/text-html the
+   mobile app reports, byte-for-byte (`<hr><center>cloudflare</center>`
+   template). The request never showed up in NPM's
+   `proxy-host-10_access.log` at all — confirming it never left Cloudflare's
+   edge.
+2. Sent the *same header* to **`paperless.tx-home-utils.com`** (a
+   completely unrelated, already-working host on the same zone) — also
+   403'd. Proved it's a zone-wide setting, not anything specific to the
+   `netbird-vpn-api` proxy host or its NPM/tunnel config, before touching
+   any of that config further.
+
+**User enabled the gRPC toggle this session.** That clears the edge-level
+block, but it does **not** by itself make gRPC work end-to-end — Cloudflare
+requires the *origin* to speak real TLS + HTTP/2 via ALPN on port 443
+(https://developers.cloudflare.com/network/grpc-connections/, "origin must
+listen on 443, support TLS, and advertise HTTP/2 over ALPN"). This confirms
+lead 2 from 20.5 was right: our origin is `http://192.168.1.23` (plain,
+cleartext) with `http2Origin: true` on the tunnel side — and `http2Origin`
+only forces HTTP/2 over an *existing* TLS connection (it maps to Go's
+`http.Transport.ForceAttemptHTTP2`, which is meaningless for a non-TLS
+`http://` URL; cloudflared has no h2c/cleartext-HTTP2 support to the
+origin). So even with the zone toggle on, this specific host will still
+fail until the origin hop is real TLS.
+
+### 20.8 Implemented and verified live: real TLS origin for grpc exposures
+Built and shipped the fix described above:
+- `backend/src/services/npmClient.ts`: added `ensureGrpcCertificate` —
+  idempotently finds or creates a self-signed `"other"`-provider NPM
+  certificate for the hostname (`openssl req -x509 ...`, uploaded via
+  NPM's `/api/nginx/certificates` + `/upload` multipart endpoint) and
+  attaches it (`certificate_id`, `ssl_forced: true`) only when `grpc` is
+  true. `buildProxyHostPayload`/`ensureProxyHost`'s drift-detection now
+  also compares `certificate_id`/`ssl_forced`.
+- `backend/src/utils/httpJson.ts`: `requestJson` gained a `rawBody` option
+  so the multipart cert upload could reuse the same mockable client
+  instead of hand-rolling a second raw `http`/`https` request path.
+- `backend/src/services/cloudflareTunnelClient.ts`:
+  `EnsureIngressRouteOptions`/`ensureIngressRoute` gained `noTLSVerify` and
+  `originServerName`, alongside the existing `http2Origin`, with drift
+  detection extended to cover all three.
+- `backend/src/services/exposure.ts`: added `getNpmGrpcOriginUrl`
+  (`https://` on 443, vs. the plain-`http://` `getNpmOriginUrl` every other
+  exposure uses) and wired `noTLSVerify`/`originServerName` into
+  `provisionHostname`'s `ensureIngressRoute` call, both keyed off the
+  existing `grpc` flag.
+- `backend/Dockerfile`: added the `openssl` package (cert generation shells
+  out to it).
+
+All covered by unit tests (`npmClient.test.ts`, `cloudflareTunnelClient.test.ts`,
+`exposure.test.ts`) and rebuilt/redeployed live. Re-ran
+`POST /api/services/netbird-vpn/exposure/verify` after deploying — both
+exposures provisioned with no error. Confirmed on the actual infra:
+- NPM's `10.conf` now has `listen 443 ssl` + `http2 on` with a real
+  self-signed cert (`/data/custom_ssl/npm-1/`), still `grpc_pass
+  grpc://172.17.0.1:8080;`.
+- The Cloudflare tunnel ingress rule for `netbird-vpn-api.tx-home-utils.com`
+  now reads `"service": "https://192.168.1.23"` with
+  `originRequest: { http2Origin: true, noTLSVerify: true, originServerName:
+  "netbird-vpn-api.tx-home-utils.com" }`.
+- **End-to-end proof**: a real gRPC call (`content-type: application/grpc`,
+  `POST /management.ManagementService/GetServerKey`) through the public
+  hostname now returns `HTTP/2 200` with `content-type: application/grpc`
+  — this is the exact call the mobile app's SSO check makes first. NPM's
+  access log shows it landing correctly: `POST https ... 200 200 ...
+  Sent-to 172.17.0.1`.
+
+### 20.9 Outstanding TODO
+- [ ] **Confirm a real peer actually enrolls and shows up** — this session's
+      fix was verified with a synthetic gRPC call (`curl`), not the actual
+      NetBird mobile app. Re-test the mobile app connection against
+      `https://netbird-vpn-api.tx-home-utils.com` and tail `docker logs
+      netbird-vpn-netbird-management-1` during the attempt. **Priority: P0**
+      — **Estimate: S**
 - [ ] **Configure STUN/TURN** — `Stuns`/`TURNConfig.Turns` are both empty in
       `apps/netbird-vpn/data/management.json`. Won't block registration, but
       peers behind NAT likely can't connect to each other without it. Not

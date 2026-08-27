@@ -220,6 +220,23 @@ describe('provisionServiceIfEnabled', () => {
       expect.objectContaining({ hostname: 'netbird-vpn-api.example.com', forwardPort: 8080, expectedHostId: null, grpc: true })
     );
     expect(mockedGetPublishedUpstreamPort).toHaveBeenCalledWith('netbird-vpn', 'NETBIRD_MGMT_PORT');
+
+    // The grpc secondary must get a real https origin (Cloudflare requires
+    // TLS+HTTP2/ALPN to the origin for gRPC — see getNpmGrpcOriginUrl),
+    // while the primary keeps its plain-http origin.
+    expect(mockedEnsureIngressRoute).toHaveBeenCalledWith(
+      // Default ports are dropped by URL serialization (http:80, https:443).
+      expect.objectContaining({ hostname: 'netbird-vpn.example.com', originUrl: 'http://npm', http2Origin: false, noTLSVerify: false })
+    );
+    expect(mockedEnsureIngressRoute).toHaveBeenCalledWith(
+      expect.objectContaining({
+        hostname: 'netbird-vpn-api.example.com',
+        originUrl: 'https://npm',
+        http2Origin: true,
+        noTLSVerify: true,
+        originServerName: 'netbird-vpn-api.example.com',
+      })
+    );
   });
 
   it('does not let a secondary exposure failure affect the primary result', async () => {

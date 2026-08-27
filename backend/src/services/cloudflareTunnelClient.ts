@@ -7,6 +7,12 @@
 
 import { requestJson } from '../utils/httpJson';
 
+interface OriginRequestConfig {
+  http2Origin?: boolean;
+  noTLSVerify?: boolean;
+  originServerName?: string;
+}
+
 interface IngressRule {
   hostname?: string;
   service: string;
@@ -114,8 +120,23 @@ interface EnsureIngressRouteOptions {
   // regardless of what the origin itself supports — real gRPC upstreams
   // (see the `grpc` flag on ServiceAdditionalExposure) need this set, or
   // the tunnel silently downgrades every request before it reaches the
-  // origin's HTTP/2 listener.
+  // origin's HTTP/2 listener. Note: this alone does nothing against a
+  // plain `http://` origin — it maps to Go's `ForceAttemptHTTP2`, which
+  // only applies to TLS connections. For grpc origins, `originUrl` must
+  // already be `https://` (see getNpmGrpcOriginUrl in exposure.ts) for
+  // this to have any effect.
   http2Origin?: boolean;
+  // The origin (NPM) presents a self-signed cert for grpc hosts — see
+  // ensureGrpcCertificate in npmClient.ts — so cloudflared must skip
+  // verifying it, the same way you would with `cloudflared tunnel ...
+  // --no-tls-verify` for any internal self-signed origin.
+  noTLSVerify?: boolean;
+  // NPM's TLS listener is shared across every proxied hostname and
+  // selects which host's config to serve by SNI. The origin URL here is
+  // an IP (see getNpmGrpcOriginUrl), so cloudflared must be told to send
+  // the real hostname as SNI, or NPM's TLS handshake falls through to its
+  // unrelated default vhost instead of this one.
+  originServerName?: string;
 }
 
 interface DnsRecord {
@@ -183,23 +204,33 @@ export async function ensureIngressRoute({
   hostname,
   originUrl,
   http2Origin,
+  noTLSVerify,
+  originServerName,
 }: EnsureIngressRouteOptions): Promise<{ updated: boolean; dnsRecordId: string }> {
   const config = await getTunnelConfiguration(apiToken, accountId, tunnelId);
   const ingress = Array.isArray(config.ingress) ? [...config.ingress] : [];
 
   const existingIndex = ingress.findIndex((rule) => rule.hostname === hostname);
-  const expectedHttp2Origin = Boolean(http2Origin);
+  const expectedOriginRequest: OriginRequestConfig = {};
+  if (http2Origin) expectedOriginRequest.http2Origin = true;
+  if (noTLSVerify) expectedOriginRequest.noTLSVerify = true;
+  if (originServerName) expectedOriginRequest.originServerName = originServerName;
+  const hasExpectedOriginRequest = Object.keys(expectedOriginRequest).length > 0;
   const desiredRule: IngressRule = {
     hostname,
     service: originUrl,
-    originRequest: expectedHttp2Origin ? { http2Origin: true } : undefined,
+    originRequest: hasExpectedOriginRequest ? expectedOriginRequest : undefined,
   };
 
   let updated = false;
   if (existingIndex >= 0) {
-    const existingRule = ingress[existingIndex] as IngressRule & { originRequest?: { http2Origin?: boolean } };
-    const existingHttp2Origin = Boolean(existingRule.originRequest?.http2Origin);
-    if (existingRule.service === originUrl && existingHttp2Origin === expectedHttp2Origin) {
+    const existingRule = ingress[existingIndex] as IngressRule & { originRequest?: OriginRequestConfig };
+    const existingOriginRequest = existingRule.originRequest ?? {};
+    const originRequestMatches =
+      Boolean(existingOriginRequest.http2Origin) === Boolean(http2Origin) &&
+      Boolean(existingOriginRequest.noTLSVerify) === Boolean(noTLSVerify) &&
+      (existingOriginRequest.originServerName ?? '') === (originServerName ?? '');
+    if (existingRule.service === originUrl && originRequestMatches) {
       // The ingress route is already correct; still verify the DNS record.
     } else {
       ingress[existingIndex] = { ...existingRule, ...desiredRule };

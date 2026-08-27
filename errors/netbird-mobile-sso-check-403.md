@@ -71,3 +71,29 @@ hostname.
    hand before this automation existed, or the exposure sync hasn't been
    re-run since. Re-sync exposure for the `netbird-vpn` service (or
    manually fix the two settings above) and retry.
+3. **Update (confirmed 2026-08-27, later same day):** re-syncing exposure
+   fixed NPM's `grpc_pass`/HTTP2 config, but the *exact same* 403/text-html
+   error persisted. Root cause was two more layers deep, both now fixed —
+   see `plan.md` §20.7–20.8 for the full investigation:
+   - **Cloudflare has a dedicated, dashboard-only "gRPC" toggle per zone**
+     (Network tab). When off, the edge itself 403s any request carrying
+     `content-type: application/grpc`, before it ever reaches the tunnel —
+     confirmed by reproducing the identical 403 against a completely
+     unrelated, already-working hostname on the same zone. **User enabled
+     it in the dashboard.**
+   - Cloudflare also requires the **origin** to speak real TLS+HTTP2 via
+     ALPN on port 443 for gRPC — the app's `http2Origin` flag on its own is
+     a no-op against a plain `http://` origin (it maps to Go's
+     `ForceAttemptHTTP2`, TLS-only). Fixed by giving the `-api` NPM host a
+     real (self-signed) certificate and switching its Cloudflare Tunnel
+     origin to `https://` with `noTLSVerify` + `originServerName` for
+     SNI-based routing — see `ensureGrpcCertificate` in
+     `backend/src/services/npmClient.ts` and `getNpmGrpcOriginUrl` in
+     `backend/src/services/exposure.ts`.
+
+   **Verified end-to-end** with a real gRPC call (`content-type:
+   application/grpc`, `POST /management.ManagementService/GetServerKey`)
+   through the public hostname: `HTTP/2 200`, `content-type:
+   application/grpc`, landing correctly in NPM's access log. Not yet
+   confirmed against the actual NetBird mobile app itself (only a synthetic
+   `curl` reproduction) — that's the next thing to try.

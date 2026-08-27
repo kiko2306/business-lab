@@ -39,6 +39,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: false,
+      certificateId: 0,
     });
 
     expect(payload).toMatchObject({
@@ -64,6 +65,7 @@ describe('buildProxyHostPayload', () => {
       websocket: undefined as unknown as boolean,
       autheliaProtected: false,
       grpc: false,
+      certificateId: 0,
     });
     expect(payload.allow_websocket_upgrade).toBe(false);
   });
@@ -77,6 +79,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: true,
       grpc: false,
+      certificateId: 0,
     });
 
     expect(payload.advanced_config).toContain('include /snippets/authelia-location.conf;');
@@ -95,12 +98,13 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: true,
       grpc: false,
+      certificateId: 0,
     });
 
     expect(payload.allow_websocket_upgrade).toBe(false);
   });
 
-  it('uses grpc_pass with http2_support on for a grpc upstream', () => {
+  it('uses grpc_pass with http2_support and a real cert/SSL on for a grpc upstream', () => {
     const payload = buildProxyHostPayload({
       hostname: 'netbird-vpn-api.example.com',
       forwardScheme: 'http',
@@ -109,11 +113,32 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: true,
+      certificateId: 42,
     });
 
     expect(payload.http2_support).toBe(true);
     expect(payload.allow_websocket_upgrade).toBe(false);
     expect(payload.advanced_config).toContain('grpc_pass grpc://172.17.0.1:8080;');
+    // Cloudflare requires a real TLS+HTTP2/ALPN hop to the origin for gRPC
+    // to negotiate at all — see exposure.ts getNpmGrpcOriginUrl.
+    expect(payload.certificate_id).toBe(42);
+    expect(payload.ssl_forced).toBe(true);
+  });
+
+  it('never attaches a certificate for a non-grpc upstream, even if one is passed', () => {
+    const payload = buildProxyHostPayload({
+      hostname: 'paperless.example.com',
+      forwardScheme: 'http',
+      forwardHost: '172.17.0.1',
+      forwardPort: 8000,
+      websocket: true,
+      autheliaProtected: false,
+      grpc: false,
+      certificateId: 42,
+    });
+
+    expect(payload.certificate_id).toBe(0);
+    expect(payload.ssl_forced).toBe(false);
   });
 });
 
@@ -187,8 +212,15 @@ describe('ensureProxyHost', () => {
     expect(result).toEqual({ id: 9, created: false, updated: true });
   });
 
-  it('updates an owned host when grpc support was turned on', async () => {
+  it('updates an owned host when grpc support was turned on, reusing an existing cert', async () => {
     mockLogin();
+    // findCertificateByDomain — a cert for this hostname already exists,
+    // so ensureGrpcCertificate skips generating/uploading a new one.
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: [{ id: 42, provider: 'other', domain_names: ['paperless.example.com'] }],
+      raw: '',
+    });
     mockedRequestJson.mockResolvedValueOnce({
       statusCode: 200,
       body: [
@@ -200,6 +232,8 @@ describe('ensureProxyHost', () => {
           forward_port: 8000,
           allow_websocket_upgrade: true,
           http2_support: false,
+          ssl_forced: false,
+          certificate_id: 0,
           advanced_config: '',
         },
       ],
@@ -210,6 +244,7 @@ describe('ensureProxyHost', () => {
     const result = await ensureProxyHost({ ...baseOptions, expectedHostId: 9, grpc: true });
 
     expect(result).toEqual({ id: 9, created: false, updated: true });
+    expect(mockedRequestJson).toHaveBeenCalledTimes(4); // login + cert list + host list + update
   });
 
   it('leaves an owned host untouched when the upstream already matches', async () => {

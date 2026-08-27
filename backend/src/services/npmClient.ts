@@ -4,7 +4,14 @@
  * https://nginxproxymanager.com/api/
  */
 
+import { execFile } from 'node:child_process';
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import path from 'node:path';
+import { promisify } from 'node:util';
 import { requestJson } from '../utils/httpJson';
+
+const execFileAsync = promisify(execFile);
 
 interface NpmProxyHost {
   id: number;
@@ -14,6 +21,8 @@ interface NpmProxyHost {
   forward_port: number;
   allow_websocket_upgrade?: boolean;
   http2_support?: boolean;
+  certificate_id?: number;
+  ssl_forced?: boolean;
   advanced_config?: string;
 }
 
@@ -71,6 +80,136 @@ interface EnsureProxyHostResult {
   updated: boolean;
 }
 
+interface NpmCertificate {
+  id: number;
+  provider: string;
+  domain_names: string[];
+}
+
+async function findCertificateByDomain(npmApiUrl: string, token: string, hostname: string): Promise<NpmCertificate | null> {
+  const response = await requestJson<NpmCertificate[]>(`${npmApiUrl}/api/nginx/certificates`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (response.statusCode !== 200 || !Array.isArray(response.body)) {
+    throw new Error(`Unable to list Nginx Proxy Manager certificates: ${response.statusCode}`);
+  }
+
+  return response.body.find((cert) => cert.provider === 'other' && (cert.domain_names || []).includes(hostname)) ?? null;
+}
+
+async function createCertificateRecord(npmApiUrl: string, token: string, hostname: string): Promise<number> {
+  const response = await requestJson<{ id?: number; error?: { message?: string } }>(
+    `${npmApiUrl}/api/nginx/certificates`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: { provider: 'other', nice_name: hostname, domain_names: [hostname] },
+    }
+  );
+
+  if ((response.statusCode !== 200 && response.statusCode !== 201) || !response.body?.id) {
+    throw new Error(
+      `Unable to create Nginx Proxy Manager certificate record: ${response.body?.error?.message || response.statusCode}`
+    );
+  }
+
+  return response.body.id;
+}
+
+// gRPC needs a real TLS+HTTP2/ALPN hop from cloudflared to NPM — Cloudflare
+// requires this for its own edge gRPC support (see the `originServerName`/
+// `noTLSVerify` handling in cloudflareTunnelClient.ts). Only cloudflared
+// ever connects to this host over TLS, via `noTLSVerify` on the tunnel
+// side, so a publicly-trusted certificate buys nothing — a self-signed one
+// generated here is sufficient and avoids depending on ACME/DNS-01 working
+// through the tunnel topology.
+async function generateSelfSignedCertificate(hostname: string): Promise<{ certificate: string; certificateKey: string }> {
+  const dir = await mkdtemp(path.join(tmpdir(), 'npm-cert-'));
+  const keyPath = path.join(dir, 'key.pem');
+  const certPath = path.join(dir, 'cert.pem');
+
+  try {
+    await execFileAsync('openssl', [
+      'req',
+      '-x509',
+      '-newkey',
+      'rsa:2048',
+      '-nodes',
+      '-keyout',
+      keyPath,
+      '-out',
+      certPath,
+      '-days',
+      '825',
+      '-subj',
+      `/CN=${hostname}`,
+    ]);
+
+    const [certificate, certificateKey] = await Promise.all([readFile(certPath, 'utf8'), readFile(keyPath, 'utf8')]);
+    return { certificate, certificateKey };
+  } finally {
+    await rm(dir, { recursive: true, force: true });
+  }
+}
+
+async function uploadCertificateFiles(
+  npmApiUrl: string,
+  token: string,
+  certificateId: number,
+  certificate: string,
+  certificateKey: string
+): Promise<void> {
+  const boundary = `npmCertUpload${Date.now()}${Math.random().toString(16).slice(2)}`;
+  const part = (field: string, filename: string, content: string) =>
+    Buffer.concat([
+      Buffer.from(
+        `--${boundary}\r\nContent-Disposition: form-data; name="${field}"; filename="${filename}"\r\nContent-Type: application/octet-stream\r\n\r\n`
+      ),
+      Buffer.from(content),
+      Buffer.from('\r\n'),
+    ]);
+  const rawBody = Buffer.concat([
+    part('certificate', 'cert.pem', certificate),
+    part('certificate_key', 'key.pem', certificateKey),
+    Buffer.from(`--${boundary}--\r\n`),
+  ]);
+
+  const response = await requestJson<{ error?: { message?: string } }>(
+    `${npmApiUrl}/api/nginx/certificates/${certificateId}/upload`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        'Content-Type': `multipart/form-data; boundary=${boundary}`,
+      },
+      rawBody,
+    }
+  );
+
+  if (response.statusCode < 200 || response.statusCode >= 300) {
+    throw new Error(
+      `Unable to upload Nginx Proxy Manager certificate files: ${response.body?.error?.message || response.statusCode}`
+    );
+  }
+}
+
+/**
+ * Idempotently ensure a self-signed "other"-provider certificate exists in
+ * NPM for `hostname`, returning its id. Only called for gRPC exposures.
+ */
+async function ensureGrpcCertificate(npmApiUrl: string, token: string, hostname: string): Promise<number> {
+  const existing = await findCertificateByDomain(npmApiUrl, token, hostname);
+  if (existing) {
+    return existing.id;
+  }
+
+  const id = await createCertificateRecord(npmApiUrl, token, hostname);
+  const { certificate, certificateKey } = await generateSelfSignedCertificate(hostname);
+  await uploadCertificateFiles(npmApiUrl, token, id, certificate, certificateKey);
+  return id;
+}
+
 async function login(npmApiUrl: string, email: string, password: string): Promise<string> {
   const response = await requestJson<{ token?: string; error?: { message?: string } }>(`${npmApiUrl}/api/tokens`, {
     method: 'POST',
@@ -105,6 +244,16 @@ export async function testNpmConnection(npmApiUrl: string, npmEmail: string, npm
   await login(npmApiUrl.replace(/\/+$/, ''), npmEmail, npmPassword);
 }
 
+type ProxyHostWriteOptions = Pick<
+  EnsureProxyHostOptions,
+  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc'
+> & {
+  // Only set (non-zero) for grpc hosts — see ensureGrpcCertificate. Cloudflare
+  // requires the origin to terminate real TLS+HTTP2/ALPN for gRPC to work at
+  // all, which NPM only does once a certificate is attached to the host.
+  certificateId: number;
+};
+
 export function buildProxyHostPayload({
   hostname,
   forwardScheme,
@@ -113,10 +262,8 @@ export function buildProxyHostPayload({
   websocket,
   autheliaProtected,
   grpc,
-}: Pick<
-  EnsureProxyHostOptions,
-  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc'
->) {
+  certificateId,
+}: ProxyHostWriteOptions) {
   return {
     domain_names: [hostname],
     forward_scheme: forwardScheme,
@@ -131,8 +278,8 @@ export function buildProxyHostPayload({
     // same directive and nginx fails to reload at all.
     allow_websocket_upgrade: autheliaProtected || grpc ? false : Boolean(websocket),
     access_list_id: '0',
-    certificate_id: 0,
-    ssl_forced: false,
+    certificate_id: grpc ? certificateId : 0,
+    ssl_forced: grpc,
     http2_support: grpc ? true : false,
     hsts_enabled: false,
     hsts_subdomains: false,
@@ -143,11 +290,6 @@ export function buildProxyHostPayload({
         : '',
   };
 }
-
-type ProxyHostWriteOptions = Pick<
-  EnsureProxyHostOptions,
-  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc'
->;
 
 async function createProxyHost(npmApiUrl: string, token: string, options: ProxyHostWriteOptions): Promise<NpmProxyHost> {
   const response = await requestJson<NpmProxyHost & { error?: { message?: string } }>(`${npmApiUrl}/api/nginx/proxy-hosts`, {
@@ -209,9 +351,10 @@ export async function ensureProxyHost({
 }: EnsureProxyHostOptions): Promise<EnsureProxyHostResult> {
   const baseUrl = npmApiUrl.replace(/\/+$/, '');
   const token = await login(baseUrl, npmEmail, npmPassword);
+  const certificateId = grpc ? await ensureGrpcCertificate(baseUrl, token, hostname) : 0;
   const existing = await findProxyHostByDomain(baseUrl, token, hostname);
 
-  const options = { hostname, forwardScheme, forwardHost, forwardPort, websocket, autheliaProtected, grpc };
+  const options = { hostname, forwardScheme, forwardHost, forwardPort, websocket, autheliaProtected, grpc, certificateId };
 
   if (!existing) {
     const created = await createProxyHost(baseUrl, token, options);
@@ -237,6 +380,8 @@ export async function ensureProxyHost({
     existing.forward_port !== forwardPort ||
     Boolean(existing.allow_websocket_upgrade) !== expectedWebsocketUpgrade ||
     Boolean(existing.http2_support) !== grpc ||
+    Boolean(existing.ssl_forced) !== grpc ||
+    (grpc && existing.certificate_id !== certificateId) ||
     (existing.advanced_config ?? '') !== expectedAdvancedConfig;
 
   if (needsUpdate) {

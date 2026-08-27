@@ -106,6 +106,22 @@ function getNpmOriginUrl(npmApiUrl: string): string {
   return url.toString().replace(/\/$/, '');
 }
 
+// gRPC needs cloudflared to actually reach the origin over TLS+HTTP2/ALPN —
+// see ensureGrpcCertificate in npmClient.ts, which gives NPM's grpc hosts a
+// self-signed cert on its normal HTTPS listener (443) for exactly this.
+// `noTLSVerify`/`originServerName` on the ingress route (see
+// provisionHostname) handle the self-signed cert and SNI-based routing.
+function getNpmGrpcOriginUrl(npmApiUrl: string): string {
+  const url = new URL(npmApiUrl);
+  url.protocol = 'https:';
+  url.port = '443';
+  url.pathname = '';
+  url.search = '';
+  url.hash = '';
+
+  return url.toString().replace(/\/$/, '');
+}
+
 async function recordProvisioningResult(
   exposureKey: string,
   { status, npmHostId, cfHostnameId, lastError }: ProvisioningResult
@@ -200,6 +216,12 @@ async function provisionHostname({
       // Same reasoning as the NPM side (grpc flag) — cloudflared defaults to
       // HTTP/1.1 to the origin regardless of what the origin speaks.
       http2Origin: grpc,
+      // originUrl is an IP (getNpmGrpcOriginUrl), fronted by NPM's
+      // self-signed cert (ensureGrpcCertificate) — skip verifying it, and
+      // send the real hostname as SNI so NPM's vhost routing picks the
+      // right proxy host.
+      noTLSVerify: grpc,
+      originServerName: grpc ? hostname : undefined,
     });
 
     await recordProvisioningResult(exposureKey, {
@@ -283,6 +305,7 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
     const exposureKey = `${serviceName}:${extra.suffix}`;
     const extraHostname = `${serviceName}-${extra.suffix}.${globalConfig.baseDomain}`;
     const extraRow = await ensureSecondaryExposureRow(exposureKey, extraHostname);
+    const grpc = Boolean(extra.grpc);
 
     await provisionHostname({
       exposureKey,
@@ -290,9 +313,13 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
       upstreamPort: getPublishedUpstreamPort(serviceName, extra.portEnvVar),
       existingNpmHostId: extraRow.npm_host_id,
       autheliaProtected: false,
-      grpc: Boolean(extra.grpc),
+      grpc,
       globalConfig,
-      originUrl,
+      // Cloudflare requires a real TLS+HTTP2/ALPN hop to the origin for
+      // gRPC — plain HTTP + http2Origin is a no-op (see
+      // getNpmGrpcOriginUrl). Every other exposure stays plain HTTP
+      // internally; this is deliberately the one exception.
+      originUrl: grpc ? getNpmGrpcOriginUrl(globalConfig.npmApiUrl) : originUrl,
       userId,
       auditResource: `${serviceName} (${extra.label})`,
     }).catch((error: Error) => {

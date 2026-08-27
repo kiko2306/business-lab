@@ -17,7 +17,7 @@ const baseOptions = {
   originUrl: 'http://172.17.0.1:8000',
 };
 
-function mockConfig(ingress: Array<{ hostname?: string; service: string }>) {
+function mockConfig(ingress: Array<{ hostname?: string; service: string; originRequest?: Record<string, unknown> }>) {
   mockedRequestJson.mockResolvedValueOnce({
     statusCode: 200,
     body: { success: true, result: { config: { ingress } } },
@@ -125,6 +125,60 @@ describe('ensureIngressRoute', () => {
     ]);
 
     const result = await ensureIngressRoute({ ...baseOptions, http2Origin: true });
+
+    expect(result).toEqual({ updated: true, dnsRecordId: 'dns-1' });
+  });
+
+  it('sets noTLSVerify and originServerName on a new rule when requested', async () => {
+    mockConfig([{ service: 'http_status:404' }]);
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { success: true, result: {} }, raw: '' }); // put config
+    mockDnsRecords([]);
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: { success: true, result: { id: 'dns-1' } },
+      raw: '',
+    }); // create dns record
+
+    await ensureIngressRoute({
+      ...baseOptions,
+      http2Origin: true,
+      noTLSVerify: true,
+      originServerName: baseOptions.hostname,
+    });
+
+    const putCall = mockedRequestJson.mock.calls[1];
+    const putBody = (
+      putCall[1] as {
+        body: { config: { ingress: Array<{ originRequest?: { http2Origin?: boolean; noTLSVerify?: boolean; originServerName?: string } }> } };
+      }
+    ).body;
+    expect(putBody.config.ingress[0].originRequest).toEqual({
+      http2Origin: true,
+      noTLSVerify: true,
+      originServerName: baseOptions.hostname,
+    });
+  });
+
+  it('treats a matching rule with a stale originServerName as drift', async () => {
+    mockConfig([
+      {
+        hostname: 'paperless.example.com',
+        service: baseOptions.originUrl,
+        originRequest: { http2Origin: true, noTLSVerify: true, originServerName: 'old-name.example.com' },
+      },
+      { service: 'http_status:404' },
+    ]);
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { success: true, result: {} }, raw: '' }); // put config
+    mockDnsRecords([
+      { id: 'dns-1', type: 'CNAME', name: 'paperless.example.com', content: 'tunnel-1.cfargotunnel.com' },
+    ]);
+
+    const result = await ensureIngressRoute({
+      ...baseOptions,
+      http2Origin: true,
+      noTLSVerify: true,
+      originServerName: 'new-name.example.com',
+    });
 
     expect(result).toEqual({ updated: true, dnsRecordId: 'dns-1' });
   });

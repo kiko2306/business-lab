@@ -12,6 +12,10 @@ export interface RequestJsonOptions {
   method?: string;
   headers?: Record<string, string>;
   body?: unknown;
+  // Pre-built request body (e.g. a multipart/form-data payload) sent as-is,
+  // bypassing JSON.stringify — the caller must set its own Content-Type
+  // header. Takes precedence over `body` if both are given.
+  rawBody?: Buffer;
   timeout?: number;
 }
 
@@ -21,7 +25,7 @@ export interface RequestJsonOptions {
  */
 export function requestJson<T = unknown>(
   urlString: string,
-  { method = 'GET', headers = {}, body, timeout = 10000 }: RequestJsonOptions = {}
+  { method = 'GET', headers = {}, body, rawBody, timeout = 10000 }: RequestJsonOptions = {}
 ): Promise<JsonResponse<T>> {
   return new Promise((resolve, reject) => {
     let url: URL;
@@ -33,11 +37,13 @@ export function requestJson<T = unknown>(
     }
 
     const transport = url.protocol === 'http:' ? http : https;
-    const payload = body !== undefined ? JSON.stringify(body) : null;
+    const payload = rawBody ?? (body !== undefined ? JSON.stringify(body) : null);
     const requestHeaders: Record<string, string> = { ...headers };
-    if (payload !== null) {
+    if (rawBody) {
+      requestHeaders['Content-Length'] = String(rawBody.length);
+    } else if (payload !== null) {
       requestHeaders['Content-Type'] = 'application/json';
-      requestHeaders['Content-Length'] = String(Buffer.byteLength(payload));
+      requestHeaders['Content-Length'] = String(Buffer.byteLength(payload as string));
     }
 
     const request = transport.request(url, { method, headers: requestHeaders }, (response) => {

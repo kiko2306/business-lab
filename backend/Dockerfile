@@ -26,7 +26,9 @@ ARG DOCKER_GID=999
 # docker CLI + compose plugin are required to start/stop the managed app stacks.
 # postgresql16-client provides pg_dump/pg_restore, matching the postgres:16-alpine database image.
 # su-exec lets the entrypoint fix volume ownership as root, then drop to appuser.
-RUN apk add --no-cache docker-cli docker-cli-compose postgresql16-client su-exec
+# openssl generates the self-signed cert gRPC exposures upload to NPM — see
+# ensureGrpcCertificate in npmClient.ts.
+RUN apk add --no-cache docker-cli docker-cli-compose postgresql16-client su-exec openssl
 
 RUN set -eux; \
     addgroup -S appgroup; \
