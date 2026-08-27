@@ -43,11 +43,23 @@ export interface ServiceAdditionalExposure {
   portEnvVar: string;
 }
 
+// Groups services on the dashboard so the grid reads by function instead of
+// as one flat list of 25+ cards.
+export type ServiceCategory =
+  | 'Networking & Security'
+  | 'Monitoring & Management'
+  | 'Media'
+  | 'Backup & Storage'
+  | 'Productivity'
+  | 'Home Automation'
+  | 'Development';
+
 export interface ServiceDefinition {
   name: string;
   label: string;
   description: string;
   icon: string;
+  category: ServiceCategory;
   composePath: string;
   healthCheck: ServiceHealthCheck;
   exposureEnvKeys?: ServiceExposureEnvKeys;
@@ -70,6 +82,7 @@ export interface ServiceStatusPayload {
   label?: string;
   description?: string;
   icon?: string;
+  category?: ServiceCategory;
   state: ServiceState;
   healthy: boolean;
   lastChecked?: Date;

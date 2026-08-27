@@ -657,6 +657,9 @@ Numbers below double as the reference used elsewhere in this log (e.g.
    pass. Still worth prioritizing given the dashboard is already
    internet-facing via the tunnel (see §17.2). **Priority: P1** —
    **Estimate: M (likely undersized)**
+9. [x] **Organize dashboard apps by type** — the service grid was one flat
+   list of 25+ cards with no grouping. Implemented this session — see §18.4.
+   **Priority: P2** — **Estimate: S**
 
 ### 18.3 Item 1 (backups) — implementation notes
 Implemented as an opt-in schedule (default off) rather than adding a cron
@@ -719,3 +722,40 @@ in behavior; the new code sits alongside it.
   switch in the browser, confirming a scheduled run actually fires) — no
   admin session was available in this environment to exercise it through
   the UI. Worth a manual pass next time the dashboard is open.
+
+### 18.4 Item 9 (organize apps by type) — implementation notes
+Added a `category: ServiceCategory` field to the service registry rather than
+inferring grouping client-side from label/description text, so the mapping
+lives in one place (`backend/src/config/services.ts`) and is explicit.
+
+- **`backend/src/types/index.ts`** — new `ServiceCategory` union (7 values:
+  Networking & Security, Monitoring & Management, Media, Backup & Storage,
+  Productivity, Home Automation, Development); `category` added as a
+  required field on `ServiceDefinition` and optional on `ServiceStatusPayload`
+  (optional there so older/partial payloads on the error path still typecheck).
+- **`backend/src/config/services.ts`** — every one of the 25 registered
+  services tagged with a category.
+- **`backend/src/services/status.ts`** — `getServiceStatus` now copies
+  `service.category` onto both the success and error-path response payloads.
+- **`frontend/src/app/core/models.ts`** — mirrored `ServiceCategory` union;
+  `ServiceStatus.category` added as optional (older cached API responses or a
+  service missing from the registry shouldn't break rendering).
+- **`frontend/src/app/pages/dashboard/dashboard.component.ts`** — added a
+  `groupServicesByCategory()` function grouping the flat service list into
+  category buckets, ordered by a fixed `CATEGORY_ORDER` array with an
+  "Other" bucket last as a fallback for anything uncategorized.
+- **`frontend/src/app/pages/dashboard/dashboard.component.html`** — the
+  service grid now iterates category groups, each rendered as its own
+  `<h2>` heading followed by its row of cards, instead of one flat grid.
+  `allServices` passed to `app-service-card` is still the full unfiltered
+  list (needed for its own `dependsOn` lookups across categories), not the
+  per-group slice.
+- **Verified**: backend `tsc --noEmit` and `vitest run` clean (49 tests, up
+  from 46 — no new tests added, but two `exposure.test.ts` mock service
+  objects needed a `category` field added to satisfy the now-required type).
+  Frontend `ng build` clean (same pre-existing bundle-size budget warning as
+  before, unrelated). **Not verified**: the existing Karma/Jasmine frontend
+  spec suite — this environment's apt-installed Chromium version didn't
+  match what Puppeteer expected, an unrelated pre-existing tooling gap (no
+  dashboard/service-card spec files exist yet to cover this change anyway).
+  Not exercised live in a browser against the real deployment.

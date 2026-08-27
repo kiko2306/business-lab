@@ -9,11 +9,21 @@ export interface AuthResponse {
   user: User;
 }
 
+export type ServiceCategory =
+  | 'Networking & Security'
+  | 'Monitoring & Management'
+  | 'Media'
+  | 'Backup & Storage'
+  | 'Productivity'
+  | 'Home Automation'
+  | 'Development';
+
 export interface ServiceStatus {
   name: string;
   label: string;
   description: string;
   icon: string;
+  category?: ServiceCategory;
   state: 'running' | 'stopped' | 'starting' | 'error' | 'unknown';
   healthy: boolean;
   lastChecked: string;

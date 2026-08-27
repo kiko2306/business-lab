@@ -64,16 +64,21 @@
     </section>
 
     <section *ngIf="serviceState.services$ | async as services; else loadingState">
-      <div *ngIf="services.length; else emptyState" class="row g-3">
-        <div class="col-12 col-md-6 col-xl-4 col-xxl-3" *ngFor="let service of services; trackBy: trackByService">
-          <app-service-card
-            [service]="service"
-            [allServices]="services"
-            [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
-            (actionRequested)="handleAction(service.name, $event)"
-          ></app-service-card>
+      <ng-container *ngIf="services.length; else emptyState">
+        <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(services)">
+          <h2 class="h5 mb-3">{{ group.category }}</h2>
+          <div class="row g-3">
+            <div class="col-12 col-md-6 col-xl-4 col-xxl-3" *ngFor="let service of group.services; trackBy: trackByService">
+              <app-service-card
+                [service]="service"
+                [allServices]="services"
+                [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
+                (actionRequested)="handleAction(service.name, $event)"
+              ></app-service-card>
+            </div>
+          </div>
         </div>
-      </div>
+      </ng-container>
     </section>
 
     <section id="settings" class="mt-5 pt-4 border-top">

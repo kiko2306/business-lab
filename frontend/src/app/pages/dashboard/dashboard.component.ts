@@ -7,9 +7,42 @@ import { ServiceStateService } from '../../core/service-state.service';
 import { ServiceCardComponent } from '../../components/service-card/service-card.component';
 import { SettingsPanelComponent } from '../../components/settings-panel/settings-panel.component';
 import { OperationsService } from '../../core/operations.service';
-import { BackupFile, BackupScheduleConfig, HealthStatus } from '../../core/models';
+import { BackupFile, BackupScheduleConfig, HealthStatus, ServiceCategory, ServiceStatus } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
+
+// Fixed display order; anything without a recognized category (or an older
+// cached API response predating this field) falls back to "Other" at the end.
+const CATEGORY_ORDER: ServiceCategory[] = [
+  'Networking & Security',
+  'Monitoring & Management',
+  'Media',
+  'Backup & Storage',
+  'Productivity',
+  'Home Automation',
+  'Development',
+];
+
+interface ServiceGroup {
+  category: string;
+  services: ServiceStatus[];
+}
+
+function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
+  const byCategory = new Map<string, ServiceStatus[]>();
+  for (const service of services) {
+    const category = service.category ?? 'Other';
+    const bucket = byCategory.get(category);
+    if (bucket) {
+      bucket.push(service);
+    } else {
+      byCategory.set(category, [service]);
+    }
+  }
+
+  const orderedCategories = [...CATEGORY_ORDER, 'Other'].filter((category) => byCategory.has(category));
+  return orderedCategories.map((category) => ({ category, services: byCategory.get(category)! }));
+}
 
 @Component({
   selector: 'app-dashboard',
@@ -25,6 +58,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly toast = inject(ToastService);
 
   protected readonly user$ = this.authService.user$;
+  protected readonly groupServicesByCategory = groupServicesByCategory;
   protected backups: BackupFile[] = [];
   protected health: HealthStatus | null = null;
   protected schedule: BackupScheduleConfig = { enabled: false, frequency: 'daily', retentionCount: 14, lastRunAt: null };

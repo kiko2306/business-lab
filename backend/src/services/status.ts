@@ -129,6 +129,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       label: service.label,
       description: service.description,
       icon: service.icon,
+      category: service.category,
       state,
       healthy,
       lastChecked: new Date(),
@@ -141,6 +142,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
     return {
       name: serviceName,
       label: service.label,
+      category: service.category,
       state: 'error',
       healthy: false,
       error: message,

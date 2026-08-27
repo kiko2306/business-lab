@@ -19,6 +19,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Nginx Proxy Manager',
     description: 'Reverse proxy and certificate management',
     icon: 'nginx',
+    category: 'Networking & Security',
     composePath: 'apps/nginx-proxy-manager/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -33,6 +34,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Netbird VPN',
     description: 'Zero-trust VPN and network access',
     icon: 'vpn',
+    category: 'Networking & Security',
     composePath: 'apps/netbird-vpn/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -52,6 +54,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Home Assistant',
     description: 'Home automation platform',
     icon: 'home',
+    category: 'Home Automation',
     composePath: 'apps/home-assistant/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -66,6 +69,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Code Server',
     description: 'VS Code in the browser',
     icon: 'code',
+    category: 'Development',
     composePath: 'apps/code-server/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -80,6 +84,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'BookStack',
     description: 'Wiki and knowledge management',
     icon: 'book',
+    category: 'Productivity',
     composePath: 'apps/bookstack/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -94,6 +99,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'File Browser',
     description: 'Web-based file manager',
     icon: 'folder',
+    category: 'Backup & Storage',
     composePath: 'apps/file-browser/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -104,6 +110,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Home Page',
     description: 'Custom start page dashboard',
     icon: 'dashboard',
+    category: 'Productivity',
     composePath: 'apps/home-page/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -118,6 +125,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'n8n',
     description: 'Workflow automation platform',
     icon: 'workflow',
+    category: 'Productivity',
     composePath: 'apps/n8n/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -132,6 +140,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Paperless',
     description: 'Document management system',
     icon: 'document',
+    category: 'Backup & Storage',
     composePath: 'apps/paperless/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -146,6 +155,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Pi-hole',
     description: 'DNS ad blocker',
     icon: 'shield',
+    category: 'Networking & Security',
     composePath: 'apps/pihole/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -156,6 +166,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Speedtest',
     description: 'Internet speed testing tool',
     icon: 'speed',
+    category: 'Monitoring & Management',
     composePath: 'apps/speedtest/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -166,6 +177,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Tailscale',
     description: 'Mesh VPN service',
     icon: 'vpn',
+    category: 'Networking & Security',
     composePath: 'apps/tailscale/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -176,6 +188,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Dozzle',
     description: 'Real-time Docker container log viewer',
     icon: 'logs',
+    category: 'Monitoring & Management',
     composePath: 'apps/dozzle/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -186,6 +199,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Beszel',
     description: 'Lightweight server monitoring hub',
     icon: 'monitor',
+    category: 'Monitoring & Management',
     composePath: 'apps/beszel/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -200,6 +214,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Mealie',
     description: 'Recipe manager and meal planner',
     icon: 'food',
+    category: 'Productivity',
     composePath: 'apps/mealie/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -210,6 +225,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Portainer',
     description: 'Docker container management UI',
     icon: 'container',
+    category: 'Monitoring & Management',
     composePath: 'apps/portainer/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -225,6 +241,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Vaultwarden',
     description: 'Self-hosted password manager (Bitwarden-compatible)',
     icon: 'lock',
+    category: 'Networking & Security',
     composePath: 'apps/vaultwarden/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -239,6 +256,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Uptime Kuma',
     description: 'Uptime and status monitoring with alerts',
     icon: 'pulse',
+    category: 'Monitoring & Management',
     composePath: 'apps/uptime-kuma/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -253,6 +271,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Authelia',
     description: 'Single sign-on and 2FA gateway',
     icon: 'key',
+    category: 'Networking & Security',
     composePath: 'apps/authelia/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -263,6 +282,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Duplicati',
     description: 'Encrypted offsite/cloud backup',
     icon: 'backup',
+    category: 'Backup & Storage',
     composePath: 'apps/duplicati/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -277,6 +297,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Nextcloud',
     description: 'File sync, calendar, and contacts',
     icon: 'cloud',
+    category: 'Backup & Storage',
     composePath: 'apps/nextcloud/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -291,6 +312,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Immich',
     description: 'Photo and video backup with mobile auto-upload',
     icon: 'photo',
+    category: 'Media',
     composePath: 'apps/immich/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -305,6 +327,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Jellyfin',
     description: 'Home media server',
     icon: 'media',
+    category: 'Media',
     composePath: 'apps/jellyfin/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -319,6 +342,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Vikunja',
     description: 'Task and project management',
     icon: 'tasks',
+    category: 'Productivity',
     composePath: 'apps/vikunja/docker-compose.yml',
     healthCheck: {
       enabled: false,
@@ -329,6 +353,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Watchtower',
     description: 'Automatic container image updates',
     icon: 'update',
+    category: 'Monitoring & Management',
     composePath: 'apps/watchtower/docker-compose.yml',
     healthCheck: {
       enabled: false,
