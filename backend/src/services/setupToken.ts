@@ -42,7 +42,13 @@ export async function getServiceSetupToken(serviceName: string): Promise<string 
     return null;
   }
 
-  const logs = await run(`docker logs ${containerName} 2>&1`);
+  // Strip ANSI escape codes (e.g. Portainer colorizes its log output) so
+  // they can't get swept into the captured token by a trailing \S+.
+  const logs = (await run(`docker logs ${containerName} 2>&1`)).replace(
+    // eslint-disable-next-line no-control-regex
+    /\x1b\[[0-9;]*m/g,
+    ''
+  );
   const match = new RegExp(service.setupToken.logPattern).exec(logs);
   return match?.[1] ?? null;
 }
