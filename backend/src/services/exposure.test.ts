@@ -203,7 +203,7 @@ describe('provisionServiceIfEnabled', () => {
       category: 'Networking & Security',
       composePath: '',
       healthCheck: { enabled: false },
-      additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT' }],
+      additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT', grpc: true }],
     });
     mockedGetPublishedUpstreamPort.mockImplementation((_name, portEnvVar) => (portEnvVar ? 8080 : 8081));
     mockedGetHostGatewayIp.mockResolvedValue('172.17.0.1');
@@ -214,10 +214,10 @@ describe('provisionServiceIfEnabled', () => {
 
     expect(result).toEqual({ attempted: true, success: true, hostname: 'netbird-vpn.example.com' });
     expect(mockedEnsureProxyHost).toHaveBeenCalledWith(
-      expect.objectContaining({ hostname: 'netbird-vpn.example.com', forwardPort: 8081, expectedHostId: 5 })
+      expect.objectContaining({ hostname: 'netbird-vpn.example.com', forwardPort: 8081, expectedHostId: 5, grpc: false })
     );
     expect(mockedEnsureProxyHost).toHaveBeenCalledWith(
-      expect.objectContaining({ hostname: 'netbird-vpn-api.example.com', forwardPort: 8080, expectedHostId: null })
+      expect.objectContaining({ hostname: 'netbird-vpn-api.example.com', forwardPort: 8080, expectedHostId: null, grpc: true })
     );
     expect(mockedGetPublishedUpstreamPort).toHaveBeenCalledWith('netbird-vpn', 'NETBIRD_MGMT_PORT');
   });

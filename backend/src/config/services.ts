@@ -47,7 +47,13 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // reachable hostname (<name>-api.<base-domain>) rather than the
     // internal container address. See NETBIRD_MGMT_API_ENDPOINT in
     // apps/netbird-vpn/docker-compose.yml.
-    additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT' }],
+    // grpc: true — native clients (mobile/desktop/CLI) call this endpoint
+    // over real gRPC, not just REST/grpc-web like the browser dashboard.
+    // That needs HTTP/2 end-to-end through the proxy, or their very first
+    // call (fetching the management server's public key) fails with
+    // "failed to check SSO support: failed getting management service
+    // public key". Plain proxy_pass (the default) is HTTP/1.1-only.
+    additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT', grpc: true }],
   },
   'home-assistant': {
     name: 'home-assistant',

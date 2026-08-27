@@ -94,6 +94,41 @@ describe('ensureIngressRoute', () => {
     await expect(ensureIngressRoute(baseOptions)).rejects.toThrow(/already exists and is not managed/);
   });
 
+  it('sets originRequest.http2Origin on a new rule when requested', async () => {
+    mockConfig([{ service: 'http_status:404' }]);
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { success: true, result: {} }, raw: '' }); // put config
+    mockDnsRecords([]);
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: { success: true, result: { id: 'dns-1' } },
+      raw: '',
+    }); // create dns record
+
+    await ensureIngressRoute({ ...baseOptions, http2Origin: true });
+
+    const putCall = mockedRequestJson.mock.calls[1];
+    const putBody = (putCall[1] as { body: { config: { ingress: Array<{ originRequest?: { http2Origin?: boolean } }> } } }).body;
+    expect(putBody.config.ingress[0].originRequest).toEqual({ http2Origin: true });
+  });
+
+  it('updates a matching-service rule when http2Origin drifts', async () => {
+    // cloudflared defaults to HTTP/1.1 to the origin, so a rule created
+    // before this flag existed has no originRequest at all — must be
+    // detected as drift and corrected, not treated as already-correct.
+    mockConfig([
+      { hostname: 'paperless.example.com', service: baseOptions.originUrl },
+      { service: 'http_status:404' },
+    ]);
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { success: true, result: {} }, raw: '' }); // put config
+    mockDnsRecords([
+      { id: 'dns-1', type: 'CNAME', name: 'paperless.example.com', content: 'tunnel-1.cfargotunnel.com' },
+    ]);
+
+    const result = await ensureIngressRoute({ ...baseOptions, http2Origin: true });
+
+    expect(result).toEqual({ updated: true, dnsRecordId: 'dns-1' });
+  });
+
   it('throws when reading the tunnel configuration fails', async () => {
     mockedRequestJson.mockResolvedValueOnce({
       statusCode: 403,

@@ -18,6 +18,7 @@ const baseOptions = {
   forwardPort: 8000,
   websocket: true,
   autheliaProtected: false,
+  grpc: false,
 };
 
 function mockLogin() {
@@ -37,6 +38,7 @@ describe('buildProxyHostPayload', () => {
       forwardPort: 8000,
       websocket: true,
       autheliaProtected: false,
+      grpc: false,
     });
 
     expect(payload).toMatchObject({
@@ -48,6 +50,7 @@ describe('buildProxyHostPayload', () => {
       block_exploits: true,
       caching_enabled: false,
       ssl_forced: false,
+      http2_support: false,
       advanced_config: '',
     });
   });
@@ -60,6 +63,7 @@ describe('buildProxyHostPayload', () => {
       forwardPort: 80,
       websocket: undefined as unknown as boolean,
       autheliaProtected: false,
+      grpc: false,
     });
     expect(payload.allow_websocket_upgrade).toBe(false);
   });
@@ -72,6 +76,7 @@ describe('buildProxyHostPayload', () => {
       forwardPort: 8000,
       websocket: true,
       autheliaProtected: true,
+      grpc: false,
     });
 
     expect(payload.advanced_config).toContain('include /snippets/authelia-location.conf;');
@@ -89,9 +94,26 @@ describe('buildProxyHostPayload', () => {
       forwardPort: 8000,
       websocket: true,
       autheliaProtected: true,
+      grpc: false,
     });
 
     expect(payload.allow_websocket_upgrade).toBe(false);
+  });
+
+  it('uses grpc_pass with http2_support on for a grpc upstream', () => {
+    const payload = buildProxyHostPayload({
+      hostname: 'netbird-vpn-api.example.com',
+      forwardScheme: 'http',
+      forwardHost: '172.17.0.1',
+      forwardPort: 8080,
+      websocket: true,
+      autheliaProtected: false,
+      grpc: true,
+    });
+
+    expect(payload.http2_support).toBe(true);
+    expect(payload.allow_websocket_upgrade).toBe(false);
+    expect(payload.advanced_config).toContain('grpc_pass grpc://172.17.0.1:8080;');
   });
 });
 
@@ -161,6 +183,31 @@ describe('ensureProxyHost', () => {
     mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { id: 9 }, raw: '' }); // update
 
     const result = await ensureProxyHost({ ...baseOptions, expectedHostId: 9, autheliaProtected: true });
+
+    expect(result).toEqual({ id: 9, created: false, updated: true });
+  });
+
+  it('updates an owned host when grpc support was turned on', async () => {
+    mockLogin();
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: [
+        {
+          id: 9,
+          domain_names: ['paperless.example.com'],
+          forward_scheme: 'http',
+          forward_host: '172.17.0.1',
+          forward_port: 8000,
+          allow_websocket_upgrade: true,
+          http2_support: false,
+          advanced_config: '',
+        },
+      ],
+      raw: '',
+    });
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { id: 9 }, raw: '' }); // update
+
+    const result = await ensureProxyHost({ ...baseOptions, expectedHostId: 9, grpc: true });
 
     expect(result).toEqual({ id: 9, created: false, updated: true });
   });

@@ -32,7 +32,11 @@ services:
       AUTH_AUDIENCE: netbird-dashboard
       AUTH_CLIENT_ID: netbird-dashboard
       AUTH_AUTHORITY: https://authelia.tx-home-utils.com
-      AUTH_SUPPORTED_SCOPES: "openid profile email"
+      # Must include offline_access, or Authelia never issues a refresh
+      # token — the dashboard's access token then simply expires with no
+      # way to silently renew it, breaking every API call (peers, users,
+      # ...) with "token expired" until a full manual re-login.
+      AUTH_SUPPORTED_SCOPES: "openid profile email offline_access"
       # Relative — the dashboard's own JS prepends its origin, so an absolute
       # URL here doubles up into "https://...comhttps://...com/nb-auth" and
       # Authelia rejects it as not matching the registered redirect_uris.

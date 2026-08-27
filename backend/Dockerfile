@@ -25,7 +25,8 @@ ARG DOCKER_GID=999
 
 # docker CLI + compose plugin are required to start/stop the managed app stacks.
 # postgresql16-client provides pg_dump/pg_restore, matching the postgres:16-alpine database image.
-RUN apk add --no-cache docker-cli docker-cli-compose postgresql16-client
+# su-exec lets the entrypoint fix volume ownership as root, then drop to appuser.
+RUN apk add --no-cache docker-cli docker-cli-compose postgresql16-client su-exec
 
 RUN set -eux; \
     addgroup -S appgroup; \
@@ -38,10 +39,12 @@ WORKDIR /app
 COPY package*.json ./
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=build /app/dist ./dist
-RUN chown -R appuser:appgroup /app
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chown -R appuser:appgroup /app && chmod +x /usr/local/bin/docker-entrypoint.sh
 
-USER appuser
-
+# Stays root here: the entrypoint fixes up the backups-data volume's
+# ownership (which Docker creates as root) before dropping to appuser.
 EXPOSE 3000
 
+ENTRYPOINT ["docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]

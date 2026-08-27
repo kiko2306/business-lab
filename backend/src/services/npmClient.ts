@@ -13,6 +13,7 @@ interface NpmProxyHost {
   forward_host: string;
   forward_port: number;
   allow_websocket_upgrade?: boolean;
+  http2_support?: boolean;
   advanced_config?: string;
 }
 
@@ -27,6 +28,7 @@ interface EnsureProxyHostOptions {
   forwardPort: number;
   websocket: boolean;
   autheliaProtected: boolean;
+  grpc: boolean;
 }
 
 // Gates a proxy host behind Authelia's forward-auth — see the snippet files
@@ -51,6 +53,17 @@ const AUTHELIA_ADVANCED_CONFIG = [
   '    proxy_pass $forward_scheme://$server:$port;',
   '}',
 ].join('\n');
+
+// Native gRPC (mobile/desktop/CLI clients — not the browser dashboard, which
+// uses REST/grpc-web over plain HTTP/1.1) requires HTTP/2 all the way to the
+// upstream. proxy_pass never speaks HTTP/2 to the backend regardless of
+// http2_support on the listener, so a gRPC-only location needs grpc_pass
+// instead — this fully replaces NPM's own auto-generated location /, same
+// reasoning as the Authelia block above. http2_support must also be turned
+// on at the host level (see buildProxyHostPayload) for the front-end side.
+function buildGrpcAdvancedConfig(forwardHost: string, forwardPort: number): string {
+  return ['location / {', `    grpc_pass grpc://${forwardHost}:${forwardPort};`, '}'].join('\n');
+}
 
 interface EnsureProxyHostResult {
   id: number;
@@ -99,9 +112,10 @@ export function buildProxyHostPayload({
   forwardPort,
   websocket,
   autheliaProtected,
+  grpc,
 }: Pick<
   EnsureProxyHostOptions,
-  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected'
+  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc'
 >) {
   return {
     domain_names: [hostname],
@@ -111,24 +125,28 @@ export function buildProxyHostPayload({
     block_exploits: true,
     caching_enabled: false,
     // NPM auto-injects proxy_http_version/Upgrade/Connection itself when
-    // this is on, regardless of a custom advanced_config — the Authelia
-    // block below sets those directives itself (since it fully replaces
-    // NPM's own location /), so leaving this also on for a protected host
-    // means both add the same directive and nginx fails to reload at all.
-    allow_websocket_upgrade: autheliaProtected ? false : Boolean(websocket),
+    // this is on, regardless of a custom advanced_config — the Authelia and
+    // gRPC blocks below set their own directives (since both fully replace
+    // NPM's own location /), so leaving this also on means both add the
+    // same directive and nginx fails to reload at all.
+    allow_websocket_upgrade: autheliaProtected || grpc ? false : Boolean(websocket),
     access_list_id: '0',
     certificate_id: 0,
     ssl_forced: false,
-    http2_support: false,
+    http2_support: grpc ? true : false,
     hsts_enabled: false,
     hsts_subdomains: false,
-    advanced_config: autheliaProtected ? AUTHELIA_ADVANCED_CONFIG : '',
+    advanced_config: grpc
+      ? buildGrpcAdvancedConfig(forwardHost, forwardPort)
+      : autheliaProtected
+        ? AUTHELIA_ADVANCED_CONFIG
+        : '',
   };
 }
 
 type ProxyHostWriteOptions = Pick<
   EnsureProxyHostOptions,
-  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected'
+  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc'
 >;
 
 async function createProxyHost(npmApiUrl: string, token: string, options: ProxyHostWriteOptions): Promise<NpmProxyHost> {
@@ -187,12 +205,13 @@ export async function ensureProxyHost({
   forwardPort,
   websocket,
   autheliaProtected,
+  grpc,
 }: EnsureProxyHostOptions): Promise<EnsureProxyHostResult> {
   const baseUrl = npmApiUrl.replace(/\/+$/, '');
   const token = await login(baseUrl, npmEmail, npmPassword);
   const existing = await findProxyHostByDomain(baseUrl, token, hostname);
 
-  const options = { hostname, forwardScheme, forwardHost, forwardPort, websocket, autheliaProtected };
+  const options = { hostname, forwardScheme, forwardHost, forwardPort, websocket, autheliaProtected, grpc };
 
   if (!existing) {
     const created = await createProxyHost(baseUrl, token, options);
@@ -206,13 +225,18 @@ export async function ensureProxyHost({
     throw new Error(`Nginx Proxy Manager host for ${hostname} already exists and is not managed by this service.`);
   }
 
-  const expectedAdvancedConfig = autheliaProtected ? AUTHELIA_ADVANCED_CONFIG : '';
-  const expectedWebsocketUpgrade = autheliaProtected ? false : Boolean(websocket);
+  const expectedAdvancedConfig = grpc
+    ? buildGrpcAdvancedConfig(forwardHost, forwardPort)
+    : autheliaProtected
+      ? AUTHELIA_ADVANCED_CONFIG
+      : '';
+  const expectedWebsocketUpgrade = autheliaProtected || grpc ? false : Boolean(websocket);
   const needsUpdate =
     existing.forward_scheme !== forwardScheme ||
     existing.forward_host !== forwardHost ||
     existing.forward_port !== forwardPort ||
     Boolean(existing.allow_websocket_upgrade) !== expectedWebsocketUpgrade ||
+    Boolean(existing.http2_support) !== grpc ||
     (existing.advanced_config ?? '') !== expectedAdvancedConfig;
 
   if (needsUpdate) {

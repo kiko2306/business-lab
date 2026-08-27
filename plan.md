@@ -885,3 +885,243 @@ to open each service card or run `docker ps` by hand.
   tool was available in this session and the dashboard's own login
   credentials weren't on hand. Worth a quick visual pass next time the
   dashboard is open.
+
+## 20. Session Log — 2026-08-27 (cont.): NetBird "peers not showing"
+
+### 20.1 Reported
+NetBird's dashboard `/peers` page shows no peers.
+
+### 20.2 Investigated
+Checked the live deployment directly (all three `netbird-vpn-*` containers
+running, ~3h uptime):
+- **`netbird-management` logs**: on boot, `No records in table peers, no
+  migration needed` — the peers table is genuinely empty, not a rendering
+  bug. Across the container's full uptime there is exactly one `/api/peers`
+  request logged, my own manual `curl` just now (`401`, expected without a
+  token) — **zero peer registration/login attempts have ever reached
+  management**. No client has ever run `netbird up` against this server.
+- **OIDC/auth plumbing**: healthy. Management fetches Authelia's OIDC config
+  successfully after one transient `502` retry at boot (cold-start race
+  between containers, not a config error — self-recovers, unrelated to
+  peers). The dashboard's own login flow completes fine — its access log
+  shows a real browser session hitting `/nb-auth` then `/peers` with a
+  `200`, i.e. dashboard login through Authelia already works.
+- **Public exposure**: both hostnames are provisioned and reachable —
+  `netbird-vpn.tx-home-utils.com` (dashboard) and
+  `netbird-vpn-api.tx-home-utils.com` (management API, the second hostname
+  the SPA calls directly from the browser per `additionalExposures` in
+  `backend/src/config/services.ts`). Confirmed live: `service_exposure` DB
+  rows for both show `status: provisioned` with no `last_error`, and
+  `curl https://netbird-vpn-api.tx-home-utils.com/api/peers` returns a
+  correct `401` (reachable, auth-gated, not a 502/timeout/DNS failure).
+- **STUN/TURN**: `data/management.json` has `"Stuns": []` and
+  `"TURNConfig": {"Turns": []}` — none configured. This doesn't affect
+  whether a peer *registers* (shows up in the list at all), only whether two
+  registered peers can actually establish a direct/relayed connection to
+  each other afterward. Worth fixing before this is relied on for real
+  connectivity, but it isn't the cause of an empty peers list.
+
+### 20.3 Conclusion
+Not a bug in this deployment's NetBird setup as far as could be verified —
+the peers list is empty because **no device has ever connected a NetBird
+client to this management server**, not because of a broken dashboard,
+auth, or exposure path. All the infrastructure a peer enrollment would need
+(public hostnames, OIDC, management API) checks out live. Could not verify
+further in this environment: there is no NetBird client available here to
+actually attempt `netbird up --management-url
+https://netbird-vpn-api.tx-home-utils.com` end-to-end.
+
+### 20.4 Root causes found and fixed (live debugging with the user)
+Two independent bugs, found by walking the browser dashboard and the mobile
+app through the failure live rather than guessing from logs alone.
+
+**Bug 1 — dashboard: missing `offline_access` scope.**
+`apps/netbird-vpn/docker-compose.yml`'s `AUTH_SUPPORTED_SCOPES` was `"openid
+profile email"` — no `offline_access` — even though Authelia's
+`netbird-dashboard` OIDC client (`apps/authelia/config/configuration.yml`)
+already allows `offline_access` and the `refresh_token` grant. Without
+requesting it, Authelia never issues a refresh token, so the dashboard's
+access token simply expired with no way to renew it, and every API call
+(including the peers list) started failing with `401 token expired` —
+confirmed live via the browser console. **Fixed**: added `offline_access`
+to `AUTH_SUPPORTED_SCOPES`; redeployed
+(`docker compose up -d --force-recreate netbird-dashboard`).
+
+**Bug 2 (the real blocker) — mobile/native clients: gRPC needs HTTP/2, proxy
+was HTTP/1.1-only.** After fixing Bug 1, the mobile app still failed with
+`failed to check SSO support: failed getting management service public
+key`. Root cause: NPM's proxy host for `netbird-vpn-api.tx-home-utils.com`
+had `http2 off;` / `proxy_http_version 1.1;`. That's fine for the browser
+dashboard (grpc-web tunnels over plain HTTP/1.1), but native NetBird clients
+(mobile/desktop/CLI) speak real gRPC, which needs HTTP/2 end-to-end —
+`proxy_pass` never speaks HTTP/2 to the upstream no matter what. This is
+almost certainly why the peers table was empty in the first place (§20.2):
+no native client could ever complete the initial gRPC handshake, through
+any reverse-proxy path, regardless of the dashboard bug above.
+
+**Fixed and automated**, not just patched live:
+- `backend/src/types/index.ts` — `ServiceAdditionalExposure` gained an
+  optional `grpc?: boolean` field.
+- `backend/src/config/services.ts` — netbird-vpn's `additionalExposures`
+  entry (the `-api` hostname) now sets `grpc: true`.
+- `backend/src/services/npmClient.ts` — new `buildGrpcAdvancedConfig(host,
+  port)` builds a `location / { grpc_pass grpc://host:port; }` block (fully
+  replacing NPM's auto-generated one, same pattern as the existing Authelia
+  block). `buildProxyHostPayload` now sets `http2_support: true` and this
+  `advanced_config`, and forces `allow_websocket_upgrade` off, whenever
+  `grpc` is true. `ensureProxyHost`'s drift check now also compares
+  `http2_support`, so a live host that regresses gets self-healed on the
+  next provisioning run (e.g. the existing "re-verify" button).
+- `backend/src/services/exposure.ts` — threads `grpc` from each
+  `additionalExposures` entry through to `ensureProxyHost` (primary hostname
+  always passes `grpc: false`).
+- Tests: `npmClient.test.ts` (+3: payload shape with `grpc: true`, drift
+  detection when grpc turns on) and `exposure.test.ts` (updated to assert
+  `grpc: true`/`false` land on the right hostname). Backend suite now 57
+  tests, `tsc --noEmit` clean.
+- **Verified live**: rebuilt and redeployed the backend
+  (`docker compose up -d --build backend`), then called
+  `provisionServiceIfEnabled('netbird-vpn', 1)` directly inside the running
+  container — this is the same path a real service start/re-verify takes,
+  not a one-off script. Confirmed `/data/nginx/proxy_host/10.conf` now has
+  `http2 on;` and `location / { grpc_pass grpc://172.17.0.1:8080; }`,
+  `nginx -t` passes, and `GET /api/peers` still correctly returns `401`
+  (REST traffic still works through the same `grpc_pass`'d location — the
+  management server's combined HTTP+gRPC handler serves both fine, this
+  isn't an either/or).
+- **This is now automated for every future setup** — a fresh deployment or
+  a rebuilt backend image provisions gRPC support on NetBird's API hostname
+  from the registry entry alone, no manual NPM/nginx editing needed. Any
+  other future service that mixes real gRPC with REST on one port can reuse
+  the same `grpc: true` flag on its `additionalExposures` entry.
+- **Not yet confirmed**: an actual end-to-end peer enrollment from the
+  mobile app (the user was retrying at the time this was written). If it
+  still fails after both fixes, the next thing to check is
+  `apps/netbird-vpn/data/management.json`'s empty `Stuns`/`TURNConfig.Turns`
+  — that wouldn't block registration but could block two registered peers
+  from actually connecting to each other.
+
+### 20.5 Status: still broken after both fixes — pick up here next session
+Both fixes in §20.4 are live and confirmed applied (not just "should be
+applied" — actually checked): NPM's `10.conf` has `http2 on;` +
+`grpc_pass grpc://172.17.0.1:8080;` (`nginx -t` passes), and Cloudflare's
+tunnel config for `netbird-vpn-api.tx-home-utils.com` has
+`originRequest.http2Origin: true` (confirmed via `GET
+.../cfd_tunnel/{id}/configurations` directly, not just "we wrote it").
+`journalctl -u cloudflared` shows cloudflared reloaded that exact config at
+`2026-08-27T10:45:28Z` (`event=... Updated to new configuration ...
+netbird-vpn-api.tx-home-utils.com ... originRequest:{"http2Origin":true}`).
+
+**Yet the mobile app retry after all of this still fails with the same
+`failed to check SSO support: failed getting management service public
+key`.** Don't re-apply either fix again next session — both are verifiably
+live. The bug is somewhere past them. Two concrete leads, unexplored:
+
+1. **No request-level cloudflared log for `netbird-vpn-api` at all, before
+   or after the config reload.** `journalctl -u cloudflared --since <retry
+   time>` shows nothing hostname-matching `netbird-vpn-api` — not a success,
+   not a `502`, nothing. Either the mobile app's request never actually
+   reaches Cloudflare's edge for this hostname (DNS? a client-side cached
+   failure without a new attempt? wrong hostname/port entered in the app?),
+   or cloudflared logs gRPC-level failures at a level below `INF` (default).
+   **Next step**: run `cloudflared` with `--loglevel debug` (or bump the
+   systemd unit's log level, then `journalctl -u cloudflared -f`) and watch
+   it live during a fresh mobile-app retry, to see whether the request
+   arrives at all and if so exactly how it fails.
+2. **`http2Origin` may require an HTTPS origin to mean anything.**
+   Cloudflare's own docs describe `http2Origin` as negotiating HTTP/2 via
+   ALPN — which is a TLS handshake feature. The origin service here is
+   `http://192.168.1.23` (confirmed live, in both the NPM payload and the
+   cloudflared config dump above) — **plain HTTP, no TLS**, because this
+   whole chain (NPM → management) was built as an internal cleartext hop
+   with TLS terminated at Cloudflare's edge. If `http2Origin` is a no-op
+   against a non-TLS origin, cloudflared may still be talking HTTP/1.1 to
+   NPM regardless of the flag, which would explain the persisting failure
+   even with everything upstream of that hop fixed. **Not yet confirmed
+   either way** — needs the debug-log check in (1) to see what protocol
+   cloudflared actually negotiates, or a targeted search of cloudflared's
+   docs/source for whether `http2Origin` silently no-ops on an `http://`
+   service URL.
+   - If confirmed, the fix would be giving NPM's `netbird-vpn-api` host a
+     real TLS listener (self-signed is fine, `noTLSVerify: true` on the
+     Cloudflare Tunnel side) so cloudflared can ALPN-negotiate HTTP/2 for
+     real, matching NetBird's own documented nginx reverse-proxy examples
+     (which assume `listen 443 ssl http2;`, not a cleartext listener). That
+     would mean widening `additionalExposures`/`ensureProxyHost` further:
+     an `https`-scheme origin option for `grpc` exposures specifically,
+     since every other exposure in this app deliberately stays plain HTTP
+     internally (TLS only at the edge) — this one may be the exception.
+
+**Also still unconfirmed** (unrelated to the above, don't forget): whether
+`Stuns`/`TURNConfig.Turns` being empty in
+`apps/netbird-vpn/data/management.json` would block anything further even
+if enrollment itself starts working — irrelevant until enrollment succeeds
+at all.
+
+### 20.5a New detail from the user, changes the leading hypothesis
+The mobile app's actual error also includes **`403` with an unexpected
+`Content-Type: text/html`** (the user reported this after the write-up
+above was already logged). This reframes things:
+
+- A `403` + HTML body is Cloudflare's own edge block/challenge page shape
+  (WAF rule or Bot Fight Mode), not something NPM or the management
+  container would produce for a gRPC call — nginx's own 403 error page is
+  also HTML by default, but see below for why Cloudflare's edge is more
+  likely than nginx here.
+- This lines up with the already-noted oddity in 20.5 item 1: **zero
+  request-level cloudflared log entries for `netbird-vpn-api`, before or
+  after the config reload, across multiple retries.** If Cloudflare's edge
+  is blocking/challenging the request before it ever reaches the tunnel,
+  cloudflared would never log it at all — which is exactly what's observed.
+  A native gRPC client (Go-based user agent, binary protobuf POST body, no
+  browser session/cookies, first contact with no prior page load) is a very
+  typical profile for Cloudflare's Bot Fight Mode or a managed WAF rule to
+  challenge, since it looks nothing like a browser.
+- Also worth reconsidering: nginx's `grpc_pass` does **not** require the
+  downstream (client-facing) leg to already be HTTP/2 — it translates
+  whatever protocol the client used into HTTP/2 toward the upstream
+  regardless. That's consistent with the earlier `curl .../api/peers` test
+  succeeding over what was almost certainly a plain HTTP/1.1 hop. So the
+  `http2Origin`/TLS-ALPN theory from 20.5 item 2 is weaker than first
+  thought — nginx's own protocol translation may make it unnecessary. Don't
+  chase that lead first next session; chase the Cloudflare edge one below.
+
+### 20.6 Outstanding TODO
+- [ ] **First thing next session: get Claude access to Cloudflare Security
+      Events/WAF for this zone.** The API token currently stored in this
+      app's exposure settings is scoped to DNS + Tunnel config only, so the
+      investigation below had to be handed back to the user to check
+      manually in the dashboard. Widen the token's permissions (or provide
+      a separate one) to include Zone → Firewall Services/WAF → Read (and
+      ideally Edit, to add the exception in the next item too) so this can
+      be checked and fixed directly instead of relayed through the user.
+      **Priority: P0** — **Estimate: S**
+- [ ] **Check Cloudflare's zone security settings for `tx-home-utils.com`**
+      (Security → WAF managed rules, Bot Fight Mode / Super Bot Fight Mode,
+      Security Level) and check for a block/challenge event logged against
+      `netbird-vpn-api.tx-home-utils.com` in the Cloudflare dashboard's
+      Security Events log. This is the fastest way to confirm or rule out
+      the edge-blocking hypothesis in 20.5a — needs the Cloudflare
+      dashboard directly, since the API token this app stores is scoped to
+      DNS + Tunnel config, not WAF/security settings. **Priority: P0** —
+      **Estimate: S**
+- [ ] **If confirmed, add a WAF/Bot Fight Mode exception for
+      `netbird-vpn-api.tx-home-utils.com`** (a Configuration Rule or WAF
+      custom rule skipping bot checks for that one hostname, since it's a
+      machine-to-machine API that will never solve a JS/managed challenge).
+      **Priority: P0** — **Estimate: S**, once the above confirms it.
+- [ ] **Debug-log cloudflared during a live mobile-app retry** — only if the
+      Cloudflare-edge lead above doesn't pan out. See 20.5 item 1.
+      **Priority: P1** — **Estimate: S**
+- [ ] **Determine whether `http2Origin` needs an HTTPS origin** — now the
+      weaker lead (see 20.5a) — only chase this after the above two are
+      ruled out. **Priority: P2** — **Estimate: M**
+- [ ] **Confirm a real peer actually enrolls and shows up** — once the
+      above is resolved, re-test the mobile app connection and tail
+      `docker logs netbird-vpn-netbird-management-1` during the attempt.
+      **Priority: P0** — **Estimate: S**
+- [ ] **Configure STUN/TURN** — `Stuns`/`TURNConfig.Turns` are both empty in
+      `apps/netbird-vpn/data/management.json`. Won't block registration, but
+      peers behind NAT likely can't connect to each other without it. Not
+      worth touching until enrollment itself works. **Priority: P1** —
+      **Estimate: S–M**

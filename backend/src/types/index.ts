@@ -41,6 +41,11 @@ export interface ServiceAdditionalExposure {
   // one port, so "first port in the file" (the single-hostname default)
   // can't tell them apart. See getPublishedUpstreamPort.
   portEnvVar: string;
+  // True if this upstream serves real gRPC (not grpc-web) alongside its REST
+  // API on the same port — native clients need HTTP/2 end-to-end, which
+  // plain proxy_pass doesn't provide. See buildGrpcAdvancedConfig in
+  // npmClient.ts. Defaults to false (plain HTTP/1.1 proxying).
+  grpc?: boolean;
 }
 
 // Groups services on the dashboard so the grid reads by function instead of

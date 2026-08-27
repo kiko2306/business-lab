@@ -134,6 +134,7 @@ interface ProvisionHostnameOptions {
   upstreamPort: number | null;
   existingNpmHostId: number | null;
   autheliaProtected: boolean;
+  grpc: boolean;
   globalConfig: ExposureGlobalConfig;
   originUrl: string;
   userId: number;
@@ -151,6 +152,7 @@ async function provisionHostname({
   upstreamPort,
   existingNpmHostId,
   autheliaProtected,
+  grpc,
   globalConfig,
   originUrl,
   userId,
@@ -177,6 +179,7 @@ async function provisionHostname({
       forwardPort: upstreamPort,
       websocket: ALLOW_WEBSOCKET_UPGRADE,
       autheliaProtected,
+      grpc,
     });
 
     // Persist ownership before the Cloudflare call so a later retry can safely
@@ -194,6 +197,9 @@ async function provisionHostname({
       tunnelId: globalConfig.cloudflareTunnelId,
       hostname,
       originUrl,
+      // Same reasoning as the NPM side (grpc flag) — cloudflared defaults to
+      // HTTP/1.1 to the origin regardless of what the origin speaks.
+      http2Origin: grpc,
     });
 
     await recordProvisioningResult(exposureKey, {
@@ -265,6 +271,7 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
     // Authelia can't gate itself — the auth_request call would loop back
     // into its own unauthenticated login page.
     autheliaProtected: serviceName === 'authelia' ? false : exposureRow.authelia_protected,
+    grpc: false,
     globalConfig,
     originUrl,
     userId,
@@ -283,6 +290,7 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
       upstreamPort: getPublishedUpstreamPort(serviceName, extra.portEnvVar),
       existingNpmHostId: extraRow.npm_host_id,
       autheliaProtected: false,
+      grpc: Boolean(extra.grpc),
       globalConfig,
       originUrl,
       userId,

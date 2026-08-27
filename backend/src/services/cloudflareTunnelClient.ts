@@ -110,6 +110,12 @@ interface EnsureIngressRouteOptions {
   tunnelId: string;
   hostname: string;
   originUrl: string;
+  // cloudflared defaults to HTTP/1.1 when connecting to the origin,
+  // regardless of what the origin itself supports — real gRPC upstreams
+  // (see the `grpc` flag on ServiceAdditionalExposure) need this set, or
+  // the tunnel silently downgrades every request before it reaches the
+  // origin's HTTP/2 listener.
+  http2Origin?: boolean;
 }
 
 interface DnsRecord {
@@ -176,19 +182,27 @@ export async function ensureIngressRoute({
   tunnelId,
   hostname,
   originUrl,
+  http2Origin,
 }: EnsureIngressRouteOptions): Promise<{ updated: boolean; dnsRecordId: string }> {
   const config = await getTunnelConfiguration(apiToken, accountId, tunnelId);
   const ingress = Array.isArray(config.ingress) ? [...config.ingress] : [];
 
   const existingIndex = ingress.findIndex((rule) => rule.hostname === hostname);
-  const desiredRule: IngressRule = { hostname, service: originUrl };
+  const expectedHttp2Origin = Boolean(http2Origin);
+  const desiredRule: IngressRule = {
+    hostname,
+    service: originUrl,
+    originRequest: expectedHttp2Origin ? { http2Origin: true } : undefined,
+  };
 
   let updated = false;
   if (existingIndex >= 0) {
-    if (ingress[existingIndex].service === originUrl) {
+    const existingRule = ingress[existingIndex] as IngressRule & { originRequest?: { http2Origin?: boolean } };
+    const existingHttp2Origin = Boolean(existingRule.originRequest?.http2Origin);
+    if (existingRule.service === originUrl && existingHttp2Origin === expectedHttp2Origin) {
       // The ingress route is already correct; still verify the DNS record.
     } else {
-      ingress[existingIndex] = { ...ingress[existingIndex], ...desiredRule };
+      ingress[existingIndex] = { ...existingRule, ...desiredRule };
       updated = true;
     }
   } else {
