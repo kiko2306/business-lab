@@ -31,33 +31,21 @@ interface ServiceGroup {
 interface ServicePortRow {
   serviceName: string;
   label: string;
-  hostPort: string;
-  containerPort: string;
-  protocol: string;
+  ports: ServiceStatus['ports'];
 }
 
-// Flattened one-row-per-published-port list for the "running app ports"
-// table — only running services that actually publish a host port show up.
+// One row per running app for the "running app ports" table — all of an
+// app's published ports are listed together instead of one row each.
 function getRunningServicePorts(services: ServiceStatus[]): ServicePortRow[] {
   const rows: ServicePortRow[] = [];
   for (const service of services) {
-    if (service.state !== 'running') {
+    if (service.state !== 'running' || !service.ports?.length) {
       continue;
     }
-    for (const port of service.ports ?? []) {
-      rows.push({
-        serviceName: service.name,
-        label: service.label,
-        hostPort: port.hostPort,
-        containerPort: port.containerPort,
-        protocol: port.protocol,
-      });
-    }
+    rows.push({ serviceName: service.name, label: service.label, ports: service.ports });
   }
 
-  return rows.sort(
-    (a, b) => a.label.localeCompare(b.label) || Number(a.hostPort) - Number(b.hostPort)
-  );
+  return rows.sort((a, b) => a.label.localeCompare(b.label));
 }
 
 function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
@@ -133,8 +121,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return group.category;
   }
 
-  trackByPortRow(_index: number, row: { serviceName: string; hostPort: string; protocol: string }): string {
-    return `${row.serviceName}:${row.hostPort}/${row.protocol}`;
+  trackByPortRow(_index: number, row: { serviceName: string }): string {
+    return row.serviceName;
   }
 
   loadBackups(): void {
