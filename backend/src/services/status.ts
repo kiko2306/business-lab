@@ -134,6 +134,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       healthy,
       lastChecked: new Date(),
       setupTokenSupported: Boolean(service.setupToken),
+      adminUserManagementSupported: Boolean(service.supportsAdminUserManagement),
       dependsOn: service.dependsOn,
     };
   } catch (error) {

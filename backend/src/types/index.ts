@@ -64,6 +64,10 @@ export interface ServiceDefinition {
   healthCheck: ServiceHealthCheck;
   exposureEnvKeys?: ServiceExposureEnvKeys;
   setupToken?: ServiceSetupToken;
+  // Whether this service exposes a manageable admin account from the
+  // dashboard (currently only Authelia's file-based users_database.yml —
+  // see services/autheliaUsers.ts).
+  supportsAdminUserManagement?: boolean;
   // Other SERVICES keys (separate compose projects) that must already be
   // running before this one can start — e.g. an app that authenticates
   // against Authelia's OIDC provider needs Authelia up first.
@@ -88,6 +92,7 @@ export interface ServiceStatusPayload {
   lastChecked?: Date;
   error?: string;
   setupTokenSupported?: boolean;
+  adminUserManagementSupported?: boolean;
   dependsOn?: string[];
 }
 

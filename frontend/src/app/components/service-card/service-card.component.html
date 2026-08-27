@@ -184,5 +184,51 @@
         </ng-container>
       </div>
     </div>
+
+    <div class="pt-2" *ngIf="service.adminUserManagementSupported">
+      <button type="button" class="btn btn-link btn-sm px-0" (click)="toggleAdminUserPanel()">
+        {{ adminUserPanelOpen ? 'Hide admin account' : 'Admin account' }}
+      </button>
+
+      <div *ngIf="adminUserPanelOpen" class="admin-user-panel border-top pt-3 mt-1">
+        <div *ngIf="adminUserLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
+          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+          Loading...
+        </div>
+
+        <ng-container *ngIf="!adminUserLoading && adminUser">
+          <div class="mb-2">
+            <label class="form-label small mb-1" [for]="'admin-username-' + service.name">Username</label>
+            <input class="form-control form-control-sm" [id]="'admin-username-' + service.name" [(ngModel)]="adminUserForm.username" />
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1" [for]="'admin-displayname-' + service.name">Display name</label>
+            <input class="form-control form-control-sm" [id]="'admin-displayname-' + service.name" [(ngModel)]="adminUserForm.displayName" />
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1" [for]="'admin-email-' + service.name">Email</label>
+            <input type="email" class="form-control form-control-sm" [id]="'admin-email-' + service.name" [(ngModel)]="adminUserForm.email" />
+          </div>
+          <div class="mb-2">
+            <label class="form-label small mb-1" [for]="'admin-password-' + service.name">New password</label>
+            <input
+              type="password"
+              class="form-control form-control-sm"
+              [id]="'admin-password-' + service.name"
+              [(ngModel)]="adminUserForm.password"
+              placeholder="leave blank to keep current password"
+              autocomplete="new-password"
+            />
+          </div>
+          <div class="small text-body-secondary mb-2">
+            Saving restarts {{ service.label }} to apply the change (briefly interrupts single sign-on for anything behind it).
+          </div>
+          <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="adminUserSaving" (click)="saveAdminUser()">
+            <span *ngIf="adminUserSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+            Save admin account
+          </button>
+        </ng-container>
+      </div>
+    </div>
   </div>
 </article>

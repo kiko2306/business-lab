@@ -74,6 +74,13 @@ export const schemas = {
   serviceEnvUpdate: Joi.object({
     values: Joi.object().pattern(/^[A-Z][A-Z0-9_]*$/, Joi.string().allow('').max(2000)).required(),
   }),
+  autheliaAdminUserUpdate: Joi.object({
+    username: Joi.string().trim().min(1).max(64).pattern(/^[a-zA-Z0-9_.-]+$/).required(),
+    displayName: Joi.string().trim().min(1).max(128).required(),
+    email: Joi.string().trim().email().max(255).required(),
+    // Optional: omit or leave blank to keep the previously saved password.
+    password: passwordSchema.allow('').optional(),
+  }),
   healthThresholds: Joi.object({
     diskPercent: Joi.number().min(1).max(100).required(),
     memoryPercent: Joi.number().min(1).max(100).required(),

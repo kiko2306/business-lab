@@ -9,11 +9,12 @@ import auth from '../middleware/auth';
 import * as executor from '../services/executor';
 import * as status from '../services/status';
 import { createStreamTicket } from '../services/realtime';
-import { isValidServiceName } from '../config/services';
+import { getService, isValidServiceName } from '../config/services';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getServiceSetupToken } from '../services/setupToken';
+import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
 import { HttpError } from '../types';
@@ -31,6 +32,13 @@ const serviceLimiter = rateLimit({
 function validateServiceAllowlist(req: Request, res: Response, next: NextFunction) {
   if (!isValidServiceName(req.params.name)) {
     return res.status(400).json({ error: 'Invalid service name' });
+  }
+  return next();
+}
+
+function requireAdminUserSupport(req: Request, res: Response, next: NextFunction) {
+  if (!getService(req.params.name)?.supportsAdminUserManagement) {
+    return res.status(404).json({ error: 'This service does not support admin account management.' });
   }
   return next();
 }
@@ -313,6 +321,65 @@ router.get(
     } catch (error) {
       logger.error(`Failed to read setup token: ${req.params.name}`, { error: (error as Error).message });
       return res.status(500).json({ error: 'Unable to read setup token.' });
+    }
+  }
+);
+
+/**
+ * GET /api/services/:name/admin-user
+ * Read the manageable admin account for services that support it (currently
+ * only Authelia's file-based user database — see services/autheliaUsers.ts).
+ */
+router.get(
+  '/:name/admin-user',
+  auth,
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  requireAdminUserSupport,
+  (req: Request, res: Response) => {
+    const user = getAutheliaAdminUser();
+    if (!user) {
+      return res.status(404).json({ error: 'No admin account found.' });
+    }
+    return res.json(user);
+  }
+);
+
+/**
+ * PUT /api/services/:name/admin-user
+ * Update the account's username/display name/email and, optionally, its
+ * password (bcrypt-hashed the same way Authelia's own `authelia crypto hash
+ * generate bcrypt` does). Restarts the service if it's currently running so
+ * the change takes effect immediately, since the file backend only reads
+ * users_database.yml at startup.
+ */
+router.put(
+  '/:name/admin-user',
+  auth,
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  requireAdminUserSupport,
+  validateBody(schemas.autheliaAdminUserUpdate),
+  async (req: Request, res: Response) => {
+    try {
+      const user = await updateAutheliaAdminUser(req.body);
+      const restart = await executor.restartService(req.params.name, req.user!.id);
+
+      await writeAuditLog({
+        userId: req.user!.id,
+        action: 'SERVICE_ADMIN_USER_UPDATE',
+        resource: req.params.name,
+        result: 'success',
+        // Never the password — key names/flags only.
+        metadata: { username: user.username, passwordChanged: Boolean(req.body.password) },
+      }).catch(() => {});
+
+      return res.json({ message: restart.message, user });
+    } catch (error) {
+      const httpError = error as HttpError;
+      logger.error(`Failed to update admin account: ${req.params.name}`, { error: httpError.message });
+      const statusCode = httpError.statusCode || 500;
+      return res.status(statusCode).json({ error: httpError.message || 'Unable to update admin account.' });
     }
   }
 );

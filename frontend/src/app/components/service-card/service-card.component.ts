@@ -3,7 +3,7 @@ import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
-import { ServiceEnvStatus, ServiceExposureConfig, ServiceStatus } from '../../core/models';
+import { AutheliaAdminUser, ServiceEnvStatus, ServiceExposureConfig, ServiceStatus } from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
 
@@ -42,6 +42,12 @@ export class ServiceCardComponent {
   protected setupTokenLoading = false;
   protected setupToken: string | null = null;
   protected setupTokenCopied = false;
+
+  protected adminUserPanelOpen = false;
+  protected adminUserLoading = false;
+  protected adminUserSaving = false;
+  protected adminUser: AutheliaAdminUser | null = null;
+  protected adminUserForm = { username: '', displayName: '', email: '', password: '' };
 
   requestAction(action: 'start' | 'stop'): void {
     this.actionRequested.emit(action);
@@ -187,6 +193,48 @@ export class ServiceCardComponent {
           this.loadEnv();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save configuration.')),
+      });
+  }
+
+  toggleAdminUserPanel(): void {
+    this.adminUserPanelOpen = !this.adminUserPanelOpen;
+    if (this.adminUserPanelOpen && !this.adminUser) {
+      this.loadAdminUser();
+    }
+  }
+
+  loadAdminUser(): void {
+    this.adminUserLoading = true;
+    this.operations
+      .getAutheliaAdminUser(this.service.name)
+      .pipe(finalize(() => (this.adminUserLoading = false)))
+      .subscribe({
+        next: (user) => {
+          this.adminUser = user;
+          this.adminUserForm = { username: user.username, displayName: user.displayName, email: user.email, password: '' };
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load admin account.')),
+      });
+  }
+
+  saveAdminUser(): void {
+    this.adminUserSaving = true;
+    const { username, displayName, email, password } = this.adminUserForm;
+    this.operations
+      .updateAutheliaAdminUser(this.service.name, {
+        username,
+        displayName,
+        email,
+        ...(password ? { password } : {}),
+      })
+      .pipe(finalize(() => (this.adminUserSaving = false)))
+      .subscribe({
+        next: (response) => {
+          this.toast.success(response.message);
+          this.adminUserForm.password = '';
+          this.loadAdminUser();
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save admin account.')),
       });
   }
 

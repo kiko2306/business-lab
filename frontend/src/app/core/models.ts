@@ -29,7 +29,23 @@ export interface ServiceStatus {
   lastChecked: string;
   error?: string;
   setupTokenSupported?: boolean;
+  adminUserManagementSupported?: boolean;
   dependsOn?: string[];
+}
+
+export interface AutheliaAdminUser {
+  username: string;
+  displayName: string;
+  email: string;
+  groups: string[];
+}
+
+export interface AutheliaAdminUserUpdate {
+  username: string;
+  displayName: string;
+  email: string;
+  // Omit or leave blank to keep the current password.
+  password?: string;
 }
 
 export interface ServiceSummary {

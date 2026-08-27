@@ -276,6 +276,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     healthCheck: {
       enabled: false,
     },
+    supportsAdminUserManagement: true,
   },
   'duplicati': {
     name: 'duplicati',

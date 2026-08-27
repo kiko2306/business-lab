@@ -310,6 +310,81 @@ export async function stopService(serviceName: string, userId: number): Promise<
 }
 
 /**
+ * Restart a service so it re-reads its config/bind-mounted files (e.g.
+ * Authelia's users_database.yml, only read at startup). A no-op — reported
+ * as success — when the service isn't currently running, since there's
+ * nothing to restart and the new config will simply apply on next start.
+ */
+export async function restartService(serviceName: string, userId: number): Promise<ServiceActionResult> {
+  if (!isValidServiceName(serviceName)) {
+    throw {
+      statusCode: 400,
+      message: `Invalid service name: ${serviceName}`,
+    } as HttpError;
+  }
+
+  const resolved = resolveComposeFile(serviceName);
+  const { projectName, appDir, composeFile } = resolved ?? { projectName: null, appDir: '', composeFile: null };
+
+  if (!composeFile) {
+    throw {
+      statusCode: 404,
+      message: `Service ${serviceName} is not installed: no compose file found in ${appDir}`,
+    } as HttpError;
+  }
+
+  const currentStatus = await getServiceStatus(serviceName);
+  if (currentStatus.state !== 'running') {
+    return {
+      success: true,
+      service: serviceName,
+      message: `Service ${serviceName} is not currently running — the change will apply on next start.`,
+      timestamp: new Date(),
+    };
+  }
+
+  try {
+    logger.info(`Restarting service: ${serviceName}`, { userId, service: serviceName });
+
+    const command = `docker compose -p ${projectName} -f ${composeFile} restart`;
+    const result = await executeCommand(command, 60000);
+
+    await logAuditEvent(userId, 'SERVICE_RESTART', serviceName, 'success', {
+      stdout: result.stdout,
+      stderr: result.stderr,
+    });
+
+    logger.info(`Service restarted successfully: ${serviceName}`, { userId });
+
+    return {
+      success: true,
+      service: serviceName,
+      message: `Service ${serviceName} restarted to apply the change.`,
+      timestamp: new Date(),
+    };
+  } catch (error) {
+    const httpError = error as HttpError;
+    logger.error(`Failed to restart service: ${serviceName}`, {
+      userId,
+      error: httpError.message,
+      stderr: httpError.stderr,
+    });
+
+    await logAuditEvent(userId, 'SERVICE_RESTART', serviceName, 'failure', {
+      error: httpError.message,
+      stderr: httpError.stderr,
+      code: httpError.code,
+    }).catch((err: Error) => logger.error('Failed to log audit event', { error: err.message }));
+
+    throw {
+      statusCode: 500,
+      message: `Failed to restart service ${serviceName}: ${httpError.message}`,
+      details: httpError.stderr,
+    } as HttpError;
+  }
+}
+
+/**
  * Log an audit event to the database
  */
 export async function logAuditEvent(

@@ -7,6 +7,8 @@ import {
   AdminUser,
   AdminUserListResponse,
   AuditLogResponse,
+  AutheliaAdminUser,
+  AutheliaAdminUserUpdate,
   BackupListResponse,
   BackupScheduleConfig,
   HealthStatus,
@@ -93,6 +95,20 @@ export class OperationsService {
     return this.http.put<{ message: string } & ServiceEnvStatus>(`${API_BASE_URL}/services/${serviceName}/env`, {
       values,
     });
+  }
+
+  getAutheliaAdminUser(serviceName: string): Observable<AutheliaAdminUser> {
+    return this.http.get<AutheliaAdminUser>(`${API_BASE_URL}/services/${serviceName}/admin-user`);
+  }
+
+  updateAutheliaAdminUser(
+    serviceName: string,
+    update: AutheliaAdminUserUpdate
+  ): Observable<{ message: string; user: AutheliaAdminUser }> {
+    return this.http.put<{ message: string; user: AutheliaAdminUser }>(
+      `${API_BASE_URL}/services/${serviceName}/admin-user`,
+      update
+    );
   }
 
   getHealth(): Observable<HealthStatus> {

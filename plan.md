@@ -660,6 +660,10 @@ Numbers below double as the reference used elsewhere in this log (e.g.
 9. [x] **Organize dashboard apps by type** — the service grid was one flat
    list of 25+ cards with no grouping. Implemented this session — see §18.4.
    **Priority: P2** — **Estimate: S**
+10. [x] **Manage Authelia's admin account from the dashboard** — username,
+    display name, email, and password lived only in
+    `apps/authelia/config/users_database.yml`, editable by hand only.
+    Implemented this session — see §18.5. **Priority: P2** — **Estimate: S**
 
 ### 18.3 Item 1 (backups) — implementation notes
 Implemented as an opt-in schedule (default off) rather than adding a cron
@@ -759,3 +763,71 @@ lives in one place (`backend/src/config/services.ts`) and is explicit.
   match what Puppeteer expected, an unrelated pre-existing tooling gap (no
   dashboard/service-card spec files exist yet to cover this change anyway).
   Not exercised live in a browser against the real deployment.
+
+### 18.5 Item 10 (Authelia admin account panel) — implementation notes
+Authelia's file authentication backend stores its admin account in
+`config/users_database.yml` (YAML, argon2-hashed password) — a different
+file and format from the generic per-app `.env` editor added in §17.1, so
+this needed its own read/write path rather than reusing `appEnv.ts`.
+
+- **Scope, decided with the user up front**: edit the single account tagged
+  `admins` in the file (falls back to the first entry) — not full multi-user
+  CRUD, matching how this and presumably every deployment of this app is
+  actually set up. Saving auto-restarts the Authelia container so the change
+  takes effect immediately (a few seconds of SSO downtime for anything
+  behind it), rather than silently reporting success on a stale container.
+- **Password hashing**: reused `bcryptjs` (already a dependency, via the
+  existing `utils/password.ts` `hashPassword()` used for the dashboard's own
+  accounts) instead of adding a new `argon2` native dependency. Verified
+  compatible with Authelia's file backend empirically against the live
+  `authelia/authelia:latest` image in this environment: generated a bcrypt
+  hash with `authelia crypto hash generate bcrypt` (produces a `$2b$12$...`
+  digest — same prefix bcryptjs produces), then confirmed a bcryptjs
+  digest passes `authelia crypto hash validate`.
+- **`backend/src/services/autheliaUsers.ts`** (new) — `getAutheliaAdminUser()`
+  / `updateAutheliaAdminUser()`. Reads `apps/authelia/config/users_database.yml`
+  via `js-yaml` (new dependency — nothing YAML-capable existed in the
+  codebase before this). Splits the file into the header-comment preamble
+  and the parsed `users:` document so a save preserves the human-written
+  comments at the top instead of clobbering them with a bare re-dump.
+  Renaming the username (a YAML map key) is handled by deleting the old key
+  and inserting the new one. A blank/omitted password keeps the existing
+  hash unchanged, same convention as every other secret field in this app.
+- **`backend/src/services/executor.ts`** — new `restartService()`. No-ops
+  (reports success without running anything) if the service isn't currently
+  running, since there's nothing to restart and the new config applies on
+  next start anyway — avoids erroring out when an admin edits the account
+  while Authelia happens to be stopped.
+- **`backend/src/config/services.ts` / `types/index.ts`** — new
+  `supportsAdminUserManagement` flag on `ServiceDefinition` (set only on
+  `authelia`), surfaced to the frontend as `adminUserManagementSupported` on
+  `ServiceStatusPayload`/`ServiceStatus`, mirroring the existing
+  `setupTokenSupported` pattern — capability-driven, not a hardcoded service
+  name check in the UI.
+- **`backend/src/routes/services.ts`** — `GET`/`PUT /api/services/:name/admin-user`,
+  gated by the new capability flag (404 for any service that doesn't set it).
+  `PUT` calls `updateAutheliaAdminUser()` then `executor.restartService()`,
+  audit-logs the username and whether the password changed (never the
+  password itself).
+- **Frontend**: a collapsible "Admin account" panel on the service card
+  (`service-card.component.ts`/`.html`), shown only when
+  `service.adminUserManagementSupported` is true — username, display name,
+  email, and a password field (blank = keep current), with copy noting the
+  restart/downtime up front before the admin saves.
+- **Verified**: backend `tsc --noEmit` and `vitest run` clean (55 tests, up
+  from 49 — 6 new in `autheliaUsers.test.ts`, covering read, the
+  multi-user "admins"-tag fallback, rename + preamble preservation, bcrypt
+  hashing of a new password, and the 404 path when the file is missing).
+  Frontend `ng build` clean (same pre-existing budget warning, unrelated).
+  Deployed live (`docker compose up -d --build backend frontend`): backend
+  booted without error, `GET /api/services/authelia/admin-user` returns
+  `401` unauthenticated, confirming the route is live and gated correctly.
+  **Deliberately not exercised**: the live `PUT` was never actually called
+  against this deployment's real `users_database.yml` — doing so would have
+  changed this environment's actual Authelia login and forced a real restart
+  of the production Authelia container outside of a deliberate user action.
+  The rename/rehash/restart-skip-when-stopped logic is covered by the unit
+  tests above against a synthetic copy of the real file's exact format
+  instead. Worth a manual pass through the browser next time the dashboard
+  is open, using a throwaway password change to confirm the full
+  save-then-login round trip.
