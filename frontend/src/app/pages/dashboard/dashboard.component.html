@@ -105,16 +105,18 @@
     <section *ngIf="serviceState.services$ | async as services; else loadingState">
       <ng-container *ngIf="services.length; else emptyState">
         <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(services); trackBy: trackByCategory">
-          <h2 class="h5 mb-3">{{ group.category }}</h2>
-          <div class="row g-3">
-            <div class="col-12 col-md-6 col-xl-4 col-xxl-3" *ngFor="let service of group.services; trackBy: trackByService">
-              <app-service-card
-                [service]="service"
-                [allServices]="services"
-                [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
-                (actionRequested)="handleAction(service.name, $event)"
-              ></app-service-card>
-            </div>
+          <h2 class="h6 text-body-secondary text-uppercase mb-2 d-flex align-items-center gap-2">
+            {{ group.category }}
+            <span class="badge rounded-pill text-bg-light border fw-normal">{{ group.services.length }}</span>
+          </h2>
+          <div class="service-rows">
+            <app-service-card
+              *ngFor="let service of group.services; trackBy: trackByService"
+              [service]="service"
+              [allServices]="services"
+              [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
+              (actionRequested)="handleAction(service.name, $event)"
+            ></app-service-card>
           </div>
         </div>
       </ng-container>

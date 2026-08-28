@@ -21,3 +21,9 @@
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
+
+.service-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

@@ -1,22 +1,176 @@
-.service-card {
-  min-height: 100%;
+:host {
+  display: block;
+}
+
+/* ---- Compact full-width service row ---- */
+.service-row {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.55rem 0.85rem;
+  background: #fff;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 0.6rem;
+  box-shadow: 0 0.125rem 0.4rem rgba(15, 23, 42, 0.05);
+}
+
+.service-row.row-error {
+  border-color: var(--bs-danger-border-subtle, #f1aeb5);
+  background: var(--bs-danger-bg-subtle, #fdf1f2);
 }
 
 .service-icon {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 3rem;
-  height: 3rem;
-  border-radius: 0.9rem;
+  width: 2.25rem;
+  height: 2.25rem;
+  border-radius: 0.6rem;
   background: rgba(13, 110, 253, 0.12);
-  font-size: 1.4rem;
+  font-size: 1.1rem;
 }
 
-.startup-logs-backdrop {
+.service-icon-sm {
+  width: 1.9rem;
+  height: 1.9rem;
+  font-size: 1rem;
+}
+
+.service-row-main {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.service-row-heading {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+
+.service-name {
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 16rem;
+}
+
+.service-row-heading .badge {
+  font-weight: 500;
+}
+
+.service-row-sub {
+  display: flex;
+  gap: 0.35rem;
+  align-items: baseline;
+  margin-top: 0.15rem;
+  font-size: 0.8125rem;
+  color: var(--bs-secondary-color, #6c757d);
+  min-width: 0;
+}
+
+.service-row-sub > .text-truncate {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.service-row-sub > span:not(.text-truncate) {
+  flex: none;
+  white-space: nowrap;
+}
+
+.service-row-actions {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.service-row-actions .btn {
+  min-width: 4.25rem;
+}
+
+@media (max-width: 575.98px) {
+  .service-row {
+    flex-wrap: wrap;
+  }
+
+  .service-name {
+    max-width: none;
+  }
+
+  .service-row-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* ---- Settings modal ---- */
+.settings-backdrop {
   position: fixed;
   inset: 0;
   z-index: 1080;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 3rem 1rem;
+  background: rgba(15, 23, 42, 0.5);
+  overflow-y: auto;
+}
+
+.settings-dialog {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: calc(100vh - 6rem);
+  overflow: hidden;
+  background: #fff;
+  border-radius: 0.75rem;
+  box-shadow: 0 1rem 3rem rgba(15, 23, 42, 0.35);
+}
+
+.settings-head {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.85rem 1rem;
+  border-bottom: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.settings-body {
+  padding: 0.5rem 1.15rem 1.15rem;
+  overflow-y: auto;
+}
+
+.settings-section {
+  padding: 1rem 0;
+  border-bottom: 1px solid var(--bs-border-color-translucent, rgba(0, 0, 0, 0.1));
+}
+
+.settings-section:last-child {
+  border-bottom: 0;
+  padding-bottom: 0.25rem;
+}
+
+.settings-section-title {
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--bs-secondary-color, #6c757d);
+  margin-bottom: 0.75rem;
+}
+
+/* ---- Startup log popup (unchanged) ---- */
+.startup-logs-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1085;
   display: flex;
   align-items: center;
   justify-content: center;

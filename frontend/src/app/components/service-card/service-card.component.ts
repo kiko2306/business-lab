@@ -46,7 +46,10 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   @Output() actionRequested = new EventEmitter<'start' | 'stop'>();
 
-  protected exposurePanelOpen = false;
+  // All per-service setup (configuration, exposure, admin account) lives in a
+  // single modal opened from the row, instead of inline expanding panels.
+  protected settingsModalOpen = false;
+
   protected exposureLoading = false;
   protected exposureSaving = false;
   protected exposureVerifying = false;
@@ -55,7 +58,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   protected exposureEnabled = false;
   protected exposureAutheliaProtected = false;
 
-  protected envPanelOpen = false;
   protected envLoading = false;
   protected envSaving = false;
   protected env: ServiceEnvStatus | null = null;
@@ -65,7 +67,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   protected setupToken: string | null = null;
   protected setupTokenCopied = false;
 
-  protected adminUserPanelOpen = false;
   protected adminUserLoading = false;
   protected adminUserSaving = false;
   protected adminUser: AutheliaAdminUser | null = null;
@@ -104,7 +105,29 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   onEscapeKey(): void {
     if (this.startupLogsOpen) {
       this.closeStartupLogs();
+    } else if (this.settingsModalOpen) {
+      this.closeSettings();
     }
+  }
+
+  openSettings(): void {
+    this.settingsModalOpen = true;
+    if (!this.env) {
+      this.loadEnv();
+    }
+    if (this.service.setupTokenSupported && this.setupToken === null) {
+      this.loadSetupToken();
+    }
+    if (!this.exposure) {
+      this.loadExposure();
+    }
+    if (this.service.adminUserManagementSupported && !this.adminUser) {
+      this.loadAdminUser();
+    }
+  }
+
+  closeSettings(): void {
+    this.settingsModalOpen = false;
   }
 
   private async openStartupLogs(): Promise<void> {
@@ -275,13 +298,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     return notRunning.length ? `Start ${notRunning.join(', ')} first` : '';
   }
 
-  toggleExposurePanel(): void {
-    this.exposurePanelOpen = !this.exposurePanelOpen;
-    if (this.exposurePanelOpen && !this.exposure) {
-      this.loadExposure();
-    }
-  }
-
   loadExposure(): void {
     this.exposureLoading = true;
     this.operations
@@ -330,16 +346,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to verify exposure configuration.')),
       });
-  }
-
-  toggleEnvPanel(): void {
-    this.envPanelOpen = !this.envPanelOpen;
-    if (this.envPanelOpen && !this.env) {
-      this.loadEnv();
-    }
-    if (this.envPanelOpen && this.service.setupTokenSupported && this.setupToken === null) {
-      this.loadSetupToken();
-    }
   }
 
   loadSetupToken(): void {
@@ -426,13 +432,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save configuration.')),
       });
-  }
-
-  toggleAdminUserPanel(): void {
-    this.adminUserPanelOpen = !this.adminUserPanelOpen;
-    if (this.adminUserPanelOpen && !this.adminUser) {
-      this.loadAdminUser();
-    }
   }
 
   loadAdminUser(): void {
