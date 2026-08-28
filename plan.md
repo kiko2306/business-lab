@@ -2073,3 +2073,16 @@ status API returns `exposedHostname` for NPM so the dashboard row shows the
 Cloudflare URL. First provision attempt hit a transient `ECONNREFUSED
 …:81` because `startService` briefly recreated NPM (it publishes the API
 port NPM-provisioning calls); a `exposure/verify` retry succeeded.
+
+### 23.14 Session Log — 2026-08-28 (cont.): Watchtower crash-loop (old Docker API)
+
+`containrrr/watchtower:latest` (v1.7.1, unmaintained since 2023) ships a
+Docker client pinned to API **1.25**; the host runs Engine 29.7.2 with
+`MinAPIVersion 1.40`, so every call was rejected — *"client version 1.25 is
+too old"* — and the container sat in `Restarting (1)`. Fixed by pinning
+`DOCKER_API_VERSION: ${WATCHTOWER_DOCKER_API_VERSION:-1.44}` in
+`apps/watchtower/docker-compose.yml` (verified: `--run-once` scans all
+containers cleanly with it). Recreated → `RestartCount 0`, "Watchtower 1.7.1
+… Scheduling first run", no errors. Comment + `.env.example` note that a
+future engine bump may need a higher value, or a switch to a maintained fork
+(`ghcr.io/nickfedor/watchtower`).
