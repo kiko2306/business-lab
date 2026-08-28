@@ -1,4 +1,4 @@
-import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
+import { HttpClient, HttpContext } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Router, UrlTree } from '@angular/router';
 import { BehaviorSubject, Observable, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
@@ -142,25 +142,19 @@ export class AuthService {
   }
 
   private checkSetupRequired(): Observable<boolean> {
+    // Public endpoint: always 200, so a fresh (unauthenticated) page load no
+    // longer logs a 401/503 to the console just to pick between /login and
+    // /setup. Any unexpected failure falls back to "setup not required" so the
+    // user still lands on the login screen.
     return this.http
-      .get(`${API_BASE_URL}`, {
+      .get<{ setupRequired?: boolean }>(`${API_BASE_URL}/auth/setup-status`, {
         context: new HttpContext()
           .set(SKIP_AUTH, true)
           .set(SKIP_GLOBAL_ERROR_HANDLING, true),
       })
       .pipe(
-        map(() => false),
-        catchError((error: HttpErrorResponse) => {
-          if (error.status === 503 && error.error?.setupRequired) {
-            return of(true);
-          }
-
-          if (error.status === 401) {
-            return of(false);
-          }
-
-          return of(false);
-        })
+        map((response) => response?.setupRequired === true),
+        catchError(() => of(false))
       );
   }
 

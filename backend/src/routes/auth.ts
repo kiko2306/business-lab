@@ -18,11 +18,43 @@ const authLimiter = rateLimit({
   message: { error: 'Too many requests, please try again later' },
 });
 
+// The SPA probes setup status on every load / route guard, so this needs a
+// far roomier budget than the login/setup limiter and must not share its
+// counter (a page refresh loop shouldn't be able to lock out real logins).
+const statusLimiter = rateLimit({
+  windowMs: 5 * 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
+
 interface UserRow {
   id: number;
   username: string;
   password_hash?: string;
 }
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/setup-status — public, unauthenticated
+//
+// Lets the frontend decide between the /setup and /login screens without
+// firing an authenticated request that necessarily 401s on a fresh load
+// (which shows up as a console error on the login page).
+// ---------------------------------------------------------------------------
+router.get('/setup-status', statusLimiter, async (_req: Request, res: Response) => {
+  try {
+    const result = await query<{ cnt: string }>(
+      'SELECT COUNT(*) AS cnt FROM users WHERE is_setup_complete = TRUE',
+      []
+    );
+    const setupRequired = parseInt(result.rows[0].cnt, 10) === 0;
+    return res.json({ setupRequired });
+  } catch (err) {
+    console.error('Setup status error:', (err as Error).message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // POST /api/auth/setup — create the first admin user
