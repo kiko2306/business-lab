@@ -25,6 +25,30 @@ If a design can't meet them, it doesn't ship until it can.
    obtain (e.g. a third-party API token, and even then it's entered in the
    UI, once).
 
+## 0.1 URGENT — open bugs (fix before new features)
+
+1. **`EACCES` writing app `.env` files.** The backend (runs as `appuser`
+   uid 100, group `docker`/DOCKER_GID) can't write some `apps/<name>/.env`:
+   observed for `apps/nocodb/.env` and `apps/stirling-pdf/.env`
+   (`EACCES: permission denied, open '…/apps/nocodb/.env'` /
+   `'…/apps/stirling-pdf/.env'`). So `saveServiceEnv` /
+   `ensureGeneratedSecrets` fail → secrets never get generated, config can't
+   be saved from the UI (violates §0.2, §0.3). Root cause: those `.env`
+   files / dirs aren't group-writable by DOCKER_GID (some are owned
+   `usbmux:lxd`). `start.sh`'s new per-directory `chgrp`/`chmod g+rwX` loop
+   (commit `977d51f`) should cover this but either hasn't been re-run or
+   doesn't fix a file the backend didn't create. Fix options: (a) ensure the
+   backend can always write `apps/*/` — entrypoint chowns/chmods on boot,
+   or the backend writes via a root helper like the HA/CrowdSec hooks;
+   (b) create `.env` from `.env.example` with group-write mode and never let
+   a container own it.
+2. **Duplicati: default-map `APPS_DIR`.** `apps/duplicati/docker-compose.yml`
+   references `${APPS_DIR}` (backup source mount) with no default, so
+   Duplicati fails to start unless `APPS_DIR` is set in *its own* `.env`
+   (the top-level stack sets it, individual app compose projects don't).
+   Give it a sane default — `${APPS_DIR:-/apps}` or map the repo's `apps/`
+   read-only at a fixed path — so it starts out of the box.
+
 ## 1. Overview
 This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express (TypeScript) backend. It provides a dashboard for starting and stopping Docker-based services, viewing logs, and monitoring system resources.
 
