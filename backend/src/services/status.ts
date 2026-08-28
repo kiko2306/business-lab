@@ -140,37 +140,41 @@ function getContainerPorts(projectName: string | null): Promise<ServicePortMappi
 
 /**
  * Health check URLs in the service registry are written from the host's point
- * of view (localhost:PORT). The backend runs in a container, where localhost is
- * the backend itself, so the host must be substituted.
+ * of view (localhost:CONTAINER_PORT). To make them reachable from the backend
+ * container we connect to SERVICE_HEALTH_HOST on the service's *published* host
+ * port (which often isn't the container port — Vaultwarden serves :80 but
+ * publishes :8222) while still sending the original `localhost:CONTAINER_PORT`
+ * as the Host header, so apps that validate Host (gethomepage) still accept it.
  */
-function resolveHealthUrl(rawUrl: string): string {
-  const healthHost = process.env.SERVICE_HEALTH_HOST;
-  if (!healthHost) {
-    return rawUrl;
-  }
-
+function resolveHealthTarget(rawUrl: string, publishedPort: number | null): { url: string; hostHeader?: string } {
   try {
     const url = new URL(rawUrl);
-    if (url.hostname === 'localhost' || url.hostname === '127.0.0.1') {
+    const hostHeader = url.host; // e.g. "localhost:3000" — what the app expects
+    const healthHost = process.env.SERVICE_HEALTH_HOST;
+    if (healthHost && (url.hostname === 'localhost' || url.hostname === '127.0.0.1')) {
       url.hostname = healthHost;
     }
-    return url.toString();
+    if (publishedPort) {
+      url.port = String(publishedPort);
+    }
+    return { url: url.toString(), hostHeader };
   } catch {
-    return rawUrl;
+    return { url: rawUrl };
   }
 }
 
 /**
  * Check service health via HTTP
  */
-function checkHealthHttp(url: string, timeout = 5000): Promise<boolean> {
+function checkHealthHttp(target: { url: string; hostHeader?: string }, timeout = 5000): Promise<boolean> {
   return new Promise((resolve) => {
-    const protocol = url.startsWith('https') ? https : http;
+    const protocol = target.url.startsWith('https') ? https : http;
     const timeoutHandle = setTimeout(() => {
       resolve(false);
     }, timeout);
 
-    const request = protocol.get(url, { timeout }, (response) => {
+    const options = target.hostHeader ? { timeout, headers: { Host: target.hostHeader } } : { timeout };
+    const request = protocol.get(target.url, options, (response) => {
       clearTimeout(timeoutHandle);
       // Consider 2xx and 3xx as healthy
       resolve((response.statusCode ?? 0) >= 200 && (response.statusCode ?? 0) < 400);
@@ -208,19 +212,23 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
     const installed = Boolean(resolveComposeFile(serviceName)?.composeFile);
     const state: ServiceState = containerState === 'unknown' && installed ? 'stopped' : containerState;
 
+    const webPort =
+      state === 'running' ? getPublishedUpstreamPort(serviceName, service.exposurePortEnvVar) ?? null : null;
+
     // Without a configured check there's nothing to fail, so a running
     // service is reported healthy; only an actual check can mark it unhealthy.
     let healthy = state === 'running';
     if (service.healthCheck?.enabled && state === 'running') {
       if (service.healthCheck.type === 'http' && service.healthCheck.url) {
-        healthy = await checkHealthHttp(resolveHealthUrl(service.healthCheck.url), service.healthCheck.timeout);
+        healthy = await checkHealthHttp(
+          resolveHealthTarget(service.healthCheck.url, webPort),
+          service.healthCheck.timeout
+        );
       }
     }
 
     const ports = state === 'running' ? await getContainerPorts(getProjectName(serviceName)) : [];
     const exposedHostname = state === 'running' ? await getExposedHostname(serviceName) : null;
-    const webPort =
-      state === 'running' ? getPublishedUpstreamPort(serviceName, service.exposurePortEnvVar) ?? null : null;
 
     return {
       name: serviceName,

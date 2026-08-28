@@ -1,8 +1,25 @@
 
 services:
+  # Vikunja's image runs as uid/gid 1000 but the bind-mounted data dirs are
+  # created root-owned by Docker (and older Vikunja images ran as root), so a
+  # fresh install — or an image that switched users — can't write its files.
+  # One-off chown before the app starts; exits 0. (Vikunja's own image is
+  # `FROM scratch` with no shell, hence busybox.)
+  vikunja-init:
+    image: busybox:stable
+    user: "0:0"
+    command: ["chown", "-R", "1000:1000", "/db", "/files"]
+    restart: "no"
+    volumes:
+      - ./data/db:/db
+      - ./data/files:/files
+
   vikunja:
     image: vikunja/vikunja:latest
     restart: unless-stopped
+    depends_on:
+      vikunja-init:
+        condition: service_completed_successfully
     ports:
       - "${VIKUNJA_PORT:-3456}:3456"
     environment:

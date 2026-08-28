@@ -10,10 +10,16 @@ services:
       PGID: ${PGID:-1000}
       TZ: ${TZ:-UTC}
       APP_URL: ${BOOKSTACK_URL:-http://localhost:80}
+      # LSIO's BookStack image halts on boot without a valid Laravel key
+      # ("The application key is missing"); the dashboard generates one.
+      APP_KEY: ${BOOKSTACK_APP_KEY}
       DB_HOST: bookstack-db
       DB_PORT: 3306
-      DB_USER: ${BOOKSTACK_DB_USER:-bookstack}
-      DB_PASS: ${BOOKSTACK_DB_PASSWORD}
+      # Current LSIO image uses DB_USERNAME/DB_PASSWORD (the old DB_USER/DB_PASS
+      # are ignored → BookStack falls back to its "database_username" default
+      # and the DB denies access).
+      DB_USERNAME: ${BOOKSTACK_DB_USER:-bookstack}
+      DB_PASSWORD: ${BOOKSTACK_DB_PASSWORD}
       DB_DATABASE: ${BOOKSTACK_DB_NAME:-bookstack}
     labels:
       - "homepage.group=Productivity"

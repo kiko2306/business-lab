@@ -261,7 +261,12 @@ export async function ensureGeneratedSecrets(serviceName: string): Promise<strin
   const generated: Record<string, string> = {};
   for (const key of keys) {
     if (SECRET_PLACEHOLDERS.has((currentValues[key] ?? '').trim().toLowerCase())) {
-      generated[key] = crypto.randomBytes(32).toString('hex');
+      // Laravel's APP_KEY must be exactly 32 bytes, conventionally as
+      // `base64:<b64 of 32 bytes>` — a 64-char hex string is 64 bytes and
+      // makes the app 500 on boot ("incorrect key length").
+      generated[key] = /(^|_)APP_KEY$/.test(key)
+        ? `base64:${crypto.randomBytes(32).toString('base64')}`
+        : crypto.randomBytes(32).toString('hex');
     }
   }
 
