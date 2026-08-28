@@ -43,6 +43,14 @@ interface CommandResult {
   stderr: string;
 }
 
+// `docker compose up` has to cover a first-run image pull, which for a large
+// multi-image app (Immich, Jellyfin, …) is minutes, not seconds. `compose
+// down` / `restart` don't pull, so they keep the short default.
+const COMPOSE_UP_TIMEOUT_MS = 15 * 60_000;
+// A full pull streams a lot of progress text to stdout; the default 1MB
+// exec buffer overflows and kills the command mid-pull.
+const COMMAND_MAX_BUFFER = 16 * 1024 * 1024;
+
 /**
  * Execute a shell command with timeout and error handling. Extra env vars
  * are merged over process.env — Docker Compose prefers the shell environment
@@ -52,7 +60,7 @@ interface CommandResult {
  */
 function executeCommand(command: string, timeout = 30000, extraEnv: Record<string, string> = {}): Promise<CommandResult> {
   return new Promise((resolve, reject) => {
-    exec(command, { timeout, env: { ...process.env, ...extraEnv } }, (error, stdout, stderr) => {
+    exec(command, { timeout, maxBuffer: COMMAND_MAX_BUFFER, env: { ...process.env, ...extraEnv } }, (error, stdout, stderr) => {
       if (error) {
         reject({
           code: error.code,
@@ -194,7 +202,7 @@ export async function startService(serviceName: string, userId: number): Promise
     // Execute docker compose up -d
     const envOverrides = await buildExposureEnvOverrides(serviceName, appDir);
     const command = `docker compose -p ${projectName} -f ${composeFile} up -d`;
-    const result = await executeCommand(command, 60000, envOverrides); // 60s timeout for startup
+    const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, envOverrides);
 
     // Log the successful operation
     await logAuditEvent(userId, 'SERVICE_START', serviceName, 'success', {

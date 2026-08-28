@@ -21,15 +21,17 @@ import logger from '../utils/logger';
 const ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
 const POLL_INTERVAL_MS = 2000;
-const MAX_STREAM_MS = 180_000;
-// A container that never reached "running" for this long is treated as a
-// failed start (crash loop, stuck entrypoint, failing health check). It's
-// generous because `docker compose up -d` can legitimately take a while
-// before the container even exists — pulling the image, creating volumes —
-// during which it reads as stopped/created. An actual `compose up` failure
-// (bad env, port clash, malformed compose) is surfaced separately and
-// immediately from the start request's own response, not from here.
-const STARTING_GRACE_MS = 150_000;
+// The popup stays open this long before it stops waiting and just leaves the
+// logs on screen ("still starting"). It has to outlast the worst case for
+// `docker compose up` itself — a first-run pull of a large multi-image app
+// like Immich — since until that returns no container exists to report on.
+// A real `compose up` failure (bad env, port clash, malformed compose) is
+// reported immediately from the start request's own response, independent of
+// this timeout.
+const MAX_STREAM_MS = 16 * 60_000;
+// While no container exists and nothing has been logged yet, drop a
+// reassurance line at this cadence so a long image pull doesn't look hung.
+const PREP_HEARTBEAT_MS = 20_000;
 // Once a terminal state (running+healthy / failed) is detected, keep the log
 // stream open this much longer so the container's boot output actually
 // reaches the popup — a fast, healthy start would otherwise be cut off
@@ -95,6 +97,7 @@ function streamStartupLogs(serviceName: string, res: Response): void {
   let spawnAttempts = 0;
   let child: ChildProcessWithoutNullStreams | undefined;
   let sawRunning = false;
+  let lastHeartbeatAt = 0;
   const startedAt = Date.now();
   let poll: ReturnType<typeof setInterval> | undefined;
   let hardStop: ReturnType<typeof setTimeout> | undefined;
@@ -157,6 +160,15 @@ function streamStartupLogs(serviceName: string, res: Response): void {
       send('log', { line: `— ${serviceName} is running and healthy —` });
     }
     drainTimer = setTimeout(() => finish(info), DRAIN_MS);
+  };
+
+  // A holding message while `compose up` is still pulling images and there's
+  // no container to tail yet. Deliberately doesn't set sawOutput — it's not
+  // container output.
+  const pushHeartbeat = () => {
+    send('log', {
+      line: '— still preparing: downloading images can take several minutes on a first start —',
+    });
   };
 
   const emitLines = (chunk: Buffer) => {
@@ -228,13 +240,16 @@ function streamStartupLogs(serviceName: string, res: Response): void {
       return;
     }
 
-    // Never running yet: 'starting' (a peer container still coming up),
-    // 'error' (crash loop, or created-but-not-started), 'stopped'/'unknown'
-    // (container doesn't exist yet — image still pulling). All of these are
-    // normal early in a start, so hold for the full runway; only past it is
-    // this a genuinely stuck start.
-    if (elapsed > STARTING_GRACE_MS) {
-      finishAfterDrain({ state, healthy: false });
+    // Not running yet: 'starting' (a peer still coming up), 'error' (crash
+    // loop, or created-but-not-started), or 'stopped'/'unknown' (no container
+    // exists — `compose up` is still pulling). We can't tell a slow start from
+    // a doomed one here, and an outright `compose up` failure already comes
+    // back on the start request itself, so don't call it failed from the
+    // poll — just keep the logs flowing until MAX_STREAM_MS. Meanwhile, if
+    // there's still nothing to show, reassure that it's working.
+    if (!sawOutput && elapsed - lastHeartbeatAt > PREP_HEARTBEAT_MS) {
+      lastHeartbeatAt = elapsed;
+      pushHeartbeat();
     }
   }, POLL_INTERVAL_MS);
 
