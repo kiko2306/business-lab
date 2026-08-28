@@ -123,7 +123,8 @@
               <span *ngIf="field.required" class="text-danger">*</span>
             </label>
 
-            <!-- Exposure-managed (read-only) — e.g. Vaultwarden's DOMAIN -->
+            <!-- Exposure-managed (read-only) — e.g. Vaultwarden's DOMAIN,
+                 n8n's N8N_HOST, ntfy's NTFY_BASE_URL -->
             <ng-container *ngIf="field.managed">
               <input
                 type="text"
@@ -133,7 +134,9 @@
                 readonly
               />
               <div class="form-text small">
-                Set automatically — follows this service's public URL once exposure is enabled.
+                {{ field.managedValue
+                  ? 'Set automatically from this service\'s exposure settings.'
+                  : 'Set automatically — follows this service\'s public URL once exposure is enabled.' }}
               </div>
             </ng-container>
 

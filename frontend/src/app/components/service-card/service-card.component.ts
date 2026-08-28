@@ -404,12 +404,13 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
               continue;
             }
             if (field.boolean) {
-              this.envValues[field.key] = field.value ?? field.defaultValue ?? 'false';
+              this.envValues[field.key] = field.value ?? field.suggestedValue ?? field.defaultValue ?? 'false';
             } else if (!field.secret) {
-              // Prefill port fields with the effective value (the compose
-              // default when .env doesn't pin one) so a default that clashes
-              // with another service surfaces its conflict right away.
-              this.envValues[field.key] = field.value ?? (field.isPort ? field.defaultValue : null) ?? '';
+              // Prefill with the current value, else a suggestion (generated
+              // secret / global timezone), else the compose default for port
+              // fields so a clashing default surfaces its conflict right away.
+              this.envValues[field.key] =
+                field.value ?? field.suggestedValue ?? (field.isPort ? field.defaultValue : null) ?? '';
             } else if (field.suggestedValue) {
               this.envValues[field.key] = field.suggestedValue;
             }
@@ -424,15 +425,13 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   }
 
   /**
-   * Read-only value shown for an exposure-managed field (e.g. Vaultwarden's
-   * DOMAIN): the public URL once exposure is on, otherwise the current .env
-   * value or the compose default.
+   * Read-only value shown for an exposure-managed field: the exact value the
+   * exposure system injects (scheme+host for URL keys, bare host for host
+   * keys, the merged allow-list, `https` for protocol knobs, …) when exposure
+   * is on, otherwise the current .env value or the compose default.
    */
   protected managedFieldValue(field: ServiceEnvField): string {
-    if (this.exposure?.enabled && this.exposure.hostname) {
-      return `https://${this.exposure.hostname}`;
-    }
-    return field.value ?? field.defaultValue ?? '—';
+    return field.managedValue ?? field.value ?? field.defaultValue ?? '—';
   }
 
   /**

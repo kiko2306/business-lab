@@ -2096,3 +2096,37 @@ label: `homelab-management-{backend,frontend,database}` and
 `docker-socket-proxy` come back `value=false` (excluded), everything else
 watched. Container `Up (healthy)`, `RestartCount 0`. Old
 `containrrr/watchtower` image removed.
+
+### 23.15 Session Log — 2026-08-28 (cont.): Config-panel fixes (TZ prefill, exposure URLs, boolean radios)
+
+Three reported gaps in each app's Configuration panel, all in
+`appEnv.ts` `loadStatus` + the service-card form.
+
+1. **TZ not prefilled.** After §23.11 stripped `TZ=Europe/Lisbon` from the
+   `.env.example` files, the panel's `TZ` field showed blank. `loadStatus`
+   now sets `suggestedValue = getAppTimezone()` for an unset `TZ` key, and
+   the frontend prefills non-secret fields from `suggestedValue` too (not
+   just secrets). `executor.resolveTimezoneOverride` no longer treats a
+   `.env` `TZ` that equals the global as a pin, so prefilling + saving it
+   doesn't sever the "follows Settings → General" link.
+2. **Base-URL fields showed `http://localhost:…` while exposed.** `loadStatus`
+   now calls `buildExposureEnvOverrides(serviceName, appDir)` (the exact
+   values injected at `docker compose up`) and marks any key it returns as
+   `managed` with a new `managedValue` — so `NTFY_BASE_URL`,
+   `VIKUNJA_PUBLIC_URL`, `N8N_HOST`, `NEXTCLOUD_TRUSTED_DOMAINS`,
+   `N8N_PROTOCOL=https`, `NTFY_BEHIND_PROXY=true`, … render read-only at
+   their exposure value when exposure is on, and stay editable when it's off.
+   `managedFieldValue()` now returns `field.managedValue` instead of
+   hard-coding `https://<hostname>` (which was wrong for host/list/protocol
+   keys). Verified live: ntfy `NTFY_BASE_URL` →
+   `https://ntfy.tx-home-utils.com`.
+3. **true/false fields weren't radios.** `booleanEnvKeys` only covered
+   Vaultwarden's `SIGNUPS_ALLOWED`. `loadStatus` now also auto-detects a
+   field as boolean when its current value or compose default is exactly
+   `true`/`false` — so `NTFY_BEHIND_PROXY`, `WAHA_PRINT_QR`,
+   `STIRLING_PDF_ENABLE_*`, `NC_DISABLE_TELE`, … get the existing true/false
+   radio UI with no registry churn.
+
+`ServiceEnvField` gained `managedValue`. Backend `tsc` clean, 121 tests
+(+4 for TZ prefill / boolean auto-detect / exposure-managed url). Frontend
+builds clean. Stack rebuilt.

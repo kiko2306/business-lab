@@ -84,17 +84,20 @@ function executeCommand(command: string, timeout = 30000, extraEnv: Record<strin
 }
 
 /**
- * The global timezone as a `TZ` env override for `docker compose up`, unless
- * this app's own .env pins a `TZ` (a per-app override entered in the config
- * panel wins). Apps that don't read ${TZ} just get a harmless unused var.
+ * The global timezone as a `TZ` env override for `docker compose up`. A per-app
+ * `TZ` in the app's own .env wins — but only when it differs from the global
+ * value, so the config panel prefilling `TZ` with the global (and the user
+ * saving it) doesn't sever the "follows Settings" link. Apps that don't read
+ * ${TZ} just get a harmless unused var.
  */
 async function resolveTimezoneOverride(appDir: string): Promise<Record<string, string>> {
+  const globalTimezone = await getAppTimezone();
   const envFilePath = path.join(appDir, '.env');
   const pinned = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath).TZ?.trim() : '';
-  if (pinned) {
+  if (pinned && pinned !== globalTimezone) {
     return {};
   }
-  return { TZ: await getAppTimezone() };
+  return { TZ: globalTimezone };
 }
 
 /**

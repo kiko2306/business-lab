@@ -173,13 +173,15 @@ export interface ServiceEnvField {
   boolean: boolean;
   // Generated and persisted automatically on save — never rendered.
   hidden: boolean;
-  // Value is derived automatically (the exposure hostname) and shown
-  // read-only; never submitted by the client.
+  // Value is derived automatically (managedEnvKeys, or an exposure override
+  // while exposure is on) and shown read-only; never submitted by the client.
   managed: boolean;
+  // The exposure-derived value for a managed field, when exposure is on.
+  managedValue: string | null;
   value: string | null;
   defaultValue: string | null;
-  // A freshly generated secret to pre-fill an unset auto-generated field
-  // with — the user just has to save it.
+  // A value to pre-fill an unset field with (saved as-is): a generated secret
+  // for auto-generated keys, or the dashboard-wide timezone for `TZ`.
   suggestedValue: string | null;
   // True for `*_PORT` keys — a host port validated against what's already
   // published by other services.
