@@ -4,7 +4,7 @@ import { __test } from './crowdsecConfig';
 
 const { buildBouncerConfig, buildNpmRealIpBlock, NPM_REALIP_MARKER_BEGIN, NPM_REALIP_MARKER_END } = __test;
 
-describe('buildBouncerConfig', () => {
+describe('buildBouncerConfig (cloudflare-worker-bouncer)', () => {
   const cfg = buildBouncerConfig({
     lapiKey: 'lapi-key-123',
     accountId: 'acc-1',
@@ -13,16 +13,20 @@ describe('buildBouncerConfig', () => {
   });
 
   it('points the bouncer at the agent over the compose network', () => {
-    expect(cfg.crowdsec_lapi_url).toBe('http://crowdsec:8080/');
-    expect(cfg.crowdsec_lapi_key).toBe('lapi-key-123');
+    expect(cfg.crowdsec_config.lapi_url).toBe('http://crowdsec:8080/');
+    expect(cfg.crowdsec_config.lapi_key).toBe('lapi-key-123');
   });
 
-  it('nests the Cloudflare account, token and zone with a block action', () => {
+  it('nests the Cloudflare account, token and zone with a ban action, no turnstile', () => {
     const account = cfg.cloudflare_config.accounts[0];
     expect(account.id).toBe('acc-1');
     expect(account.token).toBe('cf-token-xyz');
-    expect(account.default_action).toBe('block');
-    expect(account.zones).toEqual([{ zone_id: 'zone-1', actions: ['block'] }]);
+    expect(account.default_action).toBe('ban');
+    const zone = account.zones[0];
+    expect(zone.zone_id).toBe('zone-1');
+    expect(zone.actions).toEqual(['ban']);
+    expect(zone.turnstile.enabled).toBe(false);
+    expect(zone.routes_to_protect).toEqual([]);
   });
 
   it('serialises to valid YAML that round-trips', () => {

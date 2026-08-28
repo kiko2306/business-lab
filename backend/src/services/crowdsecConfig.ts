@@ -5,12 +5,13 @@
  * startService as buildExposureEnvOverrides / applyExposureConfigFiles. Nothing
  * to hand-edit.
  *
- *  1. config/cloudflare-bouncer.yaml — the bundled Cloudflare bouncer only
- *     reads a YAML file. It needs the Cloudflare account/zone/token the
- *     dashboard already stores for tunnel management (utils/exposureSettings)
+ *  1. config/cloudflare-worker-bouncer.yaml — crowdsecurity/cloudflare-worker-
+ *     bouncer only reads a YAML file. It needs the Cloudflare account/zone/token
+ *     the dashboard already stores for tunnel management (utils/exposureSettings)
  *     plus the local-API key from this app's own .env (CROWDSEC_BOUNCER_KEY,
  *     which the compose file also feeds to the agent as BOUNCER_KEY_cloudflare
- *     so the two ends share a secret).
+ *     so the two ends share a secret). The bouncer then deploys a Cloudflare
+ *     Worker + KV + zone routes that block flagged IPs at the edge.
  *
  *  2. Nginx Proxy Manager's data/.../nginx/custom/http_top.conf — CrowdSec only
  *     ever sees Cloudflare's edge IPs in NPM's access logs unless nginx is told
@@ -29,7 +30,7 @@ import { resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 
 const NPM_SERVICE = 'nginx-proxy-manager';
-const BOUNCER_CONFIG_RELATIVE = path.join('config', 'cloudflare-bouncer.yaml');
+const BOUNCER_CONFIG_RELATIVE = path.join('config', 'cloudflare-worker-bouncer.yaml');
 const BOUNCER_KEY_ENV = 'CROWDSEC_BOUNCER_KEY';
 
 const NPM_REALIP_MARKER_BEGIN = '# >>> homelab-management: crowdsec real-ip >>>';
@@ -78,36 +79,46 @@ function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+// Config for crowdsecurity/cloudflare-worker-bouncer — it deploys a Cloudflare
+// Worker + KV namespace + zone routes that block IPs CrowdSec has flagged
+// (the legacy IP-list + Firewall-Rules bouncer stopped working when Cloudflare
+// froze that API). `actions: ['ban']` = drop, no captcha, so no Turnstile.
 function buildBouncerConfig(opts: { lapiKey: string; accountId: string; zoneId: string; apiToken: string }) {
   return {
-    crowdsec_lapi_url: 'http://crowdsec:8080/',
-    crowdsec_lapi_key: opts.lapiKey,
-    crowdsec_update_frequency: '10s',
-    include_scenarios_containing: [],
-    exclude_scenarios_containing: [],
-    only_include_decisions_from: [],
-    key_path: '',
-    cert_path: '',
-    ca_cert_path: '',
+    crowdsec_config: {
+      lapi_url: 'http://crowdsec:8080/',
+      lapi_key: opts.lapiKey,
+      update_frequency: '10s',
+      include_scenarios_containing: [],
+      exclude_scenarios_containing: [],
+      only_include_decisions_from: [],
+      key_path: '',
+      cert_path: '',
+      ca_cert_path: '',
+    },
     cloudflare_config: {
       accounts: [
         {
           id: opts.accountId,
           token: opts.apiToken,
+          account_name: '',
           ip_list_prefix: 'crowdsec',
-          default_action: 'block',
+          default_action: 'ban',
           total_ip_list_capacity: 10000,
-          zones: [{ zone_id: opts.zoneId, actions: ['block'] }],
+          zones: [
+            {
+              zone_id: opts.zoneId,
+              actions: ['ban'],
+              default_action: 'ban',
+              routes_to_protect: [],
+              turnstile: { enabled: false },
+            },
+          ],
         },
       ],
-      update_frequency: '30s',
     },
-    daemon: false,
     log_mode: 'stdout',
-    log_dir: '/var/log/',
     log_level: 'info',
-    log_max_size: 40,
-    compress_logs: true,
     prometheus: { enabled: false, listen_addr: '127.0.0.1', listen_port: '2112' },
   };
 }
@@ -132,7 +143,7 @@ function writeIfChanged(target: string, body: string, mode: number): boolean {
 }
 
 /**
- * Render config/cloudflare-bouncer.yaml. Always writes a file (so the compose
+ * Render config/cloudflare-worker-bouncer.yaml. Always writes a file (so the compose
  * bind mount never resolves to an auto-created directory); when a setting is
  * missing the file is a self-describing placeholder that makes the bouncer
  * fail loudly rather than silently mis-start.
@@ -159,7 +170,7 @@ function writeBouncerConfig(appDir: string, lapiKey: string | null, exposure: Aw
     );
 
   if (writeIfChanged(path.join(appDir, BOUNCER_CONFIG_RELATIVE), body, 0o600)) {
-    logger.info(`CrowdSec: rendered cloudflare-bouncer.yaml (${ready ? 'configured' : 'placeholder — missing settings'})`);
+    logger.info(`CrowdSec: rendered cloudflare-worker-bouncer.yaml (${ready ? 'configured' : 'placeholder — missing settings'})`);
   }
 }
 

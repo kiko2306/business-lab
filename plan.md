@@ -1584,7 +1584,7 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
 
 ### 22.6 Security, network & hardware health
 - [x] **CrowdSec** — `crowdsecurity/crowdsec` + **Cloudflare** bouncer
-      (chosen over the nginx bouncer: everything ingresses via the tunnel, so
+      (chosen over the nginx bouncer; the CF integration is now the maintained cloudflare-worker-bouncer, see §23.17: everything ingresses via the tunnel, so
       a firewall bouncer is blind to real IPs and the nginx bouncer would
       need a forked NPM image — the CF bouncer blocks at the edge, before the
       tunnel, and reuses CF creds). Added 2026-08-28 (§23.8):
@@ -2197,3 +2197,31 @@ Batch of "app shows error / check fail" fixes. Backend `tsc` clean, 121 tests.
   uses the tunnel token, which lacks **Account → Account Filter Lists → Edit**
   and **Zone → Firewall Services → Edit**. Needs a broader token or a
   dedicated one (see §22.6 / §23.9). Not yet resolved.
+
+### 23.17 Session Log — 2026-08-28 (cont.): CrowdSec → Cloudflare Worker bouncer
+
+The IP-list + Firewall-Rules bouncer (`crowdsecurity/cloudflare-bouncer`
+v0.3.0, unmaintained) authenticated fine once the token got
+`Account Filter Lists` + `Firewall Services` edit, but then hit
+`firewallrules.api.maintenance_mode (10020)` — Cloudflare froze the legacy
+Firewall Rules API. Switched to the maintained
+**`crowdsecurity/cloudflare-worker-bouncer`** (v0.0.18), which deploys a
+Cloudflare Worker + KV namespace + zone routes instead.
+
+- `apps/crowdsec/docker-compose.yml` — `cloudflare-bouncer` service replaced
+  with `cloudflare-worker-bouncer`, mounting
+  `config/cloudflare-worker-bouncer.yaml`.
+- `services/crowdsecConfig.ts` — `buildBouncerConfig` now emits the worker
+  schema (`crowdsec_config` / `cloudflare_config.accounts[].zones[]` with
+  `actions: ['ban']`, `default_action: ban`, `routes_to_protect: []`,
+  `turnstile.enabled: false` — no captcha, so no Turnstile setup). Renders to
+  `config/cloudflare-worker-bouncer.yaml` (gitignore glob `*-bouncer.yaml`).
+- `routes/settings.ts` — token permission hint updated: CrowdSec now needs
+  **Account → Workers Scripts → Edit**, **Account → Workers KV Storage →
+  Edit**, **Zone → Workers Routes → Edit** (the Filter-Lists / Firewall
+  scopes are no longer used).
+- `.example` renamed + rewritten; `crowdsecConfig.test.ts` updated. 121
+  tests, `tsc` clean, backend rebuilt.
+- **Blocked on the token**: worker-bouncer starts, renders config, but
+  `Authentication error (10000)` until the three Workers scopes are added.
+  Once they are it recovers on its own (crash-loop re-reads config).

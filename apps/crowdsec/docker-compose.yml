@@ -8,9 +8,9 @@ services:
       # Parsers + scenarios for Nginx Proxy Manager access logs and generic
       # HTTP attacks (path traversal, scanners, bad bots, known CVE probes).
       COLLECTIONS: "crowdsecurity/nginx crowdsecurity/http-cve crowdsecurity/base-http-scenarios"
-      # Auto-registers a bouncer named "cloudflare" with this key on startup
-      # so cloudflare-bouncer below can authenticate to the local API. Keep it
-      # in sync with crowdsec_lapi_key in config/cloudflare-bouncer.yaml.
+      # Auto-registers a bouncer named "cloudflare" with this key on startup so
+      # the worker bouncer below can authenticate to the local API. Keep it in
+      # sync with crowdsec_config.lapi_key in cloudflare-worker-bouncer.yaml.
       BOUNCER_KEY_cloudflare: ${CROWDSEC_BOUNCER_KEY}
     volumes:
       # Which logs to read and how to parse them.
@@ -29,8 +29,11 @@ services:
       retries: 3
       start_period: 40s
 
-  cloudflare-bouncer:
-    image: crowdsecurity/cloudflare-bouncer:latest
+  # Deploys a Cloudflare Worker + KV + zone routes that block IPs CrowdSec
+  # flags, at the edge. (Replaced crowdsecurity/cloudflare-bouncer, which is
+  # stuck on Cloudflare's now-frozen Firewall Rules API.)
+  cloudflare-worker-bouncer:
+    image: crowdsecurity/cloudflare-worker-bouncer:latest
     restart: unless-stopped
     depends_on:
       crowdsec:
@@ -40,9 +43,9 @@ services:
     volumes:
       # Rendered by the dashboard backend (services/crowdsecConfig.ts) from the
       # stored Cloudflare settings + CROWDSEC_BOUNCER_KEY on each start, so it
-      # holds a token — gitignored. cloudflare-bouncer.yaml.example documents
-      # the schema.
-      - ./config/cloudflare-bouncer.yaml:/etc/crowdsec/bouncers/crowdsec-cloudflare-bouncer.yaml:ro
+      # holds a token — gitignored. cloudflare-worker-bouncer.yaml.example
+      # documents the schema + the token scopes it needs.
+      - ./config/cloudflare-worker-bouncer.yaml:/etc/crowdsec/bouncers/crowdsec-cloudflare-worker-bouncer.yaml:ro
     networks:
       - crowdsec-net
 
