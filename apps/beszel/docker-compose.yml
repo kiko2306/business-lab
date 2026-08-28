@@ -4,6 +4,13 @@ services:
     restart: unless-stopped
     ports:
       - "${BESZEL_PORT:-8090}:8090"
+    environment:
+      # First-run only: seeds Beszel's own login on an empty database so the
+      # agent's universal token can be attached to an account with no manual
+      # steps. Ignored once a user exists — it never clobbers a real account.
+      # Change the password from the Beszel UI after first start.
+      USER_EMAIL: "${BESZEL_ADMIN_EMAIL:-admin@homelab.local}"
+      USER_PASSWORD: "${BESZEL_ADMIN_PASSWORD:-changeme-beszel}"
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Beszel"
@@ -13,8 +20,69 @@ services:
     volumes:
       - ./data:/beszel_data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:8090/api/health || exit 1"]
+      test: ["CMD", "/beszel", "health", "--url", "http://localhost:8090"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  # One-shot bootstrap so the hub actually has something to monitor on a
+  # fresh setup. Waits for the hub, then idempotently:
+  #   1. exports the hub's public SSH key next to its private key, and
+  #   2. registers a stable universal token in the hub database
+  # so beszel-agent below can self-enroll with zero dashboard clicks.
+  beszel-init:
+    image: alpine:3
+    restart: "no"
+    depends_on:
+      beszel:
+        condition: service_healthy
+    volumes:
+      - ./data:/beszel_data
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        apk add --no-cache sqlite openssh-keygen >/dev/null
+
+        DB=/beszel_data/data.db
+        PUB=/beszel_data/id_ed25519.pub
+        TOKFILE=/beszel_data/universal_token
+
+        [ -f "$$PUB" ] || ssh-keygen -y -f /beszel_data/id_ed25519 > "$$PUB"
+
+        [ -f "$$TOKFILE" ] || tr -d - < /proc/sys/kernel/random/uuid > "$$TOKFILE"
+        TOK=$$(cat "$$TOKFILE")
+
+        sqlite3 "$$DB" ".timeout 15000" "
+          INSERT INTO universal_tokens (id, token, user, created)
+          SELECT lower(hex(randomblob(7))), '$$TOK',
+                 (SELECT id FROM users ORDER BY created LIMIT 1),
+                 strftime('%Y-%m-%d %H:%M:%fZ','now')
+          WHERE EXISTS (SELECT 1 FROM users)
+            AND NOT EXISTS (SELECT 1 FROM universal_tokens WHERE token = '$$TOK');
+        "
+        echo "beszel-init: universal token registered"
+
+  beszel-agent:
+    image: henrygd/beszel-agent:latest
+    restart: unless-stopped
+    network_mode: host
+    depends_on:
+      beszel-init:
+        condition: service_completed_successfully
+    volumes:
+      - ./data:/beszel_data:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    environment:
+      LISTEN: "127.0.0.1:45876"
+      HUB_URL: "http://localhost:${BESZEL_PORT:-8090}"
+      TOKEN_FILE: /beszel_data/universal_token
+      KEY_FILE: /beszel_data/id_ed25519.pub
+      SYSTEM_NAME: "${BESZEL_SYSTEM_NAME:-homelab}"
+    healthcheck:
+      test: ["CMD", "/agent", "health"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
