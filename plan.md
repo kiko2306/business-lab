@@ -189,7 +189,8 @@ Preferred update strategies, in order:
 - [x] Health checks
 - [x] Real-time updates
 - [x] Recovery workflows
-- [ ] UI polish and mobile refinement
+- [x] UI polish and mobile refinement — dashboard grouping/collapsibles,
+      PWA install, responsive header + stacked tables on phones. See §23.
 
 ## 13.1 Priority and Estimate Reference
 
@@ -1531,3 +1532,93 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
 - [ ] **Grafana + Prometheus** — proper metrics/alerting if Beszel +
       Uptime-Kuma stop being enough. Heavier; a step change in ops
       complexity.
+
+## 23. Session Log — 2026-08-28 (cont.): PWA + mobile UI, login-probe fix, and the recommended order for what's left
+
+### 23.0 Shipped this session (all committed + pushed, `5b368c2`..`f5222b5`)
+- **`7201364`** — Vaultwarden compose healthcheck used `wget` (absent from
+  `vaultwarden/server`); switched to `curl -fsS`. The container was
+  permanently `unhealthy` while the app served `/alive` fine.
+- **`e8a2c53`** — `booleanEnvKeys` / `managedEnvKeys` / `hiddenGeneratedSecrets`
+  on `ServiceDefinition`, wired through `appEnv.ts` + the service-card config
+  panel; Vaultwarden uses all three (DOMAIN managed, SIGNUPS_ALLOWED toggle,
+  ADMIN_TOKEN hidden-generated). (This was pre-existing working-tree work,
+  committed as its own unit.)
+- **`8b3885b`** — checked in the rest of `apps/home-page/data/` (services,
+  bookmarks, widgets, settings, proxmox, kubernetes, custom CSS/JS).
+- **`1c3a2bb`** — dashboard: "Running apps" table grouped by the same
+  category + fixed order as the full list; category headers in both lists
+  and the Settings / Backups / Health sections are collapse toggles, state
+  namespaced + persisted to `localStorage`; "Running apps" is now a tinted
+  green-accented panel, the full list sits under an "All apps" heading + rule.
+- **`2a46e11`** — PWA: `manifest.webmanifest`, 192/512 + maskable icons
+  (rasterized from `favicon.svg`), 180px `apple-touch-icon`, `index.html`
+  meta (theme-color, apple-mobile-web-app-*), a conservative service worker
+  (`public/sw.js`: network-first navigations, cache-first only for
+  content-hashed assets, never touches `/api`), and nginx serving
+  `.webmanifest` as `application/manifest+json` + `sw.js` `no-cache`.
+- **`6d8b085`** — new public `GET /auth/setup-status` → `{ setupRequired }`
+  (200, own roomy rate limiter). The route guards' setup check hit `GET /api`
+  before, which always 401s (503 pre-setup) on a fresh load — a console
+  error on the login page every visit. Frontend now calls the public endpoint.
+- **`f5222b5`** — mobile: header rebuilt so it no longer forces one
+  horizontal row at every width (brand + Logout on row 1, secondary links
+  as a full-width swipeable strip on row 2 below `lg`); `section[id]`
+  `scroll-margin-top` for the sticky header; Running-apps tables collapse
+  to stacked labelled cards below 768px (`data-label` + `::before`,
+  `thead` visually hidden) so there's no horizontal drag; tighter panel /
+  summary-card spacing on phones.
+
+This delivers most of §13 Milestone 4's "UI polish and mobile refinement".
+
+### 23.1 Recommended implementation order for the outstanding work
+Sequenced by dependency and momentum, not just P-label (same spirit as
+§18.2). Tracks A–C run in order; Track D is genuinely blocked and runs in
+parallel whenever the user unblocks it.
+
+**Track A — visible-bug fixes first (small, self-contained, high-signal)**
+1. **§21.1 "Running apps" links.** Introduces a reusable per-service
+   "web path suffix" field on the registry (Pi-hole `/admin/login`), fixes
+   the NPM card to target its real admin hostname, and ties a Portainer
+   `restart` into the existing setup-token flow to clear its first-run
+   lockout. Small, and the web-path field is reused by later apps.
+2. **§21.2 live-verify + Authelia check.** Enable exposure + restart each
+   app touched by §21.2 and confirm the Host/CSRF error is gone; adjust the
+   Home Assistant `trusted_proxies` range in `exposureConfigFiles.ts` if the
+   proxy source address isn't covered; confirm `authelia.<base-domain>` is
+   in Authelia's `configuration.yml`. No code unless HA needs a wider range.
+   **Do this before Track B** — every new app in §22 is told to "wire
+   reverse-proxy config up front per §21.2", so the mechanism must be
+   proven first.
+
+**Track B — new apps (smallest first, for momentum)**
+3. **ntfy** (§22.2, S) — unblocks push notifications for uptime-kuma,
+   watchtower, and the backup scheduler; broad value for low effort.
+4. **Stirling-PDF** (§22.5, S) — zero Host validation, near-zero config,
+   Paperless companion. Quick win.
+5. **WAHA** (§22.1, M) — explicitly requested; build it once the exposure
+   pattern is proven and ntfy has exercised the "notification target" shape.
+6. **NocoDB** (§22.4, M) — Airtable-style data backbone for n8n.
+
+**Track C — security hardening (higher value, larger, wants a stable base)**
+7. **CrowdSec** (§22.6, M) — biggest single security upgrade for the
+   exposed stack; touches NPM, so batch it after Track A's NPM-adjacent work.
+8. **2FA for admin accounts** (§18.2 item 8) — the dashboard is
+   internet-facing; do this last of the must-dos but don't defer it
+   indefinitely. Give it its own dedicated plan (TOTP enrolment, backup
+   codes, login-flow + UI changes) — the M estimate is undersized.
+
+**Track D — NetBird (blocked on the user, run in parallel, not in sequence)**
+- Resume §20.11 / §21.3 only once the user confirms whether a router
+  port-forward + static IP/DDNS is feasible, or picks the no-router path
+  (NetBird Relay/Signal, enrol over the existing Tailscale overlay, or
+  retest a newer `cloudflared` for the trailers bug). Then: §20.10
+  (DNS-01 cert path in `ensureGrpcCertificate`, a "direct exposure" mode in
+  the exposure config/DB, grey-cloud the DNS record), confirm a real peer
+  enrols, then STUN/TURN. Independent of Tracks A–C.
+
+**Opportunistic / not scheduled**
+- Remaining §22 P2/P3 apps — pull individually when a concrete use appears.
+- §18.2 item 7 (health-check host-port assumption) — only if a service
+  actually exhibits that failure pattern.
+- §13.3 nice-to-haves: service templates, UI theming.
