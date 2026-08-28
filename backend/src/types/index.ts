@@ -125,6 +125,12 @@ export interface ServiceDefinition {
   // so its management API needs its own directly-reachable hostname.
   // Provisioned/torn down automatically alongside the primary exposure.
   additionalExposures?: ServiceAdditionalExposure[];
+  // URL path where the app's web UI actually lives, when it isn't the bare
+  // root — appended to the public URL for the dashboard "open" link (and any
+  // future exposure health check). e.g. Pi-hole serves its admin UI under
+  // `/admin`, so its bare hostname just 403s / redirects. Leading slash, no
+  // trailing slash; unset for the common "UI is at /" case.
+  webPath?: string;
 }
 
 export type ServiceState = 'running' | 'stopped' | 'starting' | 'error' | 'unknown';
@@ -156,6 +162,9 @@ export interface ServiceStatusPayload {
   // provisioned successfully — null/absent otherwise, including for
   // services with no published port to expose in the first place.
   exposedHostname?: string | null;
+  // URL path suffix for the app's web UI when it isn't at the bare root
+  // (e.g. Pi-hole's `/admin`) — the dashboard appends it to the "open" link.
+  webPath?: string;
 }
 
 export interface ServiceStatusSummary {

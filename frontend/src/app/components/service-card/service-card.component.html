@@ -9,12 +9,12 @@
       <a
         *ngIf="service.exposedHostname"
         class="badge text-bg-light border text-decoration-none"
-        [href]="'https://' + service.exposedHostname"
+        [href]="'https://' + service.exposedHostname + (service.webPath || '')"
         target="_blank"
         rel="noopener noreferrer"
         title="Open public URL"
       >
-        {{ service.exposedHostname }}
+        {{ service.exposedHostname }}{{ service.webPath }}
       </a>
     </div>
     <div class="service-row-sub">
@@ -90,6 +90,20 @@
           </div>
           <div *ngIf="!setupTokenLoading && !setupToken" class="small text-body-secondary">
             No active setup token found — setup is likely already complete, or the token (valid 5 minutes after first start) has expired.
+          </div>
+          <div *ngIf="!setupTokenLoading" class="mt-2">
+            <button
+              type="button"
+              class="btn btn-outline-secondary btn-sm"
+              (click)="resetSetupToken()"
+              [disabled]="setupTokenResetting"
+            >
+              <span *ngIf="setupTokenResetting" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              {{ setupTokenResetting ? 'Restarting…' : 'Restart & get a new token' }}
+            </button>
+            <div class="form-text">
+              Use this if setup timed out — restarts the app to clear its first-run lock and issue a fresh token.
+            </div>
           </div>
         </div>
 

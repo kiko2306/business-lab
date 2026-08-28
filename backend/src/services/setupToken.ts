@@ -20,6 +20,11 @@ function run(command: string): Promise<string> {
  * has no container yet, or the pattern isn't found (already completed setup,
  * or the token line has scrolled out — logs aren't truncated here, so this
  * only happens if the container's own log retention dropped it).
+ *
+ * When the logs hold more than one match — which happens after a restart, e.g.
+ * Portainer re-prints a fresh `setup_token=` every boot while admin creation
+ * is still pending — the *last* one wins, since that's the token currently
+ * valid.
  */
 export async function getServiceSetupToken(serviceName: string): Promise<string | null> {
   const service = getService(serviceName);
@@ -49,6 +54,31 @@ export async function getServiceSetupToken(serviceName: string): Promise<string 
     /\x1b\[[0-9;]*m/g,
     ''
   );
-  const match = new RegExp(service.setupToken.logPattern).exec(logs);
-  return match?.[1] ?? null;
+  const pattern = new RegExp(service.setupToken.logPattern, 'g');
+  let token: string | null = null;
+  for (const match of logs.matchAll(pattern)) {
+    token = match[1] ?? token;
+  }
+  return token;
+}
+
+/**
+ * Poll for a service's setup token, for use right after a restart when the
+ * container needs a beat to boot and print the token line. Resolves with the
+ * first non-null read, or null once the attempts are exhausted.
+ */
+export async function waitForServiceSetupToken(
+  serviceName: string,
+  { attempts = 6, delayMs = 1500 }: { attempts?: number; delayMs?: number } = {}
+): Promise<string | null> {
+  for (let i = 0; i < attempts; i++) {
+    const token = await getServiceSetupToken(serviceName);
+    if (token) {
+      return token;
+    }
+    if (i < attempts - 1) {
+      await new Promise((resolve) => setTimeout(resolve, delayMs));
+    }
+  }
+  return null;
 }

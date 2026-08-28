@@ -28,6 +28,12 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       interval: 30000, // 30 seconds
       timeout: 5000,
     },
+    // The compose file publishes the proxy listeners (:80, :443) before the
+    // admin UI (:81) — "first port in the file" would point exposure at :80,
+    // whose default vhost is NPM's "Congratulations" placeholder, not the
+    // admin panel. Pin the upstream to the admin port so the dashboard link
+    // (and the tunnel route) land on the actual UI.
+    exposurePortEnvVar: 'NPM_ADMIN_PORT',
   },
   'netbird-vpn': {
     name: 'netbird-vpn',
@@ -196,6 +202,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // port — "first port in the file" would pick DNS, not the web UI, so
     // exposure needs to be told explicitly which one is the actual upstream.
     exposurePortEnvVar: 'PIHOLE_WEB_PORT',
+    // Pi-hole serves its admin UI under /admin; the bare root just redirects
+    // (or 403s on v6), so the dashboard link has to target the sub-path.
+    webPath: '/admin',
   },
   'speedtest': {
     name: 'speedtest',

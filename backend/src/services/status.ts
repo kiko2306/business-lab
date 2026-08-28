@@ -234,6 +234,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       dependsOn: service.dependsOn,
       ports,
       exposedHostname,
+      webPath: service.webPath,
     };
   } catch (error) {
     const message = (error as Error).message;

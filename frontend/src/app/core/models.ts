@@ -39,6 +39,9 @@ export interface ServiceStatus {
   dependsOn?: string[];
   ports?: ServicePortMapping[];
   exposedHostname?: string | null;
+  // URL path suffix for the app's web UI when it isn't the bare root
+  // (e.g. Pi-hole's `/admin`) — appended to the public URL for "open" links.
+  webPath?: string;
 }
 
 export interface AutheliaAdminUser {

@@ -1315,28 +1315,29 @@ Shipped this session (git `d1977a7`..`7b8e4a4`):
   pulls (Immich's four images) actually complete. Popup shows a "still
   preparing — downloading images" heartbeat while pulling.
 
-### 21.1 Dashboard "running apps" list — wrong / unhelpful links
-- [ ] **Nginx Proxy Manager** — the card should open NPM's admin UI at the
-      hostname configured for it in Cloudflare, not an internal `host:port`
-      or the bare proxied root. Check what `exposedHostname` resolves to for
-      `nginx-proxy-manager` and whether the link needs the NPM admin path.
-      **Priority: P1** — **Estimate: S**
-- [ ] **Pi-hole** — card links to `https://pihole.tx-home-utils.com/`, which
-      is not the admin app; it should be
-      `https://pihole.tx-home-utils.com/admin/login` (or `/admin/`). Pi-hole
-      serves its UI under `/admin`. Needs a per-service "web path" suffix on
-      the service definition (like `exposurePortEnvVar`, but for the URL
-      path) that both the dashboard link and any exposure health check
-      append. **Priority: P1** — **Estimate: S–M**
-- [ ] **Portainer** — shows *"New Portainer installation / Your Portainer
-      instance timed out for security purposes. To re-enable … restart
-      Portainer."* Portainer locks first-run admin creation if it isn't
-      completed within a few minutes of initial boot. Fix path: `restart`
-      Portainer to clear the lock, then complete setup immediately — or
-      pre-seed the admin account so the timeout window is never hit
-      (`--admin-password-file` on the command, or a seeded `portainer` data
-      dir). Tie the restart into the setup-token flow the card already has
-      for Portainer. **Priority: P1** — **Estimate: M**
+### 21.1 Dashboard "running apps" list — wrong / unhelpful links — DONE 2026-08-28
+- [x] **Nginx Proxy Manager** — `exposurePortEnvVar: 'NPM_ADMIN_PORT'` on the
+      registry entry. The compose file publishes the proxy listeners (:80,
+      :443) before the admin UI (:81), so the primary-exposure upstream (and
+      therefore the dashboard link) pointed at :80's default "Congratulations"
+      vhost. `provisionServiceIfEnabled` already passes
+      `serviceDef.exposurePortEnvVar` to `getPublishedUpstreamPort`, so no
+      exposure-code change — just the registry pin.
+- [x] **Pi-hole** — new optional `webPath?: string` on `ServiceDefinition`
+      (leading slash, no trailing slash), surfaced through
+      `ServiceStatusPayload` → the frontend `ServiceStatus` model. The
+      dashboard "open" link (`groupRunningPortsByCategory`) and the
+      service-card hostname badge both append it. `pihole` sets
+      `webPath: '/admin'`. Reserved for a future exposure health check too.
+- [x] **Portainer** — new `POST /api/services/:name/setup-token/reset`
+      (guarded by `requireSetupTokenSupport`): restarts the service — which
+      clears Portainer's "timed out for security purposes" first-run lock and
+      makes it print a fresh `setup_token=` line, resetting the 5-min window —
+      then polls `waitForServiceSetupToken` for the new token and returns it.
+      `getServiceSetupToken` now returns the *last* pattern match, not the
+      first, so a post-restart log with a stale token line above the fresh one
+      resolves correctly. Card's setup-token panel gained a "Restart & get a
+      new token" button (`resetSetupToken()`).
 
 ### 21.2 Exposed apps returning HTTP errors (Host / CSRF rejection) — DONE 2026-08-28
 Shared root cause: each app rejects requests whose `Host` header is the
@@ -1577,11 +1578,11 @@ Sequenced by dependency and momentum, not just P-label (same spirit as
 parallel whenever the user unblocks it.
 
 **Track A — visible-bug fixes first (small, self-contained, high-signal)**
-1. **§21.1 "Running apps" links.** Introduces a reusable per-service
-   "web path suffix" field on the registry (Pi-hole `/admin/login`), fixes
-   the NPM card to target its real admin hostname, and ties a Portainer
-   `restart` into the existing setup-token flow to clear its first-run
-   lockout. Small, and the web-path field is reused by later apps.
+1. ~~**§21.1 "Running apps" links.**~~ **DONE 2026-08-28** — see §21.1 and
+   §23.2. Added the reusable `webPath` registry field (Pi-hole `/admin`),
+   pinned NPM's exposure upstream to `NPM_ADMIN_PORT`, and added
+   `POST /services/:name/setup-token/reset` + a card button that restarts
+   Portainer to clear its first-run lock and reissue the token.
 2. **§21.2 live-verify + Authelia check.** Enable exposure + restart each
    app touched by §21.2 and confirm the Host/CSRF error is gone; adjust the
    Home Assistant `trusted_proxies` range in `exposureConfigFiles.ts` if the
@@ -1622,3 +1623,35 @@ parallel whenever the user unblocks it.
 - §18.2 item 7 (health-check host-port assumption) — only if a service
   actually exhibits that failure pattern.
 - §13.3 nice-to-haves: service templates, UI theming.
+
+### 23.2 Session Log — 2026-08-28 (cont.): §21.1 "Running apps" links
+
+Track A item 1 shipped. Backend `tsc --noEmit` clean; backend vitest 31/31
+on the touched suites; frontend `ng build` compiles clean (dev config).
+Not yet verified against live containers — needs exposure actually enabled
+(same gate as §21.2 item 1).
+
+- **`webPath` registry field** — optional `webPath?: string` on
+  `ServiceDefinition` (leading slash, no trailing slash) for apps whose web
+  UI isn't at `/`. Flows: `config/services.ts` → `ServiceStatusPayload`
+  (`status.ts`) → frontend `ServiceStatus` model → appended in
+  `dashboard.ts` `groupRunningPortsByCategory` and the `service-card`
+  hostname badge (`https://<host><webPath>`). `pihole` sets `'/admin'`.
+  Intended to also feed a future exposure health check (none exists yet).
+- **NPM link** — `nginx-proxy-manager` gains
+  `exposurePortEnvVar: 'NPM_ADMIN_PORT'`. Its compose publishes :80/:443
+  (proxy listeners) before :81 (admin UI), so "first port in the file" sent
+  the exposure upstream — and the dashboard link — to :80's default
+  "Congratulations" vhost. `provisionServiceIfEnabled` already threads
+  `serviceDef.exposurePortEnvVar` into `getPublishedUpstreamPort`, so this
+  was a one-line registry pin, no exposure-code change.
+- **Portainer lock recovery** — `POST /api/services/:name/setup-token/reset`
+  (new `requireSetupTokenSupport` guard): `executor.restartService` →
+  `waitForServiceSetupToken` (polls `getServiceSetupToken`, 6×1.5s) →
+  `{ token, message }`, audited as `SERVICE_SETUP_TOKEN_RESET`. Restarting
+  Portainer clears its "timed out for security purposes" first-run lock and
+  reprints a fresh `setup_token=`, resetting the 5-min window.
+  `getServiceSetupToken` now takes the **last** regex match, not the first,
+  so a post-restart log (stale token line above the fresh one) resolves to
+  the current token. Card's setup-token panel has a "Restart & get a new
+  token" button → `resetSetupToken()` (`setupTokenResetting` spinner state).

@@ -91,6 +91,13 @@ export class OperationsService {
     return this.http.get<{ token: string | null }>(`${API_BASE_URL}/services/${serviceName}/setup-token`);
   }
 
+  resetServiceSetupToken(serviceName: string): Observable<{ token: string | null; message: string }> {
+    return this.http.post<{ token: string | null; message: string }>(
+      `${API_BASE_URL}/services/${serviceName}/setup-token/reset`,
+      {}
+    );
+  }
+
   updateServiceEnv(serviceName: string, values: Record<string, string>): Observable<{ message: string } & ServiceEnvStatus> {
     return this.http.put<{ message: string } & ServiceEnvStatus>(`${API_BASE_URL}/services/${serviceName}/env`, {
       values,

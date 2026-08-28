@@ -33,6 +33,19 @@ describe('getServiceSetupToken', () => {
     expect(token).toBe('ecfb7281e5565d0df32cf3277de06970247e60bf48d9afb9d9cc7add3fbbcc73');
   });
 
+  it('returns the last match when a restart has left an older, stale token in the logs', async () => {
+    const logs =
+      'no administrator account configured | setup_token=stale000000000000000000000000000000000000000000000000000000000000\n' +
+      '... some later restart ...\n' +
+      'no administrator account configured | setup_token=fresh111111111111111111111111111111111111111111111111111111111111\n';
+
+    mockExecSequence(['portainer-portainer-1\n', logs]);
+
+    const token = await getServiceSetupToken('portainer');
+
+    expect(token).toBe('fresh111111111111111111111111111111111111111111111111111111111111');
+  });
+
   it('returns null for services without setupToken support', async () => {
     const token = await getServiceSetupToken('nonexistent-service');
     expect(token).toBeNull();

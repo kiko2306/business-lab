@@ -52,9 +52,10 @@ interface ServicePortGroup {
 // One row per running app for the "running apps" table — all of an app's
 // published ports are listed together instead of one row each. The URL is
 // the app's public hostname (no port — that's an internal implementation
-// detail Cloudflare/NPM strip away), and is null for apps that aren't
-// exposed publicly. Rows are grouped by the same category as the full apps
-// list so the two views line up.
+// detail Cloudflare/NPM strip away) plus the registry's `webPath` when the
+// UI isn't at the bare root (e.g. Pi-hole's `/admin`), and is null for apps
+// that aren't exposed publicly. Rows are grouped by the same category as the
+// full apps list so the two views line up.
 function groupRunningPortsByCategory(services: ServiceStatus[]): ServicePortGroup[] {
   const byCategory = new Map<string, ServicePortRow[]>();
   for (const service of services) {
@@ -62,7 +63,9 @@ function groupRunningPortsByCategory(services: ServiceStatus[]): ServicePortGrou
       continue;
     }
     const category = service.category ?? 'Other';
-    const url = service.exposedHostname ? `https://${service.exposedHostname}` : null;
+    const url = service.exposedHostname
+      ? `https://${service.exposedHostname}${service.webPath ?? ''}`
+      : null;
     const row: ServicePortRow = { serviceName: service.name, label: service.label, url, ports: service.ports };
     const bucket = byCategory.get(category);
     if (bucket) {

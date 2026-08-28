@@ -64,6 +64,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   protected envValues: Record<string, string> = {};
 
   protected setupTokenLoading = false;
+  protected setupTokenResetting = false;
   protected setupToken: string | null = null;
   protected setupTokenCopied = false;
 
@@ -367,6 +368,24 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       this.setupTokenCopied = true;
       setTimeout(() => (this.setupTokenCopied = false), 2000);
     });
+  }
+
+  resetSetupToken(): void {
+    this.setupTokenResetting = true;
+    this.operations
+      .resetServiceSetupToken(this.service.name)
+      .pipe(finalize(() => (this.setupTokenResetting = false)))
+      .subscribe({
+        next: (result) => {
+          this.setupToken = result.token;
+          if (result.token) {
+            this.toast.success('Restarted — a fresh setup token is ready. Complete setup within 5 minutes.');
+          } else {
+            this.toast.info('Restarted, but no token appeared yet — reopen this panel in a moment to retry.');
+          }
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to reset the setup token.')),
+      });
   }
 
   loadEnv(): void {
