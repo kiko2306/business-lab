@@ -22,14 +22,14 @@ const ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_STREAM_MS = 180_000;
-// `docker compose up -d` returns quickly, so if the container is still
-// missing/stopped this long after, the start almost certainly errored out
-// before anything ran.
-const STOPPED_GRACE_MS = 12_000;
-// A container that's been created/health-starting but never reached
-// "running" for this long is treated as a failed start (crash loop, stuck
-// entrypoint, failing health check).
-const STARTING_GRACE_MS = 90_000;
+// A container that never reached "running" for this long is treated as a
+// failed start (crash loop, stuck entrypoint, failing health check). It's
+// generous because `docker compose up -d` can legitimately take a while
+// before the container even exists — pulling the image, creating volumes —
+// during which it reads as stopped/created. An actual `compose up` failure
+// (bad env, port clash, malformed compose) is surfaced separately and
+// immediately from the start request's own response, not from here.
+const STARTING_GRACE_MS = 150_000;
 // Once a terminal state (running+healthy / failed) is detected, keep the log
 // stream open this much longer so the container's boot output actually
 // reaches the popup — a fast, healthy start would otherwise be cut off
@@ -228,20 +228,12 @@ function streamStartupLogs(serviceName: string, res: Response): void {
       return;
     }
 
-    if (state === 'starting') {
-      // multi-container app still bringing its peers up: long runway before
-      // giving up
-      if (elapsed > STARTING_GRACE_MS) {
-        finishAfterDrain({ state: 'starting', healthy: false });
-      }
-      return;
-    }
-
-    // 'error' (crash loop, or a container that was created but never started),
-    // 'stopped' or 'unknown', and it never came up. Right after the click this
-    // can just be a start still in flight, so hold for the short grace while
-    // the logs stream; past that it's a failed start.
-    if (elapsed > STOPPED_GRACE_MS) {
+    // Never running yet: 'starting' (a peer container still coming up),
+    // 'error' (crash loop, or created-but-not-started), 'stopped'/'unknown'
+    // (container doesn't exist yet — image still pulling). All of these are
+    // normal early in a start, so hold for the full runway; only past it is
+    // this a genuinely stuck start.
+    if (elapsed > STARTING_GRACE_MS) {
       finishAfterDrain({ state, healthy: false });
     }
   }, POLL_INTERVAL_MS);
