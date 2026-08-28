@@ -2,7 +2,10 @@
   <header class="navbar navbar-expand border-bottom bg-white sticky-top">
     <div class="container-fluid py-2">
       <div>
-        <div class="navbar-brand fw-semibold mb-0">Homelab Manager</div>
+        <div class="navbar-brand fw-semibold mb-0 d-flex align-items-center gap-2">
+          <img src="favicon.svg" alt="" width="26" height="26" />
+          Homelab Manager
+        </div>
         <div class="small text-body-secondary" *ngIf="user$ | async as user">
           Signed in as {{ user.username }}
         </div>

@@ -1,11 +1,25 @@
 import { CommonModule } from '@angular/common';
-import { Component, EventEmitter, Input, Output, inject } from '@angular/core';
+import {
+  AfterViewChecked,
+  Component,
+  ElementRef,
+  EventEmitter,
+  HostListener,
+  Input,
+  OnDestroy,
+  Output,
+  ViewChild,
+  inject,
+} from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { AutheliaAdminUser, ServiceEnvStatus, ServiceExposureConfig, ServiceStatus } from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
+import { ServiceStateService } from '../../core/service-state.service';
 import { ToastService } from '../../core/toast.service';
+
+type StartupPhase = 'streaming' | 'running' | 'error' | 'timeout';
 
 @Component({
   selector: 'app-service-card',
@@ -14,8 +28,9 @@ import { ToastService } from '../../core/toast.service';
   templateUrl: './service-card.component.html',
   styleUrl: './service-card.component.css'
 })
-export class ServiceCardComponent {
+export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly operations = inject(OperationsService);
+  private readonly serviceState = inject(ServiceStateService);
   private readonly toast = inject(ToastService);
 
   @Input({ required: true }) service!: ServiceStatus;
@@ -49,8 +64,159 @@ export class ServiceCardComponent {
   protected adminUser: AutheliaAdminUser | null = null;
   protected adminUserForm = { username: '', displayName: '', email: '', password: '' };
 
+  protected startupLogsOpen = false;
+  protected startupLogLines: string[] = [];
+  protected startupPhase: StartupPhase = 'streaming';
+  private startupLogSource?: EventSource;
+  private startupAutoCloseTimer?: ReturnType<typeof setTimeout>;
+  private scrollLogsPending = false;
+
+  @ViewChild('startupLogBody') private startupLogBody?: ElementRef<HTMLElement>;
+
   requestAction(action: 'start' | 'stop'): void {
+    if (action === 'start') {
+      void this.openStartupLogs();
+    }
     this.actionRequested.emit(action);
+  }
+
+  ngAfterViewChecked(): void {
+    if (this.scrollLogsPending && this.startupLogBody) {
+      const el = this.startupLogBody.nativeElement;
+      el.scrollTop = el.scrollHeight;
+      this.scrollLogsPending = false;
+    }
+  }
+
+  ngOnDestroy(): void {
+    this.teardownStartupLogs();
+  }
+
+  @HostListener('document:keydown.escape')
+  onEscapeKey(): void {
+    if (this.startupLogsOpen) {
+      this.closeStartupLogs();
+    }
+  }
+
+  private async openStartupLogs(): Promise<void> {
+    this.teardownStartupLogs();
+    this.startupLogsOpen = true;
+    this.startupLogLines = [];
+    this.startupPhase = 'streaming';
+
+    const url = await this.serviceState.createStartupLogUrl(this.service.name);
+    if (!url) {
+      this.pushStartupLine('Unable to open the log stream — try reloading the dashboard.');
+      this.startupPhase = 'error';
+      return;
+    }
+    if (!this.startupLogsOpen) {
+      return; // closed again while the ticket request was in flight
+    }
+
+    const source = new EventSource(url);
+    this.startupLogSource = source;
+
+    source.addEventListener('log', (event) => {
+      try {
+        const { line } = JSON.parse((event as MessageEvent<string>).data) as { line: string };
+        this.pushStartupLine(line);
+      } catch {
+        // ignore malformed frames
+      }
+    });
+
+    source.addEventListener('done', (event) => {
+      try {
+        const info = JSON.parse((event as MessageEvent<string>).data) as {
+          state?: string;
+          healthy?: boolean;
+          timedOut?: boolean;
+        };
+        this.startupPhase = info.timedOut
+          ? 'timeout'
+          : info.state === 'running' && info.healthy
+            ? 'running'
+            : 'error';
+      } catch {
+        this.startupPhase = 'error';
+      }
+      source.close();
+      this.startupLogSource = undefined;
+      if (this.startupPhase === 'running') {
+        this.startupAutoCloseTimer = setTimeout(() => this.closeStartupLogs(), 2500);
+      }
+    });
+
+    source.onerror = () => {
+      if (this.startupPhase === 'streaming') {
+        this.pushStartupLine('— log stream disconnected —');
+      }
+      source.close();
+      this.startupLogSource = undefined;
+    };
+  }
+
+  private pushStartupLine(line: string): void {
+    this.startupLogLines.push(line);
+    if (this.startupLogLines.length > 600) {
+      this.startupLogLines.splice(0, this.startupLogLines.length - 600);
+    }
+    this.scrollLogsPending = true;
+  }
+
+  closeStartupLogs(): void {
+    this.teardownStartupLogs();
+    this.startupLogsOpen = false;
+  }
+
+  private teardownStartupLogs(): void {
+    this.startupLogSource?.close();
+    this.startupLogSource = undefined;
+    if (this.startupAutoCloseTimer) {
+      clearTimeout(this.startupAutoCloseTimer);
+      this.startupAutoCloseTimer = undefined;
+    }
+  }
+
+  protected startupPhaseLabel(): string {
+    switch (this.startupPhase) {
+      case 'streaming':
+        return 'starting…';
+      case 'running':
+        return 'running';
+      case 'error':
+        return 'failed';
+      case 'timeout':
+        return 'still starting';
+    }
+  }
+
+  protected startupPhaseBadgeClass(): Record<string, boolean> {
+    return {
+      'text-bg-secondary': this.startupPhase === 'streaming',
+      'text-bg-success': this.startupPhase === 'running',
+      'text-bg-danger': this.startupPhase === 'error',
+      'text-bg-warning': this.startupPhase === 'timeout',
+    };
+  }
+
+  protected startupFootNote(): string {
+    switch (this.startupPhase) {
+      case 'streaming':
+        return 'Streaming container logs until the service is running and healthy…';
+      case 'running':
+        return `${this.service.label} is up and healthy.`;
+      case 'error':
+        return `${this.service.label} did not come up — check the log above for the error.`;
+      case 'timeout':
+        return 'Still starting after a few minutes — leaving the logs here so you can keep watching.';
+    }
+  }
+
+  protected startupLogText(): string {
+    return this.startupLogLines.length ? this.startupLogLines.join('\n') : 'Waiting for output…';
   }
 
   dependencyStates(): { label: string; running: boolean }[] {

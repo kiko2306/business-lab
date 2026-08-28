@@ -31,11 +31,27 @@ function getTokenFromRequest(req: Request): string | null {
   return null;
 }
 
+/**
+ * Resolve a stream ticket (issued by createStreamTicket) to its user id, or
+ * null if it's unknown or expired. Tickets aren't consumed on use — they're
+ * short-lived (60s) and a client may open more than one stream with one.
+ */
+export function resolveStreamTicketUser(ticket: string | null | undefined): number | null {
+  if (!ticket) {
+    return null;
+  }
+  const entry = streamTickets.get(ticket);
+  if (!entry || entry.expiresAt <= Date.now()) {
+    return null;
+  }
+  return entry.userId;
+}
+
 function authenticateStreamRequest(req: Request): { id: number } | null {
   if (typeof req.query?.ticket === 'string') {
-    const ticket = streamTickets.get(req.query.ticket);
-    if (ticket && ticket.expiresAt > Date.now()) {
-      return { id: ticket.userId };
+    const userId = resolveStreamTicketUser(req.query.ticket);
+    if (userId !== null) {
+      return { id: userId };
     }
   }
 

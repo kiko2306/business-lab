@@ -77,6 +77,19 @@ export class ServiceStateService {
     this.runServiceAction(serviceName, 'stop');
   }
 
+  /**
+   * Build a ticket-authenticated URL for the service's startup log SSE
+   * stream (an EventSource can't send an Authorization header). Returns null
+   * if no ticket could be obtained (e.g. not logged in).
+   */
+  async createStartupLogUrl(serviceName: string): Promise<string | null> {
+    const ticket = await this.getStreamTicket();
+    if (!ticket) {
+      return null;
+    }
+    return `${API_BASE_URL}/services/${encodeURIComponent(serviceName)}/startup-logs?ticket=${encodeURIComponent(ticket)}`;
+  }
+
   private fetchServices(showLoader: boolean) {
     if (showLoader) {
       this.refreshingSubject.next(true);

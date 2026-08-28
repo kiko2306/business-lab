@@ -239,3 +239,28 @@
     </div>
   </div>
 </article>
+
+<div *ngIf="startupLogsOpen" class="startup-logs-backdrop" (click)="closeStartupLogs()">
+  <div class="startup-logs-dialog" (click)="$event.stopPropagation()">
+    <div class="startup-logs-head">
+      <span
+        *ngIf="startupPhase === 'streaming'"
+        class="spinner-border spinner-border-sm text-light"
+        aria-hidden="true"
+      ></span>
+      <span class="fw-semibold">Starting {{ service.label }}</span>
+      <span class="badge" [ngClass]="startupPhaseBadgeClass()">{{ startupPhaseLabel() }}</span>
+      <button
+        type="button"
+        class="btn-close btn-close-white ms-auto"
+        aria-label="Close startup logs"
+        (click)="closeStartupLogs()"
+      ></button>
+    </div>
+    <pre #startupLogBody class="startup-logs-body">{{ startupLogText() }}</pre>
+    <div class="startup-logs-foot">
+      <span class="small">{{ startupFootNote() }}</span>
+      <button type="button" class="btn btn-sm btn-secondary ms-auto" (click)="closeStartupLogs()">Close</button>
+    </div>
+  </div>
+</div>

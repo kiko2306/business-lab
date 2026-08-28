@@ -16,6 +16,7 @@ import { dropLegacyRoleColumn, ensureServiceExposureTable, ensureServiceExposure
 import authMiddleware from './middleware/auth';
 import setupModeMiddleware from './middleware/setupMode';
 import { initWebSocket, sseHandler } from './services/realtime';
+import { startupLogsHandler } from './services/serviceLogs';
 import { startBackupScheduler } from './services/backupScheduler';
 
 const apiLimiter = rateLimit({
@@ -117,6 +118,8 @@ for (const prefix of ROUTE_PREFIXES) {
   // The SSE stream authenticates via a short-lived ticket, so it must be
   // registered before the JWT gate below.
   app.get(`${prefix}/services/stream`, streamLimiter, sseHandler);
+  // Same deal — the per-service startup log stream is ticket-authenticated.
+  app.get(`${prefix}/services/:name/startup-logs`, streamLimiter, startupLogsHandler);
 
   // API root
   app.get(prefix || '/', ...protectedGate(), (_req: Request, res: Response) => {
