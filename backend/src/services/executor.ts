@@ -97,6 +97,34 @@ async function resolveTimezoneOverride(appDir: string): Promise<Record<string, s
   return { TZ: await getAppTimezone() };
 }
 
+/**
+ * `docker compose up -d` for a service with every piece of managed config
+ * re-applied first: generatable secrets, the exposure env overrides + config
+ * files (Host/CSRF/URL knobs derived from the public hostname), CrowdSec's
+ * rendered config, and the global timezone. Shared by start and restart so a
+ * "restart to apply" after toggling exposure actually recreates the container
+ * with the new values (a plain `docker compose restart` never re-substitutes
+ * `${VAR}`, which is why it didn't).
+ */
+async function composeUpWithManagedConfig(
+  serviceName: string,
+  projectName: string | null,
+  appDir: string,
+  composeFile: string,
+  { forceRecreate }: { forceRecreate: boolean }
+): Promise<CommandResult> {
+  const envOverrides = await buildExposureEnvOverrides(serviceName, appDir);
+  await applyExposureConfigFiles(serviceName, appDir);
+  await applyCrowdsecConfigFiles(serviceName, appDir);
+
+  const recreate = forceRecreate ? ' --force-recreate' : '';
+  const command = `docker compose -p ${projectName} -f ${composeFile} up -d${recreate}`;
+  return executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
+    ...(await resolveTimezoneOverride(appDir)),
+    ...envOverrides,
+  });
+}
+
 function requiredSecretsFromCompose(composeFilePath: string): string[] {
   const composeContent = fs.readFileSync(composeFilePath, 'utf8');
   return extractComposeEnvVars(composeContent)
@@ -178,13 +206,8 @@ export async function startService(serviceName: string, userId: number): Promise
     // Keep the app's own reverse-proxy config in step with its exposed
     // hostname before it (re)starts: env overrides for most apps, a config
     // file for the few that need it (Home Assistant).
-    const envOverrides = await buildExposureEnvOverrides(serviceName, appDir);
-    await applyExposureConfigFiles(serviceName, appDir);
-    await applyCrowdsecConfigFiles(serviceName, appDir);
-    const command = `docker compose -p ${projectName} -f ${composeFile} up -d`;
-    const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
-      ...(await resolveTimezoneOverride(appDir)),
-      ...envOverrides,
+    const result = await composeUpWithManagedConfig(serviceName, projectName, appDir, composeFile, {
+      forceRecreate: false,
     });
 
     // Log the successful operation
@@ -301,10 +324,13 @@ export async function stopService(serviceName: string, userId: number): Promise<
 }
 
 /**
- * Restart a service so it re-reads its config/bind-mounted files (e.g.
- * Authelia's users_database.yml, only read at startup). A no-op — reported
- * as success — when the service isn't currently running, since there's
- * nothing to restart and the new config will simply apply on next start.
+ * Restart a service so it picks up config changes — bind-mounted files (e.g.
+ * Authelia's users_database.yml), the exposure-derived env vars (Vaultwarden's
+ * DOMAIN, n8n's N8N_HOST, …), and the global timezone. Recreates the container
+ * (`up -d --force-recreate`) rather than `docker compose restart`, because a
+ * bare restart never re-substitutes `${VAR}`, so a "restart to apply" after
+ * enabling exposure would otherwise keep the old localhost values. A no-op —
+ * reported as success — when the service isn't currently running.
  */
 export async function restartService(serviceName: string, userId: number): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
@@ -337,8 +363,9 @@ export async function restartService(serviceName: string, userId: number): Promi
   try {
     logger.info(`Restarting service: ${serviceName}`, { userId, service: serviceName });
 
-    const command = `docker compose -p ${projectName} -f ${composeFile} restart`;
-    const result = await executeCommand(command, 60000);
+    const result = await composeUpWithManagedConfig(serviceName, projectName, appDir, composeFile, {
+      forceRecreate: true,
+    });
 
     await logAuditEvent(userId, 'SERVICE_RESTART', serviceName, 'success', {
       stdout: result.stdout,

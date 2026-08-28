@@ -2027,3 +2027,31 @@ env override unless the app's own `.env` pins a `TZ` (per-app override wins).
 The hardcoded `TZ=Europe/Lisbon` line was removed from all 15 `.env.example`
 files (replaced with a comment). Settings panel gained a "General" section
 with a timezone `<select>`. Applies on each app's next start.
+
+### 23.12 Session Log — 2026-08-28 (cont.): Bitwarden app couldn't reach Vaultwarden
+
+Root cause on the live box: Vaultwarden's `DOMAIN` was still
+`http://localhost:8222` while it was served at
+`https://vaultwarden.tx-home-utils.com`, so `/api/config` advertised
+`http://localhost:8222` as the api/identity/notifications base and the
+Bitwarden client had nowhere to connect. `DOMAIN` is a `managedEnvKeys` /
+`exposureEnvKeys.url` value injected **at `docker compose up`** (never written
+to `.env`), so it only lands via the dashboard's start flow.
+
+The bug: `executor.restartService` ran `docker compose restart`, which never
+re-substitutes `${VAR}` — so "restart to apply" after enabling exposure kept
+the old localhost values (would also hit n8n's `N8N_HOST`, Nextcloud's
+overwrites, etc.). Fixed: extracted `composeUpWithManagedConfig()` (env
+overrides + `applyExposureConfigFiles` + `applyCrowdsecConfigFiles` + global
+`TZ`), shared by start and restart; `restartService` now calls it with
+`up -d --force-recreate` instead of `restart`. `PUT /:name/exposure` message
+changed to "Restart the service to apply it."
+
+Live fix + verification: recreated Vaultwarden with
+`VAULTWARDEN_DOMAIN=https://vaultwarden.tx-home-utils.com`. `/api/config` now
+returns the correct `environment` URLs; `/alive`, `/api/config`,
+`/api/version` = 200 through Cloudflare→NPM; WS `/notifications/hub` returns
+401 (route present, needs the client's token → 101) end to end — confirmed
+with an HTTP/1.1 handshake (an HTTP/2 curl can't carry `Upgrade: websocket`,
+which produced a misleading 404 at first). Backend rebuilt. `tsc` clean,
+117 tests pass.

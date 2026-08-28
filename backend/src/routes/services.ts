@@ -218,7 +218,7 @@ router.put(
     try {
       const row = await upsertServiceExposureConfig(req.params.name, req.body);
       return res.json({
-        message: 'Exposure configuration saved. It will be applied on the next service start.',
+        message: 'Exposure configuration saved. Restart the service to apply it.',
         enabled: row.enabled,
         hostname: row.hostname,
       });
