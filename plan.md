@@ -2247,3 +2247,20 @@ the token/upstream situation changes. The agent keeps parsing NPM access
 logs, pulling the community blocklist and exposing metrics — observability +
 shared intel, just no active edge enforcement. `crowdsec` now reports
 `running / healthy` in the dashboard.
+
+### 23.19 Session Log — 2026-08-28 (cont.): n8n crash-loop + healthcheck path
+
+n8n was `Restarting (1)` — `EACCES: permission denied, open
+'/home/node/.n8n/config'` (3rd app after vikunja / file-browser with the same
+root-owned-bind-mount vs uid-1000 image issue). Added the busybox `n8n-init`
+chown service (`condition: service_completed_successfully`). Also its
+healthcheck hit `/health` (404) — n8n's endpoint is `/healthz`; fixed the
+compose healthcheck and the registry `healthCheck.url`. After a live chown +
+recreate: n8n `Up (healthy)`, `/healthz` 200, migrations ran.
+
+Dashboard now: **26 running / all healthy, 0 error**, 4 stopped (not started).
+
+This is the 3rd instance of the root-owned-data-dir class — the systemic fix
+(§0.1) is overdue: the backend should ensure `apps/<name>/data` is writable
+by the container's uid before `docker compose up` (inspect the image's
+configured user, or a generic init), instead of a per-app busybox sidecar.

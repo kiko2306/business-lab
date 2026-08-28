@@ -1,8 +1,23 @@
 
 services:
+  # n8n runs as uid/gid 1000 (node) but Docker creates ./data/n8n root-owned,
+  # so it can't write /home/node/.n8n/config. One-off chown; exits 0.
+  n8n-init:
+    image: busybox:stable
+    user: "0:0"
+    command: ["chown", "-R", "1000:1000", "/data"]
+    restart: "no"
+    volumes:
+      - ./data/n8n:/data
+
   n8n:
     image: docker.n8n.io/n8nio/n8n:latest
     restart: unless-stopped
+    depends_on:
+      n8n-init:
+        condition: service_completed_successfully
+      n8n-db:
+        condition: service_healthy
     ports:
       - "${N8N_PORT:-5678}:5678"
     environment:
@@ -28,13 +43,10 @@ services:
       - "homepage.description=Workflow automation platform"
     volumes:
       - ./data/n8n:/home/node/.n8n
-    depends_on:
-      n8n-db:
-        condition: service_healthy
     networks:
       - n8n-net
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:5678/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:5678/healthz"]
       interval: 30s
       timeout: 10s
       retries: 3
