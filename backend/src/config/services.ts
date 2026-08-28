@@ -297,10 +297,17 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       timeout: 5000,
     },
     // Vaultwarden needs DOMAIN to exactly match the browser URL or WebAuthn,
-    // attachments and the /admin panel break.
+    // attachments and the /admin panel break — so the dashboard drives it
+    // from the exposure hostname and shows it read-only instead of letting
+    // the user type a value.
     exposureEnvKeys: {
       url: ['VAULTWARDEN_DOMAIN'],
     },
+    managedEnvKeys: ['VAULTWARDEN_DOMAIN'],
+    booleanEnvKeys: ['VAULTWARDEN_SIGNUPS_ALLOWED'],
+    // ADMIN_TOKEN only unlocks the /admin panel; generate it during setup and
+    // keep it out of the dashboard entirely.
+    hiddenGeneratedSecrets: ['VAULTWARDEN_ADMIN_TOKEN'],
   },
   'uptime-kuma': {
     name: 'uptime-kuma',

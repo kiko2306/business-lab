@@ -379,7 +379,14 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
           this.env = env;
           this.envValues = {};
           for (const field of env.fields) {
-            if (!field.secret) {
+            // Hidden secrets are generated server-side on save; managed keys
+            // follow the exposure hostname — the client submits neither.
+            if (field.hidden || field.managed) {
+              continue;
+            }
+            if (field.boolean) {
+              this.envValues[field.key] = field.value ?? field.defaultValue ?? 'false';
+            } else if (!field.secret) {
               // Prefill port fields with the effective value (the compose
               // default when .env doesn't pin one) so a default that clashes
               // with another service surfaces its conflict right away.
@@ -395,6 +402,18 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   missingRequiredCount(): number {
     return this.env?.fields.filter((field) => field.required && !field.isSet).length ?? 0;
+  }
+
+  /**
+   * Read-only value shown for an exposure-managed field (e.g. Vaultwarden's
+   * DOMAIN): the public URL once exposure is on, otherwise the current .env
+   * value or the compose default.
+   */
+  protected managedFieldValue(field: ServiceEnvField): string {
+    if (this.exposure?.enabled && this.exposure.hostname) {
+      return `https://${this.exposure.hostname}`;
+    }
+    return field.value ?? field.defaultValue ?? '—';
   }
 
   /**

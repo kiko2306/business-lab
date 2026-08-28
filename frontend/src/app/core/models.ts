@@ -157,6 +157,13 @@ export interface ServiceEnvField {
   required: boolean;
   secret: boolean;
   isSet: boolean;
+  // Render a true/false choice instead of a text field.
+  boolean: boolean;
+  // Generated and persisted automatically on save — never rendered.
+  hidden: boolean;
+  // Value is derived automatically (the exposure hostname) and shown
+  // read-only; never submitted by the client.
+  managed: boolean;
   value: string | null;
   defaultValue: string | null;
   // A freshly generated secret to pre-fill an unset auto-generated field

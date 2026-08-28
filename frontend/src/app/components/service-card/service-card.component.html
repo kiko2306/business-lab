@@ -102,13 +102,55 @@
             {{ missingRequiredCount() }} required value(s) not set yet — this service won't start until they are.
           </div>
 
-          <div *ngFor="let field of env.fields" class="mb-2">
+          <ng-container *ngFor="let field of env.fields">
+           <div *ngIf="!field.hidden" class="mb-2">
             <label class="form-label small mb-1" [for]="'env-' + service.name + '-' + field.key">
               {{ field.key }}
               <span *ngIf="field.required" class="text-danger">*</span>
             </label>
+
+            <!-- Exposure-managed (read-only) — e.g. Vaultwarden's DOMAIN -->
+            <ng-container *ngIf="field.managed">
+              <input
+                type="text"
+                class="form-control form-control-sm"
+                [id]="'env-' + service.name + '-' + field.key"
+                [value]="managedFieldValue(field)"
+                readonly
+              />
+              <div class="form-text small">
+                Set automatically — follows this service's public URL once exposure is enabled.
+              </div>
+            </ng-container>
+
+            <!-- Boolean toggle — e.g. Vaultwarden's SIGNUPS_ALLOWED -->
+            <div *ngIf="!field.managed && field.boolean" class="d-flex gap-3 pt-1">
+              <div class="form-check">
+                <input
+                  class="form-check-input"
+                  type="radio"
+                  [id]="'env-' + service.name + '-' + field.key + '-true'"
+                  [name]="'env-' + service.name + '-' + field.key"
+                  value="true"
+                  [(ngModel)]="envValues[field.key]"
+                />
+                <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-true'">true</label>
+              </div>
+              <div class="form-check">
+                <input
+                  class="form-check-input"
+                  type="radio"
+                  [id]="'env-' + service.name + '-' + field.key + '-false'"
+                  [name]="'env-' + service.name + '-' + field.key"
+                  value="false"
+                  [(ngModel)]="envValues[field.key]"
+                />
+                <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-false'">false</label>
+              </div>
+            </div>
+
             <input
-              *ngIf="!field.secret"
+              *ngIf="!field.managed && !field.boolean && !field.secret"
               type="text"
               [attr.inputmode]="field.isPort ? 'numeric' : null"
               class="form-control form-control-sm"
@@ -118,7 +160,7 @@
               [placeholder]="field.defaultValue ?? ''"
             />
             <input
-              *ngIf="field.secret"
+              *ngIf="!field.managed && !field.boolean && field.secret"
               type="password"
               class="form-control form-control-sm"
               [id]="'env-' + service.name + '-' + field.key"
@@ -126,7 +168,7 @@
               [placeholder]="field.isSet ? 'configured — leave blank to keep' : 'not set'"
               autocomplete="new-password"
             />
-            <div *ngIf="field.secret && field.suggestedValue" class="form-text small">
+            <div *ngIf="!field.managed && !field.boolean && field.secret && field.suggestedValue" class="form-text small">
               Auto-generated — click Save configuration to apply.
             </div>
             <div *ngIf="portConflict(field)" class="form-text small text-danger d-flex align-items-center gap-2 mt-1">
@@ -140,7 +182,8 @@
                 Use {{ field.suggestedPort }}
               </button>
             </div>
-          </div>
+           </div>
+          </ng-container>
 
           <button
             type="button"
