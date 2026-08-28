@@ -66,50 +66,93 @@
       Last refresh {{ lastUpdated | date: 'medium' }}
     </section>
 
-    <section class="mb-4" *ngIf="serviceState.services$ | async as services">
-      <h2 class="h5 mb-3">Running apps</h2>
-      <ng-container *ngIf="getRunningServicePorts(services) as portRows">
-        <div class="table-responsive" *ngIf="portRows.length; else noPortsState">
-          <table class="table table-sm table-striped align-middle mb-0">
-            <thead>
-              <tr>
-                <th scope="col">App</th>
-                <th scope="col">URL</th>
-                <th scope="col">Ports</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr *ngFor="let row of portRows; trackBy: trackByPortRow">
-                <td>{{ row.label }}</td>
-                <td>
-                  <a *ngIf="row.url; else notExposed" [href]="row.url" target="_blank" rel="noopener noreferrer">{{ row.url }}</a>
-                  <ng-template #notExposed><span class="text-body-secondary">Not exposed</span></ng-template>
-                </td>
-                <td>
-                  <div class="d-flex flex-wrap gap-1">
-                    <span class="badge text-bg-light border" *ngFor="let port of row.ports">
-                      {{ port.hostPort }} &rarr; {{ port.containerPort }}/{{ port.protocol }}
-                    </span>
-                  </div>
-                </td>
-              </tr>
-            </tbody>
-          </table>
-        </div>
+    <section id="running" class="running-panel mb-5" *ngIf="serviceState.services$ | async as services">
+      <div class="d-flex align-items-center gap-2 mb-1">
+        <span class="status-dot status-dot--running" aria-hidden="true"></span>
+        <h2 class="h4 mb-0">Running apps</h2>
+      </div>
+      <p class="text-body-secondary mb-3">
+        Apps that are currently up — with their public URL and published host ports.
+      </p>
+      <ng-container *ngIf="groupRunningPortsByCategory(services) as portGroups">
+        <ng-container *ngIf="portGroups.length; else noPortsState">
+          <div class="service-group mb-3" *ngFor="let group of portGroups; trackBy: trackByCategory">
+            <h3 class="h6 text-body-secondary text-uppercase mb-2">
+              <button
+                type="button"
+                class="section-toggle"
+                [class.collapsed]="isCollapsed('running:' + group.category)"
+                [attr.aria-expanded]="!isCollapsed('running:' + group.category)"
+                (click)="toggleSection('running:' + group.category)"
+              >
+                <svg class="chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{{ group.category }}</span>
+                <span class="badge rounded-pill text-bg-light border fw-normal">{{ group.rows.length }}</span>
+              </button>
+            </h3>
+            <div class="table-responsive" *ngIf="!isCollapsed('running:' + group.category)">
+              <table class="table table-sm table-striped align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">App</th>
+                    <th scope="col">URL</th>
+                    <th scope="col">Ports</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of group.rows; trackBy: trackByPortRow">
+                    <td>{{ row.label }}</td>
+                    <td>
+                      <a *ngIf="row.url; else notExposed" [href]="row.url" target="_blank" rel="noopener noreferrer">{{ row.url }}</a>
+                      <ng-template #notExposed><span class="text-body-secondary">Not exposed</span></ng-template>
+                    </td>
+                    <td>
+                      <div class="d-flex flex-wrap gap-1">
+                        <span class="badge text-bg-light border" *ngFor="let port of row.ports">
+                          {{ port.hostPort }} &rarr; {{ port.containerPort }}/{{ port.protocol }}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </ng-container>
         <ng-template #noPortsState>
           <p class="text-body-secondary mb-0">No running services currently publish a host port.</p>
         </ng-template>
       </ng-container>
     </section>
 
-    <section *ngIf="serviceState.services$ | async as services; else loadingState">
+    <section id="apps" class="mt-5 pt-4 border-top" *ngIf="serviceState.services$ | async as services; else loadingState">
+      <div class="mb-3">
+        <h2 class="h4 mb-1">All apps</h2>
+        <p class="text-body-secondary mb-0">
+          Every app this dashboard manages — start, stop, and configure them here.
+          The ones that are up also appear under <a href="#running">Running apps</a> above.
+        </p>
+      </div>
       <ng-container *ngIf="services.length; else emptyState">
         <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(services); trackBy: trackByCategory">
-          <h2 class="h6 text-body-secondary text-uppercase mb-2 d-flex align-items-center gap-2">
-            {{ group.category }}
-            <span class="badge rounded-pill text-bg-light border fw-normal">{{ group.services.length }}</span>
+          <h2 class="h6 text-body-secondary text-uppercase mb-2">
+            <button
+              type="button"
+              class="section-toggle"
+              [class.collapsed]="isCollapsed('apps:' + group.category)"
+              [attr.aria-expanded]="!isCollapsed('apps:' + group.category)"
+              (click)="toggleSection('apps:' + group.category)"
+            >
+              <svg class="chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>{{ group.category }}</span>
+              <span class="badge rounded-pill text-bg-light border fw-normal">{{ group.services.length }}</span>
+            </button>
           </h2>
-          <div class="service-rows">
+          <div class="service-rows" *ngIf="!isCollapsed('apps:' + group.category)">
             <app-service-card
               *ngFor="let service of group.services; trackBy: trackByService"
               [service]="service"
@@ -124,22 +167,49 @@
 
     <section id="settings" class="mt-5 pt-4 border-top">
       <div class="mb-3">
-        <h2 class="h4 mb-1">Settings</h2>
+        <h2 class="h4 mb-1">
+          <button
+            type="button"
+            class="section-toggle"
+            [class.collapsed]="isCollapsed('settings')"
+            [attr.aria-expanded]="!isCollapsed('settings')"
+            (click)="toggleSection('settings')"
+          >
+            <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+              <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+            </svg>
+            <span>Settings</span>
+          </button>
+        </h2>
         <p class="text-body-secondary mb-0">
           Manage shared credentials and verify external service connectivity.
         </p>
       </div>
-      <app-settings-panel></app-settings-panel>
+      <app-settings-panel *ngIf="!isCollapsed('settings')"></app-settings-panel>
     </section>
 
     <section id="backups" class="mt-5 pt-4 border-top">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <h2 class="h4 mb-1">Backups</h2>
+          <h2 class="h4 mb-1">
+            <button
+              type="button"
+              class="section-toggle"
+              [class.collapsed]="isCollapsed('backups')"
+              [attr.aria-expanded]="!isCollapsed('backups')"
+              (click)="toggleSection('backups')"
+            >
+              <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>Backups</span>
+            </button>
+          </h2>
           <p class="text-body-secondary mb-0">Create, download, and restore compressed backups.</p>
         </div>
         <button class="btn btn-primary" (click)="createBackup()">Create backup</button>
       </div>
+      <ng-container *ngIf="!isCollapsed('backups')">
       <div class="form-check form-switch mb-3">
         <input
           class="form-check-input"
@@ -206,17 +276,31 @@
           No backups found yet.
         </div>
       </div>
+      </ng-container>
     </section>
 
     <section id="health" class="mt-5 pt-4 border-top">
       <div class="d-flex justify-content-between align-items-center mb-3">
         <div>
-          <h2 class="h4 mb-1">Health checks</h2>
+          <h2 class="h4 mb-1">
+            <button
+              type="button"
+              class="section-toggle"
+              [class.collapsed]="isCollapsed('health')"
+              [attr.aria-expanded]="!isCollapsed('health')"
+              (click)="toggleSection('health')"
+            >
+              <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>Health checks</span>
+            </button>
+          </h2>
           <p class="text-body-secondary mb-0">Database, disk, memory, and system load monitoring.</p>
         </div>
         <button class="btn btn-outline-primary" (click)="loadHealth()">Refresh health</button>
       </div>
-      <div class="card" *ngIf="health">
+      <div class="card" *ngIf="health && !isCollapsed('health')">
         <div class="card-body">
           <div class="mb-3">
             <span class="badge" [class.text-bg-success]="health.status === 'ok'" [class.text-bg-warning]="health.status !== 'ok'">

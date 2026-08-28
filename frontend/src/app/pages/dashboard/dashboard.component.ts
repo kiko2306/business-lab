@@ -23,6 +23,15 @@ const CATEGORY_ORDER: ServiceCategory[] = [
   'Development',
 ];
 
+// Fixed display order for both the running-apps table and the full apps
+// list, so the same category shows up in the same place in both.
+const CATEGORY_DISPLAY_ORDER: readonly string[] = [...CATEGORY_ORDER, 'Other'];
+
+function orderCategories(present: Iterable<string>): string[] {
+  const seen = new Set(present);
+  return CATEGORY_DISPLAY_ORDER.filter((category) => seen.has(category));
+}
+
 interface ServiceGroup {
   category: string;
   services: ServiceStatus[];
@@ -35,22 +44,39 @@ interface ServicePortRow {
   ports: ServiceStatus['ports'];
 }
 
+interface ServicePortGroup {
+  category: string;
+  rows: ServicePortRow[];
+}
+
 // One row per running app for the "running apps" table — all of an app's
 // published ports are listed together instead of one row each. The URL is
 // the app's public hostname (no port — that's an internal implementation
 // detail Cloudflare/NPM strip away), and is null for apps that aren't
-// exposed publicly.
-function getRunningServicePorts(services: ServiceStatus[]): ServicePortRow[] {
-  const rows: ServicePortRow[] = [];
+// exposed publicly. Rows are grouped by the same category as the full apps
+// list so the two views line up.
+function groupRunningPortsByCategory(services: ServiceStatus[]): ServicePortGroup[] {
+  const byCategory = new Map<string, ServicePortRow[]>();
   for (const service of services) {
     if (service.state !== 'running' || !service.ports?.length) {
       continue;
     }
+    const category = service.category ?? 'Other';
     const url = service.exposedHostname ? `https://${service.exposedHostname}` : null;
-    rows.push({ serviceName: service.name, label: service.label, url, ports: service.ports });
+    const row: ServicePortRow = { serviceName: service.name, label: service.label, url, ports: service.ports };
+    const bucket = byCategory.get(category);
+    if (bucket) {
+      bucket.push(row);
+    } else {
+      byCategory.set(category, [row]);
+    }
   }
 
-  return rows.sort((a, b) => a.label.localeCompare(b.label));
+  for (const rows of byCategory.values()) {
+    rows.sort((a, b) => a.label.localeCompare(b.label));
+  }
+
+  return orderCategories(byCategory.keys()).map((category) => ({ category, rows: byCategory.get(category)! }));
 }
 
 function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
@@ -65,8 +91,7 @@ function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
     }
   }
 
-  const orderedCategories = [...CATEGORY_ORDER, 'Other'].filter((category) => byCategory.has(category));
-  return orderedCategories.map((category) => ({ category, services: byCategory.get(category)! }));
+  return orderCategories(byCategory.keys()).map((category) => ({ category, services: byCategory.get(category)! }));
 }
 
 @Component({
@@ -82,9 +107,12 @@ export class DashboardComponent implements OnInit, OnDestroy {
   private readonly operations = inject(OperationsService);
   private readonly toast = inject(ToastService);
 
+  private static readonly COLLAPSE_STORAGE_KEY = 'dashboard.collapsedSections';
+
   protected readonly user$ = this.authService.user$;
   protected readonly groupServicesByCategory = groupServicesByCategory;
-  protected readonly getRunningServicePorts = getRunningServicePorts;
+  protected readonly groupRunningPortsByCategory = groupRunningPortsByCategory;
+  protected readonly collapsedSections = new Set<string>(this.loadCollapsedSections());
   protected backups: BackupFile[] = [];
   protected health: HealthStatus | null = null;
   protected schedule: BackupScheduleConfig = { enabled: false, frequency: 'daily', retentionCount: 14, lastRunAt: null };
@@ -122,12 +150,46 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return service.name;
   }
 
-  trackByCategory(_index: number, group: ServiceGroup): string {
+  trackByCategory(_index: number, group: { category: string }): string {
     return group.category;
   }
 
   trackByPortRow(_index: number, row: { serviceName: string }): string {
     return row.serviceName;
+  }
+
+  isCollapsed(key: string): boolean {
+    return this.collapsedSections.has(key);
+  }
+
+  toggleSection(key: string): void {
+    if (this.collapsedSections.has(key)) {
+      this.collapsedSections.delete(key);
+    } else {
+      this.collapsedSections.add(key);
+    }
+    this.persistCollapsedSections();
+  }
+
+  private loadCollapsedSections(): string[] {
+    try {
+      const raw = localStorage.getItem(DashboardComponent.COLLAPSE_STORAGE_KEY);
+      const parsed = raw ? JSON.parse(raw) : [];
+      return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : [];
+    } catch {
+      return [];
+    }
+  }
+
+  private persistCollapsedSections(): void {
+    try {
+      localStorage.setItem(
+        DashboardComponent.COLLAPSE_STORAGE_KEY,
+        JSON.stringify([...this.collapsedSections]),
+      );
+    } catch {
+      // Non-fatal: collapse state just won't survive a reload.
+    }
   }
 
   loadBackups(): void {
