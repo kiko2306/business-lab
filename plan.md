@@ -2225,3 +2225,25 @@ Cloudflare Worker + KV namespace + zone routes instead.
 - **Blocked on the token**: worker-bouncer starts, renders config, but
   `Authentication error (10000)` until the three Workers scopes are added.
   Once they are it recovers on its own (crash-loop re-reads config).
+
+### 23.18 Session Log — 2026-08-28 (cont.): Worker bouncer also blocked — agent only
+
+`crowdsecurity/cloudflare-worker-bouncer` (tried latest / v0.0.18, v0.0.15,
+v0.0.12) crash-loops with `Authentication error (10000)` on its
+"cleaning up existing workers" step — even though the same token, tested with
+raw `curl`, can list **and create+delete** Workers scripts, KV namespaces and
+zone routes. The account's custom API token carries Cloudflare's newer
+`cfut_` prefix; the bouncer's internal `makeRequest` helper appears not to
+handle that token format (the calls that go through the older cloudflare-go
+client succeed — "Using API key auth", script-exists checks — then
+`makeRequest` fails). Not fixable from config; needs a classic 40-char token
+(Cloudflare seems to only issue `cfut_` now) or an upstream fix.
+
+**Decision: run CrowdSec agent-only for now.** `cloudflare-worker-bouncer`
+moved behind a compose `profiles: ["edge-bouncer"]` gate so it doesn't
+auto-start / crash-loop; `crowdsecConfig.ts` still renders its config on every
+start, so `docker compose --profile edge-bouncer up -d` is all it takes once
+the token/upstream situation changes. The agent keeps parsing NPM access
+logs, pulling the community blocklist and exposing metrics — observability +
+shared intel, just no active edge enforcement. `crowdsec` now reports
+`running / healthy` in the dashboard.

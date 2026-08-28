@@ -32,8 +32,17 @@ services:
   # Deploys a Cloudflare Worker + KV + zone routes that block IPs CrowdSec
   # flags, at the edge. (Replaced crowdsecurity/cloudflare-bouncer, which is
   # stuck on Cloudflare's now-frozen Firewall Rules API.)
+  #
+  # Behind a compose profile so it doesn't start by default: as of v0.0.18 it
+  # crash-loops with "Authentication error (10000)" against Cloudflare
+  # API tokens that carry the newer `cfut_` prefix, even when the token has
+  # full Workers/KV/Routes access (verified via curl). The config is still
+  # rendered on every start (services/crowdsecConfig.ts) so this just works
+  # once a classic token is usable or the bouncer is fixed:
+  #   docker compose --profile edge-bouncer up -d
   cloudflare-worker-bouncer:
     image: crowdsecurity/cloudflare-worker-bouncer:latest
+    profiles: ["edge-bouncer"]
     restart: unless-stopped
     depends_on:
       crowdsec:
