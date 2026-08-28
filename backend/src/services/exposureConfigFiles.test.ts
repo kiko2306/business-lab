@@ -75,4 +75,31 @@ describe('applyExposureConfigFiles — home-assistant', () => {
     await applyExposureConfigFiles('home-assistant', appDir);
     expect(fs.readFileSync(configPath(), 'utf8')).not.toContain('trusted_proxies');
   });
+
+  it('moves aside a migrated .storage/http so the yaml http: block re-migrates', async () => {
+    const storeDir = path.join(appDir, 'data', '.storage');
+    fs.mkdirSync(storeDir);
+    const storePath = path.join(storeDir, 'http');
+    fs.writeFileSync(storePath, JSON.stringify({ data: { yaml_migration_done: true, stable: {} } }));
+
+    await applyExposureConfigFiles('home-assistant', appDir);
+
+    expect(fs.existsSync(storePath)).toBe(false);
+    expect(fs.existsSync(`${storePath}.superseded-by-homelab-management`)).toBe(true);
+    expect(fs.readFileSync(configPath(), 'utf8')).toContain('use_x_forwarded_for: true');
+  });
+
+  it('leaves .storage/http alone when it already carries use_x_forwarded_for', async () => {
+    const storeDir = path.join(appDir, 'data', '.storage');
+    fs.mkdirSync(storeDir);
+    const storePath = path.join(storeDir, 'http');
+    fs.writeFileSync(
+      storePath,
+      JSON.stringify({ data: { yaml_migration_done: true, stable: { use_x_forwarded_for: true } } })
+    );
+
+    await applyExposureConfigFiles('home-assistant', appDir);
+
+    expect(fs.existsSync(storePath)).toBe(true);
+  });
 });

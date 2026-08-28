@@ -76,6 +76,39 @@ function applyHomeAssistantProxyConfig(appDir: string): void {
   const separator = current.endsWith('\n') || current === '' ? '\n' : '\n\n';
   fs.writeFileSync(configPath, `${current}${separator}${HA_HTTP_BLOCK}`, { mode: 0o644 });
   logger.info('Added reverse-proxy http: block to Home Assistant configuration.yaml');
+
+  resetMigratedHttpStorage(appDir);
+}
+
+/**
+ * HA 2026.x migrates `http:` out of configuration.yaml into `.storage/http`
+ * once (`"yaml_migration_done": true`) and then ignores later yaml edits to
+ * keys it has already migrated. An already-onboarded instance therefore never
+ * picks up the block we just appended. Move that stale store aside so HA
+ * re-migrates from the (now updated) yaml on its next start — it rebuilds the
+ * file from yaml + defaults, and `use_x_forwarded_for` / `trusted_proxies`
+ * have no UI, so nothing hand-set is lost. Only runs right before
+ * `docker compose up`, i.e. with HA stopped.
+ */
+function resetMigratedHttpStorage(appDir: string): void {
+  const storePath = path.join(appDir, 'data', '.storage', 'http');
+  if (!fs.existsSync(storePath)) {
+    return; // fresh HA — the first boot migrates our yaml cleanly
+  }
+
+  try {
+    const store = JSON.parse(fs.readFileSync(storePath, 'utf8')) as {
+      data?: { yaml_migration_done?: boolean; stable?: Record<string, unknown> };
+    };
+    const alreadyHasForwarded = store.data?.stable?.use_x_forwarded_for !== undefined;
+    if (!store.data?.yaml_migration_done || alreadyHasForwarded) {
+      return; // nothing migrated yet, or it already carries our setting
+    }
+    fs.renameSync(storePath, `${storePath}.superseded-by-homelab-management`);
+    logger.info('Reset migrated Home Assistant .storage/http so the yaml http: block re-migrates');
+  } catch (error) {
+    logger.error('Could not inspect Home Assistant .storage/http', { error: (error as Error).message });
+  }
 }
 
 /**
