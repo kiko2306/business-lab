@@ -1,0 +1,34 @@
+
+services:
+  ntfy:
+    image: binwiederhier/ntfy:latest
+    restart: unless-stopped
+    command: serve
+    ports:
+      - "${NTFY_PORT:-8010}:80"
+    environment:
+      TZ: ${TZ:-UTC}
+      # ntfy builds the web app's base href, notification click links and
+      # attachment URLs from this — the dashboard rewrites it to the public
+      # https:// hostname once exposure is enabled.
+      NTFY_BASE_URL: ${NTFY_BASE_URL:-http://localhost:8010}
+      # Only trust X-Forwarded-For when ntfy is actually reached through the
+      # reverse proxy; the dashboard flips this to true with exposure. Left on
+      # for direct LAN access it would let clients spoof their visitor IP.
+      NTFY_BEHIND_PROXY: ${NTFY_BEHIND_PROXY:-false}
+      # Persist messages / subscriptions across restarts (default is in-memory).
+      NTFY_CACHE_FILE: /var/cache/ntfy/cache.db
+    labels:
+      - "homepage.group=Monitoring & Backup"
+      - "homepage.name=ntfy"
+      - "homepage.icon=ntfy.png"
+      - "homepage.href=http://localhost:${NTFY_PORT:-8010}"
+      - "homepage.description=Push notifications to phone and desktop"
+    volumes:
+      - ./data:/var/cache/ntfy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --tries=1 -O - http://localhost:80/v1/health | grep -Eo '\"healthy\"\\s*:\\s*true' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s

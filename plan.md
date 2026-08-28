@@ -1451,10 +1451,15 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       **Priority: P1** — **Estimate: M**
 
 ### 22.2 Communication & notifications
-- [ ] **ntfy** — `binwiederhier/ntfy`. Dead-simple pub/sub push to phone and
-      desktop; `uptime-kuma`, `n8n`, `watchtower` and backup scripts can all
-      post to it. `exposureEnvKeys.url: ['NTFY_BASE_URL']` (it builds click
-      links from it). **Priority: P1** — **Estimate: S**
+- [x] **ntfy** — `binwiederhier/ntfy`. Added 2026-08-28 (§23.4):
+      `apps/ntfy/` (`docker-compose.yml` + `.env.example`), `command: serve`,
+      host port `${NTFY_PORT:-8010}` → `:80`, `NTFY_CACHE_FILE` for message
+      persistence, `wget /v1/health` healthcheck. Registry entry
+      (Monitoring & Management, `bell` icon 🔔),
+      `exposureEnvKeys.url: ['NTFY_BASE_URL']` +
+      `staticOnExposure: { NTFY_BEHIND_PROXY: 'true' }` (only trust
+      X-Forwarded-For when actually proxied). `dead-simple` pub/sub push;
+      `uptime-kuma`, `n8n`, `watchtower` and backup scripts can all post to it.
 - [ ] **FreeScout** — `tiredofit/freescout`. Shared-inbox help desk for a
       `support@` address (Zendesk-lite). Laravel →
       `exposureEnvKeys.url: ['APP_URL']`, needs MySQL. **Priority: P2** —
@@ -1610,8 +1615,9 @@ parallel whenever the user unblocks it.
    proven first.
 
 **Track B — new apps (smallest first, for momentum)**
-3. **ntfy** (§22.2, S) — unblocks push notifications for uptime-kuma,
-   watchtower, and the backup scheduler; broad value for low effort.
+3. ~~**ntfy** (§22.2, S)~~ **DONE 2026-08-28** (§23.4) — registry + compose
+   in; not yet started against Docker. Unblocks push notifications for
+   uptime-kuma, watchtower, and the backup scheduler.
 4. **Stirling-PDF** (§22.5, S) — zero Host validation, near-zero config,
    Paperless companion. Quick win.
 5. **WAHA** (§22.1, M) — explicitly requested; build it once the exposure
@@ -1703,3 +1709,29 @@ so it's the user's to drive.
   `X-Original-URL https://$host$request_uri` — correct for the
   TLS-terminated-upstream model. **No change.** Nit only: `totp.issuer` is
   still `authelia.local` (cosmetic — the label shown in authenticator apps).
+
+### 23.4 Session Log — 2026-08-28 (cont.): ntfy added (§22.2, Track B #3)
+
+First of the Track B new apps. Backend `tsc` clean, backend vitest 109/109,
+frontend `ng build` clean. Registry + files only — not yet `compose up`'d
+against Docker, and (per Track A #2) exposure still needs its live pass
+before ntfy's public hostname is verified end to end.
+
+- **`apps/ntfy/`** — `docker-compose.yml` (`binwiederhier/ntfy:latest`,
+  `command: serve`, `${NTFY_PORT:-8010}:80`, `./data:/var/cache/ntfy` with
+  `NTFY_CACHE_FILE` so messages/subscriptions survive a restart,
+  `wget …/v1/health | grep '"healthy":true'` healthcheck) and `.env.example`
+  (`NTFY_PORT`, `NTFY_BASE_URL`, `NTFY_BEHIND_PROXY=false`, `TZ`). No DB.
+  Chose 8010 for the host port — 80 is taken by speedtest, 8080 by pihole.
+- **Registry** — `SERVICES.ntfy`, category Monitoring & Management, new
+  `bell` icon → 🔔 in `serviceIcon()`. `healthCheck` hits
+  `http://localhost:8010/v1/health`.
+- **Exposure** — `exposureEnvKeys.url: ['NTFY_BASE_URL']` (ntfy builds the
+  web app base href + click/attachment links from it) and
+  `staticOnExposure: { NTFY_BEHIND_PROXY: 'true' }` so X-Forwarded-For is
+  only trusted when actually behind NPM/Cloudflare — spoofable otherwise.
+  `.env` default stays `false`. Single published port, so no
+  `exposurePortEnvVar`.
+- **Attachments** — left `NTFY_ATTACHMENT_CACHE_DIR` unset; ntfy refuses to
+  start if it points at a dir that doesn't exist yet, and attachments are
+  opt-in. Add it back (plus `mkdir`) if wanted later.

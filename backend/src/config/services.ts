@@ -451,6 +451,28 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       enabled: false,
     },
   },
+  'ntfy': {
+    name: 'ntfy',
+    label: 'ntfy',
+    description: 'Push notifications to phone and desktop',
+    icon: 'bell',
+    category: 'Monitoring & Management',
+    composePath: 'apps/ntfy/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8010/v1/health',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // ntfy builds the web app base href, click links and attachment URLs from
+    // NTFY_BASE_URL, and only trusts X-Forwarded-For when NTFY_BEHIND_PROXY is
+    // set — both follow the public hostname once exposure is enabled.
+    exposureEnvKeys: {
+      url: ['NTFY_BASE_URL'],
+      staticOnExposure: { NTFY_BEHIND_PROXY: 'true' },
+    },
+  },
 };
 
 export function getAllServices(): ServiceDefinition[] {
