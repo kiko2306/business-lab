@@ -130,15 +130,29 @@ if [ -S /var/run/docker.sock ]; then
   log "Setting DOCKER_GID to $DOCKER_GID (owner of /var/run/docker.sock)"
   set_env_var DOCKER_GID "$DOCKER_GID"
 
-  # The backend writes each app's .env from the dashboard (no more manual
-  # editing), which needs apps/ to be writable by DOCKER_GID inside the
-  # container. Best-effort: harmless if it fails (e.g. not a member of that
-  # group), just falls back to the old manual chgrp/chmod dance per app.
-  if chgrp -R "$DOCKER_GID" apps/ 2>/dev/null && chmod -R g+rwX apps/ 2>/dev/null; then
-    log "Set apps/ group ownership to gid $DOCKER_GID so the dashboard can write per-app config"
+  # The backend writes each app's .env (and other config) from the
+  # dashboard, which needs every apps/<name>/ directory to be writable by
+  # DOCKER_GID inside the container. Applied per-directory, on every run
+  # (not just first install), so a directory added later — e.g. a new app
+  # pulled in by `git pull`, which lands owned by whichever user ran that
+  # command rather than DOCKER_GID — is always picked up, and one directory
+  # that can't be fixed (e.g. a container-owned data volume) doesn't stop
+  # the rest from being fixed too.
+  FAILED_APP_DIRS=()
+  for app_dir in apps/*/; do
+    [ -d "$app_dir" ] || continue
+    if ! { chgrp -R "$DOCKER_GID" "$app_dir" && chmod -R g+rwX "$app_dir"; } 2>/dev/null; then
+      FAILED_APP_DIRS+=("$app_dir")
+    fi
+  done
+
+  if [ "${#FAILED_APP_DIRS[@]}" -eq 0 ]; then
+    log "Set apps/*/ group ownership to gid $DOCKER_GID so the dashboard can write per-app config"
   else
-    echo "warning: couldn't chgrp apps/ to gid ${DOCKER_GID} — per-app config saved from the dashboard may fail until you run:" >&2
-    echo "  sudo chgrp -R ${DOCKER_GID} apps/" >&2
+    echo "warning: couldn't chgrp/chmod the following app directories to gid ${DOCKER_GID} — per-app config saved from the dashboard may fail for them until you run:" >&2
+    for app_dir in "${FAILED_APP_DIRS[@]}"; do
+      echo "  sudo chgrp -R ${DOCKER_GID} ${app_dir} && sudo chmod -R g+rwX ${app_dir}" >&2
+    done
   fi
 else
   echo "warning: /var/run/docker.sock not found — leaving DOCKER_GID as-is." >&2

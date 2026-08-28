@@ -332,6 +332,27 @@ async function updateProxyHost(
 }
 
 /**
+ * Idempotently delete a proxy host by id — used to tear down exposure when a
+ * service's exposure is disabled. A 404 (already gone, e.g. hand-deleted in
+ * NPM) is treated as success rather than an error.
+ */
+export async function deleteProxyHost(npmApiUrl: string, npmEmail: string, npmPassword: string, id: number): Promise<void> {
+  const baseUrl = npmApiUrl.replace(/\/+$/, '');
+  const token = await login(baseUrl, npmEmail, npmPassword);
+
+  const response = await requestJson<{ error?: { message?: string } }>(`${baseUrl}/api/nginx/proxy-hosts/${id}`, {
+    method: 'DELETE',
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (response.statusCode !== 200 && response.statusCode !== 404) {
+    throw new Error(
+      `Unable to delete Nginx Proxy Manager proxy host: ${response.body?.error?.message || response.statusCode}`
+    );
+  }
+}
+
+/**
  * Idempotently ensure a proxy host exists for the given hostname, pointing
  * to the given upstream. Creates it if missing, updates it if the upstream
  * has changed, and leaves it untouched otherwise.
