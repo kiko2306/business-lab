@@ -1393,9 +1393,25 @@ can be added later if wanted.
       particular: check the appended `trusted_proxies` range actually covers
       the source address NPM/the tunnel presents (adjust the list in
       `exposureConfigFiles.ts` if not). **Priority: P1** — **Estimate: S**
-- [ ] **authelia** — domain-sensitive but driven by its own
-      `config/configuration.yml` (`session.cookies`, `access_control`), not
-      env. Confirm `authelia.<base-domain>` is present there. **Priority: P2**
+      - Code-inspection pass done 2026-08-28 (see §23.3): the request path is
+        cloudflared → NPM `:80` → `getHostGatewayIp()` (`host.docker.internal`
+        = the Docker bridge gateway) → app's published host port. HA's
+        immediate peer is therefore NPM's container IP or the bridge gateway
+        — both inside the `172.16.0.0/12` entry already in `HA_HTTP_BLOCK`,
+        and `10.0.0.0/8` + `192.168.0.0/16` cover any non-default Docker
+        `default-address-pool` / LAN case. **No `exposureConfigFiles.ts`
+        change needed.** Only the live per-app `curl` remains.
+- [x] **authelia** — `apps/authelia/config/configuration.yml` already has
+      `session.cookies[0].authelia_url: 'https://authelia.tx-home-utils.com'`
+      (= the `${serviceName}.${baseDomain}` exposure hostname) and cookie
+      `domain: 'tx-home-utils.com'` scoping the session across every
+      `*.tx-home-utils.com` app it protects. `access_control` is just
+      `default_policy: one_factor` — no domain rules to audit. NPM
+      forward-auth snippets reach Authelia at `http://172.17.0.1:9091` and
+      send `X-Original-URL https://$host$request_uri`, consistent with the
+      TLS-terminated-at-the-edge model. No change. (Nit, not blocking:
+      `totp.issuer` is still the `authelia.local` placeholder — cosmetic,
+      shows as the label in authenticator apps.)
 
 ### 21.3 NetBird VPN without a router port-forward
 - [ ] The §20.10/20.11 plan to bypass the cloudflared gRPC-trailers bug
@@ -1583,11 +1599,12 @@ parallel whenever the user unblocks it.
    pinned NPM's exposure upstream to `NPM_ADMIN_PORT`, and added
    `POST /services/:name/setup-token/reset` + a card button that restarts
    Portainer to clear its first-run lock and reissue the token.
-2. **§21.2 live-verify + Authelia check.** Enable exposure + restart each
-   app touched by §21.2 and confirm the Host/CSRF error is gone; adjust the
-   Home Assistant `trusted_proxies` range in `exposureConfigFiles.ts` if the
-   proxy source address isn't covered; confirm `authelia.<base-domain>` is
-   in Authelia's `configuration.yml`. No code unless HA needs a wider range.
+2. **§21.2 live-verify + Authelia check.** Code-inspection half **DONE
+   2026-08-28** (§23.3): Authelia config already carries
+   `authelia.tx-home-utils.com`; HA's `trusted_proxies` block already covers
+   the cloudflared→NPM→app source address — no code change. **Still
+   outstanding:** the live per-app run — toggle exposure, restart, `curl`
+   each of the ~11 touched apps and confirm the Host/CSRF error is gone.
    **Do this before Track B** — every new app in §22 is told to "wire
    reverse-proxy config up front per §21.2", so the mechanism must be
    proven first.
@@ -1655,3 +1672,34 @@ Not yet verified against live containers — needs exposure actually enabled
   so a post-restart log (stale token line above the fresh one) resolves to
   the current token. Card's setup-token panel has a "Restart & get a new
   token" button → `resetSetupToken()` (`setupTokenResetting` spinner state).
+
+### 23.3 Session Log — 2026-08-28 (cont.): §21.2 code-inspection pass
+
+Track A item 2's no-code half. Both checks came back clean — **nothing to
+change**. What remains is purely live: enable exposure on each of the ~11
+apps §21.2 touched, restart, and `curl` the public hostname to confirm the
+Host/CSRF 400s are gone. That needs the running stack + the exposure toggle,
+so it's the user's to drive.
+
+- **HA `trusted_proxies`** — traced the real request path:
+  `cloudflared → NPM (:80) → getHostGatewayIp()` (which is
+  `host.docker.internal` resolved to the Docker bridge gateway, e.g.
+  `172.17.0.1`) `→ <app>`'s published host port. So the source address HA
+  sees for a proxied request is NPM's own container IP or the destination
+  bridge's gateway — both land inside the `172.16.0.0/12` entry that
+  `HA_HTTP_BLOCK` (`exposureConfigFiles.ts`) already lists, and the block's
+  `10.0.0.0/8` + `192.168.0.0/16` entries cover any custom Docker
+  `default-address-pool` or LAN-origin case. The only thing outside all
+  three is an exotic pool like CGNAT `100.64.0.0/10`, which isn't this
+  setup. **No widening needed.**
+- **Authelia** — `apps/authelia/config/configuration.yml` already has
+  `session.cookies[0].authelia_url: https://authelia.tx-home-utils.com`
+  (exactly the `${serviceName}.${baseDomain}` hostname the exposure system
+  provisions for `authelia`) and cookie `domain: tx-home-utils.com`
+  (session valid across every protected `*.tx-home-utils.com` app).
+  `access_control` has no domain rules (`default_policy: one_factor` only).
+  The NPM forward-auth snippets (`apps/nginx-proxy-manager/snippets/`) call
+  Authelia at `http://172.17.0.1:9091/api/authz/auth-request` and pass
+  `X-Original-URL https://$host$request_uri` — correct for the
+  TLS-terminated-upstream model. **No change.** Nit only: `totp.issuer` is
+  still `authelia.local` (cosmetic — the label shown in authenticator apps).
