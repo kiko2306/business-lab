@@ -108,6 +108,9 @@
               [placeholder]="field.isSet ? 'configured — leave blank to keep' : 'not set'"
               autocomplete="new-password"
             />
+            <div *ngIf="field.secret && field.suggestedValue" class="form-text small">
+              Auto-generated — click Save configuration to apply.
+            </div>
           </div>
 
           <button type="button" class="btn btn-outline-primary btn-sm mt-1" [disabled]="envSaving || !env.fields.length" (click)="saveEnv()">

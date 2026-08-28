@@ -151,6 +151,9 @@ export interface ServiceEnvField {
   isSet: boolean;
   value: string | null;
   defaultValue: string | null;
+  // A freshly generated secret to pre-fill an unset auto-generated field
+  // with — the user just has to save it.
+  suggestedValue: string | null;
 }
 
 export interface ServiceEnvStatus {

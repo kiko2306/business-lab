@@ -171,6 +171,8 @@ export class ServiceCardComponent {
           for (const field of env.fields) {
             if (!field.secret) {
               this.envValues[field.key] = field.value ?? '';
+            } else if (field.suggestedValue) {
+              this.envValues[field.key] = field.suggestedValue;
             }
           }
         },
