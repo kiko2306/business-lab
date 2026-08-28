@@ -2055,3 +2055,21 @@ returns the correct `environment` URLs; `/alive`, `/api/config`,
 with an HTTP/1.1 handshake (an HTTP/2 curl can't carry `Upgrade: websocket`,
 which produced a misleading 404 at first). Backend rebuilt. `tsc` clean,
 117 tests pass.
+
+### 23.13 Session Log — 2026-08-28 (cont.): NPM admin panel exposed via Cloudflare
+
+Requested: the "Running apps" row for Nginx Proxy Manager should show a
+Cloudflare URL for its admin panel. No code change needed — the display
+(`buildRunningAppUrl` → `exposedHostname` branch, §23.11) and the `:81`
+routing (`exposurePortEnvVar: 'NPM_ADMIN_PORT'`, §21.1) were already in place;
+NPM just had no `service_exposure` row. Enabled it via the API
+(`PUT /services/nginx-proxy-manager/exposure {enabled:true,
+autheliaProtected:true}` + provision), so the admin UI is now at
+`https://nginx-proxy-manager.tx-home-utils.com` → NPM `:81`, **gated by
+Authelia** (a public reverse-proxy admin panel unprotected would be reckless;
+the user has an Authelia account). Verified: exposure row `provisioned`
+(`upstream_port 81`, `authelia_protected t`), public GET → 302 to Authelia,
+status API returns `exposedHostname` for NPM so the dashboard row shows the
+Cloudflare URL. First provision attempt hit a transient `ECONNREFUSED
+…:81` because `startService` briefly recreated NPM (it publishes the API
+port NPM-provisioning calls); a `exposure/verify` retry succeeded.
