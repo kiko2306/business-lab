@@ -9,6 +9,7 @@ import {
   ExposureSettings,
   ExposureSettingsInput,
   ExposureTestResponse,
+  GeneralSettings,
 } from './models';
 
 @Injectable({
@@ -60,6 +61,22 @@ export class SettingsService {
     return this.http.post<ExposureTestResponse>(
       `${API_BASE_URL}/settings/exposure/test`,
       {},
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
+  loadGeneralSettings(): Observable<GeneralSettings> {
+    return this.http
+      .get<GeneralSettings>(`${API_BASE_URL}/settings/general`, {
+        context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+      })
+      .pipe(retry({ count: 1, delay: 400 }));
+  }
+
+  saveGeneralSettings(timezone: string): Observable<{ timezone: string; message: string }> {
+    return this.http.put<{ timezone: string; message: string }>(
+      `${API_BASE_URL}/settings/general`,
+      { timezone },
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }

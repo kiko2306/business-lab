@@ -107,8 +107,8 @@
                   <tr *ngFor="let row of group.rows; trackBy: trackByPortRow">
                     <td data-label="App">{{ row.label }}</td>
                     <td data-label="URL">
-                      <a *ngIf="row.url; else notExposed" [href]="row.url" target="_blank" rel="noopener noreferrer">{{ row.url }}</a>
-                      <ng-template #notExposed><span class="text-body-secondary">Not exposed</span></ng-template>
+                      <a *ngIf="row.url; else noUrl" [href]="row.url" target="_blank" rel="noopener noreferrer">{{ row.url }}</a>
+                      <ng-template #noUrl><span class="text-body-secondary">&mdash;</span></ng-template>
                     </td>
                     <td data-label="Ports">
                       <div class="d-flex flex-wrap gap-1">

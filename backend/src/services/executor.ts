@@ -12,6 +12,7 @@ import { writeAuditLog } from '../utils/audit';
 import { provisionServiceIfEnabled } from './exposure';
 import { buildExposureEnvOverrides } from './exposureEnv';
 import { ensureGeneratedSecrets } from './appEnv';
+import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
@@ -80,6 +81,20 @@ function executeCommand(command: string, timeout = 30000, extraEnv: Record<strin
       }
     });
   });
+}
+
+/**
+ * The global timezone as a `TZ` env override for `docker compose up`, unless
+ * this app's own .env pins a `TZ` (a per-app override entered in the config
+ * panel wins). Apps that don't read ${TZ} just get a harmless unused var.
+ */
+async function resolveTimezoneOverride(appDir: string): Promise<Record<string, string>> {
+  const envFilePath = path.join(appDir, '.env');
+  const pinned = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath).TZ?.trim() : '';
+  if (pinned) {
+    return {};
+  }
+  return { TZ: await getAppTimezone() };
 }
 
 function requiredSecretsFromCompose(composeFilePath: string): string[] {
@@ -167,7 +182,10 @@ export async function startService(serviceName: string, userId: number): Promise
     await applyExposureConfigFiles(serviceName, appDir);
     await applyCrowdsecConfigFiles(serviceName, appDir);
     const command = `docker compose -p ${projectName} -f ${composeFile} up -d`;
-    const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, envOverrides);
+    const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
+      ...(await resolveTimezoneOverride(appDir)),
+      ...envOverrides,
+    });
 
     // Log the successful operation
     await logAuditEvent(userId, 'SERVICE_START', serviceName, 'success', {

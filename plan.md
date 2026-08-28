@@ -1426,6 +1426,13 @@ can be added later if wanted.
         and `10.0.0.0/8` + `192.168.0.0/16` cover any non-default Docker
         `default-address-pool` / LAN case. **No `exposureConfigFiles.ts`
         change needed.** Only the live per-app `curl` remains.
+      - **HA 400 fixed live 2026-08-28** (§23.11): the `trusted_proxies`
+        *content* was right all along — the failure was HA 2026.x's
+        `.storage/http` migration stuck at `pending`/`not_promoted` while HA
+        ran on the default (proxy-less) `stable`. `exposureConfigFiles.ts`
+        now resets that store via a one-off HA container. Verified: proxied
+        request went 400 → 200, "not set-up for reverse proxies" errors
+        stopped.
 - [x] **authelia** — `apps/authelia/config/configuration.yml` already has
       `session.cookies[0].authelia_url: 'https://authelia.tx-home-utils.com'`
       (= the `${serviceName}.${baseDomain}` exposure hostname) and cookie
@@ -1978,3 +1985,45 @@ it with no user step. Backend `tsc` clean, 117 tests pass.
   emails — those aren't secrets and their defaults are fine.
 - Tests: `appEnv.test.ts` gains an `ensureGeneratedSecrets` block (fills
   blank + placeholder, never rotates a set value, no-op without declarations).
+
+### 23.11 Session Log — 2026-08-28 (cont.): three reported issues
+
+Backend `tsc` clean, 117 tests pass; frontend `ng build` clean.
+
+**1. NPM admin URL in "Running apps".** The table only linked apps that were
+publicly exposed. `ServiceStatusPayload` gained `webPort` — the running app's
+web-UI host port from `getPublishedUpstreamPort(name, exposurePortEnvVar)` (so
+NPM resolves to its admin `:81`, not proxy `:80`; Pi-hole to its web port).
+The dashboard now builds `http://<dashboard-host>:<webPort><webPath>` for
+un-exposed running apps and `https://<hostname><webPath>` for exposed ones
+(`buildRunningAppUrl`). The "Not exposed" cell became a plain "—" (most
+running apps now have a link).
+
+**2. Home Assistant 400 Bad Request.** Root cause found on the live box: the
+appended `http:` block + its `trusted_proxies` were correct, but HA 2026.x
+had migrated `http:` into `.storage/http` with our config stuck as
+`pending` / `error: not_promoted` while HA served requests from the default
+`stable` (no `use_x_forwarded_for`) → every proxied request 400'd with
+"not set-up for reverse proxies". The old `resetMigratedHttpStorage` couldn't
+help: it ran only when the yaml marker was absent, and `.storage/http` is
+`root:root 600` — unwritable by the backend's non-root process.
+`exposureConfigFiles.ts` was rewritten: `applyExposureConfigFiles` now runs a
+one-off `docker compose run --rm --no-deps --entrypoint /bin/sh
+home-assistant` container (HA's own image + `/config` mount, HA never boots)
+that ensures the yaml block and — via a `python3` probe of `.storage/http` —
+moves the store aside only when neither `stable` nor a healthy `pending`
+carries `use_x_forwarded_for`, so HA re-migrates the block cleanly on the
+start that follows. **Verified live**: reset the user's stuck store, restarted
+HA, proxied request went 400 → 200, forwarded errors stopped; a second run is
+a no-op ("already carries the reverse-proxy config"). Tests reworked to mock
+`exec` and assert the command shape + embedded payload.
+
+**3. Global timezone (default Europe/Lisbon, UI-changeable).**
+`utils/generalSettings.ts` (`app_timezone` setting, `DEFAULT_TIMEZONE =
+'Europe/Lisbon'`, IANA validation via `Intl.DateTimeFormat`). New
+`GET/PUT /api/settings/general` (returns `Intl.supportedValuesOf('timeZone')`
+for the picker). `executor.startService` injects `TZ=<global>` as a compose-up
+env override unless the app's own `.env` pins a `TZ` (per-app override wins).
+The hardcoded `TZ=Europe/Lisbon` line was removed from all 15 `.env.example`
+files (replaced with a comment). Settings panel gained a "General" section
+with a timezone `<select>`. Applies on each app's next start.

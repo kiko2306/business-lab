@@ -42,6 +42,9 @@ export interface ServiceStatus {
   // URL path suffix for the app's web UI when it isn't the bare root
   // (e.g. Pi-hole's `/admin`) — appended to the public URL for "open" links.
   webPath?: string;
+  // Published host port of the app's web UI while running — used for a LAN
+  // "open" link when the app isn't publicly exposed.
+  webPort?: number | null;
 }
 
 export interface AutheliaAdminUser {
@@ -113,6 +116,12 @@ export interface ExposureTestResponse {
   success: boolean;
   npm: ExposureTestCheckResult;
   cloudflare: ExposureTestCheckResult;
+}
+
+export interface GeneralSettings {
+  timezone: string;
+  defaultTimezone: string;
+  timezones: string[];
 }
 
 export interface ExposureSettingsInput {

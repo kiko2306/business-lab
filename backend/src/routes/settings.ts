@@ -4,6 +4,7 @@ import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { schemas, validateBody } from '../middleware/validation';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig } from '../utils/exposureSettings';
+import { DEFAULT_TIMEZONE, getAppTimezone, isValidTimezone, setAppTimezone } from '../utils/generalSettings';
 import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
 
@@ -259,6 +260,48 @@ router.post('/exposure/test', async (_req: Request, res: Response) => {
     npm: npmResult,
     cloudflare: cloudflareResult,
   });
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/settings/general — read general dashboard settings (timezone)
+// ---------------------------------------------------------------------------
+router.get('/general', async (_req: Request, res: Response) => {
+  try {
+    return res.json({
+      timezone: await getAppTimezone(),
+      defaultTimezone: DEFAULT_TIMEZONE,
+      // A snapshot of what this Node build recognises, for the UI picker.
+      timezones: Intl.supportedValuesOf('timeZone'),
+    });
+  } catch {
+    return res.status(500).json({ error: 'Unable to load general settings.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/settings/general — update general dashboard settings
+// Applies to every managed app that reads ${TZ} and hasn't pinned its own in
+// that app's .env; takes effect the next time each app is started/restarted.
+// ---------------------------------------------------------------------------
+router.put('/general', async (req: Request, res: Response) => {
+  const timezone = req.body?.timezone;
+  if (!isValidTimezone(timezone)) {
+    return res.status(400).json({ error: 'Unknown timezone. Use an IANA name like "Europe/Lisbon".' });
+  }
+
+  try {
+    await setAppTimezone(timezone);
+    await writeAuditLog({
+      userId: req.user?.id ?? null,
+      action: 'settings_change',
+      resource: 'app_timezone',
+      result: 'success',
+    }).catch(() => {});
+
+    return res.json({ timezone, message: 'Timezone saved. Restart apps to apply.' });
+  } catch {
+    return res.status(500).json({ error: 'Unable to save general settings.' });
+  }
 });
 
 export default router;

@@ -8,7 +8,7 @@ import { exec } from 'child_process';
 import https from 'https';
 import http from 'http';
 import logger from '../utils/logger';
-import { getAllServices, getService, getProjectName, resolveComposeFile } from '../config/services';
+import { getAllServices, getService, getProjectName, getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getServiceExposureRow } from './exposure';
 import { ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
 
@@ -219,6 +219,8 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
 
     const ports = state === 'running' ? await getContainerPorts(getProjectName(serviceName)) : [];
     const exposedHostname = state === 'running' ? await getExposedHostname(serviceName) : null;
+    const webPort =
+      state === 'running' ? getPublishedUpstreamPort(serviceName, service.exposurePortEnvVar) ?? null : null;
 
     return {
       name: serviceName,
@@ -235,6 +237,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       ports,
       exposedHostname,
       webPath: service.webPath,
+      webPort,
     };
   } catch (error) {
     const message = (error as Error).message;

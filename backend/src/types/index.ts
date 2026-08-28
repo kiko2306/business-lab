@@ -165,6 +165,10 @@ export interface ServiceStatusPayload {
   // URL path suffix for the app's web UI when it isn't at the bare root
   // (e.g. Pi-hole's `/admin`) — the dashboard appends it to the "open" link.
   webPath?: string;
+  // Published host port of the app's web UI (the exposurePortEnvVar one when
+  // set — e.g. NPM's admin :81, not its proxy :80), while running. Lets the
+  // dashboard offer a LAN link even when the app isn't publicly exposed.
+  webPort?: number | null;
 }
 
 export interface ServiceStatusSummary {

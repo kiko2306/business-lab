@@ -4,7 +4,13 @@ import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { sanitizePastedText } from '../../core/input-sanitize';
-import { CloudflareSettings, ExposureSettings, ExposureSettingsInput, ExposureTestResponse } from '../../core/models';
+import {
+  CloudflareSettings,
+  ExposureSettings,
+  ExposureSettingsInput,
+  ExposureTestResponse,
+  GeneralSettings,
+} from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
 
@@ -34,8 +40,16 @@ export class SettingsPanelComponent implements OnInit {
     cloudflareTunnelId: ['', [Validators.required, Validators.maxLength(255)]],
   });
 
+  protected readonly generalForm = this.formBuilder.nonNullable.group({
+    timezone: ['', [Validators.required]],
+  });
+
   protected configuredSettings: CloudflareSettings | null = null;
   protected exposureSettings: ExposureSettings | null = null;
+  protected generalSettings: GeneralSettings | null = null;
+  protected generalLoading = true;
+  protected savingGeneral = false;
+  protected generalFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected showToken = false;
   protected loading = true;
   protected exposureLoading = true;
@@ -58,6 +72,46 @@ export class SettingsPanelComponent implements OnInit {
   ngOnInit(): void {
     this.loadSettings();
     this.loadExposureSettings();
+    this.loadGeneralSettings();
+  }
+
+  private loadGeneralSettings(): void {
+    this.generalLoading = true;
+    this.settingsService
+      .loadGeneralSettings()
+      .pipe(finalize(() => (this.generalLoading = false)))
+      .subscribe({
+        next: (settings) => {
+          this.generalSettings = settings;
+          this.generalForm.controls.timezone.setValue(settings.timezone);
+        },
+        error: (error) => {
+          this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to load general settings.') };
+        },
+      });
+  }
+
+  saveGeneral(): void {
+    if (this.generalForm.invalid) {
+      this.generalForm.markAllAsTouched();
+      return;
+    }
+    this.savingGeneral = true;
+    this.settingsService
+      .saveGeneralSettings(this.generalForm.controls.timezone.value)
+      .pipe(finalize(() => (this.savingGeneral = false)))
+      .subscribe({
+        next: (response) => {
+          this.generalFeedback = { type: 'success', message: response.message };
+          this.toastService.success('Timezone saved.');
+          if (this.generalSettings) {
+            this.generalSettings = { ...this.generalSettings, timezone: response.timezone };
+          }
+        },
+        error: (error) => {
+          this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save timezone.') };
+        },
+      });
   }
 
   saveExposure(): void {

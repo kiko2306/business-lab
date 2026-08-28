@@ -183,3 +183,43 @@
     </ng-container>
   </div>
 </section>
+
+<section class="card border-0 shadow-sm mt-4">
+  <div class="card-body p-4">
+    <div class="mb-3">
+      <h2 class="h4 mb-1">General</h2>
+      <p class="text-body-secondary mb-0">
+        The timezone applied to every managed app that reads <code>TZ</code>, unless an app pins its own in
+        its Configuration panel. Takes effect the next time each app is started.
+      </p>
+    </div>
+
+    <div *ngIf="generalLoading" class="text-body-secondary small">Loading…</div>
+
+    <form *ngIf="!generalLoading && generalSettings" [formGroup]="generalForm" (ngSubmit)="saveGeneral()" class="row g-3">
+      <div class="col-12 col-md-8">
+        <label class="form-label fw-semibold" for="timezone">Timezone</label>
+        <select id="timezone" class="form-select" formControlName="timezone">
+          <option *ngFor="let tz of generalSettings.timezones" [value]="tz">{{ tz }}</option>
+        </select>
+        <p class="form-text mb-0">Default: {{ generalSettings.defaultTimezone }}</p>
+      </div>
+      <div class="col-12 d-flex align-items-center gap-2">
+        <button type="submit" class="btn btn-primary" [disabled]="savingGeneral || generalForm.invalid">
+          {{ savingGeneral ? 'Saving…' : 'Save timezone' }}
+        </button>
+        <span
+          *ngIf="generalFeedback"
+          class="small"
+          [ngClass]="{
+            'text-success': generalFeedback.type === 'success',
+            'text-danger': generalFeedback.type === 'danger',
+            'text-body-secondary': generalFeedback.type === 'info'
+          }"
+        >
+          {{ generalFeedback.message }}
+        </span>
+      </div>
+    </form>
+  </div>
+</section>
