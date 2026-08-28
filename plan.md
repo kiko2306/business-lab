@@ -1299,3 +1299,82 @@ worth a look if the router port-forward turns out to be impractical.
       peers behind NAT likely can't connect to each other without it. Not
       worth touching until enrollment itself works. **Priority: P1** —
       **Estimate: S–M**
+
+## 21. Session Log — 2026-08-28: Container status fixes + backlog of exposed-app issues
+
+Shipped this session (git `d1977a7`..`7b8e4a4`):
+- `aggregateContainerState` — crash-looping (`restarting`) and
+  created-but-never-started (`created`, e.g. host-port clash) projects now
+  report `error` instead of sitting on `starting` forever; a project with a
+  one-shot init container that exits 0 (beszel) reports `running`, not
+  `starting`.
+- Startup-log popup no longer declares failure from its own poll during a
+  slow start; `docker compose up` timeout raised 60s → 15min, nginx
+  `proxy_read_timeout` → 1200s, exec buffer → 16MB, so large first-run
+  pulls (Immich's four images) actually complete. Popup shows a "still
+  preparing — downloading images" heartbeat while pulling.
+
+### 21.1 Dashboard "running apps" list — wrong / unhelpful links
+- [ ] **Nginx Proxy Manager** — the card should open NPM's admin UI at the
+      hostname configured for it in Cloudflare, not an internal `host:port`
+      or the bare proxied root. Check what `exposedHostname` resolves to for
+      `nginx-proxy-manager` and whether the link needs the NPM admin path.
+      **Priority: P1** — **Estimate: S**
+- [ ] **Pi-hole** — card links to `https://pihole.tx-home-utils.com/`, which
+      is not the admin app; it should be
+      `https://pihole.tx-home-utils.com/admin/login` (or `/admin/`). Pi-hole
+      serves its UI under `/admin`. Needs a per-service "web path" suffix on
+      the service definition (like `exposurePortEnvVar`, but for the URL
+      path) that both the dashboard link and any exposure health check
+      append. **Priority: P1** — **Estimate: S–M**
+- [ ] **Portainer** — shows *"New Portainer installation / Your Portainer
+      instance timed out for security purposes. To re-enable … restart
+      Portainer."* Portainer locks first-run admin creation if it isn't
+      completed within a few minutes of initial boot. Fix path: `restart`
+      Portainer to clear the lock, then complete setup immediately — or
+      pre-seed the admin account so the timeout window is never hit
+      (`--admin-password-file` on the command, or a seeded `portainer` data
+      dir). Tie the restart into the setup-token flow the card already has
+      for Portainer. **Priority: P1** — **Estimate: M**
+
+### 21.2 Exposed apps returning HTTP errors (Host / CSRF rejection)
+Shared root cause: each app rejects requests whose `Host` header is the
+public exposure hostname because that hostname isn't in the app's
+trusted-hosts / allowed-origins list. `exposureEnvKeys` (see §16) already
+solves this for env-configurable apps and runs on service start via
+`buildExposureEnvOverrides` in `executor.ts`; the apps below either need a
+key added or a non-env mechanism.
+- [ ] **Home Assistant — `400: Bad Request`** — HA validates the
+      `Host`/`X-Forwarded-*` headers and has no env knob for it. Needs an
+      `http:` block written into
+      `apps/home-assistant/data/configuration.yaml` on exposure-enable
+      (`use_x_forwarded_for: true`, `trusted_proxies: [<NPM/tunnel
+      source>]`), then a restart — same pattern as the Authelia users-file
+      editor in `services/autheliaUsers.ts`. **Priority: P1** —
+      **Estimate: M**
+- [ ] **Home Page — `{"error":"Host validation failed. See logs for more
+      details."}`** — gethomepage needs `HOMEPAGE_ALLOWED_HOSTS=<public
+      hostname>` (comma-separated). Add
+      `exposureEnvKeys.allowedHosts: ['HOMEPAGE_ALLOWED_HOSTS']` to the
+      `homepage` service definition and make
+      `apps/home-page/docker-compose.yml` pass the var through to the
+      container. **Priority: P1** — **Estimate: S**
+- [ ] **Paperless — `Bad Request (400)`** — `exposureEnvKeys` already maps
+      `PAPERLESS_URL` + `PAPERLESS_ALLOWED_HOSTS`, but paperless-ngx also
+      needs `PAPERLESS_CSRF_TRUSTED_ORIGINS=https://<host>` for an HTTPS
+      origin. Add that as a `url`-style key, and verify (a) the compose file
+      actually references all three vars and (b) the overrides from
+      `buildExposureEnvOverrides` reach the running container (env vs `.env`
+      precedence). **Priority: P1** — **Estimate: S–M**
+
+### 21.3 NetBird VPN without a router port-forward
+- [ ] The §20.10/20.11 plan to bypass the cloudflared gRPC-trailers bug
+      assumes a router port-forward + grey-clouded DNS + real Let's Encrypt
+      cert. User wants a path that needs **no** router change. Evaluate:
+      (a) NetBird's embedded **Relay/Signal** components as the enrollment
+      transport instead of the Management API over the tunnel;
+      (b) enrolling peers over an already-working tunnel (Tailscale is
+      installed) and exposing Management only on that private overlay;
+      (c) re-test with a current `cloudflared` release in case the
+      trailers bug (still open as of §20.9) has since been fixed.
+      **Priority: P1** — **Estimate: L**
