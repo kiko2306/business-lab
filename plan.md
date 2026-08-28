@@ -1502,9 +1502,14 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       **Priority: P2** — **Estimate: M**
 
 ### 22.5 Files, documents & PDF
-- [ ] **Stirling-PDF** — `stirlingtools/stirling-pdf`. Full local PDF toolkit
-      (merge/split/OCR/sign/compress/convert) — the natural companion to
-      Paperless. No Host validation. **Priority: P1** — **Estimate: S**
+- [x] **Stirling-PDF** — `stirlingtools/stirling-pdf`. Added 2026-08-28
+      (§23.5): `apps/stirling-pdf/` (`docker-compose.yml` + `.env.example`),
+      host port `${STIRLING_PDF_PORT:-8009}` → `:8080`, `curl
+      /api/v1/info/status | grep UP` healthcheck, bind mounts for tessdata /
+      configs / customFiles / pipeline. Registry entry (Backup & Storage,
+      `pdf` icon 📕). No Host validation → **no `exposureEnvKeys`** (put it
+      behind Authelia rather than the app's own optional login). The natural
+      companion to Paperless.
 - [ ] **Syncthing** — `syncthing/syncthing`. Continuous peer-to-peer folder
       sync across machines (no server of record) — complements Nextcloud.
       Its GUI enforces a Host check → `exposureEnvKeys.allowedHosts` or the
@@ -1618,8 +1623,8 @@ parallel whenever the user unblocks it.
 3. ~~**ntfy** (§22.2, S)~~ **DONE 2026-08-28** (§23.4) — registry + compose
    in; not yet started against Docker. Unblocks push notifications for
    uptime-kuma, watchtower, and the backup scheduler.
-4. **Stirling-PDF** (§22.5, S) — zero Host validation, near-zero config,
-   Paperless companion. Quick win.
+4. ~~**Stirling-PDF** (§22.5, S)~~ **DONE 2026-08-28** (§23.5) — registry +
+   compose in; not yet started against Docker.
 5. **WAHA** (§22.1, M) — explicitly requested; build it once the exposure
    pattern is proven and ntfy has exercised the "notification target" shape.
 6. **NocoDB** (§22.4, M) — Airtable-style data backbone for n8n.
@@ -1735,3 +1740,22 @@ before ntfy's public hostname is verified end to end.
 - **Attachments** — left `NTFY_ATTACHMENT_CACHE_DIR` unset; ntfy refuses to
   start if it points at a dir that doesn't exist yet, and attachments are
   opt-in. Add it back (plus `mkdir`) if wanted later.
+
+### 23.5 Session Log — 2026-08-28 (cont.): Stirling-PDF added (§22.5, Track B #4)
+
+Backend `tsc` clean, backend vitest 109/109, frontend `ng build` clean.
+Registry + files only — not yet `compose up`'d.
+
+- **`apps/stirling-pdf/`** — `docker-compose.yml`
+  (`stirlingtools/stirling-pdf:latest`, `${STIRLING_PDF_PORT:-8009}:8080`,
+  `curl -fsS …/api/v1/info/status | grep UP` healthcheck, `start_period: 60s`
+  since the first boot unpacks OCR/LibreOffice bits, bind mounts
+  `./data/{tessdata,configs,customFiles,pipeline}`) and `.env.example`
+  (port, `*_ENABLE_SECURITY`/`*_ENABLE_LOGIN` both `false`, langs/locale, TZ).
+  Host port 8009 — 8010 is ntfy's, 8080 pihole's.
+- **Registry** — `SERVICES['stirling-pdf']`, category Backup & Storage (with
+  Paperless), new `pdf` icon → 📕. `healthCheck` →
+  `http://localhost:8009/api/v1/info/status`.
+- **Exposure** — none. Stirling-PDF does no Host-header / origin validation,
+  so there's nothing to keep in sync; the `.env.example` steers users to
+  Authelia-gate it on exposure rather than enabling the app's own login.

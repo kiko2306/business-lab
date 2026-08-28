@@ -1,0 +1,34 @@
+
+services:
+  stirling-pdf:
+    image: stirlingtools/stirling-pdf:latest
+    restart: unless-stopped
+    ports:
+      - "${STIRLING_PDF_PORT:-8009}:8080"
+    environment:
+      TZ: ${TZ:-UTC}
+      # All processing is local; no login by default. Flip to true (and add
+      # users via the UI) to gate access — but exposure should go through
+      # Authelia rather than relying on this.
+      DOCKER_ENABLE_SECURITY: ${STIRLING_PDF_ENABLE_SECURITY:-false}
+      SECURITY_ENABLELOGIN: ${STIRLING_PDF_ENABLE_LOGIN:-false}
+      LANGS: ${STIRLING_PDF_LANGS:-en_GB}
+      SYSTEM_DEFAULTLOCALE: ${STIRLING_PDF_LOCALE:-en-US}
+    labels:
+      - "homepage.group=Files"
+      - "homepage.name=Stirling-PDF"
+      - "homepage.icon=stirling-pdf.png"
+      - "homepage.href=http://localhost:${STIRLING_PDF_PORT:-8009}"
+      - "homepage.description=Local PDF toolkit (merge, split, OCR, sign, convert)"
+    volumes:
+      # OCR language packs, custom app config, uploaded custom files, pipelines.
+      - ./data/tessdata:/usr/share/tessdata
+      - ./data/configs:/configs
+      - ./data/customFiles:/customFiles
+      - ./data/pipeline:/pipeline
+    healthcheck:
+      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/api/v1/info/status | grep -q 'UP' || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s

@@ -473,6 +473,22 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       staticOnExposure: { NTFY_BEHIND_PROXY: 'true' },
     },
   },
+  'stirling-pdf': {
+    name: 'stirling-pdf',
+    label: 'Stirling-PDF',
+    description: 'Local PDF toolkit (merge, split, OCR, sign, convert)',
+    icon: 'pdf',
+    category: 'Backup & Storage',
+    composePath: 'apps/stirling-pdf/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8009/api/v1/info/status',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // No Host-header / allowed-origin validation — nothing to sync on exposure.
+  },
 };
 
 export function getAllServices(): ServiceDefinition[] {
