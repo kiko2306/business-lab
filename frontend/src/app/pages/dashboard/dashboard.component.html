@@ -1,21 +1,23 @@
 <div class="dashboard-shell">
-  <header class="navbar navbar-expand border-bottom bg-white sticky-top">
+  <header class="app-header border-bottom bg-white sticky-top">
     <div class="container-fluid py-2">
-      <div>
-        <div class="navbar-brand fw-semibold mb-0 d-flex align-items-center gap-2">
-          <img src="favicon.svg" alt="" width="26" height="26" />
-          Homelab Manager
+      <div class="app-header__bar">
+        <div class="app-header__brand">
+          <div class="app-header__title fw-semibold d-flex align-items-center gap-2">
+            <img src="favicon.svg" alt="" width="26" height="26" />
+            Homelab Manager
+          </div>
+          <div class="small text-body-secondary text-truncate" *ngIf="user$ | async as user">
+            Signed in as {{ user.username }}
+          </div>
         </div>
-        <div class="small text-body-secondary" *ngIf="user$ | async as user">
-          Signed in as {{ user.username }}
-        </div>
-      </div>
-      <div class="d-flex gap-2">
-        <a class="btn btn-outline-secondary btn-sm" routerLink="/audit-logs">Audit logs</a>
-        <a class="btn btn-outline-secondary btn-sm" routerLink="/users">Users</a>
-        <a class="btn btn-outline-warning btn-sm" routerLink="/recovery">Recovery</a>
-        <a class="btn btn-outline-secondary btn-sm" href="#settings">Settings</a>
-        <button type="button" class="btn btn-outline-danger btn-sm" (click)="logout()">Logout</button>
+        <nav class="app-header__actions">
+          <a class="btn btn-outline-secondary btn-sm" routerLink="/audit-logs">Audit logs</a>
+          <a class="btn btn-outline-secondary btn-sm" routerLink="/users">Users</a>
+          <a class="btn btn-outline-warning btn-sm" routerLink="/recovery">Recovery</a>
+          <a class="btn btn-outline-secondary btn-sm" href="#settings">Settings</a>
+        </nav>
+        <button type="button" class="btn btn-outline-danger btn-sm app-header__logout" (click)="logout()">Logout</button>
       </div>
     </div>
   </header>
@@ -103,12 +105,12 @@
                 </thead>
                 <tbody>
                   <tr *ngFor="let row of group.rows; trackBy: trackByPortRow">
-                    <td>{{ row.label }}</td>
-                    <td>
+                    <td data-label="App">{{ row.label }}</td>
+                    <td data-label="URL">
                       <a *ngIf="row.url; else notExposed" [href]="row.url" target="_blank" rel="noopener noreferrer">{{ row.url }}</a>
                       <ng-template #notExposed><span class="text-body-secondary">Not exposed</span></ng-template>
                     </td>
-                    <td>
+                    <td data-label="Ports">
                       <div class="d-flex flex-wrap gap-1">
                         <span class="badge text-bg-light border" *ngFor="let port of row.ports">
                           {{ port.hostPort }} &rarr; {{ port.containerPort }}/{{ port.protocol }}
@@ -189,7 +191,7 @@
     </section>
 
     <section id="backups" class="mt-5 pt-4 border-top">
-      <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
           <h2 class="h4 mb-1">
             <button
@@ -280,7 +282,7 @@
     </section>
 
     <section id="health" class="mt-5 pt-4 border-top">
-      <div class="d-flex justify-content-between align-items-center mb-3">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
         <div>
           <h2 class="h4 mb-1">
             <button
