@@ -1,0 +1,10 @@
+# Log acquisition for CrowdSec — mounted at /etc/crowdsec/acquis.d/npm.yaml.
+#
+# Nginx Proxy Manager writes one access log per proxy host
+# (proxy-host-*_access.log) plus fallback_access.log / default-host_access.log
+# under /data/logs inside its container (./data/app/log on the host). The
+# crowdsecurity/nginx collection parses the "combined"-ish format they use.
+filenames:
+  - /var/log/npm/*_access.log
+labels:
+  type: nginx

@@ -10,6 +10,10 @@ apps/*/data/
 !apps/home-page/data/
 !apps/home-page/data/**
 
+# CrowdSec's Cloudflare-bouncer config holds an API token + the LAPI key
+# (keep the .example template).
+apps/crowdsec/config/cloudflare-bouncer.yaml
+
 # Node modules
 node_modules/
 */node_modules/

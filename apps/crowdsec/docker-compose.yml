@@ -1,0 +1,49 @@
+
+services:
+  crowdsec:
+    image: crowdsecurity/crowdsec:latest
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+      # Parsers + scenarios for Nginx Proxy Manager access logs and generic
+      # HTTP attacks (path traversal, scanners, bad bots, known CVE probes).
+      COLLECTIONS: "crowdsecurity/nginx crowdsecurity/http-cve crowdsecurity/base-http-scenarios"
+      # Auto-registers a bouncer named "cloudflare" with this key on startup
+      # so cloudflare-bouncer below can authenticate to the local API. Keep it
+      # in sync with crowdsec_lapi_key in config/cloudflare-bouncer.yaml.
+      BOUNCER_KEY_cloudflare: ${CROWDSEC_BOUNCER_KEY}
+    volumes:
+      # Which logs to read and how to parse them.
+      - ./config/acquis.yaml:/etc/crowdsec/acquis.d/npm.yaml:ro
+      # Decisions DB, downloaded blocklists, bouncer/machine registrations.
+      - ./data/crowdsec:/var/lib/crowdsec/data
+      # NPM writes per-proxy-host access logs here (./data/app -> /data in the
+      # NPM container, so /data/logs is ./data/app/log on the host). Read-only.
+      - ../nginx-proxy-manager/data/app/log:/var/log/npm:ro
+    networks:
+      - crowdsec-net
+    healthcheck:
+      test: ["CMD", "cscli", "lapi", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  cloudflare-bouncer:
+    image: crowdsecurity/cloudflare-bouncer:latest
+    restart: unless-stopped
+    depends_on:
+      crowdsec:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Holds the Cloudflare token + account/zone IDs and the LAPI bouncer
+      # key — gitignored, copied from cloudflare-bouncer.yaml.example.
+      - ./config/cloudflare-bouncer.yaml:/etc/crowdsec/bouncers/crowdsec-cloudflare-bouncer.yaml:ro
+    networks:
+      - crowdsec-net
+
+networks:
+  crowdsec-net:
+    driver: bridge
