@@ -11,6 +11,7 @@ import logger from '../utils/logger';
 import { writeAuditLog } from '../utils/audit';
 import { provisionServiceIfEnabled } from './exposure';
 import { buildExposureEnvOverrides } from './exposureEnv';
+import { ensureGeneratedSecrets } from './appEnv';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
@@ -148,6 +149,10 @@ export async function startService(serviceName: string, userId: number): Promise
     } as HttpError;
   }
 
+  // Generate any declared secret that's still a placeholder before validating,
+  // so an app whose only outstanding config is generatable secrets starts with
+  // no dashboard step (project principle §0.3).
+  await ensureGeneratedSecrets(serviceName);
   ensureServiceSecrets(serviceName, appDir, composeFile);
   await assertDependenciesRunning(serviceName);
 
