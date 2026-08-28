@@ -1,0 +1,60 @@
+
+services:
+  nocodb:
+    image: nocodb/nocodb:latest
+    restart: unless-stopped
+    ports:
+      - "${NOCODB_PORT:-8011}:8080"
+    environment:
+      # NocoDB's own metadata DB. Keep NOCODB_DB_PASSWORD alphanumeric — it is
+      # substituted into this URL-style connection string.
+      NC_DB: "pg://nocodb-db:5432?u=${NOCODB_DB_USER:-nocodb}&p=${NOCODB_DB_PASSWORD}&d=${NOCODB_DB_NAME:-nocodb}"
+      # Signs auth tokens. No default — the dashboard's Configuration panel
+      # pre-fills a generated value; a per-start random one would drop every
+      # session on restart.
+      NC_AUTH_JWT_SECRET: ${NOCODB_JWT_SECRET}
+      # Builds invite links, shared-view URLs and email links — the dashboard
+      # rewrites it to the public https:// hostname once exposure is enabled.
+      NC_PUBLIC_URL: ${NOCODB_PUBLIC_URL:-http://localhost:8011}
+      NC_DISABLE_TELE: ${NOCODB_DISABLE_TELEMETRY:-true}
+      TZ: ${TZ:-UTC}
+    labels:
+      - "homepage.group=Data"
+      - "homepage.name=NocoDB"
+      - "homepage.icon=nocodb.png"
+      - "homepage.href=http://localhost:${NOCODB_PORT:-8011}"
+      - "homepage.description=Airtable-style database over Postgres"
+    volumes:
+      - ./data/nocodb:/usr/app/data
+    depends_on:
+      nocodb-db:
+        condition: service_healthy
+    networks:
+      - nocodb-net
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  nocodb-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${NOCODB_DB_NAME:-nocodb}
+      POSTGRES_USER: ${NOCODB_DB_USER:-nocodb}
+      POSTGRES_PASSWORD: ${NOCODB_DB_PASSWORD}
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    networks:
+      - nocodb-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${NOCODB_DB_USER:-nocodb}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  nocodb-net:
+    driver: bridge
