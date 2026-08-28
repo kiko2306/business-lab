@@ -62,6 +62,33 @@ if command -v systemctl >/dev/null 2>&1; then
   systemctl enable --now docker >/dev/null 2>&1 || warn "couldn't enable/start the docker service via systemctl — is it running already under a different init system?"
 fi
 
+# Every managed app is its own compose project with its own bridge network.
+# Docker's default address pool only fits ~31 user networks before
+# `all predefined address pools have been fully subnetted` and new apps can't
+# start. Widen it — /24 networks out of a couple of /16 bases = 512 slots.
+# 10.201/16 is picked to be unlikely to clash with a home LAN.
+DOCKER_DAEMON_JSON="/etc/docker/daemon.json"
+if [ ! -f "$DOCKER_DAEMON_JSON" ]; then
+  log "Setting a wider Docker default-address-pool (per-app networks) in $DOCKER_DAEMON_JSON"
+  mkdir -p /etc/docker
+  cat > "$DOCKER_DAEMON_JSON" <<'JSON'
+{
+  "default-address-pools": [
+    { "base": "10.201.0.0/16", "size": 24 },
+    { "base": "172.31.0.0/16", "size": 24 }
+  ]
+}
+JSON
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl restart docker >/dev/null 2>&1 && log "restarted docker to apply the address-pool change" \
+      || warn "couldn't restart docker — apply $DOCKER_DAEMON_JSON and restart it manually"
+  else
+    warn "restart the Docker daemon to apply $DOCKER_DAEMON_JSON"
+  fi
+elif ! grep -q 'default-address-pools' "$DOCKER_DAEMON_JSON"; then
+  warn "$DOCKER_DAEMON_JSON exists without 'default-address-pools' — add one (see the block start.sh would write) or new app networks will eventually fail with 'all predefined address pools have been fully subnetted'"
+fi
+
 if ! docker compose version >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
     log "Docker Compose plugin not found — installing docker-compose-plugin"

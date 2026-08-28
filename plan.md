@@ -27,27 +27,25 @@ If a design can't meet them, it doesn't ship until it can.
 
 ## 0.1 URGENT — open bugs (fix before new features)
 
-1. **`EACCES` writing app `.env` files.** The backend (runs as `appuser`
-   uid 100, group `docker`/DOCKER_GID) can't write some `apps/<name>/.env`:
-   observed for `apps/nocodb/.env` and `apps/stirling-pdf/.env`
-   (`EACCES: permission denied, open '…/apps/nocodb/.env'` /
-   `'…/apps/stirling-pdf/.env'`). So `saveServiceEnv` /
-   `ensureGeneratedSecrets` fail → secrets never get generated, config can't
-   be saved from the UI (violates §0.2, §0.3). Root cause: those `.env`
-   files / dirs aren't group-writable by DOCKER_GID (some are owned
-   `usbmux:lxd`). `start.sh`'s new per-directory `chgrp`/`chmod g+rwX` loop
-   (commit `977d51f`) should cover this but either hasn't been re-run or
-   doesn't fix a file the backend didn't create. Fix options: (a) ensure the
-   backend can always write `apps/*/` — entrypoint chowns/chmods on boot,
-   or the backend writes via a root helper like the HA/CrowdSec hooks;
-   (b) create `.env` from `.env.example` with group-write mode and never let
-   a container own it.
-2. **Duplicati: default-map `APPS_DIR`.** `apps/duplicati/docker-compose.yml`
-   references `${APPS_DIR}` (backup source mount) with no default, so
-   Duplicati fails to start unless `APPS_DIR` is set in *its own* `.env`
-   (the top-level stack sets it, individual app compose projects don't).
-   Give it a sane default — `${APPS_DIR:-/apps}` or map the repo's `apps/`
-   read-only at a fixed path — so it starts out of the box.
+1. ~~**`EACCES` writing app `.env` files**~~ **DONE 2026-08-28** (§23.20).
+   `backend/docker-entrypoint.sh` (runs as root) now `chown appuser:appgroup`s
+   every `apps/<name>/` dir and its `.env` / `.env.example` on boot — not
+   recursively, so `data/` (Postgres et al.) is untouched. Verified: backend
+   can create `apps/nocodb/.env`; nocodb generated its secrets and started.
+2. ~~**Duplicati: default-map `APPS_DIR`**~~ **DONE 2026-08-28** (§23.20).
+   `apps/duplicati/docker-compose.yml` now mounts `${APPS_DIR:-../}:/source/apps:ro`
+   (absolute host path when the dashboard starts it, else this compose's
+   `apps/` parent) — Duplicati has a real backup source out of the box.
+3. **Docker address-pool exhaustion.** Each managed app is its own compose
+   project with its own bridge network. Docker's default pool fits only
+   ~31 user networks; past that new apps fail to start with
+   `all predefined address pools have been fully subnetted` (hit live with
+   `stirling-pdf`, ~28 networks in use). `start.sh` now writes
+   `/etc/docker/daemon.json` with a wider `default-address-pools` (/24 out of
+   two /16 bases = 512 slots) and restarts docker — **needs `start.sh`
+   re-run (sudo)** on the live host, or the daemon.json added by hand. Longer
+   term: a single shared `homelab-apps` external network instead of one per
+   compose project.
 
 ## 1. Overview
 This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express (TypeScript) backend. It provides a dashboard for starting and stopping Docker-based services, viewing logs, and monitoring system resources.
@@ -2264,3 +2262,25 @@ This is the 3rd instance of the root-owned-data-dir class — the systemic fix
 (§0.1) is overdue: the backend should ensure `apps/<name>/data` is writable
 by the container's uid before `docker compose up` (inspect the image's
 configured user, or a generic init), instead of a per-app busybox sidecar.
+
+### 23.20 Session Log — 2026-08-28 (cont.): urgent items (.env EACCES, Duplicati source, address pool)
+
+- **`.env` EACCES (§0.1.1).** `apps/nocodb/` etc. were owned `1000:1000`
+  (the host user), and the backend runs as `appuser` uid 100 — not owner,
+  not in group 1000 → can't create `.env`. `backend/docker-entrypoint.sh`
+  now, as root before dropping to appuser, `chown appuser:appgroup`s each
+  `apps/<name>/` dir + its `.env`/`.env.example` (maxdepth 1 — `data/`
+  untouched so Postgres dir modes stay valid). Rebuilt; verified appuser can
+  write `apps/nocodb/.env`, and `POST /services/nocodb/start` generated
+  `NOCODB_DB_PASSWORD` + `NOCODB_JWT_SECRET` and brought nocodb up healthy.
+- **Duplicati backup source (§0.1.2).** `docker-compose.yml` volume
+  `- ${APPS_DIR:-../}:/source/apps:ro` (was a commented example). The
+  dashboard passes `APPS_DIR` (abs host path) in the compose-up env; a manual
+  `docker compose` falls back to `../` = the repo's `apps/`.
+- **Address-pool exhaustion (§0.1.3).** `stirling-pdf` failed to start:
+  `all predefined address pools have been fully subnetted`. ~28 per-app
+  bridge networks + the default pool's ~31-network ceiling. `start.sh` now
+  drops a `/etc/docker/daemon.json` with a wide `default-address-pools`
+  (10.201.0.0/16 + 172.31.0.0/16, size /24) and restarts docker. Can't be
+  applied from here (no root); **re-run `start.sh` on the host**. After that,
+  start stirling-pdf (+ any other stopped apps) from the dashboard.

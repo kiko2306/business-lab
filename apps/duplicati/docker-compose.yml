@@ -24,8 +24,11 @@ services:
     volumes:
       - ./data/config:/config
       - ./data/backups:/backups
-      # Add read-only mounts of whatever you actually want backed up, e.g.:
-      # - ${APPS_DIR}:/source/apps:ro
+      # The managed apps/ tree (per-app data + .env) mounted read-only as a
+      # backup source, so Duplicati has something to back up out of the box.
+      # APPS_DIR is the absolute host path when the dashboard starts this;
+      # falls back to this compose file's own apps/ parent otherwise.
+      - ${APPS_DIR:-../}:/source/apps:ro
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8200"]
       interval: 30s
