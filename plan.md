@@ -1406,3 +1406,128 @@ can be added later if wanted.
       (c) re-test with a current `cloudflared` release in case the
       trailers bug (still open as of §20.9) has since been fixed.
       **Priority: P1** — **Estimate: L**
+
+## 22. Backlog: new apps to add to the registry
+
+Each new app is: an `apps/<name>/` dir with a compose file (+ `.env.example`,
++ a `data/` dir), plus a `SERVICES` entry in
+`backend/src/config/services.ts` with `label`/`description`/`icon`/`category`
+and a `healthCheck`. **When adding any of these, wire its reverse-proxy
+config up front** per §21.2 — `exposureEnvKeys` (`url` / `host` /
+`allowedHosts` / `staticOnExposure`) for env-configurable apps, or
+`exposureConfigFile` for the file-only ones — and follow the existing
+multi-container DB pattern (immich / paperless / nextcloud) for anything
+that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
+`service-card.component.ts`.
+
+### 22.1 WAHA — WhatsApp HTTP API  (requested)
+- [ ] **WAHA** — `devlikeapro/waha`. Self-hosted WhatsApp gateway: REST API +
+      webhooks + a small web dashboard, session data under `./sessions`.
+      The obvious pairing with **n8n** — order/booking confirmations,
+      delivery alerts, on-call notifications, simple chatbots — and a
+      notification target for `uptime-kuma`. **Category:** Productivity (or a
+      new "Communication"). **Auth:** set `WHATSAPP_API_KEY` +
+      `WAHA_DASHBOARD_USERNAME`/`WAHA_DASHBOARD_PASSWORD` (none by default).
+      **Exposure:** `exposureEnvKeys.url: ['WAHA_BASE_URL']` (used in webhook
+      payloads and the dashboard); healthcheck `GET /health`.
+      **Priority: P1** — **Estimate: M**
+
+### 22.2 Communication & notifications
+- [ ] **ntfy** — `binwiederhier/ntfy`. Dead-simple pub/sub push to phone and
+      desktop; `uptime-kuma`, `n8n`, `watchtower` and backup scripts can all
+      post to it. `exposureEnvKeys.url: ['NTFY_BASE_URL']` (it builds click
+      links from it). **Priority: P1** — **Estimate: S**
+- [ ] **FreeScout** — `tiredofit/freescout`. Shared-inbox help desk for a
+      `support@` address (Zendesk-lite). Laravel →
+      `exposureEnvKeys.url: ['APP_URL']`, needs MySQL. **Priority: P2** —
+      **Estimate: M**
+- [ ] **Stalwart Mail** — `stalwartlabs/mail-server`. Modern all-in-one mail
+      server (SMTP/IMAP/JMAP + web admin), far less fiddly than Mailcow.
+      Advanced: needs real MX/SPF/DKIM/DMARC/PTR and inbound port 25, which a
+      residential line / the tunnel usually can't do — only worth it with a
+      static IP or a smarthost relay. **Priority: P3** — **Estimate: L**
+
+### 22.3 Business operations
+- [ ] **Docuseal** — `docuseal/docuseal`. Self-hosted e-signatures and
+      fillable PDF forms (DocuSign alt) — contracts, NDAs, onboarding.
+      `exposureEnvKeys.host: ['HOST']`. **Priority: P2** — **Estimate: M**
+- [ ] **Twenty** — `twentycrm/twenty`. Modern open-source CRM (people,
+      companies, opportunities, pipelines). Needs Postgres + Redis;
+      `exposureEnvKeys.url: ['SERVER_URL']`. **Priority: P2** —
+      **Estimate: M**
+- [ ] **Invoice Ninja** — `invoiceninja/invoiceninja`. Invoices, quotes,
+      recurring billing, client portal, payment-gateway hooks. Laravel →
+      `exposureEnvKeys` `url: ['APP_URL']` + `staticOnExposure:
+      { REQUIRE_HTTPS: 'true' }`; MySQL. **Priority: P2** — **Estimate: M**
+- [ ] **Kimai** — `kimai/kimai2`. Time tracking with rates/exports, a basis
+      for billable hours. Symfony → set `TRUSTED_HOSTS` / `TRUSTED_PROXIES`
+      via `exposureEnvKeys.allowedHosts` + `staticOnExposure`; MySQL.
+      **Priority: P3** — **Estimate: M**
+- [ ] **Cal.com** — `calcom/cal.com`. Appointment scheduling / booking pages
+      (Calendly alt). Heavier (Next.js + Postgres + SMTP);
+      `exposureEnvKeys.url: ['NEXT_PUBLIC_WEBAPP_URL', 'NEXTAUTH_URL']`.
+      **Priority: P3** — **Estimate: L**
+
+### 22.4 Data, no-code & BI
+- [ ] **NocoDB** — `nocodb/nocodb`. Airtable-style database over
+      Postgres/MySQL: internal tools, intake forms, and a clean data source
+      for `n8n`. `exposureEnvKeys.url: ['NC_PUBLIC_URL']`. **Priority: P1** —
+      **Estimate: M**
+- [ ] **Metabase** — `metabase/metabase`. Dashboards / BI straight on top of
+      the Postgres DBs these apps already run (paperless, immich, n8n, …).
+      `exposureEnvKeys.url: ['MB_SITE_URL']`; own Postgres for app state.
+      **Priority: P2** — **Estimate: M**
+
+### 22.5 Files, documents & PDF
+- [ ] **Stirling-PDF** — `stirlingtools/stirling-pdf`. Full local PDF toolkit
+      (merge/split/OCR/sign/compress/convert) — the natural companion to
+      Paperless. No Host validation. **Priority: P1** — **Estimate: S**
+- [ ] **Syncthing** — `syncthing/syncthing`. Continuous peer-to-peer folder
+      sync across machines (no server of record) — complements Nextcloud.
+      Its GUI enforces a Host check → `exposureEnvKeys.allowedHosts` or the
+      `gui.insecureSkipHostcheck` config knob. **Priority: P2** —
+      **Estimate: S**
+
+### 22.6 Security, network & hardware health
+- [ ] **CrowdSec** — `crowdsecurity/crowdsec` + the nginx/NPM bouncer.
+      Parses the proxy access logs and blocks scanners/brute-force at the
+      edge, sharing signals with the community blocklist. No web UI (console
+      optional). Biggest single security upgrade for a publicly-exposed
+      stack. **Priority: P1** — **Estimate: M**
+- [ ] **Scrutiny** — `analogj/scrutiny`. SMART attributes + failure
+      prediction for the host's disks — a real gap (Beszel doesn't do SMART).
+      Needs `/dev/disk` + `SYS_RAWIO`. No Host validation. **Priority: P2** —
+      **Estimate: S**
+- [ ] **NetAlertX** — `jokobsk/netalertx` (ex Pi.Alert). LAN scan with
+      new-device / device-down / presence alerts. `network_mode: host`.
+      **Priority: P3** — **Estimate: S**
+
+### 22.7 Dev & self-host infra
+- [ ] **Forgejo** — `codeberg.org/forgejo/forgejo`. Self-hosted Git forge
+      (Gitea fork) with Actions CI — pairs with `code-server`.
+      `exposureEnvKeys.url: ['FORGEJO__server__ROOT_URL']`; SSH on a
+      dedicated host port. **Priority: P2** — **Estimate: M**
+- [ ] **IT-Tools** — `corentinth/it-tools`. Offline box of dev/IT utilities
+      (hash, JWT, cron, base64, colour, cert decode…). Static, zero config.
+      **Priority: P3** — **Estimate: S**
+
+### 22.8 Productivity & knowledge
+- [ ] **Karakeep** — `ghcr.io/karakeep-app/karakeep` (ex Hoarder).
+      Bookmarks + read-it-later with automatic tagging and full-text search
+      (Pocket/Raindrop alt). `exposureEnvKeys.url: ['NEXTAUTH_URL']`.
+      **Priority: P3** — **Estimate: M**
+- [ ] **Miniflux** — `miniflux/miniflux`. Minimalist, fast RSS reader over
+      Postgres. `exposureEnvKeys.url: ['BASE_URL']`. **Priority: P3** —
+      **Estimate: S**
+
+### 22.9 Optional / niche
+- [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
+      streaming, if Jellyfin's music side isn't enough.
+      `exposureEnvKeys.url: ['ND_BASEURL']` (subpath) — usually fine at root.
+- [ ] **Changedetection.io** (`dgtlmoon/changedetection.io`) — watch web
+      pages for changes (price/stock/policy), notify via ntfy.
+- [ ] ***arr stack** (Prowlarr/Sonarr/Radarr + a download client) — media
+      automation for Jellyfin. Big surface; only if that's a real use.
+- [ ] **Grafana + Prometheus** — proper metrics/alerting if Beszel +
+      Uptime-Kuma stop being enough. Heavier; a step change in ops
+      complexity.
