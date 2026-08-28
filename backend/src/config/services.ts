@@ -559,7 +559,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     healthCheck: {
       enabled: true,
       type: 'http',
-      url: 'http://localhost:3009/health',
+      url: 'http://localhost:3009/ping',
       interval: 30000,
       timeout: 5000,
     },

@@ -2284,3 +2284,19 @@ configured user, or a generic init), instead of a per-app busybox sidecar.
   (10.201.0.0/16 + 172.31.0.0/16, size /24) and restarts docker. Can't be
   applied from here (no root); **re-run `start.sh` on the host**. After that,
   start stirling-pdf (+ any other stopped apps) from the dashboard.
+
+### 23.21 Session Log — 2026-08-28 (cont.): daemon.json applied, all apps green
+
+`start.sh`'s `/etc/docker/daemon.json` (`default-address-pools` 10.201.0.0/16
++ 172.31.0.0/16 size /24) applied on the host + docker restarted. New app
+networks now allocate from 10.201.x. Started the remaining stopped apps
+(duplicati, stirling-pdf) from the dashboard — both `healthy`; stirling-pdf
+public 200; Duplicati's `/source/apps` shows all 30 app dirs (backup source
+working).
+
+WAHA came up `unhealthy` — its `/health` is API-key-gated (401), exactly the
+caveat noted in §22.1 / §23.6. Switched both healthchecks (compose `node -e`
+probe + registry `healthCheck.url`) to `/ping` (always unauthenticated, 200).
+Recreated → healthy.
+
+**Dashboard: 30 / 30 running, all healthy, 0 error, 0 stopped.**
