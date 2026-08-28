@@ -19,6 +19,9 @@ services:
       PAPERLESS_ADMIN_PASSWORD: ${PAPERLESS_ADMIN_PASSWORD}
       PAPERLESS_URL: ${PAPERLESS_URL:-http://localhost:8000}
       PAPERLESS_ALLOWED_HOSTS: ${PAPERLESS_ALLOWED_HOSTS:-localhost,127.0.0.1}
+      # Set by the dashboard alongside PAPERLESS_URL when exposure is enabled;
+      # without a matching trusted origin the login POST returns a bare 400.
+      PAPERLESS_CSRF_TRUSTED_ORIGINS: ${PAPERLESS_CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
       PAPERLESS_ENABLE_COMPRESSION: "true"
       PAPERLESS_TASK_WORKERS: 2
       PAPERLESS_THREADS_PER_WORKER: 1

@@ -10,6 +10,10 @@ services:
       PGID: ${PGID:-1000}
       TZ: ${TZ:-UTC}
       APP_KEY: ${SPEEDTEST_APP_KEY}
+      # APP_URL must match the browser URL or assets 404 and login hits a 419
+      # CSRF error; the dashboard sets it when exposure is enabled.
+      APP_URL: ${SPEEDTEST_APP_URL:-http://localhost:80}
+      APP_TRUSTED_PROXIES: ${SPEEDTEST_TRUSTED_PROXIES:-*}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Speedtest"

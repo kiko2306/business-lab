@@ -9,8 +9,9 @@ import fs from 'fs';
 import path from 'path';
 import logger from '../utils/logger';
 import { writeAuditLog } from '../utils/audit';
-import { provisionServiceIfEnabled, getServiceExposureRow } from './exposure';
-import { getExposureConfig } from '../utils/exposureSettings';
+import { provisionServiceIfEnabled } from './exposure';
+import { buildExposureEnvOverrides } from './exposureEnv';
+import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getServiceStatus } from './status';
@@ -117,52 +118,6 @@ function ensureServiceSecrets(serviceName: string, appDir: string, composeFile: 
   }
 }
 
-/**
- * Compute PAPERLESS_URL/PAPERLESS_ALLOWED_HOSTS-style env overrides (per
- * ServiceDefinition.exposureEnvKeys) so a service's own Host-header/CSRF
- * checks stay in sync with its exposed public hostname automatically,
- * without writing to the app's .env file.
- */
-async function buildExposureEnvOverrides(serviceName: string, appDir: string): Promise<Record<string, string>> {
-  const exposureEnvKeys = getService(serviceName)?.exposureEnvKeys;
-  if (!exposureEnvKeys) {
-    return {};
-  }
-
-  const exposureRow = await getServiceExposureRow(serviceName);
-  if (!exposureRow?.enabled) {
-    return {};
-  }
-
-  const globalConfig = await getExposureConfig();
-  if (!globalConfig) {
-    return {};
-  }
-
-  const hostname = `${serviceName}.${globalConfig.baseDomain}`;
-  const envFilePath = path.join(appDir, '.env');
-  const existingValues = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath) : {};
-
-  const overrides: Record<string, string> = {};
-
-  for (const key of exposureEnvKeys.url ?? []) {
-    overrides[key] = `https://${hostname}`;
-  }
-
-  for (const key of exposureEnvKeys.allowedHosts ?? []) {
-    const hosts = (existingValues[key] ?? '')
-      .split(',')
-      .map((host) => host.trim())
-      .filter(Boolean);
-    if (!hosts.includes(hostname)) {
-      hosts.push(hostname);
-    }
-    overrides[key] = hosts.join(',');
-  }
-
-  return overrides;
-}
-
 interface ServiceActionResult {
   success: boolean;
   service: string;
@@ -199,8 +154,11 @@ export async function startService(serviceName: string, userId: number): Promise
     const startTime = new Date();
     logger.info(`Starting service: ${serviceName}`, { userId, service: serviceName });
 
-    // Execute docker compose up -d
+    // Keep the app's own reverse-proxy config in step with its exposed
+    // hostname before it (re)starts: env overrides for most apps, a config
+    // file for the few that need it (Home Assistant).
     const envOverrides = await buildExposureEnvOverrides(serviceName, appDir);
+    await applyExposureConfigFiles(serviceName, appDir);
     const command = `docker compose -p ${projectName} -f ${composeFile} up -d`;
     const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, envOverrides);
 

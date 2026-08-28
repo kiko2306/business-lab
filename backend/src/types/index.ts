@@ -16,13 +16,28 @@ export interface ServiceHealthCheck {
 }
 
 export interface ServiceExposureEnvKeys {
-  // Compose env var(s) that should receive the service's public URL
-  // (e.g. PAPERLESS_URL) when exposure is enabled.
+  // Compose env var(s) that should receive the service's public URL, scheme
+  // included — `https://<host>` (e.g. PAPERLESS_URL, BOOKSTACK_URL).
   url?: string[];
-  // Compose env var(s) holding a comma-separated allowed-hosts list that the
-  // public hostname must be appended to (e.g. PAPERLESS_ALLOWED_HOSTS).
+  // Compose env var(s) that should receive the bare public hostname, no
+  // scheme (e.g. N8N_HOST, NEXTCLOUD_OVERWRITEHOST).
+  host?: string[];
+  // Compose env var(s) holding a separated allowed-hosts list that the public
+  // hostname must be appended to (e.g. PAPERLESS_ALLOWED_HOSTS,
+  // NEXTCLOUD_TRUSTED_DOMAINS).
   allowedHosts?: string[];
+  // Separator for the `allowedHosts` lists. Defaults to ",". Nextcloud's
+  // NEXTCLOUD_TRUSTED_DOMAINS is space-separated, so it sets " ".
+  allowedHostsSeparator?: string;
+  // Literal env values to set only while exposure is enabled — for reverse
+  // proxy knobs that aren't derived from the hostname, e.g.
+  // { N8N_PROTOCOL: 'https' }, { NEXTCLOUD_OVERWRITEPROTOCOL: 'https' }.
+  staticOnExposure?: Record<string, string>;
 }
+
+// Marks a service that needs a config *file* touched (not just env) before it
+// will accept proxied requests once exposed — see services/exposureConfigFiles.ts.
+// Currently only Home Assistant (its http: block).
 
 export interface ServiceSetupToken {
   // Regex with one capture group, applied to the container's full logs, to
@@ -68,6 +83,9 @@ export interface ServiceDefinition {
   composePath: string;
   healthCheck: ServiceHealthCheck;
   exposureEnvKeys?: ServiceExposureEnvKeys;
+  // See services/exposureConfigFiles.ts — service needs a config file edited
+  // on exposure, beyond env overrides.
+  exposureConfigFile?: boolean;
   setupToken?: ServiceSetupToken;
   // Compose env var(s) holding a random secret the app needs but can't
   // default (e.g. Vikunja's VIKUNJA_JWT_SECRET). When one of these is still

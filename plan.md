@@ -1337,35 +1337,63 @@ Shipped this session (git `d1977a7`..`7b8e4a4`):
       dir). Tie the restart into the setup-token flow the card already has
       for Portainer. **Priority: P1** — **Estimate: M**
 
-### 21.2 Exposed apps returning HTTP errors (Host / CSRF rejection)
+### 21.2 Exposed apps returning HTTP errors (Host / CSRF rejection) — DONE 2026-08-28
 Shared root cause: each app rejects requests whose `Host` header is the
 public exposure hostname because that hostname isn't in the app's
-trusted-hosts / allowed-origins list. `exposureEnvKeys` (see §16) already
-solves this for env-configurable apps and runs on service start via
-`buildExposureEnvOverrides` in `executor.ts`; the apps below either need a
-key added or a non-env mechanism.
-- [ ] **Home Assistant — `400: Bad Request`** — HA validates the
-      `Host`/`X-Forwarded-*` headers and has no env knob for it. Needs an
-      `http:` block written into
-      `apps/home-assistant/data/configuration.yaml` on exposure-enable
-      (`use_x_forwarded_for: true`, `trusted_proxies: [<NPM/tunnel
-      source>]`), then a restart — same pattern as the Authelia users-file
-      editor in `services/autheliaUsers.ts`. **Priority: P1** —
-      **Estimate: M**
-- [ ] **Home Page — `{"error":"Host validation failed. See logs for more
-      details."}`** — gethomepage needs `HOMEPAGE_ALLOWED_HOSTS=<public
-      hostname>` (comma-separated). Add
-      `exposureEnvKeys.allowedHosts: ['HOMEPAGE_ALLOWED_HOSTS']` to the
-      `homepage` service definition and make
-      `apps/home-page/docker-compose.yml` pass the var through to the
-      container. **Priority: P1** — **Estimate: S**
-- [ ] **Paperless — `Bad Request (400)`** — `exposureEnvKeys` already maps
-      `PAPERLESS_URL` + `PAPERLESS_ALLOWED_HOSTS`, but paperless-ngx also
-      needs `PAPERLESS_CSRF_TRUSTED_ORIGINS=https://<host>` for an HTTPS
-      origin. Add that as a `url`-style key, and verify (a) the compose file
-      actually references all three vars and (b) the overrides from
-      `buildExposureEnvOverrides` reach the running container (env vs `.env`
-      precedence). **Priority: P1** — **Estimate: S–M**
+trusted-hosts / allowed-origins list. Fixed by growing the exposure-override
+mechanism and auditing **every** web app in the registry — not just the
+three that were reported.
+
+**Mechanism changes** (git after `92cf723`):
+- `ServiceExposureEnvKeys` gained `host` (bare hostname, no scheme),
+  `allowedHostsSeparator` (Nextcloud's list is space-separated) and
+  `staticOnExposure` (literal values like `N8N_PROTOCOL=https`).
+- `buildExposureEnvOverrides` extracted to `services/exposureEnv.ts` with a
+  pure `computeExposureEnvOverrides` (unit-tested).
+- New `services/exposureConfigFiles.ts` + `ServiceDefinition.exposureConfigFile`
+  for apps that need a config *file* touched, not just env. Runs from
+  `startService` right before `docker compose up`, same as the env overrides.
+- **All overrides only apply at `docker compose up` time** — after toggling
+  exposure the service must be restarted. `.env.example` files now say so.
+
+**Per-app outcome** (`exposureEnvKeys` unless noted):
+- **home-assistant** — `exposureConfigFile: true`. On start-while-exposed,
+  appends a marker-fenced `http:` block (`use_x_forwarded_for: true` +
+  broad private `trusted_proxies`) to `data/configuration.yaml`; skips if the
+  user already defined `http:`.
+- **homepage** — `allowedHosts: [HOMEPAGE_ALLOWED_HOSTS]` (compose already
+  passed the var).
+- **paperless** — added `PAPERLESS_CSRF_TRUSTED_ORIGINS` to `url` keys +
+  compose; kept `PAPERLESS_URL` / `PAPERLESS_ALLOWED_HOSTS`.
+- **bookstack** — `url: [BOOKSTACK_URL]` (APP_URL).
+- **mealie** — `url: [MEALIE_BASE_URL]`.
+- **vaultwarden** — `url: [VAULTWARDEN_DOMAIN]`.
+- **nextcloud** — `allowedHosts: [NEXTCLOUD_TRUSTED_DOMAINS]` (space sep),
+  `host: [NEXTCLOUD_OVERWRITEHOST]`, `staticOnExposure`
+  `NEXTCLOUD_OVERWRITEPROTOCOL=https` + `NEXTCLOUD_TRUSTED_PROXIES`; compose
+  gained `OVERWRITEHOST` / `OVERWRITEPROTOCOL` / `TRUSTED_PROXIES`.
+- **speedtest** — `url: [SPEEDTEST_APP_URL]`; compose gained `APP_URL` +
+  `APP_TRUSTED_PROXIES=*`.
+- **n8n** — `url: [N8N_WEBHOOK_URL, N8N_EDITOR_BASE_URL]`, `host: [N8N_HOST]`,
+  `staticOnExposure` `N8N_PROTOCOL=https`; compose gained `N8N_EDITOR_BASE_URL`.
+- **duplicati** — compose default for `DUPLICATI__WEBSERVICE_ALLOWEDHOSTNAMES`
+  set to `*` so the 2.x host check passes behind the proxy out of the box.
+- **vikunja** — already handled (`VIKUNJA_PUBLIC_URL`).
+
+**Audited, no change needed** (no Host/allow-list hard-fail behind a proxy at
+root): immich, jellyfin, uptime-kuma, dozzle, filebrowser, code-server,
+portainer, beszel, pihole, nginx-proxy-manager. `IMMICH_APP_URL` /
+Jellyfin "known proxies" / Beszel `APP_URL` only affect generated links and
+can be added later if wanted.
+
+- [ ] **Verify live once exposed** — enable exposure + restart each of the
+      touched apps and confirm the error is gone. Home Assistant in
+      particular: check the appended `trusted_proxies` range actually covers
+      the source address NPM/the tunnel presents (adjust the list in
+      `exposureConfigFiles.ts` if not). **Priority: P1** — **Estimate: S**
+- [ ] **authelia** — domain-sensitive but driven by its own
+      `config/configuration.yml` (`session.cookies`, `access_control`), not
+      env. Confirm `authelia.<base-domain>` is present there. **Priority: P2**
 
 ### 21.3 NetBird VPN without a router port-forward
 - [ ] The §20.10/20.11 plan to bypass the cloudflared gRPC-trailers bug

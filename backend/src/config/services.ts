@@ -69,6 +69,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       interval: 30000,
       timeout: 5000,
     },
+    // HA returns "400: Bad Request" through any proxy unless its
+    // configuration.yaml has an http: block with use_x_forwarded_for +
+    // trusted_proxies, and there's no env var for it. See
+    // services/exposureConfigFiles.ts.
+    exposureConfigFile: true,
   },
   'code-server': {
     name: 'code-server',
@@ -99,6 +104,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       interval: 30000,
       timeout: 5000,
     },
+    // BookStack forces redirects to APP_URL and rejects login CSRF if it
+    // doesn't match the URL in the browser, so it has to track the public one.
+    exposureEnvKeys: {
+      url: ['BOOKSTACK_URL'],
+    },
   },
   'filebrowser': {
     name: 'filebrowser',
@@ -125,6 +135,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       interval: 30000,
       timeout: 5000,
     },
+    // gethomepage rejects any request whose Host isn't in HOMEPAGE_ALLOWED_HOSTS
+    // with `{"error":"Host validation failed. See logs for more details."}`.
+    exposureEnvKeys: {
+      allowedHosts: ['HOMEPAGE_ALLOWED_HOSTS'],
+    },
   },
   'n8n': {
     name: 'n8n',
@@ -140,6 +155,14 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       interval: 30000,
       timeout: 5000,
     },
+    // n8n blocks the editor ("secure cookie … not using https") unless it
+    // knows it's behind HTTPS, and builds webhook/OAuth callback URLs from
+    // N8N_HOST / WEBHOOK_URL / N8N_EDITOR_BASE_URL.
+    exposureEnvKeys: {
+      url: ['N8N_WEBHOOK_URL', 'N8N_EDITOR_BASE_URL'],
+      host: ['N8N_HOST'],
+      staticOnExposure: { N8N_PROTOCOL: 'https' },
+    },
   },
   'paperless': {
     name: 'paperless',
@@ -152,7 +175,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       enabled: false,
     },
     exposureEnvKeys: {
-      url: ['PAPERLESS_URL'],
+      // PAPERLESS_URL feeds ALLOWED_HOSTS + CSRF_TRUSTED_ORIGINS derivation,
+      // but set CSRF explicitly too — a bare 400 on the login POST is exactly
+      // what a missing trusted origin looks like.
+      url: ['PAPERLESS_URL', 'PAPERLESS_CSRF_TRUSTED_ORIGINS'],
       allowedHosts: ['PAPERLESS_ALLOWED_HOSTS'],
     },
   },
@@ -180,6 +206,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     composePath: 'apps/speedtest/docker-compose.yml',
     healthCheck: {
       enabled: false,
+    },
+    // speedtest-tracker is a Laravel app: wrong APP_URL = broken assets and
+    // 419 CSRF errors on login once it's proxied.
+    exposureEnvKeys: {
+      url: ['SPEEDTEST_APP_URL'],
     },
   },
   'tailscale': {
@@ -229,6 +260,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     healthCheck: {
       enabled: false,
     },
+    // Mealie builds share links, OAuth redirects and API URLs from BASE_URL;
+    // wrong value = broken login and links once proxied.
+    exposureEnvKeys: {
+      url: ['MEALIE_BASE_URL'],
+    },
   },
   'portainer': {
     name: 'portainer',
@@ -259,6 +295,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       url: 'http://localhost:80/alive',
       interval: 30000,
       timeout: 5000,
+    },
+    // Vaultwarden needs DOMAIN to exactly match the browser URL or WebAuthn,
+    // attachments and the /admin panel break.
+    exposureEnvKeys: {
+      url: ['VAULTWARDEN_DOMAIN'],
     },
   },
   'uptime-kuma': {
@@ -302,6 +343,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       interval: 30000,
       timeout: 5000,
     },
+    // Duplicati 2.x rejects requests whose Host header isn't allow-listed;
+    // its compose default is "*" so it works proxied out of the box. If you
+    // narrow DUPLICATI__WEBSERVICE_ALLOWEDHOSTNAMES in .env, add the public
+    // hostname there yourself.
   },
   'nextcloud': {
     name: 'nextcloud',
@@ -316,6 +361,18 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       url: 'http://localhost:80/status.php',
       interval: 30000,
       timeout: 5000,
+    },
+    // Nextcloud hard-blocks unknown domains ("Access through untrusted
+    // domain") and needs the overwrite* knobs to emit https:// URLs behind a
+    // TLS-terminating proxy. TRUSTED_DOMAINS is space-separated, not comma.
+    exposureEnvKeys: {
+      allowedHosts: ['NEXTCLOUD_TRUSTED_DOMAINS'],
+      allowedHostsSeparator: ' ',
+      host: ['NEXTCLOUD_OVERWRITEHOST'],
+      staticOnExposure: {
+        NEXTCLOUD_OVERWRITEPROTOCOL: 'https',
+        NEXTCLOUD_TRUSTED_PROXIES: '10.0.0.0/8 172.16.0.0/12 192.168.0.0/16 fc00::/7',
+      },
     },
   },
   'immich': {

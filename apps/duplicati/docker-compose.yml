@@ -11,6 +11,10 @@ services:
       TZ: ${TZ:-UTC}
       SETTINGS_ENCRYPTION_KEY: ${DUPLICATI_SETTINGS_ENCRYPTION_KEY}
       DUPLICATI__WEBSERVICE_PASSWORD: ${DUPLICATI_WEB_PASSWORD}
+      # Duplicati 2.x rejects requests whose Host header isn't allow-listed;
+      # the dashboard sets this to "*" when exposure is enabled (the web UI
+      # still has its own password / optional Authelia in front).
+      DUPLICATI__WEBSERVICE_ALLOWEDHOSTNAMES: ${DUPLICATI__WEBSERVICE_ALLOWEDHOSTNAMES:-*}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Duplicati"
