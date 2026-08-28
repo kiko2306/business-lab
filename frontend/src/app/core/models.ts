@@ -56,6 +56,14 @@ export interface AutheliaAdminUserUpdate {
   password?: string;
 }
 
+export interface StartupActionEvent {
+  serviceName: string;
+  // Whether `docker compose up` for this start attempt succeeded.
+  ok: boolean;
+  // Success message, or the failure detail (compose output / error text).
+  message: string;
+}
+
 export interface ServiceSummary {
   total: number;
   running: number;

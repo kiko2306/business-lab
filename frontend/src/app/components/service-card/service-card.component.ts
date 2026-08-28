@@ -12,9 +12,15 @@ import {
   inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { finalize } from 'rxjs';
+import { Subscription, filter, finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
-import { AutheliaAdminUser, ServiceEnvStatus, ServiceExposureConfig, ServiceStatus } from '../../core/models';
+import {
+  AutheliaAdminUser,
+  ServiceEnvStatus,
+  ServiceExposureConfig,
+  ServiceStatus,
+  StartupActionEvent,
+} from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ToastService } from '../../core/toast.service';
@@ -68,6 +74,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   protected startupLogLines: string[] = [];
   protected startupPhase: StartupPhase = 'streaming';
   private startupLogSource?: EventSource;
+  private startupActionSub?: Subscription;
   private startupAutoCloseTimer?: ReturnType<typeof setTimeout>;
   private scrollLogsPending = false;
 
@@ -104,6 +111,13 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     this.startupLogsOpen = true;
     this.startupLogLines = [];
     this.startupPhase = 'streaming';
+
+    // Listen for this start attempt's `docker compose up` outcome so a
+    // command-level failure (port clash, bad env, missing image) shows in
+    // the popup even though the container never produced any logs.
+    this.startupActionSub = this.serviceState.startupEvents$
+      .pipe(filter((event) => event.serviceName === this.service.name))
+      .subscribe((event) => this.applyStartupActionResult(event));
 
     const url = await this.serviceState.createStartupLogUrl(this.service.name);
     if (!url) {
@@ -158,6 +172,27 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     };
   }
 
+  private applyStartupActionResult(event: StartupActionEvent): void {
+    if (!this.startupLogsOpen || this.startupPhase !== 'streaming') {
+      return;
+    }
+    if (event.ok) {
+      return; // container is coming up — let the log stream report the rest
+    }
+    for (const raw of event.message.split('\n')) {
+      const line = raw.replace(/\s+$/, '');
+      if (line) {
+        this.pushStartupLine(line);
+      }
+    }
+    this.pushStartupLine('— docker compose could not start this service —');
+    this.startupPhase = 'error';
+    this.startupLogSource?.close();
+    this.startupLogSource = undefined;
+    this.startupActionSub?.unsubscribe();
+    this.startupActionSub = undefined;
+  }
+
   private pushStartupLine(line: string): void {
     this.startupLogLines.push(line);
     if (this.startupLogLines.length > 600) {
@@ -174,6 +209,8 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private teardownStartupLogs(): void {
     this.startupLogSource?.close();
     this.startupLogSource = undefined;
+    this.startupActionSub?.unsubscribe();
+    this.startupActionSub = undefined;
     if (this.startupAutoCloseTimer) {
       clearTimeout(this.startupAutoCloseTimer);
       this.startupAutoCloseTimer = undefined;

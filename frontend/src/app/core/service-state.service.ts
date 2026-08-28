@@ -1,11 +1,31 @@
-import { HttpClient, HttpContext } from '@angular/common/http';
+import { HttpClient, HttpContext, HttpErrorResponse } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { BehaviorSubject, EMPTY, Subscription, catchError, finalize, firstValueFrom, retry, switchMap, tap, timer } from 'rxjs';
+import { BehaviorSubject, EMPTY, Subject, Subscription, catchError, finalize, firstValueFrom, retry, switchMap, tap, timer } from 'rxjs';
 import { API_BASE_URL, extractErrorMessage } from './api';
 import { SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
-import { ConnectionStatus, ServiceActionResponse, ServiceStatus, ServiceStatusResponse, ServiceSummary } from './models';
+import { ConnectionStatus, ServiceActionResponse, ServiceStatus, ServiceStatusResponse, ServiceSummary, StartupActionEvent } from './models';
 import { ToastService } from './toast.service';
 import { AuthService } from './auth.service';
+
+/**
+ * Pull the most detailed text out of a failed start response — the backend
+ * puts the raw `docker compose up` output in `message`/`details`, which is
+ * what actually explains a failure (port clash, missing image, bad env).
+ */
+function extractStartFailureDetail(error: unknown): string | null {
+  if (error instanceof HttpErrorResponse && error.error && typeof error.error === 'object') {
+    const body = error.error as { message?: unknown; details?: unknown };
+    const candidates = [body.details, body.message].filter(
+      (part): part is string => typeof part === 'string' && part.trim().length > 0
+    );
+    if (candidates.length) {
+      // `details` usually repeats `message`'s text plus the compose progress
+      // lines, so the longer of the two is the fuller picture.
+      return candidates.sort((a, b) => b.length - a.length)[0].trim();
+    }
+  }
+  return null;
+}
 
 @Injectable({
   providedIn: 'root'
@@ -27,6 +47,10 @@ export class ServiceStateService {
   private readonly refreshingSubject = new BehaviorSubject(false);
   private readonly operatingSubject = new BehaviorSubject<Record<string, 'start' | 'stop' | null>>({});
   private readonly connectionStatusSubject = new BehaviorSubject<ConnectionStatus>('connecting');
+  // Fires once per start attempt with the `docker compose up` outcome, so the
+  // startup-log popup can show the command's own error (e.g. a port clash)
+  // and not just the container logs.
+  private readonly startupEventsSubject = new Subject<StartupActionEvent>();
 
   private pollingSubscription?: Subscription;
   private reconnectTimer?: ReturnType<typeof setTimeout>;
@@ -41,6 +65,7 @@ export class ServiceStateService {
   readonly refreshing$ = this.refreshingSubject.asObservable();
   readonly operating$ = this.operatingSubject.asObservable();
   readonly connectionStatus$ = this.connectionStatusSubject.asObservable();
+  readonly startupEvents$ = this.startupEventsSubject.asObservable();
 
   startPolling(): void {
     this.stopped = false;
@@ -261,6 +286,9 @@ export class ServiceStateService {
         retry({ count: 1, delay: 500 }),
         tap((response) => {
           this.toast.success(response.message);
+          if (action === 'start') {
+            this.startupEventsSubject.next({ serviceName, ok: true, message: response.message });
+          }
           if (response.exposure?.attempted && !response.exposure.success && response.exposure.warning) {
             this.toast.error(response.exposure.warning);
           }
@@ -273,7 +301,15 @@ export class ServiceStateService {
           });
         }),
         catchError((error) => {
-          this.toast.error(extractErrorMessage(error, `Unable to ${action} ${serviceName}.`));
+          const message = extractErrorMessage(error, `Unable to ${action} ${serviceName}.`);
+          this.toast.error(message);
+          if (action === 'start') {
+            this.startupEventsSubject.next({
+              serviceName,
+              ok: false,
+              message: extractStartFailureDetail(error) ?? message,
+            });
+          }
           return EMPTY;
         })
       )

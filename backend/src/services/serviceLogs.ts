@@ -14,16 +14,27 @@ import { getServiceStatus } from './status';
 import { resolveStreamTicketUser } from './realtime';
 import logger from '../utils/logger';
 
-// Portainer et al. colorize their output; strip it so the popup shows clean
-// text (same approach as services/setupToken.ts).
+// Strip ANSI CSI escapes (colors, but also cursor moves / erase-line that
+// `docker compose` itself emits around "container exited" notices) so the
+// popup shows clean text — same idea as services/setupToken.ts.
 // eslint-disable-next-line no-control-regex
-const ANSI_PATTERN = /\x1b\[[0-9;]*m/g;
+const ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
 const POLL_INTERVAL_MS = 2000;
 const MAX_STREAM_MS = 180_000;
-// `docker compose up -d` returns quickly, so if nothing is up after this
-// long the start almost certainly errored out before any container ran.
+// `docker compose up -d` returns quickly, so if the container is still
+// missing/stopped this long after, the start almost certainly errored out
+// before anything ran.
 const STOPPED_GRACE_MS = 12_000;
+// A container that's been created/health-starting but never reached
+// "running" for this long is treated as a failed start (crash loop, stuck
+// entrypoint, failing health check).
+const STARTING_GRACE_MS = 90_000;
+// Once a terminal state (running+healthy / failed) is detected, keep the log
+// stream open this much longer so the container's boot output actually
+// reaches the popup — a fast, healthy start would otherwise be cut off
+// before `docker compose logs` has flushed a single line.
+const DRAIN_MS = 4000;
 
 interface DoneInfo {
   state: string;
@@ -79,12 +90,16 @@ function streamStartupLogs(serviceName: string, res: Response): void {
   const composeFile = resolved.composeFile;
 
   let finished = false;
-  let child: ChildProcessWithoutNullStreams | undefined;
+  let draining = false;
+  let sawOutput = false;
   let spawnAttempts = 0;
+  let child: ChildProcessWithoutNullStreams | undefined;
   let sawRunning = false;
   const startedAt = Date.now();
   let poll: ReturnType<typeof setInterval> | undefined;
   let hardStop: ReturnType<typeof setTimeout> | undefined;
+  let drainTimer: ReturnType<typeof setTimeout> | undefined;
+  let respawnTimer: ReturnType<typeof setTimeout> | undefined;
 
   const cleanup = () => {
     if (poll) {
@@ -94,6 +109,14 @@ function streamStartupLogs(serviceName: string, res: Response): void {
     if (hardStop) {
       clearTimeout(hardStop);
       hardStop = undefined;
+    }
+    if (drainTimer) {
+      clearTimeout(drainTimer);
+      drainTimer = undefined;
+    }
+    if (respawnTimer) {
+      clearTimeout(respawnTimer);
+      respawnTimer = undefined;
     }
     if (child && !child.killed) {
       child.kill('SIGTERM');
@@ -106,26 +129,55 @@ function streamStartupLogs(serviceName: string, res: Response): void {
       return;
     }
     finished = true;
+    if (!sawOutput) {
+      send('log', {
+        line:
+          info.state === 'running'
+            ? '— no log output was captured —'
+            : '— no log output was captured; the container may not have started —',
+      });
+    }
     send('done', info);
     cleanup();
     res.end();
   };
 
+  // Stop polling for state but keep the log child streaming for a moment so
+  // the boot output lands in the popup before it closes.
+  const finishAfterDrain = (info: DoneInfo) => {
+    if (finished || draining) {
+      return;
+    }
+    draining = true;
+    if (poll) {
+      clearInterval(poll);
+      poll = undefined;
+    }
+    if (info.state === 'running' && info.healthy) {
+      send('log', { line: `— ${serviceName} is running and healthy —` });
+    }
+    drainTimer = setTimeout(() => finish(info), DRAIN_MS);
+  };
+
   const emitLines = (chunk: Buffer) => {
-    const text = chunk.toString('utf8').replace(ANSI_PATTERN, '');
-    for (const raw of text.split(/\r?\n/)) {
+    const text = chunk.toString('utf8').replace(ANSI_PATTERN, '').replace(/\r/g, '');
+    for (const raw of text.split('\n')) {
       const line = raw.replace(/\s+$/, '');
       if (line) {
+        sawOutput = true;
         send('log', { line });
       }
     }
   };
 
   const spawnLogs = () => {
+    if (finished || spawnAttempts >= 60) {
+      return;
+    }
     spawnAttempts += 1;
     child = spawn(
       'docker',
-      ['compose', '-p', projectName, '-f', composeFile, 'logs', '--follow', '--no-color', '--tail', '120'],
+      ['compose', '-p', projectName, '-f', composeFile, 'logs', '--follow', '--no-color', '--tail', '200'],
       { env: process.env }
     );
     child.stdout.on('data', emitLines);
@@ -134,18 +186,15 @@ function streamStartupLogs(serviceName: string, res: Response): void {
       send('log', { line: `Could not read container logs: ${err.message}` });
     });
     child.on('exit', () => {
+      child = undefined;
       if (finished) {
         return;
       }
-      // `logs --follow` exits right away when the project has no containers
-      // yet — retry a few times while `compose up` is still creating them.
-      if (spawnAttempts < 4 && Date.now() - startedAt < 15_000) {
-        setTimeout(() => {
-          if (!finished) {
-            spawnLogs();
-          }
-        }, 1500);
-      }
+      // `logs --follow` exits immediately while the project still has no
+      // containers (compose is mid `up`); once it attaches it stays alive.
+      // Keep retrying until we're done — cheap, and the only way slow /
+      // image-pulling starts ever get their logs shown.
+      respawnTimer = setTimeout(() => spawnLogs(), 1500);
     });
   };
 
@@ -163,22 +212,38 @@ function streamStartupLogs(serviceName: string, res: Response): void {
       return; // transient docker error — retry next tick
     }
 
+    const elapsed = Date.now() - startedAt;
+
     if (state === 'running') {
       sawRunning = true;
       if (healthy) {
-        finish({ state: 'running', healthy: true });
+        finishAfterDrain({ state: 'running', healthy: true });
+      }
+      return; // running but health check not passing yet — keep waiting
+    }
+
+    if (state === 'error') {
+      finishAfterDrain({ state: 'error', healthy: false });
+      return;
+    }
+
+    if (sawRunning) {
+      // came up, then fell back to stopped/starting → it crashed
+      finishAfterDrain({ state, healthy: false });
+      return;
+    }
+
+    if (state === 'starting') {
+      // created / health-starting: give it a long runway before giving up
+      if (elapsed > STARTING_GRACE_MS) {
+        finishAfterDrain({ state: 'starting', healthy: false });
       }
       return;
     }
 
-    if (state === 'error') {
-      finish({ state: 'error', healthy: false });
-      return;
-    }
-
-    // stopped / unknown
-    if (sawRunning || Date.now() - startedAt > STOPPED_GRACE_MS) {
-      finish({ state, healthy: false });
+    // stopped / unknown and never came up
+    if (elapsed > STOPPED_GRACE_MS) {
+      finishAfterDrain({ state, healthy: false });
     }
   }, POLL_INTERVAL_MS);
 
