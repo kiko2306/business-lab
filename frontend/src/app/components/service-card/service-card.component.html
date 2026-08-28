@@ -123,25 +123,8 @@
               <span *ngIf="field.required" class="text-danger">*</span>
             </label>
 
-            <!-- Exposure-managed (read-only) — e.g. Vaultwarden's DOMAIN,
-                 n8n's N8N_HOST, ntfy's NTFY_BASE_URL -->
-            <ng-container *ngIf="field.managed">
-              <input
-                type="text"
-                class="form-control form-control-sm"
-                [id]="'env-' + service.name + '-' + field.key"
-                [value]="managedFieldValue(field)"
-                readonly
-              />
-              <div class="form-text small">
-                {{ field.managedValue
-                  ? 'Set automatically from this service\'s exposure settings.'
-                  : 'Set automatically — follows this service\'s public URL once exposure is enabled.' }}
-              </div>
-            </ng-container>
-
-            <!-- Boolean toggle — e.g. Vaultwarden's SIGNUPS_ALLOWED -->
-            <div *ngIf="!field.managed && field.boolean" class="d-flex gap-3 pt-1">
+            <!-- Boolean toggle (editable) — e.g. Vaultwarden's SIGNUPS_ALLOWED -->
+            <div *ngIf="field.boolean && !field.managed" class="d-flex gap-3 pt-1">
               <div class="form-check">
                 <input
                   class="form-check-input"
@@ -164,6 +147,38 @@
                 />
                 <label class="form-check-label small" [for]="'env-' + service.name + '-' + field.key + '-false'">false</label>
               </div>
+            </div>
+
+            <!-- Boolean toggle pinned by exposure (e.g. ntfy NTFY_BEHIND_PROXY) —
+                 same radios, disabled, showing the enforced value. -->
+            <div *ngIf="field.boolean && field.managed" class="d-flex gap-3 pt-1">
+              <div class="form-check">
+                <input class="form-check-input" type="radio" disabled
+                  [checked]="managedFieldValue(field) === 'true'" />
+                <label class="form-check-label small">true</label>
+              </div>
+              <div class="form-check">
+                <input class="form-check-input" type="radio" disabled
+                  [checked]="managedFieldValue(field) !== 'true'" />
+                <label class="form-check-label small">false</label>
+              </div>
+            </div>
+
+            <!-- Exposure-managed non-boolean (read-only) — Vaultwarden DOMAIN,
+                 n8n N8N_HOST, ntfy NTFY_BASE_URL, … -->
+            <input
+              *ngIf="field.managed && !field.boolean"
+              type="text"
+              class="form-control form-control-sm"
+              [id]="'env-' + service.name + '-' + field.key"
+              [value]="managedFieldValue(field)"
+              readonly
+            />
+
+            <div *ngIf="field.managed" class="form-text small">
+              {{ field.managedValue
+                ? 'Set automatically from this service\'s exposure settings.'
+                : 'Set automatically — follows this service\'s public URL once exposure is enabled.' }}
             </div>
 
             <input
