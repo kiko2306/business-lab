@@ -1,16 +1,15 @@
 
 services:
   watchtower:
-    image: containrrr/watchtower:latest
+    # Community-maintained fork — the original containrrr/watchtower has been
+    # unmaintained since 2023 and its pinned Docker API (1.25) is rejected by
+    # modern engines. This fork keeps a current Docker client and stays
+    # backward compatible with the WATCHTOWER_* env vars and the
+    # com.centurylinklabs.watchtower.* labels used across this repo.
+    image: ghcr.io/nicholas-fedor/watchtower:latest
     restart: unless-stopped
     environment:
       TZ: ${TZ:-UTC}
-      # containrrr/watchtower is unmaintained and ships a Docker client pinned
-      # to API 1.25; modern engines (Docker 25+) reject anything below ~1.40
-      # with "client version 1.25 is too old", so pin a supported version.
-      # Raise it if a future engine bump complains again, or switch the image
-      # to a maintained fork (ghcr.io/nickfedor/watchtower).
-      DOCKER_API_VERSION: ${WATCHTOWER_DOCKER_API_VERSION:-1.44}
       # Checks for new images on this interval (seconds). Default: daily.
       WATCHTOWER_POLL_INTERVAL: ${WATCHTOWER_POLL_INTERVAL:-86400}
       # Pulls the new image, recreates the container with it, then removes

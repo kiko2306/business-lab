@@ -2086,3 +2086,13 @@ containers cleanly with it). Recreated → `RestartCount 0`, "Watchtower 1.7.1
 … Scheduling first run", no errors. Comment + `.env.example` note that a
 future engine bump may need a higher value, or a switch to a maintained fork
 (`ghcr.io/nickfedor/watchtower`).
+
+**Switched to the maintained fork the same day**: image is now
+`ghcr.io/nicholas-fedor/watchtower:latest` (Watchtower **1.21.2**), which
+negotiates the current Docker API on its own — the `DOCKER_API_VERSION` pin
+and its `.env.example` var were removed. Verified with `--run-once --debug`
+that it still honours the legacy `com.centurylinklabs.watchtower.enable`
+label: `homelab-management-{backend,frontend,database}` and
+`docker-socket-proxy` come back `value=false` (excluded), everything else
+watched. Container `Up (healthy)`, `RestartCount 0`. Old
+`containrrr/watchtower` image removed.
