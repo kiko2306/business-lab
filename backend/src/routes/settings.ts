@@ -10,7 +10,9 @@ import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
 const router = Router();
 
 const CLOUDFLARE_TOKEN_KEY = 'cloudflare_tunnel_token';
-const PERMISSION_EXPLANATION = 'Required permissions: Account → Cloudflare Tunnel → Edit, Zone → DNS → Edit.';
+const PERMISSION_EXPLANATION =
+  'Required permissions: Account → Cloudflare Tunnel → Edit, Zone → DNS → Edit. ' +
+  'To also run CrowdSec, add Account → Account Filter Lists → Edit and Zone → Firewall Services → Edit.';
 
 function maskToken(token: string | null): string | null {
   if (!token) {

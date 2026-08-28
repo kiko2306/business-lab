@@ -1,6 +1,9 @@
-# Copy to cloudflare-bouncer.yaml (same directory, gitignored) and fill in the
-# five <PLACEHOLDER> values, then start the app. This file is NOT processed for
-# ${ENV} substitution — paste literal values.
+# SCHEMA REFERENCE ONLY — you do not need to touch this.
+#
+# On every CrowdSec start the dashboard backend (services/crowdsecConfig.ts)
+# renders the real cloudflare-bouncer.yaml (gitignored) next to this file from
+# the stored Cloudflare account/zone/token and CROWDSEC_BOUNCER_KEY. This copy
+# just documents the shape and the token scope it needs.
 #
 # The bouncer pulls ban decisions from the local CrowdSec API and mirrors them
 # into a Cloudflare "IP List" that a zone firewall rule blocks — so scanners

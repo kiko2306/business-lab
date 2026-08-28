@@ -38,8 +38,10 @@ services:
     environment:
       TZ: ${TZ:-UTC}
     volumes:
-      # Holds the Cloudflare token + account/zone IDs and the LAPI bouncer
-      # key — gitignored, copied from cloudflare-bouncer.yaml.example.
+      # Rendered by the dashboard backend (services/crowdsecConfig.ts) from the
+      # stored Cloudflare settings + CROWDSEC_BOUNCER_KEY on each start, so it
+      # holds a token — gitignored. cloudflare-bouncer.yaml.example documents
+      # the schema.
       - ./config/cloudflare-bouncer.yaml:/etc/crowdsec/bouncers/crowdsec-cloudflare-bouncer.yaml:ro
     networks:
       - crowdsec-net

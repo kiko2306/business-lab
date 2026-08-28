@@ -12,6 +12,7 @@ import { writeAuditLog } from '../utils/audit';
 import { provisionServiceIfEnabled } from './exposure';
 import { buildExposureEnvOverrides } from './exposureEnv';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
+import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getServiceStatus } from './status';
@@ -159,6 +160,7 @@ export async function startService(serviceName: string, userId: number): Promise
     // file for the few that need it (Home Assistant).
     const envOverrides = await buildExposureEnvOverrides(serviceName, appDir);
     await applyExposureConfigFiles(serviceName, appDir);
+    await applyCrowdsecConfigFiles(serviceName, appDir);
     const command = `docker compose -p ${projectName} -f ${composeFile} up -d`;
     const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, envOverrides);
 
