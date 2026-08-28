@@ -473,6 +473,26 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       staticOnExposure: { NTFY_BEHIND_PROXY: 'true' },
     },
   },
+  'waha': {
+    name: 'waha',
+    label: 'WAHA',
+    description: 'WhatsApp HTTP API — REST, webhooks, and a dashboard',
+    icon: 'chat',
+    category: 'Productivity',
+    composePath: 'apps/waha/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:3009/health',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // WAHA_BASE_URL feeds webhook payloads, Swagger's server URL and the
+    // QR/screenshot links — it has to follow the public hostname once exposed.
+    exposureEnvKeys: {
+      url: ['WAHA_BASE_URL'],
+    },
+  },
   'stirling-pdf': {
     name: 'stirling-pdf',
     label: 'Stirling-PDF',

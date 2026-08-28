@@ -1439,16 +1439,20 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
 `service-card.component.ts`.
 
 ### 22.1 WAHA — WhatsApp HTTP API  (requested)
-- [ ] **WAHA** — `devlikeapro/waha`. Self-hosted WhatsApp gateway: REST API +
-      webhooks + a small web dashboard, session data under `./sessions`.
-      The obvious pairing with **n8n** — order/booking confirmations,
-      delivery alerts, on-call notifications, simple chatbots — and a
-      notification target for `uptime-kuma`. **Category:** Productivity (or a
-      new "Communication"). **Auth:** set `WHATSAPP_API_KEY` +
-      `WAHA_DASHBOARD_USERNAME`/`WAHA_DASHBOARD_PASSWORD` (none by default).
-      **Exposure:** `exposureEnvKeys.url: ['WAHA_BASE_URL']` (used in webhook
-      payloads and the dashboard); healthcheck `GET /health`.
-      **Priority: P1** — **Estimate: M**
+- [x] **WAHA** — `devlikeapro/waha`. Added 2026-08-28 (§23.6):
+      `apps/waha/` (`docker-compose.yml` + `.env.example`), host port
+      `${WAHA_PORT:-3009}` → `:3000`, session/media under `./data/{sessions,
+      media}` (repo `.gitignore` covers `apps/*/data/`), `node -e` HTTP probe
+      of `/health` as the container healthcheck (`start_period: 60s` — WEBJS
+      spins up headless Chromium). **Category:** Productivity (kept — no new
+      enum). **Icon:** new `chat` → 💬. **Auth env:** `WAHA_API_KEY`
+      (`X-Api-Key`), `WAHA_DASHBOARD_USERNAME/PASSWORD`,
+      `WAHA_SWAGGER_USERNAME/PASSWORD`. **Exposure:**
+      `exposureEnvKeys.url: ['WAHA_BASE_URL']`. Pairs with **n8n** —
+      order/booking confirmations, delivery alerts, chatbots — and is a
+      notification target for `uptime-kuma`.
+      - If `/health` turns out to sit behind the API-key guard on the running
+        image, switch both healthchecks to `/ping` (always unauthenticated).
 
 ### 22.2 Communication & notifications
 - [x] **ntfy** — `binwiederhier/ntfy`. Added 2026-08-28 (§23.4):
@@ -1625,8 +1629,8 @@ parallel whenever the user unblocks it.
    uptime-kuma, watchtower, and the backup scheduler.
 4. ~~**Stirling-PDF** (§22.5, S)~~ **DONE 2026-08-28** (§23.5) — registry +
    compose in; not yet started against Docker.
-5. **WAHA** (§22.1, M) — explicitly requested; build it once the exposure
-   pattern is proven and ntfy has exercised the "notification target" shape.
+5. ~~**WAHA** (§22.1, M)~~ **DONE 2026-08-28** (§23.6) — registry + compose
+   in; not yet started against Docker (needs `WAHA_API_KEY` etc. set first).
 6. **NocoDB** (§22.4, M) — Airtable-style data backbone for n8n.
 
 **Track C — security hardening (higher value, larger, wants a stable base)**
@@ -1759,3 +1763,28 @@ Registry + files only — not yet `compose up`'d.
 - **Exposure** — none. Stirling-PDF does no Host-header / origin validation,
   so there's nothing to keep in sync; the `.env.example` steers users to
   Authelia-gate it on exposure rather than enabling the app's own login.
+
+### 23.6 Session Log — 2026-08-28 (cont.): WAHA added (§22.1, Track B #5)
+
+The explicitly-requested one. Backend `tsc` clean, backend vitest 109/109,
+frontend `ng build` clean, all three new compose files parse as YAML.
+Registry + files only — not `compose up`'d, and it won't start usefully
+until `WAHA_API_KEY` / dashboard creds are set in `apps/waha/.env`.
+
+- **`apps/waha/`** — `docker-compose.yml` (`devlikeapro/waha:latest`,
+  `${WAHA_PORT:-3009}:3000` — 3000 is homepage's, 3001 uptime-kuma's;
+  `WHATSAPP_DEFAULT_ENGINE=WEBJS`, `WAHA_PRINT_QR=false`, bind mounts
+  `./data/sessions` → `/app/.sessions` and `./data/media` → `/app/.media`)
+  and `.env.example` (port, engine, `WAHA_API_KEY`, dashboard +
+  swagger basic-auth pairs, `WAHA_BASE_URL`, `TZ`).
+- **Healthcheck** — `node -e "require('http').get('…/health', …)"` rather
+  than curl/wget (WAHA is a Node image; curl presence isn't guaranteed).
+  Same `/health` in the registry `healthCheck`. Fallback if it's
+  auth-gated on the live image: `/ping`.
+- **Registry** — `SERVICES.waha`, category Productivity (next to n8n, its
+  stated pairing — no new `ServiceCategory` enum), new `chat` icon → 💬.
+  `exposureEnvKeys.url: ['WAHA_BASE_URL']`; single published port so no
+  `exposurePortEnvVar`.
+- Data lives under `./data/` (not WAHA's default `./.sessions`) so the
+  existing `apps/*/data/` `.gitignore` rule keeps session/media state out
+  of git.

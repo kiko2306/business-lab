@@ -1,0 +1,41 @@
+
+services:
+  waha:
+    image: devlikeapro/waha:latest
+    restart: unless-stopped
+    ports:
+      - "${WAHA_PORT:-3009}:3000"
+    environment:
+      TZ: ${TZ:-UTC}
+      WHATSAPP_DEFAULT_ENGINE: ${WAHA_ENGINE:-WEBJS}
+      # Protects the REST API (/api/*, Swagger). Plain value or `sha512:<hex>`.
+      # No default — without it this is an unauthenticated WhatsApp gateway.
+      WHATSAPP_API_KEY: ${WAHA_API_KEY}
+      # HTTP basic auth for the bundled dashboard (/dashboard).
+      WAHA_DASHBOARD_USERNAME: ${WAHA_DASHBOARD_USERNAME:-admin}
+      WAHA_DASHBOARD_PASSWORD: ${WAHA_DASHBOARD_PASSWORD}
+      # HTTP basic auth for the Swagger UI (separate from the dashboard).
+      WHATSAPP_SWAGGER_USERNAME: ${WAHA_SWAGGER_USERNAME:-admin}
+      WHATSAPP_SWAGGER_PASSWORD: ${WAHA_SWAGGER_PASSWORD}
+      # Goes into webhook payloads and Swagger's server URL, and builds
+      # QR / screenshot links — the dashboard rewrites it to the public
+      # https:// hostname once exposure is enabled.
+      WAHA_BASE_URL: ${WAHA_BASE_URL:-http://localhost:3009}
+      WAHA_PRINT_QR: ${WAHA_PRINT_QR:-false}
+    labels:
+      - "homepage.group=Communication"
+      - "homepage.name=WAHA"
+      - "homepage.icon=whatsapp.png"
+      - "homepage.href=http://localhost:${WAHA_PORT:-3009}/dashboard"
+      - "homepage.description=WhatsApp HTTP API gateway"
+    volumes:
+      - ./data/sessions:/app/.sessions
+      - ./data/media:/app/.media
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "node -e \"require('http').get('http://localhost:3000/health',r=>process.exit(r.statusCode<400?0:1)).on('error',()=>process.exit(1))\""
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
