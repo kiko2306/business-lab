@@ -162,6 +162,13 @@ export interface ServiceEnvField {
   // A freshly generated secret to pre-fill an unset auto-generated field
   // with — the user just has to save it.
   suggestedValue: string | null;
+  // True for `*_PORT` keys — a host port validated against what's already
+  // published by other services.
+  isPort: boolean;
+  // Port fields only: whether the effective value collides with a port
+  // another service already publishes, and the next free port to offer.
+  portInUse: boolean;
+  suggestedPort: number | null;
 }
 
 export interface ServiceEnvStatus {

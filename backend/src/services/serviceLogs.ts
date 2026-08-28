@@ -222,26 +222,25 @@ function streamStartupLogs(serviceName: string, res: Response): void {
       return; // running but health check not passing yet — keep waiting
     }
 
-    if (state === 'error') {
-      finishAfterDrain({ state: 'error', healthy: false });
-      return;
-    }
-
     if (sawRunning) {
-      // came up, then fell back to stopped/starting → it crashed
+      // came up, then left 'running' → it crashed / is restarting
       finishAfterDrain({ state, healthy: false });
       return;
     }
 
     if (state === 'starting') {
-      // created / health-starting: give it a long runway before giving up
+      // multi-container app still bringing its peers up: long runway before
+      // giving up
       if (elapsed > STARTING_GRACE_MS) {
         finishAfterDrain({ state: 'starting', healthy: false });
       }
       return;
     }
 
-    // stopped / unknown and never came up
+    // 'error' (crash loop, or a container that was created but never started),
+    // 'stopped' or 'unknown', and it never came up. Right after the click this
+    // can just be a start still in flight, so hold for the short grace while
+    // the logs stream; past that it's a failed start.
     if (elapsed > STOPPED_GRACE_MS) {
       finishAfterDrain({ state, healthy: false });
     }

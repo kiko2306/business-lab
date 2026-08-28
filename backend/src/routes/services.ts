@@ -271,8 +271,8 @@ router.get(
   auth,
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
-  (req: Request, res: Response) => {
-    const envStatus = getServiceEnvStatus(req.params.name);
+  async (req: Request, res: Response) => {
+    const envStatus = await getServiceEnvStatus(req.params.name);
     if (!envStatus) {
       return res.status(404).json({ error: `Service ${req.params.name} is not installed.` });
     }
@@ -294,7 +294,7 @@ router.put(
   validateBody(schemas.serviceEnvUpdate),
   async (req: Request, res: Response) => {
     try {
-      const { status: envStatus, changedKeys } = saveServiceEnv(req.params.name, req.body.values);
+      const { status: envStatus, changedKeys } = await saveServiceEnv(req.params.name, req.body.values);
       await writeAuditLog({
         userId: req.user!.id,
         action: 'SERVICE_ENV_UPDATE',

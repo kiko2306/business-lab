@@ -94,7 +94,10 @@
             </label>
             <input
               *ngIf="!field.secret"
+              type="text"
+              [attr.inputmode]="field.isPort ? 'numeric' : null"
               class="form-control form-control-sm"
+              [class.is-invalid]="portConflict(field)"
               [id]="'env-' + service.name + '-' + field.key"
               [(ngModel)]="envValues[field.key]"
               [placeholder]="field.defaultValue ?? ''"
@@ -111,9 +114,25 @@
             <div *ngIf="field.secret && field.suggestedValue" class="form-text small">
               Auto-generated — click Save configuration to apply.
             </div>
+            <div *ngIf="portConflict(field)" class="form-text small text-danger d-flex align-items-center gap-2 mt-1">
+              <span>Port in use by another service.</span>
+              <button
+                *ngIf="field.suggestedPort != null"
+                type="button"
+                class="btn btn-outline-secondary btn-sm py-0"
+                (click)="useSuggestedPort(field)"
+              >
+                Use {{ field.suggestedPort }}
+              </button>
+            </div>
           </div>
 
-          <button type="button" class="btn btn-outline-primary btn-sm mt-1" [disabled]="envSaving || !env.fields.length" (click)="saveEnv()">
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm mt-1"
+            [disabled]="envSaving || !env.fields.length || hasPortConflict()"
+            (click)="saveEnv()"
+          >
             <span *ngIf="envSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
             Save configuration
           </button>

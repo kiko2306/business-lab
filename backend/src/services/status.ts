@@ -28,6 +28,44 @@ async function getExposedHostname(serviceName: string): Promise<string | null> {
 }
 
 /**
+ * Collapse a compose project's per-container `docker ps` states into a single
+ * service state. Order matters here:
+ *  - any container stuck `restarting` → the project is crash-looping (`error`),
+ *    not "still starting" — a restart loop never resolves on its own.
+ *  - all `running` → `running`.
+ *  - some `running`, some still `created` → genuinely mid-boot (`starting`),
+ *    e.g. a dependency container hasn't been started yet.
+ *  - some `running`, the rest exited → treat as up: one-shot init/migration
+ *    containers that ran and exited are normal (e.g. beszel's init step).
+ *  - nothing `running` but something `created` → `compose up` created the
+ *    container(s) but they never started — a host-port clash or a bad mount —
+ *    which is a failure (`error`), not a transient state.
+ *  - nothing `running` or `created` → everything exited → `stopped`.
+ */
+function aggregateContainerState(states: string[]): ServiceState {
+  if (!states.length) {
+    return 'unknown';
+  }
+
+  const has = (state: string) => states.includes(state);
+  const running = states.filter((state) => state === 'running').length;
+
+  if (has('restarting')) {
+    return 'error';
+  }
+  if (running === states.length) {
+    return 'running';
+  }
+  if (running > 0) {
+    return has('created') ? 'starting' : 'running';
+  }
+  if (has('created')) {
+    return 'error';
+  }
+  return 'stopped';
+}
+
+/**
  * Get the aggregated state of a compose project's containers.
  * Matching is done on the compose project label rather than container names,
  * because compose prefixes/suffixes the names it generates.
@@ -47,16 +85,7 @@ function getContainerStatus(projectName: string | null): Promise<ServiceState> {
         .map((line) => line.trim().toLowerCase())
         .filter(Boolean);
 
-      if (!states.length) {
-        resolve('unknown');
-      } else if (states.every((state) => state === 'running')) {
-        resolve('running');
-      } else if (states.some((state) => ['running', 'restarting', 'created'].includes(state))) {
-        // Partially up, e.g. a dependency is still coming online.
-        resolve('starting');
-      } else {
-        resolve('stopped');
-      }
+      resolve(aggregateContainerState(states));
     });
   });
 }
@@ -241,4 +270,4 @@ export async function getAllServiceStatus(): Promise<ServiceStatusResponse> {
   };
 }
 
-export { getContainerStatus, getContainerPorts, checkHealthHttp };
+export { aggregateContainerState, getContainerStatus, getContainerPorts, checkHealthHttp };

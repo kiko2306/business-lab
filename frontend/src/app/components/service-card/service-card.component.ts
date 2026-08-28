@@ -16,6 +16,7 @@ import { Subscription, filter, finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import {
   AutheliaAdminUser,
+  ServiceEnvField,
   ServiceEnvStatus,
   ServiceExposureConfig,
   ServiceStatus,
@@ -373,7 +374,10 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
           this.envValues = {};
           for (const field of env.fields) {
             if (!field.secret) {
-              this.envValues[field.key] = field.value ?? '';
+              // Prefill port fields with the effective value (the compose
+              // default when .env doesn't pin one) so a default that clashes
+              // with another service surfaces its conflict right away.
+              this.envValues[field.key] = field.value ?? (field.isPort ? field.defaultValue : null) ?? '';
             } else if (field.suggestedValue) {
               this.envValues[field.key] = field.suggestedValue;
             }
@@ -385,6 +389,29 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   missingRequiredCount(): number {
     return this.env?.fields.filter((field) => field.required && !field.isSet).length ?? 0;
+  }
+
+  /**
+   * A port field still shows a conflict while its value is unchanged from the
+   * one the backend flagged as in use — once the user edits it (or takes the
+   * suggested free port) the warning clears; the backend re-checks on save.
+   */
+  protected portConflict(field: ServiceEnvField): boolean {
+    if (!field.portInUse) {
+      return false;
+    }
+    const flaggedValue = field.value ?? field.defaultValue ?? '';
+    return (this.envValues[field.key] ?? '') === flaggedValue;
+  }
+
+  protected hasPortConflict(): boolean {
+    return this.env?.fields.some((field) => this.portConflict(field)) ?? false;
+  }
+
+  protected useSuggestedPort(field: ServiceEnvField): void {
+    if (field.suggestedPort != null) {
+      this.envValues[field.key] = String(field.suggestedPort);
+    }
   }
 
   saveEnv(): void {
