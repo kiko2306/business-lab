@@ -175,6 +175,17 @@ textarea { resize: vertical; }
 .switch input:checked + .switch-slider::before { transform: translateX(18px); background: #fff; }
 .switch input:disabled + .switch-slider { opacity: .5; cursor: not-allowed; }
 
+.notify-troubleshoot {
+  margin-top: 10px; border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px;
+}
+.notify-troubleshoot summary {
+  cursor: pointer; font-size: 13px; color: var(--text-muted); user-select: none;
+}
+.notify-troubleshoot ol {
+  margin: 10px 0 4px; padding-left: 20px; font-size: 13px; color: var(--text-muted); line-height: 1.5;
+}
+.notify-troubleshoot li { margin-bottom: 6px; }
+
 .history-box { width: min(640px, 100%); }
 .history-chart-svg { background: var(--bg); border-radius: 8px; }
 .chart-legend { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }

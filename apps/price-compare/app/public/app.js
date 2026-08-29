@@ -506,11 +506,13 @@ document.getElementById('notify-enable').addEventListener('click', async () => {
 async function refreshNotifyToggleState() {
   const toggle = document.getElementById('notify-toggle');
   const blockedHint = document.getElementById('notify-blocked-hint');
+  const statusIcon = document.getElementById('notify-status-icon');
   blockedHint.classList.add('hidden');
 
   if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
     toggle.checked = false;
     toggle.disabled = true;
+    statusIcon.textContent = '🔕';
     blockedHint.textContent = 'O seu navegador não suporta notificações push.';
     blockedHint.classList.remove('hidden');
     return;
@@ -518,6 +520,7 @@ async function refreshNotifyToggleState() {
   if (Notification.permission === 'denied') {
     toggle.checked = false;
     toggle.disabled = true;
+    statusIcon.textContent = '🔕';
     blockedHint.textContent = 'Notificações bloqueadas nas definições do navegador — tem de as ativar aí primeiro.';
     blockedHint.classList.remove('hidden');
     return;
@@ -528,8 +531,10 @@ async function refreshNotifyToggleState() {
     const reg = await navigator.serviceWorker.ready;
     const sub = await reg.pushManager.getSubscription();
     toggle.checked = !!sub;
+    statusIcon.textContent = sub ? '🔔' : '🔕';
   } catch {
     toggle.checked = false;
+    statusIcon.textContent = '🔕';
   }
 }
 
@@ -568,6 +573,7 @@ document.getElementById('notify-toggle').addEventListener('change', async (e) =>
     showToast('Não foi possível atualizar as notificações: ' + err.message, true);
   } finally {
     e.target.disabled = false;
+    document.getElementById('notify-status-icon').textContent = e.target.checked ? '🔔' : '🔕';
   }
 });
 

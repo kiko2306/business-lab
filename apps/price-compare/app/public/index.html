@@ -110,7 +110,7 @@
       <h2>⚙️ Definições</h2>
       <div class="settings-row">
         <div>
-          <strong>Notificações de descida de preço</strong>
+          <strong><span id="notify-status-icon">🔕</span> Notificações de descida de preço</strong>
           <p class="hint" style="margin: 4px 0 0">Aviso quando um preço descer 10% ou mais.</p>
         </div>
         <label class="switch">
@@ -119,6 +119,15 @@
         </label>
       </div>
       <p id="notify-blocked-hint" class="price-error hidden"></p>
+      <details class="notify-troubleshoot">
+        <summary>Problemas ao ativar as notificações?</summary>
+        <ol>
+          <li>Toque no ícone de cadeado/informação junto ao endereço do site, no navegador, e reponha as permissões deste site.</li>
+          <li>No telemóvel, confirme que o navegador tem permissão para enviar notificações: Definições do sistema → Aplicações → (o seu navegador, ex. Chrome) → Notificações → ativar.</li>
+          <li>Feche e reabra a página, inicie sessão novamente e tente ativar de novo.</li>
+          <li>Se continuar a falhar, limpe os dados do navegador para este site: Definições do sistema → Aplicações → (o navegador) → Armazenamento → Limpar armazenamento — depois repita os passos acima.</li>
+        </ol>
+      </details>
       <div class="modal-actions">
         <button type="button" id="settings-close" class="btn">Fechar</button>
       </div>
