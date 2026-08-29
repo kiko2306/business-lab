@@ -1858,6 +1858,52 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       pack-only (milk sold only in 6-packs at one store, say). Revisit if
       that turns out to matter in practice.
 
+### 22.9f Price Compare follow-up (same day): price history + chart, Portuguese translation, PWA install
+- [x] **Price history per store per product** — every *successful* scrape
+      now appends `{price, scrapedAt}` to a `history` array on that store's
+      entry (`server.js` `buildStoreEntry`), carried forward from the
+      previous entry so it accumulates across refreshes instead of being
+      overwritten. A failed scrape doesn't add a point but leaves existing
+      history untouched. Old products from before this change just start
+      with `history: []` — no migration needed (`previous?.history ?? []`).
+- [x] **Inline SVG line chart, no charting library or CDN** — a new "📈
+      Histórico" button per product opens a modal
+      (`buildHistoryChart()` in `app.js`) plotting one polyline per store
+      (colour-coded: Continente red, Pingo Doce green, Lidl blue) against
+      price (y) and time (x), with gridlines, price labels, date range, and
+      a legend. Says "not enough history yet" below 2 total points instead
+      of drawing a broken/empty chart. **Verified live**: refreshed a real
+      product twice, opened its history, confirmed a correctly-plotted
+      3-store chart with the right colours/legend/axis values.
+      **Not done**: no history pruning/cap — fine for a personal,
+      infrequently-refreshed tool; revisit if `products.json` growth ever
+      becomes noticeable.
+- [x] **Full Portuguese translation** — all UI strings in `index.html` and
+      `app.js` (buttons, labels, toasts, empty states, the history modal),
+      plus the handful of user-facing error strings that actually reach
+      the page (`scrapers.js`: "price not found in page" →
+      "preço não encontrado na página", the two "no results"/"no scrapable
+      product" messages; `server.js`'s validation errors). Left in English,
+      deliberately: internal code comments, and the `scrapeUrl`/
+      `detectStore` error paths that are no longer reachable from the UI
+      after 22.9d removed URL-pasting (kept for API completeness only).
+- [x] **Installable as a PWA** — same pattern as `apps/kitchen-switcher`
+      (§22.9b): `manifest.webmanifest` (`lang: pt-PT`, name "Comparador de
+      Preços"), 192/512/512-maskable icons (same `imagemagick`-generated
+      approach, "€" glyph on the app's blue accent), a minimal no-op
+      service worker (deliberately no offline caching — this app is
+      nothing without its live API, so an offline shell with stale/no data
+      would be worse than no PWA at all), and the usual
+      `apple-mobile-web-app-*` meta tags. Since this app serves its own
+      static files via `express.static` (no nginx in front, unlike
+      kitchen-switcher), added an explicit
+      `app.get('/manifest.webmanifest', ...)` route setting
+      `application/manifest+json` rather than trusting Express's default
+      mime lookup. Already exposed at `price-compare.tx-home-utils.com`
+      (done in §22.9c) — install works from there. **Verified live**:
+      `curl` confirms `200` + correct content-type for the manifest,
+      service worker, and icons.
+
 ### 22.9 Optional / niche
 - [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
       streaming, if Jellyfin's music side isn't enough.

@@ -47,11 +47,26 @@ function saveProducts(products) {
 // first — never throws — a failed search/scrape keeps the previous known
 // price and URL (if any) and just records the error, so a transient site
 // hiccup or a temporarily-off-catalogue product doesn't wipe out the last
-// good price shown.
+// good price shown. Every *successful* scrape appends {price, scrapedAt} to
+// `history`, carried forward from the previous entry — this is what the
+// price-over-time chart is built from. A failed scrape doesn't add a point
+// (nothing new was actually observed) but doesn't touch existing history
+// either.
 async function buildStoreEntry(store, name, previous) {
+  const history = previous?.history ?? [];
   try {
     const { url, price, currency, name: scrapedName } = await searchAndScrapeStore(store, name);
-    return { url, store, price, currency, scrapedName: scrapedName || null, scrapedAt: new Date().toISOString(), error: null };
+    const scrapedAt = new Date().toISOString();
+    return {
+      url,
+      store,
+      price,
+      currency,
+      scrapedName: scrapedName || null,
+      scrapedAt,
+      error: null,
+      history: [...history, { price, scrapedAt }],
+    };
   } catch (err) {
     return {
       url: previous?.url ?? null,
@@ -61,6 +76,7 @@ async function buildStoreEntry(store, name, previous) {
       scrapedName: previous?.scrapedName ?? null,
       scrapedAt: previous?.scrapedAt ?? null,
       error: err.message,
+      history,
     };
   }
 }
@@ -74,6 +90,12 @@ async function searchAllStores(name, previousEntries = []) {
 
 const app = express();
 app.use(express.json());
+// express's static mime lookup doesn't always know .webmanifest — set it
+// explicitly rather than relying on that, same reasoning as the nginx
+// config in apps/kitchen-switcher.
+app.get('/manifest.webmanifest', (req, res) => {
+  res.type('application/manifest+json').sendFile(path.join(__dirname, 'public', 'manifest.webmanifest'));
+});
 app.use(express.static(path.join(__dirname, 'public')));
 
 app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
@@ -93,7 +115,7 @@ app.get('/api/products', (req, res) => {
 app.post('/api/products', async (req, res) => {
   const { name, category } = req.body || {};
   if (typeof name !== 'string' || !name.trim()) {
-    return res.status(400).json({ error: 'name is required' });
+    return res.status(400).json({ error: 'o nome é obrigatório' });
   }
   const trimmedName = name.trim();
 
@@ -120,14 +142,14 @@ app.post('/api/products', async (req, res) => {
 app.put('/api/products/:id', async (req, res) => {
   const products = loadProducts();
   const product = products.find((p) => p.id === req.params.id);
-  if (!product) return res.status(404).json({ error: 'product not found' });
+  if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
   const { name, category } = req.body || {};
   if (category !== undefined) {
     product.category = CATEGORIES.includes(category) ? category : DEFAULT_CATEGORY;
   }
   if (name !== undefined) {
-    if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'name cannot be empty' });
+    if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'o nome não pode estar vazio' });
     const trimmedName = name.trim();
     if (trimmedName !== product.name) {
       product.name = trimmedName;
@@ -143,7 +165,7 @@ app.put('/api/products/:id', async (req, res) => {
 app.delete('/api/products/:id', (req, res) => {
   const products = loadProducts();
   const next = products.filter((p) => p.id !== req.params.id);
-  if (next.length === products.length) return res.status(404).json({ error: 'product not found' });
+  if (next.length === products.length) return res.status(404).json({ error: 'produto não encontrado' });
   saveProducts(next);
   res.status(204).end();
 });
@@ -152,7 +174,7 @@ app.delete('/api/products/:id', (req, res) => {
 app.post('/api/products/:id/refresh', async (req, res) => {
   const products = loadProducts();
   const product = products.find((p) => p.id === req.params.id);
-  if (!product) return res.status(404).json({ error: 'product not found' });
+  if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
   product.urls = await searchAllStores(product.name, product.urls);
   product.updatedAt = new Date().toISOString();

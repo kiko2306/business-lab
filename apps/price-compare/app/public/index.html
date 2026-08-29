@@ -1,59 +1,77 @@
 <!doctype html>
-<html lang="en">
+<html lang="pt-PT">
 <head>
 <meta charset="utf-8" />
-<title>Price Compare</title>
+<title>Comparador de Preços</title>
 <meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#1c1f26" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Preços" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
 <link rel="stylesheet" href="style.css" />
 </head>
 <body>
   <header id="bar">
-    <h1>🛒 Price Compare</h1>
+    <h1>🛒 Comparador de Preços</h1>
     <div class="header-actions">
-      <button id="update-all-btn" class="btn">↻ Update prices</button>
-      <button id="add-product-btn" class="btn primary">+ Add product</button>
+      <button id="update-all-btn" class="btn">↻ Atualizar preços</button>
+      <button id="add-product-btn" class="btn primary">+ Adicionar produto</button>
     </div>
   </header>
 
   <main>
     <p class="hint">
-      Just type a product name — Continente, Pingo Doce, and Lidl are searched
-      and priced automatically.
+      Basta escrever o nome de um produto — a Continente, o Pingo Doce e o
+      Lidl são pesquisados e os preços obtidos automaticamente.
     </p>
     <div id="products"></div>
-    <p id="products-empty" class="empty hidden">No products yet — add your first one above.</p>
+    <p id="products-empty" class="empty hidden">Ainda não há produtos — adicione o primeiro acima.</p>
   </main>
 
   <div id="product-modal" class="modal">
     <div class="modal-box">
-      <h2 id="product-modal-title">Add product</h2>
+      <h2 id="product-modal-title">Adicionar produto</h2>
       <form id="product-form">
         <input type="hidden" id="product-id" />
-        <label>Product name</label>
-        <input id="product-name" type="text" required placeholder="e.g. Leite meio-gordo 1L" />
+        <label>Nome do produto</label>
+        <input id="product-name" type="text" required placeholder="ex. Leite meio-gordo 1L" />
 
         <label>Categoria</label>
         <select id="product-category"></select>
 
         <p class="hint" style="margin: 10px 0 0">
-          Continente, Pingo Doce, and Lidl are searched automatically using
-          this name — no need to find or paste a product link.
+          A Continente, o Pingo Doce e o Lidl são pesquisados automaticamente
+          com este nome — não é preciso procurar nem colar um link do produto.
         </p>
 
         <div class="modal-actions">
-          <button type="button" id="product-cancel" class="btn">Cancel</button>
-          <button type="submit" class="btn primary">Save</button>
+          <button type="button" id="product-cancel" class="btn">Cancelar</button>
+          <button type="submit" class="btn primary">Guardar</button>
         </div>
       </form>
     </div>
   </div>
 
+  <div id="history-modal" class="modal">
+    <div class="modal-box history-box">
+      <h2 id="history-title">Histórico de preços</h2>
+      <div id="history-chart"></div>
+      <div class="modal-actions">
+        <button type="button" id="history-close" class="btn">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="confirm-modal" class="modal">
     <div class="modal-box">
-      <h2 id="confirm-title">Are you sure?</h2>
+      <h2 id="confirm-title">Tem a certeza?</h2>
       <div class="modal-actions">
-        <button type="button" id="confirm-cancel" class="btn">Cancel</button>
-        <button type="button" id="confirm-ok" class="btn danger">Confirm</button>
+        <button type="button" id="confirm-cancel" class="btn">Cancelar</button>
+        <button type="button" id="confirm-ok" class="btn danger">Confirmar</button>
       </div>
     </div>
   </div>

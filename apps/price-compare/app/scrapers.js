@@ -116,14 +116,14 @@ function extractJsonLdPrice(html) {
 async function scrapeContinente(url) {
   const html = await fetchHtml(url);
   const result = extractJsonLdPrice(html);
-  if (!result) throw new Error('price not found in page');
+  if (!result) throw new Error('preço não encontrado na página');
   return { ...result, html };
 }
 
 async function scrapeLidl(url) {
   const html = await fetchHtml(url);
   const result = extractJsonLdPrice(html);
-  if (!result) throw new Error('price not found in page');
+  if (!result) throw new Error('preço não encontrado na página');
   return { ...result, html };
 }
 
@@ -136,7 +136,7 @@ async function scrapePingoDoce(url) {
   const $ = cheerio.load(html);
   const content = $('.sales .value').first().attr('content');
   const price = Number(content);
-  if (!content || !Number.isFinite(price)) throw new Error('price not found in page');
+  if (!content || !Number.isFinite(price)) throw new Error('preço não encontrado na página');
   const name = $('h1.product-name, h1').first().text().trim() || undefined;
   return { price, currency: 'EUR', name, html };
 }
@@ -184,7 +184,7 @@ async function searchAndScrapeStore(store, query) {
 
   const searchHtml = await fetchHtml(def.searchUrl(query));
   const candidates = extractCandidateUrls(def, searchHtml);
-  if (!candidates.length) throw new Error(`no search results found on ${def.label}`);
+  if (!candidates.length) throw new Error(`sem resultados de pesquisa em ${def.label}`);
 
   let fallback = null;
   for (const productUrl of candidates.slice(0, MAX_CANDIDATES_TRIED)) {
@@ -203,7 +203,7 @@ async function searchAndScrapeStore(store, query) {
   }
 
   if (fallback) return fallback;
-  throw new Error(`no scrapable product found on ${def.label}`);
+  throw new Error(`não foi possível obter um produto em ${def.label}`);
 }
 
 module.exports = { STORES, detectStore, scrapeUrl, searchAndScrapeStore };

@@ -86,3 +86,8 @@ textarea { resize: vertical; }
 }
 .toast.error { border-left: 3px solid #f06060; }
 .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+.history-box { width: min(640px, 100%); }
+.chart-legend { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
+.legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: #c7ccd6; }
+.legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
