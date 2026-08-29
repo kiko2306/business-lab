@@ -1904,6 +1904,47 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       `curl` confirms `200` + correct content-type for the manifest,
       service worker, and icons.
 
+### 22.9g Price Compare follow-up (same day): stale-cache bug, root-caused and fixed
+- [x] **"Add product isn't working" reported again after 22.9f shipped —
+      not a repeat of the earlier bug, a caching layer problem.** Compared
+      what a real browser session had loaded against what curl got from
+      the origin: the page was rendering "Refresh"/"Edit"/"Delete" in
+      English, while the deployed `app.js` on disk was confirmed (`curl`
+      against the container directly) to be the current Portuguese
+      version. Root cause, confirmed by comparing headers at each hop:
+      Express's own `Cache-Control: max-age=0` on `app.js` was being
+      overridden somewhere between the origin and the browser — the public
+      hostname served `Cache-Control: public, max-age=14400` (4h) with
+      `cf-cache-status: REVALIDATED` for the same file. Most likely NPM's
+      own default nginx template for static-looking extensions
+      (`.js`/`.css`), not anything this project's exposure code sets
+      (`price-compare` has no custom `advanced_config`) — not fully
+      isolated to NPM specifically vs. Cloudflare's edge also playing a
+      part, but the fix doesn't need to know which: **worked around the
+      caching layer instead of fighting it**. `server.js` now generates
+      `index.html` per-request (`renderIndexHtml()`), appending a
+      `?v=<hash>` query string to `app.js`/`style.css` where the hash is
+      derived from those two files' current mtimes — so every deploy
+      produces genuinely new URLs that no existing cache (browser, NPM, or
+      Cloudflare) has ever seen, regardless of that cache's TTL.
+      `index.html` itself, plus `manifest.webmanifest` and `sw.js`, are now
+      served with an explicit `Cache-Control: no-store` so the page that
+      *points to* the versioned assets is never itself stale.
+      **Verified live**: `curl` against the public hostname shows
+      `cache-control: no-store` / `cf-cache-status: DYNAMIC` for `/` (down
+      from `public, max-age=14400` / `REVALIDATED`) and the correct
+      `app.js?v=<hash>` reference; a real browser session that had
+      previously loaded the stale English bundle immediately picked up the
+      Portuguese one on the very next navigation, and "Adicionar produto"
+      opened correctly on the first real click.
+      **Worth remembering for any future app added here**: this caching
+      behavior likely applies to every app exposed through NPM the same
+      way, not just this one — if a deploy to any of these apps ever
+      "doesn't take effect" for a user despite the container clearly
+      running new code, check response headers for an inflated
+      `Cache-Control`/`cf-cache-status: HIT` before assuming it's a code
+      bug.
+
 ### 22.9 Optional / niche
 - [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
       streaming, if Jellyfin's music side isn't enough.

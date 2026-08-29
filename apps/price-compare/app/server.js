@@ -88,13 +88,45 @@ async function searchAllStores(name, previousEntries = []) {
   );
 }
 
+// NPM's default nginx config overrides this app's own Cache-Control
+// (max-age=0) with a much longer one for static-looking extensions like
+// .js/.css — confirmed live: the public hostname served a 4h-old app.js
+// well after a fresh deploy, so a user reporting a fixed bug as "still
+// broken" was actually just seeing a stale cached bundle. Working around a
+// caching layer we don't control (NPM's nginx, possibly Cloudflare's edge
+// too) rather than fighting it: index.html is generated on every request
+// with a version query string (hash of app.js + style.css's current mtimes)
+// appended to their URLs, so a new deploy is a genuinely new URL — any
+// cache holding the old one is simply never consulted, regardless of its
+// TTL. index.html itself is served with Cache-Control: no-store so it's
+// never the thing that's stale.
+function assetVersion() {
+  const files = ['app.js', 'style.css'].map((f) => path.join(__dirname, 'public', f));
+  const mtimes = files.map((f) => fs.statSync(f).mtimeMs).join(',');
+  return crypto.createHash('md5').update(mtimes).digest('hex').slice(0, 10);
+}
+
+function renderIndexHtml() {
+  const html = fs.readFileSync(path.join(__dirname, 'public', 'index.html'), 'utf8');
+  const v = assetVersion();
+  return html.replace('app.js"', `app.js?v=${v}"`).replace('style.css"', `style.css?v=${v}"`);
+}
+
 const app = express();
 app.use(express.json());
+
+app.get(['/', '/index.html'], (req, res) => {
+  res.set('Cache-Control', 'no-store').type('html').send(renderIndexHtml());
+});
+
 // express's static mime lookup doesn't always know .webmanifest — set it
 // explicitly rather than relying on that, same reasoning as the nginx
 // config in apps/kitchen-switcher.
 app.get('/manifest.webmanifest', (req, res) => {
-  res.type('application/manifest+json').sendFile(path.join(__dirname, 'public', 'manifest.webmanifest'));
+  res.set('Cache-Control', 'no-store').type('application/manifest+json').sendFile(path.join(__dirname, 'public', 'manifest.webmanifest'));
+});
+app.get('/sw.js', (req, res) => {
+  res.set('Cache-Control', 'no-store').sendFile(path.join(__dirname, 'public', 'sw.js'));
 });
 app.use(express.static(path.join(__dirname, 'public')));
 
