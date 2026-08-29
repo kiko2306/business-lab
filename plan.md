@@ -3103,3 +3103,42 @@ next session, likely needs:
   route not linked from the main nav — worth deciding with the user once
   §26.5/§26.6 are actually being built, since the shape of user records
   isn't decided yet.
+
+### 26.8 URGENT — push notification activation fails on Android Chrome, root cause not yet isolated
+
+User hit `AbortError: Registration failed - push service error` when tapping
+"Ativar" on Android Chrome (mainstream phone — Samsung/Pixel-class,
+signed into a Google account, other apps' push notifications work fine).
+Ruled out so far:
+- Not our server: `/api/push/public-key` responds correctly, no errors in
+  container logs, `push-subscriptions.json` never even gets created — the
+  failure happens client-side in `reg.pushManager.subscribe()`, before any
+  request reaches our server at all.
+- Not the home network/DNS: same error persists on mobile data (rules out
+  Pi-hole/AdGuard/NextDNS/firewall blocking `fcm.googleapis.com`).
+- Not a device-wide Play Services problem: other apps (Gmail, WhatsApp,
+  etc.) receive push notifications fine on this phone.
+- Tried clearing the site's permissions/data in Chrome and retrying — same
+  error.
+
+**Not yet tried / next steps:**
+- Test on a *desktop* Chrome (real browser, not the browser-automation
+  tool — confirmed the automation tool cannot click through the native
+  "Allow notifications?" OS-level permission dialog, so it can't complete
+  this test itself). Desktop Chrome's push path doesn't depend on Android
+  Play Services at all, so this isolates app/server-side VAPID issues from
+  Android-Chrome-specific ones.
+  - If desktop works: problem is Android-Chrome/Play-Services-specific on
+    that one device — try a full Chrome app storage clear (Android
+    Settings → Apps → Chrome → Storage → Clear storage, not just Chrome's
+    in-app "clear site data"), confirm device date/time is set to
+    automatic/network time, or try another Android device/browser
+    (Firefox for Android, Edge) to see if it's Chrome-specific.
+  - If desktop also fails the same way: something in this app's VAPID
+    setup itself (`apps/price-compare/app/push.js`,
+    `VAPID_PUBLIC_KEY`/`VAPID_SUBJECT` in `.env`) needs a closer look —
+    re-verify the generated keypair, `VAPID_SUBJECT` format
+    (`mailto:miguelamtx@gmail.com`), and try regenerating a fresh keypair
+    in case something is subtly wrong with this specific one.
+
+Flagged urgent by the user — resume here first next session.
