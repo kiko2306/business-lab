@@ -14,9 +14,9 @@
 
   <main>
     <p class="hint">
-      Paste one or more product page URLs from Continente, Pingo Doce, or Lidl —
-      prices are fetched automatically. Recheio and Makro don't publish prices
-      without an account, so enter those by hand.
+      Just type a product name — Continente, Pingo Doce, and Lidl are searched
+      and priced automatically. Recheio and Makro don't publish prices without
+      an account, so enter those by hand.
     </p>
     <div id="products"></div>
     <p id="products-empty" class="empty hidden">No products yet — add your first one above.</p>
@@ -33,8 +33,10 @@
         <label>Categoria</label>
         <select id="product-category"></select>
 
-        <label>Store URLs (one per line — Continente / Pingo Doce / Lidl)</label>
-        <textarea id="product-urls" rows="4" placeholder="https://www.continente.pt/produto/...&#10;https://www.pingodoce.pt/...&#10;https://www.lidl.pt/p/..."></textarea>
+        <p class="hint" style="margin: 10px 0 0">
+          Continente, Pingo Doce, and Lidl are searched automatically using
+          this name — no need to find or paste a product link.
+        </p>
 
         <div class="modal-actions">
           <button type="button" id="product-cancel" class="btn">Cancel</button>

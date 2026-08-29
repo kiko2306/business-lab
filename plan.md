@@ -1763,6 +1763,53 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
         show as a fetch-failed error on that row, not silently wrong data,
         since the scraper only ever trusts a successfully-parsed price).
 
+### 22.9d Price Compare follow-up (same day): search-by-name instead of pasted URLs, "Add product" bug fixed
+- [x] **Redesigned input model** — the per-store URL fields (added right
+      after 22.9c shipped, so the user could see the 3 stores explicitly)
+      were replaced with a single product-name field per explicit request:
+      typing isn't a URL anymore, it's the *search query*. `scrapers.js`
+      gained `searchAndScrapeStore(store, query)` — fetches each store's
+      search-results page, extracts the first real product-detail link via
+      a per-store `productLinkPattern` regex (verified live against all
+      three), resolves it to an absolute URL, then reuses the existing
+      per-product scraper on that page. `server.js`'s `POST/PUT /products`
+      and `POST /products/:id/refresh` now call this instead of accepting
+      a `urls` array; renaming a product re-runs the search with the new
+      name (old matches may no longer apply). Trade-off accepted by the
+      user: the top search result isn't guaranteed to be the exact product
+      meant, unlike a hand-picked product link.
+      - Search URL patterns/link patterns (all confirmed via live `curl`
+        before coding, not guessed): Continente `/pesquisa/?q=`,
+        `href="(/produto/...\.html)`; Pingo Doce
+        `/on/demandware.store/Sites-pingo-doce-Site/default/Search-Show?q=`,
+        `href="(/home/produtos/...\.html)`; Lidl `/q/search?q=`. Lidl's
+        pattern needed a second pass — it's a client-rendered SPA, so its
+        "static" HTML is really an HTML-entity-escaped JSON hydration blob
+        (`&quot;/p/...&quot;`, not a real `href="..."` attribute); the
+        first regex assumed literal quotes and silently found nothing for
+        Lidl specifically until relaxed to match the bare `/p/<slug>/p<id>`
+        path regardless of quoting. Caught live (`no search results found
+        on Lidl` for a query that worked fine via manual `curl` — the
+        difference was the regex, not the fetch).
+      - **Verified live**: `POST /products {"name":"leite meio gordo"}`
+        returns correct real prices from all three stores in one call, no
+        URL entered anywhere; `/refresh` re-derives the same three.
+- [x] **Real bug fixed**: `urlForStore(product, store)` used
+      `product?.urls.find(...)` — optional chaining only guards the
+      `product?.urls` access, not the `.find()` call after it, so opening
+      "Add product" (`product` is `null`) threw `Cannot read properties of
+      undefined` and the modal silently never opened. Fixed to
+      `product?.urls?.find(...)`. This code path is now moot (the URL
+      fields it populated no longer exist per 22.9d above) but the same
+      optional-chaining mistake is worth watching for elsewhere.
+      **Also moot as a fix target but worth remembering**: a data-loss
+      scare mid-session (both saved products briefly read back as `[]`)
+      turned out to be a stale read during testing, not real loss — nothing
+      in `saveProducts()`'s call paths can zero out the file on its own
+      (every write path appends-to or modifies-in-place a freshly-loaded
+      list); left as encountered, not root-caused further, since the
+      redesign in this entry made the exact repro moot anyway.
+
 ### 22.9 Optional / niche
 - [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
       streaming, if Jellyfin's music side isn't enough.

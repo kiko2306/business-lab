@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { STORES, scrapeUrl } = require('./scrapers');
+const { STORES, searchAndScrapeStore } = require('./scrapers');
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const DATA_FILE = path.join(DATA_DIR, 'products.json');
@@ -49,17 +49,19 @@ function saveProducts(products) {
   fs.renameSync(tmp, DATA_FILE);
 }
 
-// Scrapes one URL and returns the entry to store, never throwing — a failed
-// scrape keeps the previous known price (if any) and just records the error,
-// so a transient site hiccup doesn't wipe out the last good price shown.
-async function buildUrlEntry(url, previous) {
+// Searches one store for `name` and scrapes whichever product it ranks
+// first — never throws — a failed search/scrape keeps the previous known
+// price and URL (if any) and just records the error, so a transient site
+// hiccup or a temporarily-off-catalogue product doesn't wipe out the last
+// good price shown.
+async function buildStoreEntry(store, name, previous) {
   try {
-    const { store, price, currency, name } = await scrapeUrl(url);
-    return { url, store, price, currency, scrapedName: name || null, scrapedAt: new Date().toISOString(), error: null };
+    const { url, price, currency, name: scrapedName } = await searchAndScrapeStore(store, name);
+    return { url, store, price, currency, scrapedName: scrapedName || null, scrapedAt: new Date().toISOString(), error: null };
   } catch (err) {
     return {
-      url,
-      store: previous?.store ?? null,
+      url: previous?.url ?? null,
+      store,
       price: previous?.price ?? null,
       currency: previous?.currency ?? null,
       scrapedName: previous?.scrapedName ?? null,
@@ -67,6 +69,13 @@ async function buildUrlEntry(url, previous) {
       error: err.message,
     };
   }
+}
+
+async function searchAllStores(name, previousEntries = []) {
+  const previousByStore = new Map(previousEntries.map((e) => [e.store, e]));
+  return Promise.all(
+    Object.keys(STORES).map((store) => buildStoreEntry(store, name, previousByStore.get(store)))
+  );
 }
 
 const app = express();
@@ -89,17 +98,17 @@ app.get('/api/products', (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
-  const { name, urls, category } = req.body || {};
+  const { name, category } = req.body || {};
   if (typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'name is required' });
   }
-  const urlList = Array.isArray(urls) ? urls.filter((u) => typeof u === 'string' && u.trim()) : [];
+  const trimmedName = name.trim();
 
-  const entries = await Promise.all(urlList.map((u) => buildUrlEntry(u.trim())));
+  const entries = await searchAllStores(trimmedName);
 
   const product = {
     id: crypto.randomUUID(),
-    name: name.trim(),
+    name: trimmedName,
     category: CATEGORIES.includes(category) ? category : DEFAULT_CATEGORY,
     urls: entries,
     manualPrices: {},
@@ -113,23 +122,25 @@ app.post('/api/products', async (req, res) => {
   res.status(201).json(product);
 });
 
+// Renaming re-runs the store searches with the new name — the old matches
+// were found using the old name as the query, so they may no longer be the
+// right product once it changes.
 app.put('/api/products/:id', async (req, res) => {
   const products = loadProducts();
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'product not found' });
 
-  const { name, urls, category } = req.body || {};
-  if (name !== undefined) {
-    if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'name cannot be empty' });
-    product.name = name.trim();
-  }
+  const { name, category } = req.body || {};
   if (category !== undefined) {
     product.category = CATEGORIES.includes(category) ? category : DEFAULT_CATEGORY;
   }
-  if (urls !== undefined) {
-    const urlList = Array.isArray(urls) ? urls.filter((u) => typeof u === 'string' && u.trim()) : [];
-    const previousByUrl = new Map(product.urls.map((e) => [e.url, e]));
-    product.urls = await Promise.all(urlList.map((u) => buildUrlEntry(u.trim(), previousByUrl.get(u.trim()))));
+  if (name !== undefined) {
+    if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'name cannot be empty' });
+    const trimmedName = name.trim();
+    if (trimmedName !== product.name) {
+      product.name = trimmedName;
+      product.urls = await searchAllStores(trimmedName, product.urls);
+    }
   }
   product.updatedAt = new Date().toISOString();
 
@@ -145,13 +156,13 @@ app.delete('/api/products/:id', (req, res) => {
   res.status(204).end();
 });
 
-// Re-scrapes every URL already on the product.
+// Re-runs the store searches for this product's current name.
 app.post('/api/products/:id/refresh', async (req, res) => {
   const products = loadProducts();
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'product not found' });
 
-  product.urls = await Promise.all(product.urls.map((entry) => buildUrlEntry(entry.url, entry)));
+  product.urls = await searchAllStores(product.name, product.urls);
   product.updatedAt = new Date().toISOString();
 
   saveProducts(products);

@@ -171,7 +171,6 @@ function openProductModal(product) {
   document.getElementById('product-id').value = product ? product.id : '';
   document.getElementById('product-name').value = product ? product.name : '';
   document.getElementById('product-category').value = product ? product.category : 'Outros';
-  document.getElementById('product-urls').value = product ? product.urls.map((e) => e.url).join('\n') : '';
   productModal.classList.add('open');
 }
 
@@ -183,15 +182,10 @@ productForm.addEventListener('submit', async (e) => {
   const id = document.getElementById('product-id').value;
   const name = document.getElementById('product-name').value;
   const category = document.getElementById('product-category').value;
-  const urls = document
-    .getElementById('product-urls')
-    .value.split('\n')
-    .map((s) => s.trim())
-    .filter(Boolean);
 
   try {
-    if (id) await api(`/products/${id}`, { method: 'PUT', body: JSON.stringify({ name, category, urls }) });
-    else await api('/products', { method: 'POST', body: JSON.stringify({ name, category, urls }) });
+    if (id) await api(`/products/${id}`, { method: 'PUT', body: JSON.stringify({ name, category }) });
+    else await api('/products', { method: 'POST', body: JSON.stringify({ name, category }) });
     productModal.classList.remove('open');
     await loadProducts();
     showToast('Saved.');

@@ -15,10 +15,38 @@ const cheerio = require('cheerio');
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
+// origin: base URL to resolve a relative product link found on a search
+// page against. searchUrl(query): builds that store's search-results URL.
+// productLinkPattern: matches the first real product-detail link in the
+// search page's raw HTML — verified live against each store (see
+// plan.md §22.9c) rather than guessed.
 const STORES = {
-  continente: { label: 'Continente', hostSuffix: 'continente.pt' },
-  pingodoce: { label: 'Pingo Doce', hostSuffix: 'pingodoce.pt' },
-  lidl: { label: 'Lidl', hostSuffix: 'lidl.pt' },
+  continente: {
+    label: 'Continente',
+    hostSuffix: 'continente.pt',
+    origin: 'https://www.continente.pt',
+    searchUrl: (q) => `https://www.continente.pt/pesquisa/?q=${encodeURIComponent(q)}`,
+    productLinkPattern: /href="(\/produto\/[^"?]+\.html)/,
+  },
+  pingodoce: {
+    label: 'Pingo Doce',
+    hostSuffix: 'pingodoce.pt',
+    origin: 'https://www.pingodoce.pt',
+    searchUrl: (q) =>
+      `https://www.pingodoce.pt/on/demandware.store/Sites-pingo-doce-Site/default/Search-Show?q=${encodeURIComponent(q)}`,
+    productLinkPattern: /href="(\/home\/produtos\/[^"?]+\.html)/,
+  },
+  lidl: {
+    label: 'Lidl',
+    hostSuffix: 'lidl.pt',
+    origin: 'https://www.lidl.pt',
+    searchUrl: (q) => `https://www.lidl.pt/q/search?q=${encodeURIComponent(q)}`,
+    // Lidl's storefront is a client-rendered SPA — what's in the initial
+    // HTML isn't real <a href> markup but an HTML-entity-escaped JSON blob
+    // for hydration (paths show up as &quot;/p/...&quot;, not "/p/...").
+    // Match the bare path instead of assuming real quoting around it.
+    productLinkPattern: /(\/p\/[a-z0-9-]+\/p\d+)/,
+  },
 };
 
 function detectStore(url) {
@@ -106,4 +134,22 @@ async function scrapeUrl(url) {
   return { store, ...result };
 }
 
-module.exports = { STORES, detectStore, scrapeUrl };
+// Given a product name, searches the store and scrapes whichever product
+// its search results ranks first — no product URL needed from the user at
+// all. Less precise than a hand-picked product link (the top search result
+// isn't guaranteed to be the exact product meant), but that trade-off is
+// deliberate: see plan.md §22.9c.
+async function searchAndScrapeStore(store, query) {
+  const def = STORES[store];
+  if (!def) throw new Error(`unknown store: ${store}`);
+
+  const searchHtml = await fetchHtml(def.searchUrl(query));
+  const match = def.productLinkPattern.exec(searchHtml);
+  if (!match) throw new Error(`no search results found on ${def.label}`);
+
+  const productUrl = new URL(match[1], def.origin).toString();
+  const result = await SCRAPERS[store](productUrl);
+  return { store, url: productUrl, ...result };
+}
+
+module.exports = { STORES, detectStore, scrapeUrl, searchAndScrapeStore };
