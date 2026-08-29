@@ -1,0 +1,24 @@
+services:
+  pantry:
+    build: ./app
+    restart: unless-stopped
+    ports:
+      - "${PANTRY_PORT:-8014}:3000"
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Single items.json file — this app deliberately has no real database,
+      # see app/server.js. Small dataset, single-user, low write concurrency.
+      - ./data:/data
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=Pantry"
+      - "homepage.icon=mdi-fridge-outline.png"
+      - "homepage.href=http://localhost:${PANTRY_PORT:-8014}"
+      - "homepage.description=Custom pantry stock tracker (expiration dates, use-item flow, shopping list)"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

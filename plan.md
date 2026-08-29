@@ -1630,6 +1630,93 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       Postgres. `exposureEnvKeys.url: ['BASE_URL']`. **Priority: P3** —
       **Estimate: S**
 
+### 22.9a Pantry / stock management (requested, 2026-08-29) — DONE, both paths built
+- [x] **Grocy** — installed as the existing-app candidate. `apps/grocy/`
+      (`lscr.io/linuxserver/grocy`, single container, `./data/config` volume,
+      host port `${GROCY_PORT:-8012}`), registered in `services.ts`
+      (category Productivity, icon `pantry` → 🥫). Covers the full spec
+      natively (stock, expiration, units, consume flow, shopping list) —
+      first-run login is `admin`/`admin`, change it. Exposed publicly at
+      `grocy.tx-home-utils.com` (opt-in, same as any other app).
+- [x] **Pantry** (custom build) — a from-scratch competing app so the two
+      can be compared directly, per explicit request. `apps/pantry/`:
+      single Node/Express container (`apps/pantry/app/`, own `Dockerfile`,
+      no framework) storing items as one JSON file (`/data/items.json`,
+      atomic write via temp-file + rename — deliberately no real database,
+      dataset is small/single-user). Host port `${PANTRY_PORT:-8014}`.
+      REST API: `GET/POST /api/items`, `PUT/DELETE /api/items/:id`,
+      `POST /api/items/:id/use` (deduct stock, floors at 0),
+      `POST /api/items/:id/restock` (add stock), `GET /api/shopping-list`
+      (items at/below `minStock`, with `neededQty`). Frontend is a single
+      static page (`public/`) with three tabs — Stock (add/edit/delete),
+      Use Items (per-item amount + Use button, the required "use item"
+      page), Shopping List (auto-computed, "Mark bought" restocks by the
+      needed amount) — units restricted to exactly Kg/Gr/Lt/Uni as
+      specified. Registered in `services.ts` (icon `fridge` → 🧊).
+      Uses custom in-page confirm/toast popups instead of native
+      `alert()`/`confirm()` (the latter blocks the whole render process,
+      including browser automation — found live while testing delete).
+      Verified live end-to-end in a real browser: add item → use item
+      (deducts correctly) → shopping list picks it up automatically →
+      restock ("Mark bought") clears it → custom delete popup works
+      without freezing.
+- [x] **Kitchen** switcher extended to three tabs — `apps/kitchen-switcher/`
+      (§22.9b below) now also embeds Pantry alongside Mealie/Grocy, so all
+      three are one click apart for comparison.
+      Not done: no data migration/sync between Grocy and Pantry — they're
+      independent, meant to be compared and then one dropped.
+
+### 22.9b Kitchen — Mealie/Grocy/Pantry switcher (requested, 2026-08-29)
+- [x] Standalone static app, not a dashboard feature — `apps/kitchen-switcher/`
+      (`nginx:alpine` + a bind-mounted `./html`, custom `nginx.conf` for
+      correct `manifest.webmanifest`/`sw.js` MIME types). One page, three
+      toggle buttons + an iframe per app; only the active iframe is shown
+      (others stay loaded, not re-fetched on every switch). Host port
+      `${KITCHEN_SWITCHER_PORT:-8013}`.
+      - Target URLs default to `http://<same-host>:9925` (Mealie) / `:8012`
+        (Grocy) / `:8014` (Pantry) — works on the LAN with no config. A ⚙
+        gear icon opens a small settings panel to override each URL
+        (saved to `localStorage`, per-browser) — meant for pointing at
+        public hostnames once exposed instead of LAN ports.
+      - Verified live: Mealie and Grocy both render correctly inside the
+        iframes (no `X-Frame-Options`/CSP blocking, unlike Authelia's own
+        pages) — confirmed by loading `http://<lan-ip>:8013` and toggling
+        both tabs in a real browser.
+      - **Installable as a PWA**: `manifest.webmanifest` + icons
+        (192/512/512-maskable, generated via a one-off `imagemagick`
+        container) + a minimal no-op service worker (exists purely to
+        satisfy installability criteria — this page has nothing worth
+        caching) + the usual `apple-mobile-web-app-*` meta tags for iOS.
+        Real install support (Android's full install prompt) needs a
+        secure context — resolved: exposure was enabled for
+        `kitchen-switcher`, `grocy`, and `pantry` (all now `provisioned` at
+        `<name>.tx-home-utils.com` in `service_exposure`), so
+        `https://kitchen-switcher.tx-home-utils.com` is the URL to install
+        from on mobile, not the LAN `http://` one. **Fixed as a follow-up**:
+        the default iframe URLs were still LAN-port-based even when the
+        switcher itself was loaded from its public hostname — unreachable
+        over mobile data. Now, if `location.hostname` starts with
+        `kitchen-switcher.`, defaults swap that prefix for each sibling
+        app's own hostname (`mealie.<domain>` etc.) instead of a LAN port;
+        LAN-IP access keeps the old port-based defaults. Verified live via
+        forced-resolve `curl` against the Cloudflare edge (local DNS
+        propagation was still catching up at the time) — both
+        `kitchen-switcher` and `pantry` public hostnames return `200`
+        through the tunnel.
+
+### 22.9c Grocery price comparison (requested, 2026-08-29)
+- [ ] **Price comparison app** — find or build an app that takes product
+      URLs (or a list of them) from grocery store sites and compares
+      prices across stores. Stores to cover, as given: **Continente,
+      Pingo Doce, Lidl, Mercadona, Recheio, Makro**. Not yet evaluated:
+      whether an existing self-hosted tool covers this (most
+      price-tracking self-hosted apps, e.g. Changedetection.io per §22.9,
+      watch a single URL for changes rather than compare the same product
+      across multiple named stores) vs. needing a custom scraper/build —
+      each of these stores would need its own scraping/parsing logic since
+      none are likely to expose a public product API. **Priority: unset**
+      — **Estimate: unset**
+
 ### 22.9 Optional / niche
 - [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
       streaming, if Jellyfin's music side isn't enough.

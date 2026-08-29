@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Pantry</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header id="bar">
+    <h1>🥫 Pantry</h1>
+    <nav>
+      <button class="tab active" data-tab="stock">Stock</button>
+      <button class="tab" data-tab="use">Use Items</button>
+      <button class="tab" data-tab="shopping">Shopping List</button>
+    </nav>
+  </header>
+
+  <main>
+    <section id="tab-stock" class="tab-panel active">
+      <div class="panel-header">
+        <h2>Stock</h2>
+        <button id="add-item-btn" class="btn primary">+ Add item</button>
+      </div>
+      <table id="stock-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Quantity</th>
+            <th>Min. stock</th>
+            <th>Expires</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="stock-empty" class="empty hidden">No items yet — add your first one above.</p>
+    </section>
+
+    <section id="tab-use" class="tab-panel">
+      <h2>Use Items</h2>
+      <p class="hint">Pick an item, enter how much you used, and it's deducted from stock.</p>
+      <table id="use-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>In stock</th>
+            <th>Amount used</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="use-empty" class="empty hidden">No items in stock.</p>
+    </section>
+
+    <section id="tab-shopping" class="tab-panel">
+      <h2>Shopping List</h2>
+      <p class="hint">Items at or below their minimum stock level.</p>
+      <table id="shopping-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>In stock</th>
+            <th>Minimum</th>
+            <th>Need to buy</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+      <p id="shopping-empty" class="empty hidden">Nothing needed right now — everything is above its minimum.</p>
+    </section>
+  </main>
+
+  <div id="item-modal" class="modal">
+    <div class="modal-box">
+      <h2 id="item-modal-title">Add item</h2>
+      <form id="item-form">
+        <input type="hidden" id="item-id" />
+        <label>Name</label>
+        <input id="item-name" type="text" required placeholder="e.g. Rice" />
+
+        <label>Unit</label>
+        <select id="item-unit">
+          <option value="kg">Kg</option>
+          <option value="g">Gr</option>
+          <option value="l">Lt</option>
+          <option value="uni">Uni</option>
+        </select>
+
+        <label>Quantity in stock</label>
+        <input id="item-quantity" type="number" step="any" min="0" value="0" />
+
+        <label>Minimum stock</label>
+        <input id="item-min-stock" type="number" step="any" min="0" value="0" />
+
+        <label>Expiration date (optional)</label>
+        <input id="item-expiration" type="date" />
+
+        <div class="modal-actions">
+          <button type="button" id="item-cancel" class="btn">Cancel</button>
+          <button type="submit" class="btn primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="modal">
+    <div class="modal-box">
+      <h2 id="confirm-title">Are you sure?</h2>
+      <div class="modal-actions">
+        <button type="button" id="confirm-cancel" class="btn">Cancel</button>
+        <button type="button" id="confirm-ok" class="btn danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

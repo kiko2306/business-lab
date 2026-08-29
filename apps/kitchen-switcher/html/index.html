@@ -1,0 +1,166 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Kitchen</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<meta name="theme-color" content="#1c1f26" />
+<meta name="mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="Kitchen" />
+<link rel="manifest" href="manifest.webmanifest" />
+<link rel="icon" href="icon-192.png" />
+<link rel="apple-touch-icon" href="icon-192.png" />
+<style>
+  :root { color-scheme: dark light; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; font-family: system-ui, sans-serif; background: #14161a; }
+  #bar {
+    display: flex; align-items: center; gap: 8px;
+    padding: 8px 10px; background: #1c1f26; border-bottom: 1px solid #2a2e37;
+  }
+  .tab {
+    flex: 1; padding: 10px 14px; border: none; border-radius: 8px;
+    background: #262b34; color: #c7ccd6; font-size: 15px; font-weight: 600;
+    cursor: pointer; transition: background .15s, color .15s;
+  }
+  .tab.active { background: #3d7bfd; color: #fff; }
+  #gear {
+    padding: 10px 12px; border: none; border-radius: 8px; background: #262b34;
+    color: #c7ccd6; cursor: pointer; font-size: 15px; line-height: 1;
+  }
+  #frame-wrap { position: relative; height: calc(100% - 54px); }
+  iframe {
+    position: absolute; inset: 0; width: 100%; height: 100%; border: none;
+    display: none; background: #fff;
+  }
+  iframe.active { display: block; }
+  #cfg {
+    display: none; position: fixed; inset: 0; background: rgba(0,0,0,.6);
+    align-items: center; justify-content: center; z-index: 10;
+  }
+  #cfg.open { display: flex; }
+  #cfg-box {
+    background: #1c1f26; border-radius: 12px; padding: 20px; width: min(420px, 90vw);
+    color: #e5e7eb;
+  }
+  #cfg-box h2 { margin: 0 0 12px; font-size: 16px; }
+  #cfg-box label { display: block; font-size: 13px; margin: 12px 0 4px; color: #9aa1ad; }
+  #cfg-box input {
+    width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333944;
+    background: #14161a; color: #e5e7eb; font-size: 14px;
+  }
+  #cfg-box .row { display: flex; gap: 8px; margin-top: 18px; }
+  #cfg-box button {
+    flex: 1; padding: 9px; border: none; border-radius: 8px; cursor: pointer; font-size: 14px;
+  }
+  #cfg-save { background: #3d7bfd; color: #fff; }
+  #cfg-cancel { background: #2a2e37; color: #c7ccd6; }
+</style>
+</head>
+<body>
+  <div id="bar">
+    <button class="tab active" data-app="mealie">🍲 Mealie</button>
+    <button class="tab" data-app="grocy">🥫 Grocy</button>
+    <button class="tab" data-app="pantry">🧊 Pantry</button>
+    <button id="gear" title="Configure URLs">⚙</button>
+  </div>
+  <div id="frame-wrap">
+    <iframe id="frame-mealie" class="active"></iframe>
+    <iframe id="frame-grocy"></iframe>
+    <iframe id="frame-pantry"></iframe>
+  </div>
+
+  <div id="cfg">
+    <div id="cfg-box">
+      <h2>Configure app URLs</h2>
+      <label for="cfg-mealie">Mealie URL</label>
+      <input id="cfg-mealie" type="text" placeholder="https://mealie.example.com" />
+      <label for="cfg-grocy">Grocy URL</label>
+      <input id="cfg-grocy" type="text" placeholder="https://grocy.example.com" />
+      <label for="cfg-pantry">Pantry URL</label>
+      <input id="cfg-pantry" type="text" placeholder="https://pantry.example.com" />
+      <div class="row">
+        <button id="cfg-cancel">Cancel</button>
+        <button id="cfg-save">Save &amp; Reload</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Defaults. If this page itself was loaded from its own public hostname
+    // (e.g. https://kitchen-switcher.tx-home-utils.com — reachable from
+    // anywhere, including mobile data), swap the "kitchen-switcher" prefix
+    // for each sibling app's own exposed hostname instead of a LAN port,
+    // since a LAN port isn't reachable off the local network at all. Falls
+    // back to LAN ports on this same host when accessed by IP (no dot in
+    // the prefix to swap) — the normal case when browsing the LAN directly.
+    var HOSTNAME_PREFIX = 'kitchen-switcher.';
+    var onPublicHostname = location.hostname.indexOf(HOSTNAME_PREFIX) === 0;
+    var baseDomain = onPublicHostname ? location.hostname.slice(HOSTNAME_PREFIX.length) : null;
+
+    var DEFAULTS = onPublicHostname
+      ? {
+          mealie: location.protocol + '//mealie.' + baseDomain,
+          grocy: location.protocol + '//grocy.' + baseDomain,
+          pantry: location.protocol + '//pantry.' + baseDomain,
+        }
+      : {
+          mealie: location.protocol + '//' + location.hostname + ':9925',
+          grocy: location.protocol + '//' + location.hostname + ':8012',
+          pantry: location.protocol + '//' + location.hostname + ':8014',
+        };
+
+    function getUrl(app) {
+      return localStorage.getItem('kitchenSwitcher.' + app + 'Url') || DEFAULTS[app];
+    }
+
+    function setUrl(app, value) {
+      if (value) localStorage.setItem('kitchenSwitcher.' + app + 'Url', value);
+      else localStorage.removeItem('kitchenSwitcher.' + app + 'Url');
+    }
+
+    function loadFrames() {
+      document.getElementById('frame-mealie').src = getUrl('mealie');
+      document.getElementById('frame-grocy').src = getUrl('grocy');
+      document.getElementById('frame-pantry').src = getUrl('pantry');
+    }
+
+    document.querySelectorAll('.tab').forEach(function (btn) {
+      btn.addEventListener('click', function () {
+        var app = btn.dataset.app;
+        document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('active', b === btn); });
+        document.querySelectorAll('iframe').forEach(function (f) {
+          f.classList.toggle('active', f.id === 'frame-' + app);
+        });
+      });
+    });
+
+    document.getElementById('gear').addEventListener('click', function () {
+      document.getElementById('cfg-mealie').value = getUrl('mealie');
+      document.getElementById('cfg-grocy').value = getUrl('grocy');
+      document.getElementById('cfg-pantry').value = getUrl('pantry');
+      document.getElementById('cfg').classList.add('open');
+    });
+    document.getElementById('cfg-cancel').addEventListener('click', function () {
+      document.getElementById('cfg').classList.remove('open');
+    });
+    document.getElementById('cfg-save').addEventListener('click', function () {
+      setUrl('mealie', document.getElementById('cfg-mealie').value.trim());
+      setUrl('grocy', document.getElementById('cfg-grocy').value.trim());
+      setUrl('pantry', document.getElementById('cfg-pantry').value.trim());
+      document.getElementById('cfg').classList.remove('open');
+      loadFrames();
+    });
+
+    loadFrames();
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+  </script>
+</body>
+</html>

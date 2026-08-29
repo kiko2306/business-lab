@@ -589,6 +589,58 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     },
     // No Host-header / allowed-origin validation — nothing to sync on exposure.
   },
+  'grocy': {
+    name: 'grocy',
+    label: 'Grocy',
+    description: 'Pantry/household stock manager (expiration dates, shopping list)',
+    icon: 'pantry',
+    category: 'Productivity',
+    composePath: 'apps/grocy/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8012/',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // Plain LinuxServer.io PHP app — no Host-header / allowed-origin
+    // validation, nothing to sync on exposure.
+  },
+  'kitchen-switcher': {
+    name: 'kitchen-switcher',
+    label: 'Kitchen',
+    description: 'One-click switcher between Mealie and Grocy',
+    icon: 'switch',
+    category: 'Productivity',
+    composePath: 'apps/kitchen-switcher/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8013/',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // Static nginx page — no framework, nothing to sync on exposure. Its
+    // own Mealie/Grocy target URLs are configured client-side (gear icon,
+    // localStorage), not via env, so they can be changed without a restart.
+  },
+  'pantry': {
+    name: 'pantry',
+    label: 'Pantry',
+    description: 'Custom pantry stock tracker (expiration dates, use-item flow, shopping list)',
+    icon: 'fridge',
+    category: 'Productivity',
+    composePath: 'apps/pantry/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8014/api/health',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // Custom single-container Node/Express app (see apps/pantry/app/) — no
+    // framework Host-header/CSRF validation, nothing to sync on exposure.
+  },
 };
 
 export function getAllServices(): ServiceDefinition[] {
