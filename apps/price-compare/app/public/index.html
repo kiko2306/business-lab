@@ -13,15 +13,27 @@
 <link rel="icon" href="icon-192.png" />
 <link rel="apple-touch-icon" href="icon-192.png" />
 <link rel="stylesheet" href="style.css" />
+<script>
+  // Applied synchronously before the page paints, so a saved "light"
+  // preference doesn't flash dark for a frame first — the rest of the
+  // theme toggle logic (button wiring, persistence) lives in app.js.
+  try {
+    var t = localStorage.getItem('priceCompare.theme');
+    if (t === 'light' || t === 'dark') document.documentElement.dataset.theme = t;
+  } catch (e) {}
+</script>
 </head>
 <body>
   <header id="bar">
     <h1>🛒 Comparador de Preços</h1>
-    <div id="header-user" class="header-actions hidden">
-      <span id="user-info" class="user-info"></span>
-      <button id="update-all-btn" class="btn">↻ Atualizar preços</button>
-      <button id="add-product-btn" class="btn primary">+ Adicionar produto</button>
-      <button id="logout-btn" class="btn small">Sair</button>
+    <div class="header-actions">
+      <button id="theme-toggle-btn" class="theme-toggle" title="Alternar tema claro/escuro">🌙</button>
+      <div id="header-user" class="header-actions hidden">
+        <span id="user-info" class="user-info"></span>
+        <button id="update-all-btn" class="btn">↻ Atualizar preços</button>
+        <button id="add-product-btn" class="btn primary">+ Adicionar produto</button>
+        <button id="logout-btn" class="btn small">Sair</button>
+      </div>
     </div>
   </header>
 

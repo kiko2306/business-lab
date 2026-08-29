@@ -2046,6 +2046,34 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
         adding it to the `COPY` line; worth remembering for any future new
         `.js` file added to this app's `app/` directory.
 
+### 22.9j Price Compare follow-up (same day): light/dark theme toggle
+- [x] **CSS fully converted to custom properties** — every hardcoded colour
+      in `style.css` replaced with `var(--bg)`/`var(--text)`/etc., defined
+      once on `:root` (the existing dark palette, unchanged values) and
+      overridden under `:root[data-theme="light"]` with a new light
+      palette. The dynamically-generated history chart SVG (`app.js`)
+      switched from inline `stroke="#hex"`/`fill="#hex"` presentation
+      attributes (which don't resolve CSS variables) to `style="stroke:var(...)"`
+      declarations, which do — so the chart follows the toggle too, not
+      just the static chrome.
+      - **Not themed**: the three store brand colours in the chart legend
+        (Continente red / Pingo Doce green / Lidl blue) — left as fixed
+        hex, they're brand identity, not UI chrome, and read fine on both
+        backgrounds.
+      - Default is dark unless the user has explicitly chosen light — no
+        `prefers-color-scheme` auto-detection, only the toggle.
+      - No new npm dependency — a `<script>` inline in `index.html`'s
+        `<head>` reads `localStorage` synchronously and sets
+        `documentElement.dataset.theme` before the page paints (avoids a
+        flash of the wrong theme on load); `app.js` owns the toggle
+        button's click handling, icon (🌙/☀️) and `<meta name="theme-color">`
+        sync, and persists the choice back to the same `localStorage` key
+        (`priceCompare.theme`) — per-browser, same pattern as the existing
+        collapse-state persistence.
+      - **Verified live**: toggled dark → light (confirmed visually, full
+        page correctly re-themed including the login screen), reloaded the
+        page and confirmed light persisted with no dark flash, toggled back.
+
 ### 22.9 Optional / niche
 - [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
       streaming, if Jellyfin's music side isn't enough.

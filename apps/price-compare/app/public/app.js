@@ -1,6 +1,30 @@
 const SCRAPED_STORES = { continente: 'Continente', pingodoce: 'Pingo Doce', lidl: 'Lidl' };
 const STORE_COLORS = { continente: '#ff6b6b', pingodoce: '#4ade80', lidl: '#5b9bff' };
 
+// --- Theme (light/dark), saved per-browser ---
+// The actual dark-vs-light flip already happened synchronously in
+// index.html's inline <script> (avoids a flash of the wrong theme); this
+// just keeps the toggle button's icon in sync and handles clicks.
+function currentTheme() {
+  return document.documentElement.dataset.theme === 'light' ? 'light' : 'dark';
+}
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  try {
+    localStorage.setItem('priceCompare.theme', theme);
+  } catch {
+    // localStorage unavailable — theme choice just won't persist, fine.
+  }
+  const btn = document.getElementById('theme-toggle-btn');
+  if (btn) btn.textContent = theme === 'light' ? '☀️' : '🌙';
+  const meta = document.querySelector('meta[name="theme-color"]');
+  if (meta) meta.setAttribute('content', theme === 'light' ? '#ffffff' : '#1c1f26');
+}
+applyTheme(currentTheme());
+document.getElementById('theme-toggle-btn').addEventListener('click', () => {
+  applyTheme(currentTheme() === 'light' ? 'dark' : 'light');
+});
+
 let products = [];
 let categories = [];
 
@@ -341,19 +365,23 @@ function buildHistoryChart(product) {
   const x = (t) => padL + ((t - minT) / timeRange) * plotW;
   const y = (price) => padT + plotH - ((price - priceLo) / (priceHi - priceLo)) * plotH;
 
-  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" style="background:#14161a;border-radius:8px">`;
+  // stroke/fill set via style="...var(...)" rather than the stroke=/fill=
+  // presentation attributes — SVG only resolves CSS custom properties
+  // through actual style declarations, so the chart can follow the
+  // light/dark theme toggle instead of being stuck with hardcoded colors.
+  let svg = `<svg viewBox="0 0 ${W} ${H}" width="100%" class="history-chart-svg">`;
 
   // Y-axis gridlines/labels: low, mid, high price.
   for (const frac of [0, 0.5, 1]) {
     const price = priceLo + frac * (priceHi - priceLo);
     const yy = y(price);
-    svg += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" stroke="#2a2e37" stroke-width="1" />`;
-    svg += `<text x="${padL - 8}" y="${yy + 4}" text-anchor="end" font-size="11" fill="#9aa1ad">${fmtPrice(price, 'EUR')}</text>`;
+    svg += `<line x1="${padL}" y1="${yy}" x2="${W - padR}" y2="${yy}" style="stroke:var(--border-soft)" stroke-width="1" />`;
+    svg += `<text x="${padL - 8}" y="${yy + 4}" text-anchor="end" font-size="11" style="fill:var(--text-muted)">${fmtPrice(price, 'EUR')}</text>`;
   }
   // X-axis labels: first and last date seen.
   const fmtDate = (t) => new Date(t).toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
-  svg += `<text x="${padL}" y="${H - 8}" font-size="11" fill="#9aa1ad">${fmtDate(minT)}</text>`;
-  svg += `<text x="${W - padR}" y="${H - 8}" text-anchor="end" font-size="11" fill="#9aa1ad">${fmtDate(maxT)}</text>`;
+  svg += `<text x="${padL}" y="${H - 8}" font-size="11" style="fill:var(--text-muted)">${fmtDate(minT)}</text>`;
+  svg += `<text x="${W - padR}" y="${H - 8}" text-anchor="end" font-size="11" style="fill:var(--text-muted)">${fmtDate(maxT)}</text>`;
 
   for (const s of series) {
     const sorted = [...s.points].sort((a, b) => a.t - b.t);
