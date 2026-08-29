@@ -3247,3 +3247,34 @@ support to reopen/reinstate the closed account is a fallback option but
 not guaranteed). Once that new account exists, resume §26.4 (TWA wrapper:
 Digital Asset Links, Bubblewrap/PWABuilder, signed Android package) using
 it.
+
+### 26.12 New Google Play developer account created — "MatDevOps"
+
+Closes out §26.11. Registered under a new Google account
+(`miguel.teixeira@portoinf.com`, not the closed `miguelamtx@gmail.com`
+one) since Play Console only allows one developer account per Google
+Account and the old one is permanently closed.
+
+- Account type: Individual ("Você"), not organization.
+- Developer name: "MatDevOps". Account ID: 5508494745434403267.
+- Payment profile: reused the existing "Miguel Antonio Monteiro Teixeira"
+  Google payments profile (shared across Google accounts under the same
+  identity) rather than creating a new one.
+- Hit a real blocker mid-signup: validating `miguelamtx@gmail.com` as a
+  "declared other Google account used in the last 6 months" repeatedly
+  failed ("De momento, não é possível validar o seu endereço de email"),
+  even after a 20-minute wait — turned out not to be a transient rate
+  limit worth working around, since the honest answer was "Não" anyway:
+  that account's developer registration was closed back in March 2024,
+  outside the "last 6 months" window the question actually asks about.
+- User completed the parts requiring their own action directly (Terms
+  acceptance, the $25 registration payment, identity document upload) —
+  not something this session could do on their behalf.
+- **Current status**: Google is validating identity documents ("pode
+  demorar alguns dias" — can take a few days); phone number validation
+  is tied to the same process. Account owner will get an email when
+  validation completes.
+
+Next session: once identity validation clears, resume §26.4 (TWA wrapper:
+Digital Asset Links, Bubblewrap/PWABuilder, signed Android package) to
+actually publish Price Compare.
