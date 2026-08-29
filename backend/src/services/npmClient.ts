@@ -63,15 +63,33 @@ const AUTHELIA_ADVANCED_CONFIG = [
   '}',
 ].join('\n');
 
-// Native gRPC (mobile/desktop/CLI clients — not the browser dashboard, which
-// uses REST/grpc-web over plain HTTP/1.1) requires HTTP/2 all the way to the
-// upstream. proxy_pass never speaks HTTP/2 to the backend regardless of
-// http2_support on the listener, so a gRPC-only location needs grpc_pass
-// instead — this fully replaces NPM's own auto-generated location /, same
-// reasoning as the Authelia block above. http2_support must also be turned
-// on at the host level (see buildProxyHostPayload) for the front-end side.
+// Native gRPC (mobile/desktop/CLI clients) requires HTTP/2 all the way to
+// the upstream — proxy_pass never speaks HTTP/2 to the backend regardless of
+// http2_support on the listener, so it needs grpc_pass instead. But the
+// browser dashboard's calls (REST `/api/*` plus grpc-web, which encodes
+// trailers into the response body specifically so it *doesn't* need real
+// HTTP/2 trailers) must NOT go through grpc_pass unconditionally — routing
+// them through it broke the dashboard (peers/login calls hang forever)
+// because it forces genuine end-to-end HTTP/2 gRPC semantics, which hits the
+// same upstream cloudflared trailers-stripping bug that blocks native
+// clients (see plan.md §20.9/§23 netbird session log). So: only requests
+// whose Content-Type is exactly "application/grpc" (native gRPC — grpc-web
+// sends "application/grpc-web+proto") take the grpc_pass path; everything
+// else (REST, grpc-web) falls through to a plain HTTP/1.1 proxy_pass, same
+// as every other proxied app. This fully replaces NPM's own auto-generated
+// location /, same reasoning as the Authelia block above. http2_support must
+// also be turned on at the host level (see buildProxyHostPayload) for the
+// front-end side, since native gRPC still needs it.
 function buildGrpcAdvancedConfig(forwardHost: string, forwardPort: number): string {
-  return ['location / {', `    grpc_pass grpc://${forwardHost}:${forwardPort};`, '}'].join('\n');
+  return [
+    'location / {',
+    '    if ($http_content_type = "application/grpc") {',
+    `        grpc_pass grpc://${forwardHost}:${forwardPort};`,
+    '    }',
+    '    include /snippets/proxy.conf;',
+    `    proxy_pass http://${forwardHost}:${forwardPort};`,
+    '}',
+  ].join('\n');
 }
 
 interface EnsureProxyHostResult {

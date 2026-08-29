@@ -2300,3 +2300,157 @@ probe + registry `healthCheck.url`) to `/ping` (always unauthenticated, 200).
 Recreated → healthy.
 
 **Dashboard: 30 / 30 running, all healthy, 0 error, 0 stopped.**
+
+## 24. Session Log — 2026-08-29: NetBird — real root cause found, dashboard works, first peer enrolled
+
+Picks up Track D (§23.1) / §20-21.3. Both bugs below were found and fixed
+live against the real deployment; a real peer was enrolled and confirmed in
+both the REST API and the browser dashboard — the first time this has ever
+worked (§20.3: "no device has ever connected a NetBird client to this
+management server").
+
+### 24.1 Bug 1 (fixed) — NPM's `grpc_pass` fix from §20.4/§20.8 broke the
+browser dashboard's own REST calls
+`backend/src/services/npmClient.ts`'s `buildGrpcAdvancedConfig` (added in
+§20.4 to give native/mobile gRPC clients a working `grpc_pass` location) set
+`location / { grpc_pass ...; }` unconditionally — routing **every** request
+to `netbird-vpn-api.tx-home-utils.com`, including the dashboard's own REST
+calls (`/api/instance`, `/api/peers`, `/api/users`, ...), through nginx's
+native gRPC proxy. Real HTTP/2 gRPC requires trailers end-to-end, and the
+already-known upstream cloudflared bug (§20.9,
+https://github.com/cloudflare/cloudflared/issues/1641) strips them — so
+every REST call from the browser just hung forever. That's why the dashboard
+showed a spinner and never progressed ("loads then bounces back").
+
+**Fixed**: `buildGrpcAdvancedConfig` now only sends requests with
+`Content-Type: application/grpc` (native gRPC) through `grpc_pass`;
+everything else (REST, grpc-web) falls through to a plain HTTP/1.1
+`proxy_pass`, like every other app. Verified live: `curl /api/instance` now
+returns instantly instead of hanging, native `GetServerKey` still correctly
+routes through `grpc_pass`. Backend suite still 121/121 passing (no test
+changes needed — existing assertions on the `grpc_pass` line still hold).
+
+### 24.2 Bug 2 (the real blocker, fixed) — `NETBIRD_TOKEN_SOURCE: accessToken`
+was wrong for this Authelia setup
+Even after 24.1, the dashboard still looped: login → consent → a few seconds
+on `/peers` → bounced back to a fresh Authelia consent screen, repeating
+indefinitely (confirmed independent of my own browser automation — it
+reproduced with a completely passive `wait`, and matches the user's original
+report on their Android phone). Live evidence: `oauth2_consent_session` rows
+showed `granted=1` on every attempt (the user's Accept clicks always
+succeeded), yet **zero** requests to `/api/oidc/token` ever appeared in NPM's
+access log — the SPA received a valid authorization code but never
+attempted the exchange, then silently restarted the whole login flow
+(console showed a recurring `Uncaught (in promise)` exception right before
+each bounce).
+
+Root cause, found by manually driving the OAuth exchange with `curl` (own
+PKCE `code_verifier`/`code_challenge`, browser only for the interactive
+Accept click) to isolate the SPA entirely: Authelia issues an **opaque**
+access token for the `netbird-dashboard` client (no
+`access_token_signed_response_alg` configured) — confirmed via
+`GET /api/oidc/userinfo` (200 with the opaque token). But
+`netbird-management`'s own auth middleware
+(`shared/auth/jwt/validator.go`) parses the bearer as a **JWT** and rejects
+anything else: `token is malformed: token contains an invalid number of
+segments` → `401 token invalid`. Since `apps/netbird-vpn/docker-compose.yml`
+had `NETBIRD_TOKEN_SOURCE: accessToken`, literally every authenticated API
+call the dashboard ever made 401'd — that's why the SPA kept restarting
+login: from its perspective, auth kept failing.
+
+Confirmed by swapping which token I sent as Bearer against the live API:
+the opaque `access_token` → `401 token invalid`; the `id_token` (always a
+real JWT) → `200` with real user data.
+
+**Fixed**: `NETBIRD_TOKEN_SOURCE: idToken` in
+`apps/netbird-vpn/docker-compose.yml`. Redeployed
+(`docker compose up -d --force-recreate netbird-dashboard`). Verified live in
+a real browser session: dashboard loads normally, held stable through the
+~10-15s window that previously always bounced, Settings → Setup Keys works,
+created a real setup key through the actual UI (`claude-test-peer`), used it
+to enroll a real `netbird` client container (on the same Docker network,
+`http://netbird-management:80` — no tunnel, no router change), confirmed
+`connected: true` via `GET /api/peers` **and** saw it rendered live in the
+browser's Peers table (`ebdcd045581d`, `100.111.119.221`, "just now"). Test
+peer and setup key deleted afterward to leave the account clean.
+
+### 24.3 Side change made, of uncertain value — Authelia `consent_mode`
+Also changed both `netbird-dashboard` and left `netbird-cli` clients'
+`consent_mode` from `implicit` to `pre-configured` in
+`apps/authelia/config/configuration.yml`, on the theory (confirmed by
+https://github.com/authelia/authelia/discussions/10668) that `implicit`
+never actually skips consent for a client requesting `offline_access`
+regardless of mode. In practice, `pre-configured` **also** never persisted a
+reusable grant in this Authelia version (v4.39.20) — `oauth2_consent_preconfiguration`
+stayed at 0 rows after multiple real Accepts, matching a known class of open
+upstream bugs (https://github.com/authelia/authelia/discussions/10346,
+#10345). **This did not turn out to matter**: 24.2 was the actual bug, and
+with it fixed the dashboard's token no longer expires/fails every few
+seconds, so the consent screen is no longer being re-triggered on a tight
+loop — a normal user should now only see it rarely (real token expiry, ~1h
+default). Left as `pre-configured` since it's not worse than `implicit` and
+is the more correct choice if Authelia's persistence bug is ever fixed
+upstream; not worth reverting.
+
+### 24.4 User question: would dropping Authelia from netbird-vpn have been simpler?
+No — neither of today's two real bugs (24.1, 24.2) were caused by Authelia
+itself; Authelia was issuing valid tokens the whole time. NetBird's
+self-hosted management has no built-in username/password store — it always
+delegates to an external OIDC IdP, so "removing Authelia" would mean standing
+up a *different* IdP (Keycloak, Zitadel, NetBird's own hosted option, ...),
+which is more work, not less, and would lose the unified SSO this deployment
+already has across every other exposed app (paperless, nextcloud, immich,
+...). Not recommended.
+
+### 24.5 Still open — unchanged from §20.9-21.3, not addressed this session
+Native/mobile/CLI gRPC enrollment **through the public Cloudflare Tunnel
+hostname** (`netbird-vpn-api.tx-home-utils.com`) is still blocked by the
+upstream cloudflared gRPC-trailers bug — confirmed still present on the
+current cloudflared version (`2026.8.2`) via a live `grpcurl` test
+(`DeadlineExceeded`). This is unrelated to 24.1/24.2 and unrelated to
+Authelia. The browser dashboard and setup-key enrollment both work today
+because REST/grpc-web traffic no longer needs real gRPC trailers (24.1) —
+but a real phone/laptop enrolling from outside the LAN still needs one of
+the §21.3 options (Relay/Signal, Tailscale overlay, or a router
+port-forward per §20.10) to get native gRPC to management without going
+through the tunnel. Track D item 3 (STUN/TURN, `apps/netbird-vpn/data/management.json`)
+is also still open and still untouched.
+
+### 24.6 Live mobile retest, same session — confirms 24.5, decision deferred
+User entered `https://netbird-vpn-api.tx-home-utils.com` in the real NetBird
+Android app right after 24.1-24.2 shipped, in case those fixes incidentally
+helped. They didn't (expected — 24.5 already called this): NPM's access log
+showed the exact same signature as §20.9 — `grpc-go/1.80.0` calling
+`POST .../GetServerKey` every 10-15s in a tight loop, `200` every time, never
+progressing, no hard error surfaced in the app yet. Live, current-timestamp
+confirmation that the cloudflared trailers bug is still the sole blocker for
+native clients, unchanged by anything in this session.
+
+Discussed the two remaining options with the user:
+- **Tailscale-overlay relay** (§21.3 option b): real downside surfaced in
+  discussion — NetBird's client holds a *persistent* streaming connection to
+  management for policy/peer updates (`connecting to Management Service
+  updates stream`, seen live in every client boot log this session), not a
+  one-time enrollment call. So routing management over Tailscale would mean
+  the phone needs **both Tailscale and NetBird active simultaneously,
+  always** — not just to enroll. User asked whether NetBird-only (no second
+  app) is possible at all.
+- **Router port-forward + real cert, direct (ungrayed) exposure for just
+  this one hostname** (§20.10): the only path that lets NetBird work alone
+  on mobile, because it removes cloudflared's HTTP/2 proxy layer entirely
+  for this one host (raw TCP forward, no trailers-stripping proxy in the
+  path) — every other app stays tunneled as-is. This is the one deliberate,
+  narrow exception to §0 principle 1 ("no router changes") that the
+  project's own §21.3 anticipated needing user sign-off for. Still needs:
+  confirmation of a static public IP or DDNS, the actual router change
+  (can't be done remotely from here), grey-clouding the DNS record, and the
+  `ensureGrpcCertificate` DNS-01 Let's Encrypt path from §20.10 item 3 (not
+  yet built — today's `ensureGrpcCertificate` only does the self-signed
+  `noTLSVerify` cert for the *tunneled* path, which wouldn't be trusted by a
+  directly-exposed native client).
+
+**Decision: deferred, user will revisit.** No code changes this round for
+mobile itself — 24.1-24.2 (dashboard + setup-key path) are the only things
+that shipped and are confirmed working. Next session, resume at: does the
+user have a static IP/DDNS, and do they want to proceed with the port
+forward, or reconsider Tailscale-alongside despite the two-app cost.

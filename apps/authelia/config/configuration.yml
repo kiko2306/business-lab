@@ -90,7 +90,20 @@ identity_providers:
         client_name: 'NetBird Dashboard'
         public: true
         authorization_policy: 'one_factor'
-        consent_mode: 'implicit'
+        # 'implicit' never actually skips the consent screen for a client
+        # requesting offline_access (Authelia requires a real consent
+        # decision to mint a refresh token regardless of consent_mode — see
+        # https://github.com/authelia/authelia/discussions/10668). Since the
+        # dashboard's silent-renew iframe also can't work at all here
+        # (Authelia sends X-Frame-Options: DENY / frame-ancestors 'none' by
+        # design, so /nb-silent-auth's hidden iframe always fails to load),
+        # every renewal was falling back to a full top-level redirect that
+        # hit a fresh, un-skippable consent prompt — looked like the
+        # dashboard "loading then bouncing back to login" on a ~10-15s
+        # cycle. 'pre-configured' remembers the grant after the first real
+        # accept, so the top-level fallback redirect completes silently
+        # (302 straight through, no visible consent page) instead.
+        consent_mode: 'pre-configured'
         # NetBird's PKCEAuthorizationFlow sends this as the OIDC `audience`
         # parameter (see apps/netbird-vpn/data/management.json) — Authelia
         # rejects any audience the client hasn't explicitly whitelisted.

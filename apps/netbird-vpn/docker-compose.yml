@@ -42,7 +42,18 @@ services:
       # Authelia rejects it as not matching the registered redirect_uris.
       AUTH_REDIRECT_URI: /nb-auth
       AUTH_SILENT_REDIRECT_URI: /nb-silent-auth
-      NETBIRD_TOKEN_SOURCE: accessToken
+      # 'accessToken' sends Authelia's access token as the API bearer —
+      # but Authelia issues an OPAQUE access token for this client (no
+      # access_token_signed_response_alg configured), and netbird-management
+      # validates the bearer as a JWT locally (shared/auth/jwt/validator.go),
+      # so every authenticated call 401'd with "token invalid" / "token
+      # contains an invalid number of segments". Confirmed live: the opaque
+      # access_token 401s, the id_token (always a real JWT) succeeds against
+      # the same endpoint. This was the actual cause of the dashboard's
+      # endless "loads then bounces back to login" loop — every API call the
+      # SPA made after login silently 401'd, so its auth-error handler kept
+      # restarting the login flow. 'idToken' sends the JWT id_token instead.
+      NETBIRD_TOKEN_SOURCE: idToken
       USE_AUTH0: "false"
     labels:
       - "homepage.group=Infrastructure"
