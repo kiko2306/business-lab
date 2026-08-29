@@ -3085,3 +3085,21 @@ fields exist: an `isVip` flag (or equivalent) on the user record, checked
 before the trial/paywall logic runs, set manually (e.g. a small
 admin-only route or direct edit of the user's record) rather than through
 any payment flow.
+
+### 26.7 Open follow-up — admin dashboard to manage VIP status
+
+Extends §26.6: rather than manually editing a user's record to grant VIP,
+the user (as the app's owner) wants a small admin dashboard listing all
+accounts with a toggle to mark/unmark each as VIP. Not investigated yet —
+next session, likely needs:
+- A way to identify the owner/admin account itself — simplest is checking
+  `req.user.email` against a single `ADMIN_EMAIL` env var (matching this
+  app's existing minimal-config style, no separate roles table).
+- A new admin-only route (e.g. `GET/POST /api/admin/users`), gated by that
+  check, listing every distinct userId currently in products.json (or a
+  new users.json if one gets introduced for §26.5/§26.6's trial/VIP
+  fields) with email/name and a VIP toggle.
+- A simple admin page/section in the existing UI, or a completely separate
+  route not linked from the main nav — worth deciding with the user once
+  §26.5/§26.6 are actually being built, since the shape of user records
+  isn't decided yet.
