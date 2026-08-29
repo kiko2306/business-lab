@@ -1,0 +1,24 @@
+services:
+  price-compare:
+    build: ./app
+    restart: unless-stopped
+    ports:
+      - "${PRICE_COMPARE_PORT:-8015}:3000"
+    environment:
+      TZ: ${TZ:-UTC}
+    volumes:
+      # Single products.json file — same reasoning as apps/pantry: small,
+      # single-user dataset, no real database needed.
+      - ./data:/data
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=Price Compare"
+      - "homepage.icon=mdi-cart-outline.png"
+      - "homepage.href=http://localhost:${PRICE_COMPARE_PORT:-8015}"
+      - "homepage.description=Compare grocery prices across Continente, Pingo Doce, Lidl, Recheio, Makro"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s

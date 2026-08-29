@@ -641,6 +641,25 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // Custom single-container Node/Express app (see apps/pantry/app/) — no
     // framework Host-header/CSRF validation, nothing to sync on exposure.
   },
+  'price-compare': {
+    name: 'price-compare',
+    label: 'Price Compare',
+    description: 'Compare grocery prices across Continente, Pingo Doce, Lidl, Recheio, Makro',
+    icon: 'cart',
+    category: 'Productivity',
+    composePath: 'apps/price-compare/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8015/api/health',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // Custom single-container Node/Express app (see apps/price-compare/app/)
+    // — no framework Host-header/CSRF validation, nothing to sync on
+    // exposure. Outbound scraping to the store sites themselves isn't
+    // affected by this app's own exposure state either way.
+  },
 };
 
 export function getAllServices(): ServiceDefinition[] {

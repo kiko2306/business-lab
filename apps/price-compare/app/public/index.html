@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<title>Price Compare</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <header id="bar">
+    <h1>🛒 Price Compare</h1>
+    <button id="add-product-btn" class="btn primary">+ Add product</button>
+  </header>
+
+  <main>
+    <p class="hint">
+      Paste one or more product page URLs from Continente, Pingo Doce, or Lidl —
+      prices are fetched automatically. Recheio and Makro don't publish prices
+      without an account, so enter those by hand.
+    </p>
+    <div id="products"></div>
+    <p id="products-empty" class="empty hidden">No products yet — add your first one above.</p>
+  </main>
+
+  <div id="product-modal" class="modal">
+    <div class="modal-box">
+      <h2 id="product-modal-title">Add product</h2>
+      <form id="product-form">
+        <input type="hidden" id="product-id" />
+        <label>Product name</label>
+        <input id="product-name" type="text" required placeholder="e.g. Leite meio-gordo 1L" />
+
+        <label>Categoria</label>
+        <select id="product-category"></select>
+
+        <label>Store URLs (one per line — Continente / Pingo Doce / Lidl)</label>
+        <textarea id="product-urls" rows="4" placeholder="https://www.continente.pt/produto/...&#10;https://www.pingodoce.pt/...&#10;https://www.lidl.pt/p/..."></textarea>
+
+        <div class="modal-actions">
+          <button type="button" id="product-cancel" class="btn">Cancel</button>
+          <button type="submit" class="btn primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="manual-modal" class="modal">
+    <div class="modal-box">
+      <h2>Set price</h2>
+      <form id="manual-form">
+        <input type="hidden" id="manual-product-id" />
+        <input type="hidden" id="manual-store" />
+        <label id="manual-store-label">Price</label>
+        <input id="manual-price" type="number" step="0.01" min="0" placeholder="0.00" />
+        <div class="modal-actions">
+          <button type="button" id="manual-cancel" class="btn">Cancel</button>
+          <button type="submit" class="btn primary">Save</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="confirm-modal" class="modal">
+    <div class="modal-box">
+      <h2 id="confirm-title">Are you sure?</h2>
+      <div class="modal-actions">
+        <button type="button" id="confirm-cancel" class="btn">Cancel</button>
+        <button type="button" id="confirm-ok" class="btn danger">Confirm</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script src="app.js"></script>
+</body>
+</html>

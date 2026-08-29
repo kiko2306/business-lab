@@ -1704,18 +1704,64 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
         `kitchen-switcher` and `pantry` public hostnames return `200`
         through the tunnel.
 
-### 22.9c Grocery price comparison (requested, 2026-08-29)
-- [ ] **Price comparison app** — find or build an app that takes product
-      URLs (or a list of them) from grocery store sites and compares
-      prices across stores. Stores to cover, as given: **Continente,
-      Pingo Doce, Lidl, Mercadona, Recheio, Makro**. Not yet evaluated:
-      whether an existing self-hosted tool covers this (most
-      price-tracking self-hosted apps, e.g. Changedetection.io per §22.9,
-      watch a single URL for changes rather than compare the same product
-      across multiple named stores) vs. needing a custom scraper/build —
-      each of these stores would need its own scraping/parsing logic since
-      none are likely to expose a public product API. **Priority: unset**
-      — **Estimate: unset**
+### 22.9c Grocery price comparison (requested, 2026-08-29) — DONE
+- [x] **Price Compare** — custom-built (no existing self-hosted tool fit:
+      Changedetection.io-style tools watch one URL for change, not compare
+      the same product across several named stores). `apps/price-compare/`,
+      same single-container Node/Express + JSON-file pattern as `pantry`.
+      Host port `${PRICE_COMPARE_PORT:-8015}`, registered in `services.ts`
+      (icon `cart` → 🛒), **exposed publicly** at
+      `price-compare.tx-home-utils.com` (confirmed live via forced-resolve
+      `curl` — `200` through the tunnel).
+      - **Feasibility checked live against each real store, not assumed**
+        (see the session's own investigation): Continente, Pingo Doce, and
+        Lidl PT all serve their price server-rendered in plain HTTP —
+        Continente and Lidl embed a standard schema.org `Product`/`Offer`
+        JSON-LD block with `price`; Pingo Doce's JSON-LD omits price, but
+        it's in a predictable `<span class="value" content="X.XX">` inside
+        the SFCC-standard `.sales` block. **Mercadona dropped** (Portugal
+        has no online catalog at all, confirmed live — corporate site
+        only). **Recheio and Makro are login-walled B2B** — no page is
+        scrapable without an account, and account credentials are never
+        something this project enters — user will check those manually
+        and use the app's manual-price fields instead.
+      - `apps/price-compare/app/scrapers.js` — per-store scraper functions
+        (`continente`/`pingodoce`/`lidl`), a `detectStore()` that routes a
+        pasted URL by hostname, and `extractJsonLdPrice()` shared between
+        the two JSON-LD stores.
+      - `apps/price-compare/app/server.js` — products stored as one JSON
+        file (`/data/products.json`, same atomic-write pattern as pantry).
+        Each product has a category (see below), a list of scraped URL
+        entries (store auto-detected per URL, price/name/error cached — a
+        failed re-scrape keeps the last known price rather than wiping it),
+        and `manualPrices.{recheio,makro}`. Endpoints: `GET/POST /products`,
+        `PUT/DELETE /products/:id`, `POST /products/:id/refresh` (re-scrape
+        all its URLs), `PUT /products/:id/manual-price`, `GET /categories`.
+      - **Grouped by category, not brand** (explicit correction mid-build):
+        a fixed list of Portuguese grocery categories (Laticínios, Bebidas,
+        Mercearia, Frutas e Vegetais, Talho, Peixaria, Padaria e
+        Pastelaria, Charcutaria e Queijos, Congelados, Limpeza, Higiene,
+        Outros — matching how Continente/Recheio's own sidebars organize
+        products), chosen per product in the add/edit form; the product
+        list renders as one section per category instead of a flat list.
+      - Frontend (`public/`): one page, product cards grouped by category,
+        each row showing store label + `scraped`/`manual` badge + price
+        (cheapest across all rows for that product highlighted green) +
+        an "Open" link (scraped) or "Set" button (manual). Same custom
+        popup pattern as `pantry` (no native `alert()`/`confirm()`).
+      - **Verified live end-to-end**: created a real product ("Leite UHT
+        Meio Gordo") with real URLs from all three scraped stores via the
+        API — Continente returned `6.84`, Pingo Doce `0.83`, Lidl `1.00`,
+        all correct — then confirmed the same result rendering correctly
+        in the browser (category heading, cheapest highlighted), and the
+        manual-price "Set" modal opening correctly for Recheio/Makro. Test
+        product deleted afterward.
+      - **Not done**: no scheduled/automatic re-scraping (refresh is
+        manual, per-product, via the Refresh button) — fine for a
+        low-frequency personal price-check tool; revisit if that becomes
+        annoying. No handling yet for a store changing its markup (would
+        show as a fetch-failed error on that row, not silently wrong data,
+        since the scraper only ever trusts a successfully-parsed price).
 
 ### 22.9 Optional / niche
 - [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
