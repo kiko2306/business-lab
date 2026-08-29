@@ -3074,3 +3074,14 @@ access. Not investigated yet — next session, research:
 - Whether this is even worth building given the app's current
   scope/audience (personal/small-household tool) — worth a explicit
   sanity-check with the user before investing in Stripe/webhook plumbing.
+
+### 26.6 Open follow-up — VIP accounts (free, exempt from paywall)
+
+Alongside §26.5's trial/paywall idea: user wants a way to mark specific
+accounts as VIP so they stay free permanently, exempt from the 30-day
+trial limit and the 5-product cap. Not investigated yet — next session,
+likely the simplest addition once §26.5's per-user `isPaid`/`trialStartedAt`
+fields exist: an `isVip` flag (or equivalent) on the user record, checked
+before the trial/paywall logic runs, set manually (e.g. a small
+admin-only route or direct edit of the user's record) rather than through
+any payment flow.
