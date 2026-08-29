@@ -165,14 +165,52 @@ function looksLikeMultiPack({ html, name, url }) {
 // result. looksLikeMultiPack alone doesn't catch this (nothing about it
 // looks like a pack) — this is a distinct problem: not "right product,
 // wrong size" but "wrong product entirely".
-const STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'com', 'sem', 'e', 'ou', 'para', 'em', 'no', 'na']);
-function significantWords(text) {
+function normalizeText(text) {
   return (text || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '') // strip accents so "açúcar"/"acucar" compare equal
+    .replace(/[̀-ͯ]/g, ''); // strip accents so "açúcar"/"acucar" compare equal
+}
+
+const STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'com', 'sem', 'e', 'ou', 'para', 'em', 'no', 'na']);
+function significantWords(text) {
+  return normalizeText(text)
     .split(/[^a-z0-9]+/)
     .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+}
+
+// A plain word-overlap check can't tell "açúcar" (the query) from "sem
+// açúcar" (a candidate explicitly saying it has *none*) — both contain
+// the word. Verified live: searching "Açúcar 1 kg" on Pingo Doce matched
+// an unsweetened almond milk ("Bebida Vegetal de Amêndoa sem Açúcar") as
+// relevant purely because "açúcar" appears in its own name, and its
+// price (irrelevant either way, but it happened to be higher) skewed the
+// pool enough to make the real sugar's genuinely correct price look like
+// a statistical outlier in cheapestPlausible. Checked directly on the
+// normalized-but-unsplit text (not significantWords, which already
+// strips "sem" as a stopword) so the "sem X" bigram itself survives to
+// be matched against.
+function negatedWords(text) {
+  const set = new Set();
+  for (const m of normalizeText(text).matchAll(/\bsem\s+([a-z0-9]+)/g)) set.add(m[1]);
+  return set;
+}
+
+// A candidate negating one of the query's own words is only a conflict if
+// the *query* doesn't negate that same word too — verified live: "Leite
+// magro sem lactose" (a query that deliberately wants lactose-free milk)
+// was rejecting its own correct match, since "Leite UHT Magro sem Lactose
+// Mimosa" negates "lactose" exactly like the query does. Only "Açúcar 1
+// kg" (a query with no negation of its own) should reject a candidate
+// that negates "açúcar".
+function hasNegatedQueryWord(query, candidateName) {
+  const queryWords = new Set(significantWords(query));
+  if (!queryWords.size) return false;
+  const queryNegated = negatedWords(query);
+  for (const w of negatedWords(candidateName)) {
+    if (queryWords.has(w) && !queryNegated.has(w)) return true;
+  }
+  return false;
 }
 
 // A fixed-floor word-overlap threshold, tuned against real live cases
@@ -192,12 +230,48 @@ function significantWords(text) {
 // checked so far: rejects rice for a sugar search (0 shared), rejects an
 // unrelated yogurt/baby-food product that only coincidentally shares one
 // word, and accepts the Bifidus/Activia match that a ratio rejected.
+// Word-overlap alone isn't enough once picking the *cheapest* candidate
+// (see searchAndScrapeStore) rather than just the first one — verified
+// live: "Leite meio gordo" shares 3 of 3 words with "Leite Magro/
+// Meio-gordo sem Lactose" (a lactose-free variant) and that variant
+// happened to be a few cents cheaper, so it won purely on price despite
+// being a materially different product. These marker words each signal a
+// distinct product variant regardless of how many other words overlap —
+// a candidate carrying one that the query didn't ask for is rejected
+// outright, not just down-weighted.
+const VARIANT_MARKERS = [
+  'lactose',
+  'gluten',
+  'proteina',
+  'proteico',
+  'proteica',
+  'integral',
+  'organico',
+  'biologico',
+  'zero',
+  'light',
+  'diet',
+  'descafeinado',
+  // Verified live: "Iogurte Natural Danone" (€1.29) matched Pingo Doce's
+  // "Iogurte Grego Natural Oikos Danone" (€4.79, ~3.7x) — "grego" (Greek
+  // yogurt, a thicker/pricier style) is a real product-line qualifier
+  // the plain-word-overlap check didn't weigh any differently than
+  // incidental phrasing.
+  'grego',
+  'skyr',
+];
+function hasConflictingVariantMarker(queryWords, candidateWords) {
+  return VARIANT_MARKERS.some((marker) => candidateWords.has(marker) && !queryWords.includes(marker));
+}
+
 function looksIrrelevant(query, candidateName) {
   if (!candidateName) return false; // nothing to judge against — don't block on missing data
   const queryWords = significantWords(query);
   if (!queryWords.length) return false;
-  const required = queryWords.length === 1 ? 1 : 2;
+  if (hasNegatedQueryWord(query, candidateName)) return true;
   const candidateWords = new Set(significantWords(candidateName));
+  if (hasConflictingVariantMarker(queryWords, candidateWords)) return true;
+  const required = queryWords.length === 1 ? 1 : 2;
   const matches = queryWords.filter((w) => candidateWords.has(w)).length;
   return matches < required;
 }
@@ -320,10 +394,21 @@ function extractCandidateUrls(def, searchHtml) {
 // its search results ranks first — no product URL needed from the user at
 // all. Less precise than a hand-picked product link (the top search result
 // isn't guaranteed to be the exact product meant), but that trade-off is
-// deliberate: see plan.md §22.9c. Walks past the first few candidates when
-// they look like multi-packs (see looksLikeMultiPack) — comparing a 6-pack's
-// total price against another store's single-unit price is misleading, so
-// a single-unit match is preferred whenever the search offers one.
+// deliberate: see plan.md §22.9c.
+//
+// Evaluates every candidate in the first page of results (not just the
+// first one that looks valid) and returns the *cheapest* one that passes
+// looksIrrelevant/looksLikeSizeMismatch — verified live this matters:
+// Pingo Doce's own search ranked a €1.64 "Arroz Agulha Cigala" first for
+// "Arroz agulha", but five cheaper equivalents (down to €1.15) sat lower
+// in the same results. A price-comparison app returning whichever brand a
+// store's search happens to rank first, rather than the actual best price
+// available there, defeats the point. Single-unit matches are preferred
+// over multi-packs when both exist; multi-packs are only used if nothing
+// single-unit passed at all. The cost is real: this always fetches up to
+// MAX_CANDIDATES_TRIED pages now (it used to stop at the first valid
+// single-unit match), trading more requests per store per refresh for
+// actually finding the best price.
 const MAX_CANDIDATES_TRIED = 5;
 async function searchAndScrapeStore(store, query) {
   const def = STORES[store];
@@ -333,7 +418,8 @@ async function searchAndScrapeStore(store, query) {
   const candidates = extractCandidateUrls(def, searchHtml);
   if (!candidates.length) throw new NoMatchError(`sem resultados de pesquisa em ${def.label}`);
 
-  let fallback = null;
+  const singleUnitEntries = [];
+  const packEntries = [];
   for (const productUrl of candidates.slice(0, MAX_CANDIDATES_TRIED)) {
     let scraped;
     try {
@@ -342,23 +428,42 @@ async function searchAndScrapeStore(store, query) {
       continue; // this candidate's page didn't yield a price — try the next
     }
     const { html, ...result } = scraped;
+    if (result.price == null) continue;
     const entry = { store, url: productUrl, ...result };
     // A wrong product entirely, or the right product at a clearly wrong
     // size, is never usable — not even as a last-resort fallback, since
     // showing it at all would be a misleading price, worse than showing
-    // none. Only a multi-pack (the right single-unit product, just
-    // bundled) is worth falling back to if nothing better turns up.
+    // none.
     if (looksIrrelevant(query, result.name) || looksLikeSizeMismatch(query, { html, name: result.name, url: productUrl })) {
       continue;
     }
-    if (!looksLikeMultiPack({ html, name: result.name, url: productUrl })) {
-      return entry;
-    }
-    if (!fallback) fallback = entry; // keep the first working result in case every candidate is a multi-pack
+    (looksLikeMultiPack({ html, name: result.name, url: productUrl }) ? packEntries : singleUnitEntries).push(entry);
   }
 
-  if (fallback) return fallback;
-  throw new NoMatchError(`não foi possível obter um produto em ${def.label}`);
+  const pool = singleUnitEntries.length ? singleUnitEntries : packEntries;
+  if (!pool.length) throw new NoMatchError(`não foi possível obter um produto em ${def.label}`);
+  return cheapestPlausible(pool);
+}
+
+// Picking the outright cheapest candidate trusts every store's own price
+// data completely — verified live that's not always safe: one of Pingo
+// Doce's own "Leite UHT Magro sem Lactose" listings showed €0.44 (a
+// near-identical listing of the same product, same brand, same name,
+// sat at €1.08) — almost certainly a stale/glitched price on their own
+// site, not a real bargain. Genuinely different single-unit options for
+// the same search (verified live: Pingo Doce's six-way "Arroz agulha"
+// results, €1.15–€1.64 across different brands) aren't outliers of each
+// other — they're a normal price spread the app exists to surface. The
+// distinction: drop only a candidate priced far below the *median* of
+// its own pool (a below-half-price listing is far more likely a data
+// error than a real deal), which only ever fires with 3+ candidates —
+// not enough data points below that to tell a true bargain from a glitch.
+function cheapestPlausible(entries) {
+  if (entries.length < 3) return entries.reduce((cheapest, e) => (e.price < cheapest.price ? e : cheapest));
+  const sortedPrices = entries.map((e) => e.price).sort((a, b) => a - b);
+  const median = sortedPrices[Math.floor(sortedPrices.length / 2)];
+  const plausible = entries.filter((e) => e.price >= median * 0.5);
+  return plausible.reduce((cheapest, e) => (e.price < cheapest.price ? e : cheapest));
 }
 
 module.exports = { STORES, detectStore, scrapeUrl, searchAndScrapeStore, NoMatchError };

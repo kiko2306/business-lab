@@ -3427,3 +3427,116 @@ Continente/Pingo Doce/Auchan and shows no Lidl row) via a full regression
 suite run in a throwaway container across every already-tracked product
 before deploying, catching two self-introduced regressions along the way
 (both documented above) before they reached production.
+
+## 31. Session Log — 2026-08-29 (cont.): Price Compare — cheapest-of-candidates selection + more accuracy fixes + 123-item test pool
+
+### 31.1 Cheapest-candidate selection
+
+User found "Arroz agulha" at Pingo Doce matched "Arroz Agulha Cigala"
+(€1.64) when five cheaper equivalents (down to €1.15) existed in the same
+search results — the scraper was returning whichever candidate a store's
+search happened to rank first, not the best price actually available
+there. `searchAndScrapeStore` (scrapers.js) now evaluates every candidate
+in the first page of results (not just the first valid one) and returns
+the *cheapest* one that passes `looksIrrelevant`/`looksLikeSizeMismatch`
+— single-unit matches still preferred over multi-packs, multi-packs only
+used as a pool if nothing single-unit passed. Real cost: this always
+fetches up to `MAX_CANDIDATES_TRIED` (5) pages now instead of stopping at
+the first valid one — more requests per store per refresh, traded for
+actually finding the best price, which is the whole point of the app.
+
+This surfaced two follow-on correctness bugs once "pick anything valid"
+became "pick the cheapest valid thing":
+
+- **Wrong-variant-wins-on-price**: "Leite meio gordo" matched a
+  lactose-free variant at Lidl purely because it was a few cents cheaper,
+  despite being a materially different product. Extended `VARIANT_MARKERS`
+  (already existed for lactose/gluten/etc.) — a candidate carrying a
+  marker word the query didn't ask for is rejected outright regardless of
+  overlap score, no longer just down-weighted.
+- **Price-glitch-wins-on-price**: one of Pingo Doce's own "Leite UHT
+  Magro sem Lactose" listings showed €0.44 (a near-identical listing of
+  the same product sat at €1.08) — almost certainly a stale/glitched
+  price on their own site. New `cheapestPlausible()` drops any candidate
+  priced below half the pool's median, but only when there are 3+
+  candidates (not enough data points below that to tell a real bargain
+  from a glitch) — a genuine price spread across different brands (the
+  Arroz agulha case, €1.15–€1.64) isn't touched.
+
+Implementing the outlier filter surfaced a third bug: the median got
+skewed by a candidate that should never have been in the pool at all —
+"Açúcar 1 kg" matched an unsweetened almond milk ("Bebida Vegetal de
+Amêndoa **sem Açúcar**") as relevant purely because the word "açúcar"
+appears in its own name (word-overlap can't tell "açúcar" from "no
+açúcar"). New `hasNegatedQueryWord()` checks the candidate's raw text for
+"sem X" where X is one of the query's own words — but only flags it when
+the *query itself* doesn't also negate that word, since "Leite magro sem
+lactose" deliberately wants a lactose-free match and must not reject its
+own correct result. Went through one broken intermediate version of this
+exact bug before landing on the query-aware one (documented in the code
+comment).
+
+Also, per explicit request: a store confidently found no match
+(`NoMatchError`) is no longer shown in the UI at all, rather than showing
+"sem preço" — already shipped in §30.2, unaffected by this round.
+
+### 31.2 "Iogurte Natural Danone" — another variant-marker gap
+
+User spot-checked the new 123-item test pool (see §31.3) and found Pingo
+Doce matched "Iogurte **Grego** Natural **Oikos** Danone" (€4.79) for a
+plain "Iogurte Natural Danone" query (€1.29 elsewhere — ~3.7x off).
+Added `grego` and `skyr` to `VARIANT_MARKERS` — same fix pattern as
+lactose/gluten, just a qualifier the earlier list hadn't anticipated.
+This class of bug (a real product-line qualifier that plain word-overlap
+can't distinguish from incidental phrasing) is inherently open-ended —
+expect to keep finding and adding markers as more get spotted.
+
+### 31.3 123-item test pool + de-branding rename
+
+User asked for a much bigger test pool to stress-test the accuracy work
+above — scoped down from a requested 30-50 items/category (~400-500
+total, judged too heavy a load on the 4 stores' live sites, real risk of
+getting the shared homelab IP rate-limited/blocked) to ~10 items/category
+(~120 total) instead. Sourced real product names live from Continente's
+own search results (all 12 app categories, 5 broad search terms each),
+extracted via the same JSON-LD scraping the app's own scrapers.js already
+uses — not invented names. Added via a direct script run inside the
+running container (bypassing the browser session, which would have timed
+out over 100+ sequential requests) reusing the exact same
+`searchAndScrapeStore` logic already fixed above. Result: 118 added, 0
+failed, every product found a match at ≥1 store. Store coverage:
+Continente 123/123, Auchan 107/123, Pingo Doce 97/123, Lidl 25/123 (Lidl's
+low number is expected — smaller private-label catalog, and the accuracy
+checks now correctly show no match instead of a wrong product where Lidl
+genuinely doesn't carry something).
+
+Then: since these names were sourced from Continente search results, ~53
+of them carried the literal word "Continente" (their own private-label
+brand) baked into the product name — user pointed out this biases the
+search toward Continente specifically at the expense of matching well
+elsewhere, and asked to strip it and refresh everything. Ran a second
+script: strips `\bcontinente\b` (case-insensitive) from every affected
+product's name, then re-runs the full 4-store search for *all* 123
+products (not just the renamed ones) using the same carry-forward-aware
+`buildStoreEntry` logic `server.js` itself uses, so a transient failure
+still preserves the last known price exactly like a normal refresh would.
+Running in the background — check progress before relying on this data
+for further spot-checks.
+
+### 31.4 Open — user-reported edit-creates-duplicate bug, not reproduced
+
+User reported that editing a product's name creates a *new* product
+instead of updating the existing one. Direct live test (rename "Água sem
+Gás Alcalina..." via the Editar modal) worked correctly — updated in
+place, category count unchanged, no duplicate. Reviewed both the client
+(`app.js` productForm submit — correctly branches PUT vs POST based on
+the hidden `product-id` field) and server (`server.js` `PUT
+/api/products/:id` — finds by id, updates in place, saves) and found
+nothing wrong on inspection either. Two *actual* duplicate product names
+did turn up in the data, but they're a side effect of the §31.3 bulk-add
+script pulling the same product name under two different categories
+(e.g. "Sumo 100% Maçã Continente Equilíbrio" appeared in both Bebidas and
+Frutas e Vegetais search results) — not the edit bug. Asked the user for
+more specific repro details (which product, which device, what exactly
+happened after clicking Guardar) but they moved on to other reports
+before answering. **Still open — revisit if it recurs.**
