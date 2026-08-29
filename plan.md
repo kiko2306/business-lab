@@ -3221,3 +3221,29 @@ Android-Chrome/Play-Services-specific, not an app or server bug — the
 exact same server, VAPID keys, and code worked cleanly from a different
 device. No code change was needed. Nothing further to chase on §26.8
 unless the original phone is revisited specifically.
+
+### 26.11 URGENT — need a different Google account for Play Store publishing
+
+Checked `miguelamtx@gmail.com` in Google Play Console (§26.4 follow-up):
+it already has a developer account ("Porto de Informática, lda"), but its
+status is **Account closed** (closed 2024-03-20 — Google auto-closes
+unused developer accounts after a warning period; warning sent
+2024-01-16, deadline 2024-03-16). The $25 registration fee is explicitly
+non-refundable per Google's own message on the page.
+
+Confirmed this is a hard blocker, not just a UI dead-end: tried both the
+current (`play.google.com/console/signup`) and legacy
+(`play.google.com/apps/publish/signup/`) registration entry points while
+signed into this Google account — both redirect straight back to the
+existing closed developer account instead of offering a fresh
+registration form. **Google Play Console allows only one developer
+account per Google Account**, and a closed one blocks creating a new one
+on the same account.
+
+**Action needed from the user, urgent**: create a **new/different Google
+account** to use for Play Store publishing (a fresh $25 registration
+under that new account is the guaranteed path — contacting Google Play
+support to reopen/reinstate the closed account is a fallback option but
+not guaranteed). Once that new account exists, resume §26.4 (TWA wrapper:
+Digital Asset Links, Bubblewrap/PWABuilder, signed Android package) using
+it.
