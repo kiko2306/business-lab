@@ -2968,3 +2968,78 @@ list show.
   redirect → same session state, no CSS regression.
 
 Google Sign-In for Price Compare is now fully functional in production.
+
+## 26. Session Log — 2026-08-29 (cont.): Price Compare — price-drop push notifications
+
+User asked for a way to be notified when a tracked product's price drops
+10% or more at any store. Chosen approach: Web Push (browser/PWA push, no
+external service/account — self-owned VAPID keypair, delivery goes straight
+through the browser vendor's own push infra, free). Baseline for "drop":
+each store's previously recorded price, not the price when the product was
+first added — so any day-over-day 10%+ drop triggers it, including a slow
+downward drift if any single update crosses the threshold.
+
+### 26.1 Server side
+
+- New `apps/price-compare/app/push.js` — thin wrapper around `web-push`:
+  VAPID config, per-user subscription storage (`push-subscriptions.json`,
+  same flat-JSON-file pattern as products.json), `notifyPriceDrops(userId,
+  drops)` which sends one push per refresh run (not one per drop, so a big
+  daily update with several drops doesn't spam a stack of pushes). Dead
+  subscriptions (404/410 from the push service — uninstalled, permission
+  revoked, site data cleared) are pruned automatically; any other send
+  error is logged and the subscription kept (assumed transient).
+- `server.js`: `collectPriceDrops(productName, previousEntries, newEntries)`
+  compares same-store prices before/after a refresh, threshold 10%
+  (`PRICE_DROP_THRESHOLD = 0.10`). Wired into every refresh path that
+  reuses the *same* product's previous entries — manual per-product
+  refresh, "Atualizar preços" (refresh-all), and the daily 8am scheduler
+  (all three funnel through `refreshProductsForUser` except the
+  single-product route, which duplicates the same before/after diff).
+  Deliberately *not* wired into rename (PUT /api/products/:id) — a new
+  name re-runs the search and may match a different product entirely, so
+  diffing its price against the old name's price isn't a real price change
+  of the same item.
+- New routes: `GET /api/push/public-key` (503 if VAPID not configured),
+  `POST /api/push/subscribe`, `POST /api/push/unsubscribe` (both
+  `auth.requireAuth`-gated, scoped to `req.user.sub`).
+- VAPID keypair generated via a one-off `node:20-alpine` container running
+  `web-push generate-vapid-keys` (no local Node on the host) — same
+  "one-off Docker container for a one-time local task" pattern as the PWA
+  icon generation earlier. Written to `apps/price-compare/.env` (gitignored)
+  as `VAPID_PUBLIC_KEY` / `VAPID_PRIVATE_KEY` / `VAPID_SUBJECT`.
+  `.env.example` documents how to generate your own.
+
+### 26.2 Client side
+
+- `sw.js`: added `push` (shows the notification, tag `price-drop` so a
+  second one while the first is still showing replaces it rather than
+  stacking) and `notificationclick` (focuses an existing app tab if one is
+  open, otherwise opens a new one) handlers.
+- One-time opt-in popup (`#notify-modal`, shown once per browser right
+  after login via `maybeShowNotifyPrompt()`) — skipped if the browser
+  already answered the permission prompt (granted or denied), the user
+  already dismissed it once (`priceCompare.notifyDismissed` in
+  localStorage), or the server has no VAPID keys configured.
+- New **Settings** menu (⚙️ button next to "Sair", per this session's
+  explicit request for a persistent way to toggle notifications rather
+  than only the one-time popup) — a toggle switch reflecting the live
+  `PushManager` subscription state, disabled with an explanatory message
+  if the browser has notifications blocked or doesn't support push at all.
+  Turning it on requests permission (if not already granted) and
+  subscribes; turning it off unsubscribes both browser-side and
+  server-side (`POST /api/push/unsubscribe`).
+
+### 26.3 Live verification, still in progress
+
+Confirmed server-side: `/api/push/public-key` returns the configured key,
+container logs clean after rebuild, `.env` correctly stayed untracked by
+git. Confirmed client-side in the browser-tool session: the popup renders
+correctly right after login and the Settings toggle UI works. The actual
+browser permission grant is a native Chrome dialog outside the page — not
+something the browser automation tool can click through — so the
+end-to-end "permission granted → subscription saved server-side → real
+push received" chain is still pending the user's own click, which they're
+doing from their phone. Follow up next session (or later this one): check
+`push-subscriptions.json` for a saved subscription, then send a real test
+notification for one simple product to confirm delivery.

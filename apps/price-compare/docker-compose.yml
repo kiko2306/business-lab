@@ -19,6 +19,13 @@ services:
       GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
       GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
       GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
+      # Web Push (push.js) — notifies a user when a tracked product's price
+      # drops 10%+ at any store. See .env.example for how to generate a
+      # VAPID keypair. The app boots fine without them; the notification
+      # opt-in popup just stays hidden until they're configured.
+      VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
+      VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
+      VAPID_SUBJECT: ${VAPID_SUBJECT:-}
     volumes:
       # Single products.json file — same reasoning as apps/pantry: small
       # dataset, no real database needed. Now multi-user (each product

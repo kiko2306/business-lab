@@ -4,6 +4,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { STORES, searchAndScrapeStore } = require('./scrapers');
 const auth = require('./auth');
+const push = require('./push');
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const DATA_FILE = path.join(DATA_DIR, 'products.json');
@@ -127,6 +128,27 @@ async function searchAllStores(name, previousEntries = []) {
   );
 }
 
+// A "drop" is only meaningful when comparing the same store's price before
+// and after one refresh — not used on rename (PUT /api/products/:id),
+// since a new name means a re-run search that may match a different
+// product entirely, and comparing its price to the old name's price isn't
+// a real price change of the same item.
+const PRICE_DROP_THRESHOLD = 0.10;
+
+function collectPriceDrops(productName, previousEntries, newEntries) {
+  const previousByStore = new Map(previousEntries.map((e) => [e.store, e]));
+  const drops = [];
+  for (const entry of newEntries) {
+    const previous = previousByStore.get(entry.store);
+    if (!previous || previous.price == null || entry.price == null) continue;
+    if (entry.price >= previous.price) continue;
+    const pct = (previous.price - entry.price) / previous.price;
+    if (pct < PRICE_DROP_THRESHOLD) continue;
+    drops.push({ productName, store: entry.store, oldPrice: previous.price, newPrice: entry.price, pct });
+  }
+  return drops;
+}
+
 // NPM's default nginx config overrides this app's own Cache-Control
 // (max-age=0) with a much longer one for static-looking extensions like
 // .js/.css — confirmed live: the public hostname served a 4h-old app.js
@@ -215,6 +237,28 @@ app.get('/api/stores', (req, res) => {
 
 app.get('/api/categories', (req, res) => res.json(CATEGORIES));
 
+// --- Push notifications (price drops) ---
+app.get('/api/push/public-key', (req, res) => {
+  if (!push.isConfigured()) return res.status(503).json({ error: 'notificações push não configuradas' });
+  res.json({ publicKey: push.publicKey() });
+});
+
+app.post('/api/push/subscribe', auth.requireAuth, (req, res) => {
+  const subscription = req.body;
+  if (!subscription || typeof subscription.endpoint !== 'string') {
+    return res.status(400).json({ error: 'subscrição inválida' });
+  }
+  push.addSubscription(req.user.sub, subscription);
+  res.status(204).end();
+});
+
+app.post('/api/push/unsubscribe', auth.requireAuth, (req, res) => {
+  const { endpoint } = req.body || {};
+  if (typeof endpoint !== 'string') return res.status(400).json({ error: 'endpoint em falta' });
+  push.removeSubscription(req.user.sub, endpoint);
+  res.status(204).end();
+});
+
 // Every /api/products* route from here on is per-user: requireAuth attaches
 // req.user, and each handler only ever reads/writes that user's own slice
 // of products.json (loadUserProducts/saveUserProducts) — there is no code
@@ -290,10 +334,13 @@ app.post('/api/products/:id/refresh', async (req, res) => {
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
-  product.urls = await searchAllStores(product.name, product.urls);
+  const previousEntries = product.urls;
+  product.urls = await searchAllStores(product.name, previousEntries);
   product.updatedAt = new Date().toISOString();
 
   saveUserProducts(req.user.sub, products);
+  const drops = collectPriceDrops(product.name, previousEntries, product.urls);
+  if (drops.length) await push.notifyPriceDrops(req.user.sub, drops);
   res.json(product);
 });
 
@@ -305,11 +352,18 @@ app.post('/api/products/:id/refresh', async (req, res) => {
 // user at once, the daily scheduler below.
 async function refreshProductsForUser(userId) {
   const products = loadUserProducts(userId);
+  const allDrops = [];
   for (const product of products) {
-    product.urls = await searchAllStores(product.name, product.urls);
+    const previousEntries = product.urls;
+    product.urls = await searchAllStores(product.name, previousEntries);
     product.updatedAt = new Date().toISOString();
+    allDrops.push(...collectPriceDrops(product.name, previousEntries, product.urls));
   }
   saveUserProducts(userId, products);
+  // One notification per refresh run, not one per drop — a run that finds
+  // several drops (e.g. the daily 8am update) shouldn't spam a stack of
+  // separate pushes.
+  if (allDrops.length) await push.notifyPriceDrops(userId, allDrops);
   return products;
 }
 

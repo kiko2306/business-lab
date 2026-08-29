@@ -439,9 +439,158 @@ async function init() {
   showApp(user);
   await loadCategories();
   await loadProducts();
+  maybeShowNotifyPrompt();
 }
 
 init();
+
+// --- Push notifications (price-drop alerts) ---
+// The VAPID public key is plain base64url; the Push API wants it as the raw
+// bytes it actually encodes, hence this decode step.
+function urlBase64ToUint8Array(base64String) {
+  const padding = '='.repeat((4 - (base64String.length % 4)) % 4);
+  const base64 = (base64String + padding).replace(/-/g, '+').replace(/_/g, '/');
+  const rawData = atob(base64);
+  return Uint8Array.from([...rawData].map((c) => c.charCodeAt(0)));
+}
+
+async function subscribeToPush() {
+  const reg = await navigator.serviceWorker.ready;
+  const { publicKey } = await api('/push/public-key');
+  const subscription = await reg.pushManager.subscribe({
+    userVisibleOnly: true,
+    applicationServerKey: urlBase64ToUint8Array(publicKey),
+  });
+  await api('/push/subscribe', { method: 'POST', body: JSON.stringify(subscription) });
+}
+
+async function unsubscribeFromPush() {
+  const reg = await navigator.serviceWorker.ready;
+  const sub = await reg.pushManager.getSubscription();
+  if (!sub) return;
+  const endpoint = sub.endpoint;
+  await sub.unsubscribe();
+  await api('/push/unsubscribe', { method: 'POST', body: JSON.stringify({ endpoint }) });
+}
+
+function showNotifyModal() {
+  document.getElementById('notify-modal').classList.add('open');
+}
+function hideNotifyModal() {
+  document.getElementById('notify-modal').classList.remove('open');
+}
+
+document.getElementById('notify-later').addEventListener('click', () => {
+  try {
+    localStorage.setItem('priceCompare.notifyDismissed', '1');
+  } catch {
+    // localStorage unavailable — the popup will just ask again next visit, fine.
+  }
+  hideNotifyModal();
+});
+
+document.getElementById('notify-enable').addEventListener('click', async () => {
+  hideNotifyModal();
+  try {
+    const permission = await Notification.requestPermission();
+    if (permission !== 'granted') return;
+    await subscribeToPush();
+    showToast('Notificações ativadas.');
+  } catch (err) {
+    showToast('Não foi possível ativar as notificações.', true);
+  }
+});
+
+// --- Settings modal — lets a user re-enable/disable push notifications any
+// time, unlike the once-per-browser notify-modal prompt above. ---
+async function refreshNotifyToggleState() {
+  const toggle = document.getElementById('notify-toggle');
+  const blockedHint = document.getElementById('notify-blocked-hint');
+  blockedHint.classList.add('hidden');
+
+  if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+    toggle.checked = false;
+    toggle.disabled = true;
+    blockedHint.textContent = 'O seu navegador não suporta notificações push.';
+    blockedHint.classList.remove('hidden');
+    return;
+  }
+  if (Notification.permission === 'denied') {
+    toggle.checked = false;
+    toggle.disabled = true;
+    blockedHint.textContent = 'Notificações bloqueadas nas definições do navegador — tem de as ativar aí primeiro.';
+    blockedHint.classList.remove('hidden');
+    return;
+  }
+
+  toggle.disabled = false;
+  try {
+    const reg = await navigator.serviceWorker.ready;
+    const sub = await reg.pushManager.getSubscription();
+    toggle.checked = !!sub;
+  } catch {
+    toggle.checked = false;
+  }
+}
+
+document.getElementById('settings-btn').addEventListener('click', () => {
+  document.getElementById('settings-modal').classList.add('open');
+  refreshNotifyToggleState();
+});
+document.getElementById('settings-close').addEventListener('click', () => {
+  document.getElementById('settings-modal').classList.remove('open');
+});
+
+document.getElementById('notify-toggle').addEventListener('change', async (e) => {
+  const enable = e.target.checked;
+  e.target.disabled = true;
+  try {
+    if (enable) {
+      const permission = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
+      if (permission !== 'granted') {
+        e.target.checked = false;
+        await refreshNotifyToggleState();
+        return;
+      }
+      await subscribeToPush();
+      try {
+        localStorage.setItem('priceCompare.notifyDismissed', '1');
+      } catch {
+        // localStorage unavailable — harmless, just means the initial popup could show again later.
+      }
+      showToast('Notificações ativadas.');
+    } else {
+      await unsubscribeFromPush();
+      showToast('Notificações desativadas.');
+    }
+  } catch {
+    e.target.checked = !enable;
+    showToast('Não foi possível atualizar as notificações.', true);
+  } finally {
+    e.target.disabled = false;
+  }
+});
+
+// Shown once per browser, right after login — skipped entirely if the
+// browser doesn't support push, the user already answered the permission
+// prompt (granted or denied — nothing left to ask), they already dismissed
+// it with "Agora não", or the server has no VAPID keys configured.
+async function maybeShowNotifyPrompt() {
+  if (!('serviceWorker' in navigator) || !('PushManager' in window) || !('Notification' in window)) return;
+  if (Notification.permission !== 'default') return;
+  try {
+    if (localStorage.getItem('priceCompare.notifyDismissed') === '1') return;
+  } catch {
+    // localStorage unavailable — fall through and ask anyway.
+  }
+  try {
+    const res = await fetch('/api/push/public-key');
+    if (!res.ok) return;
+  } catch {
+    return;
+  }
+  showNotifyModal();
+}
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

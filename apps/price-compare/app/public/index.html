@@ -32,6 +32,7 @@
         <span id="user-info" class="user-info"></span>
         <button id="update-all-btn" class="btn">↻ Atualizar preços</button>
         <button id="add-product-btn" class="btn primary">+ Adicionar produto</button>
+        <button id="settings-btn" class="theme-toggle" title="Definições">⚙️</button>
         <button id="logout-btn" class="btn small">Sair</button>
       </div>
     </div>
@@ -85,6 +86,40 @@
       <div id="history-chart"></div>
       <div class="modal-actions">
         <button type="button" id="history-close" class="btn">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="notify-modal" class="modal">
+    <div class="modal-box">
+      <h2>🔔 Ativar notificações</h2>
+      <p class="hint">
+        Receba um aviso sempre que o preço de um produto da sua lista descer
+        10% ou mais em qualquer loja.
+      </p>
+      <div class="modal-actions">
+        <button type="button" id="notify-later" class="btn">Agora não</button>
+        <button type="button" id="notify-enable" class="btn primary">Ativar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="settings-modal" class="modal">
+    <div class="modal-box">
+      <h2>⚙️ Definições</h2>
+      <div class="settings-row">
+        <div>
+          <strong>Notificações de descida de preço</strong>
+          <p class="hint" style="margin: 4px 0 0">Aviso quando um preço descer 10% ou mais.</p>
+        </div>
+        <label class="switch">
+          <input type="checkbox" id="notify-toggle" />
+          <span class="switch-slider"></span>
+        </label>
+      </div>
+      <p id="notify-blocked-hint" class="price-error hidden"></p>
+      <div class="modal-actions">
+        <button type="button" id="settings-close" class="btn">Fechar</button>
       </div>
     </div>
   </div>
