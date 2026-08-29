@@ -2032,6 +2032,12 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
         (`https://price-compare.tx-home-utils.com/auth/google/callback`).
         The app boots and serves the login screen fine without these set;
         `/auth/google` just returns a friendly `503` until they are.
+      - **Confirmed with the user, deliberate, not an oversight**: sign-up
+        stays open to *any* Google account, no email allowlist. Flagged
+        explicitly since this app is already publicly exposed (not behind
+        Authelia) — anyone who finds the URL and has a Google account can
+        self-register once credentials are configured, not just the
+        deploying user. User's call, left as-is.
       - **Verified live** (everything short of an actual Google login,
         which needs those credentials): `/api/me` and `/api/products`
         both correctly `401` when logged out, `/auth/google` correctly
