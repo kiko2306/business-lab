@@ -3055,3 +3055,22 @@ Google Play Console developer account — one-time $25 fee), and whether
 it's worth it for a single/small-household-user app versus just keeping it
 as a PWA install (already works today via the existing manifest.webmanifest
 + sw.js).
+
+### 26.5 Open follow-up — monetization (30-day trial, then paywall)
+
+User wants to explore charging for Price Compare: free for the first 30
+days per account, then restrict a non-paying account to seeing only its
+first 5 products (rest blocked/hidden) until they pay to unlock full
+access. Not investigated yet — next session, research:
+- Where to track trial start / paid status per user — likely a new field
+  on the user record (`trialStartedAt`, `paidUntil`/`isPaid`) alongside the
+  existing Google-Sign-In user data, enforced server-side in the
+  `/api/products` routes (never trust a client-side gate alone).
+- Payment processing options for a small personal/side project — Stripe
+  Checkout (hosted, minimal PCI scope, supports one-time or subscription)
+  is the likely default recommendation; compare against Paddle/LemonSqueezy
+  (merchant-of-record, handles EU VAT automatically, relevant since this
+  app's users are in Portugal) before committing.
+- Whether this is even worth building given the app's current
+  scope/audience (personal/small-household tool) — worth a explicit
+  sanity-check with the user before investing in Stripe/webhook plumbing.
