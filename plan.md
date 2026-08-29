@@ -3201,3 +3201,23 @@ Portuguese chains worth considering.
 Existing products won't automatically pick up an Auchan price until their
 next refresh (manual "Atualizar" or the daily 8am scheduler) — expected,
 same as any other scraper change.
+
+## 28. Session Log — 2026-08-29 (cont.): Push notifications confirmed working end-to-end
+
+Resolves §26.3 (live verification, was pending) and closes out the urgent
+§26.8 investigation.
+
+User activated notifications successfully on a **different, newer phone**
+than the one that hit `AbortError: Registration failed - push service
+error` in §26.8. Confirmed via `docker exec ... cat
+/data/push-subscriptions.json`: a real subscription was saved for user
+`101601682654810331368`. Sent a manual test notification directly via
+`push.notifyPriceDrops()` (simulated a price drop: Açúcar 1 kg, Pingo
+Doce, 1,09€ → 0,89€, -18%) — delivered successfully (no 404/410, i.e. the
+push service accepted it), and the user confirmed it arrived on the phone.
+
+**§26.8 conclusion**: the original phone's `push service error` was device/
+Android-Chrome/Play-Services-specific, not an app or server bug — the
+exact same server, VAPID keys, and code worked cleanly from a different
+device. No code change was needed. Nothing further to chase on §26.8
+unless the original phone is revisited specifically.
