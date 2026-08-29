@@ -50,6 +50,17 @@ const STORES = {
     // Match the bare path instead of assuming real quoting around it.
     productLinkPattern: /(\/p\/[a-z0-9-]+\/p\d+)/g,
   },
+  // Minipreço's own online store no longer exists — minipreco.pt now
+  // redirects into Auchan.pt after Auchan absorbed the brand's
+  // e-commerce, so Auchan is the closest available equivalent (verified
+  // live, see plan.md §26.9).
+  auchan: {
+    label: 'Auchan',
+    hostSuffix: 'auchan.pt',
+    origin: 'https://www.auchan.pt',
+    searchUrl: (q) => `https://www.auchan.pt/pt/pesquisa/?q=${encodeURIComponent(q)}`,
+    productLinkPattern: /href="(\/pt\/[^"?]+\/\d+\.html)/g,
+  },
 };
 
 // A search for e.g. "leite meio gordo" can rank a 6-pack above the single
@@ -59,9 +70,14 @@ const STORES = {
 // "pack" right in the URL slug or product name (Lidl: "Pack 8x1 L"). None
 // of these signals alone covers every store, so check all of them together.
 const PACK_TEXT_PATTERN = /\bemb\.?\s*\d+\s*x\s*[\d.,]+\s*(l|lt|kg|g|un|ml)\b/i;
+// Auchan's product-URL slugs put the pack size right in the slug with no
+// "emb." prefix and no "pack" word at all (e.g. .../meio-gordo-6x1l/...,
+// .../meio-gordo-3x200ml/...) — PACK_TEXT_PATTERN and the "pack" checks
+// below both miss this, so check for the bare NxSIZE shape too.
+const URL_PACK_SIZE_PATTERN = /\b\d+\s*x\s*[\d.,]+\s*(l|lt|kg|g|un|ml)\b/i;
 function looksLikeMultiPack({ html, name, url }) {
   if (name && /\bpack\b/i.test(name)) return true;
-  if (url && /\bpack\b/i.test(url)) return true;
+  if (url && (/\bpack\b/i.test(url) || URL_PACK_SIZE_PATTERN.test(url))) return true;
   if (html && PACK_TEXT_PATTERN.test(html)) return true;
   return false;
 }
@@ -141,15 +157,26 @@ async function scrapePingoDoce(url) {
   return { price, currency: 'EUR', name, html };
 }
 
+// Same schema.org JSON-LD Product/Offer block as Continente/Lidl (Auchan
+// runs on the same Salesforce Commerce Cloud platform as Pingo Doce, but
+// unlike Pingo Doce it does include price in the JSON-LD — verified live).
+async function scrapeAuchan(url) {
+  const html = await fetchHtml(url);
+  const result = extractJsonLdPrice(html);
+  if (!result) throw new Error('preço não encontrado na página');
+  return { ...result, html };
+}
+
 const SCRAPERS = {
   continente: scrapeContinente,
   pingodoce: scrapePingoDoce,
   lidl: scrapeLidl,
+  auchan: scrapeAuchan,
 };
 
 async function scrapeUrl(url) {
   const store = detectStore(url);
-  if (!store) throw new Error('unsupported store (not Continente, Pingo Doce, or Lidl)');
+  if (!store) throw new Error('unsupported store (not Continente, Pingo Doce, Lidl, or Auchan)');
   const { html, ...result } = await SCRAPERS[store](url);
   return { store, ...result };
 }

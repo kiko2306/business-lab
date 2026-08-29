@@ -1,7 +1,7 @@
 {
   "name": "Comparador de Preços",
   "short_name": "Preços",
-  "description": "Compara preços entre Continente, Pingo Doce e Lidl",
+  "description": "Compara preços entre Continente, Pingo Doce, Lidl e Auchan",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

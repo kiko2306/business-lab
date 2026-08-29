@@ -69,7 +69,7 @@ function removeSubscription(userId, endpoint) {
   saveAll(all);
 }
 
-const STORE_LABELS = { continente: 'Continente', pingodoce: 'Pingo Doce', lidl: 'Lidl' };
+const STORE_LABELS = { continente: 'Continente', pingodoce: 'Pingo Doce', lidl: 'Lidl', auchan: 'Auchan' };
 
 function formatEuro(price) {
   return price.toFixed(2).replace('.', ',') + '€';

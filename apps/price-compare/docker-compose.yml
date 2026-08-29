@@ -36,7 +36,7 @@ services:
       - "homepage.name=Price Compare"
       - "homepage.icon=mdi-cart-outline.png"
       - "homepage.href=http://localhost:${PRICE_COMPARE_PORT:-8015}"
-      - "homepage.description=Compare grocery prices across Continente, Pingo Doce, Lidl, Recheio, Makro"
+      - "homepage.description=Compare grocery prices across Continente, Pingo Doce, Lidl, Auchan"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
       interval: 30s

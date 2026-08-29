@@ -1,5 +1,5 @@
-const SCRAPED_STORES = { continente: 'Continente', pingodoce: 'Pingo Doce', lidl: 'Lidl' };
-const STORE_COLORS = { continente: '#ff6b6b', pingodoce: '#4ade80', lidl: '#5b9bff' };
+const SCRAPED_STORES = { continente: 'Continente', pingodoce: 'Pingo Doce', lidl: 'Lidl', auchan: 'Auchan' };
+const STORE_COLORS = { continente: '#ff6b6b', pingodoce: '#4ade80', lidl: '#5b9bff', auchan: '#f0a020' };
 
 // --- Theme (light/dark), saved per-browser ---
 // The actual dark-vs-light flip already happened synchronously in
@@ -497,7 +497,7 @@ document.getElementById('notify-enable').addEventListener('click', async () => {
     await subscribeToPush();
     showToast('Notificações ativadas.');
   } catch (err) {
-    showToast('Não foi possível ativar as notificações.', true);
+    showToast('Não foi possível ativar as notificações: ' + err.message, true);
   }
 });
 
@@ -563,9 +563,9 @@ document.getElementById('notify-toggle').addEventListener('change', async (e) =>
       await unsubscribeFromPush();
       showToast('Notificações desativadas.');
     }
-  } catch {
+  } catch (err) {
     e.target.checked = !enable;
-    showToast('Não foi possível atualizar as notificações.', true);
+    showToast('Não foi possível atualizar as notificações: ' + err.message, true);
   } finally {
     e.target.disabled = false;
   }

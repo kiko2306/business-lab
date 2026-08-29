@@ -3142,3 +3142,62 @@ Ruled out so far:
     in case something is subtly wrong with this specific one.
 
 Flagged urgent by the user — resume here first next session.
+
+## 27. Session Log — 2026-08-29 (cont.): Price Compare — researched Minipreço/other PT chains, added Auchan
+
+User asked whether Minipreço could be added as a store, and to list other
+Portuguese chains worth considering.
+
+### 26.9 Research findings
+
+- **Minipreço**: no longer has its own online store — minipreco.pt now
+  redirects into Auchan.pt after Auchan Portugal absorbed the brand's
+  e-commerce (physical Minipreço stores still exist, ~500 of them, but
+  nothing separate to scrape). Auchan is the closest available equivalent.
+- **Auchan**: verified live — same Salesforce Commerce Cloud platform as
+  Pingo Doce, but unlike Pingo Doce it *does* carry price in a standard
+  schema.org JSON-LD Product/Offer block (`extractJsonLdPrice` — already
+  written for Continente/Lidl — works unmodified). No login/store-selection
+  wall on search or product pages. Chosen to add.
+- **Intermarché**: ruled out — every request (even a plain homepage fetch)
+  is blocked by DataDome bot-protection (JS-challenge/CAPTCHA,
+  `x-datadome: protected` header). Would need a real headless browser plus
+  CAPTCHA-solving infra, which conflicts with this app's whole "no headless
+  browser" scraping design and likely violates their ToS.
+- **Mercadona**: `mercadona.pt` returns 403 even on a bare HEAD request —
+  confirms the existing scrapers.js comment ("no PT catalog") is still
+  accurate despite Mercadona's growing PT market share.
+- **El Corte Inglés**: has a PT site, but it's a department store (Supercor
+  grocery section) with only 2 locations (Lisbon, Gaia) — not a meaningful
+  national grocery-price source even if scrapeable.
+
+### 26.10 Added Auchan
+
+- `scrapers.js`: new `auchan` entry in `STORES` (search URL
+  `auchan.pt/pt/pesquisa/?q=`, product links matched as
+  `/pt/.../<digits>.html`), `scrapeAuchan()` reusing `extractJsonLdPrice`.
+- Found and fixed a real gap in `looksLikeMultiPack()` while adding this:
+  Auchan's multi-pack URLs put the pack size bare in the slug with no
+  "emb." prefix and no "pack" word at all (e.g. `.../meio-gordo-6x1l/...`,
+  `.../meio-gordo-3x200ml/...`) — neither existing check
+  (`PACK_TEXT_PATTERN`, the "pack" substring checks) caught this. Added
+  `URL_PACK_SIZE_PATTERN` (`\d+x[\d.,]+(l|lt|kg|g|un|ml)`, applied to the
+  URL) alongside the existing checks.
+- Verified end-to-end in a throwaway `node:20-alpine` container before
+  deploying: `searchAndScrapeStore('auchan', 'leite meio gordo')` correctly
+  skipped several 6x1l/3x200ml multi-pack candidates ranked above it in
+  Auchan's own search results and landed on the single 1L unit
+  (`LEITE UHT AUCHAN MEIO GORDO 1L`, €0.86).
+- Updated every place that listed the 3 stores by name: `app.js`
+  (`SCRAPED_STORES`, `STORE_COLORS`), `push.js` (`STORE_LABELS`, so
+  price-drop notifications show "Auchan" correctly), `index.html` (both
+  hint texts), `manifest.webmanifest` description. Also fixed
+  `docker-compose.yml`'s `homepage.description` label, which was still
+  stale from before Recheio/Makro were removed (§ earlier session) —
+  caught while touching the same line for Auchan.
+- Deployed and confirmed live: `GET /api/stores` now returns
+  `{"continente":...,"pingodoce":...,"lidl":...,"auchan":"Auchan"}`.
+
+Existing products won't automatically pick up an Auchan price until their
+next refresh (manual "Atualizar" or the daily 8am scheduler) — expected,
+same as any other scraper change.
