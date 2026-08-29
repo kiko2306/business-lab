@@ -219,15 +219,68 @@ app.post('/api/products/:id/refresh', async (req, res) => {
 // Promise.all across products — each product already fans out to 3 stores
 // in parallel via searchAllStores, so this caps how many concurrent
 // requests hit the store sites at once rather than firing dozens together).
-app.post('/api/products/refresh-all', async (req, res) => {
+// Shared by the manual "Update prices" button (POST /refresh-all below) and
+// the daily scheduler.
+async function refreshAllProducts() {
   const products = loadProducts();
   for (const product of products) {
     product.urls = await searchAllStores(product.name, product.urls);
     product.updatedAt = new Date().toISOString();
   }
   saveProducts(products);
-  res.json(products);
+  return products;
+}
+
+app.post('/api/products/refresh-all', async (req, res) => {
+  res.json(await refreshAllProducts());
 });
 
+// --- Daily scheduled update ---
+// Same "poll every so often, compare against a stored last-run date"
+// pattern as the main dashboard's backup scheduler (see plan.md §18.3) —
+// no host-level cron, consistent with this project not needing any
+// console/host configuration beyond the initial ./start.sh. Checked every
+// 15 minutes (cheap) rather than computing an exact ms-until-8am timer, so
+// a container restart mid-window still catches the run instead of missing
+// it entirely.
+const SCHEDULE_FILE = path.join(DATA_DIR, 'schedule.json');
+const SCHEDULED_HOUR = 8;
+
+function todayLocalDateString() {
+  return new Date().toLocaleDateString('en-CA'); // YYYY-MM-DD, locale-stable
+}
+
+function loadScheduleState() {
+  try {
+    return JSON.parse(fs.readFileSync(SCHEDULE_FILE, 'utf8'));
+  } catch {
+    return { lastRunDate: null };
+  }
+}
+
+function saveScheduleState(state) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(state, null, 2));
+}
+
+async function checkScheduledUpdate() {
+  const now = new Date();
+  const today = todayLocalDateString();
+  const state = loadScheduleState();
+  if (now.getHours() < SCHEDULED_HOUR || state.lastRunDate === today) return;
+
+  console.log(`[schedule] running daily update for ${today}`);
+  try {
+    await refreshAllProducts();
+  } catch (err) {
+    console.error('[schedule] daily update failed:', err.message);
+  }
+  saveScheduleState({ lastRunDate: today });
+}
+
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => console.log(`price-compare listening on :${PORT}`));
+app.listen(PORT, () => {
+  console.log(`price-compare listening on :${PORT}`);
+  checkScheduledUpdate(); // catch up immediately if the container was down through 08:00
+  setInterval(checkScheduledUpdate, 15 * 60 * 1000);
+});

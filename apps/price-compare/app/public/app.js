@@ -4,20 +4,31 @@ const STORE_COLORS = { continente: '#ff6b6b', pingodoce: '#4ade80', lidl: '#5b9b
 let products = [];
 let categories = [];
 
-// Which product cards are collapsed, persisted per-browser so it survives
-// a reload. Keyed by product id.
-let collapsed = new Set();
-try {
-  collapsed = new Set(JSON.parse(localStorage.getItem('priceCompare.collapsed') || '[]'));
-} catch {
-  collapsed = new Set();
-}
-function saveCollapsed() {
+// Which product cards, and which whole category sections, are collapsed —
+// both persisted per-browser (separate keys) so they survive a reload.
+function loadCollapsedSet(key) {
   try {
-    localStorage.setItem('priceCompare.collapsed', JSON.stringify([...collapsed]));
+    return new Set(JSON.parse(localStorage.getItem(key) || '[]'));
+  } catch {
+    return new Set();
+  }
+}
+function saveCollapsedSet(key, set) {
+  try {
+    localStorage.setItem(key, JSON.stringify([...set]));
   } catch {
     // localStorage unavailable — collapse state just won't persist, fine.
   }
+}
+
+let collapsed = loadCollapsedSet('priceCompare.collapsed');
+function saveCollapsed() {
+  saveCollapsedSet('priceCompare.collapsed', collapsed);
+}
+
+let collapsedCategories = loadCollapsedSet('priceCompare.collapsedCategories');
+function saveCollapsedCategories() {
+  saveCollapsedSet('priceCompare.collapsedCategories', collapsedCategories);
 }
 
 async function api(path, options) {
@@ -67,16 +78,25 @@ function renderProducts() {
     const items = byCategory.get(cat);
     if (!items || !items.length) continue;
 
+    const isCatCollapsed = collapsedCategories.has(cat);
+
     const section = document.createElement('section');
     section.className = 'category-section';
+
     const heading = document.createElement('h2');
     heading.className = 'category-heading';
-    heading.textContent = cat;
+    heading.dataset.collapseCategory = cat;
+    heading.title = isCatCollapsed ? 'Expandir' : 'Colapsar';
+    heading.innerHTML = `<span class="collapse-toggle">${isCatCollapsed ? '▸' : '▾'}</span> ${escapeHtml(cat)} <span class="category-count">(${items.length})</span>`;
     section.appendChild(heading);
 
+    const list = document.createElement('div');
+    list.className = 'category-items' + (isCatCollapsed ? ' hidden' : '');
     for (const product of items.sort((a, b) => a.name.localeCompare(b.name))) {
-      section.appendChild(renderProductCard(product));
+      list.appendChild(renderProductCard(product));
     }
+    section.appendChild(list);
+
     container.appendChild(section);
   }
 }
@@ -230,6 +250,7 @@ document.body.addEventListener('click', async (e) => {
   const deleteId = e.target.dataset.delete;
   const refreshId = e.target.dataset.refresh;
   const collapseId = e.target.dataset.collapse;
+  const collapseCategory = e.target.closest('[data-collapse-category]')?.dataset.collapseCategory;
 
   if (editId) {
     openProductModal(products.find((p) => p.id === editId));
@@ -253,6 +274,11 @@ document.body.addEventListener('click', async (e) => {
     if (collapsed.has(collapseId)) collapsed.delete(collapseId);
     else collapsed.add(collapseId);
     saveCollapsed();
+    renderProducts();
+  } else if (collapseCategory) {
+    if (collapsedCategories.has(collapseCategory)) collapsedCategories.delete(collapseCategory);
+    else collapsedCategories.add(collapseCategory);
+    saveCollapsedCategories();
     renderProducts();
   } else if (e.target.dataset.history) {
     openHistoryModal(products.find((p) => p.id === e.target.dataset.history));

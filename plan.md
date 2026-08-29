@@ -1945,6 +1945,40 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       `Cache-Control`/`cf-cache-status: HIT` before assuming it's a code
       bug.
 
+### 22.9h Price Compare follow-up (same day): collapsible categories, daily 08:00 update
+- [x] **Category sections collapsible, not just individual products** —
+      the whole category heading (e.g. "LATICÍNIOS (3)") is now clickable,
+      toggling a `▾`/`▸` and hiding/showing every product card in that
+      category at once; item count shown next to the name. State persisted
+      per-browser via a second `localStorage` key
+      (`priceCompare.collapsedCategories`, separate from the existing
+      per-product `priceCompare.collapsed`). **Verified live**: collapsed
+      "Laticínios" — its 3 cards disappeared, "Mercearia" right below
+      stayed expanded and unaffected.
+- [x] **Daily automatic update at 08:00** — same "poll periodically,
+      compare against a stored last-run date" pattern the main dashboard's
+      backup scheduler already uses (plan.md §18.3), not host-level cron
+      (this project avoids host/console config beyond `./start.sh` per
+      §0 principle 2). `server.js` checks every 15 minutes whether it's
+      past 08:00 local time and today's date isn't already recorded in
+      `/data/schedule.json`; if so, runs the same `refreshAllProducts()`
+      the manual "Update prices" button uses, then records today's date.
+      Also runs one check immediately at boot, so a container restart
+      that happens to land after 08:00 still catches the day's update
+      instead of silently skipping it.
+      - **Timezone default changed**: this app now defaults to
+        `TZ=Europe/Lisbon` in its own `docker-compose.yml`, overriding the
+        dashboard-wide default of UTC (confirmed live: host and every
+        other app here run UTC) — "08:00" has to mean 08:00 in Portugal
+        specifically, since every store this app scrapes is Portuguese,
+        regardless of what timezone the host happens to run in. Still
+        overridable via `.env` like any other app.
+      - **Verified live**: `Intl.DateTimeFormat().resolvedOptions().timeZone`
+        inside the container confirms `Europe/Lisbon`; the boot-time catch-up
+        check fired immediately (deployed well after 08:00) and wrote
+        `{"lastRunDate":"2026-08-29"}` to `schedule.json`, confirming it
+        won't re-run again today.
+
 ### 22.9 Optional / niche
 - [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
       streaming, if Jellyfin's music side isn't enough.

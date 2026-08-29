@@ -19,7 +19,10 @@ main { padding: 20px; max-width: 900px; margin: 0 auto; }
 .category-heading {
   font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: #9aa1ad;
   margin: 0 0 10px; padding-bottom: 6px; border-bottom: 1px solid #2a2e37;
+  display: flex; align-items: center; gap: 4px; cursor: pointer; user-select: none;
 }
+.category-count { color: #6b7280; font-weight: 400; text-transform: none; letter-spacing: normal; }
+.category-items.hidden { display: none; }
 
 .product-card {
   background: #1c1f26; border: 1px solid #2a2e37; border-radius: 12px;

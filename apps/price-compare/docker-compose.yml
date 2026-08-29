@@ -5,7 +5,12 @@ services:
     ports:
       - "${PRICE_COMPARE_PORT:-8015}:3000"
     environment:
-      TZ: ${TZ:-UTC}
+      # Defaults to Portugal specifically (not UTC like the dashboard-wide
+      # default) — this app's daily scheduled update (server.js) fires at
+      # 08:00 in whatever TZ the process sees, and every store it scrapes
+      # is Portuguese, so "8am" should mean 8am in Portugal regardless of
+      # what timezone the host itself runs in.
+      TZ: ${TZ:-Europe/Lisbon}
     volumes:
       # Single products.json file — same reasoning as apps/pantry: small,
       # single-user dataset, no real database needed.
