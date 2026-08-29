@@ -3043,3 +3043,15 @@ push received" chain is still pending the user's own click, which they're
 doing from their phone. Follow up next session (or later this one): check
 `push-subscriptions.json` for a saved subscription, then send a real test
 notification for one simple product to confirm delivery.
+
+### 26.4 Open follow-up — Google Play Store publishing
+
+User asked to look into whether Price Compare (currently an installable
+PWA) could be published to the Google Play Store. Not investigated yet —
+next session: check feasibility of wrapping it as a Trusted Web Activity
+(TWA), what that requires (Digital Asset Links verification on the
+production domain, a signed Android package via Bubblewrap/PWABuilder, a
+Google Play Console developer account — one-time $25 fee), and whether
+it's worth it for a single/small-household-user app versus just keeping it
+as a PWA install (already works today via the existing manifest.webmanifest
++ sw.js).
