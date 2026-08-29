@@ -5,6 +5,10 @@ const crypto = require('crypto');
 const { STORES, searchAndScrapeStore } = require('./scrapers');
 const auth = require('./auth');
 const push = require('./push');
+const users = require('./users');
+
+const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
+const ADSENSE_CLIENT_ID = process.env.ADSENSE_CLIENT_ID || '';
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const DATA_FILE = path.join(DATA_DIR, 'products.json');
@@ -194,6 +198,7 @@ app.get('/auth/google/callback', async (req, res) => {
   try {
     const user = await auth.exchangeCode(code);
     claimLegacyProductsIfNeeded(user.sub);
+    users.upsertProfile(user);
     const token = auth.createSession(user);
     auth.setSessionCookie(req, res, token);
     res.redirect('/');
@@ -213,7 +218,46 @@ app.post('/auth/logout', (req, res) => {
 app.get('/api/me', (req, res) => {
   const user = auth.currentUser(req);
   if (!user) return res.status(401).json({ error: 'sessão não iniciada' });
-  res.json({ email: user.email, name: user.name, picture: user.picture });
+  res.json({
+    email: user.email,
+    name: user.name,
+    picture: user.picture,
+    adsEnabled: Boolean(ADSENSE_CLIENT_ID) && users.adsEnabledFor(user.sub),
+    isAdmin: Boolean(ADMIN_EMAIL) && user.email === ADMIN_EMAIL,
+  });
+});
+
+// Public — the AdSense script needs this client-side; not a secret (it's
+// visible in AdSense's own script tag on any page that uses it anyway).
+app.get('/api/ads-config', (req, res) => {
+  res.json({ clientId: ADSENSE_CLIENT_ID || null });
+});
+
+// --- Admin: VIP/paid status management ---
+// Deliberately not under /api/products' requireAuth chain — gated by
+// email match instead, since this isn't a per-product-owner action.
+function requireAdmin(req, res, next) {
+  const user = auth.currentUser(req);
+  if (!user) return res.status(401).json({ error: 'sessão não iniciada' });
+  if (!ADMIN_EMAIL || user.email !== ADMIN_EMAIL) return res.status(403).json({ error: 'acesso negado' });
+  req.user = user;
+  next();
+}
+
+app.get('/api/admin/users', requireAdmin, (req, res) => {
+  res.json(users.listUsers());
+});
+
+app.post('/api/admin/users/:userId/vip', requireAdmin, (req, res) => {
+  const ok = users.setVip(req.params.userId, Boolean(req.body?.isVip));
+  if (!ok) return res.status(404).json({ error: 'utilizador não encontrado' });
+  res.status(204).end();
+});
+
+app.post('/api/admin/users/:userId/paid', requireAdmin, (req, res) => {
+  const ok = users.setPaid(req.params.userId, Boolean(req.body?.isPaid));
+  if (!ok) return res.status(404).json({ error: 'utilizador não encontrado' });
+  res.status(204).end();
 });
 
 // express's static mime lookup doesn't always know .webmanifest — set it

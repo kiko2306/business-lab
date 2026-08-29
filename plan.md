@@ -3278,3 +3278,65 @@ Account and the old one is permanently closed.
 Next session: once identity validation clears, resume §26.4 (TWA wrapper:
 Digital Asset Links, Bubblewrap/PWABuilder, signed Android package) to
 actually publish Price Compare.
+
+## 29. Session Log — 2026-08-29 (cont.): Price Compare — ads scaffolding + VIP/paid gating + admin dashboard
+
+User decided on ads (Google AdSense) as the monetization path over the
+earlier trial/paywall idea (§26.5): free users see ads, VIP and paid
+users don't. Real ad revenue expectation set correctly first — RPM for a
+small/niche PT-traffic site is roughly €0.50-3/1000 impressions, so this
+is not a meaningful income stream at this app's scale, more a nudge
+toward VIP/paid than real revenue.
+
+### 29.1 What shipped
+
+- New `users.js` — per-user record (`isVip`, `isPaid`, cached
+  `email`/`name`) in `/data/users.json`, same flat-JSON-file pattern as
+  the rest of this app. `adsEnabledFor(userId)` returns false if either
+  flag is set. Profile upserted on every login (`server.js`'s
+  `/auth/google/callback`) so the admin dashboard has human-readable
+  names/emails without needing an active session per user.
+- `/api/me` now includes `adsEnabled` (false for VIP/paid, and also false
+  if `ADSENSE_CLIENT_ID` isn't configured at all — no point exposing the
+  flag if there's nothing to gate) and `isAdmin` (exact match against
+  `ADMIN_EMAIL`).
+- `/api/ads-config` (public) returns the AdSense client ID or null — not
+  a secret, AdSense client IDs are visible in the page source of any site
+  using them anyway.
+- Admin routes (`/api/admin/users`, `POST .../vip`, `POST .../paid`),
+  gated by `req.user.email === ADMIN_EMAIL` — deliberately not under the
+  `/api/products` `requireAuth` chain since this isn't a per-owner action.
+- Frontend: `#ad-slot` in main content, populated with a real
+  `<ins class="adsbygoogle">` unit + the AdSense loader script only when
+  `adsEnabled && clientId` are both true — stays completely inert
+  (no script injected at all) until a real publisher ID is set, so this
+  ships live with zero visible/behavioral change today.
+- New "Administração" section in the Settings modal (👑, visible only to
+  `ADMIN_EMAIL`) — lists every user with VIP/Pago checkboxes, calling the
+  admin API directly. Verified live: toggled VIP for the admin's own
+  account, confirmed `isVip: true` landed in `/data/users.json`, then
+  reverted it.
+- `ADMIN_EMAIL=miguelamtx@gmail.com` set in the real `.env` — the admin
+  dashboard is live now, no external account needed for that part.
+  `ADSENSE_CLIENT_ID` left empty — **user does not have an AdSense
+  account yet**, needs to sign up themselves at adsense.google.com
+  (account creation/approval is a self-serve flow, same category of
+  thing as the Play Console account — can't be done on their behalf).
+
+### 29.2 Deliberately not built yet — "buy the app to remove ads"
+
+User's ask was "when user buy the app ads will be off" — the `isPaid`
+flag and its ads-gating effect already exist and work (verified via the
+admin toggle), but there's no self-serve purchase flow wired to it yet.
+That needs an actual payment processor decision. Two paths, both still
+open:
+- **Google Play Billing** — becomes available once the Play Console
+  developer account (§26.12, pending Google's identity verification)
+  is fully active and Price Compare is published via the TWA wrapper
+  (§26.4). Natural fit since it was already the plan, and uses Google Pay
+  under the hood.
+  - Stripe/Paddle (§26.5) with Google Pay as one of the checkout payment
+  methods — works independent of Play Store status, but needs a Stripe/
+  Paddle account setup first.
+Follow up next session once the Play Console identity check clears —
+that likely tips the decision toward Play Billing given the timing.

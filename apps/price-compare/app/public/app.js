@@ -410,11 +410,42 @@ function showLoginScreen() {
   document.getElementById('header-user').classList.add('hidden');
 }
 
+let currentUser = null;
+
 function showApp(user) {
+  currentUser = user;
   document.getElementById('login-screen').classList.add('hidden');
   document.getElementById('main-content').classList.remove('hidden');
   document.getElementById('header-user').classList.remove('hidden');
   document.getElementById('user-info').textContent = user.name || user.email;
+  document.getElementById('admin-section').classList.toggle('hidden', !user.isAdmin);
+}
+
+// --- Ads (Google AdSense) — hidden entirely for VIP/paid users (server
+// already reflects that in adsEnabled) and until a real AdSense publisher
+// ID is configured server-side (see .env.example ADSENSE_CLIENT_ID).
+async function setupAds(user) {
+  if (!user.adsEnabled) return;
+  const res = await fetch('/api/ads-config');
+  const { clientId } = await res.json();
+  if (!clientId) return;
+
+  const slot = document.getElementById('ad-slot');
+  slot.classList.remove('hidden');
+  slot.innerHTML = `<ins class="adsbygoogle" style="display:block" data-ad-client="${clientId}" data-ad-format="auto" data-full-width-responsive="true"></ins>`;
+
+  const script = document.createElement('script');
+  script.async = true;
+  script.src = `https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=${clientId}`;
+  script.crossOrigin = 'anonymous';
+  script.onload = () => {
+    try {
+      (window.adsbygoogle = window.adsbygoogle || []).push({});
+    } catch {
+      // AdSense not yet approved for this site, or blocked by an ad blocker — fine, slot just stays empty.
+    }
+  };
+  document.head.appendChild(script);
 }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
@@ -440,6 +471,7 @@ async function init() {
   await loadCategories();
   await loadProducts();
   maybeShowNotifyPrompt();
+  setupAds(user);
 }
 
 init();
@@ -538,9 +570,59 @@ async function refreshNotifyToggleState() {
   }
 }
 
+// --- Admin (VIP/paid management) — only visible to ADMIN_EMAIL, see showApp() ---
+async function loadAdminUsers() {
+  const list = document.getElementById('admin-users-list');
+  list.textContent = 'A carregar...';
+  let usersList;
+  try {
+    usersList = await fetch('/api/admin/users').then((r) => r.json());
+  } catch {
+    list.textContent = 'Não foi possível carregar utilizadores.';
+    return;
+  }
+  if (!usersList.length) {
+    list.innerHTML = '<p class="hint">Ainda não há utilizadores.</p>';
+    return;
+  }
+  list.innerHTML = usersList
+    .map(
+      (u) => `
+    <div class="admin-user-row" data-user-id="${escapeHtml(u.userId)}">
+      <div>
+        <div>${escapeHtml(u.name || u.email)}</div>
+        <div class="admin-user-email">${escapeHtml(u.email)}</div>
+      </div>
+      <div class="admin-user-toggles">
+        <label><input type="checkbox" class="admin-vip-toggle" ${u.isVip ? 'checked' : ''} /> VIP</label>
+        <label><input type="checkbox" class="admin-paid-toggle" ${u.isPaid ? 'checked' : ''} /> Pago</label>
+      </div>
+    </div>`
+    )
+    .join('');
+
+  list.querySelectorAll('.admin-vip-toggle').forEach((el) =>
+    el.addEventListener('change', (e) => {
+      const userId = e.target.closest('.admin-user-row').dataset.userId;
+      api(`/admin/users/${encodeURIComponent(userId)}/vip`, { method: 'POST', body: JSON.stringify({ isVip: e.target.checked }) }).catch((err) =>
+        showToast(err.message, true)
+      );
+    })
+  );
+  list.querySelectorAll('.admin-paid-toggle').forEach((el) =>
+    el.addEventListener('change', (e) => {
+      const userId = e.target.closest('.admin-user-row').dataset.userId;
+      api(`/admin/users/${encodeURIComponent(userId)}/paid`, { method: 'POST', body: JSON.stringify({ isPaid: e.target.checked }) }).catch((err) =>
+        showToast(err.message, true)
+      );
+    })
+  );
+}
+
 document.getElementById('settings-btn').addEventListener('click', () => {
   document.getElementById('settings-modal').classList.add('open');
   refreshNotifyToggleState();
+  if (currentUser?.isAdmin) loadAdminUsers();
 });
 document.getElementById('settings-close').addEventListener('click', () => {
   document.getElementById('settings-modal').classList.remove('open');

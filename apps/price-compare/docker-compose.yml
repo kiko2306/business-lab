@@ -26,6 +26,9 @@ services:
       VAPID_PUBLIC_KEY: ${VAPID_PUBLIC_KEY:-}
       VAPID_PRIVATE_KEY: ${VAPID_PRIVATE_KEY:-}
       VAPID_SUBJECT: ${VAPID_SUBJECT:-}
+      # Ads (push.js is unrelated) + admin dashboard — see .env.example.
+      ADSENSE_CLIENT_ID: ${ADSENSE_CLIENT_ID:-}
+      ADMIN_EMAIL: ${ADMIN_EMAIL:-}
     volumes:
       # Single products.json file — same reasoning as apps/pantry: small
       # dataset, no real database needed. Now multi-user (each product

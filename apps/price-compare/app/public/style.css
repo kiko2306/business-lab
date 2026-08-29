@@ -69,6 +69,23 @@ body {
 
 main { padding: 20px; max-width: 900px; margin: 0 auto; }
 .hint { color: var(--text-muted); font-size: 13px; margin-top: 0; }
+
+.ad-slot {
+  margin-bottom: 20px; min-height: 90px; display: flex; align-items: center; justify-content: center;
+  background: var(--bg-elevated); border: 1px dashed var(--border); border-radius: 8px;
+  color: var(--text-faint); font-size: 12px;
+}
+
+.settings-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+#admin-section h3 { margin: 0 0 4px; font-size: 15px; }
+.admin-user-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 0; border-top: 1px solid var(--border-soft); font-size: 13px;
+}
+.admin-user-row:first-of-type { border-top: none; }
+.admin-user-email { color: var(--text-muted); font-size: 12px; }
+.admin-user-toggles { display: flex; gap: 14px; align-items: center; flex-shrink: 0; }
+.admin-user-toggles label { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--btn-text); cursor: pointer; }
 .empty { color: var(--text-faint); padding: 24px 0; text-align: center; }
 .hidden { display: none !important; }
 

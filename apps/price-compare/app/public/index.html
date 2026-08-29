@@ -53,6 +53,7 @@
       Basta escrever o nome de um produto — a Continente, o Pingo Doce, o
       Lidl e o Auchan são pesquisados e os preços obtidos automaticamente.
     </p>
+    <div id="ad-slot" class="ad-slot hidden"></div>
     <div id="products"></div>
     <p id="products-empty" class="empty hidden">Ainda não há produtos — adicione o primeiro acima.</p>
   </main>
@@ -128,6 +129,12 @@
           <li>Se continuar a falhar, limpe os dados do navegador para este site: Definições do sistema → Aplicações → (o navegador) → Armazenamento → Limpar armazenamento — depois repita os passos acima.</li>
         </ol>
       </details>
+      <div id="admin-section" class="hidden">
+        <hr class="settings-divider" />
+        <h3>👑 Administração</h3>
+        <p class="hint">Contas VIP não veem anúncios.</p>
+        <div id="admin-users-list"></div>
+      </div>
       <div class="modal-actions">
         <button type="button" id="settings-close" class="btn">Fechar</button>
       </div>
