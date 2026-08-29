@@ -3,9 +3,16 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { STORES, searchAndScrapeStore } = require('./scrapers');
+const auth = require('./auth');
 
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const DATA_FILE = path.join(DATA_DIR, 'products.json');
+// Every account's data lives together in the same products.json, one flat
+// list — each product carries the owning user's Google `sub` (userId).
+// loadUserProducts()/saveUserProducts() below are the only things that
+// touch the file on a per-user code path; the scheduler and the migration
+// below work with the unfiltered list directly.
+const CLAIM_FILE = path.join(DATA_DIR, 'legacy-claimed.json');
 
 // Portuguese grocery categories, matching how these stores organize their
 // own sites — products are grouped by category in the UI, not by brand.
@@ -25,7 +32,7 @@ const CATEGORIES = [
 ];
 const DEFAULT_CATEGORY = 'Outros';
 
-function loadProducts() {
+function loadAllProducts() {
   if (!fs.existsSync(DATA_FILE)) return [];
   try {
     const raw = fs.readFileSync(DATA_FILE, 'utf8');
@@ -36,11 +43,43 @@ function loadProducts() {
   }
 }
 
-function saveProducts(products) {
+function saveAllProducts(products) {
   fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = DATA_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(products, null, 2));
   fs.renameSync(tmp, DATA_FILE);
+}
+
+// One-time migration: this app ran single-user (no accounts at all) before
+// Google login was added, so every product already in products.json has no
+// userId. The first person who ever logs in is, in practice, the person
+// who already owned that data — assign it all to them, once, tracked via
+// CLAIM_FILE so a second/third user logging in later doesn't also inherit
+// it.
+function claimLegacyProductsIfNeeded(userId) {
+  if (fs.existsSync(CLAIM_FILE)) return;
+  const products = loadAllProducts();
+  let changed = false;
+  for (const p of products) {
+    if (!p.userId) {
+      p.userId = userId;
+      changed = true;
+    }
+  }
+  if (changed) saveAllProducts(products);
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.writeFileSync(CLAIM_FILE, JSON.stringify({ claimedBy: userId, claimedAt: new Date().toISOString() }, null, 2));
+}
+
+function loadUserProducts(userId) {
+  return loadAllProducts().filter((p) => p.userId === userId);
+}
+
+// Replaces this user's products within the full multi-user list, leaving
+// every other user's products untouched.
+function saveUserProducts(userId, userProducts) {
+  const others = loadAllProducts().filter((p) => p.userId !== userId);
+  saveAllProducts([...others, ...userProducts]);
 }
 
 // Searches one store for `name` and scrapes whichever product it ranks
@@ -113,10 +152,46 @@ function renderIndexHtml() {
 }
 
 const app = express();
+app.set('trust proxy', true); // behind NPM/Cloudflare Tunnel — needed so req.protocol reflects X-Forwarded-Proto for secure cookies
 app.use(express.json());
 
 app.get(['/', '/index.html'], (req, res) => {
   res.set('Cache-Control', 'no-store').type('html').send(renderIndexHtml());
+});
+
+// --- Google Sign-In ---
+app.get('/auth/google', (req, res) => {
+  if (!auth.isConfigured()) return res.status(503).send('Login com Google ainda não está configurado neste servidor.');
+  res.redirect(auth.buildAuthUrl());
+});
+
+app.get('/auth/google/callback', async (req, res) => {
+  const { code, state, error } = req.query;
+  if (error) return res.redirect('/?auth_error=' + encodeURIComponent(String(error)));
+  if (!auth.consumeState(state)) return res.status(400).send('Pedido de autenticação inválido ou expirado — tente novamente.');
+  try {
+    const user = await auth.exchangeCode(code);
+    claimLegacyProductsIfNeeded(user.sub);
+    const token = auth.createSession(user);
+    auth.setSessionCookie(req, res, token);
+    res.redirect('/');
+  } catch (err) {
+    console.error('Google auth failed:', err.message);
+    res.redirect('/?auth_error=1');
+  }
+});
+
+app.post('/auth/logout', (req, res) => {
+  const token = req.headers.cookie?.match(/(?:^|;\s*)pc_session=([^;]+)/)?.[1];
+  if (token) auth.destroySession(token);
+  auth.clearSessionCookie(res);
+  res.status(204).end();
+});
+
+app.get('/api/me', (req, res) => {
+  const user = auth.currentUser(req);
+  if (!user) return res.status(401).json({ error: 'sessão não iniciada' });
+  res.json({ email: user.email, name: user.name, picture: user.picture });
 });
 
 // express's static mime lookup doesn't always know .webmanifest — set it
@@ -140,8 +215,14 @@ app.get('/api/stores', (req, res) => {
 
 app.get('/api/categories', (req, res) => res.json(CATEGORIES));
 
+// Every /api/products* route from here on is per-user: requireAuth attaches
+// req.user, and each handler only ever reads/writes that user's own slice
+// of products.json (loadUserProducts/saveUserProducts) — there is no code
+// path here that can read or modify another account's data.
+app.use('/api/products', auth.requireAuth);
+
 app.get('/api/products', (req, res) => {
-  res.json(loadProducts().sort((a, b) => a.name.localeCompare(b.name)));
+  res.json(loadUserProducts(req.user.sub).sort((a, b) => a.name.localeCompare(b.name)));
 });
 
 app.post('/api/products', async (req, res) => {
@@ -155,6 +236,7 @@ app.post('/api/products', async (req, res) => {
 
   const product = {
     id: crypto.randomUUID(),
+    userId: req.user.sub,
     name: trimmedName,
     category: CATEGORIES.includes(category) ? category : DEFAULT_CATEGORY,
     urls: entries,
@@ -162,9 +244,9 @@ app.post('/api/products', async (req, res) => {
     updatedAt: new Date().toISOString(),
   };
 
-  const products = loadProducts();
+  const products = loadUserProducts(req.user.sub);
   products.push(product);
-  saveProducts(products);
+  saveUserProducts(req.user.sub, products);
   res.status(201).json(product);
 });
 
@@ -172,7 +254,7 @@ app.post('/api/products', async (req, res) => {
 // were found using the old name as the query, so they may no longer be the
 // right product once it changes.
 app.put('/api/products/:id', async (req, res) => {
-  const products = loadProducts();
+  const products = loadUserProducts(req.user.sub);
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
@@ -190,49 +272,49 @@ app.put('/api/products/:id', async (req, res) => {
   }
   product.updatedAt = new Date().toISOString();
 
-  saveProducts(products);
+  saveUserProducts(req.user.sub, products);
   res.json(product);
 });
 
 app.delete('/api/products/:id', (req, res) => {
-  const products = loadProducts();
+  const products = loadUserProducts(req.user.sub);
   const next = products.filter((p) => p.id !== req.params.id);
   if (next.length === products.length) return res.status(404).json({ error: 'produto não encontrado' });
-  saveProducts(next);
+  saveUserProducts(req.user.sub, next);
   res.status(204).end();
 });
 
 // Re-runs the store searches for this product's current name.
 app.post('/api/products/:id/refresh', async (req, res) => {
-  const products = loadProducts();
+  const products = loadUserProducts(req.user.sub);
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
   product.urls = await searchAllStores(product.name, product.urls);
   product.updatedAt = new Date().toISOString();
 
-  saveProducts(products);
+  saveUserProducts(req.user.sub, products);
   res.json(product);
 });
 
-// Re-runs the store searches for every product, one at a time (not
-// Promise.all across products — each product already fans out to 3 stores
-// in parallel via searchAllStores, so this caps how many concurrent
-// requests hit the store sites at once rather than firing dozens together).
-// Shared by the manual "Update prices" button (POST /refresh-all below) and
-// the daily scheduler.
-async function refreshAllProducts() {
-  const products = loadProducts();
+// Re-runs the store searches for every product belonging to one user, one
+// at a time (not Promise.all across products — each product already fans
+// out to 3 stores in parallel via searchAllStores, so this caps how many
+// concurrent requests hit the store sites at once rather than firing dozens
+// together). Shared by the manual "Update prices" button and, for every
+// user at once, the daily scheduler below.
+async function refreshProductsForUser(userId) {
+  const products = loadUserProducts(userId);
   for (const product of products) {
     product.urls = await searchAllStores(product.name, product.urls);
     product.updatedAt = new Date().toISOString();
   }
-  saveProducts(products);
+  saveUserProducts(userId, products);
   return products;
 }
 
 app.post('/api/products/refresh-all', async (req, res) => {
-  res.json(await refreshAllProducts());
+  res.json(await refreshProductsForUser(req.user.sub));
 });
 
 // --- Daily scheduled update ---
@@ -270,10 +352,13 @@ async function checkScheduledUpdate() {
   if (now.getHours() < SCHEDULED_HOUR || state.lastRunDate === today) return;
 
   console.log(`[schedule] running daily update for ${today}`);
-  try {
-    await refreshAllProducts();
-  } catch (err) {
-    console.error('[schedule] daily update failed:', err.message);
+  const userIds = [...new Set(loadAllProducts().map((p) => p.userId).filter(Boolean))];
+  for (const userId of userIds) {
+    try {
+      await refreshProductsForUser(userId);
+    } catch (err) {
+      console.error(`[schedule] daily update failed for user ${userId}:`, err.message);
+    }
   }
   saveScheduleState({ lastRunDate: today });
 }

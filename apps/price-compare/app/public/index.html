@@ -17,13 +17,24 @@
 <body>
   <header id="bar">
     <h1>🛒 Comparador de Preços</h1>
-    <div class="header-actions">
+    <div id="header-user" class="header-actions hidden">
+      <span id="user-info" class="user-info"></span>
       <button id="update-all-btn" class="btn">↻ Atualizar preços</button>
       <button id="add-product-btn" class="btn primary">+ Adicionar produto</button>
+      <button id="logout-btn" class="btn small">Sair</button>
     </div>
   </header>
 
-  <main>
+  <div id="login-screen" class="login-screen hidden">
+    <div class="login-box">
+      <h2>🛒 Comparador de Preços</h2>
+      <p class="hint">Inicie sessão para ver e comparar os seus produtos.</p>
+      <a id="google-login-link" href="/auth/google" class="btn primary google-btn">Entrar com o Google</a>
+      <p id="login-error" class="price-error hidden"></p>
+    </div>
+  </div>
+
+  <main id="main-content" class="hidden">
     <p class="hint">
       Basta escrever o nome de um produto — a Continente, o Pingo Doce e o
       Lidl são pesquisados e os preços obtidos automaticamente.

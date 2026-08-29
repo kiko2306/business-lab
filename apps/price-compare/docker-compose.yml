@@ -11,9 +11,18 @@ services:
       # is Portuguese, so "8am" should mean 8am in Portugal regardless of
       # what timezone the host itself runs in.
       TZ: ${TZ:-Europe/Lisbon}
+      # Standalone Google Sign-In (apps/price-compare/app/auth.js) — each
+      # Google account that signs in becomes its own user automatically,
+      # each only ever seeing their own products. See .env.example for how
+      # to get these from Google Cloud Console. The app boots fine without
+      # them set; /auth/google just returns 503 until they're configured.
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GOOGLE_REDIRECT_URI: ${GOOGLE_REDIRECT_URI:-}
     volumes:
-      # Single products.json file — same reasoning as apps/pantry: small,
-      # single-user dataset, no real database needed.
+      # Single products.json file — same reasoning as apps/pantry: small
+      # dataset, no real database needed. Now multi-user (each product
+      # carries a userId), still just one flat JSON file.
       - ./data:/data
     labels:
       - "homepage.group=Productivity"

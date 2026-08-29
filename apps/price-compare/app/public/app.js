@@ -36,6 +36,12 @@ async function api(path, options) {
     headers: { 'Content-Type': 'application/json' },
     ...options,
   });
+  if (res.status === 401) {
+    // Session expired/logged out elsewhere mid-use — drop back to the
+    // login screen instead of just toasting a confusing error.
+    showLoginScreen();
+    throw new Error('sessão expirada — inicie sessão novamente');
+  }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
     throw new Error(body.error || `request failed (${res.status})`);
@@ -369,7 +375,45 @@ function buildHistoryChart(product) {
   return svg + `<div class="chart-legend">${legend}</div>`;
 }
 
-loadCategories().then(loadProducts);
+// --- Auth bootstrap ---
+function showLoginScreen() {
+  document.getElementById('login-screen').classList.remove('hidden');
+  document.getElementById('main-content').classList.add('hidden');
+  document.getElementById('header-user').classList.add('hidden');
+}
+
+function showApp(user) {
+  document.getElementById('login-screen').classList.add('hidden');
+  document.getElementById('main-content').classList.remove('hidden');
+  document.getElementById('header-user').classList.remove('hidden');
+  document.getElementById('user-info').textContent = user.name || user.email;
+}
+
+document.getElementById('logout-btn').addEventListener('click', async () => {
+  await fetch('/auth/logout', { method: 'POST' });
+  showLoginScreen();
+});
+
+async function init() {
+  const params = new URLSearchParams(location.search);
+  if (params.get('auth_error')) {
+    document.getElementById('login-error').textContent = 'Não foi possível iniciar sessão com o Google. Tente novamente.';
+    document.getElementById('login-error').classList.remove('hidden');
+    history.replaceState(null, '', location.pathname);
+  }
+
+  const res = await fetch('/api/me');
+  if (!res.ok) {
+    showLoginScreen();
+    return;
+  }
+  const user = await res.json();
+  showApp(user);
+  await loadCategories();
+  await loadProducts();
+}
+
+init();
 
 if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {

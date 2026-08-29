@@ -1979,6 +1979,73 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
         `{"lastRunDate":"2026-08-29"}` to `schedule.json`, confirming it
         won't re-run again today.
 
+### 22.9i Price Compare: multi-user via standalone Google Sign-In (requested, 2026-08-29)
+- [x] **Google Sign-In, standalone (not via Authelia)** — explicit choice
+      over reusing the existing Authelia SSO, discussed with the user
+      before building: each Google account becomes its own user
+      automatically the moment it completes login, no separate
+      invite/registration step, no shared homelab account. `app/auth.js`
+      (new) implements the OAuth2 authorization-code flow by hand against
+      Google's endpoints with plain `fetch` — no new npm dependency
+      (`google-auth-library` etc. deliberately skipped, matching this
+      app's existing minimal-deps pattern of `express` + `cheerio` only).
+      - `GET /auth/google` redirects to Google (state param = CSRF guard,
+        5 min TTL, single-use); `GET /auth/google/callback` exchanges the
+        code server-to-server (requires `client_secret`, never exposed to
+        the browser) and decodes the returned `id_token` *without*
+        verifying its signature — safe specifically because it came from
+        Google's token endpoint over our own authenticated request, not
+        from the client, so there's nothing for a browser to have forged.
+      - Sessions are an in-memory `Map` (opaque token in an httpOnly,
+        `sameSite=lax` cookie, `secure` when `req.protocol` is https —
+        `trust proxy` enabled so that reflects NPM's `X-Forwarded-Proto`
+        correctly) — **not** persisted to disk, so a container restart
+        logs everyone out. Accepted trade-off for a personal-scale tool;
+        revisit if that becomes annoying in practice.
+      - **Data now multi-user**: every product carries a `userId` (the
+        Google `sub`); `server.js`'s `loadUserProducts`/`saveUserProducts`
+        filter/merge against the single shared `products.json` so one
+        user's write can never touch another's data. All `/api/products*`
+        routes gated behind `auth.requireAuth`; `/api/categories`,
+        `/api/stores`, `/api/health` stay public (no user data in them).
+      - **Existing data migrated automatically, once**: the 5 products
+        already in `products.json` from before this change have no
+        `userId` — `claimLegacyProductsIfNeeded()` assigns all of them to
+        whichever Google account logs in *first* after this ships (tracked
+        via a `legacy-claimed.json` marker so a second/third user later
+        doesn't also inherit them). In practice that'll be the person who
+        already owned this data day-to-day, so it lands correctly without
+        needing a manual admin step.
+      - **Daily scheduler (§22.9h) updated for multi-user**: it now
+        iterates every distinct `userId` found in the file and refreshes
+        each user's products separately, instead of one flat list.
+      - Frontend: a login screen (`Entrar com o Google`) gates the whole
+        app until `GET /api/me` succeeds; the header then shows the
+        signed-in user's name/email and a "Sair" (logout) button. A 401
+        from any API call mid-session (expired/cleared session) drops back
+        to the login screen instead of just toasting a confusing error.
+      - **Needs the user to create Google OAuth credentials themselves** —
+        not something this session can do (requires their own Google
+        account, Cloud Console access, and clicking through Google's own
+        consent-screen setup). `.env.example` now documents the exact
+        steps and the exact `GOOGLE_REDIRECT_URI` to register
+        (`https://price-compare.tx-home-utils.com/auth/google/callback`).
+        The app boots and serves the login screen fine without these set;
+        `/auth/google` just returns a friendly `503` until they are.
+      - **Verified live** (everything short of an actual Google login,
+        which needs those credentials): `/api/me` and `/api/products`
+        both correctly `401` when logged out, `/auth/google` correctly
+        `503`s pre-configuration instead of crashing, the login screen
+        renders correctly in a real browser, and the 5 pre-existing
+        products are confirmed still intact with `userId: null`, waiting
+        to be claimed on first login.
+      - **Caught and fixed during this build**: the `Dockerfile` only
+        `COPY`'d `scrapers.js server.js` — the new `auth.js` module wasn't
+        in the image at all, so the container crash-looped on
+        `Cannot find module './auth'` on the very first rebuild. Fixed by
+        adding it to the `COPY` line; worth remembering for any future new
+        `.js` file added to this app's `app/` directory.
+
 ### 22.9 Optional / niche
 - [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
       streaming, if Jellyfin's music side isn't enough.

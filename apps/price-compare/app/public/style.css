@@ -8,12 +8,23 @@ body {
   padding: 14px 20px; background: #1c1f26; border-bottom: 1px solid #2a2e37;
 }
 #bar h1 { margin: 0; font-size: 20px; }
-.header-actions { display: flex; gap: 8px; }
+.header-actions { display: flex; gap: 8px; align-items: center; }
+.user-info { font-size: 13px; color: #9aa1ad; margin-right: 4px; }
 
 main { padding: 20px; max-width: 900px; margin: 0 auto; }
 .hint { color: #9aa1ad; font-size: 13px; margin-top: 0; }
 .empty { color: #6b7280; padding: 24px 0; text-align: center; }
 .hidden { display: none; }
+
+.login-screen {
+  min-height: calc(100vh - 62px); display: flex; align-items: center; justify-content: center; padding: 20px;
+}
+.login-box {
+  background: #1c1f26; border: 1px solid #2a2e37; border-radius: 12px;
+  padding: 32px; width: min(360px, 100%); text-align: center;
+}
+.login-box h2 { margin: 0 0 8px; font-size: 20px; }
+.google-btn { display: block; margin-top: 16px; text-decoration: none; }
 
 .category-section { margin-bottom: 24px; }
 .category-heading {
