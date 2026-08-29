@@ -2904,3 +2904,67 @@ mobile itself — 24.1-24.2 (dashboard + setup-key path) are the only things
 that shipped and are confirmed working. Next session, resume at: does the
 user have a static IP/DDNS, and do they want to proceed with the port
 forward, or reconsider Tailscale-alongside despite the two-app cost.
+
+## 25. Session Log — 2026-08-29 (cont.): Price Compare — Google OAuth credentials created, login flow fixed and verified live
+
+Continuing from the multi-user Google Sign-In work already shipped in code
+(auth.js, per-user data scoping, legacy-claim migration) — that only needed
+real Google OAuth credentials to actually function.
+
+### 25.1 Created the Google Cloud OAuth client
+
+Walked Google Cloud Console directly (browser tool, at the user's request)
+since project creation and OAuth consent screen setup can't be scripted:
+- New GCP project (ended up named "My Project 1306PriceCompare" — a text
+  field append bug, cosmetic only, project ID `my-project-1306pricecompare`).
+- OAuth consent screen: External audience (any Google account, not just a
+  Workspace org), app name "Comparador de Precos", support/contact email
+  miguelamtx@gmail.com.
+- OAuth client ID: Web application, name "Price Compare", redirect URI
+  `https://price-compare.tx-home-utils.com/auth/google/callback` (must match
+  `GOOGLE_REDIRECT_URI` byte-for-byte — it does).
+- Got Client ID `623448257699-seft2nn02rgib4ah6168jarajg696shi.apps.googleusercontent.com`
+  and a Client Secret, written into a new `apps/price-compare/.env` (copied
+  from `.env.example`, gitignored, not committed).
+- `docker compose up -d` to pick up the new env vars. `/auth/google` went
+  from 503 to a proper redirect to Google's consent page.
+
+### 25.2 Bug found during live login test — `.hidden` utility class losing the CSS cascade
+
+Logged in for real via the browser. Google auth succeeded (session cookie
+set, `/api/me` returns the user) and the header correctly switched to the
+logged-in state (name, Atualizar preços, Adicionar produto, Sair) — but the
+`#login-screen` box stayed visibly rendered on top of/alongside it, both on
+first redirect and after a plain reload (not a transient paint glitch).
+
+Root cause: in `style.css`, `.hidden { display: none; }` (line 73) is
+defined *before* `.login-screen { ...; display: flex; }` (line 75). Same
+specificity (0,1,0) on both selectors, so cascade order decides, and the
+later rule wins — `.login-screen`'s `display: flex` beat `.hidden`'s
+`display: none` whenever an element carried both classes. `#header-user`
+happened to work correctly only because `.header-actions` (also
+`display: flex`) is defined *before* `.hidden` in the file, so `.hidden` won
+there by luck of ordering, not by design.
+
+Fix: `.hidden { display: none !important; }` — makes it behave like an
+actual override utility class regardless of where other display-setting
+rules land in the file. Rebuilt (`docker compose up -d --build`) and
+retested: fresh page load now shows only the login screen; after signing in,
+`#login-screen` is properly hidden and only the logged-in header + product
+list show.
+
+### 25.3 Verified live, end to end
+
+- Fresh (logged-out) load → clean login screen, no header-user artifacts.
+- Clicked "Entrar com o Google" → Google account chooser → consent screen
+  (first time only) → redirected back, session established.
+- Header shows "Miguel Teixeira" with Atualizar preços / Adicionar produto /
+  Sair.
+- The 5 pre-existing legacy products (from before multi-user existed) show
+  up correctly under this account — confirms `claimLegacyProductsIfNeeded`
+  worked on first login.
+- Logged out and back in again (simulating a second visit): Google skipped
+  the consent screen (already approved) straight to account chooser →
+  redirect → same session state, no CSS regression.
+
+Google Sign-In for Price Compare is now fully functional in production.
