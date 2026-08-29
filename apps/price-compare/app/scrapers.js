@@ -20,13 +20,16 @@ const USER_AGENT =
 // productLinkPattern: matches the first real product-detail link in the
 // search page's raw HTML — verified live against each store (see
 // plan.md §22.9c) rather than guessed.
+// productLinkPattern uses the 'g' flag — searchAndScrapeStore walks every
+// match in order (not just the first) so it can skip multi-pack listings
+// (see looksLikeMultiPack below) and fall through to the next candidate.
 const STORES = {
   continente: {
     label: 'Continente',
     hostSuffix: 'continente.pt',
     origin: 'https://www.continente.pt',
     searchUrl: (q) => `https://www.continente.pt/pesquisa/?q=${encodeURIComponent(q)}`,
-    productLinkPattern: /href="(\/produto\/[^"?]+\.html)/,
+    productLinkPattern: /href="(\/produto\/[^"?]+\.html)/g,
   },
   pingodoce: {
     label: 'Pingo Doce',
@@ -34,7 +37,7 @@ const STORES = {
     origin: 'https://www.pingodoce.pt',
     searchUrl: (q) =>
       `https://www.pingodoce.pt/on/demandware.store/Sites-pingo-doce-Site/default/Search-Show?q=${encodeURIComponent(q)}`,
-    productLinkPattern: /href="(\/home\/produtos\/[^"?]+\.html)/,
+    productLinkPattern: /href="(\/home\/produtos\/[^"?]+\.html)/g,
   },
   lidl: {
     label: 'Lidl',
@@ -45,9 +48,23 @@ const STORES = {
     // HTML isn't real <a href> markup but an HTML-entity-escaped JSON blob
     // for hydration (paths show up as &quot;/p/...&quot;, not "/p/...").
     // Match the bare path instead of assuming real quoting around it.
-    productLinkPattern: /(\/p\/[a-z0-9-]+\/p\d+)/,
+    productLinkPattern: /(\/p\/[a-z0-9-]+\/p\d+)/g,
   },
 };
+
+// A search for e.g. "leite meio gordo" can rank a 6-pack above the single
+// carton — comparing a pack's total price against another store's per-unit
+// price is meaningless. Verified live: Continente's multi-pack size lives
+// in a dedicated "emb. 6 x 1 lt" element, Pingo Doce/Lidl multi-packs say
+// "pack" right in the URL slug or product name (Lidl: "Pack 8x1 L"). None
+// of these signals alone covers every store, so check all of them together.
+const PACK_TEXT_PATTERN = /\bemb\.?\s*\d+\s*x\s*[\d.,]+\s*(l|lt|kg|g|un|ml)\b/i;
+function looksLikeMultiPack({ html, name, url }) {
+  if (name && /\bpack\b/i.test(name)) return true;
+  if (url && /\bpack\b/i.test(url)) return true;
+  if (html && PACK_TEXT_PATTERN.test(html)) return true;
+  return false;
+}
 
 function detectStore(url) {
   let hostname;
@@ -93,18 +110,21 @@ function extractJsonLdPrice(html) {
   return null;
 }
 
+// Each scraper returns the raw html alongside the parsed fields so the
+// caller can run looksLikeMultiPack() against it — never stored, stripped
+// before the result reaches an API response.
 async function scrapeContinente(url) {
   const html = await fetchHtml(url);
   const result = extractJsonLdPrice(html);
   if (!result) throw new Error('price not found in page');
-  return result;
+  return { ...result, html };
 }
 
 async function scrapeLidl(url) {
   const html = await fetchHtml(url);
   const result = extractJsonLdPrice(html);
   if (!result) throw new Error('price not found in page');
-  return result;
+  return { ...result, html };
 }
 
 // Pingo Doce's JSON-LD block doesn't include the offer/price — the
@@ -118,7 +138,7 @@ async function scrapePingoDoce(url) {
   const price = Number(content);
   if (!content || !Number.isFinite(price)) throw new Error('price not found in page');
   const name = $('h1.product-name, h1').first().text().trim() || undefined;
-  return { price, currency: 'EUR', name };
+  return { price, currency: 'EUR', name, html };
 }
 
 const SCRAPERS = {
@@ -130,26 +150,60 @@ const SCRAPERS = {
 async function scrapeUrl(url) {
   const store = detectStore(url);
   if (!store) throw new Error('unsupported store (not Continente, Pingo Doce, or Lidl)');
-  const result = await SCRAPERS[store](url);
+  const { html, ...result } = await SCRAPERS[store](url);
   return { store, ...result };
+}
+
+// Every real product-detail link in a search page's HTML, in order,
+// deduped, resolved to an absolute URL.
+function extractCandidateUrls(def, searchHtml) {
+  const seen = new Set();
+  const urls = [];
+  for (const match of searchHtml.matchAll(def.productLinkPattern)) {
+    const absolute = new URL(match[1], def.origin).toString();
+    if (!seen.has(absolute)) {
+      seen.add(absolute);
+      urls.push(absolute);
+    }
+  }
+  return urls;
 }
 
 // Given a product name, searches the store and scrapes whichever product
 // its search results ranks first — no product URL needed from the user at
 // all. Less precise than a hand-picked product link (the top search result
 // isn't guaranteed to be the exact product meant), but that trade-off is
-// deliberate: see plan.md §22.9c.
+// deliberate: see plan.md §22.9c. Walks past the first few candidates when
+// they look like multi-packs (see looksLikeMultiPack) — comparing a 6-pack's
+// total price against another store's single-unit price is misleading, so
+// a single-unit match is preferred whenever the search offers one.
+const MAX_CANDIDATES_TRIED = 5;
 async function searchAndScrapeStore(store, query) {
   const def = STORES[store];
   if (!def) throw new Error(`unknown store: ${store}`);
 
   const searchHtml = await fetchHtml(def.searchUrl(query));
-  const match = def.productLinkPattern.exec(searchHtml);
-  if (!match) throw new Error(`no search results found on ${def.label}`);
+  const candidates = extractCandidateUrls(def, searchHtml);
+  if (!candidates.length) throw new Error(`no search results found on ${def.label}`);
 
-  const productUrl = new URL(match[1], def.origin).toString();
-  const result = await SCRAPERS[store](productUrl);
-  return { store, url: productUrl, ...result };
+  let fallback = null;
+  for (const productUrl of candidates.slice(0, MAX_CANDIDATES_TRIED)) {
+    let scraped;
+    try {
+      scraped = await SCRAPERS[store](productUrl);
+    } catch {
+      continue; // this candidate's page didn't yield a price — try the next
+    }
+    const { html, ...result } = scraped;
+    const entry = { store, url: productUrl, ...result };
+    if (!looksLikeMultiPack({ html, name: result.name, url: productUrl })) {
+      return entry;
+    }
+    if (!fallback) fallback = entry; // keep the first working result in case every candidate is a multi-pack
+  }
+
+  if (fallback) return fallback;
+  throw new Error(`no scrapable product found on ${def.label}`);
 }
 
 module.exports = { STORES, detectStore, scrapeUrl, searchAndScrapeStore };

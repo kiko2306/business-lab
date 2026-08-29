@@ -1810,6 +1810,54 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       list); left as encountered, not root-caused further, since the
       redesign in this entry made the exact repro moot anyway.
 
+### 22.9e Price Compare follow-up (same day): manual stores dropped, collapse, bulk update, pack-vs-unit fix
+- [x] **Recheio and Makro removed entirely** — per explicit request, not
+      just deprioritized. `MANUAL_STORES`, the manual-price endpoint
+      (`PUT /products/:id/manual-price`), the manual-price modal, and
+      `manualPrices` on the product model are all gone; `/api/stores` only
+      lists the 3 scraped stores now.
+- [x] **Per-product collapse** — a ▾/▸ toggle next to the product name
+      hides/shows its price rows (`.product-card-body`). State persists
+      per-browser via `localStorage` (`priceCompare.collapsed`, an array of
+      product ids) so it survives a reload.
+- [x] **Bulk "↻ Update prices" button** in the header —
+      `POST /products/refresh-all` re-runs the search+scrape for every
+      product, sequentially (one product at a time, not all fired in
+      parallel) to cap how many concurrent requests hit the store sites at
+      once; each product's own 3-store search still runs in parallel
+      internally. The existing per-product "Refresh" button is unchanged.
+- [x] **Pack-vs-unit pricing bug fixed** — reported live by the user
+      against real data: a search for "leite meio gordo" had matched a
+      6-pack on Continente (€6.84 total) against single cartons on Pingo
+      Doce/Lidl (€0.83/€1.00), so "cheapest" was comparing a 6-pack's total
+      price to two single units — meaningless. Root-caused live (not
+      guessed): Continente's multi-pack size lives in a dedicated
+      `class="ct-pdp--unit"` element (`emb. 6 x 1 lt`), separate from the
+      JSON-LD `name`; Pingo Doce and Lidl instead put "pack" directly in
+      the URL slug or product name (Lidl: name `"Pack 8x1 L"`) — no single
+      signal covers all three. `scrapers.js` now: (1) extracts *every*
+      product-detail link from a search page, not just the first,
+      (2) each scraper returns the raw HTML alongside its parsed price so
+      the caller can inspect it, (3) `looksLikeMultiPack()` checks the
+      name, URL, and HTML together (name/URL containing "pack";
+      HTML matching `emb.? N x SIZE UNIT`), and
+      `searchAndScrapeStore` walks candidates in order (capped at 5),
+      returning the first non-multi-pack match — falling back to the
+      first successfully-scraped candidate only if every one of them looks
+      like a multi-pack, so a product that's genuinely only sold in packs
+      still gets a price instead of an error.
+      **Verified live**: re-searching "leite meio gordo" on Continente now
+      returns a different product (`.../leite-uht-meio-gordo-mimosa-mimosa-2210946.html`,
+      not the earlier 6-pack) at `€1.00` — in the same ballpark as Pingo
+      Doce (`€1.08`) and Lidl (`€0.99`) for the existing "Leite magro sem
+      lactose" product, instead of the earlier 6x mismatch.
+      **Not done**: no actual price-per-unit normalization (e.g. €/L) —
+      this fix prevents comparing a pack to a single unit by preferring a
+      single-unit match when the search offers one, but doesn't compute or
+      display a normalized unit price for products that are genuinely
+      pack-only (milk sold only in 6-packs at one store, say). Revisit if
+      that turns out to matter in practice.
+
 ### 22.9 Optional / niche
 - [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
       streaming, if Jellyfin's music side isn't enough.

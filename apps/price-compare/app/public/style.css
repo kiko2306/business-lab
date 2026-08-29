@@ -8,6 +8,7 @@ body {
   padding: 14px 20px; background: #1c1f26; border-bottom: 1px solid #2a2e37;
 }
 #bar h1 { margin: 0; font-size: 20px; }
+.header-actions { display: flex; gap: 8px; }
 
 main { padding: 20px; max-width: 900px; margin: 0 auto; }
 .hint { color: #9aa1ad; font-size: 13px; margin-top: 0; }
@@ -27,8 +28,15 @@ main { padding: 20px; max-width: 900px; margin: 0 auto; }
 .product-card-header {
   display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; gap: 8px; flex-wrap: wrap;
 }
-.product-card-header h3 { margin: 0; font-size: 16px; }
+.product-card-header h3 { margin: 0; font-size: 16px; display: flex; align-items: center; gap: 6px; }
 .product-actions { display: flex; gap: 6px; }
+
+.collapse-toggle {
+  background: none; border: none; color: #9aa1ad; cursor: pointer; font-size: 13px;
+  padding: 2px 4px; line-height: 1; width: 18px;
+}
+
+.product-card-body.hidden { display: none; }
 
 .price-row {
   display: flex; align-items: center; justify-content: space-between;

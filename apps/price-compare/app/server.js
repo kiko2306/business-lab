@@ -7,12 +7,6 @@ const { STORES, searchAndScrapeStore } = require('./scrapers');
 const DATA_DIR = process.env.DATA_DIR || '/data';
 const DATA_FILE = path.join(DATA_DIR, 'products.json');
 
-// Stores with no scraper (login-walled) — price is entered by hand instead.
-const MANUAL_STORES = {
-  recheio: { label: 'Recheio' },
-  makro: { label: 'Makro' },
-};
-
 // Portuguese grocery categories, matching how these stores organize their
 // own sites — products are grouped by category in the UI, not by brand.
 const CATEGORIES = [
@@ -87,7 +81,6 @@ app.get('/api/health', (req, res) => res.json({ status: 'ok' }));
 app.get('/api/stores', (req, res) => {
   res.json({
     scraped: Object.fromEntries(Object.entries(STORES).map(([k, v]) => [k, v.label])),
-    manual: Object.fromEntries(Object.entries(MANUAL_STORES).map(([k, v]) => [k, v.label])),
   });
 });
 
@@ -111,7 +104,6 @@ app.post('/api/products', async (req, res) => {
     name: trimmedName,
     category: CATEGORIES.includes(category) ? category : DEFAULT_CATEGORY,
     urls: entries,
-    manualPrices: {},
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
   };
@@ -169,27 +161,18 @@ app.post('/api/products/:id/refresh', async (req, res) => {
   res.json(product);
 });
 
-app.put('/api/products/:id/manual-price', (req, res) => {
+// Re-runs the store searches for every product, one at a time (not
+// Promise.all across products — each product already fans out to 3 stores
+// in parallel via searchAllStores, so this caps how many concurrent
+// requests hit the store sites at once rather than firing dozens together).
+app.post('/api/products/refresh-all', async (req, res) => {
   const products = loadProducts();
-  const product = products.find((p) => p.id === req.params.id);
-  if (!product) return res.status(404).json({ error: 'product not found' });
-
-  const { store, price } = req.body || {};
-  if (!MANUAL_STORES[store]) {
-    return res.status(400).json({ error: `store must be one of: ${Object.keys(MANUAL_STORES).join(', ')}` });
+  for (const product of products) {
+    product.urls = await searchAllStores(product.name, product.urls);
+    product.updatedAt = new Date().toISOString();
   }
-
-  if (price === null || price === '') {
-    delete product.manualPrices[store];
-  } else {
-    const n = Number(price);
-    if (!Number.isFinite(n) || n < 0) return res.status(400).json({ error: 'price must be a non-negative number' });
-    product.manualPrices[store] = { price: n, updatedAt: new Date().toISOString() };
-  }
-  product.updatedAt = new Date().toISOString();
-
   saveProducts(products);
-  res.json(product);
+  res.json(products);
 });
 
 const PORT = process.env.PORT || 3000;

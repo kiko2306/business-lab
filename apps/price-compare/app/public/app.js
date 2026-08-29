@@ -1,8 +1,23 @@
 const SCRAPED_STORES = { continente: 'Continente', pingodoce: 'Pingo Doce', lidl: 'Lidl' };
-const MANUAL_STORES = { recheio: 'Recheio', makro: 'Makro' };
 
 let products = [];
 let categories = [];
+
+// Which product cards are collapsed, persisted per-browser so it survives
+// a reload. Keyed by product id.
+let collapsed = new Set();
+try {
+  collapsed = new Set(JSON.parse(localStorage.getItem('priceCompare.collapsed') || '[]'));
+} catch {
+  collapsed = new Set();
+}
+function saveCollapsed() {
+  try {
+    localStorage.setItem('priceCompare.collapsed', JSON.stringify([...collapsed]));
+  } catch {
+    // localStorage unavailable — collapse state just won't persist, fine.
+  }
+}
 
 async function api(path, options) {
   const res = await fetch('/api' + path, {
@@ -66,19 +81,16 @@ function renderProducts() {
 }
 
 function renderProductCard(product) {
-  // One row per known store — scraped rows may repeat if the product has
-  // more than one URL for the same store (unusual but not prevented).
-  const rows = [];
-  for (const entry of product.urls) {
-    const label = SCRAPED_STORES[entry.store] || entry.store || 'Unknown store';
-    rows.push({ key: entry.store, label, price: entry.price, currency: entry.currency, error: entry.error, url: entry.url, kind: 'scraped' });
-  }
-  for (const [key, label] of Object.entries(MANUAL_STORES)) {
-    const manual = product.manualPrices[key];
-    rows.push({ key, label, price: manual ? manual.price : null, currency: 'EUR', kind: 'manual' });
-  }
+  const rows = product.urls.map((entry) => ({
+    label: SCRAPED_STORES[entry.store] || entry.store || 'Unknown store',
+    price: entry.price,
+    currency: entry.currency,
+    error: entry.error,
+    url: entry.url,
+  }));
 
   const cheapest = rows.reduce((min, r) => (r.price != null && (min == null || r.price < min) ? r.price : min), null);
+  const isCollapsed = collapsed.has(product.id);
 
   const card = document.createElement('div');
   card.className = 'product-card';
@@ -86,7 +98,7 @@ function renderProductCard(product) {
   const header = document.createElement('div');
   header.className = 'product-card-header';
   header.innerHTML = `
-    <h3>${escapeHtml(product.name)}</h3>
+    <h3><button class="collapse-toggle" data-collapse="${product.id}" title="${isCollapsed ? 'Expand' : 'Collapse'}">${isCollapsed ? '▸' : '▾'}</button> ${escapeHtml(product.name)}</h3>
     <div class="product-actions">
       <button class="btn small" data-refresh="${product.id}">Refresh</button>
       <button class="btn small" data-edit="${product.id}">Edit</button>
@@ -95,6 +107,9 @@ function renderProductCard(product) {
   `;
   card.appendChild(header);
 
+  const body = document.createElement('div');
+  body.className = 'product-card-body' + (isCollapsed ? ' hidden' : '');
+
   for (const row of rows) {
     const div = document.createElement('div');
     div.className = 'price-row';
@@ -102,17 +117,11 @@ function renderProductCard(product) {
     const isCheapest = row.price != null && row.price === cheapest;
     const priceHtml = priceText
       ? `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${priceText}</span>`
-      : `<span class="price-value missing">${row.kind === 'manual' ? 'not set' : row.error ? 'fetch failed' : 'no price'}</span>`;
-
-    const actionHtml =
-      row.kind === 'manual'
-        ? `<button class="btn small" data-set-manual="${row.key}" data-product="${product.id}">Set</button>`
-        : row.url
-          ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Open</a>`
-          : '';
+      : `<span class="price-value missing">${row.error ? 'fetch failed' : 'no price'}</span>`;
+    const actionHtml = row.url ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Open</a>` : '';
 
     div.innerHTML = `
-      <span class="store-name">${escapeHtml(row.label)} <span class="store-badge">${row.kind}</span></span>
+      <span class="store-name">${escapeHtml(row.label)}</span>
       <span class="price-actions">${priceHtml}${actionHtml}</span>
     `;
     if (row.error) {
@@ -121,8 +130,9 @@ function renderProductCard(product) {
       err.textContent = row.error;
       div.appendChild(err);
     }
-    card.appendChild(div);
+    body.appendChild(div);
   }
+  card.appendChild(body);
 
   return card;
 }
@@ -194,34 +204,21 @@ productForm.addEventListener('submit', async (e) => {
   }
 });
 
-// --- Manual price modal ---
-const manualModal = document.getElementById('manual-modal');
-const manualForm = document.getElementById('manual-form');
-
-function openManualModal(productId, store) {
-  const product = products.find((p) => p.id === productId);
-  const existing = product?.manualPrices[store];
-  document.getElementById('manual-product-id').value = productId;
-  document.getElementById('manual-store').value = store;
-  document.getElementById('manual-store-label').textContent = `${MANUAL_STORES[store]} price`;
-  document.getElementById('manual-price').value = existing ? existing.price : '';
-  manualModal.classList.add('open');
-}
-
-document.getElementById('manual-cancel').addEventListener('click', () => manualModal.classList.remove('open'));
-
-manualForm.addEventListener('submit', async (e) => {
-  e.preventDefault();
-  const productId = document.getElementById('manual-product-id').value;
-  const store = document.getElementById('manual-store').value;
-  const price = document.getElementById('manual-price').value;
+// --- Update all prices ---
+document.getElementById('update-all-btn').addEventListener('click', async (e) => {
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  const original = btn.textContent;
+  btn.textContent = '↻ Updating…';
   try {
-    await api(`/products/${productId}/manual-price`, { method: 'PUT', body: JSON.stringify({ store, price: price === '' ? null : price }) });
-    manualModal.classList.remove('open');
+    await api('/products/refresh-all', { method: 'POST' });
     await loadProducts();
-    showToast('Price updated.');
+    showToast('Prices updated.');
   } catch (err) {
     showToast(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = original;
   }
 });
 
@@ -230,7 +227,7 @@ document.body.addEventListener('click', async (e) => {
   const editId = e.target.dataset.edit;
   const deleteId = e.target.dataset.delete;
   const refreshId = e.target.dataset.refresh;
-  const manualStore = e.target.dataset.setManual;
+  const collapseId = e.target.dataset.collapse;
 
   if (editId) {
     openProductModal(products.find((p) => p.id === editId));
@@ -250,8 +247,11 @@ document.body.addEventListener('click', async (e) => {
     } catch (err) {
       showToast(err.message, true);
     }
-  } else if (manualStore) {
-    openManualModal(e.target.dataset.product, manualStore);
+  } else if (collapseId) {
+    if (collapsed.has(collapseId)) collapsed.delete(collapseId);
+    else collapsed.add(collapseId);
+    saveCollapsed();
+    renderProducts();
   }
 });
 
