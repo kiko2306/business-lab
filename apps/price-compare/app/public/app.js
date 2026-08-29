@@ -140,7 +140,14 @@ function renderProductCard(product) {
     url: entry.url,
   }));
 
-  const cheapest = rows.reduce((min, r) => (r.price != null && (min == null || r.price < min) ? r.price : min), null);
+  // A store that has never successfully matched this product (no price
+  // ever found, not just a stale one) isn't shown at all — a "sem preço"
+  // row read as if the store just happened to be missing a price this
+  // once, when really the store doesn't carry a matching product at all
+  // (see scrapers.js looksIrrelevant/looksLikeSizeMismatch).
+  const visibleRows = rows.filter((r) => r.price != null);
+
+  const cheapest = visibleRows.reduce((min, r) => (min == null || r.price < min ? r.price : min), null);
   const isCollapsed = collapsed.has(product.id);
 
   const card = document.createElement('div');
@@ -162,27 +169,25 @@ function renderProductCard(product) {
   const body = document.createElement('div');
   body.className = 'product-card-body' + (isCollapsed ? ' hidden' : '');
 
-  for (const row of rows) {
+  for (const row of visibleRows) {
     const div = document.createElement('div');
     div.className = 'price-row';
     const priceText = fmtPrice(row.price, row.currency);
-    const isCheapest = row.price != null && row.price === cheapest;
-    const priceHtml = priceText
-      ? `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${priceText}</span>`
-      : `<span class="price-value missing">${row.error ? 'falha ao obter' : 'sem preço'}</span>`;
+    const isCheapest = row.price === cheapest;
+    const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${priceText}</span>`;
     const actionHtml = row.url ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Abrir</a>` : '';
 
     div.innerHTML = `
       <span class="store-name">${escapeHtml(row.label)}</span>
       <span class="price-actions">${priceHtml}${actionHtml}</span>
     `;
-    if (row.error) {
-      const err = document.createElement('div');
-      err.className = 'price-error';
-      err.textContent = row.error;
-      div.appendChild(err);
-    }
     body.appendChild(div);
+  }
+  if (!visibleRows.length) {
+    const none = document.createElement('p');
+    none.className = 'hint';
+    none.textContent = 'Ainda sem preços encontrados para este produto.';
+    body.appendChild(none);
   }
   card.appendChild(body);
 
@@ -448,6 +453,47 @@ async function setupAds(user) {
   document.head.appendChild(script);
 }
 
+// --- Price-drop detail popup — shown when a push notification is tapped,
+// either via the service worker postMessage (app already open) or a
+// ?priceDrop= URL param (service worker opened a fresh tab). See sw.js.
+function showPriceDropModal(data) {
+  const drops = data.drops || [];
+  document.getElementById('price-drop-title').textContent = data.title || 'Descida de preço';
+  const body = document.getElementById('price-drop-body');
+  if (!drops.length) {
+    body.innerHTML = `<p class="hint">${escapeHtml(data.body || '')}</p>`;
+  } else {
+    body.innerHTML = drops
+      .map((d) => {
+        const pct = Math.round(d.pct * 100);
+        return `
+      <div class="price-drop-row">
+        <div>
+          <div>${escapeHtml(d.productName)}</div>
+          <div class="price-drop-store">${escapeHtml(SCRAPED_STORES[d.store] || d.store)}</div>
+        </div>
+        <div class="price-drop-change">
+          <span class="price-drop-old">${d.oldPrice.toFixed(2)}€</span>
+          <span class="price-drop-new">${d.newPrice.toFixed(2)}€</span>
+          <span class="price-drop-pct">-${pct}%</span>
+        </div>
+      </div>`;
+      })
+      .join('');
+  }
+  document.getElementById('price-drop-modal').classList.add('open');
+}
+
+document.getElementById('price-drop-close').addEventListener('click', () => {
+  document.getElementById('price-drop-modal').classList.remove('open');
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data?.type === 'PRICE_DROP_NOTIFICATION') showPriceDropModal(event.data.data);
+  });
+}
+
 document.getElementById('logout-btn').addEventListener('click', async () => {
   await fetch('/auth/logout', { method: 'POST' });
   showLoginScreen();
@@ -472,6 +518,16 @@ async function init() {
   await loadProducts();
   maybeShowNotifyPrompt();
   setupAds(user);
+
+  const priceDropParam = params.get('priceDrop');
+  if (priceDropParam) {
+    try {
+      showPriceDropModal(JSON.parse(priceDropParam));
+    } catch {
+      // Malformed/unexpected payload — just skip the popup, nothing else depends on it.
+    }
+    history.replaceState(null, '', location.pathname);
+  }
 }
 
 init();

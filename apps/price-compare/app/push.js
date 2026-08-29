@@ -97,7 +97,10 @@ async function notifyPriceDrops(userId, drops) {
     const shown = drops.slice(0, 3).map((d) => `${d.productName} (${STORE_LABELS[d.store] || d.store}) -${pctOf(d)}%`);
     body = shown.join(', ') + (drops.length > 3 ? `, +${drops.length - 3} mais` : '');
   }
-  const payload = JSON.stringify({ title, body });
+  // `drops` travels alongside title/body so the app can render a full
+  // detail popup on notificationclick, not just the OS notification's own
+  // (often truncated) text.
+  const payload = JSON.stringify({ title, body, drops });
 
   const stillValid = [];
   let changed = false;

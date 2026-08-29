@@ -12,6 +12,17 @@
 
 const cheerio = require('cheerio');
 
+// Thrown specifically when a store confidently doesn't carry a matching
+// product (no search results at all, or every candidate tried was either
+// a wrong product or a wrong size — see looksIrrelevant/
+// looksLikeSizeMismatch) — as opposed to an ordinary Error for a
+// transient failure (network blip, page structure change). server.js
+// tells the two apart: a transient failure keeps the previously known
+// price/URL (a blip shouldn't wipe out a good price), but a confident
+// "this store doesn't have it" should clear them instead of silently
+// keeping a stale, unrelated price around.
+class NoMatchError extends Error {}
+
 const USER_AGENT =
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0 Safari/537.36';
 
@@ -75,11 +86,120 @@ const PACK_TEXT_PATTERN = /\bemb\.?\s*\d+\s*x\s*[\d.,]+\s*(l|lt|kg|g|un|ml)\b/i;
 // .../meio-gordo-3x200ml/...) — PACK_TEXT_PATTERN and the "pack" checks
 // below both miss this, so check for the bare NxSIZE shape too.
 const URL_PACK_SIZE_PATTERN = /\b\d+\s*x\s*[\d.,]+\s*(l|lt|kg|g|un|ml)\b/i;
+
+// Separate from multi-pack detection: a store can return the *right*
+// product at the *wrong* size — verified live: searching "Açúcar 1 kg"
+// on Lidl matched a real Sidul sugar (not a different product, so
+// looksIrrelevant below doesn't catch it), but the page's own "Emb. 2 kg"
+// label shows it's actually a 2kg bag at €1.69 (€0.85/kg) — a materially
+// different price point than the 1kg bags the other three stores
+// matched, silently shown as if directly comparable. Only ever compared
+// when the user's own product name states a size, and only skips a
+// candidate when both sizes are known and clearly different — no size
+// stated, or size not found on the candidate page, means nothing to
+// compare against, so it's left alone rather than guessed at.
+const SIZE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(kg|g|lt|l|ml)\b/i;
+const UNIT_TO_GRAMS_OR_ML = { kg: 1000, g: 1, l: 1000, lt: 1000, ml: 1 };
+
+function parseSize(text) {
+  if (!text) return null;
+  const m = SIZE_PATTERN.exec(text);
+  if (!m) return null;
+  const value = Number(m[1].replace(',', '.'));
+  const unit = m[2].toLowerCase();
+  if (!Number.isFinite(value)) return null;
+  return value * UNIT_TO_GRAMS_OR_ML[unit];
+}
+
+// A raw page's HTML is too noisy to scan for "any number followed by a
+// unit" — verified live: Lidl's own per-kg unit-price label ("1 kg =
+// 0.85") sits right next to the real "Emb. 2 kg" package-size label, and
+// a generic scan matches whichever comes first, which isn't reliably the
+// package size. Deliberately restricted to the same "Emb. N unit" shape
+// multi-pack detection already looks for (just without requiring the
+// "x" multiplier), so it only ever reads the actual package-size label.
+const EMB_SIZE_PATTERN = /\bemb\.?\s*(\d+(?:[.,]\d+)?)\s*(kg|g|lt|l|ml)\b/i;
+function parseEmbSize(html) {
+  if (!html) return null;
+  const m = EMB_SIZE_PATTERN.exec(html);
+  if (!m) return null;
+  const value = Number(m[1].replace(',', '.'));
+  const unit = m[2].toLowerCase();
+  if (!Number.isFinite(value)) return null;
+  return value * UNIT_TO_GRAMS_OR_ML[unit];
+}
+
+// Looks for the size stated directly on the candidate's own product name
+// first (most reliable — e.g. Auchan states it right there), then the
+// page's "Emb. N kg" label (Lidl/Continente); never the raw URL or a
+// generic page scan, both too noisy (see EMB_SIZE_PATTERN above).
+function candidateSize({ html, name }) {
+  return parseSize(name) ?? parseEmbSize(html);
+}
+
+// A generous tolerance (±20%) since package sizes aren't perfectly
+// standardized across brands (e.g. 900g vs 1kg bags of the same staple
+// are common) — this is only meant to catch a clearly different size
+// (1kg vs 2kg), not penalize minor real-world packaging variance.
+function looksLikeSizeMismatch(query, candidate) {
+  const expected = parseSize(query);
+  if (!expected) return false; // user's own product name doesn't state a size — nothing to check against
+  const actual = candidateSize(candidate);
+  if (!actual) return false; // couldn't determine this candidate's size — don't block on missing data
+  const ratio = actual / expected;
+  return ratio < 0.8 || ratio > 1.2;
+}
+
 function looksLikeMultiPack({ html, name, url }) {
   if (name && /\bpack\b/i.test(name)) return true;
   if (url && (/\bpack\b/i.test(url) || URL_PACK_SIZE_PATTERN.test(url))) return true;
   if (html && PACK_TEXT_PATTERN.test(html)) return true;
   return false;
+}
+
+// A store's search can rank a completely different product first when it
+// simply doesn't carry the thing being searched for — verified live:
+// Lidl (a private-label discount retailer) doesn't stock Danone's Activia
+// yogurt at all, so searching "Iogurte Activia aveia e nozes pack 8"
+// there returned an unrelated Mimosa lactose-free yogurt as the top
+// result. looksLikeMultiPack alone doesn't catch this (nothing about it
+// looks like a pack) — this is a distinct problem: not "right product,
+// wrong size" but "wrong product entirely".
+const STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'com', 'sem', 'e', 'ou', 'para', 'em', 'no', 'na']);
+function significantWords(text) {
+  return (text || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[̀-ͯ]/g, '') // strip accents so "açúcar"/"acucar" compare equal
+    .split(/[^a-z0-9]+/)
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+}
+
+// A fixed-floor word-overlap threshold, tuned against real live cases
+// rather than a ratio — two earlier versions of this check both broke on
+// real data: excluding the query's first word (its usual "category",
+// e.g. "iogurte") let a wrong product through whenever a query happened
+// to have only one significant word (e.g. "Açúcar 1 kg" → just "açúcar"
+// once the size is stripped out — nothing left to exclude *from*, so
+// every candidate passed unchecked, and Lidl's search matched rice).
+// Requiring a ratio of ALL significant words including the first one
+// broke a real match the other way: Continente's own listing for a
+// tracked yogurt never says "iogurte" at all ("Bifidus Pedaços Aveia e
+// Noz Activia Danone" — Danone's product line name, not the generic
+// category), so a 5-word query needing a 3-word majority rejected a
+// listing that only shared 2 ("activia", "aveia"). A flat floor of 2
+// matches (or all of it, for a 1-word query) passes every real case
+// checked so far: rejects rice for a sugar search (0 shared), rejects an
+// unrelated yogurt/baby-food product that only coincidentally shares one
+// word, and accepts the Bifidus/Activia match that a ratio rejected.
+function looksIrrelevant(query, candidateName) {
+  if (!candidateName) return false; // nothing to judge against — don't block on missing data
+  const queryWords = significantWords(query);
+  if (!queryWords.length) return false;
+  const required = queryWords.length === 1 ? 1 : 2;
+  const candidateWords = new Set(significantWords(candidateName));
+  const matches = queryWords.filter((w) => candidateWords.has(w)).length;
+  return matches < required;
 }
 
 function detectStore(url) {
@@ -211,7 +331,7 @@ async function searchAndScrapeStore(store, query) {
 
   const searchHtml = await fetchHtml(def.searchUrl(query));
   const candidates = extractCandidateUrls(def, searchHtml);
-  if (!candidates.length) throw new Error(`sem resultados de pesquisa em ${def.label}`);
+  if (!candidates.length) throw new NoMatchError(`sem resultados de pesquisa em ${def.label}`);
 
   let fallback = null;
   for (const productUrl of candidates.slice(0, MAX_CANDIDATES_TRIED)) {
@@ -223,6 +343,14 @@ async function searchAndScrapeStore(store, query) {
     }
     const { html, ...result } = scraped;
     const entry = { store, url: productUrl, ...result };
+    // A wrong product entirely, or the right product at a clearly wrong
+    // size, is never usable — not even as a last-resort fallback, since
+    // showing it at all would be a misleading price, worse than showing
+    // none. Only a multi-pack (the right single-unit product, just
+    // bundled) is worth falling back to if nothing better turns up.
+    if (looksIrrelevant(query, result.name) || looksLikeSizeMismatch(query, { html, name: result.name, url: productUrl })) {
+      continue;
+    }
     if (!looksLikeMultiPack({ html, name: result.name, url: productUrl })) {
       return entry;
     }
@@ -230,7 +358,7 @@ async function searchAndScrapeStore(store, query) {
   }
 
   if (fallback) return fallback;
-  throw new Error(`não foi possível obter um produto em ${def.label}`);
+  throw new NoMatchError(`não foi possível obter um produto em ${def.label}`);
 }
 
-module.exports = { STORES, detectStore, scrapeUrl, searchAndScrapeStore };
+module.exports = { STORES, detectStore, scrapeUrl, searchAndScrapeStore, NoMatchError };

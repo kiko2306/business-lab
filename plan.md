@@ -3340,3 +3340,90 @@ open:
   Paddle account setup first.
 Follow up next session once the Play Console identity check clears —
 that likely tips the decision toward Play Billing given the timing.
+
+## 30. Session Log — 2026-08-29 (cont.): Price Compare — push-notification tap-through popup + scraper accuracy fixes
+
+### 30.1 Notification tap → full-detail popup
+
+User asked for tapping a price-drop push notification to show a popup
+with the full details, not just whatever text the OS notification itself
+showed (the multi-drop body text is already truncated to 3 items).
+
+- `push.js`: payload now includes the raw `drops` array alongside
+  title/body, so the client has structured data to render from, not just
+  summary text.
+- `sw.js`: the push handler attaches that data to the notification
+  (`notification.data`); `notificationclick` either `postMessage`s it to
+  an already-open app tab (most common case) or, if no tab is open,
+  encodes it into a `?priceDrop=` URL param on the tab it opens — a
+  service worker has no DOM access, so it can't show a popup itself.
+- `app.js`: new `#price-drop-modal`, populated by `showPriceDropModal()`,
+  triggered either by the SW's postMessage or by `init()` picking up the
+  `priceDrop` URL param.
+- Hit one real gotcha during testing: a tap on a notification created by
+  the *previous* service worker version (before this change shipped)
+  showed a popup with only the fallback generic title and no drops — the
+  old notification simply never had the data attached. Not a bug in the
+  new code; resolved once the user fully closed and reopened the app so
+  the browser picked up the updated service worker (already calls
+  `skipWaiting()`/`clients.claim()`, so no reinstall needed, just a
+  reopen). Verified working end-to-end after that with a real 2-drop
+  test notification.
+
+### 30.2 Scraper accuracy — two real mismatches found live by the user, both fixed
+
+User spotted two live Lidl mismatches on their own product list. Both were
+things the existing scraper heuristics (multi-pack detection) didn't
+address at all:
+
+1. **"Açúcar 1 kg" matched a 2kg bag** (€1.69, "Emb. 2 kg" — a Sidul sugar,
+   right product, wrong size) — `looksLikeMultiPack` only catches "N x
+   SIZE" multi-item packs (e.g. "6x1L"), not a single bigger package.
+2. **"Iogurte Activia aveia e nozes pack 8" matched an unrelated Mimosa
+   "Iogurte sem Lactose"** — Lidl (private-label discount retailer)
+   simply doesn't carry Danone's Activia brand at all, so the search fell
+   back to the nearest keyword match: a completely different product.
+
+Fixes, both in `scrapers.js`:
+- `looksLikeSizeMismatch(query, candidate)` — parses an expected size
+  from the user's own product name (e.g. "1 kg") and compares it against
+  the candidate's own stated size (±20% tolerance). Only ever compares
+  when *both* sizes are actually found — no size in the query, or none
+  found on the candidate, means nothing to check, left alone. Went
+  through one real false-negative first: an initial version scanned the
+  *entire* raw page HTML for any digit+unit pattern and matched Lidl's
+  own "1 kg = 0.85" per-kg unit-price label before ever reaching the
+  actual "Emb. 2 kg" package-size label — narrowed to only the specific
+  `Emb. N unit` shape multi-pack detection already looks for.
+- `looksIrrelevant(query, candidateName)` — word-overlap relevance check,
+  new problem class distinct from multi-pack/size (wrong product
+  entirely, not a size variant). Went through two broken iterations
+  before landing on a working fixed-floor threshold (documented at length
+  in the code comment, since the reasoning isn't obvious from the diff
+  alone): excluding the query's first word ("category") broke on
+  single-significant-word queries (nothing left to check against, so any
+  candidate passed — Lidl matched *rice* for a sugar search); requiring a
+  ratio of *all* words including the first broke a real match (Continente
+  labels a tracked yogurt "Bifidus Pedaços Aveia e Noz Activia Danone" —
+  never says "iogurte" at all, so a majority-of-5 threshold rejected a
+  match sharing 2 relevant words). A flat floor (need 1 shared word for a
+  1-word query, 2 for anything longer) passes every case checked.
+- New `NoMatchError` (scrapers.js) distinct from an ordinary transient
+  Error — `server.js`'s `buildStoreEntry` already carried forward a
+  stale price/URL on any scrape failure (correct for an actual transient
+  blip), but that logic was silently keeping the *wrong* Lidl prices
+  around indefinitely once the new checks started rejecting them, since
+  a confident "this store doesn't carry it" was being treated the same
+  as "the site was briefly down." `NoMatchError` now clears price/url
+  instead of preserving them.
+- `app.js`: per explicit user request ("if an item does not exist in a
+  store don't display it") — a store row with no price at all (never
+  successfully found, not just a stale one) is no longer rendered, rather
+  than showing "sem preço"/"falha ao obter" text.
+
+Verified live end-to-end for both original mismatches (Açúcar 1 kg no
+longer shows a Lidl row at all; Iogurte Activia now correctly matches at
+Continente/Pingo Doce/Auchan and shows no Lidl row) via a full regression
+suite run in a throwaway container across every already-tracked product
+before deploying, catching two self-introduced regressions along the way
+(both documented above) before they reached production.

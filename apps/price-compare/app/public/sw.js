@@ -10,7 +10,7 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 self.addEventListener('fetch', () => {});
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Comparador de Preços', body: 'Um preço desceu.' };
+  let data = { title: 'Comparador de Preços', body: 'Um preço desceu.', drops: [] };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
@@ -22,19 +22,31 @@ self.addEventListener('push', (event) => {
       icon: 'icon-192.png',
       badge: 'icon-192.png',
       tag: 'price-drop',
+      data,
     })
   );
 });
 
-// Focuses an already-open app tab if there is one, otherwise opens a new one.
+// Tapping the notification should show the full price-drop details, not
+// just whatever the OS notification's own (often-truncated) text showed.
+// If an app tab is already open, postMessage it directly; a service
+// worker can't show a popup itself. If none is open, fall back to
+// encoding the data in the URL the new tab opens with — app.js's init()
+// picks it up from there.
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
+  const data = event.notification.data || {};
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
-        if ('focus' in client) return client.focus();
+        if ('focus' in client) {
+          client.postMessage({ type: 'PRICE_DROP_NOTIFICATION', data });
+          return client.focus();
+        }
       }
-      if (self.clients.openWindow) return self.clients.openWindow('/');
+      if (self.clients.openWindow) {
+        return self.clients.openWindow('/?priceDrop=' + encodeURIComponent(JSON.stringify(data)));
+      }
     })
   );
 });

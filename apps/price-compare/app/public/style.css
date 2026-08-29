@@ -77,6 +77,17 @@ main { padding: 20px; max-width: 900px; margin: 0 auto; }
 }
 
 .settings-divider { border: none; border-top: 1px solid var(--border); margin: 16px 0; }
+
+.price-drop-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 10px 0; border-top: 1px solid var(--border-soft); font-size: 14px;
+}
+.price-drop-row:first-of-type { border-top: none; }
+.price-drop-store { color: var(--text-muted); font-size: 12px; }
+.price-drop-change { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.price-drop-old { color: var(--text-faint); text-decoration: line-through; font-size: 13px; }
+.price-drop-new { color: var(--success); font-weight: 700; }
+.price-drop-pct { color: var(--success); font-size: 12px; font-weight: 600; }
 #admin-section h3 { margin: 0 0 4px; font-size: 15px; }
 .admin-user-row {
   display: flex; align-items: center; justify-content: space-between; gap: 10px;

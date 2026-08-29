@@ -2,7 +2,7 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { STORES, searchAndScrapeStore } = require('./scrapers');
+const { STORES, searchAndScrapeStore, NoMatchError } = require('./scrapers');
 const auth = require('./auth');
 const push = require('./push');
 const users = require('./users');
@@ -88,14 +88,23 @@ function saveUserProducts(userId, userProducts) {
 }
 
 // Searches one store for `name` and scrapes whichever product it ranks
-// first — never throws — a failed search/scrape keeps the previous known
-// price and URL (if any) and just records the error, so a transient site
-// hiccup or a temporarily-off-catalogue product doesn't wipe out the last
-// good price shown. Every *successful* scrape appends {price, scrapedAt} to
-// `history`, carried forward from the previous entry — this is what the
-// price-over-time chart is built from. A failed scrape doesn't add a point
-// (nothing new was actually observed) but doesn't touch existing history
-// either.
+// first — never throws. Two different kinds of failure are handled
+// differently:
+//   - A transient failure (network blip, page structure change) keeps
+//     the previous known price/URL and just records the error, so a
+//     temporary site hiccup doesn't wipe out the last good price shown.
+//   - A NoMatchError — the store confidently doesn't carry a matching
+//     product (see scrapers.js: no search results, or every candidate
+//     was the wrong product/size) — clears price/URL instead of keeping
+//     a stale one around. Carrying forward an old price here would show
+//     a number for a product the store doesn't actually have, which is
+//     worse than showing nothing (the frontend hides a store row
+//     entirely when price is null — see app.js renderProductCard).
+// Every *successful* scrape appends {price, scrapedAt} to `history`,
+// carried forward from the previous entry — this is what the
+// price-over-time chart is built from. A failed scrape doesn't add a
+// point (nothing new was actually observed) but doesn't touch existing
+// history either.
 async function buildStoreEntry(store, name, previous) {
   const history = previous?.history ?? [];
   try {
@@ -112,13 +121,14 @@ async function buildStoreEntry(store, name, previous) {
       history: [...history, { price, scrapedAt }],
     };
   } catch (err) {
+    const isNoMatch = err instanceof NoMatchError;
     return {
-      url: previous?.url ?? null,
+      url: isNoMatch ? null : previous?.url ?? null,
       store,
-      price: previous?.price ?? null,
-      currency: previous?.currency ?? null,
-      scrapedName: previous?.scrapedName ?? null,
-      scrapedAt: previous?.scrapedAt ?? null,
+      price: isNoMatch ? null : previous?.price ?? null,
+      currency: isNoMatch ? null : previous?.currency ?? null,
+      scrapedName: isNoMatch ? null : previous?.scrapedName ?? null,
+      scrapedAt: isNoMatch ? null : previous?.scrapedAt ?? null,
       error: err.message,
       history,
     };
