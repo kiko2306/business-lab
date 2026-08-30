@@ -34,6 +34,7 @@
         <button id="update-all-btn" class="btn">↻ Atualizar preços</button>
         <button id="add-product-btn" class="btn primary">+ Adicionar produto</button>
         <button id="shopping-list-btn" class="btn" title="Lista de compras">🛒 Lista<span id="shopping-list-count" class="count-badge hidden">0</span></button>
+        <button id="review-btn" class="btn" title="Rever correspondências com problemas">🔎 Rever<span id="review-count" class="count-badge hidden">0</span></button>
         <button id="settings-btn" class="theme-toggle" title="Definições">⚙️</button>
         <button id="logout-btn" class="btn small">Sair</button>
       </div>
@@ -187,6 +188,17 @@
       <div class="modal-actions">
         <button type="button" id="report-bug-cancel" class="btn">Cancelar</button>
         <button type="button" id="report-bug-submit" class="btn primary">Reportar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="review-modal" class="modal">
+    <div class="modal-box">
+      <h2>🔎 Rever correspondências</h2>
+      <p class="hint">Produtos sem preço em alguma loja, ou com um preço muito diferente das restantes. Toque em "Corrigir" para escolher o produto certo.</p>
+      <div id="review-body"></div>
+      <div class="modal-actions">
+        <button type="button" id="review-close" class="btn primary">Fechar</button>
       </div>
     </div>
   </div>

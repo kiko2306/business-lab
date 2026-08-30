@@ -129,7 +129,112 @@ function renderProducts() {
 
     container.appendChild(section);
   }
+  refreshReviewCount();
 }
+
+// --- "Rever correspondências" — the needs-attention worklist ----------
+// A product needs a look when a store has no price for it (not one the
+// user deliberately excluded), or when one store's price is wildly out of
+// line with the others (a wrong product, a per-kg vs per-piece listing, a
+// mega-pack). Computed entirely from the loaded `products` — no endpoint.
+const OUTLIER_RATIO = 3;
+
+function priceForCompare(entry) {
+  // unit price when known (fairer), else the raw total
+  return entry.unitSizeValue && entry.price != null
+    ? (entry.price * 1000) / entry.unitSizeValue
+    : entry.price;
+}
+
+function needsAttention(product) {
+  const reasons = [];
+  const rows = product.urls || [];
+  const excluded = rows.filter((e) => e.excluded).length;
+  const priced = rows.filter((e) => e.price != null && !e.excluded);
+  const expected = Object.keys(SCRAPED_STORES).length - excluded;
+
+  // A missing store on its own isn't worth flagging — Lidl carries maybe a
+  // quarter of a typical list. Flag only when almost nothing matched (0 or
+  // 1 of the expected stores), where the one match can't be cross-checked.
+  if (priced.length === 0) {
+    reasons.push({ store: null, text: 'sem preço em nenhuma loja' });
+  } else if (priced.length === 1 && expected >= 3) {
+    reasons.push({ store: null, text: `só ${SCRAPED_STORES[priced[0].store]} tem preço — pode estar errado` });
+  }
+
+  // One store's price wildly out of line with the others — usually a wrong
+  // product, a per-kg vs per-piece listing, or a mega-pack.
+  const forCompare = priced.filter((e) => !e.isPack);
+  if (forCompare.length >= 2) {
+    const vals = forCompare.map((e) => ({ store: e.store, v: priceForCompare(e), raw: e.price }));
+    const lo = vals.reduce((a, b) => (b.v < a.v ? b : a));
+    const hi = vals.reduce((a, b) => (b.v > a.v ? b : a));
+    if (lo.v > 0 && hi.v / lo.v > OUTLIER_RATIO) {
+      reasons.push({
+        store: hi.store,
+        text: `preço díspar — ${SCRAPED_STORES[hi.store]} ${fmtPrice(hi.raw, 'EUR')} vs ${SCRAPED_STORES[lo.store]} ${fmtPrice(lo.raw, 'EUR')}`,
+      });
+    }
+  }
+  return reasons;
+}
+
+const REASON_SEVERITY = { 'sem preço em nenhuma loja': 3, 'só': 2 }; // "só X tem preço" -> 2, outlier -> 1
+function severity(reasons) {
+  return reasons.reduce((s, r) => s + (REASON_SEVERITY[r.text] || (r.text.startsWith('só ') ? 2 : 1)), 0);
+}
+
+function computeNeedsAttention() {
+  return products
+    .map((p) => ({ product: p, reasons: needsAttention(p) }))
+    .filter((x) => x.reasons.length)
+    .sort((a, b) => severity(b.reasons) - severity(a.reasons) || a.product.name.localeCompare(b.product.name));
+}
+
+function refreshReviewCount() {
+  const badge = document.getElementById('review-count');
+  if (!badge) return;
+  const n = computeNeedsAttention().length;
+  badge.textContent = n;
+  badge.classList.toggle('hidden', n === 0);
+}
+
+function openReviewModal() {
+  const list = computeNeedsAttention();
+  const body = document.getElementById('review-body');
+  if (!list.length) {
+    body.innerHTML = '<p class="hint">Tudo em ordem — nenhum produto precisa de revisão.</p>';
+  } else {
+    body.innerHTML = list
+      .map(
+        ({ product, reasons }) => `
+      <div class="review-item">
+        <div class="review-item-name">${escapeHtml(product.name)}${product.brand ? `<span class="product-brand"> · ${escapeHtml(product.brand)}</span>` : ''}</div>
+        ${reasons
+          .map(
+            (r) => `<div class="review-reason">
+              <span>${escapeHtml(r.text)}</span>
+              <button type="button" class="btn small" data-review-correct="${product.id}" data-review-store="${r.store || ''}">Corrigir</button>
+            </div>`
+          )
+          .join('')}
+      </div>`
+      )
+      .join('');
+  }
+  document.getElementById('review-modal').classList.add('open');
+}
+
+document.getElementById('review-btn').addEventListener('click', openReviewModal);
+document.getElementById('review-close').addEventListener('click', () =>
+  document.getElementById('review-modal').classList.remove('open')
+);
+document.getElementById('review-body').addEventListener('click', (e) => {
+  const btn = e.target.closest('[data-review-correct]');
+  if (!btn) return;
+  document.getElementById('review-modal').classList.remove('open');
+  openCorrectModal(products.find((p) => p.id === btn.dataset.reviewCorrect), btn.dataset.reviewStore || null);
+});
 
 function renderProductCard(product) {
   const rows = product.urls.map((entry) => {
