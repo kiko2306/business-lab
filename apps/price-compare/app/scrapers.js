@@ -880,6 +880,19 @@ function pickClosestNameMatches(entries) {
   return headMatched.length ? headMatched : closest;
 }
 
+// The quantity to minimise when choosing between a store's remaining
+// candidates: the unit price (€ per kg / per L) when *every* candidate has
+// a comparable size, the raw total otherwise. Ranking a lactose-free-milk
+// search by total would pick a 200 ml bottle over a 1 L carton that's
+// cheaper per litre — "cheapest" has to mean cheapest per unit. Falls back
+// to the total the moment one candidate's size is unknown (nothing to
+// divide by) or the sizes are different kinds (mass vs volume).
+function rankMetric(entries) {
+  const kinds = new Set(entries.map((e) => e.unitSizeKind));
+  const allSized = entries.every((e) => e.unitSizeValue > 0 && e.unitSizeKind) && kinds.size === 1;
+  return allSized ? (e) => e.price / e.unitSizeValue : (e) => e.price;
+}
+
 // Picking the outright cheapest candidate trusts every store's own price
 // data completely — verified live that's not always safe: one of Pingo
 // Doce's own "Leite UHT Magro sem Lactose" listings showed €0.44 (a
@@ -893,12 +906,15 @@ function pickClosestNameMatches(entries) {
 // its own pool (a below-half-price listing is far more likely a data
 // error than a real deal), which only ever fires with 3+ candidates —
 // not enough data points below that to tell a true bargain from a glitch.
+// All of this runs on rankMetric (unit price where possible), not the raw
+// total.
 function cheapestPlausible(entries) {
-  if (entries.length < 3) return entries.reduce((cheapest, e) => (e.price < cheapest.price ? e : cheapest));
-  const sortedPrices = entries.map((e) => e.price).sort((a, b) => a - b);
-  const median = sortedPrices[Math.floor(sortedPrices.length / 2)];
-  const plausible = entries.filter((e) => e.price >= median * 0.5);
-  return plausible.reduce((cheapest, e) => (e.price < cheapest.price ? e : cheapest));
+  const value = rankMetric(entries);
+  if (entries.length < 3) return entries.reduce((best, e) => (value(e) < value(best) ? e : best));
+  const sorted = entries.map(value).sort((a, b) => a - b);
+  const median = sorted[Math.floor(sorted.length / 2)];
+  const plausible = entries.filter((e) => value(e) >= median * 0.5);
+  return plausible.reduce((best, e) => (value(e) < value(best) ? e : best));
 }
 
 module.exports = {

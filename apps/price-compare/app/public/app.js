@@ -171,17 +171,17 @@ function renderProductCard(product) {
   // (see scrapers.js looksIrrelevant/looksLikeSizeMismatch).
   const visibleRows = rows.filter((r) => r.price != null);
 
-  // Comparing raw totals across stores is only fair when they're selling
-  // the same pack size — a store's 6-pack will always look "cheaper" than
-  // another's single unit otherwise. When every visible row has a known
-  // unit price, rank by that instead (see scrapers.js candidateSize); a
-  // row missing size data falls back to the plain total, same as before
-  // this existed.
-  const allHaveUnitPrice = visibleRows.length > 0 && visibleRows.every((r) => r.unitPrice != null);
-  const cheapestUnitPrice = allHaveUnitPrice
-    ? visibleRows.reduce((min, r) => (min == null || r.unitPrice < min ? r.unitPrice : min), null)
-    : null;
-  const cheapest = visibleRows.reduce((min, r) => (min == null || r.price < min ? r.price : min), null);
+  // The "cheapest" badge is the lowest *unit* price (€/kg or €/L), not the
+  // lowest total — a 1 L carton at €1.08 beats another store's 200 ml
+  // bottle at €0.70. It's decided among the rows that can actually be
+  // compared that way (a known size, same unit kind); a row with no size,
+  // or a different kind, simply doesn't get the badge. Only when fewer
+  // than two rows have a comparable unit price does it fall back to the
+  // raw total.
+  const unitRows = visibleRows.filter((r) => r.unitPrice != null && r.unitLabel != null);
+  const byUnit = unitRows.length >= 2 && unitRows.every((r) => r.unitLabel === unitRows[0].unitLabel);
+  const cheapestUnitPrice = byUnit ? Math.min(...unitRows.map((r) => r.unitPrice)) : null;
+  const cheapest = visibleRows.length ? Math.min(...visibleRows.map((r) => r.price)) : null;
   const isCollapsed = collapsed.has(product.id);
 
   const card = document.createElement('div');
@@ -214,7 +214,7 @@ function renderProductCard(product) {
     const div = document.createElement('div');
     div.className = 'price-row';
     const priceText = fmtPrice(row.price, row.currency);
-    const isCheapest = allHaveUnitPrice ? row.unitPrice === cheapestUnitPrice : row.price === cheapest;
+    const isCheapest = byUnit ? row.unitPrice === cheapestUnitPrice : row.price === cheapest;
     const unitPriceHtml =
       row.unitPrice != null
         ? `<span class="unit-price">${fmtPrice(row.unitPrice, row.currency)}/${row.unitLabel}</span>`
