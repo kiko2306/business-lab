@@ -4484,6 +4484,26 @@ work all still blocks on external accounts the user doesn't have yet):
   and the unit price is shown alongside when qty > 1. Re-adding an item
   already on the list now **bumps its quantity** instead of being a no-op.
 
+### 43.23 Full refresh with B + the AI polish
+
+**758/1140 (66.5%) priced, 13 zero-store, 91 AI rows** — up from 65.0% /
+15 zero-store. The fresh-produce false AI picks (Ananás→soft drink,
+Tomates→paste) are gone; the prompt answers "none" there now.
+
+Checked B's remaining "prep word in the winner" rows (21): every one is a
+case where the preparation is *inherent to the product* ("Grão de Bico
+**Cozido** em Lata" — canned chickpeas are cooked by definition; "Feijão
+Encarnado Cozido"), *the only way the store sells it* (squid, octopus,
+hake are all ultracongelado), or *asked for by the query* ("Bacalhau
+**demolhado**"). B only demotes when a plain alternative exists in the
+same pool — so these are correct fallbacks, not misses.
+
+The 13 remaining zero-store items are genuinely not sold online under any
+recognisable name (Elixir bocal, Esfregões de arame, Boiões de fruta
+pronta, Pudins/Mousses lácteas, Gelados de pauzinho, the "não chora mais"
+tagline). Diminishing returns — the manual override is the right tool for
+whichever of them the user actually wants.
+
 ### 43.19 G — AI last-resort matcher (Gemini free tier)
 
 New `aiMatch.js`: a single plain `fetch` to the Gemini `generateContent`
