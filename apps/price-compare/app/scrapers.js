@@ -202,11 +202,24 @@ const STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'com', 'sem', 'e', 'o
 // word-for-word. Stripping one trailing "s" (only past 3 letters, so
 // short words like "gas" aren't mangled) turns both into the same stem
 // for every regular case in the product list (bananas/batatas/cebolas/
-// tomates/cenouras/pimentos/...). Doesn't fix irregular plurals (e.g.
-// "limões" from "limão" doesn't reduce to "limao" this way) — that's a
-// real remaining gap, just a much rarer one than the regular case this
-// fixes.
+// tomates/cenouras/pimentos/...).
+//
+// Two irregular plural shapes verified live to still fail after that
+// simple strip: words ending "-ão" pluralize to "-ões" or "-ães", not
+// "-ãos" ("limão"→"limões", "pão"→"pães") — after accent-stripping that's
+// "limao"→"limoes" and "pao"→"paes", so a plain trailing-"s" strip leaves
+// "limoe"/"pae", neither matching the singular. "Limões" was one of the
+// 300-item list's real entries and scored 0/4 stores for exactly this
+// reason. Reduce "-oes"/"-aes" back to "-ao" first, before the general
+// case.
 function stemWord(word) {
+  if (word.length > 3 && word.endsWith('oes')) return word.slice(0, -3) + 'ao';
+  if (word.length > 3 && word.endsWith('aes')) return word.slice(0, -3) + 'ao';
+  // Words ending "-al" pluralize to "-ais", not "-als" — verified live:
+  // "Iogurtes naturais" still scored 0/4 stores after the -ão fix above,
+  // since "naturais" didn't reduce to "natural" (the word every store's
+  // own listing actually uses).
+  if (word.length > 3 && word.endsWith('ais')) return word.slice(0, -3) + 'al';
   return word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word;
 }
 
@@ -386,6 +399,20 @@ function looksIrrelevant(query, candidateName) {
   // that's nothing *but* a generic word (e.g. "Açúcar 1 kg" once its
   // size is stripped out leaves only "açúcar"), so that case still
   // requires its one real word rather than passing everything.
+  //
+  // Tried also excluding NEUTRAL_PACKAGING_WORDS here (to fix "Sardinhas
+  // em lata" — real listings say "Sardinha em Azeite/Tomate" without ever
+  // literally saying "lata", since canned is implied) — reverted after
+  // replaying it against the full 300-item pool's recorded matches:
+  // it broke more than it fixed. For "Água mineral sem gás (garrafão
+  // 5L)", "Sacos do lixo de 30L", and "Gelo em cubo (saco)", the
+  // packaging word *is* the actual product ("garrafão"/"saco" aren't
+  // incidental there, they're what's being sold — a jerry-can, a trash
+  // bag), so treating them as neutral broke those correct matches. Same
+  // lesson as GENERIC_CATEGORY_WORDS and VARIANT_MARKERS before it:
+  // whether a word is "just packaging" depends on the product, not just
+  // the word itself, so a fixed exemption list can't get this right in
+  // both directions at once. "Sardinhas em lata" stays a known gap.
   const specificWords = queryWords.filter((w) => !GENERIC_CATEGORY_WORDS.has(w));
   const wordsToCheck = specificWords.length ? specificWords : queryWords;
   const required = wordsToCheck.length === 1 ? 1 : 2;

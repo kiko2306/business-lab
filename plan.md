@@ -3793,3 +3793,48 @@ over.
 
 Deployed all three fixes together, re-running the full 300-item ×
 4-store refresh in the background.
+
+## 37. Session Log — 2026-08-30 (cont.): Price Compare — 300-item refresh results + irregular plurals + a reverted fix
+
+First full refresh of the 300-item pool (with §36's regular-plural fix
+already in place) landed at 61.7% match rate (740/1200 store-product
+pairs), with 32 items matching 0/4 stores. Investigated a sample of the
+zero-match items rather than accepting the number at face value:
+
+- **Irregular "-ão" plurals** ("Limões" from "Limão") and **"-al"
+  plurals** ("naturais" from "natural", as in "Iogurtes naturais") both
+  still failed after §36's simple trailing-s stemmer, for the same
+  reason "bananas" originally did — Portuguese doesn't just add "s" for
+  these. Extended `stemWord` (scrapers.js) with two more reductions
+  (oes/aes→ao, ais→al) after accent-stripping. Live-verified both fixed
+  with zero replay regressions.
+- **Tried and reverted**: excluding packaging words ("lata", "saco",
+  "garrafão"...) from the required-word-match floor too (not just from
+  the extra-word ranking), to fix "Sardinhas em lata" (real listings say
+  "Sardinha em Azeite" without ever literally saying "lata"). Replaying
+  it against the 300-item pool's own recorded matches caught real
+  breakage before it shipped: "Água mineral sem gás (garrafão 5L)",
+  "Sacos do lixo de 30L", and "Gelo em cubo (saco)" all stopped matching,
+  because for *those* queries the packaging word isn't incidental — it's
+  the actual product (a jerry-can, a trash bag). Same lesson as
+  GENERIC_CATEGORY_WORDS and the abandoned VARIANT_MARKERS before it:
+  whether a word is "just packaging" depends on the specific product, not
+  the word alone, so a fixed exemption list breaks in one direction or
+  the other. Reverted; "Sardinhas em lata"-style items stay a known gap.
+
+Other 0/4 causes identified but *not* code-fixed, flagged as list-content
+issues rather than app bugs: "Amaciador de cabelo" doesn't match because
+Portuguese stores sell hair conditioner as "Condicionador", not
+"Amaciador" (that word is used for fabric softener); "Champô de bebé
+'não chora mais'" is a marketing tagline, not how any store titles the
+product; "Água mineral sem gás (garrafas 1.5L)" returned zero search
+results at Continente, likely the parenthetical annotation confusing the
+store's own search. Also confirmed live: Continente's own search for
+"Tomate(s)" never surfaces fresh tomatoes in its top 12 results at all
+(everything returned is canned/processed) — a store search-ranking
+limitation from §36, not something client-side matching logic can work
+around.
+
+Deployed the plural fixes together with the bug-report feature (built
+earlier this session, deploy had been deferred to avoid killing the
+in-progress refresh) and re-ran the full 300-item refresh.
