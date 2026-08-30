@@ -4469,6 +4469,21 @@ work all still blocks on external accounts the user doesn't have yet):
 - **CI confirmed green** — the `price-compare` job has passed on every run
   since it was added.
 
+### 43.22 Shopping list: totals, one-stop comparison, quantities
+
+- **Running total** at the top of the list (pending items only), and a
+  **one-stop comparison**: "Só na Continente: €X (+€Y vs. dividir por
+  lojas)". The list is built per-store from whichever store was cheapest
+  per item, so it usually spans 3-4 shops — this answers "what does the
+  convenience of one trip actually cost?". Only offered for stores that
+  have a price for *every* pending item; says "igual ou melhor" when one
+  store wins outright.
+- **Quantities** — `qty` on the entry (`?? 1` for pre-existing rows),
+  `PUT /api/shopping-list/:id/qty` (absolute, 1-99, so a double-tap can't
+  drift), a −/+ stepper per row, line totals and both subtotals multiply,
+  and the unit price is shown alongside when qty > 1. Re-adding an item
+  already on the list now **bumps its quantity** instead of being a no-op.
+
 ### 43.19 G — AI last-resort matcher (Gemini free tier)
 
 New `aiMatch.js`: a single plain `fetch` to the Gemini `generateContent`

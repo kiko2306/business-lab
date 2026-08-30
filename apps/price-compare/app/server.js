@@ -638,6 +638,7 @@ app.get('/api/shopping-list', (req, res) => {
       scrapedName: storeEntry.scrapedName,
       url: storeEntry.url,
       checked: entry.checked,
+      qty: entry.qty ?? 1, // entries added before quantities existed
       addedAt: entry.addedAt,
     });
   }
@@ -651,8 +652,8 @@ app.get('/api/shopping-list', (req, res) => {
 });
 
 // Adding the same product+store twice (already on the list, not yet
-// bought) is a no-op rather than a duplicate row — most likely just a
-// double-tap, not an intentional second entry.
+// bought) bumps its quantity rather than creating a duplicate row — the
+// second tap almost always means "actually I need two".
 app.post('/api/shopping-list', (req, res) => {
   const { productId, store } = req.body || {};
   if (typeof productId !== 'string' || typeof store !== 'string') {
@@ -666,12 +667,33 @@ app.post('/api/shopping-list', (req, res) => {
 
   const list = loadShoppingList();
   const existing = list.find((e) => e.userId === req.user.sub && e.productId === productId && e.store === store && !e.checked);
-  if (existing) return res.status(200).json(existing);
+  if (existing) {
+    existing.qty = Math.min(MAX_QTY, (existing.qty ?? 1) + 1);
+    saveShoppingList(list);
+    return res.status(200).json(existing);
+  }
 
-  const entry = { id: crypto.randomUUID(), userId: req.user.sub, productId, store, checked: false, addedAt: new Date().toISOString() };
+  const entry = { id: crypto.randomUUID(), userId: req.user.sub, productId, store, checked: false, qty: 1, addedAt: new Date().toISOString() };
   list.push(entry);
   saveShoppingList(list);
   res.status(201).json(entry);
+});
+
+// Set an item's quantity (1..MAX_QTY). Deliberately absolute rather than
+// a +1/-1 delta so a double-tap on the stepper can't drift out of sync
+// with what the user sees.
+const MAX_QTY = 99;
+app.put('/api/shopping-list/:id/qty', (req, res) => {
+  const qty = Number(req.body?.qty);
+  if (!Number.isInteger(qty) || qty < 1 || qty > MAX_QTY) {
+    return res.status(400).json({ error: `quantidade inválida (1-${MAX_QTY})` });
+  }
+  const list = loadShoppingList();
+  const entry = list.find((e) => e.id === req.params.id && e.userId === req.user.sub);
+  if (!entry) return res.status(404).json({ error: 'item não encontrado' });
+  entry.qty = qty;
+  saveShoppingList(list);
+  res.json(entry);
 });
 
 app.post('/api/shopping-list/:id/toggle', (req, res) => {

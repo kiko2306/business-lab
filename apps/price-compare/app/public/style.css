@@ -319,6 +319,24 @@ textarea { resize: vertical; }
 
 .history-box { width: min(640px, 100%); }
 
+.qty-stepper { display: flex; align-items: center; gap: 2px; flex-shrink: 0; }
+.qty-btn {
+  width: 22px; height: 22px; padding: 0; line-height: 1; border: none; border-radius: 5px;
+  background: var(--btn-bg); color: var(--btn-text); font-size: 14px; font-weight: 700; cursor: pointer;
+}
+.qty-btn:disabled { opacity: .35; cursor: default; }
+.qty-value { min-width: 18px; text-align: center; font-size: 13px; font-weight: 600; }
+.qty-unit-price { color: var(--text-faint); font-weight: 400; font-size: 11px; }
+
+.shopping-list-total {
+  display: flex; justify-content: space-between; align-items: baseline; gap: 10px;
+  padding: 8px 10px; border-radius: 8px; background: var(--btn-bg);
+  font-size: 14px; margin-bottom: 4px;
+}
+.shopping-list-total strong { font-size: 16px; }
+.one-stop { font-size: 12px; color: var(--text-muted); padding: 0 10px 10px; }
+.one-stop-extra { color: var(--text-faint); }
+
 .shopping-list-box { width: min(480px, 100%); }
 #shopping-list-body { max-height: 50vh; overflow-y: auto; }
 .shopping-list-store { margin-bottom: 14px; }

@@ -975,23 +975,75 @@ async function loadShoppingListModal() {
     byStore.get(entry.store).push(entry);
   }
 
-  body.innerHTML = [...byStore.entries()]
+  // "Could I just buy the whole list at one store?" — the list is built
+  // per-store from whichever store was cheapest per item, so it usually
+  // spans 3-4 shops. Compare the split total against buying every pending
+  // item at a single store (only stores that actually have a price for
+  // every one of them), and say what the convenience costs.
+  const qtyOf = (e) => e.qty ?? 1;
+  const lineTotal = (e) => e.price * qtyOf(e);
+  const pending = list.filter((e) => !e.checked);
+  const splitTotal = pending.reduce((sum, e) => sum + lineTotal(e), 0);
+  const currencyAll = list[0]?.currency || 'EUR';
+  let oneStopHtml = '';
+  if (pending.length >= 2 && byStore.size > 1) {
+    const byProduct = new Map(); // productId -> { store -> line total }
+    for (const e of pending) {
+      if (!byProduct.has(e.productId)) byProduct.set(e.productId, new Map());
+      byProduct.get(e.productId).set(e.store, lineTotal(e));
+    }
+    // A store only counts if it can supply every pending product. The list
+    // only holds the rows the user added, so "has a price" means "the user
+    // added that store for that product" — conservative but honest.
+    const options = [];
+    for (const store of Object.keys(SCRAPED_STORES)) {
+      let total = 0;
+      let complete = true;
+      for (const prices of byProduct.values()) {
+        const p = prices.get(store);
+        if (p == null) { complete = false; break; }
+        total += p;
+      }
+      if (complete) options.push({ store, total });
+    }
+    if (options.length) {
+      const best = options.reduce((a, b) => (b.total < a.total ? b : a));
+      const extra = best.total - splitTotal;
+      oneStopHtml =
+        `<div class="one-stop">Só na ${escapeHtml(SCRAPED_STORES[best.store])}: ` +
+        `<strong>${fmtPrice(best.total, currencyAll)}</strong>` +
+        (extra > 0.005 ? ` <span class="one-stop-extra">(+${fmtPrice(extra, currencyAll)} vs. dividir por lojas)</span>` : ' — igual ou melhor que dividir') +
+        `</div>`;
+    }
+  }
+  const totalHtml =
+    pending.length >= 2
+      ? `<div class="shopping-list-total"><span>Total (${pending.length} ${pending.length === 1 ? 'item' : 'itens'})</span><strong>${fmtPrice(splitTotal, currencyAll)}</strong></div>${oneStopHtml}`
+      : '';
+
+  body.innerHTML = totalHtml + [...byStore.entries()]
     .map(([store, entries]) => {
       const storeLabel = SCRAPED_STORES[store] || store;
-      const subtotal = entries.filter((e) => !e.checked).reduce((sum, e) => sum + e.price, 0);
+      const subtotal = entries.filter((e) => !e.checked).reduce((sum, e) => sum + lineTotal(e), 0);
       const currency = entries[0]?.currency || 'EUR';
       const rows = entries
-        .map(
-          (e) => `
+        .map((e) => {
+          const q = qtyOf(e);
+          return `
         <div class="shopping-list-row ${e.checked ? 'checked' : ''}" data-entry-id="${escapeHtml(e.id)}">
           <label class="shopping-list-item">
             <input type="checkbox" class="shopping-list-toggle" ${e.checked ? 'checked' : ''} />
-            <span>${escapeHtml(e.productName)}</span>
+            <span>${escapeHtml(e.productName)}${q > 1 ? `<span class="qty-unit-price"> · ${fmtPrice(e.price, e.currency)} cada</span>` : ''}</span>
           </label>
-          <span class="shopping-list-price">${fmtPrice(e.price, e.currency)}</span>
+          <span class="qty-stepper">
+            <button type="button" class="qty-btn" data-qty-set="${escapeHtml(e.id)}" data-qty="${q - 1}" ${q <= 1 ? 'disabled' : ''} title="Menos um">−</button>
+            <span class="qty-value">${q}</span>
+            <button type="button" class="qty-btn" data-qty-set="${escapeHtml(e.id)}" data-qty="${q + 1}" ${q >= 99 ? 'disabled' : ''} title="Mais um">+</button>
+          </span>
+          <span class="shopping-list-price">${fmtPrice(lineTotal(e), e.currency)}</span>
           <button type="button" class="btn small" data-shopping-list-remove="${escapeHtml(e.id)}" title="Remover">✕</button>
-        </div>`
-        )
+        </div>`;
+        })
         .join('');
       return `
       <div class="shopping-list-store">
@@ -1025,6 +1077,22 @@ async function loadShoppingListModal() {
         refreshShoppingListCount();
       } catch (err) {
         showToast(err.message, true);
+      }
+    })
+  );
+  body.querySelectorAll('[data-qty-set]').forEach((el) =>
+    el.addEventListener('click', async (e) => {
+      const btn = e.currentTarget;
+      btn.disabled = true;
+      try {
+        await api(`/shopping-list/${btn.dataset.qtySet}/qty`, {
+          method: 'PUT',
+          body: JSON.stringify({ qty: Number(btn.dataset.qty) }),
+        });
+        await loadShoppingListModal();
+      } catch (err) {
+        showToast(err.message, true);
+        btn.disabled = false;
       }
     })
   );
