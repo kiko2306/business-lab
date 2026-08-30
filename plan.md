@@ -4451,6 +4451,17 @@ tier the likely pick)**, then B as the deterministic lever.
 
 Stemmer `-zes`→`z`, `MAX_CANDIDATES_TRIED` 5→8, and the cross-store
 outlier check (§43.17 for detail). Test suite 208 tests / 202 pass / 6
-todo. Deployed; a full-pool refresh to apply pool-wide is still pending
-(each one is heavier now — A means up to 8 candidate fetches per store,
-E adds a retry fetch for any flagged store).
+todo.
+
+Full-pool refresh (D+A+E applied per product, mirroring `searchAllStores`):
+**668/1140 (58.6%) priced, 35 zero-store** — down ~0.8 pt from §43.16's
+59.4%, which is exactly E doing its job: it **cleared 12 cross-store
+outlier rows** that were showing a misleading "cheapest", mostly premium
+or different-form variants — Himalayan salt for "Sal fino" (€7.56 vs
+€1.16/kg), sugar *sticks* for "Açúcar branco", Neoblanc for "Lixívia
+delicada" (€6.19 vs €0.99), Fish4Dogs for "Snacks para cão", Alentejo
+raisins for "Passas de uva" (€26.60 vs €6.45/kg). A couple are borderline
+(Vinagre @ Pingo Doce, Alho em pó @ Pingo Doce). Precision otherwise
+unchanged — the "<2 shared stemmed words" scan still flags only 4 rows,
+all false positives. `-zes` didn't recover "Nozes descascadas" (store
+listings don't surface a plain "noz(es)" match) — stays a gap for G.
