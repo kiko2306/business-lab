@@ -318,3 +318,27 @@ textarea { resize: vertical; }
 .chart-legend { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--btn-text); }
 .legend-swatch { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+
+/* --- Small screens ---------------------------------------------------------
+   The product list is what gets used on a phone in the aisle, and a price
+   row crams a store name, price, €/unit line and four buttons into one flex
+   row that overflows well before 400px. Stack each row (store name / price /
+   buttons on their own lines), give the cards their space back by trimming
+   outer padding, and drop the card's action buttons under the name. */
+@media (max-width: 600px) {
+  main { padding: 14px 10px; }
+  #bar { padding: 12px 14px; }
+  .modal { padding: 10px; }
+
+  .product-card { padding: 14px 13px; }
+  .product-card-header { flex-direction: column; align-items: stretch; gap: 10px; }
+  .product-card-header h3 { font-size: 15px; flex-wrap: wrap; row-gap: 4px; }
+  .product-actions { flex-wrap: wrap; }
+  .product-actions .btn { flex: 1 1 auto; text-align: center; }
+
+  .price-row { flex-wrap: wrap; gap: 4px 10px; padding: 11px 0; }
+  .store-name { width: 100%; font-weight: 600; color: var(--text); }
+  .price-actions { width: 100%; flex-wrap: wrap; gap: 6px; }
+  .price-value { flex: 1 1 100%; }               /* price + €/unit on their own line */
+  .price-actions .btn { flex: 1 1 auto; text-align: center; min-width: 58px; }
+}

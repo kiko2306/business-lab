@@ -4279,3 +4279,16 @@ Two follow-ups after the browser walk-through:
   before. Verified a real `docker restart` keeps a seeded session live.
   The OAuth CSRF `pendingStates` map stays in-memory (5-min TTL, a restart
   mid-login just means retry).
+
+### 43.13 Small-screen layout for the product list
+
+The app had **no layout `@media` queries** at all despite being an
+installable PWA meant for in-aisle phone use — a price row flexed a store
+name, price, €/unit line and four buttons onto one line that overflowed
+below ~400px. Added a `@media (max-width: 600px)` block (`style.css`, end
+of file) that stacks each price row (store name / price+€unit / button row
+each on their own line, buttons stretched to fill), drops the card's
+action buttons under the product name, and trims `main` / `.product-card`
+padding. Desktop (>600px) is untouched. Not screenshot-verified — the
+browser tooling wouldn't render a true mobile viewport this session and
+the list is auth-gated; to check on a real phone.
