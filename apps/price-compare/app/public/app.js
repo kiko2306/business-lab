@@ -137,6 +137,7 @@ function renderProductCard(product) {
     const unitPrice =
       entry.unitSizeValue && entry.price != null ? (entry.price * 1000) / entry.unitSizeValue : null;
     return {
+      store: entry.store,
       label: SCRAPED_STORES[entry.store] || entry.store || 'Unknown store',
       price: entry.price,
       currency: entry.currency,
@@ -178,7 +179,6 @@ function renderProductCard(product) {
       <button class="btn small" data-history="${product.id}">📈 Histórico</button>
       <button class="btn small" data-refresh="${product.id}">Atualizar</button>
       <button class="btn small" data-edit="${product.id}">Editar</button>
-      <button class="btn small" data-report-bug="${product.id}" title="Reportar um erro neste item">🐞 Reportar</button>
       <button class="btn small danger" data-delete="${product.id}">Eliminar</button>
     </div>
   `;
@@ -198,10 +198,11 @@ function renderProductCard(product) {
         : '';
     const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${priceText}${unitPriceHtml}</span>`;
     const actionHtml = row.url ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Abrir</a>` : '';
+    const reportHtml = `<button class="btn small" data-report-bug="${product.id}" data-report-store="${row.store}" title="Reportar um erro neste preço (${escapeHtml(row.label)})">🐞</button>`;
 
     div.innerHTML = `
       <span class="store-name">${escapeHtml(row.label)}</span>
-      <span class="price-actions">${priceHtml}${actionHtml}</span>
+      <span class="price-actions">${priceHtml}${actionHtml}${reportHtml}</span>
     `;
     body.appendChild(div);
   }
@@ -247,6 +248,33 @@ function showConfirm(title) {
     function onOk() { cleanup(true); }
     function onCancel() { cleanup(false); }
     okBtn.addEventListener('click', onOk);
+    cancelBtn.addEventListener('click', onCancel);
+  });
+}
+
+// Returns the note text (possibly empty) if submitted, or null if
+// cancelled — same contract window.prompt() had, but as an in-page modal
+// (centered like every other dialog here) instead of the browser's native
+// prompt, which on some platforms doesn't render centered over the page.
+function showReportBugModal(title) {
+  const modal = document.getElementById('report-bug-modal');
+  document.getElementById('report-bug-title').textContent = title;
+  const noteEl = document.getElementById('report-bug-note');
+  noteEl.value = '';
+  modal.classList.add('open');
+  noteEl.focus();
+  return new Promise((resolve) => {
+    const submitBtn = document.getElementById('report-bug-submit');
+    const cancelBtn = document.getElementById('report-bug-cancel');
+    function cleanup(result) {
+      modal.classList.remove('open');
+      submitBtn.removeEventListener('click', onSubmit);
+      cancelBtn.removeEventListener('click', onCancel);
+      resolve(result);
+    }
+    function onSubmit() { cleanup(noteEl.value.trim()); }
+    function onCancel() { cleanup(null); }
+    submitBtn.addEventListener('click', onSubmit);
     cancelBtn.addEventListener('click', onCancel);
   });
 }
@@ -307,15 +335,20 @@ document.body.addEventListener('click', async (e) => {
   const deleteId = e.target.dataset.delete;
   const refreshId = e.target.dataset.refresh;
   const reportBugId = e.target.dataset.reportBug;
+  const reportBugStore = e.target.dataset.reportStore;
   const collapseId = e.target.dataset.collapse;
   const collapseCategory = e.target.closest('[data-collapse-category]')?.dataset.collapseCategory;
 
   if (reportBugId) {
-    const note = window.prompt('O que está errado neste item? (opcional)');
+    const storeLabel = SCRAPED_STORES[reportBugStore] || reportBugStore;
+    const note = await showReportBugModal(`Reportar erro — ${storeLabel}`);
     if (note !== null) {
       e.target.disabled = true;
       try {
-        await api(`/products/${reportBugId}/report-bug`, { method: 'POST', body: JSON.stringify({ note }) });
+        await api(`/products/${reportBugId}/report-bug`, {
+          method: 'POST',
+          body: JSON.stringify({ note, store: reportBugStore }),
+        });
         showToast('Erro reportado — obrigado!');
       } catch (err) {
         showToast(err.message, true);
