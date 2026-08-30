@@ -623,7 +623,90 @@ function resolveWorkspace(req, res, next) {
   return res.status(403).json({ error: 'sem acesso a esta partilha' });
 }
 
-app.use('/api/products', auth.requireAuth, resolveWorkspace);
+// --- Single-editor lock for shared workspaces ---
+// A list that is shared with someone can be edited by two people at once,
+// against the same flat JSON file. So a shared workspace gets a
+// one-editor-at-a-time advisory lock, held in memory (like refreshJobs /
+// sessions — a restart clears it, which is the safe direction). The
+// holder refreshes it with a heartbeat; a lock older than the TTL is
+// treated as free, so a closed tab or a crash can't freeze the list.
+const editLocks = new Map(); // workspaceId -> { sub, email, name, touchedAt }
+const EDIT_LOCK_TTL_MS = 90_000;
+
+function currentLock(workspaceId) {
+  const l = editLocks.get(workspaceId);
+  if (!l) return null;
+  if (Date.now() - l.touchedAt > EDIT_LOCK_TTL_MS) {
+    editLocks.delete(workspaceId);
+    return null;
+  }
+  return l;
+}
+
+// Blocks a *mutating* request on a shared workspace unless the caller
+// holds (or can take) the lock. Reads are never blocked. A private
+// workspace (shared with nobody) skips this entirely — no coordination
+// needed. A successful pass (re)acquires the lock for the TTL, so a
+// client that writes without an explicit PUT /api/workspace/lock still
+// can't be raced by another writer.
+function requireEditLock(req, res, next) {
+  if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+  if (!shares.isShared(req.workspaceId)) return next();
+  const l = currentLock(req.workspaceId);
+  if (l && l.sub !== req.user.sub) {
+    return res
+      .status(409)
+      .json({ error: 'Outra pessoa está a editar esta lista.', heldBy: { name: l.name, email: l.email } });
+  }
+  editLocks.set(req.workspaceId, {
+    sub: req.user.sub,
+    email: req.user.email,
+    name: req.user.name || req.user.email,
+    touchedAt: Date.now(),
+  });
+  next();
+}
+
+app.use('/api/workspace', auth.requireAuth, resolveWorkspace);
+
+app.get('/api/workspace/lock', (req, res) => {
+  const l = currentLock(req.workspaceId);
+  res.json({
+    shared: shares.isShared(req.workspaceId),
+    locked: Boolean(l),
+    heldByMe: Boolean(l && l.sub === req.user.sub),
+    heldBy: l && l.sub !== req.user.sub ? { name: l.name, email: l.email } : null,
+    since: l ? l.touchedAt : null,
+  });
+});
+
+// Acquire or refresh. `{ steal: true }` takes it from a live holder (the
+// "Tomar controlo" button); without it, a held lock returns 409.
+app.put('/api/workspace/lock', (req, res) => {
+  const l = currentLock(req.workspaceId);
+  if (l && l.sub !== req.user.sub && !req.body?.steal) {
+    return res.status(409).json({
+      error: 'Outra pessoa está a editar esta lista.',
+      heldBy: { name: l.name, email: l.email },
+      since: l.touchedAt,
+    });
+  }
+  editLocks.set(req.workspaceId, {
+    sub: req.user.sub,
+    email: req.user.email,
+    name: req.user.name || req.user.email,
+    touchedAt: Date.now(),
+  });
+  res.json({ ok: true, heldByMe: true });
+});
+
+app.delete('/api/workspace/lock', (req, res) => {
+  const l = editLocks.get(req.workspaceId);
+  if (l && l.sub === req.user.sub) editLocks.delete(req.workspaceId);
+  res.status(204).end();
+});
+
+app.use('/api/products', auth.requireAuth, resolveWorkspace, requireEditLock);
 
 app.get('/api/products', (req, res) => {
   res.json(loadUserProducts(req.workspaceId).sort((a, b) => a.name.localeCompare(b.name)));
@@ -706,7 +789,7 @@ app.delete('/api/products/:id', (req, res) => {
 });
 
 // --- Shopping list: pick one store's match for a product to buy from ---
-app.use('/api/shopping-list', auth.requireAuth, resolveWorkspace);
+app.use('/api/shopping-list', auth.requireAuth, resolveWorkspace, requireEditLock);
 
 // Returns each entry enriched with live data from the product's current
 // urls (name, price, currency, scrapedName) rather than anything frozen
