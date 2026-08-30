@@ -222,7 +222,9 @@ async function buildStoreEntry(store, name, previous, override, excludeUrls) {
       unitSizeKind,
       isPack,
       aiMatched,
-    } = pinned ? await scrapeChosenUrl(store, override.url) : await searchAndScrapeStore(store, name, excludeUrls, aiMatch);
+    } = pinned
+      ? await scrapeChosenUrl(store, override.url)
+      : await searchAndScrapeStore(store, name, excludeUrls, aiMatch, previous?.aiMatched ? previous.url : null);
     const scrapedAt = new Date().toISOString();
     return {
       url,

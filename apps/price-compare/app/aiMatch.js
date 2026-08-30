@@ -35,9 +35,14 @@ function buildPrompt(query, names) {
     `A shopper in Portugal is looking for this grocery product: "${query}".\n` +
     `Below are the results from a Portuguese supermarket's search. Which ONE is the same product the shopper wants?\n` +
     `Accept synonyms and how stores actually name things (e.g. "achocolatado" = "chocolate em pó", ` +
-    `"amaciador de cabelo" = "condicionador", "tangerina" = "clementina"/"mandarina", "colorau" = "paprika"). ` +
+    `"amaciador de cabelo" = "condicionador", "tangerina" = "clementina"/"mandarina", "colorau" = "paprika", ` +
+    `"cornetos" = "gelado Cornetto", "miolo de noz" = shelled walnuts).\n` +
     `Reject a different product type, a different core variant (lactose-free vs normal, greek vs plain, ` +
-    `flavoured vs plain), or a clearly different size/pack. If several fit, choose the plainest standard single unit.\n` +
+    `flavoured vs plain), or a clearly different size/pack.\n` +
+    `IMPORTANT: if the shopper wants a FRESH fruit, vegetable, herb, or fresh meat/fish and EVERY result ` +
+    `is a processed version (juice, nectar, jam, compote, purée, paste, concentrate, canned, dried, frozen, ` +
+    `a snack, a drink, a sauce), answer 0 — a processed form is not the fresh product.\n` +
+    `If several genuinely fit, choose the plainest standard single unit.\n` +
     `Answer with ONLY the number of the best match, or 0 if none fits.\n\n${list}`
   );
 }

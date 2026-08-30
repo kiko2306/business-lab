@@ -814,7 +814,10 @@ function selectBestCandidate(query, candidates) {
 // aiMatch.js): a last-resort matcher asked *only* when the deterministic
 // selection finds nothing but candidates do exist, for the vocabulary /
 // synonym cases word-overlap can't reach. Off unless GEMINI_API_KEY is set.
-async function searchAndScrapeStore(store, query, excludeUrls, ai) {
+// `prevAiUrl` (optional): the URL this store's entry was last AI-matched
+// to — if it's still in the results, reuse it without spending an API
+// call (a confirmed synonym match stays confirmed).
+async function searchAndScrapeStore(store, query, excludeUrls, ai, prevAiUrl) {
   const def = STORES[store];
   if (!def) throw new Error(`unknown store: ${store}`);
 
@@ -839,6 +842,8 @@ async function searchAndScrapeStore(store, query, excludeUrls, ai) {
   if (best) return best;
 
   if (pool.length && ai && ai.isConfigured()) {
+    const cached = prevAiUrl && pool.find((c) => c.url === prevAiUrl);
+    if (cached) return { ...cached, aiMatched: true };
     const idx = await ai.pickCandidate(query, pool.map((c) => c.name));
     if (idx >= 0 && pool[idx]) return { ...pool[idx], aiMatched: true };
   }
