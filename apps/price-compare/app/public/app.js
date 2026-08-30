@@ -145,6 +145,7 @@ function renderProductCard(product) {
       url: entry.url,
       unitPrice,
       unitLabel,
+      isPack: Boolean(entry.isPack),
     };
   });
 
@@ -196,7 +197,12 @@ function renderProductCard(product) {
       row.unitPrice != null
         ? `<span class="unit-price">${fmtPrice(row.unitPrice, row.currency)}/${row.unitLabel}</span>`
         : '';
-    const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${priceText}${unitPriceHtml}</span>`;
+    // Shown before the price itself — a €2.94 "pack" price and a €2.94
+    // "unit" price mean very different things, and without this label the
+    // two look identical (see plan.md §39: a pack's own total price read
+    // as an absurdly overpriced single unit until this was added).
+    const packBadgeHtml = `<span class="pack-badge ${row.isPack ? 'pack' : ''}">${row.isPack ? 'Pack' : 'Unidade'}</span>`;
+    const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${packBadgeHtml}${priceText}${unitPriceHtml}</span>`;
     const actionHtml = row.url ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Abrir</a>` : '';
     const reportHtml = `<button class="btn small" data-report-bug="${product.id}" data-report-store="${row.store}" title="Reportar um erro neste preço (${escapeHtml(row.label)})">🐞</button>`;
 
@@ -744,10 +750,71 @@ async function loadAdminUsers() {
   );
 }
 
+const BUG_REPORT_STATUS_LABELS = { open: 'Por resolver', resolved: 'Resolvido', false_positive: 'Falso positivo' };
+
+async function loadAdminBugReports() {
+  const list = document.getElementById('admin-bug-reports-list');
+  list.textContent = 'A carregar...';
+  let reports;
+  try {
+    reports = await fetch('/api/admin/bug-reports').then((r) => r.json());
+  } catch {
+    list.textContent = 'Não foi possível carregar relatórios.';
+    return;
+  }
+  if (!reports.length) {
+    list.innerHTML = '<p class="hint">Ainda não há relatórios.</p>';
+    return;
+  }
+  list.innerHTML = reports
+    .map((r) => {
+      const storeLabel = SCRAPED_STORES[r.reportedStore] || r.reportedStore || '(todas as lojas)';
+      const date = new Date(r.reportedAt).toLocaleString('pt-PT');
+      const entry = r.stores?.find((s) => s.store === r.reportedStore);
+      const priceInfo = entry?.price != null ? `€${entry.price} — "${escapeHtml(entry.scrapedName || '')}"` : entry?.error || '';
+      return `
+    <div class="bug-report-row status-${r.status}" data-report-id="${escapeHtml(r.id)}">
+      <div class="bug-report-header">
+        <strong>${escapeHtml(r.productName)}</strong>
+        <span class="bug-report-status">${BUG_REPORT_STATUS_LABELS[r.status] || r.status}</span>
+      </div>
+      <div class="bug-report-meta">${escapeHtml(storeLabel)} · ${escapeHtml(r.userEmail || '')} · ${date}</div>
+      ${priceInfo ? `<div class="bug-report-meta">${priceInfo}</div>` : ''}
+      ${r.note ? `<div class="bug-report-note">${escapeHtml(r.note)}</div>` : ''}
+      <div class="bug-report-actions">
+        ${r.status !== 'resolved' ? '<button type="button" class="btn small" data-bug-status="resolved">✅ Resolvido</button>' : ''}
+        ${r.status !== 'false_positive' ? '<button type="button" class="btn small" data-bug-status="false_positive">🤷 Falso positivo</button>' : ''}
+        ${r.status !== 'open' ? '<button type="button" class="btn small" data-bug-status="open">↺ Reabrir</button>' : ''}
+      </div>
+    </div>`;
+    })
+    .join('');
+
+  list.querySelectorAll('[data-bug-status]').forEach((btn) =>
+    btn.addEventListener('click', async (e) => {
+      const row = e.target.closest('.bug-report-row');
+      const reportId = row.dataset.reportId;
+      const status = e.target.dataset.bugStatus;
+      try {
+        await api(`/admin/bug-reports/${encodeURIComponent(reportId)}/status`, {
+          method: 'POST',
+          body: JSON.stringify({ status }),
+        });
+        await loadAdminBugReports();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    })
+  );
+}
+
 document.getElementById('settings-btn').addEventListener('click', () => {
   document.getElementById('settings-modal').classList.add('open');
   refreshNotifyToggleState();
-  if (currentUser?.isAdmin) loadAdminUsers();
+  if (currentUser?.isAdmin) {
+    loadAdminUsers();
+    loadAdminBugReports();
+  }
 });
 document.getElementById('settings-close').addEventListener('click', () => {
   document.getElementById('settings-modal').classList.remove('open');

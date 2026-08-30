@@ -93,20 +93,25 @@ function saveUserProducts(userId, userProducts) {
 // survive independently of the product being edited, refreshed, or
 // deleted afterwards.
 const BUG_REPORTS_FILE = path.join(DATA_DIR, 'bug-reports.json');
-function appendBugReport(report) {
-  fs.mkdirSync(DATA_DIR, { recursive: true });
-  let reports = [];
-  if (fs.existsSync(BUG_REPORTS_FILE)) {
-    try {
-      reports = JSON.parse(fs.readFileSync(BUG_REPORTS_FILE, 'utf8'));
-    } catch (err) {
-      console.error('Failed to read bug-reports.json, starting fresh:', err.message);
-    }
+function loadBugReports() {
+  if (!fs.existsSync(BUG_REPORTS_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(BUG_REPORTS_FILE, 'utf8'));
+  } catch (err) {
+    console.error('Failed to read bug-reports.json, starting fresh:', err.message);
+    return [];
   }
-  reports.push(report);
+}
+function saveBugReports(reports) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
   const tmp = BUG_REPORTS_FILE + '.tmp';
   fs.writeFileSync(tmp, JSON.stringify(reports, null, 2));
   fs.renameSync(tmp, BUG_REPORTS_FILE);
+}
+function appendBugReport(report) {
+  const reports = loadBugReports();
+  reports.push({ status: 'open', resolvedAt: null, resolvedBy: null, ...report });
+  saveBugReports(reports);
 }
 
 // Searches one store for `name` and scrapes whichever product it ranks
@@ -137,6 +142,7 @@ async function buildStoreEntry(store, name, previous) {
       name: scrapedName,
       unitSizeValue,
       unitSizeKind,
+      isPack,
     } = await searchAndScrapeStore(store, name);
     const scrapedAt = new Date().toISOString();
     return {
@@ -150,6 +156,7 @@ async function buildStoreEntry(store, name, previous) {
       history: [...history, { price, scrapedAt }],
       unitSizeValue: unitSizeValue ?? null,
       unitSizeKind: unitSizeKind ?? null,
+      isPack: Boolean(isPack),
     };
   } catch (err) {
     const isNoMatch = err instanceof NoMatchError;
@@ -164,6 +171,7 @@ async function buildStoreEntry(store, name, previous) {
       history,
       unitSizeValue: isNoMatch ? null : previous?.unitSizeValue ?? null,
       unitSizeKind: isNoMatch ? null : previous?.unitSizeKind ?? null,
+      isPack: isNoMatch ? false : previous?.isPack ?? false,
     };
   }
 }
@@ -301,6 +309,34 @@ app.post('/api/admin/users/:userId/paid', requireAdmin, (req, res) => {
   const ok = users.setPaid(req.params.userId, Boolean(req.body?.isPaid));
   if (!ok) return res.status(404).json({ error: 'utilizador não encontrado' });
   res.status(204).end();
+});
+
+app.get('/api/admin/bug-reports', requireAdmin, (req, res) => {
+  // Reports logged before the status field existed don't have one —
+  // default them to "open" rather than showing as blank/unstyled.
+  const reports = loadBugReports().map((r) => ({ status: 'open', ...r }));
+  res.json(reports.sort((a, b) => b.reportedAt.localeCompare(a.reportedAt)));
+});
+
+// A report's outcome, not just a done/not-done flag — "resolved" means
+// something was actually fixed because of it, "false_positive" means it
+// was looked at and turned out not to be a bug (e.g. an ambiguous product
+// name, not a matching bug — see plan.md §39's "Agua 1.5L" reports).
+// Reversible (can go back to "open") in case a status gets set by mistake.
+const BUG_REPORT_STATUSES = new Set(['open', 'resolved', 'false_positive']);
+app.post('/api/admin/bug-reports/:id/status', requireAdmin, (req, res) => {
+  const status = req.body?.status;
+  if (!BUG_REPORT_STATUSES.has(status)) return res.status(400).json({ error: 'estado inválido' });
+
+  const reports = loadBugReports();
+  const report = reports.find((r) => r.id === req.params.id);
+  if (!report) return res.status(404).json({ error: 'relatório não encontrado' });
+
+  report.status = status;
+  report.resolvedAt = status === 'open' ? null : new Date().toISOString();
+  report.resolvedBy = status === 'open' ? null : req.user.email;
+  saveBugReports(reports);
+  res.json(report);
 });
 
 // express's static mime lookup doesn't always know .webmanifest — set it

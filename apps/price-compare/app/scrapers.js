@@ -642,6 +642,7 @@ async function searchAndScrapeStore(store, query) {
       ...result,
       extraWordCount,
       headMismatch,
+      isPack,
       unitSizeValue: size?.value ?? null,
       unitSizeKind: size?.kind ?? null,
     };
