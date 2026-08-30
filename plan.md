@@ -4346,3 +4346,19 @@ network). `scrapers.js` now exports the pure helpers under `_test`.
   `node --test test/` loads *every* file in `test/`, so a capture script
   there fired ~50 live requests on every run. `npm run capture` rebuilds
   the fixture; `npm test` is now `node --test test/` and stays offline.
+
+### 43.15 CI + "Rever correspondências" view
+
+- **CI**: `.github/workflows/ci.yml` gains a `price-compare` job
+  (`npm ci` + `npm test` in `apps/price-compare/app`) alongside the
+  existing backend/frontend jobs — the 205-test suite now runs on every
+  push and PR. Verified locally from the committed lockfile.
+- **Needs-attention worklist**: a 🔎 Rever header button (count badge)
+  opens a modal listing every product that matched 0 stores, or only 1 of
+  ≥3 expected, or has one store's price >3× another's (unit price where
+  known) — a plain missing store is *not* flagged (Lidl carries ~a
+  quarter of a list). Computed client-side from `products`, no endpoint.
+  Sorted worst-first; each row's "Corrigir" hands off to the correction
+  modal (§43.5), preselecting the outlier store or the store picker for a
+  gap. Turns the override / coverage / correction-modal work into an
+  actual worklist. Verified live (badge 122, list + sort + handoff).
