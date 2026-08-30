@@ -3,6 +3,16 @@ services:
   netbird-vpn:
     image: netbirdio/signal:latest
     restart: unless-stopped
+    ports:
+      # Signal is gRPC, same as management, and native clients reach it
+      # DIRECTLY — management just hands them whatever Signal.URI is set to in
+      # data/management.json. That used to be the internal "netbird-vpn:80",
+      # which no phone off this Docker network can resolve, so signalling
+      # silently never happened for remote peers (the peer would register and
+      # then fail to connect to anything). Publishing it gives the
+      # netbird-vpn-signal.<base-domain> exposure something to forward to —
+      # see additionalExposures on netbird-vpn in backend/src/config/services.ts.
+      - "${NETBIRD_SIGNAL_PORT:-8086}:80"
     volumes:
       - ./data/signal:/var/lib/netbird
     networks:

@@ -112,6 +112,18 @@ identity_providers:
         redirect_uris:
           - 'https://netbird-vpn.tx-home-utils.com/nb-auth'
           - 'https://netbird-vpn.tx-home-utils.com/nb-silent-auth'
+          # Native clients (Android/desktop/CLI) reuse this same public PKCE
+          # client — they can't use the two web URLs above, because the app
+          # runs a throwaway loopback listener and expects the authorization
+          # code delivered back to it there (RFC 8252). Reusing this client
+          # rather than netbird-cli is deliberate: management validates the
+          # bearer's audience against HttpConfig.AuthAudience, which is
+          # 'netbird-dashboard', so a token minted for a different client_id
+          # would be rejected. Both slash variants are registered because
+          # Authelia matches redirect_uri by exact string.
+          # See PKCEAuthorizationFlow in apps/netbird-vpn/data/management.json.
+          - 'http://localhost:53000/'
+          - 'http://localhost:53000'
         scopes:
           - 'openid'
           - 'profile'

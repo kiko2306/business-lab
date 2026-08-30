@@ -89,6 +89,50 @@ elif ! grep -q 'default-address-pools' "$DOCKER_DAEMON_JSON"; then
   warn "$DOCKER_DAEMON_JSON exists without 'default-address-pools' — add one (see the block start.sh would write) or new app networks will eventually fail with 'all predefined address pools have been fully subnetted'"
 fi
 
+# NetBird's native gRPC (management + signal) only survives the Cloudflare
+# Tunnel if the connector is pinned to HTTP/2. cloudflared's default QUIC
+# backbone silently drops HTTP/2 trailers: gRPC responses still arrive as a
+# 200 with a correct body, but with no grpc-status trailer, so grpc-go reports
+# "server closed the stream without sending trailers" and NetBird clients
+# retry the same call forever with nothing in any log looking like an error.
+# The setting lives in a systemd drop-in — host state this repo doesn't
+# otherwise own — so re-assert it on every bootstrap, or a rebuilt host
+# silently loses it. See plan.md §46.
+#
+# Deliberately written as an environment variable rather than by rewriting
+# ExecStart with --protocol: cloudflared is NOT installed by this script (it's
+# a separate host service), so on a fresh machine it usually doesn't exist yet
+# at this point. systemd applies drop-ins whenever the unit later appears, so
+# an Environment= drop-in works regardless of install order, and needs to know
+# nothing about the unit's ExecStart (whose token path/flags vary per host).
+# An explicit --protocol flag on the command line still wins over this, so a
+# deliberate per-host choice is not overridden.
+CF_DROPIN_DIR="/etc/systemd/system/cloudflared.service.d"
+CF_DROPIN="$CF_DROPIN_DIR/10-grpc-http2.conf"
+if [ ! -f "$CF_DROPIN" ] || ! grep -q 'TUNNEL_TRANSPORT_PROTOCOL=http2' "$CF_DROPIN" 2>/dev/null; then
+  log "Pinning cloudflared to the http2 transport (gRPC trailers; see plan.md §46)"
+  mkdir -p "$CF_DROPIN_DIR"
+  cat > "$CF_DROPIN" <<'UNIT'
+# Managed by start.sh — see plan.md §46.
+# cloudflared's default QUIC backbone silently drops HTTP/2 trailers, which
+# breaks every gRPC service behind the tunnel (NetBird management + signal):
+# responses arrive as a 200 with a correct body but no grpc-status trailer, and
+# clients then retry forever with nothing that looks like an error in any log.
+[Service]
+Environment=TUNNEL_TRANSPORT_PROTOCOL=http2
+UNIT
+fi
+# Apply it now only if cloudflared is actually installed here; otherwise the
+# drop-in just sits waiting for whenever it gets installed.
+if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files cloudflared.service >/dev/null 2>&1; then
+  systemctl daemon-reload >/dev/null 2>&1 || true
+  if systemctl is-active --quiet cloudflared 2>/dev/null; then
+    systemctl restart cloudflared >/dev/null 2>&1 \
+      && log "restarted cloudflared on the http2 transport" \
+      || warn "wrote $CF_DROPIN but couldn't restart cloudflared — restart it manually"
+  fi
+fi
+
 if ! docker compose version >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
     log "Docker Compose plugin not found — installing docker-compose-plugin"

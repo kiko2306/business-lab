@@ -59,7 +59,14 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // call (fetching the management server's public key) fails with
     // "failed to check SSO support: failed getting management service
     // public key". Plain proxy_pass (the default) is HTTP/1.1-only.
-    additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT', grpc: true }],
+    // signal is gRPC too, and native clients connect to it directly using
+    // whatever Signal.URI data/management.json advertises. That has to be a
+    // publicly resolvable hostname or remote peers can register but never
+    // signal, so they never establish a tunnel to anything.
+    additionalExposures: [
+      { suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT', grpc: true },
+      { suffix: 'signal', label: 'Signal', portEnvVar: 'NETBIRD_SIGNAL_PORT', grpc: true },
+    ],
   },
   'home-assistant': {
     name: 'home-assistant',
