@@ -4416,36 +4416,46 @@ test`, keep only if a `todo` flips to pass with the rest still green.
 - **F. Query relaxation** — on NoMatch, retry with `[head noun] +
   [brand]` only (drop trailing qualifiers). Catches "Champô de bebé 'não
   chora mais'".
-- **G. LLM fallback for the tail — NEXT, use a free AI API.** Heuristics
-  for the 90%; for the ~30 NoMatch-everywhere items + the price-outlier
-  rows, one call per `(query, store)`: *"here are N candidate product
-  names from `<store>`'s search for `<query>` — return the index of the
-  one that is the same product, or -1 if none."* Wire it as a last resort
-  inside `searchAndScrapeStore` (or a post-pass in `searchAllStores`)
-  only when the deterministic path returns NoMatch — so it never runs on
-  the 90% that already work, keeping cost and latency near zero.
-  - **Free/cheap API options to evaluate** (no card, or a standing free
-    tier): Google **Gemini API** free tier (`gemini-1.5-flash` /
-    `gemini-2.0-flash`, generous RPM/RPD, `GEMINI_API_KEY`);
-    **Groq** free tier (Llama-3.x, very fast); **OpenRouter** free models
-    (`:free` suffix); **Cloudflare Workers AI** free allowance. Pick one,
-    put the key in `apps/price-compare/.env` (gitignored) like the other
-    secrets, and keep the call behind a `AI_MATCH_API_KEY`-is-set guard so
-    the app still boots and works without it (same pattern as
-    `GOOGLE_CLIENT_ID` / `VAPID_*` / `ADSENSE_CLIENT_ID`).
-  - Cache the verdict on the product's store entry (`aiMatched: true` +
-    the chosen url) so a refresh doesn't re-ask unless the candidate set
-    changed. Deterministic-enough for the test suite: mock the API in
-    tests, assert the plumbing (guarded off → unchanged behaviour;
-    guarded on with a stub → the stubbed pick is used).
-    Non-determinism risk is bounded to the ~30 items that currently match
-    nothing anyway.
+- **G. LLM fallback for the tail — DONE (§43.19), Google Gemini free tier.**
 - **H. Lean on the tooling** — the override + Rever worklist already let
   the user pin the ~30 hard items by hand in ~15 min; pins survive
   refreshes. May beat chasing heuristics for a personal tool.
 
-Path: D + A + E done (§43.18). Next: **G with a free API (Gemini free
-tier the likely pick)**, then B as the deterministic lever.
+Path: D + A + E done (§43.18), G done (§43.19). Next deterministic lever
+is B.
+
+### 43.19 G — AI last-resort matcher (Gemini free tier)
+
+New `aiMatch.js`: a single plain `fetch` to the Gemini `generateContent`
+endpoint (`gemini-2.0-flash` by default, `GEMINI_MODEL` overridable). Only
+called from `searchAndScrapeStore` when `selectBestCandidate` returns
+nothing *but* candidates were fetched — it's handed the candidate names
+and asked which one (1-indexed, `0` = none) is the same product, with the
+prompt telling it to accept synonyms ("achocolatado" = "chocolate em pó",
+"amaciador de cabelo" = "condicionador", "tangerina" = "clementina") and
+reject a different type/variant/size. The pick becomes the store entry
+with `aiMatched: true`.
+
+- Guarded on `GEMINI_API_KEY` — unset (the default) means the call site
+  never runs it and the app behaves exactly as before. Same pattern as
+  `GOOGLE_CLIENT_ID` / `VAPID_*` / `ADSENSE_CLIENT_ID`. Key goes in
+  `apps/price-compare/.env` (gitignored); `.env.example` + compose +
+  `Dockerfile` COPY updated. **Needs the user to grab a free key at
+  aistudio.google.com → "Get API key" (no card).**
+- Fails safe: any error (network, quota, an odd reply), an 8 s timeout, or
+  an out-of-range number → `-1` → ordinary `NoMatchError`. A bad day for
+  the API is never worse than not having it.
+- Only fires on a no-match, so ~30 items × a few stores ≈ <100 calls per
+  full refresh — well under the free tier's daily limit. No caching for
+  now (a "none" verdict is re-asked each refresh); revisit if RPD bites.
+- UI: a muted "IA" tag next to the store name on an `aiMatched` row, so
+  the user can eyeball AI picks and "Corrigir" them if wrong.
+- 8 new tests (`test/aimatch.test.js`) cover the plumbing with a stubbed
+  `fetch`: config guard, request shape, `"1"→0` / `"0"|garbage|"99"→-1`,
+  chatty-reply tolerance, error/throw → -1. Suite: 215 / 209 pass / 6 todo.
+- Not yet exercised end-to-end — needs the key. Once set, a full refresh
+  should recover a chunk of the 35 zero-store items (Achocolatado,
+  Amaciador de cabelo, Tangerinas, Nozes descascadas, Paprika/colorau, …).
 
 ### 43.18 D + A + E shipped
 

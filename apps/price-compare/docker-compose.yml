@@ -29,6 +29,11 @@ services:
       # Ads (push.js is unrelated) + admin dashboard — see .env.example.
       ADSENSE_CLIENT_ID: ${ADSENSE_CLIENT_ID:-}
       ADMIN_EMAIL: ${ADMIN_EMAIL:-}
+      # Optional last-resort product matcher (aiMatch.js) — Google Gemini
+      # free tier, only called when the deterministic match finds nothing.
+      # App works normally without it. See .env.example.
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      GEMINI_MODEL: ${GEMINI_MODEL:-}
     volumes:
       # Single products.json file — same reasoning as apps/pantry: small
       # dataset, no real database needed. Now multi-user (each product

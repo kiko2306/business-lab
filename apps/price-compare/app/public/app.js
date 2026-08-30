@@ -253,6 +253,7 @@ function renderProductCard(product) {
       isPack: Boolean(entry.isPack),
       excluded: Boolean(entry.excluded),
       pinned: Boolean(entry.pinned),
+      aiMatched: Boolean(entry.aiMatched),
     };
   });
 
@@ -334,8 +335,11 @@ function renderProductCard(product) {
     const addToListHtml = `<button class="btn small" data-add-to-list="${product.id}" data-add-to-list-store="${row.store}" title="Adicionar à lista de compras (${escapeHtml(row.label)})">🛒</button>`;
     const correctHtml = `<button class="btn small" data-correct="${product.id}" data-correct-store="${row.store}" title="Corrigir a correspondência nesta loja (${escapeHtml(row.label)})">${row.pinned ? '📌' : '✎'}</button>`;
 
+    const aiTag = row.aiMatched
+      ? ` <span class="ai-tag" title="Correspondência encontrada por IA — confirme com &quot;Corrigir&quot; se parecer errada">IA</span>`
+      : '';
     div.innerHTML = `
-      <span class="store-name">${escapeHtml(row.label)}</span>
+      <span class="store-name">${escapeHtml(row.label)}${aiTag}</span>
       ${priceHtml}
       <span class="price-actions">${actionHtml}${addToListHtml}${correctHtml}${reportHtml}</span>
     `;

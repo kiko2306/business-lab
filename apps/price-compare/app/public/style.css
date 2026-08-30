@@ -294,6 +294,12 @@ textarea { resize: vertical; }
 .correct-cand-price { font-weight: 700; white-space: nowrap; }
 .correct-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 
+.ai-tag {
+  font-size: 9px; font-weight: 700; letter-spacing: .04em; padding: 1px 4px;
+  border-radius: 3px; background: var(--btn-bg); color: var(--text-faint);
+  vertical-align: middle;
+}
+
 #review-body { max-height: 56vh; overflow-y: auto; }
 .review-item { padding: 10px 0; border-top: 1px solid var(--border-soft); }
 .review-item:first-child { border-top: none; }

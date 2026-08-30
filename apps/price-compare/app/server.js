@@ -14,6 +14,7 @@ const {
 const auth = require('./auth');
 const push = require('./push');
 const users = require('./users');
+const aiMatch = require('./aiMatch');
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
 const ADSENSE_CLIENT_ID = process.env.ADSENSE_CLIENT_ID || '';
@@ -220,7 +221,8 @@ async function buildStoreEntry(store, name, previous, override, excludeUrls) {
       unitSizeValue,
       unitSizeKind,
       isPack,
-    } = pinned ? await scrapeChosenUrl(store, override.url) : await searchAndScrapeStore(store, name, excludeUrls);
+      aiMatched,
+    } = pinned ? await scrapeChosenUrl(store, override.url) : await searchAndScrapeStore(store, name, excludeUrls, aiMatch);
     const scrapedAt = new Date().toISOString();
     return {
       url,
@@ -231,6 +233,7 @@ async function buildStoreEntry(store, name, previous, override, excludeUrls) {
       scrapedAt,
       error: null,
       pinned,
+      aiMatched: Boolean(aiMatched),
       history: [...history, { price, scrapedAt }],
       unitSizeValue: unitSizeValue ?? null,
       unitSizeKind: unitSizeKind ?? null,

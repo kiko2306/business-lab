@@ -810,7 +810,11 @@ function selectBestCandidate(query, candidates) {
 // `excludeUrls` (optional): candidate URLs to skip during selection — used
 // by server.js's cross-store outlier retry (this store's first pick was a
 // gross price outlier vs the others; try again without it).
-async function searchAndScrapeStore(store, query, excludeUrls) {
+// `ai` (optional, { isConfigured, pickCandidate } — server.js passes
+// aiMatch.js): a last-resort matcher asked *only* when the deterministic
+// selection finds nothing but candidates do exist, for the vocabulary /
+// synonym cases word-overlap can't reach. Off unless GEMINI_API_KEY is set.
+async function searchAndScrapeStore(store, query, excludeUrls, ai) {
   const def = STORES[store];
   if (!def) throw new Error(`unknown store: ${store}`);
 
@@ -832,8 +836,13 @@ async function searchAndScrapeStore(store, query, excludeUrls) {
 
   const pool = excludeUrls ? candidates.filter((c) => !excludeUrls.has(c.url)) : candidates;
   const best = selectBestCandidate(query, pool);
-  if (!best) throw new NoMatchError(`não foi possível obter um produto em ${def.label}`);
-  return best;
+  if (best) return best;
+
+  if (pool.length && ai && ai.isConfigured()) {
+    const idx = await ai.pickCandidate(query, pool.map((c) => c.name));
+    if (idx >= 0 && pool[idx]) return { ...pool[idx], aiMatched: true };
+  }
+  throw new NoMatchError(`não foi possível obter um produto em ${def.label}`);
 }
 
 // The parsed candidate list for one store's search, no selection applied.
