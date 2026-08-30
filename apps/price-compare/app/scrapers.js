@@ -152,8 +152,36 @@ function parseEmbSize(html) {
 // first (most reliable — e.g. Auchan states it right there), then the
 // page's "Emb. N kg" label (Lidl/Continente); never the raw URL or a
 // generic page scan, both too noisy (see EMB_SIZE_PATTERN above).
+// A store's schema.org JSON-LD "description" field, when there is one —
+// verified live: a bug report insisted Pingo Doce's "Água sem Gás
+// Garrafão" (matched against a 1.5L query) was actually 6L, not a
+// mismeasurement. Its displayed name really is just "Água sem Gás
+// Garrafão" (no size), and it has no "Emb. N unit" label either — but its
+// JSON-LD Product block carries `"description":"ÁGUA SEM GÁS PD 6L"`,
+// never read anywhere before this. Only used as a last-resort fallback,
+// after the name and the Emb. label — a free-text description field is
+// more likely than either to contain an unrelated number (marketing
+// copy), so it's trusted least.
+function extractJsonLdDescription(html) {
+  if (!html) return null;
+  const scriptPattern = /<script type="application\/ld\+json">([\s\S]*?)<\/script>/g;
+  for (const match of html.matchAll(scriptPattern)) {
+    let data;
+    try {
+      data = JSON.parse(match[1].trim());
+    } catch {
+      continue;
+    }
+    const items = Array.isArray(data) ? data : [data];
+    for (const item of items) {
+      if (item['@type'] === 'Product' && typeof item.description === 'string') return item.description;
+    }
+  }
+  return null;
+}
+
 function candidateSize({ html, name }) {
-  return parseSize(name) ?? parseEmbSize(html);
+  return parseSize(name) ?? parseEmbSize(html) ?? parseSize(extractJsonLdDescription(html));
 }
 
 // Verified live: a "Reportar" note flagged Continente's "Água sem Gás

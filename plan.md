@@ -3970,3 +3970,48 @@ without the new isPack field at all, so the Pack/Unidade badge was
 showing "Unidade" almost everywhere regardless of the real answer — not
 a logic bug, just an incomplete backfill. Re-running it now with the
 clobber-safe script.
+
+## 41. Session Log — 2026-08-30 (cont.): Price Compare — optional brand field, shopping list
+
+Two feature requests, plus one more real bug fixed along the way:
+
+**Brand as a separate, optional field.** Following the "Agua 1.5L" size
+mismatch (previous section), the product-add form only ever had one
+"name" field — no way to say "this specific brand" without cramming it
+into the name and making every other display of that name longer too.
+Added `brand` as its own field (`product-brand` input, optional,
+`Guardar`-time validation stays name-only). `searchQueryFor(product)`
+(server.js) combines `${name} ${brand}` into the actual store-search
+query whenever a brand is set, used consistently everywhere a query is
+built (add, rename/re-brand, single refresh, refresh-all). Shown next to
+the name on the card (`· Marca`) rather than folded into it.
+
+**Shopping list.** New 🛒 button on every price row (next to 🐞) adds
+that specific product+store combination to a per-user shopping list;
+🛒 Lista in the header (with a pending-count badge) opens it grouped by
+store with a running subtotal per store, a checkbox per item to mark it
+bought (struck through, price stays visible but drops out of the
+subtotal), a remove button, and a "Limpar comprados" bulk-clear.
+Deliberately *not* a frozen-price snapshot like a bug report — GET
+enriches each entry from the product's *current* store price live, since
+checking a shopping list before buying is exactly when a stale price
+would be actively misleading. Orphaned entries (product deleted, or that
+store no longer has a price) are dropped silently on read and on product
+delete. New `shopping-list.json`, same append/load/save shape as
+bug-reports.json but mutable (toggle/remove/clear, not append-only).
+
+**Real bug, found investigating the "Agua 1.5L is 6L" report properly**:
+Pingo Doce's "Água sem Gás Garrafão" page states its actual size
+("ÁGUA SEM GÁS PD 6L") only in a JSON-LD `description` field — never in
+the visible name, and never in an "Emb. N unit" label either, so nothing
+in `candidateSize` had ever read it. Added `extractJsonLdDescription` as
+a third, last-resort fallback (after name, after the Emb. label — a
+free-text description is more likely than either to contain an
+unrelated number). Verified live: "Agua 1.5L" at Pingo Doce now
+correctly rejects the 6L jerry can on size mismatch (falls through to
+the next candidate instead — which turned out to be a canned-tuna
+listing, exposing that this item's name has no brand at all to fall
+back on; motivated building the brand field above the same session).
+
+Deployed all three together, running one more full-pool refresh pass to
+pick up the size fallback and finish isPack consistency everywhere.

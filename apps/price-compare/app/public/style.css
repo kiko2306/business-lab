@@ -67,8 +67,17 @@ body {
 }
 .theme-toggle:hover { background: var(--btn-bg); }
 
+#shopping-list-btn { position: relative; }
+.count-badge {
+  display: inline-flex; align-items: center; justify-content: center; min-width: 16px; height: 16px;
+  padding: 0 4px; margin-left: 5px; border-radius: 8px; background: var(--accent); color: var(--accent-text);
+  font-size: 11px; font-weight: 700; line-height: 1;
+}
+
 main { padding: 20px; max-width: 900px; margin: 0 auto; }
 .hint { color: var(--text-muted); font-size: 13px; margin-top: 0; }
+.hint-inline { font-weight: 400; color: var(--text-faint); font-size: 12px; }
+.product-brand { font-weight: 400; color: var(--text-muted); font-size: 0.85em; }
 
 .ad-slot {
   margin-bottom: 20px; min-height: 90px; display: flex; align-items: center; justify-content: center;
@@ -243,6 +252,25 @@ textarea { resize: vertical; }
 .notify-troubleshoot li { margin-bottom: 6px; }
 
 .history-box { width: min(640px, 100%); }
+
+.shopping-list-box { width: min(480px, 100%); }
+#shopping-list-body { max-height: 50vh; overflow-y: auto; }
+.shopping-list-store { margin-bottom: 14px; }
+.shopping-list-store-header {
+  display: flex; justify-content: space-between; font-size: 13px; font-weight: 700;
+  color: var(--text-muted); text-transform: uppercase; letter-spacing: .03em;
+  padding-bottom: 4px; border-bottom: 1px solid var(--border-soft); margin-bottom: 4px;
+}
+.shopping-list-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 8px;
+  padding: 6px 0; font-size: 14px;
+}
+.shopping-list-item { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; cursor: pointer; }
+.shopping-list-item input[type="checkbox"] { width: auto; flex-shrink: 0; }
+.shopping-list-item span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.shopping-list-row.checked .shopping-list-item span { text-decoration: line-through; color: var(--text-faint); }
+.shopping-list-price { font-weight: 600; white-space: nowrap; }
+.shopping-list-row.checked .shopping-list-price { color: var(--text-faint); font-weight: 400; }
 .history-chart-svg { background: var(--bg); border-radius: 8px; }
 .chart-legend { display: flex; gap: 16px; margin-top: 10px; flex-wrap: wrap; }
 .legend-item { display: flex; align-items: center; gap: 6px; font-size: 13px; color: var(--btn-text); }

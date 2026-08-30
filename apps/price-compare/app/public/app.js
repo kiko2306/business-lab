@@ -175,7 +175,7 @@ function renderProductCard(product) {
   const header = document.createElement('div');
   header.className = 'product-card-header';
   header.innerHTML = `
-    <h3><button class="collapse-toggle" data-collapse="${product.id}" title="${isCollapsed ? 'Expandir' : 'Colapsar'}">${isCollapsed ? '▸' : '▾'}</button> ${escapeHtml(product.name)}</h3>
+    <h3><button class="collapse-toggle" data-collapse="${product.id}" title="${isCollapsed ? 'Expandir' : 'Colapsar'}">${isCollapsed ? '▸' : '▾'}</button> ${escapeHtml(product.name)}${product.brand ? `<span class="product-brand"> · ${escapeHtml(product.brand)}</span>` : ''}</h3>
     <div class="product-actions">
       <button class="btn small" data-history="${product.id}">📈 Histórico</button>
       <button class="btn small" data-refresh="${product.id}">Atualizar</button>
@@ -205,10 +205,11 @@ function renderProductCard(product) {
     const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${packBadgeHtml}${priceText}${unitPriceHtml}</span>`;
     const actionHtml = row.url ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Abrir</a>` : '';
     const reportHtml = `<button class="btn small" data-report-bug="${product.id}" data-report-store="${row.store}" title="Reportar um erro neste preço (${escapeHtml(row.label)})">🐞</button>`;
+    const addToListHtml = `<button class="btn small" data-add-to-list="${product.id}" data-add-to-list-store="${row.store}" title="Adicionar à lista de compras (${escapeHtml(row.label)})">🛒</button>`;
 
     div.innerHTML = `
       <span class="store-name">${escapeHtml(row.label)}</span>
-      <span class="price-actions">${priceHtml}${actionHtml}${reportHtml}</span>
+      <span class="price-actions">${priceHtml}${actionHtml}${addToListHtml}${reportHtml}</span>
     `;
     body.appendChild(div);
   }
@@ -293,6 +294,7 @@ function openProductModal(product) {
   document.getElementById('product-modal-title').textContent = product ? 'Editar produto' : 'Adicionar produto';
   document.getElementById('product-id').value = product ? product.id : '';
   document.getElementById('product-name').value = product ? product.name : '';
+  document.getElementById('product-brand').value = product ? product.brand || '' : '';
   document.getElementById('product-category').value = product ? product.category : 'Outros';
   productModal.classList.add('open');
 }
@@ -304,11 +306,12 @@ productForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   const id = document.getElementById('product-id').value;
   const name = document.getElementById('product-name').value;
+  const brand = document.getElementById('product-brand').value;
   const category = document.getElementById('product-category').value;
 
   try {
-    if (id) await api(`/products/${id}`, { method: 'PUT', body: JSON.stringify({ name, category }) });
-    else await api('/products', { method: 'POST', body: JSON.stringify({ name, category }) });
+    if (id) await api(`/products/${id}`, { method: 'PUT', body: JSON.stringify({ name, brand, category }) });
+    else await api('/products', { method: 'POST', body: JSON.stringify({ name, brand, category }) });
     productModal.classList.remove('open');
     await loadProducts();
     showToast('Guardado.');
@@ -342,10 +345,23 @@ document.body.addEventListener('click', async (e) => {
   const refreshId = e.target.dataset.refresh;
   const reportBugId = e.target.dataset.reportBug;
   const reportBugStore = e.target.dataset.reportStore;
+  const addToListId = e.target.dataset.addToList;
+  const addToListStore = e.target.dataset.addToListStore;
   const collapseId = e.target.dataset.collapse;
   const collapseCategory = e.target.closest('[data-collapse-category]')?.dataset.collapseCategory;
 
-  if (reportBugId) {
+  if (addToListId) {
+    e.target.disabled = true;
+    try {
+      await api('/shopping-list', { method: 'POST', body: JSON.stringify({ productId: addToListId, store: addToListStore }) });
+      showToast('Adicionado à lista de compras.');
+      refreshShoppingListCount();
+    } catch (err) {
+      showToast(err.message, true);
+    } finally {
+      e.target.disabled = false;
+    }
+  } else if (reportBugId) {
     const storeLabel = SCRAPED_STORES[reportBugStore] || reportBugStore;
     const note = await showReportBugModal(`Reportar erro — ${storeLabel}`);
     if (note !== null) {
@@ -499,6 +515,7 @@ function showApp(user) {
   document.getElementById('header-user').classList.remove('hidden');
   document.getElementById('user-info').textContent = user.name || user.email;
   document.getElementById('admin-section').classList.toggle('hidden', !user.isAdmin);
+  refreshShoppingListCount();
 }
 
 // --- Ads (Google AdSense) — hidden entirely for VIP/paid users (server
@@ -561,6 +578,115 @@ function showPriceDropModal(data) {
 
 document.getElementById('price-drop-close').addEventListener('click', () => {
   document.getElementById('price-drop-modal').classList.remove('open');
+});
+
+// --- Shopping list ---
+async function refreshShoppingListCount() {
+  const badge = document.getElementById('shopping-list-count');
+  try {
+    const list = await api('/shopping-list');
+    const pending = list.filter((e) => !e.checked).length;
+    badge.textContent = pending;
+    badge.classList.toggle('hidden', pending === 0);
+  } catch {
+    // Not logged in yet, or a transient failure — badge just stays as-is.
+  }
+}
+
+async function loadShoppingListModal() {
+  const body = document.getElementById('shopping-list-body');
+  body.textContent = 'A carregar...';
+  let list;
+  try {
+    list = await api('/shopping-list');
+  } catch (err) {
+    body.textContent = 'Não foi possível carregar a lista.';
+    return;
+  }
+  if (!list.length) {
+    body.innerHTML = '<p class="hint">A lista de compras está vazia — use o botão 🛒 junto a um preço para adicionar.</p>';
+    return;
+  }
+
+  // Grouped by store — the whole point is "what do I need to buy at each
+  // store, and how much will it come to" (checked/already-bought items
+  // still show, struck through, but don't count toward the subtotal).
+  const byStore = new Map();
+  for (const entry of list) {
+    if (!byStore.has(entry.store)) byStore.set(entry.store, []);
+    byStore.get(entry.store).push(entry);
+  }
+
+  body.innerHTML = [...byStore.entries()]
+    .map(([store, entries]) => {
+      const storeLabel = SCRAPED_STORES[store] || store;
+      const subtotal = entries.filter((e) => !e.checked).reduce((sum, e) => sum + e.price, 0);
+      const currency = entries[0]?.currency || 'EUR';
+      const rows = entries
+        .map(
+          (e) => `
+        <div class="shopping-list-row ${e.checked ? 'checked' : ''}" data-entry-id="${escapeHtml(e.id)}">
+          <label class="shopping-list-item">
+            <input type="checkbox" class="shopping-list-toggle" ${e.checked ? 'checked' : ''} />
+            <span>${escapeHtml(e.productName)}</span>
+          </label>
+          <span class="shopping-list-price">${fmtPrice(e.price, e.currency)}</span>
+          <button type="button" class="btn small" data-shopping-list-remove="${escapeHtml(e.id)}" title="Remover">✕</button>
+        </div>`
+        )
+        .join('');
+      return `
+      <div class="shopping-list-store">
+        <div class="shopping-list-store-header">
+          <strong>${escapeHtml(storeLabel)}</strong>
+          <span>${fmtPrice(subtotal, currency)}</span>
+        </div>
+        ${rows}
+      </div>`;
+    })
+    .join('');
+
+  body.querySelectorAll('.shopping-list-toggle').forEach((el) =>
+    el.addEventListener('change', async (e) => {
+      const entryId = e.target.closest('.shopping-list-row').dataset.entryId;
+      try {
+        await api(`/shopping-list/${entryId}/toggle`, { method: 'POST' });
+        await loadShoppingListModal();
+        refreshShoppingListCount();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    })
+  );
+  body.querySelectorAll('[data-shopping-list-remove]').forEach((el) =>
+    el.addEventListener('click', async (e) => {
+      const entryId = e.target.dataset.shoppingListRemove;
+      try {
+        await api(`/shopping-list/${entryId}`, { method: 'DELETE' });
+        await loadShoppingListModal();
+        refreshShoppingListCount();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    })
+  );
+}
+
+document.getElementById('shopping-list-btn').addEventListener('click', () => {
+  document.getElementById('shopping-list-modal').classList.add('open');
+  loadShoppingListModal();
+});
+document.getElementById('shopping-list-close').addEventListener('click', () => {
+  document.getElementById('shopping-list-modal').classList.remove('open');
+});
+document.getElementById('shopping-list-clear').addEventListener('click', async () => {
+  try {
+    await api('/shopping-list', { method: 'DELETE' });
+    await loadShoppingListModal();
+    refreshShoppingListCount();
+  } catch (err) {
+    showToast(err.message, true);
+  }
 });
 
 if ('serviceWorker' in navigator) {

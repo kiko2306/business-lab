@@ -37,6 +37,18 @@ const CATEGORIES = [
 ];
 const DEFAULT_CATEGORY = 'Outros';
 
+// Brand is optional and separate from the item name — a query like "Água
+// 1.5L" with no brand at all is far more likely to land on an unrelated
+// product (see plan.md §41: it fell through to a canned-tuna listing once
+// the wrong-size candidate got correctly filtered out) since there's
+// nothing left to discriminate on beyond a single generic word. Stored
+// separately from `name` (shown separately in the UI too) rather than
+// baked into one string, but combined into a single query whenever it's
+// actually sent to a store's search.
+function searchQueryFor(product) {
+  return product.brand ? `${product.name} ${product.brand}` : product.name;
+}
+
 function loadAllProducts() {
   if (!fs.existsSync(DATA_FILE)) return [];
   try {
@@ -103,6 +115,30 @@ function updateOneProduct(userId, productId, updates) {
   Object.assign(product, updates);
   saveAllProducts(products);
   return product;
+}
+
+// Shopping list entries reference a product + one specific store, not a
+// frozen price — deliberately *not* a snapshot like a bug report, since
+// the whole point is checking current prices before buying, and a price
+// that drifted since it was added should show the drift, not a stale
+// number. Kept in its own file rather than embedded in products.json:
+// the list is a cross-cutting view over products the user already has
+// (or once had), not a property of the product itself.
+const SHOPPING_LIST_FILE = path.join(DATA_DIR, 'shopping-list.json');
+function loadShoppingList() {
+  if (!fs.existsSync(SHOPPING_LIST_FILE)) return [];
+  try {
+    return JSON.parse(fs.readFileSync(SHOPPING_LIST_FILE, 'utf8'));
+  } catch (err) {
+    console.error('Failed to read shopping-list.json, starting fresh:', err.message);
+    return [];
+  }
+}
+function saveShoppingList(list) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  const tmp = SHOPPING_LIST_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(list, null, 2));
+  fs.renameSync(tmp, SHOPPING_LIST_FILE);
 }
 
 // A simple append-only log, not part of products.json — a bug report is a
@@ -411,18 +447,20 @@ app.get('/api/products', (req, res) => {
 });
 
 app.post('/api/products', async (req, res) => {
-  const { name, category } = req.body || {};
+  const { name, brand, category } = req.body || {};
   if (typeof name !== 'string' || !name.trim()) {
     return res.status(400).json({ error: 'o nome é obrigatório' });
   }
   const trimmedName = name.trim();
+  const trimmedBrand = typeof brand === 'string' ? brand.trim() : '';
 
-  const entries = await searchAllStores(trimmedName);
+  const entries = await searchAllStores(searchQueryFor({ name: trimmedName, brand: trimmedBrand }));
 
   const product = {
     id: crypto.randomUUID(),
     userId: req.user.sub,
     name: trimmedName,
+    brand: trimmedBrand,
     category: CATEGORIES.includes(category) ? category : DEFAULT_CATEGORY,
     urls: entries,
     createdAt: new Date().toISOString(),
@@ -435,25 +473,36 @@ app.post('/api/products', async (req, res) => {
   res.status(201).json(product);
 });
 
-// Renaming re-runs the store searches with the new name — the old matches
-// were found using the old name as the query, so they may no longer be the
-// right product once it changes.
+// Changing the name or brand re-runs the store searches with the new
+// query — the old matches were found using the old query, so they may no
+// longer be the right product once either half of it changes.
 app.put('/api/products/:id', async (req, res) => {
   const products = loadUserProducts(req.user.sub);
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
-  const { name, category } = req.body || {};
+  const { name, brand, category } = req.body || {};
   if (category !== undefined) {
     product.category = CATEGORIES.includes(category) ? category : DEFAULT_CATEGORY;
   }
+  let queryChanged = false;
   if (name !== undefined) {
     if (typeof name !== 'string' || !name.trim()) return res.status(400).json({ error: 'o nome não pode estar vazio' });
     const trimmedName = name.trim();
     if (trimmedName !== product.name) {
       product.name = trimmedName;
-      product.urls = await searchAllStores(trimmedName, product.urls);
+      queryChanged = true;
     }
+  }
+  if (brand !== undefined) {
+    const trimmedBrand = typeof brand === 'string' ? brand.trim() : '';
+    if (trimmedBrand !== (product.brand || '')) {
+      product.brand = trimmedBrand;
+      queryChanged = true;
+    }
+  }
+  if (queryChanged) {
+    product.urls = await searchAllStores(searchQueryFor(product), product.urls);
   }
   product.updatedAt = new Date().toISOString();
 
@@ -466,6 +515,102 @@ app.delete('/api/products/:id', (req, res) => {
   const next = products.filter((p) => p.id !== req.params.id);
   if (next.length === products.length) return res.status(404).json({ error: 'produto não encontrado' });
   saveUserProducts(req.user.sub, next);
+  // Also drop any shopping-list entries pointing at the now-deleted
+  // product — otherwise they'd linger as orphans the GET route has to
+  // silently filter out forever.
+  saveShoppingList(loadShoppingList().filter((e) => e.productId !== req.params.id));
+  res.status(204).end();
+});
+
+// --- Shopping list: pick one store's match for a product to buy from ---
+app.use('/api/shopping-list', auth.requireAuth);
+
+// Returns each entry enriched with live data from the product's current
+// urls (name, price, currency, scrapedName) rather than anything frozen
+// at add-time — checking a shopping list is exactly when a stale price
+// would be misleading. An entry whose product or store match no longer
+// exists is dropped from the response (and from the file, tidying up
+// orphans left by a product being deleted or a store no longer matching).
+app.get('/api/shopping-list', (req, res) => {
+  const list = loadShoppingList().filter((e) => e.userId === req.user.sub);
+  const products = loadUserProducts(req.user.sub);
+  const enriched = [];
+  const stillValid = [];
+  for (const entry of list) {
+    const product = products.find((p) => p.id === entry.productId);
+    const storeEntry = product?.urls.find((u) => u.store === entry.store);
+    if (!product || !storeEntry || storeEntry.price == null) continue; // orphaned — product/store deleted or no longer matched
+    stillValid.push(entry);
+    enriched.push({
+      id: entry.id,
+      productId: product.id,
+      productName: product.name,
+      category: product.category,
+      store: entry.store,
+      price: storeEntry.price,
+      currency: storeEntry.currency,
+      scrapedName: storeEntry.scrapedName,
+      url: storeEntry.url,
+      checked: entry.checked,
+      addedAt: entry.addedAt,
+    });
+  }
+  if (stillValid.length !== list.length) {
+    // Persist the cleanup — quietly drop the orphans rather than showing
+    // them again on every future load.
+    const others = loadShoppingList().filter((e) => e.userId !== req.user.sub);
+    saveShoppingList([...others, ...stillValid]);
+  }
+  res.json(enriched);
+});
+
+// Adding the same product+store twice (already on the list, not yet
+// bought) is a no-op rather than a duplicate row — most likely just a
+// double-tap, not an intentional second entry.
+app.post('/api/shopping-list', (req, res) => {
+  const { productId, store } = req.body || {};
+  if (typeof productId !== 'string' || typeof store !== 'string') {
+    return res.status(400).json({ error: 'productId e store são obrigatórios' });
+  }
+  const products = loadUserProducts(req.user.sub);
+  const product = products.find((p) => p.id === productId);
+  if (!product) return res.status(404).json({ error: 'produto não encontrado' });
+  const storeEntry = product.urls.find((u) => u.store === store);
+  if (!storeEntry || storeEntry.price == null) return res.status(400).json({ error: 'esta loja não tem preço para este produto' });
+
+  const list = loadShoppingList();
+  const existing = list.find((e) => e.userId === req.user.sub && e.productId === productId && e.store === store && !e.checked);
+  if (existing) return res.status(200).json(existing);
+
+  const entry = { id: crypto.randomUUID(), userId: req.user.sub, productId, store, checked: false, addedAt: new Date().toISOString() };
+  list.push(entry);
+  saveShoppingList(list);
+  res.status(201).json(entry);
+});
+
+app.post('/api/shopping-list/:id/toggle', (req, res) => {
+  const list = loadShoppingList();
+  const entry = list.find((e) => e.id === req.params.id && e.userId === req.user.sub);
+  if (!entry) return res.status(404).json({ error: 'item não encontrado' });
+  entry.checked = !entry.checked;
+  saveShoppingList(list);
+  res.json(entry);
+});
+
+app.delete('/api/shopping-list/:id', (req, res) => {
+  const list = loadShoppingList();
+  const next = list.filter((e) => !(e.id === req.params.id && e.userId === req.user.sub));
+  if (next.length === list.length) return res.status(404).json({ error: 'item não encontrado' });
+  saveShoppingList(next);
+  res.status(204).end();
+});
+
+// Bulk-remove everything already checked off — the common "done shopping,
+// clear the list" action, rather than tapping delete on each item.
+app.delete('/api/shopping-list', (req, res) => {
+  const list = loadShoppingList();
+  const next = list.filter((e) => !(e.userId === req.user.sub && e.checked));
+  saveShoppingList(next);
   res.status(204).end();
 });
 
@@ -476,7 +621,7 @@ app.post('/api/products/:id/refresh', async (req, res) => {
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
   const previousEntries = product.urls;
-  product.urls = await searchAllStores(product.name, previousEntries);
+  product.urls = await searchAllStores(searchQueryFor(product), previousEntries);
   product.updatedAt = new Date().toISOString();
 
   saveUserProducts(req.user.sub, products);
@@ -511,6 +656,7 @@ app.post('/api/products/:id/report-bug', (req, res) => {
     userEmail: req.user.email || null,
     productId: product.id,
     productName: product.name,
+    brand: product.brand || null,
     category: product.category,
     reportedStore,
     note,
@@ -546,7 +692,7 @@ async function refreshProductsForUser(userId) {
   const allDrops = [];
   for (const product of products) {
     const previousEntries = product.urls;
-    const urls = await searchAllStores(product.name, previousEntries);
+    const urls = await searchAllStores(searchQueryFor(product), previousEntries);
     const updated = updateOneProduct(userId, product.id, { urls, updatedAt: new Date().toISOString() });
     if (!updated) continue; // deleted while this product's refresh was in flight — nothing left to update
     allDrops.push(...collectPriceDrops(product.name, previousEntries, urls));

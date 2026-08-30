@@ -33,6 +33,7 @@
         <span id="user-info" class="user-info"></span>
         <button id="update-all-btn" class="btn">↻ Atualizar preços</button>
         <button id="add-product-btn" class="btn primary">+ Adicionar produto</button>
+        <button id="shopping-list-btn" class="btn" title="Lista de compras">🛒 Lista<span id="shopping-list-count" class="count-badge hidden">0</span></button>
         <button id="settings-btn" class="theme-toggle" title="Definições">⚙️</button>
         <button id="logout-btn" class="btn small">Sair</button>
       </div>
@@ -66,12 +67,15 @@
         <label>Nome do produto</label>
         <input id="product-name" type="text" required placeholder="ex. Leite meio-gordo 1L" />
 
+        <label>Marca <span class="hint-inline">(opcional)</span></label>
+        <input id="product-brand" type="text" placeholder="ex. Luso — ajuda a encontrar o produto certo" />
+
         <label>Categoria</label>
         <select id="product-category"></select>
 
         <p class="hint" style="margin: 10px 0 0">
           A Continente, o Pingo Doce, o Lidl e o Auchan são pesquisados automaticamente
-          com este nome — não é preciso procurar nem colar um link do produto.
+          com o nome (e a marca, se indicada) — não é preciso procurar nem colar um link do produto.
         </p>
 
         <div class="modal-actions">
@@ -98,6 +102,17 @@
       <div id="price-drop-body"></div>
       <div class="modal-actions">
         <button type="button" id="price-drop-close" class="btn primary">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="shopping-list-modal" class="modal">
+    <div class="modal-box shopping-list-box">
+      <h2>🛒 Lista de compras</h2>
+      <div id="shopping-list-body"></div>
+      <div class="modal-actions">
+        <button type="button" id="shopping-list-clear" class="btn">Limpar comprados</button>
+        <button type="button" id="shopping-list-close" class="btn primary">Fechar</button>
       </div>
     </div>
   </div>
