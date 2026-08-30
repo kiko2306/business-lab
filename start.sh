@@ -26,6 +26,50 @@ fi
 # in which case there is no separate user to add to the group.
 TARGET_USER="${SUDO_USER:-root}"
 
+# Whether systemd is actually running as PID 1 — not merely whether the
+# systemctl binary exists. WSL ships systemctl but does not boot systemd unless
+# it is explicitly turned on, and everything to do with the Cloudflare Tunnel
+# connector below depends on it. /run/systemd/system is the canonical marker.
+HAS_SYSTEMD=0
+if [ -d /run/systemd/system ] && command -v systemctl >/dev/null 2>&1; then
+  HAS_SYSTEMD=1
+fi
+
+IS_WSL=0
+if grep -qi 'microsoft\|WSL' /proc/version 2>/dev/null; then
+  IS_WSL=1
+fi
+
+# Warn up front rather than letting this be discovered later. Without systemd
+# the tunnel connector is never installed or started, yet everything else here
+# still succeeds — so the run looks fine while the one piece that publishes
+# this host to the internet is missing.
+if [ "$HAS_SYSTEMD" -eq 0 ]; then
+  echo >&2
+  echo "=============================================================" >&2
+  echo " WARNING: systemd is not running as PID 1." >&2
+  echo >&2
+  echo " The Cloudflare Tunnel connector cannot be installed or" >&2
+  echo " started without it, so nothing on this host will be" >&2
+  echo " reachable from the internet. Everything else — Docker, the" >&2
+  echo " dashboard, the generated config — will still come up, so" >&2
+  echo " this is easy to miss." >&2
+  if [ "$IS_WSL" -eq 1 ]; then
+    echo >&2
+    echo " Detected WSL, which does not enable systemd by default." >&2
+    echo " To fix, add to /etc/wsl.conf:" >&2
+    echo >&2
+    echo "     [boot]" >&2
+    echo "     systemd=true" >&2
+    echo >&2
+    echo " then from Windows run 'wsl --shutdown', reopen the distro," >&2
+    echo " and re-run this script. Verify with:" >&2
+    echo "     test -d /run/systemd/system && echo systemd-ok" >&2
+  fi
+  echo "=============================================================" >&2
+  echo >&2
+fi
+
 if command -v apt-get >/dev/null 2>&1; then
   APT_MISSING=()
   for bin_pkg in "curl:curl" "openssl:openssl" "gnupg:gnupg" "ca-certificates:ca-certificates" "python3:python3"; do
@@ -345,7 +389,11 @@ if [ "$CF_READY" = "1" ]; then
 
       # Only install the service if there isn't one already: re-running must not
       # repoint an existing connector (possibly serving a different tunnel).
-      if command -v cloudflared >/dev/null 2>&1 \
+      # Requires systemd — `cloudflared service install` writes a unit, so
+      # without it we'd leave behind a unit that never runs and report success.
+      if [ "$HAS_SYSTEMD" -eq 0 ]; then
+        warn "skipping the cloudflared connector install — no systemd (see the warning at the top). The tunnel '${TUNNEL_NAME}' exists in Cloudflare but nothing on this host is serving it yet."
+      elif command -v cloudflared >/dev/null 2>&1 \
         && ! systemctl list-unit-files cloudflared.service >/dev/null 2>&1; then
         CF_CONNECTOR_TOKEN="$(cf_api GET "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${CF_TUNNEL_ID}/token" \
           | json_field '["result"]')"
@@ -513,3 +561,14 @@ record. NetBird works out of the box once its exposure is enabled: point a
 client at https://netbird-vpn-api.${BASE_DOMAIN:-<domain>} and sign in
 through Authelia.
 EOF
+
+# Repeat the systemd warning last, where it won't have scrolled away — the
+# tunnel is the whole point of the Cloudflare setup above.
+if [ "$HAS_SYSTEMD" -eq 0 ] && [ "$CF_READY" = "1" ]; then
+  cat >&2 <<EOF
+
+!! The Cloudflare Tunnel connector was NOT installed: systemd is not running.
+!! Nothing here is reachable from the internet until that is fixed.
+!! See the warning at the top of this run for how.
+EOF
+fi

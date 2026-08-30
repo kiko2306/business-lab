@@ -5620,3 +5620,39 @@ Docker should be installed inside the distro rather than via Docker Desktop's
 WSL integration — `start.sh` manages a `docker` service and writes
 `/etc/docker/daemon.json`, neither of which exists in the distro under Docker
 Desktop.
+### 49.4 Chosen: second domain, and `start.sh` now warns about missing systemd
+
+User picked the second-domain option and asked to be warned at deploy time
+rather than only in the plan. Both done.
+
+**Second domain** (`setup_test/README.md` §1). The test runs against a
+different Cloudflare zone, which is what makes it safe to turn exposure *on*
+and therefore the first setup that can prove a from-scratch NetBird deployment
+works end to end. Requirements recorded: it must be a real zone (a subdomain of
+the live domain will not work — §49.2), and the existing API token only works
+if its *Zone Resources* actually include the new zone. Since the hostnames
+differ from production's, DNS and NPM entries cannot collide; the one remaining
+rule is simply not to type the live domain at the `BASE_DOMAIN` prompt.
+
+**Runtime warning** (`start.sh`). Detection uses `-d /run/systemd/system`, the
+canonical "systemd is PID 1" marker — checking for the `systemctl` *binary*
+proves nothing, since WSL ships it either way. That gap is exactly what would
+have made this silent. It also detects WSL from `/proc/version` to give the
+specific fix. Behaviour when systemd is absent:
+
+- a banner before any work is done, explaining that nothing will be reachable
+  from the internet and that everything else will still appear to succeed;
+- with WSL detected, the `/etc/wsl.conf` `[boot] systemd=true` fix,
+  `wsl --shutdown`, and the verify command;
+- the connector install is **skipped with an explanatory warning** instead of
+  being attempted and failing confusingly — previously it would write a systemd
+  unit that could never run;
+- the warning is repeated as the **last** output, so it cannot scroll away
+  behind the build log.
+
+Never fatal: a deployment with no tunnel is still a valid local install, so
+this warns and continues rather than exiting.
+
+Verified: `bash -n` and shellcheck `-S warning` clean; detection returns
+`HAS_SYSTEMD=1 IS_WSL=0` on this host; the banner was rendered with the flags
+forced to the WSL case to check the wording and layout.

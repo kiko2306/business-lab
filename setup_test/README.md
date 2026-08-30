@@ -22,21 +22,27 @@ If you run the test with the **live** `BASE_DOMAIN` and then enable
 rewrite the live `CNAME` for e.g. `netbird-vpn.<domain>` to point at the
 **test** tunnel. Production breaks instantly, from a different computer.
 
-Two ways to be safe, and they decide how much the test can prove:
+**This test uses a second domain** — a different zone in Cloudflare, not the
+live one. That is what makes it safe to turn exposure *on*, which in turn makes
+this the first setup that can prove a from-scratch NetBird deployment works end
+to end. On the server that was impossible: any exposure there would have hit
+production.
 
-| Option | `BASE_DOMAIN` | Exposure | What it proves |
-|---|---|---|---|
-| **A — same domain** | the live one | **must stay off** | everything up to publishing a route |
-| **B — second domain** (recommended) | a different domain in Cloudflare | safe to turn on | **the whole thing, end to end, including NetBird** |
+Requirements for the second domain:
 
-Option B is the real prize: a full end-to-end verification was *impossible* on
-the server (any exposure there would have hit production), so this is the first
-setup that can genuinely prove NetBird works from scratch.
+- it must be a **zone in Cloudflare** (added, nameservers delegated) — see §7,
+  a subdomain of the live domain will **not** work;
+- it can live in the same Cloudflare account, so the same API token works,
+  provided the token's *Zone Resources* actually include it. If the token was
+  scoped to the live zone only, either widen it or mint a second one.
 
-For option A the guard is the same as before: leave the Nginx Proxy Manager
-fields (URL, email, password) **empty** in the test dashboard's Exposure
-settings. `start.sh` seeds only the Cloudflare half, never NPM (§47.3), so
-provisioning cannot run and the default state is already safe.
+Because the domain differs, every hostname the test publishes
+(`netbird-vpn.<test-domain>`, ...) is distinct from production's, so DNS and
+NPM entries cannot collide.
+
+**The one rule that still matters:** double-check `BASE_DOMAIN` at the prompt
+before pressing Enter. Typing the live domain by muscle memory and then
+enabling exposure is the single action that would break production.
 
 The test also creates a **real tunnel** in the real account either way. Delete
 it in teardown (§8).
@@ -47,19 +53,20 @@ it in teardown (§8).
 
 ### 2.1 systemd must be enabled — otherwise the test is meaningless
 
-WSL does not run systemd by default, and the cloudflared steps in `start.sh`
-depend on it (lines 127-134 and 349-359). Precisely what happens without it:
+WSL does not run systemd by default, and the Cloudflare Tunnel connector cannot
+be installed or started without it — so nothing would be reachable from the
+internet, while Docker, the dashboard and all the generated config still come
+up fine. A run like that looks successful having skipped exactly the piece this
+project spent the most effort on.
 
-- the http2 drop-in file **is** written (that part is just a file write),
-- `cloudflared service install` is **attempted and fails**, warning
-  `cloudflared service install failed — run it manually`,
-- `daemon-reload` and `restart` then fail silently behind `|| true`,
-- so **no connector ever runs** — but `start.sh` completes and every other
-  check in §5 still passes.
+**`start.sh` now detects this and warns you**, so you will be told rather than
+having to remember. It checks for `/run/systemd/system` (the real marker —
+`systemctl` merely *existing* proves nothing on WSL), prints a banner before it
+does any work, names WSL specifically with the fix below, skips the connector
+install with an explanatory warning rather than a confusing failure, and
+repeats the warning as the last thing it prints so it can't scroll away.
 
-The net effect is a run that looks successful while having tested everything
-*except* the part this project spent the most effort on. The single warning is
-easy to scroll past, so enable systemd rather than relying on spotting it.
+Fix it before starting:
 
 ```ini
 # /etc/wsl.conf
@@ -74,9 +81,14 @@ systemctl is-system-running
 ```
 
 Anything other than a hard failure is fine (`running`, or `degraded` — WSL
-often reports degraded harmlessly). If you get
-`System has not been booted with systemd as init system`, stop and fix it
-before going further.
+often reports degraded harmlessly). The check `start.sh` itself uses:
+
+```bash
+test -d /run/systemd/system && echo systemd-ok
+```
+
+If that prints nothing, `start.sh` will refuse to install the connector and
+will say so. Fix it before going further.
 
 ### 2.2 Docker
 
@@ -191,9 +203,9 @@ What does **not** go away is §1: the shared Cloudflare account and domain.
 the longest to find (§46), and it is the only item that a systemd-less WSL
 would silently skip while still reporting success.
 
-### 5.1 Option B only — the full end-to-end proof
+### 5.1 The full end-to-end proof
 
-With a second domain, continue past setup and actually finish the job:
+Continue past setup and actually finish the job:
 
 1. Change NPM's default login (`admin@example.com` / `changeme`), then enter
    the URL and new credentials in Exposure settings.
@@ -243,9 +255,9 @@ cd ~/homelab-management && sudo docker compose down -v
 ```
 
 Then delete the **`setup-test`** tunnel in the Cloudflare dashboard (check the
-name twice — do not touch `home-srv-01`). For option B, also remove the DNS
-records and NPM hosts the test created, or just leave the second domain as a
-permanent staging environment.
+name twice — do not touch `home-srv-01`). Also remove the DNS records and NPM hosts the
+test created — or just leave the second domain in place as a permanent
+staging environment, which is arguably the more useful outcome.
 
 ---
 
