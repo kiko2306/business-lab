@@ -4035,3 +4035,169 @@ Verified live: "Creme vegetal (margarina)" at Continente now resolves to
 250g/mass (was null before); Leite/Açúcar controls unaffected. Deployed,
 running a full-pool refresh to backfill "gr"-labelled sizes wherever
 else Continente uses that abbreviation.
+
+## 43. Session Log — 2026-08-30 (cont.): Price Compare — loading screen, matching-accuracy pass with an offline test harness, query sanitization, + 4 robustness/UX gaps
+
+Large multi-part change. User asked for: a UI-blocking loading screen on
+any price update; a real push at matching accuracy, "tested" (offline
+replay + live), with item-name sanitization folded in; and to also close
+the robustness/UX gaps flagged the session before. Approved plan lives at
+`~/.claude/plans/vectorized-weaving-ripple.md`.
+
+### 43.1 Loading screen (shipped first, earlier in the session)
+
+Full-screen blocking overlay (`#loading-overlay`, spinner + message, no
+dismiss control, `z-index` above modals/toasts) shown during: per-product
+"Atualizar", header "Atualizar preços", and add/rename (all run a
+multi-second server-side scrape). `showLoading`/`hideLoading` depth-counted
+so nested calls don't hide early; `setLoadingMessage` updates text without
+touching the count (used by the progress poll below). Incidental fix: the
+per-product refresh handler had no `finally`, so a failed refresh left its
+button stuck disabled on "A atualizar…".
+
+### 43.2 Offline replay harness (new — also the app's first tests)
+
+`apps/price-compare/app/test/`:
+- `capture.js` — dev tool (not run by `npm test`). Hits the live store
+  search pages once for a curated ~63-item list (every failure class +
+  known-good controls) and records every candidate, parsed down to the
+  JSON-serialisable fields the matcher needs, into
+  `fixtures/candidates.json`.
+- `fixtures/labels.json` — hand-labelled expected outcome per (product,
+  store): `match` (with `nameIncludes`/`nameExcludes` substring guards) or
+  `nomatch`.
+- `match.test.js` — `node:test`, zero network. Replays the extracted
+  `selectBestCandidate(query, candidates)` against the snapshot; asserts
+  every labelled case, plus an aggregate floor (≥165 of 252 pairs must
+  still match — catches an over-aggressive heuristic).
+- `package.json`: `"test": "node --test test/*.test.js"` (the glob matters
+  — a bare `test/` dir also runs `capture.js` and fires 250 live requests).
+- `scrapers.js` refactor: the candidate-selection body of
+  `searchAndScrapeStore` pulled out into a pure exported
+  `selectBestCandidate` + `parseCandidate` (HTML-derived facts only; the
+  word-overlap ranking stays live so it's tunable without re-capturing).
+
+### 43.3 Matching-accuracy changes (each kept only after the harness showed net-positive)
+
+Root cause from a live candidate dump: the relevance filter
+(`looksIrrelevant`) keeps a candidate on ≥2 non-generic shared words (≥1
+for a 1-word query), so when the query's only distinctive word is a weak
+adjective, the *one* candidate that survives is often the wrong one —
+"Iogurtes naturais" → Lidl "Atum ao Natural" (tuna), "Queijo da Serra" →
+Lidl "Serra Grande de Jardinagem" (a garden tool), "Mel de abelha" →
+Auchan "DESODORIZANTE … ABELHAS MEL". Separately, `countExtraWords`
+ranking picked a processed form over the plain item ("Pêras" → "Bolsa de
+Fruta Pêra", a €0.67 pouch, over "Pera Rocha").
+
+1. **`sanitizeSearchQuery(q)`** — `stripDiacritics → lowercase →
+   [^a-z0-9]+ → space`. Replaces the bare `stripDiacritics` in all four
+   `searchUrl` builders; also folded into `normalizeText`. Fixes
+   quoted/parenthesised/hyphenated names that returned zero results
+   (`Champô de bebé "não chora mais"`, `Paprika (colorau)`, `Papos-secos`).
+   The raw name still flows to `significantWords`/size parsing, so "1.5L"
+   is untouched.
+2. **Lead-with-a-category-noun gate** — in `looksIrrelevant`, if
+   `queryWords[0]` is in `GENERIC_CATEGORY_WORDS` and the query has other
+   words, that noun must appear in the candidate. Gated on the *first*
+   word specifically, so a trailing incidental one doesn't fire it
+   ("Fermento em pó para bolos" leads with "fermento", stores never say
+   "bolo"). This is the change plan.md §30.2 avoided over a brand-named
+   yogurt — not present in the current generic-worded list, re-validated
+   via the harness. Added `vinagre` to the set (→ fixes "Vinagre de vinho
+   branco" → Lidl "3 Castas Vinho Branco/Tinto").
+3. **Head-word rule for short category-less queries** — if the query has
+   ≤2 significant words and no category noun ("Mel de abelha", "Canela em
+   pó", "Tangerinas"), the candidate's own first word must be one of the
+   query's. Portuguese titles lead with what the thing *is*; "Desodorizante
+   … Mel" / "Café Solúvel … Canela" / "Água com Gás Tangerina" lead with a
+   different noun. Only here — the §38-reverted false rejects ("Postas de
+   Bacalhau", "Folha de Massa Fresca") are all category-noun queries, which
+   skip this.
+4. **Processed-form demotion** — `PROCESSED_FORM_WORDS` (sumo, néctar,
+   puré, gelatina, compota, sorbet, gelado, sangria, bolsa, batido,
+   farinha, polpa, …). In `pickClosestNameMatches` a candidate carrying an
+   unrequested form word ranks strictly below every plain candidate,
+   before extra-word closeness or price. Ranking-only, never a reject; no
+   effect when the query itself is that form. Bounded/closed the same way
+   `NEUTRAL_PACKAGING_WORDS` is.
+
+Net effect: more honest `NoMatchError` for stores that genuinely don't
+carry the item (the UI already hides those rows; §43.7 makes the absence
+visible). Not chased — unit-basis mismatches (per-kg vs per-piece fish, 8
+vs 100 capsules, a 20 kg dog-food bag) and store-vocabulary gaps
+("Amaciador de cabelo" vs "Condicionador", "Achocolatado" vs "Chocolate
+em pó", "whitening" vs "branqueadora"). Those are for the manual override
+(§43.5) / a manual reword; listed at the end.
+
+**Harness result**: all 35 labelled products / ~90 pairs pass, incl. every
+`nomatch` (Iogurtes/Lidl, Queijo/Lidl, Mel all stores, Tangerinas,
+Vinagre/Lidl) with no control regressions. Live re-check against the
+deployed container matched the replay.
+
+### 43.4 `refresh-all` is now a background job with live progress
+
+`POST /api/products/refresh-all` responds `202` immediately and runs the
+refresh detached; per-user progress lives in an in-memory
+`refreshJobs` map, exposed at `GET /api/products/refresh-status`
+(`{running,total,done}`). The client kicks it off then polls every 1.5s
+and keeps the blocking overlay up showing "N de 300 concluídos";
+`init()` also checks the status on load, so a mid-run reload re-attaches
+instead of losing the overlay while the job continues. Daily scheduler
+path unchanged (synchronous, no callback).
+
+### 43.5 Manual match override ("corrigir correspondência")
+
+Per product: `overrides = { [store]: { url } | { excluded: true } }`
+(optional, `?? {}` for old data). `buildStoreEntry` honours it —
+`{url}` scrapes that exact page via new `scrapeChosenUrl` (skips
+search/selection, still resolves pack/size, and a failed fetch is treated
+as transient not NoMatch since the user asserted the page); `{excluded}`
+emits a placeholder entry so the coverage indicator can tell it apart from
+a plain no-match. New routes: `GET /api/products/:id/candidates?store=`
+(raw search results, no selection) and `PUT /api/products/:id/override`
+(`{store,url}` | `{store,excluded}` | `{store,clear}`, re-scrapes just that
+store). UI: `✎`/`📌` on each price row and on the coverage chip → a modal
+with a store picker, the candidate list as radios, "Excluir esta loja" and
+"Automático".
+
+### 43.6 Scheduler re-entrancy guard
+
+`checkScheduledUpdate` now bails if `scheduledRunInFlight` is set or any
+`refreshJobs` entry is running, and wraps its body in `try/finally` — a
+full refresh taking longer than the 15-minute poll interval can no longer
+start a second concurrent run (or double up with a user's manual one).
+
+### 43.7 No-match visibility
+
+`renderProductCard` shows a muted "3/4 lojas" chip in the card header when
+a product has fewer priced stores than expected (user-excluded stores
+don't count against it); the chip's tooltip names the missing stores and
+clicking it opens the correction modal. Hidden rows stay hidden.
+
+### 43.8 Deploy + verification
+
+`docker compose up -d --build`, container healthy, `npm test` green,
+new endpoints correctly `401` unauthenticated, versioned bundle carries
+the new code. Live read-only sample of ~22 items across every failure
+class matched the harness (Iogurtes naturais / Queijo da Serra / Mel /
+Tangerinas / Vinagre-at-Lidl all now honest no-matches; Peito de frango
+no longer the ham; controls unchanged). A full 300-item live refresh was
+kicked off in the background right after deploy to apply the new
+heuristics pool-wide — see a follow-up entry for the resulting numbers.
+
+Not verified interactively: the correction modal and progress overlay in a
+real browser — Claude-in-Chrome was not connected this session. Endpoints
+and bundle checked by other means; the DOM wiring is syntax-clean but
+should get a real click-through.
+
+### 43.9 Known gaps left for a manual reword (store vocabulary / underspecified names)
+
+- "Amaciador de cabelo" — PT stores sell it as "Condicionador".
+- "Achocolatado em pó (Nesquik)" — stores title it "Chocolate em pó".
+- "Pasta de dentes whitening" — Continente uses "branqueadora" (works at
+  Pingo Doce/Auchan which keep "whitening").
+- "Champô de bebé 'não chora mais'" — marketing tagline, not a title.
+- "Nozes descascadas", "Sardinhas em lata" — the stemmer / a
+  literally-required packaging word (both pre-existing, §36–§38).
+- Fresh "Tangerinas" — PT stores list the fruit as "Clementina/Mandarina";
+  now an honest no-match rather than a juice.
