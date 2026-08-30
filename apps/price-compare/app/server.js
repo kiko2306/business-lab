@@ -87,6 +87,24 @@ function saveUserProducts(userId, userProducts) {
   saveAllProducts([...others, ...userProducts]);
 }
 
+// Persists a single product's fields against the file's *current* state
+// (re-read immediately before writing), not a snapshot taken however long
+// ago the caller started — see refreshProductsForUser below, whose bulk
+// loop can run for minutes across a large catalog. Verified live: a user
+// renamed "Água com gás das pedras" to "Agua das pedras" mid-refresh, and
+// the refresh's own end-of-run save (the old code: load once, loop, save
+// once) blew the rename away with its stale in-memory copy the moment it
+// finished. Returns the updated product, or null if it was deleted
+// concurrently (nothing to update, not an error).
+function updateOneProduct(userId, productId, updates) {
+  const products = loadAllProducts();
+  const product = products.find((p) => p.id === productId && p.userId === userId);
+  if (!product) return null;
+  Object.assign(product, updates);
+  saveAllProducts(products);
+  return product;
+}
+
 // A simple append-only log, not part of products.json — a bug report is a
 // point-in-time snapshot of what was wrong (the product's name and every
 // store's price/URL/scrapedName at the moment reported), so it needs to
@@ -515,21 +533,29 @@ app.post('/api/products/:id/report-bug', (req, res) => {
 // concurrent requests hit the store sites at once rather than firing dozens
 // together). Shared by the manual "Update prices" button and, for every
 // user at once, the daily scheduler below.
+//
+// Persists each product immediately via updateOneProduct rather than
+// collecting every result in memory and saving once at the end — for a
+// large catalog this loop can run for many minutes (hundreds of items ×
+// 4 stores), and a single save at the end using product objects captured
+// at the *start* of the loop would silently discard any edit, rename, or
+// delete the user made in the meantime. See updateOneProduct's comment
+// for the live case that caught this.
 async function refreshProductsForUser(userId) {
   const products = loadUserProducts(userId);
   const allDrops = [];
   for (const product of products) {
     const previousEntries = product.urls;
-    product.urls = await searchAllStores(product.name, previousEntries);
-    product.updatedAt = new Date().toISOString();
-    allDrops.push(...collectPriceDrops(product.name, previousEntries, product.urls));
+    const urls = await searchAllStores(product.name, previousEntries);
+    const updated = updateOneProduct(userId, product.id, { urls, updatedAt: new Date().toISOString() });
+    if (!updated) continue; // deleted while this product's refresh was in flight — nothing left to update
+    allDrops.push(...collectPriceDrops(product.name, previousEntries, urls));
   }
-  saveUserProducts(userId, products);
   // One notification per refresh run, not one per drop — a run that finds
   // several drops (e.g. the daily 8am update) shouldn't spam a stack of
   // separate pushes.
   if (allDrops.length) await push.notifyPriceDrops(userId, allDrops);
-  return products;
+  return loadUserProducts(userId);
 }
 
 app.post('/api/products/refresh-all', async (req, res) => {

@@ -3920,3 +3920,53 @@ its `unitSizeValue`/`unitSizeKind` from the pack total instead of the
 case (€2.94 → 9000ml volume → €0.327/L) plus a handful of non-pack
 controls for regressions. Deployed, refreshing the full 300-item pool in
 the background to backfill pack totals everywhere this applies.
+
+## 40. Session Log — 2026-08-30 (cont.): Price Compare — concurrent-edit clobbering bug, report-list scroll
+
+User reported a rename reverting itself: "im updating Água com gás das
+pedras to Agua das pedras and it changes back again." Root cause found
+and confirmed live — not a UI bug, a real data-race in
+`refreshProductsForUser` (server.js): it loaded the user's full product
+list once at the start, looped through every item re-scraping all 4
+stores (minutes for a large catalog), and only wrote the whole list back
+once at the very end, using product objects captured at the *start* of
+the loop. Any edit made anywhere in that window — this rename included —
+got silently discarded the moment the refresh's own stale snapshot was
+written back over it. This function backs both the manual "Atualizar
+tudo" button and the daily scheduler, so it wasn't a one-off: any refresh
+run big enough to take a while was a live risk to concurrent edits. Very
+likely the same root cause as the earlier-session "editing creates a
+duplicate" report that couldn't be reproduced at the time — plausible
+that report also landed during an in-flight refresh.
+
+Fix: `updateOneProduct(userId, productId, updates)` re-reads the file
+fresh and writes back immediately after *each* product's search
+finishes, instead of accumulating in memory; returns null (skipped, not
+an error) if the product was deleted mid-refresh. The one known
+remaining tradeoff, documented in the code: if a product's name changes
+mid-refresh, that iteration's search results (based on the name read at
+loop start) still get saved against the now-renamed product — a stale
+price for a few seconds until the next refresh, not a lost edit. Applied
+the identical fix to the scratchpad `refresh_all.js` pattern used
+throughout this session for direct-to-container reindexing, since it had
+the exact same flaw and was actively causing this — killed the
+in-progress run, restored the user's rename by hand (re-searching under
+the new name), then re-ran the corrected version.
+
+Also: the admin bug-reports/users lists in the Settings modal had no
+scroll bound — `.modal-box` now caps at `calc(100vh - 32px)` with its own
+overflow, and `#admin-users-list`/`#admin-bug-reports-list` each get a
+240px scrollable area so the list scrolls independently of the modal's
+Fechar button.
+
+Three more per-store reports came in during this work, all still
+pointing at the same open issues: two more "it's actually a pack"
+reports on Pedras water (Continente/Lidl) and "Agua 1.5L" landing on
+Pingo Doce's unlabelled 6L jerry can again — same underlying gaps
+already logged (§37's packaging-word revert, the ambiguous "sem/com Gás"
+product name). One new wrinkle: the interrupted isPack backfill (killed
+mid-run to fix the clobbering bug above) left 749 of 752 priced entries
+without the new isPack field at all, so the Pack/Unidade badge was
+showing "Unidade" almost everywhere regardless of the real answer — not
+a logic bug, just an incomplete backfill. Re-running it now with the
+clobber-safe script.
