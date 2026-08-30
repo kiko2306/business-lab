@@ -5391,3 +5391,76 @@ Backend 121/121, `tsc` clean.
   of truth; not done here because Authelia needs the value at *first boot*,
   before any exposure row exists.
 - Relay (§46.9) and the CLI device flow (§46.12) remain open.
+
+## 48. Reference: every fix NetBird needed, in one place
+
+NetBird took the longest of anything in this project to get working, and the
+reasons are scattered across §20, §21, §24, §46 and §47. This is the
+consolidated list — what was actually wrong, and where the fix now lives. Read
+this first if NetBird ever breaks again, or before standing it up elsewhere.
+
+The through-line: **almost every one of these failed silently.** No stack
+trace, no 500, usually an HTTP `200` — a client retrying forever, or a
+dashboard spinner. That is why it took so many passes, and why each item below
+names the *observable symptom* rather than just the fix.
+
+### 48.1 Transport — getting native gRPC through the tunnel at all
+
+| # | Problem | Symptom | Fix, and where it lives now |
+|---|---|---|---|
+| 1 | cloudflared's **QUIC** backbone drops HTTP/2 trailers | `200` + correct body but **no `grpc-status`**; grpc-go says "server closed the stream without sending trailers"; client loops on `GetServerKey` forever | `TUNNEL_TRANSPORT_PROTOCOL=http2` systemd drop-in, asserted by `start.sh` (§46.7, §46.10) |
+| 2 | Cloudflare **zone gRPC toggle** off | `403` + an HTML body, *before* traffic ever reaches the tunnel — nothing in NPM or cloudflared logs | Zone → Network → gRPC = on (§20.7) |
+| 3 | Tunnel origin not HTTP/2 | gRPC can't negotiate | `http2Origin: true`, `noTLSVerify: true`, `originServerName`, and an `https://` origin (§20.8) |
+| 4 | NPM proxied gRPC as HTTP/1.1 | `failed to check SSO support: failed getting management service public key` | `grpc_pass` via `buildGrpcAdvancedConfig` (`npmClient.ts`), driven by `grpc: true` on the exposure (§20.4) |
+| 5 | ...but `grpc_pass` applied to **everything** | browser dashboard hung forever on its own REST calls — REST doesn't carry trailers either | the `grpc_pass` is conditional on `$http_content_type = "application/grpc"`; REST/grpc-web fall through to plain `proxy_pass` (§24.1) |
+
+Items 2-5 were each found and fixed in earlier sessions and were all genuinely
+necessary — but none of them mattered until item 1 was fixed, which is why
+progress kept stalling. **Item 1 was misdiagnosed for several sessions as an
+unfixable upstream cloudflared bug** (§20.9, §24.5), and nearly cost a router
+port-forward that would have broken §0 principle 1. It was one flag.
+
+### 48.2 Authentication — Authelia and native clients
+
+| # | Problem | Symptom | Fix |
+|---|---|---|---|
+| 6 | `AUTH_SUPPORTED_SCOPES` missing `offline_access` | no refresh token issued; every API call `401 token expired` shortly after login | added to `AUTH_SUPPORTED_SCOPES` (§20.11) |
+| 7 | `NETBIRD_TOKEN_SOURCE: accessToken` | Authelia issues an **opaque** access token; management parses bearers as JWTs → `token contains an invalid number of segments` → SPA restarted login in a loop | `NETBIRD_TOKEN_SOURCE: idToken` — the id_token is always a real JWT (§24.2) |
+| 8 | Native PKCE `RedirectURLs` pointed at the **web dashboard** | phone enrolled, then the code was delivered to `/nb-auth` in the browser instead of to the app; the app never received it | `RedirectURLs: ["http://localhost:53000/"]` — native clients run a loopback listener (RFC 8252) (§46.11) |
+| 9 | Same opaque-token bug as #7, on the native path | would have bitten the moment #8 was fixed | `UseIDToken: true` in `PKCEAuthorizationFlow` (§46.11) |
+| 10 | Loopback redirect not registered with the IdP | Authelia rejects `redirect_uri` | `http://localhost:53000/` **and** the no-slash variant on the `netbird-dashboard` client — Authelia matches by exact string (§46.11) |
+
+On #10: native clients deliberately **reuse the `netbird-dashboard` client**
+rather than `netbird-cli`, because management validates the bearer's audience
+against `HttpConfig.AuthAudience`, which is `netbird-dashboard`. A token minted
+for a different `client_id` is rejected.
+
+### 48.3 Reachability — what a remote peer actually needs
+
+| # | Problem | Symptom | Fix |
+|---|---|---|---|
+| 11 | **Signal** advertised as the internal `netbird-vpn:80` | peer registers and appears in the dashboard, then can never connect to anything — no remote client can resolve that name | signal's port published + its own `netbird-vpn-signal.<domain>` exposure with `grpc: true`; `Signal.URI` points there (§46.8) |
+| 12 | `Stuns: []` and `Turns: []` | no NAT traversal at all | public STUN servers (client reaches them **directly over UDP**, never through the tunnel — so still no port-forward) (§46.8) |
+
+§24.2's original test peer only worked because it ran on the same Docker
+network, where `netbird-vpn:80` resolves. That masked #11 completely.
+
+### 48.4 Reproducibility — so a new host doesn't relive all of it
+
+| # | Problem | Fix |
+|---|---|---|
+| 13 | The http2 setting was pure host state, outside the repo and its backups | `start.sh` writes the drop-in every run, before cloudflared is even installed (§46.10, §47.1) |
+| 14 | Domain hardcoded in Authelia, NetBird compose, and `management.json` | all templated from `BASE_DOMAIN` (§47.2) |
+| 15 | Tunnel, connector, OIDC keys, `management.json` all set up by hand | `start.sh` prompts for 3 values and derives the rest (§47.1, §47.3) |
+| 16 | A locally-configured tunnel silently ignores the dashboard's ingress writes | tunnels are created with `config_src: "cloudflare"` (§47.1) |
+
+### 48.5 Still open
+
+- **Relay** (§46.9) — `netbirdio/relay` over WebSocket, for when hole-punching
+  fails (mobile-data CGNAT). Not built: it can't be verified without enrolling
+  a peer, and everything else here was verified before being trusted.
+- **CLI device-authorization flow** (§46.12) — `Provider: ""` makes
+  `netbird login` fail on headless clients. Affects laptops, not the phone;
+  a correct fix also has to realign `netbird-cli`'s audience.
+- The enrolled phone has only been tested on **home WiFi**, not mobile data
+  (§46.13) — which is exactly where relay would be needed.
