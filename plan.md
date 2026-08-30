@@ -4653,3 +4653,69 @@ raisins for "Passas de uva" (€26.60 vs €6.45/kg). A couple are borderline
 unchanged — the "<2 shared stemmed words" scan still flags only 4 rows,
 all false positives. `-zes` didn't recover "Nozes descascadas" (store
 listings don't surface a plain "noz(es)" match) — stays a gap for G.
+
+## 44. Session Log — 2026-08-30 (cont.): Price Compare — share a list with another account
+
+Two people in one household can now work off **one shared products list +
+one shared shopping list**. Not a copy and not read-only: both accounts
+read and write the same rows, coordinated by a single-editor lock.
+
+### 44.1 What shipped
+
+- **`shares.js`** (new) — `/data/shares.json` grant store, same flat-JSON
+  pattern as `users.js`. A row is `{ ownerUserId, ownerEmail/Name,
+  inviteeEmail, inviteeUserId, status }`, `status` ∈ `pending | accepted
+  | declined | revoked`. `isSharedWith(owner, viewer)` (an `accepted`
+  row) is the authorization primitive; `isShared(owner)` drives the lock.
+  `bindPendingInvites(user)` on login attaches the userId to an invite
+  addressed to that email before signup. 7 unit tests (`test/shares.test.js`).
+- **Workspace resolver** — `resolveWorkspace` middleware on
+  `/api/products` + `/api/shopping-list`: an `X-Workspace: <ownerId>`
+  header, validated against an accepted grant, sets `req.workspaceId`;
+  absent / own id behaves exactly as before; anything else → 403. Every
+  data read/write in ~15 handlers switched `req.user.sub` → `req.workspaceId`
+  (bug-report *provenance* and push subscriptions stay `req.user.*`).
+  `refreshJobs` keyed by workspace.
+- **Share routes** (`auth.requireAuth`, not workspace-scoped): `GET
+  /api/shares` → `{ outgoing, incoming }`, `POST /api/shares {email}`,
+  `POST /api/shares/:id/(accept|decline)`, `DELETE /api/shares/:id`.
+- **Single-editor lock** — in-memory `editLocks` Map, `90 s` heartbeat
+  TTL (stale = free). `GET/PUT/DELETE /api/workspace/lock` (PUT takes
+  `{steal:true}` for the "Tomar controlo" button). `requireEditLock`
+  middleware: a **shared** workspace rejects a mutating request from
+  anyone but the lock holder with `409 { heldBy }`; a private workspace
+  skips it entirely; a passing write (re)acquires the lock.
+- **Client** — `api()` sends `X-Workspace` when a shared list is active
+  and, on `409 { heldBy }`, flips to read-only. Settings gains a "👥
+  Partilha" block (invite by email, list sent invites w/ Anular, list
+  accepted shares w/ Sair). A pending invite shows a modal on load
+  (Aceitar / Recusar). An "A ver:" `<select>` appears once you hold an
+  accepted share and re-scopes every call. Lock UX: acquire on entering a
+  shared list (or your own once shared), heartbeat 30 s, poll 20 s,
+  release on switch-away / logout / `pagehide` (`keepalive` fetch). Banner
+  strip shows "Está a editar" / "🔒 X está a editar" + Tomar controlo;
+  `body.shared-readonly` hides every mutating control.
+- **`push.notify(userId, {title,body,url})`** — generic one-off push,
+  fired on invite + accept (no-op if push unconfigured / no sub). SW
+  distinguishes a price-drop payload (`drops[]`) from a plain notice.
+
+### 44.2 Design decisions (from the user)
+
+- "Share the same data file so changes can be shared" → collaborative
+  edit, **not** a copy or a read-only view — hence the resolver + lock
+  rather than a snapshot.
+- "All items and shopping list, no selection" → no per-item/-category
+  scope; a grant is the whole workspace.
+- "Separate switchable view" → the `A ver:` switcher, not a merged list.
+- "Show user editing so no concurrency happens" → the single-editor lock
+  + presence banner (added after the first plan review).
+
+### 44.3 Verification
+
+Inviter side checked live in-browser (invite send / list / revoke, invite
+modal render) and by `curl` (all `POST /api/shares` validations, resolver
+403 for a non-granted workspace, `X-Workspace` = own id is a no-op, lock
+acquire/refresh/status/release). **Two-account paths — accept, switch
+into the shared list, the 409 vs. steal hand-off — need a live second
+login to exercise** (the local session store can't be hand-seeded).
+Suite: 229 tests / 224 pass / 5 todo. `Dockerfile` COPYs `shares.js`.
