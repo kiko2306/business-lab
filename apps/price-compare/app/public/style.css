@@ -399,4 +399,59 @@ textarea { resize: vertical; }
   .price-actions a.btn { flex: 1 1 auto; text-align: center; }   /* "Abrir" fills the row */
   .price-actions button.btn { flex: 0 0 auto; }                  /* icon buttons stay compact */
   .pack-badge:not(.pack) { display: none; }                      /* "Unidade" is noise on a phone; keep "Pack" */
+
+  .shared-banner { flex-direction: column; align-items: stretch; }
+  .share-invite-form { flex-direction: column; }
+}
+
+/* --- Sharing: workspace switcher, shared banner, settings block --- */
+.workspace-switcher-wrap {
+  display: flex; align-items: center; gap: 8px; margin: 0 0 10px;
+  font-size: 13px; color: var(--text-muted);
+}
+.workspace-switcher-wrap select {
+  background: var(--input-bg); color: var(--text);
+  border: 1px solid var(--input-border); border-radius: 6px;
+  padding: 5px 8px; font-size: 13px;
+}
+
+.shared-banner {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin: 0 0 12px; padding: 9px 12px; border-radius: 8px;
+  border: 1px solid var(--border); background: var(--bg-elevated); font-size: 13px;
+}
+.shared-banner .shared-banner-whose { display: block; }
+.shared-banner .shared-banner-msg { color: var(--text-muted); }
+.shared-banner[data-mode="editing"] { border-color: var(--success); }
+.shared-banner[data-mode="readonly"] { border-color: var(--warning); }
+
+.share-invite-form { display: flex; gap: 8px; margin: 0 0 12px; }
+.share-invite-form input {
+  flex: 1 1 auto; background: var(--input-bg); color: var(--text);
+  border: 1px solid var(--input-border); border-radius: 6px; padding: 8px 10px; font-size: 14px;
+}
+.shares-list { display: flex; flex-direction: column; gap: 6px; }
+.shares-list:not(:empty) { margin-top: 6px; }
+.share-row {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  padding: 8px 10px; border: 1px solid var(--border-soft); border-radius: 6px; font-size: 13px;
+}
+.share-row .share-row-email { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.share-row .share-row-status { color: var(--text-faint); font-size: 12px; }
+
+/* Read-only mode: a collaborator is looking at a list someone else is
+   editing — hide every control that would mutate it (and 409 anyway). */
+body.shared-readonly #add-product-btn,
+body.shared-readonly #update-all-btn,
+body.shared-readonly [data-edit],
+body.shared-readonly [data-delete],
+body.shared-readonly [data-refresh],
+body.shared-readonly [data-correct],
+body.shared-readonly [data-report-bug],
+body.shared-readonly [data-add-to-list],
+body.shared-readonly .qty-stepper,
+body.shared-readonly .shopping-list-toggle,
+body.shared-readonly [data-shopping-list-remove],
+body.shared-readonly #shopping-list-clear {
+  display: none !important;
 }

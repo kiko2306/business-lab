@@ -55,6 +55,17 @@
       Dica: nomes curtos e genéricos (ex. "Água 1,5L") podem encontrar o
       produto errado — indique a marca sempre que possível.
     </p>
+    <div id="workspace-switcher-wrap" class="workspace-switcher-wrap hidden">
+      <label for="workspace-switcher">A ver:</label>
+      <select id="workspace-switcher"></select>
+    </div>
+    <div id="shared-banner" class="shared-banner hidden">
+      <div class="shared-banner-text">
+        <strong class="shared-banner-whose"></strong>
+        <span class="shared-banner-msg"></span>
+      </div>
+      <button type="button" id="take-control-btn" class="btn small hidden">Tomar controlo</button>
+    </div>
     <div id="ad-slot" class="ad-slot hidden"></div>
     <div id="products"></div>
     <p id="products-empty" class="empty hidden">Ainda não há produtos — adicione o primeiro acima.</p>
@@ -132,6 +143,18 @@
     </div>
   </div>
 
+  <div id="share-invite-modal" class="modal">
+    <div class="modal-box">
+      <h2>👥 Convite de partilha</h2>
+      <p id="share-invite-text" class="hint"></p>
+      <p class="hint">Se aceitar, essa pessoa passa a ver e a editar os seus produtos e a sua lista de compras.</p>
+      <div class="modal-actions">
+        <button type="button" id="share-invite-decline" class="btn">Recusar</button>
+        <button type="button" id="share-invite-accept" class="btn primary">Aceitar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="settings-modal" class="modal">
     <div class="modal-box">
       <h2>⚙️ Definições</h2>
@@ -155,6 +178,21 @@
           <li>Se continuar a falhar, limpe os dados do navegador para este site: Definições do sistema → Aplicações → (o navegador) → Armazenamento → Limpar armazenamento — depois repita os passos acima.</li>
         </ol>
       </details>
+
+      <hr class="settings-divider" />
+      <h3>👥 Partilha</h3>
+      <p class="hint" style="margin: 4px 0 10px">
+        Convide outra conta pelo email. Depois de aceitar, ambos veem e
+        editam os mesmos produtos e a mesma lista de compras — mas só uma
+        pessoa de cada vez.
+      </p>
+      <form id="share-invite-form" class="share-invite-form">
+        <input id="share-invite-email" type="email" required placeholder="email da pessoa" />
+        <button type="submit" class="btn primary">Convidar</button>
+      </form>
+      <div id="shares-outgoing" class="shares-list"></div>
+      <div id="shares-incoming" class="shares-list"></div>
+
       <div id="admin-section" class="hidden">
         <hr class="settings-divider" />
         <h3>👑 Administração</h3>

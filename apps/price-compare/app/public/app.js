@@ -28,6 +28,19 @@ document.getElementById('theme-toggle-btn').addEventListener('click', () => {
 let products = [];
 let categories = [];
 
+// --- Sharing / shared-workspace state ---
+// activeWorkspace: the owner id of the list we're currently viewing, or
+// null for our own. shareState: { outgoing, incoming } from GET /api/shares.
+// sharedMode: 'idle' (nothing shared) | 'editing' (we hold the lock) |
+// 'readonly' (someone else does). lockHolder: { name, email } when readonly.
+let shareState = { outgoing: [], incoming: [] };
+let activeWorkspace = null;
+let activeWorkspaceLabel = '';
+let sharedMode = 'idle';
+let lockHolder = null;
+let lockHeartbeatTimer = null;
+let lockPollTimer = null;
+
 // Which product cards, and which whole category sections, are collapsed —
 // both persisted per-browser (separate keys) so they survive a reload.
 function loadCollapsedSet(key) {
@@ -55,11 +68,12 @@ function saveCollapsedCategories() {
   saveCollapsedSet('priceCompare.collapsedCategories', collapsedCategories);
 }
 
-async function api(path, options) {
-  const res = await fetch('/api' + path, {
-    headers: { 'Content-Type': 'application/json' },
-    ...options,
-  });
+async function api(path, options = {}) {
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  // When viewing a list shared with us, every products/shopping-list call
+  // carries the owner's id; the server checks the grant (see shares.js).
+  if (activeWorkspace) headers['X-Workspace'] = activeWorkspace;
+  const res = await fetch('/api' + path, { ...options, headers });
   if (res.status === 401) {
     // Session expired/logged out elsewhere mid-use — drop back to the
     // login screen instead of just toasting a confusing error.
@@ -68,6 +82,13 @@ async function api(path, options) {
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
+    // 409 + heldBy = the shared list was grabbed by someone else between
+    // our last poll and this write. Flip to read-only and let the caller's
+    // catch surface it.
+    if (res.status === 409 && body.heldBy) {
+      enterReadonly(body.heldBy);
+      showToast(`🔒 ${body.heldBy.name || body.heldBy.email} está a editar esta lista.`, true);
+    }
     throw new Error(body.error || `request failed (${res.status})`);
   }
   return res.status === 204 ? null : res.json();
@@ -130,6 +151,7 @@ function renderProducts() {
     container.appendChild(section);
   }
   refreshReviewCount();
+  applySharedMode(); // re-hide mutating controls if we're in read-only shared mode
 }
 
 // --- "Rever correspondências" — the needs-attention worklist ----------
@@ -1106,6 +1128,7 @@ async function loadShoppingListModal() {
       }
     })
   );
+  applySharedMode(); // hide +/−/✓/✕ when viewing a list someone else is editing
 }
 
 document.getElementById('shopping-list-btn').addEventListener('click', () => {
@@ -1132,8 +1155,302 @@ if ('serviceWorker' in navigator) {
 }
 
 document.getElementById('logout-btn').addEventListener('click', async () => {
+  if (sharedMode === 'editing') await releaseLock();
   await fetch('/auth/logout', { method: 'POST' });
   showLoginScreen();
+});
+
+// ===================================================================
+// Sharing — invite another account to co-edit; switch between "my
+// lists" and a shared one; a single-editor lock so two people can't
+// clobber the same flat file (server: shares.js + /api/workspace/lock).
+// ===================================================================
+
+async function loadShares() {
+  try {
+    shareState = await api('/shares');
+  } catch {
+    shareState = { outgoing: [], incoming: [] };
+  }
+  renderWorkspaceSwitcher();
+  renderSharesSettings();
+}
+
+function acceptedIncoming() {
+  return shareState.incoming.filter((s) => s.status === 'accepted');
+}
+
+function renderWorkspaceSwitcher() {
+  const wrap = document.getElementById('workspace-switcher-wrap');
+  const sel = document.getElementById('workspace-switcher');
+  const accepted = acceptedIncoming();
+  if (!accepted.length) {
+    wrap.classList.add('hidden');
+    return;
+  }
+  wrap.classList.remove('hidden');
+  sel.innerHTML =
+    `<option value="">As minhas listas</option>` +
+    accepted
+      .map((s) => `<option value="${escapeHtml(s.ownerUserId)}">De ${escapeHtml(s.ownerEmail)}</option>`)
+      .join('');
+  sel.value = activeWorkspace || '';
+}
+
+const SHARE_STATUS_LABEL = { pending: 'pendente', accepted: 'aceite', declined: 'recusado' };
+
+function renderSharesSettings() {
+  const out = document.getElementById('shares-outgoing');
+  const inc = document.getElementById('shares-incoming');
+  if (!out || !inc) return;
+  out.innerHTML = shareState.outgoing
+    .map(
+      (s) => `<div class="share-row" data-share-id="${escapeHtml(s.id)}">
+        <span class="share-row-email">${escapeHtml(s.inviteeEmail)} <span class="share-row-status">· ${SHARE_STATUS_LABEL[s.status] || s.status}</span></span>
+        <button type="button" class="btn small" data-share-remove="${escapeHtml(s.id)}">Anular</button>
+      </div>`
+    )
+    .join('');
+  inc.innerHTML = acceptedIncoming()
+    .map(
+      (s) => `<div class="share-row" data-share-id="${escapeHtml(s.id)}">
+        <span class="share-row-email">Dados de ${escapeHtml(s.ownerEmail)}</span>
+        <button type="button" class="btn small" data-share-remove="${escapeHtml(s.id)}">Sair</button>
+      </div>`
+    )
+    .join('');
+}
+
+// Raw fetch (not api()) so the generic 409 handler doesn't fire for the
+// lock's own negotiation.
+async function lockRequest(method, body) {
+  const headers = {};
+  if (activeWorkspace) headers['X-Workspace'] = activeWorkspace;
+  if (body) headers['Content-Type'] = 'application/json';
+  try {
+    const res = await fetch('/api/workspace/lock', {
+      method,
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    return { status: res.status, body: res.status === 204 ? null : await res.json().catch(() => ({})) };
+  } catch {
+    return { status: 0, body: null };
+  }
+}
+
+async function setWorkspace(ownerSub) {
+  if (sharedMode === 'editing') await releaseLock();
+  stopLockTimers();
+  activeWorkspace = ownerSub || null;
+  const match = acceptedIncoming().find((s) => s.ownerUserId === activeWorkspace);
+  activeWorkspaceLabel = match ? match.ownerEmail : '';
+  sharedMode = 'idle';
+  lockHolder = null;
+  await enterWorkspaceLockFlow();
+  await loadProducts();
+  refreshShoppingListCount();
+}
+
+// On entering a workspace: learn whether it's shared, then take the lock
+// if it's free. A private list stays 'idle' — no lock, no banner.
+async function enterWorkspaceLockFlow() {
+  const { body: st } = await lockRequest('GET');
+  if (!st || !st.shared) {
+    sharedMode = 'idle';
+    lockHolder = null;
+    updateSharedBanner();
+    applySharedMode();
+    return;
+  }
+  if (st.locked && !st.heldByMe) {
+    sharedMode = 'readonly';
+    lockHolder = st.heldBy;
+  } else {
+    const put = await lockRequest('PUT', {});
+    if (put.status === 200) {
+      sharedMode = 'editing';
+      lockHolder = null;
+    } else {
+      sharedMode = 'readonly';
+      lockHolder = put.body?.heldBy || null;
+    }
+  }
+  updateSharedBanner();
+  applySharedMode();
+  startLockTimers();
+}
+
+function startLockTimers() {
+  stopLockTimers();
+  if (sharedMode === 'editing') {
+    lockHeartbeatTimer = setInterval(() => lockRequest('PUT', {}), 30000);
+  }
+  if (sharedMode !== 'idle') {
+    lockPollTimer = setInterval(pollLock, 20000);
+  }
+}
+
+function stopLockTimers() {
+  clearInterval(lockHeartbeatTimer);
+  clearInterval(lockPollTimer);
+  lockHeartbeatTimer = null;
+  lockPollTimer = null;
+}
+
+async function pollLock() {
+  const { body: st } = await lockRequest('GET');
+  if (!st || !st.shared) return;
+  if (sharedMode === 'readonly' && !st.locked) {
+    // freed — grab it and become the editor
+    const put = await lockRequest('PUT', {});
+    if (put.status === 200) {
+      sharedMode = 'editing';
+      lockHolder = null;
+      startLockTimers();
+      await loadProducts();
+    }
+  } else if (sharedMode === 'readonly' && st.locked && !st.heldByMe) {
+    lockHolder = st.heldBy;
+  } else if (sharedMode === 'editing' && st.locked && !st.heldByMe) {
+    // someone took control
+    sharedMode = 'readonly';
+    lockHolder = st.heldBy;
+    startLockTimers();
+    await loadProducts();
+  } else if (sharedMode === 'editing' && !st.locked) {
+    // our heartbeat lapsed — retake
+    await lockRequest('PUT', {});
+  }
+  updateSharedBanner();
+  applySharedMode();
+}
+
+async function releaseLock() {
+  stopLockTimers();
+  await lockRequest('DELETE');
+  if (sharedMode === 'editing') sharedMode = 'idle';
+}
+
+// Called from api()'s 409 branch when a write races a lost lock.
+function enterReadonly(heldBy) {
+  sharedMode = 'readonly';
+  lockHolder = heldBy || null;
+  startLockTimers();
+  updateSharedBanner();
+  applySharedMode();
+  loadProducts();
+}
+
+function updateSharedBanner() {
+  const el = document.getElementById('shared-banner');
+  if (!el) return;
+  if (!activeWorkspace && sharedMode === 'idle') {
+    el.classList.add('hidden');
+    return;
+  }
+  el.classList.remove('hidden');
+  const whose = activeWorkspace ? `Lista de ${activeWorkspaceLabel}` : 'A sua lista (partilhada)';
+  let msg = '';
+  if (sharedMode === 'readonly') {
+    const who = lockHolder?.name || lockHolder?.email || 'Outra pessoa';
+    msg = `🔒 ${who} está a editar. Está em modo de leitura.`;
+  } else if (sharedMode === 'editing') {
+    msg = 'Está a editar — as alterações são partilhadas e mais ninguém pode editar agora.';
+  }
+  el.querySelector('.shared-banner-whose').textContent = whose;
+  el.querySelector('.shared-banner-msg').textContent = msg;
+  el.dataset.mode = sharedMode;
+  document.getElementById('take-control-btn').classList.toggle('hidden', sharedMode !== 'readonly');
+}
+
+function applySharedMode() {
+  document.body.classList.toggle('shared-readonly', sharedMode === 'readonly');
+}
+
+document.getElementById('workspace-switcher').addEventListener('change', (e) => {
+  setWorkspace(e.target.value || null);
+});
+
+document.getElementById('take-control-btn').addEventListener('click', async () => {
+  const who = lockHolder?.name || lockHolder?.email || 'a outra pessoa';
+  if (!(await showConfirm(`Tomar controlo de ${who}? As alterações não guardadas dela podem perder-se.`))) return;
+  const put = await lockRequest('PUT', { steal: true });
+  if (put.status === 200) {
+    sharedMode = 'editing';
+    lockHolder = null;
+    startLockTimers();
+    updateSharedBanner();
+    applySharedMode();
+    await loadProducts();
+    showToast('Tem agora o controlo desta lista.');
+  } else {
+    showToast('Não foi possível tomar o controlo.', true);
+  }
+});
+
+document.getElementById('share-invite-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  const input = document.getElementById('share-invite-email');
+  const email = input.value.trim();
+  if (!email) return;
+  try {
+    await api('/shares', { method: 'POST', body: JSON.stringify({ email }) });
+    input.value = '';
+    showToast('Convite enviado.');
+    await loadShares();
+  } catch (err) {
+    showToast(err.message, true);
+  }
+});
+
+document.getElementById('settings-modal').addEventListener('click', async (e) => {
+  const removeId = e.target.dataset.shareRemove;
+  if (!removeId) return;
+  if (!(await showConfirm('Terminar esta partilha?'))) return;
+  try {
+    await api(`/shares/${removeId}`, { method: 'DELETE' });
+    // if we were viewing that shared list, drop back to our own
+    await loadShares();
+    if (activeWorkspace && !acceptedIncoming().some((s) => s.ownerUserId === activeWorkspace)) {
+      await setWorkspace(null);
+    }
+  } catch (err) {
+    showToast(err.message, true);
+  }
+});
+
+let pendingInvite = null;
+function showShareInviteModal(invite) {
+  pendingInvite = invite;
+  document.getElementById('share-invite-text').textContent =
+    `${invite.ownerName || invite.ownerEmail} (${invite.ownerEmail}) quer partilhar os produtos e a lista de compras consigo.`;
+  document.getElementById('share-invite-modal').classList.add('open');
+}
+function hideShareInviteModal() {
+  document.getElementById('share-invite-modal').classList.remove('open');
+  pendingInvite = null;
+}
+async function respondToInvite(action) {
+  if (!pendingInvite) return;
+  try {
+    await api(`/shares/${pendingInvite.id}/${action}`, { method: 'POST' });
+    hideShareInviteModal();
+    await loadShares();
+    if (action === 'accept') showToast('Partilha aceite — escolha-a no seletor "A ver:".');
+  } catch (err) {
+    showToast(err.message, true);
+  }
+}
+document.getElementById('share-invite-accept').addEventListener('click', () => respondToInvite('accept'));
+document.getElementById('share-invite-decline').addEventListener('click', () => respondToInvite('decline'));
+
+// Best-effort lock release when the tab goes away (keepalive lets it
+// finish during unload; the 90s TTL covers the case where it doesn't).
+window.addEventListener('pagehide', () => {
+  if (sharedMode !== 'editing') return;
+  const headers = activeWorkspace ? { 'X-Workspace': activeWorkspace } : {};
+  fetch('/api/workspace/lock', { method: 'DELETE', headers, keepalive: true });
 });
 
 async function init() {
@@ -1155,6 +1472,16 @@ async function init() {
   await loadProducts();
   maybeShowNotifyPrompt();
   setupAds(user);
+
+  // Sharing: build the switcher, prompt any pending invitation, and — if
+  // our own list is shared with someone — engage the edit lock for it.
+  await loadShares();
+  const pending = shareState.incoming.find((s) => s.status === 'pending');
+  if (pending) {
+    showShareInviteModal(pending);
+  } else if (shareState.outgoing.some((s) => s.status === 'accepted')) {
+    await enterWorkspaceLockFlow();
+  }
 
   // If a whole-catalogue refresh is still running server-side (e.g. the
   // page was reloaded mid-run), re-attach the progress overlay to it.
@@ -1382,6 +1709,7 @@ async function loadAdminBugReports() {
 document.getElementById('settings-btn').addEventListener('click', () => {
   document.getElementById('settings-modal').classList.add('open');
   refreshNotifyToggleState();
+  loadShares();
   if (currentUser?.isAdmin) {
     loadAdminUsers();
     loadAdminBugReports();

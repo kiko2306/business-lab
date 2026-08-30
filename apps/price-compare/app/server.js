@@ -697,7 +697,7 @@ app.put('/api/workspace/lock', (req, res) => {
     name: req.user.name || req.user.email,
     touchedAt: Date.now(),
   });
-  res.json({ ok: true, heldByMe: true });
+  res.json({ ok: true, heldByMe: true, shared: shares.isShared(req.workspaceId) });
 });
 
 app.delete('/api/workspace/lock', (req, res) => {
