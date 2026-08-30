@@ -304,6 +304,12 @@ function stemWord(word) {
   // since "naturais" didn't reduce to "natural" (the word every store's
   // own listing actually uses).
   if (word.length > 3 && word.endsWith('ais')) return word.slice(0, -3) + 'al';
+  // "-z" words pluralize to "-zes" (noz→nozes, raiz→raízes, vez→vezes) —
+  // the plain trailing-"s" strip leaves "noze", which matches nothing.
+  // ("-m"→"-ns" deliberately NOT handled: "amendoim"→"amendoins" wants it,
+  // but "muffins" is an English loanword whose singular is "muffin", and
+  // no suffix test tells the two apart — net-negative for this list.)
+  if (word.length > 4 && word.endsWith('zes')) return word.slice(0, -3) + 'z';
   return word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word;
 }
 
@@ -726,7 +732,11 @@ function extractCandidateUrls(def, searchHtml) {
 // MAX_CANDIDATES_TRIED pages now (it used to stop at the first valid
 // single-unit match), trading more requests per store per refresh for
 // actually finding the best price.
-const MAX_CANDIDATES_TRIED = 5;
+//
+// Raised 5 → 8: several wrong picks were "the right product was result #6"
+// (fresh produce, less-common brands). +3 product-page fetches per store
+// per refresh, worst case — acceptable for a low-frequency personal tool.
+const MAX_CANDIDATES_TRIED = 8;
 
 // One candidate's product page, parsed down to the JSON-serialisable facts
 // selectBestCandidate needs. Everything that requires the raw HTML — price,
@@ -797,7 +807,10 @@ function selectBestCandidate(query, candidates) {
 // all. Less precise than a hand-picked product link (see plan.md §22.9c),
 // which is what the "corrigir correspondência" override (listStoreCandidates
 // below) exists to fix. Fetches up to MAX_CANDIDATES_TRIED product pages.
-async function searchAndScrapeStore(store, query) {
+// `excludeUrls` (optional): candidate URLs to skip during selection — used
+// by server.js's cross-store outlier retry (this store's first pick was a
+// gross price outlier vs the others; try again without it).
+async function searchAndScrapeStore(store, query, excludeUrls) {
   const def = STORES[store];
   if (!def) throw new Error(`unknown store: ${store}`);
 
@@ -817,7 +830,8 @@ async function searchAndScrapeStore(store, query) {
     candidates.push(parseCandidate(store, productUrl, scraped, query));
   }
 
-  const best = selectBestCandidate(query, candidates);
+  const pool = excludeUrls ? candidates.filter((c) => !excludeUrls.has(c.url)) : candidates;
+  const best = selectBestCandidate(query, pool);
   if (!best) throw new NoMatchError(`não foi possível obter um produto em ${def.label}`);
   return best;
 }
@@ -917,6 +931,29 @@ function cheapestPlausible(entries) {
   return plausible.reduce((best, e) => (value(e) < value(best) ? e : best));
 }
 
+// `selectBestCandidate` is per-store and blind to what the other stores
+// matched. Once all 4 store entries are in (server.js searchAllStores),
+// this flags any whose *unit* price is more than 3x the cheapest of the
+// others — a strong "wrong product / wrong grade" signal when it's the
+// same physical quantity (€/kg or €/L): a 20 kg dry-food bag matched to
+// "ração húmida", a 36 g bacalhau snack, Água das Pedras at €5.39/L.
+// Only fires when 3+ store entries have a comparable unit price of ONE
+// kind — total-vs-total across stores is too noisy (pack sizes differ).
+// server.js then re-runs the flagged store without its outlier pick.
+const CROSS_STORE_OUTLIER_RATIO = 3;
+function findCrossStoreOutliers(entries) {
+  const sized = entries
+    .filter((e) => e.price != null && !e.isPack && !e.excluded && e.unitSizeValue > 0 && e.unitSizeKind)
+    .map((e) => ({ store: e.store, kind: e.unitSizeKind, u: (e.price * 1000) / e.unitSizeValue }));
+  if (sized.length < 3 || new Set(sized.map((s) => s.kind)).size !== 1) return new Set();
+  const out = new Set();
+  for (const s of sized) {
+    const minOther = Math.min(...sized.filter((o) => o.store !== s.store).map((o) => o.u));
+    if (minOther > 0 && s.u > CROSS_STORE_OUTLIER_RATIO * minOther) out.add(s.store);
+  }
+  return out;
+}
+
 module.exports = {
   STORES,
   detectStore,
@@ -926,6 +963,7 @@ module.exports = {
   scrapeChosenUrl,
   selectBestCandidate,
   parseCandidate,
+  findCrossStoreOutliers,
   NoMatchError,
   // Pure helpers, exposed for the test suite (test/heuristics.test.js).
   // Not part of the app's public surface — nothing in server.js uses these.

@@ -4376,22 +4376,33 @@ badge sits at 122 (35 zero-store + 21 one-store + 66 price-outlier) —
 that's the worklist to chip at with the correction modal, or with the
 heuristic improvements in §43.17.
 
-### 43.17 Matching-heuristics improvement roadmap (not yet built)
+### 43.17 Matching-heuristics improvement roadmap
 
-The 205-test suite makes each of these safe to trial — change, `npm
-test`, keep only if a `todo` flips to pass with the 199 still green.
-Ordered by value/effort:
+The 208-test suite makes each of these safe to trial — change, `npm
+test`, keep only if a `todo` flips to pass with the rest still green.
 
-- **D. Stemmer** — add `-ns`→singular and `-zes`→`z`. Recovers
-  "amendoins"/"nozes". ~4 lines, low risk.
-- **A. More candidates** — `MAX_CANDIDATES_TRIED` 5 → 8-10 (or: 5, then
-  deeper only if none pass relevance). Several wrong picks are "the right
-  product was result #6". Costs more requests per refresh.
-- **E. Cross-store outlier check** — `selectBestCandidate` is per-store
-  and blind to the others. Feed the "Rever" view's ">3x the other stores'
-  unit price" signal back into selection: a gross outlier ⇒ prefer the
-  next candidate or NoMatch. Catches the 20 kg dog-food bag, the 36 g
-  bacalhau snack, Pedras at €5.39.
+**Done (§43.18):**
+
+- **D. Stemmer** — added `-zes`→`z` (nozes→noz, vezes→vez). `-ns`→`-m`
+  (amendoim→amendoins) was tried and dropped: it also fires on the
+  loanword "muffins" (singular "muffin"), which no suffix test can tell
+  apart — net-negative for this list.
+- **A. More candidates** — `MAX_CANDIDATES_TRIED` 5 → 8. +3 product-page
+  fetches per store per refresh, worst case.
+- **E. Cross-store outlier check** — `scrapers.findCrossStoreOutliers`:
+  after all 4 store entries are in, flag any whose *unit* price is >3× the
+  cheapest of the others (same €/kg or €/L, needs 3+ sized entries of one
+  kind). `server.js searchAllStores` re-runs the flagged store without its
+  outlier pick; if the re-pick is still an outlier or a no-match, that
+  store is cleared with a "preço muito diferente" note. Verified live:
+  fired once on "Iogurtes líquidos" (Auchan YoPro protein drink €6.63/kg →
+  plain 4×160 g liquid yogurt €2.02/kg), left every control alone. Stays
+  conservative by design — 2-data-point cases (Bacalhau seco 36 g snack,
+  Ração húmida 20 kg bag) and total-only cases (Queijo da Serra whole
+  cheese) are not touched.
+
+**Still open:**
+
 - **B. Weight distinguishing words** — down-rank a candidate that adds a
   *strong differentiating* word, where "strong" is derived from the
   corpus (head nouns / frequent qualifiers across the other list items:
@@ -4405,13 +4416,41 @@ Ordered by value/effort:
 - **F. Query relaxation** — on NoMatch, retry with `[head noun] +
   [brand]` only (drop trailing qualifiers). Catches "Champô de bebé 'não
   chora mais'".
-- **G. LLM fallback for the tail** — heuristics for the 90%; for the ~30
-  NoMatch-everywhere items + flagged outliers, one call: "here are N
-  candidate names from store X for 'query' — which is the same product,
-  or none?". The only thing that really solves vocabulary + semantic
-  variants; adds a dependency, cost, non-determinism.
+- **G. LLM fallback for the tail — NEXT, use a free AI API.** Heuristics
+  for the 90%; for the ~30 NoMatch-everywhere items + the price-outlier
+  rows, one call per `(query, store)`: *"here are N candidate product
+  names from `<store>`'s search for `<query>` — return the index of the
+  one that is the same product, or -1 if none."* Wire it as a last resort
+  inside `searchAndScrapeStore` (or a post-pass in `searchAllStores`)
+  only when the deterministic path returns NoMatch — so it never runs on
+  the 90% that already work, keeping cost and latency near zero.
+  - **Free/cheap API options to evaluate** (no card, or a standing free
+    tier): Google **Gemini API** free tier (`gemini-1.5-flash` /
+    `gemini-2.0-flash`, generous RPM/RPD, `GEMINI_API_KEY`);
+    **Groq** free tier (Llama-3.x, very fast); **OpenRouter** free models
+    (`:free` suffix); **Cloudflare Workers AI** free allowance. Pick one,
+    put the key in `apps/price-compare/.env` (gitignored) like the other
+    secrets, and keep the call behind a `AI_MATCH_API_KEY`-is-set guard so
+    the app still boots and works without it (same pattern as
+    `GOOGLE_CLIENT_ID` / `VAPID_*` / `ADSENSE_CLIENT_ID`).
+  - Cache the verdict on the product's store entry (`aiMatched: true` +
+    the chosen url) so a refresh doesn't re-ask unless the candidate set
+    changed. Deterministic-enough for the test suite: mock the API in
+    tests, assert the plumbing (guarded off → unchanged behaviour;
+    guarded on with a stub → the stubbed pick is used).
+    Non-determinism risk is bounded to the ~30 items that currently match
+    nothing anyway.
 - **H. Lean on the tooling** — the override + Rever worklist already let
   the user pin the ~30 hard items by hand in ~15 min; pins survive
   refreshes. May beat chasing heuristics for a personal tool.
 
-Suggested path: D + A + E first (safe, cheap), then B as the real lever.
+Path: D + A + E done (§43.18). Next: **G with a free API (Gemini free
+tier the likely pick)**, then B as the deterministic lever.
+
+### 43.18 D + A + E shipped
+
+Stemmer `-zes`→`z`, `MAX_CANDIDATES_TRIED` 5→8, and the cross-store
+outlier check (§43.17 for detail). Test suite 208 tests / 202 pass / 6
+todo. Deployed; a full-pool refresh to apply pool-wide is still pending
+(each one is heavier now — A means up to 8 candidate fetches per store,
+E adds a retry fetch for any flagged store).

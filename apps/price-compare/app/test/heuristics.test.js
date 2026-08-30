@@ -10,7 +10,7 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
-const { selectBestCandidate, _test: H } = require('../scrapers');
+const { selectBestCandidate, findCrossStoreOutliers, _test: H } = require('../scrapers');
 
 // --- query sanitization ---------------------------------------------------
 test('sanitizeSearchQuery folds accents and punctuation to spaces, keeps digits', () => {
@@ -34,11 +34,13 @@ test('stemWord reduces regular and irregular Portuguese plurals', () => {
   assert.equal(H.stemWord('limoes'), 'limao'); // limões, accent already stripped
   assert.equal(H.stemWord('paes'), 'pao'); // pães
   assert.equal(H.stemWord('naturais'), 'natural');
+  assert.equal(H.stemWord('nozes'), 'noz'); // -z plural: nozes -> noz
+  assert.equal(H.stemWord('vezes'), 'vez');
   assert.equal(H.stemWord('gas'), 'gas'); // <=3 letters: left alone
   assert.equal(H.stemWord('arroz'), 'arroz'); // ends in z, not touched
-  // Known limitation: a longer singular ending in "s" ("lápis", "atum" is
-  // fine, "lápis" is not) still loses the "s" — no dictionary. None such
-  // in the grocery list; documented in plan.md §36.
+  assert.equal(H.stemWord('muffins'), 'muffin'); // loanword -s, NOT the PT -m->-ns rule
+  // Known limitation: a longer singular ending in "s" ("lápis") still
+  // loses the "s" — no dictionary. None such in the grocery list.
   assert.equal(H.stemWord('lapis'), 'lapi');
 });
 
@@ -232,4 +234,53 @@ test('selectBestCandidate: a size-mismatched candidate is never used', () => {
     C('Açúcar Branco 1 kg', 1.15, 1000, 'mass'),
   ]);
   assert.equal(best.name, 'Açúcar Branco 1 kg');
+});
+
+// --- cross-store outlier detection (E) ------------------------------
+const E = (store, price, size, kind, isPack = false) => ({
+  store, price, isPack, excluded: false, unitSizeValue: size, unitSizeKind: kind,
+});
+
+test('findCrossStoreOutliers flags a store >3x the cheapest of the others (same unit kind)', () => {
+  // ração: 3 stores ~1.2/kg, one at 0.77/kg (20kg bag) — wait, that's
+  // *cheaper*; the real outlier case is the expensive wrong grade.
+  const out = findCrossStoreOutliers([
+    E('continente', 1.35, 640, 'mass'),  // 2.11/kg
+    E('pingodoce', 0.99, 230, 'mass'),   // 4.30/kg
+    E('lidl', 2.0, 1000, 'mass'),        // 2.00/kg
+    E('auchan', 1.99, 300, 'mass'),      // 6.63/kg  -> >3x of min(2.00)
+  ]);
+  assert.deepEqual([...out], ['auchan']);
+});
+
+test('findCrossStoreOutliers: a normal 2-3x spread is not flagged', () => {
+  const out = findCrossStoreOutliers([
+    E('continente', 1.99, 1000, 'volume'),
+    E('pingodoce', 1.08, 1000, 'volume'),
+    E('lidl', 0.99, 1000, 'volume'),
+    E('auchan', 1.08, 1000, 'volume'),
+  ]);
+  assert.equal(out.size, 0);
+});
+
+test('findCrossStoreOutliers: needs 3+ sized entries of one kind', () => {
+  assert.equal(findCrossStoreOutliers([E('a', 5, 100, 'mass'), E('b', 1, 100, 'mass')]).size, 0);
+  // mixed kinds -> skip
+  assert.equal(
+    findCrossStoreOutliers([
+      E('a', 9, 100, 'mass'),
+      E('b', 1, 100, 'volume'),
+      E('c', 1, 100, 'mass'),
+    ]).size,
+    0
+  );
+  // packs and priced-null are ignored
+  assert.equal(
+    findCrossStoreOutliers([
+      E('a', 9, 100, 'mass', true),
+      E('b', 1, 100, 'mass'),
+      { store: 'c', price: null, isPack: false, excluded: false, unitSizeValue: 100, unitSizeKind: 'mass' },
+    ]).size,
+    0
+  );
 });

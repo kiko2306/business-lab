@@ -8,6 +8,7 @@ const {
   listStoreCandidates,
   scrapeChosenUrl,
   detectStore,
+  findCrossStoreOutliers,
   NoMatchError,
 } = require('./scrapers');
 const auth = require('./auth');
@@ -200,7 +201,7 @@ function appendBugReport(report) {
 //     coverage indicator can tell apart from a plain no-match.
 //   { url } — the user hand-picked the exact product page; scrape that,
 //     skipping search + candidate selection entirely.
-async function buildStoreEntry(store, name, previous, override) {
+async function buildStoreEntry(store, name, previous, override, excludeUrls) {
   const history = previous?.history ?? [];
   if (override?.excluded) {
     return {
@@ -219,7 +220,7 @@ async function buildStoreEntry(store, name, previous, override) {
       unitSizeValue,
       unitSizeKind,
       isPack,
-    } = pinned ? await scrapeChosenUrl(store, override.url) : await searchAndScrapeStore(store, name);
+    } = pinned ? await scrapeChosenUrl(store, override.url) : await searchAndScrapeStore(store, name, excludeUrls);
     const scrapedAt = new Date().toISOString();
     return {
       url,
@@ -259,11 +260,43 @@ async function buildStoreEntry(store, name, previous, override) {
 
 async function searchAllStores(name, previousEntries = [], overrides = {}) {
   const previousByStore = new Map(previousEntries.map((e) => [e.store, e]));
-  return Promise.all(
+  let entries = await Promise.all(
     Object.keys(STORES).map((store) =>
       buildStoreEntry(store, name, previousByStore.get(store), overrides[store])
     )
   );
+
+  // Cross-store outlier pass (scrapers.findCrossStoreOutliers): if one
+  // store's unit price is >3x the cheapest of the others (same €/kg or
+  // €/L), re-run that store without its outlier pick. A user-pinned store
+  // is left alone. One retry per store; if the re-pick is still an outlier
+  // or a no-match, that store is cleared with a "preço díspar" note.
+  const outliers = findCrossStoreOutliers(entries);
+  for (const store of outliers) {
+    if (overrides[store]?.url) continue;
+    const bad = entries.find((e) => e.store === store);
+    const redo = await buildStoreEntry(
+      store,
+      name,
+      previousByStore.get(store),
+      overrides[store],
+      new Set([bad.url].filter(Boolean))
+    );
+    const idx = entries.indexOf(bad);
+    const stillOutlier = findCrossStoreOutliers(
+      entries.map((e) => (e.store === store ? redo : e))
+    ).has(store);
+    entries[idx] =
+      redo.price != null && !stillOutlier
+        ? redo
+        : {
+            url: null, store, price: null, currency: null, scrapedName: null,
+            scrapedAt: null, error: 'preço muito diferente das outras lojas',
+            pinned: false, history: bad.history ?? [],
+            unitSizeValue: null, unitSizeKind: null, isPack: false,
+          };
+  }
+  return entries;
 }
 
 // A "drop" is only meaningful when comparing the same store's price before
