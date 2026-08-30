@@ -3589,3 +3589,134 @@ brand/origin-specificity check catches structurally regardless of price.
 
 Deployed and refreshing all 122 test-pool products in the background to
 apply the fix pool-wide.
+
+## 33. Session Log — 2026-08-30 (cont.): Price Compare — re-scan after §32 fix + two more variant markers
+
+Re-scanned the refreshed 122-item pool after §32 deployed and applied
+pool-wide: flagged entries dropped from 47 (41 products) to 25 (25
+products) — every original high-confidence case (Alhambra, Boost, wrong
+water brand, Nivea/Old Spice, Bacalhau origin, etc.) confirmed gone. Of
+the 25 remaining, cross-checking `scrapedName` against the query showed
+almost all are legitimate deli/pack-size price variance (per-kg deli
+counter price vs. pre-packaged price, single item vs. multi-pack), not
+matching bugs — the same category as the pre-existing Low/Medium-confidence
+noise from the original scan.
+
+Two genuine remaining cases, found by inspection rather than price ratio
+alone (same brand in both, so the price gap wasn't the giveaway — the
+`scrapedName` was):
+- "Água sem Gás Luso" matched Pingo Doce's "Água sem Gás Luso **Sport**"
+  — added `sport` to `VARIANT_MARKERS`. That alone just surfaced the next
+  cheapest candidate, "Água sem Gás Luso **Fruta Limão**" (a flavoured
+  line) — same problem one word over, so `fruta` was added too. Final
+  match: "Água sem Gás Luso **Box**" (a multi-bottle box, not a flavour
+  or fitness variant — correct product, just a pack format).
+- "Croissant com Recheio de Chocolate Bollycao" matched Continente's
+  "Croissant com Recheio de Chocolate **e Avelã** Bollycao" (hazelnut
+  filling) — added `avela` to `VARIANT_MARKERS`.
+
+Checked but left alone: "Gel de Banho Creme Care Nivea" matches Pingo
+Doce's "Gel de Banho Creme Care" (brand word dropped from the listing
+title) — "Creme Care" is itself a Nivea product line, so this reads as
+the same product with an incomplete title rather than a wrong match;
+didn't add a blanket "brand word must always match" rule since several
+correct matches in this pool have their brand as the *last* word for
+brand-name queries but a plain *descriptor* as the last word for others
+(e.g. "Fiambre da Perna Extra Fatias Finíssimas"), and forcing a
+last-word match would have hidden that one incorrectly.
+
+Verified live against the two fixed cases plus the existing regression
+controls (Danone/Activia grego match, lactose-free Mimosa milk) before
+deploying — no regressions. Deployed, refreshed just the two affected
+products (targeted refresh, not a full pool re-scrape).
+
+## 34. Session Log — 2026-08-30 (cont.): Price Compare — replaced variant-marker list with rank-by-closest-name
+
+User pushback on §33's approach, mid-turn: "i dont like the list of words
+you are adding because that will become fast a lot of words .. we need to
+find another way to be more accurate in the query" — plus a concrete
+report that "Água sem Gás Luso" still picked the wrong bottle even after
+the `sport`/`fruta` additions. Right call: `VARIANT_MARKERS` was already
+on its second addition within the same session (12 words → 15 in §33)
+purely from live-testing one query at a time, with no reason to expect
+it'd ever stop growing.
+
+First replacement attempt was worse, not better: reject a candidate
+outright if it has *any* significant word the query didn't ask for.
+Sounded like a clean generalization of the marker idea, but replaying it
+against all 294 currently-recorded `(query, scrapedName)` pairs (cheap to
+check — no live scraping needed, just re-running the new function against
+data already on file) rejected 188 of them. Ordinary store-added text —
+brand names, "UHT", the store's own name repeated in the title, size
+units — turned out to be the norm on real listings, not the exception, so
+a blanket reject was unusable.
+
+The actual fix: stop treating a candidate's extra words as a pass/fail
+gate on that candidate in isolation, and use them instead to *rank*
+candidates within one store's own search results — fewest
+query-unaccounted-for words wins, price only breaks ties within that
+closest tier (`countExtraWords` + `pickClosestNameMatches`,
+scrapers.js). "Água sem Gás Luso" (0 extra words) now beats "...Luso
+Sport" (1) and "...Fruta Limão" (2) on textual closeness alone, no
+`VARIANT_MARKERS` list involved — removed it entirely.
+
+One live-tested wrinkle: Pingo Doce's actual candidates for the Luso
+query were "...Sport" (€0.84, 1 extra word: "sport") and "...Box" (€4.19,
+a multi-bottle pack, still plain water, 1 extra word: "box") — tied
+extra-word counts, so price alone still picked the flavoured Sport
+bottle. Fix: `NEUTRAL_PACKAGING_WORDS`, a small exempted set (garrafa,
+lata, pack, embalagem, caixa, box, etc.) — deliberately kept small and
+closed since real-world packaging containers are a bounded, enumerable
+set (bottle/box/can/bag/jar/tray/loose), unlike flavours or formulas
+which a manufacturer can invent indefinitely. With that exemption, "Box"
+scores 0 extra words and wins outright — no price tiebreak needed.
+
+Verified: replay against all 294 recorded matches → 0 would now be
+rejected (the hard-reject path is gone entirely, replaced by ranking).
+Live-tested the two originally-reported cases plus 5 known-good controls
+(Danone/Activia grego, lactose-free Mimosa milk, plain arroz agulha) — no
+regressions. Ran a live 20-product × 4-store sample of the pool
+post-deploy as a broader sanity check — all matches looked correct
+except one Continente listing showing €6 for "Leite UHT Meio Gordo
+Mimosa" against an identical `scrapedName` elsewhere priced ~€1 — same
+product, same text, just a stale/glitched price on Continente's own site
+(the exact same class of issue `cheapestPlausible`'s median-outlier guard
+already exists for elsewhere, not a matching bug — left alone).
+
+Deployed, refreshing the full 122-item pool in the background to apply
+pool-wide.
+
+## 35. Session Log — 2026-08-30 (cont.): Price Compare — unit price (€/kg, €/L)
+
+User's follow-up on §34: pack-size differences between stores (a store's
+6-pack total vs. another's single-unit total) make raw price comparisons
+misleading even once the matching itself is correct. Chose "show the
+unit price" over "only show same-pack matches" — the app already had the
+size-parsing groundwork (`parseSize`/`parseEmbSize`/`candidateSize` in
+scrapers.js, built for the size-mismatch check) so this reuses rather
+than re-derives it.
+
+Changes:
+- `UNIT_KIND` (scrapers.js) — mass vs volume, since a size in grams and a
+  size in millilitres reduce to the same base-unit number today but
+  aren't the same physical quantity; `looksLikeSizeMismatch` now also
+  refuses to compare across kinds (previously would've silently compared
+  a "500g" query against a "500ml" candidate if both matched the regex).
+- The winning entry from `searchAndScrapeStore` now carries
+  `unitSizeValue`/`unitSizeKind` alongside price/name/url — captured once
+  per candidate during the existing scrape loop, no extra requests.
+- `server.js buildStoreEntry` persists these two fields per store entry
+  (both the success and carry-forward-on-transient-error paths).
+- `app.js renderProductCard` computes €/kg or €/L per row and shows it as
+  a small line under the price. The "cheapest" highlight switches to
+  unit-price comparison when *every* visible row for a product has one
+  (the fair, apples-to-apples comparison); falls back to the old
+  raw-total comparison when any row's size is unknown (e.g. Pingo Doce's
+  "Água sem Gás Luso Box" — a multi-bottle pack whose own page never
+  states its total volume, so nothing to compute from).
+
+Verified live: "Açúcar 1 kg" at Continente → €1.15, size 1000g mass, unit
+price €1.15/kg; "Leite meio gordo" at Auchan → €0.86, size 1000ml volume,
+€0.86/L; Luso water at Pingo Doce → size unknown, unit price correctly
+null rather than guessed. Deployed, refreshing the full 122-item pool in
+the background to backfill size data pool-wide.

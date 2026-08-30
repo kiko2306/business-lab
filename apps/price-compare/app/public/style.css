@@ -149,6 +149,7 @@ main { padding: 20px; max-width: 900px; margin: 0 auto; }
 .price-value { font-weight: 700; font-size: 15px; }
 .price-value.cheapest { color: var(--success); }
 .price-value.missing { color: var(--text-faint); font-weight: 400; font-size: 13px; }
+.unit-price { display: block; font-weight: 400; font-size: 11px; color: var(--text-faint); }
 .price-error { color: var(--warning); font-size: 12px; }
 .price-actions { display: flex; gap: 6px; align-items: center; }
 

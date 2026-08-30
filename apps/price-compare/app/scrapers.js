@@ -100,6 +100,13 @@ const URL_PACK_SIZE_PATTERN = /\b\d+\s*x\s*[\d.,]+\s*(l|lt|kg|g|un|ml)\b/i;
 // compare against, so it's left alone rather than guessed at.
 const SIZE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(kg|g|lt|l|ml)\b/i;
 const UNIT_TO_GRAMS_OR_ML = { kg: 1000, g: 1, l: 1000, lt: 1000, ml: 1 };
+// Mass and volume are different physical quantities — a "500g" candidate
+// isn't the same size as a "500ml" one just because they multiply out to
+// the same base-unit number. Kept separate from UNIT_TO_GRAMS_OR_ML so
+// looksLikeSizeMismatch and the unit-price display (server.js/app.js)
+// both know which of "€/kg" or "€/L" applies, and so a mass/volume pair
+// is never silently compared as if they were the same axis.
+const UNIT_KIND = { kg: 'mass', g: 'mass', l: 'volume', lt: 'volume', ml: 'volume' };
 
 function parseSize(text) {
   if (!text) return null;
@@ -108,7 +115,7 @@ function parseSize(text) {
   const value = Number(m[1].replace(',', '.'));
   const unit = m[2].toLowerCase();
   if (!Number.isFinite(value)) return null;
-  return value * UNIT_TO_GRAMS_OR_ML[unit];
+  return { value: value * UNIT_TO_GRAMS_OR_ML[unit], kind: UNIT_KIND[unit] };
 }
 
 // A raw page's HTML is too noisy to scan for "any number followed by a
@@ -126,7 +133,7 @@ function parseEmbSize(html) {
   const value = Number(m[1].replace(',', '.'));
   const unit = m[2].toLowerCase();
   if (!Number.isFinite(value)) return null;
-  return value * UNIT_TO_GRAMS_OR_ML[unit];
+  return { value: value * UNIT_TO_GRAMS_OR_ML[unit], kind: UNIT_KIND[unit] };
 }
 
 // Looks for the size stated directly on the candidate's own product name
@@ -146,7 +153,8 @@ function looksLikeSizeMismatch(query, candidate) {
   if (!expected) return false; // user's own product name doesn't state a size — nothing to check against
   const actual = candidateSize(candidate);
   if (!actual) return false; // couldn't determine this candidate's size — don't block on missing data
-  const ratio = actual / expected;
+  if (actual.kind !== expected.kind) return false; // mass vs volume — not comparable, not a "mismatch" to flag
+  const ratio = actual.value / expected.value;
   return ratio < 0.8 || ratio > 1.2;
 }
 
@@ -230,38 +238,63 @@ function hasNegatedQueryWord(query, candidateName) {
 // checked so far: rejects rice for a sugar search (0 shared), rejects an
 // unrelated yogurt/baby-food product that only coincidentally shares one
 // word, and accepts the Bifidus/Activia match that a ratio rejected.
-// Word-overlap alone isn't enough once picking the *cheapest* candidate
-// (see searchAndScrapeStore) rather than just the first one — verified
-// live: "Leite meio gordo" shares 3 of 3 words with "Leite Magro/
-// Meio-gordo sem Lactose" (a lactose-free variant) and that variant
-// happened to be a few cents cheaper, so it won purely on price despite
-// being a materially different product. These marker words each signal a
-// distinct product variant regardless of how many other words overlap —
-// a candidate carrying one that the query didn't ask for is rejected
-// outright, not just down-weighted.
-const VARIANT_MARKERS = [
-  'lactose',
-  'gluten',
-  'proteina',
-  'proteico',
-  'proteica',
-  'integral',
-  'organico',
-  'biologico',
-  'zero',
-  'light',
-  'diet',
-  'descafeinado',
-  // Verified live: "Iogurte Natural Danone" (€1.29) matched Pingo Doce's
-  // "Iogurte Grego Natural Oikos Danone" (€4.79, ~3.7x) — "grego" (Greek
-  // yogurt, a thicker/pricier style) is a real product-line qualifier
-  // the plain-word-overlap check didn't weigh any differently than
-  // incidental phrasing.
-  'grego',
-  'skyr',
-];
-function hasConflictingVariantMarker(queryWords, candidateWords) {
-  return VARIANT_MARKERS.some((marker) => candidateWords.has(marker) && !queryWords.includes(marker));
+
+// A word-overlap floor alone isn't enough once picking the *cheapest*
+// candidate (see searchAndScrapeStore) rather than just the first one —
+// verified live, repeatedly: a query fully contained inside a longer
+// candidate name still gets picked whenever the extra words happen to
+// make it cheaper, even though those extra words describe a materially
+// different product (a lactose-free variant, a Greek-style yogurt, a
+// flavoured or "Sport" bottled water, a hazelnut-filled croissant instead
+// of plain). A first attempt tried hand-listing every such qualifier word
+// as it was found live (VARIANT_MARKERS: "lactose", "grego", "skyr",
+// "sport", "fruta", "avela"...) — abandoned because that list only grows,
+// one live-tested mismatch at a time, and can never be complete. Rejecting
+// outright on *any* unrequested extra word was tried next and is even
+// worse: replayed against the 294 matches already on file, it rejected
+// 188 of them, because ordinary store-added text (brand names, "UHT",
+// the store's own name, size units) is the norm on every real listing,
+// not the exception.
+//
+// What actually distinguishes "Sport"/"Fruta"/"Avelã" from harmless
+// extras like "Mimosa" or "UHT" isn't the words themselves — it's that
+// within *one store's own* set of search candidates for the same query,
+// the plain/correct listing has fewer unaccounted-for words than the
+// flavoured/variant one does. So instead of judging any single candidate
+// name in isolation, count each candidate's unmatched words and use that
+// count to *rank* candidates from the same store's pool — closest name
+// match wins, price only breaks ties within that closest tier (see
+// pickClosestNameMatches in searchAndScrapeStore). No word list, no
+// accept/reject threshold: "Água sem Gás Luso" (0 extra words) beats
+// "...Luso Sport" (1) and "...Luso Fruta Limão" (2) purely because it's
+// textually closer, even when a flavoured variant happens to be cheaper.
+// Packaging-container nouns, exempted from the extra-word count below —
+// verified live this exemption is needed, not just theoretical: Pingo
+// Doce's own candidates for "Água sem Gás Luso" were "...Sport" and
+// "...Box" (a multi-bottle pack, still plain water), both scoring 1 extra
+// word with nothing to break the tie but price, so the €0.84 flavoured
+// bottle beat the €4.19 correct pack. Unlike VARIANT_MARKERS (abandoned
+// above for growing without bound — every manufacturer can invent a new
+// flavour or formula name), packaging containers are a small, closed,
+// real-world set: a store sells things in a bottle, a box, a can, a bag,
+// a jar, a tray, or loose units, and nothing else.
+const NEUTRAL_PACKAGING_WORDS = new Set([
+  'pack', 'embalagem', 'garrafa', 'garrafao', 'lata', 'uni', 'unidade',
+  'unidades', 'caixa', 'saco', 'frasco', 'tabuleiro', 'bandeja', 'box',
+  'tetra', 'pet', 'vidro', 'dose', 'doses',
+]);
+
+function countExtraWords(queryWords, candidateWords) {
+  const queryWordSet = new Set(queryWords);
+  let count = 0;
+  for (const w of candidateWords) {
+    if (queryWordSet.has(w)) continue;
+    if (GENERIC_CATEGORY_WORDS.has(w)) continue;
+    if (NEUTRAL_PACKAGING_WORDS.has(w)) continue;
+    if (/^\d+$/.test(w)) continue; // stray size/quantity digits, not a product qualifier
+    count++;
+  }
+  return count;
 }
 
 // Category-noun words so generic they appear in nearly every candidate a
@@ -293,7 +326,6 @@ function looksIrrelevant(query, candidateName) {
   if (!queryWords.length) return false;
   if (hasNegatedQueryWord(query, candidateName)) return true;
   const candidateWords = new Set(significantWords(candidateName));
-  if (hasConflictingVariantMarker(queryWords, candidateWords)) return true;
 
   // Check against the query's more distinguishing (non-generic) words
   // when there are any — falls back to the full word list for a query
@@ -460,7 +492,23 @@ async function searchAndScrapeStore(store, query) {
     }
     const { html, ...result } = scraped;
     if (result.price == null) continue;
-    const entry = { store, url: productUrl, ...result };
+    // Extra words the query never asked for (see countExtraWords) rank
+    // candidates by how closely their name matches the query, so the
+    // plain product is preferred over a flavoured/variant one from the
+    // same store even when the variant is cheaper.
+    const extraWordCount = countExtraWords(significantWords(query), new Set(significantWords(result.name)));
+    // Carried through to the winning entry so callers (server.js) can
+    // show a €/kg or €/L unit price — the only way to compare two stores
+    // fairly when neither sells the item in the same pack size.
+    const size = candidateSize({ html, name: result.name });
+    const entry = {
+      store,
+      url: productUrl,
+      ...result,
+      extraWordCount,
+      unitSizeValue: size?.value ?? null,
+      unitSizeKind: size?.kind ?? null,
+    };
     // A wrong product entirely, or the right product at a clearly wrong
     // size, is never usable — not even as a last-resort fallback, since
     // showing it at all would be a misleading price, worse than showing
@@ -473,7 +521,16 @@ async function searchAndScrapeStore(store, query) {
 
   const pool = singleUnitEntries.length ? singleUnitEntries : packEntries;
   if (!pool.length) throw new NoMatchError(`não foi possível obter um produto em ${def.label}`);
-  return cheapestPlausible(pool);
+  return cheapestPlausible(pickClosestNameMatches(pool));
+}
+
+// Narrows a store's candidate pool to only the entries tied for the
+// fewest query-unaccounted-for words (see countExtraWords) before price
+// is ever considered — the closest name match, not the cheapest name
+// match, is the right product.
+function pickClosestNameMatches(entries) {
+  const minExtra = Math.min(...entries.map((e) => e.extraWordCount));
+  return entries.filter((e) => e.extraWordCount === minExtra);
 }
 
 // Picking the outright cheapest candidate trusts every store's own price

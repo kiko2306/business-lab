@@ -108,7 +108,14 @@ function saveUserProducts(userId, userProducts) {
 async function buildStoreEntry(store, name, previous) {
   const history = previous?.history ?? [];
   try {
-    const { url, price, currency, name: scrapedName } = await searchAndScrapeStore(store, name);
+    const {
+      url,
+      price,
+      currency,
+      name: scrapedName,
+      unitSizeValue,
+      unitSizeKind,
+    } = await searchAndScrapeStore(store, name);
     const scrapedAt = new Date().toISOString();
     return {
       url,
@@ -119,6 +126,8 @@ async function buildStoreEntry(store, name, previous) {
       scrapedAt,
       error: null,
       history: [...history, { price, scrapedAt }],
+      unitSizeValue: unitSizeValue ?? null,
+      unitSizeKind: unitSizeKind ?? null,
     };
   } catch (err) {
     const isNoMatch = err instanceof NoMatchError;
@@ -131,6 +140,8 @@ async function buildStoreEntry(store, name, previous) {
       scrapedAt: isNoMatch ? null : previous?.scrapedAt ?? null,
       error: err.message,
       history,
+      unitSizeValue: isNoMatch ? null : previous?.unitSizeValue ?? null,
+      unitSizeKind: isNoMatch ? null : previous?.unitSizeKind ?? null,
     };
   }
 }

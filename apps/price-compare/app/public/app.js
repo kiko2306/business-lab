@@ -132,13 +132,20 @@ function renderProducts() {
 }
 
 function renderProductCard(product) {
-  const rows = product.urls.map((entry) => ({
-    label: SCRAPED_STORES[entry.store] || entry.store || 'Unknown store',
-    price: entry.price,
-    currency: entry.currency,
-    error: entry.error,
-    url: entry.url,
-  }));
+  const rows = product.urls.map((entry) => {
+    const unitLabel = entry.unitSizeKind === 'mass' ? 'kg' : entry.unitSizeKind === 'volume' ? 'L' : null;
+    const unitPrice =
+      entry.unitSizeValue && entry.price != null ? (entry.price * 1000) / entry.unitSizeValue : null;
+    return {
+      label: SCRAPED_STORES[entry.store] || entry.store || 'Unknown store',
+      price: entry.price,
+      currency: entry.currency,
+      error: entry.error,
+      url: entry.url,
+      unitPrice,
+      unitLabel,
+    };
+  });
 
   // A store that has never successfully matched this product (no price
   // ever found, not just a stale one) isn't shown at all — a "sem preço"
@@ -147,6 +154,16 @@ function renderProductCard(product) {
   // (see scrapers.js looksIrrelevant/looksLikeSizeMismatch).
   const visibleRows = rows.filter((r) => r.price != null);
 
+  // Comparing raw totals across stores is only fair when they're selling
+  // the same pack size — a store's 6-pack will always look "cheaper" than
+  // another's single unit otherwise. When every visible row has a known
+  // unit price, rank by that instead (see scrapers.js candidateSize); a
+  // row missing size data falls back to the plain total, same as before
+  // this existed.
+  const allHaveUnitPrice = visibleRows.length > 0 && visibleRows.every((r) => r.unitPrice != null);
+  const cheapestUnitPrice = allHaveUnitPrice
+    ? visibleRows.reduce((min, r) => (min == null || r.unitPrice < min ? r.unitPrice : min), null)
+    : null;
   const cheapest = visibleRows.reduce((min, r) => (min == null || r.price < min ? r.price : min), null);
   const isCollapsed = collapsed.has(product.id);
 
@@ -173,8 +190,12 @@ function renderProductCard(product) {
     const div = document.createElement('div');
     div.className = 'price-row';
     const priceText = fmtPrice(row.price, row.currency);
-    const isCheapest = row.price === cheapest;
-    const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${priceText}</span>`;
+    const isCheapest = allHaveUnitPrice ? row.unitPrice === cheapestUnitPrice : row.price === cheapest;
+    const unitPriceHtml =
+      row.unitPrice != null
+        ? `<span class="unit-price">${fmtPrice(row.unitPrice, row.currency)}/${row.unitLabel}</span>`
+        : '';
+    const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${priceText}${unitPriceHtml}</span>`;
     const actionHtml = row.url ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Abrir</a>` : '';
 
     div.innerHTML = `
