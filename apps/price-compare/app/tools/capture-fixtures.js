@@ -4,12 +4,13 @@
  * return (parsed down to the JSON-serialisable fields selectBestCandidate
  * needs — see scrapers.parseCandidate) into fixtures/candidates.json.
  *
- * match.test.js then replays selectBestCandidate against that snapshot with
- * zero network, so the matching heuristics can be tuned and regression-
- * checked without re-scraping. Re-run this only to refresh the snapshot
- * (a store changed its markup, or the curated list changed):
+ * test/match.test.js then replays selectBestCandidate against that snapshot
+ * with zero network, so the matching heuristics can be tuned and
+ * regression-checked without re-scraping. Lives OUTSIDE test/ so
+ * `node --test test/` never picks it up. Re-run only to refresh the
+ * snapshot (a store changed its markup, or the curated list changed):
  *
- *   node test/capture.js
+ *   npm run capture      # or: node tools/capture-fixtures.js
  *
  * Sequential across products, parallel across a product's 4 stores — same
  * shape as the app's own refresh, to keep the load on the store sites the
@@ -84,7 +85,7 @@ async function main() {
     console.log(`[${i}/${NAMES.length}] ${name}  ${counts}`);
     await sleep(SLEEP_MS);
   }
-  const dir = path.join(__dirname, 'fixtures');
+  const dir = path.join(__dirname, '..', 'test', 'fixtures');
   fs.mkdirSync(dir, { recursive: true });
   fs.writeFileSync(path.join(dir, 'candidates.json'), JSON.stringify(out, null, 1));
   console.log(`\nwrote ${path.join(dir, 'candidates.json')}  (${NAMES.length} products)`);

@@ -4311,4 +4311,38 @@ to confirm on a real phone.
 total instead of on a stacked block line. Desktop: all on one row. Mobile:
 store name + unit price + total share line 1, buttons drop to line 2, and
 the "Unidade" badge is hidden (only "Pack" shows — the meaningful case).
-Dead `.store-badge` / `.price-value.missing` CSS removed.
+The mobile header also got a pass: `#theme-toggle-btn` pinned to the
+corner, `#user-info` hidden, `#header-user` wrapped into two tidy button
+rows. Verified at 400px against the deployed CSS — no horizontal scroll,
+header 3 rows. Dead `.store-badge` / `.price-value.missing` CSS removed.
+
+### 43.14 Comprehensive test suite (requested)
+
+Expanded from 3 tests to **205** (199 pass, 6 `todo`, ~1.3 s, zero
+network). `scrapers.js` now exports the pure helpers under `_test`.
+
+- `test/heuristics.test.js` (new) — unit tests for every helper:
+  `sanitizeSearchQuery` / `normalizeText`, `stemWord` (regular + `-ões` /
+  `-ães` / `-ais` plurals), `significantWords`, `negatedWords` /
+  `hasNegatedQueryWord`, the two `looksIrrelevant` gates (lead-with-a-
+  category-noun, head-word for short queries) + the pure-generic fallback,
+  `parseSize` / `parseEmbSize` / `parsePackTotalSize`, `looksLikeMultiPack`,
+  `looksLikeSizeMismatch`, `countExtraWords`, `hasUnrequestedFormWord`,
+  `pickClosestNameMatches`, `rankMetric`, `cheapestPlausible`, and
+  `selectBestCandidate` on synthetic pools (lowest **unit** price wins,
+  single-unit beats a cheaper pack, size-unknown falls back to total,
+  all-irrelevant → null, a size-mismatch is never used).
+- `test/match.test.js` — labels expanded to ~175 `(product, store)`
+  assertions across all 53 fixture products, `nameIncludes` /
+  `nameExcludes` on the winner's description; `todo` labels for the 6 known
+  gaps (Ração húmida→20 kg bag, Pasta whitening→herbal, Gelo/saco ×2,
+  Leite Proteína, Ovos Cozidos) run as `test.todo` — tracked, not failing.
+  Plus fixture-wide invariants over **every** pick: the winner is
+  relevance- and size-valid; its description shares a real word with the
+  query; for two listings of the same product the cheaper **per unit**
+  wins (barring a sub-half-median glitch); a pack is never chosen while a
+  valid single-unit exists; the aggregate match count holds a floor.
+- `test/capture.js` moved to `tools/capture-fixtures.js` — Node 20's
+  `node --test test/` loads *every* file in `test/`, so a capture script
+  there fired ~50 live requests on every run. `npm run capture` rebuilds
+  the fixture; `npm test` is now `node --test test/` and stays offline.

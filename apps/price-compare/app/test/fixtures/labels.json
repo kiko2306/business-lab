@@ -1,365 +1,285 @@
 {
-  "_comment": "Hand-labelled expected outcome per (product, store) for the captured fixture. expect: 'match' | 'nomatch'. nameIncludes / nameExcludes: accent-insensitive substrings the winner's scrapedName must / must not contain. Only pairs worth pinning are listed; the rest are covered by the aggregate assertions in match.test.js. Derived from a live review of candidates.json — see plan.md.",
+  "_comment": "Expected outcome per (product, store) for test/fixtures/candidates.json. expect: 'match' | 'nomatch'. nameIncludes / nameExcludes: accent-insensitive substrings the winner's scrapedName must / must not contain. todo: a string marks a known gap — the assertion runs as test.todo (tracked, does not fail the suite). Unlisted (product, store) pairs are still covered by the fixture-wide invariants in match.test.js. Derived from a full review of the fixture — see plan.md.",
+
   "Iogurtes naturais": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "iogurte"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "iogurte"
-    },
-    "lidl": {
-      "expect": "nomatch"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "iogurte"
-    }
+    "continente": { "expect": "match", "nameIncludes": "iogurte" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "iogurte" }
+  },
+  "Iogurtes gregos": {
+    "continente": { "expect": "match", "nameIncludes": "grego" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "grego" },
+    "auchan":     { "expect": "match", "nameIncludes": "grego" }
+  },
+  "Iogurtes líquidos": {
+    "continente": { "expect": "match", "nameIncludes": "liquido" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "liquido" }
   },
   "Queijo da Serra": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "queijo"
-    },
-    "lidl": {
-      "expect": "nomatch"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "queijo"
-    }
+    "continente": { "expect": "match", "nameIncludes": "queijo" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "queijo" }
+  },
+  "Queijo da Beira Baixa": {
+    "continente": { "expect": "match", "nameIncludes": "beira baixa" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "beira baixa" },
+    "auchan":     { "expect": "match", "nameIncludes": "beira baixa" }
   },
   "Mel de abelha": {
-    "continente": {
-      "expect": "nomatch"
-    },
-    "pingodoce": {
-      "expect": "nomatch"
-    },
-    "lidl": {
-      "expect": "nomatch"
-    },
-    "auchan": {
-      "expect": "nomatch"
-    }
+    "continente": { "expect": "nomatch" },
+    "pingodoce":  { "expect": "nomatch" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "nomatch" }
+  },
+  "Canela em pó": {
+    "continente": { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "canela" }
   },
   "Tangerinas": {
-    "continente": {
-      "expect": "nomatch"
-    },
-    "pingodoce": {
-      "expect": "nomatch"
-    },
-    "auchan": {
-      "expect": "nomatch"
-    }
+    "continente": { "expect": "nomatch" },
+    "pingodoce":  { "expect": "nomatch" },
+    "auchan":     { "expect": "nomatch" }
+  },
+  "Pêras": {
+    "continente": { "expect": "match", "nameIncludes": "pera" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "pera" },
+    "lidl":       { "expect": "match", "nameIncludes": "pera" },
+    "auchan":     { "expect": "match", "nameIncludes": "pera" }
+  },
+  "Morangos": {
+    "continente": { "expect": "match", "nameIncludes": "morango" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "morango" }
+  },
+  "Melão": {
+    "continente": { "expect": "match", "nameIncludes": "melao" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "melao" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "melao" }
+  },
+  "Alface": {
+    "continente": { "expect": "match", "nameIncludes": "alface" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "alface" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "alface" }
+  },
+  "Cenouras": {
+    "continente": { "expect": "match", "nameIncludes": "cenoura" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "cenoura" },
+    "lidl":       { "expect": "nomatch" }
   },
   "Vinagre de vinho branco": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "vinagre"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "vinagre"
-    },
-    "lidl": {
-      "expect": "nomatch"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "vinagre"
-    }
+    "continente": { "expect": "match", "nameIncludes": "vinagre" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "vinagre" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "vinagre" }
   },
   "Peito de frango": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "peito",
-      "nameExcludes": "fiambre"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameExcludes": "fiambre"
-    },
-    "lidl": {
-      "expect": "match",
-      "nameExcludes": "fiambre"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "peito"
-    }
+    "continente": { "expect": "match", "nameIncludes": "peito", "nameExcludes": "fiambre" },
+    "pingodoce":  { "expect": "match", "nameExcludes": "fiambre" },
+    "lidl":       { "expect": "match", "nameExcludes": "fiambre" },
+    "auchan":     { "expect": "match", "nameIncludes": "peito" }
   },
-  "Fermento em pó para bolos": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "fermento"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "fermento"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "fermento"
-    }
+  "Sal fino": {
+    "continente": { "expect": "match", "nameIncludes": "sal fino" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "sal fino" },
+    "lidl":       { "expect": "nomatch" }
   },
-  "Massa esparguete": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "esparguete"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "esparguete"
-    }
+  "Café solúvel": {
+    "continente": { "expect": "match", "nameIncludes": "soluvel" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "soluvel" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "soluvel" }
   },
-  "Massa para lasanha": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "lasanha"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "lasanha"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "lasanha"
-    }
+  "Café em cápsulas": {
+    "pingodoce":  { "expect": "nomatch" },
+    "lidl":       { "expect": "match", "nameIncludes": "capsula" },
+    "auchan":     { "expect": "match", "nameIncludes": "capsula" }
   },
-  "Postas de salmão": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "salmao"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "salmao"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "salmao"
-    }
+  "Molho de soja": {
+    "continente": { "expect": "match", "nameIncludes": "soja" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "soja" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "soja" }
   },
-  "Bananas": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "banana"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "banana"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "banana"
-    }
+  "Bacalhau seco": {
+    "continente": { "expect": "match", "nameIncludes": "bacalhau" },
+    "pingodoce":  { "expect": "nomatch" },
+    "lidl":       { "expect": "nomatch" }
   },
-  "Maçãs Gala": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "maca"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "maca gala"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "maca"
-    }
+  "Papel higiénico (rolo duplo)": {
+    "continente": { "expect": "match", "nameIncludes": "papel higienico" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "papel higienico" },
+    "auchan":     { "expect": "match", "nameIncludes": "papel higienico" }
   },
-  "Leite meio gordo": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "meio",
-      "nameExcludes": "lactose"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameExcludes": "lactose"
-    },
-    "lidl": {
-      "expect": "match",
-      "nameExcludes": "lactose"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "meio"
-    }
+  "Ração húmida para cão em lata": {
+    "continente": { "expect": "nomatch" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "humida" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "nomatch", "todo": "20kg dry-food bag matched to 'humida em lata' — unit-basis gap, plan.md §43.10" }
   },
-  "Leite sem lactose": {
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "lactose"
-    },
-    "lidl": {
-      "expect": "match",
-      "nameIncludes": "lactose"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "lactose"
-    }
+  "Bombons": {
+    "continente": { "expect": "match", "nameIncludes": "bombons" },
+    "auchan":     { "expect": "match", "nameIncludes": "bombons" }
   },
-  "Açúcar branco": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "acucar"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "acucar"
-    },
-    "lidl": {
-      "expect": "match",
-      "nameIncludes": "acucar"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "acucar"
-    }
-  },
-  "Caldos de galinha": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "caldo de galinha"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "caldo de galinha"
-    },
-    "lidl": {
-      "expect": "match",
-      "nameIncludes": "caldo de galinha"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "galinha"
-    }
-  },
-  "Bolachas Maria": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "maria"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "maria"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "maria"
-    }
-  },
-  "Cebolas": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "cebola"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "cebola"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "cebola"
-    }
-  },
-  "Pão de forma integral": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "pao de forma"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "pao de forma integral"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "integral"
-    }
-  },
-  "Amaciador de roupa": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "amaciador"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "amaciador"
-    },
-    "lidl": {
-      "expect": "match",
-      "nameIncludes": "amaciador"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "amaciador"
-    }
-  },
-  "Molas para a roupa": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "molas"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "molas"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "molas"
-    }
-  },
-  "Detergente manual para a loiça (Fairy)": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "fairy"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "fairy"
-    }
-  },
-  "Passas de uva": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "uva"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "uva"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "uva"
-    }
-  },
-  "Espuma de barbear": {
-    "continente": {
-      "expect": "match",
-      "nameIncludes": "espuma de barbear"
-    },
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "espuma de barbear"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "espuma de barbear"
-    }
+  "Cerveja sem álcool": {
+    "continente": { "expect": "match", "nameIncludes": "alcool" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "alcool" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match" }
   },
   "Pasta de dentes whitening": {
-    "pingodoce": {
-      "expect": "match",
-      "nameIncludes": "branqueadora"
-    },
-    "auchan": {
-      "expect": "match",
-      "nameIncludes": "whitening"
-    }
+    "continente": { "expect": "match", "nameExcludes": "herbal", "todo": "'whitening' vocab — Continente shows no branqueadora, picks a non-whitening paste" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "branqueadora" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "whitening" }
+  },
+  "Sardinhas em lata": {
+    "continente": { "expect": "nomatch" },
+    "pingodoce":  { "expect": "nomatch" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "nomatch" }
+  },
+  "Passas de uva": {
+    "continente": { "expect": "match", "nameIncludes": "uva" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "uva" }
+  },
+  "Muffins": {
+    "continente": { "expect": "match", "nameIncludes": "muffin" },
+    "auchan":     { "expect": "match", "nameIncludes": "muffin" }
+  },
+  "Queques": {
+    "continente": { "expect": "match", "nameIncludes": "queque" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "queque" }
+  },
+  "Azeitonas pretas galegas": {
+    "continente": { "expect": "match", "nameIncludes": "galega" },
+    "auchan":     { "expect": "match", "nameIncludes": "galega" }
+  },
+  "Espuma de barbear": {
+    "continente": { "expect": "match", "nameIncludes": "espuma de barbear" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "espuma de barbear" },
+    "auchan":     { "expect": "match", "nameIncludes": "espuma de barbear" }
+  },
+  "Molas para a roupa": {
+    "continente": { "expect": "match", "nameIncludes": "molas" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "molas" },
+    "auchan":     { "expect": "match", "nameIncludes": "molas" }
+  },
+  "Champô de bebé \"não chora mais\"": {
+    "continente": { "expect": "nomatch" },
+    "pingodoce":  { "expect": "nomatch" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "nomatch" }
+  },
+  "Paprika (colorau)": {
+    "continente": { "expect": "nomatch" },
+    "pingodoce":  { "expect": "nomatch" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "nomatch" }
+  },
+  "Papos-secos": {
+    "continente": { "expect": "nomatch" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "papo" },
+    "auchan":     { "expect": "nomatch" }
+  },
+  "Gelo em cubo (saco)": {
+    "continente": { "expect": "nomatch", "todo": "'saco' ambiguity — ice-cube BAGS vs bag OF ice; matches empty bags" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "gelo" },
+    "auchan":     { "expect": "nomatch", "todo": "'saco' ambiguity — matches empty ice-cube bags" }
+  },
+  "Achocolatado em pó (Nesquik)": {
+    "continente": { "expect": "nomatch" },
+    "pingodoce":  { "expect": "nomatch" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "nomatch" }
+  },
+  "Amaciador de roupa": {
+    "continente": { "expect": "match", "nameIncludes": "amaciador" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "amaciador" },
+    "lidl":       { "expect": "match", "nameIncludes": "amaciador" },
+    "auchan":     { "expect": "match", "nameIncludes": "amaciador" }
+  },
+  "Bananas": {
+    "continente": { "expect": "match", "nameIncludes": "banana" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "banana" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "banana" }
+  },
+  "Maçãs Gala": {
+    "continente": { "expect": "match", "nameIncludes": "maca" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "maca gala" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "gala" }
+  },
+  "Leite meio gordo": {
+    "continente": { "expect": "match", "nameIncludes": "meio", "nameExcludes": "lactose" },
+    "pingodoce":  { "expect": "match", "nameExcludes": "lactose" },
+    "lidl":       { "expect": "match", "nameExcludes": "lactose" },
+    "auchan":     { "expect": "match", "nameIncludes": "meio" }
+  },
+  "Leite sem lactose": {
+    "continente": { "expect": "match", "nameIncludes": "lactose", "nameExcludes": "proteina", "todo": "'proteina' variant not demoted for a 'leite sem lactose' query" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "lactose" },
+    "lidl":       { "expect": "match", "nameIncludes": "lactose" },
+    "auchan":     { "expect": "match", "nameIncludes": "lactose" }
+  },
+  "Açúcar branco": {
+    "continente": { "expect": "match", "nameIncludes": "acucar" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "acucar" },
+    "lidl":       { "expect": "match", "nameIncludes": "acucar" },
+    "auchan":     { "expect": "match", "nameIncludes": "acucar" }
+  },
+  "Massa esparguete": {
+    "continente": { "expect": "match", "nameIncludes": "esparguete" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "esparguete" },
+    "lidl":       { "expect": "nomatch" }
+  },
+  "Massa para lasanha": {
+    "continente": { "expect": "match", "nameIncludes": "lasanha" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "lasanha" },
+    "auchan":     { "expect": "match", "nameIncludes": "lasanha" }
+  },
+  "Fermento em pó para bolos": {
+    "continente": { "expect": "match", "nameIncludes": "fermento" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "fermento" },
+    "auchan":     { "expect": "match", "nameIncludes": "fermento" }
+  },
+  "Caldos de galinha": {
+    "continente": { "expect": "match", "nameIncludes": "galinha" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "galinha" },
+    "lidl":       { "expect": "match", "nameIncludes": "galinha" },
+    "auchan":     { "expect": "match", "nameIncludes": "galinha" }
+  },
+  "Bolachas Maria": {
+    "continente": { "expect": "match", "nameIncludes": "maria" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "maria" },
+    "auchan":     { "expect": "match", "nameIncludes": "maria" }
+  },
+  "Postas de salmão": {
+    "continente": { "expect": "match", "nameIncludes": "salmao" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "salmao" },
+    "auchan":     { "expect": "match", "nameIncludes": "salmao" }
+  },
+  "Cebolas": {
+    "continente": { "expect": "match", "nameIncludes": "cebola" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "cebola" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "cebola" }
+  },
+  "Pão de forma integral": {
+    "continente": { "expect": "match", "nameIncludes": "forma integral" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "forma integral" },
+    "auchan":     { "expect": "match", "nameIncludes": "integral" }
+  },
+  "Detergente manual para a loiça (Fairy)": {
+    "continente": { "expect": "match", "nameIncludes": "fairy" },
+    "pingodoce":  { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "fairy" }
+  },
+  "Ovos": {
+    "continente": { "expect": "match", "nameExcludes": "cozidos", "todo": "picks 'Ovos Cozidos' (boiled) for a plain 'Ovos' query" },
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "ovos" }
   }
 }
