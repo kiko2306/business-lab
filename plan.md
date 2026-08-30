@@ -4258,3 +4258,24 @@ User asked to shrink both lists for faster refreshes, removing only
   once-broken item (e.g. "Peito de frango" vs the ham) stays in the test
   fixture even though the item left the live list — that's the point of
   the split.
+
+### 43.12 Unit-price ranking + persisted sessions
+
+Two follow-ups after the browser walk-through:
+
+- **"Cheapest" now means cheapest per unit** (€/kg, €/L), not the lowest
+  total — both when `cheapestPlausible` chooses which candidate to show
+  for a store (via a new `rankMetric`: unit price when every pooled
+  candidate has a comparable size, raw total otherwise; the median-outlier
+  guard runs on the same metric) and when `renderProductCard` paints the
+  green badge (lowest €/unit among the rows that share a unit kind; a row
+  with no size gets no badge; falls back to total only with <2 comparable
+  rows). Verified against live data: "Iogurtes líquidos" highlights
+  Continente at €2.11/kg, not Pingo Doce's €0.99 total (€4.30/kg).
+- **Sessions persist to `/data/sessions.json`** (§22.9i's "revisit if
+  annoying" — it got annoying: every redeploy this session logged the
+  tester out). Same atomic-write pattern; `token -> { user, createdAt }`,
+  30-day TTL pruned on load, missing/corrupt file starts empty exactly as
+  before. Verified a real `docker restart` keeps a seeded session live.
+  The OAuth CSRF `pendingStates` map stays in-memory (5-min TTL, a restart
+  mid-login just means retry).

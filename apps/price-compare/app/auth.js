@@ -4,9 +4,10 @@
  * automatically (no separate invite/registration step); server.js scopes
  * every product to req.user.sub.
  *
- * Sessions are an in-memory Map, not a DB table or JWT — restarting the
- * container logs everyone out. Acceptable trade-off for a personal tool;
- * revisit (persist sessions to /data) if that becomes annoying.
+ * Sessions live in an in-memory Map but are mirrored to /data/sessions.json
+ * (same flat-JSON + atomic-write pattern as products.json) so a container
+ * restart — i.e. every redeploy — no longer logs everyone out. A missing or
+ * corrupt file just starts empty, exactly as before.
  *
  * The id_token returned by exchangeCode() is decoded without verifying its
  * signature — safe here specifically because it was fetched server-to-server
@@ -15,6 +16,8 @@
  */
 
 const crypto = require('crypto');
+const fs = require('fs');
+const path = require('path');
 
 const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID;
 const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET;
@@ -67,16 +70,51 @@ async function exchangeCode(code) {
 
 // --- Sessions ---
 const SESSION_COOKIE = 'pc_session';
-const sessions = new Map(); // token -> user
+const SESSION_TTL_MS = 30 * 24 * 60 * 60 * 1000; // matches the cookie maxAge below
+const SESSIONS_FILE = path.join(process.env.DATA_DIR || '/data', 'sessions.json');
+const sessions = new Map(); // token -> { user, createdAt }
+
+function loadSessions() {
+  let raw;
+  try {
+    raw = fs.readFileSync(SESSIONS_FILE, 'utf8');
+  } catch {
+    return; // no file yet — first run
+  }
+  try {
+    const now = Date.now();
+    for (const [token, entry] of Object.entries(JSON.parse(raw))) {
+      if (entry?.user && entry.createdAt && now - entry.createdAt < SESSION_TTL_MS) {
+        sessions.set(token, entry);
+      }
+    }
+  } catch (err) {
+    console.error('sessions.json unreadable, starting with no sessions:', err.message);
+  }
+}
+
+function saveSessions() {
+  try {
+    fs.mkdirSync(path.dirname(SESSIONS_FILE), { recursive: true });
+    const tmp = SESSIONS_FILE + '.tmp';
+    fs.writeFileSync(tmp, JSON.stringify(Object.fromEntries(sessions), null, 2));
+    fs.renameSync(tmp, SESSIONS_FILE);
+  } catch (err) {
+    console.error('failed to persist sessions.json:', err.message);
+  }
+}
+
+loadSessions();
 
 function createSession(user) {
   const token = crypto.randomBytes(24).toString('hex');
-  sessions.set(token, user);
+  sessions.set(token, { user, createdAt: Date.now() });
+  saveSessions();
   return token;
 }
 
 function destroySession(token) {
-  sessions.delete(token);
+  if (sessions.delete(token)) saveSessions();
 }
 
 function getCookie(req, name) {
@@ -88,7 +126,15 @@ function getCookie(req, name) {
 
 function currentUser(req) {
   const token = getCookie(req, SESSION_COOKIE);
-  return token ? sessions.get(token) || null : null;
+  if (!token) return null;
+  const entry = sessions.get(token);
+  if (!entry) return null;
+  if (Date.now() - entry.createdAt >= SESSION_TTL_MS) {
+    sessions.delete(token);
+    saveSessions();
+    return null;
+  }
+  return entry.user;
 }
 
 function setSessionCookie(req, res, token) {
