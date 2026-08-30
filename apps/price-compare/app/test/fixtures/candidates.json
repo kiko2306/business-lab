@@ -1,62 +1,5 @@
 {
  "Iogurtes naturais": {
-  "lidl": [
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/milbona-iogurte-grego-de-framboesa-amora/p10054438",
-    "name": "Iogurte Grego de Framboesa/ Amora",
-    "price": 1.39,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/mimosa-iogurte-sem-lactose/p10054291",
-    "name": "Iogurte sem Lactose",
-    "price": 1.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/mimosa-iogurte-magro-de-morango-coco-ou-manga/p10054293",
-    "name": "Iogurte Magro de Morango, Coco ou Manga",
-    "price": 2.39,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/bom-petisco-atum-ao-natural/p10054307",
-    "name": "Atum ao Natural",
-    "price": 1.31,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 120,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/milbona-iogurte-stracciatella-com-proteina/p10054404",
-    "name": "Iogurte Stracciatella com Proteína",
-    "price": 1.85,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
   "auchan": [
    {
     "store": "auchan",
@@ -147,93 +90,60 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
+  "lidl": [
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-grego-natural-pingo-doce-940497.html",
-    "name": "Iogurte Grego Natural",
-    "price": 2.25,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 1000,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-natural-pack-8-pingo-doce-969872.html",
-    "name": "Iogurte Natural Pack 8",
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/milbona-iogurte-grego-de-framboesa-amora/p10054438",
+    "name": "Iogurte Grego de Framboesa/ Amora",
     "price": 1.39,
     "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-grego-natural-oikos-danone-950061.html",
-    "name": "Iogurte Grego Natural",
-    "price": 4.79,
-    "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
     "unitSizeKind": null,
     "sizeMismatch": false
    },
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-grego-natural-pingo-doce-741389.html",
-    "name": "Iogurte Grego Natural",
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/mimosa-iogurte-sem-lactose/p10054291",
+    "name": "Iogurte sem Lactose",
     "price": 1.79,
     "currency": "EUR",
     "isPack": false,
-    "unitSizeValue": 500,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-proteicos/iogurte-skyr-natural-go-active-846908.html",
-    "name": "Iogurte Skyr Natural",
-    "price": 0.65,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 150,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-natural-pack-8-danone-917194.html",
-    "name": "Iogurte Natural Pack 8",
-    "price": 2.09,
-    "currency": "EUR",
-    "isPack": true,
     "unitSizeValue": null,
     "unitSizeKind": null,
     "sizeMismatch": false
    },
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-inteiro-natural-pack-2-pingo-doce-923861.html",
-    "name": "Iogurte Inteiro Natural Pack 2",
-    "price": 0.8,
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/mimosa-iogurte-magro-de-morango-coco-ou-manga/p10054293",
+    "name": "Iogurte Magro de Morango, Coco ou Manga",
+    "price": 2.39,
     "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": 125,
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/bom-petisco-atum-ao-natural/p10054307",
+    "name": "Atum ao Natural",
+    "price": 1.31,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 120,
     "unitSizeKind": "mass",
     "sizeMismatch": false
    },
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-grego-natural-acucarado-pack-4-pingo-doce-753134.html",
-    "name": "Iogurte Grego Natural Açucarado Pack 4",
-    "price": 1.65,
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/milbona-iogurte-stracciatella-com-proteina/p10054404",
+    "name": "Iogurte Stracciatella com Proteína",
+    "price": 1.85,
     "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": 125,
-    "unitSizeKind": "mass",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
     "sizeMismatch": false
    }
   ],
@@ -323,6 +233,96 @@
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": 500,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-grego-natural-pingo-doce-940497.html",
+    "name": "Iogurte Grego Natural",
+    "price": 2.25,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 1000,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-natural-pack-8-pingo-doce-969872.html",
+    "name": "Iogurte Natural Pack 8",
+    "price": 1.39,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-grego-natural-oikos-danone-950061.html",
+    "name": "Iogurte Grego Natural",
+    "price": 4.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-grego-natural-pingo-doce-741389.html",
+    "name": "Iogurte Grego Natural",
+    "price": 1.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 500,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-proteicos/iogurte-skyr-natural-go-active-846908.html",
+    "name": "Iogurte Skyr Natural",
+    "price": 0.65,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 150,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-natural-pack-8-danone-917194.html",
+    "name": "Iogurte Natural Pack 8",
+    "price": 2.09,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-inteiro-natural-pack-2-pingo-doce-923861.html",
+    "name": "Iogurte Inteiro Natural Pack 2",
+    "price": 0.8,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": 125,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-naturais%E2%80%8B/iogurte-grego-natural-acucarado-pack-4-pingo-doce-753134.html",
+    "name": "Iogurte Grego Natural Açucarado Pack 4",
+    "price": 1.65,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": 125,
     "unitSizeKind": "mass",
     "sizeMismatch": false
    }
@@ -1011,52 +1011,6 @@
     "sizeMismatch": false
    }
   ],
-  "lidl": [
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/parkside-serra-grande-de-jardinagem/p10054023",
-    "name": "Serra Grande de Jardinagem",
-    "price": 3.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/limiano-queijo-em-fatias-50-gordura/p10054476",
-    "name": "Queijo em Fatias -50% Gordura",
-    "price": 2.39,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/limiano-queijo-em-fatias/p10054478",
-    "name": "Queijo em Fatias",
-    "price": 2.35,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/a-vaca-que-ri-queijo-light-semi-curado-azul/p10054480",
-    "name": "Queijo Light Semi Curado/ Azul",
-    "price": 2.95,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 250,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   }
-  ],
   "auchan": [
    {
     "store": "auchan",
@@ -1133,6 +1087,52 @@
     "isPack": false,
     "unitSizeValue": null,
     "unitSizeKind": null,
+    "sizeMismatch": false
+   }
+  ],
+  "lidl": [
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/parkside-serra-grande-de-jardinagem/p10054023",
+    "name": "Serra Grande de Jardinagem",
+    "price": 3.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/limiano-queijo-em-fatias-50-gordura/p10054476",
+    "name": "Queijo em Fatias -50% Gordura",
+    "price": 2.39,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/limiano-queijo-em-fatias/p10054478",
+    "name": "Queijo em Fatias",
+    "price": 2.35,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/a-vaca-que-ri-queijo-light-semi-curado-azul/p10054480",
+    "name": "Queijo Light Semi Curado/ Azul",
+    "price": 2.95,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 250,
+    "unitSizeKind": "mass",
     "sizeMismatch": false
    }
   ],
@@ -1392,6 +1392,7 @@
   ]
  },
  "Mel de abelha": {
+  "continente": [],
   "auchan": [
    {
     "store": "auchan",
@@ -1416,7 +1417,6 @@
     "sizeMismatch": false
    }
   ],
-  "continente": [],
   "lidl": [
    {
     "store": "lidl",
@@ -1464,12 +1464,12 @@
    },
    {
     "store": "lidl",
-    "url": "https://www.lidl.pt/p/vaqueiro-creme-vegetal-para-cozinhar/p10054299",
-    "name": "Creme Vegetal para Cozinhar",
-    "price": 2.99,
+    "url": "https://www.lidl.pt/p/cerelac-farinha-lactea-aveia-maca-e-cenoura/p10054195",
+    "name": "Farinha Láctea Aveia, Maçã e Cenoura",
+    "price": 3.19,
     "currency": "EUR",
     "isPack": false,
-    "unitSizeValue": 1000,
+    "unitSizeValue": 240,
     "unitSizeKind": "mass",
     "sizeMismatch": false
    }
@@ -2173,96 +2173,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/bananas-peras-e-macas/pera-rocha-dop-oeste-nossa-fruta-e-legumes-369927.html",
-    "name": "Pera Rocha DOP Oeste",
-    "price": 2.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/bananas-peras-e-macas/pera-rocha-dop-oeste-embalada-nossa-fruta-e-legumes-949756.html",
-    "name": "Pera Rocha DOP Oeste Embalada",
-    "price": 1.89,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 1000,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/cereais-barras-e-bolsas-de-fruta/bolsas-de-fruta/bolsa-de-fruta-maca-e-pera-pingo-doce-975728.html",
-    "name": "Bolsa de Fruta Maçã e Pêra",
-    "price": 0.67,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 90,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/cereais-barras-e-bolsas-de-fruta/bolsas-de-fruta/bolsa-de-fruta-pera-pingo-doce-976792.html",
-    "name": "Bolsa de Fruta Pêra",
-    "price": 0.67,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 90,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/aguas-sumos-e-refrigerantes/sumos-e-refrigerantes/nectares/nectar-de-pera-rocha-compal-classico-61525.html",
-    "name": "Néctar de Pera Rocha",
-    "price": 1.35,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 1000,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/aguas-sumos-e-refrigerantes/sumos-e-refrigerantes/nectares/sumo-de-100%25-pera-rocha-pingo-doce-822458.html",
-    "name": "Sumo de 100% Pera Rocha",
-    "price": 1.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 1500,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/cereais-barras-e-bolsas-de-fruta/bolsas-de-fruta/bolsa-de-fruta-maca-e-pera-bledina-935077.html",
-    "name": "Bolsa de Fruta Maçã e Pera",
-    "price": 0.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bebe-e-crianca/alimentacao/pures-de-fruta-e-sobremesas/pure-de-fruta-maca-e-pera-bledina-928487.html",
-    "name": "Puré de Fruta Maçã e Pera",
-    "price": 4.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
   "continente": [
    {
     "store": "continente",
@@ -2350,6 +2260,96 @@
     "isPack": false,
     "unitSizeValue": 1000,
     "unitSizeKind": "volume",
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/bananas-peras-e-macas/pera-rocha-dop-oeste-nossa-fruta-e-legumes-369927.html",
+    "name": "Pera Rocha DOP Oeste",
+    "price": 2.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/bananas-peras-e-macas/pera-rocha-dop-oeste-embalada-nossa-fruta-e-legumes-949756.html",
+    "name": "Pera Rocha DOP Oeste Embalada",
+    "price": 1.89,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 1000,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/cereais-barras-e-bolsas-de-fruta/bolsas-de-fruta/bolsa-de-fruta-maca-e-pera-pingo-doce-975728.html",
+    "name": "Bolsa de Fruta Maçã e Pêra",
+    "price": 0.67,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 90,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/cereais-barras-e-bolsas-de-fruta/bolsas-de-fruta/bolsa-de-fruta-pera-pingo-doce-976792.html",
+    "name": "Bolsa de Fruta Pêra",
+    "price": 0.67,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 90,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/aguas-sumos-e-refrigerantes/sumos-e-refrigerantes/nectares/nectar-de-pera-rocha-compal-classico-61525.html",
+    "name": "Néctar de Pera Rocha",
+    "price": 1.35,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 1000,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/aguas-sumos-e-refrigerantes/sumos-e-refrigerantes/nectares/sumo-de-100%25-pera-rocha-pingo-doce-822458.html",
+    "name": "Sumo de 100% Pera Rocha",
+    "price": 1.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 1500,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/cereais-barras-e-bolsas-de-fruta/bolsas-de-fruta/bolsa-de-fruta-maca-e-pera-bledina-935077.html",
+    "name": "Bolsa de Fruta Maçã e Pera",
+    "price": 0.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bebe-e-crianca/alimentacao/pures-de-fruta-e-sobremesas/pure-de-fruta-maca-e-pera-bledina-928487.html",
+    "name": "Puré de Fruta Maçã e Pera",
+    "price": 4.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
     "sizeMismatch": false
    }
   ]
@@ -2853,96 +2853,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/melao-waikiki-nossa-fruta-e-legumes-906847.html",
-    "name": "Melão Waikiki",
-    "price": 1.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/vinhos/champanhe-espumante-e-frisante/cocktail-aromatizado-sunset-royale-melao-sunset-royale-978118.html",
-    "name": "Cocktail Aromatizado Sunset Royale Melão",
-    "price": 2.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/melao-branco-nossa-fruta-e-legumes-53371.html",
-    "name": "Melão Branco",
-    "price": 0.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/vinhos/champanhe-espumante-e-frisante/cocktail-de-melao-casa-vila-nova-1010615.html",
-    "name": "Cocktail de Melão",
-    "price": 2.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/melao-amarelo-selecionado-nacional-pingo-doce-1011415.html",
-    "name": "Melão Amarelo Selecionado Nacional",
-    "price": 1.19,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/melao-melancia-e-meloa/melao-verde-selecionado-nacional-pingo-doce-46493.html",
-    "name": "Melão Verde Selecionado Nacional",
-    "price": 1.19,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/vinhos/champanhe-espumante-e-frisante/cocktail-aromatizado-bar-royal-melao-bar-royal-672664.html",
-    "name": "Cocktail Aromatizado Bar Royal Melão",
-    "price": 4.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/vinhos/champanhe-espumante-e-frisante/cocktail-casal-garcia-fruitzy-melao-casal-garcia-943481.html",
-    "name": "Cocktail Casal Garcia Fruitzy Melão",
-    "price": 3.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
   "continente": [
    {
     "store": "continente",
@@ -3026,6 +2936,96 @@
     "url": "https://www.continente.pt/produto/melao-extra-doce-continente-continente-8505037.html",
     "name": "Melão Extra Doce Continente",
     "price": 2.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/melao-waikiki-nossa-fruta-e-legumes-906847.html",
+    "name": "Melão Waikiki",
+    "price": 1.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/vinhos/champanhe-espumante-e-frisante/cocktail-aromatizado-sunset-royale-melao-sunset-royale-978118.html",
+    "name": "Cocktail Aromatizado Sunset Royale Melão",
+    "price": 2.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/melao-branco-nossa-fruta-e-legumes-53371.html",
+    "name": "Melão Branco",
+    "price": 0.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/vinhos/champanhe-espumante-e-frisante/cocktail-de-melao-casa-vila-nova-1010615.html",
+    "name": "Cocktail de Melão",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/melao-amarelo-selecionado-nacional-pingo-doce-1011415.html",
+    "name": "Melão Amarelo Selecionado Nacional",
+    "price": 1.19,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/melao-melancia-e-meloa/melao-verde-selecionado-nacional-pingo-doce-46493.html",
+    "name": "Melão Verde Selecionado Nacional",
+    "price": 1.19,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/vinhos/champanhe-espumante-e-frisante/cocktail-aromatizado-bar-royal-melao-bar-royal-672664.html",
+    "name": "Cocktail Aromatizado Bar Royal Melão",
+    "price": 4.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/vinhos/champanhe-espumante-e-frisante/cocktail-casal-garcia-fruitzy-melao-casal-garcia-943481.html",
+    "name": "Cocktail Casal Garcia Fruitzy Melão",
+    "price": 3.99,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
@@ -3182,6 +3182,96 @@
     "sizeMismatch": false
    }
   ],
+  "continente": [
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/alface-frisada-continente-continente-2647366.html",
+    "name": "Alface Frisada Continente",
+    "price": 1.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/alface-lisa-continente-continente-6579810.html",
+    "name": "Alface Lisa Continente",
+    "price": 1.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/alface-roxa-continente-continente-6579807.html",
+    "name": "Alface Roxa Continente",
+    "price": 1.05,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/alface-biologica-continente-bio-continente-bio-8784413.html",
+    "name": "Alface Biológica Continente Bio",
+    "price": 1.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/alface-iceberg-biologica-continente-bio-continente-bio-7971767.html",
+    "name": "Alface Iceberg Biológica Continente Bio",
+    "price": 2.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 300,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/algas-alface-do-mar-biologicas-wissi-wissi-7472936.html",
+    "name": "Algas Alface do Mar Biológicas Wissi",
+    "price": 3.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 30,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/sementes-horticolas-alface-atraccao-delgarden-delgarden-7829939.html",
+    "name": "Sementes Hortícolas Alface Atracção Delgarden",
+    "price": 1.19,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/algas-aromaticas-alface-do-mar-wissi-wissi-7815143.html",
+    "name": "Algas Aromáticas Alface do Mar Wissi",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 10,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
   "pingodoce": [
    {
     "store": "pingodoce",
@@ -3254,96 +3344,6 @@
     "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/vegetais/saladas-e-legumes-preparados/salada-crocante-com-alface-iceberg-e-cenoura-vitacress-1009401.html",
     "name": "Salada Crocante com Alface Iceberg e Cenoura",
     "price": 1.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
-  "continente": [
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/alface-frisada-continente-continente-2647366.html",
-    "name": "Alface Frisada Continente",
-    "price": 1.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/alface-lisa-continente-continente-6579810.html",
-    "name": "Alface Lisa Continente",
-    "price": 1.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/alface-biologica-continente-bio-continente-bio-8784413.html",
-    "name": "Alface Biológica Continente Bio",
-    "price": 1.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/alface-iceberg-biologica-continente-bio-continente-bio-7971767.html",
-    "name": "Alface Iceberg Biológica Continente Bio",
-    "price": 2.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 300,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/algas-alface-do-mar-biologicas-wissi-wissi-7472936.html",
-    "name": "Algas Alface do Mar Biológicas Wissi",
-    "price": 3.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 30,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/sementes-horticolas-alface-atraccao-delgarden-delgarden-7829939.html",
-    "name": "Sementes Hortícolas Alface Atracção Delgarden",
-    "price": 1.19,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/algas-aromaticas-alface-do-mar-wissi-wissi-7815143.html",
-    "name": "Algas Aromáticas Alface do Mar Wissi",
-    "price": 2.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 10,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/sementes-horticolas-alface-maravilha-4-estacoes-delgarden-delgarden-7829913.html",
-    "name": "Sementes Hortícolas Alface Maravilha 4 Estações Delgarden",
-    "price": 1.19,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
@@ -3750,63 +3750,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-pingo-doce-648564.html",
-    "name": "Vinagre de Vinho Branco",
-    "price": 0.75,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 1000,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-cristal-10301.html",
-    "name": "Vinagre de Vinho Branco",
-    "price": 1.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 500,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-peninsular-735978.html",
-    "name": "Vinagre de Vinho Branco",
-    "price": 0.87,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 750,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-gallo-543297.html",
-    "name": "Vinagre de Vinho Branco",
-    "price": 1.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 250,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-oliveira-da-serra-512822.html",
-    "name": "Vinagre de Vinho Branco",
-    "price": 1.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 250,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   }
-  ],
   "auchan": [
    {
     "store": "auchan",
@@ -3893,6 +3836,63 @@
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": 500,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-pingo-doce-648564.html",
+    "name": "Vinagre de Vinho Branco",
+    "price": 0.75,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 1000,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-cristal-10301.html",
+    "name": "Vinagre de Vinho Branco",
+    "price": 1.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 500,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-peninsular-735978.html",
+    "name": "Vinagre de Vinho Branco",
+    "price": 0.87,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 750,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-gallo-543297.html",
+    "name": "Vinagre de Vinho Branco",
+    "price": 1.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 250,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/azeite-oleo-e-vinagre/vinagre/vinagre-de-vinho-branco-oliveira-da-serra-512822.html",
+    "name": "Vinagre de Vinho Branco",
+    "price": 1.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 250,
     "unitSizeKind": "volume",
     "sizeMismatch": false
    }
@@ -4082,17 +4082,6 @@
    },
    {
     "store": "auchan",
-    "url": "https://www.auchan.pt/pt/produtos-frescos/talho/frango-e-galinha/peito-de-frango-do-campo-auchan-cultivamos-o-bom-kg/923772.html",
-    "name": "PEITO DE FRANGO DO CAMPO AUCHAN CULTIVAMOS O BOM KG",
-    "price": 8.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "auchan",
     "url": "https://www.auchan.pt/pt/produtos-frescos/charcutaria/fiambre-de-peru-e-frango/fiambre-de-peito-frango-auchan-fatias-150g/3803975.html",
     "name": "FIAMBRE DE PEITO FRANGO AUCHAN FATIAS 150G",
     "price": 1.99,
@@ -4123,95 +4112,16 @@
     "unitSizeValue": null,
     "unitSizeKind": null,
     "sizeMismatch": false
-   }
-  ],
-  "pingodoce": [
+   },
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/talho/aves/frango/bife%2Fpeito-de-frango-embalado-nosso-talho-544184.html",
-    "name": "Bife/Peito de Frango Embalado",
-    "price": 6.19,
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/produtos-frescos/charcutaria/fiambre-de-peru-e-frango/peito-de-frango-primor-forno-a-lenha-kg/4042642.html",
+    "name": "PEITO DE FRANGO PRIMOR FORNO A LENHA KG",
+    "price": 11.99,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
     "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/talho/aves/frango/peito-de-frango-embalado-pingo-doce-465789.html",
-    "name": "Peito de Frango Embalado",
-    "price": 6.59,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/talho/aves/frango/peito-de-frango-do-campo-embalado-pingo-doce-421157.html",
-    "name": "Peito de Frango do Campo Embalado",
-    "price": 8.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-monells-953489.html",
-    "name": "Fiambre Peito de Frango",
-    "price": 1.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 150,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-%28fatiado-ao-balcao%29-pingo-doce-962939.html",
-    "name": "Fiambre Peito de Frango (fatiado ao Balcão)",
-    "price": 12.09,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-forno-de-lenha-fatias-finas-campofrio-733576.html",
-    "name": "Fiambre Peito de Frango Forno de Lenha Fatias Finas",
-    "price": 2.39,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 120,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-%28fatiado-ao-balcao%29-campofrio-161975.html",
-    "name": "Fiambre Peito de Frango (fatiado ao Balcão)",
-    "price": 15.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-fatias-finas-cuida-t%2B-nobre-842210.html",
-    "name": "Fiambre Peito de Frango Fatias Finas Cuida-t+",
-    "price": 2.39,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 110,
-    "unitSizeKind": "mass",
     "sizeMismatch": false
    }
   ],
@@ -4304,55 +4214,99 @@
     "unitSizeKind": "mass",
     "sizeMismatch": false
    }
-  ]
- },
- "Sal fino": {
-  "lidl": [
+  ],
+  "pingodoce": [
    {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/knorr-caldo-de-galinha/p10054189",
-    "name": "Caldo de Galinha",
-    "price": 2.54,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 240,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/latin-american-style-preparado-de-abobora-e-batata-doce/p10054468",
-    "name": "Preparado de Abóbora e Batata Doce",
-    "price": 2.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 400,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/ola-gelado-cornetto-de-limao/p10054428",
-    "name": "Gelado Cornetto de Limão",
-    "price": 3.49,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": 540,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/parkside-fita-cola-em-tecido/p10054171",
-    "name": "Fita Cola em Tecido",
-    "price": 2.99,
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/talho/aves/frango/bife%2Fpeito-de-frango-embalado-nosso-talho-544184.html",
+    "name": "Bife/Peito de Frango Embalado",
+    "price": 6.19,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
     "unitSizeKind": null,
     "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/talho/aves/frango/peito-de-frango-embalado-pingo-doce-465789.html",
+    "name": "Peito de Frango Embalado",
+    "price": 6.59,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/talho/aves/frango/peito-de-frango-do-campo-embalado-pingo-doce-421157.html",
+    "name": "Peito de Frango do Campo Embalado",
+    "price": 8.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-monells-953489.html",
+    "name": "Fiambre Peito de Frango",
+    "price": 1.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 150,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-%28fatiado-ao-balcao%29-pingo-doce-962939.html",
+    "name": "Fiambre Peito de Frango (fatiado ao Balcão)",
+    "price": 12.09,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-forno-de-lenha-fatias-finas-campofrio-733576.html",
+    "name": "Fiambre Peito de Frango Forno de Lenha Fatias Finas",
+    "price": 2.39,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 120,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-%28fatiado-ao-balcao%29-campofrio-161975.html",
+    "name": "Fiambre Peito de Frango (fatiado ao Balcão)",
+    "price": 15.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/charcutaria-e-queijos/charcutaria/fiambre-mortadela-e-chouricao%E2%80%8B/fiambre-peito-de-frango-fatias-finas-cuida-t%2B-nobre-842210.html",
+    "name": "Fiambre Peito de Frango Fatias Finas Cuida-t+",
+    "price": 2.39,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 110,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
    }
-  ],
+  ]
+ },
+ "Sal fino": {
   "auchan": [
    {
     "store": "auchan",
@@ -4407,6 +4361,52 @@
     "isPack": false,
     "unitSizeValue": 250,
     "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
+  "lidl": [
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/knorr-caldo-de-galinha/p10054189",
+    "name": "Caldo de Galinha",
+    "price": 2.54,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 240,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/latin-american-style-preparado-de-abobora-e-batata-doce/p10054468",
+    "name": "Preparado de Abóbora e Batata Doce",
+    "price": 2.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 400,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/ola-gelado-cornetto-de-limao/p10054428",
+    "name": "Gelado Cornetto de Limão",
+    "price": 3.49,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": 540,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/parkside-fita-cola-em-tecido/p10054171",
+    "name": "Fita Cola em Tecido",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
     "sizeMismatch": false
    }
   ],
@@ -4562,23 +4562,23 @@
    },
    {
     "store": "lidl",
-    "url": "https://www.lidl.pt/p/a-vaca-que-ri-queijo-light-semi-curado-azul/p10054480",
-    "name": "Queijo Light Semi Curado/ Azul",
-    "price": 2.95,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 250,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
     "url": "https://www.lidl.pt/p/nestle-chocapic-xxl/p10054313",
     "name": "Chocapic XXL",
     "price": 4.89,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": 900,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/a-vaca-que-ri-queijo-light-semi-curado-azul/p10054480",
+    "name": "Queijo Light Semi Curado/ Azul",
+    "price": 2.95,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 250,
     "unitSizeKind": "mass",
     "sizeMismatch": false
    },
@@ -5241,63 +5241,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-kikkoman-731943.html",
-    "name": "Molho de Soja",
-    "price": 4.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-pingo-doce-936578.html",
-    "name": "Molho de Soja",
-    "price": 0.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-heinz-725576.html",
-    "name": "Molho de Soja",
-    "price": 4.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 150,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-paladin-955036.html",
-    "name": "Molho de Soja",
-    "price": 1.14,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-com-teor-reduzido-de-sal-kikkoman-732564.html",
-    "name": "Molho de Soja com Teor Reduzido de Sal",
-    "price": 4.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
   "auchan": [
    {
     "store": "auchan",
@@ -5385,6 +5328,63 @@
     "isPack": false,
     "unitSizeValue": 210,
     "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-kikkoman-731943.html",
+    "name": "Molho de Soja",
+    "price": 4.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-pingo-doce-936578.html",
+    "name": "Molho de Soja",
+    "price": 0.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-heinz-725576.html",
+    "name": "Molho de Soja",
+    "price": 4.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 150,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-paladin-955036.html",
+    "name": "Molho de Soja",
+    "price": 1.14,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/outros-molhos-e-temperos/molho-de-soja-com-teor-reduzido-de-sal-kikkoman-732564.html",
+    "name": "Molho de Soja com Teor Reduzido de Sal",
+    "price": 4.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
     "sizeMismatch": false
    }
   ],
@@ -6169,52 +6169,6 @@
   ]
  },
  "Bombons": {
-  "lidl": [
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/cuetara-bolacha-flakes-bombing/p10054201",
-    "name": "Bolacha Flakes Bombing",
-    "price": 1.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 175,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/el-tequito-nuggets-de-chilli-e-queijo/p10054466",
-    "name": "Nuggets de Chilli e Queijo",
-    "price": 2.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 300,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/tuli-creme-de-chocolate-para-barrar/p10054207",
-    "name": "Creme de Chocolate para Barrar",
-    "price": 1.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/el-tequito-azeitonas-com-chipotle/p10054452",
-    "name": "Azeitonas com Chipotle",
-    "price": 1.89,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 150,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   }
-  ],
   "auchan": [
    {
     "store": "auchan",
@@ -6305,92 +6259,48 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
+  "lidl": [
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/pao-e-bolos-embalados/bolos-e-tortas/donuts-glace-bombon-4un-donuts-671850.html",
-    "name": "Donuts Glacé Bombón 4un",
-    "price": 2.29,
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/cuetara-bolacha-flakes-bombing/p10054201",
+    "name": "Bolacha Flakes Bombing",
+    "price": 1.99,
     "currency": "EUR",
     "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-merci-217442.html",
-    "name": "Bombons de Chocolate",
-    "price": 10.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 250,
+    "unitSizeValue": 175,
     "unitSizeKind": "mass",
     "sizeMismatch": false
    },
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-com-coco-raffaello-raffaello-529198.html",
-    "name": "Bombons com Coco Raffaello",
-    "price": 4.99,
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/el-tequito-nuggets-de-chilli-e-queijo/p10054466",
+    "name": "Nuggets de Chilli e Queijo",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 300,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/tuli-creme-de-chocolate-para-barrar/p10054207",
+    "name": "Creme de Chocolate para Barrar",
+    "price": 1.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/el-tequito-azeitonas-com-chipotle/p10054452",
+    "name": "Azeitonas com Chipotle",
+    "price": 1.89,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": 150,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-caja-roja-nestle-979316.html",
-    "name": "Bombons de Chocolate Caja Roja",
-    "price": 4.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 103,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-de-leite-lindt-563540.html",
-    "name": "Bombons de Chocolate de Leite",
-    "price": 10.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-com-menta-after-eight-16855.html",
-    "name": "Bombons de Chocolate com Menta",
-    "price": 4.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-guylian-original-seashells-guylian-263844.html",
-    "name": "Bombons de Chocolate Guylian Original Seashells",
-    "price": 11.59,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 250,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-i-love-milka-milka-740232.html",
-    "name": "Bombons de Chocolate I Love Milka",
-    "price": 6.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 110,
     "unitSizeKind": "mass",
     "sizeMismatch": false
    }
@@ -6481,6 +6391,96 @@
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/pao-e-bolos-embalados/bolos-e-tortas/donuts-glace-bombon-4un-donuts-671850.html",
+    "name": "Donuts Glacé Bombón 4un",
+    "price": 2.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-merci-217442.html",
+    "name": "Bombons de Chocolate",
+    "price": 10.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 250,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-com-coco-raffaello-raffaello-529198.html",
+    "name": "Bombons com Coco Raffaello",
+    "price": 4.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 150,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-caja-roja-nestle-979316.html",
+    "name": "Bombons de Chocolate Caja Roja",
+    "price": 4.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 103,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-de-leite-lindt-563540.html",
+    "name": "Bombons de Chocolate de Leite",
+    "price": 10.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-com-menta-after-eight-16855.html",
+    "name": "Bombons de Chocolate com Menta",
+    "price": 4.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-guylian-original-seashells-guylian-263844.html",
+    "name": "Bombons de Chocolate Guylian Original Seashells",
+    "price": 11.59,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 250,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/chocolates-e-guloseimas/bombons/bombons-de-chocolate-i-love-milka-milka-740232.html",
+    "name": "Bombons de Chocolate I Love Milka",
+    "price": 6.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 110,
     "unitSizeKind": "mass",
     "sizeMismatch": false
    }
@@ -6623,96 +6623,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-pack-6-heineken-880533.html",
-    "name": "Cerveja sem Álcool Pack 6",
-    "price": 4.59,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-pack-6-super-bock-891762.html",
-    "name": "Cerveja sem Álcool Pack 6",
-    "price": 4.49,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-sagres-1006913.html",
-    "name": "Cerveja sem Álcool",
-    "price": 0.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-heineken-1007139.html",
-    "name": "Cerveja sem Álcool",
-    "price": 0.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-preta-sem-alcool-sagres-1006914.html",
-    "name": "Cerveja Preta sem Álcool",
-    "price": 0.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-lata-super-bock-1007353.html",
-    "name": "Cerveja sem Álcool Lata",
-    "price": 0.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-tropical-super-bock-1010001.html",
-    "name": "Cerveja sem Álcool Tropical",
-    "price": 0.75,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-mini-pack-6-super-bock-840453.html",
-    "name": "Cerveja sem Álcool Mini Pack 6",
-    "price": 2.99,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
   "continente": [
    {
     "store": "continente",
@@ -6802,6 +6712,96 @@
     "unitSizeKind": null,
     "sizeMismatch": false
    }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-pack-6-heineken-880533.html",
+    "name": "Cerveja sem Álcool Pack 6",
+    "price": 4.59,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-pack-6-super-bock-891762.html",
+    "name": "Cerveja sem Álcool Pack 6",
+    "price": 4.49,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-sagres-1006913.html",
+    "name": "Cerveja sem Álcool",
+    "price": 0.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-heineken-1007139.html",
+    "name": "Cerveja sem Álcool",
+    "price": 0.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-preta-sem-alcool-sagres-1006914.html",
+    "name": "Cerveja Preta sem Álcool",
+    "price": 0.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-lata-super-bock-1007353.html",
+    "name": "Cerveja sem Álcool Lata",
+    "price": 0.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-tropical-super-bock-1010001.html",
+    "name": "Cerveja sem Álcool Tropical",
+    "price": 0.75,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cervejas-e-sidras/cervejas-sem-alcool/cerveja-sem-alcool-mini-pack-6-super-bock-840453.html",
+    "name": "Cerveja sem Álcool Mini Pack 6",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   }
   ]
  },
  "Pasta de dentes whitening": {
@@ -6872,96 +6872,6 @@
     "isPack": false,
     "unitSizeValue": 1000,
     "unitSizeKind": "mass",
-    "sizeMismatch": false
-   }
-  ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-total-original-pack-2-colgate-860118.html",
-    "name": "Pasta de Dentes Total Original Pack 2",
-    "price": 4.94,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-tripla-acao-sabor-menta-colgate-973176.html",
-    "name": "Pasta de Dentes Tripla Ação Sabor Menta",
-    "price": 2.14,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-branqueadora-sensodyne-557642.html",
-    "name": "Pasta de Dentes Branqueadora",
-    "price": 4.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-pro-expert-dentes-sensiveis-oral-b-724261.html",
-    "name": "Pasta de Dentes Pro-Expert Dentes Sensíveis",
-    "price": 2.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-protetora-dentagard-colgate-53897.html",
-    "name": "Pasta de Dentes Protetora Dentagard",
-    "price": 1.84,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-sensation-branqueador-colgate-269992.html",
-    "name": "Pasta de Dentes Sensation Branqueador",
-    "price": 2.14,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-sensibilidade-%26-gengivas-sensodyne-879048.html",
-    "name": "Pasta de Dentes Sensibilidade & Gengivas",
-    "price": 3.94,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-total-branqueadora-colgate-777137.html",
-    "name": "Pasta de Dentes Total Branqueadora",
-    "price": 4.94,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
     "sizeMismatch": false
    }
   ],
@@ -7052,6 +6962,96 @@
     "isPack": false,
     "unitSizeValue": 75,
     "unitSizeKind": "volume",
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-total-original-pack-2-colgate-860118.html",
+    "name": "Pasta de Dentes Total Original Pack 2",
+    "price": 4.94,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-tripla-acao-sabor-menta-colgate-973176.html",
+    "name": "Pasta de Dentes Tripla Ação Sabor Menta",
+    "price": 2.14,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-branqueadora-sensodyne-557642.html",
+    "name": "Pasta de Dentes Branqueadora",
+    "price": 4.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-pro-expert-dentes-sensiveis-oral-b-724261.html",
+    "name": "Pasta de Dentes Pro-Expert Dentes Sensíveis",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-protetora-dentagard-colgate-53897.html",
+    "name": "Pasta de Dentes Protetora Dentagard",
+    "price": 1.84,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-sensation-branqueador-colgate-269992.html",
+    "name": "Pasta de Dentes Sensation Branqueador",
+    "price": 2.14,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-sensibilidade-%26-gengivas-sensodyne-879048.html",
+    "name": "Pasta de Dentes Sensibilidade & Gengivas",
+    "price": 3.94,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/higiene-pessoal-e-beleza/higiene-oral/pastas-de-dentes/pasta-de-dentes-total-branqueadora-colgate-777137.html",
+    "name": "Pasta de Dentes Total Branqueadora",
+    "price": 4.94,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
     "sizeMismatch": false
    }
   ]
@@ -7709,6 +7709,17 @@
   "lidl": [
    {
     "store": "lidl",
+    "url": "https://www.lidl.pt/p/livergy-calcoes/p10054131",
+    "name": "Calções",
+    "price": 9.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
     "url": "https://www.lidl.pt/p/esmara-men-calcoes/p10054127",
     "name": "Calções",
     "price": 8.99,
@@ -7738,17 +7749,6 @@
     "isPack": false,
     "unitSizeValue": 200,
     "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/livergy-calcoes/p10054131",
-    "name": "Calções",
-    "price": 9.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
     "sizeMismatch": false
    },
    {
@@ -7868,6 +7868,19 @@
     "sizeMismatch": false
    }
   ],
+  "continente": [
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/azeitona-preta-galega-azeite-e-alho-macarico-macarico-8769539.html",
+    "name": "Azeitona Preta Galega Azeite e Alho Maçarico",
+    "price": 3.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 150,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
   "lidl": [
    {
     "store": "lidl",
@@ -7922,19 +7935,6 @@
     "isPack": false,
     "unitSizeValue": 750,
     "unitSizeKind": "volume",
-    "sizeMismatch": false
-   }
-  ],
-  "continente": [
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/azeitona-preta-galega-azeite-e-alho-macarico-macarico-8769539.html",
-    "name": "Azeitona Preta Galega Azeite e Alho Maçarico",
-    "price": 3.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 150,
-    "unitSizeKind": "mass",
     "sizeMismatch": false
    }
   ],
@@ -8000,17 +8000,6 @@
    },
    {
     "store": "lidl",
-    "url": "https://www.lidl.pt/p/vaseline-balsamo-labial-tube-rosy/p10054337",
-    "name": "Bálsamo Labial Tube Rosy",
-    "price": 2.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 10,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
     "url": "https://www.lidl.pt/p/l-oreal-men-expert-desodorizante-roll-on/p10054345",
     "name": "Desodorizante Roll-On",
     "price": 2.59,
@@ -8018,6 +8007,17 @@
     "isPack": false,
     "unitSizeValue": 50,
     "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/vaseline-balsamo-labial-tube-rosy/p10054337",
+    "name": "Bálsamo Labial Tube Rosy",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 10,
+    "unitSizeKind": "mass",
     "sizeMismatch": false
    },
    {
@@ -8306,41 +8306,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/limpeza/roupa/aditivos-e--acessorios-para-roupa/molas-para-roupa-ultra-932282.html",
-    "name": "Molas para Roupa",
-    "price": 1.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/limpeza/roupa/aditivos-e--acessorios-para-roupa/molas-para-roupa-neolar-808020.html",
-    "name": "Molas para Roupa",
-    "price": 1.75,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/limpeza/roupa/aditivos-e--acessorios-para-roupa/cesto-com-24-molas-para-roupa-ultra-933525.html",
-    "name": "Cesto com 24 Molas para Roupa",
-    "price": 2.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
   "auchan": [
    {
     "store": "auchan",
@@ -8391,6 +8356,41 @@
     "url": "https://www.auchan.pt/pt/casa-e-jardim/limpeza-e-lavandaria/tratamento-de-roupa/estendais-e-molas/estendal-roupa-interior-actuel-com-16-molas/3584230.html",
     "name": "ESTENDAL ROUPA INTERIOR ACTUEL COM 16 MOLAS",
     "price": 3.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/limpeza/roupa/aditivos-e--acessorios-para-roupa/molas-para-roupa-ultra-932282.html",
+    "name": "Molas para Roupa",
+    "price": 1.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/limpeza/roupa/aditivos-e--acessorios-para-roupa/molas-para-roupa-neolar-808020.html",
+    "name": "Molas para Roupa",
+    "price": 1.75,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/limpeza/roupa/aditivos-e--acessorios-para-roupa/cesto-com-24-molas-para-roupa-ultra-933525.html",
+    "name": "Cesto com 24 Molas para Roupa",
+    "price": 2.49,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
@@ -8491,30 +8491,6 @@
  },
  "Champô de bebé \"não chora mais\"": {
   "continente": [],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bebe-e-crianca/banho-e-higiene/champo-e-gel-banho-infantil/champo-infantil-de-framboesa-le-petit-marseillais-996327.html",
-    "name": "Champô Infantil de Framboesa",
-    "price": 4.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bebe-e-crianca/banho-e-higiene/champo-e-gel-banho-infantil/champo-infantil-de-pessego-e-alperce-le-petit-marseillais-996355.html",
-    "name": "Champô Infantil de Pêssego e Alperce",
-    "price": 4.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
   "lidl": [
    {
     "store": "lidl",
@@ -8547,6 +8523,30 @@
     "isPack": false,
     "unitSizeValue": 10,
     "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bebe-e-crianca/banho-e-higiene/champo-e-gel-banho-infantil/champo-infantil-de-framboesa-le-petit-marseillais-996327.html",
+    "name": "Champô Infantil de Framboesa",
+    "price": 4.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bebe-e-crianca/banho-e-higiene/champo-e-gel-banho-infantil/champo-infantil-de-pessego-e-alperce-le-petit-marseillais-996355.html",
+    "name": "Champô Infantil de Pêssego e Alperce",
+    "price": 4.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
     "sizeMismatch": false
    }
   ],
@@ -8688,6 +8688,96 @@
     "sizeMismatch": false
    }
   ],
+  "auchan": [
+   {
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/sal-ervas-e-temperos/pimenta-piri-piri-e-paprika/paprika-margao-saqueta-35g/3482963.html",
+    "name": "PAPRIKA MARGÃO SAQUETA 35G",
+    "price": 1.22,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 35,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/sal-ervas-e-temperos/pimenta-piri-piri-e-paprika/paprika-margao-frasco-40g/8975.html",
+    "name": "PAPRIKA MARGÃO FRASCO 40G",
+    "price": 1.9,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 40,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/batatas-fritas-e-aperitivos-snacks/aperitivos-snacks-e-pipocas/aperitivo-pringles-paprika-175g/3308890.html",
+    "name": "APERITIVO PRINGLES PAPRIKA 175G",
+    "price": 1.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 175,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/sal-ervas-e-temperos/pimenta-piri-piri-e-paprika/especiaria-espiga-paprika-fumada-45g/2133498.html",
+    "name": "ESPECIARIA ESPIGA PAPRIKA FUMADA 45G",
+    "price": 2.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 45,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/batatas-fritas-e-aperitivos-snacks/batatas-com-sabores/batatas-fritas-lays-paprika-150g/3430382.html",
+    "name": "BATATAS FRITAS LAY'S PAPRIKA 150G",
+    "price": 2.09,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 150,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/batatas-fritas-e-aperitivos-snacks/batatas-com-sabores/batatas-fritas-lorenz-pomsticks-paprika-100g/4055958.html",
+    "name": "BATATAS FRITAS LORENZ POMSTICKS PAPRIKA 100G",
+    "price": 1.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 100,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/batatas-fritas-e-aperitivos-snacks/aperitivos-snacks-e-pipocas/crisps-cemporcento-queijo-e-paprika-100g/3509723.html",
+    "name": "CRISPS CEMPORCENTO QUEIJO E PAPRIKA 100G",
+    "price": 2.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 100,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/polpas-caldos-e-temperos/temperos-especialidades/paprika-essentia-90g/3684908.html",
+    "name": "PAPRIKA ESSENTIA 90G",
+    "price": 5.19,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 90,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
   "pingodoce": [
    {
     "store": "pingodoce",
@@ -8742,96 +8832,6 @@
     "isPack": false,
     "unitSizeValue": null,
     "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
-  "auchan": [
-   {
-    "store": "auchan",
-    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/sal-ervas-e-temperos/pimenta-piri-piri-e-paprika/paprika-margao-saqueta-35g/3482963.html",
-    "name": "PAPRIKA MARGÃO SAQUETA 35G",
-    "price": 1.22,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 35,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "auchan",
-    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/sal-ervas-e-temperos/pimenta-piri-piri-e-paprika/paprika-margao-frasco-40g/8975.html",
-    "name": "PAPRIKA MARGÃO FRASCO 40G",
-    "price": 1.9,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 40,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "auchan",
-    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/batatas-fritas-e-aperitivos-snacks/aperitivos-snacks-e-pipocas/aperitivo-pringles-paprika-175g/3308890.html",
-    "name": "APERITIVO PRINGLES PAPRIKA 175G",
-    "price": 1.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 175,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "auchan",
-    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/sal-ervas-e-temperos/pimenta-piri-piri-e-paprika/paprika-fumada-margao-40gr/3802714.html",
-    "name": "PAPRIKA FUMADA MARGÃO 40GR",
-    "price": 2.39,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 40,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "auchan",
-    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/sal-ervas-e-temperos/pimenta-piri-piri-e-paprika/especiaria-espiga-paprika-fumada-45g/2133498.html",
-    "name": "ESPECIARIA ESPIGA PAPRIKA FUMADA 45G",
-    "price": 2.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 45,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "auchan",
-    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/batatas-fritas-e-aperitivos-snacks/batatas-com-sabores/batatas-fritas-lays-paprika-150g/3430382.html",
-    "name": "BATATAS FRITAS LAY'S PAPRIKA 150G",
-    "price": 2.09,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 150,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "auchan",
-    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/batatas-fritas-e-aperitivos-snacks/batatas-com-sabores/batatas-fritas-lorenz-pomsticks-paprika-100g/4055958.html",
-    "name": "BATATAS FRITAS LORENZ POMSTICKS PAPRIKA 100G",
-    "price": 1.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 100,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "auchan",
-    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/batatas-fritas-e-aperitivos-snacks/aperitivos-snacks-e-pipocas/crisps-cemporcento-queijo-e-paprika-100g/3509723.html",
-    "name": "CRISPS CEMPORCENTO QUEIJO E PAPRIKA 100G",
-    "price": 2.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 100,
-    "unitSizeKind": "mass",
     "sizeMismatch": false
    }
   ],
@@ -8940,41 +8940,6 @@
     "sizeMismatch": false
    }
   ],
-  "lidl": [
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/lupilu-calcas-sweat-para-crianca/p10054087",
-    "name": "Calças Sweat para Criança",
-    "price": 4.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/esmara-men-calcoes-sweat/p10054129",
-    "name": "Calções Sweat",
-    "price": 7.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/pescanova-filetes-pangasius-sem-pele/p10054285",
-    "name": "Filetes Pangasius sem Pele",
-    "price": 4.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 600,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   }
-  ],
   "continente": [
    {
     "store": "continente",
@@ -9017,6 +8982,41 @@
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": 230,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
+  "lidl": [
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/lupilu-calcas-sweat-para-crianca/p10054087",
+    "name": "Calças Sweat para Criança",
+    "price": 4.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/esmara-men-calcoes-sweat/p10054129",
+    "name": "Calções Sweat",
+    "price": 7.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/pescanova-filetes-pangasius-sem-pele/p10054285",
+    "name": "Filetes Pangasius sem Pele",
+    "price": 4.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 600,
     "unitSizeKind": "mass",
     "sizeMismatch": false
    }
@@ -9113,19 +9113,6 @@
   ]
  },
  "Gelo em cubo (saco)": {
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/congelados/gelo/gelo-em-saco-pingo-doce-559077.html",
-    "name": "Gelo em Saco",
-    "price": 1.09,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 2000,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   }
-  ],
   "auchan": [
    {
     "store": "auchan",
@@ -9160,6 +9147,19 @@
     "isPack": false,
     "unitSizeValue": null,
     "unitSizeKind": null,
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/congelados/gelo/gelo-em-saco-pingo-doce-559077.html",
+    "name": "Gelo em Saco",
+    "price": 1.09,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 2000,
+    "unitSizeKind": "mass",
     "sizeMismatch": false
    }
   ],
@@ -9292,74 +9292,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-nesquik-729232.html",
-    "name": "Chocolate em Pó",
-    "price": 5.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-nesquik-941233.html",
-    "name": "Chocolate em Pó",
-    "price": 5.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 390,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-nesquik-961627.html",
-    "name": "Chocolate em Pó",
-    "price": 7.59,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 600,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-extra-choco-nesquik-741905.html",
-    "name": "Chocolate em Pó Extra Choco",
-    "price": 5.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 390,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-sabor-morango-nesquik-976372.html",
-    "name": "Chocolate em Pó Sabor Morango",
-    "price": 5.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 350,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-zero-acucar-nesquik-955298.html",
-    "name": "Chocolate em Pó Zero Açúcar",
-    "price": 7.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 320,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   }
-  ],
   "continente": [
    {
     "store": "continente",
@@ -9449,6 +9381,74 @@
     "unitSizeKind": "mass",
     "sizeMismatch": false
    }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-nesquik-729232.html",
+    "name": "Chocolate em Pó",
+    "price": 5.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-nesquik-941233.html",
+    "name": "Chocolate em Pó",
+    "price": 5.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 390,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-nesquik-961627.html",
+    "name": "Chocolate em Pó",
+    "price": 7.59,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 600,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-extra-choco-nesquik-741905.html",
+    "name": "Chocolate em Pó Extra Choco",
+    "price": 5.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 390,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-sabor-morango-nesquik-976372.html",
+    "name": "Chocolate em Pó Sabor Morango",
+    "price": 5.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 350,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/cafe-cha-e-achocolatados/achocolatados/chocolate-em-po-zero-acucar-nesquik-955298.html",
+    "name": "Chocolate em Pó Zero Açúcar",
+    "price": 7.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 320,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
   ]
  },
  "Amaciador de roupa": {
@@ -9466,17 +9466,6 @@
    },
    {
     "store": "lidl",
-    "url": "https://www.lidl.pt/p/super-pop-detergente-de-loica-de-limao/p10054239",
-    "name": "Detergente de Loiça de Limão",
-    "price": 6.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 4500,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
     "url": "https://www.lidl.pt/p/zoofari-arranhador-grande/p10054059",
     "name": "Arranhador Grande",
     "price": 34.99,
@@ -9484,6 +9473,17 @@
     "isPack": false,
     "unitSizeValue": null,
     "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/super-pop-detergente-de-loica-de-limao/p10054239",
+    "name": "Detergente de Loiça de Limão",
+    "price": 6.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 4500,
+    "unitSizeKind": "volume",
     "sizeMismatch": false
    },
    {
@@ -9895,96 +9895,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/banana-importada-nossa-fruta-e-legumes-43218.html",
-    "name": "Banana Importada",
-    "price": 1.19,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/bananas-peras-e-macas/banana-da-madeira-nossa-fruta-e-legumes-31208.html",
-    "name": "Banana da Madeira",
-    "price": 2.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/congelados/gelados-e-sobremesas/sobremesas-congeladas/panquecas-de-banana-e-espelta-congeladas-pingo-doce-971819.html",
-    "name": "Panquecas de Banana e Espelta Congeladas",
-    "price": 3.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-liquidos%E2%80%8B/iogurte-liquido-morango-e-banana-pack-8-mimosa-935259002.html",
-    "name": "Iogurte Líquido Morango e Banana Pack 8",
-    "price": 2.59,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": 151,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-liquidos%E2%80%8B/iogurte-liquido-cremoso-morango-e-banana-pack-4-pingo-doce-953141.html",
-    "name": "Iogurte Líquido Cremoso Morango e Banana Pack 4",
-    "price": 1.36,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/cereais-barras-e-bolsas-de-fruta/bolsas-de-fruta/bolsa-de-fruta-maca-banana-e-laranja-com-bolacha-pingo-doce-900858.html",
-    "name": "Bolsa de Fruta Maçã, Banana e Laranja com Bolacha",
-    "price": 0.67,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 90,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-liquidos%E2%80%8B/iogurte-liquido-magro-00%25-morango-e-banana-pack-4-pingo-doce-968254.html",
-    "name": "Iogurte Líquido Magro 00% Morango e Banana Pack 4",
-    "price": 1.39,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-de-aromas%E2%80%8B/iogurte-aroma-morango-coco-banana-e-frutos-tropicais-pack-8-pingo-doce-973795.html",
-    "name": "Iogurte Aroma Morango, Coco , Banana e Frutos Tropicais Pack 8",
-    "price": 1.49,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": 125,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   }
-  ],
   "continente": [
    {
     "store": "continente",
@@ -10074,6 +9984,96 @@
     "unitSizeKind": "mass",
     "sizeMismatch": false
    }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/banana-importada-nossa-fruta-e-legumes-43218.html",
+    "name": "Banana Importada",
+    "price": 1.19,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/bananas-peras-e-macas/banana-da-madeira-nossa-fruta-e-legumes-31208.html",
+    "name": "Banana da Madeira",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/congelados/gelados-e-sobremesas/sobremesas-congeladas/panquecas-de-banana-e-espelta-congeladas-pingo-doce-971819.html",
+    "name": "Panquecas de Banana e Espelta Congeladas",
+    "price": 3.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-liquidos%E2%80%8B/iogurte-liquido-morango-e-banana-pack-8-mimosa-935259002.html",
+    "name": "Iogurte Líquido Morango e Banana Pack 8",
+    "price": 2.59,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": 151,
+    "unitSizeKind": "volume",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-liquidos%E2%80%8B/iogurte-liquido-cremoso-morango-e-banana-pack-4-pingo-doce-953141.html",
+    "name": "Iogurte Líquido Cremoso Morango e Banana Pack 4",
+    "price": 1.36,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/cereais-barras-e-bolsas-de-fruta/bolsas-de-fruta/bolsa-de-fruta-maca-banana-e-laranja-com-bolacha-pingo-doce-900858.html",
+    "name": "Bolsa de Fruta Maçã, Banana e Laranja com Bolacha",
+    "price": 0.67,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 90,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-liquidos%E2%80%8B/iogurte-liquido-magro-00%25-morango-e-banana-pack-4-pingo-doce-968254.html",
+    "name": "Iogurte Líquido Magro 00% Morango e Banana Pack 4",
+    "price": 1.39,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/iogurtes-e-sobremesas/iogurtes/iogurtes-de-aromas%E2%80%8B/iogurte-aroma-morango-coco-banana-e-frutos-tropicais-pack-8-pingo-doce-973795.html",
+    "name": "Iogurte Aroma Morango, Coco , Banana e Frutos Tropicais Pack 8",
+    "price": 1.49,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": 125,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
   ]
  },
  "Maçãs Gala": {
@@ -10113,9 +10113,9 @@
    },
    {
     "store": "lidl",
-    "url": "https://www.lidl.pt/p/parkside-mala-de-ferramentas/p10054145",
-    "name": "Mala de ferramentas",
-    "price": 22.99,
+    "url": "https://www.lidl.pt/p/lupilu-meias-para-crianca/p10054095",
+    "name": "Meias para Criança",
+    "price": 3.19,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
@@ -10124,22 +10124,22 @@
    },
    {
     "store": "lidl",
-    "url": "https://www.lidl.pt/p/ola-gelado-perna-de-pau-cone/p10054432",
-    "name": "Gelado Perna de Pau Cone",
-    "price": 2.99,
+    "url": "https://www.lidl.pt/p/esmara-kids-meias/p10054097",
+    "name": "Meias",
+    "price": 4.99,
     "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": 360,
-    "unitSizeKind": "volume",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
+  "continente": [
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/maca-gala-nossa-fruta-e-legumes-30717.html",
-    "name": "Maçã Gala",
-    "price": 1.79,
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/maca-gala-igp-alcobaca-sem-residuos-de-pesticidas-continente-continente-7848011.html",
+    "name": "Maçã Gala IGP Alcobaça Sem Resíduos de Pesticidas Continente",
+    "price": 2.09,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
@@ -10147,14 +10147,25 @@
     "sizeMismatch": false
    },
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/maca-gala-embalada-nossa-fruta-e-legumes-952933.html",
-    "name": "Maçã Gala Embalada",
-    "price": 2.99,
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/maca-gala-biologica-continente-bio-continente-bio-7366348.html",
+    "name": "Maçã Gala Biológica Continente Bio",
+    "price": 2.49,
     "currency": "EUR",
     "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
+    "unitSizeValue": 500,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "continente",
+    "url": "https://www.continente.pt/produto/maca-gala-sem-residuos-de-pesticidas-continente-continente-7683300.html",
+    "name": "Maçã Gala Sem Resíduos de Pesticidas Continente",
+    "price": 1.89,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 1000,
+    "unitSizeKind": "mass",
     "sizeMismatch": false
    }
   ],
@@ -10204,12 +10215,12 @@
     "sizeMismatch": false
    }
   ],
-  "continente": [
+  "pingodoce": [
    {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/maca-gala-igp-alcobaca-sem-residuos-de-pesticidas-continente-continente-7848011.html",
-    "name": "Maçã Gala IGP Alcobaça Sem Resíduos de Pesticidas Continente",
-    "price": 2.09,
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/maca-gala-nossa-fruta-e-legumes-30717.html",
+    "name": "Maçã Gala",
+    "price": 1.79,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
@@ -10217,25 +10228,14 @@
     "sizeMismatch": false
    },
    {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/maca-gala-biologica-continente-bio-continente-bio-7366348.html",
-    "name": "Maçã Gala Biológica Continente Bio",
-    "price": 2.49,
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/frutas-e-vegetais/frutas/fruta-da-epoca/maca-gala-embalada-nossa-fruta-e-legumes-952933.html",
+    "name": "Maçã Gala Embalada",
+    "price": 2.99,
     "currency": "EUR",
     "isPack": false,
-    "unitSizeValue": 500,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "continente",
-    "url": "https://www.continente.pt/produto/maca-gala-sem-residuos-de-pesticidas-continente-continente-7683300.html",
-    "name": "Maçã Gala Sem Resíduos de Pesticidas Continente",
-    "price": 1.89,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 1000,
-    "unitSizeKind": "mass",
+    "unitSizeValue": null,
+    "unitSizeKind": null,
     "sizeMismatch": false
    }
   ]
@@ -11414,41 +11414,6 @@
   ]
  },
  "Massa para lasanha": {
-  "lidl": [
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/cigala-arroz-agulha/p10054175",
-    "name": "Arroz Agulha",
-    "price": 1.25,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 1000,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/ola-gelado-perna-de-pau-cone/p10054432",
-    "name": "Gelado Perna de Pau Cone",
-    "price": 2.99,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": 360,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/vigor-leite-meio-gordo/p10054490",
-    "name": "Leite Meio-gordo",
-    "price": 1,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 1000,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   }
-  ],
   "pingodoce": [
    {
     "store": "pingodoce",
@@ -11470,6 +11435,30 @@
     "isPack": false,
     "unitSizeValue": 250,
     "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
+  "lidl": [
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/cigala-arroz-agulha/p10054175",
+    "name": "Arroz Agulha",
+    "price": 1.25,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 1000,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/ola-gelado-perna-de-pau-cone/p10054432",
+    "name": "Gelado Perna de Pau Cone",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": 360,
+    "unitSizeKind": "volume",
     "sizeMismatch": false
    }
   ],
@@ -11852,19 +11841,6 @@
   ]
  },
  "Caldos de galinha": {
-  "auchan": [
-   {
-    "store": "auchan",
-    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/polpas-caldos-e-temperos/caldo-carne-peixe-e-legumes/caldo-de-galinha-amandin-bio-1l/3635611.html",
-    "name": "CALDO DE GALINHA AMANDÍN BIO 1L",
-    "price": 3.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 1000,
-    "unitSizeKind": "volume",
-    "sizeMismatch": false
-   }
-  ],
   "lidl": [
    {
     "store": "lidl",
@@ -11922,82 +11898,16 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
+  "auchan": [
    {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-24-cubos-knorr-11325.html",
-    "name": "Caldo de Galinha 24 Cubos",
-    "price": 3.29,
+    "store": "auchan",
+    "url": "https://www.auchan.pt/pt/alimentacao/mercearia/polpas-caldos-e-temperos/caldo-carne-peixe-e-legumes/caldo-de-galinha-amandin-bio-1l/3635611.html",
+    "name": "CALDO DE GALINHA AMANDÍN BIO 1L",
+    "price": 3.99,
     "currency": "EUR",
     "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-24-cubos-pingo-doce-660081.html",
-    "name": "Caldo de Galinha 24 Cubos",
-    "price": 1.59,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-16-cubos-knorr-499863.html",
-    "name": "Caldo de Galinha 16 Cubos",
-    "price": 2.54,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-8-cubos-knorr-551915.html",
-    "name": "Caldo de Galinha 8 Cubos",
-    "price": 1.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-eco-16-cubos-knorr-639857.html",
-    "name": "Caldo de Galinha Eco 16 Cubos",
-    "price": 1.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-economico-24-cubos-knorr-897386.html",
-    "name": "Caldo de Galinha Económico 24 Cubos",
-    "price": 1.84,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-vitalie-8-cubos-knorr-639855.html",
-    "name": "Caldo de Galinha Vitalie 8 Cubos",
-    "price": 1.64,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
+    "unitSizeValue": 1000,
+    "unitSizeKind": "volume",
     "sizeMismatch": false
    }
   ],
@@ -12084,6 +11994,85 @@
     "url": "https://www.continente.pt/produto/caldo-de-galinha-cubos-knorr-knorr-4407757.html",
     "name": "Caldo de Galinha Cubos Knorr",
     "price": 2.03,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-24-cubos-knorr-11325.html",
+    "name": "Caldo de Galinha 24 Cubos",
+    "price": 3.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-24-cubos-pingo-doce-660081.html",
+    "name": "Caldo de Galinha 24 Cubos",
+    "price": 1.59,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-16-cubos-knorr-499863.html",
+    "name": "Caldo de Galinha 16 Cubos",
+    "price": 2.54,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-8-cubos-knorr-551915.html",
+    "name": "Caldo de Galinha 8 Cubos",
+    "price": 1.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-eco-16-cubos-knorr-639857.html",
+    "name": "Caldo de Galinha Eco 16 Cubos",
+    "price": 1.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-economico-24-cubos-knorr-897386.html",
+    "name": "Caldo de Galinha Económico 24 Cubos",
+    "price": 1.84,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/mercearia/temperos-e-molhos/caldos-e-preparados/caldo-de-galinha-vitalie-8-cubos-knorr-639855.html",
+    "name": "Caldo de Galinha Vitalie 8 Cubos",
+    "price": 1.64,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
@@ -12229,96 +12218,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-pack-4-pingo-doce-673345.html",
-    "name": "Bolacha Maria Pack 4",
-    "price": 1.59,
-    "currency": "EUR",
-    "isPack": true,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolachas-maria-douradas-pingo-doce-819904.html",
-    "name": "Bolachas Maria Douradas",
-    "price": 1.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolachas-maria-unidoses-pingo-doce-813484.html",
-    "name": "Bolachas Maria Unidoses",
-    "price": 1.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 25,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-cuetara-12955.html",
-    "name": "Bolacha Maria",
-    "price": 2.44,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-pingo-doce-808838.html",
-    "name": "Bolacha Maria",
-    "price": 0.59,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/fibra-tortitas-e-marinheiras/bolacha-maria-sem-acucar-pingo-doce-989256.html",
-    "name": "Bolacha Maria sem Açúcar",
-    "price": 1.09,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-triunfo-985343.html",
-    "name": "Bolacha Maria",
-    "price": 1.39,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 177,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-dourada-cuetara-984246.html",
-    "name": "Bolacha Maria Dourada",
-    "price": 0.84,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 200,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   }
-  ],
   "continente": [
    {
     "store": "continente",
@@ -12408,9 +12307,145 @@
     "unitSizeKind": "mass",
     "sizeMismatch": false
    }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-pack-4-pingo-doce-673345.html",
+    "name": "Bolacha Maria Pack 4",
+    "price": 1.59,
+    "currency": "EUR",
+    "isPack": true,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolachas-maria-douradas-pingo-doce-819904.html",
+    "name": "Bolachas Maria Douradas",
+    "price": 1.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolachas-maria-unidoses-pingo-doce-813484.html",
+    "name": "Bolachas Maria Unidoses",
+    "price": 1.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 25,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-cuetara-12955.html",
+    "name": "Bolacha Maria",
+    "price": 2.44,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-pingo-doce-808838.html",
+    "name": "Bolacha Maria",
+    "price": 0.59,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/fibra-tortitas-e-marinheiras/bolacha-maria-sem-acucar-pingo-doce-989256.html",
+    "name": "Bolacha Maria sem Açúcar",
+    "price": 1.09,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-triunfo-985343.html",
+    "name": "Bolacha Maria",
+    "price": 1.39,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 177,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/bolachas-cereais-e-guloseimas/bolachas-e-biscoitos/maria-manteiga-e-classicas/bolacha-maria-dourada-cuetara-984246.html",
+    "name": "Bolacha Maria Dourada",
+    "price": 0.84,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 200,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
   ]
  },
  "Postas de salmão": {
+  "lidl": [
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/posta-de-perca-do-nilo/p10054277",
+    "name": "Posta de Perca do Nilo",
+    "price": 8.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/costeletas-do-cachaco-de-porco/p10054269",
+    "name": "Costeletas do Cachaço de Porco",
+    "price": 4.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/combino-esparguete-xxl/p10052775",
+    "name": "Esparguete XXL",
+    "price": 1.69,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 2000,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   },
+   {
+    "store": "lidl",
+    "url": "https://www.lidl.pt/p/cogumelos-marrom/p10054261",
+    "name": "Cogumelos Marrom",
+    "price": 1.49,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": 300,
+    "unitSizeKind": "mass",
+    "sizeMismatch": false
+   }
+  ],
   "auchan": [
    {
     "store": "auchan",
@@ -12478,52 +12513,6 @@
     "isPack": false,
     "unitSizeValue": null,
     "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
-  "lidl": [
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/posta-de-perca-do-nilo/p10054277",
-    "name": "Posta de Perca do Nilo",
-    "price": 8.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/costeletas-do-cachaco-de-porco/p10054269",
-    "name": "Costeletas do Cachaço de Porco",
-    "price": 4.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/cogumelos-marrom/p10054261",
-    "name": "Cogumelos Marrom",
-    "price": 1.49,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 300,
-    "unitSizeKind": "mass",
-    "sizeMismatch": false
-   },
-   {
-    "store": "lidl",
-    "url": "https://www.lidl.pt/p/combino-esparguete-xxl/p10052775",
-    "name": "Esparguete XXL",
-    "price": 1.69,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": 2000,
-    "unitSizeKind": "mass",
     "sizeMismatch": false
    }
   ],
@@ -13466,96 +13455,6 @@
     "sizeMismatch": false
    }
   ],
-  "pingodoce": [
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-l-pingo-doce-889026.html",
-    "name": "Ovos de Solo Classe L",
-    "price": 3.29,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-m-pingo-doce-889028.html",
-    "name": "Ovos de Solo Classe M",
-    "price": 2.99,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-ar-livre-classe-m%2Fl-pingo-doce-889024.html",
-    "name": "Ovos de Ar Livre Classe M/L",
-    "price": 2.09,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/ovos/ovos-classe-m-saborosos-461603.html",
-    "name": "Ovos Classe M",
-    "price": 6.35,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/ovos/ovos-de-ar-livre-classe-m%2Fl-matinados-895037.html",
-    "name": "Ovos de Ar Livre Classe M/L",
-    "price": 4.59,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-l-pingo-doce-889025.html",
-    "name": "Ovos de Solo Classe L",
-    "price": 1.89,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-m-pingo-doce-889027.html",
-    "name": "Ovos de Solo Classe M",
-    "price": 1.79,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   },
-   {
-    "store": "pingodoce",
-    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-xl-pingo-doce-889029.html",
-    "name": "Ovos de Solo Classe XL",
-    "price": 2.35,
-    "currency": "EUR",
-    "isPack": false,
-    "unitSizeValue": null,
-    "unitSizeKind": null,
-    "sizeMismatch": false
-   }
-  ],
   "continente": [
    {
     "store": "continente",
@@ -13639,6 +13538,96 @@
     "url": "https://www.continente.pt/produto/ovos-de-solo-classe-l-continente-continente-7066777.html",
     "name": "Ovos de Solo Classe L Continente",
     "price": 3.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   }
+  ],
+  "pingodoce": [
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-l-pingo-doce-889026.html",
+    "name": "Ovos de Solo Classe L",
+    "price": 3.29,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-m-pingo-doce-889028.html",
+    "name": "Ovos de Solo Classe M",
+    "price": 2.99,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-ar-livre-classe-m%2Fl-pingo-doce-889024.html",
+    "name": "Ovos de Ar Livre Classe M/L",
+    "price": 2.09,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/ovos/ovos-classe-m-saborosos-461603.html",
+    "name": "Ovos Classe M",
+    "price": 6.35,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/ovos/ovos-de-ar-livre-classe-m%2Fl-matinados-895037.html",
+    "name": "Ovos de Ar Livre Classe M/L",
+    "price": 4.59,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-l-pingo-doce-889025.html",
+    "name": "Ovos de Solo Classe L",
+    "price": 1.89,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-m-pingo-doce-889027.html",
+    "name": "Ovos de Solo Classe M",
+    "price": 1.79,
+    "currency": "EUR",
+    "isPack": false,
+    "unitSizeValue": null,
+    "unitSizeKind": null,
+    "sizeMismatch": false
+   },
+   {
+    "store": "pingodoce",
+    "url": "https://www.pingodoce.pt/home/produtos/as-nossas-marcas/pingo-doce/ovos-de-solo-classe-xl-pingo-doce-889029.html",
+    "name": "Ovos de Solo Classe XL",
+    "price": 2.35,
     "currency": "EUR",
     "isPack": false,
     "unitSizeValue": null,
