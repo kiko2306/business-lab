@@ -350,6 +350,7 @@ function renderProductCard(product) {
       <button class="btn small" data-history="${product.id}">📈 Histórico</button>
       <button class="btn small" data-refresh="${product.id}">Atualizar</button>
       <button class="btn small" data-edit="${product.id}">Editar</button>
+      <button class="btn small" data-report-bug="${product.id}" title="Reportar um erro neste produto (não específico de uma loja)">🐞</button>
       <button class="btn small danger" data-delete="${product.id}">Eliminar</button>
     </div>
   `;
@@ -612,14 +613,19 @@ document.body.addEventListener('click', async (e) => {
       e.target.disabled = false;
     }
   } else if (reportBugId) {
-    const storeLabel = SCRAPED_STORES[reportBugStore] || reportBugStore;
-    const note = await showReportBugModal(`Reportar erro — ${storeLabel}`);
+    // Two entry points: the 🐞 on a price row reports that one store's
+    // match; the 🐞 in the card header reports the product as a whole
+    // (no data-report-store → store omitted, reportedStore stays null).
+    const heading = reportBugStore
+      ? `Reportar erro — ${SCRAPED_STORES[reportBugStore] || reportBugStore}`
+      : 'Reportar erro no produto';
+    const note = await showReportBugModal(heading);
     if (note !== null) {
       e.target.disabled = true;
       try {
         await api(`/products/${reportBugId}/report-bug`, {
           method: 'POST',
-          body: JSON.stringify({ note, store: reportBugStore }),
+          body: JSON.stringify(reportBugStore ? { note, store: reportBugStore } : { note }),
         });
         showToast('Erro reportado — obrigado!');
       } catch (err) {

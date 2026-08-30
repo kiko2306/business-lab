@@ -807,12 +807,14 @@ app.post('/api/products/:id/report-bug', (req, res) => {
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
   const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
-  // Which store's price row the user clicked "report" on — the report is
-  // about one specific store's match, not the item as a whole, so this is
-  // required rather than inferred; every other store's data is still
-  // logged alongside it purely for context when fixing it later.
+  // A report raised on one store's price row names that store; one raised
+  // from the product-card header names none — reportedStore stays null and
+  // the report is about the item as a whole (wrong size basis, all four
+  // matches off, etc.). Every store's data is logged either way for
+  // context when fixing it later. A present-but-unknown store is still an
+  // error.
   const reportedStore = typeof req.body?.store === 'string' ? req.body.store : null;
-  if (!reportedStore || !STORES[reportedStore]) {
+  if (reportedStore && !STORES[reportedStore]) {
     return res.status(400).json({ error: 'loja inválida' });
   }
 

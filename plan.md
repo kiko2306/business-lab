@@ -4539,14 +4539,19 @@ per-row comparison round to cents (`round2`), so any set of rows that
 *display* the same best unit price (or same best total, in the no-unit
 fallback) all get the `.cheapest` green treatment.
 
-### 43.25 TODO — report an error at the *product* level, not only per store
+### 43.25 DONE — report an error at the *product* level, not only per store
 
-The 🐞 button is currently only on each store price row and the server
-requires a valid `reportedStore`. Add a product-level entry point (card
-header) for "this item is wrong / the name should be X / it's missing
-everywhere" — a report with no store. Server: accept `store: null`
-(store stays required for a *row* report, optional for a *product*
-report); admin list already groups by product so it slots in. Small.
+The 🐞 button was only on each store price row and the server required a
+valid `reportedStore`. Added a second 🐞 in the product-card header
+(between "Editar" and "Eliminar") with `data-report-bug` but no
+`data-report-store`; the shared click handler now titles the modal
+"Reportar erro no produto" and POSTs `{note}` with no `store`. Server:
+`reportedStore` is `null` when `store` is absent and only a
+*present-but-unknown* store 400s — a row report still carries its store,
+a product report carries none. Admin list already rendered
+`r.reportedStore || '(todas as lojas)'` and tolerated a missing per-store
+entry, so it slotted in with no change. Verified live: product-level
+POST → 201 with `reportedStore: null`, bad store → 400, row report → 201.
 
 ### 43.19 G — AI last-resort matcher (Gemini free tier)
 
