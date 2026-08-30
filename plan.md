@@ -4015,3 +4015,23 @@ back on; motivated building the brand field above the same session).
 
 Deployed all three together, running one more full-pool refresh pass to
 pick up the size fallback and finish isPack consistency everywhere.
+
+## 42. Session Log — 2026-08-30 (cont.): Price Compare — "gr" gram abbreviation missing from size parsing
+
+User reported the €/kg or €/L price not showing for "Creme vegetal
+(margarina)" at Continente. Its page states "Emb. 250 gr" — "gr", not
+"g". Every size-related regex in scrapers.js used a `(kg|g|lt|l|ml)`
+style alternation, and a bare "g" alternative can never match "gr": the
+trailing `\b` fails when the very next character ("r") is itself a word
+character, so there's no boundary there — the whole match silently fails
+rather than partially matching. Added "gr" as its own alternative
+(mapping to the same 1 g / "mass" as "g") across every pattern that used
+this list: `SIZE_PATTERN`, `EMB_SIZE_PATTERN`, `PACK_TOTAL_SIZE_PATTERN`,
+and the two multi-pack detection patterns (`PACK_TEXT_PATTERN`,
+`URL_PACK_SIZE_PATTERN`) for consistency, even though the reported case
+was specifically the unit-price path.
+
+Verified live: "Creme vegetal (margarina)" at Continente now resolves to
+250g/mass (was null before); Leite/Açúcar controls unaffected. Deployed,
+running a full-pool refresh to backfill "gr"-labelled sizes wherever
+else Continente uses that abbreviation.

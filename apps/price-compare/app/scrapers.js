@@ -92,12 +92,12 @@ const STORES = {
 // in a dedicated "emb. 6 x 1 lt" element, Pingo Doce/Lidl multi-packs say
 // "pack" right in the URL slug or product name (Lidl: "Pack 8x1 L"). None
 // of these signals alone covers every store, so check all of them together.
-const PACK_TEXT_PATTERN = /\bemb\.?\s*\d+\s*x\s*[\d.,]+\s*(l|lt|kg|g|un|ml)\b/i;
+const PACK_TEXT_PATTERN = /\bemb\.?\s*\d+\s*x\s*[\d.,]+\s*(l|lt|kg|gr|g|un|ml)\b/i;
 // Auchan's product-URL slugs put the pack size right in the slug with no
 // "emb." prefix and no "pack" word at all (e.g. .../meio-gordo-6x1l/...,
 // .../meio-gordo-3x200ml/...) — PACK_TEXT_PATTERN and the "pack" checks
 // below both miss this, so check for the bare NxSIZE shape too.
-const URL_PACK_SIZE_PATTERN = /\b\d+\s*x\s*[\d.,]+\s*(l|lt|kg|g|un|ml)\b/i;
+const URL_PACK_SIZE_PATTERN = /\b\d+\s*x\s*[\d.,]+\s*(l|lt|kg|gr|g|un|ml)\b/i;
 
 // Separate from multi-pack detection: a store can return the *right*
 // product at the *wrong* size — verified live: searching "Açúcar 1 kg"
@@ -110,15 +110,23 @@ const URL_PACK_SIZE_PATTERN = /\b\d+\s*x\s*[\d.,]+\s*(l|lt|kg|g|un|ml)\b/i;
 // candidate when both sizes are known and clearly different — no size
 // stated, or size not found on the candidate page, means nothing to
 // compare against, so it's left alone rather than guessed at.
-const SIZE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(kg|g|lt|l|ml)\b/i;
-const UNIT_TO_GRAMS_OR_ML = { kg: 1000, g: 1, l: 1000, lt: 1000, ml: 1 };
+// "gr" verified live as a real, distinct abbreviation from "g" — not a
+// typo to normalize away. Continente's own "Creme Vegetal Culinário
+// Vaqueiro" page states "Emb. 250 gr", and the old (kg|g|lt|l|ml)
+// alternation never matched it: a bare "g" alternative can't satisfy the
+// trailing \b when the next character is "r" (both word characters, no
+// boundary between them), so the whole size lookup silently found
+// nothing and the unit-price feature had no size to show at all —
+// reported as "the €/kg or €/L price should show all the time".
+const SIZE_PATTERN = /(\d+(?:[.,]\d+)?)\s*(kg|gr|g|lt|l|ml)\b/i;
+const UNIT_TO_GRAMS_OR_ML = { kg: 1000, g: 1, gr: 1, l: 1000, lt: 1000, ml: 1 };
 // Mass and volume are different physical quantities — a "500g" candidate
 // isn't the same size as a "500ml" one just because they multiply out to
 // the same base-unit number. Kept separate from UNIT_TO_GRAMS_OR_ML so
 // looksLikeSizeMismatch and the unit-price display (server.js/app.js)
 // both know which of "€/kg" or "€/L" applies, and so a mass/volume pair
 // is never silently compared as if they were the same axis.
-const UNIT_KIND = { kg: 'mass', g: 'mass', l: 'volume', lt: 'volume', ml: 'volume' };
+const UNIT_KIND = { kg: 'mass', g: 'mass', gr: 'mass', l: 'volume', lt: 'volume', ml: 'volume' };
 
 function parseSize(text) {
   if (!text) return null;
@@ -137,7 +145,7 @@ function parseSize(text) {
 // package size. Deliberately restricted to the same "Emb. N unit" shape
 // multi-pack detection already looks for (just without requiring the
 // "x" multiplier), so it only ever reads the actual package-size label.
-const EMB_SIZE_PATTERN = /\bemb\.?\s*(\d+(?:[.,]\d+)?)\s*(kg|g|lt|l|ml)\b/i;
+const EMB_SIZE_PATTERN = /\bemb\.?\s*(\d+(?:[.,]\d+)?)\s*(kg|gr|g|lt|l|ml)\b/i;
 function parseEmbSize(html) {
   if (!html) return null;
   const m = EMB_SIZE_PATTERN.exec(html);
@@ -200,7 +208,7 @@ function candidateSize({ html, name }) {
 // comparison there would make every legitimate multi-pack fallback look
 // like a size mismatch against a 1.5L query and get rejected outright,
 // losing the only price the store had.
-const PACK_TOTAL_SIZE_PATTERN = /\bemb\.?\s*(\d+)\s*x\s*(\d+(?:[.,]\d+)?)\s*(kg|g|lt|l|ml)\b/i;
+const PACK_TOTAL_SIZE_PATTERN = /\bemb\.?\s*(\d+)\s*x\s*(\d+(?:[.,]\d+)?)\s*(kg|gr|g|lt|l|ml)\b/i;
 function parsePackTotalSize(html) {
   if (!html) return null;
   const m = PACK_TOTAL_SIZE_PATTERN.exec(html);
