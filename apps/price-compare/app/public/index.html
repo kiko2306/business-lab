@@ -191,7 +191,32 @@
     </div>
   </div>
 
+  <div id="correct-modal" class="modal">
+    <div class="modal-box">
+      <h2 id="correct-title">Corrigir correspondência</h2>
+      <p class="hint">Escolha a loja e depois o produto certo entre os resultados da pesquisa dessa loja.</p>
+      <div id="correct-stores" class="correct-stores"></div>
+      <div id="correct-candidates" class="correct-candidates"></div>
+      <div class="modal-actions">
+        <button type="button" id="correct-close" class="btn">Fechar</button>
+      </div>
+    </div>
+  </div>
+
   <div id="toast" class="toast"></div>
+
+  <!-- Full-screen blocking loader — shown during any store re-scrape
+       (single refresh, "atualizar tudo", add/rename). Those take seconds
+       to minutes and must not run against a half-interactive product list
+       (a long refresh-all overlapping an edit was a real clobber source —
+       see plan.md §40). Deliberately has no dismiss control. -->
+  <div id="loading-overlay" class="loading-overlay hidden" role="status" aria-live="polite" aria-busy="true">
+    <div class="loading-box">
+      <div class="spinner" aria-hidden="true"></div>
+      <p id="loading-message">A atualizar…</p>
+      <p id="loading-submessage" class="hint hidden"></p>
+    </div>
+  </div>
 
   <script src="app.js"></script>
 </body>

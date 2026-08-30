@@ -146,8 +146,23 @@ function renderProductCard(product) {
       unitPrice,
       unitLabel,
       isPack: Boolean(entry.isPack),
+      excluded: Boolean(entry.excluded),
+      pinned: Boolean(entry.pinned),
     };
   });
+
+  // How many of the 4 stores this product actually has a price at — stores
+  // the user deliberately excluded don't count against it. Shown as a
+  // muted "3/4 lojas" chip only when short, and doubles as the entry point
+  // to the "corrigir correspondência" modal (a store with no row is
+  // otherwise invisible).
+  const STORE_KEYS = Object.keys(SCRAPED_STORES);
+  const excludedCount = rows.filter((r) => r.excluded).length;
+  const matchedCount = rows.filter((r) => r.price != null).length;
+  const expectedCount = STORE_KEYS.length - excludedCount;
+  const missingStores = STORE_KEYS.filter(
+    (k) => !rows.some((r) => r.store === k && (r.price != null || r.excluded))
+  );
 
   // A store that has never successfully matched this product (no price
   // ever found, not just a stale one) isn't shown at all — a "sem preço"
@@ -172,10 +187,17 @@ function renderProductCard(product) {
   const card = document.createElement('div');
   card.className = 'product-card';
 
+  const coverageHtml =
+    matchedCount < expectedCount
+      ? `<button class="store-coverage" data-correct="${product.id}" title="Sem correspondência em: ${escapeHtml(
+          missingStores.map((k) => SCRAPED_STORES[k]).join(', ')
+        )} — clique para corrigir">${matchedCount}/${STORE_KEYS.length} lojas</button>`
+      : '';
+
   const header = document.createElement('div');
   header.className = 'product-card-header';
   header.innerHTML = `
-    <h3><button class="collapse-toggle" data-collapse="${product.id}" title="${isCollapsed ? 'Expandir' : 'Colapsar'}">${isCollapsed ? '▸' : '▾'}</button> ${escapeHtml(product.name)}${product.brand ? `<span class="product-brand"> · ${escapeHtml(product.brand)}</span>` : ''}</h3>
+    <h3><button class="collapse-toggle" data-collapse="${product.id}" title="${isCollapsed ? 'Expandir' : 'Colapsar'}">${isCollapsed ? '▸' : '▾'}</button> ${escapeHtml(product.name)}${product.brand ? `<span class="product-brand"> · ${escapeHtml(product.brand)}</span>` : ''}${coverageHtml}</h3>
     <div class="product-actions">
       <button class="btn small" data-history="${product.id}">📈 Histórico</button>
       <button class="btn small" data-refresh="${product.id}">Atualizar</button>
@@ -206,10 +228,11 @@ function renderProductCard(product) {
     const actionHtml = row.url ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Abrir</a>` : '';
     const reportHtml = `<button class="btn small" data-report-bug="${product.id}" data-report-store="${row.store}" title="Reportar um erro neste preço (${escapeHtml(row.label)})">🐞</button>`;
     const addToListHtml = `<button class="btn small" data-add-to-list="${product.id}" data-add-to-list-store="${row.store}" title="Adicionar à lista de compras (${escapeHtml(row.label)})">🛒</button>`;
+    const correctHtml = `<button class="btn small" data-correct="${product.id}" data-correct-store="${row.store}" title="Corrigir a correspondência nesta loja (${escapeHtml(row.label)})">${row.pinned ? '📌' : '✎'}</button>`;
 
     div.innerHTML = `
       <span class="store-name">${escapeHtml(row.label)}</span>
-      <span class="price-actions">${priceHtml}${actionHtml}${addToListHtml}${reportHtml}</span>
+      <span class="price-actions">${priceHtml}${actionHtml}${addToListHtml}${correctHtml}${reportHtml}</span>
     `;
     body.appendChild(div);
   }
@@ -237,6 +260,31 @@ function showToast(message, isError) {
   el.classList.add('show');
   clearTimeout(toastTimer);
   toastTimer = setTimeout(() => el.classList.remove('show'), 3000);
+}
+
+// --- Full-screen blocking loader ---
+// Any operation that re-scrapes the stores (single-product refresh,
+// "atualizar tudo", add/rename) takes seconds to minutes and holds a
+// server-side write of the product list — the UI must be inert while it
+// runs, both so the user isn't confused by a frozen-looking page and so a
+// concurrent edit can't be clobbered by the refresh's own save (plan.md
+// §40). The overlay covers the viewport (CSS) so clicks are blocked; this
+// just toggles it and sets the message.
+let loadingDepth = 0;
+function setLoadingMessage(message, submessage) {
+  document.getElementById('loading-message').textContent = message || 'A atualizar…';
+  const sub = document.getElementById('loading-submessage');
+  sub.textContent = submessage || '';
+  sub.classList.toggle('hidden', !submessage);
+}
+function showLoading(message, submessage) {
+  loadingDepth++;
+  setLoadingMessage(message, submessage);
+  document.getElementById('loading-overlay').classList.remove('hidden');
+}
+function hideLoading() {
+  loadingDepth = Math.max(0, loadingDepth - 1);
+  if (loadingDepth === 0) document.getElementById('loading-overlay').classList.add('hidden');
 }
 
 function showConfirm(title) {
@@ -309,6 +357,12 @@ productForm.addEventListener('submit', async (e) => {
   const brand = document.getElementById('product-brand').value;
   const category = document.getElementById('product-category').value;
 
+  // Both POST and a name/brand PUT run a full 4-store search server-side
+  // (seconds), so block the UI the same way a refresh does. A pure
+  // category change is quick, but it's not worth branching on here.
+  const submitBtn = productForm.querySelector('button[type="submit"]');
+  submitBtn.disabled = true;
+  showLoading(id ? 'A guardar e a procurar nas lojas…' : 'A procurar o produto nas lojas…');
   try {
     if (id) await api(`/products/${id}`, { method: 'PUT', body: JSON.stringify({ name, brand, category }) });
     else await api('/products', { method: 'POST', body: JSON.stringify({ name, brand, category }) });
@@ -317,25 +371,63 @@ productForm.addEventListener('submit', async (e) => {
     showToast('Guardado.');
   } catch (err) {
     showToast(err.message, true);
+  } finally {
+    hideLoading();
+    submitBtn.disabled = false;
   }
 });
 
 // --- Update all prices ---
-document.getElementById('update-all-btn').addEventListener('click', async (e) => {
-  const btn = e.currentTarget;
-  btn.disabled = true;
-  const original = btn.textContent;
-  btn.textContent = '↻ A atualizar…';
+// The server runs this as a background job (it takes minutes on a large
+// list); we kick it off, then poll for progress and keep the blocking
+// overlay up with a live "42 de 300" count until it finishes. attachTo
+// RefreshJob is also called on page load so reloading mid-run re-attaches
+// instead of hiding the overlay while the job keeps going server-side.
+let refreshPollTimer = null;
+
+let refreshOverlayShown = false;
+
+async function attachToRefreshJob() {
+  if (refreshPollTimer) return;
+  if (!refreshOverlayShown) {
+    showLoading('A atualizar todos os preços…', 'Isto pode demorar vários minutos — mantenha esta página aberta.');
+    refreshOverlayShown = true;
+  }
+  const poll = async () => {
+    let status;
+    try {
+      status = await api('/products/refresh-status');
+    } catch {
+      refreshPollTimer = setTimeout(poll, 2000); // transient — retry next tick
+      return;
+    }
+    if (status.running) {
+      setLoadingMessage(
+        'A atualizar todos os preços…',
+        status.total ? `${status.done} de ${status.total} concluídos` : 'A começar…'
+      );
+      refreshPollTimer = setTimeout(poll, 1500);
+      return;
+    }
+    refreshPollTimer = null;
+    if (refreshOverlayShown) {
+      hideLoading();
+      refreshOverlayShown = false;
+    }
+    await loadProducts();
+    showToast(status.error ? `Terminado com erros: ${status.error}` : 'Preços atualizados.', Boolean(status.error));
+  };
+  poll();
+}
+
+document.getElementById('update-all-btn').addEventListener('click', async () => {
   try {
     await api('/products/refresh-all', { method: 'POST' });
-    await loadProducts();
-    showToast('Preços atualizados.');
   } catch (err) {
     showToast(err.message, true);
-  } finally {
-    btn.disabled = false;
-    btn.textContent = original;
+    return;
   }
+  attachToRefreshJob();
 });
 
 // --- Delegated actions ---
@@ -347,10 +439,14 @@ document.body.addEventListener('click', async (e) => {
   const reportBugStore = e.target.dataset.reportStore;
   const addToListId = e.target.dataset.addToList;
   const addToListStore = e.target.dataset.addToListStore;
+  const correctId = e.target.dataset.correct;
+  const correctStore = e.target.dataset.correctStore;
   const collapseId = e.target.dataset.collapse;
   const collapseCategory = e.target.closest('[data-collapse-category]')?.dataset.collapseCategory;
 
-  if (addToListId) {
+  if (correctId) {
+    openCorrectModal(products.find((p) => p.id === correctId), correctStore || null);
+  } else if (addToListId) {
     e.target.disabled = true;
     try {
       await api('/shopping-list', { method: 'POST', body: JSON.stringify({ productId: addToListId, store: addToListStore }) });
@@ -387,14 +483,22 @@ document.body.addEventListener('click', async (e) => {
       showToast('Produto eliminado.');
     }
   } else if (refreshId) {
-    e.target.disabled = true;
-    e.target.textContent = 'A atualizar…';
+    const btn = e.target;
+    btn.disabled = true;
+    btn.textContent = 'A atualizar…';
+    showLoading('A atualizar os preços deste produto…');
     try {
       await api(`/products/${refreshId}/refresh`, { method: 'POST' });
       await loadProducts();
       showToast('Preços atualizados.');
     } catch (err) {
       showToast(err.message, true);
+      // loadProducts() re-renders (and replaces this button) only on
+      // success — on error the old card stays, so restore the button.
+      btn.disabled = false;
+      btn.textContent = 'Atualizar';
+    } finally {
+      hideLoading();
     }
   } else if (collapseId) {
     if (collapsed.has(collapseId)) collapsed.delete(collapseId);
@@ -408,6 +512,110 @@ document.body.addEventListener('click', async (e) => {
     renderProducts();
   } else if (e.target.dataset.history) {
     openHistoryModal(products.find((p) => p.id === e.target.dataset.history));
+  }
+});
+
+// --- Correct a wrong match ("corrigir correspondência") ---
+// The automatic pick is wrong often enough (store vocabulary, per-kg vs
+// per-piece, an ambiguous name) that the user needs to override it: pick a
+// different result from the store's own search, exclude the store, or reset
+// to automatic. Server side: GET /candidates + PUT /override.
+const correctModal = document.getElementById('correct-modal');
+let correctProduct = null;
+
+document.getElementById('correct-close').addEventListener('click', () => {
+  correctModal.classList.remove('open');
+  correctProduct = null;
+});
+
+function openCorrectModal(product, initialStore) {
+  if (!product) return;
+  correctProduct = product;
+  document.getElementById('correct-title').textContent = `Corrigir correspondência — ${product.name}`;
+  const overrides = product.overrides || {};
+  const byStore = new Map((product.urls || []).map((e) => [e.store, e]));
+
+  document.getElementById('correct-stores').innerHTML = Object.entries(SCRAPED_STORES)
+    .map(([key, label]) => {
+      const entry = byStore.get(key);
+      let state = '—';
+      if (overrides[key]?.excluded) state = '🚫 excluída';
+      else if (overrides[key]?.url) state = '📌 fixada';
+      else if (entry?.price != null) state = '✓';
+      else state = '✗ sem correspondência';
+      return `<button class="btn small" data-correct-pick-store="${key}">${escapeHtml(label)} <span class="correct-store-state">${state}</span></button>`;
+    })
+    .join('');
+  document.getElementById('correct-candidates').innerHTML = '';
+  correctModal.classList.add('open');
+  if (initialStore) loadCorrectCandidates(initialStore);
+}
+
+document.getElementById('correct-stores').addEventListener('click', (e) => {
+  const store = e.target.closest('[data-correct-pick-store]')?.dataset.correctPickStore;
+  if (store) loadCorrectCandidates(store);
+});
+
+async function loadCorrectCandidates(store) {
+  if (!correctProduct) return;
+  const box = document.getElementById('correct-candidates');
+  const storeLabel = SCRAPED_STORES[store] || store;
+  box.innerHTML = `<p class="hint">A procurar em ${escapeHtml(storeLabel)}…</p>`;
+  const pinnedUrl = correctProduct.overrides?.[store]?.url || null;
+  const currentUrl = (correctProduct.urls || []).find((x) => x.store === store)?.url || null;
+
+  let candidates;
+  try {
+    candidates = await api(`/products/${correctProduct.id}/candidates?store=${store}`);
+  } catch (err) {
+    box.innerHTML = `<p class="price-error">Não foi possível procurar em ${escapeHtml(storeLabel)}: ${escapeHtml(err.message)}</p>`;
+    return;
+  }
+
+  const rows = candidates
+    .map((c) => {
+      const checked = (pinnedUrl || currentUrl) === c.url ? 'checked' : '';
+      return `<label class="correct-cand"><input type="radio" name="correct-cand" value="${escapeHtml(c.url)}" ${checked} />
+        <span>${escapeHtml(c.name || '(sem nome)')}${c.isPack ? ' <span class="pack-badge pack">Pack</span>' : ''}</span>
+        <span class="correct-cand-price">${fmtPrice(c.price, c.currency) || '—'}</span></label>`;
+    })
+    .join('');
+
+  box.innerHTML = `
+    ${candidates.length ? rows : `<p class="hint">Sem resultados em ${escapeHtml(storeLabel)}.</p>`}
+    <div class="correct-actions">
+      <button type="button" class="btn small" data-correct-apply="pin" data-correct-apply-store="${store}">Fixar selecionado</button>
+      <button type="button" class="btn small" data-correct-apply="exclude" data-correct-apply-store="${store}">🚫 Excluir loja</button>
+      <button type="button" class="btn small" data-correct-apply="auto" data-correct-apply-store="${store}">↻ Automático</button>
+    </div>`;
+}
+
+document.getElementById('correct-candidates').addEventListener('click', async (e) => {
+  const btn = e.target.closest('[data-correct-apply]');
+  if (!btn || !correctProduct) return;
+  const mode = btn.dataset.correctApply;
+  const store = btn.dataset.correctApplyStore;
+  let body;
+  if (mode === 'exclude') body = { store, excluded: true };
+  else if (mode === 'auto') body = { store, clear: true };
+  else {
+    const picked = document.querySelector('input[name="correct-cand"]:checked');
+    if (!picked) return showToast('Escolha um produto primeiro.', true);
+    body = { store, url: picked.value };
+  }
+  btn.closest('.correct-actions').querySelectorAll('button').forEach((b) => (b.disabled = true));
+  showLoading('A aplicar a correção…');
+  try {
+    const updated = await api(`/products/${correctProduct.id}/override`, { method: 'PUT', body: JSON.stringify(body) });
+    correctProduct = updated;
+    products = products.map((p) => (p.id === updated.id ? updated : p));
+    renderProducts();
+    openCorrectModal(updated, store); // re-render modal state + candidate list
+    showToast('Correspondência atualizada.');
+  } catch (err) {
+    showToast(err.message, true);
+  } finally {
+    hideLoading();
   }
 });
 
@@ -719,6 +927,15 @@ async function init() {
   await loadProducts();
   maybeShowNotifyPrompt();
   setupAds(user);
+
+  // If a whole-catalogue refresh is still running server-side (e.g. the
+  // page was reloaded mid-run), re-attach the progress overlay to it.
+  try {
+    const status = await api('/products/refresh-status');
+    if (status.running) attachToRefreshJob();
+  } catch {
+    // no session / transient — nothing to attach to
+  }
 
   const priceDropParam = params.get('priceDrop');
   if (priceDropParam) {
