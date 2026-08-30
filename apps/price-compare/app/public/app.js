@@ -178,6 +178,7 @@ function renderProductCard(product) {
       <button class="btn small" data-history="${product.id}">📈 Histórico</button>
       <button class="btn small" data-refresh="${product.id}">Atualizar</button>
       <button class="btn small" data-edit="${product.id}">Editar</button>
+      <button class="btn small" data-report-bug="${product.id}" title="Reportar um erro neste item">🐞 Reportar</button>
       <button class="btn small danger" data-delete="${product.id}">Eliminar</button>
     </div>
   `;
@@ -305,10 +306,24 @@ document.body.addEventListener('click', async (e) => {
   const editId = e.target.dataset.edit;
   const deleteId = e.target.dataset.delete;
   const refreshId = e.target.dataset.refresh;
+  const reportBugId = e.target.dataset.reportBug;
   const collapseId = e.target.dataset.collapse;
   const collapseCategory = e.target.closest('[data-collapse-category]')?.dataset.collapseCategory;
 
-  if (editId) {
+  if (reportBugId) {
+    const note = window.prompt('O que está errado neste item? (opcional)');
+    if (note !== null) {
+      e.target.disabled = true;
+      try {
+        await api(`/products/${reportBugId}/report-bug`, { method: 'POST', body: JSON.stringify({ note }) });
+        showToast('Erro reportado — obrigado!');
+      } catch (err) {
+        showToast(err.message, true);
+      } finally {
+        e.target.disabled = false;
+      }
+    }
+  } else if (editId) {
     openProductModal(products.find((p) => p.id === editId));
   } else if (deleteId) {
     if (await showConfirm('Eliminar este produto?')) {

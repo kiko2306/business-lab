@@ -87,6 +87,28 @@ function saveUserProducts(userId, userProducts) {
   saveAllProducts([...others, ...userProducts]);
 }
 
+// A simple append-only log, not part of products.json — a bug report is a
+// point-in-time snapshot of what was wrong (the product's name and every
+// store's price/URL/scrapedName at the moment reported), so it needs to
+// survive independently of the product being edited, refreshed, or
+// deleted afterwards.
+const BUG_REPORTS_FILE = path.join(DATA_DIR, 'bug-reports.json');
+function appendBugReport(report) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  let reports = [];
+  if (fs.existsSync(BUG_REPORTS_FILE)) {
+    try {
+      reports = JSON.parse(fs.readFileSync(BUG_REPORTS_FILE, 'utf8'));
+    } catch (err) {
+      console.error('Failed to read bug-reports.json, starting fresh:', err.message);
+    }
+  }
+  reports.push(report);
+  const tmp = BUG_REPORTS_FILE + '.tmp';
+  fs.writeFileSync(tmp, JSON.stringify(reports, null, 2));
+  fs.renameSync(tmp, BUG_REPORTS_FILE);
+}
+
 // Searches one store for `name` and scrapes whichever product it ranks
 // first — never throws. Two different kinds of failure are handled
 // differently:
@@ -407,6 +429,39 @@ app.post('/api/products/:id/refresh', async (req, res) => {
   const drops = collectPriceDrops(product.name, previousEntries, product.urls);
   if (drops.length) await push.notifyPriceDrops(req.user.sub, drops);
   res.json(product);
+});
+
+// Logs the product's current name, category, and every store's price/URL/
+// scrapedName exactly as shown when the user clicked the button — a
+// snapshot to fix later, not a live reference (the product itself may get
+// edited, refreshed, or deleted afterwards).
+app.post('/api/products/:id/report-bug', (req, res) => {
+  const products = loadUserProducts(req.user.sub);
+  const product = products.find((p) => p.id === req.params.id);
+  if (!product) return res.status(404).json({ error: 'produto não encontrado' });
+
+  const note = typeof req.body?.note === 'string' ? req.body.note.trim().slice(0, 1000) : '';
+
+  appendBugReport({
+    id: crypto.randomUUID(),
+    reportedAt: new Date().toISOString(),
+    userId: req.user.sub,
+    userEmail: req.user.email || null,
+    productId: product.id,
+    productName: product.name,
+    category: product.category,
+    note,
+    stores: product.urls.map((u) => ({
+      store: u.store,
+      price: u.price,
+      currency: u.currency,
+      scrapedName: u.scrapedName,
+      url: u.url,
+      error: u.error,
+    })),
+  });
+
+  res.status(201).json({ ok: true });
 });
 
 // Re-runs the store searches for every product belonging to one user, one
