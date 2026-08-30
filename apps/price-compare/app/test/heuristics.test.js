@@ -104,6 +104,17 @@ test('parseEmbSize only reads the "Emb. N unit" package label', () => {
   assert.equal(H.parseEmbSize('per-kg unit price 1 kg = 0.85 only'), null);
 });
 
+test('candidateSize treats loose "by the kilo" produce as 1 kg (so € price == €/kg)', () => {
+  assert.deepEqual(H.candidateSize({ name: 'LARANJA AUCHAN KG', html: '' }), { value: 1000, kind: 'mass' });
+  assert.deepEqual(H.candidateSize({ name: 'Cebola Granel', html: '' }), { value: 1000, kind: 'mass' });
+  // Pingo Doce states it only in the JSON-LD description
+  const ld = '<script type="application/ld+json">{"@type":"Product","description":"LARANJA KG"}</script>';
+  assert.deepEqual(H.candidateSize({ name: 'Laranja', html: ld }), { value: 1000, kind: 'mass' });
+  // an explicit quantity still wins, unchanged
+  assert.deepEqual(H.candidateSize({ name: 'Laranja 2 kg', html: '' }), { value: 2000, kind: 'mass' });
+  assert.equal(H.candidateSize({ name: 'Laranja', html: '' }), null); // no kg anywhere -> unknown
+});
+
 test('parsePackTotalSize multiplies count x per-unit size', () => {
   assert.deepEqual(H.parsePackTotalSize('Emb. 6 x 1,5 lt'), { value: 9000, kind: 'volume' });
   assert.deepEqual(H.parsePackTotalSize('emb. 8 x 125 g'), { value: 1000, kind: 'mass' });

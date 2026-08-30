@@ -4504,6 +4504,34 @@ pronta, Pudins/Mousses lácteas, Gelados de pauzinho, the "não chora mais"
 tagline). Diminishing returns — the manual override is the right tool for
 whichever of them the user actually wants.
 
+### 43.24 Bug reports — loose "by the kilo" produce had no €/kg
+
+Three reports came in, all on "Laranjas":
+- **Pingo Doce / Auchan "Missing €/kg"** — real. Loose oranges are sold
+  per kilo, so the store's "1,69 €" *is* the €/kg, but nothing stated a
+  size so no unit price showed. `candidateSize` now has a `soldByWeight`
+  fallback: after the "N unit" parses fail, a bare "kg" (in the name, or
+  in Pingo Doce's JSON-LD description "LARANJA KG") or "granel" → treat as
+  1 kg, so `€ price == €/kg`. Only consulted last, so "Açúcar 1 kg" etc.
+  are untouched. Verified: Pingo Doce "Laranja" now €1,69/kg; Auchan
+  switched to "Laranja 2 kg" at €1,49/kg (genuinely cheaper per kilo).
+  Fixes many loose-produce rows, not just oranges (Cebola Granel, KG
+  bananas, …). Suite 221 / 216 pass.
+- **"not on Lidl, but I can find it in Lidl's search"** — not a bug:
+  Lidl's "Laranja - Citrinos do Algarve IGP" is `availability:
+  "InStoreOnly"` with **no `price`** in its JSON-LD, so there is nothing
+  to scrape. Could surface a "só em loja" hint instead of just hiding the
+  row — minor, not done.
+
+### 43.25 TODO — report an error at the *product* level, not only per store
+
+The 🐞 button is currently only on each store price row and the server
+requires a valid `reportedStore`. Add a product-level entry point (card
+header) for "this item is wrong / the name should be X / it's missing
+everywhere" — a report with no store. Server: accept `store: null`
+(store stays required for a *row* report, optional for a *product*
+report); admin list already groups by product so it slots in. Small.
+
 ### 43.19 G — AI last-resort matcher (Gemini free tier)
 
 New `aiMatch.js`: a single plain `fetch` to the Gemini `generateContent`

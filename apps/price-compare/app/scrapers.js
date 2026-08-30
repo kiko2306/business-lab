@@ -206,8 +206,29 @@ function extractJsonLdDescription(html) {
   return null;
 }
 
+// Loose fruit/veg/meat sold by the kilo: the store's price IS the €/kg, so
+// "1,69 €" for "Laranja" isn't missing a unit — it's already per-kg. We
+// detect it from an explicit "kg" with no quantity (Pingo Doce's "Laranja"
+// page carries JSON-LD description "LARANJA KG"; Auchan names it "LARANJA
+// AUCHAN KG") or "granel". Only consulted after the real "N unit" parses
+// fail, so "Açúcar 1 kg" is unaffected. From user bug reports on
+// "Laranjas" at Pingo Doce and Auchan ("Missing €/kg").
+const SOLD_BY_KG_PATTERN = /\b(?:granel|kg)\b/i;
+function soldByWeight(text) {
+  return text && !parseSize(text) && SOLD_BY_KG_PATTERN.test(text)
+    ? { value: 1000, kind: 'mass' }
+    : null;
+}
+
 function candidateSize({ html, name }) {
-  return parseSize(name) ?? parseEmbSize(html) ?? parseSize(extractJsonLdDescription(html));
+  const desc = extractJsonLdDescription(html);
+  return (
+    parseSize(name) ??
+    parseEmbSize(html) ??
+    parseSize(desc) ??
+    soldByWeight(name) ??
+    soldByWeight(desc)
+  );
 }
 
 // Verified live: a "Reportar" note flagged Continente's "Água sem Gás
