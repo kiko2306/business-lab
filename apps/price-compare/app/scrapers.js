@@ -46,12 +46,30 @@ function stripDiacritics(text) {
   return (text || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
 }
 
+// The user's product names are free text — accents, quotes, parentheses,
+// slashes, hyphens ("Champô de bebé \"não chora mais\"", "Paprika
+// (colorau)", "Papos-secos"). Store search boxes choke on the punctuation
+// (a parenthetical annotation was verified live to return zero results at
+// Continente) and some rank worse with accents (see stripDiacritics'
+// note above). Fold every character that isn't a-z/0-9 down: accents to
+// their base letter, everything else to a single space. Only ever applied
+// to the string handed to a store's search URL — the raw product name
+// still flows unchanged to significantWords / looksLikeSizeMismatch, which
+// tokenise on non-alphanumerics themselves, so "1.5L" size parsing is
+// unaffected.
+function sanitizeSearchQuery(text) {
+  return stripDiacritics(text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 const STORES = {
   continente: {
     label: 'Continente',
     hostSuffix: 'continente.pt',
     origin: 'https://www.continente.pt',
-    searchUrl: (q) => `https://www.continente.pt/pesquisa/?q=${encodeURIComponent(stripDiacritics(q))}`,
+    searchUrl: (q) => `https://www.continente.pt/pesquisa/?q=${encodeURIComponent(sanitizeSearchQuery(q))}`,
     productLinkPattern: /href="(\/produto\/[^"?]+\.html)/g,
   },
   pingodoce: {
@@ -59,14 +77,14 @@ const STORES = {
     hostSuffix: 'pingodoce.pt',
     origin: 'https://www.pingodoce.pt',
     searchUrl: (q) =>
-      `https://www.pingodoce.pt/on/demandware.store/Sites-pingo-doce-Site/default/Search-Show?q=${encodeURIComponent(stripDiacritics(q))}`,
+      `https://www.pingodoce.pt/on/demandware.store/Sites-pingo-doce-Site/default/Search-Show?q=${encodeURIComponent(sanitizeSearchQuery(q))}`,
     productLinkPattern: /href="(\/home\/produtos\/[^"?]+\.html)/g,
   },
   lidl: {
     label: 'Lidl',
     hostSuffix: 'lidl.pt',
     origin: 'https://www.lidl.pt',
-    searchUrl: (q) => `https://www.lidl.pt/q/search?q=${encodeURIComponent(stripDiacritics(q))}`,
+    searchUrl: (q) => `https://www.lidl.pt/q/search?q=${encodeURIComponent(sanitizeSearchQuery(q))}`,
     // Lidl's storefront is a client-rendered SPA — what's in the initial
     // HTML isn't real <a href> markup but an HTML-entity-escaped JSON blob
     // for hydration (paths show up as &quot;/p/...&quot;, not "/p/...").
@@ -81,7 +99,7 @@ const STORES = {
     label: 'Auchan',
     hostSuffix: 'auchan.pt',
     origin: 'https://www.auchan.pt',
-    searchUrl: (q) => `https://www.auchan.pt/pt/pesquisa/?q=${encodeURIComponent(stripDiacritics(q))}`,
+    searchUrl: (q) => `https://www.auchan.pt/pt/pesquisa/?q=${encodeURIComponent(sanitizeSearchQuery(q))}`,
     productLinkPattern: /href="(\/pt\/[^"?]+\/\d+\.html)/g,
   },
 };
@@ -253,7 +271,9 @@ function normalizeText(text) {
   return (text || '')
     .toLowerCase()
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, ''); // strip accents so "açúcar"/"acucar" compare equal
+    .replace(/[̀-ͯ]/g, '') // strip accents so "açúcar"/"acucar" compare equal
+    .replace(/[^a-z0-9]+/g, ' ') // fold every other non-alphanumeric to a space ("sem-glúten" → "sem gluten", "c/pimento" → "c pimento")
+    .trim();
 }
 
 const STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'com', 'sem', 'e', 'ou', 'para', 'em', 'no', 'na']);
@@ -409,6 +429,36 @@ function countExtraWords(queryWords, candidateWords) {
   return count;
 }
 
+// A candidate whose name says it's a *processed form* the query never
+// asked for — a juice, jelly, pouch, sorbet, purée — of the query's
+// ingredient. countExtraWords can't catch these: "Bolsa de Fruta Pêra"
+// (a fruit pouch, €0.67) scores fewer extra words than the plain "Pera
+// Rocha DOP Oeste" (€2.49) because "rocha/DOP/oeste" are three descriptors
+// while "bolsa/fruta" are only two — so ranking by closeness alone picks
+// the pouch. Same shape verified live: "Morangos"→"Gelatina de Morango",
+// "Melão"→"Sangria Melão", "Tangerinas"→"Sumo 100% Tangerina",
+// "Cenouras"→"Farinha Láctea ... Cenoura". Used only to *rank* (a
+// candidate with an unrequested form word sorts below every candidate
+// without one — see pickClosestNameMatches), never to reject: if every
+// candidate a store returns is a processed form, the least-bad one is
+// still shown. Bounded and closed the same way NEUTRAL_PACKAGING_WORDS is
+// — the set of culinary forms (juice/nectar/purée/jelly/jam/ice-cream/
+// sorbet/pouch/shake/broth/flour) is enumerable; flavours are not.
+const PROCESSED_FORM_WORDS = new Set([
+  'sumo', 'sumos', 'nectar', 'nectars', 'pure', 'pures', 'gelatina', 'gelatinas',
+  'compota', 'compotas', 'doce', 'doces', 'sorbet', 'gelado', 'gelados',
+  'sangria', 'mocktail', 'cocktail', 'bolsa', 'bolsas', 'batido', 'batidos',
+  'farinha', 'polpa', 'concentrado', 'refrigerante',
+]);
+
+function hasUnrequestedFormWord(queryWords, candidateWords) {
+  const queryWordSet = new Set(queryWords);
+  for (const w of candidateWords) {
+    if (PROCESSED_FORM_WORDS.has(w) && !queryWordSet.has(w)) return true;
+  }
+  return false;
+}
+
 // Verified live: "Cebolas" at Continente had three candidates all tied at
 // 1 extra word — "Cebola Picada" (chopped), "Cebola Roxa" (red), and
 // "Sopa de Cebola" (onion *soup*, a fundamentally different product that
@@ -449,6 +499,10 @@ const GENERIC_CATEGORY_WORDS = new Set([
   'presunto', 'fiambre', 'champo', 'banho', 'roupa', 'loica',
   'refrigerante', 'sacos', 'guardanapos', 'chourico', 'chouricao',
   'bolo', 'gelado', 'bacalhau', 'maquina', 'liquido',
+  // Added after the test/ replay: a query's leading category noun that a
+  // wrong candidate didn't carry — "Vinagre de vinho branco" → Lidl's
+  // "3 Castas Vinho Branco/ Tinto" (a wine).
+  'vinagre',
 ]);
 
 function looksIrrelevant(query, candidateName) {
@@ -456,7 +510,8 @@ function looksIrrelevant(query, candidateName) {
   const queryWords = significantWords(query);
   if (!queryWords.length) return false;
   if (hasNegatedQueryWord(query, candidateName)) return true;
-  const candidateWords = new Set(significantWords(candidateName));
+  const candidateWordList = significantWords(candidateName);
+  const candidateWords = new Set(candidateWordList);
 
   // Check against the query's more distinguishing (non-generic) words
   // when there are any — falls back to the full word list for a query
@@ -478,25 +533,63 @@ function looksIrrelevant(query, candidateName) {
   // the word itself, so a fixed exemption list can't get this right in
   // both directions at once. "Sardinhas em lata" stays a known gap.
   const specificWords = queryWords.filter((w) => !GENERIC_CATEGORY_WORDS.has(w));
+  const genericWords = queryWords.filter((w) => GENERIC_CATEGORY_WORDS.has(w));
+
+  // (1) When the query *leads* with a category noun ("Iogurtes naturais",
+  // "Queijo da Serra", "Cerveja sem álcool"), that noun must actually
+  // appear in the candidate — not just the more specific words. Without
+  // this, a query whose only specific word is a weak modifier matches
+  // whichever candidate happens to carry it: Lidl returns no plain natural
+  // yogurt for "Iogurtes naturais", so the one candidate past the
+  // specific-word floor was "Atum ao Natural" (tuna); "Queijo da Serra"
+  // landed on "Serra Grande de Jardinagem" (a garden tool). Gated on the
+  // *first* word specifically, so a trailing incidental category word
+  // doesn't trigger it — "Fermento em pó para bolos" leads with "fermento",
+  // and stores list it without ever saying "bolo". Historically avoided
+  // (plan.md §30.2) over a brand-named yogurt ("Bifidus … Activia") that
+  // never says "iogurte"; not present in the current generic-worded
+  // 300-item list — re-validated net-positive against it (test/).
+  if (GENERIC_CATEGORY_WORDS.has(queryWords[0]) && specificWords.length) {
+    if (!candidateWords.has(queryWords[0])) return true;
+  }
+
+  // (2) For a short query with no category noun at all (≤2 significant
+  // words: "Mel de abelha", "Canela em pó", "Tangerinas"), the candidate's
+  // own first word must be one of the query's words. Portuguese product
+  // titles lead with what the thing *is*; a candidate that leads with a
+  // different noun — "Desodorizante … Mel", "Café Solúvel … Canela", "Água
+  // com Gás Tangerina" — is a different product that merely mentions the
+  // query term. Only applied when there's no category noun to fall back on:
+  // the §38-documented false rejects of a head-word rule ("Postas de
+  // Bacalhau", "Folha de Massa Fresca", "Detergente Máquina …") are all
+  // category-noun queries, which skip this. Needs ≥1 shared word first
+  // (otherwise the floor below already rejects it).
+  if (
+    !genericWords.length &&
+    queryWords.length <= 2 &&
+    candidateWordList.length &&
+    candidateWordList.some((w) => queryWords.includes(w)) &&
+    !queryWords.includes(candidateWordList[0])
+  ) {
+    return true;
+  }
+
   const wordsToCheck = specificWords.length ? specificWords : queryWords;
   const required = wordsToCheck.length === 1 ? 1 : 2;
   const matches = wordsToCheck.filter((w) => candidateWords.has(w)).length;
 
   // Tried also gating on headWordMismatch here when only one fragile
-  // specific word is left (e.g. "Iogurtes naturais" → just "natural"
-  // once "iogurte" is excluded as generic, weak enough on its own to
-  // match Lidl's "Atum ao Natural" — tuna, not yogurt). Reverted:
-  // replaying it against the 300-item pool's recorded matches caught 6
-  // genuine mismatches this way but also rejected 6 *correct* ones —
-  // "Postas de Bacalhau Seco", "Lombos de Bacalhau Demolhado", "Folha de
-  // Massa Fresca para Lasanha", real dishwasher-tablet listings — because
-  // Portuguese product names routinely lead with a cut/format word
-  // ("Postas de", "Lombos de", "Detergente") before the category noun,
-  // not the noun itself. headWordMismatch stays useful as a tiebreaker
-  // between several candidates from the same store (pickClosestNameMatches
-  // below) — it's only unsafe as a hard reject with no fallback. The
-  // Atum/Iogurte case stays a known gap rather than trading it for six
-  // new false rejections.
+  // specific word is left (e.g. "Iogurtes naturais" → just "natural" once
+  // "iogurte" is excluded as generic). Reverted: replaying it against the
+  // 300-item pool's recorded matches caught 6 genuine mismatches but also
+  // rejected 6 *correct* ones — "Postas de Bacalhau Seco", "Lombos de
+  // Bacalhau Demolhado", "Folha de Massa Fresca para Lasanha", real
+  // dishwasher-tablet listings — because Portuguese product names routinely
+  // lead with a cut/format word ("Postas de", "Lombos de", "Detergente")
+  // before the category noun, not the noun itself. headWordMismatch stays
+  // useful only as a tiebreaker between candidates from one store
+  // (pickClosestNameMatches below). The Atum/Iogurte case is now caught by
+  // the require-the-generic-word gate above instead.
   return matches < required;
 }
 
@@ -634,77 +727,155 @@ function extractCandidateUrls(def, searchHtml) {
 // single-unit match), trading more requests per store per refresh for
 // actually finding the best price.
 const MAX_CANDIDATES_TRIED = 5;
+
+// One candidate's product page, parsed down to the JSON-serialisable facts
+// selectBestCandidate needs. Everything that requires the raw HTML — price,
+// multi-pack detection, size, and whether the size disagrees with a size
+// stated in the query — is resolved here; the word-overlap ranking is
+// deliberately left to selectBestCandidate so it stays tunable against
+// recorded fixtures (test/) without re-scraping. `scraped` is the
+// `{ html, name, price, currency }` a SCRAPERS[store] call returns.
+function parseCandidate(store, url, scraped, query) {
+  const { html, ...result } = scraped;
+  const isPack = looksLikeMultiPack({ html, name: result.name, url });
+  // A pack's €N.NN is for the whole pack, not one unit — use its total
+  // size, not the single-unit size (see parsePackTotalSize's comment for
+  // why the two are kept separate).
+  const size = isPack
+    ? (parsePackTotalSize(html) ?? candidateSize({ html, name: result.name }))
+    : candidateSize({ html, name: result.name });
+  return {
+    store,
+    url,
+    name: result.name || null,
+    price: result.price ?? null,
+    currency: result.currency || 'EUR',
+    isPack,
+    unitSizeValue: size?.value ?? null,
+    unitSizeKind: size?.kind ?? null,
+    sizeMismatch: looksLikeSizeMismatch(query, { html, name: result.name, url }),
+  };
+}
+
+// The whole matching decision, pure: given the query and a list of parsed
+// candidates (see parseCandidate), return the winning entry (with the
+// ranking fields attached) or null if none is usable. No network, no HTML —
+// test/match.test.js replays exactly this against recorded fixtures.
+//
+// Evaluates every candidate (not just the first that looks valid) and
+// returns the *cheapest* that passes looksIrrelevant/size-mismatch —
+// verified live this matters: Pingo Doce ranked a €1.64 "Arroz Agulha
+// Cigala" first for "Arroz agulha" with five cheaper equivalents (down to
+// €1.15) lower in the same results. Single-unit matches beat multi-packs;
+// packs are a fallback only when nothing single-unit passed.
+function selectBestCandidate(query, candidates) {
+  const queryWords = significantWords(query);
+  const usable = [];
+  for (const c of candidates) {
+    if (c.price == null || !c.name) continue;
+    // A wrong product entirely, or the right product at a clearly wrong
+    // size, is never usable — not even as a last-resort fallback: showing
+    // it at all is a misleading price, worse than showing none.
+    if (looksIrrelevant(query, c.name) || c.sizeMismatch) continue;
+    const candidateWords = significantWords(c.name);
+    usable.push({
+      ...c,
+      extraWordCount: countExtraWords(queryWords, new Set(candidateWords)),
+      headMismatch: headWordMismatch(queryWords, candidateWords),
+      formMismatch: hasUnrequestedFormWord(queryWords, candidateWords),
+    });
+  }
+  const singleUnit = usable.filter((e) => !e.isPack);
+  const packs = usable.filter((e) => e.isPack);
+  const pool = singleUnit.length ? singleUnit : packs;
+  if (!pool.length) return null;
+  return cheapestPlausible(pickClosestNameMatches(pool));
+}
+
+// Given a product name, searches the store and scrapes whichever product
+// its search results rank first — no product URL needed from the user at
+// all. Less precise than a hand-picked product link (see plan.md §22.9c),
+// which is what the "corrigir correspondência" override (listStoreCandidates
+// below) exists to fix. Fetches up to MAX_CANDIDATES_TRIED product pages.
 async function searchAndScrapeStore(store, query) {
   const def = STORES[store];
   if (!def) throw new Error(`unknown store: ${store}`);
 
   const searchHtml = await fetchHtml(def.searchUrl(query));
-  const candidates = extractCandidateUrls(def, searchHtml);
-  if (!candidates.length) throw new NoMatchError(`sem resultados de pesquisa em ${def.label}`);
+  const candidateUrls = extractCandidateUrls(def, searchHtml);
+  if (!candidateUrls.length) throw new NoMatchError(`sem resultados de pesquisa em ${def.label}`);
 
-  const singleUnitEntries = [];
-  const packEntries = [];
-  for (const productUrl of candidates.slice(0, MAX_CANDIDATES_TRIED)) {
+  const candidates = [];
+  for (const productUrl of candidateUrls.slice(0, MAX_CANDIDATES_TRIED)) {
     let scraped;
     try {
       scraped = await SCRAPERS[store](productUrl);
     } catch {
       continue; // this candidate's page didn't yield a price — try the next
     }
-    const { html, ...result } = scraped;
-    if (result.price == null) continue;
-    // Extra words the query never asked for (see countExtraWords) rank
-    // candidates by how closely their name matches the query, so the
-    // plain product is preferred over a flavoured/variant one from the
-    // same store even when the variant is cheaper. headWordMismatch
-    // breaks ties within that (see its own comment above).
-    const queryWords = significantWords(query);
-    const candidateWords = significantWords(result.name);
-    const extraWordCount = countExtraWords(queryWords, new Set(candidateWords));
-    const headMismatch = headWordMismatch(queryWords, candidateWords);
-    // Carried through to the winning entry so callers (server.js) can
-    // show a €/kg or €/L unit price — the only way to compare two stores
-    // fairly when neither sells the item in the same pack size.
-    const isPack = looksLikeMultiPack({ html, name: result.name, url: productUrl });
-    // A pack's own €N.NN is for the whole pack, not one unit — its
-    // single-unit size (candidateSize) isn't what that price maps to, so
-    // use the pack's total size instead when there is one (see
-    // parsePackTotalSize's own comment for why this is kept separate from
-    // candidateSize rather than folded into it).
-    const size = isPack ? (parsePackTotalSize(html) ?? candidateSize({ html, name: result.name })) : candidateSize({ html, name: result.name });
-    const entry = {
-      store,
-      url: productUrl,
-      ...result,
-      extraWordCount,
-      headMismatch,
-      isPack,
-      unitSizeValue: size?.value ?? null,
-      unitSizeKind: size?.kind ?? null,
-    };
-    // A wrong product entirely, or the right product at a clearly wrong
-    // size, is never usable — not even as a last-resort fallback, since
-    // showing it at all would be a misleading price, worse than showing
-    // none.
-    if (looksIrrelevant(query, result.name) || looksLikeSizeMismatch(query, { html, name: result.name, url: productUrl })) {
-      continue;
-    }
-    (isPack ? packEntries : singleUnitEntries).push(entry);
+    if (scraped.price == null) continue;
+    candidates.push(parseCandidate(store, productUrl, scraped, query));
   }
 
-  const pool = singleUnitEntries.length ? singleUnitEntries : packEntries;
-  if (!pool.length) throw new NoMatchError(`não foi possível obter um produto em ${def.label}`);
-  return cheapestPlausible(pickClosestNameMatches(pool));
+  const best = selectBestCandidate(query, candidates);
+  if (!best) throw new NoMatchError(`não foi possível obter um produto em ${def.label}`);
+  return best;
 }
 
-// Narrows a store's candidate pool to only the entries tied for the
-// fewest query-unaccounted-for words (see countExtraWords) before price
-// is ever considered — the closest name match, not the cheapest name
-// match, is the right product. Ties within that are narrowed further by
-// headWordMismatch (see its own comment) before price ever breaks a tie.
+// The parsed candidate list for one store's search, no selection applied.
+// Backs both the "corrigir correspondência" UI (server.js
+// GET /api/products/:id/candidates, where the user picks the right result
+// when the automatic pick is wrong) and the offline test harness
+// (test/capture.js records exactly this, test/match.test.js replays
+// selectBestCandidate against it). `query` is passed through to
+// parseCandidate for its size-vs-query check.
+async function listStoreCandidates(store, query, limit = 8) {
+  const def = STORES[store];
+  if (!def) throw new Error(`unknown store: ${store}`);
+  const searchHtml = await fetchHtml(def.searchUrl(query));
+  const candidateUrls = extractCandidateUrls(def, searchHtml);
+  const out = [];
+  for (const productUrl of candidateUrls.slice(0, limit)) {
+    let scraped;
+    try {
+      scraped = await SCRAPERS[store](productUrl);
+    } catch {
+      continue;
+    }
+    if (scraped.price == null) continue;
+    out.push(parseCandidate(store, productUrl, scraped, query || ''));
+  }
+  return out;
+}
+
+// Scrape one specific product URL the user pinned as the correct match for
+// a store (server.js PUT /api/products/:id/override) — bypasses search and
+// selection, but still resolves pack/size so the unit-price display keeps
+// working.
+async function scrapeChosenUrl(store, url) {
+  const def = STORES[store];
+  if (!def) throw new Error(`unknown store: ${store}`);
+  if (detectStore(url) !== store) throw new Error('URL não pertence a esta loja');
+  const scraped = await SCRAPERS[store](url);
+  if (scraped.price == null) throw new Error('preço não encontrado na página');
+  const c = parseCandidate(store, url, scraped, '');
+  return {
+    store: c.store, url: c.url, name: c.name, price: c.price, currency: c.currency,
+    isPack: c.isPack, unitSizeValue: c.unitSizeValue, unitSizeKind: c.unitSizeKind,
+  };
+}
+
+// Narrows a store's candidate pool before price is ever considered — the
+// closest name match, not the cheapest name match, is the right product.
+// Order: plain products before unrequested processed forms
+// (hasUnrequestedFormWord), then fewest query-unaccounted-for words
+// (countExtraWords), then head-word agreement (headWordMismatch). Each
+// stage only narrows; it never empties a non-empty pool.
 function pickClosestNameMatches(entries) {
-  const minExtra = Math.min(...entries.map((e) => e.extraWordCount));
-  const closest = entries.filter((e) => e.extraWordCount === minExtra);
+  const plain = entries.filter((e) => !e.formMismatch);
+  const tier = plain.length ? plain : entries;
+  const minExtra = Math.min(...tier.map((e) => e.extraWordCount));
+  const closest = tier.filter((e) => e.extraWordCount === minExtra);
   const headMatched = closest.filter((e) => !e.headMismatch);
   return headMatched.length ? headMatched : closest;
 }
@@ -730,4 +901,14 @@ function cheapestPlausible(entries) {
   return plausible.reduce((cheapest, e) => (e.price < cheapest.price ? e : cheapest));
 }
 
-module.exports = { STORES, detectStore, scrapeUrl, searchAndScrapeStore, NoMatchError };
+module.exports = {
+  STORES,
+  detectStore,
+  scrapeUrl,
+  searchAndScrapeStore,
+  listStoreCandidates,
+  scrapeChosenUrl,
+  selectBestCandidate,
+  parseCandidate,
+  NoMatchError,
+};
