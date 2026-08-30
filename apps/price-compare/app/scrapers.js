@@ -699,11 +699,62 @@ async function scrapeContinente(url) {
   return { ...result, html };
 }
 
+// The product `name` from a schema.org Product block, even when its Offer
+// carries no price (Lidl's in-store-only produce).
+function extractJsonLdProductName(html) {
+  for (const m of (html || '').matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
+    let data;
+    try {
+      data = JSON.parse(m[1].trim());
+    } catch {
+      continue;
+    }
+    for (const item of Array.isArray(data) ? data : [data]) {
+      if (item && item['@type'] === 'Product' && typeof item.name === 'string') return item.name;
+    }
+  }
+  return null;
+}
+
+// Lidl's storefront is a Qwik SPA. For most items the price is in the
+// schema.org Offer, but fresh produce is listed availability:"InStoreOnly"
+// with no Offer price — the number still ships in the Qwik hydration
+// state, an index-referenced flat JSON array
+// (`{"price":45,"oldPrice":42,...}` where 45/42 are positions in the same
+// array, so `arr[45]` is the actual €1.49). Verified live against
+// "Laranja - Citrinos do Algarve IGP". Guarded: a serializer change just
+// yields null, i.e. the same NoMatch as today.
+function extractLidlStatePrice(html) {
+  for (const m of (html || '').matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
+    const body = m[1].trim();
+    if (body[0] !== '[' || !body.includes('"oldPrice"')) continue;
+    let arr;
+    try {
+      arr = JSON.parse(body);
+    } catch {
+      continue;
+    }
+    if (!Array.isArray(arr)) continue;
+    for (const o of arr) {
+      if (o && typeof o === 'object' && !Array.isArray(o) && typeof o.price === 'number' && ('oldPrice' in o || 'basePrice' in o)) {
+        const v = arr[o.price];
+        if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v;
+      }
+    }
+  }
+  return null;
+}
+
 async function scrapeLidl(url) {
   const html = await fetchHtml(url);
   const result = extractJsonLdPrice(html);
-  if (!result) throw new Error('preço não encontrado na página');
-  return { ...result, html };
+  if (result && result.price != null) return { ...result, html };
+  // in-store-only produce: no Offer price, dig it out of the Qwik state
+  const price = extractLidlStatePrice(html);
+  if (price != null) {
+    return { price, currency: 'EUR', name: extractJsonLdProductName(html), html };
+  }
+  throw new Error('preço não encontrado na página');
 }
 
 // Pingo Doce's JSON-LD block doesn't include the offer/price — the

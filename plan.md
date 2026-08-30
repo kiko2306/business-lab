@@ -4517,11 +4517,18 @@ Three reports came in, all on "Laranjas":
   switched to "Laranja 2 kg" at €1,49/kg (genuinely cheaper per kilo).
   Fixes many loose-produce rows, not just oranges (Cebola Granel, KG
   bananas, …). Suite 221 / 216 pass.
-- **"not on Lidl, but I can find it in Lidl's search"** — not a bug:
+- **"not on Lidl, but I can find it in Lidl's search"** — real, fixed.
   Lidl's "Laranja - Citrinos do Algarve IGP" is `availability:
-  "InStoreOnly"` with **no `price`** in its JSON-LD, so there is nothing
-  to scrape. Could surface a "só em loja" hint instead of just hiding the
-  row — minor, not done.
+  "InStoreOnly"` and its schema.org Offer has **no `price`** — but the
+  number *is* on the page, in the Qwik SPA hydration state: an
+  index-referenced flat JSON array where `{"price":45,"oldPrice":42}`
+  means `arr[45]` is the €1.49. `scrapeLidl` now falls back to
+  `extractLidlStatePrice` (+ `extractJsonLdProductName` for the label)
+  when the Offer carries no price. Guarded — a serializer change just
+  yields the same NoMatch as before. Verified: Lidl "Laranjas" now
+  matches at €1.49 → €0.99/kg (1.5 kg Algarve bag), so all four stores
+  have it. This also recovers other Lidl fresh-produce rows that were
+  silently dropped.
 
 ### 43.25 TODO — report an error at the *product* level, not only per store
 
