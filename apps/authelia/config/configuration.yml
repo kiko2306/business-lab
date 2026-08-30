@@ -36,9 +36,9 @@ session:
     # If your setup doesn't already expose Authelia at this hostname via the
     # dashboard's Exposure settings, update this to whatever domain it will
     # actually be reachable at first.
-    - domain: 'tx-home-utils.com'
-      authelia_url: 'https://authelia.tx-home-utils.com'
-      default_redirection_url: 'https://netbird-vpn.tx-home-utils.com'
+    - domain: '{{ env "BASE_DOMAIN" }}'
+      authelia_url: 'https://authelia.{{ env "BASE_DOMAIN" }}'
+      default_redirection_url: 'https://netbird-vpn.{{ env "BASE_DOMAIN" }}'
 
 storage:
   local:
@@ -57,8 +57,19 @@ notifier:
 # Both clients below are "public" (no client_secret) since NetBird's
 # dashboard (PKCE) and CLI (device code) are exactly the kind of clients
 # that can't safely hold a static secret. redirect_uris point at NetBird's
-# real exposed hostname (netbird-vpn.tx-home-utils.com) — update them if
-# yours differs.
+# real exposed hostname (netbird-vpn.<base domain>).
+#
+# Every hostname here is templated from the BASE_DOMAIN environment variable
+# rather than hardcoded, so a new deployment on a different domain needs no
+# edits to this file. That requires the `template` config filter, which
+# docker-compose.yml enables via --config.experimental.filters; without it
+# Authelia reads the template expressions as literal text and fails validation
+# with "could not decode ... to a *url.URL". BASE_DOMAIN is written into this
+# app's .env by start.sh.
+#
+# Note the filter templates this whole file, comments included — so don't write
+# a literal template action anywhere here, even inside a comment, or Authelia
+# fails to start on a parse error.
 #
 # The jwks signing key itself is NOT in this file: Authelia's config schema
 # doesn't support a key_file reference or env-var override for it (jwks is a
@@ -110,8 +121,8 @@ identity_providers:
         audience:
           - 'netbird-dashboard'
         redirect_uris:
-          - 'https://netbird-vpn.tx-home-utils.com/nb-auth'
-          - 'https://netbird-vpn.tx-home-utils.com/nb-silent-auth'
+          - 'https://netbird-vpn.{{ env "BASE_DOMAIN" }}/nb-auth'
+          - 'https://netbird-vpn.{{ env "BASE_DOMAIN" }}/nb-silent-auth'
           # Native clients (Android/desktop/CLI) reuse this same public PKCE
           # client — they can't use the two web URLs above, because the app
           # runs a throwaway loopback listener and expects the authorization

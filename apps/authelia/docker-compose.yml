@@ -7,11 +7,25 @@ services:
     # gitignored data/oidc-secrets.yml holding the actual OIDC signing key
     # (see the identity_providers comment in configuration.yml for why it's
     # split out like this).
-    command: ["--config", "/config/configuration.yml,/data/oidc-secrets.yml"]
+    # --config.experimental.filters template turns on Go templating inside the
+    # config files, which is what lets configuration.yml derive every hostname
+    # from ${BASE_DOMAIN} ({{ env "BASE_DOMAIN" }}) instead of hardcoding a
+    # domain. Drop the filter and Authelia reads the braces literally and
+    # refuses to start ("could not decode ... to a *url.URL").
+    command:
+      - "--config"
+      - "/config/configuration.yml,/data/oidc-secrets.yml"
+      - "--config.experimental.filters"
+      - "template"
     ports:
       - "${AUTHELIA_PORT:-9091}:9091"
     environment:
       TZ: ${TZ:-UTC}
+      # Consumed by the {{ env "BASE_DOMAIN" }} templating in
+      # config/configuration.yml. Written into this app's .env by start.sh;
+      # no default on purpose — a silently-empty domain would produce a
+      # subtly broken cookie domain and OIDC issuer rather than a clear error.
+      BASE_DOMAIN: ${BASE_DOMAIN}
       AUTHELIA_SESSION_SECRET: ${AUTHELIA_SESSION_SECRET}
       AUTHELIA_STORAGE_ENCRYPTION_KEY: ${AUTHELIA_STORAGE_ENCRYPTION_KEY}
       AUTHELIA_IDENTITY_VALIDATION_RESET_PASSWORD_JWT_SECRET: ${AUTHELIA_JWT_SECRET}

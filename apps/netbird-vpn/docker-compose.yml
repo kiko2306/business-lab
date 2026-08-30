@@ -37,11 +37,11 @@ services:
       # See apps/netbird-vpn/.env.example for what provisions this.
       # Matches the auto-provisioned secondary hostname: <service>-<suffix>
       # (see additionalExposures on netbird-vpn in backend/src/config/services.ts).
-      NETBIRD_MGMT_API_ENDPOINT: https://netbird-vpn-api.tx-home-utils.com
-      NETBIRD_MGMT_GRPC_API_ENDPOINT: https://netbird-vpn-api.tx-home-utils.com
+      NETBIRD_MGMT_API_ENDPOINT: https://netbird-vpn-api.${BASE_DOMAIN}
+      NETBIRD_MGMT_GRPC_API_ENDPOINT: https://netbird-vpn-api.${BASE_DOMAIN}
       AUTH_AUDIENCE: netbird-dashboard
       AUTH_CLIENT_ID: netbird-dashboard
-      AUTH_AUTHORITY: https://authelia.tx-home-utils.com
+      AUTH_AUTHORITY: https://authelia.${BASE_DOMAIN}
       # Must include offline_access, or Authelia never issues a refresh
       # token — the dashboard's access token then simply expires with no
       # way to silently renew it, breaking every API call (peers, users,
@@ -69,7 +69,7 @@ services:
       - "homepage.group=Infrastructure"
       - "homepage.name=Netbird VPN"
       - "homepage.icon=netbird.png"
-      - "homepage.href=https://netbird-vpn.tx-home-utils.com"
+      - "homepage.href=https://netbird-vpn.${BASE_DOMAIN}"
       - "homepage.description=Zero-trust VPN and network access"
     depends_on:
       - netbird-management

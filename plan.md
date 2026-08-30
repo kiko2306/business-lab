@@ -5288,3 +5288,106 @@ cost this project several sessions and a nearly-accepted router port-forward)
 is now automated away. What remains manual is the ordinary per-deployment
 configuration a new domain needs, which fails loudly and obviously rather than
 silently.
+
+## 47. Session Log — 2026-08-30 (cont.): `start.sh` bootstraps Cloudflare + NetBird end-to-end
+
+Answers §46.15's "what doesn't carry over" by removing almost all of it. A
+clean `git clone` + `sudo ./start.sh` on a new host now asks three questions
+and configures the rest.
+
+### 47.1 What start.sh now asks for, and what it derives
+
+Prompts (once; remembered in the root `.env`, which is already gitignored and
+`chmod 600`, so no new secret file or ignore rule was needed):
+**base domain**, **Cloudflare API token** (read silently), **tunnel name**
+(defaults to the hostname).
+
+Everything else is derived rather than typed:
+- **Zone ID *and* account ID from one call** — `GET /zones?name=<domain>`
+  returns the zone with its owning account embedded.
+- **The tunnel**, looked up by name and created only if absent. Created with
+  **`config_src: "cloudflare"`**, which is not optional: the dashboard
+  publishes ingress with `PUT /cfd_tunnel/{id}/configurations`
+  (`cloudflareTunnelClient.ts`), and against a locally-configured tunnel that
+  call is *accepted* but the connector never reads it — every exposure would
+  silently 404. Exactly the failure shape §46 was about, so it is commented in
+  place.
+- **The connector token**, fetched from the API — so it never has to be pasted
+  in, and is never written to a file.
+- **cloudflared itself**, downloaded per-arch and `service install`ed, but only
+  when no `cloudflared.service` already exists, so re-runs can't repoint a
+  connector that may be serving a different tunnel.
+
+The §46.10 http2 drop-in is written before any of this, so a connector
+installed here picks it up immediately.
+
+Non-interactive safety: if the values are absent *and* there is no TTY, the
+whole block is skipped with a warning instead of hanging — an unattended
+re-run still brings the stack up.
+
+### 47.2 The domain is no longer hardcoded anywhere
+
+§46.15 listed this as the main thing that didn't carry over. All three config
+files are now templated:
+
+- **`apps/authelia/config/configuration.yml`** — all 6 occurrences became
+  `{{ env "BASE_DOMAIN" }}`, enabled by adding
+  `--config.experimental.filters template` to the container command.
+  Verified this filter exists and works on v4.39.20 before relying on it.
+  **Gotcha found the hard way and now commented in the file**: the filter
+  templates the *whole file, comments included* — a literal template action
+  written inside an explanatory comment made Authelia fail to start with
+  `template: config.template:66: unexpected <.> in operand`.
+- **`apps/netbird-vpn/docker-compose.yml`** — the 4 endpoint/label literals
+  became `${BASE_DOMAIN}`.
+- **`apps/netbird-vpn/config/management.json.example`** — 8 occurrences became
+  `${BASE_DOMAIN}`; `start.sh` renders `data/management.json` from it with the
+  domain substituted and a fresh 32-byte `DataStoreEncryptionKey`, replacing
+  the python snippet that used to live in a comment in `.env.example`.
+
+`start.sh` also now generates Authelia's four required secrets and its OIDC
+JWKS (`data/oidc-secrets.yml`), which were previously a manual `openssl genrsa`
+recipe. User bootstrap stays with the dashboard (`autheliaUsers.ts`).
+
+### 47.3 Exposure settings are seeded, not retyped
+
+After the stack is up, `start.sh` writes `exposure_base_domain`,
+`cloudflare_tunnel_token`, and the account/zone/tunnel IDs into the `settings`
+table, so the dashboard's Exposure page is pre-filled on first login. The
+upsert has a `WHERE settings.value IS NULL OR settings.value = ''` guard, so a
+value already set from the dashboard always wins over a re-run.
+
+### 47.4 Verified
+
+Mechanisms were each proven before being built on, not assumed:
+
+- `TUNNEL_TRANSPORT_PROTOCOL=http2` genuinely works → `INF Initial protocol
+  http2` (this is what let §46.10 drop the fragile ExecStart rewrite).
+- Authelia's `template` filter genuinely substitutes — proven with a *negative*
+  control: `BASE_DOMAIN='not a domain'` produced
+  `redirect uri 'https://netbird-vpn.not a domain/nb-auth' could not be parsed`,
+  quoting the substituted value.
+- Real config validates clean for `tx-home-utils.com` **and** for an unrelated
+  `example.org` (only the pre-existing `netbird-cli` warning).
+- `management.json` generation for `example.org` yields correct URLs
+  throughout, a 32-byte key, and no leftover `${BASE_DOMAIN}` placeholders.
+- `json_field` checked against every real Cloudflare response shape used, plus
+  the `success:false` and empty-array cases (must return empty, not crash).
+- `bash -n` clean; **shellcheck clean at `-S warning`**.
+
+Live regression after restarting Authelia, management and the dashboard on the
+templated config: OIDC issuer correct, both real redirect URIs still accepted
+and a bogus one still rejected, gRPC trailers still arriving for management and
+signal, all services 200/302, and the enrolled peer (`garnet_eea`) intact.
+Backend 121/121, `tsc` clean.
+
+### 47.5 Still not automated
+
+- **`BASE_DOMAIN` is written into each app's `.env` by `start.sh`**, so
+  changing the base domain later from the dashboard alone won't move Authelia
+  or NetBird — that needs a re-run (or hand-editing those two `.env`s). A
+  cleaner fix would be a `baseDomainEnvKeys` field injected by
+  `exposureEnv.ts` from the stored setting, keeping the DB as the single source
+  of truth; not done here because Authelia needs the value at *first boot*,
+  before any exposure row exists.
+- Relay (§46.9) and the CLI device flow (§46.12) remain open.

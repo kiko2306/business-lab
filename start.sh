@@ -28,7 +28,7 @@ TARGET_USER="${SUDO_USER:-root}"
 
 if command -v apt-get >/dev/null 2>&1; then
   APT_MISSING=()
-  for bin_pkg in "curl:curl" "openssl:openssl" "gnupg:gnupg" "ca-certificates:ca-certificates"; do
+  for bin_pkg in "curl:curl" "openssl:openssl" "gnupg:gnupg" "ca-certificates:ca-certificates" "python3:python3"; do
     bin="${bin_pkg%%:*}"
     pkg="${bin_pkg##*:}"
     if ! command -v "$bin" >/dev/null 2>&1; then
@@ -196,6 +196,221 @@ ensure_secret POSTGRES_PASSWORD
 log "Setting APPS_DIR to $(pwd)/apps"
 set_env_var APPS_DIR "$(pwd)/apps"
 
+# ---------------------------------------------------------------------------
+# Cloudflare / base-domain bootstrap
+#
+# Everything below exists so a fresh server ends up with a working NetBird
+# without anyone hand-editing config files. It is all idempotent: values
+# already in .env are reused, an existing tunnel is looked up rather than
+# recreated, and an already-installed connector is left alone.
+# ---------------------------------------------------------------------------
+
+# Same idempotent set/read as .env, against an arbitrary app's .env file.
+set_app_env_var() {
+  local file="$1" key="$2" value="$3"
+  if [ ! -f "$file" ]; then
+    if [ -f "${file}.example" ]; then cp "${file}.example" "$file"; else : >"$file"; fi
+    chmod 600 "$file"
+  fi
+  if grep -qE "^${key}=" "$file"; then
+    sed -i.bak "s|^${key}=.*|${key}=${value}|" "$file" && rm -f "${file}.bak"
+  else
+    printf '%s=%s\n' "$key" "$value" >>"$file"
+  fi
+}
+
+app_env_value() {
+  [ -f "$1" ] || return 0
+  grep -E "^${2}=" "$1" | head -n1 | cut -d= -f2-
+}
+
+# Fill a placeholder secret in an app's .env, once. Never overwrites a real value.
+ensure_app_secret() {
+  local file="$1" key="$2" value
+  value="$(app_env_value "$file" "$key")"
+  case "$value" in
+    "" | change-me* | change_this* )
+      set_app_env_var "$file" "$key" "$(openssl rand -hex 64)"
+      ;;
+  esac
+}
+
+# Ask for a value once and remember it in .env. Returns non-zero (without
+# prompting) when there's nothing set and no TTY to ask on, so an unattended
+# re-run degrades to "skip the Cloudflare setup" instead of hanging forever.
+prompt_env_var() {
+  local key="$1" prompt="$2" default="${3:-}" silent="${4:-}" value
+  value="$(current_value "$key")"
+  case "$value" in "" | change_this* ) value="" ;; esac
+  if [ -n "$value" ]; then return 0; fi
+  if [ ! -t 0 ]; then return 1; fi
+  while [ -z "$value" ]; do
+    if [ -n "$silent" ]; then
+      printf '%s: ' "$prompt" >&2; read -r -s value; printf '\n' >&2
+    elif [ -n "$default" ]; then
+      printf '%s [%s]: ' "$prompt" "$default" >&2; read -r value; value="${value:-$default}"
+    else
+      printf '%s: ' "$prompt" >&2; read -r value
+    fi
+  done
+  set_env_var "$key" "$value"
+}
+
+# Reads a top-level field out of a Cloudflare API response. python3 rather than
+# jq because jq isn't in this script's package list and python3 already is.
+json_field() { python3 -c 'import json,sys;d=json.load(sys.stdin);print(eval("d"+sys.argv[1]) if d.get("success") else "")' "$1" 2>/dev/null || true; }
+
+cf_api() {
+  local method="$1" path="$2" body="${3:-}"
+  if [ -n "$body" ]; then
+    curl -fsS -X "$method" -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+      -H 'Content-Type: application/json' --data "$body" \
+      "https://api.cloudflare.com/client/v4${path}" 2>/dev/null || true
+  else
+    curl -fsS -X "$method" -H "Authorization: Bearer ${CLOUDFLARE_API_TOKEN}" \
+      "https://api.cloudflare.com/client/v4${path}" 2>/dev/null || true
+  fi
+}
+
+CF_READY=0
+if prompt_env_var BASE_DOMAIN "Base domain for published services (e.g. example.com)" \
+  && prompt_env_var CLOUDFLARE_API_TOKEN "Cloudflare API token (Tunnel:Edit + DNS:Edit)" "" silent \
+  && prompt_env_var TUNNEL_NAME "Cloudflare Tunnel name for this host" "$(hostname -s 2>/dev/null || hostname)"; then
+  CF_READY=1
+else
+  warn "BASE_DOMAIN / CLOUDFLARE_API_TOKEN not set and no terminal to prompt on — skipping Cloudflare + NetBird auto-setup. Re-run interactively to finish it."
+fi
+
+BASE_DOMAIN="$(current_value BASE_DOMAIN)"
+
+if [ "$CF_READY" = "1" ]; then
+  CLOUDFLARE_API_TOKEN="$(current_value CLOUDFLARE_API_TOKEN)"
+  TUNNEL_NAME="$(current_value TUNNEL_NAME)"
+
+  # One call yields both ids — the zone record carries its owning account.
+  ZONE_JSON="$(cf_api GET "/zones?name=${BASE_DOMAIN}")"
+  CF_ZONE_ID="$(printf '%s' "$ZONE_JSON" | json_field '["result"][0]["id"]')"
+  CF_ACCOUNT_ID="$(printf '%s' "$ZONE_JSON" | json_field '["result"][0]["account"]["id"]')"
+
+  if [ -z "$CF_ZONE_ID" ] || [ -z "$CF_ACCOUNT_ID" ]; then
+    warn "Couldn't look up zone '${BASE_DOMAIN}' with that Cloudflare token — check the token's permissions and that the domain is in this account. Skipping tunnel setup."
+    CF_READY=0
+  else
+    set_env_var CLOUDFLARE_ZONE_ID "$CF_ZONE_ID"
+    set_env_var CLOUDFLARE_ACCOUNT_ID "$CF_ACCOUNT_ID"
+
+    CF_TUNNEL_ID="$(cf_api GET "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel?name=${TUNNEL_NAME}&is_deleted=false" \
+      | json_field '["result"][0]["id"]')"
+
+    if [ -z "$CF_TUNNEL_ID" ]; then
+      log "Creating Cloudflare Tunnel '${TUNNEL_NAME}'"
+      # config_src MUST be "cloudflare" (remotely-managed). The dashboard
+      # publishes each service's ingress with
+      # PUT /cfd_tunnel/{id}/configurations (see cloudflareTunnelClient.ts);
+      # against a locally-configured tunnel that call is accepted but the
+      # connector never reads it, so every exposure would silently 404.
+      CF_TUNNEL_ID="$(cf_api POST "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel" \
+        "{\"name\":\"${TUNNEL_NAME}\",\"config_src\":\"cloudflare\"}" \
+        | json_field '["result"]["id"]')"
+    else
+      log "Reusing existing Cloudflare Tunnel '${TUNNEL_NAME}'"
+    fi
+
+    if [ -z "$CF_TUNNEL_ID" ]; then
+      warn "Couldn't create or find the tunnel — skipping connector install."
+      CF_READY=0
+    else
+      set_env_var CLOUDFLARE_TUNNEL_ID "$CF_TUNNEL_ID"
+
+      if ! command -v cloudflared >/dev/null 2>&1; then
+        case "$(uname -m)" in
+          x86_64) CF_ARCH=amd64 ;;
+          aarch64|arm64) CF_ARCH=arm64 ;;
+          armv7l|armhf) CF_ARCH=arm ;;
+          *) CF_ARCH="" ;;
+        esac
+        if [ -n "$CF_ARCH" ] && command -v dpkg >/dev/null 2>&1; then
+          log "Installing cloudflared (linux-${CF_ARCH})"
+          if curl -fsSL -o /tmp/cloudflared.deb \
+            "https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-${CF_ARCH}.deb"; then
+            dpkg -i /tmp/cloudflared.deb >/dev/null 2>&1 || warn "cloudflared package install failed"
+            rm -f /tmp/cloudflared.deb
+          else
+            warn "couldn't download cloudflared — install it manually"
+          fi
+        else
+          warn "don't know how to install cloudflared on this platform — install it manually"
+        fi
+      fi
+
+      # Only install the service if there isn't one already: re-running must not
+      # repoint an existing connector (possibly serving a different tunnel).
+      if command -v cloudflared >/dev/null 2>&1 \
+        && ! systemctl list-unit-files cloudflared.service >/dev/null 2>&1; then
+        CF_CONNECTOR_TOKEN="$(cf_api GET "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${CF_TUNNEL_ID}/token" \
+          | json_field '["result"]')"
+        if [ -n "$CF_CONNECTOR_TOKEN" ]; then
+          log "Installing the cloudflared connector service for '${TUNNEL_NAME}'"
+          cloudflared service install "$CF_CONNECTOR_TOKEN" >/dev/null 2>&1 \
+            || warn "cloudflared service install failed — run it manually"
+          # The http2 drop-in written earlier applies from here on; the unit was
+          # created after it, so make sure it's actually picked up.
+          systemctl daemon-reload >/dev/null 2>&1 || true
+          systemctl restart cloudflared >/dev/null 2>&1 || true
+          unset CF_CONNECTOR_TOKEN
+        else
+          warn "couldn't retrieve the tunnel's connector token — install the service manually"
+        fi
+      fi
+    fi
+  fi
+fi
+
+# --- Per-app config that used to be hand-edited --------------------------
+
+if [ -n "$BASE_DOMAIN" ]; then
+  # Authelia and NetBird both template every hostname from this rather than
+  # hardcoding a domain (see apps/authelia/config/configuration.yml and
+  # apps/netbird-vpn/docker-compose.yml).
+  set_app_env_var apps/authelia/.env BASE_DOMAIN "$BASE_DOMAIN"
+  set_app_env_var apps/netbird-vpn/.env BASE_DOMAIN "$BASE_DOMAIN"
+
+  # Authelia refuses to start without these, and they have no safe defaults.
+  ensure_app_secret apps/authelia/.env AUTHELIA_SESSION_SECRET
+  ensure_app_secret apps/authelia/.env AUTHELIA_STORAGE_ENCRYPTION_KEY
+  ensure_app_secret apps/authelia/.env AUTHELIA_JWT_SECRET
+  ensure_app_secret apps/authelia/.env AUTHELIA_OIDC_HMAC_SECRET
+
+  # Authelia's OIDC signing key can't live in the tracked config (it's a
+  # private key), so it's merged in from this gitignored second file.
+  if [ ! -f apps/authelia/data/oidc-secrets.yml ]; then
+    log "Generating Authelia's OIDC signing key"
+    mkdir -p apps/authelia/data
+    {
+      printf 'identity_providers:\n  oidc:\n    jwks:\n'
+      printf "      - key_id: 'main'\n        algorithm: 'RS256'\n        use: 'sig'\n        key: |\n"
+      openssl genrsa 4096 2>/dev/null | sed 's/^/          /'
+    } > apps/authelia/data/oidc-secrets.yml
+    chmod 600 apps/authelia/data/oidc-secrets.yml
+  fi
+
+  # NetBird's working config: the tracked template with the domain filled in
+  # and a real store-encryption key generated. Never regenerated — the key
+  # encrypts existing data.
+  if [ ! -f apps/netbird-vpn/data/management.json ]; then
+    log "Generating NetBird's management.json for ${BASE_DOMAIN}"
+    mkdir -p apps/netbird-vpn/data
+    BASE_DOMAIN="$BASE_DOMAIN" python3 - <<'PY'
+import base64, json, os, secrets
+tpl = open('apps/netbird-vpn/config/management.json.example').read()
+cfg = json.loads(tpl.replace('${BASE_DOMAIN}', os.environ['BASE_DOMAIN']))
+cfg['DataStoreEncryptionKey'] = base64.b64encode(secrets.token_bytes(32)).decode()
+json.dump(cfg, open('apps/netbird-vpn/data/management.json', 'w'), indent=2)
+PY
+    chmod 600 apps/netbird-vpn/data/management.json
+  fi
+fi
+
 if [ -S /var/run/docker.sock ]; then
   DOCKER_GID="$(stat -c '%g' /var/run/docker.sock 2>/dev/null || stat -f '%g' /var/run/docker.sock)"
   log "Setting DOCKER_GID to $DOCKER_GID (owner of /var/run/docker.sock)"
@@ -243,6 +458,33 @@ for _ in $(seq 1 30); do
   sleep 2
 done
 
+# Seed the dashboard's exposure settings from what was collected above, so the
+# Cloudflare/base-domain fields are already filled in on first login instead of
+# having to be retyped. Runs here because it needs the database container up.
+# Only fills blanks — a value already set from the dashboard always wins.
+if [ "$CF_READY" = "1" ]; then
+  DB_USER="$(current_value POSTGRES_USER)"; DB_USER="${DB_USER:-homelab}"
+  DB_NAME="$(current_value POSTGRES_DB)"; DB_NAME="${DB_NAME:-homelab}"
+  DB_CID="$(docker compose ps -q database 2>/dev/null || true)"
+  if [ -n "$DB_CID" ]; then
+    seed_setting() {
+      [ -n "$2" ] || return 0
+      docker exec -i "$DB_CID" psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" \
+        -c "INSERT INTO settings (key, value) VALUES ('$1', '$2')
+            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
+            WHERE settings.value IS NULL OR settings.value = '';" >/dev/null 2>&1 || true
+    }
+    log "Seeding the dashboard's exposure settings"
+    seed_setting exposure_base_domain "$BASE_DOMAIN"
+    seed_setting cloudflare_tunnel_token "$(current_value CLOUDFLARE_API_TOKEN)"
+    seed_setting exposure_cloudflare_account_id "$(current_value CLOUDFLARE_ACCOUNT_ID)"
+    seed_setting exposure_cloudflare_zone_id "$(current_value CLOUDFLARE_ZONE_ID)"
+    seed_setting exposure_cloudflare_tunnel_id "$(current_value CLOUDFLARE_TUNNEL_ID)"
+  else
+    warn "database container not found — fill the Cloudflare fields in Settings manually"
+  fi
+fi
+
 cat <<EOF
 
 Homelab Management is up.
@@ -252,4 +494,12 @@ Homelab Management is up.
 First run: open the dashboard and complete /setup to create the first admin
 account. Per-app secrets and public exposure are configured from the
 dashboard's Settings — no further manual .env editing is required.
+
+Cloudflare / NetBird: the tunnel, its connector service, Authelia's OIDC keys
+and NetBird's management.json were all set up for ${BASE_DOMAIN:-<no domain set>}.
+To publish a service, enable "Publicly expose this service" for it in the
+dashboard — that creates its Nginx Proxy Manager host, tunnel route and DNS
+record. NetBird works out of the box once its exposure is enabled: point a
+client at https://netbird-vpn-api.${BASE_DOMAIN:-<domain>} and sign in
+through Authelia.
 EOF

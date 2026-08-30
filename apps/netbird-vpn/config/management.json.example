@@ -21,7 +21,7 @@
   },
   "Signal": {
     "Proto": "https",
-    "URI": "netbird-vpn-signal.tx-home-utils.com:443",
+    "URI": "netbird-vpn-signal.${BASE_DOMAIN}:443",
     "Username": "",
     "Password": null
   },
@@ -38,19 +38,19 @@
   },
   "HttpConfig": {
     "Address": "0.0.0.0:8080",
-    "AuthIssuer": "https://authelia.tx-home-utils.com",
+    "AuthIssuer": "https://authelia.${BASE_DOMAIN}",
     "AuthAudience": "netbird-dashboard",
-    "AuthKeysLocation": "https://authelia.tx-home-utils.com/jwks.json",
+    "AuthKeysLocation": "https://authelia.${BASE_DOMAIN}/jwks.json",
     "AuthUserIDClaim": "sub",
-    "OIDCConfigEndpoint": "https://authelia.tx-home-utils.com/.well-known/openid-configuration"
+    "OIDCConfigEndpoint": "https://authelia.${BASE_DOMAIN}/.well-known/openid-configuration"
   },
   "DeviceAuthorizationFlow": {
     "Provider": "",
     "ProviderConfig": {
       "Audience": "netbird-cli",
       "ClientID": "netbird-cli",
-      "TokenEndpoint": "https://authelia.tx-home-utils.com/api/oidc/token",
-      "DeviceAuthEndpoint": "https://authelia.tx-home-utils.com/api/oidc/device-authorization",
+      "TokenEndpoint": "https://authelia.${BASE_DOMAIN}/api/oidc/token",
+      "DeviceAuthEndpoint": "https://authelia.${BASE_DOMAIN}/api/oidc/device-authorization",
       "Scope": "openid profile email offline_access",
       "UseIDToken": false
     }
@@ -60,8 +60,8 @@
       "Audience": "netbird-dashboard",
       "ClientID": "netbird-dashboard",
       "Domain": "",
-      "AuthorizationEndpoint": "https://authelia.tx-home-utils.com/api/oidc/authorization",
-      "TokenEndpoint": "https://authelia.tx-home-utils.com/api/oidc/token",
+      "AuthorizationEndpoint": "https://authelia.${BASE_DOMAIN}/api/oidc/authorization",
+      "TokenEndpoint": "https://authelia.${BASE_DOMAIN}/api/oidc/token",
       "Scope": "openid profile email offline_access",
       "RedirectURLs": [
         "http://localhost:53000/"
