@@ -417,6 +417,22 @@ function looksIrrelevant(query, candidateName) {
   const wordsToCheck = specificWords.length ? specificWords : queryWords;
   const required = wordsToCheck.length === 1 ? 1 : 2;
   const matches = wordsToCheck.filter((w) => candidateWords.has(w)).length;
+
+  // Tried also gating on headWordMismatch here when only one fragile
+  // specific word is left (e.g. "Iogurtes naturais" → just "natural"
+  // once "iogurte" is excluded as generic, weak enough on its own to
+  // match Lidl's "Atum ao Natural" — tuna, not yogurt). Reverted:
+  // replaying it against the 300-item pool's recorded matches caught 6
+  // genuine mismatches this way but also rejected 6 *correct* ones —
+  // "Postas de Bacalhau Seco", "Lombos de Bacalhau Demolhado", "Folha de
+  // Massa Fresca para Lasanha", real dishwasher-tablet listings — because
+  // Portuguese product names routinely lead with a cut/format word
+  // ("Postas de", "Lombos de", "Detergente") before the category noun,
+  // not the noun itself. headWordMismatch stays useful as a tiebreaker
+  // between several candidates from the same store (pickClosestNameMatches
+  // below) — it's only unsafe as a hard reject with no fallback. The
+  // Atum/Iogurte case stays a known gap rather than trading it for six
+  // new false rejections.
   return matches < required;
 }
 

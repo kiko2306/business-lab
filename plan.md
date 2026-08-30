@@ -3838,3 +3838,38 @@ around.
 Deployed the plural fixes together with the bug-report feature (built
 earlier this session, deploy had been deferred to avoid killing the
 in-progress refresh) and re-ran the full 300-item refresh.
+
+## 38. Session Log — 2026-08-30 (cont.): Price Compare — a second reverted fix, final 300-item numbers
+
+Final refresh (with §37's irregular-plural fixes deployed) landed at
+62.4% match rate (749/1200), 30 items at 0/4. Manually checking a few of
+the newly-successful matches (the irregular-plural fix let several
+queries reach stores for the first time) surfaced one real mismatch:
+"Iogurtes naturais" matched Lidl's "Atum ao Natural" — tuna, not yogurt,
+sharing only the word "natural" once "iogurte" is excluded as generic.
+
+Tried fixing it by gating on `headWordMismatch` (already used as a
+same-store tiebreaker) as a hard rejection whenever only one fragile
+specific word is left after generic-word exclusion. Reverted the same
+session it was written, after replaying it against the 300-item pool's
+own recorded matches: it correctly caught 6 real mismatches (including
+the Atum/Iogurte case) but also rejected 6 *genuinely correct* matches —
+"Postas de Bacalhau Seco", "Lombos de Bacalhau Demolhado", "Folha de
+Massa Fresca para Lasanha", real dishwasher-tablet listings — because
+Portuguese product names routinely lead with a cut/format word ("Postas
+de", "Lombos de", "Detergente") ahead of the category noun itself, not
+the noun first. `headWordMismatch` stays valid as a same-store tiebreaker
+(where there's always a fallback to the full candidate set) but isn't
+safe as an unconditional reject with nothing to fall back to. Net neutral
+at best, so reverted rather than trade one gap for six new ones — same
+call as §37's packaging-word revert, both caught by testing against real
+recorded data before shipping instead of after.
+
+Final state, redeployed: 300 items, 62.4% match rate (749/1200 store ×
+item pairs), 30 items with no store match at all. Known remaining gaps,
+not chased further this session: "Sardinhas em lata" (packaging word
+required literally), "Iogurtes naturais" at Lidl specifically (the
+Atum/Natural false match), a handful of items whose store-side name
+differs from common usage ("Amaciador de cabelo" vs "Condicionador"),
+one marketing-tagline product name, and fresh tomatoes not surfacing in
+Continente's own top search results at all.
