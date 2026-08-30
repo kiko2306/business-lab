@@ -5498,6 +5498,10 @@ missed.
 
 ## 49. Fresh-setup test plan (`setup_test/`)
 
+**Revised mid-writing**: the user proposed running the test on a laptop under
+WSL rather than on `home-srv-01`, which is clearly better — see §49.3. The plan
+now targets that, with the same-host variant kept as an appendix.
+
 A plan for validating that `git clone` + `sudo ./start.sh` produces a working
 deployment, run on this host alongside production. Not executed yet — the plan,
 its hazard analysis, and a read-only snapshot script.
@@ -5579,3 +5583,40 @@ up with `GET /zones?name=<domain>`, which matches zone names exactly — a
 subdomain returns nothing and the Cloudflare step is skipped with a warning. It
 should warn and continue, never hang or half-configure. A suffix-match fallback
 would be needed to support a subdomain base.
+
+
+### 49.3 Revised: run it on a laptop (WSL), not on the server
+
+A separate machine means a separate Docker daemon, which removes four of the
+five hazards outright: the Compose project-name collision (§49.1), the shared
+`homelab-*` image tags, the port collisions on 80/3000, and — since the
+hostname differs — the tunnel-name default matching production's tunnel.
+
+**What does not go away is the Cloudflare account and the domain.** That is
+account-level, not machine-level: running the test with the live `BASE_DOMAIN`
+and then enabling exposure would still repoint the live `CNAME`s at the test
+tunnel and break production from a different computer. So the plan offers two
+options — same domain with exposure left off, or a **second domain** with
+exposure on.
+
+The second domain is the real prize: a full end-to-end verification was
+*impossible* on the server, because any exposure there would have hit
+production. On a laptop with its own domain it becomes the first setup that can
+prove a from-scratch NetBird deployment works — ending at the same
+`grpc-status: 0` check that §46 turned on.
+
+**WSL prerequisite, and the reason it matters more than it looks.** WSL does
+not run systemd by default, and `start.sh`'s cloudflared steps depend on it
+(lines 127-134, 349-359). Without systemd the drop-in file is still written,
+`cloudflared service install` is attempted and *warns* that it failed,
+`daemon-reload`/`restart` fail silently behind `|| true` — and no connector
+ever runs, while every other check still passes and the script completes. The
+run looks successful having skipped exactly the fix that took this project the
+longest to find. `/etc/wsl.conf` needs `[boot] systemd=true` and a
+`wsl --shutdown` first; the plan makes verifying the connector's transport
+(`Initial protocol http2`) the headline assertion for this reason.
+
+Docker should be installed inside the distro rather than via Docker Desktop's
+WSL integration — `start.sh` manages a `docker` service and writes
+`/etc/docker/daemon.json`, neither of which exists in the distro under Docker
+Desktop.
