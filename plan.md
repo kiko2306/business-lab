@@ -3540,3 +3540,52 @@ Frutas e Vegetais search results) — not the edit bug. Asked the user for
 more specific repro details (which product, which device, what exactly
 happened after clicking Guardar) but they moved on to other reports
 before answering. **Still open — revisit if it recurs.**
+
+## 32. Session Log — 2026-08-30: Price Compare — brand-specificity fix (generic-word exclusion)
+
+User asked for a systematic scan of the 122-item test pool for mismatches
+beyond the ones already found manually. Scanned every product for large
+within-product price gaps across its own 4 store entries (the same signal
+that caught Grego/Oikos and the 2kg sugar bag), cross-referenced against
+each entry's actual `scrapedName`. Found 47 flagged entries; most were
+legitimate pack-size variance, but 9 were genuine wrong-brand/wrong-product
+matches, all sharing the exact same root cause:
+
+**The relevance floor (≥2 shared words) could be satisfied entirely by
+generic category words while the actual distinguishing word — almost
+always the brand — never had to match at all.** Concrete cases found:
+"Cerveja com Álcool Alhambra" matched Sagres at two different stores
+(shared "cerveja"+"álcool"); "Água sem Gás Luso" matched a different water
+brand ("Caldas de Penacova", shared "água"+"gás"); "Pilhas AAA Boost"
+matched an unrelated own-brand pack (shared "pilhas"+"aaa"); "Detergente
+Manual Loiça..." repeatedly matched dishwasher tablets at Lidl (shared
+"detergente"+"loiça", "manual" vs the candidate's "máquina" never
+checked); "Massa Esparguete Milaneza"/"Nº5 Barilla" both matched a diet
+"Konjac Slim" pasta at Auchan; "Gel de Banho...Nivea" matched Old Spice;
+"Gel de Banho...MYLABEL" matched Lactovit; "Lombos de Bacalhau...Noruega"
+matched a "Desfiado" (shredded) cut at Lidl.
+
+Fix: new `GENERIC_CATEGORY_WORDS` set (scrapers.js) — words so common
+within their category (leite, água, cerveja, pilhas, detergente, gel,
+etc.) that nearly every candidate shares them, giving them no power to
+discriminate. `looksIrrelevant` now checks the required-match floor
+against the query's words *excluding* these, falling back to the full
+word list only when a query is nothing but a generic word (e.g. "Açúcar 1
+kg" once its size is stripped) so that case still requires its one real
+word. Two words missed on the first pass and added after re-testing:
+"bacalhau" (missed the Noruega/Islândia origin-country mismatch — see
+below) and "maquina"/"liquido" (missed "Detergente Máquina Roupa Líquido
+Omo" matching a "Baby"-branded detergent at Pingo Doce for the same
+reason).
+
+Verified against all 9 originally-flagged cases plus the full existing
+regression suite (Leite/Açúcar/Arroz/Iogurte/Grego cases from prior
+sessions) — all fixed, zero regressions. One bonus find along the way:
+Pingo Doce's only "Lombos de Bacalhau...Noruega" candidate was actually
+Icelandic ("Islândia") bacalhau, not Norwegian — a mismatch the earlier
+price-outlier scan had missed entirely since the price wasn't different
+enough to flag (€23.99 vs a €19.99-20.99 range), but the new
+brand/origin-specificity check catches structurally regardless of price.
+
+Deployed and refreshing all 122 test-pool products in the background to
+apply the fix pool-wide.

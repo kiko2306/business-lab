@@ -264,6 +264,29 @@ function hasConflictingVariantMarker(queryWords, candidateWords) {
   return VARIANT_MARKERS.some((marker) => candidateWords.has(marker) && !queryWords.includes(marker));
 }
 
+// Category-noun words so generic they appear in nearly every candidate a
+// search for that category turns up (e.g. "leite" in every milk
+// listing) — satisfying the required-match floor with these alone let
+// real mismatches straight through, since the word that actually
+// distinguishes one product from another (almost always a brand) never
+// had to match at all. Verified live, all sharing this exact shape:
+// "Cerveja com Álcool Alhambra" matched Sagres at two different stores
+// (shared "cerveja"+"álcool"), "Água sem Gás Luso" matched a different
+// water brand entirely (shared "água"+"gás"), "Pilhas AAA Boost" matched
+// an unrelated own-brand pack (shared "pilhas"+"aaa"), "Detergente
+// Manual Loiça..." repeatedly matched dishwasher tablets at Lidl (shared
+// "detergente"+"loiça", the query's own "manual" never required against
+// the candidate's "máquina"). Kept deliberately small and conservative —
+// only unambiguous top-level category nouns, not anything that could
+// itself be part of what makes two products different.
+const GENERIC_CATEGORY_WORDS = new Set([
+  'iogurte', 'leite', 'agua', 'cerveja', 'pilhas', 'detergente', 'gel',
+  'queijo', 'massa', 'azeite', 'arroz', 'sumo', 'croissant', 'pao',
+  'presunto', 'fiambre', 'champo', 'banho', 'roupa', 'loica',
+  'refrigerante', 'sacos', 'guardanapos', 'chourico', 'chouricao',
+  'bolo', 'gelado', 'bacalhau', 'maquina', 'liquido',
+]);
+
 function looksIrrelevant(query, candidateName) {
   if (!candidateName) return false; // nothing to judge against — don't block on missing data
   const queryWords = significantWords(query);
@@ -271,8 +294,16 @@ function looksIrrelevant(query, candidateName) {
   if (hasNegatedQueryWord(query, candidateName)) return true;
   const candidateWords = new Set(significantWords(candidateName));
   if (hasConflictingVariantMarker(queryWords, candidateWords)) return true;
-  const required = queryWords.length === 1 ? 1 : 2;
-  const matches = queryWords.filter((w) => candidateWords.has(w)).length;
+
+  // Check against the query's more distinguishing (non-generic) words
+  // when there are any — falls back to the full word list for a query
+  // that's nothing *but* a generic word (e.g. "Açúcar 1 kg" once its
+  // size is stripped out leaves only "açúcar"), so that case still
+  // requires its one real word rather than passing everything.
+  const specificWords = queryWords.filter((w) => !GENERIC_CATEGORY_WORDS.has(w));
+  const wordsToCheck = specificWords.length ? specificWords : queryWords;
+  const required = wordsToCheck.length === 1 ? 1 : 2;
+  const matches = wordsToCheck.filter((w) => candidateWords.has(w)).length;
   return matches < required;
 }
 
