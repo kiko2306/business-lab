@@ -4453,9 +4453,18 @@ with `aiMatched: true`.
 - 8 new tests (`test/aimatch.test.js`) cover the plumbing with a stubbed
   `fetch`: config guard, request shape, `"1"→0` / `"0"|garbage|"99"→-1`,
   chatty-reply tolerance, error/throw → -1. Suite: 215 / 209 pass / 6 todo.
-- Not yet exercised end-to-end — needs the key. Once set, a full refresh
-  should recover a chunk of the 35 zero-store items (Achocolatado,
-  Amaciador de cabelo, Tangerinas, Nozes descascadas, Paprika/colorau, …).
+- **Model**: default `gemini-3.5-flash-lite` (`GEMINI_MODEL` overridable).
+  `gemini-2.0-flash` is 404 for new keys now; the non-lite 3.x models burn
+  the whole `maxOutputTokens` on internal reasoning and finish with no
+  text unless the budget is large — the lite model returns a bare number
+  with `maxOutputTokens: 24`. The current AI Studio key format is
+  `AQ.Ab8…` (53 chars), not the old `AIza…`.
+- **Verified live end-to-end** with a real key against the real stores:
+  "Achocolatado em pó (Nesquik)" → "Bebida de Chocolate Solúvel Nesquik";
+  "Tangerinas" → "Clementina/Mandarina"; "Amaciador de cabelo" →
+  "Condicionador …" (2 stores); "Nozes descascadas" → "Miolo de Noz"
+  (3 stores); "Paprika (colorau)" → "Paprika …" (3 stores);
+  "Mel de abelha" correctly stays no-match. All tagged `[IA]`.
 
 ### 43.18 D + A + E shipped
 

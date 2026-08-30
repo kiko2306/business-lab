@@ -17,7 +17,11 @@
  * No SDK — a single plain fetch, matching this app's minimal-deps style.
  */
 const API_KEY = process.env.GEMINI_API_KEY || '';
-const MODEL = process.env.GEMINI_MODEL || 'gemini-2.0-flash';
+// A "lite" flash model is plenty for "pick the number" and returns a bare
+// answer without burning the token budget on internal reasoning (the
+// non-lite 3.x models need a much larger maxOutputTokens or they finish
+// with MAX_TOKENS and no text). Overridable via GEMINI_MODEL.
+const MODEL = process.env.GEMINI_MODEL || 'gemini-3.5-flash-lite';
 const ENDPOINT = `https://generativelanguage.googleapis.com/v1beta/models/${MODEL}:generateContent`;
 const TIMEOUT_MS = 8000;
 
@@ -49,7 +53,7 @@ async function pickCandidate(query, names) {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         contents: [{ parts: [{ text: buildPrompt(query, names) }] }],
-        generationConfig: { temperature: 0, maxOutputTokens: 8 },
+        generationConfig: { temperature: 0, maxOutputTokens: 24 },
       }),
       signal: controller.signal,
     });
