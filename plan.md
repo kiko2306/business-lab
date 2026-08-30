@@ -4362,3 +4362,56 @@ network). `scrapers.js` now exports the pure helpers under `_test`.
   modal (§43.5), preselecting the outlier store or the store picker for a
   gap. Turns the override / coverage / correction-modal work into an
   actual worklist. Verified live (badge 122, list + sort + handoff).
+
+### 43.16 Full refresh after unit-price ranking + the list trim
+
+285 items now (300 − the 16 "0-issue" items removed in §43.11).
+**677/1140 (59.4%) priced, 35 zero-store.** The dip from §43.10's 61.5%
+is mechanical: removing 16 items that each matched 4/4 stores drops the
+rate ~2 points on its own, plus a few more honest NoMatches from the
+unit-price ranking and the `vinagre` gate. Precision is unchanged and
+good — the "<2 shared stemmed words" scan still flags only 4 rows, all
+false positives ("Fermento em Pó", "Molas Azuis Kasa"). The "Rever"
+badge sits at 122 (35 zero-store + 21 one-store + 66 price-outlier) —
+that's the worklist to chip at with the correction modal, or with the
+heuristic improvements in §43.17.
+
+### 43.17 Matching-heuristics improvement roadmap (not yet built)
+
+The 205-test suite makes each of these safe to trial — change, `npm
+test`, keep only if a `todo` flips to pass with the 199 still green.
+Ordered by value/effort:
+
+- **D. Stemmer** — add `-ns`→singular and `-zes`→`z`. Recovers
+  "amendoins"/"nozes". ~4 lines, low risk.
+- **A. More candidates** — `MAX_CANDIDATES_TRIED` 5 → 8-10 (or: 5, then
+  deeper only if none pass relevance). Several wrong picks are "the right
+  product was result #6". Costs more requests per refresh.
+- **E. Cross-store outlier check** — `selectBestCandidate` is per-store
+  and blind to the others. Feed the "Rever" view's ">3x the other stores'
+  unit price" signal back into selection: a gross outlier ⇒ prefer the
+  next candidate or NoMatch. Catches the 20 kg dog-food bag, the 36 g
+  bacalhau snack, Pedras at €5.39.
+- **B. Weight distinguishing words** — down-rank a candidate that adds a
+  *strong differentiating* word, where "strong" is derived from the
+  corpus (head nouns / frequent qualifiers across the other list items:
+  proteína, grego, cozido, húmida, seca, ralado, fatiado…). Data-driven,
+  not a hand list — targets the whole "variant word" class (`Leite
+  Proteína`, `Ovos Cozidos`, `Cenoura Ralada`, húmida→seca) at once.
+- **C. Tiny synonym map** — `whitening→branqueadora`,
+  `tangerina→clementina/mandarina`, `amaciador de cabelo→condicionador`,
+  `achocolatado→chocolate em pó` — tried as a fallback query only on
+  NoMatch. §34's "it'll grow" risk; gate each entry behind a test.
+- **F. Query relaxation** — on NoMatch, retry with `[head noun] +
+  [brand]` only (drop trailing qualifiers). Catches "Champô de bebé 'não
+  chora mais'".
+- **G. LLM fallback for the tail** — heuristics for the 90%; for the ~30
+  NoMatch-everywhere items + flagged outliers, one call: "here are N
+  candidate names from store X for 'query' — which is the same product,
+  or none?". The only thing that really solves vocabulary + semantic
+  variants; adds a dependency, cost, non-determinism.
+- **H. Lean on the tooling** — the override + Rever worklist already let
+  the user pin the ~30 hard items by hand in ~15 min; pins survive
+  refreshes. May beat chasing heuristics for a personal tool.
+
+Suggested path: D + A + E first (safe, cheap), then B as the real lever.
