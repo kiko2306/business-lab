@@ -4530,6 +4530,15 @@ Three reports came in, all on "Laranjas":
   have it. This also recovers other Lidl fresh-produce rows that were
   silently dropped.
 
+### 43.26 DONE — tie on best €/unit turns every matching row green
+
+`renderProductCard` compared `row.unitPrice === cheapestUnitPrice` on the
+raw float, so two stores showing the same `€1.99/kg` could disagree by a
+rounding artefact and only one went green. Now both the min and the
+per-row comparison round to cents (`round2`), so any set of rows that
+*display* the same best unit price (or same best total, in the no-unit
+fallback) all get the `.cheapest` green treatment.
+
 ### 43.25 TODO — report an error at the *product* level, not only per store
 
 The 🐞 button is currently only on each store price row and the server

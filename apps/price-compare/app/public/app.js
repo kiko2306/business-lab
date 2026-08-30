@@ -322,10 +322,14 @@ function renderProductCard(product) {
   // or a different kind, simply doesn't get the badge. Only when fewer
   // than two rows have a comparable unit price does it fall back to the
   // raw total.
+  // Compare on the cent-rounded value that's actually shown, so two stores
+  // displaying the same €/kg (or same total) both go green — not just
+  // whichever one won a floating-point tiebreak.
+  const round2 = (n) => Math.round(n * 100) / 100;
   const unitRows = visibleRows.filter((r) => r.unitPrice != null && r.unitLabel != null);
   const byUnit = unitRows.length >= 2 && unitRows.every((r) => r.unitLabel === unitRows[0].unitLabel);
-  const cheapestUnitPrice = byUnit ? Math.min(...unitRows.map((r) => r.unitPrice)) : null;
-  const cheapest = visibleRows.length ? Math.min(...visibleRows.map((r) => r.price)) : null;
+  const cheapestUnitPrice = byUnit ? Math.min(...unitRows.map((r) => round2(r.unitPrice))) : null;
+  const cheapest = visibleRows.length ? Math.min(...visibleRows.map((r) => round2(r.price))) : null;
   const isCollapsed = collapsed.has(product.id);
 
   const card = document.createElement('div');
@@ -358,7 +362,7 @@ function renderProductCard(product) {
     const div = document.createElement('div');
     div.className = 'price-row';
     const priceText = fmtPrice(row.price, row.currency);
-    const isCheapest = byUnit ? row.unitPrice === cheapestUnitPrice : row.price === cheapest;
+    const isCheapest = byUnit ? round2(row.unitPrice) === cheapestUnitPrice : round2(row.price) === cheapest;
     const unitPriceHtml =
       row.unitPrice != null
         ? `<span class="unit-price">${fmtPrice(row.unitPrice, row.currency)}/${row.unitLabel}</span>`
