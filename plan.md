@@ -4201,3 +4201,32 @@ should get a real click-through.
   literally-required packaging word (both pre-existing, §36–§38).
 - Fresh "Tangerinas" — PT stores list the fruit as "Clementina/Mandarina";
   now an honest no-match rather than a juice.
+
+### 43.10 Full-pool refresh result
+
+Match rate **63.9% → 61.5%** (738/1200 store×item pairs), zero-store items
+**28 → 35**. The dip is the intended precision-for-recall trade — a wrong
+price is worse than none. Evidence it's precision, not breakage:
+
+- A "priced row shares <2 stemmed words with its query" scan (the same
+  signal used to find the original mismatches) dropped from **89 flagged
+  rows to 4**, and all 4 remaining are correct matches the crude scan
+  mis-flags ("Molas Azuis Kasa" for "Molas para a roupa", "Fermento em Pó"
+  for "Fermento em pó para bolos").
+- Every clear wrong match from the start of the session is gone — now
+  either correct or an honest no-match: deodorant for "Mel de abelha",
+  a book for "Alface", wine for "Vinagre de vinho branco", jelly for
+  "Morangos", coffee for "Canela em pó", tuna for "Iogurtes naturais",
+  ham for "Peito de frango", a garden tool for "Queijo da Serra", sangria
+  for "Melão", baby cereal for "Cenouras", juice for "Tangerinas".
+
+Net-new zero-store items (~6): "Tangerinas" (was 4 wrong prices → a clean
+win), and a few single-store weak matches lost to the new gates —
+"Atum fresco" → "Bife de Atum Fresco" now rejected by rule (2) because
+"bife" (the cut) leads the candidate and isn't in the query; likewise
+"Carne para cozer/estufar", and "Detergente limpa-vidros / para o chão"
+where the listing drops the word "detergente". A bounded butchery-cut
+exemption set (bife/posta/lombo/filete/…, closed the same way
+NEUTRAL_PACKAGING_WORDS is) would recover the meat/fish cases without
+re-opening the "Fiambre Peito de Frango" false match — deferred, not
+chased this session.
