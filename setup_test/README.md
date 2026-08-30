@@ -90,15 +90,64 @@ test -d /run/systemd/system && echo systemd-ok
 If that prints nothing, `start.sh` will refuse to install the connector and
 will say so. Fix it before going further.
 
-### 2.2 Docker
+### 2.2 Docker and Docker Compose
 
 Use **Docker Engine installed inside the distro**, not Docker Desktop's WSL
 integration. `start.sh` runs `systemctl enable --now docker` and writes
-`/etc/docker/daemon.json`; with Docker Desktop there is no such service inside
-the distro to manage, and the daemon config lives on the Windows side.
+`/etc/docker/daemon.json`; under Docker Desktop there is no such service inside
+the distro to manage and the daemon config lives on the Windows side, so both
+of those steps quietly do nothing.
 
-Leaving it to `start.sh` is fine — it installs Docker via `get.docker.com` when
-`docker` is absent.
+If Docker Desktop is installed, turn its integration **off** for this distro
+first (Docker Desktop → Settings → Resources → WSL Integration), or `docker`
+will resolve to the Desktop shim instead of the engine you install below.
+
+Do this **after** §2.1 — the last command needs systemd.
+
+```bash
+sudo apt-get remove -y docker docker-engine docker.io containerd runc 2>/dev/null; sudo apt-get update && sudo apt-get install -y ca-certificates curl gnupg
+```
+
+```bash
+sudo install -m 0755 -d /etc/apt/keyrings && . /etc/os-release && curl -fsSL "https://download.docker.com/linux/$ID/gpg" | sudo gpg --dearmor -o /etc/apt/keyrings/docker.gpg && sudo chmod a+r /etc/apt/keyrings/docker.gpg
+```
+
+```bash
+. /etc/os-release && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/$ID $VERSION_CODENAME stable" | sudo tee /etc/apt/sources.list.d/docker.list >/dev/null
+```
+
+```bash
+sudo apt-get update && sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+```
+
+```bash
+sudo systemctl enable --now docker
+```
+
+`docker-compose-plugin` is what provides `docker compose` (v2, a subcommand).
+The old standalone `docker-compose` binary is not used by this project and is
+not needed.
+
+Verify all three before continuing:
+
+```bash
+docker --version && docker compose version && sudo docker run --rm hello-world
+```
+
+To use `docker` without `sudo`, log out and back in after
+`sudo usermod -aG docker "$USER"` — `start.sh` does that for you, but the group
+only takes effect in a new shell, so a verification run in the *current* shell
+still needs `sudo`.
+
+**If `apt-get update` 404s on the Docker repo**, the release codename is newer
+than anything Docker has published for it. Substitute the most recent LTS
+codename — e.g. `noble` — in the `sources.list.d/docker.list` line, or skip
+this section and let `start.sh` install Docker via `get.docker.com` instead.
+Unlikely to bite on WSL, which normally ships an LTS. Check first if unsure:
+
+```bash
+. /etc/os-release && curl -fsSI "https://download.docker.com/linux/$ID/dists/$VERSION_CODENAME/Release" | head -1
+```
 
 ### 2.3 Ports
 

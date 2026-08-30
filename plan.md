@@ -5656,3 +5656,29 @@ this warns and continues rather than exiting.
 Verified: `bash -n` and shellcheck `-S warning` clean; detection returns
 `HAS_SYSTEMD=1 IS_WSL=0` on this host; the banner was rendered with the flags
 forced to the WSL case to check the wording and layout.
+
+
+### 49.5 Docker/Compose install commands added to the test plan
+
+`setup_test/README.md` §2.2 now carries the explicit install, since `start.sh`'s
+own `get.docker.com` fallback doesn't give a WSL user anything to verify before
+starting. Uses Docker's official apt repo, which provides the engine and
+`docker-compose-plugin` (i.e. `docker compose` v2) in one install; the
+standalone `docker-compose` binary is not used by this project.
+
+Distro-derived rather than hardcoded — `$ID` and `$VERSION_CODENAME` from
+`/etc/os-release` — so the same lines work on Debian or Ubuntu. Ordered after
+§2.1 because `systemctl enable --now docker` needs systemd.
+
+Two WSL-specific notes: Docker Desktop's WSL integration must be turned **off**
+for the distro first, or `docker` resolves to the Desktop shim rather than the
+engine (and `start.sh`'s `systemctl enable --now docker` plus its
+`/etc/docker/daemon.json` write then both quietly do nothing); and the
+`usermod -aG docker` that `start.sh` performs only takes effect in a new shell,
+so a verification run in the current one still needs `sudo`.
+
+All six command blocks were `bash -n` parsed. The keyring URL and the generated
+repo line were checked live. A caveat was drafted claiming Docker doesn't
+publish a codename as new as this host's (`resolute`) — checking it found that
+Docker *does* publish it, so the claim was removed rather than shipped; the
+caveat now stands as a general possibility with a one-liner to check it.
