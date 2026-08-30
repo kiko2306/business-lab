@@ -436,7 +436,18 @@ function requireAdmin(req, res, next) {
 }
 
 app.get('/api/admin/users', requireAdmin, (req, res) => {
-  res.json(users.listUsers());
+  // users.json is written lazily — only when a user logs in (users.js
+  // upsertProfile). An account that owns products but hasn't logged in
+  // since accounts were introduced isn't in it, so it never showed up
+  // here. Union in every distinct product owner as a stub so the admin
+  // can grant VIP ahead of that person's next login; email/name fill
+  // themselves in once they do log in.
+  const known = users.listUsers();
+  const knownIds = new Set(known.map((u) => u.userId));
+  const stubs = [...new Set(loadAllProducts().map((p) => p.userId))]
+    .filter((id) => id && !knownIds.has(id))
+    .map((userId) => ({ userId, isVip: false, isPaid: false, email: null, name: null, lastLoginAt: null }));
+  res.json([...known, ...stubs]);
 });
 
 app.post('/api/admin/users/:userId/vip', requireAdmin, (req, res) => {

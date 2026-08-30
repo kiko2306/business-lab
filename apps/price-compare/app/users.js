@@ -59,7 +59,13 @@ function adsEnabledFor(userId) {
 
 function setFlag(userId, flag, value) {
   const all = loadAll();
-  if (!all[userId]) return false;
+  if (!all[userId]) {
+    // No profile yet — the user owns data but hasn't logged in since
+    // accounts were introduced. Create a minimal record so an admin can
+    // still grant VIP/paid ahead of time; upsertProfile fills in
+    // email/name on their next login and preserves these flags.
+    all[userId] = { isVip: false, isPaid: false, email: null, name: null };
+  }
   all[userId][flag] = Boolean(value);
   saveAll(all);
   return true;

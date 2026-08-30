@@ -4553,6 +4553,28 @@ a product report carries none. Admin list already rendered
 entry, so it slotted in with no change. Verified live: product-level
 POST → 201 with `reportedStore: null`, bad store → 400, row report → 201.
 
+### 43.27 DONE — admin dashboard now lists every account, not just recent logins
+
+Follow-up to §26.7/§29. `users.json` is written lazily by
+`upsertProfile` on login, so `GET /api/admin/users` (which just returned
+`users.listUsers()`) only ever showed accounts that had logged in since
+accounts were introduced (2026-08-29). The admin saw only themselves
+until a second user happened to log in. Two changes:
+
+- `GET /api/admin/users` now unions `listUsers()` with every distinct
+  `userId` in `products.json`, emitting a stub
+  `{userId, isVip:false, isPaid:false, email:null, name:null}` for owners
+  with no profile yet. Email/name fill in on that user's next login.
+- `users.setFlag` creates the record instead of 404ing when it's absent,
+  so VIP/paid can be granted ahead of the user's next login;
+  `upsertProfile` later merges email/name in and preserves the flags.
+- Admin UI renders "Sem sessão recente" + `ID … — nome aparece após
+  iniciar sessão` for a profile-less row.
+
+Verified live: list went from 2 → 3 rows (surfaced an account that owns
+one product, "Arroz Carolino", created 2026-08-29 and never seen since);
+toggling its VIP wrote `isVip:true` to `users.json`; reverted.
+
 ### 43.19 G — AI last-resort matcher (Gemini free tier)
 
 New `aiMatch.js`: a single plain `fetch` to the Gemini `generateContent`

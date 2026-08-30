@@ -1292,8 +1292,8 @@ async function loadAdminUsers() {
       (u) => `
     <div class="admin-user-row" data-user-id="${escapeHtml(u.userId)}">
       <div>
-        <div>${escapeHtml(u.name || u.email)}</div>
-        <div class="admin-user-email">${escapeHtml(u.email)}</div>
+        <div>${escapeHtml(u.name || u.email || 'Sem sessão recente')}</div>
+        <div class="admin-user-email">${escapeHtml(u.email || `ID ${u.userId} — nome aparece após iniciar sessão`)}</div>
       </div>
       <div class="admin-user-toggles">
         <label><input type="checkbox" class="admin-vip-toggle" ${u.isVip ? 'checked' : ''} /> VIP</label>
