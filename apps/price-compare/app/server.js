@@ -194,7 +194,10 @@ function appendBugReport(report) {
 // carried forward from the previous entry — this is what the
 // price-over-time chart is built from. A failed scrape doesn't add a
 // point (nothing new was actually observed) but doesn't touch existing
-// history either.
+// history either. The history is capped (see appendHistory): it grew
+// unbounded before, and products.json is re-read and rewritten on every
+// single product update (updateOneProduct), so an ever-growing file makes
+// every refresh slower for data nobody looks at.
 // `override` (optional) is this product's user-set override for this store
 // (product.overrides[store], see PUT /api/products/:id/override):
 //   { excluded: true } — the user said this store doesn't carry the item;
@@ -202,6 +205,22 @@ function appendBugReport(report) {
 //     coverage indicator can tell apart from a plain no-match.
 //   { url } — the user hand-picked the exact product page; scrape that,
 //     skipping search + candidate selection entirely.
+// Keeps the chart useful without letting one store entry's history grow
+// forever: drop points older than a year, then keep at most MAX_HISTORY
+// (the most recent ones). At the daily 08:00 refresh that's ~365/year, so
+// the age rule usually does the work and the count is the backstop against
+// a day of manual refreshing.
+const MAX_HISTORY_POINTS = 400;
+const MAX_HISTORY_AGE_MS = 365 * 24 * 60 * 60 * 1000;
+function appendHistory(history, point) {
+  const cutoff = Date.now() - MAX_HISTORY_AGE_MS;
+  const kept = history.filter((h) => {
+    const t = Date.parse(h?.scrapedAt);
+    return !Number.isFinite(t) || t >= cutoff; // undated legacy points are kept
+  });
+  return [...kept, point].slice(-MAX_HISTORY_POINTS);
+}
+
 async function buildStoreEntry(store, name, previous, override, excludeUrls) {
   const history = previous?.history ?? [];
   if (override?.excluded) {
@@ -236,7 +255,7 @@ async function buildStoreEntry(store, name, previous, override, excludeUrls) {
       error: null,
       pinned,
       aiMatched: Boolean(aiMatched),
-      history: [...history, { price, scrapedAt }],
+      history: appendHistory(history, { price, scrapedAt }),
       unitSizeValue: unitSizeValue ?? null,
       unitSizeKind: unitSizeKind ?? null,
       isPack: Boolean(isPack),

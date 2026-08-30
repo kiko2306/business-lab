@@ -16,14 +16,26 @@ function loadFresh(env) {
   return require('../aiMatch');
 }
 
-function stubFetch(replyText, { ok = true } = {}) {
+function stubFetch(replyText, { ok = true, status = ok ? 200 : 400 } = {}) {
   const calls = [];
   global.fetch = async (url, opts) => {
     calls.push({ url, body: JSON.parse(opts.body), method: opts.method });
     return {
       ok,
+      status,
       json: async () => ({ candidates: [{ content: { parts: [{ text: replyText }] } }] }),
     };
+  };
+  return calls;
+}
+
+// Fails with `status` for the first `failures` calls, then succeeds.
+function stubFetchFlaky(failures, status, replyText) {
+  const calls = [];
+  global.fetch = async (url, opts) => {
+    calls.push({ url, body: JSON.parse(opts.body) });
+    if (calls.length <= failures) return { ok: false, status, json: async () => ({}) };
+    return { ok: true, status: 200, json: async () => ({ candidates: [{ content: { parts: [{ text: replyText }] } }] }) };
   };
   return calls;
 }
@@ -70,12 +82,33 @@ test('pickCandidate: tolerates a chatty reply, takes the first number', async ()
 
 test('pickCandidate: API error or throw -> -1 (never worse than no AI)', async () => {
   const ai = loadFresh({ GEMINI_API_KEY: 'k' });
-  stubFetch('1', { ok: false });
+  stubFetch('1', { ok: false, status: 400 });
   assert.equal(await ai.pickCandidate('x', NAMES), -1);
   global.fetch = async () => {
     throw new Error('network down');
   };
   assert.equal(await ai.pickCandidate('x', NAMES), -1);
+});
+
+test('pickCandidate: retries a 429 and succeeds on the retry', async () => {
+  const ai = loadFresh({ GEMINI_API_KEY: 'k' });
+  const calls = stubFetchFlaky(1, 429, '2');
+  assert.equal(await ai.pickCandidate('x', NAMES), 1);
+  assert.equal(calls.length, 2); // one rate-limited, one good
+});
+
+test('pickCandidate: gives up after the retry budget on persistent 429', async () => {
+  const ai = loadFresh({ GEMINI_API_KEY: 'k' });
+  const calls = stubFetchFlaky(99, 429, '1');
+  assert.equal(await ai.pickCandidate('x', NAMES), -1);
+  assert.equal(calls.length, 3); // initial + 2 retries
+});
+
+test('pickCandidate: a non-retryable status is not retried', async () => {
+  const ai = loadFresh({ GEMINI_API_KEY: 'k' });
+  const calls = stubFetchFlaky(99, 400, '1');
+  assert.equal(await ai.pickCandidate('x', NAMES), -1);
+  assert.equal(calls.length, 1);
 });
 
 test('pickCandidate: empty candidate list -> -1', async () => {

@@ -165,23 +165,38 @@ function needsAttention(product) {
   // One store's price wildly out of line with the others — usually a wrong
   // product, a per-kg vs per-piece listing, or a mega-pack.
   const forCompare = priced.filter((e) => !e.isPack);
+  let outlierStore = null;
   if (forCompare.length >= 2) {
     const vals = forCompare.map((e) => ({ store: e.store, v: priceForCompare(e), raw: e.price }));
     const lo = vals.reduce((a, b) => (b.v < a.v ? b : a));
     const hi = vals.reduce((a, b) => (b.v > a.v ? b : a));
     if (lo.v > 0 && hi.v / lo.v > OUTLIER_RATIO) {
+      outlierStore = hi.store;
       reasons.push({
         store: hi.store,
+        weight: 1,
         text: `preço díspar — ${SCRAPED_STORES[hi.store]} ${fmtPrice(hi.raw, 'EUR')} vs ${SCRAPED_STORES[lo.store]} ${fmtPrice(lo.raw, 'EUR')}`,
       });
     }
   }
+
+  // An AI-picked row that is *also* the price outlier is the most suspect
+  // thing in the list — the deterministic matcher already gave up on it,
+  // and the price disagrees with every other store. Worth a look before
+  // anything else.
+  const aiOutlier = priced.find((e) => e.aiMatched && e.store === outlierStore);
+  if (aiOutlier) {
+    reasons.push({
+      store: aiOutlier.store,
+      weight: 4,
+      text: `escolha por IA com preço díspar em ${SCRAPED_STORES[aiOutlier.store]} — "${aiOutlier.scrapedName || ''}"`,
+    });
+  }
   return reasons;
 }
 
-const REASON_SEVERITY = { 'sem preço em nenhuma loja': 3, 'só': 2 }; // "só X tem preço" -> 2, outlier -> 1
 function severity(reasons) {
-  return reasons.reduce((s, r) => s + (REASON_SEVERITY[r.text] || (r.text.startsWith('só ') ? 2 : 1)), 0);
+  return reasons.reduce((s, r) => s + (r.weight ?? (r.text.startsWith('sem preço') ? 3 : r.text.startsWith('só ') ? 2 : 1)), 0);
 }
 
 function computeNeedsAttention() {
@@ -236,6 +251,28 @@ document.getElementById('review-body').addEventListener('click', (e) => {
   openCorrectModal(products.find((p) => p.id === btn.dataset.reviewCorrect), btn.dataset.reviewStore || null);
 });
 
+// "This is the best price this store has shown lately" — only interesting
+// when the price actually moved: a store that has sat at €1.09 all month
+// isn't at a low, it's just flat. Needs a couple of recorded points and a
+// genuinely higher one in the window to say anything.
+const LOW_WINDOW_DAYS = 30;
+const MIN_LOW_DROP = 0.05; // 5% below the window's high before it's news
+
+function isRecentLow(entry) {
+  if (entry.price == null || !Array.isArray(entry.history)) return false;
+  const cutoff = Date.now() - LOW_WINDOW_DAYS * 24 * 60 * 60 * 1000;
+  const recent = entry.history.filter((h) => {
+    const t = Date.parse(h?.scrapedAt);
+    return h?.price != null && Number.isFinite(t) && t >= cutoff;
+  });
+  if (recent.length < 3) return false;
+  const prices = recent.map((h) => h.price);
+  const low = Math.min(...prices);
+  const high = Math.max(...prices);
+  if (high <= 0 || (high - low) / high < MIN_LOW_DROP) return false; // flat month
+  return entry.price <= low + 0.001;
+}
+
 function renderProductCard(product) {
   const rows = product.urls.map((entry) => {
     const unitLabel = entry.unitSizeKind === 'mass' ? 'kg' : entry.unitSizeKind === 'volume' ? 'L' : null;
@@ -254,6 +291,7 @@ function renderProductCard(product) {
       excluded: Boolean(entry.excluded),
       pinned: Boolean(entry.pinned),
       aiMatched: Boolean(entry.aiMatched),
+      recentLow: isRecentLow(entry),
     };
   });
 
@@ -329,7 +367,10 @@ function renderProductCard(product) {
     // mean very different things (plan.md §39). Order within the row:
     // store name · unit price (€/kg, €/L) · total price, all on one line.
     const packBadgeHtml = `<span class="pack-badge ${row.isPack ? 'pack' : ''}">${row.isPack ? 'Pack' : 'Unidade'}</span>`;
-    const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${packBadgeHtml}${unitPriceHtml}<span class="price-total">${priceText}</span></span>`;
+    const lowBadgeHtml = row.recentLow
+      ? `<span class="low-badge" title="Preço mais baixo desta loja nos últimos 30 dias">▼ mín. 30d</span>`
+      : '';
+    const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${packBadgeHtml}${lowBadgeHtml}${unitPriceHtml}<span class="price-total">${priceText}</span></span>`;
     const actionHtml = row.url ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Abrir</a>` : '';
     const reportHtml = `<button class="btn small" data-report-bug="${product.id}" data-report-store="${row.store}" title="Reportar um erro neste preço (${escapeHtml(row.label)})">🐞</button>`;
     const addToListHtml = `<button class="btn small" data-add-to-list="${product.id}" data-add-to-list-store="${row.store}" title="Adicionar à lista de compras (${escapeHtml(row.label)})">🛒</button>`;

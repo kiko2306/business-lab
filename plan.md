@@ -4441,6 +4441,34 @@ test`, keep only if a `todo` flips to pass with the rest still green.
 Path: D + A + E done (§43.18), G done (§43.19). Next deterministic lever
 is B.
 
+### 43.21 Robustness + the 30-day-low badge
+
+Batch of "implementable now" items (the Play Store / AdSense / payments
+work all still blocks on external accounts the user doesn't have yet):
+
+- **Gemini retry/backoff** (`aiMatch.js`) — a 429/5xx is retried twice
+  (1.5 s, 6 s) before giving up, and an exhausted retry logs a line. Before
+  this, hitting the free tier's per-minute quota mid-refresh silently
+  turned the whole remaining tail into no-matches with nothing in the logs.
+  Non-retryable statuses (400 etc.) still fail immediately. 3 new tests.
+- **AI-picked *and* price-outlier → top of the worklist** (`app.js`
+  `needsAttention`) — the deterministic matcher gave up on that row *and*
+  its price disagrees with every other store, so it's the most suspect
+  thing in the list. Given weight 4 (above "sem preço em nenhuma loja").
+  Reason weights moved onto the reason objects rather than string-matching.
+- **Price-history cap** (`server.js appendHistory`) — history grew forever
+  and `updateOneProduct` rewrites the whole file per product, so it made
+  every refresh slower for data nobody reads. Now: drop points older than
+  a year, then keep the most recent 400. Undated legacy points are kept.
+  (Live data is at max 16 points today — this is a long-run guard.)
+- **"▼ mín. 30d" badge** (`app.js isRecentLow`) — a green badge on a price
+  row that is at that store's lowest in 30 days. Deliberately quiet: needs
+  ≥3 recorded points in the window *and* a ≥5% spread, so a store that has
+  sat flat all month doesn't get a badge for nothing. Uses the history the
+  app already records; 74 rows qualify on the current data.
+- **CI confirmed green** — the `price-compare` job has passed on every run
+  since it was added.
+
 ### 43.19 G — AI last-resort matcher (Gemini free tier)
 
 New `aiMatch.js`: a single plain `fetch` to the Gemini `generateContent`

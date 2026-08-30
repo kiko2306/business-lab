@@ -47,9 +47,8 @@ function buildPrompt(query, names) {
   );
 }
 
-// Returns the 0-based index of the chosen candidate, or -1 for "none".
-async function pickCandidate(query, names) {
-  if (!isConfigured() || !Array.isArray(names) || !names.length) return -1;
+// One request. Resolves { status, text } — never throws.
+async function askOnce(query, names) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
@@ -62,18 +61,50 @@ async function pickCandidate(query, names) {
       }),
       signal: controller.signal,
     });
-    if (!res.ok) return -1;
+    if (!res.ok) return { status: res.status, text: '' };
     const data = await res.json();
-    const text = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-    const m = text.match(/\d+/);
-    if (!m) return -1;
-    const n = Number(m[0]);
-    return n >= 1 && n <= names.length ? n - 1 : -1;
+    return { status: 200, text: data?.candidates?.[0]?.content?.parts?.[0]?.text || '' };
   } catch {
-    return -1; // network, abort, quota, malformed — treat as no match
+    return { status: 0, text: '' }; // network, abort — same as a failed call
   } finally {
     clearTimeout(timer);
   }
+}
+
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// Once the free tier's per-minute quota is hit, every remaining item in a
+// big refresh would silently fall back to no-match with nothing in the
+// logs. Retry a 429 (and a 503 "high demand") a couple of times with
+// growing backoff, and log when the retries are exhausted so an
+// unexpectedly bad batch is visible rather than mysterious.
+const RETRY_STATUSES = new Set([429, 500, 502, 503, 504]);
+const RETRY_DELAYS_MS = [1500, 6000];
+
+// Returns the 0-based index of the chosen candidate, or -1 for "none".
+async function pickCandidate(query, names) {
+  if (!isConfigured() || !Array.isArray(names) || !names.length) return -1;
+
+  let last = { status: 0, text: '' };
+  for (let attempt = 0; ; attempt++) {
+    last = await askOnce(query, names);
+    if (last.status === 200) break;
+    if (attempt >= RETRY_DELAYS_MS.length || !RETRY_STATUSES.has(last.status)) break;
+    await sleep(RETRY_DELAYS_MS[attempt]);
+  }
+
+  if (last.status !== 200) {
+    // Quota/outage is worth a line; an ordinary "model said nothing" isn't.
+    if (RETRY_STATUSES.has(last.status)) {
+      console.warn(`[aiMatch] giving up after retries (HTTP ${last.status}) for "${query}"`);
+    }
+    return -1;
+  }
+
+  const m = last.text.match(/\d+/);
+  if (!m) return -1;
+  const n = Number(m[0]);
+  return n >= 1 && n <= names.length ? n - 1 : -1;
 }
 
 module.exports = { isConfigured, pickCandidate, buildPrompt, MODEL };

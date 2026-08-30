@@ -294,6 +294,12 @@ textarea { resize: vertical; }
 .correct-cand-price { font-weight: 700; white-space: nowrap; }
 .correct-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--border); }
 
+.low-badge {
+  font-size: 10px; font-weight: 700; letter-spacing: .02em; padding: 1px 5px;
+  border-radius: 4px; background: var(--success); color: var(--bg);
+  white-space: nowrap;
+}
+
 .ai-tag {
   font-size: 9px; font-weight: 700; letter-spacing: .04em; padding: 1px 4px;
   border-radius: 3px; background: var(--btn-bg); color: var(--text-faint);
