@@ -4466,6 +4466,24 @@ with `aiMatched: true`.
   (3 stores); "Paprika (colorau)" → "Paprika …" (3 stores);
   "Mel de abelha" correctly stays no-match. All tagged `[IA]`.
 
+**Full refresh with D+A+E+G: 58.6% → 65.0% (741/1140), zero-store 35 →
+15.** 74 rows are `aiMatched`, and a review of all 74 puts precision
+~96%: the synonym/regional-name/packaging-word cases the deterministic
+pipeline can't reach are almost all right — "Sardinha em Azeite" for
+"Sardinhas em lata" (the §37 gap), "Carcaça Portuguesa" / "Pão Bijou" for
+regional bread, "Miolo de Noz/Amêndoa", "Anticalcário" for
+"Descalcificador (Calgon)", "Max White" for "whitening", "Cornetto" for
+"Cornetos", "Aroma Baunilha" for "Essência de baunilha". **~2-3 wrong**,
+all fresh-produce-at-Lidl where the deterministic path already found
+nothing and the results were all processed: "Ananás" → a soft drink,
+"Tomates" → tomato paste — the model should have answered 0. Tightening
+the prompt ("if the shopper wants a fresh fruit/veg and every result is a
+processed form — juice, paste, canned, dried — answer 0") would fix
+those; deferred, they're `[IA]`-tagged and one "Corrigir" away. The 15
+remaining zero-store are genuinely niche / not-sold-online (Elixir bocal,
+Esfregões de arame, Boiões de fruta pronta, Pudins/Mousses lácteas, the
+"não chora mais" tagline).
+
 ### 43.18 D + A + E shipped
 
 Stemmer `-zes`→`z`, `MAX_CANDIDATES_TRIED` 5→8, and the cross-store
