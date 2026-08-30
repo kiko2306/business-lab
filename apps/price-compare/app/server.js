@@ -14,6 +14,7 @@ const {
 const auth = require('./auth');
 const push = require('./push');
 const users = require('./users');
+const shares = require('./shares');
 const aiMatch = require('./aiMatch');
 
 const ADMIN_EMAIL = process.env.ADMIN_EMAIL || '';
@@ -390,6 +391,7 @@ app.get('/auth/google/callback', async (req, res) => {
     const user = await auth.exchangeCode(code);
     claimLegacyProductsIfNeeded(user.sub);
     users.upsertProfile(user);
+    shares.bindPendingInvites(user); // attach userId to invites sent to this email pre-signup
     const token = auth.createSession(user);
     auth.setSessionCookie(req, res, token);
     res.redirect('/');
@@ -490,6 +492,73 @@ app.post('/api/admin/bug-reports/:id/status', requireAdmin, (req, res) => {
   res.json(report);
 });
 
+// --- Sharing: let another account co-edit my products + shopping list ---
+// The grant lives in shares.js; these routes are about the *actor*
+// (req.user), so they are not behind resolveWorkspace. The invitee must
+// accept in-app before anything is shared; see shares.js for the rules.
+app.get('/api/shares', auth.requireAuth, (req, res) => {
+  const outgoing = shares
+    .listForOwner(req.user.sub)
+    .filter((r) => r.status !== 'revoked') // the owner's own teardown — no need to show it back
+    .map((r) => ({
+      id: r.id,
+      inviteeEmail: r.inviteeEmail,
+      status: r.status,
+      createdAt: r.createdAt,
+      respondedAt: r.respondedAt,
+    }));
+  const incoming = shares
+    .listForInvitee({ userId: req.user.sub, email: req.user.email })
+    .filter((r) => r.status === 'pending' || r.status === 'accepted')
+    .map((r) => ({
+      id: r.id,
+      ownerUserId: r.ownerUserId,
+      ownerEmail: r.ownerEmail,
+      ownerName: r.ownerName,
+      status: r.status,
+      createdAt: r.createdAt,
+    }));
+  res.json({ outgoing, incoming });
+});
+
+app.post('/api/shares', auth.requireAuth, (req, res) => {
+  try {
+    const row = shares.createInvite({ owner: req.user, inviteeEmail: req.body?.email });
+    // Optional nudge if the invitee already has an account + push enabled.
+    push.notify?.(row.inviteeUserId, {
+      title: 'Convite de partilha',
+      body: `${req.user.name || req.user.email} quer partilhar listas consigo.`,
+    });
+    res.status(201).json({ id: row.id, inviteeEmail: row.inviteeEmail, status: row.status });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.post('/api/shares/:id/:action(accept|decline)', auth.requireAuth, (req, res) => {
+  try {
+    const row = shares.respond(req.params.id, req.user, req.params.action);
+    if (row.status === 'accepted') {
+      push.notify?.(row.ownerUserId, {
+        title: 'Partilha aceite',
+        body: `${req.user.name || req.user.email} aceitou a sua partilha.`,
+      });
+    }
+    res.json({ id: row.id, status: row.status });
+  } catch (err) {
+    res.status(400).json({ error: err.message });
+  }
+});
+
+app.delete('/api/shares/:id', auth.requireAuth, (req, res) => {
+  try {
+    shares.remove(req.params.id, req.user.sub);
+    res.status(204).end();
+  } catch (err) {
+    res.status(404).json({ error: err.message });
+  }
+});
+
 // express's static mime lookup doesn't always know .webmanifest — set it
 // explicitly rather than relying on that, same reasoning as the nginx
 // config in apps/kitchen-switcher.
@@ -533,14 +602,31 @@ app.post('/api/push/unsubscribe', auth.requireAuth, (req, res) => {
   res.status(204).end();
 });
 
-// Every /api/products* route from here on is per-user: requireAuth attaches
-// req.user, and each handler only ever reads/writes that user's own slice
-// of products.json (loadUserProducts/saveUserProducts) — there is no code
-// path here that can read or modify another account's data.
-app.use('/api/products', auth.requireAuth);
+// Every /api/products* and /api/shopping-list* route from here on is
+// scoped to a *workspace* — by default the caller's own account, but if
+// they hold an accepted share (shares.js) they can act on the owner's
+// data by sending that owner's id in an X-Workspace header. resolveWorkspace
+// checks the grant and sets req.workspaceId; handlers use req.workspaceId
+// for all data reads/writes and keep req.user.* only for actor identity
+// (e.g. bug-report provenance). Without the header, behaviour is exactly
+// as before — a caller only ever touches their own slice.
+function resolveWorkspace(req, res, next) {
+  const requested = req.get('X-Workspace') || req.query.workspace;
+  if (!requested || requested === req.user.sub) {
+    req.workspaceId = req.user.sub;
+    return next();
+  }
+  if (shares.isSharedWith(requested, req.user.sub)) {
+    req.workspaceId = requested;
+    return next();
+  }
+  return res.status(403).json({ error: 'sem acesso a esta partilha' });
+}
+
+app.use('/api/products', auth.requireAuth, resolveWorkspace);
 
 app.get('/api/products', (req, res) => {
-  res.json(loadUserProducts(req.user.sub).sort((a, b) => a.name.localeCompare(b.name)));
+  res.json(loadUserProducts(req.workspaceId).sort((a, b) => a.name.localeCompare(b.name)));
 });
 
 app.post('/api/products', async (req, res) => {
@@ -555,7 +641,7 @@ app.post('/api/products', async (req, res) => {
 
   const product = {
     id: crypto.randomUUID(),
-    userId: req.user.sub,
+    userId: req.workspaceId, // the workspace owner owns the product, not necessarily the actor
     name: trimmedName,
     brand: trimmedBrand,
     category: CATEGORIES.includes(category) ? category : DEFAULT_CATEGORY,
@@ -564,9 +650,9 @@ app.post('/api/products', async (req, res) => {
     updatedAt: new Date().toISOString(),
   };
 
-  const products = loadUserProducts(req.user.sub);
+  const products = loadUserProducts(req.workspaceId);
   products.push(product);
-  saveUserProducts(req.user.sub, products);
+  saveUserProducts(req.workspaceId, products);
   res.status(201).json(product);
 });
 
@@ -574,7 +660,7 @@ app.post('/api/products', async (req, res) => {
 // query — the old matches were found using the old query, so they may no
 // longer be the right product once either half of it changes.
 app.put('/api/products/:id', async (req, res) => {
-  const products = loadUserProducts(req.user.sub);
+  const products = loadUserProducts(req.workspaceId);
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
@@ -603,15 +689,15 @@ app.put('/api/products/:id', async (req, res) => {
   }
   product.updatedAt = new Date().toISOString();
 
-  saveUserProducts(req.user.sub, products);
+  saveUserProducts(req.workspaceId, products);
   res.json(product);
 });
 
 app.delete('/api/products/:id', (req, res) => {
-  const products = loadUserProducts(req.user.sub);
+  const products = loadUserProducts(req.workspaceId);
   const next = products.filter((p) => p.id !== req.params.id);
   if (next.length === products.length) return res.status(404).json({ error: 'produto não encontrado' });
-  saveUserProducts(req.user.sub, next);
+  saveUserProducts(req.workspaceId, next);
   // Also drop any shopping-list entries pointing at the now-deleted
   // product — otherwise they'd linger as orphans the GET route has to
   // silently filter out forever.
@@ -620,7 +706,7 @@ app.delete('/api/products/:id', (req, res) => {
 });
 
 // --- Shopping list: pick one store's match for a product to buy from ---
-app.use('/api/shopping-list', auth.requireAuth);
+app.use('/api/shopping-list', auth.requireAuth, resolveWorkspace);
 
 // Returns each entry enriched with live data from the product's current
 // urls (name, price, currency, scrapedName) rather than anything frozen
@@ -629,8 +715,8 @@ app.use('/api/shopping-list', auth.requireAuth);
 // exists is dropped from the response (and from the file, tidying up
 // orphans left by a product being deleted or a store no longer matching).
 app.get('/api/shopping-list', (req, res) => {
-  const list = loadShoppingList().filter((e) => e.userId === req.user.sub);
-  const products = loadUserProducts(req.user.sub);
+  const list = loadShoppingList().filter((e) => e.userId === req.workspaceId);
+  const products = loadUserProducts(req.workspaceId);
   const enriched = [];
   const stillValid = [];
   for (const entry of list) {
@@ -656,7 +742,7 @@ app.get('/api/shopping-list', (req, res) => {
   if (stillValid.length !== list.length) {
     // Persist the cleanup — quietly drop the orphans rather than showing
     // them again on every future load.
-    const others = loadShoppingList().filter((e) => e.userId !== req.user.sub);
+    const others = loadShoppingList().filter((e) => e.userId !== req.workspaceId);
     saveShoppingList([...others, ...stillValid]);
   }
   res.json(enriched);
@@ -670,21 +756,21 @@ app.post('/api/shopping-list', (req, res) => {
   if (typeof productId !== 'string' || typeof store !== 'string') {
     return res.status(400).json({ error: 'productId e store são obrigatórios' });
   }
-  const products = loadUserProducts(req.user.sub);
+  const products = loadUserProducts(req.workspaceId);
   const product = products.find((p) => p.id === productId);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
   const storeEntry = product.urls.find((u) => u.store === store);
   if (!storeEntry || storeEntry.price == null) return res.status(400).json({ error: 'esta loja não tem preço para este produto' });
 
   const list = loadShoppingList();
-  const existing = list.find((e) => e.userId === req.user.sub && e.productId === productId && e.store === store && !e.checked);
+  const existing = list.find((e) => e.userId === req.workspaceId && e.productId === productId && e.store === store && !e.checked);
   if (existing) {
     existing.qty = Math.min(MAX_QTY, (existing.qty ?? 1) + 1);
     saveShoppingList(list);
     return res.status(200).json(existing);
   }
 
-  const entry = { id: crypto.randomUUID(), userId: req.user.sub, productId, store, checked: false, qty: 1, addedAt: new Date().toISOString() };
+  const entry = { id: crypto.randomUUID(), userId: req.workspaceId, productId, store, checked: false, qty: 1, addedAt: new Date().toISOString() };
   list.push(entry);
   saveShoppingList(list);
   res.status(201).json(entry);
@@ -700,7 +786,7 @@ app.put('/api/shopping-list/:id/qty', (req, res) => {
     return res.status(400).json({ error: `quantidade inválida (1-${MAX_QTY})` });
   }
   const list = loadShoppingList();
-  const entry = list.find((e) => e.id === req.params.id && e.userId === req.user.sub);
+  const entry = list.find((e) => e.id === req.params.id && e.userId === req.workspaceId);
   if (!entry) return res.status(404).json({ error: 'item não encontrado' });
   entry.qty = qty;
   saveShoppingList(list);
@@ -709,7 +795,7 @@ app.put('/api/shopping-list/:id/qty', (req, res) => {
 
 app.post('/api/shopping-list/:id/toggle', (req, res) => {
   const list = loadShoppingList();
-  const entry = list.find((e) => e.id === req.params.id && e.userId === req.user.sub);
+  const entry = list.find((e) => e.id === req.params.id && e.userId === req.workspaceId);
   if (!entry) return res.status(404).json({ error: 'item não encontrado' });
   entry.checked = !entry.checked;
   saveShoppingList(list);
@@ -718,7 +804,7 @@ app.post('/api/shopping-list/:id/toggle', (req, res) => {
 
 app.delete('/api/shopping-list/:id', (req, res) => {
   const list = loadShoppingList();
-  const next = list.filter((e) => !(e.id === req.params.id && e.userId === req.user.sub));
+  const next = list.filter((e) => !(e.id === req.params.id && e.userId === req.workspaceId));
   if (next.length === list.length) return res.status(404).json({ error: 'item não encontrado' });
   saveShoppingList(next);
   res.status(204).end();
@@ -728,14 +814,14 @@ app.delete('/api/shopping-list/:id', (req, res) => {
 // clear the list" action, rather than tapping delete on each item.
 app.delete('/api/shopping-list', (req, res) => {
   const list = loadShoppingList();
-  const next = list.filter((e) => !(e.userId === req.user.sub && e.checked));
+  const next = list.filter((e) => !(e.userId === req.workspaceId && e.checked));
   saveShoppingList(next);
   res.status(204).end();
 });
 
 // Re-runs the store searches for this product's current name.
 app.post('/api/products/:id/refresh', async (req, res) => {
-  const products = loadUserProducts(req.user.sub);
+  const products = loadUserProducts(req.workspaceId);
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
@@ -743,9 +829,9 @@ app.post('/api/products/:id/refresh', async (req, res) => {
   product.urls = await searchAllStores(searchQueryFor(product), previousEntries, product.overrides || {});
   product.updatedAt = new Date().toISOString();
 
-  saveUserProducts(req.user.sub, products);
+  saveUserProducts(req.workspaceId, products);
   const drops = collectPriceDrops(product.name, previousEntries, product.urls);
-  if (drops.length) await push.notifyPriceDrops(req.user.sub, drops);
+  if (drops.length) await push.notifyPriceDrops(req.workspaceId, drops); // price-drop alert goes to the list's owner
   res.json(product);
 });
 
@@ -757,7 +843,7 @@ app.post('/api/products/:id/refresh', async (req, res) => {
 app.get('/api/products/:id/candidates', async (req, res) => {
   const store = req.query.store;
   if (!STORES[store]) return res.status(400).json({ error: 'loja inválida' });
-  const product = loadUserProducts(req.user.sub).find((p) => p.id === req.params.id);
+  const product = loadUserProducts(req.workspaceId).find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
   try {
     const candidates = await listStoreCandidates(store, searchQueryFor(product), 10);
@@ -782,7 +868,7 @@ app.put('/api/products/:id/override', async (req, res) => {
   const { store, url, excluded, clear } = req.body || {};
   if (!STORES[store]) return res.status(400).json({ error: 'loja inválida' });
 
-  const products = loadUserProducts(req.user.sub);
+  const products = loadUserProducts(req.workspaceId);
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
@@ -804,7 +890,7 @@ app.put('/api/products/:id/override', async (req, res) => {
   product.urls = seen ? product.urls.map((e) => (e.store === store ? entry : e)) : [...product.urls, entry];
   product.updatedAt = new Date().toISOString();
 
-  saveUserProducts(req.user.sub, products);
+  saveUserProducts(req.workspaceId, products);
   res.json(product);
 });
 
@@ -813,7 +899,7 @@ app.put('/api/products/:id/override', async (req, res) => {
 // snapshot to fix later, not a live reference (the product itself may get
 // edited, refreshed, or deleted afterwards).
 app.post('/api/products/:id/report-bug', (req, res) => {
-  const products = loadUserProducts(req.user.sub);
+  const products = loadUserProducts(req.workspaceId);
   const product = products.find((p) => p.id === req.params.id);
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
@@ -832,8 +918,8 @@ app.post('/api/products/:id/report-bug', (req, res) => {
   appendBugReport({
     id: crypto.randomUUID(),
     reportedAt: new Date().toISOString(),
-    userId: req.user.sub,
-    userEmail: req.user.email || null,
+    userId: req.workspaceId, // the list this product belongs to
+    userEmail: req.user.email || null, // who actually filed it (may be a collaborator)
     productId: product.id,
     productName: product.name,
     brand: product.brand || null,
@@ -894,7 +980,7 @@ async function refreshProductsForUser(userId, onProgress) {
 // a killed run just needs re-triggering and the daily scheduler catches it
 // up regardless. A per-user job is single-flight; a second POST while one
 // runs just returns the running job's status.
-const refreshJobs = new Map(); // userId -> { total, done, running, error, startedAt }
+const refreshJobs = new Map(); // workspaceId -> { total, done, running, error, startedAt }
 
 function anyRefreshJobRunning() {
   for (const job of refreshJobs.values()) if (job.running) return true;
@@ -902,23 +988,23 @@ function anyRefreshJobRunning() {
 }
 
 app.post('/api/products/refresh-all', (req, res) => {
-  const userId = req.user.sub;
-  const existing = refreshJobs.get(userId);
+  const workspaceId = req.workspaceId; // one job per list, whichever collaborator kicked it off
+  const existing = refreshJobs.get(workspaceId);
   if (existing?.running) {
     return res.status(202).json({ running: true, total: existing.total, done: existing.done });
   }
-  const total = loadUserProducts(userId).length;
+  const total = loadUserProducts(workspaceId).length;
   const job = { total, done: 0, running: true, error: null, startedAt: Date.now() };
-  refreshJobs.set(userId, job);
+  refreshJobs.set(workspaceId, job);
   res.status(202).json({ running: true, total, done: 0 });
 
-  refreshProductsForUser(userId, (done, tot) => {
+  refreshProductsForUser(workspaceId, (done, tot) => {
     job.done = done;
     job.total = tot;
   })
     .catch((err) => {
       job.error = err.message;
-      console.error(`[refresh-all] failed for user ${userId}:`, err.message);
+      console.error(`[refresh-all] failed for workspace ${workspaceId}:`, err.message);
     })
     .finally(() => {
       job.running = false;
@@ -927,7 +1013,7 @@ app.post('/api/products/refresh-all', (req, res) => {
 });
 
 app.get('/api/products/refresh-status', (req, res) => {
-  const job = refreshJobs.get(req.user.sub);
+  const job = refreshJobs.get(req.workspaceId);
   if (!job) return res.json({ running: false, total: 0, done: 0 });
   res.json({ running: job.running, total: job.total, done: job.done, error: job.error || null });
 });
