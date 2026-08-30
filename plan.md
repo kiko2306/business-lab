@@ -4302,3 +4302,13 @@ stacked the price row but missed the header; this round fixes the header
 scroll. Still not screenshot-verified: the browser tooling won't render a
 true mobile viewport and the list is auth-gated — checked by CSS audit,
 to confirm on a real phone.
+
+**Price row, one line** (requested): restructured so `.store-name`,
+`.price-value` and `.price-actions` are three siblings of `.price-row`
+(was store-name + a `.price-actions` that also wrapped the price).
+`.price-value` is now `inline-flex` holding `pack-badge · unit price ·
+.price-total` in reading order — the €/kg or €/L sits inline before the
+total instead of on a stacked block line. Desktop: all on one row. Mobile:
+store name + unit price + total share line 1, buttons drop to line 2, and
+the "Unidade" badge is hidden (only "Pack" shows — the meaningful case).
+Dead `.store-badge` / `.price-value.missing` CSS removed.

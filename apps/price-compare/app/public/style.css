@@ -163,27 +163,27 @@ main { padding: 20px; max-width: 900px; margin: 0 auto; }
 .product-card-body.hidden { display: none; }
 
 .price-row {
-  display: flex; align-items: center; justify-content: space-between;
+  display: flex; align-items: center; gap: 10px;
   padding: 8px 0; border-top: 1px solid var(--border-soft); font-size: 14px;
 }
 .price-row:first-of-type { border-top: none; }
-.store-name { display: flex; align-items: center; gap: 8px; color: var(--btn-text); }
-.store-badge {
-  font-size: 10px; text-transform: uppercase; letter-spacing: .03em; padding: 2px 6px;
-  border-radius: 4px; background: var(--btn-bg); color: var(--text-muted);
-}
-.price-value { font-weight: 700; font-size: 15px; }
+.store-name { display: flex; align-items: center; gap: 8px; flex: 1 1 auto; min-width: 0; color: var(--btn-text); }
+
+/* store name · unit price (€/kg, €/L) · total price — all on one line */
+.price-value { display: inline-flex; align-items: baseline; gap: 6px; flex: 0 0 auto; white-space: nowrap; }
+.price-value .pack-badge { align-self: center; }
+.price-total { font-weight: 700; font-size: 15px; }
+.unit-price { font-weight: 400; font-size: 12px; color: var(--text-muted); }
 .price-value.cheapest { color: var(--success); }
-.price-value.missing { color: var(--text-faint); font-weight: 400; font-size: 13px; }
-.unit-price { display: block; font-weight: 400; font-size: 11px; color: var(--text-faint); }
+.price-value.cheapest .unit-price { color: inherit; }
 .pack-badge {
   display: inline-block; font-weight: 600; font-size: 10px; text-transform: uppercase;
-  letter-spacing: .03em; padding: 1px 6px; border-radius: 4px; margin-right: 6px;
-  background: var(--btn-bg); color: var(--text-muted); vertical-align: middle;
+  letter-spacing: .03em; padding: 1px 6px; border-radius: 4px;
+  background: var(--btn-bg); color: var(--text-muted);
 }
 .pack-badge.pack { background: var(--warning); color: var(--accent-text); }
 .price-error { color: var(--warning); font-size: 12px; }
-.price-actions { display: flex; gap: 6px; align-items: center; }
+.price-actions { display: flex; gap: 6px; align-items: center; flex: 0 0 auto; }
 
 .btn {
   padding: 8px 14px; border: none; border-radius: 7px; background: var(--btn-bg); color: var(--btn-text);
@@ -346,10 +346,12 @@ textarea { resize: vertical; }
   .product-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; }
   .product-actions .btn { text-align: center; }
 
-  .price-row { flex-wrap: wrap; gap: 2px 10px; padding: 12px 0; }
-  .store-name { width: 100%; font-weight: 600; color: var(--text); font-size: 13px; }
-  .price-actions { width: 100%; flex-wrap: wrap; gap: 6px; }
-  .price-value { flex: 1 1 100%; font-size: 16px; margin-bottom: 2px; }
+  /* line 1: store name + unit price + total; line 2: the buttons */
+  .price-row { flex-wrap: wrap; column-gap: 8px; row-gap: 6px; padding: 12px 0; align-items: baseline; }
+  .store-name { flex: 1 1 auto; min-width: 0; font-weight: 600; color: var(--text); font-size: 13px; }
+  .price-value { flex: 0 0 auto; }
+  .price-actions { flex: 1 1 100%; flex-wrap: wrap; gap: 6px; }
   .price-actions a.btn { flex: 1 1 auto; text-align: center; }   /* "Abrir" fills the row */
   .price-actions button.btn { flex: 0 0 auto; }                  /* icon buttons stay compact */
+  .pack-badge:not(.pack) { display: none; }                      /* "Unidade" is noise on a phone; keep "Pack" */
 }

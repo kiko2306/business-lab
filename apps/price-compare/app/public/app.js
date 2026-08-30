@@ -219,12 +219,11 @@ function renderProductCard(product) {
       row.unitPrice != null
         ? `<span class="unit-price">${fmtPrice(row.unitPrice, row.currency)}/${row.unitLabel}</span>`
         : '';
-    // Shown before the price itself — a €2.94 "pack" price and a €2.94
-    // "unit" price mean very different things, and without this label the
-    // two look identical (see plan.md §39: a pack's own total price read
-    // as an absurdly overpriced single unit until this was added).
+    // Pack/Unidade label — a €2.94 "pack" price and a €2.94 "unit" price
+    // mean very different things (plan.md §39). Order within the row:
+    // store name · unit price (€/kg, €/L) · total price, all on one line.
     const packBadgeHtml = `<span class="pack-badge ${row.isPack ? 'pack' : ''}">${row.isPack ? 'Pack' : 'Unidade'}</span>`;
-    const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${packBadgeHtml}${priceText}${unitPriceHtml}</span>`;
+    const priceHtml = `<span class="price-value ${isCheapest ? 'cheapest' : ''}">${packBadgeHtml}${unitPriceHtml}<span class="price-total">${priceText}</span></span>`;
     const actionHtml = row.url ? `<a class="btn small" href="${escapeHtml(row.url)}" target="_blank" rel="noopener">Abrir</a>` : '';
     const reportHtml = `<button class="btn small" data-report-bug="${product.id}" data-report-store="${row.store}" title="Reportar um erro neste preço (${escapeHtml(row.label)})">🐞</button>`;
     const addToListHtml = `<button class="btn small" data-add-to-list="${product.id}" data-add-to-list-store="${row.store}" title="Adicionar à lista de compras (${escapeHtml(row.label)})">🛒</button>`;
@@ -232,7 +231,8 @@ function renderProductCard(product) {
 
     div.innerHTML = `
       <span class="store-name">${escapeHtml(row.label)}</span>
-      <span class="price-actions">${priceHtml}${actionHtml}${addToListHtml}${correctHtml}${reportHtml}</span>
+      ${priceHtml}
+      <span class="price-actions">${actionHtml}${addToListHtml}${correctHtml}${reportHtml}</span>
     `;
     body.appendChild(div);
   }
