@@ -66,7 +66,8 @@
   "Cenouras": {
     "continente": { "expect": "match", "nameIncludes": "cenoura" },
     "pingodoce":  { "expect": "match", "nameIncludes": "cenoura" },
-    "lidl":       { "expect": "nomatch" }
+    "lidl":       { "expect": "nomatch" },
+    "auchan":     { "expect": "match", "nameIncludes": "cenoura", "nameExcludes": "ralada" }
   },
   "Vinagre de vinho branco": {
     "continente": { "expect": "match", "nameIncludes": "vinagre" },
@@ -258,7 +259,7 @@
   },
   "Postas de salmão": {
     "continente": { "expect": "match", "nameIncludes": "salmao" },
-    "pingodoce":  { "expect": "match", "nameIncludes": "salmao" },
+    "pingodoce":  { "expect": "match", "nameIncludes": "salmao", "nameExcludes": "congelad" },
     "auchan":     { "expect": "match", "nameIncludes": "salmao" }
   },
   "Cebolas": {
@@ -278,7 +279,7 @@
     "auchan":     { "expect": "match", "nameIncludes": "fairy" }
   },
   "Ovos": {
-    "continente": { "expect": "match", "nameExcludes": "cozidos", "todo": "picks 'Ovos Cozidos' (boiled) for a plain 'Ovos' query" },
+    "continente": { "expect": "match", "nameIncludes": "ovo", "nameExcludes": "cozidos" },
     "lidl":       { "expect": "nomatch" },
     "auchan":     { "expect": "match", "nameIncludes": "ovos" }
   }

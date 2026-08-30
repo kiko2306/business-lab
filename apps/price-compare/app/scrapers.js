@@ -457,10 +457,35 @@ const PROCESSED_FORM_WORDS = new Set([
   'farinha', 'polpa', 'concentrado', 'refrigerante',
 ]);
 
+// The same idea one step over: a preparation / cut / state that changes
+// what you'd actually buy for a *plain* query — boiled eggs for "Ovos",
+// grated carrot for "Cenouras", frozen strawberries for "Morangos",
+// breaded fish for "Filetes". countExtraWords weights "cozido" the same as
+// "UHT" or a brand, so "Ovos Cozidos" (1 extra word) beats "Ovos de Solo
+// Classe M" (2) and wins on price. Demote (never reject) a candidate that
+// adds one of these unless the query asked for it ("Batatas fritas
+// congeladas" keeps "congelada" — it's in the query). Gendered/plural
+// forms listed explicitly since stemWord doesn't normalise -o/-a. Closed,
+// enumerable set (kitchen preparations + cuts), same footing as
+// PROCESSED_FORM_WORDS / NEUTRAL_PACKAGING_WORDS.
+const PREPARATION_WORDS = new Set([
+  'cozido', 'cozida', 'cozidos', 'cozidas',
+  'frito', 'frita', 'fritos', 'fritas',
+  'assado', 'assada', 'grelhado', 'grelhada',
+  'panado', 'panada', 'panados', 'panadas',
+  'ralado', 'ralada', 'fatiado', 'fatiada', 'fatias',
+  'picado', 'picada', 'laminado', 'laminada',
+  'moido', 'moida', 'desfiado', 'desfiada',
+  'congelado', 'congelada', 'congelados', 'congeladas',
+  'demolhado', 'demolhada', 'torrado', 'torrada',
+  'fumado', 'fumada', 'defumado', 'defumada',
+]);
+
 function hasUnrequestedFormWord(queryWords, candidateWords) {
   const queryWordSet = new Set(queryWords);
   for (const w of candidateWords) {
-    if (PROCESSED_FORM_WORDS.has(w) && !queryWordSet.has(w)) return true;
+    if (queryWordSet.has(w)) continue;
+    if (PROCESSED_FORM_WORDS.has(w) || PREPARATION_WORDS.has(w)) return true;
   }
   return false;
 }
@@ -1003,6 +1028,7 @@ module.exports = {
     cheapestPlausible,
     GENERIC_CATEGORY_WORDS,
     PROCESSED_FORM_WORDS,
+    PREPARATION_WORDS,
     NEUTRAL_PACKAGING_WORDS,
   },
 };

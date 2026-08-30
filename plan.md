@@ -4401,9 +4401,26 @@ test`, keep only if a `todo` flips to pass with the rest still green.
   Ração húmida 20 kg bag) and total-only cases (Queijo da Serra whole
   cheese) are not touched.
 
+**Done (§43.20):**
+
+- **B. Preparation / cut / state words** — a `PREPARATION_WORDS` set
+  (cozido/ralado/fatiado/panado/congelado/torrado/… with gendered+plural
+  forms) folded into `hasUnrequestedFormWord`, so a candidate that adds an
+  unrequested prep/cut word is demoted in `pickClosestNameMatches` the
+  same way an unrequested processed *form* already was. Fixes "Ovos" →
+  was "Ovos Cozidos" (boiled), now "Ovos de Solo Classe S"; bonus:
+  "Cenouras" @ Auchan grated→fresh, "Postas de salmão" @ Pingo Doce
+  frozen→fresh. Not a growing flavour list (§34) — a closed, enumerable
+  set of kitchen preparations, same footing as `PROCESSED_FORM_WORDS` /
+  `NEUTRAL_PACKAGING_WORDS`. Suite 217 / 212 pass / 5 todo.
+
 **Still open:**
 
-- **B. Weight distinguishing words** — down-rank a candidate that adds a
+- **B (older framing) — corpus-derived word weighting** — the more
+  general version (derive the "strong" words from the list's own
+  head-nouns instead of a set). The preparation set above covers the
+  concrete cases; revisit the general approach only if new variant classes
+  show up. Down-rank a candidate that adds a
   *strong differentiating* word, where "strong" is derived from the
   corpus (head nouns / frequent qualifiers across the other list items:
   proteína, grego, cozido, húmida, seca, ralado, fatiado…). Data-driven,

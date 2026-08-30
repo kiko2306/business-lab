@@ -142,6 +142,15 @@ test('hasUnrequestedFormWord flags a processed form the query did not ask for', 
   assert.equal(H.hasUnrequestedFormWord(H.significantWords('Sumo de laranja'), H.significantWords('Sumo Laranja 100%')), false);
 });
 
+test('hasUnrequestedFormWord also flags an unrequested preparation / cut / state', () => {
+  assert.equal(H.hasUnrequestedFormWord(H.significantWords('Ovos'), H.significantWords('Ovos Cozidos Continente')), true);
+  assert.equal(H.hasUnrequestedFormWord(H.significantWords('Cenouras'), H.significantWords('Cenoura Ralada Auchan')), true);
+  assert.equal(H.hasUnrequestedFormWord(H.significantWords('Postas de salmão'), H.significantWords('Postas de Salmão Congeladas')), true);
+  assert.equal(H.hasUnrequestedFormWord(H.significantWords('Ovos'), H.significantWords('Ovos de Solo Classe M Continente')), false);
+  // query asked for it -> not flagged
+  assert.equal(H.hasUnrequestedFormWord(H.significantWords('Batatas para fritar congeladas'), H.significantWords('Batata para Fritar Congelada Auchan')), false);
+});
+
 test('pickClosestNameMatches: plain product beats an unrequested form, then fewest extra words', () => {
   const mk = (name, extra, form, head) => ({ name, extraWordCount: extra, formMismatch: form, headMismatch: head, price: 1 });
   const chosen = H.pickClosestNameMatches([
