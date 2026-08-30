@@ -2,7 +2,14 @@ const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
-const { STORES, searchAndScrapeStore, NoMatchError } = require('./scrapers');
+const {
+  STORES,
+  searchAndScrapeStore,
+  listStoreCandidates,
+  scrapeChosenUrl,
+  detectStore,
+  NoMatchError,
+} = require('./scrapers');
 const auth = require('./auth');
 const push = require('./push');
 const users = require('./users');
@@ -186,8 +193,23 @@ function appendBugReport(report) {
 // price-over-time chart is built from. A failed scrape doesn't add a
 // point (nothing new was actually observed) but doesn't touch existing
 // history either.
-async function buildStoreEntry(store, name, previous) {
+// `override` (optional) is this product's user-set override for this store
+// (product.overrides[store], see PUT /api/products/:id/override):
+//   { excluded: true } — the user said this store doesn't carry the item;
+//     emit a placeholder entry (price null, so no row renders) that the
+//     coverage indicator can tell apart from a plain no-match.
+//   { url } — the user hand-picked the exact product page; scrape that,
+//     skipping search + candidate selection entirely.
+async function buildStoreEntry(store, name, previous, override) {
   const history = previous?.history ?? [];
+  if (override?.excluded) {
+    return {
+      url: null, store, price: null, currency: null, scrapedName: null,
+      scrapedAt: null, error: null, excluded: true, pinned: false, history,
+      unitSizeValue: null, unitSizeKind: null, isPack: false,
+    };
+  }
+  const pinned = Boolean(override?.url);
   try {
     const {
       url,
@@ -197,7 +219,7 @@ async function buildStoreEntry(store, name, previous) {
       unitSizeValue,
       unitSizeKind,
       isPack,
-    } = await searchAndScrapeStore(store, name);
+    } = pinned ? await scrapeChosenUrl(store, override.url) : await searchAndScrapeStore(store, name);
     const scrapedAt = new Date().toISOString();
     return {
       url,
@@ -207,21 +229,26 @@ async function buildStoreEntry(store, name, previous) {
       scrapedName: scrapedName || null,
       scrapedAt,
       error: null,
+      pinned,
       history: [...history, { price, scrapedAt }],
       unitSizeValue: unitSizeValue ?? null,
       unitSizeKind: unitSizeKind ?? null,
       isPack: Boolean(isPack),
     };
   } catch (err) {
-    const isNoMatch = err instanceof NoMatchError;
+    // A pinned URL that fails is treated like a transient failure (keep the
+    // last known price), never a NoMatch — the user asserted this is the
+    // right page, so a bad fetch shouldn't silently drop it.
+    const isNoMatch = !pinned && err instanceof NoMatchError;
     return {
-      url: isNoMatch ? null : previous?.url ?? null,
+      url: isNoMatch ? null : previous?.url ?? (pinned ? override.url : null),
       store,
       price: isNoMatch ? null : previous?.price ?? null,
       currency: isNoMatch ? null : previous?.currency ?? null,
       scrapedName: isNoMatch ? null : previous?.scrapedName ?? null,
       scrapedAt: isNoMatch ? null : previous?.scrapedAt ?? null,
       error: err.message,
+      pinned,
       history,
       unitSizeValue: isNoMatch ? null : previous?.unitSizeValue ?? null,
       unitSizeKind: isNoMatch ? null : previous?.unitSizeKind ?? null,
@@ -230,10 +257,12 @@ async function buildStoreEntry(store, name, previous) {
   }
 }
 
-async function searchAllStores(name, previousEntries = []) {
+async function searchAllStores(name, previousEntries = [], overrides = {}) {
   const previousByStore = new Map(previousEntries.map((e) => [e.store, e]));
   return Promise.all(
-    Object.keys(STORES).map((store) => buildStoreEntry(store, name, previousByStore.get(store)))
+    Object.keys(STORES).map((store) =>
+      buildStoreEntry(store, name, previousByStore.get(store), overrides[store])
+    )
   );
 }
 
@@ -502,7 +531,7 @@ app.put('/api/products/:id', async (req, res) => {
     }
   }
   if (queryChanged) {
-    product.urls = await searchAllStores(searchQueryFor(product), product.urls);
+    product.urls = await searchAllStores(searchQueryFor(product), product.urls, product.overrides || {});
   }
   product.updatedAt = new Date().toISOString();
 
@@ -621,12 +650,71 @@ app.post('/api/products/:id/refresh', async (req, res) => {
   if (!product) return res.status(404).json({ error: 'produto não encontrado' });
 
   const previousEntries = product.urls;
-  product.urls = await searchAllStores(searchQueryFor(product), previousEntries);
+  product.urls = await searchAllStores(searchQueryFor(product), previousEntries, product.overrides || {});
   product.updatedAt = new Date().toISOString();
 
   saveUserProducts(req.user.sub, products);
   const drops = collectPriceDrops(product.name, previousEntries, product.urls);
   if (drops.length) await push.notifyPriceDrops(req.user.sub, drops);
+  res.json(product);
+});
+
+// --- Manual match override ("corrigir correspondência") ---
+// The automatic pick is wrong often enough (store vocabulary, per-kg vs
+// per-piece, an ambiguous name) that the user needs an escape hatch. This
+// returns one store's raw search results so they can choose the right one;
+// PUT .../override then pins it (or excludes the store).
+app.get('/api/products/:id/candidates', async (req, res) => {
+  const store = req.query.store;
+  if (!STORES[store]) return res.status(400).json({ error: 'loja inválida' });
+  const product = loadUserProducts(req.user.sub).find((p) => p.id === req.params.id);
+  if (!product) return res.status(404).json({ error: 'produto não encontrado' });
+  try {
+    const candidates = await listStoreCandidates(store, searchQueryFor(product), 10);
+    res.json(
+      candidates.map((c) => ({
+        url: c.url,
+        name: c.name,
+        price: c.price,
+        currency: c.currency,
+        isPack: c.isPack,
+      }))
+    );
+  } catch (err) {
+    res.status(502).json({ error: err.message });
+  }
+});
+
+// Pin a specific candidate URL as this store's match, exclude the store, or
+// clear back to automatic. Re-scrapes just that store so the change shows
+// immediately without a full refresh.
+app.put('/api/products/:id/override', async (req, res) => {
+  const { store, url, excluded, clear } = req.body || {};
+  if (!STORES[store]) return res.status(400).json({ error: 'loja inválida' });
+
+  const products = loadUserProducts(req.user.sub);
+  const product = products.find((p) => p.id === req.params.id);
+  if (!product) return res.status(404).json({ error: 'produto não encontrado' });
+
+  product.overrides = product.overrides || {};
+  if (clear) {
+    delete product.overrides[store];
+  } else if (excluded) {
+    product.overrides[store] = { excluded: true };
+  } else if (typeof url === 'string' && url.trim()) {
+    if (detectStore(url) !== store) return res.status(400).json({ error: 'o link não pertence a esta loja' });
+    product.overrides[store] = { url: url.trim() };
+  } else {
+    return res.status(400).json({ error: 'indique url, excluded ou clear' });
+  }
+
+  const previous = product.urls.find((e) => e.store === store);
+  const entry = await buildStoreEntry(store, searchQueryFor(product), previous, product.overrides[store]);
+  const seen = product.urls.some((e) => e.store === store);
+  product.urls = seen ? product.urls.map((e) => (e.store === store ? entry : e)) : [...product.urls, entry];
+  product.updatedAt = new Date().toISOString();
+
+  saveUserProducts(req.user.sub, products);
   res.json(product);
 });
 
@@ -687,13 +775,16 @@ app.post('/api/products/:id/report-bug', (req, res) => {
 // at the *start* of the loop would silently discard any edit, rename, or
 // delete the user made in the meantime. See updateOneProduct's comment
 // for the live case that caught this.
-async function refreshProductsForUser(userId) {
+async function refreshProductsForUser(userId, onProgress) {
   const products = loadUserProducts(userId);
   const allDrops = [];
+  let done = 0;
   for (const product of products) {
     const previousEntries = product.urls;
-    const urls = await searchAllStores(searchQueryFor(product), previousEntries);
+    const urls = await searchAllStores(searchQueryFor(product), previousEntries, product.overrides || {});
     const updated = updateOneProduct(userId, product.id, { urls, updatedAt: new Date().toISOString() });
+    done++;
+    if (onProgress) onProgress(done, products.length);
     if (!updated) continue; // deleted while this product's refresh was in flight — nothing left to update
     allDrops.push(...collectPriceDrops(product.name, previousEntries, urls));
   }
@@ -704,8 +795,49 @@ async function refreshProductsForUser(userId) {
   return loadUserProducts(userId);
 }
 
-app.post('/api/products/refresh-all', async (req, res) => {
-  res.json(await refreshProductsForUser(req.user.sub));
+// "Atualizar preços" (whole catalogue) runs for minutes on a large list, so
+// it's a background job the client polls, not a request it waits on:
+// respond 202 immediately, track progress in memory (refreshJobs), expose
+// it at GET /api/products/refresh-status. Lost on restart, like sessions —
+// a killed run just needs re-triggering and the daily scheduler catches it
+// up regardless. A per-user job is single-flight; a second POST while one
+// runs just returns the running job's status.
+const refreshJobs = new Map(); // userId -> { total, done, running, error, startedAt }
+
+function anyRefreshJobRunning() {
+  for (const job of refreshJobs.values()) if (job.running) return true;
+  return false;
+}
+
+app.post('/api/products/refresh-all', (req, res) => {
+  const userId = req.user.sub;
+  const existing = refreshJobs.get(userId);
+  if (existing?.running) {
+    return res.status(202).json({ running: true, total: existing.total, done: existing.done });
+  }
+  const total = loadUserProducts(userId).length;
+  const job = { total, done: 0, running: true, error: null, startedAt: Date.now() };
+  refreshJobs.set(userId, job);
+  res.status(202).json({ running: true, total, done: 0 });
+
+  refreshProductsForUser(userId, (done, tot) => {
+    job.done = done;
+    job.total = tot;
+  })
+    .catch((err) => {
+      job.error = err.message;
+      console.error(`[refresh-all] failed for user ${userId}:`, err.message);
+    })
+    .finally(() => {
+      job.running = false;
+      job.finishedAt = Date.now();
+    });
+});
+
+app.get('/api/products/refresh-status', (req, res) => {
+  const job = refreshJobs.get(req.user.sub);
+  if (!job) return res.json({ running: false, total: 0, done: 0 });
+  res.json({ running: job.running, total: job.total, done: job.done, error: job.error || null });
 });
 
 // --- Daily scheduled update ---
@@ -736,22 +868,35 @@ function saveScheduleState(state) {
   fs.writeFileSync(SCHEDULE_FILE, JSON.stringify(state, null, 2));
 }
 
+// Guards against the 15-minute poll starting a second run on top of one
+// still in flight — a full refresh of a large catalogue can take longer
+// than 15 minutes, and setInterval doesn't wait for the async callback to
+// settle. Also stands down while a user's manual "Atualizar preços" job is
+// running, so the two don't double up.
+let scheduledRunInFlight = false;
+
 async function checkScheduledUpdate() {
+  if (scheduledRunInFlight || anyRefreshJobRunning()) return;
   const now = new Date();
   const today = todayLocalDateString();
   const state = loadScheduleState();
   if (now.getHours() < SCHEDULED_HOUR || state.lastRunDate === today) return;
 
-  console.log(`[schedule] running daily update for ${today}`);
-  const userIds = [...new Set(loadAllProducts().map((p) => p.userId).filter(Boolean))];
-  for (const userId of userIds) {
-    try {
-      await refreshProductsForUser(userId);
-    } catch (err) {
-      console.error(`[schedule] daily update failed for user ${userId}:`, err.message);
+  scheduledRunInFlight = true;
+  try {
+    console.log(`[schedule] running daily update for ${today}`);
+    const userIds = [...new Set(loadAllProducts().map((p) => p.userId).filter(Boolean))];
+    for (const userId of userIds) {
+      try {
+        await refreshProductsForUser(userId);
+      } catch (err) {
+        console.error(`[schedule] daily update failed for user ${userId}:`, err.message);
+      }
     }
+    saveScheduleState({ lastRunDate: today });
+  } finally {
+    scheduledRunInFlight = false;
   }
-  saveScheduleState({ lastRunDate: today });
 }
 
 const PORT = process.env.PORT || 3000;
