@@ -4719,3 +4719,102 @@ acquire/refresh/status/release). **Two-account paths — accept, switch
 into the shared list, the 409 vs. steal hand-off — need a live second
 login to exercise** (the local session store can't be hand-seeded).
 Suite: 229 tests / 224 pass / 5 todo. `Dockerfile` COPYs `shares.js`.
+
+## 45. Session Log — 2026-08-30 (cont.): Price Compare — bug reports: pack €/kg wrong, Lidl €/kg missing
+
+Seven bug reports came in (three during this session). Three ("Laranjas" —
+Pingo Doce/Auchan "Missing €/kg", "not on Lidl") were already resolved by
+§43.24's `soldByWeight` + Lidl Qwik-state price work and just needed the
+data to catch up; verified fixed. The rest were real, in current code —
+all shapes of the same "the pack / €/kg the store shows isn't in the app"
+gap (§45.1–45.4).
+
+### 45.1 Multi-pack €/kg computed off the single-unit size
+
+- **"Iogurtes com pedaços de fruta" / Pingo Doce** ("Iogurte Cremoso …
+  Amora Pack 2", €1.09) showed **€8.72/kg**; the page shows **€4.36/kg**.
+- **… / Auchan** ("IOGURTE PEDACOS AUCHAN BIO DE FRUTOS 8X125G", €3.49)
+  showed **€27.92/kg**; the page shows **€3.49/kg**.
+
+Both are packs (`looksLikeMultiPack` via the name "Pack" / the URL slug
+"8x125g"), so `parseCandidate` wanted the pack total — but
+`parsePackTotalSize` only reads an `"Emb. N x SIZE"` HTML label (§39), and
+neither page has one: Auchan puts "8X125G" in the product name, Pingo Doce
+puts "2X125G" in its JSON-LD `description` and "Pack 2" in the name. With
+that missing it fell through to `candidateSize`, which returned the
+**single tub** (125 g) — so the whole-pack price got divided by one tub's
+weight.
+
+Fix — new `packTotalFromText({ html, name })` in `scrapers.js`, tried
+between `parsePackTotalSize` and `candidateSize` in the pack branch of
+`parseCandidate`:
+- an `"N x SIZE"` shape in the **name** or the **JSON-LD description**
+  (`NX_SIZE_PATTERN`, no "emb." required) → `count × per-unit`;
+- failing that, a bare `"Pack N"` / `"N un"` count in the name
+  (`PACK_COUNT_PATTERN`, `count > 1`) → `N × candidateSize(one unit)`
+  (covers Pingo Doce, whose 125 g is only in that same description).
+Kept out of `candidateSize` / `looksLikeSizeMismatch` for the same reason
+`parsePackTotalSize` is — a pack total must never feed the single-unit
+mismatch check. Verified live: Auchan → 1000 g → €3.49/kg, Pingo Doce →
+250 g → €4.36/kg (exactly the number in that report).
+
+### 45.2 Lidl states net weight nowhere machine-readable
+
+- **"Iogurtes gregos" / Lidl** ("Iogurte Grego de Framboesa/ Amora",
+  €1.39) showed **no €/kg** — `unitSizeValue: null`. The name has no size,
+  there's no `Emb.` label, and the JSON-LD Product block has no
+  `description`.
+
+But Lidl prints its own base-unit price ("**1 kg = 2.78**", also "100 g =
+X" / "1 l = X") in the product footer and the Qwik state. New
+`lidlSizeFromBaseUnitPrice(html, price)` recovers the size from it:
+`size = round(price / baseUnitPrice × basisInBaseUnits)` — €1.39 / 2.78 ×
+1000 = **500 g** → €2.78/kg, matching the site. Used in `parseCandidate`
+only for `store === 'lidl'` and only when every other size source came up
+empty (so the parsed `Emb.` / name size still wins where it exists —
+verified against Laranja 1.5 kg, Açúcar 2 kg, milk 1 L, all unchanged).
+`LIDL_BASE_UNIT_PATTERN` requires spaces around `=` to stay off minified
+inline JS. Rounds to whole g/ml (real grocery sizes; also absorbs the
+store's own 2-decimal rounding of the label).
+
+### 45.4 Continente "emb. <total> (N un)" pack not flagged
+
+Follow-up report on the same product: **"Iogurtes com pedaços de fruta" /
+Continente** ("Iogurte Pedaços … Continente", €2.19) — *"this is also a
+pack it says 8 uni"*. The page's label is `emb. 1000 gr (8 un)`: an 8-tub
+pack. The €/kg was already right (`parseEmbSize` reads the 1000 g total,
+and Continente itself prints "2,19 €/kg"), but the row showed a
+**"Unidade"** badge — `looksLikeMultiPack`'s `PACK_TEXT_PATTERN` only
+matches an `"emb. N x SIZE"` shape, not this one.
+
+Fix — `PACK_EMB_UNIT_COUNT_PATTERN`, a new check in `looksLikeMultiPack`:
+an `emb. <size> <unit>` label immediately followed by `( N un )` with
+`N ≥ 2`. Anchored to the Emb. label so a bare "(3 unidades)" stock note
+elsewhere on the page doesn't trip it. Size path unchanged
+(`parsePackTotalSize`/`packTotalFromText` find nothing → `candidateSize` →
+`parseEmbSize` → 1000 g), so only the badge flips. +3 `heuristics.test.js`
+assertions.
+
+### 45.5 Admin: delete a bug report
+
+`DELETE /api/admin/bug-reports/:id` (`requireAdmin`, 404 if absent, 204)
++ a 🗑 button per row in the admin dashboard (`showConfirm` first — not
+reversible, unlike the status buttons). The frozen 4-store snapshot each
+report carries is bulky and there's no reason to keep one once it's been
+acted on.
+
+### 45.6 Deploy + data
+
+- `_test` exports the new helpers; +5 `heuristics.test.js` assertions
+  across §45.1/45.2/45.4. Suite **231 / 226 pass / 5 todo**. Fixture
+  (`candidates.json`) left as-is — these are parser changes, not
+  markup/list changes, and `match.test.js` replays pre-parsed candidates so
+  it neither needs nor exercises them; a full `npm run capture` is a
+  separate maintenance task.
+- Image rebuilt + container recreated (twice — §45.1/45.2, then
+  §45.4/45.5). Surgical backfill (`scrapeChosenUrl` → re-parse
+  `isPack`/`unitSizeValue`/`unitSizeKind` only, nothing else) run for the
+  affected products; the rest of the pool re-parses through the normal
+  daily 08:00 refresh. Post-backfill: the three §45.1/45.2 rows show
+  €3.49/kg, €4.36/kg, €2.78/kg; Continente "Iogurtes com pedaços" now
+  reads **Pack**, €2.19/kg.

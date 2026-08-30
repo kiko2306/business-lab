@@ -1683,6 +1683,7 @@ async function loadAdminBugReports() {
         ${r.status !== 'resolved' ? '<button type="button" class="btn small" data-bug-status="resolved">✅ Resolvido</button>' : ''}
         ${r.status !== 'false_positive' ? '<button type="button" class="btn small" data-bug-status="false_positive">🤷 Falso positivo</button>' : ''}
         ${r.status !== 'open' ? '<button type="button" class="btn small" data-bug-status="open">↺ Reabrir</button>' : ''}
+        <button type="button" class="btn small danger" data-bug-delete>🗑 Eliminar</button>
       </div>
     </div>`;
     })
@@ -1698,6 +1699,19 @@ async function loadAdminBugReports() {
           method: 'POST',
           body: JSON.stringify({ status }),
         });
+        await loadAdminBugReports();
+      } catch (err) {
+        showToast(err.message, true);
+      }
+    })
+  );
+
+  list.querySelectorAll('[data-bug-delete]').forEach((btn) =>
+    btn.addEventListener('click', async (e) => {
+      const row = e.target.closest('.bug-report-row');
+      if (!(await showConfirm('Eliminar este relatório? Não é reversível.'))) return;
+      try {
+        await api(`/admin/bug-reports/${encodeURIComponent(row.dataset.reportId)}`, { method: 'DELETE' });
         await loadAdminBugReports();
       } catch (err) {
         showToast(err.message, true);

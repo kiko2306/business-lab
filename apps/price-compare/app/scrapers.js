@@ -111,6 +111,14 @@ const STORES = {
 // "pack" right in the URL slug or product name (Lidl: "Pack 8x1 L"). None
 // of these signals alone covers every store, so check all of them together.
 const PACK_TEXT_PATTERN = /\bemb\.?\s*\d+\s*x\s*[\d.,]+\s*(l|lt|kg|gr|g|un|ml)\b/i;
+// Continente also writes a pack as one total plus a parenthesised unit
+// count — "emb. 1000 gr (8 un)" — with no "N x SIZE" shape for the pattern
+// above. A genuine multi-tub pack whose €N.NN is the pack price. Anchored
+// to the Emb. label (not a bare "(N un)" anywhere, which could be a stock
+// note) and only a count ≥ 2. Verified live on "Iogurte Pedaços …
+// Continente" (bug report: "it says 8 uni").
+const PACK_EMB_UNIT_COUNT_PATTERN =
+  /\bemb\.?\s*\d[\d.,]*\s*(?:kg|gr|g|lt|l|ml)\s*\(\s*(\d+)\s*(?:un|unid|unidades)\b/i;
 // Auchan's product-URL slugs put the pack size right in the slug with no
 // "emb." prefix and no "pack" word at all (e.g. .../meio-gordo-6x1l/...,
 // .../meio-gordo-3x200ml/...) — PACK_TEXT_PATTERN and the "pack" checks
@@ -259,6 +267,41 @@ function parsePackTotalSize(html) {
   return { value: count * perUnit * UNIT_TO_GRAMS_OR_ML[unit], kind: UNIT_KIND[unit] };
 }
 
+// A multi-pack whose total size isn't in an "Emb. N x SIZE" label (that's
+// parsePackTotalSize) but sits in the product name or the JSON-LD
+// description instead — verified live on yogurt multi-packs the "Emb."
+// pattern missed:
+//   Auchan     name "IOGURTE PEDACOS AUCHAN BIO DE FRUTOS 8X125G"
+//   Pingo Doce name "…Amora Pack 2", JSON-LD description "IOG BAT V PD 2X125G"
+// Either an "N x SIZE" shape (→ count × per-unit size), or failing that a
+// bare "Pack N" / "N un" count in the name (→ N × whatever candidateSize
+// resolves for one unit — Pingo Doce's page states the 125 g only in that
+// same description). Kept out of candidateSize/looksLikeSizeMismatch for
+// the same reason parsePackTotalSize is: a pack total must never feed the
+// single-unit size-mismatch check.
+const NX_SIZE_PATTERN = /(\d+)\s*[x×]\s*(\d+(?:[.,]\d+)?)\s*(kg|gr|g|lt|l|ml)\b/i;
+const PACK_COUNT_PATTERN = /\bpack\s*(\d+)\b|\b(\d+)\s*(?:un|unid|unidades)\b/i;
+function packTotalFromText({ html, name }) {
+  const desc = extractJsonLdDescription(html);
+  for (const text of [name, desc]) {
+    const m = text && NX_SIZE_PATTERN.exec(text);
+    if (!m) continue;
+    const count = Number(m[1]);
+    const perUnit = Number(m[2].replace(',', '.'));
+    const unit = m[3].toLowerCase();
+    if (count > 1 && Number.isFinite(perUnit)) {
+      return { value: count * perUnit * UNIT_TO_GRAMS_OR_ML[unit], kind: UNIT_KIND[unit] };
+    }
+  }
+  const cm = name && PACK_COUNT_PATTERN.exec(name);
+  const count = cm ? Number(cm[1] ?? cm[2]) : 0;
+  if (count > 1) {
+    const per = candidateSize({ html, name });
+    if (per) return { value: per.value * count, kind: per.kind };
+  }
+  return null;
+}
+
 // A generous tolerance (±20%) since package sizes aren't perfectly
 // standardized across brands (e.g. 900g vs 1kg bags of the same staple
 // are common) — this is only meant to catch a clearly different size
@@ -277,6 +320,10 @@ function looksLikeMultiPack({ html, name, url }) {
   if (name && /\bpack\b/i.test(name)) return true;
   if (url && (/\bpack\b/i.test(url) || URL_PACK_SIZE_PATTERN.test(url))) return true;
   if (html && PACK_TEXT_PATTERN.test(html)) return true;
+  if (html) {
+    const m = PACK_EMB_UNIT_COUNT_PATTERN.exec(html);
+    if (m && Number(m[1]) >= 2) return true;
+  }
   return false;
 }
 
@@ -752,6 +799,30 @@ function extractLidlStatePrice(html) {
   return null;
 }
 
+// Lidl states a product's net weight/volume nowhere machine-readable — but
+// it prints the store-computed base-unit price ("1 kg = 2.78", "100 g =
+// 0.56", "1 l = 1.20") in the product footer and the Qwik state. With the
+// scraped price that recovers the size: size = price / baseUnitPrice ×
+// basisInBaseUnits. Verified live: "Iogurte Grego de Framboesa/ Amora"
+// €1.39 with "1 kg = 2.78" → 500 g. Guarded — no label, or a nonsensical
+// result, → null (same as before). The mandatory spaces around "=" keep it
+// off minified inline JS, which writes "g=1" without them.
+const LIDL_BASE_UNIT_PATTERN = /\b(\d{1,4})\s+(kg|g|l|ml)\s+=\s+(\d{1,4}(?:[.,]\d{1,2})?)\b/i;
+function lidlSizeFromBaseUnitPrice(html, price) {
+  if (!(price > 0)) return null;
+  const m = LIDL_BASE_UNIT_PATTERN.exec(html || '');
+  if (!m) return null;
+  const unit = m[2].toLowerCase();
+  const basis = Number(m[1]) * UNIT_TO_GRAMS_OR_ML[unit];
+  const baseUnitPrice = Number(m[3].replace(',', '.'));
+  if (!(basis > 0) || !(baseUnitPrice > 0)) return null;
+  // Real grocery sizes are whole grams / millilitres; round off the
+  // float (and the store's 2-decimal rounding of the label itself).
+  const value = Math.round((price / baseUnitPrice) * basis);
+  if (!(value >= 1) || value > 1_000_000) return null;
+  return { value, kind: UNIT_KIND[unit] };
+}
+
 async function scrapeLidl(url) {
   const html = await fetchHtml(url);
   const result = extractJsonLdPrice(html);
@@ -855,10 +926,17 @@ function parseCandidate(store, url, scraped, query) {
   const isPack = looksLikeMultiPack({ html, name: result.name, url });
   // A pack's €N.NN is for the whole pack, not one unit — use its total
   // size, not the single-unit size (see parsePackTotalSize's comment for
-  // why the two are kept separate).
-  const size = isPack
-    ? (parsePackTotalSize(html) ?? candidateSize({ html, name: result.name }))
+  // why the two are kept separate). packTotalFromText covers the multipacks
+  // whose total is only in the name / JSON-LD description, not an "Emb."
+  // label; candidateSize (single unit) stays the last resort.
+  let size = isPack
+    ? (parsePackTotalSize(html) ??
+       packTotalFromText({ html, name: result.name }) ??
+       candidateSize({ html, name: result.name }))
     : candidateSize({ html, name: result.name });
+  // Lidl publishes net weight only implicitly, via its "1 kg = X" base-unit
+  // price label — recover it from that + the price when nothing else did.
+  if (!size && store === 'lidl') size = lidlSizeFromBaseUnitPrice(html, result.price);
   return {
     store,
     url,
@@ -1101,6 +1179,8 @@ module.exports = {
     parseSize,
     parseEmbSize,
     parsePackTotalSize,
+    packTotalFromText,
+    lidlSizeFromBaseUnitPrice,
     candidateSize,
     countExtraWords,
     headWordMismatch,

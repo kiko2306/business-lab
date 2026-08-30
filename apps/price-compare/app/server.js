@@ -492,6 +492,17 @@ app.post('/api/admin/bug-reports/:id/status', requireAdmin, (req, res) => {
   res.json(report);
 });
 
+// Hard-delete a report (the frozen store snapshot is bulky; once acted on
+// there's no reason to keep it). Setting a status is the reversible path —
+// this one isn't.
+app.delete('/api/admin/bug-reports/:id', requireAdmin, (req, res) => {
+  const reports = loadBugReports();
+  const next = reports.filter((r) => r.id !== req.params.id);
+  if (next.length === reports.length) return res.status(404).json({ error: 'relatório não encontrado' });
+  saveBugReports(next);
+  res.status(204).end();
+});
+
 // --- Sharing: let another account co-edit my products + shopping list ---
 // The grant lives in shares.js; these routes are about the *actor*
 // (req.user), so they are not behind resolveWorkspace. The invitee must

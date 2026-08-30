@@ -144,11 +144,44 @@ test('parsePackTotalSize multiplies count x per-unit size', () => {
   assert.equal(H.parsePackTotalSize('Emb. 1 kg'), null); // not an N x SIZE shape
 });
 
+test('packTotalFromText reads an "N x SIZE" / "Pack N" multiplier from the name or JSON-LD description', () => {
+  // Auchan: count + unit size both in the name ("8X125G")
+  assert.deepEqual(
+    H.packTotalFromText({ name: 'IOGURTE PEDACOS AUCHAN BIO DE FRUTOS 8X125G', html: '' }),
+    { value: 1000, kind: 'mass' }
+  );
+  // Pingo Doce: "N x SIZE" only in the JSON-LD description ("IOG BAT V PD 2X125G")
+  const ld = '<script type="application/ld+json">{"@type":"Product","description":"IOG BAT V PD 2X125G"}</script>';
+  assert.deepEqual(
+    H.packTotalFromText({ name: 'Iogurte Cremoso com Pedaços de Amora Pack 2', html: ld }),
+    { value: 250, kind: 'mass' }
+  );
+  // bare "Pack N" count in the name x a single-unit size from the Emb. label
+  assert.deepEqual(
+    H.packTotalFromText({ name: 'Iogurtes Pack 4', html: '<span>Emb. 125 g</span>' }),
+    { value: 500, kind: 'mass' }
+  );
+  assert.equal(H.packTotalFromText({ name: 'Iogurte Grego Natural', html: '' }), null); // nothing pack-ish
+  assert.equal(H.packTotalFromText({ name: 'Leite 1 L', html: '' }), null); // a lone size, no count
+});
+
+test('lidlSizeFromBaseUnitPrice recovers net size from the "1 kg = X" label + the price', () => {
+  assert.deepEqual(H.lidlSizeFromBaseUnitPrice('<div>1 kg = 2.78</div>', 1.39), { value: 500, kind: 'mass' });
+  assert.deepEqual(H.lidlSizeFromBaseUnitPrice('foo 100 g = 0.56 bar', 1.4), { value: 250, kind: 'mass' });
+  assert.deepEqual(H.lidlSizeFromBaseUnitPrice('1 l = 1,20', 1.2), { value: 1000, kind: 'volume' });
+  assert.equal(H.lidlSizeFromBaseUnitPrice('no such label', 1.39), null);
+  assert.equal(H.lidlSizeFromBaseUnitPrice('1 kg = 2.78', 0), null); // no usable price
+});
+
 test('looksLikeMultiPack detects packs from name, url or Emb. text', () => {
   assert.equal(H.looksLikeMultiPack({ name: 'Leite Pack 8x1 L', url: '', html: '' }), true);
   assert.equal(H.looksLikeMultiPack({ name: '', url: '/p/leite-meio-gordo-6x1l/p123', html: '' }), true);
   assert.equal(H.looksLikeMultiPack({ name: 'Leite Meio Gordo', url: '', html: '<div>Emb. 6 x 1 lt</div>' }), true);
   assert.equal(H.looksLikeMultiPack({ name: 'Leite Meio Gordo Mimosa', url: '/produto/x.html', html: 'Emb. 1 lt' }), false);
+  // Continente's "emb. <total> (N un)" pack label
+  assert.equal(H.looksLikeMultiPack({ name: 'Iogurte Pedaços Continente', url: '', html: '... Continente emb. 1000 gr (8 un) no Continente' }), true);
+  assert.equal(H.looksLikeMultiPack({ name: 'Iogurte Natural', url: '', html: 'emb. 125 g (1 un)' }), false); // a single unit is not a pack
+  assert.equal(H.looksLikeMultiPack({ name: 'Arroz', url: '', html: 'restam (3 unidades) em stock' }), false); // bare "(N un)" not tied to an Emb. label
 });
 
 test('looksLikeSizeMismatch: only fires when both sizes known and clearly differ, same kind', () => {
