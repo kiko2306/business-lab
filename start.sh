@@ -381,6 +381,16 @@ if [ -n "$BASE_DOMAIN" ]; then
   ensure_app_secret apps/authelia/.env AUTHELIA_JWT_SECRET
   ensure_app_secret apps/authelia/.env AUTHELIA_OIDC_HMAC_SECRET
 
+  # Authelia's user database is gitignored (it holds the password hash for the
+  # account guarding every exposed app), so a fresh clone has only the
+  # template. Authelia won't start without the real file.
+  if [ ! -f apps/authelia/config/users_database.yml ]; then
+    log "Creating Authelia's users_database.yml from the template"
+    cp apps/authelia/config/users_database.yml.example apps/authelia/config/users_database.yml
+    chmod 600 apps/authelia/config/users_database.yml
+    warn "apps/authelia/config/users_database.yml has a PLACEHOLDER password — set a real one before exposing anything (see the file's header, or the dashboard's Settings)"
+  fi
+
   # Authelia's OIDC signing key can't live in the tracked config (it's a
   # private key), so it's merged in from this gitignored second file.
   if [ ! -f apps/authelia/data/oidc-secrets.yml ]; then

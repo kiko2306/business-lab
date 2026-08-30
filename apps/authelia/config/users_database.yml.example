@@ -1,0 +1,29 @@
+###############################################################
+#                         Users Database                      #
+###############################################################
+# Copy to users_database.yml and replace the entry below. start.sh does that
+# copy for you if the real file is missing.
+#
+# The real users_database.yml is GITIGNORED and must stay that way: it holds a
+# hash of the password that guards every app behind Authelia. A password hash
+# in a public repo is offline-crackable at the attacker's leisure.
+#
+# Generate a hash:
+#   docker run --rm authelia/authelia:latest \
+#     authelia crypto hash generate argon2 --password 'your-password'
+#
+# Then paste the result as `password:` below. The username is the key under
+# `users:` — change it too. Once the dashboard is up you can manage this
+# account from Settings instead of editing this file by hand (see
+# backend/src/services/autheliaUsers.ts).
+
+users:
+  admin:
+    disabled: false
+    displayname: Admin
+    # Placeholder — Authelia will refuse to authenticate against this.
+    # Replace it with a real hash from the command above before first login.
+    password: '$argon2id$v=19$m=65536,t=3,p=4$REPLACE$REPLACE'
+    email: admin@example.com
+    groups:
+      - admins

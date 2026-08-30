@@ -5464,3 +5464,34 @@ network, where `netbird-vpn:80` resolves. That masked #11 completely.
   a correct fix also has to realign `netbird-cli`'s audience.
 - The enrolled phone has only been tested on **home WiFi**, not mobile data
   (§46.13) — which is exactly where relay would be needed.
+
+### 48.6 Security fix found while documenting the manual steps (2026-08-30)
+
+Auditing "what can't `start.sh` do" turned up a live leak:
+**`apps/authelia/config/users_database.yml` was tracked in this PUBLIC
+repository**, carrying the SSO account's username, display name, email and a
+**bcrypt password hash** — the credentials guarding every app behind Authelia.
+Present since `92c14b4`.
+
+The file's own header said to replace the example before production, but the
+file itself was still committed, so the real hash went up with it.
+
+Fixed:
+- `apps/authelia/config/users_database.yml.example` added, with a placeholder
+  hash that cannot authenticate and the `authelia crypto hash generate` recipe.
+- The real file is now in `.gitignore` and `git rm --cached`'d — it stays on
+  disk, so the running deployment was untouched (verified: Authelia healthy,
+  `authelia.<domain>` still `200`).
+- `start.sh` copies the template when the real file is missing (a fresh clone
+  now has only the template, and Authelia will not start without the real one),
+  `chmod 600`, and warns loudly that the password is a placeholder.
+
+**Still required from the user, and not something this repo can do:** the hash
+is in git history, so removing it from `HEAD` does not un-publish it. The
+password should be **rotated**. Purging history (`git filter-repo` + a force
+push) is a separate, destructive decision and was deliberately not done here.
+
+Worth noting the same class of mistake is already handled correctly elsewhere
+in this repo — `data/oidc-secrets.yml`, `apps/*/data/`, `.env`, and CrowdSec's
+`*-bouncer.yaml` are all gitignored-with-a-template. This one file was simply
+missed.

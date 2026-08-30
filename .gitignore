@@ -10,6 +10,10 @@ apps/*/data/
 !apps/home-page/data/
 !apps/home-page/data/**
 
+# Authelia's real user database — holds a password hash for the SSO account
+# that guards every exposed app. Keep the .example template only.
+apps/authelia/config/users_database.yml
+
 # CrowdSec's Cloudflare-bouncer config holds an API token + the LAPI key
 # (keep the .example template).
 apps/crowdsec/config/*-bouncer.yaml
