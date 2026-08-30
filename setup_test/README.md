@@ -84,12 +84,19 @@ cd /home/mat/www/homelab-management && docker compose build && docker compose up
 
 Ports `80` (frontend) and `3000` (backend) are already taken. The database
 publishes no host port, so it is fine. Override the two in the test `.env`
-before starting — see §3.
+before starting — see §4.
 
-### 1.5 Cloudflare account mutation
+### 1.5 Cloudflare account mutation, and the tunnel-name trap
 
-The test creates a **real tunnel** in the real account. Harmless, but it must
-be deleted in teardown (§6) or it lingers as a confusing "Inactive" entry.
+The test creates a **real tunnel** in the real account. Harmless in itself, but
+it must be deleted in teardown (§7) or it lingers as a confusing "Inactive"
+entry.
+
+The trap: `start.sh`'s tunnel-name prompt **defaults to `$(hostname -s)`**,
+which on this host is `home-srv-01` — the production tunnel's exact name. Just
+pressing Enter reuses production's tunnel instead of creating one, and seeds
+its ID into the test database. `TUNNEL_NAME` is therefore pre-set in `.env`
+rather than left to the prompt — see §4.
 
 ### 1.6 What is safe by design
 
@@ -100,7 +107,7 @@ be deleted in teardown (§6) or it lingers as a confusing "Inactive" entry.
   restarts cloudflared when the guard says the setting was missing.
 - `/etc/docker/daemon.json` already exists, so that block is skipped.
 
-These are asserted in §5.2 rather than assumed.
+These are asserted in §6.2 rather than assumed.
 
 ---
 
@@ -112,52 +119,90 @@ cd /home/mat/www/homelab-management && ./setup_test/snapshot-live.sh setup_test/
 
 Read-only, no credentials. Captures the cloudflared unit + transport, the
 drop-ins, running containers, published ports, every NPM proxy host, and the
-`homelab-*` image IDs. Re-run it after the test and `diff` — see §5.
+`homelab-*` image IDs. Re-run it after the test and `diff` — see §6.2.
 
 ---
 
-## 3. Set up the test clone
+## 3. Clone into a new folder
 
-Clone **from the remote**, not by copying the working tree. This is the point:
-it tests what a real user actually receives, including that gitignored files
-(`users_database.yml`, `data/management.json`, `oidc-secrets.yml`, every
-`.env`) are genuinely absent and get regenerated.
+Clone **from the remote**, not by copying the working tree. That is the point:
+it tests what a real user actually receives, including that the gitignored
+files (`users_database.yml`, `data/management.json`, `oidc-secrets.yml`, every
+`.env`) really are absent and get regenerated.
 
 ```bash
 git clone https://github.com/kiko2306/homelab-management.git /home/mat/www/homelab-management/setup_test/instance
 ```
 
-Then pre-set the non-conflicting ports, so the interactive run only asks the
-three Cloudflare questions:
-
-```bash
-cd /home/mat/www/homelab-management/setup_test/instance && cp .env.example .env && sed -i 's/^FRONTEND_PORT=.*/FRONTEND_PORT=8091/; s/^BACKEND_PORT=.*/BACKEND_PORT=3100/; s|^CORS_ORIGIN=.*|CORS_ORIGIN=http://localhost:8091|' .env
-```
-
-The compose project name comes from the directory, so containers are
-`instance-*` — no collision with `homelab-management-*`.
+The Compose project name comes from the directory, so the dashboard's own
+containers are `instance-*` — no collision with `homelab-management-*`. (This
+does **not** apply to the apps under `apps/` — see hazard §1.1.)
 
 ---
 
-## 4. Run it
+## 4. Prepare the root `.env` — the only manual prep
+
+Four values. Everything else `start.sh` either generates or asks for.
+
+| Key | Set to | Why |
+|---|---|---|
+| `FRONTEND_PORT` | `8091` | `80` is production's. Verified free. |
+| `BACKEND_PORT` | `3100` | `3000` is production's. Verified free. |
+| `CORS_ORIGIN` | `http://localhost:8091` | must match the frontend port or the dashboard's API calls fail |
+| `TUNNEL_NAME` | `setup-test` | **safety-critical — see below** |
+
+Leave these **blank** so `start.sh` prompts for them and the prompt path is
+actually exercised:
+
+| Key | Why blank |
+|---|---|
+| `BASE_DOMAIN` | prompted; use the real domain (it must be a real Cloudflare zone — §8) |
+| `CLOUDFLARE_API_TOKEN` | prompted, read silently; use the real token |
+| `CLOUDFLARE_ACCOUNT_ID` / `ZONE_ID` / `TUNNEL_ID` | derived and written back by `start.sh` — leaving them blank is what proves derivation works |
+
+Everything else in `.env.example` is left alone: `start.sh` fills `APPS_DIR`
+itself and generates `JWT_SECRET`, `JWT_REFRESH_SECRET` and
+`POSTGRES_PASSWORD` because the template ships them as `change_this_*`.
+
+### Why `TUNNEL_NAME` must be pre-set and not left to the prompt
+
+The prompt defaults to `$(hostname -s)`, which on this host is
+**`home-srv-01`** — the **exact name of the production tunnel**. Pressing Enter
+would make `start.sh` find that tunnel, *reuse* it rather than create one, and
+seed **production's tunnel ID** into the test instance's database. Tunnel
+creation would then never be tested, and the test dashboard would be holding a
+handle on the live tunnel's config.
+
+Setting it explicitly in `.env` removes the trap entirely rather than relying
+on the person running the test to notice and type over the default.
+
+```bash
+cd /home/mat/www/homelab-management/setup_test/instance && cp .env.example .env && chmod 600 .env && sed -i 's/^FRONTEND_PORT=.*/FRONTEND_PORT=8091/; s/^BACKEND_PORT=.*/BACKEND_PORT=3100/; s|^CORS_ORIGIN=.*|CORS_ORIGIN=http://localhost:8091|; s/^TUNNEL_NAME=.*/TUNNEL_NAME=setup-test/' .env
+```
+
+Confirm before continuing — `TUNNEL_NAME` must **not** read `home-srv-01`:
+
+```bash
+grep -E '^(FRONTEND_PORT|BACKEND_PORT|CORS_ORIGIN|TUNNEL_NAME|BASE_DOMAIN|CLOUDFLARE_API_TOKEN)=' /home/mat/www/homelab-management/setup_test/instance/.env
+```
+
+---
+
+## 5. Run it
 
 ```bash
 cd /home/mat/www/homelab-management/setup_test/instance && sudo ./start.sh
 ```
 
-Answer the three prompts:
-
-| Prompt | Use | Why |
-|---|---|---|
-| Base domain | the **real** domain | it must be a real Cloudflare zone (see §7) |
-| Cloudflare API token | the real token | needed for the zone lookup + tunnel create |
-| Tunnel name | **`setup-test`** | must NOT be the live tunnel's name, or `start.sh` reuses production's tunnel instead of creating one |
+It should ask exactly **two** questions — base domain, then the Cloudflare API
+token (silent). If it also asks for a tunnel name, §4 didn't take: stop and fix
+`.env`, because the default is production's tunnel.
 
 ---
 
-## 5. What must be true afterwards
+## 6. What must be true afterwards
 
-### 5.1 The test instance built itself correctly
+### 6.1 The test instance built itself correctly
 
 | # | Check | Command |
 |---|---|---|
@@ -174,7 +219,7 @@ Answer the three prompts:
 | 11 | Settings seeded | query the test DB's `settings` table for the 5 keys |
 | 12 | Dashboard responds | `curl -o /dev/null -w '%{http_code}' http://localhost:8091` |
 
-### 5.2 Production is untouched — the part that actually matters
+### 6.2 Production is untouched — the part that actually matters
 
 ```bash
 cd /home/mat/www/homelab-management && ./setup_test/snapshot-live.sh setup_test/after.txt && diff setup_test/before.txt setup_test/after.txt
@@ -208,7 +253,7 @@ printf '\x00\x00\x00\x00\x00' > /tmp/e.grpc && curl -sS --http2 -X POST https://
 
 ---
 
-## 6. Teardown
+## 7. Teardown
 
 ```bash
 cd /home/mat/www/homelab-management/setup_test/instance && sudo docker compose down -v
@@ -224,7 +269,7 @@ Then, in order:
 
 ---
 
-## 7. Known limitations this test is expected to surface
+## 8. Known limitations this test is expected to surface
 
 These are real gaps, not test-harness problems. Record what actually happens.
 

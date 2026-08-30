@@ -5502,7 +5502,13 @@ A plan for validating that `git clone` + `sudo ./start.sh` produces a working
 deployment, run on this host alongside production. Not executed yet — the plan,
 its hazard analysis, and a read-only snapshot script.
 
-- `setup_test/README.md` — the plan.
+- `setup_test/README.md` — the plan. Flow matches how it will actually be run:
+  clone from the remote into a new folder, prepare the root `.env`, then
+  `sudo ./start.sh`. The `.env` prep is the only manual step — four values
+  (`FRONTEND_PORT`, `BACKEND_PORT`, `CORS_ORIGIN`, `TUNNEL_NAME`), with
+  `BASE_DOMAIN` and `CLOUDFLARE_API_TOKEN` deliberately left blank so the
+  prompt path is exercised, and the three `*_ID`s left blank so deriving them
+  is what gets proven.
 - `setup_test/snapshot-live.sh` — read-only capture of the live state the test
   must not change (cloudflared unit + transport, drop-ins, containers, ports,
   every NPM proxy host, `homelab-*` image IDs). Verified by running it.
@@ -5541,6 +5547,15 @@ proxy hosts on the shared NPM. Naturally guarded — `start.sh` seeds only the
 Cloudflare half of the exposure settings, never NPM's URL/credentials (§47.3),
 and provisioning can't run without them — so the rule is simply to leave those
 fields blank.
+
+**3. The tunnel-name prompt defaults to production's tunnel.** `start.sh`
+defaults `TUNNEL_NAME` to `$(hostname -s)`, which on this host is
+`home-srv-01` — the live tunnel's exact name. Pressing Enter would *reuse*
+production's tunnel rather than create one, seed its ID into the test
+database, and leave the test dashboard holding a handle on the live tunnel's
+config; tunnel creation would never actually be tested. The plan therefore
+pre-sets `TUNNEL_NAME=setup-test` in the root `.env` rather than relying on
+whoever runs the test to notice and type over the default.
 
 Lesser ones: `homelab-backend`/`homelab-frontend` are declared with no tag and
 no variable, so a test build overwrites the tags production uses (run the test
