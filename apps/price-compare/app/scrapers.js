@@ -34,12 +34,24 @@ const USER_AGENT =
 // productLinkPattern uses the 'g' flag — searchAndScrapeStore walks every
 // match in order (not just the first) so it can skip multi-pack listings
 // (see looksLikeMultiPack below) and fall through to the next candidate.
+
+// Stripped from the query text before it's sent to any store's search box
+// — verified live this isn't cosmetic: Auchan's own search for "Açúcar"
+// (with the accent) mixed in unrelated results (a Coca-Cola Zero listing,
+// an almond milk) among the sugar products; searching "Acucar" (accents
+// stripped) returned five actual sugar products, cleanly ranked. Lidl's
+// result ordering shifted too. Continente and Pingo Doce were unaffected
+// either way, so applying this to every store's query is safe.
+function stripDiacritics(text) {
+  return (text || '').normalize('NFD').replace(/[̀-ͯ]/g, '');
+}
+
 const STORES = {
   continente: {
     label: 'Continente',
     hostSuffix: 'continente.pt',
     origin: 'https://www.continente.pt',
-    searchUrl: (q) => `https://www.continente.pt/pesquisa/?q=${encodeURIComponent(q)}`,
+    searchUrl: (q) => `https://www.continente.pt/pesquisa/?q=${encodeURIComponent(stripDiacritics(q))}`,
     productLinkPattern: /href="(\/produto\/[^"?]+\.html)/g,
   },
   pingodoce: {
@@ -47,14 +59,14 @@ const STORES = {
     hostSuffix: 'pingodoce.pt',
     origin: 'https://www.pingodoce.pt',
     searchUrl: (q) =>
-      `https://www.pingodoce.pt/on/demandware.store/Sites-pingo-doce-Site/default/Search-Show?q=${encodeURIComponent(q)}`,
+      `https://www.pingodoce.pt/on/demandware.store/Sites-pingo-doce-Site/default/Search-Show?q=${encodeURIComponent(stripDiacritics(q))}`,
     productLinkPattern: /href="(\/home\/produtos\/[^"?]+\.html)/g,
   },
   lidl: {
     label: 'Lidl',
     hostSuffix: 'lidl.pt',
     origin: 'https://www.lidl.pt',
-    searchUrl: (q) => `https://www.lidl.pt/q/search?q=${encodeURIComponent(q)}`,
+    searchUrl: (q) => `https://www.lidl.pt/q/search?q=${encodeURIComponent(stripDiacritics(q))}`,
     // Lidl's storefront is a client-rendered SPA — what's in the initial
     // HTML isn't real <a href> markup but an HTML-entity-escaped JSON blob
     // for hydration (paths show up as &quot;/p/...&quot;, not "/p/...").
@@ -69,7 +81,7 @@ const STORES = {
     label: 'Auchan',
     hostSuffix: 'auchan.pt',
     origin: 'https://www.auchan.pt',
-    searchUrl: (q) => `https://www.auchan.pt/pt/pesquisa/?q=${encodeURIComponent(q)}`,
+    searchUrl: (q) => `https://www.auchan.pt/pt/pesquisa/?q=${encodeURIComponent(stripDiacritics(q))}`,
     productLinkPattern: /href="(\/pt\/[^"?]+\/\d+\.html)/g,
   },
 };
@@ -181,10 +193,28 @@ function normalizeText(text) {
 }
 
 const STOPWORDS = new Set(['de', 'da', 'do', 'das', 'dos', 'com', 'sem', 'e', 'ou', 'para', 'em', 'no', 'na']);
+
+// Verified live: a query for "Bananas" (plural — how the user's own
+// grocery list writes fruit/veg names) found zero matches at Continente
+// even though its own top search result was "Banana Continente" — every
+// relevance check compares words by exact string equality, and Portuguese
+// regular plurals just add "s" to the singular, so "bananas" !== "banana"
+// word-for-word. Stripping one trailing "s" (only past 3 letters, so
+// short words like "gas" aren't mangled) turns both into the same stem
+// for every regular case in the product list (bananas/batatas/cebolas/
+// tomates/cenouras/pimentos/...). Doesn't fix irregular plurals (e.g.
+// "limões" from "limão" doesn't reduce to "limao" this way) — that's a
+// real remaining gap, just a much rarer one than the regular case this
+// fixes.
+function stemWord(word) {
+  return word.length > 3 && word.endsWith('s') ? word.slice(0, -1) : word;
+}
+
 function significantWords(text) {
   return normalizeText(text)
     .split(/[^a-z0-9]+/)
-    .filter((w) => w.length > 2 && !STOPWORDS.has(w));
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w))
+    .map(stemWord);
 }
 
 // A plain word-overlap check can't tell "açúcar" (the query) from "sem
@@ -282,6 +312,11 @@ const NEUTRAL_PACKAGING_WORDS = new Set([
   'pack', 'embalagem', 'garrafa', 'garrafao', 'lata', 'uni', 'unidade',
   'unidades', 'caixa', 'saco', 'frasco', 'tabuleiro', 'bandeja', 'box',
   'tetra', 'pet', 'vidro', 'dose', 'doses',
+  // Every store's own-brand product repeats the store's name in its own
+  // title (e.g. "Cebola Roxa Continente") — near-universal on that
+  // store's listings, so it never actually distinguishes one candidate
+  // from another within the same store's pool.
+  'continente', 'pingodoce', 'lidl', 'auchan',
 ]);
 
 function countExtraWords(queryWords, candidateWords) {
@@ -295,6 +330,25 @@ function countExtraWords(queryWords, candidateWords) {
     count++;
   }
   return count;
+}
+
+// Verified live: "Cebolas" at Continente had three candidates all tied at
+// 1 extra word — "Cebola Picada" (chopped), "Cebola Roxa" (red), and
+// "Sopa de Cebola" (onion *soup*, a fundamentally different product that
+// only shares the word "cebola"). countExtraWords alone can't tell these
+// apart since each adds exactly one word the query didn't. What does
+// distinguish them: Portuguese product titles put the actual item first
+// ("Cebola Roxa" — an onion, described as red) and a *different* item
+// second when it's not what's being sold ("Sopa de Cebola" — a soup,
+// happening to be onion-flavoured). Only used to break ties in
+// extraWordCount, never as a standalone filter — with a real brand-name
+// head word (e.g. "Bifidus Pedaços..." for a tracked yogurt) this would
+// incorrectly flag a correct match, but by then it's usually the only
+// candidate left in the pool, so the tiebreak never fires against it.
+function headWordMismatch(queryWords, candidateWords) {
+  const [firstCandidateWord] = candidateWords;
+  if (!firstCandidateWord) return false;
+  return !queryWords.includes(firstCandidateWord);
 }
 
 // Category-noun words so generic they appear in nearly every candidate a
@@ -495,8 +549,12 @@ async function searchAndScrapeStore(store, query) {
     // Extra words the query never asked for (see countExtraWords) rank
     // candidates by how closely their name matches the query, so the
     // plain product is preferred over a flavoured/variant one from the
-    // same store even when the variant is cheaper.
-    const extraWordCount = countExtraWords(significantWords(query), new Set(significantWords(result.name)));
+    // same store even when the variant is cheaper. headWordMismatch
+    // breaks ties within that (see its own comment above).
+    const queryWords = significantWords(query);
+    const candidateWords = significantWords(result.name);
+    const extraWordCount = countExtraWords(queryWords, new Set(candidateWords));
+    const headMismatch = headWordMismatch(queryWords, candidateWords);
     // Carried through to the winning entry so callers (server.js) can
     // show a €/kg or €/L unit price — the only way to compare two stores
     // fairly when neither sells the item in the same pack size.
@@ -506,6 +564,7 @@ async function searchAndScrapeStore(store, query) {
       url: productUrl,
       ...result,
       extraWordCount,
+      headMismatch,
       unitSizeValue: size?.value ?? null,
       unitSizeKind: size?.kind ?? null,
     };
@@ -527,10 +586,13 @@ async function searchAndScrapeStore(store, query) {
 // Narrows a store's candidate pool to only the entries tied for the
 // fewest query-unaccounted-for words (see countExtraWords) before price
 // is ever considered — the closest name match, not the cheapest name
-// match, is the right product.
+// match, is the right product. Ties within that are narrowed further by
+// headWordMismatch (see its own comment) before price ever breaks a tie.
 function pickClosestNameMatches(entries) {
   const minExtra = Math.min(...entries.map((e) => e.extraWordCount));
-  return entries.filter((e) => e.extraWordCount === minExtra);
+  const closest = entries.filter((e) => e.extraWordCount === minExtra);
+  const headMatched = closest.filter((e) => !e.headMismatch);
+  return headMatched.length ? headMatched : closest;
 }
 
 // Picking the outright cheapest candidate trusts every store's own price

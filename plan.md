@@ -3720,3 +3720,76 @@ price €1.15/kg; "Leite meio gordo" at Auchan → €0.86, size 1000ml volume,
 €0.86/L; Luso water at Pingo Doce → size unknown, unit price correctly
 null rather than guessed. Deployed, refreshing the full 122-item pool in
 the background to backfill size data pool-wide.
+
+## 36. Session Log — 2026-08-30 (cont.): Price Compare — 300-item grocery list swap + 3 matching fixes found along the way
+
+User replaced the entire 122-item test pool with a real 300-item grocery
+list spanning 15 categories (fresh produce, meat/fish, dairy, bakery,
+pantry, frozen, drinks, personal care, cleaning, baby/pet). Mapped each
+item to the app's fixed `CATEGORIES` list in server.js (which doesn't
+match the user's emoji section headers 1:1 — "Talho e Peixaria" split
+item-by-item into meat vs. fish/seafood; "Pequeno-Almoço", "Molhos e
+Condimentos", "Doces e Snacks" all folded into "Mercearia"; baby/pet
+items into "Outros"). Cleared all 122 old items for this user (one
+unrelated product belonging to a different account, `Arroz Carolino`,
+left untouched) and added the 300 new ones with empty price data, ready
+for the pool-wide refresh.
+
+Kicked off the refresh, then killed it seconds in — the first several
+items (all fresh produce) were scoring 0/4 stores, and manually checking
+"Bananas" showed why:
+
+**1. Portuguese plural mismatch.** `significantWords` compared words by
+exact string equality with no stemming, so query "Bananas" (plural — how
+grocery lists actually write fruit/veg names) never matched a store's own
+"Banana Continente" listing. Fixed with a minimal regular-plural stemmer
+(`stemWord`, scrapers.js) — strip one trailing "s" past 3 letters. Fixes
+every regular case in this list (bananas→banana, tomates→tomate,
+cebolas→cebola, cenouras→cenoura, ...); doesn't fix irregular plurals
+like limões→limão, a real but much rarer remaining gap.
+
+**2. Accented search queries return worse results on some stores.**
+Suspected by the user mid-session ("try to strip the special chars and
+´ç"), confirmed live before implementing: searching Auchan for "Açúcar"
+(with the accent) mixed in unrelated results (a Coca-Cola Zero listing,
+an almond-milk drink) among the sugar products; the accent-stripped
+"Acucar" returned five actual sugar products, cleanly ranked. Lidl's
+result ordering shifted too. Continente and Pingo Doce were unaffected
+either way. Added `stripDiacritics()` (reusing the same NFD-strip
+`normalizeText` already uses) and applied it to every store's
+`searchUrl`, not just the ones observed to need it, since it's a no-op
+where it isn't.
+
+**3. A same-word-count tie can still pick a wrong product category.**
+"Cebolas" at Continente had three candidates tied at 1 extra word each:
+"Cebola Picada" (chopped onion), "Cebola Roxa" (red onion), and "Sopa de
+Cebola" (onion *soup* — a different product that only shares the word
+"cebola"). `countExtraWords` alone can't rank these against each other.
+Added `headWordMismatch` as a tiebreaker only (never a standalone
+filter): Portuguese product titles put the actual item first ("Cebola
+Roxa") and something else first when that's not what's being sold ("Sopa
+de Cebola"), so preferring candidates whose first word is one of the
+query's own words demotes "Sopa" without needing to hand-list "sopa" (or
+every other category-changing noun) anywhere. Also folded the four store
+names themselves (`continente`, `pingodoce`, `lidl`, `auchan`) into
+`NEUTRAL_PACKAGING_WORDS` — every own-brand listing repeats its own
+store's name, so it was counting as a real extra word on every single
+candidate, never actually distinguishing anything.
+
+Verified live post-fix: "Cebolas" → "Cebola Picada" (was heading toward
+onion soup); "Bananas"/regular plurals across the board now match;
+existing regression controls (Luso water, Bollycao croissant, Danone
+yogurt, lactose-free milk, Açúcar, Arroz agulha) all still correct.
+
+One confirmed remaining gap, not fixed this round: Continente's own
+search for "Tomate"/"Tomates" doesn't surface fresh tomatoes in its top
+12 results at all — every result is a canned/processed tomato product
+(polpa, tomate triturado, tomate frito...). This is the store's own
+search-ranking behaviour, not something `countExtraWords`/
+`headWordMismatch` can fix when the correct candidate was never fetched
+in the first place. Fresh produce in general may show more gaps like
+this than packaged goods — flagged for the user rather than papered
+over.
+
+Deployed all three fixes together, re-running the full 300-item ×
+4-store refresh in the background.
