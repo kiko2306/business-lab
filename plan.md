@@ -3873,3 +3873,50 @@ Atum/Natural false match), a handful of items whose store-side name
 differs from common usage ("Amaciador de cabelo" vs "Condicionador"),
 one marketing-tagline product name, and fresh tomatoes not surfacing in
 Continente's own top search results at all.
+
+## 39. Session Log — 2026-08-30 (cont.): Price Compare — bug reports go per-store; pack-fallback unit price
+
+User asked for the report-bug button to be per-store, not per-item — the
+two initial reports (submitted before this change) both turned out to be
+about one specific store's price, with nothing recording which one.
+Moved the 🐞 button from the product-card header onto each store's price
+row; the server now requires a valid `store` in the request body and
+records it as `reportedStore`, alongside the existing full 4-store
+snapshot for context. Also replaced `window.prompt()` for the optional
+note with an in-page modal (`report-bug-modal`), matching the existing
+`confirm-modal` pattern — native prompt() isn't guaranteed to render
+centered on every platform, and the user asked for it centered.
+
+Three new reports came in immediately after deploying, all for the same
+item ("Agua  1.5L" — note the double space, a manually-added item, not
+part of the 300-item bulk add) at three different stores. Two are the
+same root cause: the product's own name never says "sem Gás" or "com
+Gás", so Continente/Pingo Doce/Auchan each returned a different
+water — a jerry-can, a sparkling bottle — that's each individually a
+reasonable interpretation of an underspecified query. Flagged to the
+user as a naming issue on that one item, not a matching bug; not renamed
+unilaterally.
+
+The third (`reportedStore: continente`, note "preço unitário, esta a
+mostrar o preço do pack") was a real bug. Checked the actual page:
+Continente's "Água sem Gás Caramulo" at €2.94 states "Emb. 6 x 1,5 lt" —
+a genuine 6-bottle, 9L pack, correctly used as the multi-pack fallback
+(no single-unit alternative existed there), but with no size captured at
+all — `parseEmbSize`'s pattern deliberately doesn't match an "N x SIZE"
+shape, so the unit-price feature (§35) had nothing to compute from, and
+the raw €2.94 read as a wildly overpriced single bottle instead of what
+it actually is (€0.33/L — in line with Auchan's single 1.5L bottle at
+the same per-litre rate).
+
+Fix: `parsePackTotalSize` (scrapers.js) parses the "Emb. N x SIZE unit"
+shape into a total (count × per-unit size). Deliberately *not* folded
+into `candidateSize`/`looksLikeSizeMismatch` — feeding a 9L total into
+the single-unit size-mismatch check would make every legitimate
+multi-pack fallback look like a mismatch against a 1.5L query and get
+rejected outright, losing the only price the store had. Only applied to
+an entry already confirmed to be a pack (`looksLikeMultiPack`), computing
+its `unitSizeValue`/`unitSizeKind` from the pack total instead of the
+(nonexistent) single-unit size. Verified live against the exact reported
+case (€2.94 → 9000ml volume → €0.327/L) plus a handful of non-pack
+controls for regressions. Deployed, refreshing the full 300-item pool in
+the background to backfill pack totals everywhere this applies.

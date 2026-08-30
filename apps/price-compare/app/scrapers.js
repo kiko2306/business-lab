@@ -156,6 +156,34 @@ function candidateSize({ html, name }) {
   return parseSize(name) ?? parseEmbSize(html);
 }
 
+// Verified live: a "Reportar" note flagged Continente's "Água sem Gás
+// Caramulo" at €2.94 as "showing the pack price as if it were the unit
+// price" — the page's own "Emb. 6 x 1,5 lt" label shows it's genuinely a
+// 6-bottle pack (9L total), correctly used as the multi-pack fallback
+// (no single-unit alternative existed for that search), but with no size
+// captured at all — parseEmbSize's pattern deliberately doesn't match an
+// "N x SIZE" shape (see its own comment), so the unit-price feature had
+// nothing to show and the raw €2.94 looked like a wildly overpriced
+// single bottle instead of what it actually is (€0.33/L — in line with
+// Auchan's single-bottle price at the same per-litre rate). Deliberately
+// kept separate from candidateSize/looksLikeSizeMismatch above: this
+// total is only meaningful for an entry already confirmed to be a pack
+// (see looksLikeMultiPack) — feeding a 9L total into the single-unit size
+// comparison there would make every legitimate multi-pack fallback look
+// like a size mismatch against a 1.5L query and get rejected outright,
+// losing the only price the store had.
+const PACK_TOTAL_SIZE_PATTERN = /\bemb\.?\s*(\d+)\s*x\s*(\d+(?:[.,]\d+)?)\s*(kg|g|lt|l|ml)\b/i;
+function parsePackTotalSize(html) {
+  if (!html) return null;
+  const m = PACK_TOTAL_SIZE_PATTERN.exec(html);
+  if (!m) return null;
+  const count = Number(m[1]);
+  const perUnit = Number(m[2].replace(',', '.'));
+  const unit = m[3].toLowerCase();
+  if (!Number.isFinite(count) || !Number.isFinite(perUnit)) return null;
+  return { value: count * perUnit * UNIT_TO_GRAMS_OR_ML[unit], kind: UNIT_KIND[unit] };
+}
+
 // A generous tolerance (±20%) since package sizes aren't perfectly
 // standardized across brands (e.g. 900g vs 1kg bags of the same staple
 // are common) — this is only meant to catch a clearly different size
@@ -601,7 +629,13 @@ async function searchAndScrapeStore(store, query) {
     // Carried through to the winning entry so callers (server.js) can
     // show a €/kg or €/L unit price — the only way to compare two stores
     // fairly when neither sells the item in the same pack size.
-    const size = candidateSize({ html, name: result.name });
+    const isPack = looksLikeMultiPack({ html, name: result.name, url: productUrl });
+    // A pack's own €N.NN is for the whole pack, not one unit — its
+    // single-unit size (candidateSize) isn't what that price maps to, so
+    // use the pack's total size instead when there is one (see
+    // parsePackTotalSize's own comment for why this is kept separate from
+    // candidateSize rather than folded into it).
+    const size = isPack ? (parsePackTotalSize(html) ?? candidateSize({ html, name: result.name })) : candidateSize({ html, name: result.name });
     const entry = {
       store,
       url: productUrl,
@@ -618,7 +652,7 @@ async function searchAndScrapeStore(store, query) {
     if (looksIrrelevant(query, result.name) || looksLikeSizeMismatch(query, { html, name: result.name, url: productUrl })) {
       continue;
     }
-    (looksLikeMultiPack({ html, name: result.name, url: productUrl }) ? packEntries : singleUnitEntries).push(entry);
+    (isPack ? packEntries : singleUnitEntries).push(entry);
   }
 
   const pool = singleUnitEntries.length ? singleUnitEntries : packEntries;
