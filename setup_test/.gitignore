@@ -1,0 +1,4 @@
+# The throwaway clone under test, and the before/after state snapshots.
+# Only the plan and the snapshot script are tracked.
+instance/
+*.txt

@@ -5495,3 +5495,72 @@ Worth noting the same class of mistake is already handled correctly elsewhere
 in this repo — `data/oidc-secrets.yml`, `apps/*/data/`, `.env`, and CrowdSec's
 `*-bouncer.yaml` are all gitignored-with-a-template. This one file was simply
 missed.
+
+## 49. Fresh-setup test plan (`setup_test/`)
+
+A plan for validating that `git clone` + `sudo ./start.sh` produces a working
+deployment, run on this host alongside production. Not executed yet — the plan,
+its hazard analysis, and a read-only snapshot script.
+
+- `setup_test/README.md` — the plan.
+- `setup_test/snapshot-live.sh` — read-only capture of the live state the test
+  must not change (cloudflared unit + transport, drop-ins, containers, ports,
+  every NPM proxy host, `homelab-*` image IDs). Verified by running it.
+- `setup_test/.gitignore` — the throwaway clone and the snapshots stay untracked.
+
+The clone is taken **from the remote**, not copied from the working tree —
+that is the point of the exercise, since it also verifies the gitignored files
+(`users_database.yml` after §48.6, `data/management.json`, `oidc-secrets.yml`,
+every `.env`) really are absent from a fresh clone and get regenerated.
+
+### 49.1 Two hazards found while writing it, both non-obvious
+
+**1. App controls in a test dashboard operate on production's containers.**
+`services.ts:711` derives the Compose project name from the app's directory:
+
+```js
+const projectName = path.basename(path.dirname(service.composePath));
+```
+
+so `apps/netbird-vpn/` is project `netbird-vpn` in *any* checkout, and
+`executor.ts` passes it explicitly (`docker compose -p <projectName> ...`).
+Compose selects containers by the `com.docker.compose.project` label, not by
+which file it was pointed at — so pressing Stop on NetBird in a test dashboard
+runs `docker compose -p netbird-vpn -f <test clone>/... down` and stops
+**production's** containers. Every app is affected.
+
+This is the easiest damage to do by accident (clicking "Start" to see if the
+test instance works) and has no guard in the code, so the plan's rule is: in
+the test instance use only `/setup` and read-only Settings. A consequence to
+expect: the test dashboard shows apps as already *running*, because it reads
+the same daemon — that is the symptom, not a passing test.
+
+**2. Exposure provisioning against the live domain.** Enabling exposure in the
+test instance would repoint the live `CNAME`s at the test tunnel and rewrite
+proxy hosts on the shared NPM. Naturally guarded — `start.sh` seeds only the
+Cloudflare half of the exposure settings, never NPM's URL/credentials (§47.3),
+and provisioning can't run without them — so the rule is simply to leave those
+fields blank.
+
+Lesser ones: `homelab-backend`/`homelab-frontend` are declared with no tag and
+no variable, so a test build overwrites the tags production uses (run the test
+at the same commit, rebuild live afterwards); ports 80/3000 need overriding;
+and the test creates a real Cloudflare tunnel that teardown must delete.
+
+Safe by design and asserted rather than assumed: `cloudflared service install`
+is skipped because the unit already exists, so the live connector is never
+repointed; the http2 drop-in is rewritten with identical content.
+
+### 49.2 What this test can't prove
+
+Exposure provisioning and a working NetBird can't be verified this way, because
+doing so on the live domain is exactly hazard 2. Everything up to *publishing a
+route* is covered; the end-to-end proof needs a second domain or a second
+machine, and for the live deployment it already exists in §46-48.
+
+The plan also calls out a real limitation to confirm as a negative test:
+`BASE_DOMAIN` must be a registered Cloudflare zone, because `start.sh` looks it
+up with `GET /zones?name=<domain>`, which matches zone names exactly — a
+subdomain returns nothing and the Cloudflare step is skipped with a warning. It
+should warn and continue, never hang or half-configure. A suffix-match fallback
+would be needed to support a subdomain base.
