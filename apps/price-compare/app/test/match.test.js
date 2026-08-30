@@ -66,10 +66,12 @@ test('overall match count stays healthy across the whole fixture', () => {
       if (selectBestCandidate(name, pool)) picks++;
     }
   }
-  // Baseline when this was written: 177 / 252. Dropping below 165 means the
-  // heuristics turned too aggressive and are rejecting real matches —
-  // investigate before lowering this floor.
-  assert.ok(picks >= 165, `only ${picks}/${pairs} pairs matched (floor 165) — heuristics too aggressive?`);
+  // Baseline for the current fixture: 143 / 212 (the fixture skews toward
+  // hard cases — pure always-match controls were pruned). A drop well below
+  // this means the heuristics turned too aggressive and are rejecting real
+  // matches; investigate before lowering the floor. Re-baseline whenever
+  // capture.js's NAMES list changes.
+  assert.ok(picks >= 130, `only ${picks}/${pairs} pairs matched (floor 130) — heuristics too aggressive?`);
 });
 
 test('no candidate is picked for a query with nothing in common', () => {

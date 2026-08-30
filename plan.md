@@ -4230,3 +4230,31 @@ exemption set (bife/posta/lombo/filete/…, closed the same way
 NEUTRAL_PACKAGING_WORDS is) would recover the meat/fish cases without
 re-opening the "Fiambre Peito de Frango" false match — deferred, not
 chased this session.
+
+### 43.11 List trim (requested) — drop items the app now nails everywhere
+
+User asked to shrink both lists for faster refreshes, removing only
+"0-issue" items and keeping ≥10 per category.
+
+- **`/data/products.json`**: 300 → 284 (that user's items). Removed 16
+  where all four stores are priced, agree within 1.5×, and every
+  `scrapedName` strongly matches the query — Pêras, Curgete, Peito de
+  frango, Costeletas/Entrecosto de porco, Leite meio gordo/magro, Manteiga
+  com/sem sal, Arroz agulha, Azeite virgem extra, Gelado de
+  baunilha/chocolate, Água tónica, Vinho branco fresco, Desodorizante
+  roll-on. Every category still ≥10 (Talho and Peixaria are exactly 10).
+  Backup at `/data/products.json.bak-pretrim` (not in git — `apps/*/data/`
+  is gitignored). Conservative criteria by request, so it's a small cut;
+  loosening the ratio or the "all four priced" rule would remove more.
+- **`test/capture.js`**: 63 → 53 names. Dropped pure controls that always
+  matched and guard nothing (Maçãs Fuji, Natas para bater, Tomates,
+  Manteiga com sal, Óleo de girassol, Ketchup, Coca-Cola Zero, Azeite
+  virgem extra, Cerveja em lata); kept every failure-class item and the
+  controls that each pin one mechanism (plural stemming, negation, the
+  generic-first-word gate, a cut-word-led candidate, the headWordMismatch
+  tiebreak, …). Re-captured the fixture, pruned `labels.json` to match,
+  re-baselined the aggregate floor (177/252 → 143/212 — the fixture now
+  skews toward hard cases). `npm test` green. A regression guard for a
+  once-broken item (e.g. "Peito de frango" vs the ham) stays in the test
+  fixture even though the item left the live list — that's the point of
+  the split.

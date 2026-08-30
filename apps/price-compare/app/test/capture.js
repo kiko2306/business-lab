@@ -21,10 +21,14 @@ const { STORES, listStoreCandidates } = require('../scrapers');
 
 // Curated to cover every failure class found live (wrong product class,
 // processed-form-beats-plain, size/unit-basis, punctuation in the name,
-// store-vocabulary gaps) plus a spread of known-good controls that must
-// keep matching. Names are verbatim from the real 300-item list.
+// store-vocabulary gaps) plus the minimum set of known-good controls that
+// each exercise a *specific* mechanism (plural stemming, negation, the
+// generic-first-word gate, a cut-word-led candidate, …). Pure controls
+// that always matched and guard nothing were dropped — an item the app
+// nails at every store earns its place in the live list, not here. Names
+// are verbatim from the real grocery list.
 const NAMES = [
-  // --- known or suspected mismatches ---
+  // --- failure classes: wrong product / processed form / size / vocab ---
   'Iogurtes naturais', 'Iogurtes gregos', 'Iogurtes líquidos',
   'Queijo da Serra', 'Queijo da Beira Baixa', 'Mel de abelha',
   'Canela em pó', 'Tangerinas', 'Pêras', 'Morangos', 'Melão', 'Alface',
@@ -36,14 +40,23 @@ const NAMES = [
   'Azeitonas pretas galegas', 'Espuma de barbear', 'Molas para a roupa',
   'Champô de bebé "não chora mais"', 'Paprika (colorau)', 'Papos-secos',
   'Gelo em cubo (saco)', 'Achocolatado em pó (Nesquik)',
-  // --- known-good controls (must stay matched / must not regress) ---
-  'Bananas', 'Maçãs Gala', 'Maçãs Fuji', 'Leite meio gordo',
-  'Leite sem lactose', 'Açúcar branco', 'Arroz agulha', 'Massa esparguete',
-  'Massa para lasanha', 'Fermento em pó para bolos', 'Caldos de galinha',
-  'Bolachas Maria', 'Postas de salmão', 'Natas para bater', 'Cebolas',
-  'Tomates', 'Manteiga com sal', 'Cerveja em lata', 'Pão de forma integral',
-  'Óleo de girassol', 'Ketchup', 'Amaciador de roupa', 'Coca-Cola Zero',
-  'Detergente manual para a loiça (Fairy)', 'Ovos', 'Azeite virgem extra',
+  'Amaciador de roupa',
+  // --- controls, each guarding one mechanism ---
+  'Bananas',                 // regular-plural stemming
+  'Maçãs Gala',              // plural + a variant word that must not reject
+  'Leite meio gordo',        // must NOT pick the "sem Lactose" variant
+  'Leite sem lactose',       // query negation must not reject its own match
+  'Açúcar branco',           // 1-significant-word fallback (size stripped)
+  'Massa esparguete',        // generic-first-word gate ("Esparguete XXL" out)
+  'Massa para lasanha',      // cut/format-word-led ("Folha de Massa Fresca")
+  'Fermento em pó para bolos', // trailing generic word must NOT be required
+  'Caldos de galinha',
+  'Bolachas Maria',
+  'Postas de salmão',        // cut-word-led candidate that must pass
+  'Cebolas',                 // headWordMismatch tiebreak (vs "Sopa de Cebola")
+  'Pão de forma integral',
+  'Detergente manual para a loiça (Fairy)', // "manual" vs "máquina"
+  'Ovos',                    // 1-word underspecified query
 ];
 
 const SLEEP_MS = 400;
