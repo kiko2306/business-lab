@@ -322,23 +322,27 @@ textarea { resize: vertical; }
 /* --- Small screens ---------------------------------------------------------
    The product list is what gets used on a phone in the aisle. The header's
    button cluster (#header-user) was a non-wrapping flex row ~530px wide —
-   the real source of the horizontal scroll — and each price row crammed a
-   store name, price, €/unit line and four buttons onto one line that
-   overflowed well before 400px. Wrap the header, stack every price row, and
-   give the cards their width back. Desktop (>600px) is untouched. */
+   the source of the horizontal scroll — and each price row crammed a store
+   name, price, €/unit line and four buttons onto one line that overflowed
+   well before 400px. Pin the theme toggle to the corner, wrap the header
+   into tidy button rows, put store name + €/unit + total on one line with
+   the row's buttons beneath, and give the cards their width back. Desktop
+   (>600px) is untouched. */
 @media (max-width: 600px) {
   body { overflow-x: hidden; }               /* backstop against any stray overflow */
   main { padding: 14px 10px; }
   .modal { padding: 8px; }
   .modal-box { padding: 16px; }
 
-  #bar { padding: 10px 12px; gap: 8px; }
-  #bar h1 { font-size: 17px; }
-  #header-user { width: 100%; gap: 6px; }
+  #bar { padding: 10px 12px 8px; gap: 6px; position: relative; }
+  #bar h1 { font-size: 16px; padding-right: 34px; }   /* room for the pinned toggle */
+  #theme-toggle-btn { position: absolute; top: 8px; right: 10px; }
+  .header-actions { justify-content: flex-start; gap: 6px; }
+  #header-user { width: 100%; justify-content: flex-start; gap: 6px; margin-top: 2px; }
   #header-user .btn { flex: 1 1 auto; text-align: center; }
   #header-user .btn.small,
-  #header-user .theme-toggle { flex: 0 0 auto; }
-  #user-info { width: 100%; margin: 0 0 2px; }
+  #header-user .theme-toggle { flex: 0 0 auto; }       /* Sair, ⚙️ stay compact */
+  #user-info { display: none; }                        /* "you know who you are" */
 
   .product-card { padding: 13px 12px; }
   .product-card-header { flex-direction: column; align-items: stretch; gap: 10px; }
