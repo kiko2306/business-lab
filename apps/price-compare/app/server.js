@@ -524,8 +524,9 @@ app.get('/api/shares', auth.requireAuth, (req, res) => {
 app.post('/api/shares', auth.requireAuth, (req, res) => {
   try {
     const row = shares.createInvite({ owner: req.user, inviteeEmail: req.body?.email });
-    // Optional nudge if the invitee already has an account + push enabled.
-    push.notify?.(row.inviteeUserId, {
+    // Nudge the invitee if they already have an account + push enabled
+    // (no-op otherwise). The in-app prompt is the real entry point.
+    push.notify(row.inviteeUserId, {
       title: 'Convite de partilha',
       body: `${req.user.name || req.user.email} quer partilhar listas consigo.`,
     });
@@ -539,7 +540,7 @@ app.post('/api/shares/:id/:action(accept|decline)', auth.requireAuth, (req, res)
   try {
     const row = shares.respond(req.params.id, req.user, req.params.action);
     if (row.status === 'accepted') {
-      push.notify?.(row.ownerUserId, {
+      push.notify(row.ownerUserId, {
         title: 'Partilha aceite',
         body: `${req.user.name || req.user.email} aceitou a sua partilha.`,
       });

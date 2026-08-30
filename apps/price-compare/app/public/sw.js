@@ -10,42 +10,43 @@ self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim(
 self.addEventListener('fetch', () => {});
 
 self.addEventListener('push', (event) => {
-  let data = { title: 'Comparador de Preços', body: 'Um preço desceu.', drops: [] };
+  let data = { title: 'Comparador de Preços', body: '', drops: [] };
   try {
     if (event.data) data = { ...data, ...event.data.json() };
   } catch {
     // Non-JSON payload — fall back to the default text above.
   }
+  const isPriceDrop = Array.isArray(data.drops) && data.drops.length > 0;
   event.waitUntil(
     self.registration.showNotification(data.title, {
       body: data.body,
       icon: 'icon-192.png',
       badge: 'icon-192.png',
-      tag: 'price-drop',
+      tag: isPriceDrop ? 'price-drop' : 'pc-notice',
       data,
     })
   );
 });
 
-// Tapping the notification should show the full price-drop details, not
-// just whatever the OS notification's own (often-truncated) text showed.
-// If an app tab is already open, postMessage it directly; a service
-// worker can't show a popup itself. If none is open, fall back to
-// encoding the data in the URL the new tab opens with — app.js's init()
-// picks it up from there.
+// Tapping a price-drop notification shows the full details popup (the OS
+// text is often truncated): postMessage an already-open tab, or encode
+// the data in the URL a new tab opens with — app.js init() picks it up.
+// Any other notification just focuses/opens the app (at data.url if set).
 self.addEventListener('notificationclick', (event) => {
   event.notification.close();
   const data = event.notification.data || {};
+  const isPriceDrop = Array.isArray(data.drops) && data.drops.length > 0;
+  const target = isPriceDrop ? '/?priceDrop=' + encodeURIComponent(JSON.stringify(data)) : data.url || '/';
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clients) => {
       for (const client of clients) {
         if ('focus' in client) {
-          client.postMessage({ type: 'PRICE_DROP_NOTIFICATION', data });
+          if (isPriceDrop) client.postMessage({ type: 'PRICE_DROP_NOTIFICATION', data });
           return client.focus();
         }
       }
       if (self.clients.openWindow) {
-        return self.clients.openWindow('/?priceDrop=' + encodeURIComponent(JSON.stringify(data)));
+        return self.clients.openWindow(target);
       }
     })
   );

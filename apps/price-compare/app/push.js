@@ -75,33 +75,16 @@ function formatEuro(price) {
   return price.toFixed(2).replace('.', ',') + '€';
 }
 
-// `drops` — [{ productName, store, oldPrice, newPrice, pct }], all belonging
-// to one user's own refresh run (manual or scheduled). Sent as a single
-// notification per run, not one per drop, so a big daily update with
-// several drops doesn't spam the user with a stack of separate pushes.
-async function notifyPriceDrops(userId, drops) {
-  if (!configured || !drops.length) return;
+// Sends one already-built payload to every subscription a user has,
+// pruning the ones the browser vendor reports as gone (404/410). Shared
+// by notifyPriceDrops and notify.
+async function deliver(userId, payloadObj) {
+  if (!configured) return;
   const all = loadAll();
   const subs = all[userId] || [];
   if (!subs.length) return;
 
-  const pctOf = (d) => Math.round(d.pct * 100);
-  let title;
-  let body;
-  if (drops.length === 1) {
-    const d = drops[0];
-    title = `${d.productName} desceu ${pctOf(d)}%`;
-    body = `${STORE_LABELS[d.store] || d.store}: ${formatEuro(d.oldPrice)} → ${formatEuro(d.newPrice)}`;
-  } else {
-    title = `${drops.length} preços desceram 10% ou mais`;
-    const shown = drops.slice(0, 3).map((d) => `${d.productName} (${STORE_LABELS[d.store] || d.store}) -${pctOf(d)}%`);
-    body = shown.join(', ') + (drops.length > 3 ? `, +${drops.length - 3} mais` : '');
-  }
-  // `drops` travels alongside title/body so the app can render a full
-  // detail popup on notificationclick, not just the OS notification's own
-  // (often truncated) text.
-  const payload = JSON.stringify({ title, body, drops });
-
+  const payload = JSON.stringify(payloadObj);
   const stillValid = [];
   let changed = false;
   for (const sub of subs) {
@@ -127,10 +110,43 @@ async function notifyPriceDrops(userId, drops) {
   }
 }
 
+// `drops` — [{ productName, store, oldPrice, newPrice, pct }], all belonging
+// to one user's own refresh run (manual or scheduled). Sent as a single
+// notification per run, not one per drop, so a big daily update with
+// several drops doesn't spam the user with a stack of separate pushes.
+async function notifyPriceDrops(userId, drops) {
+  if (!configured || !drops.length) return;
+
+  const pctOf = (d) => Math.round(d.pct * 100);
+  let title;
+  let body;
+  if (drops.length === 1) {
+    const d = drops[0];
+    title = `${d.productName} desceu ${pctOf(d)}%`;
+    body = `${STORE_LABELS[d.store] || d.store}: ${formatEuro(d.oldPrice)} → ${formatEuro(d.newPrice)}`;
+  } else {
+    title = `${drops.length} preços desceram 10% ou mais`;
+    const shown = drops.slice(0, 3).map((d) => `${d.productName} (${STORE_LABELS[d.store] || d.store}) -${pctOf(d)}%`);
+    body = shown.join(', ') + (drops.length > 3 ? `, +${drops.length - 3} mais` : '');
+  }
+  // `drops` travels alongside title/body so the app can render a full
+  // detail popup on notificationclick, not just the OS notification's own
+  // (often truncated) text.
+  await deliver(userId, { title, body, drops });
+}
+
+// A plain one-off notification (sharing invites / acceptances). No-op if
+// push isn't configured or the user has no subscription / no account yet.
+async function notify(userId, { title, body, url } = {}) {
+  if (!configured || !userId || !title) return;
+  await deliver(userId, { title, body: body || '', url: url || '/' });
+}
+
 module.exports = {
   isConfigured,
   publicKey,
   addSubscription,
   removeSubscription,
   notifyPriceDrops,
+  notify,
 };
