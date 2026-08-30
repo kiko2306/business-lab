@@ -99,6 +99,29 @@ test('parseSize reads value + unit into base units and a kind', () => {
   assert.equal(H.parseSize('sem tamanho'), null);
 });
 
+test('extractLidlStatePrice resolves the index-referenced price from the Qwik state', () => {
+  // arr[7] is the price object; its "price":9 points at arr[9] = 1.49
+  const arr = [
+    'root', {}, 5, false, 'x', false, 0,
+    { basePrice: 8, oldPrice: 6, price: 9, priceTheme: 10, packaging: 11 }, // [7]
+    { text: 12 }, // [8]
+    1.49, // [9]
+    'white_yellow', // [10]
+    { text: 13 }, // [11]
+    '', 'kg',
+  ];
+  const html = `<script q:context="x">${JSON.stringify(arr)}</script>`;
+  assert.equal(H.extractLidlStatePrice(html), 1.49);
+  // no such script -> null (never throws)
+  assert.equal(H.extractLidlStatePrice('<html><body>no state here</body></html>'), null);
+  // a price object with no price siblings is ignored
+  const noise = `<script>${JSON.stringify([{ price: 1 }, { oldPrice: 0 }, 2.5])}</script>`;
+  assert.equal(H.extractLidlStatePrice(noise), null);
+  // tolerate an inlined price (not an index)
+  const inlined = `<script>${JSON.stringify([{ price: 3.99, oldPrice: 0 }])}</script>`;
+  assert.equal(H.extractLidlStatePrice(inlined), 3.99);
+});
+
 test('parseEmbSize only reads the "Emb. N unit" package label', () => {
   assert.deepEqual(H.parseEmbSize('<span>Emb. 2 kg</span> ... 1 kg = 0.85'), { value: 2000, kind: 'mass' });
   assert.equal(H.parseEmbSize('per-kg unit price 1 kg = 0.85 only'), null);

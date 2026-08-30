@@ -700,7 +700,7 @@ async function scrapeContinente(url) {
 }
 
 // The product `name` from a schema.org Product block, even when its Offer
-// carries no price (Lidl's in-store-only produce).
+// carries no price.
 function extractJsonLdProductName(html) {
   for (const m of (html || '').matchAll(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/g)) {
     let data;
@@ -716,18 +716,23 @@ function extractJsonLdProductName(html) {
   return null;
 }
 
-// Lidl's storefront is a Qwik SPA. For most items the price is in the
-// schema.org Offer, but fresh produce is listed availability:"InStoreOnly"
-// with no Offer price — the number still ships in the Qwik hydration
-// state, an index-referenced flat JSON array
-// (`{"price":45,"oldPrice":42,...}` where 45/42 are positions in the same
-// array, so `arr[45]` is the actual €1.49). Verified live against
-// "Laranja - Citrinos do Algarve IGP". Guarded: a serializer change just
-// yields null, i.e. the same NoMatch as today.
+// Lidl PT has *no online sales* — every product is availability:
+// "InStoreOnly". Most still carry the price in the schema.org Offer, but a
+// meaningful slice does not: verified live, fresh produce ("Laranja"),
+// bakery ("Pão de Forma sem Côdea", "Pastel de Nata"), and fish-counter
+// cuts ("Lombos de Salmão") all ship *no* Offer price. The number is
+// always on the page though, in the Qwik SPA hydration state — an
+// index-referenced flat JSON array where a price object looks like
+// `{"basePrice":38,"oldPrice":42,"price":45,"priceTheme":46}` and 45/42/…
+// are positions in that same array, so `arr[45]` is the real €1.49. This
+// runs for *any* Lidl product whose Offer price is missing, not just
+// produce. Guarded (JSON.parse in try, type checks) — a serializer change
+// just yields null, i.e. the same NoMatch as before.
+const LIDL_PRICE_SIBLINGS = ['oldPrice', 'basePrice', 'priceTheme', 'packaging', 'discount'];
 function extractLidlStatePrice(html) {
   for (const m of (html || '').matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
     const body = m[1].trim();
-    if (body[0] !== '[' || !body.includes('"oldPrice"')) continue;
+    if (body[0] !== '[' || !/"(?:oldPrice|basePrice|priceTheme)"/.test(body)) continue;
     let arr;
     try {
       arr = JSON.parse(body);
@@ -736,10 +741,12 @@ function extractLidlStatePrice(html) {
     }
     if (!Array.isArray(arr)) continue;
     for (const o of arr) {
-      if (o && typeof o === 'object' && !Array.isArray(o) && typeof o.price === 'number' && ('oldPrice' in o || 'basePrice' in o)) {
-        const v = arr[o.price];
-        if (typeof v === 'number' && Number.isFinite(v) && v > 0) return v;
-      }
+      if (!o || typeof o !== 'object' || Array.isArray(o) || typeof o.price !== 'number') continue;
+      if (!LIDL_PRICE_SIBLINGS.some((k) => k in o)) continue;
+      // o.price is normally an index into arr; tolerate it being inlined.
+      const viaIndex = Number.isInteger(o.price) ? arr[o.price] : undefined;
+      const value = typeof viaIndex === 'number' ? viaIndex : o.price;
+      if (Number.isFinite(value) && value > 0 && value < 100000) return value;
     }
   }
   return null;
@@ -748,8 +755,9 @@ function extractLidlStatePrice(html) {
 async function scrapeLidl(url) {
   const html = await fetchHtml(url);
   const result = extractJsonLdPrice(html);
-  if (result && result.price != null) return { ...result, html };
-  // in-store-only produce: no Offer price, dig it out of the Qwik state
+  if (result && result.price != null && result.price > 0) return { ...result, html };
+  // No Offer price (produce / bakery / counter cuts / …) — the number is
+  // still in the Qwik hydration state. Always tried, for every category.
   const price = extractLidlStatePrice(html);
   if (price != null) {
     return { price, currency: 'EUR', name: extractJsonLdProductName(html), html };
@@ -1079,6 +1087,8 @@ module.exports = {
   // Pure helpers, exposed for the test suite (test/heuristics.test.js).
   // Not part of the app's public surface — nothing in server.js uses these.
   _test: {
+    extractLidlStatePrice,
+    extractJsonLdProductName,
     sanitizeSearchQuery,
     normalizeText,
     stemWord,
