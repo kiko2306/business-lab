@@ -4283,12 +4283,22 @@ Two follow-ups after the browser walk-through:
 ### 43.13 Small-screen layout for the product list
 
 The app had **no layout `@media` queries** at all despite being an
-installable PWA meant for in-aisle phone use — a price row flexed a store
-name, price, €/unit line and four buttons onto one line that overflowed
-below ~400px. Added a `@media (max-width: 600px)` block (`style.css`, end
-of file) that stacks each price row (store name / price+€unit / button row
-each on their own line, buttons stretched to fill), drops the card's
-action buttons under the product name, and trims `main` / `.product-card`
-padding. Desktop (>600px) is untouched. Not screenshot-verified — the
-browser tooling wouldn't render a true mobile viewport this session and
-the list is auth-gated; to check on a real phone.
+installable PWA meant for in-aisle phone use. Added a
+`@media (max-width: 600px)` block (`style.css`, end of file):
+
+- **Horizontal scroll root cause**: `#header-user` (the signed-in header's
+  button cluster) is a `display:flex` row with no `flex-wrap` — ~530 px
+  wide, so any narrower screen scrolled sideways. Fixed by adding
+  `flex-wrap: wrap` to `.header-actions` globally, plus a mobile block that
+  gives `#header-user` full width and lets its buttons share the row.
+  `body { overflow-x: hidden }` on mobile as a backstop.
+- Each **price row stacks**: store name / price + €unit / a button row
+  ("Abrir" fills, icon buttons stay compact) each on its own line.
+- Card action buttons become a 2×2 grid under the product name;
+  `main` / `.product-card` / `.modal` padding trimmed.
+
+Desktop (>600px) unchanged. Two rounds — the first (§43.13 initial)
+stacked the price row but missed the header; this round fixes the header
+scroll. Still not screenshot-verified: the browser tooling won't render a
+true mobile viewport and the list is auth-gated — checked by CSS audit,
+to confirm on a real phone.
