@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { extractComposeEnvVars, getPublishedUpstreamPort } from './services';
+import { SERVICES, extractComposeEnvVars, getPublishedUpstreamPort } from './services';
 
 describe('extractComposeEnvVars', () => {
   it('treats a bare ${VAR} as required', () => {
@@ -171,5 +171,36 @@ describe('getPublishedUpstreamPort', () => {
       expect(getPublishedUpstreamPort('paperless', 'NETBIRD_MGMT_PORT')).toBe(8080);
       expect(getPublishedUpstreamPort('paperless', 'NETBIRD_SIGNAL_PORT')).toBe(8086);
     });
+  });
+});
+
+describe('netbird-vpn exposures', () => {
+  const netbird = SERVICES['netbird-vpn'];
+
+  it('exposes the management API and the relay', () => {
+    const suffixes = (netbird.additionalExposures ?? []).map((e) => e.suffix);
+    expect(suffixes).toContain('api');
+    expect(suffixes).toContain('relay');
+  });
+
+  it('does NOT expose signal through the tunnel', () => {
+    // Regression guard, not a style preference. Signal registers a peer by
+    // replying with response HEADERS on a gRPC stream that then stays open,
+    // and Cloudflare never flushes headers while a stream is open — verified
+    // on both the http2 and quic transports, so no connector setting fixes
+    // it (plan.md §52). Signal is published over Tailscale Funnel instead
+    // (NETBIRD_SIGNAL_HOSTNAME -> Signal.URI, written by start.sh).
+    //
+    // Re-adding it here would provision a perfectly healthy-looking NPM host
+    // + tunnel ingress + DNS record that silently never works, which is
+    // exactly how this cost several sessions to diagnose.
+    const suffixes = (netbird.additionalExposures ?? []).map((e) => e.suffix);
+    expect(suffixes).not.toContain('signal');
+  });
+
+  it('keeps the primary hostname pinned to the dashboard port', () => {
+    // The signal container is declared first in the compose file and does
+    // publish a port, so "first port in the file" would resolve to it.
+    expect(netbird.exposurePortEnvVar).toBe('NETBIRD_DASHBOARD_PORT');
   });
 });

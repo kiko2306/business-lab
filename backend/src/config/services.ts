@@ -66,18 +66,21 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // netbird-vpn.<domain> at a gRPC service, which answers any browser GET
     // with `invalid gRPC request method "GET"`.
     exposurePortEnvVar: 'NETBIRD_DASHBOARD_PORT',
-    // signal is gRPC too, and native clients connect to it directly using
-    // whatever Signal.URI data/management.json advertises. That has to be a
-    // publicly resolvable hostname or remote peers can register but never
-    // signal, so they never establish a tunnel to anything.
     // relay is the WebSocket fallback data path (see the netbird-relay service
     // in the compose file). grpc: false on purpose — it is plain WebSocket
-    // over HTTPS, so it wants NPM's websocket-upgrade support, not grpc_pass,
-    // and it traverses the Cloudflare Tunnel where signal's native-gRPC bidi
-    // stream cannot (plan.md §46.7/§46.9).
+    // over HTTPS, so it wants NPM's websocket-upgrade support, not grpc_pass.
+    //
+    // NOTE: signal is deliberately NOT exposed here, though it used to be.
+    // Signal registers a peer by replying with response HEADERS on a gRPC
+    // stream that then stays open, and Cloudflare never flushes headers while
+    // a stream is open — measured on both http2 and quic transports, so no
+    // connector setting fixes it (plan.md §52). Signal is published through
+    // Tailscale Funnel instead; its hostname lives in NETBIRD_SIGNAL_HOSTNAME
+    // (apps/netbird-vpn/.env) and is written into Signal.URI in
+    // data/management.json by start.sh. Do not re-add it here — the exposure
+    // would provision cleanly and still not work.
     additionalExposures: [
       { suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT', grpc: true },
-      { suffix: 'signal', label: 'Signal', portEnvVar: 'NETBIRD_SIGNAL_PORT', grpc: true },
       { suffix: 'relay', label: 'Relay', portEnvVar: 'NETBIRD_RELAY_PORT', grpc: false },
     ],
   },

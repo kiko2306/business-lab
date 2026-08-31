@@ -21,7 +21,7 @@
   },
   "Signal": {
     "Proto": "https",
-    "URI": "netbird-vpn-signal.${BASE_DOMAIN}:443",
+    "URI": "${NETBIRD_SIGNAL_HOSTNAME}:443",
     "Username": "",
     "Password": null
   },

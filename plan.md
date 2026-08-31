@@ -6436,3 +6436,97 @@ Funnel**, relay as the WebSocket data path (§50.3), route
    exposure, and have `start.sh`/the dashboard set up Funnel.
 4. Consider whether the now-unused `netbird-vpn-signal.<domain>` Cloudflare
    hostname and its NPM vhost should be removed.
+
+## 54. VPN scope closed — Funnel made reproducible, Cloudflare signal path removed
+
+Follow-on to §53, same session. §53.4's three items are done.
+
+### 54.1 Connection type: Relayed, permanently
+
+`netbird status --detail` on the home peer, with everything working:
+
+```
+Connection type: Relayed
+ICE candidate (Local/Remote): -/-
+Relay server address: rels://netbird-vpn-relay.tx-home-utils.com:443
+Networks: 192.168.1.0/24
+```
+
+**No ICE candidates at all.** With no port-forward (§0 principle 1) the home
+peer's WireGuard port is unreachable from outside, so hole-punching cannot
+complete and every session relays. Relay is therefore the **permanent data
+path here, not a fallback** — which retroactively justifies §50.3 completely,
+and means relay throughput is the operating norm. Worth remembering if
+performance is ever questioned: all phone↔home traffic crosses
+`netbird-relay` and the Cloudflare Tunnel.
+
+### 54.2 Capacity, for the record
+
+- **Users**: unbounded — gated only by Authelia's `users_database.yml` (1 today).
+- **Peers**: unbounded by NetBird; self-hosted has no license cap. Practical
+  ceiling is `StoreConfig.Engine: sqlite` and host RAM (comfortable into the
+  low hundreds); NetBird supports Postgres beyond that.
+- **Tailscale Funnel**: docs state non-configurable bandwidth limits with no
+  numbers and document **no** concurrent-connection limit. Signal holds one
+  idle long-lived stream per peer and carries only candidate exchange, so this
+  is cheap. Note **Funnel visitors are not tailnet devices** — NetBird peers
+  do not consume the Tailscale plan's device count; only the server node does.
+- **The real ceiling is relay bandwidth** (§54.1), since everything relays.
+
+Comfortable for a household (roughly ten people / a few dozen devices). The
+strain case is many simultaneous relayed sessions moving bulk data through the
+Cloudflare Tunnel; the fix there would be moving signal+relay to a public-IP
+host, which is nowhere near necessary yet.
+
+### 54.3 Reproducibility — Funnel is now in the repo
+
+§53.4 item 3. Previously none of G existed outside the running host.
+
+- **`config/management.json.example`** — `Signal.URI` is now
+  `${NETBIRD_SIGNAL_HOSTNAME}:443`, no longer a `${BASE_DOMAIN}` hostname.
+- **`.env(.example)`** — new `NETBIRD_SIGNAL_HOSTNAME`, documented with *why*
+  it is not a Cloudflare hostname. Stale comments claiming signal needs a
+  `<BASE_DOMAIN>` hostname were corrected in the same file.
+- **`start.sh`**:
+  - prompts for `TAILSCALE_AUTH_KEY` **next to the Cloudflare prompts** — the
+    user's call, and the right one: Tailscale is the same class of
+    prerequisite (an account + key that must exist beforehand), and NetBird
+    has no working signalling without it;
+  - starts the tailscale app itself (`-p tailscale`, matching the project name
+    the dashboard uses, so no duplicate stack) rather than waiting for someone
+    to start it from the dashboard — otherwise a first run finishes with a
+    NetBird that silently cannot connect any peer;
+  - derives the gateway **from inside the tailscale container** (`ip route`)
+    rather than assuming docker0's `10.201.0.1`, so it is correct on whatever
+    bridge network that app lands on — verified both reach signal;
+  - enables Funnel, reads the node's `DNSName`, writes
+    `NETBIRD_SIGNAL_HOSTNAME`, patches `Signal.URI` **in place** (never
+    regenerating `management.json`, which holds the store encryption key), and
+    restarts management;
+  - detects "Funnel is not enabled" and surfaces Tailscale's one-click
+    enablement URL. That step cannot be automated — it writes a tailnet ACL.
+  - The whole phase only ever `warn`s, never exits.
+- **`services.ts`** — the `signal` `additionalExposure` is **removed**, with a
+  comment saying why it must not come back: it provisions perfectly cleanly
+  and still never works.
+- **Tests** — three new cases in `services.test.ts` asserting `api` and
+  `relay` are exposed, `signal` is **not**, and the primary hostname stays
+  pinned to the dashboard port. Suite **125/125**, `tsc` clean.
+
+### 54.4 Dead Cloudflare signal path removed from the live host
+
+There is no deprovisioning path in the codebase (`deleteProxyHost` exists but
+is never called, and nothing removes tunnel ingress), so this was manual:
+
+- tunnel A ingress: `netbird-vpn-signal` rule dropped (40 → 39 rules);
+- its DNS record deleted;
+- NPM proxy host 33 deleted;
+- the `netbird-vpn:signal` `service_exposure` row deleted.
+
+Verified afterwards: management gRPC still `grpc-status: 0`, signal via Funnel
+still returns `x-wiretrustee-peer-registered: 1`, `netbird-vpn` 302,
+`authelia`/`homelab`/`immich` 200, and `netbird-vpn-signal.<domain>` is gone.
+
+**Worth building someday**: an exposure deprovision path, so removing an
+`additionalExposure` cleans up after itself instead of stranding an NPM host,
+a tunnel ingress rule and a DNS record.

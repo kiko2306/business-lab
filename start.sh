@@ -133,8 +133,10 @@ elif ! grep -q 'default-address-pools' "$DOCKER_DAEMON_JSON"; then
   warn "$DOCKER_DAEMON_JSON exists without 'default-address-pools' — add one (see the block start.sh would write) or new app networks will eventually fail with 'all predefined address pools have been fully subnetted'"
 fi
 
-# NetBird's native gRPC (management + signal) only survives the Cloudflare
-# Tunnel if the connector is pinned to HTTP/2. cloudflared's default QUIC
+# NetBird's native gRPC management API only survives the Cloudflare Tunnel if
+# the connector is pinned to HTTP/2. (Signal is a separate problem the http2
+# transport does NOT solve — it goes over Tailscale Funnel; see the Funnel
+# phase near the end of this script and plan.md §52/§53.) cloudflared's default QUIC
 # backbone silently drops HTTP/2 trailers: gRPC responses still arrive as a
 # 200 with a correct body, but with no grpc-status trailer, so grpc-go reports
 # "server closed the stream without sending trailers" and NetBird clients
@@ -159,7 +161,8 @@ if [ ! -f "$CF_DROPIN" ] || ! grep -q 'TUNNEL_TRANSPORT_PROTOCOL=http2' "$CF_DRO
   cat > "$CF_DROPIN" <<'UNIT'
 # Managed by start.sh — see plan.md §46.
 # cloudflared's default QUIC backbone silently drops HTTP/2 trailers, which
-# breaks every gRPC service behind the tunnel (NetBird management + signal):
+# breaks every gRPC service behind the tunnel (NetBird management; signal now
+# goes over Tailscale Funnel instead, see the Funnel phase below):
 # responses arrive as a 200 with a correct body but no grpc-status trailer, and
 # clients then retry forever with nothing that looks like an error in any log.
 [Service]
@@ -325,6 +328,24 @@ else
   warn "BASE_DOMAIN / CLOUDFLARE_API_TOKEN not set and no terminal to prompt on — skipping Cloudflare + NetBird auto-setup. Re-run interactively to finish it."
 fi
 
+# Tailscale is asked for here, next to Cloudflare, because it is the same kind
+# of prerequisite: an account and a key that must exist before this script can
+# finish. It is not optional decoration — NetBird's signal server is published
+# through Tailscale Funnel and cannot work through the Cloudflare Tunnel at
+# all (plan.md §52/§53), so without this NetBird has no working signalling and
+# no peer ever connects.
+#
+# Get a key from https://login.tailscale.com/admin/settings/keys (a reusable
+# auth key is easiest). Funnel additionally needs enabling once for the
+# tailnet; the Funnel phase near the end of this script prints the one-click
+# link if it is not.
+TS_READY=0
+if prompt_env_var TAILSCALE_AUTH_KEY "Tailscale auth key (tskey-auth-...; needed for NetBird signalling)" "" silent; then
+  TS_READY=1
+else
+  warn "TAILSCALE_AUTH_KEY not set and no terminal to prompt on — NetBird signalling will not be configured."
+fi
+
 BASE_DOMAIN="$(current_value BASE_DOMAIN)"
 
 if [ "$CF_READY" = "1" ]; then
@@ -463,13 +484,20 @@ if [ -n "$BASE_DOMAIN" ]; then
   if [ ! -f apps/netbird-vpn/data/management.json ]; then
     log "Generating NetBird's management.json for ${BASE_DOMAIN}"
     mkdir -p apps/netbird-vpn/data
+    # NETBIRD_SIGNAL_HOSTNAME is usually still blank here: it comes from the
+    # tailscale container's Funnel name, and the tailscale app isn't running
+    # yet at this point. The Funnel phase near the end of this script fills it
+    # in and rewrites Signal.URI in place. A placeholder keeps the template
+    # valid JSON meanwhile.
     BASE_DOMAIN="$BASE_DOMAIN" \
     NETBIRD_RELAY_AUTH_SECRET="$(app_env_value apps/netbird-vpn/.env NETBIRD_RELAY_AUTH_SECRET)" \
+    NETBIRD_SIGNAL_HOSTNAME="$(app_env_value apps/netbird-vpn/.env NETBIRD_SIGNAL_HOSTNAME)" \
     python3 - <<'PY'
 import base64, json, os, secrets
 tpl = open('apps/netbird-vpn/config/management.json.example').read()
 tpl = tpl.replace('${BASE_DOMAIN}', os.environ['BASE_DOMAIN'])
 tpl = tpl.replace('${NETBIRD_RELAY_AUTH_SECRET}', os.environ['NETBIRD_RELAY_AUTH_SECRET'])
+tpl = tpl.replace('${NETBIRD_SIGNAL_HOSTNAME}', os.environ.get('NETBIRD_SIGNAL_HOSTNAME') or 'signal-not-configured.invalid')
 cfg = json.loads(tpl)
 cfg['DataStoreEncryptionKey'] = base64.b64encode(secrets.token_bytes(32)).decode()
 json.dump(cfg, open('apps/netbird-vpn/data/management.json', 'w'), indent=2)
@@ -549,6 +577,97 @@ if [ "$CF_READY" = "1" ]; then
     seed_setting exposure_cloudflare_tunnel_id "$(current_value CLOUDFLARE_TUNNEL_ID)"
   else
     warn "database container not found — fill the Cloudflare fields in Settings manually"
+  fi
+fi
+
+# --- NetBird signal over Tailscale Funnel --------------------------------
+#
+# Signal cannot live behind the Cloudflare Tunnel. It registers a peer by
+# replying with response HEADERS on a gRPC stream that then stays open, and
+# Cloudflare never flushes headers while a stream is open — measured on both
+# the http2 and quic transports, so no connector setting fixes it. Tailscale
+# Funnel does flush them, so signal is published there instead. See plan.md
+# §52 (the diagnosis) and §53 (the fix).
+#
+# This runs late because it needs the tailscale app actually running, and apps
+# are started from the dashboard, not by this script. It is therefore a no-op
+# on a first run and does its work on the next one — which is why it only ever
+# warns, never exits.
+if [ -f apps/netbird-vpn/.env ]; then
+  # Bring the tailscale app up ourselves rather than waiting for someone to
+  # start it from the dashboard: signalling is a hard dependency of NetBird,
+  # so leaving it to a later manual step means a first run completes with a
+  # NetBird that silently cannot connect any peer.
+  if [ "$TS_READY" = "1" ] && [ -z "$(docker ps -q -f name=tailscale 2>/dev/null | head -n1 || true)" ]; then
+    set_app_env_var apps/tailscale/.env TAILSCALE_AUTH_KEY "$(current_value TAILSCALE_AUTH_KEY)"
+    log "Starting the Tailscale app (NetBird signalling depends on it)"
+    docker compose -f apps/tailscale/docker-compose.yml --env-file apps/tailscale/.env \
+      -p tailscale up -d >/dev/null 2>&1 \
+      || warn "couldn't start the tailscale app — start it from the dashboard and re-run ./start.sh"
+    # Give it a moment to authenticate and get its DNS name.
+    for _ in $(seq 1 15); do
+      [ -n "$(docker ps -q -f name=tailscale 2>/dev/null | head -n1 || true)" ] && sleep 2 && break
+      sleep 2
+    done
+  fi
+
+  TS_CID="$(docker ps -q -f name=tailscale 2>/dev/null | head -n1 || true)"
+  if [ -z "$TS_CID" ]; then
+    warn "tailscale isn't running, so NetBird's signal server has no public address yet. Start the Tailscale app from the dashboard, then re-run ./start.sh."
+  else
+    # The host, as seen from inside that container — derived from its own
+    # default route rather than assuming docker0's gateway, so it is correct
+    # whichever bridge network the tailscale app happens to be on.
+    TS_GW="$(docker exec "$TS_CID" ip route 2>/dev/null | awk '/^default/ {print $3; exit}' || true)"
+    SIGNAL_PORT="$(app_env_value apps/netbird-vpn/.env NETBIRD_SIGNAL_PORT)"
+    SIGNAL_PORT="${SIGNAL_PORT:-8086}"
+
+    if [ -z "$TS_GW" ]; then
+      warn "couldn't determine the docker gateway from inside the tailscale container — skipping NetBird signal Funnel setup"
+    else
+      FUNNEL_OUT="$(docker exec "$TS_CID" tailscale funnel --bg --https=443 "http://${TS_GW}:${SIGNAL_PORT}" 2>&1 || true)"
+
+      if printf '%s' "$FUNNEL_OUT" | grep -qi 'not enabled'; then
+        # Tailscale prints a one-click URL that writes the node attribute into
+        # the tailnet ACL. Nothing here can do that for the user.
+        warn "Tailscale Funnel is not enabled for this tailnet, so NetBird signal has no public address. Enable it with the link below, then re-run ./start.sh:"
+        printf '%s\n' "$FUNNEL_OUT" >&2
+      else
+        SIGNAL_HOST="$(docker exec "$TS_CID" tailscale status --json 2>/dev/null \
+          | python3 -c 'import json,sys; print((json.load(sys.stdin).get("Self") or {}).get("DNSName","").rstrip("."))' 2>/dev/null || true)"
+
+        if [ -z "$SIGNAL_HOST" ]; then
+          warn "tailscale is running but reported no DNS name yet — re-run ./start.sh once it has finished coming up"
+        else
+          log "NetBird signal is published via Tailscale Funnel at ${SIGNAL_HOST}"
+          set_app_env_var apps/netbird-vpn/.env NETBIRD_SIGNAL_HOSTNAME "$SIGNAL_HOST"
+
+          # Patch Signal.URI in place. data/management.json is never
+          # regenerated (it holds the store encryption key), so the hostname
+          # has to be edited into the existing file.
+          if [ -f apps/netbird-vpn/data/management.json ]; then
+            SIGNAL_HOST="$SIGNAL_HOST" python3 - <<'NBSIGPY' || warn "couldn't update Signal.URI in apps/netbird-vpn/data/management.json"
+import json, os
+p = 'apps/netbird-vpn/data/management.json'
+cfg = json.load(open(p))
+want = os.environ['SIGNAL_HOST'] + ':443'
+if cfg.get('Signal', {}).get('URI') != want:
+    cfg.setdefault('Signal', {})
+    cfg['Signal'].update({'Proto': 'https', 'URI': want, 'Username': '', 'Password': None})
+    json.dump(cfg, open(p, 'w'), indent=2)
+    print('==> Updated Signal.URI to ' + want)
+NBSIGPY
+            # Management reads management.json only at startup.
+            NB_MGMT_CID="$(docker ps -q -f name=netbird-management 2>/dev/null | head -n1 || true)"
+            if [ -n "$NB_MGMT_CID" ]; then
+              docker restart "$NB_MGMT_CID" >/dev/null 2>&1 \
+                && log "restarted netbird-management to pick up the signal address" \
+                || warn "couldn't restart netbird-management — restart the NetBird VPN app from the dashboard"
+            fi
+          fi
+        fi
+      fi
+    fi
   fi
 fi
 
