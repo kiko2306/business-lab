@@ -5963,3 +5963,46 @@ Same two caveats as §46.15: the base domain is still hardcoded in
 `data/management.json` already exists won't gain the `Relay` block from the
 template edit alone — it was added to the live file by hand this session.
 **Not** in the repo: whichever of §50.6 A/B is eventually chosen for signal.
+
+### 50.8 Option C ruled out with evidence: signal's ws-proxy is browser-only
+
+Before choosing between §50.6 A and B, checked whether signal could ride the
+existing tunnel as **WebSocket** the way relay does — the signal container
+does log `running HTTP server with WebSocket proxy`, and netbird has a
+`util/wsproxy` package mounting `/ws-proxy/signal` (`ProxyPath` +
+`SignalComponent`) on the signal server. NetBird's own `nginx.tmpl.conf` even
+proxies that endpoint.
+
+It does not help us. The only ws-proxy **client** is
+`util/wsproxy/client/dialer_js.go` — `syscall/js`, i.e. WASM. And the native
+dialer is explicit about it:
+
+```go
+// client/grpc/dialer_generic.go   //go:build !js
+func WithCustomDialer(_ bool, _ string) grpc.DialOption {
+    return grpc.WithContextDialer(dialContext)   // both args ignored
+}
+```
+
+Native clients (Android, Linux, desktop) discard the component path and dial
+plain gRPC. The ws-proxy exists for browser/WASM clients only. So there is no
+client-side switch that puts signal on WebSocket, and §50.6 remains an A-or-B
+choice.
+
+### 50.9 Next steps, in order
+
+1. **Upgrade cloudflared to 2026.8.3 and re-test QUIC** (released
+   2026-08-31, we run 2026.8.2). Zero cost, and if the trailers bug is fixed
+   it collapses the whole problem to one flag — the same shape of fix as
+   §46.7. Release notes carry only checksums, so this is a try-it-and-see.
+   Test = §46.1 row-3 curl for `grpc-status: 0`, then `netbird status` for
+   `Management: Connected` **and** `Signal: Connected`.
+2. **If still broken → Option B** (second `cloudflared`, `--protocol quic`,
+   signal hostname only). Keeps §0 principle 1. Known risk: signal's unary
+   `Send` may hit the trailers bug under QUIC even though `ConnectStream`
+   works — that is exactly what the live test settles.
+3. **If B fails → Option A** (router port-forward for the signal hostname
+   only). Breaks §0 principle 1; only take it if 1 and 2 both fail.
+
+Whichever lands, the §50.3 relay and §50.5 timeout work is a prerequisite for
+the eventual CGNAT path and stays.
