@@ -84,6 +84,21 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       { suffix: 'relay', label: 'Relay', portEnvVar: 'NETBIRD_RELAY_PORT', grpc: false },
     ],
   },
+  'wetty': {
+    name: 'wetty',
+    label: 'Web Terminal',
+    description: 'Browser SSH terminal for this host',
+    icon: 'terminal',
+    category: 'Networking & Security',
+    composePath: 'apps/wetty/docker-compose.yml',
+    healthCheck: {
+      enabled: false,
+    },
+    // This one hands out a root-capable shell on the host, so it must never
+    // be reachable without the forward-auth gate. Authelia itself has to be
+    // up for that gate to work at all.
+    dependsOn: ['authelia'],
+  },
   'home-assistant': {
     name: 'home-assistant',
     label: 'Home Assistant',

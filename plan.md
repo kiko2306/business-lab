@@ -6614,3 +6614,119 @@ misattribution, which is exactly why this matters.
 
 Original text is left in place under each, struck through — the reasoning
 trail is worth keeping; the instruction to act on it is not.
+
+## 56. Tunnel ingress audit — dead rules removed, browser SSH replaced by an Authelia-gated app
+
+### 56.1 Terminology: there is one tunnel, not many
+
+The user asked whether the "many tunnels" could be collapsed into one with a
+wildcard. They already are one. `home-srv-01` held **39 ingress rules**; the
+other four tunnels on the account (`pi`, `pi-srv-live-01`, `pbordo-redirects`,
+`pipoka-design`) belong to other machines and are unrelated.
+
+**A wildcard was considered and rejected.** 32 of the rules are byte-identical
+(`http://192.168.1.23`) because NPM routes by `Host`, so one
+`*.<domain>` rule could replace them. But per-hostname ingress is a *security
+control*: an app that isn't exposed doesn't resolve. A wildcard publishes every
+subdomain to NPM, so any default or half-configured vhost becomes
+internet-reachable — precisely the `nginx.<domain>` problem below, multiplied.
+The rule count costs nothing because the automation maintains it.
+
+### 56.2 Hand-made vs automated
+
+Cross-referencing ingress against `service_exposure`: **32 app-managed, 6
+hand-made**. The hand-made ones are recognisable by pointing at `localhost`
+rather than the gateway IP the automation uses.
+
+| hostname | outcome |
+|---|---|
+| `nginx` → `localhost:80` | **deleted** — served only NPM's "Congratulations" default vhost |
+| `nginx-manager` → `localhost:81` | **deleted** — see §56.3 |
+| `ssh` → `ssh://localhost:22` | **deleted** — CLI access now goes over NetBird |
+| `ssh-web` → `ssh://127.0.0.1:22` | **replaced** by the wetty app, §56.4 |
+| `homelab` / `api-homelab` | left alone for now — the dashboard itself; automating it raises a dependency loop (it is what you would use to fix Authelia) |
+
+### 56.3 Real finding: the NPM admin UI was exposed unauthenticated
+
+`nginx-manager.<domain>` returned **`200` with `<title>Nginx Proxy Manager</title>`**
+— the admin panel that controls all reverse proxying and holds the
+certificates, reachable from the internet behind nothing but its own login
+form. It was a duplicate of the app-managed `nginx-proxy-manager.<domain>`,
+which correctly `302`s to Authelia, but pointed straight at `localhost:81` and
+so bypassed NPM's forward-auth snippet entirely.
+
+Deleted (ingress + DNS). Verified afterwards: the Authelia-gated route still
+works, and every other service is unaffected.
+
+### 56.4 Browser SSH, rebuilt as an ordinary app
+
+The user needs a browser terminal (some networks they use block outbound SSH),
+but CLI access can go over NetBird now that it works.
+
+Cloudflare's browser-rendered SSH was **rejected** on two grounds: it requires
+the user's email prefix to match a server username (`miguelamtx` vs `mat`), and
+the browser-rendering toggle has **no documented API field**, so `start.sh`
+would have to script an undocumented endpoint.
+
+Instead, browser SSH is now just another app — which means the existing
+automation covers it and `start.sh` needs no bespoke exposure logic:
+
+- **`apps/wetty/`** — `wettyoss/wetty`, published on `WETTY_PORT` (3030),
+  reaching the host over `host.docker.internal` (mapped via `extra_hosts` to
+  `host-gateway`, so no host-specific IP is baked into the compose file).
+- **`services.ts`** — registered with `dependsOn: ['authelia']`. This hands out
+  a shell on the host, so the forward-auth gate is not optional; wetty's own
+  startup log says it plainly: *"anything that reaches the wetty server will be
+  able to run remote operations without authentication"*.
+- **`start.sh`** — generates a dedicated ed25519 keypair and installs the
+  **public** half into `$SUDO_USER`'s `authorized_keys`. The private key never
+  leaves the machine: wetty runs on this same host and SSHes back to it, so
+  both ends of that hop are local. Permissions are `600` — not a preference,
+  `ssh(1)` refuses a group/other-readable private key outright; the container
+  runs as root so it can still read it.
+- Exposure provisioned with `authelia_protected = true` **before** first
+  publish. Verified: `wetty.<domain>` → `302` to Authelia, NPM vhost carries
+  the authelia directives, upstream `3030`.
+- Verified the hop itself independently of the browser: an alpine container
+  using the same key got `SSH-OK: mat@home-srv-01`, password-free.
+
+This also fixes the CrowdSec blind spot — traffic now arrives as ordinary
+HTTPS through NPM with `X-Forwarded-For`, instead of SSH from `127.0.0.1`.
+
+### 56.5 Correction: "0 Access applications" was wrong
+
+While auditing SSH I queried `access/apps`, got `{"result": [], "success":
+true}`, and concluded the SSH hostnames had **no** Cloudflare Access policy —
+then raised that as a serious finding.
+
+**That was an unfounded inference.** Deleting `ssh-web`'s DNS record revealed a
+redirect to
+`portoinf-servers.cloudflareaccess.com/cdn-cgi/access/login/ssh-web.<domain>`
+— it *was* behind Access the whole time. The API token's permission list (the
+user's own screenshot: Tunnel, Filter Lists, Workers, WAF, Zone Settings,
+Workers Routes, Firewall, DNS, Analytics) contains **no Access permission**, so
+the endpoint returns an empty list with `200` rather than a `403`. An empty
+result from a token whose read access was never confirmed is not evidence of
+absence.
+
+**Lesson worth keeping:** before treating an empty API listing as a finding,
+confirm the credential can actually read that resource. This is the third time
+in this project that a confident conclusion rested on misread evidence
+(§46.13's IP misattribution, §50.2's wrong root cause, and now this).
+
+What survived the correction, because it was measured rather than inferred:
+password authentication is enabled, tunnel-proxied SSH appears as `127.0.0.1`
+so CrowdSec cannot see the real source, and `nginx-manager` really was serving
+the NPM admin UI unauthenticated (verified by status code and page title).
+
+### 56.6 Left to do
+
+- A leftover **Access application for `ssh-web`** almost certainly still exists
+  and should be removed from the Zero Trust dashboard by hand — this token
+  cannot enumerate or delete it.
+- `sshd` still has **password authentication enabled**. Disabling it is now
+  safe *once the user confirms the wetty terminal works*, because wetty
+  authenticates by key and is unaffected. Personal machines should generate
+  their own keypair locally and have only the public half installed — never
+  move a private key.
+- `homelab` / `api-homelab` automation, deferred (§56.2).

@@ -580,6 +580,63 @@ if [ "$CF_READY" = "1" ]; then
   fi
 fi
 
+# --- Web terminal (wetty) key ---------------------------------------------
+#
+# Browser terminal access to this host, for networks that block outbound SSH.
+# Replaces the hand-made ssh:// Cloudflare Tunnel rules, which published a
+# password prompt to the internet with no Access policy in front of them, and
+# which CrowdSec could not defend because tunnel-proxied SSH arrives as
+# 127.0.0.1. See plan.md §56.
+#
+# The keypair is generated HERE and never leaves this machine: wetty runs in a
+# container on this same host and SSHes back to it over the docker gateway, so
+# both ends of that hop are local. This is also what makes turning off host
+# password authentication safe — browser access keeps working whether or not
+# any particular laptop has a key installed.
+if [ -d apps/wetty ]; then
+  WETTY_KEY_DIR=apps/wetty/data/keys
+  WETTY_KEY="$WETTY_KEY_DIR/id_ed25519"
+  mkdir -p "$WETTY_KEY_DIR"
+
+  if [ ! -f "$WETTY_KEY" ]; then
+    log "Generating the web terminal's SSH key"
+    ssh-keygen -t ed25519 -N '' -C "wetty@$(hostname -s 2>/dev/null || hostname)" -f "$WETTY_KEY" >/dev/null 2>&1 \
+      || warn "couldn't generate the wetty SSH key — the web terminal will not be able to log in"
+  fi
+
+  if [ -f "${WETTY_KEY}.pub" ]; then
+    # ssh(1) refuses a private key with group/other permissions
+    # ("UNPROTECTED PRIVATE KEY FILE") and would fail to connect, so 600 is
+    # required, not merely preferred. The wetty container runs as root, which
+    # bypasses file-permission checks, so it can still read it whoever owns
+    # the file on the host.
+    chmod 600 "$WETTY_KEY" 2>/dev/null || true
+    chmod 644 "${WETTY_KEY}.pub" 2>/dev/null || true
+
+    # Install the PUBLIC half for the account the terminal logs in as. Never
+    # the private half — that stays in apps/wetty/data/keys (gitignored).
+    WETTY_USER="$TARGET_USER"
+    WETTY_HOME="$(getent passwd "$WETTY_USER" 2>/dev/null | cut -d: -f6)"
+    if [ -n "$WETTY_HOME" ] && [ -d "$WETTY_HOME" ]; then
+      AUTHKEYS="$WETTY_HOME/.ssh/authorized_keys"
+      mkdir -p "$WETTY_HOME/.ssh"
+      touch "$AUTHKEYS"
+      if ! grep -qF "$(cat "${WETTY_KEY}.pub")" "$AUTHKEYS" 2>/dev/null; then
+        cat "${WETTY_KEY}.pub" >> "$AUTHKEYS"
+        log "Installed the web terminal's public key for ${WETTY_USER}"
+      fi
+      # sshd silently ignores authorized_keys with loose permissions.
+      chmod 700 "$WETTY_HOME/.ssh"; chmod 600 "$AUTHKEYS"
+      chown -R "$WETTY_USER" "$WETTY_HOME/.ssh" 2>/dev/null || true
+
+      set_app_env_var apps/wetty/.env WETTY_SSH_USER "$WETTY_USER"
+      [ -n "$BASE_DOMAIN" ] && set_app_env_var apps/wetty/.env BASE_DOMAIN "$BASE_DOMAIN"
+    else
+      warn "couldn't resolve a home directory for '${WETTY_USER}' — install apps/wetty/data/keys/id_ed25519.pub into that user's authorized_keys by hand"
+    fi
+  fi
+fi
+
 # --- NetBird signal over Tailscale Funnel --------------------------------
 #
 # Signal cannot live behind the Cloudflare Tunnel. It registers a peer by

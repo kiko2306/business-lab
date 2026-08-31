@@ -1,0 +1,48 @@
+
+services:
+  # Browser terminal on the HOST, for networks that block outbound SSH.
+  #
+  # This replaces the two hand-made Cloudflare Tunnel rules that used to
+  # publish ssh:// straight to the internet (see plan.md §56). Those had no
+  # Cloudflare Access policy in front of them, so anyone could reach a
+  # password prompt on this box — and because tunnel-proxied SSH arrives as
+  # 127.0.0.1, CrowdSec could not tell an attacker from the owner.
+  #
+  # Here the public entrypoint is an ordinary HTTPS app: NPM + Authelia gate
+  # it exactly like every other service (enable "Require Authelia login" in
+  # the dashboard's Exposure settings), and the exposure is provisioned by the
+  # normal automation rather than by hand.
+  #
+  # It reaches the host over the docker gateway with a DEDICATED key that
+  # start.sh generates and installs into the host user's authorized_keys. The
+  # private key never leaves this machine — both ends of that hop are local.
+  # That key is also what makes disabling host password auth safe: browser
+  # access keeps working regardless of whether any laptop has a key.
+  wetty:
+    image: wettyoss/wetty:latest
+    restart: unless-stopped
+    ports:
+      - "${WETTY_PORT:-3030}:3000"
+    command:
+      - --ssh-host=${WETTY_SSH_HOST:-host.docker.internal}
+      - --ssh-port=${WETTY_SSH_PORT:-22}
+      - --ssh-user=${WETTY_SSH_USER}
+      - --ssh-auth=publickey
+      - --ssh-key=/keys/id_ed25519
+      - --known-hosts=/dev/null
+      - --base=/
+      - --port=3000
+      - --title=${WETTY_TITLE:-homelab}
+    # host.docker.internal isn't defined on Linux by default; map it to the
+    # gateway so the compose file needs no host-specific IP baked in.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      # Read-only: wetty only ever needs to read the private key.
+      - ./data/keys:/keys:ro
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Web Terminal"
+      - "homepage.icon=terminal.png"
+      - "homepage.href=https://wetty.${BASE_DOMAIN}"
+      - "homepage.description=Browser SSH terminal for this host"
