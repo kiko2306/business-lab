@@ -183,3 +183,28 @@ export async function provisionBackupJob(duplicatiPassword: string, frequency: '
   }
   return { created: true, jobId: id, targetUrl, passphrase };
 }
+
+/**
+ * Ask Duplicati to run the dashboard's job now.
+ *
+ * Returns false rather than throwing when there is no job or Duplicati is
+ * unreachable: a scheduled run must not fail the whole backup cycle because
+ * the app-data half is not set up yet.
+ */
+export async function runBackupJobNow(duplicatiPassword: string): Promise<{ started: boolean; detail: string }> {
+  try {
+    const token = await login(duplicatiPassword);
+    const list = await api('/api/v1/backups', { token });
+    const job = (list.body as DuplicatiBackupEntry[] | null)?.find?.((entry) => entry.Backup?.Name === JOB_NAME);
+    if (!job) {
+      return { started: false, detail: 'no dashboard-managed backup job exists yet' };
+    }
+    const started = await api(`/api/v1/backup/${job.Backup.ID}/run`, { method: 'POST', token });
+    if (started.status !== 200) {
+      return { started: false, detail: `Duplicati refused to start the job (HTTP ${started.status})` };
+    }
+    return { started: true, detail: `queued Duplicati job ${job.Backup.ID}` };
+  } catch (error) {
+    return { started: false, detail: (error as Error).message };
+  }
+}

@@ -8018,8 +8018,92 @@ Five tests on discovery: header detection, rejecting non-SQLite `.db` files,
 never re-snapshotting its own output, ignoring unregistered directories, and
 surviving an unreadable directory rather than aborting the scan. **165/165.**
 
-### 70.6 Still open
+### 70.6 Wired into the schedule
 
-The dump is a manual endpoint (`POST /api/backups/dump-apps`). Wiring it into
-the scheduler — dump, then trigger the Duplicati job — is the remaining step
-before this is genuinely automatic.
+The scheduled run now does, in order:
+
+1. the dashboard's own archive (control plane) — unchanged
+2. prune old archives — unchanged
+3. **dump every app database** (§70.1)
+4. **trigger the Duplicati job**
+
+**The order is the point.** Running Duplicati first would archive the
+*previous* dump, quietly making every backup a cycle stale — the kind of fault
+nobody notices until a restore is short by a day.
+
+Three failure choices, all in the same direction — a partial backup beats none:
+
+- Dump failures are logged and the run continues; the dumps that succeeded are
+  still worth backing up, and a stopped app already counts as a success.
+- No Duplicati password (the app has never been started) skips the app-data
+  half rather than erroring.
+- The whole app-data step is wrapped so it cannot fail the dashboard archive
+  that already succeeded.
+
+## 71. Next session — where things stand and what to pick up
+
+### 71.1 What backups look like now, end to end
+
+| Piece | Status |
+|---|---|
+| Choose destination (disk / SMB / NFS / Google Drive) | dashboard, applied on save |
+| Destination actually mounted | automatic — env written, volume removed, Duplicati recreated |
+| Duplicati job created and owned by the dashboard | automatic |
+| Databases dumped consistently before backup | automatic, 8 servers + 22 SQLite |
+| Scheduled: archive → prune → dump → Duplicati run | automatic |
+| Live DB files excluded from the file backup | automatic |
+
+**One thing the user must do by hand, and it matters more than anything else
+here:** record the backup encryption passphrase somewhere off this machine. It
+is shown after provisioning the job. Duplicati backups **cannot be restored
+without it** — losing it makes every backup permanently unreadable while
+continuing to look healthy.
+
+### 71.2 The obvious next step: prove a restore
+
+Everything above is untested in the only way that counts. A backup nobody has
+restored from is a hypothesis. Worth doing deliberately:
+
+- restore one `_dump/*.sql` into a scratch database and confirm the data is
+  there;
+- restore a `_dump/*.sqlite` snapshot and open it;
+- run a Duplicati restore of a single file to a temp path.
+
+That is a session's work on its own and is the highest-value thing left.
+
+### 71.3 Other open items, in rough priority
+
+1. **Fresh-setup test on the VPS** (§61.5) — `start.sh` gained a great deal
+   this session and only the port allocator has been exercised on a clean tree.
+   Prompts, cloudflared install, tunnel creation from nothing and Tailscale
+   joining a fresh tailnet are all untested.
+2. **MeshCentral** (§62.2) — planned, not built. Expect a live session for the
+   agent certificate; also decide whether Authelia in front breaks agent
+   enrolment.
+3. **n8n pre-built workflows** (§64) — settle first whether several of those
+   are really dashboard features rather than automations.
+4. **Signal-port coupling** (§69) — changing NetBird's signal port from the
+   dashboard still silently breaks Tailscale Funnel. Either re-assert Funnel on
+   config change, or add a health check that probes the Funnel hostname.
+5. **Retrofit `mailEnvKeys`** to Uptime Kuma, n8n, BookStack, Paperless,
+   Vikunja — Vaultwarden is wired and proves the mechanism (§63.4).
+6. **BoltDB/H2 apps have no consistent backup** — portainer, file-browser,
+   stirling-pdf are copied live with no dump equivalent. Either stop them
+   briefly during backup or document it as best-effort.
+
+### 71.4 Themes worth carrying forward
+
+Three things went wrong repeatedly this session, and all three are the same
+shape:
+
+- **State written once into something that is neither the repo nor Docker has
+  nothing keeping it true.** The cloudflared drop-in, the Authelia snippet, and
+  Tailscale Funnel's target all drifted (§69). Anything written by a one-off
+  command needs re-asserting on every run.
+- **A read that happens before the write that determines it.** Two ordering
+  bugs in `start.sh` (§61) and one in the port allocator's own fix. Invisible on
+  a host where the values already exist; only a fresh tree surfaces them.
+- **Verify by running, not by reasoning.** `docker exec` blocked by the socket
+  proxy, `pg_dump` version mismatches, and an s6 entrypoint that *hangs* rather
+  than failing were all found by executing the thing (§70.2). None would have
+  been predicted from reading.
