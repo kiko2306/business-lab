@@ -69,20 +69,28 @@ open, which looks exactly like a rejected key:
 chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys
 ```
 
-### 4. Test before you rely on it
+### 4. Test it
 
-From the laptop, while the browser terminal is still open in another tab:
+From the laptop:
 
 ```bash
 ssh -o PasswordAuthentication=no mat@100.111.227.79 'echo OK'
 ```
 
-`OK` means the key works. Anything else means it doesn't — fix it before
-closing the browser terminal.
+`OK` means the key works. If it doesn't, nothing is lost — the browser terminal
+is unaffected by any of this, so you can go back and fix `authorized_keys`
+there.
 
 ## Turning password authentication off
 
-Only after step 4 passes.
+**You do not need a laptop key first.** The browser terminal authenticates by
+key, not password, so disabling password authentication does not affect it —
+it stays available throughout, and it is what stops this from ever being a
+lockout risk. Adding a laptop key is about CLI convenience, and can happen
+before or after.
+
+Keep the browser terminal open while you reload `sshd`, as ordinary care rather
+than because passwords matter to it.
 
 ### The drop-in ordering trap
 
