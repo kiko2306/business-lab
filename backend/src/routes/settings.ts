@@ -12,7 +12,11 @@ import {
   toMountSpec,
   validateTarget,
 } from '../utils/backupTarget';
+import logger from '../utils/logger';
 import { testBackupTarget } from '../services/backupTargetTest';
+import { provisionBackupJob } from '../services/duplicatiClient';
+import { applyBackupTarget } from '../services/backupTargetApply';
+import { readAppEnvValue } from '../services/appEnv';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
 import { testMailConnection } from '../services/mailTest';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig } from '../utils/exposureSettings';
@@ -467,10 +471,15 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
       result: 'success',
     }).catch(() => {});
 
+    // Saving alone leaves Duplicati mounted at the previous destination while
+    // the UI claims otherwise, so apply it here rather than asking the user to
+    // remember a restart — and a restart alone is not enough, because Docker
+    // reuses a named volume whose definition changed (see backupTargetApply).
+    const applied = await applyBackupTarget(target);
+
     return res.json({
-      message: isMountedKind(target.kind)
-        ? 'Backup destination saved. Restart Duplicati to mount it.'
-        : 'Backup destination saved. Set it as the target in your Duplicati backup job.',
+      message: applied.detail,
+      restarted: applied.restarted,
       // Only one of these is meaningful, depending on the family.
       mount: isMountedKind(target.kind) ? toMountSpec(target) : null,
       duplicatiUrl: toDuplicatiUrl(target),
@@ -509,6 +518,50 @@ router.post('/backup-target/test', async (_req: Request, res: Response) => {
 
   const result = await testBackupTarget(toMountSpec(target));
   return res.status(result.success ? 200 : 400).json(result);
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/settings/backup-target/provision-job
+// Push the chosen destination into Duplicati as a real backup job, so the
+// dashboard is the only place backups are configured.
+// ---------------------------------------------------------------------------
+router.post('/backup-target/provision-job', async (req: Request, res: Response) => {
+  try {
+    const password = readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD');
+    if (!password) {
+      return res.status(400).json({
+        error: 'Duplicati has no password set yet — start the Duplicati app once so the dashboard can generate one.',
+      });
+    }
+
+    const scheduleRow = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [
+      'backup_schedule_frequency',
+    ]);
+    const frequency = scheduleRow.rows[0]?.value === 'weekly' ? 'weekly' : 'daily';
+
+    const result = await provisionBackupJob(password, frequency);
+
+    await writeAuditLog({
+      userId: req.user?.id ?? null,
+      action: 'settings_change',
+      resource: 'backup_job',
+      result: 'success',
+      metadata: { created: result.created, jobId: result.jobId },
+    }).catch(() => {});
+
+    return res.json({
+      message: result.created ? 'Backup job created in Duplicati.' : 'Backup job updated in Duplicati.',
+      jobId: result.jobId,
+      // Masked — the AuthID is embedded in a Google Drive target URL.
+      targetUrl: result.targetUrl.replace(/authid=[^&]+/, 'authid=***'),
+      passphrase: result.passphrase,
+      scheduled: frequency,
+    });
+  } catch (error) {
+    const message = (error as Error).message;
+    logger.error('Backup job provisioning failed', { error: message });
+    return res.status(400).json({ error: message });
+  }
 });
 
 // ---------------------------------------------------------------------------

@@ -387,3 +387,22 @@ async function assertPortsAvailable(
     }
   }
 }
+
+/**
+ * Read a single value from an app's `.env`.
+ *
+ * For values the dashboard generated and now needs itself — e.g. Duplicati's
+ * web password, so it can drive Duplicati's own API rather than asking the
+ * user to re-enter a password the dashboard chose.
+ */
+export function readAppEnvValue(serviceName: string, key: string): string | null {
+  const resolved = resolveComposeFile(serviceName);
+  if (!resolved?.appDir) return null;
+  const envPath = path.join(resolved.appDir, '.env');
+  if (!fs.existsSync(envPath)) return null;
+  try {
+    return parseEnvFile(envPath)[key] ?? null;
+  } catch {
+    return null;
+  }
+}

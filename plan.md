@@ -7823,3 +7823,74 @@ This chooses *where*. §66's dump orchestration — making the app databases
 consistent before they are copied — is still open, and remains the more
 important half. A destination without consistent dumps still backs up torn
 SQLite and live Postgres files.
+
+## 68. Saving a destination now applies it, and the dashboard owns the Duplicati job
+
+Two gaps found by the user asking the obvious question — *"if Duplicati needs a
+restart after saving, shouldn't saving restart it?"* Yes, and it was worse than
+that.
+
+### 68.1 The destination was saved but never applied
+
+`PUT /settings/backup-target` wrote the choice to the settings table and
+stopped. But `apps/duplicati/docker-compose.yml` reads
+`BACKUP_MOUNT_TYPE/OPTIONS/DEVICE` from that app's **`.env`**, and nothing wrote
+them — so the compose file was reading variables nobody set, and the UI happily
+reported a destination that had no effect whatsoever.
+
+### 68.2 …and a restart alone would not have fixed it
+
+The more subtle half: **Docker does not recreate a named volume whose
+definition changed.** `docker compose restart`, or even `up -d
+--force-recreate`, reuses the existing volume. The container would come back
+still mounted at the *previous* destination while every UI surface said
+otherwise — confidently wrong, and only discoverable by inspecting the volume.
+
+So applying a destination is a three-step sequence, and the middle step is the
+one that is easy to omit:
+
+1. write the mount vars into `apps/duplicati/.env`
+2. `docker compose down` — a volume in use cannot be removed
+3. `docker volume rm duplicati_backup-target`
+4. `docker compose up -d`
+
+Removing the volume never touches the data: for bind, NFS and SMB volumes the
+contents live on the target, not in Docker.
+
+Verified live against the user's real Google Drive configuration —
+`applied: true, restarted: true`, Duplicati back up, and the `.env` now carries
+the values.
+
+### 68.3 The dashboard now creates the backup job
+
+The old response ended with *"Set it as the target in your Duplicati backup
+job"* — telling the user to go and rebuild, by hand, in another UI, a decision
+they had just made in this one. That is the §0 principle 2 problem exactly.
+
+Duplicati's API turned out to be straightforward, confirmed by experiment
+before writing any code: `POST /api/v1/auth/login` with the password the
+dashboard itself generated returns a JWT, and `POST /api/v1/backups` accepts a
+job. A throwaway job was created and deleted to learn the payload shape rather
+than guessing it.
+
+`services/duplicatiClient.ts` now creates or updates one job the dashboard
+owns, with the destination it was told about — `file:///backups` for a mounted
+kind, the `googledrive://…?authid=…` URL for a backend one.
+
+Three decisions worth keeping:
+
+- **A generated encryption passphrase, stored in settings.** Duplicati backups
+  cannot be restored without it, so losing it makes every backup permanently
+  unreadable — worse than no backup, because it looks like it is working. It is
+  generated once, survives a Duplicati rebuild, and is returned to the UI so it
+  can be recorded off-box.
+- **Created with no schedule.** A job that starts uploading 1.8 GB the instant
+  it is defined is a surprise; the first run should be the user's choice.
+- **Retention `7D:1D,4W:1W,12M:1M`** — daily for a week, weekly for a month,
+  monthly for a year, rather than keeping everything.
+
+### 68.4 Still open
+
+§66's dump orchestration. The job now exists and points somewhere real, but it
+still copies **live** database files — six running Postgres containers and
+fourteen SQLite stores with active WAL files. That is next.
