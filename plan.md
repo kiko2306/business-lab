@@ -6844,3 +6844,61 @@ Two maintenance notes worth keeping: `exposure.test.ts`'s fixture gave a
 detection correctly flagged — the fixture was incoherent, not the code. And its
 `beforeEach` resets mocks by name, so every new mock must be added there or
 call counts leak between tests (both new mocks initially showed 7 calls).
+
+## 58. Decision: the dashboard's own hostnames stay hand-made
+
+`homelab.<domain>` → `localhost:10001` and `api-homelab.<domain>` →
+`localhost:3000` are the last two hand-made tunnel ingress rules (§56.2).
+Deliberately **not** brought under the exposure automation. Recorded here so
+this is not re-litigated, and so a future cleanup pass does not delete them as
+cruft.
+
+### 58.1 The argument for automating, which is real
+
+Routing them through NPM would put them under CrowdSec. CrowdSec parses NPM's
+per-proxy-host access logs (`acquis.d/npm.yaml` → `/var/log/npm/*_access.log`,
+119 of them today) and blocks offenders at the Cloudflare edge via the
+`cloudflare` bouncer. Because the dashboard's rules go
+cloudflared → localhost, they write **no NPM log at all** and are therefore
+invisible to CrowdSec. Login attempts against the dashboard cannot be detected
+or blocked by it.
+
+### 58.2 Why it still isn't worth it
+
+- **Brute force is already handled where it matters.** `routes/auth.ts` rate
+  limits `/auth/login` to 20 attempts per 15 minutes. CrowdSec would add
+  IP-level edge blocking on top — better, but not the primary defence, which
+  already exists.
+- **Automating requires a registry entry, and that is a footgun.** Exposure
+  provisioning needs `SERVICES['homelab']` (it reads `composePath` to find the
+  published port). But `SERVICES` is also the *lifecycle* registry the
+  dashboard renders as start/stop-able services — so the dashboard would
+  appear in its own UI as a service you can stop. Avoiding that means a new
+  "exposure-managed but not lifecycle-managed" flag plus frontend filtering:
+  real complexity for a secondary control.
+- **It keeps the recovery surface independent of NPM.** Verified: the
+  dashboard answers `200` on both the LAN (`192.168.1.23:10001`) and its
+  NetBird address (`100.111.227.79:10001`) without NPM in the path. This
+  project has broken NPM's config before (§48.7), and the browser terminal
+  *does* depend on NPM — so keeping one route that doesn't is worth something.
+
+**Revisit if** the dashboard login ever shows real attack traffic. The fix is
+then exactly the work described above, and the CrowdSec blind spot in §58.1 is
+the reason to do it.
+
+### 58.3 Trap: CrowdSec looks inert and isn't
+
+`/etc/crowdsec/acquis.yaml` in the container reads:
+
+```
+{"source": "file", "filename": "/does/not/exist", ...}
+```
+
+That is the image's placeholder, and it looks exactly like a CrowdSec that
+parses nothing. The real configuration is in **`/etc/crowdsec/acquis.d/`**
+(`npm.yaml`, mounted from `apps/crowdsec/config/acquis.yaml`), which is
+correct and working. `cscli decisions list` showing "No active decisions" is
+also not evidence of failure — it means nothing has tripped a scenario.
+
+Check `acquis.d/` before concluding CrowdSec is doing nothing. This was very
+nearly filed as a security finding.
