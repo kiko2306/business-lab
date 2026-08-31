@@ -889,11 +889,17 @@ if [ -f apps/netbird-vpn/.env ]; then
     # whichever bridge network the tailscale app happens to be on.
     TS_GW="$(docker exec "$TS_CID" ip route 2>/dev/null | awk '/^default/ {print $3; exit}' || true)"
     SIGNAL_PORT="$(app_env_value apps/netbird-vpn/.env NETBIRD_SIGNAL_PORT)"
-    SIGNAL_PORT="${SIGNAL_PORT:-8086}"
+    SIGNAL_PORT="${SIGNAL_PORT:-10252}"
 
     if [ -z "$TS_GW" ]; then
       warn "couldn't determine the docker gateway from inside the tailscale container — skipping NetBird signal Funnel setup"
     else
+      # Re-asserted on every run, not only when absent. Funnel stores the
+      # target it was handed, so if signal's published port ever changes the
+      # stored target silently points at a dead port: the hostname still
+      # resolves, still serves TLS, and returns 502 — while NetBird reports
+      # "signal receive stream stalled" and no peer can pair. Exactly that
+      # happened when app ports were renumbered to 10100+ (plan.md §69).
       FUNNEL_OUT="$(docker exec "$TS_CID" tailscale funnel --bg --https=443 "http://${TS_GW}:${SIGNAL_PORT}" 2>&1 || true)"
 
       if printf '%s' "$FUNNEL_OUT" | grep -qi 'not enabled'; then

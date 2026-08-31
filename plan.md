@@ -7824,6 +7824,55 @@ consistent before they are copied — is still open, and remains the more
 important half. A destination without consistent dumps still backs up torn
 SQLite and live Postgres files.
 
+## 69. VPN broke — the port renumbering silently killed signal
+
+User reported the VPN broken. It was, and the renumbering in §59 caused it.
+
+**Symptom**: `Signal: Disconnected, reason: signal receive stream stalled`,
+`Peers count: 0/1`, phone unable to pair. Management fine, relays fine.
+
+**Cause**: Tailscale Funnel had been configured to proxy
+`http://<gateway>:8086` — signal's port *at the time*. The port migration moved
+signal to **10252** and nothing updated Funnel, so it proxied to a port with
+nothing on it. The hostname still resolved, still served valid TLS, and
+returned **502**.
+
+That is what made it nasty: from outside, everything looked alive. The failure
+only showed up as NetBird's own watchdog message, which names a *stream*
+problem rather than a wrong port.
+
+**Fixed** by repointing Funnel at 10252 — signal answers
+`x-wiretrustee-peer-registered: 1` again and the client reconnected on its own,
+without a restart.
+
+### 69.1 The third hidden coupling, after two that were caught
+
+§59.3 documented exactly this class — a port that moves breaking something that
+recorded it — and listed two: Authelia's forward-auth upstream and NPM's admin
+API URL. Both were found and automated. **Tailscale Funnel's stored target was
+a third, and was missed**, because it lives outside both the repo and Docker:
+in Tailscale's own state, written once by a command.
+
+Two repairs:
+
+- `start.sh`'s fallback still said `8086`, a pre-renumbering value that would
+  have written the *wrong* port on any host whose `.env` lacked the variable.
+  Now `10252`.
+- The funnel command is re-asserted on **every** run rather than only when
+  absent, so a `start.sh` run repairs a drifted target. The reasoning is now a
+  comment there, since the line looks redundant otherwise.
+
+**Still uncovered**: changing signal's port from the *dashboard* at runtime
+would break it again, and nothing would notice until a peer failed to pair. The
+honest options are to have the exposure/config path re-assert Funnel when
+`NETBIRD_SIGNAL_PORT` changes, or a health check that probes the Funnel
+hostname. Neither is built.
+
+**Lesson, and it is the same one again**: state written *once* into a system
+that is not the repo and not Docker has no mechanism keeping it true. That is
+now three for three — the cloudflared drop-in (§17.2/§46.10), the Authelia
+snippet (§59.3), and this.
+
 ## 68. Saving a destination now applies it, and the dashboard owns the Duplicati job
 
 Two gaps found by the user asking the obvious question — *"if Duplicati needs a
