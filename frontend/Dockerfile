@@ -3,6 +3,13 @@ FROM node:20-alpine AS build
 
 WORKDIR /app
 
+# Puppeteer (a devDependency, used only by `ng test`) downloads a Chrome
+# build in its postinstall. @puppeteer/browsers maps every Linux host to the
+# x86_64 build regardless of CPU, so on arm64 (Raspberry Pi) it pulls ~170MB
+# of a binary that can never run. The image build doesn't need a browser at
+# all, so skip the download everywhere.
+ENV PUPPETEER_SKIP_DOWNLOAD=1
+
 # Install dependencies first (cached layer)
 COPY package*.json ./
 RUN npm install

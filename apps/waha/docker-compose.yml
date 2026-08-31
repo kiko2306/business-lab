@@ -1,7 +1,10 @@
 
 services:
   waha:
-    image: devlikeapro/waha:latest
+    # `latest` is published for amd64 only. On arm64 (Raspberry Pi) set
+    # WAHA_IMAGE_TAG=arm in this app's .env — upstream ships the ARM build
+    # under a separate tag rather than in a multi-arch manifest.
+    image: devlikeapro/waha:${WAHA_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
       - "${WAHA_PORT:-3009}:3000"
