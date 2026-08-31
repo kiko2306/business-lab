@@ -7530,3 +7530,61 @@ names the vars it actually reads. **148/148.**
 
 Obvious next retrofits, all of which do read SMTP from env: Uptime Kuma, n8n,
 BookStack, Paperless, Vikunja.
+
+## 64. TODO: pre-built n8n workflows shipped for import
+
+**Status: not started.** User's idea — ship ready-made n8n workflow JSON so a
+fresh install has working automation instead of an empty canvas.
+
+### 64.1 What actually makes sense here
+
+The value is not "some example workflows" — it is wiring together apps this
+stack *already runs*. Almost everything worth automating converges on one
+thing: **ntfy is already the notification hub**, so the useful shape is a
+shared "notify" sub-workflow plus triggers that feed it.
+
+Candidates, roughly in order of value:
+
+| Workflow | Source | Why it earns its place |
+|---|---|---|
+| Service down → ntfy | Uptime Kuma webhook | The single most-wanted alert; Kuma can notify directly, but n8n adds routing (quiet hours, severity) |
+| Backup failed → ntfy | Duplicati result | Silent backup failure is the classic homelab disaster |
+| CrowdSec decision → ntfy | CrowdSec LAPI | You currently have no visibility when something is blocked |
+| Certificate expiring → ntfy | NPM API | NPM renews automatically until it doesn't |
+| Container updated → ntfy | Watchtower | Know what changed before something breaks |
+| Disk / host health → ntfy | Beszel | Cheap insurance, and Beszel is already collecting it |
+| New ticket → ntfy | ITFlow | Once ITFlow lands (§62.1) |
+| Document added → tag/notify | Paperless | Genuine app-to-app integration rather than an alert |
+
+### 64.2 The hard part is credentials, not workflows
+
+An exported n8n workflow references credentials **by id**. Import it into a
+fresh n8n and every node is broken until someone creates and re-links each
+credential by hand — which defeats the point of shipping them.
+
+So the design question to settle first is how a shipped workflow gets its
+credentials. Options, in rough order of preference:
+
+1. **Prefer credential-free HTTP nodes.** ntfy accepts a plain POST; most of
+   the sources above are webhooks or unauthenticated LAN endpoints. A workflow
+   that needs no credential imports cleanly and works immediately.
+2. **Provision credentials via n8n's API** at app-start, from the values the
+   dashboard already holds — the global mail settings (§63), the ntfy topic,
+   the NPM admin login. This is the "automate everything automatable" answer
+   and fits `exposureEnvKeys`/`mailEnvKeys` precedent, but needs an n8n API key
+   and is real work.
+3. Ship them **documented but unlinked**, and tell the user which credential
+   each needs. Honest, and much less useful.
+
+Start with (1) for everything it can cover, and only reach for (2) if a
+genuinely valuable workflow cannot avoid a credential.
+
+### 64.3 Open questions
+
+- Where do the files live — `apps/n8n/workflows/*.json`, imported on first
+  start, or offered as downloads from the dashboard?
+- Import **once** or reconcile on every start? Re-importing would clobber a
+  user's edits, so almost certainly once, with a marker.
+- Do these belong to n8n at all, or should the dashboard grow a generic
+  "notifications" feature? Worth asking before building a pile of JSON —
+  several of the rows above are arguably dashboard features, not automations.
