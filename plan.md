@@ -7142,3 +7142,82 @@ only its own hostname, re-appends the catch-all last, and exits without writing
 when the rule is already correct. Verified against the live 36-rule config
 before shipping: idempotent path exits 2 with no write; the add path preserves
 all 36 originals, adds one, and leaves exactly one catch-all in last position.
+
+## 61. Pre-VPS audit of the fresh-install path
+
+`start.sh` grew a great deal in one session — port allocation, Authelia's
+forward-auth upstream, the dashboard's own hostname, Tailscale prompting and
+startup, Funnel enablement, the wetty key, `exposure_npm_api_url` seeding. None
+of it had run on a clean install. A static read of the ordering, plus a real
+run against a stripped copy of `apps/`, found three defects that a VPS run
+would have hit.
+
+### 61.1 Ordering: two blocks read ports before they were allocated
+
+The Authelia forward-auth rewrite and the `exposure_npm_api_url` seeding both
+read an allocated port (`AUTHELIA_PORT`, `NPM_ADMIN_PORT`) — and both ran
+*before* the allocator. On this host that was invisible, because the values
+already existed. On a fresh install neither file exists yet, so both would have
+silently fallen back to the hardcoded default; if the allocator then moved that
+port, the results are exactly the two failures already documented in §59.3/§59.4
+— forward-auth broken on every protected site, and every exposure failing with
+`ECONNREFUSED`.
+
+Fixed by moving the allocator to run before the stack build, ahead of every
+consumer.
+
+### 61.2 The allocator threw away each app's `.env.example`
+
+`set_app_env_var` seeds a missing `.env` by copying `.env.example`. The
+allocator did not — it created a bare one-line file holding only the port. On a
+fresh clone **no app has a `.env`**, so every app would have lost the defaults
+and documentation its example carries. And permanently: `saveServiceEnv` prefers
+an existing `.env` over the example, so nothing would ever restore it.
+
+### 61.3 The fix for 61.2 was itself wrong, and only a real run showed it
+
+Seeding was added inside the write branch — *after* the "is this already set?"
+check. So for an app whose example pins a port, the allocator decided a port,
+then the copy overwrote it with the example's value, and the two disagreed:
+
+```
+==> authelia: AUTHELIA_PORT=10101 (default 10100 was taken)
+    …while apps/authelia/.env said AUTHELIA_PORT=10100
+```
+
+A log that confidently reports a port the file does not contain is worse than
+no log. Restructured into three explicit passes — **seed all, then collect
+claimed ports, then allocate** — so every read happens after every write that
+could affect it.
+
+Re-verified on a stripped copy: 36 managed ports, **0 missing**, no duplicates,
+example comments preserved, and only a genuinely-occupied port reported as
+moved.
+
+**Worth generalising:** both 61.1 and 61.3 are the same mistake — a read
+happening before the write that determines it. Bash blocks and loop passes make
+that easy to get wrong and invisible on a host where the values already exist.
+A fresh-tree run is the only thing that surfaces it.
+
+### 61.4 Checked and clean
+
+- **No hardcoded domain** in any tracked template. `authelia/configuration.yml`
+  (7 `BASE_DOMAIN` refs) and `netbird/management.json.example` (8) are fully
+  templated; zero `tx-home-utils` references outside `plan.md`.
+- **`host.docker.internal`** — mapped via `extra_hosts: host-gateway` for the
+  backend and resolving (`10.201.0.1` here). Every exposure upstream depends on
+  it, and it is not host-specific.
+- **Core ports** no longer collide with NPM (§60.4).
+- **The allocator seeds and allocates correctly from an empty tree.**
+
+### 61.5 Still untested, and only a real VPS can settle it
+
+- The **prompts** — nothing here has exercised the interactive path.
+- **cloudflared install + `cloudflared service install`** on a machine that has
+  neither.
+- **Tunnel and DNS creation from nothing**, rather than reusing this host's.
+- **Tailscale joining a tailnet from a fresh container**, and whether Funnel is
+  already enabled for the tailnet (it is now, from this host — a genuinely new
+  account would see the enablement prompt).
+- **Resource headroom.** The full stack is heavy; a small VPS may not hold every
+  app at once. Nothing checks this or warns.

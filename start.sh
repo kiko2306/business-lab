@@ -539,6 +539,111 @@ else
   echo "warning: /var/run/docker.sock not found — leaving DOCKER_GID as-is." >&2
 fi
 
+# --- App host-port allocation ---------------------------------------------
+#
+# Every managed app publishes a host port. Left to upstream defaults these
+# collide: before this scheme, port 80 was claimed by bookstack, NPM *and*
+# speedtest, 8080 by file-browser, netbird-management and pihole-web, and
+# home-page defaulted to 3000 — the backend's own port. Colliding apps simply
+# fail to start, one at a time, as they are enabled.
+#
+# So every app's default now lives at 10100+, and this block resolves what is
+# left: if a port is already taken on this host (by another app here, or by
+# something outside this project entirely), the next free one is assigned and
+# written to that app's .env.
+#
+# Only ports whose compose default is >= 10000 are managed. That rule is what
+# protects the deliberate exceptions — NPM's 80/443 (cloudflared's origin) and
+# pihole's 53 (DNS has to be on 53) — without needing a list of them here.
+#
+# An existing value in an app's .env always wins: this must never move a port
+# the user chose in the dashboard, or renumber a working install on upgrade.
+log "Allocating host ports for managed apps"
+python3 - <<'PORTALLOCPY' || warn "port allocation failed — apps keep their compose defaults, which may collide"
+import glob, os, re, shutil, socket
+
+MANAGED_FLOOR = 10000
+
+def parse_env(path):
+    vals = {}
+    if os.path.exists(path):
+        for line in open(path, errors='replace'):
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                k, v = line.split('=', 1)
+                vals[k.strip()] = v.strip()
+    return vals
+
+def port_free(p):
+    # Bind-test rather than parsing ss: this is what actually decides whether
+    # Docker can publish the port, and it covers IPv4 and IPv6 separately.
+    for fam, addr in ((socket.AF_INET, '0.0.0.0'), (socket.AF_INET6, '::')):
+        try:
+            s = socket.socket(fam, socket.SOCK_STREAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((addr, p))
+            s.close()
+        except OSError:
+            return False
+        except Exception:
+            pass
+    return True
+
+composes = sorted(glob.glob('apps/*/docker-compose.yml') + glob.glob('apps/*/compose.yaml'))
+
+# Pass 1 — seed every missing .env from its .env.example, exactly as
+# set_app_env_var does. This MUST happen before anything reads a port: on a
+# fresh clone no app has a .env, and an example that already pins a port is
+# the app's real choice. Deciding first and seeding afterwards would let the
+# example silently overwrite the allocation, so the log would claim one port
+# while the file held another.
+for f in composes:
+    env_path = os.path.join(os.path.dirname(f), '.env')
+    example = env_path + '.example'
+    if not os.path.exists(env_path) and os.path.exists(example):
+        shutil.copyfile(example, env_path)
+        os.chmod(env_path, 0o600)
+
+# Pass 2 — every port now pinned in some app's .env is off-limits to others.
+claimed = set()
+for f in composes:
+    for k, v in parse_env(os.path.join(os.path.dirname(f), '.env')).items():
+        if k.endswith('_PORT') and v.isdigit():
+            claimed.add(int(v))
+
+# Pass 3 — allocate what is still unset.
+assigned = []
+for f in composes:
+    app_dir = os.path.dirname(f)
+    env_path = os.path.join(app_dir, '.env')
+    env = parse_env(env_path)
+    text = open(f, errors='replace').read()
+
+    for m in re.finditer(r'^\s*-\s*"?\$\{([A-Z0-9_]+):-(\d+)\}:\d+', text, re.M):
+        var, default = m.group(1), int(m.group(2))
+        if default < MANAGED_FLOOR:
+            continue                      # deliberate protocol port, leave alone
+        if var in env and env[var].isdigit():
+            continue                      # user's / existing choice wins
+
+        port = default
+        while (port in claimed) or (not port_free(port)):
+            port += 1
+        claimed.add(port)
+
+        lines = open(env_path, errors='replace').read().splitlines(True) if os.path.exists(env_path) else []
+        if lines and not lines[-1].endswith('\n'):
+            lines[-1] += '\n'
+        lines.append(f'{var}={port}\n')
+        open(env_path, 'w').writelines(lines)
+        env[var] = str(port)
+        if port != default:
+            assigned.append(f'{os.path.basename(app_dir)}: {var}={port} (default {default} was taken)')
+
+for line in assigned:
+    print('==> ' + line)
+PORTALLOCPY
+
 log "Building and starting the stack (this can take a few minutes on first run)"
 docker compose up -d --build
 
@@ -686,97 +791,6 @@ if [ -f "$AUTHELIA_SNIPPET" ]; then
     warn "couldn't determine the docker bridge gateway — check the address in $AUTHELIA_SNIPPET by hand"
   fi
 fi
-
-# --- App host-port allocation ---------------------------------------------
-#
-# Every managed app publishes a host port. Left to upstream defaults these
-# collide: before this scheme, port 80 was claimed by bookstack, NPM *and*
-# speedtest, 8080 by file-browser, netbird-management and pihole-web, and
-# home-page defaulted to 3000 — the backend's own port. Colliding apps simply
-# fail to start, one at a time, as they are enabled.
-#
-# So every app's default now lives at 10100+, and this block resolves what is
-# left: if a port is already taken on this host (by another app here, or by
-# something outside this project entirely), the next free one is assigned and
-# written to that app's .env.
-#
-# Only ports whose compose default is >= 10000 are managed. That rule is what
-# protects the deliberate exceptions — NPM's 80/443 (cloudflared's origin) and
-# pihole's 53 (DNS has to be on 53) — without needing a list of them here.
-#
-# An existing value in an app's .env always wins: this must never move a port
-# the user chose in the dashboard, or renumber a working install on upgrade.
-log "Allocating host ports for managed apps"
-python3 - <<'PORTALLOCPY' || warn "port allocation failed — apps keep their compose defaults, which may collide"
-import glob, os, re, socket
-
-MANAGED_FLOOR = 10000
-
-def parse_env(path):
-    vals = {}
-    if os.path.exists(path):
-        for line in open(path, errors='replace'):
-            line = line.strip()
-            if line and not line.startswith('#') and '=' in line:
-                k, v = line.split('=', 1)
-                vals[k.strip()] = v.strip()
-    return vals
-
-def port_free(p):
-    # Bind-test rather than parsing ss: this is what actually decides whether
-    # Docker can publish the port, and it covers IPv4 and IPv6 separately.
-    for fam, addr in ((socket.AF_INET, '0.0.0.0'), (socket.AF_INET6, '::')):
-        try:
-            s = socket.socket(fam, socket.SOCK_STREAM)
-            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-            s.bind((addr, p))
-            s.close()
-        except OSError:
-            return False
-        except Exception:
-            pass
-    return True
-
-composes = sorted(glob.glob('apps/*/docker-compose.yml') + glob.glob('apps/*/compose.yaml'))
-
-# Ports already pinned in some app's .env are off-limits for everyone else.
-claimed = set()
-for f in composes:
-    for k, v in parse_env(os.path.join(os.path.dirname(f), '.env')).items():
-        if k.endswith('_PORT') and v.isdigit():
-            claimed.add(int(v))
-
-assigned = []
-for f in composes:
-    app_dir = os.path.dirname(f)
-    env_path = os.path.join(app_dir, '.env')
-    env = parse_env(env_path)
-    text = open(f, errors='replace').read()
-
-    for m in re.finditer(r'^\s*-\s*"?\$\{([A-Z0-9_]+):-(\d+)\}:\d+', text, re.M):
-        var, default = m.group(1), int(m.group(2))
-        if default < MANAGED_FLOOR:
-            continue                      # deliberate protocol port, leave alone
-        if var in env and env[var].isdigit():
-            continue                      # user's / existing choice wins
-
-        port = default
-        while (port in claimed) or (not port_free(port)):
-            port += 1
-        claimed.add(port)
-
-        lines = open(env_path, errors='replace').read().splitlines(True) if os.path.exists(env_path) else []
-        if not any(l.startswith(var + '=') for l in lines):
-            if lines and not lines[-1].endswith('\n'):
-                lines[-1] += '\n'
-            lines.append(f'{var}={port}\n')
-            open(env_path, 'w').writelines(lines)
-        if port != default:
-            assigned.append(f'{os.path.basename(app_dir)}: {var}={port} (default {default} was taken)')
-
-for line in assigned:
-    print('==> ' + line)
-PORTALLOCPY
 
 # --- Web terminal (wetty) key ---------------------------------------------
 #
