@@ -6719,6 +6719,45 @@ password authentication is enabled, tunnel-proxied SSH appears as `127.0.0.1`
 so CrowdSec cannot see the real source, and `nginx-manager` really was serving
 the NPM admin UI unauthenticated (verified by status code and page title).
 
+### 56.7 Public hostname decoupled from service name
+
+User's call, and a good one: the terminal should live at `ssh.<domain>`, not
+`wetty.<domain>` — "wetty" is the implementation, "ssh" is what a person
+reaching for a terminal actually types. It also keeps the address stable if the
+implementation is ever swapped for another web terminal.
+
+Rather than renaming the app (which would have dragged the compose project,
+directory and registry key along with it), added a general escape hatch in the
+same spirit as the existing `exposurePortEnvVar`:
+
+- **`ServiceDefinition.exposureSubdomain`** — optional; unset means "use the
+  service name", so nothing else changes.
+- **`buildExposureHostname(serviceName, baseDomain, suffix?)`** in
+  `config/services.ts` is now the single place a public hostname is derived.
+  It replaced four separate `` `${serviceName}.${baseDomain}` `` template
+  literals (three in `exposure.ts`, one in `exposureEnv.ts`) — that
+  duplication was itself the reason a rename needed touching four files.
+  `additionalExposures` stem from the same subdomain, so an override carries
+  through consistently.
+- `wetty` sets `exposureSubdomain: 'ssh'`.
+- Tests: default case, override case, suffix stemming, and unknown-service
+  fallback. **129/129.**
+
+One implementation note worth remembering: `exposure.test.ts` mocks the whole
+`../config/services` module, so adding an import to `exposure.ts` broke nine
+tests with an undefined function until the mock gained a faithful stand-in.
+A module mock that enumerates exports is a maintenance cost every new import
+pays.
+
+**Migration on the live host** exposed the §54.4 gap again: re-provisioning
+created a *new* NPM host for `ssh.*` and left the `wetty.*` one orphaned rather
+than renaming it, because `ensureProxyHost` matches on hostname. Cleaned by
+hand (NPM host 35, the tunnel ingress rule, the DNS record) — the same manual
+teardown that a deprovision path would automate.
+
+Verified: `ssh.<domain>` → `302` to Authelia, `wetty.<domain>` gone, no
+regressions across the estate.
+
 ### 56.6 Left to do
 
 - A leftover **Access application for `ssh-web`** almost certainly still exists

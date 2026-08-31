@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SERVICES, extractComposeEnvVars, getPublishedUpstreamPort } from './services';
+import { SERVICES, buildExposureHostname, extractComposeEnvVars, getPublishedUpstreamPort } from './services';
 
 describe('extractComposeEnvVars', () => {
   it('treats a bare ${VAR} as required', () => {
@@ -202,5 +202,28 @@ describe('netbird-vpn exposures', () => {
     // The signal container is declared first in the compose file and does
     // publish a port, so "first port in the file" would resolve to it.
     expect(netbird.exposurePortEnvVar).toBe('NETBIRD_DASHBOARD_PORT');
+  });
+});
+
+describe('buildExposureHostname', () => {
+  it('defaults to <service>.<base domain>', () => {
+    expect(buildExposureHostname('immich', 'example.com')).toBe('immich.example.com');
+  });
+
+  it('honours exposureSubdomain when the service sets one', () => {
+    // The browser terminal is implemented with wetty but must always be
+    // published at ssh.<domain> — the address is what a person types, the
+    // service name is internal identity.
+    expect(SERVICES['wetty'].exposureSubdomain).toBe('ssh');
+    expect(buildExposureHostname('wetty', 'example.com')).toBe('ssh.example.com');
+  });
+
+  it('stems additionalExposures from the same subdomain', () => {
+    expect(buildExposureHostname('netbird-vpn', 'example.com', 'api')).toBe('netbird-vpn-api.example.com');
+    expect(buildExposureHostname('wetty', 'example.com', 'x')).toBe('ssh-x.example.com');
+  });
+
+  it('falls back to the service name for an unknown service', () => {
+    expect(buildExposureHostname('not-a-service', 'example.com')).toBe('not-a-service.example.com');
   });
 });

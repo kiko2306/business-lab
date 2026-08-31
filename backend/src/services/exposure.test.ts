@@ -12,7 +12,14 @@ import { ServiceExposureRow, ExposureGlobalConfig } from '../types';
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
 vi.mock('../utils/exposureSettings', () => ({ getExposureConfig: vi.fn() }));
 vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn() }));
-vi.mock('../config/services', () => ({ getPublishedUpstreamPort: vi.fn(), getService: vi.fn() }));
+vi.mock('../config/services', () => ({
+  getPublishedUpstreamPort: vi.fn(),
+  getService: vi.fn(),
+  // Faithful stand-in for the real default behaviour (no exposureSubdomain
+  // override); the override itself is unit-tested in config/services.test.ts.
+  buildExposureHostname: (name: string, domain: string, suffix?: string) =>
+    `${suffix ? `${name}-${suffix}` : name}.${domain}`,
+}));
 vi.mock('./npmClient', () => ({ ensureProxyHost: vi.fn() }));
 vi.mock('./cloudflareTunnelClient', () => ({ ensureIngressRoute: vi.fn() }));
 vi.mock('../utils/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }));

@@ -120,6 +120,14 @@ export interface ServiceDefinition {
   // default getPublishedUpstreamPort behavior — see its docstring) would
   // pick DNS instead. Unset for every service with just one published port.
   exposurePortEnvVar?: string;
+  // Public subdomain to expose this service under, when it should differ
+  // from the service's own key. The service name is an internal identity
+  // (compose project, app directory, registry key); the hostname is a UX
+  // decision, and the two shouldn't be forced to match. e.g. the browser
+  // terminal is implemented with wetty but lives at ssh.<base-domain>,
+  // because that is what a person looks for. Applies to the primary hostname
+  // and is the stem for any additionalExposures. Unset = use the service name.
+  exposureSubdomain?: string;
   // Secondary public hostnames this service needs beyond its primary one —
   // e.g. NetBird VPN's dashboard is a static SPA with no server-side proxy,
   // so its management API needs its own directly-reachable hostname.

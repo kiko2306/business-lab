@@ -94,6 +94,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     healthCheck: {
       enabled: false,
     },
+    // Published as ssh.<base-domain>, not wetty.<base-domain>: "wetty" is the
+    // implementation, "ssh" is what someone reaching for a terminal actually
+    // looks for. It also keeps the address stable if the implementation is
+    // ever swapped for another web terminal.
+    exposureSubdomain: 'ssh',
     // This one hands out a root-capable shell on the host, so it must never
     // be reachable without the forward-auth gate. Authelia itself has to be
     // up for that gate to work at all.
@@ -837,4 +842,19 @@ export function getPublishedUpstreamPort(name: string, portEnvVar?: string): num
   }
   const [, varName, varDefault, literalPort] = match;
   return resolvePort(varName, varDefault, literalPort);
+}
+
+/**
+ * The public hostname a service is exposed under.
+ *
+ * Defaults to `<service name>.<base domain>`, but a service may override just
+ * the subdomain via `exposureSubdomain` (see ServiceDefinition) when its
+ * internal name isn't the name users should type. Pass `suffix` to build one
+ * of the service's additionalExposures hostnames, which are stemmed from the
+ * same subdomain so a rename carries through consistently.
+ */
+export function buildExposureHostname(serviceName: string, baseDomain: string, suffix?: string): string {
+  const subdomain = SERVICES[serviceName]?.exposureSubdomain ?? serviceName;
+  const label = suffix ? `${subdomain}-${suffix}` : subdomain;
+  return `${label}.${baseDomain}`;
 }

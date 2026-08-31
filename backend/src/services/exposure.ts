@@ -19,7 +19,7 @@
 import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
-import { getPublishedUpstreamPort, getService } from '../config/services';
+import { buildExposureHostname, getPublishedUpstreamPort, getService } from '../config/services';
 import { ensureProxyHost } from './npmClient';
 import { ensureIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
@@ -59,7 +59,7 @@ export async function upsertServiceExposureConfig(
   }
 
   const globalConfig = await getExposureConfig();
-  const hostname = globalConfig ? `${serviceName}.${globalConfig.baseDomain}` : null;
+  const hostname = globalConfig ? buildExposureHostname(serviceName, globalConfig.baseDomain) : null;
 
   // Upstream scheme/host/port/websocket are derived automatically (see
   // provisionServiceIfEnabled) rather than entered by the user; left
@@ -295,7 +295,7 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
     return { attempted: true, success: false, warning: message };
   }
 
-  const hostname = `${serviceName}.${globalConfig.baseDomain}`;
+  const hostname = buildExposureHostname(serviceName, globalConfig.baseDomain);
   const originUrl = getNpmOriginUrl(globalConfig.npmApiUrl);
   const serviceDef = getService(serviceName);
 
@@ -317,7 +317,7 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
   const additionalExposures = serviceDef?.additionalExposures ?? [];
   for (const extra of additionalExposures) {
     const exposureKey = `${serviceName}:${extra.suffix}`;
-    const extraHostname = `${serviceName}-${extra.suffix}.${globalConfig.baseDomain}`;
+    const extraHostname = buildExposureHostname(serviceName, globalConfig.baseDomain, extra.suffix);
     const extraRow = await ensureSecondaryExposureRow(exposureKey, extraHostname);
     const grpc = Boolean(extra.grpc);
 

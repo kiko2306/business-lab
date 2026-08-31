@@ -12,7 +12,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { getService } from '../config/services';
+import { buildExposureHostname, getService } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { ServiceExposureEnvKeys } from '../types';
@@ -82,7 +82,7 @@ export async function buildExposureEnvOverrides(
     return {};
   }
 
-  const hostname = `${serviceName}.${globalConfig.baseDomain}`;
+  const hostname = buildExposureHostname(serviceName, globalConfig.baseDomain);
   const envFilePath = path.join(appDir, '.env');
   const existingValues = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath) : {};
 
