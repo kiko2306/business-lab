@@ -7293,7 +7293,15 @@ Authelia and rely on MeshCentral's own login + 2FA, or split the agent
 endpoint onto its own hostname. **Decide with a real agent enrolled**, not from
 the login page.
 
-### 62.3 Email — the constraint first
+### 62.3 Email — SUPERSEDED, see §63
+
+The Cloudflare Email Routing / Email Sending design below was **dropped** on
+the user's call: "forget the email, let the user add an email and ports to
+receive and send emails." Provider-agnostic mail settings shipped instead —
+§63. The analysis is kept because the *constraint* it documents is still true
+and will come back the moment anyone proposes self-hosting mail here.
+
+### 62.3a The original analysis — the constraint first
 
 **A self-hosted mail server cannot be published through the Cloudflare Tunnel.**
 Cloudflare does not proxy SMTP; port 25 traffic only reaches an origin
@@ -7387,3 +7395,71 @@ it is once per domain.
   Vaultwarden, Uptime Kuma and n8n all want to send mail.
 - MeshCentral behind Authelia: does forward-auth break agent enrolment? Needs a
   real agent to answer.
+
+## 63. Global mail settings — one mailbox, shared by every app
+
+Replaces §62.3. The user's call, and the better one: rather than binding the
+project to Cloudflare's email products, the dashboard takes a plain mailbox —
+host, port, credentials — and hands it to any app that needs email.
+
+Two reasons it is better than the Cloudflare design it replaces:
+
+- **It covers receiving properly.** Cloudflare Email Routing *forwards*; it has
+  no IMAP. ITFlow's email-to-ticket needs a real inbox to read, which the
+  Cloudflare design could not have provided at all.
+- **It is provider-agnostic.** Whatever mailbox already exists — own server,
+  hosting provider, Gmail app password, a relay like Brevo or SMTP2GO — works
+  the same way, and switching provider is one edit rather than a change in
+  every app.
+
+### 63.1 What was built
+
+- **`utils/mailSettings.ts`** — `MAIL_SETTINGS_KEYS` in the `settings` table,
+  alongside the exposure/Cloudflare config. Sending and receiving are separate:
+  `getMailConfig()` returns `null` when sending is unusable (needs host, user
+  and a from address), but reports receiving as simply absent — an install that
+  only sends must not be blocked by having no IMAP.
+- **`services/mailEnv.ts`** — the part that makes it more than stored text. A
+  service declares `mailEnvKeys` naming *its own* env vars, and the values are
+  injected as process env at start, exactly like the exposure overrides. The
+  app's `.env` keeps its shipped defaults, so clearing mail settings reverts
+  cleanly and nothing stale is written to disk. Includes `smtpTlsBoolean` for
+  apps that want `true/false` rather than a named scheme.
+- **`services/mailTest.ts`** — a real connection test over raw sockets.
+- **API** — `GET/PUT /api/settings/mail` (passwords never echoed back, only
+  whether they are set) and `POST /api/settings/mail/test`.
+- **UI** — a Sending block and an optional Receiving block, with the port
+  auto-suggested from the encryption choice, but only when the current value is
+  still a standard one, so a deliberately customised port is never overwritten.
+
+### 63.2 Why there is a connection test
+
+Wrong mail credentials fail **silently**. The settings save, the app starts,
+and nothing surfaces until someone notices an email that never arrived. The
+test authenticates for real — SMTP `AUTH LOGIN`, IMAP `LOGIN` — and reports
+sending and receiving separately so a working SMTP is not hidden behind a
+broken IMAP.
+
+Written against raw sockets rather than adding a mail library: the job is
+"connect, negotiate, authenticate", which is a few line-oriented commands per
+protocol. Two details that matter: an SMTP multi-line reply only ends on
+`250<space>` (matching bare `250` stops early on the first `250-` line), and
+IMAP credentials must be quoted or a password containing a space parses as
+extra arguments and returns a confusing `BAD`.
+
+The STARTTLS path deliberately stops at "the server offers STARTTLS" rather
+than performing the upgrade — a real upgrade means re-wrapping the socket, and
+the SSL and plaintext paths already prove the credentials, which is where a
+wrong password actually shows up.
+
+### 63.3 Status
+
+`mailEnvKeys` currently has **no consumers** — no app in the registry declares
+SMTP env vars today. ITFlow (§62.1) will be the first, and Vaultwarden,
+Uptime Kuma and n8n are obvious retrofits. That is deliberate sequencing, not
+an oversight: the plumbing exists so ITFlow can simply declare its keys.
+
+Five tests cover the mapping: no keys declared (and no database round-trip in
+that case), mail unconfigured, one setting fanned out to several env names,
+encryption-to-boolean, and IMAP omitted entirely when receiving is unset.
+**145/145**, `tsc` clean, frontend builds, endpoints live and auth-gated.

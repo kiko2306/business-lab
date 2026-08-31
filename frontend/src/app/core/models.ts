@@ -275,3 +275,46 @@ export interface HealthStatus {
   alerts: HealthAlert[];
   timestamp: string;
 }
+
+export type MailEncryption = 'tls' | 'ssl' | 'none';
+
+/** Shape returned by GET /settings/mail. Passwords are never sent back. */
+export interface MailSettings {
+  configured: boolean;
+  receiveConfigured: boolean;
+  smtpHost: string | null;
+  smtpPort: string | null;
+  smtpUser: string | null;
+  smtpPasswordConfigured: boolean;
+  smtpEncryption: MailEncryption;
+  fromAddress: string | null;
+  fromName: string | null;
+  imapHost: string | null;
+  imapPort: string | null;
+  imapUser: string | null;
+  imapPasswordConfigured: boolean;
+  imapEncryption: MailEncryption;
+}
+
+export interface MailSettingsInput {
+  smtpHost: string;
+  smtpPort: number;
+  smtpUser: string;
+  /** Omitted to keep the stored password unchanged. */
+  smtpPassword?: string;
+  smtpEncryption: MailEncryption;
+  fromAddress: string;
+  fromName?: string;
+  imapHost?: string;
+  imapPort?: number | null;
+  imapUser?: string;
+  imapPassword?: string;
+  imapEncryption?: MailEncryption;
+}
+
+export interface MailTestResponse {
+  success: boolean;
+  message: string;
+  smtp: { ok: boolean; detail: string };
+  imap: { ok: boolean; detail: string } | null;
+}

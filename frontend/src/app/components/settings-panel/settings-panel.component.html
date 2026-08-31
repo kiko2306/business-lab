@@ -223,3 +223,135 @@
     </form>
   </div>
 </section>
+
+<section class="card border-0 shadow-sm mt-4">
+  <div class="card-body">
+    <h2 class="h5 mb-1">Email</h2>
+    <p class="text-body-secondary small mb-3">
+      One mailbox, shared by every app that sends or receives email. Configured
+      once here instead of pasted into each app — changing the password later is
+      a single edit. Apps pick it up when they next start.
+    </p>
+
+    <div *ngIf="mailLoading" class="text-body-secondary small">Loading…</div>
+
+    <form *ngIf="!mailLoading" [formGroup]="mailForm" (ngSubmit)="saveMail()" class="row g-3">
+      <div class="col-12">
+        <h3 class="h6 mb-0">Sending</h3>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="smtpHost">SMTP server</label>
+        <input id="smtpHost" type="text" class="form-control" formControlName="smtpHost"
+               placeholder="smtp.example.com" autocomplete="off" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="smtpEncryption">Encryption</label>
+        <select id="smtpEncryption" class="form-select" formControlName="smtpEncryption"
+                (change)="onMailEncryptionChange('smtp')">
+          <option value="tls">STARTTLS</option>
+          <option value="ssl">SSL/TLS</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="smtpPort">Port</label>
+        <input id="smtpPort" type="number" inputmode="numeric" class="form-control" formControlName="smtpPort" />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="smtpUser">Username</label>
+        <input id="smtpUser" type="text" class="form-control" formControlName="smtpUser"
+               placeholder="you@example.com" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="smtpPassword">Password</label>
+        <input id="smtpPassword" type="password" class="form-control" formControlName="smtpPassword"
+               [placeholder]="mailSettings?.smtpPasswordConfigured ? 'configured — leave blank to keep' : 'not set'"
+               autocomplete="new-password" />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="fromAddress">From address</label>
+        <input id="fromAddress" type="email" class="form-control" formControlName="fromAddress"
+               placeholder="homelab@example.com" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="fromName">From name <span class="fw-normal text-body-secondary">(optional)</span></label>
+        <input id="fromName" type="text" class="form-control" formControlName="fromName" placeholder="Homelab" />
+      </div>
+
+      <div class="col-12 mt-4">
+        <h3 class="h6 mb-1">Receiving <span class="fw-normal text-body-secondary small">(optional)</span></h3>
+        <p class="form-text mt-0">
+          Only needed by apps that turn incoming mail into records — ticketing
+          from an inbox, for example. Leave the server blank to turn it off.
+        </p>
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="imapHost">IMAP server</label>
+        <input id="imapHost" type="text" class="form-control" formControlName="imapHost"
+               placeholder="imap.example.com" autocomplete="off" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="imapEncryption">Encryption</label>
+        <select id="imapEncryption" class="form-select" formControlName="imapEncryption"
+                (change)="onMailEncryptionChange('imap')">
+          <option value="ssl">SSL/TLS</option>
+          <option value="tls">STARTTLS</option>
+          <option value="none">None</option>
+        </select>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="imapPort">Port</label>
+        <input id="imapPort" type="number" inputmode="numeric" class="form-control" formControlName="imapPort" />
+      </div>
+
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="imapUser">Username</label>
+        <input id="imapUser" type="text" class="form-control" formControlName="imapUser" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="imapPassword">Password</label>
+        <input id="imapPassword" type="password" class="form-control" formControlName="imapPassword"
+               [placeholder]="mailSettings?.imapPasswordConfigured ? 'configured — leave blank to keep' : 'not set'"
+               autocomplete="new-password" />
+      </div>
+
+      <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
+        <button type="submit" class="btn btn-primary" [disabled]="savingMail">
+          {{ savingMail ? 'Saving…' : 'Save email settings' }}
+        </button>
+        <button type="button" class="btn btn-outline-secondary"
+                [disabled]="testingMail || !mailSettings?.configured" (click)="testMail()">
+          {{ testingMail ? 'Testing…' : 'Test connection' }}
+        </button>
+        <span
+          *ngIf="mailFeedback"
+          class="small"
+          [ngClass]="{
+            'text-success': mailFeedback.type === 'success',
+            'text-danger': mailFeedback.type === 'danger',
+            'text-body-secondary': mailFeedback.type === 'info'
+          }"
+        >
+          {{ mailFeedback.message }}
+        </span>
+      </div>
+
+      <!-- Per-protocol results: a working SMTP shouldn't be hidden by a
+           broken IMAP, and the detail is what makes a failure actionable. -->
+      <div *ngIf="mailTestResult" class="col-12">
+        <ul class="list-unstyled small mb-0">
+          <li [ngClass]="mailTestResult.smtp.ok ? 'text-success' : 'text-danger'">
+            <strong>Sending:</strong> {{ mailTestResult.smtp.detail }}
+          </li>
+          <li *ngIf="mailTestResult.imap" [ngClass]="mailTestResult.imap.ok ? 'text-success' : 'text-danger'">
+            <strong>Receiving:</strong> {{ mailTestResult.imap.detail }}
+          </li>
+        </ul>
+      </div>
+    </form>
+  </div>
+</section>

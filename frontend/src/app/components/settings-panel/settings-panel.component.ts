@@ -8,6 +8,9 @@ import {
   CloudflareSettings,
   ExposureSettings,
   ExposureSettingsInput,
+  MailSettings,
+  MailSettingsInput,
+  MailTestResponse,
   ExposureTestResponse,
   GeneralSettings,
 } from '../../core/models';
@@ -40,6 +43,23 @@ export class SettingsPanelComponent implements OnInit {
     cloudflareTunnelId: ['', [Validators.required, Validators.maxLength(255)]],
   });
 
+  // Sending is required as a set; receiving is entirely optional, so only
+  // the SMTP half carries validators. Clearing imapHost turns receiving off.
+  protected readonly mailForm = this.formBuilder.nonNullable.group({
+    smtpHost: ['', [Validators.required, Validators.maxLength(255)]],
+    smtpPort: [587, [Validators.required, Validators.min(1), Validators.max(65535)]],
+    smtpUser: ['', [Validators.maxLength(255)]],
+    smtpPassword: ['', [Validators.maxLength(255)]],
+    smtpEncryption: ['tls', [Validators.required]],
+    fromAddress: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
+    fromName: ['', [Validators.maxLength(255)]],
+    imapHost: ['', [Validators.maxLength(255)]],
+    imapPort: [993, [Validators.min(1), Validators.max(65535)]],
+    imapUser: ['', [Validators.maxLength(255)]],
+    imapPassword: ['', [Validators.maxLength(255)]],
+    imapEncryption: ['ssl'],
+  });
+
   protected readonly generalForm = this.formBuilder.nonNullable.group({
     timezone: ['', [Validators.required]],
   });
@@ -60,6 +80,12 @@ export class SettingsPanelComponent implements OnInit {
   protected feedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected exposureFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected exposureTestResult: ExposureTestResponse | null = null;
+  protected mailSettings: MailSettings | null = null;
+  protected mailLoading = true;
+  protected savingMail = false;
+  protected testingMail = false;
+  protected mailFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  protected mailTestResult: MailTestResponse | null = null;
 
   sanitizeTokenPaste(event: ClipboardEvent): void {
     const pasted = event.clipboardData?.getData('text') ?? '';
@@ -73,6 +99,7 @@ export class SettingsPanelComponent implements OnInit {
     this.loadSettings();
     this.loadExposureSettings();
     this.loadGeneralSettings();
+    this.loadMailSettings();
   }
 
   private loadGeneralSettings(): void {
@@ -110,6 +137,114 @@ export class SettingsPanelComponent implements OnInit {
         },
         error: (error) => {
           this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save timezone.') };
+        },
+      });
+  }
+
+  /** Port that matches the chosen encryption, offered as the user switches. */
+  protected onMailEncryptionChange(protocol: 'smtp' | 'imap'): void {
+    const control = protocol === 'smtp' ? this.mailForm.controls.smtpPort : this.mailForm.controls.imapPort;
+    const encryption = protocol === 'smtp'
+      ? this.mailForm.controls.smtpEncryption.value
+      : this.mailForm.controls.imapEncryption.value;
+    const suggested = protocol === 'smtp'
+      ? encryption === 'ssl' ? 465 : encryption === 'tls' ? 587 : 25
+      : encryption === 'none' ? 143 : 993;
+    // Only overwrite a port the user hasn't deliberately customised — the
+    // suggestion is a convenience, not a correction.
+    const standard = protocol === 'smtp' ? [25, 465, 587] : [143, 993];
+    if (standard.includes(control.value)) {
+      control.setValue(suggested);
+    }
+  }
+
+  loadMailSettings(): void {
+    this.mailLoading = true;
+    this.settingsService
+      .getMailSettings()
+      .pipe(finalize(() => (this.mailLoading = false)))
+      .subscribe({
+        next: (settings) => {
+          this.mailSettings = settings;
+          this.mailForm.patchValue({
+            smtpHost: settings.smtpHost ?? '',
+            smtpPort: Number(settings.smtpPort ?? 587),
+            smtpUser: settings.smtpUser ?? '',
+            smtpEncryption: settings.smtpEncryption,
+            fromAddress: settings.fromAddress ?? '',
+            fromName: settings.fromName ?? '',
+            imapHost: settings.imapHost ?? '',
+            imapPort: Number(settings.imapPort ?? 993),
+            imapUser: settings.imapUser ?? '',
+            imapEncryption: settings.imapEncryption,
+          });
+        },
+        error: () => (this.mailFeedback = { type: 'danger', message: 'Unable to load mail settings.' }),
+      });
+  }
+
+  saveMail(): void {
+    if (this.mailForm.invalid) {
+      this.mailForm.markAllAsTouched();
+      this.mailFeedback = { type: 'info', message: 'Fill in the sending fields with valid values before saving.' };
+      return;
+    }
+
+    const value = this.mailForm.getRawValue();
+    // A username with no password and none stored would save a login that
+    // cannot work — catch it here rather than at the first failed send.
+    if (value.smtpUser && !value.smtpPassword && !this.mailSettings?.smtpPasswordConfigured) {
+      this.mailForm.controls.smtpPassword.setErrors({ required: true });
+      this.mailForm.controls.smtpPassword.markAsTouched();
+      this.mailFeedback = { type: 'info', message: 'Enter the mailbox password.' };
+      return;
+    }
+
+    const imapHost = value.imapHost.trim();
+    const payload: MailSettingsInput = {
+      smtpHost: value.smtpHost.trim(),
+      smtpPort: value.smtpPort,
+      smtpUser: value.smtpUser.trim(),
+      smtpEncryption: value.smtpEncryption as MailSettingsInput['smtpEncryption'],
+      fromAddress: value.fromAddress.trim(),
+      fromName: value.fromName.trim(),
+      imapHost,
+      imapPort: imapHost ? value.imapPort : null,
+      imapUser: imapHost ? value.imapUser.trim() : '',
+      imapEncryption: value.imapEncryption as MailSettingsInput['imapEncryption'],
+    };
+    if (value.smtpPassword) payload.smtpPassword = value.smtpPassword;
+    if (imapHost && value.imapPassword) payload.imapPassword = value.imapPassword;
+
+    this.savingMail = true;
+    this.mailTestResult = null;
+    this.settingsService
+      .saveMailSettings(payload)
+      .pipe(finalize(() => (this.savingMail = false)))
+      .subscribe({
+        next: (response) => {
+          this.mailFeedback = { type: 'success', message: response.message };
+          this.mailForm.controls.smtpPassword.reset('');
+          this.mailForm.controls.imapPassword.reset('');
+          this.loadMailSettings();
+        },
+        error: (error) => (this.mailFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save mail settings.') }),
+      });
+  }
+
+  testMail(): void {
+    this.testingMail = true;
+    this.mailTestResult = null;
+    this.settingsService
+      .testMailSettings()
+      .pipe(finalize(() => (this.testingMail = false)))
+      .subscribe({
+        next: (result) => {
+          this.mailTestResult = result;
+          this.mailFeedback = { type: result.success ? 'success' : 'danger', message: result.message };
+        },
+        error: (error) => {
+          this.mailFeedback = { type: 'danger', message: extractErrorMessage(error, 'Mail test failed.') };
         },
       });
   }

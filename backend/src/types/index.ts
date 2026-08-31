@@ -74,6 +74,26 @@ export type ServiceCategory =
   | 'Home Automation'
   | 'Development';
 
+export interface ServiceMailEnvKeys {
+  smtpHost?: string[];
+  smtpPort?: string[];
+  smtpUser?: string[];
+  smtpPassword?: string[];
+  /** Receives 'tls' | 'ssl' | 'none' as-is. */
+  smtpEncryption?: string[];
+  /** Some apps want a boolean "use TLS" rather than a named scheme. */
+  smtpTlsBoolean?: string[];
+  fromAddress?: string[];
+  fromName?: string[];
+  imapHost?: string[];
+  imapPort?: string[];
+  imapUser?: string[];
+  imapPassword?: string[];
+  imapEncryption?: string[];
+  /** Set verbatim whenever mail is configured — e.g. MAIL_ENABLED=true. */
+  staticWhenConfigured?: Record<string, string>;
+}
+
 export interface ServiceDefinition {
   name: string;
   label: string;
@@ -120,6 +140,11 @@ export interface ServiceDefinition {
   // default getPublishedUpstreamPort behavior — see its docstring) would
   // pick DNS instead. Unset for every service with just one published port.
   exposurePortEnvVar?: string;
+  // Which of this service's env vars receive the global mail settings (see
+  // services/mailEnv.ts). Declaring them here means SMTP/IMAP credentials are
+  // configured once in the dashboard instead of pasted into every app that
+  // sends email — and rotating the mailbox password is a single edit.
+  mailEnvKeys?: ServiceMailEnvKeys;
   // Public subdomain to expose this service under, when it should differ
   // from the service's own key. The service name is an internal identity
   // (compose project, app directory, registry key); the hostname is a UX

@@ -11,6 +11,7 @@ import logger from '../utils/logger';
 import { writeAuditLog } from '../utils/audit';
 import { provisionServiceIfEnabled } from './exposure';
 import { buildExposureEnvOverrides } from './exposureEnv';
+import { buildMailEnvOverrides } from './mailEnv';
 import { ensureGeneratedSecrets } from './appEnv';
 import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
@@ -117,6 +118,9 @@ async function composeUpWithManagedConfig(
   { forceRecreate }: { forceRecreate: boolean }
 ): Promise<CommandResult> {
   const envOverrides = await buildExposureEnvOverrides(serviceName, appDir);
+  // Mail settings are global and injected the same way — one mailbox
+  // configured once, inherited by every app that declares mailEnvKeys.
+  const mailOverrides = await buildMailEnvOverrides(serviceName);
   await applyExposureConfigFiles(serviceName, appDir);
   await applyCrowdsecConfigFiles(serviceName, appDir);
 
@@ -124,6 +128,9 @@ async function composeUpWithManagedConfig(
   const command = `docker compose -p ${projectName} -f ${composeFile} up -d${recreate}`;
   return executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
     ...(await resolveTimezoneOverride(appDir)),
+    ...mailOverrides,
+    // Exposure last: if a service somehow named the same var in both, the
+    // hostname-derived value is the more specific one.
     ...envOverrides,
   });
 }

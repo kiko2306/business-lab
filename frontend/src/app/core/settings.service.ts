@@ -8,6 +8,9 @@ import {
   CloudflareTestResponse,
   ExposureSettings,
   ExposureSettingsInput,
+  MailSettings,
+  MailSettingsInput,
+  MailTestResponse,
   ExposureTestResponse,
   GeneralSettings,
 } from './models';
@@ -49,6 +52,18 @@ export class SettingsService {
         context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
       })
       .pipe(retry({ count: 1, delay: 400 }));
+  }
+
+  getMailSettings(): Observable<MailSettings> {
+    return this.http.get<MailSettings>(`${API_BASE_URL}/settings/mail`);
+  }
+
+  saveMailSettings(input: MailSettingsInput): Observable<{ message: string }> {
+    return this.http.put<{ message: string }>(`${API_BASE_URL}/settings/mail`, input);
+  }
+
+  testMailSettings(): Observable<MailTestResponse> {
+    return this.http.post<MailTestResponse>(`${API_BASE_URL}/settings/mail/test`, {});
   }
 
   saveExposureSettings(input: ExposureSettingsInput): Observable<{ message: string }> {

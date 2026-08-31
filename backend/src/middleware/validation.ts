@@ -57,6 +57,24 @@ export const schemas = {
     frequency: Joi.string().valid('daily', 'weekly').required(),
     retentionCount: Joi.number().integer().min(1).max(365).required(),
   }),
+  mailSettings: Joi.object({
+    smtpHost: Joi.string().trim().hostname().max(255).required(),
+    smtpPort: Joi.number().integer().min(1).max(65535).required(),
+    smtpUser: Joi.string().trim().max(255).allow('').required(),
+    // Optional: omit to keep the previously saved password unchanged, same
+    // convention as npmPassword above.
+    smtpPassword: Joi.string().min(1).max(255).optional(),
+    smtpEncryption: Joi.string().valid('tls', 'ssl', 'none').required(),
+    fromAddress: Joi.string().trim().email().max(255).required(),
+    fromName: Joi.string().trim().max(255).allow('').optional(),
+    // Receiving is optional in full: an empty imapHost clears it.
+    imapHost: Joi.string().trim().hostname().max(255).allow('').optional(),
+    imapPort: Joi.number().integer().min(1).max(65535).allow(null).optional(),
+    imapUser: Joi.string().trim().max(255).allow('').optional(),
+    imapPassword: Joi.string().min(1).max(255).optional(),
+    imapEncryption: Joi.string().valid('tls', 'ssl', 'none').optional(),
+  }),
+
   exposureGlobalSettings: Joi.object({
     baseDomain: domainSchema.required(),
     npmApiUrl: Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(500).required(),
