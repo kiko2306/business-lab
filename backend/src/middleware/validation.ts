@@ -57,6 +57,21 @@ export const schemas = {
     frequency: Joi.string().valid('daily', 'weekly').required(),
     retentionCount: Joi.number().integer().min(1).max(365).required(),
   }),
+  backupTarget: Joi.object({
+    kind: Joi.string().valid('disk', 'smb', 'nfs', 'googledrive').required(),
+    path: Joi.string().trim().max(500).allow('').optional(),
+    server: Joi.string().trim().max(255).allow('').optional(),
+    share: Joi.string().trim().max(500).allow('').optional(),
+    username: Joi.string().trim().max(255).allow('').optional(),
+    // Optional: omit to keep the stored password unchanged.
+    password: Joi.string().max(255).optional(),
+    options: Joi.string().trim().max(500).allow('').optional(),
+    // Google Drive. authId is a long-lived refresh token — optional so a save
+    // that leaves the field blank keeps the stored one.
+    authId: Joi.string().trim().max(4096).optional(),
+    folder: Joi.string().trim().max(255).allow('').optional(),
+  }),
+
   mailSettings: Joi.object({
     smtpHost: Joi.string().trim().hostname().max(255).required(),
     smtpPort: Joi.number().integer().min(1).max(65535).required(),

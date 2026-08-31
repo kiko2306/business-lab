@@ -3,6 +3,16 @@ import { Router, Request, Response } from 'express';
 import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { schemas, validateBody } from '../middleware/validation';
+import {
+  BACKUP_TARGET_KEYS,
+  getBackupTarget,
+  DUPLICATI_OAUTH_URL,
+  isMountedKind,
+  toDuplicatiUrl,
+  toMountSpec,
+  validateTarget,
+} from '../utils/backupTarget';
+import { testBackupTarget } from '../services/backupTargetTest';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
 import { testMailConnection } from '../services/mailTest';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig } from '../utils/exposureSettings';
@@ -369,6 +379,135 @@ router.post('/mail/test', async (_req: Request, res: Response) => {
   }
 
   const result = await testMailConnection(config);
+  return res.status(result.success ? 200 : 400).json(result);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/settings/backup-target — where backups are written.
+// ---------------------------------------------------------------------------
+router.get('/backup-target', async (_req: Request, res: Response) => {
+  try {
+    const result = await query<{ key: string; value: string }>('SELECT key, value FROM settings WHERE key = ANY($1)', [
+      Object.values(BACKUP_TARGET_KEYS),
+    ]);
+    const values = Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
+
+    return res.json({
+      // Unconfigured is meaningfully different from "set to a local disk":
+      // until this is chosen, backups sit beside the data they protect.
+      configured: Boolean(values[BACKUP_TARGET_KEYS.kind]),
+      kind: values[BACKUP_TARGET_KEYS.kind] ?? 'disk',
+      path: values[BACKUP_TARGET_KEYS.path] ?? null,
+      server: values[BACKUP_TARGET_KEYS.server] ?? null,
+      share: values[BACKUP_TARGET_KEYS.share] ?? null,
+      username: values[BACKUP_TARGET_KEYS.username] ?? null,
+      passwordConfigured: Boolean(values[BACKUP_TARGET_KEYS.password]),
+      options: values[BACKUP_TARGET_KEYS.options] ?? null,
+      folder: values[BACKUP_TARGET_KEYS.folder] ?? null,
+      authIdConfigured: Boolean(values[BACKUP_TARGET_KEYS.authId]),
+      oauthUrl: DUPLICATI_OAUTH_URL,
+    });
+  } catch {
+    return res.status(500).json({ error: 'Unable to load the backup destination.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// PUT /api/settings/backup-target
+// ---------------------------------------------------------------------------
+router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Request, res: Response) => {
+  const existing = await getBackupTarget();
+  const target = {
+    kind: req.body.kind,
+    path: (req.body.path ?? '').trim(),
+    server: (req.body.server ?? '').trim(),
+    share: (req.body.share ?? '').trim(),
+    username: (req.body.username ?? '').trim(),
+    // Keep the stored password when the field is left blank.
+    password: req.body.password || existing?.password || '',
+    options: (req.body.options ?? '').trim(),
+    authId: req.body.authId || existing?.authId || '',
+    folder: (req.body.folder ?? '').trim(),
+  };
+
+  const problem = validateTarget(target);
+  if (problem) {
+    return res.status(400).json({ error: problem });
+  }
+
+  const values: Record<string, string> = {
+    [BACKUP_TARGET_KEYS.kind]: target.kind,
+    [BACKUP_TARGET_KEYS.path]: target.path,
+    [BACKUP_TARGET_KEYS.server]: target.server,
+    [BACKUP_TARGET_KEYS.share]: target.share,
+    [BACKUP_TARGET_KEYS.username]: target.username,
+    [BACKUP_TARGET_KEYS.options]: target.options,
+  };
+  values[BACKUP_TARGET_KEYS.folder] = target.folder;
+  // Secrets only overwrite when supplied, so saving with the field blank keeps
+  // the stored value — same convention as every other credential here.
+  if (req.body.password) values[BACKUP_TARGET_KEYS.password] = req.body.password;
+  if (req.body.authId) values[BACKUP_TARGET_KEYS.authId] = req.body.authId;
+
+  try {
+    for (const [key, value] of Object.entries(values)) {
+      await query(
+        `INSERT INTO settings (key, value, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (key)
+         DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [key, value]
+      );
+    }
+
+    await writeAuditLog({
+      userId: req.user?.id ?? null,
+      action: 'settings_change',
+      resource: 'backup_target',
+      result: 'success',
+    }).catch(() => {});
+
+    return res.json({
+      message: isMountedKind(target.kind)
+        ? 'Backup destination saved. Restart Duplicati to mount it.'
+        : 'Backup destination saved. Set it as the target in your Duplicati backup job.',
+      // Only one of these is meaningful, depending on the family.
+      mount: isMountedKind(target.kind) ? toMountSpec(target) : null,
+      duplicatiUrl: toDuplicatiUrl(target),
+    });
+  } catch {
+    return res.status(500).json({ error: 'Unable to save the backup destination.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/settings/backup-target/test — mount it and write to it.
+// ---------------------------------------------------------------------------
+router.post('/backup-target/test', async (_req: Request, res: Response) => {
+  const target = await getBackupTarget();
+  if (!target) {
+    return res.status(400).json({ error: 'No backup destination is configured yet.' });
+  }
+  const problem = validateTarget(target);
+  if (problem) {
+    return res.status(400).json({ error: problem });
+  }
+
+  if (!isMountedKind(target.kind)) {
+    // Being straight about this rather than showing a green tick that proves
+    // nothing: Google Drive is reached by Duplicati itself, so there is no
+    // mount here to exercise. Duplicati's own "Test connection" on the job is
+    // the real check.
+    return res.status(200).json({
+      success: true,
+      message: 'Saved — but not verified from here.',
+      detail:
+        'Google Drive is reached by Duplicati directly, not mounted, so this dashboard cannot test it. ' +
+        'Use "Test connection" on the backup job in Duplicati to confirm the AuthID works.',
+    });
+  }
+
+  const result = await testBackupTarget(toMountSpec(target));
   return res.status(result.success ? 200 : 400).json(result);
 });
 

@@ -11,6 +11,10 @@ import {
   MailSettings,
   MailSettingsInput,
   MailTestResponse,
+  BackupTargetInput,
+  BackupTargetKind,
+  BackupTargetSettings,
+  BackupTargetTestResponse,
   ExposureTestResponse,
   GeneralSettings,
 } from '../../core/models';
@@ -60,6 +64,22 @@ export class SettingsPanelComponent implements OnInit {
     imapEncryption: ['ssl'],
   });
 
+  // One form for all destination types; which controls matter depends on
+  // `kind`, and the template shows only the relevant ones. Validation is done
+  // server-side because the rules differ per kind and duplicating them here
+  // would be two places to keep in step.
+  protected readonly backupTargetForm = this.formBuilder.nonNullable.group({
+    kind: ['disk' as BackupTargetKind],
+    path: [''],
+    server: [''],
+    share: [''],
+    username: [''],
+    password: [''],
+    options: [''],
+    authId: [''],
+    folder: [''],
+  });
+
   protected readonly generalForm = this.formBuilder.nonNullable.group({
     timezone: ['', [Validators.required]],
   });
@@ -86,6 +106,12 @@ export class SettingsPanelComponent implements OnInit {
   protected testingMail = false;
   protected mailFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected mailTestResult: MailTestResponse | null = null;
+  protected backupTarget: BackupTargetSettings | null = null;
+  protected backupTargetLoading = true;
+  protected savingBackupTarget = false;
+  protected testingBackupTarget = false;
+  protected backupTargetFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  protected backupTargetTestResult: BackupTargetTestResponse | null = null;
 
   sanitizeTokenPaste(event: ClipboardEvent): void {
     const pasted = event.clipboardData?.getData('text') ?? '';
@@ -100,6 +126,7 @@ export class SettingsPanelComponent implements OnInit {
     this.loadExposureSettings();
     this.loadGeneralSettings();
     this.loadMailSettings();
+    this.loadBackupTarget();
   }
 
   private loadGeneralSettings(): void {
@@ -156,6 +183,93 @@ export class SettingsPanelComponent implements OnInit {
     if (standard.includes(control.value)) {
       control.setValue(suggested);
     }
+  }
+
+  /** Google Drive is reached by Duplicati itself, so there is no mount. */
+  protected get backupTargetIsMounted(): boolean {
+    return this.backupTargetForm.controls.kind.value !== 'googledrive';
+  }
+
+  loadBackupTarget(): void {
+    this.backupTargetLoading = true;
+    this.settingsService
+      .getBackupTarget()
+      .pipe(finalize(() => (this.backupTargetLoading = false)))
+      .subscribe({
+        next: (settings) => {
+          this.backupTarget = settings;
+          this.backupTargetForm.patchValue({
+            kind: settings.kind,
+            path: settings.path ?? '',
+            server: settings.server ?? '',
+            share: settings.share ?? '',
+            username: settings.username ?? '',
+            options: settings.options ?? '',
+            folder: settings.folder ?? '',
+          });
+        },
+        error: () =>
+          (this.backupTargetFeedback = { type: 'danger', message: 'Unable to load the backup destination.' }),
+      });
+  }
+
+  saveBackupTarget(): void {
+    const value = this.backupTargetForm.getRawValue();
+    const payload: BackupTargetInput = { kind: value.kind };
+
+    if (value.kind === 'googledrive') {
+      payload.folder = value.folder.trim();
+      if (value.authId) payload.authId = value.authId.trim();
+    } else if (value.kind === 'disk') {
+      payload.path = value.path.trim();
+    } else {
+      payload.server = value.server.trim();
+      payload.share = value.share.trim();
+      payload.username = value.username.trim();
+      payload.options = value.options.trim();
+      if (value.password) payload.password = value.password;
+    }
+
+    this.savingBackupTarget = true;
+    this.backupTargetTestResult = null;
+    this.settingsService
+      .saveBackupTarget(payload)
+      .pipe(finalize(() => (this.savingBackupTarget = false)))
+      .subscribe({
+        next: (response) => {
+          this.backupTargetFeedback = { type: 'success', message: response.message };
+          this.backupTargetForm.controls.password.reset('');
+          this.backupTargetForm.controls.authId.reset('');
+          this.loadBackupTarget();
+        },
+        error: (error) =>
+          (this.backupTargetFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Unable to save the backup destination.'),
+          }),
+      });
+  }
+
+  testBackupTarget(): void {
+    this.testingBackupTarget = true;
+    this.backupTargetTestResult = null;
+    this.settingsService
+      .testBackupTarget()
+      .pipe(finalize(() => (this.testingBackupTarget = false)))
+      .subscribe({
+        next: (result) => {
+          this.backupTargetTestResult = result;
+          this.backupTargetFeedback = {
+            type: result.success ? 'success' : 'danger',
+            message: result.message,
+          };
+        },
+        error: (error) =>
+          (this.backupTargetFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Could not test the destination.'),
+          }),
+      });
   }
 
   loadMailSettings(): void {

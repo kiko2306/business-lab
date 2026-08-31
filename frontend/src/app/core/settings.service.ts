@@ -11,6 +11,9 @@ import {
   MailSettings,
   MailSettingsInput,
   MailTestResponse,
+  BackupTargetInput,
+  BackupTargetSettings,
+  BackupTargetTestResponse,
   ExposureTestResponse,
   GeneralSettings,
 } from './models';
@@ -52,6 +55,18 @@ export class SettingsService {
         context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
       })
       .pipe(retry({ count: 1, delay: 400 }));
+  }
+
+  getBackupTarget(): Observable<BackupTargetSettings> {
+    return this.http.get<BackupTargetSettings>(`${API_BASE_URL}/settings/backup-target`);
+  }
+
+  saveBackupTarget(input: BackupTargetInput): Observable<{ message: string }> {
+    return this.http.put<{ message: string }>(`${API_BASE_URL}/settings/backup-target`, input);
+  }
+
+  testBackupTarget(): Observable<BackupTargetTestResponse> {
+    return this.http.post<BackupTargetTestResponse>(`${API_BASE_URL}/settings/backup-target/test`, {});
   }
 
   getMailSettings(): Observable<MailSettings> {

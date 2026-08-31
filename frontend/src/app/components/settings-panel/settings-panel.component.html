@@ -355,3 +355,131 @@
     </form>
   </div>
 </section>
+
+<section class="card border-0 shadow-sm mt-4">
+  <div class="card-body">
+    <h2 class="h5 mb-1">Backup destination</h2>
+    <p class="text-body-secondary small mb-3">
+      Where Duplicati writes backups. Until this is set they stay on this
+      machine's own disk — which survives deleting a file, and nothing else.
+    </p>
+
+    <div *ngIf="backupTargetLoading" class="text-body-secondary small">Loading…</div>
+
+    <form *ngIf="!backupTargetLoading" [formGroup]="backupTargetForm" (ngSubmit)="saveBackupTarget()" class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="backupKind">Destination</label>
+        <select id="backupKind" class="form-select" formControlName="kind">
+          <option value="disk">Another disk on this machine</option>
+          <option value="smb">Network drive (SMB / Windows share)</option>
+          <option value="nfs">NAS (NFS export)</option>
+          <option value="googledrive">Google Drive</option>
+        </select>
+      </div>
+
+      <!-- Local disk -->
+      <div class="col-md-8" *ngIf="backupTargetForm.controls.kind.value === 'disk'">
+        <label class="form-label fw-semibold" for="backupPath">Path</label>
+        <input id="backupPath" type="text" class="form-control" formControlName="path"
+               placeholder="/mnt/backups" autocomplete="off" />
+        <div class="form-text">
+          Must be a separate disk. A path on the system disk is rejected — it would
+          be lost by the same failure it is meant to protect against.
+        </div>
+      </div>
+
+      <!-- SMB / NFS -->
+      <ng-container *ngIf="backupTargetForm.controls.kind.value === 'smb' || backupTargetForm.controls.kind.value === 'nfs'">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold" for="backupServer">Server</label>
+          <input id="backupServer" type="text" class="form-control" formControlName="server"
+                 placeholder="192.168.1.50" autocomplete="off" />
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold" for="backupShare">
+            {{ backupTargetForm.controls.kind.value === 'nfs' ? 'Export path' : 'Share name' }}
+          </label>
+          <input id="backupShare" type="text" class="form-control" formControlName="share"
+                 [placeholder]="backupTargetForm.controls.kind.value === 'nfs' ? '/volume1/backup' : 'backup'"
+                 autocomplete="off" />
+        </div>
+        <div class="col-md-6" *ngIf="backupTargetForm.controls.kind.value === 'smb'">
+          <label class="form-label fw-semibold" for="backupUser">Username</label>
+          <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
+        </div>
+        <div class="col-md-6" *ngIf="backupTargetForm.controls.kind.value === 'smb'">
+          <label class="form-label fw-semibold" for="backupPassword">Password</label>
+          <input id="backupPassword" type="password" class="form-control" formControlName="password"
+                 [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+                 autocomplete="new-password" />
+        </div>
+        <div class="col-12">
+          <label class="form-label fw-semibold" for="backupOptions">
+            Extra mount options <span class="fw-normal text-body-secondary">(optional)</span>
+          </label>
+          <input id="backupOptions" type="text" class="form-control" formControlName="options"
+                 placeholder="vers=2.1" autocomplete="off" />
+          <div class="form-text">
+            Only needed for unusual setups. SMB defaults to version 3.0 — older
+            NAS boxes may need <code>vers=2.1</code> or <code>vers=1.0</code>.
+          </div>
+        </div>
+      </ng-container>
+
+      <!-- Google Drive -->
+      <ng-container *ngIf="backupTargetForm.controls.kind.value === 'googledrive'">
+        <div class="col-md-8">
+          <label class="form-label fw-semibold" for="backupAuthId">AuthID</label>
+          <input id="backupAuthId" type="password" class="form-control" formControlName="authId"
+                 [placeholder]="backupTarget?.authIdConfigured ? 'configured — leave blank to keep' : 'not set'"
+                 autocomplete="new-password" />
+          <div class="form-text">
+            Get one from
+            <a [href]="backupTarget?.oauthUrl" target="_blank" rel="noopener noreferrer">Duplicati's Google
+            authorisation page</a>, sign in, and paste the token here.
+          </div>
+        </div>
+        <div class="col-md-4">
+          <label class="form-label fw-semibold" for="backupFolder">Folder</label>
+          <input id="backupFolder" type="text" class="form-control" formControlName="folder"
+                 placeholder="homelab-backups" autocomplete="off" />
+        </div>
+        <div class="col-12">
+          <div class="alert alert-secondary small mb-0">
+            Google Drive is not mounted — Duplicati talks to it directly, so this
+            page cannot verify it. Set it as the destination on the backup job in
+            Duplicati and use its own <strong>Test connection</strong> there.
+          </div>
+        </div>
+      </ng-container>
+
+      <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
+        <button type="submit" class="btn btn-primary" [disabled]="savingBackupTarget">
+          {{ savingBackupTarget ? 'Saving…' : 'Save destination' }}
+        </button>
+        <button type="button" class="btn btn-outline-secondary"
+                *ngIf="backupTargetIsMounted"
+                [disabled]="testingBackupTarget || !backupTarget?.configured" (click)="testBackupTarget()">
+          {{ testingBackupTarget ? 'Testing…' : 'Test destination' }}
+        </button>
+        <span
+          *ngIf="backupTargetFeedback"
+          class="small"
+          [ngClass]="{
+            'text-success': backupTargetFeedback.type === 'success',
+            'text-danger': backupTargetFeedback.type === 'danger',
+            'text-body-secondary': backupTargetFeedback.type === 'info'
+          }"
+        >
+          {{ backupTargetFeedback.message }}
+        </span>
+      </div>
+
+      <div *ngIf="backupTargetTestResult" class="col-12">
+        <p class="small mb-0" [ngClass]="backupTargetTestResult.success ? 'text-success' : 'text-danger'">
+          {{ backupTargetTestResult.detail }}
+        </p>
+      </div>
+    </form>
+  </div>
+</section>

@@ -23,7 +23,15 @@ services:
       - "homepage.description=Encrypted offsite/cloud backup"
     volumes:
       - ./data/config:/config
-      - ./data/backups:/backups
+      # Where backups actually land. Chosen in the dashboard (Settings ->
+      # Backup destination) and written here as three values, because Docker's
+      # local driver takes the same three options for a bind mount, an NFS
+      # export and an SMB share — see utils/backupTarget.ts.
+      #
+      # The default is deliberately still a local directory so a fresh install
+      # works, but it is on the SAME DISK as the data it protects. That guards
+      # against deleting a file and nothing else; pick a real destination.
+      - backup-target:/backups
       # The managed apps/ tree (per-app data + .env) mounted read-only as a
       # backup source, so Duplicati has something to back up out of the box.
       # APPS_DIR is the absolute host path when the dashboard starts this;
@@ -35,3 +43,11 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+
+volumes:
+  backup-target:
+    driver: local
+    driver_opts:
+      type: ${BACKUP_MOUNT_TYPE:-none}
+      o: ${BACKUP_MOUNT_OPTIONS:-bind}
+      device: ${BACKUP_MOUNT_DEVICE:-./data/backups}

@@ -7742,3 +7742,84 @@ Split by what each tool is good at:
 **Priority**: this is the highest-value outstanding work in the project.
 Everything else built recently is recoverable by re-running `start.sh`; the
 data is not.
+
+## 67. Backup destination, chosen in the dashboard
+
+Answers §66.5's open question — where backups go — with the user's requirement:
+another disk, a NAS, a network drive, or Google Drive, all selectable in the UI.
+
+### 67.1 Two families, and the difference is structural
+
+| Family | Kinds | How it works |
+|---|---|---|
+| **Mounted** | disk, SMB, NFS | The kernel mounts it; Duplicati just sees a directory. Testable here. |
+| **Duplicati backend** | Google Drive | No kernel filesystem exists for it. Duplicati speaks the API itself via a target URL. Nothing to mount. |
+
+Google Drive was added on request *after* the mounted design was built, and it
+does not fit it — which is why it became a second family rather than a fourth
+option. `toMountSpec()` **throws** for a backend kind rather than returning a
+plausible-looking spec: a volume built from one would be accepted by Docker and
+fail only when a backup ran.
+
+### 67.2 One volume shape serves all three mounted kinds
+
+Docker's local driver takes the same three options regardless of protocol,
+verified before building on it:
+
+```
+disk  type=none  o=bind                    device=/mnt/backups
+nfs   type=nfs   o=addr=10.0.0.5,rw        device=:/volume1/backup
+smb   type=cifs  o=username=…,vers=3.0,…   device=//10.0.0.5/backup
+```
+
+So `apps/duplicati/docker-compose.yml` needs **one** templated volume driven by
+three env vars, not a branch per protocol. The old `./data/backups:/backups`
+bind — same disk as the data — is now the fallback default, documented as
+protecting against a deleted file and nothing else.
+
+Two defaults that prevent common, badly-reported failures:
+
+- **`vers=3.0` for SMB.** SMB1 is disabled by default everywhere now; omitting
+  a version makes the kernel negotiate down and fail with a bare "permission
+  denied" that reads exactly like wrong credentials.
+- **`uid=1000,gid=1000`.** Without them the share mounts and Duplicati cannot
+  write to it.
+
+Both are skipped if the user supplied their own, so the escape hatch still wins.
+
+### 67.3 The test actually mounts and writes
+
+`POST /settings/backup-target/test` creates a throwaway volume with the real
+options, runs a container that writes and deletes a probe file, then removes
+the volume. Creating the volume proves nothing on its own — Docker accepts the
+options without touching the network and mounts lazily — so **the write is the
+test**.
+
+Kernel mount errors are terse and routinely misread, so failures are translated:
+"permission denied" on SMB suggests credentials, on NFS suggests the export is
+not shared to this host; "invalid argument" suggests an SMB version mismatch.
+
+For Google Drive the endpoint returns **success with an explicit caveat** rather
+than a green tick that proves nothing: Duplicati reaches it directly, so this
+dashboard cannot verify it, and the UI says to use Duplicati's own
+"Test connection" on the job.
+
+### 67.4 Guard-rails
+
+- A `disk` path under `/home`, `/root` or `/var/lib/docker` is **rejected** —
+  it dies with the machine, defeating the point.
+- A comma in a username or password is rejected: mount options are
+  comma-separated, so it would silently corrupt the mount rather than fail.
+- Passwords and the Google AuthID are write-only in the API — reads report only
+  whether they are set.
+
+Twelve tests over the mount specs, the target URL, family separation and the
+guard-rails. **160/160.** Verified live end to end: a real bind destination
+created a volume, mounted it, wrote through it and cleaned up.
+
+### 67.5 Still to do
+
+This chooses *where*. §66's dump orchestration — making the app databases
+consistent before they are copied — is still open, and remains the more
+important half. A destination without consistent dumps still backs up torn
+SQLite and live Postgres files.

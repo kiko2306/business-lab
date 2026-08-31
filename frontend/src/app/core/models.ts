@@ -318,3 +318,39 @@ export interface MailTestResponse {
   smtp: { ok: boolean; detail: string };
   imap: { ok: boolean; detail: string } | null;
 }
+
+export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 'googledrive';
+
+/** GET /settings/backup-target. Secrets report only whether they are set. */
+export interface BackupTargetSettings {
+  configured: boolean;
+  kind: BackupTargetKind;
+  path: string | null;
+  server: string | null;
+  share: string | null;
+  username: string | null;
+  passwordConfigured: boolean;
+  options: string | null;
+  folder: string | null;
+  authIdConfigured: boolean;
+  /** Where the user obtains a Google Drive AuthID. */
+  oauthUrl: string;
+}
+
+export interface BackupTargetInput {
+  kind: BackupTargetKind;
+  path?: string;
+  server?: string;
+  share?: string;
+  username?: string;
+  password?: string;
+  options?: string;
+  authId?: string;
+  folder?: string;
+}
+
+export interface BackupTargetTestResponse {
+  success: boolean;
+  message: string;
+  detail: string;
+}
