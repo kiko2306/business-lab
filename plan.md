@@ -6760,9 +6760,12 @@ regressions across the estate.
 
 ### 56.6 Left to do
 
-- A leftover **Access application for `ssh-web`** almost certainly still exists
-  and should be removed from the Zero Trust dashboard by hand — this token
-  cannot enumerate or delete it.
+- ~~A leftover **Access application for `ssh-web`**~~ — **LEAVE IT ALONE.**
+  User confirmed 2026-08-31 that this Access application is **shared with
+  another tunnel** on the same Zero Trust org (`portoinf-servers`, which also
+  fronts the `pi` / `pi-srv-live-01` / `pbordo-redirects` / `pipoka-design`
+  tunnels). It is not an orphan of this project's `ssh-web` hostname, and
+  deleting it would break something else. Do not "clean it up".
 - `sshd` still has **password authentication enabled**. Disabling it is now
   safe *once the user confirms the wetty terminal works*, because wetty
   authenticates by key and is unaffected. Personal machines should generate
