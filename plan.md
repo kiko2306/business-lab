@@ -5733,3 +5733,45 @@ services.
 silently move that app's primary hostname. Any service whose first-declared
 container is not the web UI needs `exposurePortEnvVar`. Worth auditing the rest
 of `apps/` for the same shape.
+
+### 48.8 Audit: which other apps have §48.7's "first port wins" trap
+
+Swept every service in `services.ts` for the same shape — more than one
+published port and no `exposurePortEnvVar`, i.e. relying on compose ordering to
+pick the primary hostname's upstream. The audit replicated
+`getPublishedUpstreamPort`'s own `HOST_PORT_PATTERN` and `resolveComposeFile`'s
+filename fallback rather than approximating them, so it reflects what the code
+actually does.
+
+Result — **one** hit:
+
+| service | ports (in file order) | verdict |
+|---|---|---|
+| `netbird-vpn` | signal, dashboard, management | pinned in §48.7 |
+| `nginx-proxy-manager` | proxy `:80`, admin `:81` | already pinned (`NPM_ADMIN_PORT`) |
+| `pihole` | DNS tcp, DNS udp, web | already pinned (`PIHOLE_WEB_PORT`) |
+| **`portainer`** | **`9000` HTTP, `9443` HTTPS** | **was unpinned** |
+| all others | single published port | not affected |
+
+`portainer` was working, but only by luck of ordering: HTTP is declared first,
+so "first port wins" happened to choose correctly. Swap the two lines and
+exposure would silently move to Portainer's own TLS listener, where NPM's plain
+HTTP `proxy_pass` would be talking to a TLS socket. Pinned
+`exposurePortEnvVar: 'PORTAINER_HTTP_PORT'` — behaviour-neutral today,
+confirmed by re-provisioning and seeing the upstream stay `9000`.
+
+Two notes worth keeping:
+
+- The audit initially reported `nginx-proxy-manager` and `paperless` as having
+  no compose file. That was a flaw in the first pass, not a real finding: both
+  use `compose.yaml`, and `resolveComposeFile` tries a list of candidate
+  filenames beyond the configured one. Re-run with that fallback, both resolve
+  correctly. Recorded because the same mistake is easy to repeat when scripting
+  against `composePath` directly.
+- Everything else in `apps/` publishes exactly one port, so the trap can only
+  reappear when a second `ports:` entry is added to an existing app — which is
+  precisely how §48.7 happened. **Adding a published port to a multi-container
+  app is the moment to check `exposurePortEnvVar` is set.**
+
+Suite 122/122; all services verified serving afterwards
+(`portainer` 200, NetBird gRPC trailers still arriving).

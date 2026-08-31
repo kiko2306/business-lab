@@ -316,6 +316,14 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     icon: 'container',
     category: 'Monitoring & Management',
     composePath: 'apps/portainer/docker-compose.yml',
+    // Portainer publishes both 9000 (HTTP) and 9443 (its own TLS listener).
+    // The HTTP one is what belongs behind NPM — proxying plain HTTP at 9443
+    // would just garble a TLS handshake. It happens to be declared first, so
+    // "first port in the file" already picks it, but pinning it removes the
+    // dependency on that ordering: reorder the two lines and exposure would
+    // silently move to the TLS port. Same trap that pointed netbird-vpn at
+    // signal (see the comment on netbird-vpn above).
+    exposurePortEnvVar: 'PORTAINER_HTTP_PORT',
     healthCheck: {
       enabled: false,
     },
