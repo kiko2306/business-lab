@@ -3,7 +3,7 @@ services:
     image: lscr.io/linuxserver/grocy:latest
     restart: unless-stopped
     ports:
-      - "${GROCY_PORT:-8012}:80"
+      - "${GROCY_PORT:-10170}:80"
     environment:
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
@@ -12,7 +12,7 @@ services:
       - "homepage.group=Productivity"
       - "homepage.name=Grocy"
       - "homepage.icon=grocy.png"
-      - "homepage.href=http://localhost:${GROCY_PORT:-8012}"
+      - "homepage.href=http://localhost:${GROCY_PORT:-10170}"
       - "homepage.description=Pantry/household stock manager (expiration dates, shopping list)"
     volumes:
       # DB, uploaded files, PHP config — everything grocy owns.

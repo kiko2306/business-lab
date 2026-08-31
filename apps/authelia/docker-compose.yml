@@ -18,7 +18,7 @@ services:
       - "--config.experimental.filters"
       - "template"
     ports:
-      - "${AUTHELIA_PORT:-9091}:9091"
+      - "${AUTHELIA_PORT:-10100}:9091"
     environment:
       TZ: ${TZ:-UTC}
       # Consumed by the {{ env "BASE_DOMAIN" }} templating in
@@ -34,7 +34,7 @@ services:
       - "homepage.group=Security"
       - "homepage.name=Authelia"
       - "homepage.icon=authelia.png"
-      - "homepage.href=http://localhost:${AUTHELIA_PORT:-9091}"
+      - "homepage.href=http://localhost:${AUTHELIA_PORT:-10100}"
       - "homepage.description=Single sign-on and 2FA gateway"
     volumes:
       - ./config:/config:ro

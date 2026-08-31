@@ -4,14 +4,14 @@ services:
     image: jellyfin/jellyfin:latest
     restart: unless-stopped
     ports:
-      - "${JELLYFIN_PORT:-8096}:8096"
+      - "${JELLYFIN_PORT:-10210}:8096"
     environment:
       TZ: ${TZ:-UTC}
     labels:
       - "homepage.group=Media & Files"
       - "homepage.name=Jellyfin"
       - "homepage.icon=jellyfin.png"
-      - "homepage.href=http://localhost:${JELLYFIN_PORT:-8096}"
+      - "homepage.href=http://localhost:${JELLYFIN_PORT:-10210}"
       - "homepage.description=Home media server"
     volumes:
       - ./data/config:/config

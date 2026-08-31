@@ -4,7 +4,7 @@ services:
     image: ghcr.io/gethomepage/homepage:latest
     restart: unless-stopped
     ports:
-      - "${HOMEPAGE_PORT:-3000}:3000"
+      - "${HOMEPAGE_PORT:-10190}:3000"
     environment:
       # Required to reach the dashboard from anything other than
       # localhost:3000 — comma-separated, no spaces, e.g. your LAN IP.

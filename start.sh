@@ -575,10 +575,140 @@ if [ "$CF_READY" = "1" ]; then
     seed_setting exposure_cloudflare_account_id "$(current_value CLOUDFLARE_ACCOUNT_ID)"
     seed_setting exposure_cloudflare_zone_id "$(current_value CLOUDFLARE_ZONE_ID)"
     seed_setting exposure_cloudflare_tunnel_id "$(current_value CLOUDFLARE_TUNNEL_ID)"
+    # NPM's admin API, where the dashboard creates proxy hosts. Derived rather
+    # than typed: the port is allocated dynamically (see the port-allocation
+    # block above), so a hardcoded value goes stale the moment it moves — and
+    # a stale value fails every exposure with ECONNREFUSED, which looks like a
+    # Cloudflare problem rather than a wrong port. The docker bridge gateway
+    # is reachable both from the backend container and from cloudflared on the
+    # host, which is what getNpmGrpcOriginUrl needs.
+    NPM_GW="$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null || true)"
+    NPM_PORT="$(app_env_value apps/nginx-proxy-manager/.env NPM_ADMIN_PORT)"
+    NPM_PORT="${NPM_PORT:-10270}"
+    [ -n "$NPM_GW" ] && seed_setting exposure_npm_api_url "http://${NPM_GW}:${NPM_PORT}"
   else
     warn "database container not found — fill the Cloudflare fields in Settings manually"
   fi
 fi
+
+# --- Authelia forward-auth upstream ---------------------------------------
+#
+# NPM's authelia-location.conf snippet hardcodes an address:port for the
+# forward-auth subrequest. Both halves are host-specific: the docker gateway
+# depends on this host's default-address-pool, and Authelia's published port
+# is allocated by the block below. A stale value here breaks authentication on
+# every protected site simultaneously, so it is re-derived on every run rather
+# than trusted.
+AUTHELIA_SNIPPET=apps/nginx-proxy-manager/snippets/authelia-location.conf
+if [ -f "$AUTHELIA_SNIPPET" ]; then
+  GW="$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null || true)"
+  AUTH_PORT="$(app_env_value apps/authelia/.env AUTHELIA_PORT)"
+  AUTH_PORT="${AUTH_PORT:-10100}"
+  if [ -n "$GW" ]; then
+    WANT="set \$upstream_authelia http://${GW}:${AUTH_PORT}/api/authz/auth-request;"
+    if ! grep -qF "$WANT" "$AUTHELIA_SNIPPET"; then
+      sed -i "s|^set \$upstream_authelia .*|${WANT}|" "$AUTHELIA_SNIPPET"
+      log "Pointed Authelia forward-auth at ${GW}:${AUTH_PORT}"
+      NPM_CID="$(docker ps -q -f name=nginx-proxy-manager 2>/dev/null | head -n1 || true)"
+      [ -n "$NPM_CID" ] && docker exec "$NPM_CID" nginx -s reload >/dev/null 2>&1 \
+        && log "reloaded nginx to apply it" \
+        || true
+    fi
+  else
+    warn "couldn't determine the docker bridge gateway — check the address in $AUTHELIA_SNIPPET by hand"
+  fi
+fi
+
+# --- App host-port allocation ---------------------------------------------
+#
+# Every managed app publishes a host port. Left to upstream defaults these
+# collide: before this scheme, port 80 was claimed by bookstack, NPM *and*
+# speedtest, 8080 by file-browser, netbird-management and pihole-web, and
+# home-page defaulted to 3000 — the backend's own port. Colliding apps simply
+# fail to start, one at a time, as they are enabled.
+#
+# So every app's default now lives at 10100+, and this block resolves what is
+# left: if a port is already taken on this host (by another app here, or by
+# something outside this project entirely), the next free one is assigned and
+# written to that app's .env.
+#
+# Only ports whose compose default is >= 10000 are managed. That rule is what
+# protects the deliberate exceptions — NPM's 80/443 (cloudflared's origin) and
+# pihole's 53 (DNS has to be on 53) — without needing a list of them here.
+#
+# An existing value in an app's .env always wins: this must never move a port
+# the user chose in the dashboard, or renumber a working install on upgrade.
+log "Allocating host ports for managed apps"
+python3 - <<'PORTALLOCPY' || warn "port allocation failed — apps keep their compose defaults, which may collide"
+import glob, os, re, socket
+
+MANAGED_FLOOR = 10000
+
+def parse_env(path):
+    vals = {}
+    if os.path.exists(path):
+        for line in open(path, errors='replace'):
+            line = line.strip()
+            if line and not line.startswith('#') and '=' in line:
+                k, v = line.split('=', 1)
+                vals[k.strip()] = v.strip()
+    return vals
+
+def port_free(p):
+    # Bind-test rather than parsing ss: this is what actually decides whether
+    # Docker can publish the port, and it covers IPv4 and IPv6 separately.
+    for fam, addr in ((socket.AF_INET, '0.0.0.0'), (socket.AF_INET6, '::')):
+        try:
+            s = socket.socket(fam, socket.SOCK_STREAM)
+            s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            s.bind((addr, p))
+            s.close()
+        except OSError:
+            return False
+        except Exception:
+            pass
+    return True
+
+composes = sorted(glob.glob('apps/*/docker-compose.yml') + glob.glob('apps/*/compose.yaml'))
+
+# Ports already pinned in some app's .env are off-limits for everyone else.
+claimed = set()
+for f in composes:
+    for k, v in parse_env(os.path.join(os.path.dirname(f), '.env')).items():
+        if k.endswith('_PORT') and v.isdigit():
+            claimed.add(int(v))
+
+assigned = []
+for f in composes:
+    app_dir = os.path.dirname(f)
+    env_path = os.path.join(app_dir, '.env')
+    env = parse_env(env_path)
+    text = open(f, errors='replace').read()
+
+    for m in re.finditer(r'^\s*-\s*"?\$\{([A-Z0-9_]+):-(\d+)\}:\d+', text, re.M):
+        var, default = m.group(1), int(m.group(2))
+        if default < MANAGED_FLOOR:
+            continue                      # deliberate protocol port, leave alone
+        if var in env and env[var].isdigit():
+            continue                      # user's / existing choice wins
+
+        port = default
+        while (port in claimed) or (not port_free(port)):
+            port += 1
+        claimed.add(port)
+
+        lines = open(env_path, errors='replace').read().splitlines(True) if os.path.exists(env_path) else []
+        if not any(l.startswith(var + '=') for l in lines):
+            if lines and not lines[-1].endswith('\n'):
+                lines[-1] += '\n'
+            lines.append(f'{var}={port}\n')
+            open(env_path, 'w').writelines(lines)
+        if port != default:
+            assigned.append(f'{os.path.basename(app_dir)}: {var}={port} (default {default} was taken)')
+
+for line in assigned:
+    print('==> ' + line)
+PORTALLOCPY
 
 # --- Web terminal (wetty) key ---------------------------------------------
 #

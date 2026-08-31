@@ -5,7 +5,7 @@ services:
     restart: unless-stopped
     command: serve
     ports:
-      - "${NTFY_PORT:-8010}:80"
+      - "${NTFY_PORT:-10290}:80"
     environment:
       TZ: ${TZ:-UTC}
       # ntfy builds the web app's base href, notification click links and
@@ -22,7 +22,7 @@ services:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=ntfy"
       - "homepage.icon=ntfy.png"
-      - "homepage.href=http://localhost:${NTFY_PORT:-8010}"
+      - "homepage.href=http://localhost:${NTFY_PORT:-10290}"
       - "homepage.description=Push notifications to phone and desktop"
     volumes:
       - ./data:/var/cache/ntfy

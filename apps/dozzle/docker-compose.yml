@@ -3,14 +3,14 @@ services:
     image: amir20/dozzle:latest
     restart: unless-stopped
     ports:
-      - "${DOZZLE_PORT:-8081}:8080"
+      - "${DOZZLE_PORT:-10140}:8080"
     environment:
       DOZZLE_AUTH_PROVIDER: ${DOZZLE_AUTH_PROVIDER:-none}
     labels:
       - "homepage.group=Infrastructure"
       - "homepage.name=Dozzle"
       - "homepage.icon=dozzle.png"
-      - "homepage.href=http://localhost:${DOZZLE_PORT:-8081}"
+      - "homepage.href=http://localhost:${DOZZLE_PORT:-10140}"
       - "homepage.description=Real-time Docker container log viewer"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro

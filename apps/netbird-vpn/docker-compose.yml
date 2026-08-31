@@ -12,7 +12,7 @@ services:
       # then fail to connect to anything). Publishing it gives the
       # netbird-vpn-signal.<base-domain> exposure something to forward to —
       # see additionalExposures on netbird-vpn in backend/src/config/services.ts.
-      - "${NETBIRD_SIGNAL_PORT:-8086}:80"
+      - "${NETBIRD_SIGNAL_PORT:-10252}:80"
     volumes:
       - ./data/signal:/var/lib/netbird
     networks:
@@ -28,7 +28,7 @@ services:
     image: netbirdio/dashboard:latest
     restart: unless-stopped
     ports:
-      - "${NETBIRD_DASHBOARD_PORT:-8081}:80"
+      - "${NETBIRD_DASHBOARD_PORT:-10251}:80"
     environment:
       # The dashboard image is a plain static file server — it has no
       # internal reverse-proxy for /api, so these are fetched directly by
@@ -85,7 +85,7 @@ services:
       # unless overridden via a --port CLI flag, which the default command
       # here doesn't set); confirmed via its own startup log line ("running
       # HTTP server and gRPC server on the same port: [::]:80").
-      - "${NETBIRD_MGMT_PORT:-8080}:80"
+      - "${NETBIRD_MGMT_PORT:-10250}:80"
     # Fetches Authelia's OIDC config over the public internet at startup —
     # bypass the host's resolver (Docker forwards to it by default) since a
     # stale negative-cached lookup there otherwise crash-loops this container
@@ -125,7 +125,7 @@ services:
     image: netbirdio/relay:latest
     restart: unless-stopped
     ports:
-      - "${NETBIRD_RELAY_PORT:-8087}:33080"
+      - "${NETBIRD_RELAY_PORT:-10253}:33080"
     environment:
       NB_LOG_LEVEL: info
       NB_LISTEN_ADDRESS: ":33080"

@@ -3,3 +3,10 @@ dist
 .angular
 .git
 *.md
+# Test-only assets: the image build runs `ng build`, never `ng test`, so
+# nothing here is needed — and excluding them keeps the build context small
+# and avoids busting the COPY layer cache on test-only edits.
+karma.conf.js
+**/*.spec.ts
+.vscode
+.idea

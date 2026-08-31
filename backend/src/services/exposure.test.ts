@@ -6,7 +6,7 @@ import { getPublishedUpstreamPort, getService } from '../config/services';
 import { deleteProxyHost, ensureProxyHost } from './npmClient';
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
-import { deprovisionServiceExposure, provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
+import { deprovisionServiceExposure, getNpmOriginUrl, provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
 import { ServiceExposureRow, ExposureGlobalConfig } from '../types';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
@@ -413,5 +413,26 @@ describe('exposure teardown', () => {
     mockedGetExposureConfig.mockResolvedValue(null);
     await deprovisionServiceExposure('paperless', 1);
     expect(mockedRemoveIngressRoute).not.toHaveBeenCalled();
+  });
+});
+
+describe('getNpmOriginUrl', () => {
+  // Regression: this used to special-case only port 81 and pass any other
+  // port straight through. When NPM's admin port was reallocated to 10270,
+  // every tunnel ingress route was repointed at the ADMIN port — so all 33
+  // public hostnames served the NPM admin UI instead of their app. An
+  // estate-wide outage plus an unintended exposure of the admin panel, from
+  // one port that "looked custom".
+  it('always targets the proxy listener, never the admin port it is given', () => {
+    // ':80' is absent from the expectations because it is http's default port
+    // and URL.toString() omits it — this is the exact string shape the tunnel
+    // ingress has always carried for non-gRPC hosts (http://<ip>).
+    expect(getNpmOriginUrl('http://10.201.0.1:81')).toBe('http://10.201.0.1');
+    expect(getNpmOriginUrl('http://10.201.0.1:10270')).toBe('http://10.201.0.1');
+    expect(getNpmOriginUrl('http://10.201.0.1:65000')).toBe('http://10.201.0.1');
+  });
+
+  it('strips any path, query or fragment', () => {
+    expect(getNpmOriginUrl('http://10.201.0.1:10270/api?x=1#y')).toBe('http://10.201.0.1');
   });
 });

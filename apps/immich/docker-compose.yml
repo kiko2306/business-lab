@@ -4,7 +4,7 @@ services:
     image: ghcr.io/immich-app/immich-server:release
     restart: unless-stopped
     ports:
-      - "${IMMICH_PORT:-2283}:2283"
+      - "${IMMICH_PORT:-10200}:2283"
     environment:
       DB_HOSTNAME: immich-db
       DB_USERNAME: ${IMMICH_DB_USER:-immich}
@@ -15,7 +15,7 @@ services:
       - "homepage.group=Media & Files"
       - "homepage.name=Immich"
       - "homepage.icon=immich.png"
-      - "homepage.href=http://localhost:${IMMICH_PORT:-2283}"
+      - "homepage.href=http://localhost:${IMMICH_PORT:-10200}"
       - "homepage.description=Photo and video backup with mobile auto-upload"
     volumes:
       - ./data/upload:/data

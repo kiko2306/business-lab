@@ -4,7 +4,7 @@ services:
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
     restart: unless-stopped
     ports:
-      - "${PAPERLESS_PORT:-8000}:8000"
+      - "${PAPERLESS_PORT:-10310}:8000"
     environment:
       PAPERLESS_REDIS: redis://paperless-redis:6379
       PAPERLESS_DBENGINE: postgresql
@@ -29,7 +29,7 @@ services:
       - "homepage.group=Productivity"
       - "homepage.name=Paperless"
       - "homepage.icon=paperless-ngx.png"
-      - "homepage.href=http://localhost:${PAPERLESS_PORT:-8000}"
+      - "homepage.href=http://localhost:${PAPERLESS_PORT:-10310}"
       - "homepage.description=Document management system"
     volumes:
       - ./data/data:/usr/src/paperless/data

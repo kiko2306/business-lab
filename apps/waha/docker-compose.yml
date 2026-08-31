@@ -7,7 +7,7 @@ services:
     image: devlikeapro/waha:${WAHA_IMAGE_TAG:-latest}
     restart: unless-stopped
     ports:
-      - "${WAHA_PORT:-3009}:3000"
+      - "${WAHA_PORT:-10400}:3000"
     environment:
       TZ: ${TZ:-UTC}
       WHATSAPP_DEFAULT_ENGINE: ${WAHA_ENGINE:-WEBJS}
@@ -29,7 +29,7 @@ services:
       - "homepage.group=Communication"
       - "homepage.name=WAHA"
       - "homepage.icon=whatsapp.png"
-      - "homepage.href=http://localhost:${WAHA_PORT:-3009}/dashboard"
+      - "homepage.href=http://localhost:${WAHA_PORT:-10400}/dashboard"
       - "homepage.description=WhatsApp HTTP API gateway"
     volumes:
       - ./data/sessions:/app/.sessions

@@ -19,7 +19,7 @@ services:
       n8n-db:
         condition: service_healthy
     ports:
-      - "${N8N_PORT:-5678}:5678"
+      - "${N8N_PORT:-10240}:5678"
     environment:
       DB_TYPE: postgresdb
       DB_POSTGRESDB_HOST: n8n-db
@@ -39,7 +39,7 @@ services:
       - "homepage.group=Productivity"
       - "homepage.name=n8n"
       - "homepage.icon=n8n.png"
-      - "homepage.href=http://localhost:${N8N_PORT:-5678}"
+      - "homepage.href=http://localhost:${N8N_PORT:-10240}"
       - "homepage.description=Workflow automation platform"
     volumes:
       - ./data/n8n:/home/node/.n8n

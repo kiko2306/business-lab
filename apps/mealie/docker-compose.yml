@@ -3,7 +3,7 @@ services:
     image: ghcr.io/mealie-recipes/mealie:latest
     restart: unless-stopped
     ports:
-      - "${MEALIE_PORT:-9925}:9000"
+      - "${MEALIE_PORT:-10230}:9000"
     environment:
       TZ: ${TZ:-UTC}
       BASE_URL: ${MEALIE_BASE_URL:-http://localhost:9925}
@@ -11,7 +11,7 @@ services:
       - "homepage.group=Productivity"
       - "homepage.name=Mealie"
       - "homepage.icon=mealie.png"
-      - "homepage.href=http://localhost:${MEALIE_PORT:-9925}"
+      - "homepage.href=http://localhost:${MEALIE_PORT:-10230}"
       - "homepage.description=Recipe manager and meal planner"
     volumes:
       - ./data:/app/data

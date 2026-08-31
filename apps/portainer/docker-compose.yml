@@ -4,13 +4,13 @@ services:
     restart: unless-stopped
     command: -H unix:///var/run/docker.sock
     ports:
-      - "${PORTAINER_HTTP_PORT:-9000}:9000"
-      - "${PORTAINER_HTTPS_PORT:-9443}:9443"
+      - "${PORTAINER_HTTP_PORT:-10330}:9000"
+      - "${PORTAINER_HTTPS_PORT:-10331}:9443"
     labels:
       - "homepage.group=Infrastructure"
       - "homepage.name=Portainer"
       - "homepage.icon=portainer.png"
-      - "homepage.href=https://localhost:${PORTAINER_HTTPS_PORT:-9443}"
+      - "homepage.href=https://localhost:${PORTAINER_HTTPS_PORT:-10331}"
       - "homepage.description=Docker container management UI"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock

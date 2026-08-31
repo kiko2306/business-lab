@@ -4,14 +4,14 @@ services:
     image: ghcr.io/home-assistant/home-assistant:stable
     restart: unless-stopped
     ports:
-      - "${HA_PORT:-8123}:8123"
+      - "${HA_PORT:-10180}:8123"
     environment:
       TZ: ${TZ:-UTC}
     labels:
       - "homepage.group=Home Automation"
       - "homepage.name=Home Assistant"
       - "homepage.icon=home-assistant.png"
-      - "homepage.href=http://localhost:${HA_PORT:-8123}"
+      - "homepage.href=http://localhost:${HA_PORT:-10180}"
       - "homepage.description=Home automation platform"
     volumes:
       - ./data:/config

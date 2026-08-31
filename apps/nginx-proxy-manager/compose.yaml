@@ -6,7 +6,7 @@ services:
     ports:
       - "${NPM_HTTP_PORT:-80}:80"
       - "${NPM_HTTPS_PORT:-443}:443"
-      - "${NPM_ADMIN_PORT:-81}:81"
+      - "${NPM_ADMIN_PORT:-10270}:81"
     environment:
       DB_MYSQL_HOST: npm-db
       DB_MYSQL_PORT: 3306
@@ -17,7 +17,7 @@ services:
       - "homepage.group=Infrastructure"
       - "homepage.name=Nginx Proxy Manager"
       - "homepage.icon=nginx-proxy-manager.png"
-      - "homepage.href=http://localhost:${NPM_ADMIN_PORT:-81}"
+      - "homepage.href=http://localhost:${NPM_ADMIN_PORT:-10270}"
       - "homepage.description=Reverse proxy and certificate management"
     volumes:
       - ./data/app:/data

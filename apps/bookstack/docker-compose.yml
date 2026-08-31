@@ -4,7 +4,7 @@ services:
     image: lscr.io/linuxserver/bookstack:latest
     restart: unless-stopped
     ports:
-      - "${BOOKSTACK_PORT:-80}:80"
+      - "${BOOKSTACK_PORT:-10120}:80"
     environment:
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
@@ -25,7 +25,7 @@ services:
       - "homepage.group=Productivity"
       - "homepage.name=BookStack"
       - "homepage.icon=bookstack.png"
-      - "homepage.href=http://localhost:${BOOKSTACK_PORT:-80}"
+      - "homepage.href=http://localhost:${BOOKSTACK_PORT:-10120}"
       - "homepage.description=Wiki and knowledge management"
     volumes:
       - ./data/app:/config

@@ -22,7 +22,7 @@ services:
     image: wettyoss/wetty:latest
     restart: unless-stopped
     ports:
-      - "${WETTY_PORT:-3030}:3000"
+      - "${WETTY_PORT:-10410}:3000"
     command:
       - --ssh-host=${WETTY_SSH_HOST:-host.docker.internal}
       - --ssh-port=${WETTY_SSH_PORT:-22}

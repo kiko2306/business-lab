@@ -10,9 +10,14 @@ WORKDIR /app
 # all, so skip the download everywhere.
 ENV PUPPETEER_SKIP_DOWNLOAD=1
 
-# Install dependencies first (cached layer)
+# Install dependencies first (cached layer).
+# npm ci, not npm install: ci installs exactly what package-lock.json pins and
+# fails if the lockfile is out of sync, so an image built today matches one
+# built next month. npm install is free to resolve newer semver-compatible
+# versions and silently rewrite the lockfile inside the build, which makes
+# builds unreproducible and lets a dependency change ship without a commit.
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 # Copy source and build
 COPY . .

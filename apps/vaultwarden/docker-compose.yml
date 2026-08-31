@@ -4,7 +4,7 @@ services:
     image: vaultwarden/server:latest
     restart: unless-stopped
     ports:
-      - "${VAULTWARDEN_PORT:-8222}:80"
+      - "${VAULTWARDEN_PORT:-10380}:80"
     environment:
       DOMAIN: ${VAULTWARDEN_DOMAIN:-http://localhost:8222}
       SIGNUPS_ALLOWED: ${VAULTWARDEN_SIGNUPS_ALLOWED:-true}
@@ -13,7 +13,7 @@ services:
       - "homepage.group=Security"
       - "homepage.name=Vaultwarden"
       - "homepage.icon=vaultwarden.png"
-      - "homepage.href=http://localhost:${VAULTWARDEN_PORT:-8222}"
+      - "homepage.href=http://localhost:${VAULTWARDEN_PORT:-10380}"
       - "homepage.description=Self-hosted password manager"
     volumes:
       - ./data:/data

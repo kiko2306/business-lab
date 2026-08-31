@@ -2,3 +2,12 @@ node_modules
 dist
 .git
 *.log
+*.md
+# Tests never run in the image (the suite runs in CI / a throwaway container),
+# so keep them out of the build context — smaller context, and a test-only
+# edit no longer invalidates the COPY layer.
+**/*.test.ts
+vitest.config.ts
+coverage
+.vscode
+.idea

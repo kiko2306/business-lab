@@ -4,7 +4,7 @@ services:
     image: lscr.io/linuxserver/duplicati:latest
     restart: unless-stopped
     ports:
-      - "${DUPLICATI_PORT:-8200}:8200"
+      - "${DUPLICATI_PORT:-10150}:8200"
     environment:
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
@@ -19,7 +19,7 @@ services:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Duplicati"
       - "homepage.icon=duplicati.png"
-      - "homepage.href=http://localhost:${DUPLICATI_PORT:-8200}"
+      - "homepage.href=http://localhost:${DUPLICATI_PORT:-10150}"
       - "homepage.description=Encrypted offsite/cloud backup"
     volumes:
       - ./data/config:/config

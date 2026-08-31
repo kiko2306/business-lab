@@ -4,12 +4,12 @@ services:
     image: louislam/uptime-kuma:1
     restart: unless-stopped
     ports:
-      - "${UPTIME_KUMA_PORT:-3001}:3001"
+      - "${UPTIME_KUMA_PORT:-10370}:3001"
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Uptime Kuma"
       - "homepage.icon=uptime-kuma.png"
-      - "homepage.href=http://localhost:${UPTIME_KUMA_PORT:-3001}"
+      - "homepage.href=http://localhost:${UPTIME_KUMA_PORT:-10370}"
       - "homepage.description=Uptime and status monitoring with alerts"
     volumes:
       - ./data:/app/data

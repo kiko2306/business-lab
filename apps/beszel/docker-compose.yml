@@ -3,7 +3,7 @@ services:
     image: henrygd/beszel:latest
     restart: unless-stopped
     ports:
-      - "${BESZEL_PORT:-8090}:8090"
+      - "${BESZEL_PORT:-10110}:8090"
     environment:
       # First-run only: seeds Beszel's own login on an empty database so the
       # agent's universal token can be attached to an account with no manual
@@ -15,7 +15,7 @@ services:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Beszel"
       - "homepage.icon=beszel.png"
-      - "homepage.href=http://localhost:${BESZEL_PORT:-8090}"
+      - "homepage.href=http://localhost:${BESZEL_PORT:-10110}"
       - "homepage.description=Lightweight server monitoring hub"
     volumes:
       - ./data:/beszel_data
@@ -76,7 +76,7 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     environment:
       LISTEN: "127.0.0.1:45876"
-      HUB_URL: "http://localhost:${BESZEL_PORT:-8090}"
+      HUB_URL: "http://localhost:${BESZEL_PORT:-10110}"
       TOKEN_FILE: /beszel_data/universal_token
       KEY_FILE: /beszel_data/id_ed25519.pub
       SYSTEM_NAME: "${BESZEL_SYSTEM_NAME:-homelab}"

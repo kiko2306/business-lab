@@ -16,6 +16,9 @@
  * whenever the parent service's exposure is enabled — no separate toggle.
  */
 
+import fs from 'fs';
+import path from 'path';
+import { parseEnvFile } from '../utils/envFile';
 import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
@@ -104,19 +107,48 @@ interface ProvisioningResult {
   lastError?: string | null;
 }
 
-function getNpmOriginUrl(npmApiUrl: string): string {
+export function getNpmOriginUrl(npmApiUrl: string): string {
   const url = new URL(npmApiUrl);
 
-  // NPM's admin API runs on port 81, while its proxy listener is port 80.
-  // A custom API port is retained because it may be a reverse-proxied endpoint.
-  if (url.port === '81') {
-    url.port = '80';
-  }
+  // The tunnel must reach NPM's PROXY listener, not its admin API. Those are
+  // two different ports on the same host, and the setting we are handed is
+  // the admin one.
+  //
+  // This used to special-case only port 81 (NPM's stock admin port) and pass
+  // anything else through unchanged. That silently broke the moment the admin
+  // port was reallocated: every ingress route was repointed at the admin port,
+  // so every public hostname served the NPM admin UI instead of its app —
+  // one wrong port turning into an estate-wide outage *and* an unintended
+  // exposure of the admin panel.
+  //
+  // Now the proxy port is read from NPM's own env (NPM_HTTP_PORT), which is
+  // the same value its compose file publishes, and only falls back to 80.
+  url.port = getNpmProxyPort();
   url.pathname = '';
   url.search = '';
   url.hash = '';
 
   return url.toString().replace(/\/$/, '');
+}
+
+/**
+ * NPM's public HTTP listener port, from its own .env. Deliberately not
+ * inferred from the admin URL: they are independent, and NPM_HTTP_PORT is a
+ * documented fixed exception (cloudflared's origin) while the admin port is
+ * dynamically allocated.
+ */
+function getNpmProxyPort(): string {
+  try {
+    const envPath = path.join(process.cwd(), 'apps', 'nginx-proxy-manager', '.env');
+    if (fs.existsSync(envPath)) {
+      const port = parseEnvFile(envPath)['NPM_HTTP_PORT'];
+      if (port && /^\d+$/.test(port)) return port;
+    }
+  } catch {
+    // Fall through to the default — a missing or unreadable .env must not
+    // break provisioning, and 80 is NPM's published default.
+  }
+  return '80';
 }
 
 // gRPC needs cloudflared to actually reach the origin over TLS+HTTP2/ALPN —

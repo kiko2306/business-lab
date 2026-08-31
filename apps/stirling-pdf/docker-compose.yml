@@ -4,7 +4,7 @@ services:
     image: stirlingtools/stirling-pdf:latest
     restart: unless-stopped
     ports:
-      - "${STIRLING_PDF_PORT:-8009}:8080"
+      - "${STIRLING_PDF_PORT:-10360}:8080"
     environment:
       TZ: ${TZ:-UTC}
       # All processing is local; no login by default. Flip to true (and add
@@ -18,7 +18,7 @@ services:
       - "homepage.group=Files"
       - "homepage.name=Stirling-PDF"
       - "homepage.icon=stirling-pdf.png"
-      - "homepage.href=http://localhost:${STIRLING_PDF_PORT:-8009}"
+      - "homepage.href=http://localhost:${STIRLING_PDF_PORT:-10360}"
       - "homepage.description=Local PDF toolkit (merge, split, OCR, sign, convert)"
     volumes:
       # OCR language packs, custom app config, uploaded custom files, pipelines.

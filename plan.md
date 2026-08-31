@@ -6902,3 +6902,99 @@ also not evidence of failure — it means nothing has tripped a scenario.
 
 Check `acquis.d/` before concluding CrowdSec is doing nothing. This was very
 nearly filed as a security finding.
+
+## 59. Host ports moved to 10100+, allocated by start.sh
+
+### 59.1 This was fixing live breakage, not tidying
+
+Upstream defaults collided outright. Three apps could not run together:
+
+| port | claimed by |
+|---|---|
+| 80 | bookstack, nginx-proxy-manager, speedtest |
+| 8080 | file-browser, netbird-management, pihole-web |
+| 8081 | dozzle, netbird-dashboard |
+| 3000 | home-page **and the backend itself** |
+
+Evidence it had been hurting: several live `.env` files already carried
+hand-picked ports (bookstack `9976`, speedtest `9876`, dozzle `8083`,
+nextcloud `8084`, pihole `8082`) — someone had been manually working around
+collisions, app by app.
+
+### 59.2 The scheme
+
+- **10000–10099** reserved for the core stack (`FRONTEND_PORT=10001`).
+- **10100+**, alphabetical, step 10, one block per app — 36 variables,
+  `10100`–`10410`, no duplicates.
+- **Three deliberate exceptions stay below 10000**: NPM `80`/`443`
+  (cloudflared's origin) and pihole `53` (DNS must be on 53).
+
+`start.sh` gained an allocator that reads each compose file, and for any
+`${VAR:-default}` where **default ≥ 10000**, assigns the first free port
+(bind-tested on IPv4 and IPv6, and cross-checked against ports other apps have
+pinned) into that app's `.env`.
+
+Two properties worth keeping:
+
+- **"Only manage ports ≥ 10000" is what protects the exceptions.** No list of
+  special cases to maintain — NPM's 80/443 and pihole's 53 are simply below
+  the floor.
+- **An existing `.env` value always wins.** Upgrades never renumber a working
+  install, and a port chosen in the dashboard is never moved.
+
+### 59.3 Two hidden couplings the port move exposed
+
+Both were pre-existing fragility that only surfaced when a port actually moved.
+
+**Authelia's forward-auth upstream.** `apps/nginx-proxy-manager/snippets/`
+`authelia-location.conf` hardcoded `http://10.201.0.1:9091`. Moving Authelia
+would have broken forward-auth on **every protected site at once**. The file is
+tracked but was never templated, so it also hardcoded this host's docker
+gateway — the [[docker-address-pool-gateway]] problem again. `start.sh` now
+rewrites that line on every run from the real gateway and `AUTHELIA_PORT`, and
+reloads nginx.
+
+**`exposure_npm_api_url` was never seeded.** A fresh install required typing
+it by hand. `start.sh` now derives it from the gateway and the allocated
+`NPM_ADMIN_PORT`.
+
+### 59.4 The bug I introduced, and why it was nasty
+
+Moving NPM's admin port from `81` to `10270` broke every public hostname. The
+cause was in `getNpmOriginUrl`:
+
+```ts
+if (url.port === '81') { url.port = '80'; }   // only 81 was handled
+```
+
+It maps NPM's **admin** URL to its **proxy** listener, but special-cased the
+stock admin port and passed anything else through unchanged. With the admin
+port at `10270`, all 33 ingress rules were repointed at NPM's admin port — so
+every public hostname served **the NPM admin UI** instead of its app. An
+estate-wide outage *and* an unintended exposure of the admin panel, from a
+single value that "looked custom".
+
+Two things made it hard to see: it failed *identically* for every host (so it
+looked like a Cloudflare problem, not a port one), and NPM answered `302`
+correctly when queried directly — only the path through the tunnel was wrong.
+
+Fixed by reading `NPM_HTTP_PORT` from NPM's own `.env` rather than inferring
+the proxy port from the admin URL, since the two are independent: the HTTP port
+is a fixed exception, the admin port is dynamically allocated. Regression test
+added asserting `81`, `10270` and `65000` all resolve to the proxy listener.
+
+**Lesson**: a function that special-cases one known value and silently passes
+everything else through is a latent bug the moment that value becomes
+configurable. The port allocation made a previously-constant value variable,
+and every place that assumed the constant broke.
+
+### 59.5 Verified
+
+All 34 exposures re-provisioned onto ports ≥ 10000, zero remaining below.
+Suite **134/134**, `tsc` and `bash -n` clean.
+
+One methodology note: an early check used
+`curl --resolve <host>:443:<cloudflare-ip>`, which returned `200` for
+*everything* including hosts that should redirect — making a broken estate
+look healthy and, briefly, making a working one look like an auth bypass.
+Comparing NPM directly against the public path is what separated the two.

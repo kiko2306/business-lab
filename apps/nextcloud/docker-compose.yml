@@ -4,7 +4,7 @@ services:
     image: nextcloud:latest
     restart: unless-stopped
     ports:
-      - "${NEXTCLOUD_PORT:-8082}:80"
+      - "${NEXTCLOUD_PORT:-10260}:80"
     environment:
       POSTGRES_HOST: nextcloud-db
       POSTGRES_DB: ${NEXTCLOUD_DB_NAME:-nextcloud}
@@ -23,7 +23,7 @@ services:
       - "homepage.group=Media & Files"
       - "homepage.name=Nextcloud"
       - "homepage.icon=nextcloud.png"
-      - "homepage.href=http://localhost:${NEXTCLOUD_PORT:-8082}"
+      - "homepage.href=http://localhost:${NEXTCLOUD_PORT:-10260}"
       - "homepage.description=File sync, calendar, and contacts"
     volumes:
       - ./data/app:/var/www/html

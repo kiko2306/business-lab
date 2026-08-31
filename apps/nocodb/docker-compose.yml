@@ -4,7 +4,7 @@ services:
     image: nocodb/nocodb:latest
     restart: unless-stopped
     ports:
-      - "${NOCODB_PORT:-8011}:8080"
+      - "${NOCODB_PORT:-10280}:8080"
     environment:
       # NocoDB's own metadata DB. Keep NOCODB_DB_PASSWORD alphanumeric — it is
       # substituted into this URL-style connection string.
@@ -22,7 +22,7 @@ services:
       - "homepage.group=Data"
       - "homepage.name=NocoDB"
       - "homepage.icon=nocodb.png"
-      - "homepage.href=http://localhost:${NOCODB_PORT:-8011}"
+      - "homepage.href=http://localhost:${NOCODB_PORT:-10280}"
       - "homepage.description=Airtable-style database over Postgres"
     volumes:
       - ./data/nocodb:/usr/app/data

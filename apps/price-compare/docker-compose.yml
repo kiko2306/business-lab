@@ -3,7 +3,7 @@ services:
     build: ./app
     restart: unless-stopped
     ports:
-      - "${PRICE_COMPARE_PORT:-8015}:3000"
+      - "${PRICE_COMPARE_PORT:-10340}:3000"
     environment:
       # Defaults to Portugal specifically (not UTC like the dashboard-wide
       # default) — this app's daily scheduled update (server.js) fires at
@@ -43,7 +43,7 @@ services:
       - "homepage.group=Productivity"
       - "homepage.name=Price Compare"
       - "homepage.icon=mdi-cart-outline.png"
-      - "homepage.href=http://localhost:${PRICE_COMPARE_PORT:-8015}"
+      - "homepage.href=http://localhost:${PRICE_COMPARE_PORT:-10340}"
       - "homepage.description=Compare grocery prices across Continente, Pingo Doce, Lidl, Auchan"
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
