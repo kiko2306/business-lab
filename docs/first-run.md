@@ -50,16 +50,28 @@ tell you to re-run interactively — they never hang waiting for input.
 
 ## What is reachable when it finishes
 
-**The dashboard, and only the dashboard.**
+**The dashboard, and only the dashboard** — on the host, and publicly:
 
 ```
-http://<this-host>:10001
+http://<this-host>:10001          always
+https://homelab.<your-domain>     once the tunnel is up
 ```
 
 That is deliberate but easy to misread as a failure. `start.sh` brings up the
 *core stack* — dashboard frontend, backend, database, docker-socket-proxy —
 plus Tailscale, because NetBird signalling depends on it. Every other app is
 started from the dashboard, so nothing else is running or published yet.
+
+`start.sh` publishes the dashboard's own hostname itself, and does it
+differently from every other app: the tunnel routes **straight to
+`localhost:<FRONTEND_PORT>`, bypassing Nginx Proxy Manager**. Routing it
+through NPM would make the one tool you would use to repair a broken NPM
+depend on NPM being healthy. The subdomain defaults to `homelab` and can be
+changed with `DASHBOARD_SUBDOMAIN` in the root `.env`.
+
+The **API is not published**. The frontend proxies `/api` to the backend over
+the compose network, so a public API hostname would add attack surface without
+adding capability.
 
 Your first login sets the dashboard's own admin account (it is in setup mode
 until you do).

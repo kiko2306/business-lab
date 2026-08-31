@@ -7107,3 +7107,38 @@ already says not to do.
 allocator, which creates an app's `.env` when one is missing rather than
 assuming it exists — verified against a scratch copy of portainer's compose
 file. A `.env.example` was added too, so portainer matches every other app.
+
+### 60.4 start.sh now publishes the dashboard itself
+
+Found while answering "does the dashboard depend on NPM?". It does not — on
+either path. Locally the root compose publishes the frontend directly; publicly
+the tunnel rule points at `http://localhost:<FRONTEND_PORT>`, not at NPM. That
+is the §58 property, and it is what keeps the dashboard usable when NPM is the
+thing that is broken.
+
+But two things only worked on *this* host, by accident of history:
+
+**`FRONTEND_PORT` defaulted to `80`.** Which is NPM's port. A fresh install
+would have collided the moment NPM was started — before the user had done
+anything wrong. Both core ports now sit in the reserved range
+(`BACKEND_PORT=10000`, `FRONTEND_PORT=10001`). Moving the backend is safe
+because the frontend reaches it at `http://backend:3000` over the compose
+network; `BACKEND_PORT` only controls the host publish.
+
+**`start.sh` never published the dashboard.** The hostname on this host was
+hand-made. So on a new VPS the dashboard would have been LAN-only, with nothing
+saying so. `start.sh` now creates its ingress rule and DNS record — pointed at
+`localhost`, preserving the no-NPM property — with the subdomain overridable
+via `DASHBOARD_SUBDOMAIN` (default `homelab`).
+
+The API is deliberately **not** published: the frontend proxies `/api` to the
+backend over the compose network, so a public API hostname is pure attack
+surface.
+
+**The dangerous part was the merge.** The dashboard's exposure system writes
+app rules into the same tunnel configuration, so a blind `PUT` from `start.sh`
+would delete every one of them. The block reads the current config, replaces
+only its own hostname, re-appends the catch-all last, and exits without writing
+when the rule is already correct. Verified against the live 36-rule config
+before shipping: idempotent path exits 2 with no write; the add path preserves
+all 36 originals, adds one, and leaves exactly one catch-all in last position.

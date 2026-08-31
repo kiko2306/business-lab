@@ -7,7 +7,7 @@ to it, so these are internal plumbing — you reach apps by hostname, not port.
 
 | Range | Use |
 |---|---|
-| `10000`–`10099` | Core stack (`FRONTEND_PORT=10001`) |
+| `10000`–`10099` | Core stack (`BACKEND_PORT=10000`, `FRONTEND_PORT=10001`) |
 | `10100`+ | Managed apps, alphabetical, in steps of 10 |
 | below `10000` | **Only** the three exceptions below |
 
@@ -77,6 +77,16 @@ hand edit can leave its copy disagreeing with the app's.
 
 These are the defaults. The allocator may have moved one on your host if
 something else already held the port — check the app's `.env` for the truth.
+
+## The core stack
+
+`FRONTEND_PORT` used to default to **80**, which collided with Nginx Proxy
+Manager the moment you started it — on a fresh install, before you had done
+anything wrong. Both core ports now sit in the reserved range.
+
+`BACKEND_PORT` only controls the *host* publish. The frontend reaches the
+backend at `http://backend:3000` over the compose network, so changing it
+never affects the dashboard itself.
 
 ## Two couplings worth knowing
 

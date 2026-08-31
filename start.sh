@@ -591,6 +591,74 @@ if [ "$CF_READY" = "1" ]; then
   fi
 fi
 
+# --- Publish the dashboard itself -----------------------------------------
+#
+# Every managed app is published by the dashboard's own exposure system, which
+# routes cloudflared -> Nginx Proxy Manager -> app. The dashboard cannot use
+# that: it is not a managed app, and pointing it through NPM would make the one
+# tool you would use to repair a broken NPM depend on NPM being healthy.
+#
+# So its ingress rule goes straight to the published frontend port on
+# localhost, deliberately bypassing NPM (see plan.md §58). That keeps the
+# dashboard reachable whenever cloudflared and the container are up, whatever
+# state the proxy is in.
+#
+# The API is NOT published. The frontend proxies /api to the backend over the
+# compose network (see frontend/nginx.conf), so a public API hostname adds
+# attack surface without adding capability.
+if [ "$CF_READY" = "1" ] && [ -n "$BASE_DOMAIN" ] && [ -n "${CF_TUNNEL_ID:-}" ]; then
+  DASH_SUB="$(current_value DASHBOARD_SUBDOMAIN)"
+  DASH_SUB="${DASH_SUB:-homelab}"
+  DASH_HOST="${DASH_SUB}.${BASE_DOMAIN}"
+  DASH_PORT="$(current_value FRONTEND_PORT)"
+  DASH_PORT="${DASH_PORT:-10001}"
+
+  # Merge into the tunnel's existing ingress rather than replacing it — the
+  # dashboard writes app rules into the same config, and a blind PUT here
+  # would delete every one of them.
+  CF_CFG="$(cf_api GET "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${CF_TUNNEL_ID}/configurations")"
+  DASH_MERGED="$(printf '%s' "$CF_CFG" | DASH_HOST="$DASH_HOST" DASH_PORT="$DASH_PORT" python3 -c '
+import json, os, sys
+host, port = os.environ["DASH_HOST"], os.environ["DASH_PORT"]
+try:
+    cfg = (json.load(sys.stdin).get("result") or {}).get("config") or {}
+except Exception:
+    sys.exit(1)
+ingress = [r for r in (cfg.get("ingress") or []) if r.get("hostname")]
+want = {"hostname": host, "service": f"http://localhost:{port}"}
+existing = next((r for r in ingress if r.get("hostname") == host), None)
+if existing and existing.get("service") == want["service"]:
+    sys.exit(2)                      # already correct, nothing to write
+ingress = [r for r in ingress if r.get("hostname") != host] + [want]
+ingress.append({"service": "http_status:404"})   # catch-all must stay last
+print(json.dumps({"config": {**cfg, "ingress": ingress}}))
+' 2>/dev/null)"
+  DASH_RC=$?
+
+  if [ "$DASH_RC" = "2" ]; then
+    log "Dashboard already published at https://${DASH_HOST}"
+  elif [ -n "$DASH_MERGED" ]; then
+    if cf_api PUT "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${CF_TUNNEL_ID}/configurations" "$DASH_MERGED" >/dev/null; then
+      log "Published the dashboard at https://${DASH_HOST} (direct to localhost:${DASH_PORT}, not via NPM)"
+    else
+      warn "couldn't add the dashboard's tunnel ingress rule — reach it at http://<this-host>:${DASH_PORT} meanwhile"
+    fi
+
+    # DNS record, pointed at the tunnel. Only created when absent: an existing
+    # record may be deliberate, and overwriting someone's A record would be
+    # destructive.
+    DASH_DNS="$(cf_api GET "/zones/${CF_ZONE_ID}/dns_records?name=${DASH_HOST}" | json_field '["result"][0]["id"]')"
+    if [ -z "$DASH_DNS" ]; then
+      cf_api POST "/zones/${CF_ZONE_ID}/dns_records" \
+        "{\"type\":\"CNAME\",\"name\":\"${DASH_HOST}\",\"content\":\"${CF_TUNNEL_ID}.cfargotunnel.com\",\"proxied\":true,\"ttl\":1}" \
+        >/dev/null && log "Created the DNS record for ${DASH_HOST}" \
+        || warn "couldn't create the DNS record for ${DASH_HOST}"
+    fi
+  else
+    warn "couldn't read the tunnel configuration — skipping the dashboard's public hostname"
+  fi
+fi
+
 # --- Authelia forward-auth upstream ---------------------------------------
 #
 # NPM's authelia-location.conf snippet hardcodes an address:port for the
