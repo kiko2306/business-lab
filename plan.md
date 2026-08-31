@@ -6191,3 +6191,57 @@ access logs on a host that is *also* a peer, always check the address against
 the host's own `ip -6 addr` before attributing it to a client. Two of this
 project's conclusions have now turned on that (§48.7's "auth problem" that was
 routing, and this one).
+
+### 51.7 Two things settled before B1: the CF token, and the co-located host
+
+**Token — sufficient, no change needed.** §51.5's first open question is
+answered. The token stored in `settings.cloudflare_tunnel_token` verifies
+(`This API Token is valid and active`) and successfully lists the account's
+tunnels, which proves `Account → Cloudflare Tunnel` is live on it. With
+`Zone → DNS → Edit` also present, that covers every B1 call:
+
+| B1 step | API | permission |
+|---|---|---|
+| create tunnel B | `POST /accounts/<acct>/cfd_tunnel` | Cloudflare Tunnel: Edit |
+| add signal ingress | `PUT …/cfd_tunnel/<id>/configurations` | Cloudflare Tunnel: Edit |
+| fetch tunnel B's connector token | `GET …/cfd_tunnel/<id>/token` | Cloudflare Tunnel: Edit |
+| repoint signal's CNAME | `PATCH /zones/<zone>/dns_records/<id>` | Zone DNS: Edit |
+
+Two notes. The token also carries Workers KV/Scripts, Account Filter Lists,
+WAF, Firewall and Analytics rights it does not need — broader than
+least-privilege for a credential sitting in the app's database; worth trimming
+someday, not a blocker. And **the account hosts five tunnels**
+(`home-srv-01`, `pbordo-redirects`, `pi`, `pi-srv-live-01`, `pipoka-design`) —
+B1 adds a sixth; scope every call to the new id and leave the others alone.
+
+**The NetBird client runs on the same host as the NetBird server.** Raised by
+the user. Checked what it actually costs:
+
+- **The home peer hairpins.** `netbird-vpn-signal` / `-api` resolve on this
+  host to Cloudflare edge IPv6 (`2606:4700:…`), so the client goes
+  LAN → Cloudflare (lis/mad) → back down its own tunnel → NPM → the signal
+  container **on the same box**. That is why the server's own public IPv6
+  shows up as a "client" in the signal vhost log (§51.6).
+- **It is not disrupting the host**, which was the real risk on a box running
+  NPM, cloudflared and every container: `wt0` is up (`100.111.227.79`) but
+  installs **no** route for `192.168.1.0/24`, so there is no self-routing loop
+  from advertising the LAN it already sits on; and `resolvectl` shows `wt0`
+  with `Current Scopes: none` / `-DefaultRoute`, so netbird has **not**
+  hijacked systemd-resolved — the host still resolves via `192.168.1.1`.
+- **It is not an escape hatch.** The tempting move is split-DNS on the host
+  (`/etc/hosts` → `192.168.1.23`) so the home peer reaches signal over the LAN
+  and skips the tunnel entirely. It does not work as-is: `Signal.URI` is
+  `…:443` with `Proto: https`, and NPM serves a **self-signed** cert for that
+  hostname (`ensureGrpcCertificate`, accepted today only because cloudflared
+  sets `noTLSVerify`). The netbird client validates against the system cert
+  pool and would reject it, and `/etc/hosts` cannot redirect the port. It
+  could be made to work by issuing a real Let's Encrypt cert for
+  `netbird-vpn-signal` via NPM's DNS-01 (the token has the rights) — but it
+  would still only fix the *home* peer. The phone must reach signal publicly
+  regardless, so co-location changes nothing about the actual blocker.
+
+**The useful consequence for B1**: because the home peer's traffic takes the
+*same public path* as the phone's, `netbird status` on `home-srv-01` is a
+faithful test of the phone's experience. **B1 can be validated entirely from
+the server** — `Management: Connected` + `Signal: Connected` there means the
+phone's path works too. The phone is then a confirmation, not the experiment.
