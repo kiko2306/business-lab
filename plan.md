@@ -6348,3 +6348,91 @@ out-of-repo state that has bitten this project repeatedly.
 
 **Nothing from §51.4 (B2) should be built.** The flag it was going to add
 (`bidiStreaming` → second tunnel) is based on a premise §52.2 disproves.
+
+## 53. SOLVED — Tailscale Funnel replaces Cloudflare for signal. Both peers connected.
+
+**2026-08-31, immediately after §52.** The user rejected option A (§51.1) and
+option E (an overlay on the phone would mean two apps). Chose **G**: keep
+Cloudflare for everything else, publish **signal only** via **Tailscale
+Funnel**.
+
+Crucially G is *not* E: Funnel serves the **public internet**, so the phone
+runs **NetBird only**, exactly as before. Tailscale runs on the server, in the
+container that was already in the stack.
+
+### 53.1 The probe Cloudflare failed, Funnel passes
+
+Same request, same three-hop method as §52.2, now through
+`https://5a300b08a105.tail122b53.ts.net`:
+
+```
+HTTP/2 200
+content-type: application/grpc
+trailer: Grpc-Status, Grpc-Message, Grpc-Status-Details-Bin
+x-wiretrustee-peer-registered: 1      <-- registration succeeded
+curl exit: 124                        <-- stream stayed OPEN
+```
+
+And the control (no `x-wiretrustee-peer-id`) returns promptly with
+`grpc-status: 9` / `grpc-message: missing connection header: …` — so **trailers
+work too**, which Cloudflare's QUIC transport had also broken (§50.4).
+
+**Funnel flushes response headers on a still-open stream. Cloudflare does
+not.** That single difference is the whole problem, and it is now solved.
+
+One gotcha worth recording: the *first* Funnel request returned nothing at all,
+which briefly looked like the Cloudflare failure repeating. It was TLS cert
+provisioning on first use. A plain `GET` returned `405 allow: POST` (signal's
+gRPC server answering) and every request after that was fine. **Warm the
+hostname with one plain request before concluding anything about Funnel.**
+
+### 53.2 What changed
+
+- `tailscale funnel --bg --https=443 http://10.201.0.1:8086` on the tailscale
+  container (which could already reach signal via the docker gateway).
+  Required enabling the `funnel` node attribute — Tailscale's CLI prints a
+  one-click `login.tailscale.com/f/funnel?node=…` link that writes the ACL
+  entry.
+- `apps/netbird-vpn/data/management.json` — `Signal.URI`
+  `netbird-vpn-signal.tx-home-utils.com:443` → `5a300b08a105.tail122b53.ts.net:443`.
+- management restarted.
+
+### 53.3 Result
+
+```
+garnet_eea   (phone, Android)   peer_status_connected: 1
+home-srv-01  (routing peer)     peer_status_connected: 1
+```
+
+**Both peers connected simultaneously for the first time in the project.**
+`home-srv-01` had been stuck at `connected: 0` since 09:44 across every
+attempt in §50–§52. Both also register on the relay
+(`peer connected [peer_id: sha-…]`, two distinct ids).
+
+So the full working chain is now: management + dashboard + relay over the
+**Cloudflare** tunnel (http2, trailers intact), signal over **Tailscale
+Funnel**, relay as the WebSocket data path (§50.3), route
+`192.168.1.0/24` via `home-srv-01` (§50).
+
+### 53.4 Still to do
+
+1. **Confirm the phone actually reaches `192.168.1.1`** — peers are connected;
+   end-to-end routing is the last unverified link.
+2. **Tear down the dead B1 spike** (§52.5): `cloudflared-signal.service`,
+   `/etc/cloudflared/token-signal`, and Cloudflare tunnel B
+   `7e8771c5-a1a5-46bf-895e-d8ee9af3957a`. It carries nothing now.
+3. **Make G reproducible — currently it is NOT in the repo.** This is the
+   §46.15 footgun again, and worse than usual because the ts.net hostname is
+   generated per-node:
+   - the funnel config lives in the tailscale container's state volume, not
+     in `apps/tailscale/docker-compose.yml`;
+   - `Signal.URI` in `config/management.json.example` still points at
+     `netbird-vpn-signal.${BASE_DOMAIN}`, so a fresh `start.sh` would generate
+     a broken config;
+   - `backend/src/config/services.ts` still provisions a `signal`
+     additionalExposure through Cloudflare that is now **unused**.
+   Decide: templatise the funnel hostname (it is per-install, so it likely
+   becomes a prompt/setting like `BASE_DOMAIN`), drop the Cloudflare signal
+   exposure, and have `start.sh`/the dashboard set up Funnel.
+4. Consider whether the now-unused `netbird-vpn-signal.<domain>` Cloudflare
+   hostname and its NPM vhost should be removed.
