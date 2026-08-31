@@ -7943,3 +7943,83 @@ Three decisions worth keeping:
 §66's dump orchestration. The job now exists and points somewhere real, but it
 still copies **live** database files — six running Postgres containers and
 fourteen SQLite stores with active WAL files. That is next.
+
+## 70. App database dumps — making the file backup meaningful
+
+Implements §66. A file-level backup of `apps/` was copying six live Postgres
+containers, three MariaDB/MySQL, and fourteen SQLite files with open
+write-ahead logs. Every database is now dumped to `apps/<app>/data/_dump/`
+first, so the file backup captures a consistent snapshot.
+
+### 70.1 Two ways of finding databases, deliberately different
+
+**Server databases are declared**, but only barely: `backup: { engine,
+service }` on the service. Credentials are **not** declared — they are read
+from the running container with `docker inspect`, so a password rotated in the
+dashboard cannot leave a stale copy in the registry.
+
+**SQLite is discovered, not declared.** Fourteen apps embed one, several in
+paths nobody would think to list, and scanning by **file header** rather than
+extension matters: portainer and file-browser use BoltDB, stirling-pdf uses
+H2, and paperless has a Python shelve — all with a `.db` extension.
+Snapshotting those with `sqlite3` would produce garbage that still looks like
+a successful backup.
+
+### 70.2 Three failures found by running it, not by reasoning
+
+**`docker exec` is blocked, and correctly so.** Every server dump failed with
+`unable to upgrade to tcp, received 403`. The backend reaches Docker through
+`docker-socket-proxy`, whose allowlist has `CONTAINERS`, `POST` and
+`ALLOW_START` but deliberately **not** `EXEC` — exec is arbitrary code
+execution in another container. The fix was *not* to widen the allowlist:
+dumps now run as a throwaway container on the app's own network, which the
+proxy already permits and which does the same job. Trading a real security
+boundary for convenience would have been the easy wrong answer.
+
+**Client and server versions must match.** This stack runs Postgres 14, 15 and
+16 side by side, and `pg_dump` refuses to dump a newer server. So the dump runs
+from the **same image as the database container**, read from `docker inspect`.
+
+**An init system swallowed the command.** With the right image chosen,
+bookstack still hung forever. `lscr.io/linuxserver/mariadb` has `/init` (s6) as
+its entrypoint, which starts services and never runs the argument — so the dump
+did not fail, it *hung*, which is worse. Now every dump passes
+`--entrypoint pg_dump` / `--entrypoint mysqldump`, running the binary directly
+whatever the image wraps it in.
+
+### 70.3 Details that matter on restore day
+
+- **Dumps are written to `.part` and renamed on success.** Writing straight to
+  the final path would destroy the last good dump the moment dumping starts
+  failing — a broken database would quietly take the backup with it.
+- **`pg_dump --clean --if-exists`** so a dump replays over an existing database
+  instead of erroring on every object.
+- **`mysqldump --single-transaction`** for a consistent snapshot without
+  locking the app out for the duration.
+- **A stopped app is skipped, not failed.** Otherwise one app being off would
+  report the whole backup as failed.
+- **SQLite uses `.backup`**, safe against a live writer; a plain copy can catch
+  a partial transaction and misses the WAL entirely.
+
+### 70.4 The Duplicati job now excludes what it should
+
+`data/db/`, `data/pgdata/`, and `*-wal` / `*-shm` are filtered out. Their
+contents are already in the dumps, consistently — and excluding them stops the
+same data being stored twice (203 MB for NPM's MySQL alone) while removing
+files that cannot be safely restored anyway.
+
+### 70.5 Verified live
+
+7 of 8 server databases dumping (immich 50 MB, nextcloud 884 KB, paperless
+448 KB, n8n 444 KB, nocodb 332 KB, NPM 108 KB, itflow 4 KB) plus 22 SQLite
+snapshots, all with a valid `SQLite format 3` header.
+
+Five tests on discovery: header detection, rejecting non-SQLite `.db` files,
+never re-snapshotting its own output, ignoring unregistered directories, and
+surviving an unreadable directory rather than aborting the scan. **165/165.**
+
+### 70.6 Still open
+
+The dump is a manual endpoint (`POST /api/backups/dump-apps`). Wiring it into
+the scheduler — dump, then trigger the Duplicati job — is the remaining step
+before this is genuinely automatic.

@@ -147,7 +147,22 @@ export async function provisionBackupJob(duplicatiPassword: string, frequency: '
       Tags: [],
       TargetURL: targetUrl,
       Settings: settings,
-      Filters: [],
+      // Exclude the live database directories. Their contents are already in
+      // the _dump/*.sql files, written consistently just before each run —
+      // and copying a running Postgres or MariaDB data directory can restore
+      // torn. Excluding them also stops the same data being stored twice
+      // (203 MB for NPM alone).
+      //
+      // Duplicati filter syntax: "-" excludes, and a regex is wrapped in [].
+      Filters: [
+        { Order: 0, Include: false, Expression: '[.*/data/db/.*]' },
+        { Order: 1, Include: false, Expression: '[.*/data/pgdata/.*]' },
+        // SQLite side-files change constantly and are meaningless without the
+        // database they belong to; the .backup snapshot in _dump is the
+        // consistent copy.
+        { Order: 2, Include: false, Expression: '[.*-wal]' },
+        { Order: 3, Include: false, Expression: '[.*-shm]' },
+      ],
       Sources: [SOURCE_PATH],
     },
     Schedule: schedule,

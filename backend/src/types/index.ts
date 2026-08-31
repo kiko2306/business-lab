@@ -148,6 +148,18 @@ export interface ServiceDefinition {
   // default getPublishedUpstreamPort behavior — see its docstring) would
   // pick DNS instead. Unset for every service with just one published port.
   exposurePortEnvVar?: string;
+  // This service runs a database that must be dumped before its files are
+  // backed up — copying a live Postgres or MariaDB data directory can restore
+  // torn. Only the engine and the compose service name are declared:
+  // credentials are read from the running container, so a password rotated in
+  // the dashboard cannot leave a stale copy here. See services/appDumps.ts.
+  //
+  // SQLite apps need no declaration — they are discovered by file header.
+  backup?: {
+    engine: 'postgres' | 'mariadb' | 'mysql';
+    /** Compose service name of the database container, e.g. 'itflow-db'. */
+    service: string;
+  };
   // Which of this service's env vars receive the global mail settings (see
   // services/mailEnv.ts). Declaring them here means SMTP/IMAP credentials are
   // configured once in the dashboard instead of pasted into every app that

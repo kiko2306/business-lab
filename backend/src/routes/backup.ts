@@ -1,4 +1,5 @@
 import { Router, Request, Response } from 'express';
+import { dumpAllAppDatabases } from '../services/appDumps';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
@@ -68,6 +69,35 @@ router.post('/create', async (req: Request, res: Response) => {
     await writeAuditLog({ userId, action: 'backup_create', resource: 'backup', result: 'failure' }).catch(() => {});
     logger.error('Backup creation failed', { error: (error as Error).message, userId });
     return res.status(500).json({ error: 'Unable to create backup.' });
+  }
+});
+
+/**
+ * POST /api/backups/dump-apps
+ * Dump every app database to apps/<app>/data/_dump/ so a file-level backup of
+ * apps/ captures something consistent. Without this the file backup copies
+ * live Postgres/MariaDB data directories and SQLite files with open
+ * write-ahead logs, which can restore torn.
+ */
+router.post('/dump-apps', async (req: Request, res: Response) => {
+  try {
+    const report = await dumpAllAppDatabases();
+    await writeAuditLog({
+      userId: req.user?.id ?? null,
+      action: 'backup_create',
+      resource: 'app-databases',
+      result: report.failed === 0 ? 'success' : 'failure',
+      metadata: { ok: report.ok, failed: report.failed },
+    }).catch(() => {});
+    return res.json({
+      message: report.failed === 0
+        ? `Dumped ${report.ok} database${report.ok === 1 ? '' : 's'}.`
+        : `Dumped ${report.ok}, ${report.failed} failed.`,
+      ...report,
+    });
+  } catch (error) {
+    logger.error('App database dump failed', { error: (error as Error).message });
+    return res.status(500).json({ error: 'Unable to dump the app databases.' });
   }
 });
 
