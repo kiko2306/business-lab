@@ -5,6 +5,9 @@ Homelab Management is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL sys
 ## Documentation
 
 - Setup guide: [/docs/setup-guide.md](/docs/setup-guide.md)
+- First run — prerequisites, prompts, what's reachable: [/docs/first-run.md](/docs/first-run.md)
+- First login per app: [/docs/app-credentials.md](/docs/app-credentials.md)
+- Host ports: [/docs/ports.md](/docs/ports.md)
 - Raspberry Pi / arm64 guide: [/docs/raspberry-pi.md](/docs/raspberry-pi.md)
 - Deployment guide: [/docs/deployment-guide.md](/docs/deployment-guide.md)
 - API reference (OpenAPI): [/docs/openapi.yaml](/docs/openapi.yaml)
