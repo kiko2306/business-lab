@@ -59,6 +59,13 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // call (fetching the management server's public key) fails with
     // "failed to check SSO support: failed getting management service
     // public key". Plain proxy_pass (the default) is HTTP/1.1-only.
+    // The primary hostname must serve the DASHBOARD. Without this it would
+    // fall back to "first published port in the compose file", which is the
+    // signal container's — signal is declared first, and gained a published
+    // port when it was exposed for remote peers. That silently pointed
+    // netbird-vpn.<domain> at a gRPC service, which answers any browser GET
+    // with `invalid gRPC request method "GET"`.
+    exposurePortEnvVar: 'NETBIRD_DASHBOARD_PORT',
     // signal is gRPC too, and native clients connect to it directly using
     // whatever Signal.URI data/management.json advertises. That has to be a
     // publicly resolvable hostname or remote peers can register but never

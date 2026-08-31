@@ -5682,3 +5682,54 @@ repo line were checked live. A caveat was drafted claiming Docker doesn't
 publish a codename as new as this host's (`resolute`) — checking it found that
 Docker *does* publish it, so the claim was removed rather than shipped; the
 caveat now stands as a general possibility with a one-liner to check it.
+
+### 48.7 Regression introduced by 46.8, found by the user — dashboard hostname pointed at signal
+
+**Symptom**: `https://netbird-vpn.<domain>/` returned
+`invalid gRPC request method "GET"` immediately after the Authelia login, while
+the VPN itself worked fine from the phone.
+
+**Cause, and it was self-inflicted.** §46.8 published signal's port so remote
+peers could reach it. `getPublishedUpstreamPort` (`config/services.ts`) falls
+back to **the first published port in the compose file** when a service does
+not set `exposurePortEnvVar` — and the signal container (`netbird-vpn:`) is
+declared *first* in `apps/netbird-vpn/docker-compose.yml`. Before §46.8 it
+published nothing, so the first match was the dashboard's `8081`; afterwards it
+was signal's `8086`. Re-provisioning then silently repointed
+`netbird-vpn.<domain>` at a gRPC service.
+
+nginx answers a browser `GET` proxied to a gRPC upstream with exactly that
+error. It only showed up *after* login because the hostname is Authelia-gated,
+so the request never reached the wrong upstream until the session existed —
+which made it look like an auth problem rather than a routing one.
+
+**Fixed**: `exposurePortEnvVar: 'NETBIRD_DASHBOARD_PORT'` on `netbird-vpn` in
+`backend/src/config/services.ts`, pinning the primary hostname to the dashboard
+regardless of compose ordering. Backend rebuilt, `provisionServiceIfEnabled`
+re-run.
+
+Confirmed by isolation rather than inference:
+
+| | before | after |
+|---|---|---|
+| `netbird-vpn` → | `8086` (signal) | **`8081`** (dashboard) |
+| `netbird-vpn-api` → | `8080` | `8080` |
+| `netbird-vpn-signal` → | `8086` | `8086` |
+
+- `curl http://10.201.0.1:8081/` → `200`, 4837 bytes of the real Next.js SPA.
+- `curl http://10.201.0.1:8086/` → `405 invalid gRPC request method "GET"` —
+  the user's error string byte for byte, proving the misrouting.
+- Public URL now `302`s to Authelia, the correct pre-login behaviour.
+
+**Regression test added** (`services.test.ts`, suite now 122): a
+netbird-shaped compose fixture where an earlier *service* publishes a port,
+asserting the unqualified call returns `8086` while
+`getPublishedUpstreamPort(..., 'NETBIRD_DASHBOARD_PORT')` returns `8081`. It
+sits next to the existing pihole-shaped case, which covers the same trap for
+multiple ports on *one* service — this is the same bug one level up, across
+services.
+
+**Lesson for §48**: adding a `ports:` block to any multi-container app can
+silently move that app's primary hostname. Any service whose first-declared
+container is not the web UI needs `exposurePortEnvVar`. Worth auditing the rest
+of `apps/` for the same shape.

@@ -146,5 +146,30 @@ describe('getPublishedUpstreamPort', () => {
       expect(getPublishedUpstreamPort('paperless')).toBe(53);
       expect(getPublishedUpstreamPort('paperless', 'PIHOLE_WEB_PORT')).toBe(8080);
     });
+
+    it('picks the web port over an earlier SERVICE that publishes one (netbird-shaped)', () => {
+      // Regression: netbird-vpn's signal container is declared first in its
+      // compose file and gained a published port when signal was exposed for
+      // remote peers. "First port in the file" then resolved to signal's,
+      // silently pointing the primary hostname at a gRPC service — which
+      // answers a browser GET with `invalid gRPC request method "GET"`.
+      // Hence exposurePortEnvVar on netbird-vpn in services.ts.
+      writeCompose(
+        'services:\n' +
+          '  netbird-vpn:\n' +
+          '    ports:\n' +
+          '      - "${NETBIRD_SIGNAL_PORT:-8086}:80"\n' +
+          '  netbird-dashboard:\n' +
+          '    ports:\n' +
+          '      - "${NETBIRD_DASHBOARD_PORT:-8081}:80"\n' +
+          '  netbird-management:\n' +
+          '    ports:\n' +
+          '      - "${NETBIRD_MGMT_PORT:-8080}:80"\n'
+      );
+      expect(getPublishedUpstreamPort('paperless')).toBe(8086);
+      expect(getPublishedUpstreamPort('paperless', 'NETBIRD_DASHBOARD_PORT')).toBe(8081);
+      expect(getPublishedUpstreamPort('paperless', 'NETBIRD_MGMT_PORT')).toBe(8080);
+      expect(getPublishedUpstreamPort('paperless', 'NETBIRD_SIGNAL_PORT')).toBe(8086);
+    });
   });
 });
