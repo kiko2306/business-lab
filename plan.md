@@ -7588,3 +7588,59 @@ genuinely valuable workflow cannot avoid a credential.
 - Do these belong to n8n at all, or should the dashboard grow a generic
   "notifications" feature? Worth asking before building a pile of JSON —
   several of the rows above are arguably dashboard features, not automations.
+
+## 65. ITFlow shipped
+
+`apps/itflow/` + registry entry, deployed and verified. Nothing novel was
+needed — it is an ordinary HTTP app plus a database, which is the point: the
+existing exposure, port-allocation and secret-generation machinery covered it
+with no new mechanisms.
+
+### 65.1 What it looks like
+
+- `itfloworg/itflow:latest` (official) on **10420**, `mariadb:10.11` alongside,
+  both on their own bridge network.
+- `hiddenGeneratedSecrets: ['ITFLOW_DB_PASSWORD']` — internal to the compose
+  project, so nothing to ask the user.
+- `exposureEnvKeys.url: ['ITFLOW_URL']` + `managedEnvKeys` — ITFlow builds
+  password-reset links, ticket-reply URLs and the client portal address from
+  it, so it must follow the public hostname and is shown read-only.
+- `MARIADB_RANDOM_ROOT_PASSWORD` — the root password is never needed from
+  outside, and a random one is one fewer secret to store.
+- `./data/app` is persisted deliberately: the image downloads the application
+  source there on first boot and updates it in place, so a fresh volume means a
+  full re-download and loses upgrade state.
+
+### 65.2 Verified live
+
+```
+itflow-itflow-1      Up   0.0.0.0:10420->8080/tcp
+itflow-itflow-db-1   Up   (healthy)
+
+http://localhost:10420  ->  302        (setup wizard)
+crond processes: 1
+/etc/crontabs/apache: * * * * * /usr/bin/php84 …/cron/cron.php
+```
+
+Started through `startService`, not `docker compose` — so the managed-config
+path ran (§59.6's lesson applied rather than re-learned).
+
+### 65.3 Two deliberate omissions
+
+**No `mailEnvKeys`**, with a comment in the registry saying why. ITFlow has no
+env-var support for SMTP or IMAP (§62.1); adding the keys would look like it
+worked and quietly do nothing. Its mail settings are copied into its own UI
+from the dashboard's Settings → Email.
+
+**No cron sidecar.** The image runs `crond` itself and `cron/cron.php` is a
+dispatcher — confirmed running in the live container. The user must still
+enable cron *inside* ITFlow (Settings → Notifications), documented in
+`app-credentials.md` along with the caveat that the healthcheck probes only
+httpd, so a dead crond leaves the container reporting healthy while every
+scheduled job stops.
+
+### 65.4 Left to the user
+
+Claim the setup wizard **before exposing it** — the standing rule for wizard
+apps, and it matters more here since ITFlow holds client documentation and
+credentials. Then turn on exposure with **Authelia required**.

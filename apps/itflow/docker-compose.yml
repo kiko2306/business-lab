@@ -1,0 +1,75 @@
+
+services:
+  itflow:
+    image: itfloworg/itflow:latest
+    restart: unless-stopped
+    ports:
+      - "${ITFLOW_PORT:-10420}:8080"
+    environment:
+      TZ: ${TZ:-UTC}
+      ITFLOW_NAME: ${ITFLOW_NAME:-ITFlow}
+      # ITFlow builds links (password reset, ticket replies, portal URLs) from
+      # this, so it has to be the address users actually reach — not the
+      # container's. Managed from the exposure settings: see exposureEnvKeys on
+      # itflow in backend/src/config/services.ts.
+      ITFLOW_URL: ${ITFLOW_URL:-http://localhost:10420}
+      # The container listens here; the published port above maps onto it.
+      ITFLOW_PORT: 8080
+      ITFLOW_LOG_LEVEL: ${ITFLOW_LOG_LEVEL:-info}
+      ITFLOW_DB_HOST: itflow-db
+      ITFLOW_DB_PASS: ${ITFLOW_DB_PASSWORD}
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=ITFlow"
+      - "homepage.icon=itflow.png"
+      - "homepage.href=http://localhost:${ITFLOW_PORT:-10420}"
+      - "homepage.description=IT documentation, tickets and billing"
+    volumes:
+      # The image pulls the application source into this path on first boot and
+      # updates it in place, so it must persist — a fresh volume means a full
+      # re-download and loses any in-place upgrade state.
+      - ./data/app:/var/www/localhost/htdocs
+    depends_on:
+      itflow-db:
+        condition: service_healthy
+    networks:
+      - itflow-net
+    # Only httpd is probed, which is all the image exposes. Note this does NOT
+    # cover cron: the image starts `crond &` from its entrypoint, unsupervised,
+    # so if cron dies this healthcheck still reports healthy while every
+    # scheduled job (email-to-ticket, mail queue, recurring invoices) silently
+    # stops. See plan.md §62.1.
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  itflow-db:
+    image: mariadb:10.11
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+      # No root password is ever needed from outside the container, and a
+      # random one is one less generated secret to store and leak.
+      MARIADB_RANDOM_ROOT_PASSWORD: "true"
+      MARIADB_DATABASE: ${ITFLOW_DB_NAME:-itflow}
+      MARIADB_USER: ${ITFLOW_DB_USER:-itflow}
+      MARIADB_PASSWORD: ${ITFLOW_DB_PASSWORD}
+    volumes:
+      - ./data/db:/var/lib/mysql
+    networks:
+      - itflow-net
+    # itflow's own entrypoint runs the installer against this database, so it
+    # has to be genuinely accepting connections first — not merely started.
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  itflow-net:
+    driver: bridge

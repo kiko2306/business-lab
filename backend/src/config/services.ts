@@ -107,6 +107,37 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // up for that gate to work at all.
     dependsOn: ['authelia'],
   },
+  'itflow': {
+    name: 'itflow',
+    label: 'ITFlow',
+    description: 'IT documentation, tickets and billing',
+    icon: 'book',
+    category: 'Productivity',
+    composePath: 'apps/itflow/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8080',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // ITFlow builds password-reset links, ticket-reply URLs and the client
+    // portal address from this, so it must be the hostname users actually
+    // reach rather than the container's.
+    exposureEnvKeys: {
+      url: ['ITFLOW_URL'],
+    },
+    managedEnvKeys: ['ITFLOW_URL'],
+    // Internal MariaDB credentials — nothing outside this compose project
+    // uses them, so there is nothing for the user to choose.
+    hiddenGeneratedSecrets: ['ITFLOW_DB_PASSWORD'],
+    // NOTE: deliberately no mailEnvKeys. ITFlow has no environment-variable
+    // support for SMTP or IMAP at all — its mail configuration lives in its
+    // own database, entered through its UI. The dashboard's global mail
+    // settings are values to copy in, not values that can be injected. Adding
+    // mailEnvKeys here would look like it worked and quietly do nothing.
+    // See plan.md §62.1.
+  },
   'home-assistant': {
     name: 'home-assistant',
     label: 'Home Assistant',

@@ -56,6 +56,25 @@ Open these privately and claim them before exposing.
 | **Grocy** | Ships with `admin` / `admin`. |
 | **File Browser** | Ships with `admin` / `admin`. |
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |
+| **ITFlow** | Setup wizard creates the first admin. See the note below — it needs two things switched on afterwards. |
+
+### ITFlow — two things to do after the wizard
+
+Neither is obvious, and both fail *silently* if missed.
+
+1. **Email.** ITFlow does not read mail settings from the environment; it keeps
+   them in its own database. So the dashboard's global mail settings
+   (Settings → Email) are values to **copy into ITFlow's own UI**, not values
+   it inherits. Nothing warns you — outgoing mail simply never sends.
+2. **Cron.** Email-to-ticket, the mail queue and recurring invoices all run
+   from cron. The container already runs it, so there is nothing to schedule on
+   the host, but it must be enabled inside ITFlow:
+   **Settings → Notifications → enable Cron**, with the individual jobs under
+   **Maintenance → Cron**.
+
+Worth knowing: the container's healthcheck only probes the web server, not
+cron. If cron dies the container still reports healthy while every scheduled
+job stops.
 
 ## No login of their own
 
