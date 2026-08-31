@@ -645,24 +645,39 @@ if [ -f apps/netbird-vpn/.env ]; then
           # Patch Signal.URI in place. data/management.json is never
           # regenerated (it holds the store encryption key), so the hostname
           # has to be edited into the existing file.
-          if [ -f apps/netbird-vpn/data/management.json ]; then
-            SIGNAL_HOST="$SIGNAL_HOST" python3 - <<'NBSIGPY' || warn "couldn't update Signal.URI in apps/netbird-vpn/data/management.json"
+          #
+          # Read-compare-then-write, rather than letting the writer decide: the
+          # management restart below must happen ONLY when the value actually
+          # changed, or every re-run of this script needlessly bounces NetBird
+          # (and with it every connected peer).
+          NB_MGMT_JSON=apps/netbird-vpn/data/management.json
+          if [ -f "$NB_MGMT_JSON" ]; then
+            WANT_URI="${SIGNAL_HOST}:443"
+            CUR_URI="$(python3 -c 'import json,sys; print((json.load(open(sys.argv[1])).get("Signal") or {}).get("URI",""))' "$NB_MGMT_JSON" 2>/dev/null || true)"
+
+            if [ "$CUR_URI" = "$WANT_URI" ]; then
+              log "NetBird Signal.URI already points at ${WANT_URI}"
+            else
+              if WANT_URI="$WANT_URI" NB_MGMT_JSON="$NB_MGMT_JSON" python3 - <<'NBSIGPY'
 import json, os
-p = 'apps/netbird-vpn/data/management.json'
+p = os.environ['NB_MGMT_JSON']
 cfg = json.load(open(p))
-want = os.environ['SIGNAL_HOST'] + ':443'
-if cfg.get('Signal', {}).get('URI') != want:
-    cfg.setdefault('Signal', {})
-    cfg['Signal'].update({'Proto': 'https', 'URI': want, 'Username': '', 'Password': None})
-    json.dump(cfg, open(p, 'w'), indent=2)
-    print('==> Updated Signal.URI to ' + want)
+cfg.setdefault('Signal', {})
+cfg['Signal'].update({'Proto': 'https', 'URI': os.environ['WANT_URI'], 'Username': '', 'Password': None})
+json.dump(cfg, open(p, 'w'), indent=2)
 NBSIGPY
-            # Management reads management.json only at startup.
-            NB_MGMT_CID="$(docker ps -q -f name=netbird-management 2>/dev/null | head -n1 || true)"
-            if [ -n "$NB_MGMT_CID" ]; then
-              docker restart "$NB_MGMT_CID" >/dev/null 2>&1 \
-                && log "restarted netbird-management to pick up the signal address" \
-                || warn "couldn't restart netbird-management — restart the NetBird VPN app from the dashboard"
+              then
+                log "Set NetBird Signal.URI to ${WANT_URI}"
+                # Management reads management.json only at startup.
+                NB_MGMT_CID="$(docker ps -q -f name=netbird-management 2>/dev/null | head -n1 || true)"
+                if [ -n "$NB_MGMT_CID" ]; then
+                  docker restart "$NB_MGMT_CID" >/dev/null 2>&1 \
+                    && log "restarted netbird-management to pick up the signal address" \
+                    || warn "couldn't restart netbird-management — restart the NetBird VPN app from the dashboard"
+                fi
+              else
+                warn "couldn't update Signal.URI in ${NB_MGMT_JSON}"
+              fi
             fi
           fi
         fi
