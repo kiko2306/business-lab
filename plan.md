@@ -6245,3 +6245,106 @@ the user. Checked what it actually costs:
 faithful test of the phone's experience. **B1 can be validated entirely from
 the server** — `Management: Connected` + `Signal: Connected` there means the
 phone's path works too. The phone is then a confirmation, not the experiment.
+
+## 52. B1 executed — and it found the real root cause. Option B is dead.
+
+**Date: 2026-08-31, same session as §50/§51.** B1 was built and cut over. It
+did not work, but it produced the decisive diagnosis this problem has been
+missing since §20.9.
+
+### 52.1 What was built (and has since been rolled back)
+
+- Tunnel B `netbird-signal-quic` created,
+  id `7e8771c5-a1a5-46bf-895e-d8ee9af3957a`, with a single ingress rule for
+  `netbird-vpn-signal.tx-home-utils.com` → `https://192.168.1.23`
+  (`http2Origin`/`noTLSVerify`/`originServerName`), mirroring tunnel A's rule,
+  plus the 404 catch-all.
+- `cloudflared-signal.service` on the host, `--protocol quic`, own token at
+  `/etc/cloudflared/token-signal`. Registered four connections `protocol=quic`,
+  zero errors, and picked up the ingress config correctly.
+- Signal's DNS CNAME flipped to tunnel B, then **rolled back** to tunnel A.
+
+Everything else stayed on tunnel A throughout; management kept returning
+`grpc-status: 0` and `netbird-vpn`/`authelia`/`homelab` were unaffected across
+the whole cutover.
+
+### 52.2 The real root cause: Cloudflare will not flush headers on an open stream
+
+Signal registration is **not a message** — it is a gRPC **metadata header**.
+From `signal/server/signal.go`:
+
+```go
+id := metadata.ValueFromIncomingContext(stream.Context(), proto.HeaderId)
+if id == "" { return nil, status.Errorf(codes.FailedPrecondition, "missing connection header: %s", ...) }
+...
+err = stream.SendHeader(s.successHeader)   // x-wiretrustee-peer-registered: 1
+```
+
+(`HeaderId = "x-wiretrustee-peer-id"`, `shared/signal/proto/constants.go`.)
+So the handshake is: client sends a header → server replies with **headers
+only** → both sides then sit idle until a peer has something to signal.
+
+Probed the same request at all three hops:
+
+| path | result |
+|---|---|
+| direct to signal container (`10.201.0.1:8086`, h2c, no proxy) | `x-wiretrustee-peer-registered: 1`, stream stays open ✅ |
+| via NPM over the LAN (`--resolve` to `192.168.1.23`, bypasses cloudflared) | `x-wiretrustee-peer-registered: 1`, stream stays open ✅ |
+| via Cloudflare (tunnel B, QUIC) | **no response headers at all** ❌ |
+
+And the control that pins the mechanism — the *same* call through the edge
+**without** the peer-id header, so the server rejects immediately and the
+response is **complete**: `HTTP/2 200` returned promptly.
+
+**Therefore: the Cloudflare path delivers complete responses fine, but never
+flushes response headers while a stream is still open.** Signal's handshake is
+headers-only-then-wait, so it can never complete through Cloudflare.
+
+### 52.3 What this overturns
+
+- **NPM/nginx is exonerated.** `grpc_pass` forwards the custom header and holds
+  the stream correctly (hop 2 proves it). §50.5's `grpc_read_timeout` bump was
+  still worth keeping, but it was never the fix.
+- **§50.2's "bidi request-body buffering" diagnosis was wrong** — or rather,
+  half-right for the wrong reason. Nothing about the *request* body is the
+  problem; it is the *response* headers.
+- **Option B is dead, and so is any transport flag.** http2 and quic both fail
+  identically here, because the failure is in Cloudflare's edge response
+  handling, not the connector transport. §51's whole premise ("signal needs
+  quic for bidi") is disproved.
+- Combined with §50.4 (quic breaks management's trailers), the honest summary
+  is: **self-hosted NetBird signal cannot work behind a Cloudflare Tunnel at
+  all**, on any transport. This is not a tuning problem.
+
+### 52.4 Remaining options — all need a decision
+
+Option A (router port-forward) remains **withdrawn** by user decision (§51.1).
+What is actually left:
+
+- **D — host signal on a small public-IP box** (VPS, or a free tier such as
+  Oracle Cloud / fly.io). `netbirdio/signal` with a real cert; point
+  `Signal.URI` at it. Management/dashboard/relay stay on the tunnel. **Respects
+  §0 principle 1** — no router change — at the cost of one external dependency.
+  Currently the most promising path.
+- **E — a different overlay for the phone entirely** (Tailscale is already in
+  the stack). Abandons self-hosted NetBird for remote access rather than
+  fixing it. Cheapest in effort, loses the NetBird investment.
+- **F — accept LAN-only NetBird.** Everything works when both peers are on the
+  home network; remote access comes from elsewhere.
+
+### 52.5 Teardown still owed (needs sudo)
+
+DNS is already rolled back to tunnel A. Still to remove on the host:
+
+```
+sudo systemctl disable --now cloudflared-signal
+sudo rm /etc/systemd/system/cloudflared-signal.service /etc/cloudflared/token-signal
+sudo systemctl daemon-reload
+```
+
+and delete tunnel B (`7e8771c5-a1a5-46bf-895e-d8ee9af3957a`) from Cloudflare.
+Leaving it costs nothing functionally but is exactly the §46.15 class of
+out-of-repo state that has bitten this project repeatedly.
+
+**Nothing from §51.4 (B2) should be built.** The flag it was going to add
+(`bidiStreaming` → second tunnel) is based on a premise §52.2 disproves.
