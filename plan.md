@@ -7644,3 +7644,101 @@ scheduled job stops.
 Claim the setup wizard **before exposing it** — the standing rule for wizard
 apps, and it matters more here since ITFlow holds client documentation and
 credentials. Then turn on exposure with **Authelia required**.
+
+## 66. Backup audit — the dashboard is covered, every app is not
+
+Triggered by counting the project's databases (§65 follow-on). 9 database
+containers, 18 embedded stores, and a backup that touches none of them.
+
+### 66.1 Correction first
+
+An initial reading of `createBackupArchive()` suggested the dashboard's own
+credentials were only partially captured, because `settings.json` filters to
+`cloudflare_%` / `health_%` / `backup_schedule_%`. **That was wrong.**
+`pg_dump` is called with no `-t`, so it dumps the *entire* dashboard database —
+settings table included. Verified by generating an archive and grepping the
+dump: `exposure_npm_password`, `mail_smtp_password` and
+`cloudflare_tunnel_token` are all present. `settings.json` is a convenience
+extract, not the backup.
+
+So the dashboard's own state is genuinely covered. The gap is elsewhere, and it
+is total.
+
+### 66.2 The gap
+
+`createBackupArchive()` writes exactly three things — `database.sql`,
+`settings.json`, `users.json` — and **never touches `apps/`**. Nothing under
+any app's `data/` is in a backup:
+
+| Not backed up | Size |
+|---|---|
+| Nextcloud (files + Postgres) | 935 MB |
+| ITFlow (client documentation, tickets, billing) | 348 MB |
+| Nginx Proxy Manager (hosts, certificates) | 207 MB |
+| BookStack | 164 MB |
+| NetBird (`store.db` **and** the key that decrypts it) | 71 MB |
+| Immich, Paperless, Vaultwarden, Authelia, the rest | — |
+| **`apps/` total** | **1.8 GB** |
+
+Vaultwarden's vault and Authelia's user database are in there. So is every
+generated secret in `apps/*/.env`.
+
+**Duplicati is running, has `apps/` mounted read-only at `/source/apps`, and
+has zero backup jobs configured.** The plumbing was put in (§0.1 item 2); the
+job never was. So the capability exists and does nothing — arguably worse than
+not having it, because the app's presence implies coverage.
+
+### 66.3 The part that makes this non-trivial
+
+**Copying a live database file is not a backup.** Right now
+`apps/*/data` contains active WAL files (`kuma.db-wal`, `vaultwarden
+db.sqlite3-wal`, `vikunja.db-wal`, …) and six running Postgres containers. A
+file-level copy taken mid-write can restore to a corrupt or torn state, and
+nothing will tell you until you try to use it.
+
+So a correct backup needs a **dump step before the file copy**:
+
+- **Postgres containers** (6) — `pg_dump` inside the container to
+  `apps/<app>/data/_dump/`.
+- **MariaDB/MySQL** (3) — `mariadb-dump` / `mysqldump` the same way.
+- **SQLite** (14) — `sqlite3 .backup`, which is safe against a live writer;
+  a plain `cp` is not.
+- **BoltDB / H2** (4) — portainer, file-browser, stirling-pdf, celerybeat.
+  No standard online dump; these likely need the container stopped, or accept
+  a best-effort copy and document the caveat honestly.
+
+Only then is a file-level backup of `apps/` meaningful.
+
+### 66.4 Proposed shape
+
+Split by what each tool is good at:
+
+1. **The dashboard orchestrates consistency.** A "prepare app backups" step
+   that walks the registry, and for each app with a known database runs the
+   right dump into `apps/<app>/data/_dump/`. This is a natural fit for the
+   existing service registry — a `backup:` block per service saying which
+   engine and container, in the same spirit as `exposureEnvKeys`.
+2. **Duplicati does transport and retention.** It already has `apps/` mounted
+   and is built for incremental, deduplicated, encrypted, versioned backups to
+   a remote. At 1.8 GB growing (Immich and Nextcloud dominate), tarballs in the
+   dashboard's own archive are the wrong tool — that archive is ~135 KB and
+   meant for config.
+3. **The dashboard's existing backup stays as it is.** It covers the dashboard,
+   it is small, and it is the thing you need to rebuild the control plane.
+
+### 66.5 Open questions
+
+- **Where do backups go?** Duplicati needs a destination — another disk, a NAS,
+  S3/B2, or a remote over NetBird. Nothing is configured, and a backup that
+  never leaves the host does not survive the failure that matters most.
+- **Circularity**: Duplicati's own config lives in `apps/duplicati/data`.
+  Backing it up with itself is fine for file loss but useless if Duplicati is
+  what is lost — its config should also land in the dashboard's small archive.
+- Should the dump step be **automatic before every Duplicati run**, or a
+  scheduled dashboard job? The first is more correct; the second is simpler.
+- **BoltDB/H2 apps**: stop-to-back-up, or document as best-effort?
+- Retention and encryption policy — Duplicati supports both, neither is chosen.
+
+**Priority**: this is the highest-value outstanding work in the project.
+Everything else built recently is recoverable by re-running `start.sh`; the
+data is not.
