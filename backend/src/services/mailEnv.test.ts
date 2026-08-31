@@ -94,3 +94,43 @@ describe('buildMailEnvOverrides', () => {
     expect(await buildMailEnvOverrides('x')).toEqual({ SMTP_HOST: 'smtp.example.com' });
   });
 });
+
+describe('buildMailEnvOverrides — encryption vocabulary', () => {
+  beforeEach(() => {
+    mockedGetService.mockReset();
+    mockedGetMailConfig.mockReset();
+  });
+
+  it("translates to the app's own vocabulary when a map is given", async () => {
+    // Vaultwarden's shape. Passing 'tls' through verbatim would leave it
+    // unencrypted and it would not complain, so this mapping is load-bearing.
+    mockedGetService.mockReturnValue({
+      mailEnvKeys: {
+        smtpEncryption: ['SMTP_SECURITY'],
+        smtpEncryptionMap: { tls: 'starttls', ssl: 'force_tls', none: 'off' },
+      },
+    } as never);
+
+    for (const [ours, theirs] of [['tls', 'starttls'], ['ssl', 'force_tls'], ['none', 'off']] as const) {
+      mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: ours });
+      expect(await buildMailEnvOverrides('vaultwarden')).toEqual({ SMTP_SECURITY: theirs });
+    }
+  });
+
+  it('passes the value through when no map is given', async () => {
+    mockedGetService.mockReturnValue({ mailEnvKeys: { smtpEncryption: ['MAIL_ENCRYPTION'] } } as never);
+    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'ssl' });
+    expect(await buildMailEnvOverrides('x')).toEqual({ MAIL_ENCRYPTION: 'ssl' });
+  });
+});
+
+describe('vaultwarden mail wiring', () => {
+  it('maps every SMTP var vaultwarden actually reads', async () => {
+    const { SERVICES } = await vi.importActual<typeof import('../config/services')>('../config/services');
+    const keys = SERVICES['vaultwarden'].mailEnvKeys;
+    expect(keys?.smtpHost).toEqual(['SMTP_HOST']);
+    expect(keys?.fromAddress).toEqual(['SMTP_FROM']);
+    // The map is the part that silently breaks if dropped.
+    expect(keys?.smtpEncryptionMap).toEqual({ tls: 'starttls', ssl: 'force_tls', none: 'off' });
+  });
+});

@@ -375,6 +375,20 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     },
   },
   'vaultwarden': {
+    // Email comes from the dashboard's global mail settings rather than being
+    // configured per app. SMTP_SECURITY needs the map: Vaultwarden's
+    // vocabulary is starttls/force_tls/off, and passing our tls/ssl/none
+    // through verbatim would leave it unencrypted without complaining.
+    mailEnvKeys: {
+      smtpHost: ['SMTP_HOST'],
+      smtpPort: ['SMTP_PORT'],
+      smtpUser: ['SMTP_USERNAME'],
+      smtpPassword: ['SMTP_PASSWORD'],
+      smtpEncryption: ['SMTP_SECURITY'],
+      smtpEncryptionMap: { tls: 'starttls', ssl: 'force_tls', none: 'off' },
+      fromAddress: ['SMTP_FROM'],
+      fromName: ['SMTP_FROM_NAME'],
+    },
     name: 'vaultwarden',
     label: 'Vaultwarden',
     description: 'Self-hosted password manager (Bitwarden-compatible)',

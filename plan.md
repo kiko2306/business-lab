@@ -7245,9 +7245,45 @@ exposure automation covers it with no new machinery.
   `app-credentials.md`, with the standing warning to claim it privately before
   exposing.
 
-**Email sending** is the part the user flagged for a session. ITFlow just wants
-SMTP credentials, so it is not really an ITFlow problem — see §62.3, which
-gives it a working relay with no mail server at all.
+**Cron — no sidecar needed.** The user expected ITFlow to need scheduled jobs
+(email fetching, recurring invoices). It does, and the official image already
+runs them: the Dockerfile installs `php84-imap` and `php84-pecl-mailparse`,
+adds a crontab entry, and `entrypoint.sh` starts `crond &` before handing off
+to httpd.
+
+That single entry looked stale next to the docs, which list five scripts
+(`nightly_tasks`, `mail_queue`, `ticket_email_parser`, `domain_refresher`,
+`certificate_refresher`). It is not — `cron/cron.php` is a **dispatcher**, and
+says so itself:
+
+> *"The only entry that belongs in the crontab: `* * * * * php …/cron/cron.php`.
+> It wakes once a minute, works out which jobs are due, and runs them."*
+
+Scheduling lives in a `cron_jobs` table edited from **Maintenance → Cron** in
+ITFlow's UI, with per-job locking so a slow mailbox poll cannot hold up the
+every-minute jobs. So: no cron container, no host crontab, no extra ports.
+
+Two things to carry into the app definition:
+
+- Cron must be **enabled inside ITFlow** (Settings → Notifications → Cron)
+  before any of it runs. Document it in `app-credentials.md` alongside the
+  first-run wizard.
+- `crond &` is backgrounded and unsupervised, and the image's healthcheck only
+  probes httpd. If crond dies the container still reports healthy while every
+  scheduled job silently stops. Worth a note; a real fix would need our own
+  healthcheck.
+
+**Email — ITFlow cannot inherit the global mail settings.** Correcting an
+earlier assumption in §63.3 that ITFlow would be `mailEnvKeys`' first consumer.
+It cannot be: ITFlow has **no environment-variable support for SMTP or IMAP**.
+The only `getenv` calls in the repository are inside vendored libraries
+(Stripe, PHP-DI), and the Docker image accepts only `ITFLOW_DB_*`,
+`ITFLOW_NAME`, `ITFLOW_PORT`, `ITFLOW_REPO*` and `ITFLOW_URL`. Its mail
+configuration is entered in its own UI and stored in its database.
+
+So for ITFlow the dashboard's mail settings are a **reference**, not an
+injection: configure them once centrally, then copy them into ITFlow's UI. Not
+worse than before, but not the automatic inheritance that was implied.
 
 ### 62.2 MeshCentral — remote management
 
@@ -7463,3 +7499,34 @@ Five tests cover the mapping: no keys declared (and no database round-trip in
 that case), mail unconfigured, one setting fanned out to several env names,
 encryption-to-boolean, and IMAP omitted entirely when receiving is unset.
 **145/145**, `tsc` clean, frontend builds, endpoints live and auth-gated.
+
+### 63.4 Correction and first real consumer: Vaultwarden
+
+§63.3 said ITFlow would be `mailEnvKeys`' first consumer. It cannot be — see
+§62.1: ITFlow has no env-var support for mail at all. That left the feature
+with **zero** consumers, which is a poor place to leave new plumbing: untested
+against a real app, and easy to discover later that it does not quite fit.
+
+Wired **Vaultwarden** instead, and doing so exposed a genuine gap.
+
+**Apps disagree on the encryption vocabulary.** Vaultwarden's `SMTP_SECURITY`
+takes `starttls` / `force_tls` / `off`. Passing our `tls` / `ssl` / `none`
+through verbatim does not error — Vaultwarden falls back to **no encryption**
+and carries on, which is the worst possible failure for a credential-bearing
+connection. Added `smtpEncryptionMap` so a service can declare the translation:
+
+```ts
+smtpEncryption: ['SMTP_SECURITY'],
+smtpEncryptionMap: { tls: 'starttls', ssl: 'force_tls', none: 'off' },
+```
+
+`apps/vaultwarden/docker-compose.yml` now declares the seven `SMTP_*` vars,
+all defaulting to empty — unset means Vaultwarden runs without email exactly as
+it does today, so this changes nothing until mail settings are filled in.
+
+Three more tests: each of the three encryption values maps correctly,
+pass-through still works when no map is declared, and Vaultwarden's wiring
+names the vars it actually reads. **148/148.**
+
+Obvious next retrofits, all of which do read SMTP from env: Uptime Kuma, n8n,
+BookStack, Paperless, Vikunja.

@@ -6,6 +6,17 @@ services:
     ports:
       - "${VAULTWARDEN_PORT:-10380}:80"
     environment:
+      # Email. These are filled from the dashboard's global mail settings
+      # (Settings -> Email) via mailEnvKeys on vaultwarden in
+      # backend/src/config/services.ts — not set by hand. Left unset, Vaultwarden
+      # simply runs without email, which disables invitations and 2FA-by-email.
+      SMTP_HOST: ${SMTP_HOST:-}
+      SMTP_PORT: ${SMTP_PORT:-}
+      SMTP_SECURITY: ${SMTP_SECURITY:-}
+      SMTP_USERNAME: ${SMTP_USERNAME:-}
+      SMTP_PASSWORD: ${SMTP_PASSWORD:-}
+      SMTP_FROM: ${SMTP_FROM:-}
+      SMTP_FROM_NAME: ${SMTP_FROM_NAME:-}
       DOMAIN: ${VAULTWARDEN_DOMAIN:-http://localhost:8222}
       SIGNUPS_ALLOWED: ${VAULTWARDEN_SIGNUPS_ALLOWED:-true}
       ADMIN_TOKEN: ${VAULTWARDEN_ADMIN_TOKEN}

@@ -53,7 +53,7 @@ export async function buildMailEnvOverrides(serviceName: string): Promise<Record
   assign(overrides, keys.smtpPort, config.smtpPort);
   assign(overrides, keys.smtpUser, config.smtpUser);
   assign(overrides, keys.smtpPassword, config.smtpPassword);
-  assign(overrides, keys.smtpEncryption, config.smtpEncryption);
+  assign(overrides, keys.smtpEncryption, keys.smtpEncryptionMap?.[config.smtpEncryption] ?? config.smtpEncryption);
   assign(overrides, keys.smtpTlsBoolean, encryptionToBoolean(config.smtpEncryption));
   assign(overrides, keys.fromAddress, config.fromAddress);
   assign(overrides, keys.fromName, config.fromName);

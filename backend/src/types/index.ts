@@ -81,6 +81,14 @@ export interface ServiceMailEnvKeys {
   smtpPassword?: string[];
   /** Receives 'tls' | 'ssl' | 'none' as-is. */
   smtpEncryption?: string[];
+  /**
+   * Translate the encryption value before setting `smtpEncryption` keys.
+   * Apps disagree on the vocabulary — Vaultwarden wants
+   * starttls/force_tls/off, others want tls/ssl/none or true/false — and
+   * passing our name through verbatim silently misconfigures them: the app
+   * usually falls back to "no encryption" rather than erroring.
+   */
+  smtpEncryptionMap?: Partial<Record<'tls' | 'ssl' | 'none', string>>;
   /** Some apps want a boolean "use TLS" rather than a named scheme. */
   smtpTlsBoolean?: string[];
   fromAddress?: string[];
