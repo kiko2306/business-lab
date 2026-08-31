@@ -7221,3 +7221,133 @@ A fresh-tree run is the only thing that surfaces it.
   account would see the enablement prompt).
 - **Resource headroom.** The full stack is heavy; a small VPS may not hold every
   app at once. Nothing checks this or warns.
+
+## 62. Plan: ITFlow, MeshCentral, and email for the domain
+
+**Status: planned, not started.** Written so it can be picked up cold. The mail
+question has a hard constraint that changes the answer, so read §62.3 before
+designing anything around it.
+
+### 62.1 ITFlow — MSP documentation / ticketing / billing
+
+`itfloworg/itflow` (official, [itflow-org/itflow-docker]) — PHP + Apache, with
+MariaDB alongside. Straightforward: it is an ordinary HTTP app, so the existing
+exposure automation covers it with no new machinery.
+
+- `apps/itflow/docker-compose.yml` — `itflow` + `itflow-db` (MariaDB 10.11).
+- Port **`10420`** (next free; 10410 is wetty).
+- `services.ts`: `hiddenGeneratedSecrets: ['ITFLOW_DB_PASSWORD',
+  'ITFLOW_DB_ROOT_PASSWORD']` — internal to its own compose project, so nothing
+  to ask the user.
+- Exposure: normal HTTP, **Authelia on**. ITFlow holds client documentation and
+  credentials; its own login should not be the only gate.
+- First run is a **setup wizard** → document it as a *wizard* app in
+  `app-credentials.md`, with the standing warning to claim it privately before
+  exposing.
+
+**Email sending** is the part the user flagged for a session. ITFlow just wants
+SMTP credentials, so it is not really an ITFlow problem — see §62.3, which
+gives it a working relay with no mail server at all.
+
+### 62.2 MeshCentral — remote management
+
+`ghcr.io/ylianst/meshcentral`. Node.js, config-file driven
+(`data/config.json`), and the interesting part is the certificate handling the
+user already anticipated.
+
+**The known failure**: agents pin the server's web certificate hash. Behind a
+reverse proxy that terminates TLS, the hash the agent computes stops matching
+what the server expects, and agents fail with **`Agent bad web cert hash`**.
+This is well documented upstream, including specifically for Cloudflare
+([discussion #7684], [issue #4879]).
+
+The config that addresses it:
+
+```json
+{ "settings": {
+    "cert": "mesh.<base-domain>",
+    "TLSOffload": "<docker gateway>",     // the NPM address, i.e. our proxy
+    "port": 443,
+    "aliasPort": 443
+  },
+  "domains": { "": { "certUrl": "https://mesh.<base-domain>" } } }
+```
+
+`certUrl` tells MeshCentral to fetch the *real* public certificate the agent
+will see, rather than assuming its own. `ignoreAgentHashCheck: true` also
+"works" and appears in many write-ups — **treat it as a last resort**: it
+disables the check that stops an agent being redirected to an impostor server.
+
+Two things to get right, both learned the hard way on NetBird:
+
+- **WebSocket, not gRPC.** Agents connect over WebSocket-over-HTTPS, which is
+  the transport that *does* traverse a Cloudflare Tunnel cleanly (§50.3's relay
+  proved it). So MeshCentral should work through the tunnel where NetBird's
+  signal could not — but verify with a real agent, not a browser login.
+- **`aliasPort`/`cert` must match the public hostname**, not the container's.
+
+Port **`10430`**. Authelia in front of the *web UI* is desirable, but check
+first whether it breaks agent connections — agents cannot complete a
+forward-auth redirect. If it does, the honest options are: expose without
+Authelia and rely on MeshCentral's own login + 2FA, or split the agent
+endpoint onto its own hostname. **Decide with a real agent enrolled**, not from
+the login page.
+
+### 62.3 Email — the constraint first
+
+**A self-hosted mail server cannot be published through the Cloudflare Tunnel.**
+Cloudflare does not proxy SMTP; port 25 traffic only reaches an origin
+directly, and only Spectrum (Enterprise) changes that. So a mail server here
+would need an inbound port-forward — which is §0 principle 1, withdrawn twice
+already (§51.1).
+
+There is a better answer, and it needs no mail server at all:
+
+| Direction | Mechanism | Cost |
+|---|---|---|
+| **Outbound** (ITFlow, alerts, ntfy…) | **Cloudflare Email Service SMTP** — `smtp.mx.cloudflare.net:465`, implicit TLS, username `api_token`, password = an API token with **Email Sending: Edit** | none beyond the existing Cloudflare account |
+| **Inbound** (mail *to* the domain) | **Cloudflare Email Routing** — MX records at Cloudflare, forwarded to a mailbox you already own | free |
+
+That covers what the user actually described — "a mail server to work with the
+domain in Cloudflare" — with zero new infrastructure, no port-forward, and no
+third-party relay account. It also solves §62.1's ITFlow email in one step.
+
+**Limits to know**: 5 MiB per message, 50 recipients per session, port 465 only
+(no 587/STARTTLS), and an account-wide daily quota shared with the REST/Workers
+send APIs.
+
+**What it does not give you** is a mailbox of your own — Email Routing forwards,
+it does not store. If the goal is genuinely to *host* mail (IMAP, own storage),
+that is a different project and only two paths work:
+
+- **On the VPS**, if the provider permits port 25 outbound/inbound — most block
+  it by default (Hetzner, Oracle, DigitalOcean all require a request; AWS
+  refuses). Needs a static IP, a PTR record, SPF/DKIM/DMARC, and ongoing
+  reputation management. `stalwartlabs/mail-server` is already on the backlog
+  for this.
+- **Not at home.** Residential IPs are blocked for port 25 by essentially every
+  receiver; this is not a configuration problem.
+
+**Recommendation**: do the Cloudflare pair now — it is small, immediate, and
+unblocks ITFlow. Treat self-hosted mailboxes as a separate decision once the
+VPS exists and its port-25 policy is known.
+
+### 62.4 Suggested order
+
+1. **Email first** (§62.3) — smallest, unblocks ITFlow, and needs only a
+   Cloudflare token permission plus DNS. Worth adding the SMTP settings to the
+   dashboard so any app can use them, rather than pasting credentials per app.
+2. **ITFlow** — ordinary app, exercises the new-app path end to end.
+3. **MeshCentral** — most likely to need a live troubleshooting session, so do
+   it when there is time to enrol a real agent and watch it fail.
+
+### 62.5 Open questions
+
+- Does the existing Cloudflare API token cover **Email Sending: Edit** and
+  **Email Routing: Edit**? Its current scopes (§51.7) do not list either, so a
+  token edit is likely needed — check before starting.
+- Should SMTP credentials become a **global dashboard setting** (like the
+  Cloudflare/NPM ones) so apps inherit them? Probably yes, given ITFlow,
+  Vaultwarden, Uptime Kuma and n8n all want to send mail.
+- MeshCentral behind Authelia: does forward-auth break agent enrolment? Needs a
+  real agent to answer.
