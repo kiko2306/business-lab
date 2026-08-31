@@ -11,7 +11,7 @@ import * as status from '../services/status';
 import { createStreamTicket } from '../services/realtime';
 import { getPublishedUpstreamPort, getService, isValidServiceName } from '../config/services';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
-import { getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
+import { deprovisionServiceExposure, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getServiceSetupToken, waitForServiceSetupToken } from '../services/setupToken';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
@@ -216,9 +216,22 @@ router.put(
   validateBody(schemas.serviceExposureUpdate),
   async (req: Request, res: Response) => {
     try {
+      const previous = await getServiceExposureRow(req.params.name);
       const row = await upsertServiceExposureConfig(req.params.name, req.body);
+
+      // Turning exposure off has to actually take the service off the
+      // internet. Before this, the row flipped to disabled while the NPM
+      // host, tunnel ingress rule and DNS record all stayed live and kept
+      // serving traffic — the setting looked applied and wasn't.
+      const turnedOff = Boolean(previous?.enabled) && !row.enabled;
+      if (turnedOff) {
+        await deprovisionServiceExposure(req.params.name, req.user!.id);
+      }
+
       return res.json({
-        message: 'Exposure configuration saved. Restart the service to apply it.',
+        message: turnedOff
+          ? 'Exposure disabled and public hostnames removed.'
+          : 'Exposure configuration saved. Restart the service to apply it.',
         enabled: row.enabled,
         hostname: row.hostname,
       });

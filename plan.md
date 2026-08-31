@@ -6772,3 +6772,75 @@ regressions across the estate.
   their own keypair locally and have only the public half installed — never
   move a private key.
 - `homelab` / `api-homelab` automation, deferred (§56.2).
+
+## 57. Exposure deprovisioning — the gap that was hand-patched three times
+
+`deleteProxyHost` existed in `npmClient.ts` but was **never called**, and
+nothing removed a tunnel ingress rule or DNS record. In one session that gap
+was cleaned by hand three separate times (§54.4 the NetBird signal hostname,
+§56.3 the two hand-made rules, §56.7 the wetty→ssh rename). Now automated.
+
+### 57.1 The worst case it fixes
+
+Turning exposure **off** for a service did not take it off the internet. The
+`service_exposure` row flipped to disabled while the NPM proxy host, the tunnel
+ingress rule and the DNS record all stayed live and kept serving traffic. The
+setting looked applied and wasn't — the failure mode is silent, and the user
+would reasonably believe a service was private when it wasn't.
+
+### 57.2 What was added
+
+- **`removeIngressRoute()`** in `cloudflareTunnelClient.ts`, the inverse of
+  `ensureIngressRoute`. Idempotent and forgiving: an already-absent hostname is
+  success, not an error, because teardown must be safe to re-run after a
+  half-finished attempt. It re-adds the `http_status:404` catch-all if removing
+  the last hostname rule would leave a config Cloudflare rejects. It deletes a
+  DNS record **only** when that record is a CNAME pointing at this tunnel —
+  one someone repointed by hand is left alone rather than destroyed.
+- **`deprovisionHostname()`** in `exposure.ts` — tears down one hostname's NPM
+  host, ingress rule and DNS record. Never throws, matching
+  `provisionHostname`. **Cloudflare first, then NPM**, deliberately: if the
+  process dies mid-way the hostname no longer resolves and the leftover is a
+  harmless unreferenced NPM host, whereas the reverse order would leave live
+  DNS pointing at a vhost that no longer exists.
+- **`deprovisionServiceExposure()`** — tears down a service's primary plus
+  every secondary. Secondary rows are deleted (they are synthetic, rebuilt
+  from the registry); the primary row survives because it carries the user's
+  enabled / authelia choices.
+
+Wired into three paths:
+
+1. **Exposure switched off** (`PUT /:name/exposure`) — the §57.1 bug. Only
+   fires on a true→false transition, and the response text changes to say the
+   hostnames were removed.
+2. **Hostname renamed** — `provisionServiceIfEnabled` now removes the old
+   hostname first when the stored one differs from the computed one. This is
+   exactly what stranded `wetty.<domain>` in §56.7, because `ensureProxyHost`
+   matches on hostname and so creates a second host rather than renaming.
+3. **Secondary removed from the registry** — reconciled away on the next
+   provision. This is the §54.4 case: NetBird's `signal` exposure outlived the
+   definition that created it.
+
+### 57.3 Verified live, not just in tests
+
+Injected a fake `netbird-vpn:legacy` row the registry doesn't declare and
+re-provisioned:
+
+```
+Removing exposure for netbird-vpn:legacy, no longer declared in the service registry
+Deprovisioned exposure for netbird-vpn-legacy.tx-home-utils.com
+```
+
+Row gone; the real `:api` and `:relay` rows untouched; tunnel still at 36
+ingress rules; `netbird-vpn` 302, `ssh` 302, `homelab`/`authelia`/`immich`/
+`portainer` 200; management gRPC still `grpc-status: 0`; both NetBird peers
+still connected.
+
+Tests cover the rename path, full-service teardown, and the incomplete-settings
+no-op. **132/132.**
+
+Two maintenance notes worth keeping: `exposure.test.ts`'s fixture gave a
+`netbird-vpn` row `paperless.example.com` as its hostname, which the new rename
+detection correctly flagged — the fixture was incoherent, not the code. And its
+`beforeEach` resets mocks by name, so every new mock must be added there or
+call counts leak between tests (both new mocks initially showed 7 calls).

@@ -20,8 +20,8 @@ import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
 import { buildExposureHostname, getPublishedUpstreamPort, getService } from '../config/services';
-import { ensureProxyHost } from './npmClient';
-import { ensureIngressRoute } from './cloudflareTunnelClient';
+import { deleteProxyHost, ensureProxyHost } from './npmClient';
+import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
 import { ExposureGlobalConfig, ExposureProvisionResult, HttpError, ServiceExposureInput, ServiceExposureRow } from '../types';
@@ -170,6 +170,127 @@ interface ProvisionHostnameOptions {
   auditResource: string;
 }
 
+interface DeprovisionHostnameOptions {
+  exposureKey: string;
+  hostname: string;
+  npmHostId: number | null;
+  globalConfig: ExposureGlobalConfig;
+  userId: number;
+  auditResource: string;
+  /** Drop the service_exposure row entirely, rather than marking it torn down. */
+  deleteRow: boolean;
+}
+
+/**
+ * Tear down everything provisionHostname created for one hostname: the NPM
+ * proxy host, the tunnel ingress rule and its DNS record.
+ *
+ * Never throws, for the same reason provisionHostname doesn't — teardown runs
+ * on paths (disabling exposure, renaming a hostname, reconciling a removed
+ * additionalExposure) where failing loudly would block the caller from doing
+ * the thing the user actually asked for. Failures are logged and audited.
+ *
+ * Ordering matters: Cloudflare first, then NPM. If the process dies in
+ * between, the hostname no longer resolves and the leftover is a harmless
+ * unreferenced NPM host. The reverse order would leave a live DNS record
+ * pointing at a vhost that no longer exists.
+ */
+async function deprovisionHostname({
+  exposureKey,
+  hostname,
+  npmHostId,
+  globalConfig,
+  userId,
+  auditResource,
+  deleteRow,
+}: DeprovisionHostnameOptions): Promise<void> {
+  try {
+    await removeIngressRoute({
+      apiToken: globalConfig.cloudflareApiToken,
+      accountId: globalConfig.cloudflareAccountId,
+      zoneId: globalConfig.cloudflareZoneId,
+      tunnelId: globalConfig.cloudflareTunnelId,
+      hostname,
+    });
+
+    if (npmHostId) {
+      await deleteProxyHost(globalConfig.npmApiUrl, globalConfig.npmEmail, globalConfig.npmPassword, npmHostId);
+    }
+
+    if (deleteRow) {
+      await query(`DELETE FROM service_exposure WHERE service_name = $1`, [exposureKey]);
+    } else {
+      await query(
+        `UPDATE service_exposure
+         SET status = 'not_provisioned', npm_host_id = NULL, cf_hostname_id = NULL, last_error = NULL, updated_at = NOW()
+         WHERE service_name = $1`,
+        [exposureKey]
+      );
+    }
+
+    await writeAuditLog({
+      userId,
+      action: 'exposure_deprovision',
+      resource: auditResource,
+      result: 'success',
+      metadata: { hostname },
+    }).catch(() => {});
+
+    logger.info(`Deprovisioned exposure for ${hostname}`);
+  } catch (error) {
+    const message = (error as Error).message;
+    logger.error(`Exposure deprovisioning failed for ${hostname}`, { error: message });
+    await recordProvisioningResult(exposureKey, { status: 'failed', npmHostId, lastError: message }).catch(() => {});
+    await writeAuditLog({
+      userId,
+      action: 'exposure_deprovision',
+      resource: auditResource,
+      result: 'failure',
+      metadata: { hostname, error: message },
+    }).catch(() => {});
+  }
+}
+
+/**
+ * Tear down every hostname a service owns — its primary plus any
+ * additionalExposures — and mark/remove their rows.
+ *
+ * Called when exposure is switched off for a service. Without this, turning
+ * exposure off left the app publicly reachable: the row said "disabled" while
+ * the NPM host, tunnel ingress rule and DNS record all still existed and
+ * served traffic. That is the bug this function exists to fix, and it is why
+ * it runs even when the row is already marked not_provisioned.
+ */
+export async function deprovisionServiceExposure(serviceName: string, userId: number): Promise<void> {
+  const globalConfig = await getExposureConfig();
+  if (!globalConfig) {
+    logger.warn(`Cannot deprovision ${serviceName}: exposure settings are incomplete`);
+    return;
+  }
+
+  const rows = await query<ServiceExposureRow>(
+    `SELECT * FROM service_exposure WHERE service_name = $1 OR service_name LIKE $2`,
+    [serviceName, `${serviceName}:%`]
+  );
+
+  for (const row of rows.rows) {
+    if (!row.hostname) continue;
+    const isSecondary = row.service_name !== serviceName;
+    await deprovisionHostname({
+      exposureKey: row.service_name,
+      hostname: row.hostname,
+      npmHostId: row.npm_host_id,
+      globalConfig,
+      userId,
+      auditResource: row.service_name,
+      // Secondary rows are synthetic — recreated from the registry on the
+      // next provision — so they go away entirely. The primary row carries
+      // the user's enabled/authelia choices and must survive.
+      deleteRow: isSecondary,
+    });
+  }
+}
+
 /**
  * Ensure one NPM proxy host + Cloudflare Tunnel ingress route exist for a
  * single hostname (primary or secondary), recording status/errors against
@@ -299,6 +420,22 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
   const originUrl = getNpmOriginUrl(globalConfig.npmApiUrl);
   const serviceDef = getService(serviceName);
 
+  // A hostname rename (e.g. a service gaining exposureSubdomain) would
+  // otherwise strand the old one: ensureProxyHost matches on hostname, so it
+  // creates a second NPM host and leaves the first serving traffic.
+  if (exposureRow.hostname && exposureRow.hostname !== hostname) {
+    await deprovisionHostname({
+      exposureKey: serviceName,
+      hostname: exposureRow.hostname,
+      npmHostId: exposureRow.npm_host_id,
+      globalConfig,
+      userId,
+      auditResource: `${serviceName} (renamed from ${exposureRow.hostname})`,
+      deleteRow: false,
+    });
+    exposureRow.npm_host_id = null;
+  }
+
   const primaryResult = await provisionHostname({
     exposureKey: serviceName,
     hostname,
@@ -340,6 +477,28 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
       // provisionHostname itself never throws, but guard anyway — a
       // secondary exposure failure must never surface as a start failure.
       logger.error(`Secondary exposure provisioning failed for ${exposureKey}`, { error: error.message });
+    });
+  }
+
+  // Reconcile secondaries the registry no longer declares — e.g. NetBird's
+  // signal hostname, dropped when signal moved off the tunnel. Their rows and
+  // live resources would otherwise outlive the definition that created them.
+  const declaredKeys = new Set(additionalExposures.map((extra) => `${serviceName}:${extra.suffix}`));
+  const existingSecondaries = await query<ServiceExposureRow>(
+    `SELECT * FROM service_exposure WHERE service_name LIKE $1`,
+    [`${serviceName}:%`]
+  );
+  for (const row of existingSecondaries.rows) {
+    if (declaredKeys.has(row.service_name) || !row.hostname) continue;
+    logger.info(`Removing exposure for ${row.service_name}, no longer declared in the service registry`);
+    await deprovisionHostname({
+      exposureKey: row.service_name,
+      hostname: row.hostname,
+      npmHostId: row.npm_host_id,
+      globalConfig,
+      userId,
+      auditResource: `${row.service_name} (removed from registry)`,
+      deleteRow: true,
     });
   }
 

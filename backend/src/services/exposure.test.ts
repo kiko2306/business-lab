@@ -3,10 +3,10 @@ import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
 import { getPublishedUpstreamPort, getService } from '../config/services';
-import { ensureProxyHost } from './npmClient';
-import { ensureIngressRoute } from './cloudflareTunnelClient';
+import { deleteProxyHost, ensureProxyHost } from './npmClient';
+import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
-import { provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
+import { deprovisionServiceExposure, provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
 import { ServiceExposureRow, ExposureGlobalConfig } from '../types';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
@@ -20,8 +20,8 @@ vi.mock('../config/services', () => ({
   buildExposureHostname: (name: string, domain: string, suffix?: string) =>
     `${suffix ? `${name}-${suffix}` : name}.${domain}`,
 }));
-vi.mock('./npmClient', () => ({ ensureProxyHost: vi.fn() }));
-vi.mock('./cloudflareTunnelClient', () => ({ ensureIngressRoute: vi.fn() }));
+vi.mock('./npmClient', () => ({ ensureProxyHost: vi.fn(), deleteProxyHost: vi.fn() }));
+vi.mock('./cloudflareTunnelClient', () => ({ ensureIngressRoute: vi.fn(), removeIngressRoute: vi.fn() }));
 vi.mock('../utils/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
@@ -32,6 +32,8 @@ const mockedGetPublishedUpstreamPort = vi.mocked(getPublishedUpstreamPort);
 const mockedGetService = vi.mocked(getService);
 const mockedEnsureProxyHost = vi.mocked(ensureProxyHost);
 const mockedEnsureIngressRoute = vi.mocked(ensureIngressRoute);
+const mockedRemoveIngressRoute = vi.mocked(removeIngressRoute);
+const mockedDeleteProxyHost = vi.mocked(deleteProxyHost);
 const mockedWriteAuditLog = vi.mocked(writeAuditLog);
 
 const globalConfig: ExposureGlobalConfig = {
@@ -78,6 +80,8 @@ beforeEach(() => {
   mockedGetService.mockReturnValue(undefined);
   mockedEnsureProxyHost.mockReset();
   mockedEnsureIngressRoute.mockReset();
+  mockedRemoveIngressRoute.mockReset();
+  mockedDeleteProxyHost.mockReset();
   mockedWriteAuditLog.mockReset();
   mockedWriteAuditLog.mockResolvedValue(undefined);
 });
@@ -219,7 +223,7 @@ describe('provisionServiceIfEnabled', () => {
     mockedQuery.mockImplementation(async (text: unknown) => {
       const sql = String(text);
       if (sql.includes('SELECT * FROM service_exposure')) {
-        return { rows: [exposureRow({ service_name: 'netbird-vpn', npm_host_id: 5 })] } as never;
+        return { rows: [exposureRow({ service_name: 'netbird-vpn', hostname: 'netbird-vpn.example.com', npm_host_id: 5 })] } as never;
       }
       if (sql.includes('DO UPDATE SET hostname = EXCLUDED.hostname')) {
         // ensureSecondaryExposureRow upsert
@@ -278,7 +282,7 @@ describe('provisionServiceIfEnabled', () => {
     mockedQuery.mockImplementation(async (text: unknown) => {
       const sql = String(text);
       if (sql.includes('SELECT * FROM service_exposure')) {
-        return { rows: [exposureRow({ service_name: 'netbird-vpn', npm_host_id: 5 })] } as never;
+        return { rows: [exposureRow({ service_name: 'netbird-vpn', hostname: 'netbird-vpn.example.com', npm_host_id: 5 })] } as never;
       }
       if (sql.includes('DO UPDATE SET hostname = EXCLUDED.hostname')) {
         return {
@@ -339,5 +343,75 @@ describe('upsertServiceExposureConfig', () => {
     mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ enabled: true })] } as never);
 
     await expect(upsertServiceExposureConfig('paperless', { enabled: true })).resolves.toMatchObject({ enabled: true });
+  });
+});
+
+describe('exposure teardown', () => {
+  it('removes the old hostname when a service is renamed, instead of stranding it', async () => {
+    // ensureProxyHost matches on hostname, so without this the rename leaves
+    // the previous NPM host in place, still serving the old hostname.
+    mockedQuery.mockImplementation(async (text: unknown) => {
+      const sql = String(text);
+      if (sql.includes('SELECT * FROM service_exposure')) {
+        return {
+          rows: [exposureRow({ service_name: 'paperless', hostname: 'old-name.example.com', npm_host_id: 7 })],
+        } as never;
+      }
+      return { rows: [] } as never;
+    });
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedGetService.mockReturnValue(undefined as never);
+    mockedGetPublishedUpstreamPort.mockReturnValue(8000);
+    mockedGetHostGatewayIp.mockResolvedValue('172.17.0.1');
+    mockedEnsureProxyHost.mockResolvedValue({ id: 9, created: true, updated: false });
+    mockedEnsureIngressRoute.mockResolvedValue({ updated: true, dnsRecordId: 'dns-9' });
+
+    await provisionServiceIfEnabled('paperless', 1);
+
+    expect(mockedRemoveIngressRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'old-name.example.com' })
+    );
+    expect(mockedDeleteProxyHost).toHaveBeenCalledWith(
+      globalConfig.npmApiUrl,
+      globalConfig.npmEmail,
+      globalConfig.npmPassword,
+      7
+    );
+    // ...and the new hostname is still provisioned afterwards.
+    expect(mockedEnsureProxyHost).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'paperless.example.com' })
+    );
+  });
+
+  it('deprovisionServiceExposure tears down the primary and every secondary', async () => {
+    mockedQuery.mockImplementation(async (text: unknown) => {
+      const sql = String(text);
+      if (sql.includes('SELECT * FROM service_exposure')) {
+        return {
+          rows: [
+            exposureRow({ service_name: 'netbird-vpn', hostname: 'netbird-vpn.example.com', npm_host_id: 1 }),
+            exposureRow({ service_name: 'netbird-vpn:api', hostname: 'netbird-vpn-api.example.com', npm_host_id: 2 }),
+          ],
+        } as never;
+      }
+      return { rows: [] } as never;
+    });
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+
+    await deprovisionServiceExposure('netbird-vpn', 1);
+
+    expect(mockedRemoveIngressRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'netbird-vpn.example.com' })
+    );
+    expect(mockedRemoveIngressRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'netbird-vpn-api.example.com' })
+    );
+    expect(mockedDeleteProxyHost).toHaveBeenCalledTimes(2);
+  });
+
+  it('does nothing when exposure settings are incomplete', async () => {
+    mockedGetExposureConfig.mockResolvedValue(null);
+    await deprovisionServiceExposure('paperless', 1);
+    expect(mockedRemoveIngressRoute).not.toHaveBeenCalled();
   });
 });

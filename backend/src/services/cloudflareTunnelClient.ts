@@ -253,3 +253,78 @@ export async function ensureIngressRoute({
   const dnsRecordId = await ensureTunnelDnsRecord(apiToken, zoneId, tunnelId, hostname);
   return { updated, dnsRecordId };
 }
+
+export interface RemoveIngressRouteOptions {
+  apiToken: string;
+  accountId: string;
+  zoneId: string;
+  tunnelId: string;
+  hostname: string;
+}
+
+/**
+ * Remove a hostname's ingress rule and its DNS record — the inverse of
+ * ensureIngressRoute.
+ *
+ * Idempotent, and deliberately forgiving: a hostname that is already absent
+ * from either the tunnel config or DNS is a success, not an error. This runs
+ * when exposure is turned off or a hostname is renamed, and half-finished
+ * cleanup must be safe to re-run rather than wedging on the part that already
+ * happened.
+ *
+ * Only deletes a DNS record that points at THIS tunnel. A record someone
+ * repointed elsewhere by hand is left alone — deleting it would be destroying
+ * a resource this code no longer owns.
+ */
+export async function removeIngressRoute({
+  apiToken,
+  accountId,
+  zoneId,
+  tunnelId,
+  hostname,
+}: RemoveIngressRouteOptions): Promise<{ ingressRemoved: boolean; dnsRemoved: boolean }> {
+  const config = await getTunnelConfiguration(apiToken, accountId, tunnelId);
+  const ingress = Array.isArray(config.ingress) ? [...config.ingress] : [];
+  const remaining = ingress.filter((rule) => rule.hostname !== hostname);
+
+  let ingressRemoved = false;
+  if (remaining.length !== ingress.length) {
+    // Cloudflare rejects a config whose last rule has a hostname, so keep the
+    // catch-all. Removing the only hostname rule would otherwise leave an
+    // ingress list that fails validation.
+    if (!remaining.some((rule) => !rule.hostname)) {
+      remaining.push({ service: 'http_status:404' });
+    }
+    await putTunnelConfiguration(apiToken, accountId, tunnelId, { ...config, ingress: remaining });
+    ingressRemoved = true;
+  }
+
+  let dnsRemoved = false;
+  const listResponse = await requestJson<CloudflareApiEnvelope<DnsRecord[]>>(dnsRecordsUrl(zoneId, hostname), {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  });
+
+  if (listResponse.statusCode === 200 && listResponse.body?.success && listResponse.body.result) {
+    const owned = listResponse.body.result.find(
+      (record) =>
+        record.name.toLowerCase() === hostname.toLowerCase() &&
+        record.type === 'CNAME' &&
+        record.content.toLowerCase() === `${tunnelId}.cfargotunnel.com`
+    );
+
+    if (owned) {
+      const deleteResponse = await requestJson<CloudflareApiEnvelope<unknown>>(
+        `${dnsRecordsUrl(zoneId)}/${owned.id}`,
+        { method: 'DELETE', headers: { Authorization: `Bearer ${apiToken}` } }
+      );
+      if (deleteResponse.statusCode !== 200 && deleteResponse.statusCode !== 404) {
+        throw new Error(
+          `Unable to delete Cloudflare DNS record for ${hostname}: ${deleteResponse.body?.errors?.[0]?.message || deleteResponse.statusCode}`
+        );
+      }
+      dnsRemoved = true;
+    }
+  }
+
+  return { ingressRemoved, dnsRemoved };
+}
