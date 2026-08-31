@@ -11,6 +11,7 @@ Homelab Management is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL sys
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
 - User guide: [/docs/user-guide.md](/docs/user-guide.md)
 - Development guide: [/docs/development-guide.md](/docs/development-guide.md)
+- SSH key access: [/docs/ssh-keys.md](/docs/ssh-keys.md)
 - Security checklist: [/docs/security-checklist.md](/docs/security-checklist.md)
 
 ## Quick start
