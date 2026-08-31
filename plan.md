@@ -5230,11 +5230,15 @@ network, and every attempt through the tunnel before today looped forever
 Authelia (§46.11).
 
 `peer_status_connected` reads `false` at time of checking, which is expected —
-the app was no longer in the foreground; it is not a fault. Note the recorded
-`location_connection_ip` is on this LAN's own IPv6 prefix
-(`2a01:14:120:cfb0:...`), i.e. the phone was on home WiFi for that login, so
-**this has not yet exercised the CGNAT/mobile-data path** where §46.9's relay
-gap is most likely to bite.
+the app was no longer in the foreground; it is not a fault.
+
+> **CORRECTION (2026-08-31, §51.6).** The original text here read the
+> `location_connection_ip` `2a01:14:120:cfb0:...` as the phone's and concluded
+> "the phone was on home WiFi, so the CGNAT path is untested". That was a
+> **misattribution** — `2a01:14:120:cfb0:16b3:1fff:fe13:fbca` is *this
+> server's own* global IPv6. The phone's recorded connection IP is
+> `87.196.82.251` (Porto; the server is in Guimarães). The mobile-data path
+> has been exercised all along. See §51.6.
 
 **§0 principle 1 held**: no router port-forward, no static IP, no DDNS. The
 §20.10 / §24.6 port-forward exception was never needed and is now formally
@@ -6151,5 +6155,39 @@ safe and a rebuilt host reproduces it.
 - Does anything else in the stack want bidi gRPC? Only signal today, but the
   flag should be checked against future services.
 - Does the phone actually need relay once signal works, or does hole-punching
-  succeed on this network? Relay stays either way, but this determines whether
-  §46.9's CGNAT concern was ever real here.
+  succeed between mobile data and this host? Relay stays either way. Note the
+  phone **is** on mobile data (§51.6), so whatever B1 shows is the real
+  remote-peer answer, not a home-WiFi shortcut.
+
+### 51.6 Correction: the phone has been on mobile data all along
+
+User pushed back on the repeated "only tested on home WiFi" caveat. They were
+right; it originated in §46.13 and propagated from there. Checked properly:
+
+| | address | city (CF geo) |
+|---|---|---|
+| `home-srv-01` own public IPv6 (`ip -6 addr`, `ifconfig.co -6`) | `2a01:14:120:cfb0:16b3:1fff:fe13:fbca` | Guimarães |
+| `garnet_eea` (phone) `location_connection_ip` | `87.196.82.251` | Porto |
+
+§46.13 read the `2a01:14:120:cfb0:…` address as the *phone's* and concluded it
+was on the home LAN. It is the **server's own** global IPv6. In the signal
+vhost access log both addresses appear because the home peer hairpins out to
+its own public hostname through Cloudflare — so one of the two "clients"
+hitting signal is this host itself.
+
+Consequences:
+
+- **The CGNAT / mobile-data path is not an untested unknown.** Every
+  `ConnectStream` attempt from the phone today came from `87.196.82.251`, a
+  different network and city from the server. §50.2's failure is a genuine
+  remote-peer failure.
+- **§46.9's relay rationale is confirmed, not hypothetical** — the remote peer
+  really is off-network, so relay is on the likely path once signal works.
+- Any future "test it from mobile data first" advice is already satisfied;
+  don't re-raise it.
+
+Method note worth keeping: when reading `location_connection_ip` or proxy
+access logs on a host that is *also* a peer, always check the address against
+the host's own `ip -6 addr` before attributing it to a client. Two of this
+project's conclusions have now turned on that (§48.7's "auth problem" that was
+routing, and this one).
