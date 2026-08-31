@@ -104,6 +104,36 @@ services:
     networks:
       - netbird-net
 
+  # Fallback data path for peers that can't hole-punch a direct WireGuard
+  # tunnel (the common case for a phone on mobile-data CGNAT reaching a home
+  # peer with no port-forward). Signal only exchanges connection candidates;
+  # when none work, traffic has to relay through here instead.
+  #
+  # Unlike signal/management this is NOT gRPC — it's WebSocket over HTTPS,
+  # which is why it can traverse the Cloudflare Tunnel cleanly where a
+  # native-gRPC bidirectional stream cannot (see plan.md §46.7/§46.9). Its
+  # public hostname (netbird-vpn-relay.<base-domain>) is provisioned as a
+  # plain websocket exposure — the third additionalExposures entry on
+  # netbird-vpn in backend/src/config/services.ts, grpc:false.
+  #
+  # NB_EXPOSED_ADDRESS is what management hands to peers, so it must be the
+  # public rels:// URL (TLS terminates at Cloudflare/NPM; the container
+  # itself speaks plain ws on NB_LISTEN_ADDRESS). NB_AUTH_SECRET must match
+  # the Relay.Secret in data/management.json exactly — management mints
+  # time-based tokens with it that the relay verifies.
+  netbird-relay:
+    image: netbirdio/relay:latest
+    restart: unless-stopped
+    ports:
+      - "${NETBIRD_RELAY_PORT:-8087}:33080"
+    environment:
+      NB_LOG_LEVEL: info
+      NB_LISTEN_ADDRESS: ":33080"
+      NB_EXPOSED_ADDRESS: "rels://netbird-vpn-relay.${BASE_DOMAIN}:443"
+      NB_AUTH_SECRET: "${NETBIRD_RELAY_AUTH_SECRET}"
+    networks:
+      - netbird-net
+
 networks:
   netbird-net:
     driver: bridge

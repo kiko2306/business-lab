@@ -119,6 +119,9 @@ describe('buildProxyHostPayload', () => {
     expect(payload.http2_support).toBe(true);
     expect(payload.allow_websocket_upgrade).toBe(false);
     expect(payload.advanced_config).toContain('grpc_pass grpc://172.17.0.1:8080;');
+    // Long-lived NetBird streams (signal ConnectStream) must survive past the
+    // default 60s grpc_read_timeout or peer setup never completes.
+    expect(payload.advanced_config).toContain('grpc_read_timeout 3600s;');
     // Cloudflare requires a real TLS+HTTP2/ALPN hop to the origin for gRPC
     // to negotiate at all — see exposure.ts getNpmGrpcOriginUrl.
     expect(payload.certificate_id).toBe(42);

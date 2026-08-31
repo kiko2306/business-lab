@@ -452,16 +452,25 @@ if [ -n "$BASE_DOMAIN" ]; then
     chmod 600 apps/authelia/data/oidc-secrets.yml
   fi
 
+  # Relay's shared HMAC secret. Lives in .env (consumed by the relay
+  # container) and must be substituted identically into data/management.json
+  # below, so generate it before that step.
+  ensure_app_secret apps/netbird-vpn/.env NETBIRD_RELAY_AUTH_SECRET
+
   # NetBird's working config: the tracked template with the domain filled in
   # and a real store-encryption key generated. Never regenerated — the key
   # encrypts existing data.
   if [ ! -f apps/netbird-vpn/data/management.json ]; then
     log "Generating NetBird's management.json for ${BASE_DOMAIN}"
     mkdir -p apps/netbird-vpn/data
-    BASE_DOMAIN="$BASE_DOMAIN" python3 - <<'PY'
+    BASE_DOMAIN="$BASE_DOMAIN" \
+    NETBIRD_RELAY_AUTH_SECRET="$(app_env_value apps/netbird-vpn/.env NETBIRD_RELAY_AUTH_SECRET)" \
+    python3 - <<'PY'
 import base64, json, os, secrets
 tpl = open('apps/netbird-vpn/config/management.json.example').read()
-cfg = json.loads(tpl.replace('${BASE_DOMAIN}', os.environ['BASE_DOMAIN']))
+tpl = tpl.replace('${BASE_DOMAIN}', os.environ['BASE_DOMAIN'])
+tpl = tpl.replace('${NETBIRD_RELAY_AUTH_SECRET}', os.environ['NETBIRD_RELAY_AUTH_SECRET'])
+cfg = json.loads(tpl)
 cfg['DataStoreEncryptionKey'] = base64.b64encode(secrets.token_bytes(32)).decode()
 json.dump(cfg, open('apps/netbird-vpn/data/management.json', 'w'), indent=2)
 PY

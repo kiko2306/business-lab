@@ -143,25 +143,19 @@ identity_providers:
         grant_types:
           - 'authorization_code'
           - 'refresh_token'
+          # Native clients (desktop / headless CLI) that can't run the
+          # loopback listener fall back to the OAuth device-code grant, and
+          # NetBird's DeviceAuthorizationFlow is pointed at THIS client (not a
+          # separate netbird-cli) for the same reason the loopback redirect
+          # is: management validates the bearer's audience against
+          # HttpConfig.AuthAudience = 'netbird-dashboard', so the token has to
+          # be minted for this client_id. The device flow sends the id_token
+          # as the bearer (UseIDToken:true in management.json) because the
+          # access token Authelia issues for a public client is opaque and
+          # management validates it locally as a JWT.
+          - 'urn:ietf:params:oauth:grant-type:device_code'
         response_types:
           - 'code'
         token_endpoint_auth_method: 'none'
         require_pkce: true
         pkce_challenge_method: 'S256'
-      - client_id: 'netbird-cli'
-        client_name: 'NetBird CLI / Peer Login'
-        public: true
-        authorization_policy: 'one_factor'
-        consent_mode: 'implicit'
-        audience:
-          - 'netbird-cli'
-        scopes:
-          - 'openid'
-          - 'profile'
-          - 'email'
-          - 'offline_access'
-        grant_types:
-          - 'urn:ietf:params:oauth:grant-type:device_code'
-          - 'refresh_token'
-        response_types: []
-        token_endpoint_auth_method: 'none'

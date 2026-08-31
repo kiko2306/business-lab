@@ -70,9 +70,15 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // whatever Signal.URI data/management.json advertises. That has to be a
     // publicly resolvable hostname or remote peers can register but never
     // signal, so they never establish a tunnel to anything.
+    // relay is the WebSocket fallback data path (see the netbird-relay service
+    // in the compose file). grpc: false on purpose — it is plain WebSocket
+    // over HTTPS, so it wants NPM's websocket-upgrade support, not grpc_pass,
+    // and it traverses the Cloudflare Tunnel where signal's native-gRPC bidi
+    // stream cannot (plan.md §46.7/§46.9).
     additionalExposures: [
       { suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT', grpc: true },
       { suffix: 'signal', label: 'Signal', portEnvVar: 'NETBIRD_SIGNAL_PORT', grpc: true },
+      { suffix: 'relay', label: 'Relay', portEnvVar: 'NETBIRD_RELAY_PORT', grpc: false },
     ],
   },
   'home-assistant': {
