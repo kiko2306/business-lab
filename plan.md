@@ -7341,11 +7341,47 @@ VPS exists and its port-25 policy is known.
 3. **MeshCentral** — most likely to need a live troubleshooting session, so do
    it when there is time to enrol a real agent and watch it fail.
 
-### 62.5 Open questions
+### 62.5 Token scopes — measured 2026-08-31
 
-- Does the existing Cloudflare API token cover **Email Sending: Edit** and
-  **Email Routing: Edit**? Its current scopes (§51.7) do not list either, so a
-  token edit is likely needed — check before starting.
+User added **Account → Email Sending: Edit** and **Account → Email Routing
+Addresses: Edit**. Probed the live API rather than reading the list:
+
+| Call | Result |
+|---|---|
+| `GET /zones/{z}/email/routing` (settings) | **200** |
+| `GET /accounts/{a}/email/routing/addresses` | **200** |
+| `GET /zones/{z}/email/routing/rules` | **403** |
+
+**One permission still missing: `Zone → Email Routing Rules → Edit`.** The
+account-level "Email Routing Addresses" scope covers destination addresses
+only; the rules that actually route `you@domain` live at the *zone* level and
+are a separate permission. Without it, inbound routing cannot be configured
+via the API — the dashboard would still work by hand.
+
+Zone state, also measured: Email Routing is `enabled: false`,
+`status: unconfigured`, **zero** destination addresses, and the zone has **no
+MX, SPF or DMARC records at all**. So this is a clean starting point, with
+nothing to migrate or break.
+
+**Sending is dashboard-onboarded, not API.** Cloudflare's own docs describe
+Email Sending onboarding as a dashboard flow (Compute → Email Service → Email
+Sending → Onboard Domain), which then writes the DNS itself: MX for bounces on
+`cf-bounce`, `v=spf1 include:_spf.mx.cloudflare.net ~all`, a DKIM key on
+`cf-bounce._domainkey`, and a `_dmarc` policy. So §62.4 step 1 is partly a
+click-through, not something `start.sh` can fully automate — and that is fine,
+it is once per domain.
+
+### 62.6 Remaining open questions
+
+- Should SMTP credentials become a **global dashboard setting** (like the
+  Cloudflare/NPM ones) so apps inherit them? Probably yes, given ITFlow,
+  Vaultwarden, Uptime Kuma and n8n all want to send mail.
+- MeshCentral behind Authelia: does forward-auth break agent enrolment? Needs a
+  real agent to answer.
+- Adding SPF/DKIM/DMARC has a **side effect worth planning for**: once a DMARC
+  policy exists, anything else sending as this domain (including any future
+  self-hosted mailer) must be listed in SPF or it will start failing
+  authentication. Onboarding Email Sending first makes that the baseline.
 - Should SMTP credentials become a **global dashboard setting** (like the
   Cloudflare/NPM ones) so apps inherit them? Probably yes, given ITFlow,
   Vaultwarden, Uptime Kuma and n8n all want to send mail.
