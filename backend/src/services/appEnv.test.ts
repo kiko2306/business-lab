@@ -263,3 +263,63 @@ describe('ensureGeneratedSecrets', () => {
     expect(fs.existsSync(path.join(tmpDir, 'dozzle', '.env'))).toBe(false);
   });
 });
+
+// 'pihole' is a real registry entry whose compose publishes DNS on 53 (a
+// protocol port that must not move) alongside a web port at 10320 (freely
+// changeable). It is the clearest case of both behaviours in one service.
+describe('appEnv — fixed protocol ports are locked', () => {
+  let tmpDir: string;
+  let originalAppsDir: string | undefined;
+
+  const compose =
+    'services:\n' +
+    '  pihole:\n' +
+    '    ports:\n' +
+    '      - "${PIHOLE_DNS_PORT:-53}:53/tcp"\n' +
+    '      - "${PIHOLE_WEB_PORT:-10320}:80"\n';
+
+  beforeEach(() => {
+    tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'appenv-lock-'));
+    fs.mkdirSync(path.join(tmpDir, 'pihole'));
+    fs.writeFileSync(path.join(tmpDir, 'pihole', 'compose.yaml'), compose);
+    originalAppsDir = process.env.APPS_DIR;
+    process.env.APPS_DIR = tmpDir;
+    mockedExposureOverrides.mockResolvedValue({});
+  });
+
+  afterEach(() => {
+    fs.rmSync(tmpDir, { recursive: true, force: true });
+    if (originalAppsDir === undefined) delete process.env.APPS_DIR;
+    else process.env.APPS_DIR = originalAppsDir;
+  });
+
+  it('locks a sub-10000 default and leaves a managed one editable', async () => {
+    const status = await getServiceEnvStatus('pihole');
+    const dns = status?.fields.find((f) => f.key === 'PIHOLE_DNS_PORT');
+    const web = status?.fields.find((f) => f.key === 'PIHOLE_WEB_PORT');
+
+    expect(dns?.locked).toBe(true);
+    expect(dns?.lockedReason).toMatch(/port 53/i);
+    expect(web?.locked).toBe(false);
+    expect(web?.lockedReason).toBeNull();
+  });
+
+  it('never offers to move a locked port, even if something else holds it', async () => {
+    const status = await getServiceEnvStatus('pihole');
+    const dns = status?.fields.find((f) => f.key === 'PIHOLE_DNS_PORT');
+    // Suggesting an alternative for a fixed protocol port would invite exactly
+    // the change that breaks it.
+    expect(dns?.portInUse).toBe(false);
+    expect(dns?.suggestedPort).toBeNull();
+  });
+
+  it('refuses a write to a locked port — read-only in the UI is not the control', async () => {
+    await expect(saveServiceEnv('pihole', { PIHOLE_DNS_PORT: '5353' })).rejects.toMatchObject({
+      statusCode: 400,
+    });
+  });
+
+  it('accepts the unchanged value, so submitting the whole form still works', async () => {
+    await expect(saveServiceEnv('pihole', { PIHOLE_WEB_PORT: '10320' })).resolves.toBeTruthy();
+  });
+});

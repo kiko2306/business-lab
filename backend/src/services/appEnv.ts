@@ -25,6 +25,43 @@ const SECRET_PLACEHOLDERS = new Set(['', 'change-me', 'changeme', 'change_me', '
 // password in the global exposure settings.
 const SECRET_KEY_PATTERN = /PASSWORD|SECRET|TOKEN|_KEY$|APIKEY/i;
 
+// Managed app ports start here (see start.sh's allocator and docs/ports.md).
+// A compose default below this is a protocol port that must stay put.
+const MANAGED_PORT_FLOOR = 10000;
+
+/**
+ * The port keys a service must not have changed, derived from its compose
+ * defaults: anything below MANAGED_PORT_FLOOR is a protocol port.
+ *
+ * Shared by the read path (which renders them read-only) and the write path
+ * (which refuses them). Deriving both from one function is the point — a
+ * read-only input is a hint, not a control, and the two must not drift.
+ */
+function lockedPortKeys(composeContent: string): Set<string> {
+  const locked = new Set<string>();
+  for (const envVar of extractComposeEnvVars(composeContent)) {
+    if (!isPortKey(envVar.key)) continue;
+    const dflt = Number.parseInt(envVar.defaultValue ?? '', 10);
+    if (Number.isFinite(dflt) && dflt < MANAGED_PORT_FLOOR) {
+      locked.add(envVar.key);
+    }
+  }
+  return locked;
+}
+
+function lockedPortReason(serviceName: string, key: string): string {
+  if (serviceName === 'pihole') {
+    return 'DNS clients connect to port 53 and cannot be told to use another, so this must stay as it is.';
+  }
+  if (key === 'NPM_HTTPS_PORT') {
+    return 'The Cloudflare Tunnel connector uses this as its TLS origin. Changing it breaks every published hostname.';
+  }
+  if (key === 'NPM_HTTP_PORT') {
+    return 'The Cloudflare Tunnel connector uses this as its origin. Changing it breaks every published hostname.';
+  }
+  return 'A fixed protocol port other parts of the system depend on. Changing it breaks them.';
+}
+
 export interface ServiceEnvField {
   key: string;
   required: boolean;
@@ -55,6 +92,15 @@ export interface ServiceEnvField {
   // True for `*_PORT` keys — a host port the dashboard validates against
   // what's already published.
   isPort: boolean;
+  // A port that must not be changed, so the dashboard renders it read-only.
+  // These are the well-known protocol ports the rest of the system depends
+  // on being exactly where they are: NPM's 80/443 (the Cloudflare Tunnel
+  // connector's origin) and Pi-hole's 53 (DNS clients don't negotiate a
+  // port). Editing one doesn't produce a helpful error — it silently breaks
+  // ingress for every hostname, or DNS for the whole LAN. See docs/ports.md.
+  locked: boolean;
+  // Why it's locked, shown under the read-only field.
+  lockedReason: string | null;
   // Set only for port fields: whether the field's effective value (current
   // value, or the compose default) is a host port another service already
   // publishes, and if so the next free port to offer instead.
@@ -108,6 +154,14 @@ async function loadStatus(
     const effectivePort = isPort ? Number.parseInt(currentValue ?? envVar.defaultValue ?? '', 10) : NaN;
     const portInUse = Number.isFinite(effectivePort) && portsInUse.has(effectivePort);
 
+    // Same rule start.sh's allocator uses: managed app ports live at 10000+,
+    // so a compose default below that is a deliberate protocol port rather
+    // than an arbitrary choice. Deriving it from the default (not a hardcoded
+    // list of keys) means the two stay consistent by construction — a new app
+    // that legitimately needs a low port is locked automatically.
+    const defaultPort = isPort ? Number.parseInt(envVar.defaultValue ?? '', 10) : NaN;
+    const locked = isPort && Number.isFinite(defaultPort) && defaultPort < MANAGED_PORT_FLOOR;
+
     const suggestedValue =
       !isSet && !hidden && envVar.key === 'TZ'
         ? globalTimezone
@@ -130,8 +184,13 @@ async function loadStatus(
       defaultValue: envVar.defaultValue,
       suggestedValue,
       isPort,
-      portInUse,
-      suggestedPort: portInUse ? nextFreePort(effectivePort + 1, portsInUse) : null,
+      locked,
+      lockedReason: locked ? lockedPortReason(serviceName, envVar.key) : null,
+      // A locked port can't collide with anything the dashboard would move,
+      // and offering a "suggested port" for one would invite exactly the
+      // change that breaks it.
+      portInUse: locked ? false : portInUse,
+      suggestedPort: !locked && portInUse ? nextFreePort(effectivePort + 1, portsInUse) : null,
     };
   });
 
@@ -159,6 +218,26 @@ export async function saveServiceEnv(
   const resolved = resolveComposeFile(serviceName);
   if (!resolved?.composeFile) {
     throw { statusCode: 404, message: `Service ${serviceName} is not installed.` } as HttpError;
+  }
+
+  // Refuse a change to a fixed protocol port before anything else. The UI
+  // renders these read-only, but that is presentation — this is the control.
+  const lockedKeys = lockedPortKeys(fs.readFileSync(resolved.composeFile, 'utf8'));
+  const currentForLockCheck = fs.existsSync(path.join(resolved.appDir, '.env'))
+    ? parseEnvFile(path.join(resolved.appDir, '.env'))
+    : {};
+  for (const [key, value] of Object.entries(values)) {
+    if (!lockedKeys.has(key)) continue;
+    const incoming = value.trim();
+    // Echoing back the unchanged value is fine — only an actual change is an
+    // error, so a client that submits the whole form still works.
+    const existing = (currentForLockCheck[key] ?? '').trim();
+    if (incoming && incoming !== existing) {
+      throw {
+        statusCode: 400,
+        message: `${key} is a fixed port and cannot be changed. ${lockedPortReason(serviceName, key)}`,
+      } as HttpError;
+    }
   }
 
   await assertPortsAvailable(serviceName, resolved.projectName, values);

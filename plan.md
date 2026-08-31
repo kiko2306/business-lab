@@ -7050,3 +7050,60 @@ which is the honest place for it. A test asserts both halves of that: the
 generatable ones are declared, and the third-party one is not.
 
 Suite **136/136**.
+
+## 60. Fixed protocol ports are read-only in the dashboard
+
+User's request: a port that cannot be changed should not be offered as an
+editable field.
+
+### 60.1 Derived, not listed
+
+A port is locked when its **compose default is below 10000** — the same rule
+`start.sh`'s allocator uses to decide what it may reallocate (§59.2). Deriving
+both from one threshold means they cannot drift: an app that legitimately needs
+a low port is locked automatically, with no list of keys to maintain.
+
+Today that is exactly `NPM_HTTP_PORT` (80), `NPM_HTTPS_PORT` (443) and
+`PIHOLE_DNS_PORT` (53). Verified live: those three report `locked=true`, while
+`NPM_ADMIN_PORT` and `PIHOLE_WEB_PORT` stay editable.
+
+Each carries a reason, shown under the field, because "you can't change this"
+without a why invites someone to work around it:
+
+- DNS clients connect to 53 and cannot be told to use another port.
+- The Cloudflare Tunnel connector uses NPM's 80/443 as its origin — changing
+  either breaks every published hostname.
+
+### 60.2 Read-only is presentation; the refusal is the control
+
+`saveServiceEnv` rejects a change to a locked port with a 400 before it
+validates anything else. A read-only input is a hint — a crafted request, a
+stale client or a future UI change would otherwise write it. Both paths call
+the same `lockedPortKeys()` helper, so the field the UI disables and the field
+the API refuses are the same set by construction.
+
+Submitting the **unchanged** value is allowed, so a client that posts the whole
+form still works; only an actual change is an error. The client also skips
+locked fields entirely now, alongside hidden and managed ones.
+
+Four tests: locked vs editable in one service, no "suggested port" offered for
+a locked one (that would invite the very change that breaks it), the write
+refused, and the unchanged value accepted. **140/140.**
+
+### 60.3 The two operational gotchas — permanent fixes
+
+**"Restart managed apps through the executor, not `docker compose`."**
+Not fixable, and shouldn't be: it is §0 principle 2 working as designed. The
+exposure overrides are passed as *process env* to `docker compose`, deliberately
+— the app's `.env` keeps the not-exposed `localhost:<port>` fallback, and the
+public URL is overlaid at runtime only while exposure is on. Persisting the
+overlay into `.env` would look tidier and would make manual compose runs work,
+but it would **destroy the fallback**: disabling exposure would leave a stale
+`https://…` behind instead of reverting to localhost. The current split is
+correct. What was wrong was bypassing the dashboard, which is what principle 2
+already says not to do.
+
+**"Portainer has no `.env`, so `--env-file` fails."** Already fixed by §59's
+allocator, which creates an app's `.env` when one is missing rather than
+assuming it exists — verified against a scratch copy of portainer's compose
+file. A `.env.example` was added too, so portainer matches every other app.

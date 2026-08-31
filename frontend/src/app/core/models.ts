@@ -186,6 +186,10 @@ export interface ServiceEnvField {
   // True for `*_PORT` keys — a host port validated against what's already
   // published by other services.
   isPort: boolean;
+  // A fixed protocol port (NPM's 80/443, Pi-hole's 53). Rendered read-only —
+  // the backend also refuses to write it. See docs/ports.md.
+  locked: boolean;
+  lockedReason: string | null;
   // Port fields only: whether the effective value collides with a port
   // another service already publishes, and the next free port to offer.
   portInUse: boolean;

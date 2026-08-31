@@ -181,8 +181,24 @@
                 : 'Set automatically — follows this service\'s public URL once exposure is enabled.' }}
             </div>
 
+            <!-- Fixed protocol port (NPM 80/443, Pi-hole 53) — read-only.
+                 Changing one doesn't fail loudly, it silently breaks ingress
+                 for every hostname or DNS for the whole LAN, so it isn't
+                 offered as an editable field at all. -->
             <input
-              *ngIf="!field.managed && !field.boolean && !field.secret"
+              *ngIf="!field.managed && field.locked"
+              type="text"
+              class="form-control form-control-sm"
+              [id]="'env-' + service.name + '-' + field.key"
+              [value]="field.value ?? field.defaultValue ?? ''"
+              readonly
+            />
+            <div *ngIf="!field.managed && field.locked" class="form-text small">
+              {{ field.lockedReason }}
+            </div>
+
+            <input
+              *ngIf="!field.managed && !field.locked && !field.boolean && !field.secret"
               type="text"
               [attr.inputmode]="field.isPort ? 'numeric' : null"
               class="form-control form-control-sm"

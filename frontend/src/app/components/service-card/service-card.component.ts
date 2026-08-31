@@ -399,8 +399,11 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
           this.envValues = {};
           for (const field of env.fields) {
             // Hidden secrets are generated server-side on save; managed keys
-            // follow the exposure hostname — the client submits neither.
-            if (field.hidden || field.managed) {
+            // follow the exposure hostname; locked keys are fixed protocol
+            // ports the backend refuses to write. The client submits none of
+            // them — the read-only inputs render straight from the field, not
+            // from envValues.
+            if (field.hidden || field.managed || field.locked) {
               continue;
             }
             if (field.boolean) {
