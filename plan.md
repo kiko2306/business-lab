@@ -5991,18 +5991,165 @@ choice.
 
 ### 50.9 Next steps, in order
 
-1. **Upgrade cloudflared to 2026.8.3 and re-test QUIC** (released
-   2026-08-31, we run 2026.8.2). Zero cost, and if the trailers bug is fixed
-   it collapses the whole problem to one flag — the same shape of fix as
-   §46.7. Release notes carry only checksums, so this is a try-it-and-see.
-   Test = §46.1 row-3 curl for `grpc-status: 0`, then `netbird status` for
-   `Management: Connected` **and** `Signal: Connected`.
-2. **If still broken → Option B** (second `cloudflared`, `--protocol quic`,
-   signal hostname only). Keeps §0 principle 1. Known risk: signal's unary
-   `Send` may hit the trailers bug under QUIC even though `ConnectStream`
-   works — that is exactly what the live test settles.
-3. **If B fails → Option A** (router port-forward for the signal hostname
-   only). Breaks §0 principle 1; only take it if 1 and 2 both fail.
+1. ~~**Upgrade cloudflared to 2026.8.3 and re-test QUIC**~~ **DONE — FAILED.**
+   Upgraded and flipped to `--protocol quic` (all four connections
+   registered `protocol=quic`). Management still dies with
+   `server closed the stream without sending trailers`. Confirmed at the
+   wire level, not just via the client — raw curl to
+   `/management.ManagementService/GetServerKey`:
+
+   ```
+   HTTP/2 200 / content-type: application/grpc / 60-byte body
+   ...and no grpc-status trailer at all
+   ```
+
+   The §20.9 signature, unchanged in 2026.8.3. Reverted to `http2`.
+2. **Option B** — second `cloudflared` on `--protocol quic`, signal only.
+   Full plan in §51.
+3. ~~**Option A** (router port-forward)~~ — **withdrawn, see §51.1.**
 
 Whichever lands, the §50.3 relay and §50.5 timeout work is a prerequisite for
 the eventual CGNAT path and stays.
+
+## 51. Plan (next session): signal on a second QUIC connector — B1 spike, then B2
+
+**Status: not started.** Written 2026-08-31 at the end of §50, to be picked up
+cold. Everything needed to execute is in this section.
+
+### 51.1 Why this, and why Option A is withdrawn
+
+NetBird needs two gRPC behaviours that **one** cloudflared connector cannot
+provide simultaneously (measured, §50.2/§50.4/§50.9):
+
+| transport | unary + trailers (management) | bidi streaming (signal `ConnectStream`) |
+|---|---|---|
+| `http2` | works | broken — stream opens, client→server body never flushes |
+| `quic`  | broken — `stream closed without trailers` | works |
+
+Both confirmed on cloudflared **2026.8.3** (current). No NPM directive bridges
+it: §50.5's `grpc_read_timeout` bump removed the 60 s teardown but not the
+buffering. §50.8 ruled out signal-over-WebSocket — the ws-proxy client is
+WASM-only (`dialer_js.go`); the native dialer discards the component path.
+
+So: **run two connectors and split by protocol.** Management, dashboard, relay
+and every other app stay on the existing `http2` tunnel; only
+`netbird-vpn-signal` moves to a second `quic` tunnel.
+
+**Option A (router port-forward for the signal hostname) is withdrawn** by the
+user's decision, 2026-08-31 — it breaks §0 principle 1, which is
+non-negotiable. It should not be re-proposed. If B fails, the honest answer is
+"self-hosted NetBird cannot fully traverse a Cloudflare Tunnel", and the
+fallback is a different overlay (Tailscale, already in the stack), not a
+router change.
+
+**Why B is expected to work.** The trailers bug only breaks calls that must
+*terminate*. The signal vhost's access log shows both peers calling **only**
+`SignalExchange/ConnectStream` — no unary `Send`. A long-lived bidi stream
+never sends trailers anyway, so the bug is not on its path.
+
+### 51.2 Facts needed to execute (verified 2026-08-31)
+
+| | |
+|---|---|
+| CF account id | `59e4586e167be8dcd5911159d5413c2d` |
+| CF zone id | `beb5ec7b05175c74bde76a68e4c81519` |
+| Tunnel A id (existing, http2) | `c10f64f0-5dfc-4ecb-8fb9-d87b8d5a342c` |
+| Base domain | `tx-home-utils.com` |
+| gRPC origin (what tunnel ingress points at) | `https://192.168.1.23:443` |
+| Existing unit | `/etc/systemd/system/cloudflared.service`, token at `/etc/cloudflared/token`, `--protocol http2` forced by `override.conf` |
+| Signal hostname / NPM vhost | `netbird-vpn-signal.tx-home-utils.com` → `proxy_host/33.conf` → `10.201.0.1:8086` |
+
+Ingress for the signal hostname must be created on tunnel B with the same
+origin options the automation uses for gRPC (see `provisionHostname` in
+`backend/src/services/exposure.ts`): `http2Origin: true`, `noTLSVerify: true`,
+`originServerName: <hostname>`, plus a catch-all `http_status:404` rule last.
+
+**Routing is decided by the DNS CNAME target**, not by which tunnels hold the
+ingress. So the spike does not need to remove anything from tunnel A — leave
+it, and rollback is a single DNS flip back to
+`c10f64f0-5dfc-4ecb-8fb9-d87b8d5a342c.cfargotunnel.com`.
+
+### 51.3 B1 — disposable spike (goal: prove signal works over QUIC)
+
+Prerequisite: a Cloudflare API token with **Cloudflare Tunnel: Edit** on the
+account (the app's existing token has Zone DNS rights; tunnel-create may need
+adding). `sudo` on `home-srv-01` throughout.
+
+1. **Create tunnel B** (`netbird-signal-quic`) — dashboard or
+   `POST /accounts/<acct>/cfd_tunnel`. Record its **id** and **token**.
+2. **Add signal ingress to tunnel B** —
+   `PUT /accounts/<acct>/cfd_tunnel/<tunnelB>/configurations` with one rule for
+   `netbird-vpn-signal.tx-home-utils.com` → `https://192.168.1.23:443`
+   (`http2Origin`, `noTLSVerify`, `originServerName`), then the 404 catch-all.
+3. **Second connector on the host**, explicitly QUIC — note the flag goes on
+   `ExecStart` because §46.10's `TUNNEL_TRANSPORT_PROTOCOL` drop-in only
+   applies to `cloudflared.service`:
+   ```
+   /etc/cloudflared/token-signal            (0600, tunnel B's token)
+   /etc/systemd/system/cloudflared-signal.service
+     ExecStart=/usr/bin/cloudflared --no-autoupdate --protocol quic \
+       tunnel run --token-file /etc/cloudflared/token-signal
+   ```
+   `daemon-reload`, `enable --now`. Expect `Initial protocol quic`.
+4. **Flip signal's DNS CNAME** to `<tunnelB>.cfargotunnel.com` (stay proxied).
+5. **Verify, in order** — do not skip to step 3 of the list:
+   - tunnel A still `protocol=http2`; dashboard + management unaffected
+     (`netbird-vpn.<domain>` 302, management `GetServerKey` curl still returns
+     `grpc-status: 0`);
+   - `sudo systemctl restart netbird && netbird status --detail` on the home
+     host → **`Management: Connected` AND `Signal: Connected`**, and the
+     command *returns* instead of hanging (the hang is the engine blocking on
+     `wait for signal stream`, so a prompt return is itself the signal);
+   - relay picks up: `Relays:` populated; peers show `Connected`;
+   - phone (on **mobile data**, not WiFi — §46.13) opens `192.168.1.1`.
+6. **Teardown if it fails**: flip DNS back to tunnel A, `disable --now
+   cloudflared-signal`, delete the unit + token, delete tunnel B.
+
+**Known fragility, and the reason B1 is explicitly disposable**: the app's
+exposure automation stores exactly one `exposure_cloudflare_tunnel_id`, and
+`ensureTunnelDnsRecord` rewrites each hostname's CNAME to
+`${tunnelId}.cfargotunnel.com`. So **any re-provision of `netbird-vpn` drags
+signal back to tunnel A and silently breaks it again.** Do not leave B1 in
+place as a permanent state — it is the §17.2 / §46.15 out-of-repo footgun in
+its purest form. Either follow with B2 or tear it down.
+
+### 51.4 B2 — make it durable and repo-managed (only if B1 succeeds)
+
+Goal: the second tunnel becomes a first-class concept so re-provisioning is
+safe and a rebuilt host reproduces it.
+
+- **`backend/src/types/index.ts`** — `ServiceAdditionalExposure` gains a
+  semantic flag, e.g. `bidiStreaming?: boolean` (name it for *why*, not for
+  "use tunnel 2": it documents that this upstream needs a QUIC connector
+  because it holds a bidirectional gRPC stream).
+- **`backend/src/config/services.ts`** — set it on the `signal` entry only.
+- **Settings** — a second, optional tunnel id (e.g.
+  `exposure_cloudflare_tunnel_id_bidi`) alongside the existing one, plus its
+  token for the connector. Optional by design: when unset, everything falls
+  back to the single tunnel and today's behaviour is unchanged.
+- **`backend/src/services/exposure.ts`** — `provisionHostname` takes the
+  `tunnelId` to use; `provisionServiceIfEnabled` picks the bidi tunnel for
+  flagged exposures when it is configured, else the default. `ensureIngressRoute`
+  and `ensureTunnelDnsRecord` already take `tunnelId`, so the change is
+  threading it through, not new Cloudflare logic.
+- **`service_exposure`** — consider recording which tunnel a row was
+  provisioned into, so a later reconcile can detect drift.
+- **`start.sh`** — assert the second connector the way §46.10 asserts the
+  http2 drop-in: write `cloudflared-signal.service` (or a drop-in) with
+  `--protocol quic`, order-independent, no-op on re-run, `warn` never `exit`.
+- **UI** — the second tunnel id/token belong in the exposure settings form,
+  per §0 principle 2 (no console configuration).
+- **Tests** — extend `exposure.test.ts`: a flagged additionalExposure
+  provisions into the bidi tunnel id; an unflagged one into the default; and
+  with no bidi tunnel configured, a flagged one still uses the default.
+
+### 51.5 Open questions to settle during B1
+
+- Does the app's existing Cloudflare token have tunnel-create rights, or does
+  a new/edited token need to be issued? (Affects whether B2 can create tunnel
+  B itself or must be handed an id.)
+- Does anything else in the stack want bidi gRPC? Only signal today, but the
+  flag should be checked against future services.
+- Does the phone actually need relay once signal works, or does hole-punching
+  succeed on this network? Relay stays either way, but this determines whether
+  §46.9's CGNAT concern was ever real here.
