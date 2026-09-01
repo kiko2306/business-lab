@@ -274,10 +274,23 @@ export interface AdminUserListResponse {
   items: AdminUser[];
 }
 
+export interface DiskUsage {
+  name: string;
+  path: string;
+  percentUsed: number;
+  totalBytes: number;
+  usedBytes: number;
+  availableBytes: number;
+}
+
 export interface HealthStatus {
   status: 'ok' | 'degraded';
   database: string;
-  disk: { percentUsed: number; totalBytes: number; usedBytes: number; availableBytes: number };
+  // One entry per filesystem worth watching: `docker` is wherever Docker's
+  // data root lives, `system` is the host's own root. They are the same
+  // filesystem until the data root is moved off it, and the API sends one
+  // entry while that is true.
+  disks: DiskUsage[];
   memory: { percentUsed: number; totalBytes: number; usedBytes: number };
   load: { oneMinute: number; loadPerCpu: number };
   thresholds: { diskPercent: number; memoryPercent: number; loadPerCpu: number };

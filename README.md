@@ -161,11 +161,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Next up (2026-09-02)
 
-- [ ] **Health check: report both filesystems** (§83.3) — `df -Pk /` in the
-      backend measures whichever filesystem Docker's data root is on, so after
-      the move below the host's root would stop being watched entirely. Mount
-      `/` read-only at `/hostfs`, report `docker` and `system` as two rows,
-      alert on either. Ships **before** the move, not after.
 - [ ] **Move Docker's data root to /home** (§83.4) — `/` is 68% full with
       Docker's 58 GB while `/home` sits at 9% of 134 GiB. Opt-in via
       `sudo DOCKER_DATA_ROOT=/home/docker ./start.sh`: preflight the space,

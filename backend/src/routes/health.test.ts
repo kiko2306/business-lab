@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDfOutput } from './health';
+import { dedupeDisks, parseDfOutput } from './health';
 
 describe('parseDfOutput', () => {
   // Verbatim `df -Pk /` from the host this runs on.
@@ -45,5 +45,40 @@ describe('parseDfOutput', () => {
       usedBytes: 0,
       availableBytes: 0,
     });
+  });
+});
+
+describe('dedupeDisks', () => {
+  const disk = (name: string, path: string, totalBytes: number, usedBytes: number) => ({
+    name,
+    path,
+    percentUsed: Math.round((usedBytes / totalBytes) * 100),
+    totalBytes,
+    usedBytes,
+    availableBytes: totalBytes - usedBytes,
+  });
+
+  it('collapses two views of the same filesystem into one row', () => {
+    // Before Docker's data root moves, / and /hostfs are the same device, and
+    // showing the identical numbers twice reads as a bug.
+    const rows = dedupeDisks([
+      disk('docker', '/', 105_000_000_000, 58_000_000_000),
+      disk('system', '/hostfs', 105_000_000_000, 58_000_000_000),
+    ]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].name).toBe('docker');
+  });
+
+  it('keeps both once they are genuinely different filesystems', () => {
+    const rows = dedupeDisks([
+      disk('docker', '/', 144_000_000_000, 57_000_000_000),
+      disk('system', '/hostfs', 105_000_000_000, 10_000_000_000),
+    ]);
+    expect(rows.map((row) => row.name)).toEqual(['docker', 'system']);
+  });
+
+  it('keeps a single row when only one filesystem could be measured', () => {
+    // /hostfs is absent in dev and CI; one row is the correct answer there.
+    expect(dedupeDisks([disk('docker', '/', 105_000_000_000, 58_000_000_000)])).toHaveLength(1);
   });
 });

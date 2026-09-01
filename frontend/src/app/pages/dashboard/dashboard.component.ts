@@ -10,6 +10,7 @@ import { OperationsService } from '../../core/operations.service';
 import {
   BackupFile,
   BackupScheduleConfig,
+  DiskUsage,
   HealthStatus,
   ServiceAction,
   ServiceCategory,
@@ -336,7 +337,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return `${value >= 10 || unit <= 1 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
   }
 
+  /** "docker" -> "Docker storage", for the disk rows and their alerts. */
+  protected diskLabel(name: string): string {
+    return name === 'docker' ? 'Docker storage' : 'System root';
+  }
+
   protected metricLabel(metric: string): string {
+    if (metric.startsWith('disk:')) {
+      return `${this.diskLabel(metric.slice('disk:'.length))} usage`;
+    }
     switch (metric) {
       case 'disk':
         return 'Disk usage';
@@ -352,6 +361,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   /** Load is a ratio, disk and memory are percentages — format accordingly. */
   protected formatMetric(metric: string, value: number): string {
     return metric === 'load' ? value.toFixed(2) : `${Math.round(value)}%`;
+  }
+
+  /** True while both rows are the same filesystem — before a data-root move. */
+  protected isAlertingDisk(health: HealthStatus, disk: DiskUsage): boolean {
+    return health.alerts.some((alert) => alert.metric === 'disk' || alert.metric === `disk:${disk.name}`);
   }
 
   /**

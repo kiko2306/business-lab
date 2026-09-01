@@ -9351,3 +9351,31 @@ Sequence, and every step matters:
 3. Run the move.
 4. Verify every app came back, images intact, dashboard reporting ~134 GiB.
 5. Remove the old tree only after a few days of that holding.
+
+### 83.3a Built: the health check watches both filesystems
+
+`/` is bind-mounted read-only at `/hostfs` for the backend, and `getDisks()`
+measures both it and the container's own `/` — the latter being wherever
+Docker's data root is, since that is what backs the overlay.
+
+Two details that only showed up in the building:
+
+- **They are the same filesystem today**, so reporting both would print the
+  identical row twice and read as a bug. `dedupeDisks` collapses rows sharing a
+  total/used pair, so the card shows one "Disk usage" row now and splits into
+  "Docker storage" / "System root" the moment the data root moves. Nothing to
+  change on the day.
+- **A filesystem that cannot be measured is omitted, not zeroed.** `/hostfs`
+  does not exist in dev or CI, and a row claiming 0% used would be an invented
+  healthy number — worse than a missing row.
+
+Alerts name the filesystem once there is more than one (`disk:docker`,
+`disk:system`), so "disk is at 91%" says which.
+
+Verified live: `getDisks()` through the shipped build returns exactly one row
+(98 GiB, 58% after the prune), and `/hostfs` is mounted and readable — the
+`/home` LV measures 134 GiB at 9% through the same container, which is what the
+second row will show after the move.
+
+Also done, step 1 of §83.5: `docker builder prune -f` + `docker image prune -f`
+freed 10 GB. `/` went 68% → 58%, and the tree to copy is 47 GB rather than 58.

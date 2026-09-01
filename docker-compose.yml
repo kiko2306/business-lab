@@ -52,6 +52,12 @@ services:
       # Compose files themselves are only ever read, never written, by
       # backend code.
       - ${APPS_DIR:?APPS_DIR must be set to an absolute path in .env}:${APPS_DIR}
+      # Read-only view of the host root, purely so the health check can df it.
+      # Without this the only filesystem the backend can measure is its own
+      # overlay — which follows Docker's data-root, so moving that storage to
+      # another filesystem would leave the host's root silently unwatched
+      # (plan.md §83.3).
+      - /:/hostfs:ro
       - backups-data:/app/backups
     depends_on:
       database:

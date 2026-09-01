@@ -76,8 +76,62 @@ export function parseDfOutput(stdout: string): DiskUsage {
   };
 }
 
-async function getDisk(): Promise<DiskUsage> {
-  return parseDfOutput(await runCommand('df', ['-Pk', '/']));
+/**
+ * Where the backend's own container root lives — which is Docker's data root,
+ * because that is what backs the overlay. It follows a `data-root` move
+ * automatically (§83.2), which is the point: it always measures the filesystem
+ * images and volumes are actually piling up on.
+ */
+const DOCKER_DISK_PATH = '/';
+/**
+ * The host's root filesystem, bind-mounted read-only. Once Docker's storage
+ * moves off the root LV, nothing else would be watching the filesystem holding
+ * the OS and its logs — it would fill up with the dashboard reporting a
+ * healthy figure for somewhere else entirely (§83.3).
+ */
+const SYSTEM_DISK_PATH = '/hostfs';
+
+export interface NamedDiskUsage extends DiskUsage {
+  name: string;
+  path: string;
+}
+
+async function measureDisk(name: string, path: string): Promise<NamedDiskUsage | null> {
+  try {
+    return { name, path, ...parseDfOutput(await runCommand('df', ['-Pk', path])) };
+  } catch {
+    // /hostfs is absent in dev and in CI, where there is no host to mount.
+    // A filesystem that cannot be measured is left out rather than reported
+    // as 0% — an invented healthy number is worse than a missing row.
+    return null;
+  }
+}
+
+/**
+ * Both filesystems worth watching, deduplicated by device size: before the
+ * data-root move they are the same filesystem, and showing one row twice
+ * would just look like a bug.
+ */
+export async function getDisks(): Promise<NamedDiskUsage[]> {
+  const measured = await Promise.all([
+    measureDisk('docker', DOCKER_DISK_PATH),
+    measureDisk('system', SYSTEM_DISK_PATH),
+  ]);
+  return dedupeDisks(measured.filter((disk): disk is NamedDiskUsage => disk !== null));
+}
+
+export function dedupeDisks(disks: NamedDiskUsage[]): NamedDiskUsage[] {
+  const seen = new Set<string>();
+  return disks.filter((disk) => {
+    // Same size and same used bytes means the same filesystem seen twice —
+    // df reports the backing device, and a bind mount of / shares it.
+    const key = `${disk.totalBytes}:${disk.usedBytes}`;
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
 }
 
 router.get('/thresholds', async (_req: Request, res: Response) => {
@@ -117,13 +171,12 @@ router.put('/thresholds', validateBody(schemas.healthThresholds), async (req: Re
 
 async function systemHealthHandler(_req: Request, res: Response) {
   try {
-    const [dbResult, thresholds, disk] = await Promise.all([
+    const [dbResult, thresholds, disks] = await Promise.all([
       query<{ ok: number }>('SELECT 1 AS ok'),
       getThresholds(),
-      getDisk(),
+      getDisks(),
     ]);
 
-    const diskPercent = disk.percentUsed;
     const memTotal = os.totalmem();
     const memFree = os.freemem();
     const memUsed = memTotal - memFree;
@@ -133,8 +186,15 @@ async function systemHealthHandler(_req: Request, res: Response) {
     const loadPerCpu = oneMinuteLoad / cpuCount;
 
     const alerts: { metric: string; value: number; threshold: number }[] = [];
-    if (diskPercent >= thresholds.diskPercent) {
-      alerts.push({ metric: 'disk', value: diskPercent, threshold: thresholds.diskPercent });
+    // One alert per filesystem, named, so "disk is at 91%" says which one.
+    for (const disk of disks) {
+      if (disk.percentUsed >= thresholds.diskPercent) {
+        alerts.push({
+          metric: disks.length > 1 ? `disk:${disk.name}` : 'disk',
+          value: disk.percentUsed,
+          threshold: thresholds.diskPercent,
+        });
+      }
     }
     if (memoryPercent >= thresholds.memoryPercent) {
       alerts.push({ metric: 'memory', value: memoryPercent, threshold: thresholds.memoryPercent });
@@ -146,7 +206,7 @@ async function systemHealthHandler(_req: Request, res: Response) {
     return res.json({
       status: alerts.length ? 'degraded' : 'ok',
       database: dbResult.rows[0]?.ok === 1 ? 'ok' : 'error',
-      disk,
+      disks,
       memory: { percentUsed: memoryPercent, totalBytes: memTotal, usedBytes: memUsed },
       load: { oneMinute: oneMinuteLoad, loadPerCpu },
       thresholds,

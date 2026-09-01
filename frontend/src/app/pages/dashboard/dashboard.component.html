@@ -325,10 +325,14 @@
             </span>
           </div>
           <div class="small">Database: {{ health.database }}</div>
-          <div class="small" [class.fw-semibold]="isAlerting(health, 'disk')">
-            Disk usage: {{ health.disk.percentUsed }}% of {{ formatBytes(health.disk.totalBytes) }}
+          <div class="small" *ngFor="let disk of health.disks" [class.fw-semibold]="isAlertingDisk(health, disk)">
+            <!-- Two rows only once Docker's storage lives on its own
+                 filesystem; until then both names describe the same one and
+                 the API sends a single entry. -->
+            {{ health.disks.length > 1 ? diskLabel(disk.name) : 'Disk usage' }}:
+            {{ disk.percentUsed }}% of {{ formatBytes(disk.totalBytes) }}
             <span class="text-body-secondary">
-              ({{ formatBytes(health.disk.availableBytes) }} free · alerts at {{ health.thresholds.diskPercent }}%)
+              ({{ formatBytes(disk.availableBytes) }} free · alerts at {{ health.thresholds.diskPercent }}%)
             </span>
           </div>
           <div class="small" [class.fw-semibold]="isAlerting(health, 'memory')">
