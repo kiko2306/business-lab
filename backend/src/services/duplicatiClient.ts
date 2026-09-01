@@ -229,3 +229,33 @@ export async function runBackupJobNow(duplicatiPassword: string): Promise<{ star
     return { started: false, detail: (error as Error).message };
   }
 }
+
+/**
+ * Ask Duplicati to test a destination URL, without creating or running a job.
+ *
+ * This is the authoritative check for a backend-family destination (Google
+ * Drive and friends), which cannot be mounted and so cannot be probed the way
+ * disk/SMB/NFS are. Duplicati lists the destination's contents using the same
+ * code path a backup uses, so whatever it says here is what a backup will do —
+ * in seconds rather than after a failed upload.
+ *
+ * The URL must be built from our own settings, not read back from a saved job:
+ * Duplicati masks secrets in the job it returns, and testing that value fails
+ * with "Unmasked URL contains password placeholder".
+ */
+export async function testDestinationUrl(duplicatiPassword: string, url: string): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const token = await login(duplicatiPassword);
+    const result = await api('/api/v1/remoteoperation/test', { method: 'POST', token, body: { path: url } });
+    if (result.status === 200) {
+      return { ok: true, detail: 'Duplicati connected to the destination and listed its contents.' };
+    }
+    const raw = (result.body as { Error?: string })?.Error ?? JSON.stringify(result.body ?? '').slice(0, 300);
+    // Duplicati prefixes machine-readable ids; the useful half is after
+    // "user-information:".
+    const friendly = /user-information:(.*)$/s.exec(raw)?.[1]?.trim() ?? raw;
+    return { ok: false, detail: friendly.slice(0, 400) };
+  } catch (error) {
+    return { ok: false, detail: (error as Error).message };
+  }
+}

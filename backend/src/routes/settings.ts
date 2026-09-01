@@ -14,7 +14,7 @@ import {
 } from '../utils/backupTarget';
 import logger from '../utils/logger';
 import { testBackupTarget } from '../services/backupTargetTest';
-import { provisionBackupJob } from '../services/duplicatiClient';
+import { provisionBackupJob, testDestinationUrl } from '../services/duplicatiClient';
 import { applyBackupTarget } from '../services/backupTargetApply';
 import { readAppEnvValue } from '../services/appEnv';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
@@ -503,16 +503,23 @@ router.post('/backup-target/test', async (_req: Request, res: Response) => {
   }
 
   if (!isMountedKind(target.kind)) {
-    // Being straight about this rather than showing a green tick that proves
-    // nothing: Google Drive is reached by Duplicati itself, so there is no
-    // mount here to exercise. Duplicati's own "Test connection" on the job is
-    // the real check.
-    return res.status(200).json({
-      success: true,
-      message: 'Saved — but not verified from here.',
-      detail:
-        'Google Drive is reached by Duplicati directly, not mounted, so this dashboard cannot test it. ' +
-        'Use "Test connection" on the backup job in Duplicati to confirm the AuthID works.',
+    // A backend destination cannot be mounted, so it is tested through
+    // Duplicati itself — the same code path a backup uses, which makes this
+    // authoritative rather than indicative. Previously this returned an
+    // honest "cannot verify", which meant a broken credential was only
+    // discovered by a failed backup.
+    const url = toDuplicatiUrl(target);
+    const password = readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD');
+    if (!url || !password) {
+      return res.status(400).json({
+        error: 'Start the Duplicati app once so the dashboard can test this destination through it.',
+      });
+    }
+    const outcome = await testDestinationUrl(password, url);
+    return res.status(outcome.ok ? 200 : 400).json({
+      success: outcome.ok,
+      message: outcome.ok ? 'Destination verified by Duplicati.' : 'Duplicati could not use this destination.',
+      detail: outcome.detail,
     });
   }
 

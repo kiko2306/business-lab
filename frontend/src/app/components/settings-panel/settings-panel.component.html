@@ -449,9 +449,9 @@
         </div>
         <div class="col-12">
           <div class="alert alert-secondary small mb-0">
-            Google Drive is not mounted — Duplicati talks to it directly, so this
-            page cannot verify it. Set it as the destination on the backup job in
-            Duplicati and use its own <strong>Test connection</strong> there.
+            Google Drive is not mounted — Duplicati reaches it directly. <strong>Test
+            destination</strong> checks it through Duplicati itself, using the same code
+            path a backup uses, so a pass here means a backup will connect.
           </div>
         </div>
       </ng-container>
@@ -461,7 +461,6 @@
           {{ savingBackupTarget ? 'Saving…' : 'Save destination' }}
         </button>
         <button type="button" class="btn btn-outline-secondary"
-                *ngIf="backupTargetIsMounted"
                 [disabled]="testingBackupTarget || !backupTarget?.configured" (click)="testBackupTarget()">
           {{ testingBackupTarget ? 'Testing…' : 'Test destination' }}
         </button>

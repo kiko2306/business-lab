@@ -8247,3 +8247,54 @@ replaced three code changes and a needless token regeneration.
 No backup has completed. Nothing has been uploaded, nothing restored. The
 dumps, the trigger path and the source mount all work; the destination does
 not, pending an AuthID from the legacy handler.
+
+## 74. Destinations can now be proven, including Google Drive
+
+§67.3 shipped a "Test destination" button that worked for disk/SMB/NFS and
+returned an honest "cannot verify this from here" for Google Drive. §73 is what
+that costs: four failed backup runs, several wrong diagnoses, and a needlessly
+regenerated token — all to discover something a working test would have said in
+seconds.
+
+### 74.1 The test that was available all along
+
+Duplicati exposes `POST /api/v1/remoteoperation/test` with `{"path": "<target
+url>"}`. It lists the destination's contents **using the same code path a
+backup uses**, so its verdict is authoritative rather than indicative.
+
+Against the current (bad) credential it returns, in about a second, the exact
+error the four backup runs took minutes each to produce:
+
+```
+Error listing content: Failed to authorize using the OAuth service: No such key.
+```
+
+Two details that made this non-obvious:
+
+- The payload key is `path`, not `url`. A wrong key returns a bare `400` with
+  no hint.
+- The URL must be built from **our own settings**, not read back from the saved
+  job. Duplicati masks secrets in the job it returns, and testing that value
+  fails with `Unmasked URL contains password placeholder` — which reads like a
+  bug in the caller rather than "you were handed a redacted value".
+
+### 74.2 What changed
+
+- `testDestinationUrl()` in `duplicatiClient.ts`, which strips Duplicati's
+  machine-readable prefix and surfaces the half after `user-information:`.
+- The test endpoint now branches by family: mounted kinds keep the container
+  mount-and-write probe (which works even when Duplicati is stopped), backend
+  kinds go through Duplicati.
+- The **Test destination** button is no longer hidden for Google Drive, and the
+  note beside it now says a pass means a backup will connect — because it does.
+
+### 74.3 The general lesson
+
+The earlier version was *honest* about not being able to verify — and honesty
+about a gap is not the same as closing it. "We can't check this" left the only
+feedback path a full backup run, which is slow, and whose failure message
+pointed at the wrong thing.
+
+**Where a component owns a capability the dashboard lacks, ask that component
+rather than declining to answer.** Duplicati could always test its own
+destinations; nothing was needed except calling it.
