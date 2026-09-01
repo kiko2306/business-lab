@@ -9257,3 +9257,97 @@ What replaces it is deliberately less: the Update button updates **one app, when
 asked**, instead of everything, nightly, unattended. §82.1 adds the part that
 was actually useful about Watchtower — knowing an update exists — without the
 part that recreates containers while people are using them.
+
+## 83. Plan — Docker's storage moves to /home (first task, 2026-09-02)
+
+### 83.1 The problem, measured
+
+    /      98 GiB   64 GiB used (68%)   30 GiB free   <- Docker lives here
+    /home 134 GiB   12 GiB used ( 9%)  116 GiB free
+
+One 256 GB NVMe, fully partitioned: `nvme0n1p3` (236.5 GiB) is an LVM PV split
+into a 100 GiB root LV and a 136.5 GiB `/home` LV, with nothing unallocated.
+So there is no partition to expand — the space exists, it is on the wrong side
+of the split. Docker's data root is `/var/lib/docker`, holding ~58 GB (52 GB
+images, 6 GB build cache), all of it on the 98 GiB side.
+
+Shrinking `/home` to grow root would need `/home` unmounted — a live-USB job on
+the filesystem holding this repo and every app's data. Moving Docker's data
+root is the same benefit with none of that.
+
+### 83.2 What the dashboard will show afterwards
+
+Worth stating because it is counter-intuitive: the health check runs
+`df -Pk /` **inside the backend container**, so it measures the overlay
+filesystem, whose backing store is Docker's data root. Verified — the
+container's `/` and the host's `/` return byte-identical numbers today.
+
+Move the data root and that same `df` starts reporting the `/home` LV: the
+dashboard goes from "98 GiB, 68% used" to "134 GiB, ~50% used", or ~40% after a
+prune. Free space where Docker lives goes 30 GiB → 68-81 GiB. There is never a
+single "250 GB" number to show; the drive is two filesystems.
+
+### 83.3 The consequence to fix first: half the disk stops being watched
+
+After the move, the host's root filesystem — still holding the OS, logs and
+`/var` — is not measured by anything. A runaway log filling it would take the
+machine down with the dashboard reporting a healthy 40%.
+
+So the health check learns to report both, and **that ships before the move**,
+not after:
+
+- Bind-mount `/` read-only at `/hostfs` in the root compose file for the
+  backend. It is a real (if modest) increase in what that container can read;
+  it already talks to a Docker socket proxy, and this is read-only. The
+  alternative — inferring host usage without a mount — does not exist, `df`
+  needs the mount point.
+- `getDisk()` becomes two measurements: `docker` (the container's `/`, which
+  follows the data root wherever it goes) and `system` (`/hostfs`). Both get
+  compared against the same threshold; the degraded reason names which one
+  tripped. `parseDfOutput` itself does not change — it already parses one
+  `df -Pk` line, and is already tested.
+- API shape: `disk` becomes `disks: [{ name, path, percentUsed, totalBytes,
+  usedBytes, availableBytes }]`. The dashboard's health card shows a row each.
+- Before the move both rows read the same filesystem, which is honest and
+  makes the change visible when it happens.
+
+### 83.4 The move itself
+
+Belongs in `start.sh`: it already runs as root, already installs Docker,
+already writes `/etc/docker/daemon.json` and restarts the daemon. Nothing that
+runs *inside* Docker can stop Docker and survive to finish the copy, so the
+dashboard cannot drive this — and `start.sh` is the one command §0.2 allows.
+
+Opt-in, not automatic. Silently rsyncing 58 GB and restarting the daemon on a
+routine bootstrap is precisely the kind of surprise this project avoids:
+
+    sudo DOCKER_DATA_ROOT=/home/docker ./start.sh
+
+Sequence, and every step matters:
+
+1. Read the current root: `docker info --format '{{.DockerRootDir}}'`. Equal to
+   the target → nothing to do (idempotent; a second run is a no-op).
+2. Preflight: free space on the target filesystem ≥ current data-root size plus
+   a margin. Abort loudly rather than half-copy.
+3. `systemctl stop docker docker.socket` — the socket too, or systemd restarts
+   the daemon under the copy.
+4. `rsync -aHAX --numeric-ids /var/lib/docker/ /home/docker/`. `-H` is not
+   optional: overlay2 is full of hard links, and copying without it both
+   explodes the size and breaks layer sharing.
+5. Merge `"data-root"` into `daemon.json` with python3, preserving
+   `default-address-pools` — start.sh currently only writes that file when it
+   does not exist, so this is a merge, not a rewrite.
+6. Start Docker, then verify: `DockerRootDir` is the target, and the image and
+   container counts match what was recorded in step 2.
+7. **Leave `/var/lib/docker` in place.** Print how to remove it once a few days
+   have passed with everything working. Rollback is then just: drop `data-root`
+   from `daemon.json`, restart Docker.
+
+### 83.5 Order on the day
+
+1. `docker builder prune -f` and `docker image prune -f` — ~14 GB, and a
+   smaller tree to copy.
+2. Ship the two-filesystem health check, deployed and visible.
+3. Run the move.
+4. Verify every app came back, images intact, dashboard reporting ~134 GiB.
+5. Remove the old tree only after a few days of that holding.

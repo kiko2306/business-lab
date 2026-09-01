@@ -159,6 +159,23 @@ it is done — not ticked off and left behind. Section references point at
       exercised.
 - [ ] **Prove a Postgres/MySQL restore** — only SQLite has been round-tripped.
 
+### Next up (2026-09-02)
+
+- [ ] **Health check: report both filesystems** (§83.3) — `df -Pk /` in the
+      backend measures whichever filesystem Docker's data root is on, so after
+      the move below the host's root would stop being watched entirely. Mount
+      `/` read-only at `/hostfs`, report `docker` and `system` as two rows,
+      alert on either. Ships **before** the move, not after.
+- [ ] **Move Docker's data root to /home** (§83.4) — `/` is 68% full with
+      Docker's 58 GB while `/home` sits at 9% of 134 GiB. Opt-in via
+      `sudo DOCKER_DATA_ROOT=/home/docker ./start.sh`: preflight the space,
+      stop docker + docker.socket, `rsync -aHAX --numeric-ids` (hard links are
+      not optional for overlay2), merge `data-root` into `daemon.json` keeping
+      the address pools, restart, verify counts. Leaves the old tree in place
+      for rollback.
+- [ ] **Remove /var/lib/docker** (§83.4) — only after a few days of the move
+      holding. Frees ~58 GB on the root LV.
+
 ### Roster changes (§81)
 
 - [ ] **Drop Portainer** (§81.1) — overlaps the dashboard, unhealthy for days,
