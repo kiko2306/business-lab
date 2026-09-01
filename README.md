@@ -166,8 +166,14 @@ it is done — not ticked off and left behind. Section references point at
       `apps/portainer/`, both docs; ports 10330/10331 retired.
 - [ ] **File Browser: mount the home directory** (§81.2) — same treatment as
       code-server in §78, same blast radius, same `*_HOME` knob to narrow it.
-- [ ] **Drop Watchtower** (§81.3) — only after the button above exists.
-      Unattended recreation is what the management stack already opts out of.
+- [ ] **Show when an update is available** (§82.1) — compare the local
+      `RepoDigests` entry against the registry's `Docker-Content-Digest`,
+      cached in Postgres and swept once a day (Docker Hub counts an anonymous
+      manifest HEAD against a 100/6h limit). Red Update button, image names in
+      the tooltip, and an explicit "unknown" that does not read as up to date.
+- [ ] **Drop Watchtower** (§82.2) — the Update button exists now (§81.3a).
+      Also removes the four watchtower.enable=false labels from the root
+      compose file.
 - [ ] **OnlyOffice Document Server** (§81.4) — app + generated `JWT_SECRET`,
       port 10450.
 - [ ] **Wire Nextcloud to OnlyOffice** (§81.4) — installing the connector and

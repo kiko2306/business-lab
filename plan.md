@@ -9180,3 +9180,62 @@ the IDs cannot be read at all it says so rather than claiming nothing changed.
 Verified live, both branches: with an outdated `nginx:alpine` staged under the
 Kitchen switcher it reported `Updated 1 image: nginx:alpine` and the app came
 back healthy; run again immediately it reported `Already on the latest images.`
+
+## 82. Plan — an update *check*, and Watchtower's removal
+
+Two things: the Update button should say when there is something to update, and
+Watchtower goes now that the button exists (§81.3a).
+
+### 82.1 How to know an update exists without pulling one
+
+Settled by experiment before planning, because three of the obvious approaches
+do not work here:
+
+- `docker ps --format {{.ImageID}}` — not a field (that mistake already cost a
+  release, §81.3a).
+- `docker manifest inspect --verbose` — its per-entry `Descriptor.digest` is the
+  **platform** manifest digest, which never equals what the local image records.
+  For `nginx:alpine`: remote `1f25fed…` vs local `db35bfc…`.
+- `docker buildx imagetools inspect` — buildx is not in the backend image.
+
+What does work, verified on this host: the registry's `Docker-Content-Digest`
+header for `repo:tag` is **exactly** the local `RepoDigests` entry. Both were
+`sha256:db35bfc6…` for `nginx:alpine`. So:
+
+    local:  docker image inspect <ref> --format '{{json .RepoDigests}}'
+    remote: HEAD /v2/<repo>/manifests/<tag>, read Docker-Content-Digest
+
+differ → an update is available. The HEAD needs a bearer token; every registry
+answers an unauthenticated request with a `WWW-Authenticate` challenge naming
+its own token endpoint, so following the challenge generically covers Docker
+Hub, ghcr.io and lscr.io without per-registry code. `docker image inspect`
+already works through the socket proxy (checked).
+
+**Cadence is the constraint, not the mechanism.** Docker Hub counts an
+anonymous manifest HEAD against a 100-pull/6h limit per IP, and a sweep of the
+whole roster is ~50 requests. So: one sweep a day, cached in Postgres with a
+`checked_at`, plus an explicit per-app re-check. Not hourly, and never on every
+status poll.
+
+Work:
+
+- `services/imageUpdates.ts` — ref parsing, challenge parsing, digest compare.
+  The parsing halves are pure and get tests; the HTTP half does not.
+- A `service_image_updates` table (service, available images, unknown images,
+  checked_at), created at startup the way
+  `ensureServiceExposureAutheliaColumn` does it.
+- A daily sweep, started with the backup scheduler.
+- `ServiceStatus.updateAvailable` / `updateImages` / `updateCheckedAt`, read
+  from the cache — a status poll must never touch a registry.
+- The row's Update button goes red when something is available, with the image
+  names in its tooltip. It clears after a successful update.
+- An "unknown" result (private registry, no network, a rate-limit 429) shows as
+  neither red nor green — it must not read as "up to date".
+
+### 82.2 Watchtower goes
+
+Approved once the button existed. Registry entry, `apps/watchtower/`, both docs,
+and the four `com.centurylinklabs.watchtower.enable=false` labels in the root
+compose file — inert once nothing reads them, and dead config rots. Removing
+those labels means the next `docker compose up -d` recreates those four
+containers; worth knowing, not worth avoiding.
