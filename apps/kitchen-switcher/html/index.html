@@ -46,6 +46,7 @@
     color: #e5e7eb;
   }
   #cfg-box h2 { margin: 0 0 12px; font-size: 16px; }
+  #cfg-note { font-size: 12px; line-height: 1.5; color: #9aa1ad; margin: 0; }
   #cfg-box label { display: block; font-size: 13px; margin: 12px 0 4px; color: #9aa1ad; }
   #cfg-box input {
     width: 100%; padding: 8px 10px; border-radius: 6px; border: 1px solid #333944;
@@ -61,26 +62,16 @@
 </head>
 <body>
   <div id="bar">
-    <button class="tab active" data-app="mealie">🍲 Mealie</button>
-    <button class="tab" data-app="grocy">🥫 Grocy</button>
-    <button class="tab" data-app="pantry">🧊 Pantry</button>
     <button id="gear" title="Configure URLs">⚙</button>
   </div>
-  <div id="frame-wrap">
-    <iframe id="frame-mealie" class="active"></iframe>
-    <iframe id="frame-grocy"></iframe>
-    <iframe id="frame-pantry"></iframe>
-  </div>
+  <div id="frame-wrap"></div>
 
   <div id="cfg">
     <div id="cfg-box">
       <h2>Configure app URLs</h2>
-      <label for="cfg-mealie">Mealie URL</label>
-      <input id="cfg-mealie" type="text" placeholder="https://mealie.example.com" />
-      <label for="cfg-grocy">Grocy URL</label>
-      <input id="cfg-grocy" type="text" placeholder="https://grocy.example.com" />
-      <label for="cfg-pantry">Pantry URL</label>
-      <input id="cfg-pantry" type="text" placeholder="https://pantry.example.com" />
+      <p id="cfg-note">Filled in from the dashboard — each app's public URL when it is
+        exposed, its LAN port when it is not. Override one only if you need to.</p>
+      <div id="cfg-fields"></div>
       <div class="row">
         <button id="cfg-cancel">Cancel</button>
         <button id="cfg-save">Save &amp; Reload</button>
@@ -89,72 +80,112 @@
   </div>
 
   <script>
-    // Defaults. If this page itself was loaded from its own public hostname
-    // (e.g. https://kitchen-switcher.tx-home-utils.com — reachable from
-    // anywhere, including mobile data), swap the "kitchen-switcher" prefix
-    // for each sibling app's own exposed hostname instead of a LAN port,
-    // since a LAN port isn't reachable off the local network at all. Falls
-    // back to LAN ports on this same host when accessed by IP (no dot in
-    // the prefix to swap) — the normal case when browsing the LAN directly.
-    var HOSTNAME_PREFIX = 'kitchen-switcher.';
-    var onPublicHostname = location.hostname.indexOf(HOSTNAME_PREFIX) === 0;
-    var baseDomain = onPublicHostname ? location.hostname.slice(HOSTNAME_PREFIX.length) : null;
+    // Which apps to show, and where they live, comes from html/config.json —
+    // written by the dashboard on every start of this app (backend
+    // services/kitchenConfig.ts) from the real exposure state and the real
+    // allocated ports. Hard-coded LAN ports used to live here and went stale
+    // the moment the port scheme changed.
+    var ICONS = { mealie: '\uD83C\uDF72', pantry: '\uD83E\uDDCA' };
+    var FALLBACK = {
+      mealie: { label: 'Mealie', publicUrl: null, port: 10230 },
+      pantry: { label: 'Pantry', publicUrl: null, port: 10300 }
+    };
 
-    var DEFAULTS = onPublicHostname
-      ? {
-          mealie: location.protocol + '//mealie.' + baseDomain,
-          grocy: location.protocol + '//grocy.' + baseDomain,
-          pantry: location.protocol + '//pantry.' + baseDomain,
-        }
-      : {
-          mealie: location.protocol + '//' + location.hostname + ':9925',
-          grocy: location.protocol + '//' + location.hostname + ':8012',
-          pantry: location.protocol + '//' + location.hostname + ':8014',
-        };
+    var apps = [];
 
-    function getUrl(app) {
-      return localStorage.getItem('kitchenSwitcher.' + app + 'Url') || DEFAULTS[app];
+    // A per-browser override always wins; otherwise prefer the public URL when
+    // this page was itself loaded over one (a LAN port is unreachable from
+    // mobile data), and the LAN port on whatever host served this page.
+    function resolveUrl(name, cfg) {
+      var stored = localStorage.getItem('kitchenSwitcher.' + name + 'Url');
+      if (stored) return stored;
+      var onPublicHostname = location.hostname.indexOf('.') !== -1 && location.port === '';
+      if (onPublicHostname && cfg.publicUrl) return cfg.publicUrl;
+      if (cfg.port) return location.protocol + '//' + location.hostname + ':' + cfg.port;
+      return cfg.publicUrl || '';
     }
 
-    function setUrl(app, value) {
-      if (value) localStorage.setItem('kitchenSwitcher.' + app + 'Url', value);
-      else localStorage.removeItem('kitchenSwitcher.' + app + 'Url');
+    function setUrl(name, value) {
+      if (value) localStorage.setItem('kitchenSwitcher.' + name + 'Url', value);
+      else localStorage.removeItem('kitchenSwitcher.' + name + 'Url');
     }
 
-    function loadFrames() {
-      document.getElementById('frame-mealie').src = getUrl('mealie');
-      document.getElementById('frame-grocy').src = getUrl('grocy');
-      document.getElementById('frame-pantry').src = getUrl('pantry');
-    }
+    function render() {
+      var bar = document.getElementById('bar');
+      var wrap = document.getElementById('frame-wrap');
+      var gear = document.getElementById('gear');
 
-    document.querySelectorAll('.tab').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var app = btn.dataset.app;
-        document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('active', b === btn); });
-        document.querySelectorAll('iframe').forEach(function (f) {
-          f.classList.toggle('active', f.id === 'frame-' + app);
+      apps.forEach(function (app, index) {
+        var btn = document.createElement('button');
+        btn.className = 'tab' + (index === 0 ? ' active' : '');
+        btn.dataset.app = app.name;
+        btn.textContent = (ICONS[app.name] ? ICONS[app.name] + ' ' : '') + app.label;
+        bar.insertBefore(btn, gear);
+
+        var frame = document.createElement('iframe');
+        frame.id = 'frame-' + app.name;
+        if (index === 0) frame.className = 'active';
+        frame.src = resolveUrl(app.name, app);
+        wrap.appendChild(frame);
+
+        btn.addEventListener('click', function () {
+          document.querySelectorAll('.tab').forEach(function (b) { b.classList.toggle('active', b === btn); });
+          document.querySelectorAll('iframe').forEach(function (f) {
+            f.classList.toggle('active', f.id === 'frame-' + app.name);
+          });
         });
       });
-    });
+    }
 
-    document.getElementById('gear').addEventListener('click', function () {
-      document.getElementById('cfg-mealie').value = getUrl('mealie');
-      document.getElementById('cfg-grocy').value = getUrl('grocy');
-      document.getElementById('cfg-pantry').value = getUrl('pantry');
+    function openSettings() {
+      var fields = document.getElementById('cfg-fields');
+      fields.innerHTML = '';
+      apps.forEach(function (app) {
+        var label = document.createElement('label');
+        label.setAttribute('for', 'cfg-' + app.name);
+        label.textContent = app.label + ' URL';
+        var input = document.createElement('input');
+        input.id = 'cfg-' + app.name;
+        input.type = 'text';
+        input.value = resolveUrl(app.name, app);
+        fields.appendChild(label);
+        fields.appendChild(input);
+      });
       document.getElementById('cfg').classList.add('open');
-    });
+    }
+
+    document.getElementById('gear').addEventListener('click', openSettings);
     document.getElementById('cfg-cancel').addEventListener('click', function () {
       document.getElementById('cfg').classList.remove('open');
     });
     document.getElementById('cfg-save').addEventListener('click', function () {
-      setUrl('mealie', document.getElementById('cfg-mealie').value.trim());
-      setUrl('grocy', document.getElementById('cfg-grocy').value.trim());
-      setUrl('pantry', document.getElementById('cfg-pantry').value.trim());
-      document.getElementById('cfg').classList.remove('open');
-      loadFrames();
+      apps.forEach(function (app) {
+        var input = document.getElementById('cfg-' + app.name);
+        // Saving the value the dashboard already resolved would pin it in this
+        // browser forever, so only a real edit is stored.
+        setUrl(app.name, input.value.trim() === resolveUrl(app.name, app) ? '' : input.value.trim());
+      });
+      location.reload();
     });
 
-    loadFrames();
+    function start(config) {
+      apps = Object.keys(config).map(function (name) {
+        return {
+          name: name,
+          label: config[name].label || name,
+          publicUrl: config[name].publicUrl || null,
+          port: config[name].port || null
+        };
+      });
+      render();
+    }
+
+    // Cache-busted: the file is rewritten on every start of this app, and a
+    // stale cached copy would point the tabs at yesterday's URLs.
+    fetch('config.json?t=' + Date.now())
+      .then(function (r) { return r.ok ? r.json() : FALLBACK; })
+      .catch(function () { return FALLBACK; })
+      .then(start);
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', function () {

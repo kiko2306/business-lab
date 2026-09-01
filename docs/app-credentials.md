@@ -53,7 +53,6 @@ Open these privately and claim them before exposing.
 | **NocoDB** | First signup becomes the super admin. |
 | **Vikunja** | Register the first account; registration can then be disabled. |
 | **n8n** | Owner account created on first visit. |
-| **Grocy** | Ships with `admin` / `admin`. |
 | **File Browser** | Ships with `admin` / `admin`. |
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |
 | **ITFlow** | Setup wizard creates the first admin. See the note below — it needs two things switched on afterwards. |

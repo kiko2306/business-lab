@@ -12,9 +12,12 @@ services:
       - "homepage.name=Kitchen"
       - "homepage.icon=mdi-silverware-fork-knife.png"
       - "homepage.href=http://localhost:${KITCHEN_SWITCHER_PORT:-10220}"
-      - "homepage.description=One-click switcher between Mealie and Grocy"
+      - "homepage.description=One-click switcher between Mealie and Pantry"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ >/dev/null || exit 1"]
+      # 127.0.0.1, not localhost: busybox wget tries ::1 first and nginx here
+      # only listens on IPv4, so "localhost" made this permanently unhealthy
+      # while the page served fine.
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5

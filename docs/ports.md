@@ -68,7 +68,7 @@ hand edit can leave its copy disagreeing with the app's.
 ## Current allocation
 
 `10100` authelia · `10110` beszel · `10120` bookstack · `10130` code-server ·
-`10140` dozzle · `10150` duplicati · `10160` file-browser · `10170` grocy ·
+`10140` dozzle · `10150` duplicati · `10160` file-browser ·
 `10190` home-page · `10200` immich · `10210` jellyfin ·
 `10220` kitchen-switcher · `10230` mealie · `10240` n8n ·
 `10250`–`10253` netbird (management, dashboard, signal, relay) ·
@@ -120,3 +120,16 @@ every hostname breaks at once:
   the tunnel origin is derived from it. Wrong, and every public hostname
   serves NPM's admin UI instead of its app. `start.sh` seeds it from the
   gateway and the allocated admin port.
+
+### Retired ports
+
+`10170` (grocy) is retired, not free. A removed app can still have an NPM proxy
+host and a Cloudflare hostname pointing at its old port for as long as it takes
+the reconciler to clear them, and handing that number to a different app would
+route the old hostname at the new app in the meantime. New apps take the next
+number above the highest in use.
+
+Alphabetical placement holds for the original allocation. Apps added afterwards
+append rather than renumber — rule 1 above (an existing port always wins) is
+what protects a working install, and §69 is what happens when a renumbering
+moves a port something else was pinned to.

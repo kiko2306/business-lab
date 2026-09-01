@@ -15,6 +15,7 @@ import { buildMailEnvOverrides } from './mailEnv';
 import { ensureGeneratedSecrets } from './appEnv';
 import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
+import { applyKitchenConfig } from './kitchenConfig';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
@@ -124,6 +125,9 @@ async function composeUpWithManagedConfig(
   const mailOverrides = await buildMailEnvOverrides(serviceName);
   await applyExposureConfigFiles(serviceName, appDir);
   await applyCrowdsecConfigFiles(serviceName, appDir);
+  // The Kitchen switcher embeds its siblings, so it needs their URLs — which
+  // only the dashboard knows (exposure state + allocated ports).
+  await applyKitchenConfig(serviceName, appDir);
   // HACS: the appliance integrations this house needs (HomeWhiz, Ariston) only
   // exist as HACS repositories, and apps/*/data/ is gitignored, so a fresh
   // clone has to be able to get there without a console step (§0.2).

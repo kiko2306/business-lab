@@ -40,3 +40,7 @@ Thumbs.db
 # overrides and scheduler state are not.
 .claude/settings.local.json
 .claude/scheduled_tasks.lock
+
+# Written by the backend on every start of the Kitchen switcher from live
+# exposure state and allocated ports (services/kitchenConfig.ts).
+apps/kitchen-switcher/html/config.json
