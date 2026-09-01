@@ -169,6 +169,35 @@ section[id] {
   }
 }
 
+/* ---- Running-apps tables: one grid across every category ------------------ */
+/* Each category renders its own <table>, and auto layout sizes each one to its
+   own content — so App / URL / Ports start at a different x in every group and
+   the panel reads as a pile of unrelated tables. Fixed widths make the groups
+   line up as one table broken by headings. Above the stacking breakpoint only;
+   below it the rows are blocks, not columns. */
+@media (min-width: 768px) {
+  .running-panel table.table {
+    table-layout: fixed;
+  }
+
+  .running-panel table.table thead th:nth-child(1) {
+    width: 20%;
+  }
+
+  .running-panel table.table thead th:nth-child(2) {
+    width: 44%;
+  }
+
+  .running-panel table.table thead th:nth-child(3) {
+    width: 36%;
+  }
+
+  /* Fixed columns cannot widen for a long hostname, so it has to wrap. */
+  .running-panel table.table tbody td:nth-child(2) {
+    overflow-wrap: anywhere;
+  }
+}
+
 /* ---- Running-apps table: stack rows into cards on small screens ----------- */
 /* Below this width the 3-column table (App / URL / Ports) can't fit a full
    hostname plus port badges, so it becomes a set of labelled blocks and the

@@ -125,7 +125,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly user$ = this.authService.user$;
   protected readonly groupServicesByCategory = groupServicesByCategory;
   protected readonly groupRunningPortsByCategory = groupRunningPortsByCategory;
-  protected readonly collapsedSections = new Set<string>(this.loadCollapsedSections());
+  // Explicit user choices only, key -> collapsed. A key that is absent falls
+  // back to defaultCollapsed(), so the defaults can change without stale
+  // localStorage pinning every existing browser to the old behaviour.
+  protected readonly sectionState = new Map<string, boolean>(this.loadSectionState());
   protected backups: BackupFile[] = [];
   protected health: HealthStatus | null = null;
   protected schedule: BackupScheduleConfig = { enabled: false, frequency: 'daily', retentionCount: 14, lastRunAt: null };
@@ -171,34 +174,50 @@ export class DashboardComponent implements OnInit, OnDestroy {
     return row.serviceName;
   }
 
+  /**
+   * Running-apps groups start collapsed: the panel is a per-category summary
+   * of what is up, and four expanded tables push the actual app list off the
+   * first screen. Everything else starts open.
+   */
+  private defaultCollapsed(key: string): boolean {
+    return key.startsWith('running:');
+  }
+
   isCollapsed(key: string): boolean {
-    return this.collapsedSections.has(key);
+    return this.sectionState.get(key) ?? this.defaultCollapsed(key);
   }
 
   toggleSection(key: string): void {
-    if (this.collapsedSections.has(key)) {
-      this.collapsedSections.delete(key);
-    } else {
-      this.collapsedSections.add(key);
-    }
-    this.persistCollapsedSections();
+    this.sectionState.set(key, !this.isCollapsed(key));
+    this.persistSectionState();
   }
 
-  private loadCollapsedSections(): string[] {
+  /**
+   * Reads both shapes: the current key -> collapsed object, and the older
+   * array of collapsed keys, which carried no record of what had been
+   * deliberately expanded.
+   */
+  private loadSectionState(): [string, boolean][] {
     try {
       const raw = localStorage.getItem(DashboardComponent.COLLAPSE_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : [];
-      return Array.isArray(parsed) ? parsed.filter((entry): entry is string => typeof entry === 'string') : [];
+      const parsed = raw ? JSON.parse(raw) : null;
+      if (Array.isArray(parsed)) {
+        return parsed.filter((entry): entry is string => typeof entry === 'string').map((key) => [key, true]);
+      }
+      if (parsed && typeof parsed === 'object') {
+        return Object.entries(parsed).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean');
+      }
+      return [];
     } catch {
       return [];
     }
   }
 
-  private persistCollapsedSections(): void {
+  private persistSectionState(): void {
     try {
       localStorage.setItem(
         DashboardComponent.COLLAPSE_STORAGE_KEY,
-        JSON.stringify([...this.collapsedSections]),
+        JSON.stringify(Object.fromEntries(this.sectionState)),
       );
     } catch {
       // Non-fatal: collapse state just won't survive a reload.
