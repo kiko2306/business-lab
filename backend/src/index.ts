@@ -18,6 +18,7 @@ import setupModeMiddleware from './middleware/setupMode';
 import { initWebSocket, sseHandler } from './services/realtime';
 import { startupLogsHandler } from './services/serviceLogs';
 import { startBackupScheduler } from './services/backupScheduler';
+import { reconcileRemovedServices } from './services/exposure';
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -156,6 +157,11 @@ ensureServiceExposureAutheliaColumn().catch((err: Error) => {
   console.error('Unable to ensure service_exposure.authelia_protected column:', err.message);
 });
 startBackupScheduler();
+// An app dropped from the registry keeps its NPM proxy host and Cloudflare
+// hostname otherwise, with no page left in the dashboard to switch them off.
+reconcileRemovedServices().catch((err: Error) => {
+  console.error('Unable to reconcile exposure for removed services:', err.message);
+});
 
 const server = app.listen(PORT, () => {
   console.log(`Homelab backend listening on port ${PORT}`);

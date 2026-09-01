@@ -22,7 +22,7 @@ import { parseEnvFile } from '../utils/envFile';
 import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
-import { buildExposureHostname, getPublishedUpstreamPort, getService } from '../config/services';
+import { SERVICES, buildExposureHostname, getPublishedUpstreamPort, getService } from '../config/services';
 import { deleteProxyHost, ensureProxyHost } from './npmClient';
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
@@ -435,6 +435,57 @@ async function provisionHostname({
  * matching the "never blocks a Docker start" contract), suitable for merging
  * into a start-service API response as a warning.
  */
+/**
+ * Tear down exposure for services that are no longer in the registry.
+ *
+ * Removing an app used to strand its NPM proxy host and Cloudflare hostname:
+ * once the registry entry is gone the dashboard has no page for it, so there
+ * is no longer any way to switch exposure off — the route stays live,
+ * pointing at a port nothing listens on. Runs once at startup, which is the
+ * first moment the code knows an entry has gone.
+ *
+ * Secondary rows (`<service>:<suffix>`) are matched by their base name, so a
+ * removed multi-hostname app takes all of its routes with it.
+ */
+export async function reconcileRemovedServices(): Promise<void> {
+  // A registry that failed to populate would look like "every app was
+  // removed"; refuse rather than deprovision the whole stack.
+  if (!Object.keys(SERVICES).length) {
+    logger.error('Skipping exposure reconciliation: the service registry is empty');
+    return;
+  }
+
+  const rows = await query<{ service_name: string }>('SELECT service_name FROM service_exposure');
+  const orphans = [
+    ...new Set(
+      rows.rows
+        .map((row) => row.service_name.split(':')[0])
+        .filter((name) => !SERVICES[name])
+    ),
+  ];
+
+  for (const name of orphans) {
+    logger.info('Removing exposure for a service that is no longer in the registry', { service: name });
+    // userId 0: nobody asked for this, the registry changed underneath it.
+    await deprovisionServiceExposure(name, 0).catch((error: Error) => {
+      logger.error('Could not deprovision a removed service', { service: name, error: error.message });
+    });
+    // deprovisionServiceExposure keeps the primary row so a re-enable can
+    // reuse the user's choices. There is nothing to re-enable here.
+    await query('DELETE FROM service_exposure WHERE service_name = $1 OR service_name LIKE $2', [
+      name,
+      `${name}:%`,
+    ]);
+    await writeAuditLog({
+      userId: null,
+      action: 'exposure_disable',
+      resource: name,
+      result: 'success',
+      metadata: { reason: 'service removed from the registry' },
+    }).catch(() => {});
+  }
+}
+
 export async function provisionServiceIfEnabled(serviceName: string, userId: number): Promise<ExposureProvisionResult> {
   const exposureRow = await getServiceExposureRow(serviceName);
   if (!exposureRow || !exposureRow.enabled) {
