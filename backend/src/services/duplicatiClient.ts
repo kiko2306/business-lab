@@ -132,6 +132,15 @@ export async function provisionBackupJob(duplicatiPassword: string, frequency: '
   }
 
   const token = await login(duplicatiPassword);
+
+  // Make sure the destination exists before defining a job that points at it —
+  // otherwise the first run fails with "missing-folder", which is easily
+  // mistaken for a credential problem.
+  const folder = await ensureDestinationFolder(duplicatiPassword, targetUrl);
+  if (!folder.ok) {
+    logger.warn('Backup destination could not be prepared', { detail: folder.detail });
+  }
+
   const passphrase = await getOrCreatePassphrase();
 
   const settings = [
@@ -255,6 +264,43 @@ export async function testDestinationUrl(duplicatiPassword: string, url: string)
     // "user-information:".
     const friendly = /user-information:(.*)$/s.exec(raw)?.[1]?.trim() ?? raw;
     return { ok: false, detail: friendly.slice(0, 400) };
+  } catch (error) {
+    return { ok: false, detail: (error as Error).message };
+  }
+}
+
+/**
+ * Create the destination folder if it does not exist yet.
+ *
+ * Duplicati will not create it on its own: a backup against a missing folder
+ * fails with a bare `missing-folder`, which — after an authentication problem
+ * with a similar shape — reads like another credential fault. Creating it as
+ * part of provisioning removes a whole class of confusing first-run failure.
+ *
+ * Safe to call repeatedly: an existing folder is reported as success, and a
+ * failure here is returned rather than thrown, since a destination that cannot
+ * be pre-created is still worth saving so the user can see the error.
+ */
+export async function ensureDestinationFolder(duplicatiPassword: string, url: string): Promise<{ ok: boolean; detail: string }> {
+  try {
+    const token = await login(duplicatiPassword);
+
+    // Only create when the destination actually reports the folder missing —
+    // never blindly, so this cannot mask a different failure.
+    const probe = await api('/api/v1/remoteoperation/test', { method: 'POST', token, body: { path: url } });
+    if (probe.status === 200) {
+      return { ok: true, detail: 'destination already exists' };
+    }
+    const message = (probe.body as { Error?: string })?.Error ?? '';
+    if (!/missing-folder/i.test(message)) {
+      return { ok: false, detail: message.slice(0, 300) || `destination test failed (HTTP ${probe.status})` };
+    }
+
+    const created = await api('/api/v1/remoteoperation/create', { method: 'POST', token, body: { path: url } });
+    if (created.status !== 200) {
+      return { ok: false, detail: `could not create the destination folder (HTTP ${created.status})` };
+    }
+    return { ok: true, detail: 'created the destination folder' };
   } catch (error) {
     return { ok: false, detail: (error as Error).message };
   }

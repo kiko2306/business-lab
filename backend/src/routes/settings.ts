@@ -14,7 +14,7 @@ import {
 } from '../utils/backupTarget';
 import logger from '../utils/logger';
 import { testBackupTarget } from '../services/backupTargetTest';
-import { provisionBackupJob, testDestinationUrl } from '../services/duplicatiClient';
+import { ensureDestinationFolder, provisionBackupJob, testDestinationUrl } from '../services/duplicatiClient';
 import { applyBackupTarget } from '../services/backupTargetApply';
 import { readAppEnvValue } from '../services/appEnv';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
@@ -515,10 +515,28 @@ router.post('/backup-target/test', async (_req: Request, res: Response) => {
         error: 'Start the Duplicati app once so the dashboard can test this destination through it.',
       });
     }
-    const outcome = await testDestinationUrl(password, url);
+    let outcome = await testDestinationUrl(password, url);
+
+    // A missing folder is not a reason to fail a test the user cannot act on
+    // from here — creating it is the only sensible thing they would do next.
+    // Only ever attempted when the destination reports exactly that, so it
+    // cannot paper over a credential or connectivity problem.
+    let created = false;
+    if (!outcome.ok && /missing-folder/i.test(outcome.detail)) {
+      const folder = await ensureDestinationFolder(password, url);
+      created = folder.ok;
+      if (folder.ok) {
+        outcome = await testDestinationUrl(password, url);
+      }
+    }
+
     return res.status(outcome.ok ? 200 : 400).json({
       success: outcome.ok,
-      message: outcome.ok ? 'Destination verified by Duplicati.' : 'Duplicati could not use this destination.',
+      message: outcome.ok
+        ? created
+          ? 'Destination created and verified by Duplicati.'
+          : 'Destination verified by Duplicati.'
+        : 'Duplicati could not use this destination.',
       detail: outcome.detail,
     });
   }

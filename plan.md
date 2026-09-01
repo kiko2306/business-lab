@@ -8298,3 +8298,28 @@ pointed at the wrong thing.
 **Where a component owns a capability the dashboard lacks, ask that component
 rather than declining to answer.** Duplicati could always test its own
 destinations; nothing was needed except calling it.
+
+### 74.4 Test destination now creates a missing folder
+
+User's call, and correct: if the only thing wrong is that the folder does not
+exist, reporting a failure the user cannot act on from the dashboard is not
+useful — creating it is the only thing they would do next.
+
+Hit this immediately after the credential started working: the destination went
+from `No such key` (auth) to `missing-folder`, a completely different and much
+better failure. Duplicati does not create the folder itself, and a backup
+against a missing one fails with a bare `missing-folder` — which, following an
+auth error of similar shape, reads like another credential fault.
+
+Both **Test destination** and job provisioning now create it. Two constraints:
+
+- **Only when the destination reports exactly `missing-folder`.** Any other
+  failure is reported untouched. Creating blindly would paper over precisely
+  the credential and connectivity faults that took four runs to diagnose.
+- **Local disk paths are left alone.** A typo'd path would silently create a
+  stray directory somewhere on the filesystem; a remote folder is namespaced
+  inside the destination, so the risk is not comparable.
+
+Verified end to end against a folder that did not exist:
+`missing-folder` → `created the destination folder` → `connected and listed its
+contents`.
