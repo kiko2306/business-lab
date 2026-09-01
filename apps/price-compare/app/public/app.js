@@ -488,9 +488,14 @@ function showConfirm(title) {
 // cancelled — same contract window.prompt() had, but as an in-page modal
 // (centered like every other dialog here) instead of the browser's native
 // prompt, which on some platforms doesn't render centered over the page.
-function showReportBugModal(title) {
+// `label` / `submitText` override the wording for reuse beyond bug
+// reports (e.g. the admin's bug-resolution message); both reset to their
+// bug-report defaults when omitted.
+function showReportBugModal(title, { label, submitText } = {}) {
   const modal = document.getElementById('report-bug-modal');
   document.getElementById('report-bug-title').textContent = title;
+  document.getElementById('report-bug-label').textContent = label || 'O que está errado? (opcional)';
+  document.getElementById('report-bug-submit').textContent = submitText || 'Reportar';
   const noteEl = document.getElementById('report-bug-note');
   noteEl.value = '';
   modal.classList.add('open');
@@ -1679,6 +1684,7 @@ async function loadAdminBugReports() {
       <div class="bug-report-meta">${escapeHtml(storeLabel)} · ${escapeHtml(r.userEmail || '')} · ${date}</div>
       ${priceInfo ? `<div class="bug-report-meta">${priceInfo}</div>` : ''}
       ${r.note ? `<div class="bug-report-note">${escapeHtml(r.note)}</div>` : ''}
+      ${r.resolutionMessage ? `<div class="bug-report-note">✅ ${escapeHtml(r.resolutionMessage)}</div>` : ''}
       <div class="bug-report-actions">
         ${r.status !== 'resolved' ? '<button type="button" class="btn small" data-bug-status="resolved">✅ Resolvido</button>' : ''}
         ${r.status !== 'false_positive' ? '<button type="button" class="btn small" data-bug-status="false_positive">🤷 Falso positivo</button>' : ''}
@@ -1694,12 +1700,26 @@ async function loadAdminBugReports() {
       const row = e.target.closest('.bug-report-row');
       const reportId = row.dataset.reportId;
       const status = e.target.dataset.bugStatus;
+
+      // Resolving offers a message to send back to whoever filed the
+      // report (delivered as a push notification). Cancelling the prompt
+      // aborts the whole action; submitting it empty resolves silently.
+      let message;
+      if (status === 'resolved') {
+        message = await showReportBugModal('Resolver — mensagem para quem reportou', {
+          label: 'Mensagem enviada por notificação (opcional)',
+          submitText: 'Resolver',
+        });
+        if (message === null) return;
+      }
+
       try {
         await api(`/admin/bug-reports/${encodeURIComponent(reportId)}/status`, {
           method: 'POST',
-          body: JSON.stringify({ status }),
+          body: JSON.stringify(message ? { status, message } : { status }),
         });
         await loadAdminBugReports();
+        if (message) showToast('Resolvido — notificação enviada.');
       } catch (err) {
         showToast(err.message, true);
       }

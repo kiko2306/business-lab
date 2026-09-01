@@ -15,6 +15,7 @@ import {
   BackupTargetKind,
   BackupTargetSettings,
   BackupTargetTestResponse,
+  BackupJobProvisionResponse,
   ExposureTestResponse,
   GeneralSettings,
 } from '../../core/models';
@@ -112,6 +113,8 @@ export class SettingsPanelComponent implements OnInit {
   protected testingBackupTarget = false;
   protected backupTargetFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected backupTargetTestResult: BackupTargetTestResponse | null = null;
+  protected provisioningJob = false;
+  protected backupJob: BackupJobProvisionResponse | null = null;
 
   sanitizeTokenPaste(event: ClipboardEvent): void {
     const pasted = event.clipboardData?.getData('text') ?? '';
@@ -188,6 +191,29 @@ export class SettingsPanelComponent implements OnInit {
   /** Google Drive is reached by Duplicati itself, so there is no mount. */
   protected get backupTargetIsMounted(): boolean {
     return this.backupTargetForm.controls.kind.value !== 'googledrive';
+  }
+
+  /**
+   * Create the backup job in Duplicati from the saved destination. Until this
+   * runs there is no job, so nothing is ever backed up however the schedule is
+   * configured.
+   */
+  provisionBackupJob(): void {
+    this.provisioningJob = true;
+    this.settingsService
+      .provisionBackupJob()
+      .pipe(finalize(() => (this.provisioningJob = false)))
+      .subscribe({
+        next: (result) => {
+          this.backupJob = result;
+          this.backupTargetFeedback = { type: 'success', message: result.message };
+        },
+        error: (error) =>
+          (this.backupTargetFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Could not create the backup job.'),
+          }),
+      });
   }
 
   loadBackupTarget(): void {

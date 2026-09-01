@@ -49,6 +49,16 @@ function listUsers() {
   return Object.entries(all).map(([userId, u]) => ({ userId, ...u }));
 }
 
+// Reverse lookup by email (case-insensitive). Used to notify the person
+// who actually filed a bug report, which the report stores by email —
+// they may be a collaborator on someone else's list, so the report's
+// userId (the list owner) isn't necessarily them.
+function findByEmail(email) {
+  if (!email) return null;
+  const lower = String(email).toLowerCase();
+  return listUsers().find((u) => (u.email || '').toLowerCase() === lower) || null;
+}
+
 // VIP or paid both remove ads — tracked as separate booleans so it's
 // still possible to see later which users were comped vs. actually paid.
 function adsEnabledFor(userId) {
@@ -75,6 +85,7 @@ module.exports = {
   upsertProfile,
   getUser,
   listUsers,
+  findByEmail,
   adsEnabledFor,
   setVip: (userId, value) => setFlag(userId, 'isVip', value),
   setPaid: (userId, value) => setFlag(userId, 'isPaid', value),

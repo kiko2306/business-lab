@@ -462,6 +462,10 @@
                 [disabled]="testingBackupTarget || !backupTarget?.configured" (click)="testBackupTarget()">
           {{ testingBackupTarget ? 'Testing…' : 'Test destination' }}
         </button>
+        <button type="button" class="btn btn-outline-primary"
+                [disabled]="provisioningJob || !backupTarget?.configured" (click)="provisionBackupJob()">
+          {{ provisioningJob ? 'Creating…' : 'Create / update backup job' }}
+        </button>
         <span
           *ngIf="backupTargetFeedback"
           class="small"
@@ -473,6 +477,23 @@
         >
           {{ backupTargetFeedback.message }}
         </span>
+      </div>
+
+      <!-- The passphrase is shown once, here, and is the single thing that
+           makes a backup restorable. -->
+      <div *ngIf="backupJob" class="col-12">
+        <div class="alert alert-warning mb-0">
+          <p class="fw-semibold mb-1">Record this encryption passphrase somewhere off this machine.</p>
+          <p class="mb-2 small">
+            Duplicati backups <strong>cannot be restored without it</strong>. Losing it makes every
+            backup permanently unreadable — while they keep appearing to succeed.
+          </p>
+          <code class="user-select-all d-block p-2 bg-body-tertiary rounded">{{ backupJob.passphrase }}</code>
+          <p class="form-text mb-0">
+            Job created, scheduled {{ backupJob.scheduled }}. It runs on the backup schedule; app
+            databases are dumped automatically just before each run.
+          </p>
+        </div>
       </div>
 
       <div *ngIf="backupTargetTestResult" class="col-12">

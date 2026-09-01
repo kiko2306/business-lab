@@ -14,6 +14,7 @@ import {
   BackupTargetInput,
   BackupTargetSettings,
   BackupTargetTestResponse,
+  BackupJobProvisionResponse,
   ExposureTestResponse,
   GeneralSettings,
 } from './models';
@@ -63,6 +64,10 @@ export class SettingsService {
 
   saveBackupTarget(input: BackupTargetInput): Observable<{ message: string }> {
     return this.http.put<{ message: string }>(`${API_BASE_URL}/settings/backup-target`, input);
+  }
+
+  provisionBackupJob(): Observable<BackupJobProvisionResponse> {
+    return this.http.post<BackupJobProvisionResponse>(`${API_BASE_URL}/settings/backup-target/provision-job`, {});
   }
 
   testBackupTarget(): Observable<BackupTargetTestResponse> {

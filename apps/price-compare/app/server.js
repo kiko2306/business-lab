@@ -488,6 +488,24 @@ app.post('/api/admin/bug-reports/:id/status', requireAdmin, (req, res) => {
   report.status = status;
   report.resolvedAt = status === 'open' ? null : new Date().toISOString();
   report.resolvedBy = status === 'open' ? null : req.user.email;
+
+  // Resolving a report can carry a short note back to whoever filed it,
+  // explaining what was fixed (or why the match is what it is). It's kept
+  // on the report and pushed to them as a notification. Fire-and-forget,
+  // like the share-invite nudges: notify() is a no-op if push isn't
+  // configured or the user never enabled it, and delivery failures are
+  // logged inside push.deliver rather than failing the status change.
+  // Sent only when the admin actually writes a message.
+  const message = typeof req.body?.message === 'string' ? req.body.message.trim().slice(0, 500) : '';
+  if (status === 'resolved' && message) {
+    report.resolutionMessage = message;
+    const recipientId = users.findByEmail(report.userEmail)?.userId || report.userId;
+    push.notify(recipientId, {
+      title: `Correção: ${report.productName}`,
+      body: message,
+    });
+  }
+
   saveBugReports(reports);
   res.json(report);
 });

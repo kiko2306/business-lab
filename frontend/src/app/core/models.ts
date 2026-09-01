@@ -354,3 +354,12 @@ export interface BackupTargetTestResponse {
   message: string;
   detail: string;
 }
+
+export interface BackupJobProvisionResponse {
+  message: string;
+  jobId: string;
+  targetUrl: string;
+  /** Shown once so it can be recorded off-box — backups are unrestorable without it. */
+  passphrase: string;
+  scheduled: string;
+}
