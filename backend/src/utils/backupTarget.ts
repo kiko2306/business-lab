@@ -35,8 +35,17 @@ export const BACKUP_TARGET_KEYS = {
   folder: 'backup_target_folder',
 } as const;
 
-/** Where the user gets a Google Drive AuthID. Shown in the UI. */
-export const DUPLICATI_OAUTH_URL = 'https://oauth-service.duplicati.com/';
+/**
+ * Where the user gets a Google Drive AuthID.
+ *
+ * This is the handler the installed Duplicati actually validates against — its
+ * own error message names it when a token is rejected ("No such key ... try
+ * generating a new authid token from ..."). A token minted by a *different*
+ * OAuth service is accepted by this form, saved happily, and then fails at
+ * backup time with a 404 from the OAuth lookup, which reads like a network
+ * problem rather than a wrong token.
+ */
+export const DUPLICATI_OAUTH_URL = 'https://duplicati-oauth-handler.appspot.com/?type=googledrive';
 
 /**
  * Destinations come in two families, and the difference is structural:

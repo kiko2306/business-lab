@@ -105,9 +105,18 @@ export interface ProvisionResult {
 /**
  * Create the dashboard's backup job in Duplicati, or update it if it exists.
  *
- * Deliberately creates the job with **no schedule**. A job that starts
- * uploading the moment it is defined is a surprise, and the first run of a
- * 1.8 GB backup to a remote is something the user should choose to start.
+ * The job is created with **no Duplicati-side schedule**, deliberately. The
+ * dashboard's own scheduler drives it, and the order matters: it dumps every
+ * database and *then* triggers this job. A schedule inside Duplicati would
+ * fire independently of that, backing up whatever dumps happened to be lying
+ * around — silently archiving stale data while reporting success.
+ *
+ * It also avoids a real failure mode: a Duplicati schedule with a repetition
+ * but no valid start time leaves its scheduler logging
+ * "Unable to find a valid date, given the start date 1/1/0001" on every cycle.
+ *
+ * The `frequency` argument is kept so callers can express intent, but it is
+ * recorded rather than handed to Duplicati.
  */
 export async function provisionBackupJob(duplicatiPassword: string, frequency: 'daily' | 'weekly' | null): Promise<ProvisionResult> {
   const target = await getBackupTarget();
@@ -135,7 +144,10 @@ export async function provisionBackupJob(duplicatiPassword: string, frequency: '
     { Name: 'retention-policy', Value: '7D:1D,4W:1W,12M:1M' },
   ];
 
-  const schedule = frequency ? { Repeat: frequency === 'weekly' ? '1W' : '1D' } : null;
+  // Never a Duplicati-side schedule — see the note above. `frequency` is the
+  // dashboard's own cadence and is reported back, not delegated.
+  void frequency;
+  const schedule = null;
 
   const list = await api('/api/v1/backups', { token });
   const existing = (list.body as DuplicatiBackupEntry[] | null)?.find?.((entry) => entry.Backup?.Name === JOB_NAME);

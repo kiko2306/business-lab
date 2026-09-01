@@ -8107,3 +8107,72 @@ shape:
   proxy, `pg_dump` version mismatches, and an s6 entrypoint that *hangs* rather
   than failing were all found by executing the thing (§70.2). None would have
   been predicted from reading.
+
+## 72. First real backup run — failed, and that is the point of running it
+
+Triggered the first backup to Google Drive. All 30 databases dumped cleanly
+(`DUMPS ok=30 failed=0`), Duplicati started, and then:
+
+```
+Failed to authorize using the OAuth service: No such key.
+ ---> HttpRequestException: 404 (Not Found)
+```
+
+Zero files, zero bytes uploaded. Two separate faults, one of them mine.
+
+### 72.1 The AuthID is not valid for this Duplicati
+
+Duplicati's own error names the handler it validates against:
+`duplicati-oauth-handler.appspot.com?type=googledrive`. The dashboard was
+linking `oauth-service.duplicati.com` instead — a *different* service. A token
+minted there is accepted by the form, stored happily, and fails only at backup
+time with a 404 from the OAuth lookup, which reads like a network problem
+rather than a wrong token.
+
+Corrected the link, and the UI now says explicitly that the token must come
+from that page. **The user must generate a new AuthID** — the stored one cannot
+be made to work.
+
+This is precisely the gap §67.3 flagged: the dashboard cannot verify a
+Google Drive destination, so the first real run is the test. It found the
+problem on the first attempt.
+
+### 72.2 The job carried a broken schedule — my bug
+
+Duplicati's scheduler was logging, every cycle:
+
+```
+Unable to find a valid date, given the start date 1/1/0001 12:36:00 AM,
+the repetition interval 1D
+```
+
+The job was created with `{Repeat: '1D'}` and no start time, which Duplicati
+cannot turn into a next-run date.
+
+The fix is not to add a start time — it is to **remove the Duplicati-side
+schedule entirely**. The dashboard's own scheduler already drives this job, and
+the order is load-bearing: dump every database, *then* run Duplicati. A
+schedule inside Duplicati fires independently of that, backing up whatever
+dumps happen to be lying around — silently archiving stale data while
+reporting success. §68.3 said the job should be created without a schedule;
+the route then passed a frequency through and reintroduced one.
+
+`provisionBackupJob` now never sets a Duplicati schedule. The frequency
+argument is kept for reporting intent, not delegated.
+
+### 72.3 What the run did prove
+
+Not nothing — the parts before the upload all worked:
+
+- 8 server dumps + 22 SQLite snapshots, no failures
+- the dashboard triggered Duplicati through its API and the job started
+- `/source/apps` is visible inside the container (36 apps, 2.5 GB)
+- the failure surfaced immediately and precisely, rather than silently
+
+### 72.4 Next
+
+1. User generates a fresh AuthID from the corrected link and saves it.
+2. Re-run "Create / update backup job" (removes the broken schedule) and
+   trigger again.
+3. Then the actual objective: **restore something**. Nothing has yet proven the
+   passphrase, the archive format, or that a dump can be replayed.
