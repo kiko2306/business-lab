@@ -36,14 +36,23 @@ export const BACKUP_TARGET_KEYS = {
 } as const;
 
 /**
- * Where the user gets a Google Drive AuthID.
+ * Where the user must get a Google Drive AuthID.
  *
- * This is the handler the installed Duplicati actually validates against — its
- * own error message names it when a token is rejected ("No such key ... try
- * generating a new authid token from ..."). A token minted by a *different*
- * OAuth service is accepted by this form, saved happily, and then fails at
- * backup time with a 404 from the OAuth lookup, which reads like a network
- * problem rather than a wrong token.
+ * This is the LEGACY handler, and it is deliberate: it is the service the
+ * installed Duplicati actually queries when refreshing a token. Established by
+ * testing one AuthID against both services directly —
+ *
+ *   duplicati-oauth-handler.appspot.com/refresh  -> 404 {"error":"No such key"}
+ *   oauth-service.duplicati.com/refresh          -> 200 {"access_token":...}
+ *
+ * — and then confirming that a token minted by the *newer* service fails at
+ * backup time, and that setting the job's `oauth-url` to the newer service
+ * does NOT change which one Duplicati consults (the option is stored and
+ * ignored by this build's Google Drive backend).
+ *
+ * So the token has to come from the service Duplicati asks, not the one its
+ * own website currently offers. Its error message names this URL — that part
+ * of the message is right; the part implying the token is expired is not.
  */
 export const DUPLICATI_OAUTH_URL = 'https://duplicati-oauth-handler.appspot.com/?type=googledrive';
 
@@ -125,7 +134,18 @@ export async function getBackupTarget(): Promise<BackupTarget | null> {
 export function toDuplicatiUrl(target: BackupTarget): string | null {
   if (target.kind !== 'googledrive') return null;
   const folder = target.folder.trim().replace(/^\/+|\/+$/g, '') || 'homelab-backups';
-  return `googledrive://${encodeURI(folder)}?authid=${encodeURIComponent(target.authId)}`;
+
+  // The AuthID is inserted RAW, not percent-encoded.
+  //
+  // Duplicati AuthIDs contain a colon, and encodeURIComponent turns it into
+  // %3A — Duplicati then looks up a key that does not exist and fails with
+  // "Failed to authorize using the OAuth service: No such key" and a 404.
+  // That error names the OAuth service, so it reads like an expired or
+  // wrong-service token and sends you off to regenerate a perfectly good one.
+  //
+  // A colon is legal in a query-string value; the characters that genuinely
+  // would break this URL are rejected at save time instead (validateTarget).
+  return `googledrive://${encodeURI(folder)}?authid=${target.authId}`;
 }
 
 /**
@@ -186,6 +206,12 @@ export function validateTarget(target: BackupTarget): string | null {
   if (target.kind === 'googledrive') {
     if (!target.authId) {
       return 'Paste the AuthID from Duplicati\'s Google authorisation page.';
+    }
+    // The AuthID goes into the target URL unencoded (see toDuplicatiUrl), so
+    // anything that would terminate or split the query string is refused here
+    // rather than silently corrupting the URL. A colon is fine and common.
+    if (/[&#?\s]/.test(target.authId)) {
+      return 'That AuthID contains a character that cannot appear in the destination URL — re-copy it from the authorisation page.';
     }
     return null;
   }

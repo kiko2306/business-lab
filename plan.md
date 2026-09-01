@@ -8176,3 +8176,74 @@ Not nothing — the parts before the upload all worked:
    trigger again.
 3. Then the actual objective: **restore something**. Nothing has yet proven the
    passphrase, the archive format, or that a dump can be replayed.
+
+## 73. Google Drive OAuth — four failed runs, and what they actually proved
+
+The first real backup failed four times. Worth recording in full, because the
+error message was actively misleading and I acted on it three times before
+testing it.
+
+### 73.1 The error, and why it misleads
+
+```
+Failed to authorize using the OAuth service: No such key.
+If the problem persists, try generating a new authid token from:
+https://duplicati-oauth-handler.appspot.com?type=googledrive
+ ---> HttpRequestException: 404 (Not Found)
+```
+
+It reads as "your token is expired or wrong". It is not. The token is fine;
+Duplicati is asking a service that has never heard of it.
+
+### 73.2 What was established, by testing rather than reading
+
+Querying **one AuthID against both services directly** settled it in a single
+command — which is what should have happened after the first failure:
+
+| Service | Result |
+|---|---|
+| `duplicati-oauth-handler.appspot.com/refresh` (legacy — what Duplicati asks) | `404 {"error":"No such key"}` |
+| `oauth-service.duplicati.com/refresh` (current — what the website offers) | `200 {"access_token": …}` |
+
+The token exists, in the newer service. Duplicati 2.3.0.4 only consults the
+legacy one. **Setting the job's `oauth-url` to the newer service does not
+help** — verified: the option is stored on the job and the failure still names
+the appspot handler, so this build's Google Drive backend ignores it.
+
+**Conclusion: the AuthID must be generated from the legacy handler**, because
+that is the only service this Duplicati will look in.
+
+### 73.3 One real bug found on the way
+
+`toDuplicatiUrl` ran the AuthID through `encodeURIComponent`, turning the colon
+Duplicati AuthIDs contain into `%3A`. That would have produced the *same*
+"No such key" error independently. Fixed — the AuthID is inserted raw, and
+characters that genuinely would break the URL (`&`, `#`, `?`, whitespace) are
+rejected at save time instead. Regression test asserts the colon survives.
+
+Worth noting this made diagnosis harder: two independent causes producing one
+identical error message.
+
+### 73.4 What I got wrong, in order
+
+1. Blamed the user's token and had them regenerate one that was never broken.
+2. "Corrected" the UI link to the legacy handler — which was *right*, on wrong
+   reasoning.
+3. Reverted that to the newer service after the token test — which was *wrong*,
+   because the test showed where the token lived, not where Duplicati looks.
+4. Added `oauth-url` expecting it to bridge the two. It is ignored.
+
+The link is now back on the legacy handler, this time with the evidence
+recorded next to it so it does not get "fixed" again, and the UI explains why
+it must not be the newer service the Duplicati website offers.
+
+**The lesson, and it generalises:** when a component reports a fault in
+something else — a credential, a network, another service — test that claim
+directly before acting on it. One `curl` against each service would have
+replaced three code changes and a needless token regeneration.
+
+### 73.5 Still not proven
+
+No backup has completed. Nothing has been uploaded, nothing restored. The
+dumps, the trigger path and the source mount all work; the destination does
+not, pending an AuthID from the legacy handler.

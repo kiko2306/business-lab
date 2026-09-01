@@ -436,9 +436,10 @@
           <div class="form-text">
             Get one from
             <a [href]="backupTarget?.oauthUrl" target="_blank" rel="noopener noreferrer">Duplicati's Google
-            authorisation page</a>, sign in, and paste the token here. It must come from
-            <em>that</em> page — a token from a different Duplicati OAuth service saves fine
-            and then fails at backup time with “No such key”.
+            authorisation page</a>, sign in, and paste the token here.
+            Use <em>that</em> link specifically: Duplicati's website offers a newer
+            OAuth service, but this Duplicati build only looks tokens up in the one
+            linked here, and a token from the other fails with “No such key”.
           </div>
         </div>
         <div class="col-md-4">

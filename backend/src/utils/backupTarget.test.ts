@@ -54,6 +54,15 @@ describe('toDuplicatiUrl', () => {
       .toBe('googledrive://homelab?authid=abc123');
   });
 
+  it('keeps the AuthID raw — a colon must NOT become %3A', () => {
+    // Regression: percent-encoding the colon made Duplicati look up a key that
+    // does not exist and fail with "No such key" plus a 404, which reads like
+    // an expired token and sends you off to regenerate a working one.
+    const url = toDuplicatiUrl({ ...base, kind: 'googledrive', authId: '1ffa:BcD-eF_gH.F', folder: 'x' });
+    expect(url).toBe('googledrive://x?authid=1ffa:BcD-eF_gH.F');
+    expect(url).not.toContain('%3A');
+  });
+
   it('defaults the folder and strips stray slashes', () => {
     expect(toDuplicatiUrl({ ...base, kind: 'googledrive', authId: 'a' })).toBe('googledrive://homelab-backups?authid=a');
     expect(toDuplicatiUrl({ ...base, kind: 'googledrive', authId: 'a', folder: '/x/' })).toBe('googledrive://x?authid=a');
@@ -82,5 +91,10 @@ describe('validateTarget', () => {
     expect(validateTarget({ ...base, kind: 'smb', server: 'h', share: 's', username: '' })).toMatch(/username/);
     expect(validateTarget({ ...base, kind: 'googledrive' })).toMatch(/AuthID/);
     expect(validateTarget({ ...base, kind: 'googledrive', authId: 'tok' })).toBeNull();
+    // A colon is normal in an AuthID and must be accepted.
+    expect(validateTarget({ ...base, kind: 'googledrive', authId: 'a:b' })).toBeNull();
+    // These would split or truncate the query string.
+    expect(validateTarget({ ...base, kind: 'googledrive', authId: 'a&b' })).toMatch(/cannot appear/);
+    expect(validateTarget({ ...base, kind: 'googledrive', authId: 'a b' })).toMatch(/cannot appear/);
   });
 });
