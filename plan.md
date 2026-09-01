@@ -9239,3 +9239,21 @@ and the four `com.centurylinklabs.watchtower.enable=false` labels in the root
 compose file — inert once nothing reads them, and dead config rots. Removing
 those labels means the next `docker compose up -d` recreates those four
 containers; worth knowing, not worth avoiding.
+
+### 82.2a Done: Watchtower removed
+
+Registry entry, `apps/watchtower/`, its rows in `docs/app-credentials.md` and
+`docs/raspberry-pi.md`, and the four `com.centurylinklabs.watchtower.enable=false`
+labels in the root compose file — nothing reads them now, and dead config rots.
+The container is stopped and gone from the host; the four management containers
+keep their stale labels until the next `docker compose up -d` recreates them,
+which is harmless.
+
+Exposure had nothing to clean up: Watchtower published no port and was never
+exposed. `reconcileRemovedServices` (§81) ran anyway and found nothing, which is
+the intended outcome for an app like this.
+
+What replaces it is deliberately less: the Update button updates **one app, when
+asked**, instead of everything, nightly, unattended. §82.1 adds the part that
+was actually useful about Watchtower — knowing an update exists — without the
+part that recreates containers while people are using them.

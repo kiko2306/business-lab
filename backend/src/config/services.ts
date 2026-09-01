@@ -613,17 +613,6 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       url: ['VIKUNJA_PUBLIC_URL'],
     },
   },
-  'watchtower': {
-    name: 'watchtower',
-    label: 'Watchtower',
-    description: 'Automatic container image updates',
-    icon: 'update',
-    category: 'Monitoring & Management',
-    composePath: 'apps/watchtower/docker-compose.yml',
-    healthCheck: {
-      enabled: false,
-    },
-  },
   'ntfy': {
     name: 'ntfy',
     label: 'ntfy',

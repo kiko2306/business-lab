@@ -93,7 +93,7 @@ gate.
 
 ## Services with no web UI
 
-**CrowdSec**, **Tailscale**, **Watchtower** — no login, nothing to expose.
+**CrowdSec**, **Tailscale** — no login, nothing to expose.
 CrowdSec's bouncer key and Tailscale's auth key are handled by the dashboard
 and `start.sh`.
 
