@@ -8323,3 +8323,53 @@ Both **Test destination** and job provisioning now create it. Two constraints:
 Verified end to end against a folder that did not exist:
 `missing-folder` → `created the destination folder` → `connected and listed its
 contents`.
+
+### 74.5 The Google Drive backup was broken by a malformed `oauth-url` — mine
+
+Every backup to Google Drive had failed. No backup had **ever** completed:
+`last started: never`, `versions: -`. The errors mutated across runs, which is
+what made this expensive — `No such key`, then `403 Forbidden`, then
+`TimeoutException` inside `GoogleDrive.GetFolderIdAsync`. Each one points
+somewhere plausible and wrong: expired token, revoked permission, bad network.
+
+Ruled out by direct test rather than inference, which is the only reason this
+got found:
+
+| Hypothesis | Test | Result |
+|---|---|---|
+| Credential dead | refresh AuthID at the handler | 200, access token |
+| Scope too narrow | `tokeninfo` on the access token | `drive.file` — sufficient |
+| Drive full | `about?fields=storageQuota` | 96 GB free |
+| Cannot write | multipart upload to the folder | **HTTP 200** |
+| Ambiguous folder | search folders by name | exactly one |
+| Container egress | curl googleapis *inside* the container | HTTP 200, 0.36s |
+
+Everything the failure blamed was healthy. The job itself held the fault:
+
+    oauth-url = https://duplicati-oauth-handler.appspot.com/?type=googledrive/refresh
+
+Built by appending `/refresh` to a constant that already ended in a query
+string. The resulting path is `/`, the query is `type=googledrive/refresh`, and
+that address answers **405 Method Not Allowed** — verified against the correct
+`/refresh`, which answers 200 with a token. So every token refresh mid-backup
+failed, and the *downstream* symptoms were 403s and folder-resolution timeouts.
+
+The handler has two endpoints that are not interchangeable:
+
+- `/?type=googledrive` — the **login page**, for a human to get an AuthID
+- `/refresh` — the **refresh endpoint**, what the job's `oauth-url` must be
+
+One constant served both. Now split into `DUPLICATI_OAUTH_LOGIN_URL` and
+`DUPLICATI_OAUTH_REFRESH_URL`, used verbatim with no string surgery, plus three
+regression tests — one asserts the exact concatenation that caused this cannot
+produce the refresh URL.
+
+**Why it stayed hidden.** A comment I had written above that line asserted the
+build *ignored* `oauth-url` — so the value looked inert and went unread for
+several debugging rounds. It was never ignored. A note recording a conclusion as
+settled fact stopped the line being questioned; the note was the bug's cover.
+Reasserting §73's lesson, one level up: verify a claim before **writing it down
+as a comment**, because a wrong comment outlives the session that made it.
+
+After the fix, the first run ever to get past `PreBackupVerify`: uploading, with
+encrypted `.dblock`/`.dindex` files appearing in Drive.

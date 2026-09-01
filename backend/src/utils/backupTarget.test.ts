@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BackupTarget, isMountedKind, toDuplicatiUrl, toMountSpec, validateTarget } from './backupTarget';
+import { BackupTarget, DUPLICATI_OAUTH_LOGIN_URL, DUPLICATI_OAUTH_REFRESH_URL, isMountedKind, toDuplicatiUrl, toMountSpec, validateTarget } from './backupTarget';
 
 const base: BackupTarget = {
   kind: 'disk', path: '', server: '', share: '', username: '', password: '',
@@ -96,5 +96,34 @@ describe('validateTarget', () => {
     // These would split or truncate the query string.
     expect(validateTarget({ ...base, kind: 'googledrive', authId: 'a&b' })).toMatch(/cannot appear/);
     expect(validateTarget({ ...base, kind: 'googledrive', authId: 'a b' })).toMatch(/cannot appear/);
+  });
+});
+
+describe('OAuth handler endpoints', () => {
+  // Regression: these two were once a single constant, and the job's
+  // `oauth-url` was built as `${LOGIN}/refresh`. Because the login URL ends in
+  // a query string, that produced
+  //   https://duplicati-oauth-handler.appspot.com/?type=googledrive/refresh
+  // whose path is "/" — an address that answers 405 Method Not Allowed. Every
+  // token refresh during a backup failed, surfacing as 403s and a
+  // TimeoutException in GetFolderIdAsync: symptoms that point at credentials
+  // or the network, and are caused by neither.
+  it('refresh endpoint is a bare path with no query string', () => {
+    const url = new URL(DUPLICATI_OAUTH_REFRESH_URL);
+    expect(url.pathname).toBe('/refresh');
+    expect(url.search).toBe('');
+  });
+
+  it('login page carries the type query and is not the refresh endpoint', () => {
+    const url = new URL(DUPLICATI_OAUTH_LOGIN_URL);
+    expect(url.searchParams.get('type')).toBe('googledrive');
+    expect(DUPLICATI_OAUTH_LOGIN_URL).not.toBe(DUPLICATI_OAUTH_REFRESH_URL);
+  });
+
+  it('neither URL can be derived from the other by appending a path', () => {
+    // The exact operation that caused the outage.
+    expect(`${DUPLICATI_OAUTH_LOGIN_URL.replace(/\/+$/, '')}/refresh`).not.toBe(
+      DUPLICATI_OAUTH_REFRESH_URL,
+    );
   });
 });

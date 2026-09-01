@@ -14,7 +14,7 @@
 
 import crypto from 'crypto';
 import { query } from '../utils/database';
-import { DUPLICATI_OAUTH_URL, getBackupTarget, isMountedKind, toDuplicatiUrl } from '../utils/backupTarget';
+import { DUPLICATI_OAUTH_REFRESH_URL, getBackupTarget, isMountedKind, toDuplicatiUrl } from '../utils/backupTarget';
 import logger from '../utils/logger';
 
 /** Name of the job the dashboard owns. Matching by name is how it is found again. */
@@ -153,13 +153,12 @@ export async function provisionBackupJob(duplicatiPassword: string, frequency: '
     { Name: 'retention-policy', Value: '7D:1D,4W:1W,12M:1M' },
   ];
 
-  // Kept, though this build ignores it: its Google Drive backend consults
-  // duplicati-oauth-handler.appspot.com regardless of what `oauth-url` says
-  // (verified — the setting is stored on the job and the failure still names
-  // the appspot handler). Harmless, and correct for builds that do honour it.
-  // The real requirement is that the AuthID comes from that same handler.
+  // Pin the token-refresh endpoint. This build DOES honour `oauth-url` — an
+  // earlier note here claimed it did not, and that mistake hid a malformed
+  // value that answered 405 and broke every refresh mid-backup. Used verbatim:
+  // it is the refresh endpoint, never the login page.
   if (!isMountedKind(target.kind)) {
-    settings.push({ Name: 'oauth-url', Value: `${DUPLICATI_OAUTH_URL.replace(/\/+$/, '')}/refresh` });
+    settings.push({ Name: 'oauth-url', Value: DUPLICATI_OAUTH_REFRESH_URL });
   }
 
   // Never a Duplicati-side schedule — see the note above. `frequency` is the

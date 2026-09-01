@@ -6,7 +6,7 @@ import { schemas, validateBody } from '../middleware/validation';
 import {
   BACKUP_TARGET_KEYS,
   getBackupTarget,
-  DUPLICATI_OAUTH_URL,
+  DUPLICATI_OAUTH_LOGIN_URL,
   isMountedKind,
   toDuplicatiUrl,
   toMountSpec,
@@ -409,7 +409,7 @@ router.get('/backup-target', async (_req: Request, res: Response) => {
       options: values[BACKUP_TARGET_KEYS.options] ?? null,
       folder: values[BACKUP_TARGET_KEYS.folder] ?? null,
       authIdConfigured: Boolean(values[BACKUP_TARGET_KEYS.authId]),
-      oauthUrl: DUPLICATI_OAUTH_URL,
+      oauthUrl: DUPLICATI_OAUTH_LOGIN_URL,
     });
   } catch {
     return res.status(500).json({ error: 'Unable to load the backup destination.' });

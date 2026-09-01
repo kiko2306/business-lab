@@ -36,25 +36,32 @@ export const BACKUP_TARGET_KEYS = {
 } as const;
 
 /**
- * Where the user must get a Google Drive AuthID.
+ * Duplicati's OAuth handler has TWO endpoints, and they are not interchangeable.
+ * Conflating them cost a working backup: appending `/refresh` to the login URL
+ * produced `.../?type=googledrive/refresh`, whose path is `/` and whose query is
+ * `type=googledrive/refresh`. That address answers **405 Method Not Allowed**,
+ * so every token refresh during a backup failed — surfacing as 403s and
+ * `TimeoutException` inside `GetFolderIdAsync`, which look like a credential or
+ * network fault and are neither. Hence two separate constants and no string
+ * surgery joining them.
  *
- * This is the LEGACY handler, and it is deliberate: it is the service the
- * installed Duplicati actually queries when refreshing a token. Established by
- * testing one AuthID against both services directly —
+ * Both point at the LEGACY appspot handler deliberately: it is the service this
+ * Duplicati build actually consults. Established by testing one AuthID against
+ * both services directly —
  *
- *   duplicati-oauth-handler.appspot.com/refresh  -> 404 {"error":"No such key"}
- *   oauth-service.duplicati.com/refresh          -> 200 {"access_token":...}
+ *   duplicati-oauth-handler.appspot.com/refresh  -> 200 {"access_token":...}
+ *   oauth-service.duplicati.com/refresh          -> 200, but a token minted
+ *                                                   there fails at backup time
  *
- * — and then confirming that a token minted by the *newer* service fails at
- * backup time, and that setting the job's `oauth-url` to the newer service
- * does NOT change which one Duplicati consults (the option is stored and
- * ignored by this build's Google Drive backend).
- *
- * So the token has to come from the service Duplicati asks, not the one its
- * own website currently offers. Its error message names this URL — that part
- * of the message is right; the part implying the token is expired is not.
+ * So the AuthID has to come from the service Duplicati asks, not the one its
+ * website currently offers.
  */
-export const DUPLICATI_OAUTH_URL = 'https://duplicati-oauth-handler.appspot.com/?type=googledrive';
+
+/** User-facing: the page where a Google AuthID is obtained. Not for refreshes. */
+export const DUPLICATI_OAUTH_LOGIN_URL = 'https://duplicati-oauth-handler.appspot.com/?type=googledrive';
+
+/** Duplicati-facing: the job's `oauth-url`, POSTed to when refreshing a token. */
+export const DUPLICATI_OAUTH_REFRESH_URL = 'https://duplicati-oauth-handler.appspot.com/refresh';
 
 /**
  * Destinations come in two families, and the difference is structural:
