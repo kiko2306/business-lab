@@ -188,9 +188,12 @@ it is done — not ticked off and left behind. Section references point at
 - [ ] **Ship against the Tier A networks first** (§84.3a) — Bluesky, Mastodon,
       own Instagram, own LinkedIn profile all publish today with no approval
       and no cost. That is a release on its own.
-- [ ] **Start Meta Business Verification** (§84.3a) — calendar time, not work,
-      and it gates both Instagram and Facebook for anyone else's accounts.
-      2-4 weeks per App Review submission, and a rejection restarts it.
+- [ ] **Per-client Meta app onboarding** (§84.7) — clients post to their own
+      accounts under their own business registration, so each client's box
+      holds their own developer app. Instagram works immediately in dev mode
+      with a Tester role; a publicly visible Facebook Page post still needs
+      that client's App Review, 2-4 weeks. Write it up as a billable
+      onboarding step, started on day one of an engagement.
 - [ ] **Decide on X** (§84.3a) — pay-per-use since April 2026: ~$0.015 a post,
       **$0.200 if it contains a URL**. A budget decision, not a build one.
 - [ ] **Verify Meta development-mode publishing empirically** (§84.3a) —
@@ -202,14 +205,26 @@ it is done — not ticked off and left behind. Section references point at
       it.
 - [ ] **`docs/it-admin.md`** (§84.4) — deploy/configure/maintain the stack.
       Same rule: link, do not duplicate.
+- [ ] **@mat: collect the SaaS inventory and monthly costs** (§84.7) — what you
+      and your clients actually pay for today, per tool per month. Without it
+      the value-proposition plan is a generic "self-hosting saves money"
+      leaflet; with it, it names the bill it removes. Blocks the item below.
 - [ ] **Sales / value-proposition plan** (§84.4) — SaaS replaced per app, and
-      the monthly cost removed. **As an Artifact, not in this repo** (§84.6).
+      the monthly cost removed, priced for offices of 2-15 (§84.7). **As an
+      Artifact, not in this repo** (§84.6).
 - [ ] **Customer journey / workflows** (§84.4) — scenarios showing why each app
       earns its place. **As an Artifact** (§84.6).
 - [ ] **Licence due diligence** (§84.5) — every registry app against
       redistribution for profit. Blocks pricing.
-- [ ] **Per-client provisioning** (§84.5) — one host is one deployment today;
-      turnkey boxes need it repeatable per client. Lands in the setup flow.
+- [ ] **Per-client provisioning** (§84.5, §84.7) — one host is one deployment
+      today; turnkey boxes need it repeatable per client. The list is concrete:
+      their domain, their Cloudflare account and API token, their tunnel, their
+      Authelia users, their backup destination. Lands in the setup flow.
+- [ ] **Turnkey build spec** (§84.7) — Dell/16 GiB/500 GB/€400 is proven (this
+      stack runs on 14.84 GiB, 4 CPUs, 53 containers, 8 GB used). The trap is
+      the disk: Ubuntu's installer defaults to a ~100 GiB root LV, which is how
+      §83 happened. Set Docker's data root or the partitioning **at install**,
+      and pick a small-office app profile rather than all of them.
 - [ ] **Data protection position** (§84.5) — controller vs processor, backup
       key custody, DR.
 - [ ] **Commercial plan** (§84.5) — hardware BOM, support model, onboarding

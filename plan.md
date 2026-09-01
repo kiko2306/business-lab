@@ -9591,3 +9591,58 @@ Postiz licence and self-host requirements.
 - **Commercial collateral lives outside this repo**, published as Artifacts and
   shared deliberately. The sales deck, pricing and client scenarios never get
   committed to a public repository.
+
+### 84.7 Answers from 2026-09-01, and what they change
+
+**Client social accounts are the clients' own — this inverts §84.3a's
+conclusion 3.** Business Lab is not a registered legal entity; every client is,
+and posts go on *their* accounts. So the reviewed-app model does not apply:
+each client's box holds that client's own developer app, created under that
+client's business registration. Consequences, per network:
+
+- **Instagram** — the client's own app in development mode with their account
+  as Tester posts to their own Instagram. No review, no cost, works on day one.
+  This is now the strongest reason to ship Instagram first.
+- **Facebook Page** — still needs App Review even for a page you own, because a
+  dev-mode post is visible only to admins. But it is now the *client's* app and
+  the *client's* business documents, so it is 2-4 weeks of per-client work.
+- **LinkedIn organisation pages** — the partner programme requires a registered
+  entity. The client qualifies; Business Lab would not have. Per-client again.
+- **Data protection gets simpler, not harder.** Social tokens live on the
+  client's own box under the client's own app, so we never hold them. That
+  removes the processor role §84.3a assumed for social accounts (it says
+  nothing about the rest of their data).
+- **Onboarding becomes a billable service step**: "we create and submit your
+  Meta app" is work performed for the client, not a product feature. It is also
+  the longest item in onboarding, so it starts on day one of an engagement.
+
+**The proposed hardware is proven, with one caveat.** Dell, 16 GiB, 500 GB,
+€400. Measured on the box this stack runs on today: **14.84 GiB RAM, 4 CPUs, 53
+containers, 8 GB used and 6 GB available**. So the spec is not optimistic — it
+is what is already working, with more disk.
+
+The caveat is the disk, and it is exactly the trap this project just spent a
+day on: Ubuntu's installer defaults to a ~100 GiB root LV and gives the rest to
+`/home`, which is how a 256 GB machine ended up with Docker squeezed into 98
+GiB (§83). A 500 GB client box installed with those defaults inherits the same
+problem. **The build spec must set Docker's data root, or the partitioning, at
+install time** — not discover it later.
+
+**Client profile: offices of 2-15 people.** The value proposition is per-seat
+SaaS at that scale, which is where the arithmetic is most favourable: most of
+these tools price per user per month, and the stack does not.
+
+**Client endpoints are Windows.** That makes Guacamole's RDP path the right one
+for machines on the overlay, and keeps MeshCentral genuinely valuable for those
+that never join it — Wake-on-LAN and Intel AMT are Windows-fleet features.
+RustDesk is also strongest on Windows if unattended support turns out to matter
+more than browser access.
+
+**Each client gets their own Cloudflare domain.** This matches the existing
+design exactly — one deployment, one base domain — and confirms the per-client
+provisioning list: their domain, their Cloudflare account and API token, their
+tunnel, their Authelia users, their backup destination. That list is §84.5's
+provisioning gap, now concrete.
+
+**Still needed from the user:** the SaaS inventory and monthly costs, for the
+value-proposition plan. Tracked as a TODO on their side.
