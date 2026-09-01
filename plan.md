@@ -8432,3 +8432,124 @@ worse than one that fails. The CLI path works; the API call needs its parameter
 shape worked out before anything in the dashboard depends on it. Filed for next
 session — the original file was never touched (mtime and checksum unchanged), so
 nothing was damaged proving this.
+
+## 75. Next session (2026-09-02): close out the backup scope
+
+Today the backup system went from never having worked to backup + restore both
+proven (§74.5, §74.7). What remains is turning *"a backup can be made"* into
+*"backups are happening, visibly, for everything."*
+
+Ordered by what actually reduces risk, not by effort.
+
+### 75.1 FIRST, before touching code: did last night's scheduled run succeed?
+
+Every successful backup so far was triggered by hand. The scheduler fires — but
+its last run, `2026-08-31T19:37:31Z`, was during the broken period, so it has
+**never produced a working backup**. Schedule is `daily`, so a run was due
+around 19:37 on 2026-09-01.
+
+This is the single most informative thing available tomorrow and it costs one
+command. Run it before anything else, because the answer changes the priorities
+below:
+
+```
+docker exec homelab-management-backend-1 node -e "require('./dist/loadEnv');require('./dist/utils/database').query(\"SELECT key,value FROM settings WHERE key='backup_schedule_last_run_at'\").then(r=>{console.log(r.rows[0]);process.exit(0)})"
+```
+
+then confirm Duplicati agrees a *second* version exists (1 version = only the
+manual run; 2 = the schedule works unattended):
+
+```
+curl -sS -X POST http://localhost:10150/api/v1/auth/login -H 'Content-Type: application/json' --data "{\"Password\":\"$(grep -E '^DUPLICATI_WEB_PASSWORD=' apps/duplicati/.env | cut -d= -f2-)\"}"
+# then GET /api/v1/backups and read Metadata.BackupListCount
+```
+
+- **2 versions** → the schedule works. Close this item, move to 75.2.
+- **still 1** → the scheduler is the top priority, above everything else. A
+  backup system nobody triggers is not a backup system. Start at
+  `runScheduledBackupCheck` / `shouldRunScheduledBackup` in
+  `services/backupScheduler.ts`, and check the container was actually up at
+  19:37.
+
+### 75.2 Make backup state visible in the dashboard
+
+`grep` for last-run/status in `settings-panel.component.html` returns **zero
+matches**. There is no way to see whether backups are working without the CLI.
+
+This ranks second only because 75.1 might change what needs showing. It is the
+direct cause of how bad today got: the system failed silently for its entire
+existence, and nothing surfaced it. Fixing the failure without fixing the
+silence just means the next failure is discovered the same way.
+
+Minimum useful surface, all of it already available from
+`GET /api/v1/backups` → `Metadata`:
+
+- last run time and its outcome (success / failed / never)
+- version count and size on the destination
+- the destination it actually used, so a stale config is visible
+- an explicit **"never run"** state — not a blank, which reads as fine
+
+Backend already exposes most of this via `duplicatiClient`. The work is a route
+returning it plus a card in the settings panel.
+
+### 75.3 Fix the restore API, or remove it
+
+`POST /api/v1/backup/2/restore` returns `{"Status":"OK"}`, reaches
+`Restore_Complete`, writes **nothing**, and logs no error (§74.7). A restore that
+reports success and produces no files is worse than one that fails outright,
+because it will be believed.
+
+`duplicati-cli` restores correctly — proven today, byte-identical — so recovery
+is possible; only the API path is broken. Options, in order of preference:
+
+1. Work out the correct parameter shape (`paths` encoding and `time` format are
+   the suspects — the same call rejected `filter` without `time`, so this API is
+   picky about both) and add a test that asserts a file actually lands.
+2. Have the dashboard shell out to `duplicati-cli`, which is already proven.
+3. If neither is quick: make the endpoint fail loudly rather than return OK.
+
+Do **not** wire a restore button to this until a test proves bytes arrive.
+
+### 75.4 Three apps still have no consistent backup
+
+`portainer`, `file-browser`, `stirling-pdf` — BoltDB and H2, **0 dump files
+each** (verified). Their live database files are copied raw, which can restore
+corrupt. `findSqliteFiles` correctly refuses them by header (there is already a
+test asserting this), so they are not silently mis-snapshotted — they are simply
+uncovered.
+
+Either add a stop-copy-start snapshot for these three, or write the decision
+down in `docs/` as accepted risk with the reason. Both are fine; leaving it
+undecided is not.
+
+### 75.5 Lower priority, genuinely deferrable
+
+- **Prove a non-Drive destination.** `disk` / `SMB` / `NFS` are built and
+  unexercised. Lower risk than it looks: Drive is the destination that does not
+  die with the LAN, and it is the one that works.
+- **Prove a Postgres/MySQL restore.** Only SQLite has been round-tripped. The
+  SQL dumps restore via `psql`/`mysql` import — a different path, untested.
+- **"Back up now" button** (§74.6). Must call `runAppDataBackup`, never
+  `runBackupJobNow`, or it archives the previous dump and each manual backup is
+  a generation stale.
+- **`backup_target_folder` is empty**, falling back to the `homelab-backups`
+  default inside `toDuplicatiUrl`. Works, but the dashboard shows a blank field
+  for a folder that is actually in use. Populate it.
+- **Retention is unexercised** — `7D:1D,4W:1W,12M:1M` with only one version.
+  Exercises itself over time; nothing to do but check later.
+
+### 75.6 Carry-over from earlier sections, unchanged
+
+VPS fresh-setup test (§61.5), MeshCentral (§62.2), n8n pre-built workflows
+(§64), signal-port coupling still uncovered (§69), `mailEnvKeys` retrofit to
+Uptime Kuma / n8n / BookStack / Paperless / Vikunja.
+
+### 75.7 The thread running through today
+
+Three separate times, a component's account of itself was wrong and testing the
+behaviour was right: the OAuth error blamed the token (§73), a comment claimed
+`oauth-url` was ignored (§74.5), and job detail reported `Sources: null` for a
+job demonstrably reading those sources (§74.7). Each cost real time.
+
+Tomorrow's first action (75.1) is deliberately a measurement, not a change, for
+the same reason.
