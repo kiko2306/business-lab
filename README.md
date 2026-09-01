@@ -168,8 +168,16 @@ it is done — not ticked off and left behind. Section references point at
       not optional for overlay2), merge `data-root` into `daemon.json` keeping
       the address pools, restart, verify counts. Leaves the old tree in place
       for rollback.
+- [ ] **@mat: create a dashboard admin account for Claude** — once the move is
+      verified and the stack is back up. Unblocks three things that have needed
+      a human click all along: fixing Home Page's `HOMEPAGE_ALLOWED_HOSTS` by
+      restarting it through the dashboard (the only path that applies exposure
+      env overrides), verifying UI changes visually instead of by grep, and
+      restarting apps the sanctioned way rather than by hand. The smoke-test
+      script already expects `SMOKE_USER`/`SMOKE_PASSWORD`, so a dedicated
+      account fits what is there.
 - [ ] **Remove /var/lib/docker** (§83.4) — only after a few days of the move
-      holding. Frees ~58 GB on the root LV.
+      holding. Frees ~47 GB on the root LV.
 
 ### Business Lab (§84)
 
