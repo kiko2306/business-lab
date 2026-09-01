@@ -304,15 +304,36 @@
       </div>
       <div class="card" *ngIf="health && !isCollapsed('health')">
         <div class="card-body">
-          <div class="mb-3">
+          <div class="mb-3 d-flex align-items-start flex-wrap gap-2">
             <span class="badge" [class.text-bg-success]="health.status === 'ok'" [class.text-bg-warning]="health.status !== 'ok'">
               {{ health.status }}
             </span>
+            <span class="small text-body-secondary" *ngIf="health.status === 'ok'">
+              Every monitored metric is below its threshold.
+            </span>
+            <span class="small" *ngIf="health.status !== 'ok'">
+              {{ degradedReason(health) }}
+            </span>
           </div>
           <div class="small">Database: {{ health.database }}</div>
-          <div class="small">Disk usage: {{ health.disk.percentUsed }}%</div>
-          <div class="small">Memory usage: {{ health.memory.percentUsed }}%</div>
-          <div class="small">Load per CPU: {{ health.load.loadPerCpu | number:'1.2-2' }}</div>
+          <div class="small" [class.fw-semibold]="isAlerting(health, 'disk')">
+            Disk usage: {{ health.disk.percentUsed }}% of {{ formatBytes(health.disk.totalBytes) }}
+            <span class="text-body-secondary">
+              ({{ formatBytes(health.disk.availableBytes) }} free · alerts at {{ health.thresholds.diskPercent }}%)
+            </span>
+          </div>
+          <div class="small" [class.fw-semibold]="isAlerting(health, 'memory')">
+            Memory usage: {{ health.memory.percentUsed }}% of {{ formatBytes(health.memory.totalBytes) }}
+            <span class="text-body-secondary">
+              ({{ formatBytes(health.memory.usedBytes) }} in use · alerts at {{ health.thresholds.memoryPercent }}%)
+            </span>
+          </div>
+          <div class="small" [class.fw-semibold]="isAlerting(health, 'load')">
+            Load per CPU: {{ health.load.loadPerCpu | number:'1.2-2' }}
+            <span class="text-body-secondary">
+              (alerts at {{ health.thresholds.loadPerCpu | number:'1.2-2' }})
+            </span>
+          </div>
         </div>
       </div>
     </section>

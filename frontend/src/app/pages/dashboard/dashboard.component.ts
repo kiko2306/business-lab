@@ -281,4 +281,63 @@ export class DashboardComponent implements OnInit, OnDestroy {
       error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load health checks.')),
     });
   }
+
+  /**
+   * Sizes are reported in bytes; show them in the unit a person would use.
+   * Binary units (KiB steps) because that is what `df` and `os.totalmem()`
+   * measure — labelling those as GB would overstate every figure by 7%.
+   */
+  protected formatBytes(bytes: number): string {
+    if (!bytes || bytes < 0) {
+      return '—';
+    }
+    const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+      value /= 1024;
+      unit += 1;
+    }
+    // One decimal is enough to distinguish 1.2 TiB from 1.9 TiB, and noise
+    // below GiB scale doesn't help anyone.
+    return `${value >= 10 || unit <= 1 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
+  }
+
+  protected metricLabel(metric: string): string {
+    switch (metric) {
+      case 'disk':
+        return 'Disk usage';
+      case 'memory':
+        return 'Memory usage';
+      case 'load':
+        return 'Load per CPU';
+      default:
+        return metric;
+    }
+  }
+
+  /** Load is a ratio, disk and memory are percentages — format accordingly. */
+  protected formatMetric(metric: string, value: number): string {
+    return metric === 'load' ? value.toFixed(2) : `${Math.round(value)}%`;
+  }
+
+  /**
+   * "degraded" on its own says nothing actionable. The API already reports
+   * which metric tripped and against what threshold, so spell that out.
+   */
+  protected degradedReason(health: HealthStatus): string {
+    if (!health.alerts.length) {
+      return 'A monitored metric is above its threshold.';
+    }
+    const parts = health.alerts.map(
+      (alert) =>
+        `${this.metricLabel(alert.metric).toLowerCase()} is ${this.formatMetric(alert.metric, alert.value)}, ` +
+        `over its ${this.formatMetric(alert.metric, alert.threshold)} threshold`
+    );
+    return `${parts.join('; ')}.`;
+  }
+
+  protected isAlerting(health: HealthStatus, metric: string): boolean {
+    return health.alerts.some((alert) => alert.metric === metric);
+  }
 }

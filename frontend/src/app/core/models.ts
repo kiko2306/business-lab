@@ -268,8 +268,8 @@ export interface AdminUserListResponse {
 export interface HealthStatus {
   status: 'ok' | 'degraded';
   database: string;
-  disk: { percentUsed: number };
-  memory: { percentUsed: number };
+  disk: { percentUsed: number; totalBytes: number; usedBytes: number; availableBytes: number };
+  memory: { percentUsed: number; totalBytes: number; usedBytes: number };
   load: { oneMinute: number; loadPerCpu: number };
   thresholds: { diskPercent: number; memoryPercent: number; loadPerCpu: number };
   alerts: HealthAlert[];
