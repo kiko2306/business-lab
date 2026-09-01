@@ -17,7 +17,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/block-stack-teardown.sh\"",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/bash-guards.sh\"",
             "timeout": 10,
             "statusMessage": "Checking for a management-stack teardown"
           }

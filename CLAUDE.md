@@ -34,15 +34,21 @@ history in it; append.
 
 ## Commands
 
+**There is no Node on this host** — everything runs in containers. Mount the
+repo root (not just the workspace: some tests resolve paths up to it) and run
+the workspace script inside `node:20`:
+
 ```bash
-cd backend  && npm run typecheck && npm test   # vitest
-cd frontend && npm run test:ci && npm run build # karma/jasmine, headless
-./scripts/smoke-tests.sh                        # against a running backend
+docker run --rm -v "$PWD":/repo -w /repo/backend node:20 npm test
 ```
 
-CI (`.github/workflows/ci.yml`) runs the backend and frontend jobs above plus
-`apps/price-compare/app` tests; the smoke tests are local-only. Run the affected
-workspace's checks before saying a change is done.
+Swap `npm test` for `npm run typecheck`, or `-w /repo/frontend` with
+`npm run test:ci` / `npm run build`. `./scripts/smoke-tests.sh` runs on the host
+against an already-running backend.
+
+CI (`.github/workflows/ci.yml`) runs backend typecheck+test, frontend
+test:ci+build, and `apps/price-compare/app` tests; the smoke tests are
+local-only. Run the affected workspace's checks before saying a change is done.
 
 ## After a change lands, commit and push
 
@@ -101,7 +107,9 @@ never be in the diff.
   of things that passed CI and failed on the host — verify against the real
   stack when the change touches Docker, exposure, networking or backups.
 
-The first two of those are enforced, not just asked for: `.claude/settings.json`
-denies reads and writes of `.env` files, and `.claude/hooks/block-stack-teardown.sh`
-refuses a root `docker compose down`. A refusal from either is the rule working —
-find another way rather than routing around it.
+The first two of those are enforced, not just asked for. `.claude/settings.json`
+denies the Read/Edit/Write tools on `.env` files, and `.claude/hooks/bash-guards.sh`
+covers what per-tool rules cannot: it refuses a root `docker compose down`, and
+refuses a shell command that reads or writes a real `.env` (`.env.example`
+templates, `ls`, `find` and `git` are left alone). A refusal from either is the
+rule working — find another way rather than routing around it.
