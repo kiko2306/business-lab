@@ -121,7 +121,10 @@ passing, unless it is genuinely part of the change at hand.
   to do its job but not to come up (NetBird needs Tailscale for signalling);
   the dashboard lists it and warns when it is down, and never blocks a start.
   Putting a proxy or a VPN in `dependsOn` would make "that one is stopped" mean
-  "nothing can be started".
+  "nothing can be started". Do **not** declare `nginx-proxy-manager` on an app
+  just because it is exposed: ingress is Cloudflare → NPM → app for everything,
+  so the card derives that from the app's live exposure instead. Declare it only
+  where the app's own function needs it (CrowdSec parsing NPM's logs).
 - **Commits**: imperative, sentence case, describing the outcome — "Fix the VPN:
   port renumbering left Tailscale Funnel pointing at a dead port". No
   conventional-commit prefixes; `plan:` prefix for plan.md-only commits.

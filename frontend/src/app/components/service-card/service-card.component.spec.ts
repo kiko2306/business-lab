@@ -77,6 +77,31 @@ describe('ServiceCardComponent dependencies', () => {
     expect(component.degradedTitle()).toBe('');
   });
 
+  it('adds the proxy for an exposed app, derived from its live hostname', () => {
+    setUp({ exposedHostname: 'netbird.example.com' }, [service('nginx-proxy-manager', 'running')]);
+
+    expect(component.dependencies()).toEqual([
+      jasmine.objectContaining({ name: 'nginx-proxy-manager', running: true, blocking: false }),
+    ]);
+    // The public URL is dead without it; the app on its LAN port is not.
+    expect(component.dependenciesSatisfied()).toBe(true);
+  });
+
+  it('adds no proxy chip for an app with no public hostname', () => {
+    setUp({}, [service('nginx-proxy-manager', 'running')]);
+
+    expect(component.dependencies()).toEqual([]);
+  });
+
+  it('does not list the proxy twice when the app already declares it', () => {
+    setUp({ exposedHostname: 'netbird.example.com', requires: ['nginx-proxy-manager'] }, [
+      service('nginx-proxy-manager', 'stopped'),
+    ]);
+
+    expect(component.dependencies().filter((d) => d.name === 'nginx-proxy-manager').length).toBe(1);
+    expect(component.degradedBy()).toEqual(['nginx-proxy-manager']);
+  });
+
   it('falls back to the raw name for a dependency the dashboard has no status for', () => {
     setUp({ dependsOn: ['authelia'] }, []);
 

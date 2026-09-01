@@ -34,6 +34,8 @@ interface DependencyState {
   running: boolean;
   // dependsOn (blocks the start) rather than requires (functional only).
   blocking: boolean;
+  // Replaces the generic tooltip when this dependency needs a specific reason.
+  note?: string;
 }
 
 @Component({
@@ -301,7 +303,42 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
         const dep = this.allServices.find((s) => s.name === name);
         return { name, label: dep?.label ?? name, running: dep?.state === 'running', blocking };
       });
-    return [...resolve(this.service.dependsOn, true), ...resolve(this.service.requires, false)];
+    return [
+      ...resolve(this.service.dependsOn, true),
+      ...resolve(this.service.requires, false),
+      ...this.proxyDependency(),
+    ];
+  }
+
+  /**
+   * Ingress is Cloudflare Tunnel -> NPM -> app, so an exposed app's public URL
+   * dies with the proxy while the app itself keeps working on its LAN port.
+   *
+   * Derived from live exposure rather than declared per app: it is true of
+   * every exposed app and of none of the others, and which is which is a
+   * runtime setting, not a property of the app. Declaring it in the registry
+   * would put the same chip on all ~36 entries and still be wrong for the
+   * ones nobody has exposed.
+   *
+   * exposedHostname is only set while the app is running, so a stopped app
+   * shows no proxy chip — there is no public URL to lose yet.
+   */
+  private proxyDependency(): DependencyState[] {
+    const name = 'nginx-proxy-manager';
+    const declared = [...(this.service.dependsOn ?? []), ...(this.service.requires ?? [])];
+    if (this.service.name === name || declared.includes(name) || !this.service.exposedHostname) {
+      return [];
+    }
+    const proxy = this.allServices.find((s) => s.name === name);
+    return [
+      {
+        name,
+        label: proxy?.label ?? 'Nginx Proxy Manager',
+        running: proxy?.state === 'running',
+        blocking: false,
+        note: `${this.service.exposedHostname} is served through it — the app itself keeps working without it.`,
+      },
+    ];
   }
 
   dependencyStates(): DependencyState[] {
@@ -336,6 +373,9 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   dependencyTitle(dep: DependencyState): string {
     const state = dep.running ? 'running' : 'not running';
+    if (dep.note) {
+      return `${dep.label} — ${state}. ${dep.note}`;
+    }
     return dep.blocking
       ? `${dep.label} — ${state}. Required to start.`
       : `${dep.label} — ${state}. Needed for this app to work, not to start.`;

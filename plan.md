@@ -9001,3 +9001,26 @@ Two fixes, both in code:
 The stored value is only rewritten on a dashboard-driven start, and this
 session has no dashboard login — so the live container still holds the bad
 value. That is a README item, not a hand-edit.
+
+### 80.5 The proxy is not a per-app declaration
+
+Follow-up question: all traffic is Cloudflare → NPM → app, so why do most apps
+not list NPM under `requires`?
+
+Because declaring it would be both noisy and wrong. It would put an identical
+chip on all ~36 registry entries, and still be inaccurate for the ones nobody
+has exposed — exposure is a runtime setting in `service_exposure`, not a
+property of the app. `requires` stays for couplings that are properties of the
+app itself (CrowdSec parses NPM's access logs; it needs the proxy whether or
+not CrowdSec is exposed).
+
+The card derives the proxy instead, from the app's live `exposedHostname`: an
+exposed app gets an NPM chip whose tooltip names the hostname it serves, and
+nothing else does. When NPM is down the chip goes amber and the app reads
+"Runs, but needs Nginx Proxy Manager to work properly", which is exactly true —
+the LAN port still answers. `exposedHostname` is only set while the app runs,
+so a stopped app shows no proxy chip; there is no public URL to lose yet.
+
+Not modelled: cloudflared. It is a systemd unit outside the repo (with the
+`--protocol http2` pin that NetBird's gRPC depends on), so the dashboard has no
+state for it to show.
