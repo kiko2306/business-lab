@@ -8849,3 +8849,61 @@ deliberately, because the ask was `~/`. Worth revisiting alongside whether
     mounts:  /home/mat -> /home/mat (rw=true)
     health:  running / healthy
     inside:  /home/mat/www/homelab-management visible, same path as the host
+
+## 79. Session Log — 2026-09-01: retention was a promise nothing kept
+
+Two things reported off the dashboard: the backup schedule controls sat bare on
+the page while every neighbouring block is a card, and the list showed **four**
+backups while the setting said *keep last 3*.
+
+### 79.1 Why the count disagreed with the setting
+
+Retention was only ever applied as a side effect of *making* a backup —
+`POST /api/backups/create` (when the schedule is enabled) and the scheduled run.
+Nothing enforced it at any other moment. So:
+
+- lowering *keep last* from 14 to 3 deleted nothing; the extra archives sat
+  there until the next backup happened to run, with the list contradicting the
+  number the user had just saved;
+- an archive that arrived by any other route stayed forever. That is exactly
+  what had happened here — `backup-2026-08-31T20-08-13-327Z.tar.gz` has **no
+  `backup_create` audit row**, so it was not made by either code path, and
+  nothing was ever going to remove it.
+
+The fix puts enforcement where the promise is made rather than where backups
+are created:
+
+- `PUT /api/backups/schedule` prunes after saving (when automatic backups are
+  on) and reports what it deleted, so the list matches the number immediately.
+- `runScheduledBackupCheck` prunes on **every** check, including the ones where
+  nothing is due — one hour is the worst-case lag for drift like the orphan
+  above, instead of forever.
+- `pruneOldBackups` no longer reports a file as deleted when its `unlink`
+  failed. It swallowed the error and returned the name anyway; now that callers
+  put that count in a toast, a lie there would be visible.
+
+The dashboard re-reads the backup list after saving the schedule — without it
+the pruned archives stay on screen until the next poll.
+
+### 79.2 Verified live
+
+Rebuilt and restarted `backend`/`frontend`. On boot the daily run was due, and
+pruned to exactly three:
+
+    "Pruned backups beyond the retention count"
+    deleted: [backup-2026-08-30…, backup-2026-08-29…]  retentionCount: 3
+
+The not-due branch is the new path, so it was proven separately: a backdated
+surplus archive was planted in `/app/backups` and the backend restarted with
+nothing due. It deleted the planted file, left the three real archives alone,
+and created no backup —
+
+    "Pruned backups beyond the retention count"
+    deleted: [backup-2026-08-01T00-00-00-000Z.tar.gz]  retentionCount: 3
+
+### 79.3 The card
+
+The schedule switch, frequency, *keep last* and **Save schedule** now live in a
+`card border-0 shadow-sm` with a *Schedule* heading and a line saying what
+retention does — matching the settings panel and the health block. The archive
+list stays outside it: it is the section's content, not one of its settings.

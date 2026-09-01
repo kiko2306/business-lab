@@ -38,6 +38,10 @@ export async function runScheduledBackupCheck(): Promise<void> {
     return;
   }
   if (!shouldRunScheduledBackup(new Date(), config.lastRunAt, config.frequency)) {
+    // Still enforce retention on a check with nothing due: a lowered "keep
+    // last", or an archive that arrived by some other route, would otherwise
+    // sit in the list contradicting the setting until the next backup runs.
+    await prune(config.retentionCount);
     return;
   }
 
@@ -52,10 +56,7 @@ export async function runScheduledBackupCheck(): Promise<void> {
       metadata: { trigger: 'scheduled' },
     });
 
-    const deleted = await pruneOldBackups(config.retentionCount);
-    if (deleted.length > 0) {
-      logger.info('Pruned old backups after scheduled run', { deleted, retentionCount: config.retentionCount });
-    }
+    await prune(config.retentionCount);
 
     // The dashboard's own archive above covers the control plane. App data is
     // Duplicati's job, and it needs consistent dumps first — copying live
@@ -74,6 +75,17 @@ export async function runScheduledBackupCheck(): Promise<void> {
       result: 'failure',
       metadata: { trigger: 'scheduled' },
     }).catch(() => {});
+  }
+}
+
+async function prune(retentionCount: number): Promise<void> {
+  try {
+    const deleted = await pruneOldBackups(retentionCount);
+    if (deleted.length > 0) {
+      logger.info('Pruned backups beyond the retention count', { deleted, retentionCount });
+    }
+  } catch (error) {
+    logger.error('Backup retention cleanup failed', { error: (error as Error).message });
   }
 }
 

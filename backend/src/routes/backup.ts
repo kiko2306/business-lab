@@ -192,7 +192,25 @@ router.put('/schedule', validateBody(schemas.backupScheduleUpdate), async (req: 
       resource: 'backup_schedule',
       result: 'success',
     }).catch(() => {});
-    return res.json({ message: 'Backup schedule updated.' });
+
+    // Retention describes the directory, not just the moment a backup is made.
+    // Without this, lowering "keep last" leaves the extra archives sitting
+    // there until the next backup happens to run, and the list contradicts the
+    // number the user just saved.
+    let deleted: string[] = [];
+    if (enabled) {
+      deleted = await pruneOldBackups(retentionCount).catch((error: Error) => {
+        logger.error('Backup retention cleanup failed', { error: error.message });
+        return [] as string[];
+      });
+    }
+
+    return res.json({
+      message: deleted.length
+        ? `Backup schedule updated. Deleted ${deleted.length} backup${deleted.length === 1 ? '' : 's'} beyond the retention count.`
+        : 'Backup schedule updated.',
+      deleted,
+    });
   } catch {
     return res.status(500).json({ error: 'Unable to update backup schedule.' });
   }

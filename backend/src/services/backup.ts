@@ -132,9 +132,18 @@ export async function pruneOldBackups(retentionCount: number): Promise<string[]>
   );
 
   files.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  const toDelete = files.slice(retentionCount);
-  await Promise.all(toDelete.map((file) => fs.unlink(path.join(BACKUP_DIR, file.name)).catch(() => {})));
-  return toDelete.map((file) => file.name);
+  const deleted: string[] = [];
+  for (const file of files.slice(retentionCount)) {
+    try {
+      await fs.unlink(path.join(BACKUP_DIR, file.name));
+      deleted.push(file.name);
+    } catch {
+      // One undeletable archive is not worth failing the whole prune over — the
+      // next run tries again. It stays out of the returned list so callers
+      // never report a file as gone while it is still in the backup list.
+    }
+  }
+  return deleted;
 }
 
 export async function getBackupScheduleConfig(): Promise<BackupScheduleConfig> {

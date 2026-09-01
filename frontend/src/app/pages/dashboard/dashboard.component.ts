@@ -265,6 +265,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.toast.success(response.message);
         this.savingSchedule = false;
         this.loadSchedule();
+        // Saving a lower retention count deletes the extra archives server-side,
+        // so the list has to be re-read or it keeps showing what is gone.
+        this.loadBackups();
       },
       error: (error) => {
         this.toast.error(extractErrorMessage(error, 'Unable to update backup schedule.'));
