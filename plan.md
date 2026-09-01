@@ -8373,3 +8373,20 @@ as a comment**, because a wrong comment outlives the session that made it.
 
 After the fix, the first run ever to get past `PreBackupVerify`: uploading, with
 encrypted `.dblock`/`.dindex` files appearing in Drive.
+
+### 74.6 Gap: no on-demand "Back up now" in the dashboard
+
+Found while confirming dump ordering. `runBackupJobNow` has exactly one caller —
+`runAppDataBackup` in `backupScheduler.ts`, which dumps databases first, so no
+code path archives stale dumps. That guarantee is sound.
+
+But it also means the **only** way a backup starts is the scheduler. There is no
+endpoint behind a dashboard button, so a user who has just changed a destination
+cannot verify it end to end without waiting for the next scheduled run. Every
+run performed while debugging today went through the service layer directly,
+which a user cannot do.
+
+Not built — outside the destination-selection scope that was asked for. The
+implementation is small and the ordering constraint is the only subtlety: it
+must call `runAppDataBackup`, never `runBackupJobNow`, or it will archive the
+previous dump and quietly make each manual backup a generation stale.
