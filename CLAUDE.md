@@ -79,6 +79,12 @@ that arrives as a list. The point is that intent survives a session that runs
 long or gets interrupted, and that the order things get built in stays the
 user's call.
 
+**Then stop when that change is complete.** Finish it properly — checks pass,
+verified against the real stack, committed, its TODO item deleted — and stop
+there to report. Do not roll straight on into the next item, even an obviously
+related one, and even when it was in the same plan. Picking up the next task is
+the user's call, every time.
+
 ## TODOs live in README.md, and get deleted
 
 `README.md`'s TODO section is the **only** place open work is tracked. Not
