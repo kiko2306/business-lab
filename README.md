@@ -171,6 +171,43 @@ it is done — not ticked off and left behind. Section references point at
 - [ ] **Remove /var/lib/docker** (§83.4) — only after a few days of the move
       holding. Frees ~58 GB on the root LV.
 
+### Business Lab (§84)
+
+- [ ] **Rebrand, tier 1** (§84.2) — the three user-visible strings, the
+      favicon, and the README/docs headings. Nothing restarts, nothing
+      migrates.
+- [ ] **Rebrand, tier 2** (§84.2) — package/image/network/project names. Do it
+      in the same maintenance window as the §83 data-root move; both recreate
+      the management stack.
+- [ ] **Platform access audit for social publishing** (§84.3) — Meta app
+      review, X's paid API, LinkedIn partner approval, TikTok review. Blocks
+      any timeline; Mastodon and Bluesky work today. Do this before the app.
+- [ ] **Add Postiz** (§84.3) — adopt rather than build: a bespoke publisher
+      means maintaining OAuth for every network.
+- [ ] **Content generation** (§84.3) — prompt + a Claude API key entered once
+      in Settings, same third-party-token pattern as Cloudflare/Tailscale;
+      n8n for "generate on a schedule, queue in Postiz".
+- [ ] **`docs/webmaster.md`** (§84.4) — Cloudflare role runbook: domain, DNS,
+      Tunnel, routing, Zero Trust. Links to first-run.md rather than restating
+      it.
+- [ ] **`docs/it-admin.md`** (§84.4) — deploy/configure/maintain the stack.
+      Same rule: link, do not duplicate.
+- [ ] **Decide where commercial collateral lives** (§84.4) — this repo is
+      public. Sales deck, pricing and client scenarios need a private repo or
+      Artifacts. Decide before the first draft.
+- [ ] **Sales / value-proposition plan** (§84.4) — SaaS replaced per app, and
+      the monthly cost removed.
+- [ ] **Customer journey / workflows** (§84.4) — scenarios showing why each app
+      earns its place.
+- [ ] **Licence due diligence** (§84.5) — every registry app against
+      redistribution for profit. Blocks pricing.
+- [ ] **Per-client provisioning** (§84.5) — one host is one deployment today;
+      turnkey boxes need it repeatable per client. Lands in the setup flow.
+- [ ] **Data protection position** (§84.5) — controller vs processor, backup
+      key custody, DR.
+- [ ] **Commercial plan** (§84.5) — hardware BOM, support model, onboarding
+      time, and what happens to a client's data when they stop paying.
+
 ### Roster changes (§81)
 
 - [ ] **Drop Portainer** (§81.1) — overlaps the dashboard, unhealthy for days,
@@ -240,7 +277,10 @@ it is done — not ticked off and left behind. Section references point at
 
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
-- [ ] **MeshCentral** (§62.2) — planned, not yet added to the registry.
+- [ ] **Decide remote management** (§84.1) — MeshCentral vs Guacamole, and it
+      is a requirements question: do client machines join the NetBird overlay?
+      Yes → Guacamole (no agent, no cert-hash problem, Authelia can gate it)
+      and this item dies. No → MeshCentral as specified in §62.2.
 - [ ] **Pre-built n8n workflows** (§64) — ship useful workflows rather than an
       empty n8n.
 - [ ] **Home Assistant: identify the three unlabelled Espressif devices**

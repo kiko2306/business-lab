@@ -9379,3 +9379,134 @@ second row will show after the move.
 
 Also done, step 1 of §83.5: `docker builder prune -f` + `docker image prune -f`
 freed 10 GB. `/` went 68% → 58%, and the tree to copy is 47 GB rather than 58.
+
+## 84. Plan — Business Lab: rebrand, social publishing, role plans, and a product
+
+A four-part brief (2026-09-01). Three of the four parts are documents rather
+than code, and one of them changes what this repo *is*, so the sequencing and
+the public-repo question are addressed first where they matter.
+
+### 84.1 Remote management: MeshCentral reviewed
+
+Reviewed against the constraint that decides it — ingress is Cloudflare Tunnel
+→ NPM, which carries HTTP(S) and WebSocket only. Anything wanting raw TCP/UDP
+needs a port-forward, i.e. §0 principle 1.
+
+| Option | Through the tunnel | Verdict |
+|---|---|---|
+| **Guacamole** | yes (HTTPS + WebSocket) | **Recommended.** Browser-only RDP/VNC/SSH gateway. No agent, so no `Agent bad web cert hash` (§62.2) at all, and Authelia can gate it because there is no agent to fail a forward-auth redirect. Reaches endpoints over the NetBird overlay that already exists — which is exactly the change that makes MeshCentral optional. |
+| RustDesk | no | `hbbs`/`hbbr` need TCP 21115-21118 + UDP 21116 for hole punching. Fine over NetBird for our own machines; useless for a client machine that has not joined the overlay. Best desktop-support UX of the set. |
+| ShellHub / OpenRPort | yes (agents dial out over WebSocket) | For a Linux fleet wanting shell + tunnels. OpenRPort is a community fork after RPort went commercial — check its commit activity before betting on it. |
+| Tactical RMM | yes | **Bundles MeshCentral** for remote control, so it is not an escape from it. Take it only if real RMM (inventory, patching, scripted checks) is wanted, and inherit the same cert config. |
+| MeshCentral as planned | yes | Still the only answer if the requirement is unattended access to machines behind arbitrary NAT with *no* VPN, plus Wake-on-LAN and Intel AMT. The cert problem is solved config (`TLSOffload` + `certUrl`), not a blocker. |
+
+**Decision needed**, and it is a requirements question, not a technical one: do
+client machines join the overlay? If yes → Guacamole, and the MeshCentral item
+is deleted. If no → MeshCentral stays as specified in §62.2.
+
+### 84.2 Rebrand to "Business Lab" — three tiers, only one of which is free
+
+"Homelab" appears in 50 files. They are not equivalent, and doing them as one
+sweep would take the stack down for no reason.
+
+**Tier 1 — user-visible, no risk, do first.** Three strings and an icon:
+`frontend/src/index.html` `<title>`, the dashboard header, the login kicker,
+plus the favicon and the README/docs headings. Nothing restarts, nothing
+migrates. This is what "renaming the app" means to anyone looking at it.
+
+**Tier 2 — internal identifiers, recreates containers.** `package.json` names,
+`image: homelab-backend|homelab-frontend`, the `homelab-net` network, the
+compose project name. All safe, all cosmetic, but they recreate the management
+stack — so do them in the same maintenance window as the §83 data-root move
+rather than on their own.
+
+**Tier 3 — do not, unless the product is genuinely sold under the name.** Each
+has a real cost and no user-visible benefit:
+
+- **Postgres `POSTGRES_DB`/`POSTGRES_USER` = `homelab`** → dump, recreate role
+  and database, restore. Risk to the only stateful thing in the stack, for a
+  string nobody sees.
+- **Public hostnames** (`homelab.`/`api-homelab.<domain>`) → new NPM proxy
+  hosts, new Cloudflare DNS, Authelia rules, and everyone re-logs-in. Worth it
+  *only* alongside a real product launch, and then as its own migration task
+  with the exposure system doing the work.
+- **The GitHub repo name** — `kiko2306/homelab-management`. GitHub redirects
+  old URLs, but CI, remotes, badges and every `plan.md`/CLAUDE.md reference
+  need updating.
+
+### 84.3 Social media generation and scheduling
+
+**The app is not the hard part; platform access is.** Before any code:
+
+- Meta (Facebook Pages, Instagram) — Business/Creator account plus app review
+  for `pages_manage_posts` / `instagram_content_publish`.
+- X — API is paid; the free tier does not post at useful volume.
+- LinkedIn — posting scopes need partner approval.
+- TikTok — Content Posting API, subject to review.
+- Mastodon, Bluesky — open, trivial.
+
+So the realistic first release publishes to the open networks and queues the
+rest behind approvals that take weeks. Any plan that does not say this is
+lying about the timeline.
+
+**Adopt, do not build.** A bespoke publisher means implementing and then
+maintaining OAuth for each network — the expensive part, and the part that
+breaks without warning when a platform changes terms. Candidates:
+**Postiz** (AGPL, Docker, multi-provider, its own scheduler) or **Mixpost
+Lite** (self-hosted Laravel; the paid tier carries the interesting features).
+Recommend Postiz, next free port after the §81 additions.
+
+**Generation** is the part worth building here, and it is small: a prompt plus
+a Claude API key entered once in Settings — the same third-party-token pattern
+as Cloudflare and Tailscale, which §0.3 explicitly allows. n8n is already
+installed and is the right glue for "generate on a schedule, queue in Postiz".
+
+### 84.4 The four role plans — and the public-repo problem
+
+Two of these are operator documentation and belong in `docs/`, written as
+role-oriented runbooks that **link to** `first-run.md`, `ports.md` and
+`app-credentials.md` rather than restating them; a duplicated fact is a fact
+that will rot:
+
+- **Webmaster (Cloudflare admin)** — domain, DNS, Tunnel, routing, Zero Trust
+  policies, and the two constraints that bite: no port-forwards, and the
+  `--protocol http2` pin NetBird's gRPC depends on.
+- **IT administrator** — deploy, configure and maintain the app stack; the
+  dashboard is the interface, `./start.sh` is the only command.
+
+The other two are commercial collateral, and **this repository is public**
+(`kiko2306/homelab-management`). A value-proposition deck, pricing, and named
+client scenarios pushed here are published to the world the moment they land:
+
+- **Sales / value proposition** — which SaaS each app replaces, and the
+  monthly cost it removes.
+- **Customer journey / workflows** — real scenarios showing why each app earns
+  its place.
+
+Recommendation: keep both out of this repo — a private repo, or published as
+Artifacts that are shared deliberately. Decide before the first draft, not
+after.
+
+### 84.5 Commercial plan: what has to be true before pricing exists
+
+Prose is the easy half. Four things gate a real go-to-market and each is a
+discrete task:
+
+1. **Licence due diligence** — a table of every app in the registry against
+   redistribution-for-profit: AGPL obligations, anything with a commercial-use
+   restriction, and the licences of whatever gets added (Postiz, Mixpost,
+   RustDesk Pro). This blocks pricing, not the other way round.
+2. **Per-client provisioning** — today one host is one deployment with one
+   Cloudflare account, one domain, one Authelia user set and one backup
+   destination. Selling turnkey boxes needs that to be repeatable per client.
+   This is a genuine product gap and it lands in the dashboard's setup flow.
+3. **Data protection** — client data on a box you sold, in the EU. Controller
+   vs processor, backup encryption key custody (the Duplicati passphrase
+   problem, §74, becomes a contractual one), and a stated DR position.
+4. **Invoicing** — anything issuing invoices to Portuguese clients needs
+   AT-certified software. Invoice Ninja is not certified, which is part of why
+   it was dropped (§81.8).
+
+Plus the ordinary parts: hardware BOM and SKU, support/warranty model,
+onboarding time per client, and what happens when a client stops paying while
+their data lives on their own hardware.
