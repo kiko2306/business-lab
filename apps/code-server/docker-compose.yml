@@ -15,6 +15,9 @@ services:
       # it. Direct LAN access to this container's own port has no auth at
       # all — restrict that at the network level if this box isn't trusted.
       SUDO_PASSWORD: ${CODE_SERVER_SUDO_PASSWORD}
+      # Open the mounted home directory on first load, so "~/" is there
+      # without a File -> Open Folder step.
+      DEFAULT_WORKSPACE: ${CODE_SERVER_HOME:-/home/mat}
     labels:
       - "homepage.group=Development"
       - "homepage.name=Code Server"
@@ -23,6 +26,22 @@ services:
       - "homepage.description=VS Code in the browser"
     volumes:
       - ./data:/config
+      # The host home directory, mounted at the SAME absolute path inside the
+      # container as outside it. Same reasoning as APPS_DIR in the root compose
+      # file: a path copied from a host terminal, a git worktree path, or an
+      # absolute path in a VS Code task then resolves identically in both
+      # places, instead of silently pointing somewhere else.
+      #
+      # PUID/PGID above are 1000, which is the owner of this directory, so
+      # files created from the IDE keep the right ownership.
+      #
+      # NOTE ON BLAST RADIUS: this hands the browser IDE everything in the home
+      # directory — ~/.ssh, ~/.gnupg, ~/.docker, and every apps/*/.env in the
+      # checkout. code-server's own login is disabled (see above), so the only
+      # gate is Authelia on the exposed hostname, and direct access to this
+      # container's LAN port has no gate at all. Narrow CODE_SERVER_HOME to a
+      # subdirectory (e.g. /home/mat/www) if that trade isn't wanted.
+      - ${CODE_SERVER_HOME:-/home/mat}:${CODE_SERVER_HOME:-/home/mat}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8443/healthz"]
       interval: 30s

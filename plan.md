@@ -8810,3 +8810,42 @@ Documented in `docs/app-credentials.md` rather than left as folklore.
 - **Ariston via eBus.** The cloud integration works but the vendor API is
   flaky and Nuos is not on its tested list. An eBus adapter (~€30–40) + ebusd
   is the durable local path, and would survive Ariston's servers going away.
+
+## 78. Session Log — 2026-09-01: code-server can see the home directory
+
+code-server only ever had `./data:/config`, so the IDE could edit its own
+config and nothing else — not this repo, not anything under `~/`.
+
+`apps/code-server/docker-compose.yml` now mounts `${CODE_SERVER_HOME:-/home/mat}`
+**at the same absolute path inside the container as outside it**, the same
+convention the root compose file uses for `APPS_DIR` and for the same reason: a
+path copied out of a host terminal, a git worktree path, or an absolute path in
+a VS Code task resolves identically in both places instead of quietly pointing
+somewhere else. `DEFAULT_WORKSPACE` points at it, so the folder is open on load
+rather than needing File → Open Folder.
+
+`PUID`/`PGID` were already 1000, which owns `/home/mat`, so this needed no
+ownership work — verified inside the running container: `id abc` is
+`uid=1000 gid=1000`, and a write probe in `/home/mat` succeeded and cleaned up.
+
+### 78.1 The blast radius, stated plainly
+
+This is the part worth being honest about. The mount hands the browser IDE
+**everything** in the home directory: `~/.ssh`, `~/.gnupg`, `~/.docker`,
+`~/.claude.json`, and every `apps/*/.env` in the checkout. code-server's own
+web login is disabled (§ its compose comment) — Authelia on the exposed
+hostname is the only gate, and **direct access to its LAN port :10130 has no
+gate at all**. Before this change that exposure bought an attacker one config
+directory; now it buys the SSH keys.
+
+The knob is `CODE_SERVER_HOME`: set it to `/home/mat/www` in the app's config
+panel to keep the dotfiles out while still having the repo. Left at the default
+deliberately, because the ask was `~/`. Worth revisiting alongside whether
+:10130 should be reachable on the LAN at all.
+
+### 78.2 Verified live
+
+    docker compose up -d --force-recreate
+    mounts:  /home/mat -> /home/mat (rw=true)
+    health:  running / healthy
+    inside:  /home/mat/www/homelab-management visible, same path as the host
