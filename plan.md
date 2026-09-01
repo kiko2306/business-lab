@@ -8390,3 +8390,45 @@ Not built — outside the destination-selection scope that was asked for. The
 implementation is small and the ordering constraint is the only subtlety: it
 must call `runAppDataBackup`, never `runBackupJobNow`, or it will archive the
 previous dump and quietly make each manual backup a generation stale.
+
+### 74.7 RESTORE PROVEN — §71.2 closed
+
+The first backup in this project's history completed, and the first restore
+succeeded. Until now the whole system was a hypothesis: `last started: never`.
+
+**Backup.** 15:39 → 17:13 (1h33m), 35,263 files, 1.228 GiB source → 593 MiB
+encrypted on Google Drive, 1 version.
+
+**Restore.** Via `duplicati-cli` inside the container — the same path a real
+recovery uses, not the server API:
+
+    Downloading dindex volumes, then 2 dblocks (~99 MiB)
+    Restored 1 (616.000 KiB) files to /tmp/restore-proof
+    Duration of restore: 00:00:56
+
+Verification of `vikunja.sqlite`, pulled from Drive and decrypted:
+
+| Check | Result |
+|---|---|
+| sha256 vs original | **identical** (`f3b7383f…b85f`) |
+| size | 630784 bytes, exact match |
+| `PRAGMA integrity_check` | `ok` |
+| tables | 38 |
+| `users` rows | 1 — real data, not an empty shell |
+
+**Exclusions verified by behaviour, not config.** 527 files live in `data/db/`
+directories on disk; **0** are in the backup. The live-database excludes work.
+Worth stating how this was checked: reading job detail *while the job ran*
+returned `Filters: null` **and** `Sources: null`, which looked alarming — but a
+job with null sources cannot be reading `/source/apps/...`, which it demonstrably
+was. Self-reported config was unreliable mid-run; the archive's own contents
+were not. Same lesson as §74.5, third instance: **test the behaviour, not the
+component's account of itself.**
+
+**Note on the server-API restore.** `POST /api/v1/backup/2/restore` returned
+`{"Status":"OK"}` and reached `Restore_Complete` having written **nothing**, with
+no error logged. A restore that reports success and silently produces no files is
+worse than one that fails. The CLI path works; the API call needs its parameter
+shape worked out before anything in the dashboard depends on it. Filed for next
+session — the original file was never touched (mtime and checksum unchanged), so
+nothing was damaged proving this.
