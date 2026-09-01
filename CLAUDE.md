@@ -65,6 +65,20 @@ so and leave it uncommitted rather than pushing a checkpoint.
 Check `git status` before committing — the repo is public, and `.env` files must
 never be in the diff.
 
+## Multi-part work: plan, then TODO, then ask
+
+For anything with more than one piece, the order is fixed:
+
+1. **Plan it** — append a new numbered section to `plan.md` describing what is
+   being done and why, including what was considered and rejected.
+2. **Track it** — add each piece to the README TODO list.
+3. **Ask** — ask which task to start. Do not pick one and begin.
+
+A single small change still goes straight to implementation; this is for work
+that arrives as a list. The point is that intent survives a session that runs
+long or gets interrupted, and that the order things get built in stays the
+user's call.
+
 ## TODOs live in README.md, and get deleted
 
 `README.md`'s TODO section is the **only** place open work is tracked. Not
