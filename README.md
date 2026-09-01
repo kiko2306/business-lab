@@ -67,11 +67,16 @@ backend starts and stops on your behalf.
   on the host, so relative paths inside an app's compose file resolve
   identically inside and outside the container. It's mounted **read-write**
   so the dashboard can write each app's `.env` for you (see below) — combined
-  with the Docker socket mount below, the backend already has root-equivalent
+  with the Docker access below, the backend already has root-equivalent
   host control, so this isn't a materially larger trust boundary.
-- The host Docker socket is mounted into the backend so it can drive the daemon.
-  **This grants the backend root-equivalent control of the host** — only expose
-  the API to trusted users.
+- The backend does **not** mount the host Docker socket. A `docker-socket-proxy`
+  service holds the real socket and the backend reaches it over
+  `DOCKER_HOST=tcp://docker-socket-proxy:2375`, on the internal network only,
+  scoped to what `docker ps` and `docker compose up|down` need — `exec`,
+  `build`, `secrets`, `swarm` and `plugins` stay off. That narrows the blast
+  radius but does not sandbox compose: creating containers is still creating
+  containers, so **treat the backend as root-equivalent on the host** and only
+  expose the API to trusted users.
 - Apps with required secrets ship a `.env.example` documenting them, but you
   don't need to touch it by hand: open the service's card on the dashboard,
   expand **Configuration**, fill in the required (`*`) fields, and save. The
@@ -96,128 +101,98 @@ backend starts and stops on your behalf.
   ./scripts/docker-e2e-test.sh
   ```
 
-## Project status (as of 2026-08-26)
+## Project status
 
-Public exposure (Cloudflare Tunnel + Nginx Proxy Manager) has now been
-validated end-to-end against a real deployment, using `paperless` as the
-proof case:
+Working and proven against the real deployment: authenticated start/stop with
+per-app config written from the dashboard, public exposure (Cloudflare Tunnel +
+Nginx Proxy Manager) with upstreams derived automatically, Authelia SSO in front
+of exposed apps, NetBird VPN with peers connected, app database dumps, and
+backup + restore verified byte-identical.
 
-- Per-service upstream scheme/host/port and websocket support are no longer
-  entered by the user — the backend derives them automatically (published
-  port parsed from the app's compose file, origin host resolved to the
-  Docker host's gateway IP, scheme fixed at `http`, websocket upgrade always
-  allowed). The exposure panel is now just an enable toggle plus a read-only
-  "forwarding to..." line.
-- A service can declare `exposureEnvKeys` in `backend/src/config/services.ts`
-  (see the `paperless` entry) to have its own public-URL/allowed-hosts env
-  vars (e.g. `PAPERLESS_URL`, `PAPERLESS_ALLOWED_HOSTS`) injected
-  automatically at every start, computed from the exposed hostname — without
-  ever writing to the (read-only) `apps/` mount.
-- Fixed along the way: an invalid field sent to the Nginx Proxy Manager API
-  (`websocket_upgrade` isn't a real field — `allow_websocket_upgrade` is),
-  and Nginx's resolver-based `proxy_pass` failing on `host.docker.internal`
-  (its variable resolver doesn't consult `/etc/hosts`, only real DNS — fixed
-  by resolving to the literal gateway IP once, up front).
-- **Deployment note:** this environment runs `cloudflared` as a host-level
-  systemd service, not via the `apps/cloudflare-tunnel/` Docker stack shipped
-  in this repo (that stack has no `.env` and has never been started here).
-  Keep this in mind before assuming the Docker stack is what's actually
-  running — see the Remove list below.
-- A live-since-day-one secret leak was found and fixed during this session:
-  `.env.save` was committed to git with a real `JWT_SECRET` that was still
-  the active session-signing key. It has been rotated, the file removed from
-  tracking, and `.gitignore` broadened to `.env.*` (with `.env.example`
-  explicitly re-allowed). The old value remains visible in git history
-  (commit `5cafdfb`) — rotation makes it inert, but a history rewrite would
-  still be needed to fully scrub it if that matters to you.
-- A health-status bug was fixed: services without a configured health check
-  (most of the registry) were reported as `check failed` instead of
-  `healthy` while running, because `healthy` defaulted to `false` whenever no
-  check was configured. It now defaults to `true` for a running service with
-  no check, and `check failed` is reserved for an actual failed check.
+`plan.md` is the running spec and session log — every change, including what was
+tried and rejected, is recorded there in numbered sections. Read its last section
+for where things stand.
 
 ## TODO
 
-### Add
+**This list is the single place open work is tracked.** An item is deleted when
+it is done — not ticked off and left behind. Section references point at
+`plan.md`.
 
-- [ ] **Fix: NetBird VPN dashboard hangs loading `/peers` after a successful
-      login** — Authelia SSO login for NetBird VPN is fully working now
-      (verified end-to-end: token exchange, userinfo, and the redirect to
-      `/peers` all return 200), but the peers page itself never finishes
-      loading — stuck on the spinner indefinitely. The browser console logs
-      a plain object every ~2s with no matching HTTP request in the network
-      panel, which points at a stuck WebSocket or gRPC-Web streaming
-      connection for live peer data rather than a REST call. CSP
-      (`connect-src`/`wss:`) and NPM's `allow_websocket_upgrade` are both
-      already correctly configured for the `netbird-vpn-api.<base-domain>`
-      host, so the next step is identifying the actual failing
-      connection — the available browser tooling only captures HTTP
-      requests, not raw WebSocket frames, so this needs either browser
-      DevTools directly or instrumenting the dashboard bundle.
-- [ ] **Verify the NetBird Android app can actually enroll a peer** — the
-      `netbird-cli` OIDC client (device authorization / device-code flow,
-      audience `netbird-cli`) is configured in Authelia and management.json
-      but has never been exercised end-to-end. Install the NetBird Android
-      app, point it at this management server, and confirm the device-code
-      login flow completes and the phone shows up as a connected peer in
-      the dashboard. Do this only after the `/peers` loading hang above is
-      fixed, since that page is how you'd confirm the peer actually
-      registered.
-- [ ] **CI pipeline** — there's no `.github/workflows/`, so `smoke-tests.sh`,
-      `docker-e2e-test.sh`, and both `tsc` builds only ever run manually.
-      Wire them into a workflow that runs on every push/PR.
-- [ ] **Automated tests** — there are currently zero `*.spec.ts`/`*.test.ts`
-      files in either `backend/` or `frontend/`, despite `ng test` and the
-      shell-script smoke tests existing. At minimum, unit-test the exposure
-      pipeline (`exposure.ts`, `npmClient.ts`, `cloudflareTunnelClient.ts`,
-      the compose-port-parsing regex) — this session's bugs were all in that
-      code path and would have been caught by tests instead of by manually
-      poking a production tunnel.
-- [ ] **"Test connection" action for exposure settings** — NPM credentials
-      and Cloudflare account/zone/tunnel IDs are currently only exercised the
-      next time a service starts. A validate-now button in Settings would
-      have caught several of this session's misconfigurations (wrong NPM API
-      URL, wrong upstream host) immediately instead of after a failed
-      provisioning attempt.
-- [ ] **Exposure drift detection** — nothing currently notices if NPM's or
-      Cloudflare's live state diverges from `service_exposure` (e.g. someone
-      edits the proxy host by hand in NPM's UI). A periodic reconciliation
-      check, or at least a "re-verify" button, would catch that.
-- [x] **Docker socket proxy** — the backend no longer mounts
-      `/var/run/docker.sock` directly. A `docker-socket-proxy`
-      (`tecnativa/docker-socket-proxy`) service holds the real socket, and
-      the backend talks to it over `DOCKER_HOST=tcp://docker-socket-proxy:2375`
-      on the internal network only. Scoped to just what `docker ps` /
-      `docker compose up|down` need (containers/images/networks/volumes,
-      start/stop) — `exec`, `build`, `secrets`, `swarm`, and `plugins` stay
-      off. Note this narrows blast radius, it doesn't fully sandbox compose:
-      creating containers is still creating containers, so a compose file
-      that bind-mounts something sensitive isn't stopped by this proxy.
-- [ ] **2FA for admin accounts** — worth prioritizing given the dashboard
-      itself is already internet-facing via the tunnel (`homelab.tx-home-utils.com`,
-      `api-homelab.tx-home-utils.com`), independent of this app's own
-      per-service exposure feature.
-- [ ] **Scheduled/automated backups** — confirm whether `POST /backups/create`
-      is manual-trigger only today; if so, add a cron-driven schedule with
-      retention instead of relying on someone remembering to click it.
-- [ ] **Extend `exposureEnvKeys` to other apps** — only `paperless` declares
-      one right now. Any other app with its own Host-header/CSRF allowlist
-      (many self-hosted apps have this) will hit the same class of bug the
-      first time someone enables exposure for it.
-- [ ] **Health check URLs still assume host ports** — entries use
-      `localhost:<port>`, rewritten via `SERVICE_HEALTH_HOST`. Apps not
-      published to the host, or published on a non-default port, will still
-      misreport. (Distinct from the "no check configured" bug fixed above.)
+### Security
 
-### Remove
+- [ ] **2FA for admin accounts** — the dashboard is internet-facing via the
+      tunnel (`homelab.tx-home-utils.com`, `api-homelab.tx-home-utils.com`),
+      independent of the per-service exposure feature. Nothing in the codebase
+      implements TOTP today.
+- [ ] **code-server's LAN port is ungated** — its own web login is disabled and
+      only Authelia guards the exposed hostname, so `:10130` on the LAN is open.
+      Now that `~/` is mounted into it (§78.1), that reaches `~/.ssh` and every
+      `apps/*/.env`. Either gate the port or narrow `CODE_SERVER_HOME`.
 
-- [x] **`.env.save`** — removed from git tracking and disk; contained a live
-      `JWT_SECRET`. `.gitignore` now excludes `.env.*` broadly.
-- [x] **`apps/cloudflare-tunnel/` Docker stack** — removed, along with its
-      registry entry. This deployment's real tunnel runs via host systemd;
-      the stack was never started and its `.env.example` documented a
-      topology that didn't match reality.
-- [x] **`service_configs` table** — dropped (both from `database/init.sql`
-      and the live database). It was empty and had zero code references.
-- [x] **Manual upstream host/port/scheme/websocket exposure fields** —
-      removed from the API and UI this session; see Project status above.
+### Backups
+
+- [ ] **Confirm a scheduled run actually produced a version** (§75.1) — every
+      successful backup so far was triggered by hand. The last scheduler run was
+      during the broken period, so the schedule has never produced a working
+      backup. Check `backup_schedule_last_run_at` and whether Duplicati reports
+      a second version. Do this before the items below; the answer reorders them.
+- [ ] **Surface backup state in the dashboard** (§75.2) — there is no way to see
+      whether backups work without the CLI. Needs last run + outcome, version
+      count and size, the destination actually used, and an explicit "never run"
+      state rather than a blank.
+- [ ] **Fix or remove the restore API** (§75.3) — `POST /backup/2/restore`
+      returns `{"Status":"OK"}`, writes nothing, logs no error. `duplicati-cli`
+      restores correctly, so only the API path is broken. Do not wire a restore
+      button until a test proves bytes arrive.
+- [ ] **Three apps have no consistent backup** (§75.4) — `portainer`,
+      `file-browser`, `stirling-pdf` (BoltDB/H2, 0 dump files each). Their live
+      DB files are copied raw and can restore corrupt. Either snapshot them
+      stop-copy-start, or record the accepted risk in `docs/`.
+- [ ] **"Back up now" button** (§74.6) — must call `runAppDataBackup`, never
+      `runBackupJobNow`, or each manual backup is a generation stale.
+- [ ] **`backup_target_folder` is blank** — falls back to the `homelab-backups`
+      default inside `toDuplicatiUrl`, so the dashboard shows an empty field for
+      a folder that is in use. Populate it.
+- [ ] **Prove a non-Drive destination** — `disk`/`SMB`/`NFS` are built and never
+      exercised.
+- [ ] **Prove a Postgres/MySQL restore** — only SQLite has been round-tripped.
+
+### Exposure and platform
+
+- [ ] **Periodic exposure drift reconciliation** — `POST
+      /api/services/:name/exposure/verify` re-verifies one service on demand,
+      but nothing notices on its own when NPM or Cloudflare drifts from
+      `service_exposure`.
+- [ ] **Retrofit `mailEnvKeys`** (§75.6) to Uptime Kuma, n8n, BookStack,
+      Paperless and Vikunja — global mail settings exist but these apps don't
+      consume them yet.
+- [ ] **Signal-port coupling is uncovered** (§69) — the port renumbering
+      silently killed NetBird's signal service once; no test would catch a
+      repeat.
+- [ ] **Health checks for a container with no published port** — the port is now
+      resolved from the compose file, and host-networked apps declare
+      `hostNetworkPort`, so the common cases are right. A container publishing
+      nothing and declaring nothing still falls back to `localhost:<container
+      port>` and would misreport. No app hits this today.
+
+### Apps and integrations
+
+- [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
+      fresh-install path but never run on a clean VPS.
+- [ ] **MeshCentral** (§62.2) — planned, not yet added to the registry.
+- [ ] **Pre-built n8n workflows** (§64) — ship useful workflows rather than an
+      empty n8n.
+- [ ] **Home Assistant: identify the three unlabelled Espressif devices**
+      (§77.6) — `.18`/`.19`/`.20`, no DHCP hostname. Power-cycle one appliance
+      and re-sweep to identify by elimination.
+- [ ] **Home Assistant: Bluetooth for the washing machine** (§77.6) — if it is
+      BLE rather than Wi-Fi, an ESPHome Bluetooth proxy near the machine beats
+      enabling the host stack (the server is nowhere near the laundry, and it
+      avoids mounting the host's D-Bus into the container).
+- [ ] **Home Assistant: Ariston via eBus** (§77.6) — the cloud integration works
+      but the vendor API is flaky and Nuos is not on its tested list. An eBus
+      adapter (~€30–40) plus ebusd is the durable local path.
+- [ ] **App backlog** — §22 lists candidate apps by category (communication,
+      business ops, no-code/BI, files/PDF, security/network, dev infra,
+      productivity). Pull from there rather than restating it here.

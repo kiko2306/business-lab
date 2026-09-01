@@ -65,6 +65,21 @@ so and leave it uncommitted rather than pushing a checkpoint.
 Check `git status` before committing — the repo is public, and `.env` files must
 never be in the diff.
 
+## TODOs live in README.md, and get deleted
+
+`README.md`'s TODO section is the **only** place open work is tracked. Not
+scattered `// TODO` comments, not a second list in `plan.md`, not a note in a
+doc page — if it is outstanding work, it is an item there.
+
+When an item is finished, **delete it**. Do not tick the box and leave it
+behind: a list of completed work is what `plan.md` and `git log` are for, and a
+README carrying both open and closed items stops being readable as a list of
+what is left. The same goes for an item that turns out to be wrong or no longer
+wanted — delete it, and say why in the commit message.
+
+New work discovered mid-task goes in as a new item rather than being fixed in
+passing, unless it is genuinely part of the change at hand.
+
 ## Layout
 
 | Path | What |
