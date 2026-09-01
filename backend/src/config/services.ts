@@ -147,6 +147,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     icon: 'home',
     category: 'Home Automation',
     composePath: 'apps/home-assistant/docker-compose.yml',
+    // Runs with `network_mode: host` so zeroconf/SSDP/DHCP discovery can see
+    // the LAN, which means no `ports:` mapping to derive a port from — HA is
+    // on the host's 8123 directly. See apps/home-assistant/docker-compose.yml.
+    hostNetworkPort: 8123,
     healthCheck: {
       enabled: true,
       type: 'http',
@@ -884,11 +888,21 @@ const HOST_PORT_PATTERN = /-\s*["']?(?:\$\{([A-Z0-9_]+)(?::-([^}]*))?\}|(\d+)):\
  * mapping uses that specific `${VAR}` — needed once an app publishes more
  * than one port (see `additionalExposures` on ServiceDefinition), since file
  * order alone can't disambiguate which port belongs to which container.
+ *
+ * A host-networked service has no `ports:` mapping at all — it binds the host
+ * directly — so its declared `hostNetworkPort` answers instead. That only
+ * applies to the service's own port: a `portEnvVar` lookup still comes from
+ * the compose file, since an additional exposure names a published mapping.
  */
 export function getPublishedUpstreamPort(name: string, portEnvVar?: string): number | null {
   const resolved = resolveComposeFile(name);
   if (!resolved?.composeFile) {
     return null;
+  }
+
+  const hostNetworkPort = getService(name)?.hostNetworkPort;
+  if (hostNetworkPort && !portEnvVar) {
+    return hostNetworkPort;
   }
 
   const composeContent = fs.readFileSync(resolved.composeFile, 'utf8');

@@ -8553,3 +8553,260 @@ job demonstrably reading those sources (§74.7). Each cost real time.
 
 Tomorrow's first action (75.1) is deliberately a measurement, not a change, for
 the same reason.
+
+## 76. Home Assistant discovers nothing, because it was on a bridge
+
+Asked for: *"home assistant should auto discover the appliances that can be
+connected."* It could not, and no HA setting would have fixed it — the cause
+was one line missing from `apps/home-assistant/docker-compose.yml`.
+
+### 76.1 Why a bridged Home Assistant is blind
+
+Every local-discovery protocol HA uses is broadcast or multicast traffic:
+
+| Mechanism | Traffic | Finds |
+|---|---|---|
+| zeroconf / mDNS | `224.0.0.251:5353` | Chromecast, Sonos, ESPHome, Shelly, HomeKit, printers |
+| SSDP / UPnP | `239.255.255.250:1900` | routers, TVs, Hue bridges, Roku |
+| DHCP sniffer | raw socket on the LAN interface | anything the moment it takes a lease |
+
+None of it crosses a Docker bridge. HA was on `home-assistant_default`
+(172.30.0.2/16), so the only subnet it could see was that bridge — where
+nothing but HA lives. `.storage/core.config_entries` showed exactly that: ten
+entries, every one either a built-in (`sun`, `backup`, `go2rtc`), an
+onboarding default (`met`, `radio_browser`), or a **cloud** integration the
+user added by hand (`lg_thinq`, `vesync`). Zero locally discovered devices,
+after a week of running. The "Discovered" section was not slow; it was
+structurally empty.
+
+Measured from the host before changing anything, `192.168.1.23/23`:
+
+    SSDP responders: 2
+      192.168.1.1  Linux/4.19.183, UPnP/1.0, Portable SDK for UPnP devices/1.6.21
+      192.168.1.3  Chromecast/1.6.18
+
+So there *were* devices to find. HA just could not hear them.
+
+### 76.2 The fix, and the thing it costs
+
+`network_mode: host`. That is the whole mechanism, and it is what HA's own
+docs prescribe for a container install. The cost is that host networking
+cannot remap ports: HA serves on the host's **8123** directly (its own
+`http.server_port`), so `HA_PORT` is gone from
+`apps/home-assistant/.env{,.example}` and 10180 is now free.
+
+macvlan was the alternative — it would also carry multicast — and was
+rejected: the host cannot talk to a macvlan container without a shim
+interface, and NPM reaches every app here *from* the host gateway
+(`10.201.0.1`), so it would have broken exposure to fix discovery.
+
+### 76.3 The dashboard had three places that assumed a published port
+
+Removing `ports:` is not a local change. `getPublishedUpstreamPort()` derives
+the port by parsing the compose file's `ports:` mapping, and three things
+consume it — so a host-networked app silently became a non-app:
+
+| Consumer | Without a fix |
+|---|---|
+| `provisionServiceIfEnabled` | *"Unable to determine the published port"* — exposure refuses to provision |
+| `resolveHealthTarget` | falls back to the container port; works here only by luck |
+| dashboard "Open" link (`webPort`) | disappears |
+
+Plus `getContainerPorts()`, which reads `docker ps` — a host-networked
+container reports no mapping at all, so HA would have dropped straight out of
+the running-apps-and-ports table.
+
+New `ServiceDefinition.hostNetworkPort` answers all four: it is the port a
+host-networked service binds, declared where the registry can see it.
+`getPublishedUpstreamPort` returns it when set — but only for the service's
+own port, not for a `portEnvVar` lookup, since an `additionalExposures` port
+names a genuinely *published* mapping and must still come from the file.
+`status.ts` synthesises the ports-table row from it via
+`hostNetworkPortMappings()`.
+
+Three files now have to agree on 8123 (compose, registry `hostNetworkPort`,
+health-check URL) and nothing structural forces them to, so
+`services.test.ts` reads the checked-in compose file and asserts all three —
+including that `network_mode: host` is still there and `ports:` is still
+absent. That test is the guard against someone "tidying up" the compose file
+and quietly re-blinding discovery.
+
+### 76.4 Proven, not assumed
+
+Same rule as §74.5: test the behaviour, not the component's account of itself.
+All of this is *after* the switch, run from inside HA's own container:
+
+| Check | Result |
+|---|---|
+| SSDP M-SEARCH from inside the container | 2 responders — router + Chromecast (was: 0) |
+| mDNS `_services._dns-sd._udp` | 2 responders (was: 0) |
+| mDNS `_googlecast._tcp` | `192.168.1.3` → `fn=BOX v4`, `md=BOX v4` — a real appliance, by name |
+| mDNS from `192.168.1.23` | HA advertising **itself**: `base_url=http://192.168.1.23:8123` |
+| `curl localhost:8123/manifest.json` | 200, container `healthy` |
+| NPM → `10.201.0.1:8123` | 200 |
+| `home-assistant.tx-home-utils.com` via NPM | 200 (502 in between — see below) |
+| `getServiceStatus('home-assistant')` | `running`, `healthy`, `webPort: 8123`, hostname intact |
+
+That fourth row is the load-bearing one. `avahi-daemon` is **inactive** on this
+host, so the only thing that can be answering mDNS at `192.168.1.23` is HA's
+own zeroconf integration — it is not merely able to receive discovery traffic,
+it is live on the LAN.
+
+**The 502 was real and self-inflicted.** Between recreating HA and
+re-provisioning, NPM still forwarded the public hostname to `10.201.0.1:10180`,
+where nothing listened any more. Fixed by running the dashboard's own
+`provisionServiceIfEnabled('home-assistant', 1)` inside the backend container —
+the same call the Restart button makes — which rewrote the NPM host to
+`10.201.0.1:8123`. Worth remembering for the next host-mode app: **changing an
+app's port breaks its public hostname until the app is restarted through the
+dashboard.** The backend had to be rebuilt first, because the running image
+still had the old registry compiled in.
+
+### 76.5 What this does not do
+
+- **Bluetooth is still off.** `hci0` exists but `bluetoothd` is `inactive` and
+  `/run/dbus` is not mounted, so `habluetooth` logs *"Missing required
+  permissions… Add NET_ADMIN and NET_RAW"* at every start. Harmless noise
+  today. Enabling it is three separate steps — `systemctl enable --now
+  bluetooth` on the host, a `/run/dbus:/run/dbus:ro` mount, and
+  `cap_add: [NET_ADMIN, NET_RAW]` — and the D-Bus mount hands the container
+  the host's system bus, which is a real privilege expansion for a feature
+  nothing here uses yet. Deliberately not done.
+- **No USB radio.** No `/dev/ttyUSB*`, `/dev/ttyACM*` or `/dev/serial/by-id`
+  on this host, so no Zigbee/Z-Wave/Matter dongle to pass through. Zigbee
+  devices stay undiscoverable until one exists — that is a hardware gap, not
+  a config one.
+- **Cloud integrations are unaffected.** `lg_thinq` and `vesync` never used
+  local discovery and behave exactly as before.
+- **HA now sees ~20 Docker bridges** as network adapters, since it lives in
+  the host's namespace. Discovery works regardless, but if mDNS gets noisy the
+  fix is Settings → System → Network → pin the adapter to `enp2s0`.
+
+### 76.6 One port is no longer allocator-protected
+
+`start.sh`'s allocator only manages ports that appear as `${VAR:-N}:N` in a
+`ports:` mapping with `N ≥ 10000`. HA has neither now, so nothing bind-tests
+8123 on its behalf: if something else on the host takes it first, HA fails to
+bind and says so only in its own log. Documented in `docs/ports.md` alongside
+the other sub-10000 exceptions (NPM's 80/443, Pi-hole's 53) — with the
+difference that those cannot move because *clients* expect them, while this
+one cannot move because *host networking* cannot remap it.
+
+## 77. Three appliances that discovery will never find
+
+Follow-up to §76: with discovery working, three appliances still did not appear
+— a Xiaomi vacuum, a HomeWhiz (Beko/Arçelik) washing machine, and an Ariston
+heat pump water heater. §76 was necessary and is not the reason.
+
+### 77.1 What is actually on the LAN
+
+Swept `192.168.0.0/23`, resolved vendors against the host's own
+`/usr/share/ieee-data/oui.txt` (no third-party MAC lookup service involved),
+then probed each candidate:
+
+| IP | Vendor (OUI) | Open TCP | mDNS name | Verdict |
+|---|---|---|---|---|
+| 192.168.1.1 | router | — | — | answers SSDP |
+| 192.168.1.3 | Google | — | `_googlecast._tcp` | discoverable ✅ |
+| 192.168.1.15/.16 | **Beijing Xiaomi** | **none** | **none** | answers miIO on UDP 54321 |
+| 192.168.1.18 | **Espressif** | **none** | **none** | appliance Wi-Fi module |
+| 192.168.1.19 | **Espressif** | **none** | **none** | appliance Wi-Fi module |
+| 192.168.1.20 | **Espressif** | **none** | **none** | appliance Wi-Fi module |
+| 192.168.1.21 | Nintendo | — | — | Switch |
+
+**Not one appliance opens a TCP port or answers mDNS.** Probed 18 ports each
+(80/443/8080/8443/1883/8883/6668/9999/54321/502/…) and queried mDNS reverse-PTR
+per host: nothing. They are outbound-only cloud clients. The washing machine and
+the water heater are two of the three Espressif boards — which is the whole
+story in one word: an ESP32 whose firmware only ever dials its vendor.
+
+So the honest framing of §76: host networking fixed *discoverable* devices, and
+proved it by finding the Chromecast. These three were never discoverable, and no
+amount of multicast would have changed that.
+
+### 77.2 The one that is locally controllable
+
+The Xiaomi answered the miIO hello on UDP 54321 (`device id 1062724105`), so it
+does speak the local protocol. But HA's `xiaomi_miio` declares
+`zeroconf: ['_miio._udp.local.']` and **no** `dhcp` matcher, and a direct
+`_miio._udp.local` PTR query returned **zero** answers — Xiaomi devices only
+announce for a window after boot. Hence: power-cycle it, or add it by IP.
+Either way it needs the token, which the config flow can pull via a Xiaomi
+cloud login.
+
+Worth recording because it is a trap: `roborock` will *not* pick this up. That
+integration matches `macaddress: 249E7D*` / `B04A39*` / `hostname: roborock-*`;
+this vacuum is Xiaomi's `B850D8` OUI. Two plausible integrations, only one
+correct, and the wrong one fails silently by simply never matching.
+
+### 77.3 HACS — and a principle I broke on the way
+
+Neither remaining appliance has a core integration (checked the running image:
+**1484** components, no `homewhiz`/`beko`/`arcelik`/`grundig`, no `ariston`).
+Both live in HACS, and both are in the **HACS default list** (verified against
+`hacs/default`, 3247 entries) so neither needs a custom repository URL:
+
+- `home-assistant-HomeWhiz/home-assistant-HomeWhiz`
+- `fustom/ariston-remotethermo-home-assistant-v3`
+
+**I installed HACS by hand first — `docker exec`, curl, unzip.** That is exactly
+what §0.2 forbids ("no hand-edited files, no `docker exec`, no CLI steps in a
+runbook"), and it would have evaporated on the next fresh clone, because
+`apps/<app>/data/` is gitignored. Caught immediately, and redone properly.
+
+`services/homeAssistantHacs.ts` now installs it, wired into
+`composeUpWithManagedConfig` beside `applyExposureConfigFiles` and
+`applyCrowdsecConfigFiles`. It reuses §23's throwaway-container trick — HA's own
+image, `run --rm --no-deps`, `--entrypoint /bin/sh` — because `/config` is owned
+by HA's root container and the dashboard's process is not root.
+
+Three properties worth stating, since each is a decision rather than an accident:
+
+1. **Install only when absent.** HACS has its own in-app updater and tracks
+   releases. Re-stamping the latest release on every restart would fight it, and
+   could downgrade someone who updated through the UI.
+2. **Staging directory, then `mv`.** A truncated download must never leave a
+   half-populated `custom_components/hacs`: HA would try to load it and fail.
+   Verified the staging dir is not left behind on success.
+3. **Never fatal.** No network → log, `exit 0`, HA starts anyway. HA without
+   HACS is a missing feature; HA that refuses to start is an outage.
+
+**Proven by deleting the hand-install and letting the code redo it:**
+
+    rm -rf /config/custom_components/hacs
+    restartService('home-assistant', 1)
+      -> "Home Assistant HACS reconciled" output "hlm: installed HACS into /config/custom_components/hacs"
+    manifest: version 2.0.5, config_flow: True
+    HA log:   "We found a custom integration hacs" (loaded)
+    staging:  clean
+    second restart -> "hlm: HACS already installed"   (idempotent)
+
+### 77.4 Note on HACS's release cadence
+
+Latest tagged release is **2.0.5 (2025-01-28)** — 19 months old — while `main`
+is actively maintained (commits within the last week, including *"Update
+dependency homeassistant to v2026.8.3"*). Checked before installing, because a
+Jan-2025 build on a 2026.8 core is a fair worry. It loads clean here, and open
+2026 issues are cosmetic (branding icons). We seed the **release**, not `main`,
+because HACS's own updater reconciles against releases — seeding from `main`
+would leave it permanently ahead of a version it cannot match.
+
+### 77.5 What is still a human step, and why it has to be
+
+HACS needs a **GitHub device-flow authorization**, and the two integrations need
+a **HomeWhiz** and an **Ariston NET** account. §0.3's carve-out exactly: "a user
+prompt is only acceptable for information the system genuinely cannot obtain."
+Documented in `docs/app-credentials.md` rather than left as folklore.
+
+### 77.6 Still open
+
+- **Which Espressif is which.** `.18`/`.19`/`.20` are unlabelled — no DHCP
+  hostname visible from here. Power-cycling one appliance and re-sweeping would
+  identify it by elimination.
+- **Bluetooth**, if the washing machine turns out to be a BLE model rather than
+  Wi-Fi. Still off (§76.5). An **ESPHome Bluetooth proxy** near the machine is
+  the better answer than enabling the host stack: the server is nowhere near
+  the laundry, and it avoids mounting the host's D-Bus into the container.
+- **Ariston via eBus.** The cloud integration works but the vendor API is
+  flaky and Nuos is not on its tested list. An eBus adapter (~€30–40) + ebusd
+  is the durable local path, and would survive Ariston's servers going away.

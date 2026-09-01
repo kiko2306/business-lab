@@ -141,6 +141,15 @@ export interface ServiceDefinition {
   // running before this one can start — e.g. an app that authenticates
   // against Authelia's OIDC provider needs Authelia up first.
   dependsOn?: string[];
+  // The host port this service listens on when it runs with
+  // `network_mode: host` (currently Home Assistant, which needs host
+  // networking for its zeroconf/SSDP/DHCP discovery). Such a service
+  // publishes nothing — its compose file has no `ports:` mapping for
+  // getPublishedUpstreamPort to read — but it is still reachable on the host
+  // at a fixed port, so declaring it here keeps exposure, the health check
+  // and the dashboard's "Open" link working. Unset for every bridged service,
+  // where the compose file remains the source of truth.
+  hostNetworkPort?: number;
   // Disambiguates which published port is the primary exposure's upstream,
   // for services whose compose file publishes more than one port where the
   // web UI isn't simply the first one listed — e.g. Pi-hole publishes DNS

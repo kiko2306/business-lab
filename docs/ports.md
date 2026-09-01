@@ -1,7 +1,9 @@
 # Host ports
 
-Every managed app publishes a port on the host. Nginx Proxy Manager forwards
+Every managed app answers on a port on the host. Nginx Proxy Manager forwards
 to it, so these are internal plumbing — you reach apps by hostname, not port.
+Almost all of them get there by publishing a port from a Docker bridge; one
+(Home Assistant) binds the host directly instead — see below.
 
 ## The scheme
 
@@ -17,6 +19,7 @@ to it, so these are internal plumbing — you reach apps by hostname, not port.
 |---|---|---|
 | `80` / `443` | Nginx Proxy Manager | The Cloudflare Tunnel connector points at these as its origin |
 | `53` | Pi-hole | DNS clients expect port 53 |
+| `8123` | Home Assistant | Runs with `network_mode: host` so its zeroconf/SSDP/DHCP discovery can see the LAN; host networking cannot remap ports |
 
 That "below 10000 means deliberate" rule is what protects them: the allocator
 only manages ports whose compose default is **≥ 10000**, so there is no list of
@@ -66,7 +69,7 @@ hand edit can leave its copy disagreeing with the app's.
 
 `10100` authelia · `10110` beszel · `10120` bookstack · `10130` code-server ·
 `10140` dozzle · `10150` duplicati · `10160` file-browser · `10170` grocy ·
-`10180` home-assistant · `10190` home-page · `10200` immich · `10210` jellyfin ·
+`10190` home-page · `10200` immich · `10210` jellyfin ·
 `10220` kitchen-switcher · `10230` mealie · `10240` n8n ·
 `10250`–`10253` netbird (management, dashboard, signal, relay) ·
 `10260` nextcloud · `10270` npm-admin · `10280` nocodb · `10290` ntfy ·
@@ -77,6 +80,22 @@ hand edit can leave its copy disagreeing with the app's.
 
 These are the defaults. The allocator may have moved one on your host if
 something else already held the port — check the app's `.env` for the truth.
+
+`10180` is free: it was Home Assistant's before it moved to host networking.
+
+## The host-networked app
+
+Home Assistant is the one app that does not publish a port. Its automatic
+discovery — zeroconf/mDNS, SSDP/UPnP, and the DHCP sniffer — works on
+broadcast and multicast traffic that never crosses a Docker bridge, so it runs
+with `network_mode: host` and serves on the host's `8123` directly. There is
+no `HA_PORT`: the port is Home Assistant's own setting (Settings → System →
+Network), and the allocator leaves it alone because there is no `ports:`
+mapping to allocate. The registry declares that `8123` as `hostNetworkPort`
+(`backend/src/config/services.ts`) so exposure, the health check and the
+dashboard's Open link still know where to look. If something else on the host
+already holds `8123`, Home Assistant fails to bind and says so in its log —
+that is the one case the allocator cannot cover for you.
 
 ## The core stack
 

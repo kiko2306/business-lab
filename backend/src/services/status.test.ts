@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateContainerState } from './status';
+import { aggregateContainerState, hostNetworkPortMappings } from './status';
 
 describe('aggregateContainerState', () => {
   it('is unknown with no containers', () => {
@@ -31,5 +31,16 @@ describe('aggregateContainerState', () => {
 
   it('is stopped when every container has exited', () => {
     expect(aggregateContainerState(['exited', 'exited'])).toBe('stopped');
+  });
+});
+
+describe('hostNetworkPortMappings', () => {
+  it('reports the declared port on both sides of the mapping', () => {
+    // Host networking does not remap: the app binds the host's 8123 and that
+    // is also the port inside the container, so the dashboard's ports table
+    // shows a service that publishes nothing for `docker ps` to see.
+    expect(hostNetworkPortMappings(8123)).toEqual([
+      { hostPort: '8123', containerPort: '8123', protocol: 'tcp' },
+    ]);
   });
 });

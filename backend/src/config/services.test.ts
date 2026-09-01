@@ -172,6 +172,36 @@ describe('getPublishedUpstreamPort', () => {
       expect(getPublishedUpstreamPort('paperless', 'NETBIRD_SIGNAL_PORT')).toBe(8086);
     });
   });
+
+  describe('a host-networked service (hostNetworkPort)', () => {
+    // 'home-assistant' is the real registry entry carrying hostNetworkPort:
+    // it runs with `network_mode: host` so its zeroconf/SSDP/DHCP discovery
+    // can see the LAN, and host networking publishes nothing for the compose
+    // parser to read.
+    function writeHaCompose(content: string) {
+      fs.mkdirSync(path.join(tmpDir, 'home-assistant'), { recursive: true });
+      fs.writeFileSync(path.join(tmpDir, 'home-assistant', 'docker-compose.yml'), content);
+    }
+
+    it('returns the declared port even though the compose file publishes none', () => {
+      writeHaCompose('services:\n  home-assistant:\n    network_mode: host\n');
+      expect(getPublishedUpstreamPort('home-assistant')).toBe(8123);
+    });
+
+    it('still returns null when the app is not installed', () => {
+      // The declaration says where an installed service listens, not that an
+      // uninstalled one is exposable — exposure keys off this being null.
+      expect(getPublishedUpstreamPort('home-assistant')).toBeNull();
+    });
+
+    it('leaves portEnvVar lookups to the compose file', () => {
+      // An additionalExposures port names a published mapping, so it must
+      // keep coming from the file rather than collapsing to the host port.
+      writeHaCompose('services:\n  extra:\n    ports:\n      - "${EXTRA_PORT:-9123}:80"\n');
+      expect(getPublishedUpstreamPort('home-assistant', 'EXTRA_PORT')).toBe(9123);
+      expect(getPublishedUpstreamPort('home-assistant', 'MISSING_PORT')).toBeNull();
+    });
+  });
 });
 
 describe('netbird-vpn exposures', () => {
@@ -257,5 +287,35 @@ describe('generated secrets coverage', () => {
         ...(SERVICES['tailscale']?.hiddenGeneratedSecrets ?? []),
       ];
     }
+  });
+});
+
+describe('home-assistant host networking', () => {
+  const ha = SERVICES['home-assistant'];
+  // Read the checked-in compose file directly (not via APPS_DIR, which other
+  // suites here repoint at a temp root) so this guards the real coupling:
+  // three files have to agree on 8123, and nothing else forces them to.
+  const composeText = fs.readFileSync(
+    path.resolve(__dirname, '../../..', ha.composePath),
+    'utf8'
+  );
+
+  it('runs with host networking, which is what makes discovery work', () => {
+    // zeroconf/mDNS, SSDP/UPnP and the DHCP sniffer all read broadcast and
+    // multicast traffic that never crosses a Docker bridge. Put HA back on a
+    // bridge and its "Discovered" section is permanently empty.
+    expect(composeText).toMatch(/^\s*network_mode:\s*host\s*$/m);
+  });
+
+  it('publishes no port, because host networking cannot remap one', () => {
+    expect(composeText).not.toMatch(/^\s*ports:\s*$/m);
+  });
+
+  it('declares the port it binds, so exposure and health checks can find it', () => {
+    // With no ports: mapping there is nothing in the compose file to parse —
+    // hostNetworkPort is the only thing pointing exposure at the right port.
+    expect(ha.hostNetworkPort).toBe(8123);
+    expect(composeText).toContain(`:${ha.hostNetworkPort}/manifest.json`);
+    expect(ha.healthCheck.url).toContain(`:${ha.hostNetworkPort}/`);
   });
 });

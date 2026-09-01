@@ -139,6 +139,16 @@ function getContainerPorts(projectName: string | null): Promise<ServicePortMappi
 }
 
 /**
+ * The equivalent of getContainerPorts for a service running with
+ * `network_mode: host`, whose port is a registry fact rather than something
+ * `docker ps` can report. See ServiceDefinition.hostNetworkPort.
+ */
+export function hostNetworkPortMappings(hostNetworkPort: number): ServicePortMapping[] {
+  const port = String(hostNetworkPort);
+  return [{ hostPort: port, containerPort: port, protocol: 'tcp' }];
+}
+
+/**
  * Health check URLs in the service registry are written from the host's point
  * of view (localhost:CONTAINER_PORT). To make them reachable from the backend
  * container we connect to SERVICE_HEALTH_HOST on the service's *published* host
@@ -227,7 +237,17 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       }
     }
 
-    const ports = state === 'running' ? await getContainerPorts(getProjectName(serviceName)) : [];
+    // A host-networked service publishes nothing for `docker ps` to report —
+    // it binds the host's interfaces directly — so asking docker would drop it
+    // out of the dashboard's running-apps-and-ports table entirely. Report the
+    // port it declared instead: from the host's side it is just as reachable,
+    // and the container port is the same number by definition.
+    const ports =
+      state !== 'running'
+        ? []
+        : service.hostNetworkPort
+          ? hostNetworkPortMappings(service.hostNetworkPort)
+          : await getContainerPorts(getProjectName(serviceName));
     const exposedHostname = state === 'running' ? await getExposedHostname(serviceName) : null;
 
     return {

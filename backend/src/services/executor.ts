@@ -15,6 +15,7 @@ import { buildMailEnvOverrides } from './mailEnv';
 import { ensureGeneratedSecrets } from './appEnv';
 import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
+import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
@@ -123,6 +124,10 @@ async function composeUpWithManagedConfig(
   const mailOverrides = await buildMailEnvOverrides(serviceName);
   await applyExposureConfigFiles(serviceName, appDir);
   await applyCrowdsecConfigFiles(serviceName, appDir);
+  // HACS: the appliance integrations this house needs (HomeWhiz, Ariston) only
+  // exist as HACS repositories, and apps/*/data/ is gitignored, so a fresh
+  // clone has to be able to get there without a console step (§0.2).
+  await ensureHomeAssistantHacs(serviceName);
 
   const recreate = forceRecreate ? ' --force-recreate' : '';
   const command = `docker compose -p ${projectName} -f ${composeFile} up -d${recreate}`;

@@ -3,15 +3,27 @@ services:
   home-assistant:
     image: ghcr.io/home-assistant/home-assistant:stable
     restart: unless-stopped
-    ports:
-      - "${HA_PORT:-10180}:8123"
+    # Host networking is what makes Home Assistant's automatic discovery work.
+    # Every local-discovery protocol it uses is broadcast/multicast traffic
+    # that never crosses a Docker bridge: zeroconf/mDNS (224.0.0.251:5353 —
+    # Chromecast, Sonos, ESPHome, Shelly, HomeKit, printers), SSDP/UPnP
+    # (239.255.255.250:1900 — routers, TVs, Hue bridges) and the DHCP sniffer
+    # that spots a device the moment it takes a lease. On a bridge network HA
+    # only ever sees the bridge's own subnet, so the "Discovered" section stays
+    # permanently empty and every device has to be added by hand.
+    #
+    # The trade-off is that ports can no longer be remapped: HA serves on the
+    # host's 8123 directly (its own http.server_port), so there is no HA_PORT.
+    # The registry entry in backend/src/config/services.ts carries that 8123 as
+    # `hostNetworkPort` so exposure and health checks still know where it is.
+    network_mode: host
     environment:
       TZ: ${TZ:-UTC}
     labels:
       - "homepage.group=Home Automation"
       - "homepage.name=Home Assistant"
       - "homepage.icon=home-assistant.png"
-      - "homepage.href=http://localhost:${HA_PORT:-10180}"
+      - "homepage.href=http://localhost:8123"
       - "homepage.description=Home automation platform"
     volumes:
       - ./data:/config

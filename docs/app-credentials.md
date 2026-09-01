@@ -44,7 +44,7 @@ Open these privately and claim them before exposing.
 | App | First-run |
 |---|---|
 | **Authelia** | The SSO account itself. Managed from the dashboard (Authelia is the one app whose users the dashboard edits directly). |
-| **Home Assistant** | Onboarding wizard creates the owner account. |
+| **Home Assistant** | Onboarding wizard creates the owner account. HACS is installed automatically; it needs a one-time GitHub authorization — see the note below. |
 | **Immich** | First registered user becomes admin. |
 | **Jellyfin** | Setup wizard creates the admin user. |
 | **Uptime Kuma** | First visit creates the admin account. |
@@ -106,3 +106,27 @@ means the dashboard's copy and the app's copy can disagree.
 
 For anything a wizard created, change it inside the app itself; the dashboard
 does not manage those accounts (Authelia excepted).
+
+## Home Assistant: authorizing HACS
+
+HACS (the Home Assistant Community Store) is installed automatically on every
+Home Assistant start — several appliances here have no core integration and are
+only reachable through a HACS repository, so it is a prerequisite rather than an
+optional extra. It is not configured for you, because it cannot be: HACS talks
+to the GitHub API on your behalf and needs an account.
+
+One-time, in Home Assistant: **Settings → Devices & Services → Add Integration →
+HACS**, tick the acknowledgements, then open the github.com/login/device link it
+shows and enter the code. After that, HACS appears in the sidebar and
+repositories install from its UI.
+
+Two integrations this house needs are both in the HACS default list, so they are
+a search away once HACS is authorized — no custom repository URL to paste:
+
+| Appliance | HACS repository | What it needs from you |
+|---|---|---|
+| Beko/Grundig/Arçelik washing machine | `home-assistant-HomeWhiz/home-assistant-HomeWhiz` | a HomeWhiz account (Wi-Fi models) or Bluetooth range (BLE models) |
+| Ariston water heater | `fustom/ariston-remotethermo-home-assistant-v3` | an Ariston NET account |
+
+HACS updates itself from inside Home Assistant, so the automatic install only
+ever runs when HACS is missing — it never overwrites a version you already have.
