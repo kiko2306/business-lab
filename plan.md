@@ -9510,3 +9510,84 @@ discrete task:
 Plus the ordinary parts: hardware BOM and SKU, support/warranty model,
 onboarding time per client, and what happens when a client stops paying while
 their data lives on their own hardware.
+
+### 84.3a Platform access audit (researched 2026-09-01)
+
+What can actually be published to, today, and what is gated. This decides the
+release plan; every timeline before this was guesswork.
+
+**Tier A — works now, no approval, no cost**
+
+| Platform | What it takes |
+|---|---|
+| **Bluesky** | No developer portal, no review, no key issuance. An account, an App Password (or OAuth), and the AT Protocol endpoints. Free — no paid tier, no per-call fee. |
+| **Mastodon** | Self-serve app registration on the instance. |
+| **Instagram — your own account** | A Meta app in **development mode** with the account given the Instagram Tester role publishes without App Review. Needs a Professional (Business/Creator) account and a linked Facebook Page. |
+| **LinkedIn — your own personal profile** | "Share on LinkedIn". No partner programme, no cost. |
+
+**Tier B — gated behind review, measured in weeks**
+
+| Platform | Gate | Lead time |
+|---|---|---|
+| **Instagram / Facebook for accounts you do not own** | Business Verification in Meta Business Manager (real company documents) + App Review per permission (`instagram_business_basic`, `instagram_business_content_publish`), each with its own screencast of the full user journey, a privacy policy URL and data-deletion instructions | 2-4 weeks per submission; a rejection restarts the clock |
+| **Facebook Page, publicly visible posts** | `pages_manage_posts` at Advanced Access. In development mode a post is visible **only to Page admins and app developers** — i.e. it looks like it worked and nobody can see it | as above |
+| **LinkedIn organisation pages** | `w_organization_social` + Community Management API through the Marketing Developer Platform partner programme. **Only open to registered legal entities** — not individual developers — plus a verified Page, two-tier app review and a screencast | days to weeks |
+| **TikTok Direct Post** | `video.publish` + app audit. Until the audit passes, every post is forced to `SELF_ONLY` — private to the creator. The app must also display the creator's username and avatar before each post, which the audit checks | 2-4 weeks, typically several rounds |
+| **YouTube** | OAuth verification / compliance audit for the `youtube.upload` scope. Apps created after 2020-07-28 that have not passed it can upload **private videos only**, and unverified apps are capped at 100 test users | weeks |
+
+**Tier C — available, but priced**
+
+**X** moved to pay-per-use as the default in April 2026: roughly **$0.015 per
+post created, and $0.200 if the post contains a URL**. Legacy Basic ($200/mo)
+and Pro ($5,000/mo) remain only for existing subscribers; there is no free tier
+for new developers. A scheduler's posts almost always carry a link, so the
+honest unit cost is 20 cents a post — 10 posts a day is ~$60/month. X is a
+budget line, not an integration problem.
+
+#### What this changes
+
+1. **There is a real first release with zero approvals**: Bluesky, Mastodon,
+   your own Instagram, your own LinkedIn profile. Worth shipping on its own.
+2. **Everything a *client* would want is a business project, not a feature.**
+   Their Facebook Page, their Instagram, their LinkedIn company page, TikTok —
+   each is a separate review, and LinkedIn's requires a registered legal
+   entity. Start Meta Business Verification early; it has the longest lead time
+   and gates the two most-wanted networks.
+3. **A consequence for the turnkey product (§84.5):** posting to a client's
+   accounts means *an* app has been reviewed for third-party use. Per-client
+   boxes each holding their own credentials would mean each client passing
+   their own Meta review — unworkable. So Business Lab holds one reviewed app
+   and clients authorise it, which makes us a data processor for their social
+   accounts and pulls the §84.5 data-protection item forward.
+4. **Adopting Postiz removes the OAuth code, not the approvals.** Self-hosted
+   Postiz still needs credentials per platform in its own env block. It is
+   AGPL-3.0: running it unmodified, for ourselves or for clients, carries no
+   obligation, but shipping a *modified* Postiz as part of a network service
+   does trigger source release — one for the licence table. It also ships
+   Temporal + PostgreSQL + Redis, so it is four containers, not one.
+
+#### Recommended sequence
+
+- Build the **generation** half against the Tier A networks (Bluesky, Mastodon,
+  own Instagram) — real value, no gatekeeper.
+- Start **Meta Business Verification** in parallel, since it is calendar time
+  rather than work.
+- Treat X as a cost decision, not a build decision.
+- Revisit TikTok and LinkedIn organisation pages only once there is a client
+  asking, because both audits expire into wasted effort without one.
+
+Sources: Meta/Instagram app review and development-mode behaviour, LinkedIn
+Community Management API eligibility, TikTok Content Posting API audit and
+`SELF_ONLY` restriction, YouTube OAuth verification limits, X pay-per-use
+pricing (April 2026, verified July 2026 rates), Bluesky AT Protocol access,
+Postiz licence and self-host requirements.
+
+### 84.6 Decisions taken 2026-09-01
+
+- **Remote management: both.** Guacamole for our own machines, which are on the
+  NetBird overlay — cheap, tunnel-friendly, no agent. MeshCentral stays planned
+  for client endpoints that will not join a VPN. Two apps, each doing what it
+  is good at, rather than one compromise.
+- **Commercial collateral lives outside this repo**, published as Artifacts and
+  shared deliberately. The sales deck, pricing and client scenarios never get
+  committed to a public repository.

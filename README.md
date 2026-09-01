@@ -179,26 +179,33 @@ it is done — not ticked off and left behind. Section references point at
 - [ ] **Rebrand, tier 2** (§84.2) — package/image/network/project names. Do it
       in the same maintenance window as the §83 data-root move; both recreate
       the management stack.
-- [ ] **Platform access audit for social publishing** (§84.3) — Meta app
-      review, X's paid API, LinkedIn partner approval, TikTok review. Blocks
-      any timeline; Mastodon and Bluesky work today. Do this before the app.
-- [ ] **Add Postiz** (§84.3) — adopt rather than build: a bespoke publisher
-      means maintaining OAuth for every network.
+- [ ] **Add Postiz** (§84.3a) — adopt rather than build. Four containers
+      (Temporal + Postgres + Redis), AGPL-3.0, and credentials per platform in
+      its own env block: it removes the OAuth code, not the approvals.
 - [ ] **Content generation** (§84.3) — prompt + a Claude API key entered once
       in Settings, same third-party-token pattern as Cloudflare/Tailscale;
       n8n for "generate on a schedule, queue in Postiz".
+- [ ] **Ship against the Tier A networks first** (§84.3a) — Bluesky, Mastodon,
+      own Instagram, own LinkedIn profile all publish today with no approval
+      and no cost. That is a release on its own.
+- [ ] **Start Meta Business Verification** (§84.3a) — calendar time, not work,
+      and it gates both Instagram and Facebook for anyone else's accounts.
+      2-4 weeks per App Review submission, and a rejection restarts it.
+- [ ] **Decide on X** (§84.3a) — pay-per-use since April 2026: ~$0.015 a post,
+      **$0.200 if it contains a URL**. A budget decision, not a build one.
+- [ ] **Verify Meta development-mode publishing empirically** (§84.3a) —
+      sources agree Instagram publishes normally from a dev-mode app with a
+      Tester role, and that a Facebook Page post in dev mode is visible only to
+      admins. Confirm both with a real app before a timeline depends on it.
 - [ ] **`docs/webmaster.md`** (§84.4) — Cloudflare role runbook: domain, DNS,
       Tunnel, routing, Zero Trust. Links to first-run.md rather than restating
       it.
 - [ ] **`docs/it-admin.md`** (§84.4) — deploy/configure/maintain the stack.
       Same rule: link, do not duplicate.
-- [ ] **Decide where commercial collateral lives** (§84.4) — this repo is
-      public. Sales deck, pricing and client scenarios need a private repo or
-      Artifacts. Decide before the first draft.
 - [ ] **Sales / value-proposition plan** (§84.4) — SaaS replaced per app, and
-      the monthly cost removed.
+      the monthly cost removed. **As an Artifact, not in this repo** (§84.6).
 - [ ] **Customer journey / workflows** (§84.4) — scenarios showing why each app
-      earns its place.
+      earns its place. **As an Artifact** (§84.6).
 - [ ] **Licence due diligence** (§84.5) — every registry app against
       redistribution for profit. Blocks pricing.
 - [ ] **Per-client provisioning** (§84.5) — one host is one deployment today;
@@ -277,10 +284,11 @@ it is done — not ticked off and left behind. Section references point at
 
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
-- [ ] **Decide remote management** (§84.1) — MeshCentral vs Guacamole, and it
-      is a requirements question: do client machines join the NetBird overlay?
-      Yes → Guacamole (no agent, no cert-hash problem, Authelia can gate it)
-      and this item dies. No → MeshCentral as specified in §62.2.
+- [ ] **Add Guacamole** (§84.1, §84.6) — browser RDP/VNC/SSH for our own
+      machines over the NetBird overlay. No agent, so no cert-hash problem, and
+      Authelia can gate it.
+- [ ] **MeshCentral** (§62.2) — still wanted, for client endpoints that will
+      not join the overlay. `TLSOffload` + `certUrl` for the agent cert hash.
 - [ ] **Pre-built n8n workflows** (§64) — ship useful workflows rather than an
       empty n8n.
 - [ ] **Home Assistant: identify the three unlabelled Espressif devices**
