@@ -160,6 +160,11 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Restart Home Page from the dashboard once** (§80.4) — its stored
+      `HOMEPAGE_ALLOWED_HOSTS` is a URL rather than a bare host, so the public
+      hostname gets "Host validation failed" instead of the page. A start
+      through the dashboard now normalises it; until then the live container
+      keeps the bad value.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from

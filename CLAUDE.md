@@ -106,6 +106,14 @@ passing, unless it is genuinely part of the change at hand.
 - **Adding an app**: `apps/<name>/` with compose + `.env.example`, an entry in
   `services.ts`, a port per the scheme, and rows in `docs/ports.md` and
   `docs/app-credentials.md`.
+- **Every app shows up on the Home Page.** Homepage (`apps/home-page/`)
+  discovers apps from `homepage.*` labels on the container via the Docker
+  socket, and lists one only while it is running — so an app without labels is
+  invisible on the start page no matter how healthy it is. A compose file
+  therefore carries `homepage.group`, `homepage.name`, `homepage.icon`,
+  `homepage.description` and, when the app has a web UI, `homepage.href`
+  pointing at its LAN port. No exceptions: the registry-wide test in
+  `services.test.ts` fails when an app is missing them.
 - **Dependencies between apps** are declared in `services.ts`, in one of two
   tiers. `dependsOn` is for what an app cannot boot without (Authelia's OIDC
   provider, for something that crash-loops without it) — the API refuses the

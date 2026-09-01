@@ -27,6 +27,15 @@ describe('computeExposureEnvOverrides', () => {
     expect(out.H).toBe(`foo,${HOST}`);
   });
 
+  it('strips a scheme and trailing slash from an existing entry, so it can match a Host header', () => {
+    const out = computeExposureEnvOverrides({ allowedHosts: ['H'] }, HOST, {
+      H: 'https://paperless.example.com/',
+    });
+    // Not `https://paperless.example.com/,paperless.example.com`: the pasted
+    // URL matches no Host header, so keeping it around only hides the mistake.
+    expect(out.H).toBe(HOST);
+  });
+
   it('honours a space separator (Nextcloud trusted domains)', () => {
     const out = computeExposureEnvOverrides(
       { allowedHosts: ['NEXTCLOUD_TRUSTED_DOMAINS'], allowedHostsSeparator: ' ' },

@@ -8907,3 +8907,97 @@ The schedule switch, frequency, *keep last* and **Save schedule** now live in a
 `card border-0 shadow-sm` with a *Schedule* heading and a line saying what
 retention does — matching the settings panel and the health block. The archive
 list stays outside it: it is the section's content, not one of its settings.
+
+## 80. Session Log — 2026-09-01: dependencies, the running panel, and the start page
+
+Three dashboard asks in one pass, plus one thing found while proving the third.
+
+### 80.1 Running apps: collapsed by default, and one grid
+
+The panel is a per-category summary of what is up; four expanded tables pushed
+the actual app list off the first screen. Its groups now start collapsed.
+
+That needed the collapse store to change shape. It held an array of collapsed
+keys, so "not stored" meant "expanded" and a new default could never apply.
+It is now `key -> collapsed`, holding **explicit choices only**, with
+`defaultCollapsed()` deciding the rest — so expanding a running group is
+remembered, and defaults stay changeable. The old array is still read (each
+entry becomes `key: true`), so nobody loses their existing collapse state.
+
+Alignment: each category renders its own `<table>`, and with auto layout every
+one sized its columns to its own content — App / URL / Ports started at a
+different x in each group. Fixed widths (20/44/36) above the stacking
+breakpoint make the groups read as one table broken by headings.
+
+### 80.2 Dependencies: two tiers, because they are not the same thing
+
+The ask was "show each app's dependencies and disable Start when they are not
+met", with NetBird → Tailscale + Nginx as the example. The mechanism already
+existed (`dependsOn`, enforced in `executor.ts`, disabling the button in the
+card) — but only `netbird-vpn` and `wetty` declared anything, and the card
+showed dependencies **only when one was missing**.
+
+The example is right about the couplings and wrong about the tier, which is
+worth writing down:
+
+| | breaks | NetBird without it |
+|---|---|---|
+| Authelia | boot | crash-loops on the OIDC provider — a real start blocker |
+| Tailscale | function | signal goes over Funnel (§52); no peer can register |
+| NPM | function | dashboard/API/login routes live there; login is broken |
+
+Gating a start on Tailscale or NPM would mean "the proxy is stopped" implies
+"nothing can be started", including the proxy's own dependents. So there are
+now two tiers:
+
+- `dependsOn` — cannot boot without it. Refused by the API (409), Start
+  disabled. Unchanged behaviour.
+- `requires` — needs it to do its job, boots fine without it. Listed in the
+  card, warned about when down, never blocking.
+
+Declared: `netbird-vpn` requires tailscale + nginx-proxy-manager; `crowdsec`
+requires nginx-proxy-manager (it parses NPM's access logs — healthy and idle
+without them); `authelia` requires nginx-proxy-manager (nothing but NPM's
+forward-auth ever calls it). The line for `requires` is *the app's core
+function breaks*, not *it stops being reachable from outside* — otherwise
+every exposed app would list the proxy and the field would mean nothing.
+
+Both tiers are now always listed under the app, as chips with a live state dot;
+the non-blocking ones get a dashed border. Registry tests check every declared
+name exists, nothing depends on itself, and `dependsOn` has no cycles.
+
+### 80.3 Every started app on the Home Page, checked mechanically
+
+Homepage discovers apps from `homepage.*` labels over the Docker socket, and
+lists one only while it is running — so a missing label is invisible, not an
+error. Audit found two gaps: **crowdsec** (no labels at all) and **home-page**
+itself. Both now carry them; CrowdSec deliberately has no `homepage.href`,
+because it has no web UI and a tile linking nowhere is worse than a tile that
+does not link.
+
+The rule is now a test (`services.test.ts`) over every registry entry rather
+than something to remember at review time, and a bullet in CLAUDE.md.
+
+Verified live: labels present on both recreated containers, and Homepage's own
+`/api/services` lists the discovered apps grouped as labelled.
+
+### 80.4 What that turned up: Homepage was rejecting its own hostname
+
+Querying that API needed a Host header, and every value failed except the
+built-in `localhost:3000`. `HOMEPAGE_ALLOWED_HOSTS` held
+`https://homepage.tx-home-utils.com` — a **URL**, where gethomepage matches
+bare `host[:port]` against the Host header. So the public hostname got
+`{"error":"Host validation failed"}` rather than the page.
+
+Two fixes, both in code:
+
+- `computeExposureEnvOverrides` now normalises existing allow-list entries
+  (strips scheme and trailing slash) instead of carrying them through
+  verbatim. A pasted URL becomes the host it meant.
+- the compose default was `localhost:3000`, the *container* port. A browser on
+  the LAN sends `localhost:10190`, so the default could never work; it is now
+  `localhost:${HOMEPAGE_PORT:-10190}`.
+
+The stored value is only rewritten on a dashboard-driven start, and this
+session has no dashboard login — so the live container still holds the bad
+value. That is a README item, not a hand-edit.

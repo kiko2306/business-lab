@@ -6,9 +6,12 @@ services:
     ports:
       - "${HOMEPAGE_PORT:-10190}:3000"
     environment:
-      # Required to reach the dashboard from anything other than
-      # localhost:3000 — comma-separated, no spaces, e.g. your LAN IP.
-      HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS:-localhost:3000}
+      # Matched against the Host header — comma-separated bare host[:port]
+      # values, no scheme, no spaces. The default is the published host port,
+      # not the container's 3000: a browser on the LAN sends localhost:10190,
+      # and anything not listed here gets "Host validation failed" instead of
+      # the page.
+      HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS:-localhost:${HOMEPAGE_PORT:-10190}}
     volumes:
       - ./data:/app/config
       # Read-only Docker access for label-based service discovery: every
@@ -16,6 +19,15 @@ services:
       # Homepage only lists a labeled container while it's actually running
       # (docker.yaml below wires the socket up as a provider).
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    # Homepage lists itself for the same reason every other app carries these:
+    # the rule is that a running app is on the start page, with no exceptions
+    # to remember when the next app is added.
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Home Page"
+      - "homepage.icon=homepage.png"
+      - "homepage.href=http://localhost:${HOMEPAGE_PORT:-10190}"
+      - "homepage.description=This start page"
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
       interval: 30s

@@ -19,6 +19,17 @@ import { ServiceExposureEnvKeys } from '../types';
 import { getServiceExposureRow } from './exposure';
 
 /**
+ * Allow-lists are matched against the Host header, so an entry has to be a
+ * bare host[:port]. A pasted URL is the obvious way to get that wrong, and it
+ * fails silently — as a 400 from the app itself, which the dashboard never
+ * sees. Homepage rejected every request for exactly this reason, with
+ * HOMEPAGE_ALLOWED_HOSTS holding `https://homepage.<domain>` (§80).
+ */
+function normaliseHost(value: string): string {
+  return value.trim().replace(/^[a-z][a-z0-9+.-]*:\/\//i, '').replace(/\/+$/, '');
+}
+
+/**
  * Pure part: given a service's declared exposure env keys, the hostname it's
  * exposed at, and its current .env values (for merging into allow-lists),
  * produce the { KEY: value } overrides to pass to `docker compose up`.
@@ -43,7 +54,7 @@ export function computeExposureEnvOverrides(
     const splitOn = separator.trim() === '' ? /\s+/ : separator;
     const hosts = (existingValues[key] ?? '')
       .split(splitOn)
-      .map((host) => host.trim())
+      .map((host) => normaliseHost(host))
       .filter(Boolean);
     if (!hosts.includes(hostname)) {
       hosts.push(hostname);

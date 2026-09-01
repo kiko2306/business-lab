@@ -22,6 +22,14 @@ services:
       - ../nginx-proxy-manager/data/app/log:/var/log/npm:ro
     networks:
       - crowdsec-net
+    # Homepage discovers running containers by these labels. No homepage.href:
+    # CrowdSec has no web UI at all, so a tile that linked somewhere would be
+    # a dead end — it shows as a name and a description while it is up.
+    labels:
+      - "homepage.group=Security"
+      - "homepage.name=CrowdSec"
+      - "homepage.icon=crowdsec.png"
+      - "homepage.description=Intrusion prevention — bans scanners at the edge"
     healthcheck:
       test: ["CMD", "cscli", "lapi", "status"]
       interval: 30s

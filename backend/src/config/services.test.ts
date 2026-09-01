@@ -371,3 +371,29 @@ describe('dependency declarations', () => {
   });
 });
 
+describe('Home Page discovery labels', () => {
+  // Homepage lists a container only while it is running AND labelled, so an
+  // app without these labels is invisible on the start page however healthy it
+  // is. This is the rule for every app in the registry, checked here rather
+  // than left to whoever reviews the next compose file.
+  // composePath is nominal — upstream projects name the file inconsistently,
+  // so the app directory is probed the same way resolveComposeFile does.
+  const composeText = (composePath: string) => {
+    const dir = path.resolve(__dirname, '../../..', path.dirname(composePath));
+    const found = ['compose.yaml', 'compose.yml', 'docker-compose.yml', 'docker-compose.yaml']
+      .map((file) => path.join(dir, file))
+      .find((file) => fs.existsSync(file));
+    if (!found) {
+      throw new Error(`no compose file in ${dir}`);
+    }
+    return fs.readFileSync(found, 'utf8');
+  };
+
+  it('are carried by every app', () => {
+    for (const [name, service] of Object.entries(SERVICES)) {
+      const text = composeText(service.composePath);
+      expect(text, `${name} has no homepage.name label`).toContain('homepage.name=');
+      expect(text, `${name} has no homepage.group label`).toContain('homepage.group=');
+    }
+  });
+});
