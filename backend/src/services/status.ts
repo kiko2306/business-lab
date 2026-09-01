@@ -262,6 +262,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       setupTokenSupported: Boolean(service.setupToken),
       adminUserManagementSupported: Boolean(service.supportsAdminUserManagement),
       dependsOn: service.dependsOn,
+      requires: service.requires,
       ports,
       exposedHostname,
       webPath: service.webPath,

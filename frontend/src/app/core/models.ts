@@ -36,7 +36,12 @@ export interface ServiceStatus {
   error?: string;
   setupTokenSupported?: boolean;
   adminUserManagementSupported?: boolean;
+  // Must be running before this app can start — the Start button is disabled
+  // while one of them is down, and the API refuses the start with a 409.
   dependsOn?: string[];
+  // Needed for the app to work properly, but not to boot: listed with live
+  // state and warned about, never blocking.
+  requires?: string[];
   ports?: ServicePortMapping[];
   exposedHostname?: string | null;
   // URL path suffix for the app's web UI when it isn't the bare root

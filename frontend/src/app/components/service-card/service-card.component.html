@@ -22,7 +22,25 @@
       <span *ngIf="!dependenciesSatisfied()" class="text-warning-emphasis">
         · {{ startBlockedTitle() }}
       </span>
+      <span *ngIf="dependenciesSatisfied() && degradedBy().length" class="text-warning-emphasis">
+        · {{ degradedTitle() }}
+      </span>
       <span *ngIf="service.error" class="text-danger">· {{ service.error }}</span>
+    </div>
+
+    <!-- Always listed, not only when something is missing: knowing an app needs
+         Authelia is as useful when it is up as when it is down. -->
+    <div class="service-row-deps" *ngIf="dependencies().length">
+      <span class="deps-label">Needs</span>
+      <span
+        class="dep"
+        *ngFor="let dep of dependencies()"
+        [class.dep--down]="!dep.running"
+        [class.dep--optional]="!dep.blocking"
+        [title]="dependencyTitle(dep)"
+      >
+        <span class="dep-dot" aria-hidden="true"></span>{{ dep.label }}
+      </span>
     </div>
   </div>
 

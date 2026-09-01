@@ -28,6 +28,14 @@ import { ToastService } from '../../core/toast.service';
 
 type StartupPhase = 'streaming' | 'running' | 'error' | 'timeout';
 
+interface DependencyState {
+  name: string;
+  label: string;
+  running: boolean;
+  // dependsOn (blocks the start) rather than requires (functional only).
+  blocking: boolean;
+}
+
 @Component({
   selector: 'app-service-card',
   standalone: true,
@@ -281,11 +289,23 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     return this.startupLogLines.length ? this.startupLogLines.join('\n') : 'Waiting for output…';
   }
 
-  dependencyStates(): { label: string; running: boolean }[] {
-    return (this.service.dependsOn ?? []).map((name) => {
-      const dep = this.allServices.find((s) => s.name === name);
-      return { label: dep?.label ?? name, running: dep?.state === 'running' };
-    });
+  /**
+   * Both tiers of dependency, for display. `blocking` ones (dependsOn) stop
+   * the app booting at all and disable Start; the rest (requires) break what
+   * the app does without stopping it from coming up, so they are shown and
+   * warned about but never gate the button.
+   */
+  dependencies(): DependencyState[] {
+    const resolve = (names: string[] | undefined, blocking: boolean): DependencyState[] =>
+      (names ?? []).map((name) => {
+        const dep = this.allServices.find((s) => s.name === name);
+        return { name, label: dep?.label ?? name, running: dep?.state === 'running', blocking };
+      });
+    return [...resolve(this.service.dependsOn, true), ...resolve(this.service.requires, false)];
+  }
+
+  dependencyStates(): DependencyState[] {
+    return this.dependencies().filter((d) => d.blocking);
   }
 
   dependenciesSatisfied(): boolean {
@@ -297,6 +317,28 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       .filter((d) => !d.running)
       .map((d) => d.label);
     return notRunning.length ? `Start ${notRunning.join(', ')} first` : '';
+  }
+
+  /**
+   * Non-blocking dependencies that are down — the app runs, but part of what
+   * it does is broken (NetBird without Tailscale registers no peers).
+   */
+  degradedBy(): string[] {
+    return this.dependencies()
+      .filter((d) => !d.blocking && !d.running)
+      .map((d) => d.label);
+  }
+
+  degradedTitle(): string {
+    const down = this.degradedBy();
+    return down.length ? `Runs, but needs ${down.join(' and ')} to work properly` : '';
+  }
+
+  dependencyTitle(dep: DependencyState): string {
+    const state = dep.running ? 'running' : 'not running';
+    return dep.blocking
+      ? `${dep.label} — ${state}. Required to start.`
+      : `${dep.label} — ${state}. Needed for this app to work, not to start.`;
   }
 
   loadExposure(): void {

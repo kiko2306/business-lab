@@ -139,8 +139,15 @@ export interface ServiceDefinition {
   supportsAdminUserManagement?: boolean;
   // Other SERVICES keys (separate compose projects) that must already be
   // running before this one can start — e.g. an app that authenticates
-  // against Authelia's OIDC provider needs Authelia up first.
+  // against Authelia's OIDC provider needs Authelia up first. Enforced:
+  // starting with one of these down is refused (services/executor.ts).
   dependsOn?: string[];
+  // Other SERVICES keys this app needs to do its job, but not to boot. The
+  // containers come up either way and the app works on its LAN port, so this
+  // never blocks a start — the dashboard lists them and warns when one is
+  // down. Kept separate from dependsOn deliberately: gating start on these
+  // would make "the reverse proxy is stopped" mean "nothing can be started".
+  requires?: string[];
   // The host port this service listens on when it runs with
   // `network_mode: host` (currently Home Assistant, which needs host
   // networking for its zeroconf/SSDP/DHCP discovery). Such a service
@@ -219,6 +226,7 @@ export interface ServiceStatusPayload {
   setupTokenSupported?: boolean;
   adminUserManagementSupported?: boolean;
   dependsOn?: string[];
+  requires?: string[];
   ports?: ServicePortMapping[];
   // The service's public hostname, only when exposure is enabled and
   // provisioned successfully — null/absent otherwise, including for

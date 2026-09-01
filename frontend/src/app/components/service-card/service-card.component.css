@@ -84,6 +84,59 @@
   white-space: nowrap;
 }
 
+/* ---- Dependency chips ---------------------------------------------------- */
+.service-row-deps {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  margin-top: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--bs-secondary-color, #6c757d);
+}
+
+.deps-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-weight: 600;
+  font-size: 0.68rem;
+}
+
+.dep {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.05rem 0.4rem;
+  border: 1px solid var(--bs-border-color, #dee2e6);
+  border-radius: 1rem;
+  background: #fff;
+  white-space: nowrap;
+}
+
+/* A dependency that only affects what the app does gets a dashed outline, so
+   "will not start without this" and "will not work properly without this" are
+   distinguishable at a glance rather than only in the tooltip. */
+.dep--optional {
+  border-style: dashed;
+}
+
+.dep-dot {
+  width: 0.45rem;
+  height: 0.45rem;
+  border-radius: 50%;
+  background: var(--bs-success, #198754);
+}
+
+.dep--down {
+  border-color: var(--bs-warning-border-subtle, #ffe69c);
+  background: var(--bs-warning-bg-subtle, #fff9e6);
+  color: var(--bs-warning-text-emphasis, #664d03);
+}
+
+.dep--down .dep-dot {
+  background: var(--bs-warning, #ffc107);
+}
+
 .service-row-actions {
   flex: 0 0 auto;
   display: flex;

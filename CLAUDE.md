@@ -106,6 +106,14 @@ passing, unless it is genuinely part of the change at hand.
 - **Adding an app**: `apps/<name>/` with compose + `.env.example`, an entry in
   `services.ts`, a port per the scheme, and rows in `docs/ports.md` and
   `docs/app-credentials.md`.
+- **Dependencies between apps** are declared in `services.ts`, in one of two
+  tiers. `dependsOn` is for what an app cannot boot without (Authelia's OIDC
+  provider, for something that crash-loops without it) — the API refuses the
+  start and the dashboard disables the button. `requires` is for what it needs
+  to do its job but not to come up (NetBird needs Tailscale for signalling);
+  the dashboard lists it and warns when it is down, and never blocks a start.
+  Putting a proxy or a VPN in `dependsOn` would make "that one is stopped" mean
+  "nothing can be started".
 - **Commits**: imperative, sentence case, describing the outcome — "Fix the VPN:
   port renumbering left Tailscale Funnel pointing at a dead port". No
   conventional-commit prefixes; `plan:` prefix for plan.md-only commits.

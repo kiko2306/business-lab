@@ -319,3 +319,55 @@ describe('home-assistant host networking', () => {
     expect(ha.healthCheck.url).toContain(`:${ha.hostNetworkPort}/`);
   });
 });
+
+describe('dependency declarations', () => {
+  const entries = Object.entries(SERVICES);
+
+  it('only names services that exist in the registry', () => {
+    for (const [name, service] of entries) {
+      for (const dep of [...(service.dependsOn ?? []), ...(service.requires ?? [])]) {
+        expect(SERVICES[dep], `${name} declares an unknown dependency: ${dep}`).toBeDefined();
+      }
+    }
+  });
+
+  it('never declares a service as its own dependency', () => {
+    for (const [name, service] of entries) {
+      expect([...(service.dependsOn ?? []), ...(service.requires ?? [])]).not.toContain(name);
+    }
+  });
+
+  it('keeps dependsOn free of cycles, which would make both apps unstartable', () => {
+    // Only the hard tier can deadlock: it is the one that blocks a start.
+    const seen = new Set<string>();
+    const visit = (name: string, trail: string[]): void => {
+      if (trail.includes(name)) {
+        throw new Error(`dependsOn cycle: ${[...trail, name].join(' -> ')}`);
+      }
+      if (seen.has(name)) {
+        return;
+      }
+      seen.add(name);
+      for (const dep of SERVICES[name]?.dependsOn ?? []) {
+        visit(dep, [...trail, name]);
+      }
+    };
+    expect(() => entries.forEach(([name]) => visit(name, []))).not.toThrow();
+  });
+
+  it('gates a start only on what actually stops the app booting', () => {
+    // NetBird crash-loops without Authelia's OIDC provider, so that one blocks
+    // the start. Tailscale (signal via Funnel) and NPM (its API + login
+    // routes) break what it does, not whether it comes up — gating starts on
+    // the proxy would mean nothing could be started while NPM is down.
+    expect(SERVICES['netbird-vpn'].dependsOn).toEqual(['authelia']);
+    expect(SERVICES['netbird-vpn'].requires).toEqual(
+      expect.arrayContaining(['tailscale', 'nginx-proxy-manager'])
+    );
+    expect(SERVICES['netbird-vpn'].requires).not.toContain('authelia');
+    // CrowdSec parses NPM's access logs; with NPM down it is healthy and idle.
+    expect(SERVICES['crowdsec'].requires).toEqual(['nginx-proxy-manager']);
+    expect(SERVICES['crowdsec'].dependsOn).toBeUndefined();
+  });
+});
+
