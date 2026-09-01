@@ -276,6 +276,174 @@ export async function startService(serviceName: string, userId: number): Promise
 /**
  * Stop a service using docker compose down
  */
+/**
+ * Pull newer images for a service and recreate it on them.
+ *
+ * This is what replaced Watchtower (§81.3). Watchtower did the same thing
+ * unattended, to every container that had not opted out — which is why the
+ * management stack carries four `com.centurylinklabs.watchtower.enable=false`
+ * labels. Recreating an app while someone is using it, on an image whose
+ * changes nobody has read, is a decision rather than a background chore; it
+ * belongs on a button.
+ *
+ * Image IDs before and after say whether anything actually changed.
+ * Recreation goes through composeUpWithManagedConfig like every other start,
+ * so the exposure env overrides and managed config files are re-applied to the
+ * new container.
+ */
+export async function updateService(serviceName: string, userId: number): Promise<ServiceActionResult> {
+  if (!isValidServiceName(serviceName)) {
+    throw { statusCode: 400, message: `Invalid service name: ${serviceName}` } as HttpError;
+  }
+
+  const resolved = resolveComposeFile(serviceName);
+  const { projectName, appDir, composeFile } = resolved ?? { projectName: null, appDir: '', composeFile: null };
+
+  if (!composeFile) {
+    throw {
+      statusCode: 404,
+      message: `Service ${serviceName} is not installed: no compose file found in ${appDir}`,
+    } as HttpError;
+  }
+
+  await ensureGeneratedSecrets(serviceName);
+  ensureServiceSecrets(serviceName, appDir, composeFile);
+
+  const startTime = new Date();
+  try {
+    logger.info(`Updating service: ${serviceName}`, { userId, service: serviceName });
+
+    const before = await getServiceImageIds(projectName, composeFile);
+    await executeCommand(`docker compose -p ${projectName} -f ${composeFile} pull`, COMPOSE_UP_TIMEOUT_MS);
+
+    // forceRecreate: `up -d` alone leaves a running container on its old image
+    // when the compose config has not changed, so the pull would look like it
+    // did nothing.
+    await composeUpWithManagedConfig(serviceName, projectName, appDir, composeFile, {
+      forceRecreate: true,
+    });
+    const after = await getServiceImageIds(projectName, composeFile);
+
+    // Compared by container, since a multi-container app can move one image
+    // and not the others. Either side missing means "cannot tell".
+    const updated =
+      before && after
+        ? [
+            ...new Set(
+              [...after.entries()]
+                .filter(([container, image]) => before.get(container)?.id !== image.id)
+                .map(([, image]) => image.name)
+            ),
+          ]
+        : null;
+
+    await logAuditEvent(userId, 'SERVICE_UPDATE', serviceName, 'success', {
+      updated: updated ?? 'unknown',
+      duration: new Date().getTime() - startTime.getTime(),
+    });
+    logger.info(`Service updated: ${serviceName}`, { userId, updated });
+
+    const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error: Error) => {
+      logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
+      return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };
+    });
+
+    return {
+      success: true,
+      service: serviceName,
+      message: describeUpdate(updated),
+      timestamp: new Date(),
+      ...(exposure.attempted ? { exposure } : {}),
+    };
+  } catch (error) {
+    const httpError = error as HttpError;
+    logger.error(`Failed to update service: ${serviceName}`, { userId, error: httpError.message });
+    await logAuditEvent(userId, 'SERVICE_UPDATE', serviceName, 'failure', {
+      error: httpError.message,
+      stderr: httpError.stderr,
+    }).catch((err: Error) => logger.error('Failed to log audit event', { error: err.message }));
+
+    throw {
+      statusCode: 500,
+      message: `Failed to update service ${serviceName}: ${httpError.message}`,
+      details: httpError.stderr,
+    } as HttpError;
+  }
+}
+
+export function describeUpdate(updated: string[] | null): string {
+  // null, not empty: the image IDs could not be read, so "nothing changed" is
+  // not a claim this can make. Saying it anyway is the one outcome that would
+  // quietly turn a failed update into a success message.
+  if (updated === null) {
+    return 'Pulled and recreated. Could not tell which images changed.';
+  }
+  if (!updated.length) {
+    return 'Already on the latest images.';
+  }
+  return `Updated ${updated.length} image${updated.length === 1 ? '' : 's'}: ${updated.join(', ')}`;
+}
+
+/**
+ * Parse `docker compose images --format json` into image -> image ID.
+ *
+ * Not `docker ps --format {{.ImageID}}`: that field does not exist on
+ * `docker ps` (it is a `docker images` field), so the template fails, the
+ * command errors, and every update reports "already on the latest images"
+ * however much it just pulled. Found live — the first update this ran said
+ * nothing had changed while recreating the container.
+ */
+export interface ComposeImage {
+  // Image ID, which is what actually changes when a pull brings something new.
+  id: string;
+  // repository:tag, which is what a person recognises in the result message.
+  name: string;
+}
+
+export function parseComposeImages(stdout: string): Map<string, ComposeImage> | null {
+  try {
+    const parsed = JSON.parse(stdout);
+    if (!Array.isArray(parsed)) {
+      return null;
+    }
+    // Keyed by container: a multi-container app can move one image and not the
+    // others, and two of its containers can share one image.
+    const entries = parsed
+      .filter((row) => row && typeof row.ContainerName === 'string' && typeof row.ID === 'string')
+      .map((row): [string, ComposeImage] => [
+        row.ContainerName,
+        { id: row.ID, name: row.Tag ? `${row.Repository}:${row.Tag}` : String(row.Repository ?? row.ContainerName) },
+      ]);
+    return entries.length ? new Map(entries) : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * container -> image ID for a project, so an update can say what actually
+ * changed rather than reporting success for a no-op pull. Returns null when
+ * that cannot be established, which describeUpdate reports honestly instead of
+ * turning into "nothing changed".
+ */
+async function getServiceImageIds(
+  projectName: string | null,
+  composeFile: string
+): Promise<Map<string, ComposeImage> | null> {
+  if (!projectName) {
+    return null;
+  }
+  try {
+    const { stdout } = await executeCommand(
+      `docker compose -p ${projectName} -f ${composeFile} images --format json`,
+      30_000
+    );
+    return parseComposeImages(stdout);
+  } catch {
+    return null;
+  }
+}
+
 export async function stopService(serviceName: string, userId: number): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
     throw {

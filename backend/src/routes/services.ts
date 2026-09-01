@@ -150,6 +150,41 @@ router.post(
 );
 
 /**
+ * POST /api/services/:name/update
+ * Pull newer images for a service and recreate it on them. Replaces
+ * Watchtower's unattended updates with a deliberate, per-app action (§81.3).
+ */
+router.post(
+  '/:name/update',
+  serviceLimiter,
+  auth,
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  async (req: Request, res: Response) => {
+    const serviceName = req.params.name;
+    const userId = req.user!.id;
+
+    try {
+      logger.info(`Service update request: ${serviceName}`, { userId, service: serviceName });
+
+      const result = await executor.updateService(serviceName, userId);
+      res.json(result);
+    } catch (error) {
+      const httpError = error as HttpError;
+      logger.error(`Service update failed: ${serviceName}`, { userId, error: httpError.message });
+
+      const statusCode = httpError.statusCode || 500;
+      res.status(statusCode).json({
+        error: 'Failed to update service',
+        service: serviceName,
+        message: httpError.message,
+        details: httpError.details,
+      });
+    }
+  }
+);
+
+/**
  * GET /api/services/:name/exposure
  * Read public exposure provisioning config and status for a service
  */

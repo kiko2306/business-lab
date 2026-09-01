@@ -166,10 +166,6 @@ it is done — not ticked off and left behind. Section references point at
       `apps/portainer/`, both docs; ports 10330/10331 retired.
 - [ ] **File Browser: mount the home directory** (§81.2) — same treatment as
       code-server in §78, same blast radius, same `*_HOME` knob to narrow it.
-- [ ] **Dashboard: update a container** (§81.3) — `POST
-      /api/services/:name/update` (compose pull + up -d through the managed
-      config path), an Update button on the row with streamed logs, audit
-      action `service_update`. Must land before Watchtower is removed.
 - [ ] **Drop Watchtower** (§81.3) — only after the button above exists.
       Unattended recreation is what the management stack already opts out of.
 - [ ] **OnlyOffice Document Server** (§81.4) — app + generated `JWT_SECRET`,

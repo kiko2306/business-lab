@@ -18,6 +18,7 @@ import {
   AutheliaAdminUser,
   ServiceEnvField,
   ServiceEnvStatus,
+  ServiceAction,
   ServiceExposureConfig,
   ServiceStatus,
   StartupActionEvent,
@@ -52,9 +53,9 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
-  @Input() loadingAction: 'start' | 'stop' | null = null;
+  @Input() loadingAction: ServiceAction | null = null;
 
-  @Output() actionRequested = new EventEmitter<'start' | 'stop'>();
+  @Output() actionRequested = new EventEmitter<ServiceAction>();
 
   // All per-service setup (configuration, exposure, admin account) lives in a
   // single modal opened from the row, instead of inline expanding panels.
@@ -93,8 +94,11 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   @ViewChild('startupLogBody') private startupLogBody?: ElementRef<HTMLElement>;
 
-  requestAction(action: 'start' | 'stop'): void {
-    if (action === 'start') {
+  requestAction(action: ServiceAction): void {
+    // An update pulls and recreates, so it produces exactly the output a start
+    // does — and is the one most worth watching, since a new image is the most
+    // likely thing to come up broken.
+    if (action !== 'stop') {
       void this.openStartupLogs();
     }
     this.actionRequested.emit(action);

@@ -57,6 +57,16 @@
     </button>
     <button
       type="button"
+      class="btn btn-outline-secondary btn-sm"
+      [disabled]="loadingAction !== null"
+      title="Pull newer images and recreate the container"
+      (click)="requestAction('update')"
+    >
+      <span *ngIf="loadingAction === 'update'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+      <span *ngIf="loadingAction !== 'update'">Update</span>
+    </button>
+    <button
+      type="button"
       class="btn btn-outline-danger btn-sm"
       [disabled]="loadingAction !== null || service.state !== 'running'"
       (click)="requestAction('stop')"

@@ -24,6 +24,10 @@ export interface ServicePortMapping {
   protocol: string;
 }
 
+// What the row's buttons can ask for. `update` pulls newer images and
+// recreates the container — the deliberate replacement for Watchtower.
+export type ServiceAction = 'start' | 'stop' | 'update';
+
 export interface ServiceStatus {
   name: string;
   label: string;

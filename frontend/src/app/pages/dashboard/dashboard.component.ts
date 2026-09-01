@@ -7,7 +7,14 @@ import { ServiceStateService } from '../../core/service-state.service';
 import { ServiceCardComponent } from '../../components/service-card/service-card.component';
 import { SettingsPanelComponent } from '../../components/settings-panel/settings-panel.component';
 import { OperationsService } from '../../core/operations.service';
-import { BackupFile, BackupScheduleConfig, HealthStatus, ServiceCategory, ServiceStatus } from '../../core/models';
+import {
+  BackupFile,
+  BackupScheduleConfig,
+  HealthStatus,
+  ServiceAction,
+  ServiceCategory,
+  ServiceStatus,
+} from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
 
@@ -153,9 +160,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.serviceState.refresh();
   }
 
-  handleAction(serviceName: string, action: 'start' | 'stop'): void {
+  handleAction(serviceName: string, action: ServiceAction): void {
     if (action === 'start') {
       this.serviceState.startService(serviceName);
+      return;
+    }
+    if (action === 'update') {
+      this.serviceState.updateService(serviceName);
       return;
     }
 

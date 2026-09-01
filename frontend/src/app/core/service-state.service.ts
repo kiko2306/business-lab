@@ -3,7 +3,15 @@ import { Injectable, inject } from '@angular/core';
 import { BehaviorSubject, EMPTY, Subject, Subscription, catchError, finalize, firstValueFrom, retry, switchMap, tap, timer } from 'rxjs';
 import { API_BASE_URL, extractErrorMessage } from './api';
 import { SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
-import { ConnectionStatus, ServiceActionResponse, ServiceStatus, ServiceStatusResponse, ServiceSummary, StartupActionEvent } from './models';
+import {
+  ConnectionStatus,
+  ServiceAction,
+  ServiceActionResponse,
+  ServiceStatus,
+  ServiceStatusResponse,
+  ServiceSummary,
+  StartupActionEvent,
+} from './models';
 import { ToastService } from './toast.service';
 import { AuthService } from './auth.service';
 
@@ -45,7 +53,7 @@ export class ServiceStateService {
   });
   private readonly lastUpdatedSubject = new BehaviorSubject<string | null>(null);
   private readonly refreshingSubject = new BehaviorSubject(false);
-  private readonly operatingSubject = new BehaviorSubject<Record<string, 'start' | 'stop' | null>>({});
+  private readonly operatingSubject = new BehaviorSubject<Record<string, ServiceAction | null>>({});
   private readonly connectionStatusSubject = new BehaviorSubject<ConnectionStatus>('connecting');
   // Fires once per start attempt with the `docker compose up` outcome, so the
   // startup-log popup can show the command's own error (e.g. a port clash)
@@ -100,6 +108,10 @@ export class ServiceStateService {
 
   stopService(serviceName: string): void {
     this.runServiceAction(serviceName, 'stop');
+  }
+
+  updateService(serviceName: string): void {
+    this.runServiceAction(serviceName, 'update');
   }
 
   /**
@@ -270,7 +282,7 @@ export class ServiceStateService {
     }
   }
 
-  private runServiceAction(serviceName: string, action: 'start' | 'stop'): void {
+  private runServiceAction(serviceName: string, action: ServiceAction): void {
     this.operatingSubject.next({
       ...this.operatingSubject.value,
       [serviceName]: action,
@@ -283,10 +295,13 @@ export class ServiceStateService {
         { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
       )
       .pipe(
-        retry({ count: 1, delay: 500 }),
+        // An update pulls images and recreates the container — minutes, not
+        // seconds. Retrying one that appears to have failed would run the
+        // whole thing a second time on top of the first.
+        action === 'update' ? tap() : retry({ count: 1, delay: 500 }),
         tap((response) => {
           this.toast.success(response.message);
-          if (action === 'start') {
+          if (action !== 'stop') {
             this.startupEventsSubject.next({ serviceName, ok: true, message: response.message });
           }
           if (response.exposure?.attempted && !response.exposure.success && response.exposure.warning) {
@@ -303,7 +318,7 @@ export class ServiceStateService {
         catchError((error) => {
           const message = extractErrorMessage(error, `Unable to ${action} ${serviceName}.`);
           this.toast.error(message);
-          if (action === 'start') {
+          if (action !== 'stop') {
             this.startupEventsSubject.next({
               serviceName,
               ok: false,

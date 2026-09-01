@@ -9151,3 +9151,32 @@ is ~1GB and takes minutes), and having it resident makes the wiring testable.
 
 §22.3 listed it as P2. Dropped at the user's request. Recorded here rather than
 edited out of §22, which is history.
+
+### 81.3a Built: the Update button
+
+`POST /api/services/:name/update` → `executor.updateService`: compose pull,
+then a `--force-recreate` up through `composeUpWithManagedConfig`, so the new
+container gets the exposure env overrides and managed config files like any
+other start. `--force-recreate` matters — plain `up -d` leaves a running
+container on its old image when the compose config has not changed, so the pull
+would look like it did nothing.
+
+The row now has an **Update** button between Start and Stop, and opens the same
+streamed log panel a start does. A new image is the most likely thing to come
+up broken, so watching it is the default, not an option. The update is the one
+action that does *not* get the automatic retry: it takes minutes, and retrying
+one that appears to have failed would run the whole pull and recreate again.
+
+**Found while verifying, worth recording:** the first implementation read image
+IDs with `docker ps --format "{{.Image}}\t{{.ImageID}}"`. `.ImageID` is not a
+`docker ps` field — it belongs to `docker images` — so the template errored, the
+command failed, the catch returned an empty map, and every update reported
+"Already on the latest images" while happily recreating the container. A test
+would not have caught it; only running it did. It now parses
+`docker compose images --format json`, keyed by container (a multi-container app
+can move one image and not the others) and reporting `repository:tag`, and when
+the IDs cannot be read at all it says so rather than claiming nothing changed.
+
+Verified live, both branches: with an outdated `nginx:alpine` staged under the
+Kitchen switcher it reported `Updated 1 image: nginx:alpine` and the app came
+back healthy; run again immediately it reported `Already on the latest images.`
