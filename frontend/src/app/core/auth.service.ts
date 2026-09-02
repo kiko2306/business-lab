@@ -108,6 +108,17 @@ export class AuthService {
     return this.accessTokenSubject.value;
   }
 
+  /**
+   * Whether the backend still has no admin account. Public wrapper over the
+   * same `/auth/setup-status` probe the guards use — the login page reads it
+   * to decide whether to offer the "create the initial administrator account"
+   * link (the guest guard already redirects to /setup in that state, so on
+   * /login this is normally false).
+   */
+  isSetupRequired(): Observable<boolean> {
+    return this.checkSetupRequired();
+  }
+
   resolveProtectedRoute(): Observable<true | UrlTree> {
     return this.checkSetupRequired().pipe(
       map((setupRequired) => (setupRequired ? this.router.parseUrl('/setup') : this.router.parseUrl('/login')))

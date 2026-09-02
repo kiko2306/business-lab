@@ -14,7 +14,8 @@ describe('LoginComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
 
   beforeEach(async () => {
-    authService = jasmine.createSpyObj('AuthService', ['login']);
+    authService = jasmine.createSpyObj('AuthService', ['login', 'isSetupRequired']);
+    authService.isSetupRequired.and.returnValue(of(false));
     toastService = jasmine.createSpyObj('ToastService', ['success']);
 
     await TestBed.configureTestingModule({
@@ -61,6 +62,22 @@ describe('LoginComponent', () => {
     expect(component['errorMessage']).toBe('Unable to sign in.');
     expect(component['submitting']).toBe(false);
     expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('hides the "create the initial administrator account" prompt when an admin already exists', () => {
+    authService.isSetupRequired.and.returnValue(of(false));
+    fixture.detectChanges();
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a[href="/setup"]');
+    expect(link).toBeNull();
+  });
+
+  it('shows the prompt only while the backend reports setup is still required', () => {
+    authService.isSetupRequired.and.returnValue(of(true));
+    fixture.detectChanges();
+
+    const link = (fixture.nativeElement as HTMLElement).querySelector('a[href="/setup"]');
+    expect(link?.textContent).toContain('Create the initial administrator account');
   });
 
   it('trims whitespace and marks the control dirty when pasting into it', () => {

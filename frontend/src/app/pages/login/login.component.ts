@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, inject } from '@angular/core';
+import { Component, inject, OnInit } from '@angular/core';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
@@ -15,7 +15,7 @@ import { ToastService } from '../../core/toast.service';
   templateUrl: './login.component.html',
   styleUrl: './login.component.css'
 })
-export class LoginComponent {
+export class LoginComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
@@ -28,6 +28,16 @@ export class LoginComponent {
 
   protected submitting = false;
   protected errorMessage = '';
+
+  // Only offer "create the initial administrator account" while there genuinely
+  // is no admin — otherwise the link reads as open self-registration on an
+  // internet-facing page. Defaults false so nothing flashes before the probe
+  // resolves.
+  protected setupRequired = false;
+
+  ngOnInit(): void {
+    this.authService.isSetupRequired().subscribe((required) => (this.setupRequired = required));
+  }
 
   sanitizePaste(event: ClipboardEvent, controlName: 'username' | 'password', maxLength: number): void {
     const pasted = event.clipboardData?.getData('text') ?? '';

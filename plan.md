@@ -11712,3 +11712,35 @@ Homepage seeds *"My First Group" / "My First Service"* example tiles when its
 clean config so the placeholders never render — same generated file as 112.2,
 so 112.2 and 112.4 are one piece of work. 112.3 rides on 112.2 too. 112.1 is
 independent.
+
+## 113. §112.1 done — login page hides the setup prompt once an admin exists
+
+`login.component.html` showed *"First time here? Create the initial
+administrator account"* (link to `/setup`) unconditionally. On an
+internet-facing login page that reads as open self-registration, even though
+`/setup` redirects away once an admin exists.
+
+- `AuthService.isSetupRequired()` — public wrapper over the existing private
+  `checkSetupRequired()` (`GET /auth/setup-status`, fails closed to `false`).
+- `LoginComponent` implements `OnInit`, probes it, stores `setupRequired`
+  (default `false` so nothing flashes before the response).
+- The prompt is `*ngIf="setupRequired"`.
+- Specs: prompt absent when `setupRequired` is false, present (with the link
+  text) when true. `login.component.spec.ts` spy gains `isSetupRequired`
+  returning `of(false)` by default.
+
+In practice the guest guard already redirects to `/setup` whenever setup is
+required, so on `/login` this is nearly always false — the `*ngIf` makes the
+intent explicit and covers the guard's fail-open path.
+
+Frontend `test:ci` (24 specs) and `build` pass. Frontend container rebuilt;
+`/api/auth/setup-status` on the live host returns `{"setupRequired":false}`,
+so the prompt no longer renders.
+
+### 113.1 §112.3 confirmed
+
+@mat confirmed: a running-but-unexposed app **should** be left off the Home
+Page. The README item loses its "confirm first" caveat; building it still
+means reworking the CLAUDE.md "every app on the Home Page" convention and the
+registry-wide `services.test.ts` label check, and it rides on §112.2's
+generated `services.yaml`.

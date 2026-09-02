@@ -53,7 +53,7 @@
             </button>
           </form>
 
-          <p class="text-center text-body-secondary small mt-4 mb-0">
+          <p *ngIf="setupRequired" class="text-center text-body-secondary small mt-4 mb-0">
             First time here?
             <a routerLink="/setup">Create the initial administrator account</a>.
           </p>
