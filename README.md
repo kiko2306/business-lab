@@ -259,12 +259,15 @@ it is done — not ticked off and left behind. Section references point at
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from
       `service_exposure`.
-- [ ] **`BACKEND_PORT` is 3000 on this host, not the documented 10000** — the
-      backend publishes `0.0.0.0:3000`, while `docs/ports.md` states the core
-      stack occupies `10000`–`10099` and that `BACKEND_PORT=10000`. The
-      frontend is correctly on `10001`. Either the allocator moved it, or the
-      value predates the renumbering; 3000 also sits in the collision zone the
-      renumbering existed to escape (it was `home-page`'s old port).
+- [ ] **Should the backend publish a LAN port at all?** (§98) — confirmed the
+      frontend never uses it (it reaches the backend at `http://backend:3000`
+      over the compose network regardless — `docs/ports.md` already says so);
+      `BACKEND_PORT`'s host publish only exists for direct API/debug access.
+      This host's value (3000, not the documented 10000 — predating the port
+      renumbering) is a symptom of that being genuinely unnecessary once
+      exposure is configured. Decide: drop the `ports:` mapping from
+      `docker-compose.yml` entirely (backend becomes compose-network-only), or
+      keep it published and just fix the number. Bugfix, not urgent.
 - [ ] **Retrofit `mailEnvKeys`** (§75.6) to Uptime Kuma, n8n, BookStack,
       Paperless and Vikunja — global mail settings exist but these apps don't
       consume them yet.

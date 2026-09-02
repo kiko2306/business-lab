@@ -11061,3 +11061,27 @@ The same session's backend logs show `itflow.tx-home-utils.com` provisioning
 failing repeatedly with `Nginx Proxy Manager host for itflow.tx-home-utils.com
 already exists and is not managed by this service` — a leftover NPM host from
 before, unrelated to today's work. Noted, not touched.
+
+## 98. `BACKEND_PORT` investigated — not a code bug, and maybe not needed at all
+
+The README's `BACKEND_PORT is 3000, not the documented 10000` item, chased
+down. `start.sh`'s port allocator only ever touches `apps/*/.env` — the root
+`.env` (`BACKEND_PORT`, `FRONTEND_PORT`) is filled in by hand at setup and the
+allocator never sees it — so the mismatch on this host is pre-existing drift
+from before the port renumbering (§59), not something the allocator moved.
+
+More interesting: the frontend never uses `BACKEND_PORT` at all.
+`frontend/nginx.conf` proxies `/api/` to `http://backend:3000` over the
+compose network unconditionally, and `docs/ports.md` already documents this
+("`BACKEND_PORT` only controls the *host* publish... changing it never
+affects the dashboard itself"). Its only purpose is letting something outside
+the compose network hit the API directly — useful for debugging (this
+session did exactly that, curling `localhost:3000/api/health` while verifying
+§97), but not required for the dashboard to work at all.
+
+Raised whether the backend should publish a host port on the LAN at all, once
+exposure is configured — the alternative being `docker-compose.yml` drops its
+`ports:` mapping and it becomes reachable only from the frontend container.
+Decided to defer rather than pick a direction now: added as a README item
+(§98) rather than acted on, since it's a real design choice (debug
+convenience vs. attack surface) and not an urgent fix either way.
