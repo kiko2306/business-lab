@@ -29,6 +29,30 @@ What it does **not** do, and you need in advance:
 Only the domain and the two credentials genuinely have to exist beforehand.
 Everything else the script either installs or warns about clearly.
 
+### Where Docker keeps its data
+
+Worth deciding before the images pile up, because Ubuntu's installer creates a
+root filesystem of about 100 GiB and hands the rest of the disk to `/home` —
+so a 500 GB machine can still run Docker out of space while most of the disk
+sits idle. Check with `lsblk` and `df -h /` before the first run.
+
+To put Docker's storage somewhere else, set `DOCKER_DATA_ROOT` when running the
+script:
+
+```bash
+sudo DOCKER_DATA_ROOT=/home/docker ./start.sh
+```
+
+Opt-in and idempotent. On a fresh host it costs nothing — there is nothing to
+copy yet. On a host that has been running a while it stops the daemon (so every
+container with it), checks there is room, copies the tree with `rsync -aHAX`,
+adds `data-root` to `/etc/docker/daemon.json` keeping the address pools, and
+restarts, then compares the image and container counts either side.
+
+The old tree is left in place. Rollback is removing `data-root` from
+`daemon.json` and restarting Docker; reclaim the space with
+`sudo rm -rf /var/lib/docker` once you're satisfied.
+
 ## What it asks you for
 
 Four values, all remembered in `.env` so a re-run never asks twice:

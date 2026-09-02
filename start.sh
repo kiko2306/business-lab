@@ -133,6 +133,137 @@ elif ! grep -q 'default-address-pools' "$DOCKER_DAEMON_JSON"; then
   warn "$DOCKER_DAEMON_JSON exists without 'default-address-pools' — add one (see the block start.sh would write) or new app networks will eventually fail with 'all predefined address pools have been fully subnetted'"
 fi
 
+# --- Optional: move Docker's storage to another filesystem -------------------
+# Ubuntu's installer hands root ~100 GiB and gives the rest of the disk to
+# /home, so a machine with plenty of free space can still run Docker out of
+# room — 98 GiB at 68% with 116 GiB idle next door, on the box this was written
+# for (plan.md §83).
+#
+# Opt-in, never automatic: this stops the daemon and copies tens of gigabytes.
+#
+#   sudo DOCKER_DATA_ROOT=/home/docker ./start.sh
+#
+# Idempotent — a second run with the same value is a no-op. The old tree is
+# left in place, so rollback is removing "data-root" from daemon.json and
+# restarting Docker.
+DOCKER_DATA_ROOT="${DOCKER_DATA_ROOT:-}"
+if [ -n "$DOCKER_DATA_ROOT" ]; then
+  case "$DOCKER_DATA_ROOT" in
+    /*) ;;
+    *) echo "error: DOCKER_DATA_ROOT must be an absolute path (got '$DOCKER_DATA_ROOT')" >&2; exit 1 ;;
+  esac
+
+  CURRENT_DATA_ROOT="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
+  if [ -z "$CURRENT_DATA_ROOT" ]; then
+    echo "error: can't read Docker's current data root — is the daemon running?" >&2
+    exit 1
+  fi
+
+  if [ "$CURRENT_DATA_ROOT" = "$DOCKER_DATA_ROOT" ]; then
+    log "Docker storage is already at $DOCKER_DATA_ROOT — nothing to move"
+  else
+    # A target inside the tree being copied would recurse into itself.
+    case "$DOCKER_DATA_ROOT/" in
+      "$CURRENT_DATA_ROOT"/*)
+        echo "error: DOCKER_DATA_ROOT ($DOCKER_DATA_ROOT) is inside the current data root ($CURRENT_DATA_ROOT)" >&2
+        exit 1 ;;
+    esac
+
+    if [ "$HAS_SYSTEMD" -eq 0 ]; then
+      echo "error: moving Docker's storage needs systemd to stop and start the daemon cleanly." >&2
+      echo "       Stop Docker, copy $CURRENT_DATA_ROOT to $DOCKER_DATA_ROOT, set data-root in" >&2
+      echo "       $DOCKER_DAEMON_JSON, and start it again by whatever means this host uses." >&2
+      exit 1
+    fi
+
+    if ! command -v rsync >/dev/null 2>&1; then
+      if command -v apt-get >/dev/null 2>&1; then
+        log "Installing rsync (needed to copy the Docker data root)"
+        apt-get update -qq
+        apt-get install -y -qq rsync
+      else
+        echo "error: rsync is required to move the Docker data root and could not be installed." >&2
+        exit 1
+      fi
+    fi
+
+    # -x: measure only the data root's own filesystem, not anything mounted
+    # underneath it (volumes bind-mounted from elsewhere are not being copied).
+    NEED_KB="$(du -sxk "$CURRENT_DATA_ROOT" | awk '{print $1}')"
+    mkdir -p "$DOCKER_DATA_ROOT"
+    FREE_KB="$(df -Pk "$DOCKER_DATA_ROOT" | awk 'NR==2 {print $4}')"
+    NEED_WITH_MARGIN_KB=$(( NEED_KB + NEED_KB / 10 ))
+    if [ "$FREE_KB" -lt "$NEED_WITH_MARGIN_KB" ]; then
+      echo "error: not enough room at $DOCKER_DATA_ROOT." >&2
+      echo "       need $(( NEED_WITH_MARGIN_KB / 1024 )) MiB (data + 10% margin), have $(( FREE_KB / 1024 )) MiB" >&2
+      exit 1
+    fi
+
+    # Recorded while the daemon is still up, to be compared after the restart.
+    IMAGES_BEFORE="$(docker image ls -aq | wc -l)"
+    CONTAINERS_BEFORE="$(docker ps -aq | wc -l)"
+
+    log "Moving Docker storage: $CURRENT_DATA_ROOT -> $DOCKER_DATA_ROOT ($(( NEED_KB / 1024 )) MiB)"
+    log "Every container stops until this finishes — including this dashboard."
+
+    # docker.socket too: stopping only the service leaves systemd ready to
+    # start the daemon again the moment anything touches the socket, which
+    # would be in the middle of the copy.
+    systemctl stop docker.socket docker
+
+    # -H is not optional: overlay2 is full of hard links, and copying without
+    # it both inflates the result and breaks layer sharing. -A/-X keep ACLs and
+    # xattrs, --numeric-ids avoids remapping ownership through this host's
+    # name service.
+    rsync -aHAX --numeric-ids --info=progress2 "$CURRENT_DATA_ROOT"/ "$DOCKER_DATA_ROOT"/
+
+    # Merge rather than rewrite — default-address-pools above lives in the same
+    # file and matters just as much.
+    python3 - "$DOCKER_DAEMON_JSON" "$DOCKER_DATA_ROOT" <<'PYJSON'
+import json, os, sys
+
+path, data_root = sys.argv[1], sys.argv[2]
+config = {}
+if os.path.exists(path):
+    with open(path) as handle:
+        text = handle.read().strip()
+    if text:
+        config = json.loads(text)
+config['data-root'] = data_root
+os.makedirs(os.path.dirname(path), exist_ok=True)
+with open(path, 'w') as handle:
+    json.dump(config, handle, indent=2)
+    handle.write('\n')
+PYJSON
+
+    systemctl start docker
+    for _ in $(seq 1 60); do
+      docker info >/dev/null 2>&1 && break
+      sleep 1
+    done
+
+    NEW_DATA_ROOT="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
+    if [ "$NEW_DATA_ROOT" != "$DOCKER_DATA_ROOT" ]; then
+      echo "error: Docker came back on $NEW_DATA_ROOT, not $DOCKER_DATA_ROOT." >&2
+      echo "       Check $DOCKER_DAEMON_JSON and 'journalctl -u docker'. The original data is" >&2
+      echo "       untouched at $CURRENT_DATA_ROOT, so removing data-root and restarting reverts." >&2
+      exit 1
+    fi
+
+    IMAGES_AFTER="$(docker image ls -aq | wc -l)"
+    CONTAINERS_AFTER="$(docker ps -aq | wc -l)"
+    if [ "$IMAGES_AFTER" != "$IMAGES_BEFORE" ] || [ "$CONTAINERS_AFTER" != "$CONTAINERS_BEFORE" ]; then
+      warn "counts differ after the move: images $IMAGES_BEFORE -> $IMAGES_AFTER, containers $CONTAINERS_BEFORE -> $CONTAINERS_AFTER"
+      warn "the old tree at $CURRENT_DATA_ROOT is intact — do not delete it until this is understood"
+    else
+      log "Docker storage moved: $IMAGES_BEFORE images and $CONTAINERS_BEFORE containers accounted for"
+    fi
+
+    log "The old tree is still at $CURRENT_DATA_ROOT. Once you're happy, reclaim it with:"
+    log "  sudo rm -rf $CURRENT_DATA_ROOT"
+  fi
+fi
+
 # NetBird's native gRPC management API only survives the Cloudflare Tunnel if
 # the connector is pinned to HTTP/2. (Signal is a separate problem the http2
 # transport does NOT solve — it goes over Tailscale Funnel; see the Funnel

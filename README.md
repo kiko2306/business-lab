@@ -161,13 +161,10 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Next up (2026-09-02)
 
-- [ ] **Move Docker's data root to /home** (§83.4) — `/` is 68% full with
-      Docker's 58 GB while `/home` sits at 9% of 134 GiB. Opt-in via
-      `sudo DOCKER_DATA_ROOT=/home/docker ./start.sh`: preflight the space,
-      stop docker + docker.socket, `rsync -aHAX --numeric-ids` (hard links are
-      not optional for overlay2), merge `data-root` into `daemon.json` keeping
-      the address pools, restart, verify counts. Leaves the old tree in place
-      for rollback.
+- [ ] **@mat: run the data-root move** (§83.4) — the script side is built and
+      committed; this step is yours because it needs sudo:
+      `sudo DOCKER_DATA_ROOT=/home/docker ./start.sh`. Every container stops
+      for the copy (~47 GB). The old tree stays for rollback.
 - [ ] **@mat: create a dashboard admin account for Claude** — once the move is
       verified and the stack is back up. Unblocks three things that have needed
       a human click all along: fixing Home Page's `HOMEPAGE_ALLOWED_HOSTS` by

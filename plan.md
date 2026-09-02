@@ -9646,3 +9646,37 @@ provisioning gap, now concrete.
 
 **Still needed from the user:** the SaaS inventory and monthly costs, for the
 value-proposition plan. Tracked as a TODO on their side.
+
+### 83.4a Built: the DOCKER_DATA_ROOT path in start.sh
+
+Sits directly after the address-pool block, since both write the same file and
+both need the daemon restarted. Nothing happens unless `DOCKER_DATA_ROOT` is
+set, and setting it to the current root is a no-op, so a stale export in a
+shell cannot cause a surprise second migration.
+
+Guards, in the order they fire:
+
+- absolute path, or refuse;
+- target inside the current data root refused (`/var/lib/docker/sub` yes,
+  `/var/lib/dockerfoo` no — checked both);
+- systemd required, because the daemon has to be stopped and started cleanly;
+- rsync installed on demand rather than added to the standard dependency list,
+  which would put it on every host for a path most never take;
+- free space at the target ≥ `du -sxk` of the source + 10%, or abort before
+  anything is stopped.
+
+Then: record image and container counts while the daemon is still up, stop
+`docker.socket` **and** `docker` (stopping only the service leaves systemd
+ready to start it again the moment anything touches the socket, mid-copy),
+`rsync -aHAX --numeric-ids --info=progress2`, merge `data-root` into
+`daemon.json` with python3, start, wait up to 60s for the daemon, then verify
+the root actually changed and the counts match. A mismatch warns and says not
+to delete the old tree.
+
+Verified without running the migration: `bash -n` and shellcheck (severity
+warning) both clean; the JSON merge tested against a copy of the real
+`daemon.json`, which keeps `default-address-pools` and adds `data-root`; the
+inside-the-tree guard tested on three paths; `/home` has 118 GiB free against
+~47 GB needed, so the preflight passes.
+
+The run itself is the user's — it needs sudo, and this session has no password.
