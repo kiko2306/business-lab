@@ -1,0 +1,37 @@
+services:
+  clamav:
+    image: clamav/clamav:latest
+    restart: unless-stopped
+    ports:
+      # clamd's TCP scanning socket. Published on the host so apps in other
+      # compose projects — Nextcloud's antivirus app, Paperless — can reach it
+      # via the docker gateway; they are the only reason this exists.
+      - "${CLAMAV_PORT:-10450}:3310"
+    environment:
+      # Refresh signatures on start rather than waiting for the first freshclam
+      # tick, so a fresh container is not scanning with an empty database.
+      CLAMAV_NO_FRESHCLAMD: "false"
+      FRESHCLAM_CHECKS: ${CLAMAV_FRESHCLAM_CHECKS:-2}
+      TZ: ${TZ:-UTC}
+    labels:
+      # No homepage.href: ClamAV has no web UI at all, and a tile linking
+      # nowhere is worse than a tile that does not link. Same shape as
+      # CrowdSec.
+      - "homepage.group=Security"
+      - "homepage.name=ClamAV"
+      - "homepage.icon=clamav.png"
+      - "homepage.description=Antivirus scanning daemon for uploaded files"
+    volumes:
+      # The signature database — ~1 GB once downloaded. Persisted so a restart
+      # does not re-download it, which is the slow part of a first start.
+      - ./data/signatures:/var/lib/clamav
+    healthcheck:
+      # clamd answers PING with PONG on its own socket. `clamdcheck.sh` ships
+      # in the image but reports unhealthy for the whole signature download,
+      # which on a first run is many minutes — hence the long start_period
+      # rather than a shorter check that flaps.
+      test: ["CMD-SHELL", "clamdscan --ping 1 || exit 1"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 600s

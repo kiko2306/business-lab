@@ -232,8 +232,6 @@ it is done — not ticked off and left behind. Section references point at
       ServiceStatus and the dashboard UI for it are now dead code. Either find
       it a second user or remove the lot; do not leave it as furniture.
 
-- [ ] **OnlyOffice Document Server** (§81.4) — app + generated `JWT_SECRET`,
-      port 10450.
 - [ ] **Wire Nextcloud to OnlyOffice** (§81.4) — installing the connector and
       setting the document-server URL + JWT secret is `occ` inside the
       Nextcloud container. Do it from the backend the way `homeAssistantHacs.ts`
@@ -251,8 +249,6 @@ it is done — not ticked off and left behind. Section references point at
       restored from a snapshot, before anything is switched off.
 - [ ] **Remove Duplicati** (§81.5) — last, and only once the restore above is
       proven. Closes §75.3 (its restore API writes nothing) and §74.6.
-- [ ] **Homebox** (§81.6) — asset/warranty inventory, port 10430.
-- [ ] **ClamAV** (§81.7) — clamd on 10420, no web UI, no exposure.
 - [ ] **Wire ClamAV into Nextcloud and Paperless** (§81.7) — both take a
       clamd host/port; same `occ`-shaped problem as the OnlyOffice item.
 
