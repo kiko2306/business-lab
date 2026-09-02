@@ -17,6 +17,7 @@ import {
   BackupJobProvisionResponse,
   ExposureTestResponse,
   GeneralSettings,
+  CrowdsecAlertSettings,
 } from './models';
 
 @Injectable({
@@ -112,6 +113,22 @@ export class SettingsService {
     return this.http.put<{ timezone: string; message: string }>(
       `${API_BASE_URL}/settings/general`,
       { timezone },
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
+  loadCrowdsecAlerts(): Observable<CrowdsecAlertSettings> {
+    return this.http
+      .get<CrowdsecAlertSettings>(`${API_BASE_URL}/settings/crowdsec-alerts`, {
+        context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+      })
+      .pipe(retry({ count: 1, delay: 400 }));
+  }
+
+  saveCrowdsecAlerts(enabled: boolean): Observable<CrowdsecAlertSettings & { message: string }> {
+    return this.http.put<CrowdsecAlertSettings & { message: string }>(
+      `${API_BASE_URL}/settings/crowdsec-alerts`,
+      { enabled },
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }

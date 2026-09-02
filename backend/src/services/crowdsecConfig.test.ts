@@ -2,7 +2,14 @@ import { describe, expect, it } from 'vitest';
 import yaml from 'js-yaml';
 import { __test } from './crowdsecConfig';
 
-const { buildBouncerConfig, buildNpmRealIpBlock, NPM_REALIP_MARKER_BEGIN, NPM_REALIP_MARKER_END } = __test;
+const {
+  buildBouncerConfig,
+  buildNpmRealIpBlock,
+  buildProfilesYaml,
+  buildHttpNotificationYaml,
+  NPM_REALIP_MARKER_BEGIN,
+  NPM_REALIP_MARKER_END,
+} = __test;
 
 describe('buildBouncerConfig (cloudflare-worker-bouncer)', () => {
   const cfg = buildBouncerConfig({
@@ -32,6 +39,53 @@ describe('buildBouncerConfig (cloudflare-worker-bouncer)', () => {
   it('serialises to valid YAML that round-trips', () => {
     const dumped = yaml.dump(cfg, { lineWidth: -1 });
     expect(yaml.load(dumped)).toEqual(cfg);
+  });
+});
+
+describe('buildProfilesYaml', () => {
+  it('references http_default under notifications when alerting is enabled', () => {
+    const docs = yaml.loadAll(buildProfilesYaml(true)) as Array<{ name: string; notifications: string[] }>;
+    expect(docs.map((d) => d.name)).toEqual(['default_ip_remediation', 'default_range_remediation']);
+    for (const doc of docs) {
+      expect(doc.notifications).toEqual(['http_default']);
+      // The ban decision must survive regardless of the notification toggle —
+      // this file is also what produces decisions.
+    }
+  });
+
+  it('comments the notification out when alerting is disabled, keeping the ban', () => {
+    const yamlText = buildProfilesYaml(false);
+    expect(yamlText).toContain('# - http_default');
+    const docs = yaml.loadAll(yamlText) as Array<{ notifications: unknown; decisions: { type: string }[] }>;
+    for (const doc of docs) {
+      expect(doc.notifications).toBeNull();
+      expect(doc.decisions[0].type).toBe('ban');
+    }
+  });
+});
+
+describe('buildHttpNotificationYaml', () => {
+  const cfg = yaml.load(buildHttpNotificationYaml('http://host.docker.internal:10290/crowdsec-abc123')) as Record<
+    string,
+    unknown
+  >;
+
+  it('is the http_default plugin posting JSON to the given url', () => {
+    expect(cfg.type).toBe('http');
+    expect(cfg.name).toBe('http_default');
+    expect(cfg.method).toBe('POST');
+    expect(cfg.url).toBe('http://host.docker.internal:10290/crowdsec-abc123');
+    expect((cfg.headers as Record<string, string>)['Content-Type']).toBe('application/json');
+  });
+
+  it('sends the raw alert list as JSON — unchanged whether the target is ntfy or n8n', () => {
+    expect((cfg.format as string).trim()).toBe('{{ .|toJson }}');
+  });
+
+  it('batches bursts rather than sending one push per alert', () => {
+    expect(cfg.group_wait).toBe('30s');
+    // int, not "10" — CrowdSec's plugin config rejects a quoted threshold.
+    expect(cfg.group_threshold).toBe(10);
   });
 });
 

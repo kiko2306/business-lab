@@ -18,6 +18,7 @@ import {
   BackupJobProvisionResponse,
   ExposureTestResponse,
   GeneralSettings,
+  CrowdsecAlertSettings,
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
@@ -115,6 +116,10 @@ export class SettingsPanelComponent implements OnInit {
   protected backupTargetTestResult: BackupTargetTestResponse | null = null;
   protected provisioningJob = false;
   protected backupJob: BackupJobProvisionResponse | null = null;
+  protected crowdsecAlerts: CrowdsecAlertSettings | null = null;
+  protected crowdsecAlertsLoading = true;
+  protected savingCrowdsecAlerts = false;
+  protected crowdsecAlertsFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
 
   sanitizeTokenPaste(event: ClipboardEvent): void {
     const pasted = event.clipboardData?.getData('text') ?? '';
@@ -130,6 +135,43 @@ export class SettingsPanelComponent implements OnInit {
     this.loadGeneralSettings();
     this.loadMailSettings();
     this.loadBackupTarget();
+    this.loadCrowdsecAlerts();
+  }
+
+  private loadCrowdsecAlerts(): void {
+    this.crowdsecAlertsLoading = true;
+    this.settingsService
+      .loadCrowdsecAlerts()
+      .pipe(finalize(() => (this.crowdsecAlertsLoading = false)))
+      .subscribe({
+        next: (settings) => (this.crowdsecAlerts = settings),
+        error: (error) => {
+          this.crowdsecAlertsFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Unable to load CrowdSec alert settings.'),
+          };
+        },
+      });
+  }
+
+  toggleCrowdsecAlerts(enabled: boolean): void {
+    this.savingCrowdsecAlerts = true;
+    this.crowdsecAlertsFeedback = null;
+    this.settingsService
+      .saveCrowdsecAlerts(enabled)
+      .pipe(finalize(() => (this.savingCrowdsecAlerts = false)))
+      .subscribe({
+        next: (response) => {
+          this.crowdsecAlerts = { enabled: response.enabled, topic: response.topic };
+          this.crowdsecAlertsFeedback = { type: 'success', message: response.message };
+        },
+        error: (error) => {
+          this.crowdsecAlertsFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Unable to save CrowdSec alert settings.'),
+          };
+        },
+      });
   }
 
   private loadGeneralSettings(): void {

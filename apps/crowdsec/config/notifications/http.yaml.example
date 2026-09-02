@@ -1,0 +1,33 @@
+# SCHEMA REFERENCE ONLY — you do not need to touch this.
+#
+# On every CrowdSec start the dashboard backend (services/crowdsecConfig.ts)
+# renders the real notifications/http.yaml (gitignored) next to this file from
+# the "CrowdSec alerts" setting. This copy documents the shape.
+#
+# It configures CrowdSec's built-in notification-http plugin. profiles.yaml
+# references it as `http_default`. The body is the raw models.Alert list as
+# JSON — the same shape whether the target is ntfy directly (today) or an n8n
+# webhook that dedupes/formats before ntfy (§118.4); only `url` changes.
+#
+# Today `url` points at the local ntfy instance via
+# `host.docker.internal:<NTFY_PORT>` (the crowdsec service has
+# host.docker.internal:host-gateway as an extra_host) and a per-deployment
+# generated topic, so a scanner hit lands as a phone push for anyone
+# subscribed to that ntfy topic.
+
+type: http
+name: http_default
+log_level: info
+
+group_wait: 30s      # collect alerts this long before sending one message
+group_threshold: 10  # ...or send early once this many have piled up (int)
+max_retry: 2
+timeout: 10s
+
+format: |
+  {{ .|toJson }}
+
+url: "http://host.docker.internal:10290/crowdsec-XXXXXXXX"
+method: POST
+headers:
+  Content-Type: application/json

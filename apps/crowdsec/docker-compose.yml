@@ -12,9 +12,21 @@ services:
       # the worker bouncer below can authenticate to the local API. Keep it in
       # sync with crowdsec_config.lapi_key in cloudflare-worker-bouncer.yaml.
       BOUNCER_KEY_cloudflare: ${CROWDSEC_BOUNCER_KEY}
+    # So the notification-http plugin can reach ntfy's published port on the
+    # host regardless of which compose-project bridge each app is on
+    # (services/crowdsecConfig.ts renders the URL against this). plan.md §118.1.
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       # Which logs to read and how to parse them.
       - ./config/acquis.yaml:/etc/crowdsec/acquis.d/npm.yaml:ro
+      # profiles.yaml (alert -> decision, plus the alert notification) and the
+      # notification-http config, both rendered by the dashboard backend
+      # (services/crowdsecConfig.ts) from the "CrowdSec alerts" setting on each
+      # start. profiles.yaml.example / notifications/http.yaml.example document
+      # the shape. Gitignored.
+      - ./config/profiles.yaml:/etc/crowdsec/profiles.yaml:ro
+      - ./config/notifications/http.yaml:/etc/crowdsec/notifications/http.yaml:ro
       # Decisions DB, downloaded blocklists, bouncer/machine registrations.
       - ./data/crowdsec:/var/lib/crowdsec/data
       # NPM writes per-proxy-host access logs to /data/logs; its compose mounts

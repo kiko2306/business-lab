@@ -12016,3 +12016,29 @@ by posting to ntfy directly. It is on B's critical path — n8n can receive
 nothing until CrowdSec emits — and delivers a working alert this pass. Pieces
 2–4 (shared network, the §64 provisioning spike, the workflow) follow as their
 own items. Not started.
+
+### 118.1a Built and verified
+
+- New `utils/crowdsecAlerts.ts` — `settings` keys `crowdsec_alerts_enabled`
+  (bool) + `crowdsec_alerts_topic` (generated once, `crowdsec-<9 random
+  bytes>`; ntfy topics are publish-by-name and the instance is public, so a
+  guessable topic would leak attacker IPs).
+- `crowdsecConfig.ts` renders `config/profiles.yaml` (stock upstream IP/Range
+  ban profiles + `- http_default` under `notifications:` when enabled) and
+  `config/notifications/http.yaml` (`notification-http` plugin, body
+  `{{ .|toJson }}` — raw alert list, unchanged for the n8n step). Target today:
+  `http://host.docker.internal:<NTFY_PORT>/<topic>`.
+- compose: `extra_hosts: host.docker.internal:host-gateway` on the crowdsec
+  service + `:ro` bind mounts for both files. `.example` templates added,
+  real files gitignored.
+- `GET/PUT /api/settings/crowdsec-alerts`; a "CrowdSec alerts" card in the
+  settings panel (toggle + read-only topic).
+- **Real-stack:** rendered against the live backend, CrowdSec loaded both
+  files, `http_default` registered, LAPI healthy. `cscli notifications test
+  http_default` delivered the alert JSON to the ntfy topic — full chain works.
+  Bug caught here: `group_threshold` must be an unquoted int, not `"10"`, or
+  CrowdSec fatals on plugin-config load.
+- Left enabled on this deployment; topic is in `settings`.
+
+Next (§118.2/§118.3/§118.4): shared network / the §64 workflow-provisioning
+spike / the dedupe+format workflow, then repoint the `url` at the n8n webhook.

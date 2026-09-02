@@ -225,6 +225,59 @@
 </section>
 
 <section class="card border-0 shadow-sm mt-4">
+  <div class="card-body p-4">
+    <div class="mb-3">
+      <h2 class="h4 mb-1">CrowdSec alerts</h2>
+      <p class="text-body-secondary mb-0">
+        Push a notification whenever CrowdSec flags an IP. Takes effect the next time CrowdSec is started.
+        Delivered to an ntfy topic — subscribe to it in the ntfy app to get the alerts on your phone.
+      </p>
+    </div>
+
+    <div *ngIf="crowdsecAlertsLoading" class="text-body-secondary small">Loading…</div>
+
+    <div *ngIf="!crowdsecAlertsLoading && crowdsecAlerts" class="row g-3">
+      <div class="col-12">
+        <div class="form-check form-switch">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            role="switch"
+            id="crowdsecAlertsEnabled"
+            [checked]="crowdsecAlerts.enabled"
+            [disabled]="savingCrowdsecAlerts"
+            (change)="toggleCrowdsecAlerts($any($event.target).checked)"
+          />
+          <label class="form-check-label fw-semibold" for="crowdsecAlertsEnabled">
+            Push CrowdSec detections
+          </label>
+        </div>
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold">ntfy topic</label>
+        <input class="form-control font-monospace" [value]="crowdsecAlerts.topic" readonly />
+        <p class="form-text mb-0">
+          Subscribe to this topic in your ntfy client. It's per-deployment and unguessable so the alert
+          stream (which includes attacker IPs) isn't world-readable.
+        </p>
+      </div>
+      <div class="col-12" *ngIf="crowdsecAlertsFeedback">
+        <span
+          class="small"
+          [ngClass]="{
+            'text-success': crowdsecAlertsFeedback.type === 'success',
+            'text-danger': crowdsecAlertsFeedback.type === 'danger',
+            'text-body-secondary': crowdsecAlertsFeedback.type === 'info'
+          }"
+        >
+          {{ crowdsecAlertsFeedback.message }}
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="card border-0 shadow-sm mt-4">
   <div class="card-body">
     <h2 class="h5 mb-1">Email</h2>
     <p class="text-body-secondary small mb-3">

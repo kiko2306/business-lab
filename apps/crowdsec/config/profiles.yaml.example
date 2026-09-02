@@ -1,0 +1,31 @@
+# SCHEMA REFERENCE ONLY — you do not need to touch this.
+#
+# On every CrowdSec start the dashboard backend (services/crowdsecConfig.ts)
+# renders the real profiles.yaml (gitignored) next to this file from the
+# "CrowdSec alerts" setting. This copy documents the shape.
+#
+# It mirrors CrowdSec's upstream default profiles — the ones that turn an
+# Ip/Range remediation alert into a 4h ban — with one addition: the
+# `http_default` notification is listed under `notifications:` when alerting is
+# enabled in the dashboard, and commented out when it is not. The notification
+# itself is configured in notifications/http.yaml (also rendered).
+
+name: default_ip_remediation
+filters:
+  - Alert.Remediation == true && Alert.GetScope() == "Ip"
+decisions:
+  - type: ban
+    duration: 4h
+notifications:
+  - http_default        # enabled/disabled from the dashboard
+on_success: break
+---
+name: default_range_remediation
+filters:
+  - Alert.Remediation == true && Alert.GetScope() == "Range"
+decisions:
+  - type: ban
+    duration: 4h
+notifications:
+  - http_default
+on_success: break
