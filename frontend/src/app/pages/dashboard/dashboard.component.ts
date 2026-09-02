@@ -102,6 +102,22 @@ function groupRunningPortsByCategory(services: ServiceStatus[]): ServicePortGrou
   return orderCategories(byCategory.keys()).map((category) => ({ category, rows: byCategory.get(category)! }));
 }
 
+// Free-text filter for the "All apps" list. Matches a space-separated query
+// against name/label/description/category so "media jelly" narrows the same
+// way typing either word alone would. Empty query returns everything.
+export function filterServices(services: ServiceStatus[], query: string): ServiceStatus[] {
+  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
+  if (!terms.length) {
+    return services;
+  }
+  return services.filter((service) => {
+    const haystack = [service.name, service.label, service.description, service.category ?? '']
+      .join(' ')
+      .toLowerCase();
+    return terms.every((term) => haystack.includes(term));
+  });
+}
+
 function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
   const byCategory = new Map<string, ServiceStatus[]>();
   for (const service of services) {
@@ -135,6 +151,11 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly user$ = this.authService.user$;
   protected readonly groupServicesByCategory = groupServicesByCategory;
   protected readonly groupRunningPortsByCategory = groupRunningPortsByCategory;
+  protected readonly filterServices = filterServices;
+  // Bound to the "All apps" search box. While it is non-empty every category
+  // is force-expanded (isAppGroupCollapsed), so a match is never hidden inside
+  // a collapsed section.
+  protected appFilter = '';
   // Explicit user choices only, key -> collapsed. A key that is absent falls
   // back to defaultCollapsed(), so the defaults can change without stale
   // localStorage pinning every existing browser to the old behaviour.
@@ -212,6 +233,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   isCollapsed(key: string): boolean {
     return this.sectionState.get(key) ?? this.defaultCollapsed(key);
+  }
+
+  /**
+   * Same as isCollapsed, but an active "All apps" search overrides it —
+   * results must not sit hidden inside a category the user had collapsed.
+   */
+  isAppGroupCollapsed(key: string): boolean {
+    return this.appFilter.trim() ? false : this.isCollapsed(key);
+  }
+
+  clearAppFilter(): void {
+    this.appFilter = '';
   }
 
   toggleSection(key: string): void {

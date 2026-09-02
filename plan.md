@@ -11841,3 +11841,23 @@ three re-ignore lines after the `!apps/home-page/data/**` re-include.
 `settings.yaml`, `widgets.yaml`, `custom.css/js`, `kubernetes.yaml`,
 `proxmox.yaml` stay tracked — the backend doesn't touch them, and they're the
 curated baseline a fresh clone starts from.
+
+## 115. Dashboard "All apps" search box
+
+@mat asked for a search bar over the full apps list. Added to the `#apps`
+section of `dashboard.component.html`, above the category groups.
+
+- `filterServices(services, query)` (pure, exported, tested in
+  `dashboard.filter.spec.ts`): space-separated terms, each an
+  AND-substring match against `name` + `label` + `description` + `category`,
+  case-insensitive. Empty query returns everything.
+- `appFilter` two-way bound to a `type="search"` input; a Clear button shows
+  while it is non-empty. Template filters `services` through
+  `filterServices(...)` before `groupServicesByCategory`.
+- `isAppGroupCollapsed(key)` — while the query is non-empty every category is
+  force-expanded, so a match never hides inside a section the user had
+  collapsed. `toggleSection` and the persisted collapse state are untouched;
+  clearing the search restores them.
+- Empty result shows "No apps match …".
+
+Frontend `test:ci` (28) and `build` pass.

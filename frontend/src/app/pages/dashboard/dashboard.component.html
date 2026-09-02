@@ -138,32 +138,62 @@
         </p>
       </div>
       <ng-container *ngIf="services.length; else emptyState">
-        <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(services); trackBy: trackByCategory">
-          <h2 class="h6 text-body-secondary text-uppercase mb-2">
-            <button
-              type="button"
-              class="section-toggle"
-              [class.collapsed]="isCollapsed('apps:' + group.category)"
-              [attr.aria-expanded]="!isCollapsed('apps:' + group.category)"
-              (click)="toggleSection('apps:' + group.category)"
-            >
-              <svg class="chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
-              <span>{{ group.category }}</span>
-              <span class="badge rounded-pill text-bg-light border fw-normal">{{ group.services.length }}</span>
-            </button>
-          </h2>
-          <div class="service-rows" *ngIf="!isCollapsed('apps:' + group.category)">
-            <app-service-card
-              *ngFor="let service of group.services; trackBy: trackByService"
-              [service]="service"
-              [allServices]="services"
-              [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
-              (actionRequested)="handleAction(service.name, $event)"
-            ></app-service-card>
-          </div>
+        <div class="app-search input-group mb-4">
+          <span class="input-group-text" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6" />
+              <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+          </span>
+          <input
+            type="search"
+            class="form-control"
+            placeholder="Search apps by name, description or category…"
+            aria-label="Search apps"
+            [(ngModel)]="appFilter"
+            maxlength="64"
+          />
+          <button
+            *ngIf="appFilter"
+            type="button"
+            class="btn btn-outline-secondary"
+            (click)="clearAppFilter()"
+          >
+            Clear
+          </button>
         </div>
+
+        <ng-container *ngIf="filterServices(services, appFilter) as matches">
+          <p *ngIf="!matches.length" class="text-body-secondary">
+            No apps match “{{ appFilter }}”.
+          </p>
+          <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(matches); trackBy: trackByCategory">
+            <h2 class="h6 text-body-secondary text-uppercase mb-2">
+              <button
+                type="button"
+                class="section-toggle"
+                [class.collapsed]="isAppGroupCollapsed('apps:' + group.category)"
+                [attr.aria-expanded]="!isAppGroupCollapsed('apps:' + group.category)"
+                (click)="toggleSection('apps:' + group.category)"
+              >
+                <svg class="chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{{ group.category }}</span>
+                <span class="badge rounded-pill text-bg-light border fw-normal">{{ group.services.length }}</span>
+              </button>
+            </h2>
+            <div class="service-rows" *ngIf="!isAppGroupCollapsed('apps:' + group.category)">
+              <app-service-card
+                *ngFor="let service of group.services; trackBy: trackByService"
+                [service]="service"
+                [allServices]="services"
+                [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
+                (actionRequested)="handleAction(service.name, $event)"
+              ></app-service-card>
+            </div>
+          </div>
+        </ng-container>
       </ng-container>
     </section>
 
