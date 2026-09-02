@@ -10980,3 +10980,19 @@ explicit `--entrypoint sh` override. Confirmed the HTTP route is gated the
 same way its siblings are (`curl -X POST /api/network/scan` with no token ->
 401 `Authorization header missing or malformed`, identical to `/api/health`
 et al.) without extracting real admin credentials to drive it further.
+
+## 96. `/var/lib/docker` removed — the last stale tree from the data-root move
+
+The README's remaining item from §83.6 (the containerd-store move that
+actually freed 45 GB). `/var/lib/docker` was a 102 MB legacy tree
+(`containers/`, `volumes/`, `network/`, `image/`, …) left behind when
+`data-root` moved to `/home/docker`; `docker info` had reported `/home/docker`
+as the active root and `/var/lib/containerd` was already gone since §83.6a, so
+nothing pointed at the old path any more.
+
+Confirmed before deleting, not assumed: `docker info --format
+'{{.DockerRootDir}}'` → `/home/docker`, `daemon.json`'s `data-root` matches,
+`/var/lib/containerd` already absent. Ran `sudo rm -rf /var/lib/docker` (user
+confirmed — an irreversible host deletion, not something to run unprompted).
+All 58 containers stayed up through it, since none were reading from that path.
+`/` moved from 58% used (§83.6's number) to 10%.

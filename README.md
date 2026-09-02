@@ -159,13 +159,6 @@ it is done — not ticked off and left behind. Section references point at
       exercised.
 - [ ] **Prove a Postgres/MySQL restore** — only SQLite has been round-tripped.
 
-### Next up (2026-09-02)
-
-- [ ] **Remove `/var/lib/docker`** (§83.4) — the last stale tree, ~100 MB.
-      `/var/lib/containerd` is gone and reclaimed ~46 GB (§92.3); this one is
-      trivial in size but worth deleting so nothing mistakes it for a live
-      Docker root.
-
 ### Business Lab (§84)
 
 - [ ] **Rebrand, tier 2** (§84.2) — package/image/network/project names. Do it
