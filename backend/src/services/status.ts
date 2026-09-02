@@ -10,6 +10,7 @@ import http from 'http';
 import logger from '../utils/logger';
 import { getAllServices, getService, getProjectName, getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getServiceExposureRow } from './exposure';
+import { getImageUpdateRow } from './imageUpdates';
 import { ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
 
 /**
@@ -249,6 +250,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
           ? hostNetworkPortMappings(service.hostNetworkPort)
           : await getContainerPorts(getProjectName(serviceName));
     const exposedHostname = state === 'running' ? await getExposedHostname(serviceName) : null;
+    const updates = await getImageUpdateRow(serviceName).catch(() => null);
 
     return {
       name: serviceName,
@@ -263,6 +265,8 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       adminUserManagementSupported: Boolean(service.supportsAdminUserManagement),
       dependsOn: service.dependsOn,
       requires: service.requires,
+      updateImages: updates?.outdated ?? [],
+      updateCheckedAt: updates?.checkedAt ?? null,
       ports,
       exposedHostname,
       webPath: service.webPath,

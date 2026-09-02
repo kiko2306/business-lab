@@ -94,6 +94,19 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   @ViewChild('startupLogBody') private startupLogBody?: ElementRef<HTMLElement>;
 
+  /** An image the daily sweep found a newer version of (§82.1). */
+  protected updateAvailable(): boolean {
+    return (this.service.updateImages?.length ?? 0) > 0;
+  }
+
+  protected updateTitle(): string {
+    const images = this.service.updateImages ?? [];
+    if (!images.length) {
+      return 'Pull newer images and recreate the container';
+    }
+    return `Newer image${images.length === 1 ? '' : 's'} available: ${images.join(', ')}`;
+  }
+
   requestAction(action: ServiceAction): void {
     // An update pulls and recreates, so it produces exactly the output a start
     // does — and is the one most worth watching, since a new image is the most

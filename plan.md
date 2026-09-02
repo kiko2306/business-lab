@@ -9776,3 +9776,36 @@ expected value.
 
 Verified: `bash -n` and shellcheck clean, TOML editor tested as above. The run
 itself is the user's; it needs sudo.
+
+### 82.1a Built: the update-available indicator
+
+`services/imageUpdates.ts`. The comparison is the one settled by experiment in
+§82.1 — the registry's `Docker-Content-Digest` for `repo:tag` against the local
+`RepoDigests` entry — wrapped in the parts that make it usable:
+
+- **Ref parsing** decides Docker Hub versus a private registry by whether the
+  first path component looks like a host (a dot, a port, or `localhost`), so
+  `nginx` and `immich/server` go to Hub under `library/` where needed while
+  `lscr.io/linuxserver/...` and `localhost:5000/team/app` do not. A colon before
+  the last slash is a registry port, not a tag. A digest-pinned ref is marked
+  pinned and skipped — a digest cannot go out of date.
+- **Auth follows the challenge** rather than hard-coding `auth.docker.io`: the
+  401's `WWW-Authenticate` names the realm, service and scope, which is what
+  makes ghcr.io and lscr.io work through the same code.
+- **Accept headers list every manifest media type.** Without them a registry
+  answers with the v1 manifest, whose digest never matches the local one, and
+  every image looks out of date.
+- **Unknown is not "up to date".** A private registry, no network or a 429
+  records the image as unknown, which shows as neither red nor current.
+- Locally built images (the dashboard's own) have no `RepoDigests` and are
+  skipped rather than reported.
+- Distinct images only: a multi-container app often runs two containers on one
+  image, and asking twice spends quota for nothing.
+
+Cached in `service_image_updates`, swept once a day with a 2s pause between
+services, and re-checked immediately after a successful update so the button
+does not stay red on a success. `ServiceStatus` reads the cached row — a status
+poll never touches a registry.
+
+The row shows it twice over: the Update button turns red, and the sub-line says
+"N images out of date". The button's tooltip names them.

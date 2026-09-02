@@ -46,6 +46,11 @@ export interface ServiceStatus {
   // Needed for the app to work properly, but not to boot: listed with live
   // state and warned about, never blocking.
   requires?: string[];
+  // Images the daily sweep found newer versions of, and when it last looked.
+  // An empty list after a check means up to date; a null timestamp means it
+  // has never been checked, which is not the same thing.
+  updateImages?: string[];
+  updateCheckedAt?: string | null;
   ports?: ServicePortMapping[];
   exposedHostname?: string | null;
   // URL path suffix for the app's web UI when it isn't the bare root

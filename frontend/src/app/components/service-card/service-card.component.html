@@ -25,6 +25,9 @@
       <span *ngIf="dependenciesSatisfied() && degradedBy().length" class="text-warning-emphasis">
         · {{ degradedTitle() }}
       </span>
+      <span *ngIf="updateAvailable()" class="text-danger">
+        · {{ service.updateImages?.length }} image{{ service.updateImages?.length === 1 ? '' : 's' }} out of date
+      </span>
       <span *ngIf="service.error" class="text-danger">· {{ service.error }}</span>
     </div>
 
@@ -57,9 +60,11 @@
     </button>
     <button
       type="button"
-      class="btn btn-outline-secondary btn-sm"
+      class="btn btn-sm"
+      [class.btn-danger]="updateAvailable()"
+      [class.btn-outline-secondary]="!updateAvailable()"
       [disabled]="loadingAction !== null"
-      title="Pull newer images and recreate the container"
+      [title]="updateTitle()"
       (click)="requestAction('update')"
     >
       <span *ngIf="loadingAction === 'update'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>

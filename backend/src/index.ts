@@ -19,6 +19,7 @@ import { initWebSocket, sseHandler } from './services/realtime';
 import { startupLogsHandler } from './services/serviceLogs';
 import { startBackupScheduler } from './services/backupScheduler';
 import { reconcileRemovedServices } from './services/exposure';
+import { startImageUpdateSweeper } from './services/imageUpdates';
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -162,6 +163,7 @@ startBackupScheduler();
 reconcileRemovedServices().catch((err: Error) => {
   console.error('Unable to reconcile exposure for removed services:', err.message);
 });
+startImageUpdateSweeper();
 
 const server = app.listen(PORT, () => {
   console.log(`Homelab backend listening on port ${PORT}`);

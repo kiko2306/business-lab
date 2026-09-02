@@ -227,6 +227,10 @@ export interface ServiceStatusPayload {
   adminUserManagementSupported?: boolean;
   dependsOn?: string[];
   requires?: string[];
+  // From the cached daily sweep (services/imageUpdates.ts), never a live
+  // registry call — a status poll must not spend rate limit.
+  updateImages?: string[];
+  updateCheckedAt?: string | null;
   ports?: ServicePortMapping[];
   // The service's public hostname, only when exposure is enabled and
   // provisioned successfully — null/absent otherwise, including for

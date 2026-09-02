@@ -16,6 +16,7 @@ import { ensureGeneratedSecrets } from './appEnv';
 import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { applyKitchenConfig } from './kitchenConfig';
+import { checkServiceImages, recordImageCheck } from './imageUpdates';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
@@ -336,6 +337,12 @@ export async function updateService(serviceName: string, userId: number): Promis
             ),
           ]
         : null;
+
+    // The cached "out of date" answer is stale the moment this succeeds, and
+    // leaving the button red after a successful update reads as a failure.
+    await checkServiceImages(serviceName)
+      .then((check) => recordImageCheck(serviceName, check))
+      .catch((error: Error) => logger.warn('Could not refresh the update check', { serviceName, error: error.message }));
 
     await logAuditEvent(userId, 'SERVICE_UPDATE', serviceName, 'success', {
       updated: updated ?? 'unknown',
