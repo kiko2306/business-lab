@@ -12342,3 +12342,25 @@ or the service row.
 `docs/licences.md` row: **cleared for the setup-and-maintenance model via the
 §2.b.iv hosting exception + a first-start acceptance gate; High Risk Use
 (e-commerce/payments/life-safety) excluded.**
+
+### 118.4a Done — Code node filters, dedupes, drops "ban" wording
+
+`buildCrowdsecAlertWorkflow`'s jsCode now:
+- drops `NOISE_SCENARIOS` (`crowdsecurity/http-crawl-non_statics`) — a
+  `scenario.indexOf` match so a family name catches variants;
+- dedupes by source IP within `DEDUPE_WINDOW_MS` (10 min);
+- returns `[]` when nothing survives, so the HTTP node never fires;
+- message is `scenario — ip (cn) · N events` — **no "ban" text** (nothing
+  enforces the decision yet, §117).
+
+**n8n static-data caveat (found while verifying):** `$getWorkflowStaticData
+('global')` is **not persisted between executions** for a CLI-imported
+workflow — the `workflow_entity.staticData` column stays empty regardless of
+`responseMode`. So the IP dedupe only firmly covers a repeat *within one
+batch*. Cross-batch is mostly moot: real CrowdSec raises one alert per
+scenario+IP bucket (rising `events_count`), not one per event. A Redis-backed
+store is the fix if it ever proves noisy — README item.
+
+**Real stack:** noise-only batch → no push; a batch with one IP under two
+scenarios + a noise entry → a single push with a single line
+(`http-probing — 203.0.113.20 (US) · 7 events`). 6 n8nWorkflows tests pass.

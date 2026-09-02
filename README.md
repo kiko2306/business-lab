@@ -249,12 +249,12 @@ it is done — not ticked off and left behind. Section references point at
       LAN client can spoof `X-Forwarded-For` and steer or dodge a ban. Tighten
       `set_real_ip_from` to the cloudflared gateway only — carefully (§99:
       a duplicate real_ip directive wedges every proxy-host write).
-- [ ] **CrowdSec-alert workflow: make the Code node smart** (§118.4)
-      — the relay (Webhook → Code → ntfy) is live and formats each batch, but
-      the Code node does no filtering. Add: dedupe by source IP within a
-      window (workflow static data), and drop scenarios on a noise list.
-      Everything else (provisioning, reachability, CrowdSec → n8n → ntfy) is
-      done and verified (§118.3a).
+- [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
+      dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
+      persist between executions for a CLI-imported workflow, so cross-batch
+      dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
+      upstream); add a Redis-backed store only if pushes prove noisy in
+      practice.
 - [ ] **n8n workflow overwrite policy** (§118.3) — `n8n-workflows-init`
       re-imports every boot, so a managed workflow's UI edits are replaced.
       Fine for now (matches every other generated config here); revisit
