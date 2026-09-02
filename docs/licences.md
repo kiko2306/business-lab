@@ -86,8 +86,7 @@ operate within, listed again at the end.
 | postgres:14/15/16-alpine | PostgreSQL License (BSD-like) | ✅ Clean | |
 | mariadb:10.11 (ITFlow, BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | could standardise on MariaDB |
-| **redis:7-alpine** (Paperless) | **RSALv2 / SSPLv1** (7.4+) — source-available, **not** OSI open source | ⚠️ Change | RSALv2 forbids "providing the software to others as a managed service"; an internal stack component is fine, but it is avoidable. **Switch Paperless to Valkey** (BSD-3, already run by the Immich stack) or pin `redis:7.2-alpine` (still BSD-3). |
-| valkey:9-alpine (Immich) | BSD-3-Clause | ✅ Clean | the pattern to copy |
+| valkey:9-alpine (Immich, Paperless) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (which is now RSALv2/SSPL). |
 | nginx:alpine (Kitchen switcher) | BSD-2-Clause | ✅ Clean | |
 | alpine | MIT | ✅ Clean | |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |
@@ -111,7 +110,8 @@ commercial side.
 2. **Don't white-label OnlyOffice.** Keep its name and the About notice.
 3. **Don't enable Stirling-PDF's `proprietary/` features** (SSO, audit log) —
    those are paid.
-4. **Move Paperless off `redis:7-alpine`** → Valkey or `redis:7.2-alpine`.
+4. **Keep off `redis:7-alpine`** (RSALv2/SSPL). Paperless is on Valkey; if any
+   future app needs a Redis, use Valkey or pin `redis:7.2-alpine` (still BSD-3).
 5. **Speedtest**: accept the Ookla CLI EULA, or replace with LibreSpeed.
 6. **WAHA**: document the WhatsApp-ToS ban risk in the client agreement; don't
    warrant deliverability.

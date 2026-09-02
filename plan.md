@@ -11463,3 +11463,24 @@ CLAUDE.md's "Adding an app" convention now requires a `docs/licences.md` row per
 new app **and per base/sidecar image** in its compose file, checked against the
 resale model as part of the same change — and a candidate that fails the check
 does not get added. `docs/licences.md` carries the same instruction at its head.
+
+## 108. Paperless moved off redis:7-alpine to Valkey
+
+§107 follow-up: `redis:7-alpine` is now RSALv2/SSPL. `apps/paperless/compose.yaml`
+now runs `docker.io/valkey/valkey:9-alpine` (BSD-3, wire-compatible, same image
+the Immich stack uses). Service name `paperless-redis` and `PAPERLESS_REDIS`
+unchanged; healthcheck `redis-cli ping` → `valkey-cli ping`.
+
+**The data dir had to change too.** Kept `./data/redis:/data` at first — wrong:
+Valkey 9 forked from Redis 7.2 and hard-fails on the RDB **v12** file a
+redis:7.4 image writes ("Can't handle RDB format version 12", container
+crash-loops). It is only a Celery broker + result backend, no durable state, so
+the fix is a fresh `./data/valkey` dir and let Celery re-queue. Any host that
+ran the old image should delete the orphaned `./data/redis` (done here).
+
+**Verified on the live stack**: recreated the service; `paperless-redis` reports
+`healthy` on `valkey-cli ping`; `paperless-ngx` came up `healthy`, `GET /api/`
+→ 302, and its logs show celery beat and the worker both "Connected to
+redis://paperless-redis:6379//" and "ready". `docs/licences.md` updated (the
+redis ⚠️ row is gone; Valkey row now lists Paperless), README follow-up item
+deleted.

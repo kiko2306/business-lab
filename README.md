@@ -199,9 +199,6 @@ it is done — not ticked off and left behind. Section references point at
       basis. Fell out of the licence due diligence; the choice (AGPL to match
       the copyleft apps it bundles, permissive, or source-available) is a
       commercial call.
-- [ ] **Move Paperless off `redis:7-alpine`** (§107) — that tag is now
-      RSALv2/SSPL (source-available, not FOSS). Swap in Valkey (BSD-3, already
-      used by the Immich stack) or pin `redis:7.2-alpine`.
 - [ ] **Per-client provisioning** (§84.5, §84.7) — one host is one deployment
       today; turnkey boxes need it repeatable per client. The list is concrete:
       their domain, their Cloudflare account and API token, their tunnel, their

@@ -81,14 +81,24 @@ services:
       retries: 5
 
   paperless-redis:
-    image: redis:7-alpine
+    # Valkey, not Redis: redis:7-alpine is now RSALv2/SSPL (source-available,
+    # not FOSS — docs/licences.md). Valkey is the BSD-3 community fork of
+    # Redis 7.2, wire-compatible, and the Immich stack already runs it. The
+    # service name stays so PAPERLESS_REDIS is unchanged.
+    #
+    # A fresh data dir (./data/valkey, not the old ./data/redis): Valkey 9
+    # forked from Redis 7.2 and cannot load the RDB v12 file a redis:7.4 image
+    # left behind. This is only a Celery broker + result backend — no durable
+    # state — so starting empty just re-queues tasks. Delete the stale
+    # ./data/redis on any host that ran the old image.
+    image: docker.io/valkey/valkey:9-alpine
     restart: unless-stopped
     volumes:
-      - ./data/redis:/data
+      - ./data/valkey:/data
     networks:
       - paperless-net
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ["CMD", "valkey-cli", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
