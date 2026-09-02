@@ -53,6 +53,40 @@ The old tree is left in place. Rollback is removing `data-root` from
 `daemon.json` and restarting Docker; reclaim the space with
 `sudo rm -rf /var/lib/docker` once you're satisfied.
 
+### Adding a disk later
+
+When the machine gets a second disk, nothing uses it until something claims it.
+If the filesystem you want to grow is on LVM — which it is on a default Ubuntu
+Server install — the disk can be absorbed into the existing volume group and
+the filesystem grown **while everything stays running**:
+
+```bash
+sudo EXPAND_VG_DISK=/dev/sdX ./start.sh
+```
+
+`lsblk -dno NAME,SIZE,MODEL` lists the disks; pick the whole disk, not a
+partition. By default it grows whatever holds `/home`, which is where Docker's
+data root and containerd's root live once the move above has run — set
+`EXPAND_VG_TARGET` to grow a different mount point instead.
+
+**It erases the named disk.** Before doing anything it refuses a disk that has
+a mounted filesystem or belongs to another volume group, prints the partition
+table it is about to destroy, and asks you to type the disk name back. Set
+`EXPAND_VG_ASSUME_YES=1` only when you are scripting it and certain.
+
+The disk becomes a whole-disk physical volume, with no partition table —
+`lsblk` will show it as an `LVM2_member` with no children. Running it a second
+time with the same disk is a no-op.
+
+One thing to be clear about before you do this: a volume group spanning two
+disks with no redundancy fails if **either** disk fails, and takes the
+filesystem with it. That is a fine trade when backups are known to work, and a
+bad one when they are not. `start.sh` prints the same warning every time it
+runs.
+
+`./scripts/test-vg-expansion.sh` exercises this against loopback disks — the
+refusals, the grow, and a repeat run — without touching a real one.
+
 ## What it asks you for
 
 Four values, all remembered in `.env` so a re-run never asks twice:

@@ -10228,3 +10228,125 @@ own uncheckpointed WAL as source data.
 - **§86.2 and §86.3 are new work** and both survive the move to Kopia.
 - **§75.3 (the restore API) is closed by removal, not by repair** — it goes when
   Duplicati goes, and the Kopia restore proof replaces it.
+
+## 87. Plan — a second disk, and claiming it from start.sh (2026-09-02)
+
+Asked for: *"take a look for the new ssd i added and check if we can expand the
+system"*, then *"you can format the disk and use it to expand the current one"*.
+
+### 87.1 What is actually there
+
+`sda` — 238.5 GB, `SSD 256GB`, SATA, non-rotational — carrying a **Windows
+layout** it arrived with: a 100 MB EFI partition, a 16 MB reserved partition,
+237.8 GB of NTFS, and a 540 MB recovery partition. No labels, mounted nowhere,
+referenced nowhere in `/etc/fstab`. A spare out of another machine.
+
+The system it would join:
+
+| | |
+|---|---|
+| `nvme0n1` | 238.5 GB KIOXIA, the only disk in use |
+| `nvme0n1p3` | the single physical volume of `ubuntu-vg`, 236.5 GB |
+| `ubuntu--vg-ubuntu--lv` | 100 GB, `/`, 59% used |
+| `ubuntu--vg-www` | 136.5 GB, `/home`, 51% used |
+
+100 + 136.5 = 236.5, so the volume group has **no free extents** — the
+installer gave all of it away. Nothing can grow without another physical volume.
+
+### 87.2 Where the space is actually needed, and where it is not
+
+`/home` is the answer, and it is not close. §83's move landed: `docker info`
+reports `Docker Root Dir: /home/docker`, `/etc/containerd/config.toml` has
+`root = "/home/containerd"`, and both directories exist. So every image layer,
+container, volume and app data directory is on `/home`. `/` holds the OS.
+
+Worth saying plainly, because it changes how urgent this is: **the host is not
+short of space.** `/` has 39 GB free, `/home` 63 GB. And the second README item
+under §83 — remove `/var/lib/containerd`, the tree the move copied *from* —
+reclaims about 45 GB on `/` by itself, which is more than this SSD would add
+there. The disk is worth claiming for headroom, not for a shortage.
+
+### 87.3 Where it belongs: start.sh, not a button, not a runbook
+
+§0.2 says the only command a human runs on the host is `./start.sh`, and §83
+already set the precedent for host storage work: an opt-in environment variable
+on that script, idempotent, loud when its preconditions are not met.
+
+This one genuinely cannot be a dashboard action, and it is worth being precise
+about why rather than treating it as an exception to §0.2. The backend runs in
+a container whose image lives on the filesystem being grown, off the very
+volume group being extended. A button that unmounts nothing and asks LVM to
+absorb a disk under its own feet is not a button, it is a bootstrap step.
+
+Rejected: a standalone `scripts/expand-storage.sh`. `scripts/` in this repo is
+container helpers (`start-container.sh`, `smoke-tests.sh`); putting a host disk
+operation there would create a second thing an operator has to know to run,
+which is exactly what §0.2 exists to prevent.
+
+Placed **before** the `DOCKER_DATA_ROOT` block, so a host being given both a
+bigger disk and a relocated Docker root gets the space before the copy starts.
+
+### 87.4 Built
+
+    sudo EXPAND_VG_DISK=/dev/sdX ./start.sh
+
+Derives the volume group and logical volume from what is *mounted* at
+`EXPAND_VG_TARGET` (default `/home`) rather than taking them as input — naming
+the wrong LV by hand would grow a filesystem nobody asked about. Then
+`wipefs -a`, `pvcreate`, `vgextend`, `lvextend -l +100%FREE`, and `resize2fs`
+or `xfs_growfs` depending on what is actually there. All online.
+
+It refuses, before touching anything: a path that is not a block device; a disk
+that is a physical volume in another volume group; a disk with any mounted
+filesystem; a target that is not on LVM; a filesystem it does not know how to
+grow; and — unless `EXPAND_VG_ASSUME_YES=1` — running without a terminal to
+confirm on. With a terminal it prints the partition table it is about to
+destroy and requires the disk name typed back.
+
+**Whole-disk physical volume, no partition table.** Deliberate: it removes the
+two steps of this path most likely to behave differently on real hardware than
+in review — sfdisk's partition-type shortcuts, which have moved between
+util-linux versions, and waiting on udev to publish the new partition node
+before `pvcreate` can open it. LVM has taken whole disks since forever.
+
+It warns on every run that the volume group now has no redundancy. Spanning two
+disks linearly means either disk failing takes `/home` — every app's data —
+and the person running this is thinking about capacity, not about that. Given
+§86 (the scheduled backup has never produced a version), that warning is not
+decoration.
+
+### 87.5 Proved against real LVM, on loopback disks
+
+`scripts/test-vg-expansion.sh`. The block is the kind of code that is either
+right or takes the machine's data with it, and `sudo` was not available in the
+session to run it on the host — so it is tested against loopback disks in a
+privileged container: the same `pvcreate`/`vgextend`/`lvextend`/`resize2fs`
+path, real volume groups, a canary file to prove the data survives.
+
+14 assertions, all passing: five refusals, then the real thing — 986 MB grown
+to 1989 MB **while mounted**, canary intact, the disk visible as a PV in the
+target group, the redundancy warning emitted — then a second run recognising
+the disk and reporting nothing left to take.
+
+The block is extracted from `start.sh` by its boundary comment, not by line
+number, so editing the script cannot silently make the test exercise the wrong
+lines.
+
+**Two things the harness got wrong first, both worth recording** because both
+produced *passing-looking* runs:
+
+- `alloc_disk` returned its device with `echo` and was called as `$(...)`, so
+  the cleanup array was populated in a subshell and thrown away. The first run
+  left three loop devices attached to the host. It now sets a variable.
+- LVM inside a container has no udev, so `lvcreate` failed the fixture with
+  `not found: device not cleared` — and with `/mnt/target` never mounted, every
+  size assertion measured the container's overlay filesystem instead and the
+  "existing data intact" check passed on a file that was never at risk. Fixed
+  with `udev_rules = 0` / `udev_sync = 0`, and guarded by asserting the fixture
+  is mounted before any measurement is taken.
+
+### 87.6 Not run against this host
+
+The change is verified but **not applied**. Claiming `/dev/sda` needs `sudo`,
+which needs a password this session does not have, and the confirmation prompt
+is deliberately interactive. It is a TODO item with the exact command.

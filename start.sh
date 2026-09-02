@@ -133,6 +133,155 @@ elif ! grep -q 'default-address-pools' "$DOCKER_DAEMON_JSON"; then
   warn "$DOCKER_DAEMON_JSON exists without 'default-address-pools' — add one (see the block start.sh would write) or new app networks will eventually fail with 'all predefined address pools have been fully subnetted'"
 fi
 
+# --- Optional: grow the volume group onto another disk -----------------------
+# Ubuntu's installer sizes the volume group to the disk it installs on, so a
+# second disk added later is invisible to the running system until something
+# claims it (plan.md §87).
+#
+#   sudo EXPAND_VG_DISK=/dev/sdX ./start.sh
+#
+# This is the one storage job the dashboard cannot do for itself: the backend
+# runs off the very filesystem being grown, out of a container whose image
+# lives on it. So it belongs here, with the rest of the host bootstrap, rather
+# than behind a button.
+#
+# **It destroys everything on the named disk.** Opt-in, refuses any disk that
+# has a mounted filesystem or belongs to another volume group, and asks for
+# typed confirmation unless EXPAND_VG_ASSUME_YES=1.
+#
+# Runs before the DOCKER_DATA_ROOT move below, so that a host being given both
+# a bigger disk and a relocated Docker root has the space before the copy
+# starts rather than after it.
+#
+# The disk becomes a *whole-disk* physical volume, with no partition table.
+# That is deliberate: it removes the two steps of this path most likely to
+# behave differently on a machine than in review — sfdisk's type shortcuts,
+# which moved between util-linux versions, and waiting on udev to publish the
+# new partition node before pvcreate can open it. LVM has taken whole disks
+# since forever, and `lsblk` still shows the disk as an LVM2_member.
+#
+# Idempotent: a disk already in the target volume group skips straight to the
+# grow, so a second run with the same value only takes up any free extents.
+EXPAND_VG_DISK="${EXPAND_VG_DISK:-}"
+if [ -n "$EXPAND_VG_DISK" ]; then
+  # Which filesystem grows. /home by default because that is where Docker's
+  # data root and containerd's root live once §83's move has run, and so where
+  # every app's data actually is.
+  EXPAND_VG_TARGET="${EXPAND_VG_TARGET:-/home}"
+
+  for tool in findmnt lsblk wipefs pvs vgs lvs pvcreate vgextend lvextend; do
+    if ! command -v "$tool" >/dev/null 2>&1; then
+      echo "error: '$tool' is needed to grow the volume group." >&2
+      echo "       sudo apt-get install -y lvm2 e2fsprogs util-linux" >&2
+      exit 1
+    fi
+  done
+
+  if [ ! -b "$EXPAND_VG_DISK" ]; then
+    echo "error: $EXPAND_VG_DISK is not a block device." >&2
+    echo "       'lsblk -dno NAME,SIZE,MODEL' lists the disks on this host." >&2
+    exit 1
+  fi
+
+  # Derive the volume group and logical volume from what is actually mounted,
+  # rather than taking them as input: naming the wrong LV here would grow a
+  # filesystem nobody asked about.
+  EXPAND_SOURCE="$(findmnt -no SOURCE --target "$EXPAND_VG_TARGET" 2>/dev/null || true)"
+  if [ -z "$EXPAND_SOURCE" ]; then
+    echo "error: nothing is mounted at or above $EXPAND_VG_TARGET." >&2
+    exit 1
+  fi
+  EXPAND_VG="$(lvs --noheadings -o vg_name "$EXPAND_SOURCE" 2>/dev/null | tr -d ' ' || true)"
+  EXPAND_LV="$(lvs --noheadings -o lv_name "$EXPAND_SOURCE" 2>/dev/null | tr -d ' ' || true)"
+  if [ -z "$EXPAND_VG" ] || [ -z "$EXPAND_LV" ]; then
+    echo "error: $EXPAND_VG_TARGET is on $EXPAND_SOURCE, which is not an LVM logical volume." >&2
+    echo "       Only LVM can be grown onto a second disk in place; a plain partition cannot." >&2
+    exit 1
+  fi
+
+  # How the filesystem is grown depends on what it is. Both are online.
+  EXPAND_FSTYPE="$(findmnt -no FSTYPE --target "$EXPAND_VG_TARGET")"
+  case "$EXPAND_FSTYPE" in
+    ext2|ext3|ext4)
+      command -v resize2fs >/dev/null 2>&1 || { echo "error: resize2fs is missing (apt-get install e2fsprogs)" >&2; exit 1; } ;;
+    xfs)
+      command -v xfs_growfs >/dev/null 2>&1 || { echo "error: xfs_growfs is missing (apt-get install xfsprogs)" >&2; exit 1; } ;;
+    *)
+      echo "error: don't know how to grow a $EXPAND_FSTYPE filesystem online." >&2
+      exit 1 ;;
+  esac
+
+  # Is the disk already ours? Then this is a repeat run and there is nothing to
+  # erase. Any other volume group means the disk is in use by something this
+  # script has no business overwriting.
+  EXPAND_DISK_VG="$(pvs --noheadings -o pv_name,vg_name 2>/dev/null |
+    awk -v d="$EXPAND_VG_DISK" '$1 == d { print $2 }' | head -1 || true)"
+
+  if [ "$EXPAND_DISK_VG" = "$EXPAND_VG" ]; then
+    log "$EXPAND_VG_DISK is already part of $EXPAND_VG — taking up any free space"
+  else
+    if [ -n "$EXPAND_DISK_VG" ]; then
+      echo "error: $EXPAND_VG_DISK is a physical volume in volume group '$EXPAND_DISK_VG'." >&2
+      echo "       Remove it from that group first if you really mean to reuse the disk." >&2
+      exit 1
+    fi
+
+    # Anything mounted from this disk, or any of its partitions, and it is not
+    # a spare — whatever the operator believes.
+    EXPAND_MOUNTED="$(lsblk -nro MOUNTPOINT "$EXPAND_VG_DISK" 2>/dev/null | grep -v '^$' || true)"
+    if [ -n "$EXPAND_MOUNTED" ]; then
+      echo "error: $EXPAND_VG_DISK has mounted filesystems and will not be erased:" >&2
+      echo "$EXPAND_MOUNTED" | sed 's/^/       /' >&2
+      exit 1
+    fi
+
+    if [ "${EXPAND_VG_ASSUME_YES:-}" != "1" ]; then
+      if [ ! -t 0 ]; then
+        echo "error: refusing to erase $EXPAND_VG_DISK with no terminal to confirm on." >&2
+        echo "       Set EXPAND_VG_ASSUME_YES=1 if you are certain." >&2
+        exit 1
+      fi
+      echo
+      echo "About to ERASE this disk and add it to volume group '$EXPAND_VG':"
+      lsblk -o NAME,SIZE,FSTYPE,LABEL,MOUNTPOINT "$EXPAND_VG_DISK"
+      echo
+      printf 'Type the disk name (%s) to confirm, anything else to abort: ' "$EXPAND_VG_DISK"
+      read -r EXPAND_CONFIRM
+      if [ "$EXPAND_CONFIRM" != "$EXPAND_VG_DISK" ]; then
+        echo "Aborted — nothing was changed."
+        exit 1
+      fi
+    fi
+
+    log "Erasing $EXPAND_VG_DISK and adding it to $EXPAND_VG"
+    # -a clears every signature it finds, including the protective MBR a GPT
+    # disk carries; without it pvcreate sees a partition table and balks.
+    wipefs -a "$EXPAND_VG_DISK"
+    pvcreate -ff -y "$EXPAND_VG_DISK"
+    vgextend "$EXPAND_VG" "$EXPAND_VG_DISK"
+  fi
+
+  EXPAND_FREE="$(vgs --noheadings -o vg_free_count "$EXPAND_VG" 2>/dev/null | tr -d ' ' || echo 0)"
+  if [ "${EXPAND_FREE:-0}" -gt 0 ]; then
+    EXPAND_BEFORE="$(df -h --output=size "$EXPAND_VG_TARGET" | tail -1 | tr -d ' ')"
+    lvextend -l +100%FREE "/dev/$EXPAND_VG/$EXPAND_LV"
+    if [ "$EXPAND_FSTYPE" = "xfs" ]; then
+      xfs_growfs "$EXPAND_VG_TARGET"
+    else
+      resize2fs "/dev/$EXPAND_VG/$EXPAND_LV"
+    fi
+    log "$EXPAND_VG_TARGET grew from $EXPAND_BEFORE to $(df -h --output=size "$EXPAND_VG_TARGET" | tail -1 | tr -d ' ')"
+  else
+    log "$EXPAND_VG has no free extents — $EXPAND_VG_TARGET is already at full size"
+  fi
+
+  # Spanning a volume group across two disks with no redundancy doubles the
+  # number of devices whose failure loses the whole filesystem. Say so out
+  # loud, every run, because the person doing this is usually thinking about
+  # capacity and not about that.
+  warn "$EXPAND_VG now spans more than one disk with no redundancy — if either fails, $EXPAND_VG_TARGET is lost. Check the backups actually run."
+fi
+
 # --- Optional: move Docker's storage to another filesystem -------------------
 # Ubuntu's installer hands root ~100 GiB and gives the rest of the disk to
 # /home, so a machine with plenty of free space can still run Docker out of
