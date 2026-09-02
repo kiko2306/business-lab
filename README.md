@@ -278,7 +278,10 @@ it is done — not ticked off and left behind. Section references point at
       table, and they drifted apart until the tunnel bootstrap failed with a
       token that was perfectly valid in the dashboard. Make `start.sh` prefer
       the database and fall back to the file, so the dashboard is the only
-      place it is ever typed (§0.2). Same for `BASE_DOMAIN` and `TUNNEL_NAME`.
+      place it is ever typed (§0.2). Same for `BASE_DOMAIN`, `TUNNEL_NAME` and
+      `TAILSCALE_AUTH_KEY` — the last one is worse, because `start.sh` copies
+      the root value over the dashboard's whenever the tailscale container
+      happens to be stopped (§85.1a).
 - [ ] **Re-prompt after a rejected credential** (§85.2) — `prompt_env_var`
       never asks twice, so a stale token warns and skips the tunnel on every
       run forever. After a failed lookup, say it was rejected and offer to

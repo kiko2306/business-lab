@@ -9889,6 +9889,32 @@ answer back to the table so the dashboard shows what is actually in use.
 Applies to the three values the dashboard also owns: the Cloudflare token, the
 base domain, and the tunnel name.
 
+### 85.1a The same split, demonstrated again with the Tailscale key
+
+A new `TAILSCALE_AUTH_KEY` arrived the same day and lands in the same trap,
+with one extra turn of the screw. Its *app-level* copy — `apps/tailscale/.env`
+— **is** writable from the dashboard, and was written there over the API
+(`Configuration saved`, `isSet: true`). Its root copy is not, and is stale.
+
+The two are wired together by `start.sh`:
+
+    set_app_env_var apps/tailscale/.env TAILSCALE_AUTH_KEY "$(current_value TAILSCALE_AUTH_KEY)"
+
+which sits behind `[ -z "$(docker ps -q -f name=tailscale)" ]` — it only fires
+when the tailscale container is **not** running. So the dashboard's value
+survives every run while the app is up, and is silently overwritten with the
+stale root value on the first run after the app happens to be stopped. A
+credential that is correct until an unrelated container is down is worse than
+one that is plainly wrong.
+
+The §85 fix covers it: with the database as the preferred source, the root copy
+stops being an independent second answer. Until then, the app-level value is
+the one in use and the root one is a landmine.
+
+Not restarted to apply it: the node is already registered and Funnel is up, so
+the key matters only at re-registration, and a restart would blip Funnel and
+with it NetBird's signalling for no gain.
+
 ### 85.2 Worth fixing at the same time
 
 `prompt_env_var` never re-asks, which is right for a secret that still works
