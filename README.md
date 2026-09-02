@@ -135,10 +135,13 @@ it is done — not ticked off and left behind. Section references point at
       tunnel (`homelab.tx-home-utils.com`, `api-homelab.tx-home-utils.com`),
       independent of the per-service exposure feature. Nothing in the codebase
       implements TOTP today.
-- [ ] **code-server's LAN port is ungated** — its own web login is disabled and
-      only Authelia guards the exposed hostname, so `:10130` on the LAN is open.
-      Now that `~/` is mounted into it (§78.1), that reaches `~/.ssh` and every
-      `apps/*/.env`. Either gate the port or narrow `CODE_SERVER_HOME`.
+- [ ] **NEXT UP — code-server's LAN port is ungated** — its own web login is
+      disabled and only Authelia guards the exposed hostname, so `:10130` on
+      the LAN is open. Now that `~/` is mounted into it (§78.1), that reaches
+      `~/.ssh` and every `apps/*/.env`. Either gate the port or narrow
+      `CODE_SERVER_HOME`. Agreed as the next task on 2026-09-02, and it now
+      blocks the sudoers item above: passwordless sudo for `mat` would turn
+      this open port into host root.
 
 ### Backups
 
