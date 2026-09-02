@@ -38,7 +38,6 @@ export interface ServiceStatus {
   healthy: boolean;
   lastChecked: string;
   error?: string;
-  setupTokenSupported?: boolean;
   adminUserManagementSupported?: boolean;
   // Must be running before this app can start — the Start button is disabled
   // while one of them is down, and the API refuses the start with a 409.

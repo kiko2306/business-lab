@@ -109,37 +109,6 @@
           Loading…
         </div>
 
-        <div *ngIf="service.setupTokenSupported" class="mb-3">
-          <label class="form-label small mb-1">Initial setup token</label>
-          <div *ngIf="setupTokenLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
-            <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-            Loading…
-          </div>
-          <div *ngIf="!setupTokenLoading && setupToken" class="input-group input-group-sm">
-            <input type="text" class="form-control" [value]="setupToken" readonly />
-            <button type="button" class="btn btn-outline-secondary" (click)="copySetupToken()">
-              {{ setupTokenCopied ? 'Copied!' : 'Copy' }}
-            </button>
-          </div>
-          <div *ngIf="!setupTokenLoading && !setupToken" class="small text-body-secondary">
-            No active setup token found — setup is likely already complete, or the token (valid 5 minutes after first start) has expired.
-          </div>
-          <div *ngIf="!setupTokenLoading" class="mt-2">
-            <button
-              type="button"
-              class="btn btn-outline-secondary btn-sm"
-              (click)="resetSetupToken()"
-              [disabled]="setupTokenResetting"
-            >
-              <span *ngIf="setupTokenResetting" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-              {{ setupTokenResetting ? 'Restarting…' : 'Restart & get a new token' }}
-            </button>
-            <div class="form-text">
-              Use this if setup timed out — restarts the app to clear its first-run lock and issue a fresh token.
-            </div>
-          </div>
-        </div>
-
         <ng-container *ngIf="!envLoading && env">
           <div *ngIf="!env.fields.length" class="small text-body-secondary mb-2">
             This app has no configurable settings — it starts as-is.

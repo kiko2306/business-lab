@@ -39,13 +39,6 @@ export interface ServiceExposureEnvKeys {
 // will accept proxied requests once exposed — see services/exposureConfigFiles.ts.
 // Currently only Home Assistant (its http: block).
 
-export interface ServiceSetupToken {
-  // Regex with one capture group, applied to the container's full logs, to
-  // pull out a one-time first-run setup token/password some images print
-  // (e.g. Portainer's `setup_token=<value>`).
-  logPattern: string;
-}
-
 export interface ServiceAdditionalExposure {
   // Appended to the base hostname: <service>-<suffix>.<base-domain>.
   suffix: string;
@@ -114,7 +107,6 @@ export interface ServiceDefinition {
   // See services/exposureConfigFiles.ts — service needs a config file edited
   // on exposure, beyond env overrides.
   exposureConfigFile?: boolean;
-  setupToken?: ServiceSetupToken;
   // Compose env var(s) holding a random secret the app needs but can't
   // default (e.g. Vikunja's VIKUNJA_JWT_SECRET). When one of these is still
   // unset, the dashboard's config panel pre-fills it with a freshly
@@ -223,7 +215,6 @@ export interface ServiceStatusPayload {
   healthy: boolean;
   lastChecked?: Date;
   error?: string;
-  setupTokenSupported?: boolean;
   adminUserManagementSupported?: boolean;
   dependsOn?: string[];
   requires?: string[];

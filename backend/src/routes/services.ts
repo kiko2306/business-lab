@@ -13,7 +13,6 @@ import { getPublishedUpstreamPort, getService, isValidServiceName } from '../con
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { deprovisionServiceExposure, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
-import { getServiceSetupToken, waitForServiceSetupToken } from '../services/setupToken';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
@@ -39,13 +38,6 @@ function validateServiceAllowlist(req: Request, res: Response, next: NextFunctio
 function requireAdminUserSupport(req: Request, res: Response, next: NextFunction) {
   if (!getService(req.params.name)?.supportsAdminUserManagement) {
     return res.status(404).json({ error: 'This service does not support admin account management.' });
-  }
-  return next();
-}
-
-function requireSetupTokenSupport(req: Request, res: Response, next: NextFunction) {
-  if (!getService(req.params.name)?.setupToken) {
-    return res.status(404).json({ error: 'This service does not use a first-run setup token.' });
   }
   return next();
 }
@@ -364,67 +356,6 @@ router.put(
       logger.error(`Failed to save env config: ${req.params.name}`, { error: httpError.message });
       const statusCode = httpError.statusCode || 500;
       return res.status(statusCode).json({ error: httpError.message || 'Unable to save configuration.' });
-    }
-  }
-);
-
-/**
- * GET /api/services/:name/setup-token
- * Read a service's one-time first-run setup token from its container logs
- * (currently only Portainer — see setupToken in config/services.ts). Returns
- * { token: null } for services that don't support this or have no token
- * available right now (setup already done, container not running, etc.).
- */
-router.get(
-  '/:name/setup-token',
-  auth,
-  validateParams(schemas.serviceNameParam),
-  validateServiceAllowlist,
-  async (req: Request, res: Response) => {
-    try {
-      const token = await getServiceSetupToken(req.params.name);
-      return res.json({ token });
-    } catch (error) {
-      logger.error(`Failed to read setup token: ${req.params.name}`, { error: (error as Error).message });
-      return res.status(500).json({ error: 'Unable to read setup token.' });
-    }
-  }
-);
-
-/**
- * POST /api/services/:name/setup-token/reset
- * Restart the service and hand back a fresh setup token. Portainer (the only
- * caller today) permanently locks first-run admin creation a few minutes
- * after its initial boot — "Your Portainer instance timed out for security
- * purposes" — and the only recovery is a restart, which clears the lock and
- * prints a new `setup_token=` line. Restarting also resets the 5-minute
- * window, so the user can complete setup straight from the returned token.
- */
-router.post(
-  '/:name/setup-token/reset',
-  auth,
-  validateParams(schemas.serviceNameParam),
-  validateServiceAllowlist,
-  requireSetupTokenSupport,
-  async (req: Request, res: Response) => {
-    try {
-      const restart = await executor.restartService(req.params.name, req.user!.id);
-      const token = await waitForServiceSetupToken(req.params.name);
-
-      await writeAuditLog({
-        userId: req.user!.id,
-        action: 'SERVICE_SETUP_TOKEN_RESET',
-        resource: req.params.name,
-        result: 'success',
-        metadata: { tokenIssued: Boolean(token) },
-      }).catch(() => {});
-
-      return res.json({ token, message: restart.message });
-    } catch (error) {
-      const httpError = error as HttpError;
-      logger.error(`Failed to reset setup token: ${req.params.name}`, { error: httpError.message });
-      const statusCode = httpError.statusCode || 500;
-      return res.status(statusCode).json({ error: httpError.message || 'Unable to reset setup token.' });
     }
   }
 );

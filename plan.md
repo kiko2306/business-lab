@@ -10627,3 +10627,61 @@ Against the real stack, in two halves, because the whole path ends in a
 
 The first row written by an actual scheduled run lands tonight at ~19:40, and
 that run is now also the test of whether §86.2's retry path behaves.
+
+## 91. Two cleanups: a healthcheck that was always red, and a feature with no users
+
+### 91.1 Home Page's healthcheck probed a path that does not exist
+
+Noticed while looking at something else: `home-page` had reported **unhealthy**
+since boot — a failing streak of 69 when first checked — while serving fine.
+
+The compose healthcheck was `wget -qO- http://localhost:3000/health`, which
+gethomepage 404s. It serves `/api/healthcheck`, which returns the literal `up`.
+Both confirmed inside the running container, with the exact command form compose
+uses: `/health` exits 1, `/api/healthcheck` exits 0.
+
+A healthcheck that is always red is worse than no healthcheck, because it trains
+the eye to ignore the colour — and this stack has four containers showing
+unhealthy, so the signal was already thin.
+
+**Not applied yet, deliberately.** Changing a healthcheck needs the container
+recreated, and `home-page` must be restarted **through the dashboard**:
+`exposureEnv.ts` says in its own header that nothing is persisted — the
+`HOMEPAGE_ALLOWED_HOSTS` override is merged over `process.env` for the
+`docker compose up` *the backend runs*. A `docker compose up -d` from a shell
+would drop it and hand back the `400 Host validation failed` of §80.4. So the
+compose file is committed and the restart is a TODO item for whoever has the
+dashboard open.
+
+### 91.2 setupToken removed
+
+Portainer was its only user and Portainer was dropped in §81.1a, which left the
+whole feature as furniture. §81.1a said the choice was to find it a second user
+or remove it; nothing in the registry needs reading a one-time token out of
+container logs, so it is gone:
+
+- `services/setupToken.ts` and its test file
+- `GET /api/services/:name/setup-token` and
+  `POST /api/services/:name/setup-token/reset`, plus the
+  `requireSetupTokenSupport` guard
+- `ServiceSetupToken` and the `setupToken` field on the service definition
+- `setupTokenSupported` on `ServiceStatus`, and the line in `status.ts` that
+  computed it
+- the frontend: two `operations.service.ts` methods, four component fields,
+  three component methods, and the settings-panel block with its copy button
+  and "Restart & get a new token"
+- a stale comment pointer in `serviceLogs.ts`
+
+251 backend tests (the three setupToken tests went with the feature), 22
+frontend tests, backend typecheck and frontend build clean.
+
+Verified deployed: the rebuilt bundle has **zero** occurrences of `setup-token`
+in `dist/routes/services.js`, and `dist/services/setupToken.js` no longer
+exists.
+
+**A verification mistake worth recording**, because it is the kind that reads as
+success. The plan was to curl the removed route and expect a 404. It returned
+401 — and so does `/api/services/duplicati/definitely-not-a-route`, because auth
+runs before route matching, so *every* unauthenticated path in that space is
+401 whether or not it exists. The endpoint check could distinguish nothing. What
+actually proved the removal was looking at the compiled output.

@@ -232,10 +232,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Roster changes (§81)
 
-- [ ] **Decide the fate of `setupToken`** (§81.1a) — Portainer was its only
-      user, so `services/setupToken.ts`, its routes, `setupTokenSupported` on
-      ServiceStatus and the dashboard UI for it are now dead code. Either find
-      it a second user or remove the lot; do not leave it as furniture.
 
 - [ ] **Wire Nextcloud to OnlyOffice** (§81.4) — installing the connector and
       setting the document-server URL + JWT secret is `occ` inside the
@@ -283,12 +279,12 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Apps and integrations
 
-- [ ] **Home Page's healthcheck probes the wrong path** (§86) — the compose
-      healthcheck wgets `/health`, which 404s, so the container has reported
-      **unhealthy** since it started while serving fine. `/` and
-      `/api/healthcheck` both return 200; the latter is the endpoint
-      gethomepage actually provides. A false red on the dashboard is worse than
-      no check, because it trains the eye to ignore the colour.
+- [ ] **@mat: restart Home Page from the dashboard** (§91.1) — the healthcheck
+      is fixed in the compose file (`/api/healthcheck`, not the `/health` it was
+      404ing on), but applying it needs the container recreated, and Home Page
+      must be restarted **through the dashboard**: the `HOMEPAGE_ALLOWED_HOSTS`
+      override is never persisted, so a shell `docker compose up -d` would drop
+      it and bring back §80.4's `400 Host validation failed`.
 - [ ] **Duplicati carries a 5.3 GB uncheckpointed WAL** (§86.4) —
       `apps/duplicati/data/config/HQFQYTBBPZ.sqlite` is 184 KB with a 5.3 GB
       `-wal` beside it, untouched since the 2026-09-01 restore test. It sits

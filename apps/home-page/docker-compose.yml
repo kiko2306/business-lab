@@ -29,7 +29,11 @@ services:
       - "homepage.href=http://localhost:${HOMEPAGE_PORT:-10190}"
       - "homepage.description=This start page"
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      # /api/healthcheck, not /health: gethomepage serves the former and 404s
+      # the latter, so the container reported unhealthy from boot for its whole
+      # life while serving fine (plan.md §91). A healthcheck that is always red
+      # is worse than none — it trains the eye to ignore the colour.
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3

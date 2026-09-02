@@ -16,7 +16,7 @@ import logger from '../utils/logger';
 
 // Strip ANSI CSI escapes (colors, but also cursor moves / erase-line that
 // `docker compose` itself emits around "container exited" notices) so the
-// popup shows clean text — same idea as services/setupToken.ts.
+// popup shows clean text.
 // eslint-disable-next-line no-control-regex
 const ANSI_PATTERN = /\x1b\[[0-9;?]*[ -/]*[@-~]/g;
 
