@@ -121,6 +121,16 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Security
 
+- [ ] **@mat asked: `start.sh` should drop the sudo password prompt for the
+      invoking user** — a `NOPASSWD` sudoers entry for `TARGET_USER`, written
+      by `start.sh` the way it already writes the daemon config. It would have
+      let this session apply §87 and §83's tree removal directly instead of
+      handing back commands. **Read the item below first:** passwordless sudo
+      for `mat` turns *any* shell as `mat` into root, and `code-server` on
+      `:10130` is exactly that shell, ungated, on the LAN. Doing this while
+      that port is open converts a file-read exposure into host root. Gate
+      code-server first, or scope the sudoers entry to specific commands
+      (`lvextend`, `resize2fs`, `rm -rf /var/lib/containerd`) rather than ALL.
 - [ ] **2FA for admin accounts** — the dashboard is internet-facing via the
       tunnel (`homelab.tx-home-utils.com`, `api-homelab.tx-home-utils.com`),
       independent of the per-service exposure feature. Nothing in the codebase
