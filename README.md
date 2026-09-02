@@ -234,14 +234,22 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **CrowdSec edge enforcement is deferred — detection-only for now**
-      (§117) — CrowdSec parses NPM's logs and makes ban decisions, but nothing
-      acts on them: the `cloudflare-worker-bouncer` needs a Workers-scoped
-      Cloudflare token separate from the tunnel token (and likely the paid
-      Workers plan). Decided (2026-09-02) to leave it detection-only and keep
-      CrowdSec for parsed-log visibility. §117.2 has the three build options
-      if this is revisited.
-- [ ] **NEXT UP — CrowdSec-alert workflow: make the Code node smart** (§118.4)
+- [ ] **CrowdSec enforcement at NPM — lua bouncer** (§119) — NPM's nginx is
+      openresty+ngx_lua, so `lua-cs-bouncer` runs inside it: per-request IP
+      check against CrowdSec's decision stream, 403 for banned IPs, using the
+      real client IP NPM already resolves. No Cloudflare token / Workers plan.
+      Supersedes the deferred `cloudflare-worker-bouncer` route (§117). Pieces:
+      vendor the lua lib; shared NPM↔CrowdSec network; generate + register a
+      `nginx` bouncer key; `crowdsecConfig.ts` renders the `.conf` + a
+      marker-fenced lua block in NPM `http_top.conf` behind a setting; a
+      dashboard toggle; prove a ban round-trips (403 → delete → 200,
+      fail-open on CrowdSec down).
+- [ ] **XFF-spoofing hardening at NPM** (§119.2) — needed once §119 enforces:
+      NPM trusts all RFC1918 for `real_ip` with `real_ip_recursive on`, so a
+      LAN client can spoof `X-Forwarded-For` and steer or dodge a ban. Tighten
+      `set_real_ip_from` to the cloudflared gateway only — carefully (§99:
+      a duplicate real_ip directive wedges every proxy-host write).
+- [ ] **CrowdSec-alert workflow: make the Code node smart** (§118.4)
       — the relay (Webhook → Code → ntfy) is live and formats each batch, but
       the Code node does no filtering. Add: dedupe by source IP within a
       window (workflow static data), and drop scenarios on a noise list.
@@ -251,6 +259,12 @@ it is done — not ticked off and left behind. Section references point at
       re-imports every boot, so a managed workflow's UI edits are replaced.
       Fine for now (matches every other generated config here); revisit
       skip-if-exists if someone needs to customise one in place.
+- [ ] **Per-source Test button in "ntfy alerts"** (§120) — each Sources row
+      gets a Test button: `POST /api/settings/alerts/test {source}` → backend
+      posts a sample alert down that source's real path (CrowdSec → the n8n
+      relay webhook → ntfy) → toast the result. Tests the delivery path +
+      subscription, not CrowdSec's own parser (no `docker exec` for
+      `cscli notifications test`).
 - [ ] **n8n's Postgres is 15; n8n 2.36 wants 17 (16 on compat)** (§118.3) —
       `apps/n8n/docker-compose.yml` runs `postgres:15-alpine`; n8n logs
       "Postgres 15 is not supported" on every start. Runs with a warning for
@@ -280,6 +294,15 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Apps and integrations
 
+- [ ] **Evaluate SQL Server Express (LAN-only)** (§121) — @mat wants a
+      local-access-only MS SQL Express for apps/dev tools, no exposure.
+      **Licence decision blocks the build** (§121.1): `mcr.microsoft.com/
+      mssql/server` is a proprietary MS EULA product — run the §107-style
+      due diligence against the resale model; it may not pass. If it clears:
+      `apps/mssql/` (x86_64 only, ~2 GiB RAM, `MSSQL_PID=Express`,
+      complexity-compliant generated `MSSQL_SA_PASSWORD`), a new `mssql`
+      backup engine (`sqlcmd BACKUP DATABASE`), docs rows, and prove a
+      start + backup/restore round-trip.
 - [ ] **Duplicati carries a 5.3 GB uncheckpointed WAL** (§86.4) —
       `apps/duplicati/data/config/HQFQYTBBPZ.sqlite` is 184 KB with a 5.3 GB
       `-wal` beside it, untouched since the 2026-09-01 restore test. It sits

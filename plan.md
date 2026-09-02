@@ -12130,3 +12130,158 @@ Note: `update:workflow --active=true` prints a deprecation nudge toward
 `publish:workflow` but still works; the init keeps all three steps.
 §118.4 left: make the Code node smart (dedupe by source IP within a window,
 drop scenarios on a noise list).
+
+## 119. Plan — enforce CrowdSec bans at NPM (openresty lua bouncer)
+
+Reopens §117 enforcement. NPM's nginx is **openresty 1.29 with ngx_lua**
+(verified: `nginx -V` shows `--add-module=../ngx_lua-0.10.31`,
+`ngx_stream_lua`, LuaJIT), so `crowdsecurity/lua-cs-bouncer` can run inside
+NPM. Every public request already flows Cloudflare → cloudflared → NPM → app
+and NPM resolves the real client IP (§110.2), so this is the right layer:
+per-request IP check against CrowdSec's decision stream, 403 for banned IPs.
+No Cloudflare token, no Workers plan, no crash-looping container — the things
+that killed §117's edge option.
+
+### 119.1 Pieces
+
+1. **Vendor `lua-cs-bouncer`** — pin a release, drop the `.lua` files
+   (`crowdsec.lua`, `config.lua`, `ip.lua`, `session.lua`, `utils.lua`,
+   `ban.lua`, `captcha.lua`, templates) under
+   `apps/nginx-proxy-manager/crowdsec-bouncer/lua/`, mounted `:ro` into NPM.
+   A README-style note records the upstream tag + how it was fetched.
+2. **nginx hooks** — a marker-fenced block in NPM's
+   `data/app/nginx/custom/http_top.conf` (http context, where the §110
+   real-IP block already goes), rendered by `crowdsecConfig.ts`:
+   `lua_package_path` += the bouncer dir, the `lua_shared_dict`s it needs,
+   `init_by_lua_block` / `init_worker_by_lua_block` (start the stream puller),
+   `access_by_lua_block` (per-request check). Gated on a new setting so it's
+   zero overhead when off.
+3. **Bouncer config** — `crowdsecConfig.ts` renders
+   `crowdsec-nginx-bouncer.conf` (`API_URL=http://crowdsec:8080`,
+   `API_KEY=<generated>`, `MODE=stream`, `UPDATE_FREQUENCY=10`,
+   `BOUNCING_ON_TYPE=ban`, **`FALLBACK_REMEDIATION=bypass`** so a CrowdSec
+   outage fails open, cache dict names, ban-page path). Gitignored (holds the
+   key). `.example` documents it.
+4. **Register the bouncer** — `apps/crowdsec/docker-compose.yml` gets
+   `BOUNCER_KEY_nginx: ${CROWDSEC_NGINX_BOUNCER_KEY}` (auto-registers a bouncer
+   named `nginx`, same mechanism as `BOUNCER_KEY_cloudflare`); key generated
+   into `apps/crowdsec/.env` like `CROWDSEC_BOUNCER_KEY`.
+5. **Network** — NPM (own compose project) → `crowdsec:8080` (crowdsec-net).
+   A shared external network both projects attach to (keeps LAPI off the LAN).
+   Same class of change §118.2 chose *not* to make; here it is unavoidable.
+6. **Dashboard toggle** — "Enforce CrowdSec bans at NPM" in the CrowdSec area
+   of Settings; backend gates pieces 2–3 on it. Off = today's behaviour.
+7. **Ban page** — a plain 403 HTML, vendored.
+
+### 119.2 XFF-spoofing hardening (separate, risky)
+
+§110.4: NPM trusts all RFC1918 for `real_ip` with `real_ip_recursive on`, so a
+LAN client can spoof `X-Forwarded-For` and — once enforcement is live — get an
+arbitrary IP 403'd, or slip its own past a ban. Tighten `set_real_ip_from` to
+just the cloudflared gateway. But §99: a duplicate `real_ip_recursive` /
+`real_ip_header` breaks nginx's config test and wedges every future proxy-host
+write. Its own item, done carefully, not folded into the bouncer install.
+
+### 119.3 Verify (real stack)
+
+Enable → restart NPM + CrowdSec → `cscli bouncers list` shows `nginx` pulling
+→ `cscli decisions add --ip <a controlled IP> --duration 5m` → curl an exposed
+host from it → **403** → `cscli decisions delete --ip …` → **200**. Confirm a
+CrowdSec stop leaves the site reachable (fail-open).
+
+### 119.4 Risks
+
+- NPM image upgrades can move the openresty version / lua paths / include
+  order → the rendered block fails `nginx -t` → every proxy-host
+  create/update/delete fails until fixed (§99 class). Marker-fenced, and
+  render must be followed by a config test before reload.
+- `lua-cs-bouncer` is community lua — pinned, upstream tracked by hand.
+- Per-request lua on every proxied request (cached; small).
+- First enable needs a full NPM restart, not `nginx -s reload` (the backend
+  can't `docker exec` here anyway — socket proxy blocks it).
+
+### 119.5 README items
+
+Vendor the lua lib; shared NPM↔CrowdSec network; generate + register the
+`nginx` bouncer key; render the `.conf` + `http_top.conf` lua block behind a
+setting; the dashboard toggle; XFF hardening (separate); prove a ban
+round-trips.
+
+## 120. Plan — per-source Test button in the "ntfy alerts" card
+
+Each row in the Sources list gets a **Test** button that fires a sample
+notification down that source's real path, so delivery + the user's ntfy
+subscription can be confirmed without waiting for a real event.
+
+- **Backend**: `POST /api/settings/alerts/test` `{ source: 'crowdsec' }` →
+  build a representative CrowdSec-alert payload (array of one `models.Alert`-
+  shaped object) → POST it to the **n8n relay webhook**
+  (`http://host.docker.internal:<N8N_PORT>/webhook/crowdsec-alert`, resolved
+  the same way `crowdsecConfig.ts` does) → return `{ ok, detail }`.
+  New `services/alertTest.ts`.
+- **Limitation**: the backend can't `docker exec crowdsec cscli notifications
+  test` (socket proxy blocks exec), so the CrowdSec source's test exercises
+  **n8n → ntfy**, not CrowdSec's own `notification-http` plugin. That is the
+  part most likely to be misconfigured (topic, subscription, n8n workflow);
+  document it as "tests the delivery path, not CrowdSec's parser".
+- **Frontend**: a small "Test" button per source row; on click calls the
+  endpoint, toasts "Sent — check ntfy" or the error. Disabled while the
+  source is off.
+- Future sources (the §119 bouncer, etc.) register their own test path in
+  `alertTest.ts`.
+
+## 121. Plan — evaluate SQL Server Express as a managed app
+
+Requested. **The licence check is the gate, not a formality** (CLAUDE.md
+"Adding an app", §107).
+
+### 121.1 Licence — must clear this first
+
+`mcr.microsoft.com/mssql/server` ships under the **Microsoft SQL Server EULA**
++ a container-image supplemental EULA (`ACCEPT_EULA=Y`). Express edition is
+zero-cost, but the licence is proprietary with terms on hosting, benchmarking
+and redistribution. Against this repo's resale model (software not sold;
+setup/maintenance/hardware sold; client operates the box) it needs the same
+scrutiny as the AGPL / fair-code / WhatsApp-ToS cases already flagged — and it
+may **fail**: a proprietary third-party EULA the client must accept, bundled
+into a box we sell the build of, is exactly the category §107's due diligence
+exists to catch. Decision required before any build. If it fails, the item
+dies here (delete it, note why).
+
+### 121.2 If it clears — the build
+
+- `apps/mssql/`: compose (`mcr.microsoft.com/mssql/server:2022-latest`,
+  `MSSQL_PID=Express`, `ACCEPT_EULA=Y`), `.env.example`.
+- **x86_64 only** — Microsoft ships no arm64 SQL Server image. Needs a
+  `docs/raspberry-pi.md` note and probably a registry platform guard.
+- **RAM** — SQL Server wants ~2 GiB floor; note it against the turnkey build
+  spec (§84.7).
+- Secrets: `MSSQL_SA_PASSWORD` auto-generated, but MS enforces complexity
+  (8+ chars, 3 of 4 classes) — the generator must emit a compliant value
+  (may need a dedicated generator, not the default).
+- No web UI → no `homepage.href`, but still the mandatory `homepage.*`
+  group/name/icon/description labels (registry-wide test). Group "Data".
+- Port per `docs/ports.md` (10xxx scheme; SQL wire port is configurable).
+- **Backup gap**: the backup system has `postgres`/`mysql`/`sqlite` engines,
+  no `mssql`. Either add an engine (`sqlcmd BACKUP DATABASE` → `.bak`, then
+  the file backup sweeps it) or ship it explicitly unbacked like the
+  onlyoffice-bundled-PG gap. Prefer adding the engine.
+- Rows in `docs/ports.md`, `docs/app-credentials.md`, `docs/licences.md`
+  (app + image).
+- Health check via `sqlcmd -Q "SELECT 1"`.
+
+### 121.3 README items
+
+Licence decision (blocks everything); then — if it clears — the app skeleton,
+the mssql backup engine, the arm64/RAM docs, and prove a start + a
+backup/restore round-trip.
+
+### 121.4 Scope: LAN-only
+
+@mat: no exposure — SQL Server is reached only over the LAN / compose network
+by other apps and developer tools. So: no `exposureEnvKeys`, no Authelia, no
+Home Page tile (an unexposed app has none anyway, §112.3 — but the mandatory
+`homepage.*` labels still apply for the registry test). Publish 1433 (or a
+10xxx host port per the scheme) on the LAN only. This removes the NPM/tunnel
+surface but not the licence question (121.1) — the client still runs a
+proprietary MS EULA product on the box we build.
