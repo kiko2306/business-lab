@@ -12055,3 +12055,46 @@ hub, not CrowdSec-specific: `utils/crowdsecAlerts.ts` → `utils/alertNotify.ts`
 card is "ntfy alerts" with a Sources list (CrowdSec the only entry today).
 Re-verified: `cscli notifications test http_default` delivered to the
 `homelab-alerts` topic.
+
+### 118.3 spike — n8n workflow provisioning is feasible (n8n 2.36)
+
+Ran the CLI paths against the live n8n (2.36.9) to find a no-console way to
+ship a workflow. It exists.
+
+**Working recipe:**
+1. `n8n import:workflow --input=<file>` — imports/updates by the JSON's `id`
+   (**idempotent** — re-import updates in place, no duplicate). Auto-assigns
+   to the caller's personal project, so **no `--userId` needed**. Always
+   forces `active=false` ("Deactivating workflow …").
+2. `n8n publish:workflow --id=<id>` — n8n 2.x versions workflows (draft vs
+   published); a trigger/webhook only goes live from a **published** version.
+   `update:workflow --id … --active=true` is the (deprecated) way to set the
+   flag; `publish` creates the version row.
+3. Restart n8n — on boot it registers webhooks for published + active
+   workflows. Verified: `POST /webhook/<path>` went 404 → **200** after
+   import + active + publish + restart.
+
+`--activeState=fromJson` on import is a dead end — "only works in queue or
+multi-main mode", not a regular single instance.
+
+**Mechanism to build (§118.4):** a dedicated `n8n-workflows-init` container —
+n8n image, `command` override, `depends_on: n8n-db healthy`, mounts a
+backend-rendered `apps/n8n/workflows/<id>.json`. Loops the 3 steps per file,
+exits; main n8n gets `depends_on: n8n-workflows-init service_completed_
+successfully`. Same shape as the existing `n8n-init` busybox chown.
+
+**Caveats found:**
+- **Re-import clears `active` + the published version**, so the init must
+  re-run all 3 steps every boot — and a user's manual UI edit/deactivation is
+  reverted on the next n8n restart. §118.4 decision: accept "dashboard-managed,
+  overwritten" (like the CrowdSec configs) or have the init skip import when
+  the workflow already exists.
+- **Postgres 15 is unsupported by n8n 2.36** — log says "supports Postgres 17
+  and newer, with 16 on compatibility support". `apps/n8n/` runs
+  `postgres:15-alpine`. Works with a warning today; needs a PG major upgrade
+  (dump/restore). Separate README item, not part of §118.
+- Cosmetic: Python task runner missing; `WEBHOOK_URL` →`N8N_WEBHOOK_URL` and
+  other env deprecations to tidy.
+
+Verdict: buildable, ~1 init container + a mount + JSON rendering. The heavier
+part left is authoring the workflow graph itself (§118.4).
