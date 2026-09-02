@@ -10380,3 +10380,97 @@ than reasoning about the commands and hoping.
 Unchanged, and still the next storage job: `/` is untouched at 98 G / 59% used,
 and `/var/lib/containerd` is still holding roughly 45 GB there. Removing the
 old trees reclaims more on `/` than this disk could have.
+
+## 88. §86.3 investigated: the whole server-dump path went down at once
+
+The question was why 9 apps kept stale dumps through the 2026-09-01 scheduled
+run. The count in the README was wrong and the real shape is sharper.
+
+### 88.1 It was not 9 apps, it was one code path
+
+Exactly **8** apps declare a `backup:` entry in the registry — `npm`, `itflow`,
+`bookstack`, `n8n`, `paperless`, `nextcloud`, `immich`, `nocodb` — and the audit
+metadata for the run said `failed: 8`. Those are the same eight. So it was not a
+scattering of unlucky apps: **every server-database dump failed and every SQLite
+one succeeded.**
+
+That narrows it to what the two paths do differently. Both shell out to
+`docker run`, so Docker itself was working — 18 SQLite snapshots came out of the
+same run, from a container that even does `apk add sqlite` over the network. The
+server path is the only one that passes `--network <the app's network>` and
+`--entrypoint <client binary>`, and it is the only one that failed.
+
+### 88.2 It is not a standing breakage
+
+Running `dumpAllAppDatabases()` against the live stack today: **31 outcomes, 0
+failures**, including all eight server databases — immich 50.7 MB, nextcloud
+899 KB, paperless 500 KB, n8n 442 KB, nocodb 336 KB, npm 109 KB, bookstack
+56 KB, itflow 1 KB. So the path works, and 2026-09-01 was a moment, not a bug
+sitting in the code.
+
+`commitDump` is why the stale dumps were stale rather than absent: it writes to
+`.part` and renames only on success, so a failing dump preserves the last good
+one instead of destroying it. That design worked exactly as intended.
+
+### 88.3 The one lead, and why it stays a lead
+
+The audit log has a single other entry in the window:
+
+    2026-09-01T19:37:46Z | exposure_provision | nginx-proxy-manager | success
+
+Two minutes and forty-one seconds before the dumps. Exposure provisioning is
+network work, and `--network` is precisely what separates the path that failed
+from the path that did not. That is suggestive and it is *not* evidence, so it
+is recorded here as a lead rather than a conclusion.
+
+### 88.4 Why it cannot be settled, which is the actual defect
+
+Both places that would have answered it were empty:
+
+- **`runAppDataBackup` recorded only a count.** `report.outcomes` carries a
+  per-app `detail` for every failure — "connection refused", "network not
+  found", whatever `pg_dump` said — and the audit row kept `failed: 8` and threw
+  the rest away.
+- **The backend's log files live inside the container.** `LOG_DIR` is
+  `process.cwd()/logs`, not a mounted volume, so `docker logs` and the log files
+  both start at the container's creation. The backend was recreated at
+  2026-09-02T08:33 and 2026-09-01 went with it.
+
+That is the second diagnosis in this session stopped by the same wall — the
+Duplicati 401 in §86.1 was the first. A backup system whose failures are not
+legible afterwards is a backup system that gets debugged by guessing.
+
+### 88.5 Built: failures are recorded per app, with reasons
+
+`runAppDataBackup` now puts `failures: [{ app, kind, detail }]` on the audit row
+alongside the count, capped at 25 entries with the true `failed` count kept
+separately so a truncated list is visibly truncated. The same list goes to the
+warning log.
+
+It also writes an audit row on the **no-password early return**, which
+previously returned silently. That mattered more than it looks: a run whose
+dumps all failed and which then found no Duplicati password left no app-data row
+at all, and the only trace was the archive row above it saying `success`.
+
+Four tests in `backupScheduler.test.ts` cover it — the failure list reaching the
+row, the early return still recording, the cap holding the true count, and an
+empty list when everything succeeded. The mocks for `appDumps`, `appEnv`,
+`duplicatiClient` and `audit` are now hoisted so the audit metadata can be
+asserted on at all; they were previously inline and unreachable from the tests.
+
+Verified against the real stack as far as it can be without triggering a 90
+minute backup: the outcome shape the mapping consumes was taken from a live
+`dumpAllAppDatabases()` run (31 real outcomes), `audit_logs.metadata` is `jsonb`
+with no length limit so the nested array round-trips, and the rebuilt backend is
+running with the new code in `dist`. The first real row lands on tonight's
+scheduled run.
+
+### 88.6 Found on the way: two databases nobody dumps
+
+`guacamole` runs a separate `guacamole-db` Postgres 16 service and declares no
+`backup:` entry, so its database is never dumped — its live Postgres files get
+copied raw, which is the §75.4 failure mode on an app added yesterday.
+`onlyoffice` has the same exposure with its bundled Postgres, and is harder
+because the database is not a separate compose service.
+
+Both are new TODO items rather than fixed in passing.

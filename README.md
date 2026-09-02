@@ -138,13 +138,20 @@ it is done — not ticked off and left behind. Section references point at
       total app-data failure therefore leaves a green timestamp, a `success`
       audit row, and a 24-hour wait before the next attempt. This is our code,
       not the engine's, so it survives the move to Kopia.
-- [ ] **The SQL dumps went stale on the 2026-09-01 scheduled run** (§86.3) —
-      9 of 25 apps kept dumps from the earlier manual run, and they are the ones
-      with a separate database container (bookstack, immich, itflow, n8n,
-      nextcloud, nginx-proxy-manager, nocodb, paperless, pihole). That is the
-      `docker exec`-into-the-database path, not anything Duplicati does, so a
-      working Kopia snapshot tonight would still archive a day-old dump for
-      those nine.
+- [ ] **Persist the backend's log files** (§88.4) — `LOG_DIR` is
+      `process.cwd()/logs` inside the container, not a volume, so both
+      `docker logs` and the log files start at the container's creation.
+      Recreating the backend on 2026-09-02 destroyed 2026-09-01, which stopped
+      two separate diagnoses in one session (§86.1, §88.4). Mount it.
+- [ ] **`guacamole`'s database is never dumped** (§88.6) — it runs a separate
+      `guacamole-db` Postgres 16 service and declares no `backup:` entry in the
+      registry, so its live Postgres files are copied raw and can restore
+      corrupt. One registry line. Consider a registry-wide test that fails when
+      an app has a database service nothing dumps.
+- [ ] **`onlyoffice`'s bundled Postgres is never dumped** (§88.6) — same
+      exposure, harder: the database is inside the documentserver container
+      rather than a separate compose service, so `backup:` as it stands cannot
+      reach it.
 - [ ] **Surface backup state in the dashboard** (§75.2, sharpened by §86.2) —
       there is no way to see whether backups work without the CLI. Show the
       **app-data outcome**, not the scheduler tick: last run + outcome, version

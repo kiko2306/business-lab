@@ -90,6 +90,12 @@ async function prune(retentionCount: number): Promise<void> {
 }
 
 /**
+ * How many per-app failures are recorded on one audit row. The real count is
+ * recorded separately, so a truncated list is still visibly truncated.
+ */
+const MAX_RECORDED_FAILURES = 25;
+
+/**
  * Dump every app database, then ask Duplicati to run.
  *
  * Never throws — the dashboard's own backup has already succeeded by this
@@ -97,18 +103,45 @@ async function prune(retentionCount: number): Promise<void> {
  */
 async function runAppDataBackup(): Promise<void> {
   const report = await dumpAllAppDatabases();
+
+  // Which apps failed and why, not merely how many. §86.3: a scheduled run
+  // recorded `failed: 8` and nothing else, and by the time anyone looked the
+  // per-app reasons had been discarded and the backend's log files had gone
+  // with the container that wrote them. Eight is also exactly the number of
+  // apps with a separate database container — so an entire class of dump
+  // failing at once was indistinguishable, in the record, from eight
+  // unrelated hiccups. The report already carries the reasons; throwing them
+  // away is what cost the diagnosis.
+  const failures = report.outcomes
+    .filter((o) => !o.ok)
+    .slice(0, MAX_RECORDED_FAILURES)
+    .map((o) => ({ app: o.app, kind: o.kind, detail: o.detail.slice(0, 200) }));
+
   if (report.failed > 0) {
     // Worth surfacing but not worth aborting: the dumps that succeeded are
     // still worth backing up, and a stopped app counts as a success anyway.
-    logger.warn('Some app databases could not be dumped', {
-      failed: report.failed,
-      apps: report.outcomes.filter((o) => !o.ok).map((o) => o.app),
-    });
+    logger.warn('Some app databases could not be dumped', { failed: report.failed, failures });
   }
 
   const password = readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD');
   if (!password) {
     logger.info('Skipping the app-data backup: Duplicati has no password yet');
+    // Still record the dump outcome. Returning silently here is how a run
+    // whose dumps all failed could leave no audit trail at all — the archive
+    // row above would be the only trace, and it says "success".
+    await writeAuditLog({
+      userId: null,
+      action: 'backup_create',
+      resource: 'app-data',
+      result: 'failure',
+      metadata: {
+        trigger: 'scheduled',
+        dumped: report.ok,
+        failed: report.failed,
+        failures,
+        detail: 'the backup engine has no password configured yet',
+      },
+    }).catch(() => {});
     return;
   }
 
@@ -119,7 +152,7 @@ async function runAppDataBackup(): Promise<void> {
     action: 'backup_create',
     resource: 'app-data',
     result: run.started ? 'success' : 'failure',
-    metadata: { trigger: 'scheduled', dumped: report.ok, failed: report.failed, detail: run.detail },
+    metadata: { trigger: 'scheduled', dumped: report.ok, failed: report.failed, failures, detail: run.detail },
   }).catch(() => {});
 }
 
