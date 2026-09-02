@@ -152,9 +152,6 @@ it is done — not ticked off and left behind. Section references point at
       was the third and has been dropped, §81.1a.)
 - [ ] **"Back up now" button** (§74.6) — must call `runAppDataBackup`, never
       `runBackupJobNow`, or each manual backup is a generation stale.
-- [ ] **`backup_target_folder` is blank** — falls back to the `homelab-backups`
-      default inside `toDuplicatiUrl`, so the dashboard shows an empty field for
-      a folder that is in use. Populate it.
 - [ ] **Prove a non-Drive destination** — `disk`/`SMB`/`NFS` are built and never
       exercised.
 - [ ] **Prove a Postgres/MySQL restore** — only SQLite has been round-tripped.

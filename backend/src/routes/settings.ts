@@ -5,6 +5,7 @@ import { writeAuditLog } from '../utils/audit';
 import { schemas, validateBody } from '../middleware/validation';
 import {
   BACKUP_TARGET_KEYS,
+  DEFAULT_BACKUP_FOLDER,
   getBackupTarget,
   DUPLICATI_OAUTH_LOGIN_URL,
   isMountedKind,
@@ -407,7 +408,10 @@ router.get('/backup-target', async (_req: Request, res: Response) => {
       username: values[BACKUP_TARGET_KEYS.username] ?? null,
       passwordConfigured: Boolean(values[BACKUP_TARGET_KEYS.password]),
       options: values[BACKUP_TARGET_KEYS.options] ?? null,
-      folder: values[BACKUP_TARGET_KEYS.folder] ?? null,
+      // A blank folder still resolves to a real one at backup time
+      // (toDuplicatiUrl), so report the folder actually in use rather than an
+      // empty field the operator can't interpret.
+      folder: values[BACKUP_TARGET_KEYS.folder] || DEFAULT_BACKUP_FOLDER,
       authIdConfigured: Boolean(values[BACKUP_TARGET_KEYS.authId]),
       oauthUrl: DUPLICATI_OAUTH_LOGIN_URL,
     });

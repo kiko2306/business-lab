@@ -11161,3 +11161,27 @@ restarted. Verified end-to-end: `localhost:10190` → 200, `192.168.1.23:10190`
 → 200, `homepage.tx-home-utils.com` → 200 — all three at once, which was
 §92's whole point and has been broken since 2026-09-01. `service_exposure`
 shows `npm_host_id 42, status provisioned`.
+
+## 100. `backup_target_folder` blank — dashboard now shows the folder actually in use
+
+Small README item (Backups): the backup-destination card left the Google Drive
+"Folder" field empty until the operator typed something, even though a blank
+setting is not "no folder" — `toDuplicatiUrl()` has always fallen back to
+`homelab-backups`, so backups on this host land there right now. The empty box
+just made an in-use setting unreadable.
+
+**Fix**: named the fallback — `DEFAULT_BACKUP_FOLDER = 'homelab-backups'` in
+`backupTarget.ts`, replacing the inline string literal in `toDuplicatiUrl()` —
+and `GET /api/settings/backup-target` now returns
+`values[folder] || DEFAULT_BACKUP_FOLDER` instead of `?? null`. The settings
+form already patches `folder` from that response and shows the field only for
+`googledrive`, so the box now displays `homelab-backups`, and the operator's
+next save persists it as an explicit value.
+
+Not touched: the DB is left as-is for an unset folder (no backfill migration) —
+the effective value is computed on read, and any save writes it through. A test
+in `backupTarget.test.ts` ties `DEFAULT_BACKUP_FOLDER` to the string
+`toDuplicatiUrl()` actually emits, so the displayed default can't drift from the
+one a backup uses. Backend typecheck + full suite (264/264) clean. Not exercised
+against the live backend: the change is a read-path display fallback with no
+effect on backup execution or the target URL already in use.

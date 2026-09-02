@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BackupTarget, DUPLICATI_OAUTH_LOGIN_URL, DUPLICATI_OAUTH_REFRESH_URL, isMountedKind, toDuplicatiUrl, toMountSpec, validateTarget } from './backupTarget';
+import { BackupTarget, DEFAULT_BACKUP_FOLDER, DUPLICATI_OAUTH_LOGIN_URL, DUPLICATI_OAUTH_REFRESH_URL, isMountedKind, toDuplicatiUrl, toMountSpec, validateTarget } from './backupTarget';
 
 const base: BackupTarget = {
   kind: 'disk', path: '', server: '', share: '', username: '', password: '',
@@ -66,6 +66,14 @@ describe('toDuplicatiUrl', () => {
   it('defaults the folder and strips stray slashes', () => {
     expect(toDuplicatiUrl({ ...base, kind: 'googledrive', authId: 'a' })).toBe('googledrive://homelab-backups?authid=a');
     expect(toDuplicatiUrl({ ...base, kind: 'googledrive', authId: 'a', folder: '/x/' })).toBe('googledrive://x?authid=a');
+  });
+
+  it('falls back to exactly DEFAULT_BACKUP_FOLDER when the folder is blank', () => {
+    // The dashboard shows DEFAULT_BACKUP_FOLDER for an unset folder; this ties
+    // that display to the folder the URL builder actually uses, so the two
+    // cannot drift apart.
+    expect(toDuplicatiUrl({ ...base, kind: 'googledrive', authId: 'a' }))
+      .toBe(`googledrive://${DEFAULT_BACKUP_FOLDER}?authid=a`);
   });
 
   it('returns null for mounted kinds, which have no target URL', () => {

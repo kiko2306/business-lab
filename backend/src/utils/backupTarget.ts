@@ -64,6 +64,13 @@ export const DUPLICATI_OAUTH_LOGIN_URL = 'https://duplicati-oauth-handler.appspo
 export const DUPLICATI_OAUTH_REFRESH_URL = 'https://duplicati-oauth-handler.appspot.com/refresh';
 
 /**
+ * The Google Drive folder backups land in when the user leaves the field blank.
+ * A blank setting still means "back up here" — so the dashboard shows this
+ * value rather than an empty box, and `toDuplicatiUrl` falls back to it.
+ */
+export const DEFAULT_BACKUP_FOLDER = 'homelab-backups';
+
+/**
  * Destinations come in two families, and the difference is structural:
  *
  *   MOUNTED   disk / smb / nfs — the kernel mounts them, Docker's local driver
@@ -140,7 +147,7 @@ export async function getBackupTarget(): Promise<BackupTarget | null> {
  */
 export function toDuplicatiUrl(target: BackupTarget): string | null {
   if (target.kind !== 'googledrive') return null;
-  const folder = target.folder.trim().replace(/^\/+|\/+$/g, '') || 'homelab-backups';
+  const folder = target.folder.trim().replace(/^\/+|\/+$/g, '') || DEFAULT_BACKUP_FOLDER;
 
   // The AuthID is inserted RAW, not percent-encoded.
   //
