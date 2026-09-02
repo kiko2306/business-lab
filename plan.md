@@ -10350,3 +10350,33 @@ produced *passing-looking* runs:
 The change is verified but **not applied**. Claiming `/dev/sda` needs `sudo`,
 which needs a password this session does not have, and the confirmation prompt
 is deliberately interactive. It is a TODO item with the exact command.
+
+### 87.7 Done: applied to this host
+
+Run by the user as `sudo EXPAND_VG_DISK=/dev/sda ./start.sh` on 2026-09-02.
+The confirmation behaved as designed — it printed the Windows partition table
+it was about to destroy and required `/dev/sda` typed back — and the whole
+thing took about 40 seconds from confirmation to a resized filesystem.
+
+| | Before | After |
+|---|---|---|
+| `ubuntu-vg` | 1 PV, 236.47 GiB, 0 free | **2 PVs, 474.94 GiB**, 0 free |
+| `www` LV (`/home`) | 136.5 GiB | **374.94 GiB** |
+| `/home` as `df` sees it | 134 G, 51% used, 63 G free | **368 G, 19% used, 288 G free** |
+| `/dev/sda` | EFI + MSR + 237.8 G NTFS + recovery | **whole-disk `LVM2_member`**, no partition table |
+
+**Nothing restarted.** Every container still reported `Up 59 minutes` after the
+grow — the same 58 that were running before it, 43 healthy, 11 with no
+healthcheck declared, and the same 4 unhealthy as before (`home-page` per §86,
+plus `vikunja`, `itflow`, `uptime-kuma`). `/home` took a write, and a
+`hello-world` container ran, so Docker's data root came through the resize of
+the filesystem underneath it without noticing. That is what "online" was
+supposed to mean and it held.
+
+The loopback test predicted this exactly, including the `resize2fs` "on-line
+resizing required" path — which is the argument for having written it rather
+than reasoning about the commands and hoping.
+
+Unchanged, and still the next storage job: `/` is untouched at 98 G / 59% used,
+and `/var/lib/containerd` is still holding roughly 45 GB there. Removing the
+old trees reclaims more on `/` than this disk could have.

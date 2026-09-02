@@ -166,16 +166,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Next up (2026-09-02)
 
-- [ ] **@mat: claim the second SSD into the volume group** (§87) — `/dev/sda`
-      is a 238.5 GB SATA SSD carrying the Windows layout it arrived with,
-      mounted nowhere. `ubuntu-vg` has no free extents, so nothing can grow
-      without it. Built, tested against loopback LVM, not applied — it needs
-      sudo and types the disk name back at you:
-      `sudo EXPAND_VG_DISK=/dev/sda ./start.sh`
-      Takes `/home` from 134 GB to about 370 GB, online, while the stack runs.
-      **It erases `/dev/sda`.** Note the trade first: a volume group across two
-      disks with no redundancy loses `/home` if *either* disk dies, and §86
-      says the scheduled backup has never produced a version.
 - [ ] **Remove the old trees** (§83.4, §83.6) — both moves have now landed
       (`Docker Root Dir: /home/docker`, containerd `root = "/home/containerd"`),
       so once they have held for a few days: `/var/lib/docker` (~100 MB,
