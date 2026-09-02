@@ -235,15 +235,13 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Does CrowdSec ever actually see the real client IP?** (§99) — the
-      duplicate-directive bug that broke every NPM proxy-host create/update/
-      delete is fixed, but the underlying design is still unverified:
-      `set_real_ip_from` only takes effect when the real connecting peer is in
-      the trusted list, and everything reaches NPM through the Cloudflare
-      Tunnel connector — so the TCP peer is `cloudflared`'s own container
-      address, not a Cloudflare edge IP. Confirm whether CrowdSec's access-log
-      parsing ever resolves the true client IP in this topology, or whether it
-      has been logging (and would ban) `cloudflared`'s address all along.
+- [ ] **CrowdSec detects but nothing enforces** (§110.4) — the log-path typo
+      that meant CrowdSec parsed nothing for a week is fixed, and it now reads
+      real client IPs from NPM's logs. But the `cloudflare-worker-bouncer` is
+      still behind the `edge-bouncer` compose profile and does not start (it
+      crash-loops on `cfut_`-prefixed Cloudflare API tokens). Until it runs, a
+      detection is a log line, not a ban. Either get a classic-format token
+      working, or find a bouncer that accepts `cfut_`.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from

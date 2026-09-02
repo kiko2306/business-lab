@@ -21,10 +21,15 @@
  *     NPM's own nginx.conf already declares both unconditionally, and a
  *     duplicate declaration fails nginx's config test, which breaks every
  *     future proxy-host create/update/delete until someone notices (§99).
- *     Whether CrowdSec ends up seeing the real client IP at all, given
- *     traffic arrives via the Cloudflare Tunnel connector rather than a
- *     direct connection from a Cloudflare edge IP, is a separate question —
- *     not answered here.
+ *
+ *     This block turns out to be belt-and-braces (§110): NPM's own nginx.conf
+ *     already trusts all of RFC1918 (`set_real_ip_from 10.0.0.0/8` … "Includes
+ *     Docker subnet") with `real_ip_recursive on`, and `cloudflared` runs on
+ *     the host and reaches NPM's published port, so the connecting peer is the
+ *     docker bridge gateway (10.201.0.1) — already trusted. The access logs
+ *     carry the real client IP (verified: tunnelled traffic logs public IPv6,
+ *     LAN traffic logs 192.168.x). Kept anyway in case NPM ever tightens its
+ *     defaults.
  */
 
 import { exec } from 'child_process';

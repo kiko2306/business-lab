@@ -11513,3 +11513,70 @@ anything procedural. A fact duplicated across docs is a fact that rots (§84.4).
 
 Both added to the README doc index; the two TODO items deleted. Anchor links
 into the other docs were checked against their actual headings.
+
+## 110. §99 answered: CrowdSec was reading an empty directory the whole time
+
+The README question was "does CrowdSec ever see the real client IP, given
+traffic arrives via the Cloudflare Tunnel connector". Investigating it turned
+up something bigger.
+
+### 110.1 CrowdSec has parsed nothing since it was set up
+
+`apps/crowdsec/docker-compose.yml` mounted
+`../nginx-proxy-manager/data/app/log` (singular) at `/var/log/npm`. NPM mounts
+`./data/app -> /data` and writes access logs to `/data/logs` — so on the host
+they are in `./data/app/logs` (**plural**). `data/app/log` was an empty
+directory Docker auto-created at that mount, dated 2026-08-28 14:35, the minute
+CrowdSec was added.
+
+`cscli metrics` confirmed it: no Acquisition / Parser / Scenario sections at
+all, and the only decisions were origin `CAPI` (the downloaded community
+blocklist). CrowdSec's agent, parsers and scenarios were all running against
+nothing.
+
+**Fix**: one character — `data/app/log` → `data/app/logs` in the bind mount,
+plus the wrong parenthetical in the comment beside it. Recreated the
+container; `cscli metrics` now shows `file:/var/log/npm/proxy-host-*_access.log`
+with lines read = lines parsed, **0 unparsed**. The stray empty `data/app/log`
+was removed on this host.
+
+### 110.2 The real-IP mechanism works — and not because of our config
+
+`crowdsecConfig.ts` writes a `set_real_ip_from <Cloudflare edge ranges>` block
+into NPM's `http_top.conf`. That block is belt-and-braces. What actually
+resolves the client IP:
+
+- `cloudflared` runs on the **host** (systemd unit, `--protocol http2`), not a
+  container, and connects to NPM's published port. NPM's container therefore
+  sees the peer as the **docker bridge gateway, 10.201.0.1**.
+- NPM's own `nginx.conf` already declares `set_real_ip_from 10.0.0.0/8;`
+  `172.16.0.0/12;` `192.168.0.0/16;` (its own comment: "Includes Docker
+  subnet") with `real_ip_recursive on`. 10.201.0.1 is inside 10/8 → trusted →
+  nginx rewrites `$remote_addr` from the forwarded headers.
+- The live access logs prove it: tunnelled requests log a real public IPv6
+  (`2a01:14:120:cfb0:…`), LAN requests log `192.168.1.23`. It has **never**
+  been logging cloudflared's address.
+
+So §99's specific worry is answered: no, CrowdSec would not have been banning
+the connector — once it reads the right directory it parses real client IPs.
+
+### 110.3 Verified the NPM format parses
+
+NPM's log format is non-standard (`[time] - status … [Client ip] … [Sent-to
+upstream] …`). `cscli explain` against a real line: `crowdsecurity/nginx-logs`
+extracts `remote_addr`/`source_ip` = the `[Client]` IP, `target_server` = the
+`[Sent-to]` upstream, geoip + http-logs enrich, and `http-probing` /
+`http-bad-user-agent` / `http-crawl-non_statics` fire. The acquis.yaml comment
+was right.
+
+### 110.4 Left open
+
+- **Nothing enforces the decisions yet.** The `cloudflare-worker-bouncer` is
+  behind the `edge-bouncer` compose profile and does not start — it
+  crash-loops on `cfut_`-prefixed API tokens (documented in the compose file).
+  CrowdSec now detects; until that bouncer runs, a detection is a log line, not
+  a ban. New README item.
+- **`real_ip_recursive on` + trusting all of RFC1918 means a LAN client can
+  spoof `X-Forwarded-For`** and steer a CrowdSec ban at an arbitrary IP. This
+  is NPM's default config, the LAN is semi-trusted, and tightening it risks the
+  §99 duplicate-directive class of breakage — noted, not changed.

@@ -17,9 +17,12 @@ services:
       - ./config/acquis.yaml:/etc/crowdsec/acquis.d/npm.yaml:ro
       # Decisions DB, downloaded blocklists, bouncer/machine registrations.
       - ./data/crowdsec:/var/lib/crowdsec/data
-      # NPM writes per-proxy-host access logs here (./data/app -> /data in the
-      # NPM container, so /data/logs is ./data/app/log on the host). Read-only.
-      - ../nginx-proxy-manager/data/app/log:/var/log/npm:ro
+      # NPM writes per-proxy-host access logs to /data/logs; its compose mounts
+      # ./data/app -> /data, so on the host that is ./data/app/logs (plural).
+      # It was ./data/app/log here for a week — an empty dir Docker auto-created
+      # at the mount — so CrowdSec parsed nothing at all (plan.md §110).
+      # Read-only.
+      - ../nginx-proxy-manager/data/app/logs:/var/log/npm:ro
     networks:
       - crowdsec-net
     # Homepage discovers running containers by these labels. No homepage.href:
