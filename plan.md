@@ -10125,3 +10125,106 @@ container problems, which is its own piece of work (§81.4, §81.7).
 command's — the same shape of mistake that let a type error reach the user's
 build this morning, caught this time because the answer looked wrong. Redirect
 to a file, echo the real `$?`, then grep the file.
+
+## 86. §75.1 answered: the schedule has still never produced a version
+
+The measurement §75.1 asked for, run before touching anything, as instructed.
+
+**`BackupListCount = 1`.** Duplicati's only version is still
+`20260901T153928Z` — the manual run. So the answer is the second branch: the
+scheduler is the top priority, above the rest of §75.
+
+But the scheduler is not the part that is broken, and the failure is recorded:
+
+    2026-09-01T19:40:39Z | backup_create | app-data | failure |
+      "Duplicati rejected the password. It is the DUPLICATI_WEB_PASSWORD
+       in the app's configuration."
+      dumped: 18, failed: 8
+
+`backup_schedule_last_run_at` is `2026-09-01T19:40:27Z` — after the §74 fixes,
+not during the broken period as §75.1 assumed. The scheduler fired on time, the
+dashboard archive succeeded, 18 app databases dumped, and the handoff to
+Duplicati got a 401.
+
+### 86.1 The 401 is not reproducible, and was not worth chasing
+
+The same credential works now: a probe using the backend's own
+`readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD')` and `/api/v1/auth/login`
+returns an access token. Nothing explains the difference from the evidence
+available —
+
+- `apps/duplicati/.env` has not been written since 2026-08-31T20:31, so the
+  password did not change between the working 15:39 run and the 19:40 failure.
+- The container was created 2026-09-01T15:23 (saving the destination recreates
+  it) and not recreated again until the 2026-09-02 restart, `RestartCount: 0`.
+- Duplicati's container log has no entry at all in the 19:30–19:50 window, and
+  logs nothing about authentication either way.
+
+The most likely story is that Duplicati's stored web password diverged from the
+env var while the container ran, and the 2026-09-02 restart re-applied
+`DUPLICATI__WEBSERVICE_PASSWORD` and healed it. That is a guess, and it was
+deliberately not pursued further: **Duplicati is scheduled for replacement by
+Kopia (§81.5)**. Spending the session on the auth behaviour of the engine that
+is leaving buys nothing that survives the swap.
+
+What matters is which findings are engine-independent. Two are.
+
+### 86.2 Engine-independent defect: the run is stamped before the part that matters
+
+`runScheduledBackupCheck` calls `setBackupScheduleLastRun` immediately after
+`createBackupArchive()`, and only then `runAppDataBackup()` — which never
+throws, by design, so that an app-data problem cannot lose the dashboard
+archive that already succeeded.
+
+The consequence is that 2026-09-01 looks like a successful scheduled run from
+every angle the system exposes. `backup_schedule_last_run_at` is set, the
+`backup_create` audit row for the archive says `success`, and
+`shouldRunScheduledBackup` will not try again for 24 hours — while the app data,
+which is the entire point, was never sent anywhere. A total failure of the
+app-data half is indistinguishable from success unless someone reads the
+*second* audit row.
+
+This is our code, not Duplicati's, and it carries over to Kopia unchanged. It
+also makes §75.2 (surface backup state) sharper: showing
+`backup_schedule_last_run_at` in the dashboard would have shown a green
+timestamp on the day nothing was backed up. The state worth surfacing is the
+app-data outcome, not the scheduler tick.
+
+### 86.3 Engine-independent finding: the SQL dumps went stale on the same run
+
+25 apps have a `data/_dump` directory. After the 19:40 run, 16 held dumps from
+19:40 and 9 still held dumps from the 14:54 manual run — matching the
+`failed: 8` in the audit metadata.
+
+The stale ones are not a random 9. They are disproportionately the apps with a
+**separate database container**: bookstack, immich, itflow, n8n, nextcloud,
+nginx-proxy-manager, nocodb, paperless, pihole. The apps that dumped fine at
+19:40 are mostly single-container SQLite ones. That points at the SQL-dump path
+(`docker exec` into the database container) rather than at anything Duplicati
+does, so it is a real, current, engine-independent gap: even a working Kopia
+snapshot taken tonight would archive a day-old dump for those nine apps.
+
+Not diagnosed here — it is a separate piece of work and now a TODO item.
+
+### 86.4 Observed in passing: a 5.3 GB WAL in Duplicati's own data
+
+`apps/duplicati/data/config/HQFQYTBBPZ.sqlite` is 184 KB with a **5,323,320,192
+byte** `-wal` beside it, untouched since 2026-09-01T17:15 — the end of the
+restore test. Two things follow. It is corroborating evidence that no backup
+operation has opened that database since 17:15, which is consistent with the
+19:40 run never reaching Duplicati. And it sits inside `apps/`, which is exactly
+the tree Duplicati is pointed at (`/source/apps`), so the engine is carrying its
+own uncheckpointed WAL as source data.
+
+### 86.5 What this does to the §75 ordering
+
+§75.1 said the answer reorders the list. It does:
+
+- **Fixing Duplicati's scheduler handoff is not worth doing.** It is one
+  unreproducible 401 in a component with a replacement already planned.
+- **§75.2 (surface backup state) is now first**, and its requirement changed:
+  the app-data outcome is the thing to show, because §86.2 means the scheduler's
+  own timestamp is actively misleading.
+- **§86.2 and §86.3 are new work** and both survive the move to Kopia.
+- **§75.3 (the restore API) is closed by removal, not by repair** — it goes when
+  Duplicati goes, and the Kopia restore proof replaces it.

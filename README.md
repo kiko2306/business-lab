@@ -132,19 +132,24 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Backups
 
-- [ ] **Confirm a scheduled run actually produced a version** (§75.1) — every
-      successful backup so far was triggered by hand. The last scheduler run was
-      during the broken period, so the schedule has never produced a working
-      backup. Check `backup_schedule_last_run_at` and whether Duplicati reports
-      a second version. Do this before the items below; the answer reorders them.
-- [ ] **Surface backup state in the dashboard** (§75.2) — there is no way to see
-      whether backups work without the CLI. Needs last run + outcome, version
+- [ ] **The scheduled run stamps success before the part that matters** (§86.2)
+      — `runScheduledBackupCheck` calls `setBackupScheduleLastRun` after the
+      dashboard archive and before `runAppDataBackup`, which never throws. A
+      total app-data failure therefore leaves a green timestamp, a `success`
+      audit row, and a 24-hour wait before the next attempt. This is our code,
+      not the engine's, so it survives the move to Kopia.
+- [ ] **The SQL dumps went stale on the 2026-09-01 scheduled run** (§86.3) —
+      9 of 25 apps kept dumps from the earlier manual run, and they are the ones
+      with a separate database container (bookstack, immich, itflow, n8n,
+      nextcloud, nginx-proxy-manager, nocodb, paperless, pihole). That is the
+      `docker exec`-into-the-database path, not anything Duplicati does, so a
+      working Kopia snapshot tonight would still archive a day-old dump for
+      those nine.
+- [ ] **Surface backup state in the dashboard** (§75.2, sharpened by §86.2) —
+      there is no way to see whether backups work without the CLI. Show the
+      **app-data outcome**, not the scheduler tick: last run + outcome, version
       count and size, the destination actually used, and an explicit "never run"
       state rather than a blank.
-- [ ] **Fix or remove the restore API** (§75.3) — `POST /backup/2/restore`
-      returns `{"Status":"OK"}`, writes nothing, logs no error. `duplicati-cli`
-      restores correctly, so only the API path is broken. Do not wire a restore
-      button until a test proves bytes arrive.
 - [ ] **Two apps have no consistent backup** (§75.4) — `file-browser` and
       `stirling-pdf` (BoltDB/H2, 0 dump files each). Their live DB files are
       copied raw and can restore corrupt. Either snapshot them
@@ -278,6 +283,18 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Apps and integrations
 
+- [ ] **Home Page's healthcheck probes the wrong path** (§86) — the compose
+      healthcheck wgets `/health`, which 404s, so the container has reported
+      **unhealthy** since it started while serving fine. `/` and
+      `/api/healthcheck` both return 200; the latter is the endpoint
+      gethomepage actually provides. A false red on the dashboard is worse than
+      no check, because it trains the eye to ignore the colour.
+- [ ] **Duplicati carries a 5.3 GB uncheckpointed WAL** (§86.4) —
+      `apps/duplicati/data/config/HQFQYTBBPZ.sqlite` is 184 KB with a 5.3 GB
+      `-wal` beside it, untouched since the 2026-09-01 restore test. It sits
+      inside `apps/`, which is the tree Duplicati is pointed at, so the engine
+      is backing up its own WAL. Goes away with Duplicati (§81.5) — but check
+      Kopia's source tree excludes the equivalent.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
 - [ ] **@mat: change Guacamole's default login** (§84.1a) — it ships as
