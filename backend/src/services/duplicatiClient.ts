@@ -304,3 +304,136 @@ export async function ensureDestinationFolder(duplicatiPassword: string, url: st
     return { ok: false, detail: (error as Error).message };
   }
 }
+
+// ---------------------------------------------------------------------------
+// Read-only status for the dashboard's schedule card (plan.md §75.2).
+//
+// "The schedule ran" and "backups exist at the destination" are different
+// facts, and for the whole life of this system only the first was visible.
+// This surfaces the second: where the job writes, how many restore points are
+// there and how large, and when it last ran or errored.
+// ---------------------------------------------------------------------------
+
+export interface BackupJobStatus {
+  /** Duplicati answered at all. false → everything below is null. */
+  reachable: boolean;
+  /** A dashboard-managed job exists in Duplicati. */
+  configured: boolean;
+  /** Destination the job writes to, with every credential stripped. */
+  destination: string | null;
+  /** Restore points currently held at the destination. */
+  versionCount: number | null;
+  /** Human-readable size stored at the destination, e.g. "593.215 MiB". */
+  destinationSize: string | null;
+  destinationSizeBytes: number | null;
+  /** Human-readable size of the source tree at the last run. */
+  sourceSize: string | null;
+  /** ISO 8601. When the last backup started / finished. */
+  lastBackupAt: string | null;
+  lastBackupFinishedAt: string | null;
+  /** Duplicati's own duration string, seconds precision, e.g. "01:33:33". */
+  lastBackupDuration: string | null;
+  lastErrorAt: string | null;
+  lastErrorMessage: string | null;
+}
+
+const UNREACHABLE_STATUS: BackupJobStatus = {
+  reachable: false,
+  configured: false,
+  destination: null,
+  versionCount: null,
+  destinationSize: null,
+  destinationSizeBytes: null,
+  sourceSize: null,
+  lastBackupAt: null,
+  lastBackupFinishedAt: null,
+  lastBackupDuration: null,
+  lastErrorAt: null,
+  lastErrorMessage: null,
+};
+
+/**
+ * Strip anything secret from a Duplicati target URL so it can be shown in the
+ * dashboard. The query string carries `authid=` (Google Drive's long-lived
+ * refresh token) and `//user:pass@host` carries share credentials; what is
+ * left — scheme, host, path — is exactly "which destination", which is the
+ * point of showing it.
+ */
+export function sanitizeTargetUrl(raw: string): string {
+  const withoutQuery = raw.split(/[?#]/)[0];
+  return withoutQuery.replace(/\/\/[^/@]*@/, '//');
+}
+
+/**
+ * Duplicati reports times as `20260901T153928Z`, not ISO 8601. Widen it back
+ * out so the frontend date pipe can read it; pass through anything already
+ * parseable, and return null for empty or unrecognised input.
+ */
+export function parseDuplicatiTimestamp(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  const compact = raw.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/);
+  if (compact) {
+    const [, y, mo, d, h, mi, s] = compact;
+    return `${y}-${mo}-${d}T${h}:${mi}:${s}.000Z`;
+  }
+  const parsed = Date.parse(raw);
+  return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
+}
+
+/** Duplicati durations look like "01:33:33.2743087" — drop the sub-second tail. */
+function trimDuration(raw: string | undefined | null): string | null {
+  if (!raw) return null;
+  return raw.split('.')[0] || null;
+}
+
+function metaInt(raw: unknown): number | null {
+  const n = Number.parseInt(String(raw ?? ''), 10);
+  return Number.isFinite(n) ? n : null;
+}
+
+interface DuplicatiListEntry {
+  Backup?: {
+    Name?: string;
+    TargetURL?: string;
+    Metadata?: Record<string, string>;
+  };
+}
+
+/**
+ * A read-only view of the dashboard's Duplicati job. Never throws: the
+ * schedule card must degrade to "unreachable" rather than break the page.
+ */
+export async function getBackupJobStatus(duplicatiPassword: string | null): Promise<BackupJobStatus> {
+  if (!duplicatiPassword) {
+    return UNREACHABLE_STATUS;
+  }
+  try {
+    const token = await login(duplicatiPassword);
+    const list = await api('/api/v1/backups', { token });
+    const entries = Array.isArray(list.body) ? (list.body as DuplicatiListEntry[]) : [];
+    const job = entries.find((entry) => entry.Backup?.Name === JOB_NAME);
+    if (!job?.Backup) {
+      // Duplicati is up but the dashboard has never provisioned its job.
+      return { ...UNREACHABLE_STATUS, reachable: true };
+    }
+    const meta = job.Backup.Metadata ?? {};
+    return {
+      reachable: true,
+      configured: true,
+      destination: job.Backup.TargetURL ? sanitizeTargetUrl(job.Backup.TargetURL) : null,
+      // TargetFilesetsCount is the live figure; BackupListCount trails it
+      // until a run finishes, so prefer the former and fall back.
+      versionCount: metaInt(meta.TargetFilesetsCount) ?? metaInt(meta.BackupListCount),
+      destinationSize: meta.TargetSizeString ?? null,
+      destinationSizeBytes: metaInt(meta.TargetFilesSize),
+      sourceSize: meta.SourceSizeString ?? null,
+      lastBackupAt: parseDuplicatiTimestamp(meta.LastBackupStarted ?? meta.LastBackupDate),
+      lastBackupFinishedAt: parseDuplicatiTimestamp(meta.LastBackupFinished),
+      lastBackupDuration: trimDuration(meta.LastBackupDuration),
+      lastErrorAt: parseDuplicatiTimestamp(meta.LastErrorDate),
+      lastErrorMessage: meta.LastErrorMessage ?? null,
+    };
+  } catch {
+    return UNREACHABLE_STATUS;
+  }
+}

@@ -247,3 +247,71 @@ export async function recordBackupScheduleRun(outcome: BackupRunOutcome, at: Dat
     );
   }
 }
+
+// ---------------------------------------------------------------------------
+// The last app-database dump, read back for the dashboard (plan.md §75.2).
+//
+// The scheduler writes one audit row per run (§88.5) carrying which app dumps
+// failed and why. The schedule card showed the run's own outcome but not this,
+// so "the backup ran" could sit next to eight silently-stale databases.
+// ---------------------------------------------------------------------------
+
+export interface AppDumpFailure {
+  app: string;
+  kind: string;
+  detail: string;
+}
+
+export interface LastAppDataDump {
+  /** ISO 8601. */
+  at: string;
+  /** The audit row's own result — 'success' | 'failure'. */
+  result: string;
+  /** How many databases dumped / failed on that run, when the row recorded it. */
+  dumped: number | null;
+  failed: number | null;
+  trigger: string | null;
+  /**
+   * Per-app failure reasons. Empty for rows written before §88.5 added them,
+   * even when `failed` is non-zero — the frontend says so rather than implying
+   * there were none.
+   */
+  failures: AppDumpFailure[];
+}
+
+/** Shape one `audit_logs` row (metadata is jsonb) into what the card needs. */
+export function toLastAppDataDump(
+  row: { result: string; created_at: Date | string; metadata: unknown } | undefined
+): LastAppDataDump | null {
+  if (!row) {
+    return null;
+  }
+  const meta = (row.metadata && typeof row.metadata === 'object' ? row.metadata : {}) as Record<string, unknown>;
+  const rawFailures = Array.isArray(meta.failures) ? meta.failures : [];
+  return {
+    at: new Date(row.created_at).toISOString(),
+    result: String(row.result ?? ''),
+    dumped: typeof meta.dumped === 'number' ? meta.dumped : null,
+    failed: typeof meta.failed === 'number' ? meta.failed : null,
+    trigger: typeof meta.trigger === 'string' ? meta.trigger : null,
+    failures: rawFailures
+      .filter((entry): entry is Record<string, unknown> => !!entry && typeof entry === 'object')
+      .map((entry) => ({
+        app: String(entry.app ?? ''),
+        kind: String(entry.kind ?? ''),
+        detail: String(entry.detail ?? ''),
+      })),
+  };
+}
+
+export async function getLastAppDataDump(): Promise<LastAppDataDump | null> {
+  // Both resources are app-database dumps: the scheduler writes 'app-data',
+  // the manual "dump apps" route writes 'app-databases'. Newest of either.
+  const result = await query<{ result: string; created_at: Date; metadata: unknown }>(
+    `SELECT result, created_at, metadata FROM audit_logs
+     WHERE action = 'backup_create' AND resource IN ('app-data', 'app-databases')
+     ORDER BY created_at DESC
+     LIMIT 1`
+  );
+  return toLastAppDataDump(result.rows[0]);
+}

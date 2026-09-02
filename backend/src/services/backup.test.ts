@@ -6,6 +6,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Only the schedule helpers touch Postgres; pruning is pure filesystem work.
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
 
+import { toLastAppDataDump } from './backup';
+
 describe('pruneOldBackups', () => {
   let root: string;
   let pruneOldBackups: typeof import('./backup').pruneOldBackups;
@@ -68,5 +70,61 @@ describe('pruneOldBackups', () => {
 
     expect(await pruneOldBackups(3)).toEqual([]);
     expect(fs.existsSync(path.join(root, 'backups'))).toBe(true);
+  });
+});
+
+describe('toLastAppDataDump', () => {
+  it('returns null when there is no audit row', () => {
+    expect(toLastAppDataDump(undefined)).toBeNull();
+  });
+
+  it('maps a §88.5 row with per-app failure reasons', () => {
+    const row = {
+      result: 'failure',
+      created_at: '2026-09-01T19:40:39.822Z',
+      metadata: {
+        trigger: 'scheduled',
+        dumped: 18,
+        failed: 2,
+        failures: [
+          { app: 'nextcloud', kind: 'postgres', detail: 'connection refused' },
+          { app: 'immich', kind: 'postgres', detail: 'network not found' },
+        ],
+      },
+    };
+    expect(toLastAppDataDump(row)).toEqual({
+      at: '2026-09-01T19:40:39.822Z',
+      result: 'failure',
+      dumped: 18,
+      failed: 2,
+      trigger: 'scheduled',
+      failures: [
+        { app: 'nextcloud', kind: 'postgres', detail: 'connection refused' },
+        { app: 'immich', kind: 'postgres', detail: 'network not found' },
+      ],
+    });
+  });
+
+  it('reports an empty failure list for an older row that only kept a count', () => {
+    const row = {
+      result: 'failure',
+      created_at: new Date('2026-09-01T19:40:39Z'),
+      metadata: { detail: 'Duplicati rejected the password.', dumped: 18, failed: 8, trigger: 'scheduled' },
+    };
+    const mapped = toLastAppDataDump(row);
+    expect(mapped?.failed).toBe(8);
+    expect(mapped?.failures).toEqual([]);
+  });
+
+  it('coerces a garbled metadata blob rather than throwing', () => {
+    const row = { result: 'success', created_at: '2026-09-02T00:00:00.000Z', metadata: null };
+    expect(toLastAppDataDump(row)).toEqual({
+      at: '2026-09-02T00:00:00.000Z',
+      result: 'success',
+      dumped: null,
+      failed: null,
+      trigger: null,
+      failures: [],
+    });
   });
 });

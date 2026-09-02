@@ -287,6 +287,44 @@
               Save schedule
             </button>
           </div>
+
+          <!-- §75.2: "the schedule ran" and "restorable backups exist" are
+               different facts, and only the first was ever visible. This is
+               what Duplicati actually holds, where, and how the last
+               app-database dump went. -->
+          <div class="border-top mt-3 pt-3 small d-flex flex-column gap-1" *ngIf="backupStatus as st">
+            <div>
+              <span class="text-body-secondary">Destination:</span>
+              <ng-container *ngIf="st.job.configured; else noJob">
+                <code>{{ st.job.destination || 'unknown' }}</code>
+                <span class="text-body-secondary" *ngIf="st.job.versionCount !== null">
+                  &middot; {{ st.job.versionCount }} version{{ st.job.versionCount === 1 ? '' : 's' }}</span>
+                <span class="text-body-secondary" *ngIf="st.job.destinationSize">
+                  &middot; {{ st.job.destinationSize }}</span>
+              </ng-container>
+              <ng-template #noJob>
+                <span class="text-body-secondary">{{ st.job.reachable ? 'no backup job has been created yet' : 'Duplicati is unreachable' }}</span>
+              </ng-template>
+            </div>
+            <div class="text-danger" *ngIf="st.job.configured && st.job.lastErrorMessage">
+              Destination error {{ st.job.lastErrorAt | date:'short' }}: {{ st.job.lastErrorMessage }}
+            </div>
+            <div>
+              <span class="text-body-secondary">Last app-database dump:</span>
+              <ng-container *ngIf="st.lastAppData as dump; else noDump">
+                <span [class.text-danger]="dump.result !== 'success'">
+                  {{ dump.at | date:'short' }}<ng-container *ngIf="dump.dumped !== null"> &mdash; {{ dump.dumped }} dumped</ng-container><ng-container *ngIf="dump.failed"> , {{ dump.failed }} failed</ng-container>
+                </span>
+                <ul class="mt-1 mb-0 ps-3 text-danger" *ngIf="dump.failures.length">
+                  <li *ngFor="let f of dump.failures">{{ f.app }} ({{ f.kind }}): {{ f.detail }}</li>
+                </ul>
+                <div class="text-body-secondary" *ngIf="dump.failed && !dump.failures.length">
+                  (failure reasons predate this build &mdash; the next run records them)
+                </div>
+              </ng-container>
+              <ng-template #noDump><span class="text-body-secondary">never</span></ng-template>
+            </div>
+          </div>
         </div>
       </div>
       <div class="list-group">

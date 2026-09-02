@@ -12,6 +12,7 @@ import {
   BackupListResponse,
   BackupScheduleConfig,
   BackupScheduleSettings,
+  BackupStatusResponse,
   DiscoveredHost,
   HealthStatus,
   ServiceEnvStatus,
@@ -64,6 +65,10 @@ export class OperationsService {
 
   getBackupSchedule(): Observable<BackupScheduleConfig> {
     return this.http.get<BackupScheduleConfig>(`${API_BASE_URL}/backups/schedule`);
+  }
+
+  getBackupStatus(): Observable<BackupStatusResponse> {
+    return this.http.get<BackupStatusResponse>(`${API_BASE_URL}/backups/status`);
   }
 
   updateBackupSchedule(config: BackupScheduleSettings): Observable<{ message: string }> {

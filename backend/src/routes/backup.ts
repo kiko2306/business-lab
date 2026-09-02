@@ -12,6 +12,7 @@ import {
   createBackupArchive,
   ensureBackupDir,
   getBackupScheduleConfig,
+  getLastAppDataDump,
   pgConnectionEnv,
   pruneOldBackups,
   resolveBackupPath,
@@ -19,6 +20,8 @@ import {
   safeBackupFileName,
   saveBackupScheduleConfig,
 } from '../services/backup';
+import { getBackupJobStatus } from '../services/duplicatiClient';
+import { readAppEnvValue } from '../services/appEnv';
 
 const router = Router();
 
@@ -43,6 +46,25 @@ router.get('/', async (_req: Request, res: Response) => {
     return res.json({ items: files });
   } catch {
     return res.status(500).json({ error: 'Unable to list backups.' });
+  }
+});
+
+/**
+ * GET /api/backups/status — read-only backup state for the schedule card
+ * (§75.2): what Duplicati actually holds and where, and how the last
+ * app-database dump went. The schedule's own run history stays on
+ * GET /schedule; this is the half that was never visible.
+ */
+router.get('/status', async (_req: Request, res: Response) => {
+  try {
+    const [job, lastAppData] = await Promise.all([
+      getBackupJobStatus(readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD')),
+      getLastAppDataDump(),
+    ]);
+    return res.json({ job, lastAppData });
+  } catch (error) {
+    logger.error('Unable to load backup status', { error: (error as Error).message });
+    return res.status(500).json({ error: 'Unable to load backup status.' });
   }
 });
 

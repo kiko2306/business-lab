@@ -10,6 +10,7 @@ import { OperationsService } from '../../core/operations.service';
 import {
   BackupFile,
   BackupScheduleConfig,
+  BackupStatusResponse,
   DiscoveredHost,
   DiskUsage,
   HealthStatus,
@@ -150,6 +151,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     consecutiveFailures: 0,
   };
   protected savingSchedule = false;
+  protected backupStatus: BackupStatusResponse | null = null;
   protected discoveredHosts: DiscoveredHost[] | null = null;
   protected scanningNetwork = false;
 
@@ -158,6 +160,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadBackups();
     this.loadHealth();
     this.loadSchedule();
+    this.loadBackupStatus();
   }
 
   ngOnDestroy(): void {
@@ -299,6 +302,20 @@ export class DashboardComponent implements OnInit, OnDestroy {
     });
   }
 
+  loadBackupStatus(): void {
+    // Best-effort: this panel is extra detail, not the reason the page exists.
+    // A Duplicati that is down or unprovisioned is a state the card renders,
+    // not a toast.
+    this.operations.getBackupStatus().subscribe({
+      next: (response) => {
+        this.backupStatus = response;
+      },
+      error: () => {
+        this.backupStatus = null;
+      },
+    });
+  }
+
   saveSchedule(): void {
     this.savingSchedule = true;
     const { enabled, frequency, retentionCount } = this.schedule;
@@ -310,6 +327,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
         // Saving a lower retention count deletes the extra archives server-side,
         // so the list has to be re-read or it keeps showing what is gone.
         this.loadBackups();
+        this.loadBackupStatus();
       },
       error: (error) => {
         this.toast.error(extractErrorMessage(error, 'Unable to update backup schedule.'));

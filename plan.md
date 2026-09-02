@@ -11246,3 +11246,48 @@ resolve into each `environment:` block correctly and the files stay valid.
 **Not done**: starting each app and confirming a real message sends — the four
 apps are running with their pre-change env and pick this up on their next
 dashboard restart ("restart to apply", same as exposure).
+
+## 102. §75.2 closed: the schedule card now shows what Duplicati actually holds
+
+The schedule card had the run history (§86.2, §90.3) but not the state that
+run history is a proxy for — where backups land, how many there are, how big,
+and whether the app-database dumps that feed them worked. "The schedule ran an
+hour ago" sat next to a Google Drive destination holding one fileset from a
+run that timed out, and eight databases that had failed to dump, with nothing
+saying so.
+
+**New read-only endpoint** `GET /api/backups/status`, separate from
+`GET /schedule` (which stays the form's source). Returns two things:
+
+- `job` — from Duplicati's `/api/v1/backups`, the managed job's `Backup.Metadata`:
+  `destination` (the `TargetURL` with its query string and any `user:pass@`
+  stripped — Google Drive keeps its AuthID in the query), `versionCount`
+  (`TargetFilesetsCount`, falling back to the trailing `BackupListCount`),
+  `destinationSize`/`sourceSize` (Duplicati's own human strings),
+  `lastBackupAt`/`Finished`/`Duration`, and `lastError{At,Message}`. Compact
+  Duplicati timestamps (`20260901T153928Z`) are widened to ISO. Never throws —
+  a down or unprovisioned Duplicati renders as "unreachable" / "no job yet".
+- `lastAppData` — the newest `audit_logs` row for `backup_create` on resource
+  `app-data` or `app-databases`, mapped to `{ at, result, dumped, failed,
+  trigger, failures[] }`. `failures` is the §88.5 per-app reason list; it comes
+  back empty for rows written before that change even when `failed > 0`, and
+  the card says so rather than implying there were none.
+
+Both halves live in services (`getBackupJobStatus` in `duplicatiClient.ts`,
+`getLastAppDataDump` + the pure `toLastAppDataDump` mapper in `backup.ts`), the
+route is thin. Dashboard: a `border-top` block in the schedule card fired on
+load and after saving the schedule; best-effort, so a status fetch failing
+clears the panel rather than toasting.
+
+**Verified against the live stack** — the compiled `getBackupJobStatus` and
+`getLastAppDataDump` run inside the rebuilt backend container returned:
+`destination googledrive://homelab-backups` (AuthID stripped), `versionCount 1`,
+`593.215 MiB` / source `1.228 GiB`, last run 2026-09-01 15:39 lasting 01:33:33,
+`lastErrorMessage "The operation has timed out."`; and the last app-data dump
+as the 2026-09-01 scheduled failure — 18 dumped, 8 failed, `failures: []`
+(that row predates §88.5, which is the case the card labels). Endpoint is
+registered and auth-gated (401, not 404). Backend typecheck + full suite (284,
++14: 10 in a new `duplicatiClient.test.ts` covering the URL sanitiser, the
+timestamp parser and the metadata mapping with `fetch` stubbed; 4 in
+`backup.test.ts` for `toLastAppDataDump`). Frontend `test:ci` (22) + `build`
+clean.

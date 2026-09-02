@@ -139,12 +139,6 @@ it is done — not ticked off and left behind. Section references point at
       exposure, harder: the database is inside the documentserver container
       rather than a separate compose service, so `backup:` as it stands cannot
       reach it.
-- [ ] **Surface the rest of the backup state in the dashboard** (§75.2) — the
-      schedule card now shows last run + outcome, last *working* backup, and an
-      explicit "never run" (§90.3). Still missing, and all of it already
-      available from `GET /api/v1/backups` → `Metadata`: version count and size
-      on the destination, the destination actually in use (so a stale config is
-      visible), and the per-app dump failures the audit row now carries (§88.5).
 - [ ] **Two apps have no consistent backup** (§75.4) — `file-browser` and
       `stirling-pdf` (BoltDB/H2, 0 dump files each). Their live DB files are
       copied raw and can restore corrupt. Either snapshot them

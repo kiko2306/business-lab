@@ -273,6 +273,42 @@ export interface BackupScheduleConfig extends BackupScheduleSettings {
   consecutiveFailures: number;
 }
 
+/** Read-only view of what Duplicati actually holds — see GET /backups/status. */
+export interface BackupJobStatus {
+  reachable: boolean;
+  configured: boolean;
+  destination: string | null;
+  versionCount: number | null;
+  destinationSize: string | null;
+  destinationSizeBytes: number | null;
+  sourceSize: string | null;
+  lastBackupAt: string | null;
+  lastBackupFinishedAt: string | null;
+  lastBackupDuration: string | null;
+  lastErrorAt: string | null;
+  lastErrorMessage: string | null;
+}
+
+export interface BackupAppDumpFailure {
+  app: string;
+  kind: string;
+  detail: string;
+}
+
+export interface BackupLastAppDataDump {
+  at: string;
+  result: string;
+  dumped: number | null;
+  failed: number | null;
+  trigger: string | null;
+  failures: BackupAppDumpFailure[];
+}
+
+export interface BackupStatusResponse {
+  job: BackupJobStatus;
+  lastAppData: BackupLastAppDataDump | null;
+}
+
 export interface HealthAlert {
   metric: string;
   value: number;
