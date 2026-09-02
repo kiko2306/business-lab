@@ -139,7 +139,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected readonly sectionState = new Map<string, boolean>(this.loadSectionState());
   protected backups: BackupFile[] = [];
   protected health: HealthStatus | null = null;
-  protected schedule: BackupScheduleConfig = { enabled: false, frequency: 'daily', retentionCount: 14, lastRunAt: null };
+  protected schedule: BackupScheduleConfig = {
+    enabled: false,
+    frequency: 'daily',
+    retentionCount: 14,
+    lastRunAt: null,
+    lastOutcome: null,
+    lastSuccessAt: null,
+    consecutiveFailures: 0,
+  };
   protected savingSchedule = false;
 
   ngOnInit(): void {

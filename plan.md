@@ -10539,3 +10539,91 @@ both registry-wide checks share it rather than duplicating the filename probing.
 **What this test cannot see** is onlyoffice: its Postgres runs inside the
 documentserver image rather than as its own compose service, so there is no
 image line to match on. That stays an open item.
+
+## 90. §86.2 fixed: the run is stamped with what it did, not that it happened
+
+`runScheduledBackupCheck` called `setBackupScheduleLastRun` immediately after
+the dashboard archive and *before* `runAppDataBackup`, which never throws. So a
+run whose app data never left the machine produced a fresh timestamp, a
+`success` audit row for the archive, and a 24-hour wait before the next attempt
+— which is exactly what 2026-09-01 looked like from every angle the system
+exposed.
+
+### 90.1 Three problems, and why only two of them are about the stamp
+
+The README item named three: a green timestamp, a `success` audit row, and the
+day-long wait. The first two are the same bug — the schedule recorded *that* it
+ran and never *whether* it worked. The third is a separate decision, and the
+obvious fix for it is wrong.
+
+Moving the stamp to the end and only writing it on success would mean a
+persistently failing backup re-runs at every hourly check, forever: a full
+dashboard archive, thirty-odd database dumps and a 50 MB immich dump every
+hour, for a backup that is failing because it is misconfigured and will fail
+identically next hour. That is a treadmill, not a retry.
+
+### 90.2 Built
+
+`setBackupScheduleLastRun` is replaced by `recordBackupScheduleRun(outcome)`,
+one writer for four values that only make sense together:
+
+| Setting | Meaning |
+|---|---|
+| `backup_schedule_last_run_at` | when a run was last **attempted** — drives the cadence |
+| `backup_schedule_last_outcome` | `success` or `failed` |
+| `backup_schedule_last_success_at` | when one last worked **end to end** |
+| `backup_schedule_consecutive_failures` | the current failure streak |
+
+`lastSuccessAt` is the value worth alarming on: "last run was an hour ago" is
+reassuring and can be true while nothing has been backed up for a week.
+
+The stamp now happens **after** `runAppDataBackup`, which returns `{ ok }`
+rather than `void`. A run counts as successful when the app data reached the
+engine. Individual dump failures are on the audit row (§88.5) and do not fail
+the run — one app's database being unreachable should not put the whole
+schedule into retry — but a run where *nothing* dumped has made nothing safe,
+whatever the engine then did with it, so `report.ok === 0 && report.failed > 0`
+fails it.
+
+For the third problem: a failed run retries at the next hourly check rather
+than a period later, for `MAX_FAST_RETRIES = 3` consecutive failures, then
+falls back to the configured cadence and waits for a human. `getBackupSchedule`
+already returns the whole config to the dashboard, so the new fields reach the
+API for free.
+
+### 90.3 The dashboard was showing the lie, so it changed too
+
+`dashboard.component.html` rendered `Last scheduled backup: {{ lastRunAt }}` —
+the tick, with no outcome. Fixing the data and leaving that on screen would not
+have fixed anything a user can see. It now shows the outcome beside the
+timestamp, turns red on a failure, and on a failure adds the line that actually
+matters: *Last working backup: …*, or "No scheduled backup has ever succeeded"
+— which is what this host would have said all week. A schedule that has never
+run says so, rather than rendering nothing.
+
+`BackupScheduleConfig` was split so the settings the user chooses are
+`BackupScheduleSettings`; `updateBackupSchedule` takes that instead of an
+`Omit<…, 'lastRunAt'>` that would have silently grown three more fields to send.
+
+### 90.4 Verified
+
+254 backend tests (11 new), 22 frontend tests, backend typecheck and frontend
+build clean.
+
+Against the real stack, in two halves, because the whole path ends in a
+90-minute upload nobody asked for:
+
+- **The read path, deployed.** `getBackupScheduleConfig()` in the running
+  container returns the three new fields defaulted correctly for rows that do
+  not exist yet, and the startup check correctly did *not* fire — the schedule
+  is not due until 19:40 and `backup_schedule_last_run_at` was untouched.
+- **The write path, against the real Postgres.** `recordBackupScheduleRun` was
+  driven through failed → failed → success and checked at each step: the
+  outcome is set, the streak starts at 1 and increments to 2, a failure does
+  **not** move `lastSuccessAt`, success resets the streak to 0 and sets
+  `lastSuccessAt` equal to `lastRunAt`. Seven assertions, all passing, then the
+  original `last_run_at` was written back and the three new keys deleted, so the
+  table is exactly as it was found.
+
+The first row written by an actual scheduled run lands tonight at ~19:40, and
+that run is now also the test of whether §86.2's retry path behaves.

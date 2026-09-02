@@ -11,6 +11,7 @@ import {
   AutheliaAdminUserUpdate,
   BackupListResponse,
   BackupScheduleConfig,
+  BackupScheduleSettings,
   HealthStatus,
   ServiceEnvStatus,
   ServiceExposureConfig,
@@ -64,7 +65,7 @@ export class OperationsService {
     return this.http.get<BackupScheduleConfig>(`${API_BASE_URL}/backups/schedule`);
   }
 
-  updateBackupSchedule(config: Omit<BackupScheduleConfig, 'lastRunAt'>): Observable<{ message: string }> {
+  updateBackupSchedule(config: BackupScheduleSettings): Observable<{ message: string }> {
     return this.http.put<{ message: string }>(`${API_BASE_URL}/backups/schedule`, config);
   }
 

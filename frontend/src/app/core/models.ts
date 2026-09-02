@@ -256,11 +256,22 @@ export interface BackupListResponse {
 
 export type BackupScheduleFrequency = 'daily' | 'weekly';
 
-export interface BackupScheduleConfig {
+/** The three values the user actually chooses; the rest is run history. */
+export interface BackupScheduleSettings {
   enabled: boolean;
   frequency: BackupScheduleFrequency;
   retentionCount: number;
+}
+
+export type BackupRunOutcome = 'success' | 'failed';
+
+export interface BackupScheduleConfig extends BackupScheduleSettings {
+  /** When the schedule last *attempted* a run — not whether it worked. */
   lastRunAt: string | null;
+  lastOutcome: BackupRunOutcome | null;
+  /** When one last worked end to end. The value worth alarming on. */
+  lastSuccessAt: string | null;
+  consecutiveFailures: number;
 }
 
 export interface HealthAlert {

@@ -11,18 +11,34 @@ export const BACKUP_SCHEDULE_SETTINGS_KEYS = {
   frequency: 'backup_schedule_frequency',
   retentionCount: 'backup_schedule_retention_count',
   lastRunAt: 'backup_schedule_last_run_at',
+  // What the last run actually did. Without these, a run that ticked and a run
+  // that worked are the same row (§86.2).
+  lastOutcome: 'backup_schedule_last_outcome',
+  lastSuccessAt: 'backup_schedule_last_success_at',
+  consecutiveFailures: 'backup_schedule_consecutive_failures',
 } as const;
 
 export type BackupScheduleFrequency = 'daily' | 'weekly';
+export type BackupRunOutcome = 'success' | 'failed';
 
 export interface BackupScheduleConfig {
   enabled: boolean;
   frequency: BackupScheduleFrequency;
   retentionCount: number;
+  /** When the schedule last *attempted* a run. Drives the cadence. */
   lastRunAt: string | null;
+  lastOutcome: BackupRunOutcome | null;
+  /**
+   * When a run last succeeded end to end. This is the one worth alarming on:
+   * "last run was an hour ago" is reassuring and can be true while nothing has
+   * been backed up for a week.
+   */
+  lastSuccessAt: string | null;
+  consecutiveFailures: number;
 }
 
-const DEFAULT_SCHEDULE: Omit<BackupScheduleConfig, 'lastRunAt'> = {
+/** The settings a user chooses; the run-history fields are read, never defaulted. */
+const DEFAULT_SCHEDULE: Pick<BackupScheduleConfig, 'enabled' | 'frequency' | 'retentionCount'> = {
   enabled: false,
   frequency: 'daily',
   retentionCount: 14,
@@ -158,11 +174,20 @@ export async function getBackupScheduleConfig(): Promise<BackupScheduleConfig> {
   const retentionRaw = Number.parseInt(values[BACKUP_SCHEDULE_SETTINGS_KEYS.retentionCount] ?? '', 10);
   const retentionCount = Number.isFinite(retentionRaw) && retentionRaw > 0 ? retentionRaw : DEFAULT_SCHEDULE.retentionCount;
 
+  const outcomeRaw = values[BACKUP_SCHEDULE_SETTINGS_KEYS.lastOutcome];
+  const lastOutcome: BackupRunOutcome | null =
+    outcomeRaw === 'success' || outcomeRaw === 'failed' ? outcomeRaw : null;
+
+  const failuresRaw = Number.parseInt(values[BACKUP_SCHEDULE_SETTINGS_KEYS.consecutiveFailures] ?? '', 10);
+
   return {
     enabled: values[BACKUP_SCHEDULE_SETTINGS_KEYS.enabled] === 'true',
     frequency,
     retentionCount,
     lastRunAt: values[BACKUP_SCHEDULE_SETTINGS_KEYS.lastRunAt] ?? null,
+    lastOutcome,
+    lastSuccessAt: values[BACKUP_SCHEDULE_SETTINGS_KEYS.lastSuccessAt] ?? null,
+    consecutiveFailures: Number.isFinite(failuresRaw) && failuresRaw > 0 ? failuresRaw : 0,
   };
 }
 
@@ -185,10 +210,40 @@ export async function saveBackupScheduleConfig(config: {
   }
 }
 
-export async function setBackupScheduleLastRun(isoTimestamp: string): Promise<void> {
-  await query(
-    `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
-     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
-    [BACKUP_SCHEDULE_SETTINGS_KEYS.lastRunAt, isoTimestamp]
-  );
+/**
+ * Record the end of a scheduled run: when it happened, and whether it worked.
+ *
+ * One writer for all four values because they only make sense together. Writing
+ * the timestamp on its own — which is what this function used to do, before the
+ * step that matters had even run — is precisely what let 2026-09-01 look like a
+ * successful backup while nothing left the machine (§86.2).
+ *
+ * `lastSuccessAt` only moves on success, so it is the value that can say "the
+ * last working backup was six days ago" while `lastRunAt` says "an hour".
+ */
+export async function recordBackupScheduleRun(outcome: BackupRunOutcome, at: Date = new Date()): Promise<void> {
+  const iso = at.toISOString();
+  // Read back rather than take a count from the caller: the streak is an
+  // invariant of these rows, and a caller passing a stale one would quietly
+  // reset the retry budget.
+  const previous = await getBackupScheduleConfig();
+
+  const values: Record<string, string> = {
+    [BACKUP_SCHEDULE_SETTINGS_KEYS.lastRunAt]: iso,
+    [BACKUP_SCHEDULE_SETTINGS_KEYS.lastOutcome]: outcome,
+    [BACKUP_SCHEDULE_SETTINGS_KEYS.consecutiveFailures]: String(
+      outcome === 'success' ? 0 : previous.consecutiveFailures + 1
+    ),
+  };
+  if (outcome === 'success') {
+    values[BACKUP_SCHEDULE_SETTINGS_KEYS.lastSuccessAt] = iso;
+  }
+
+  for (const [key, value] of Object.entries(values)) {
+    await query(
+      `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [key, value]
+    );
+  }
 }

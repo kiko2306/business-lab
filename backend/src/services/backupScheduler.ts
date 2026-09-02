@@ -4,11 +4,12 @@ import { runBackupJobNow } from './duplicatiClient';
 import { readAppEnvValue } from './appEnv';
 import logger from '../utils/logger';
 import {
+  BackupRunOutcome,
   BackupScheduleFrequency,
   createBackupArchive,
   getBackupScheduleConfig,
   pruneOldBackups,
-  setBackupScheduleLastRun,
+  recordBackupScheduleRun,
 } from './backup';
 
 const FREQUENCY_MS: Record<BackupScheduleFrequency, number> = {
@@ -21,7 +22,30 @@ const FREQUENCY_MS: Record<BackupScheduleFrequency, number> = {
 // weekly schedules without a real cron parser.
 const CHECK_INTERVAL_MS = 60 * 60 * 1000;
 
-export function shouldRunScheduledBackup(now: Date, lastRunAt: string | null, frequency: BackupScheduleFrequency): boolean {
+/**
+ * How many consecutive failures are retried at the check interval rather than
+ * the configured cadence.
+ *
+ * A failed run should not wait a whole day to try again — that was the third
+ * complaint in §86.2. But a backup failing because it is *misconfigured* (no
+ * destination, no password, a revoked token) fails identically every hour, and
+ * re-archiving and re-dumping thirty databases hourly forever is not a retry,
+ * it is a treadmill. After this many it falls back to the normal cadence and
+ * waits for a human, which is what the dashboard card in §75.2 is for.
+ */
+const MAX_FAST_RETRIES = 3;
+
+export interface LastRunState {
+  outcome: BackupRunOutcome | null;
+  consecutiveFailures: number;
+}
+
+export function shouldRunScheduledBackup(
+  now: Date,
+  lastRunAt: string | null,
+  frequency: BackupScheduleFrequency,
+  lastRun: LastRunState = { outcome: null, consecutiveFailures: 0 }
+): boolean {
   if (!lastRunAt) {
     return true;
   }
@@ -29,7 +53,8 @@ export function shouldRunScheduledBackup(now: Date, lastRunAt: string | null, fr
   if (Number.isNaN(lastRunMs)) {
     return true;
   }
-  return now.getTime() - lastRunMs >= FREQUENCY_MS[frequency];
+  const retrying = lastRun.outcome === 'failed' && lastRun.consecutiveFailures <= MAX_FAST_RETRIES;
+  return now.getTime() - lastRunMs >= (retrying ? CHECK_INTERVAL_MS : FREQUENCY_MS[frequency]);
 }
 
 export async function runScheduledBackupCheck(): Promise<void> {
@@ -37,7 +62,12 @@ export async function runScheduledBackupCheck(): Promise<void> {
   if (!config.enabled) {
     return;
   }
-  if (!shouldRunScheduledBackup(new Date(), config.lastRunAt, config.frequency)) {
+  if (
+    !shouldRunScheduledBackup(new Date(), config.lastRunAt, config.frequency, {
+      outcome: config.lastOutcome,
+      consecutiveFailures: config.consecutiveFailures,
+    })
+  ) {
     // Still enforce retention on a check with nothing due: a lowered "keep
     // last", or an archive that arrived by some other route, would otherwise
     // sit in the list contradicting the setting until the next backup runs.
@@ -47,7 +77,6 @@ export async function runScheduledBackupCheck(): Promise<void> {
 
   try {
     const fileName = await createBackupArchive();
-    await setBackupScheduleLastRun(new Date().toISOString());
     await writeAuditLog({
       userId: null,
       action: 'backup_create',
@@ -65,9 +94,16 @@ export async function runScheduledBackupCheck(): Promise<void> {
     // Ordering is the whole point: dump, then back up. Running Duplicati first
     // would archive the *previous* dump, silently making every backup a day
     // stale.
-    await runAppDataBackup();
+    const appData = await runAppDataBackup();
+
+    // Stamped here, at the end, with what actually happened — not before the
+    // app data has moved, and not unconditionally. Doing it the old way is why
+    // 2026-09-01 left a fresh timestamp, a `success` audit row and a 24-hour
+    // wait on a run whose app data never left the machine (§86.2).
+    await recordBackupScheduleRun(appData.ok ? 'success' : 'failed');
   } catch (error) {
     logger.error('Scheduled backup failed', { error: (error as Error).message });
+    await recordBackupScheduleRun('failed').catch(() => {});
     await writeAuditLog({
       userId: null,
       action: 'backup_create',
@@ -99,9 +135,10 @@ const MAX_RECORDED_FAILURES = 25;
  * Dump every app database, then ask Duplicati to run.
  *
  * Never throws — the dashboard's own backup has already succeeded by this
- * point, and losing that to an app-data problem would be a poor trade.
+ * point, and losing that to an app-data problem would be a poor trade. It
+ * reports instead, so the caller can stamp the run with what really happened.
  */
-async function runAppDataBackup(): Promise<void> {
+async function runAppDataBackup(): Promise<{ ok: boolean }> {
   const report = await dumpAllAppDatabases();
 
   // Which apps failed and why, not merely how many. §86.3: a scheduled run
@@ -142,7 +179,7 @@ async function runAppDataBackup(): Promise<void> {
         detail: 'the backup engine has no password configured yet',
       },
     }).catch(() => {});
-    return;
+    return { ok: false };
   }
 
   const run = await runBackupJobNow(password);
@@ -154,6 +191,13 @@ async function runAppDataBackup(): Promise<void> {
     result: run.started ? 'success' : 'failure',
     metadata: { trigger: 'scheduled', dumped: report.ok, failed: report.failed, failures, detail: run.detail },
   }).catch(() => {});
+
+  // A run counts as successful when the app data reached the backup engine.
+  // Individual dump failures are on the audit row (§88.5) and do not by
+  // themselves fail the run — one app's database being unreachable should not
+  // put the whole schedule into retry. A run where *nothing* dumped is
+  // different: it has made nothing safe, whatever the engine then did with it.
+  return { ok: run.started && !(report.ok === 0 && report.failed > 0) };
 }
 
 export function startBackupScheduler(): void {

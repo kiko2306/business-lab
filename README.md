@@ -132,21 +132,16 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Backups
 
-- [ ] **The scheduled run stamps success before the part that matters** (§86.2)
-      — `runScheduledBackupCheck` calls `setBackupScheduleLastRun` after the
-      dashboard archive and before `runAppDataBackup`, which never throws. A
-      total app-data failure therefore leaves a green timestamp, a `success`
-      audit row, and a 24-hour wait before the next attempt. This is our code,
-      not the engine's, so it survives the move to Kopia.
 - [ ] **`onlyoffice`'s bundled Postgres is never dumped** (§88.6) — same
       exposure, harder: the database is inside the documentserver container
       rather than a separate compose service, so `backup:` as it stands cannot
       reach it.
-- [ ] **Surface backup state in the dashboard** (§75.2, sharpened by §86.2) —
-      there is no way to see whether backups work without the CLI. Show the
-      **app-data outcome**, not the scheduler tick: last run + outcome, version
-      count and size, the destination actually used, and an explicit "never run"
-      state rather than a blank.
+- [ ] **Surface the rest of the backup state in the dashboard** (§75.2) — the
+      schedule card now shows last run + outcome, last *working* backup, and an
+      explicit "never run" (§90.3). Still missing, and all of it already
+      available from `GET /api/v1/backups` → `Metadata`: version count and size
+      on the destination, the destination actually in use (so a stale config is
+      visible), and the per-app dump failures the audit row now carries (§88.5).
 - [ ] **Two apps have no consistent backup** (§75.4) — `file-browser` and
       `stirling-pdf` (BoltDB/H2, 0 dump files each). Their live DB files are
       copied raw and can restore corrupt. Either snapshot them

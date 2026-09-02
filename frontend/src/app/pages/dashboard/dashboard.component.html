@@ -261,9 +261,28 @@
             </div>
           </div>
           <div class="d-flex justify-content-between align-items-center">
-            <div class="small text-body-secondary" *ngIf="schedule.lastRunAt">
-              Last scheduled backup: {{ schedule.lastRunAt | date:'short' }}
+            <!-- The run and its outcome, never the run alone: a fresh
+                 timestamp on a run that backed nothing up is what made a
+                 broken schedule look healthy for days (plan.md §86.2). -->
+            <div class="small" *ngIf="schedule.lastRunAt; else neverRun">
+              <span [class.text-body-secondary]="schedule.lastOutcome !== 'failed'"
+                    [class.text-danger]="schedule.lastOutcome === 'failed'">
+                Last scheduled backup: {{ schedule.lastRunAt | date:'short' }}
+                <ng-container [ngSwitch]="schedule.lastOutcome">
+                  <span *ngSwitchCase="'failed'">&mdash; failed</span>
+                  <span *ngSwitchCase="'success'">&mdash; succeeded</span>
+                </ng-container>
+              </span>
+              <div class="text-danger" *ngIf="schedule.lastOutcome === 'failed'">
+                <ng-container *ngIf="schedule.lastSuccessAt; else neverSucceeded">
+                  Last working backup: {{ schedule.lastSuccessAt | date:'short' }}
+                </ng-container>
+                <ng-template #neverSucceeded>No scheduled backup has ever succeeded.</ng-template>
+              </div>
             </div>
+            <ng-template #neverRun>
+              <div class="small text-body-secondary">The schedule has never run.</div>
+            </ng-template>
             <button class="btn btn-sm btn-outline-primary ms-auto" [disabled]="savingSchedule" (click)="saveSchedule()">
               Save schedule
             </button>

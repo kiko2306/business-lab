@@ -6,7 +6,7 @@ const backup = vi.hoisted(() => ({
   createBackupArchive: vi.fn(async () => 'backup-new.tar.gz'),
   getBackupScheduleConfig: vi.fn(),
   pruneOldBackups: vi.fn(async () => [] as string[]),
-  setBackupScheduleLastRun: vi.fn(async () => {}),
+  recordBackupScheduleRun: vi.fn(async (_outcome: 'success' | 'failed') => {}),
 }));
 const dumps = vi.hoisted(() => ({
   dumpAllAppDatabases: vi.fn(async () => ({
@@ -84,6 +84,9 @@ describe('runScheduledBackupCheck', () => {
       frequency: 'daily',
       retentionCount: 3,
       lastRunAt: new Date().toISOString(),
+      lastOutcome: 'success',
+      lastSuccessAt: new Date().toISOString(),
+      consecutiveFailures: 0,
     });
 
     await runScheduledBackupCheck();
@@ -98,6 +101,9 @@ describe('runScheduledBackupCheck', () => {
       frequency: 'daily',
       retentionCount: 5,
       lastRunAt: null,
+      lastOutcome: null,
+      lastSuccessAt: null,
+      consecutiveFailures: 0,
     });
 
     await runScheduledBackupCheck();
@@ -112,6 +118,9 @@ describe('runScheduledBackupCheck', () => {
       frequency: 'daily',
       retentionCount: 1,
       lastRunAt: null,
+      lastOutcome: null,
+      lastSuccessAt: null,
+      consecutiveFailures: 0,
     });
 
     await runScheduledBackupCheck();
@@ -125,6 +134,9 @@ describe('runScheduledBackupCheck', () => {
       frequency: 'daily',
       retentionCount: 3,
       lastRunAt: new Date().toISOString(),
+      lastOutcome: 'success',
+      lastSuccessAt: new Date().toISOString(),
+      consecutiveFailures: 0,
     });
     backup.pruneOldBackups.mockRejectedValue(new Error('permission denied'));
 
@@ -138,6 +150,9 @@ describe('runAppDataBackup failure reporting', () => {
     frequency: 'daily' as const,
     retentionCount: 3,
     lastRunAt: null,
+    lastOutcome: null,
+    lastSuccessAt: null,
+    consecutiveFailures: 0,
   };
 
   // The audit row for the dashboard's own archive is written first; the
@@ -229,5 +244,123 @@ describe('runAppDataBackup failure reporting', () => {
     await runScheduledBackupCheck();
 
     expect(appDataRow()?.metadata).toMatchObject({ dumped: 2, failed: 0, failures: [] });
+  });
+});
+
+describe('recording what the run actually did', () => {
+  const due = {
+    enabled: true,
+    frequency: 'daily' as const,
+    retentionCount: 3,
+    lastRunAt: null,
+    lastOutcome: null,
+    lastSuccessAt: null,
+    consecutiveFailures: 0,
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    backup.pruneOldBackups.mockResolvedValue([]);
+    backup.getBackupScheduleConfig.mockResolvedValue(due);
+    appEnv.readAppEnvValue.mockReturnValue('duplicati-password');
+    duplicati.runBackupJobNow.mockResolvedValue({ started: true, detail: 'ok' });
+    dumps.dumpAllAppDatabases.mockResolvedValue({ ok: 3, failed: 0, outcomes: [] });
+  });
+
+  it('stamps the run only after the app data has moved', async () => {
+    const order: string[] = [];
+    dumps.dumpAllAppDatabases.mockImplementation(async () => {
+      order.push('dump');
+      return { ok: 3, failed: 0, outcomes: [] };
+    });
+    duplicati.runBackupJobNow.mockImplementation(async () => {
+      order.push('engine');
+      return { started: true, detail: 'ok' };
+    });
+    backup.recordBackupScheduleRun.mockImplementation(async () => {
+      order.push('stamp');
+    });
+
+    await runScheduledBackupCheck();
+
+    // The old order was stamp-then-dump, which is why a total app-data failure
+    // still left a fresh timestamp behind it (§86.2).
+    expect(order).toEqual(['dump', 'engine', 'stamp']);
+  });
+
+  it('records success when the app data reached the engine', async () => {
+    await runScheduledBackupCheck();
+    expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('success');
+  });
+
+  it('records failure when the engine refused to start', async () => {
+    duplicati.runBackupJobNow.mockResolvedValue({ started: false, detail: 'rejected the password' });
+
+    await runScheduledBackupCheck();
+
+    expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
+  });
+
+  it('records failure when there is no password to hand the engine', async () => {
+    appEnv.readAppEnvValue.mockReturnValue(null);
+
+    await runScheduledBackupCheck();
+
+    expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
+  });
+
+  it('records failure when every dump failed, since nothing was made safe', async () => {
+    dumps.dumpAllAppDatabases.mockResolvedValue({ ok: 0, failed: 4, outcomes: [] });
+
+    await runScheduledBackupCheck();
+
+    expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
+  });
+
+  it('still records success when only some dumps failed', async () => {
+    // One unreachable database must not put the whole schedule into retry.
+    dumps.dumpAllAppDatabases.mockResolvedValue({ ok: 30, failed: 1, outcomes: [] });
+
+    await runScheduledBackupCheck();
+
+    expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('success');
+  });
+
+  it('records failure when the archive itself throws', async () => {
+    backup.createBackupArchive.mockRejectedValue(new Error('no space left on device'));
+
+    await runScheduledBackupCheck();
+
+    expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
+  });
+});
+
+describe('retrying a failed run', () => {
+  const hoursAgo = (n: number) => new Date(Date.now() - n * 60 * 60 * 1000).toISOString();
+
+  it('retries a failed daily run at the next hourly check, not a day later', () => {
+    expect(
+      shouldRunScheduledBackup(new Date(), hoursAgo(2), 'daily', { outcome: 'failed', consecutiveFailures: 1 })
+    ).toBe(true);
+  });
+
+  it('does not retry a failed run before the check interval has passed', () => {
+    expect(
+      shouldRunScheduledBackup(new Date(), hoursAgo(0.5), 'daily', { outcome: 'failed', consecutiveFailures: 1 })
+    ).toBe(false);
+  });
+
+  it('falls back to the normal cadence once the retry budget is spent', () => {
+    // A misconfigured backup fails identically every hour; hourly forever is a
+    // treadmill, not a retry.
+    expect(
+      shouldRunScheduledBackup(new Date(), hoursAgo(2), 'daily', { outcome: 'failed', consecutiveFailures: 4 })
+    ).toBe(false);
+  });
+
+  it('leaves a successful run on its configured cadence', () => {
+    expect(
+      shouldRunScheduledBackup(new Date(), hoursAgo(2), 'daily', { outcome: 'success', consecutiveFailures: 0 })
+    ).toBe(false);
   });
 });
