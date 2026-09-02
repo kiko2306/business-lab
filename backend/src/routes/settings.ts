@@ -22,7 +22,12 @@ import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSet
 import { testMailConnection } from '../services/mailTest';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig } from '../utils/exposureSettings';
 import { DEFAULT_TIMEZONE, getAppTimezone, isValidTimezone, setAppTimezone } from '../utils/generalSettings';
-import { getCrowdsecAlertsConfig, setCrowdsecAlertsEnabled } from '../utils/crowdsecAlerts';
+import {
+  getAlertNotifyConfig,
+  isValidAlertTopic,
+  setAlertTopic,
+  setCrowdsecAlertsEnabled,
+} from '../utils/alertNotify';
 import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
 
@@ -637,48 +642,65 @@ router.put('/general', async (req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// GET /api/settings/crowdsec-alerts — read the CrowdSec push-alert setting
+// GET /api/settings/alerts — the shared ntfy alert topic + per-source flags
 // ---------------------------------------------------------------------------
-router.get('/crowdsec-alerts', async (_req: Request, res: Response) => {
+router.get('/alerts', async (_req: Request, res: Response) => {
   try {
-    const { enabled, topic } = await getCrowdsecAlertsConfig();
-    return res.json({ enabled, topic });
+    return res.json(await getAlertNotifyConfig());
   } catch {
-    return res.status(500).json({ error: 'Unable to load CrowdSec alert settings.' });
+    return res.status(500).json({ error: 'Unable to load alert settings.' });
   }
 });
 
 // ---------------------------------------------------------------------------
-// PUT /api/settings/crowdsec-alerts — turn CrowdSec push alerts on/off
-// Takes effect on the next CrowdSec (re)start: services/crowdsecConfig.ts
-// re-renders profiles.yaml + notifications/http.yaml.
+// PUT /api/settings/alerts — set the ntfy topic and/or a source flag.
+// A CrowdSec change takes effect on the next CrowdSec (re)start:
+// services/crowdsecConfig.ts re-renders profiles.yaml + notifications/http.yaml.
 // ---------------------------------------------------------------------------
-router.put('/crowdsec-alerts', async (req: Request, res: Response) => {
-  const enabled = req.body?.enabled;
-  if (typeof enabled !== 'boolean') {
-    return res.status(400).json({ error: 'enabled must be true or false.' });
+router.put('/alerts', async (req: Request, res: Response) => {
+  const body = req.body ?? {};
+  const hasTopic = 'topic' in body;
+  const hasCrowdsec = 'crowdsecEnabled' in body;
+
+  if (!hasTopic && !hasCrowdsec) {
+    return res.status(400).json({ error: 'Provide "topic" and/or "crowdsecEnabled".' });
+  }
+  if (hasCrowdsec && typeof body.crowdsecEnabled !== 'boolean') {
+    return res.status(400).json({ error: 'crowdsecEnabled must be true or false.' });
+  }
+  if (hasTopic && !isValidAlertTopic(body.topic)) {
+    return res
+      .status(400)
+      .json({ error: 'Topic must be 1–64 characters: letters, digits, hyphens and underscores only.' });
   }
 
   try {
-    await setCrowdsecAlertsEnabled(enabled);
+    if (hasTopic) {
+      await setAlertTopic(body.topic);
+    }
+    if (hasCrowdsec) {
+      await setCrowdsecAlertsEnabled(body.crowdsecEnabled);
+    }
     await writeAuditLog({
       userId: req.user?.id ?? null,
       action: 'settings_change',
-      resource: 'crowdsec_alerts_enabled',
+      resource: 'ntfy_alerts',
       result: 'success',
-      metadata: { enabled },
+      metadata: {
+        ...(hasTopic ? { topic: body.topic } : {}),
+        ...(hasCrowdsec ? { crowdsecEnabled: body.crowdsecEnabled } : {}),
+      },
     }).catch(() => {});
 
-    const { topic } = await getCrowdsecAlertsConfig();
+    const saved = await getAlertNotifyConfig();
     return res.json({
-      enabled,
-      topic,
-      message: enabled
-        ? 'CrowdSec alerts on. Restart CrowdSec to apply, then subscribe to the topic in ntfy.'
-        : 'CrowdSec alerts off. Restart CrowdSec to apply.',
+      ...saved,
+      message: saved.crowdsecEnabled
+        ? 'Saved. Restart CrowdSec to apply, then subscribe to the topic in ntfy.'
+        : 'Saved. Restart CrowdSec to apply.',
     });
   } catch {
-    return res.status(500).json({ error: 'Unable to save CrowdSec alert settings.' });
+    return res.status(500).json({ error: 'Unable to save alert settings.' });
   }
 });
 

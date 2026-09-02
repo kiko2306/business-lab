@@ -40,7 +40,7 @@ import logger from '../utils/logger';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
-import { getCrowdsecAlertsConfig } from '../utils/crowdsecAlerts';
+import { getAlertNotifyConfig } from '../utils/alertNotify';
 
 const NPM_SERVICE = 'nginx-proxy-manager';
 const BOUNCER_CONFIG_RELATIVE = path.join('config', 'cloudflare-worker-bouncer.yaml');
@@ -356,12 +356,12 @@ function resolveAlertTarget(topic: string): string {
  * whether profiles.yaml references the notification.
  */
 async function writeCrowdsecAlertConfig(appDir: string): Promise<void> {
-  const { enabled, topic } = await getCrowdsecAlertsConfig();
+  const { crowdsecEnabled, topic } = await getAlertNotifyConfig();
   const target = resolveAlertTarget(topic);
 
   const profilesChanged = writeIfChanged(
     path.join(appDir, PROFILES_CONFIG_RELATIVE),
-    buildProfilesYaml(enabled),
+    buildProfilesYaml(crowdsecEnabled),
     0o644
   );
   const httpChanged = writeIfChanged(
@@ -372,7 +372,7 @@ async function writeCrowdsecAlertConfig(appDir: string): Promise<void> {
 
   if (profilesChanged || httpChanged) {
     logger.info(
-      `CrowdSec: rendered alerting config (${enabled ? `enabled → ${target}` : 'disabled'})`
+      `CrowdSec: rendered alerting config (${crowdsecEnabled ? `enabled → ${target}` : 'disabled'})`
     );
   }
 }

@@ -137,10 +137,12 @@ export interface GeneralSettings {
   timezones: string[];
 }
 
-export interface CrowdsecAlertSettings {
-  enabled: boolean;
-  // ntfy topic the alerts are published to. Subscribe to it in an ntfy client.
+export interface AlertNotifySettings {
+  // The ntfy topic every alert source publishes to. Subscribe to it in an
+  // ntfy client.
   topic: string;
+  // Per-source flags.
+  crowdsecEnabled: boolean;
 }
 
 export interface ExposureSettingsInput {

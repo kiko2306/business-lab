@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { sanitizePastedText } from '../../core/input-sanitize';
@@ -18,7 +18,7 @@ import {
   BackupJobProvisionResponse,
   ExposureTestResponse,
   GeneralSettings,
-  CrowdsecAlertSettings,
+  AlertNotifySettings,
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
@@ -26,7 +26,7 @@ import { ToastService } from '../../core/toast.service';
 @Component({
   selector: 'app-settings-panel',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule],
   templateUrl: './settings-panel.component.html',
   styleUrl: './settings-panel.component.css'
 })
@@ -116,10 +116,13 @@ export class SettingsPanelComponent implements OnInit {
   protected backupTargetTestResult: BackupTargetTestResponse | null = null;
   protected provisioningJob = false;
   protected backupJob: BackupJobProvisionResponse | null = null;
-  protected crowdsecAlerts: CrowdsecAlertSettings | null = null;
-  protected crowdsecAlertsLoading = true;
-  protected savingCrowdsecAlerts = false;
-  protected crowdsecAlertsFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  protected alertSettings: AlertNotifySettings | null = null;
+  protected alertsLoading = true;
+  protected savingAlerts = false;
+  protected alertsFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  // Editable copy of the ntfy topic; committed on "Save topic".
+  protected alertTopicDraft = '';
+  protected readonly alertTopicPattern = /^[A-Za-z0-9_-]{1,64}$/;
 
   sanitizeTokenPaste(event: ClipboardEvent): void {
     const pasted = event.clipboardData?.getData('text') ?? '';
@@ -135,40 +138,63 @@ export class SettingsPanelComponent implements OnInit {
     this.loadGeneralSettings();
     this.loadMailSettings();
     this.loadBackupTarget();
-    this.loadCrowdsecAlerts();
+    this.loadAlertSettings();
   }
 
-  private loadCrowdsecAlerts(): void {
-    this.crowdsecAlertsLoading = true;
+  private loadAlertSettings(): void {
+    this.alertsLoading = true;
     this.settingsService
-      .loadCrowdsecAlerts()
-      .pipe(finalize(() => (this.crowdsecAlertsLoading = false)))
+      .loadAlertSettings()
+      .pipe(finalize(() => (this.alertsLoading = false)))
       .subscribe({
-        next: (settings) => (this.crowdsecAlerts = settings),
+        next: (settings) => {
+          this.alertSettings = settings;
+          this.alertTopicDraft = settings.topic;
+        },
         error: (error) => {
-          this.crowdsecAlertsFeedback = {
+          this.alertsFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Unable to load CrowdSec alert settings.'),
+            message: extractErrorMessage(error, 'Unable to load alert settings.'),
           };
         },
       });
   }
 
+  protected get alertTopicDirty(): boolean {
+    return !!this.alertSettings && this.alertTopicDraft.trim() !== this.alertSettings.topic;
+  }
+
+  protected get alertTopicValid(): boolean {
+    return this.alertTopicPattern.test(this.alertTopicDraft.trim());
+  }
+
   toggleCrowdsecAlerts(enabled: boolean): void {
-    this.savingCrowdsecAlerts = true;
-    this.crowdsecAlertsFeedback = null;
+    this.saveAlertSettings({ crowdsecEnabled: enabled });
+  }
+
+  saveAlertTopic(): void {
+    if (!this.alertTopicValid) {
+      return;
+    }
+    this.saveAlertSettings({ topic: this.alertTopicDraft.trim() });
+  }
+
+  private saveAlertSettings(input: { topic?: string; crowdsecEnabled?: boolean }): void {
+    this.savingAlerts = true;
+    this.alertsFeedback = null;
     this.settingsService
-      .saveCrowdsecAlerts(enabled)
-      .pipe(finalize(() => (this.savingCrowdsecAlerts = false)))
+      .saveAlertSettings(input)
+      .pipe(finalize(() => (this.savingAlerts = false)))
       .subscribe({
         next: (response) => {
-          this.crowdsecAlerts = { enabled: response.enabled, topic: response.topic };
-          this.crowdsecAlertsFeedback = { type: 'success', message: response.message };
+          this.alertSettings = { topic: response.topic, crowdsecEnabled: response.crowdsecEnabled };
+          this.alertTopicDraft = response.topic;
+          this.alertsFeedback = { type: 'success', message: response.message };
         },
         error: (error) => {
-          this.crowdsecAlertsFeedback = {
+          this.alertsFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Unable to save CrowdSec alert settings.'),
+            message: extractErrorMessage(error, 'Unable to save alert settings.'),
           };
         },
       });

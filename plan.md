@@ -12042,3 +12042,16 @@ own items. Not started.
 
 Next (§118.2/§118.3/§118.4): shared network / the §64 workflow-provisioning
 spike / the dedupe+format workflow, then repoint the `url` at the n8n webhook.
+
+### 118.1b Generalised to "ntfy alerts" + editable topic
+
+Per feedback: the topic is now a plain editable field (readable default
+`homelab-alerts`, ntfy charset validated) rather than an unguessable generated
+string — the UI carries the "keep it non-obvious, the stream has attacker IPs"
+warning instead of enforcing it. And the setting is framed as a shared alert
+hub, not CrowdSec-specific: `utils/crowdsecAlerts.ts` → `utils/alertNotify.ts`
+(`ntfy_alerts_topic` shared key + per-source `crowdsec_alerts_enabled`),
+`/api/settings/crowdsec-alerts` → `/api/settings/alerts`, and the settings
+card is "ntfy alerts" with a Sources list (CrowdSec the only entry today).
+Re-verified: `cscli notifications test http_default` delivered to the
+`homelab-alerts` topic.

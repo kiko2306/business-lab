@@ -227,50 +227,78 @@
 <section class="card border-0 shadow-sm mt-4">
   <div class="card-body p-4">
     <div class="mb-3">
-      <h2 class="h4 mb-1">CrowdSec alerts</h2>
+      <h2 class="h4 mb-1">ntfy alerts</h2>
       <p class="text-body-secondary mb-0">
-        Push a notification whenever CrowdSec flags an IP. Takes effect the next time CrowdSec is started.
-        Delivered to an ntfy topic — subscribe to it in the ntfy app to get the alerts on your phone.
+        One ntfy topic every alert this dashboard raises is published to. Subscribe to it in the ntfy app
+        to get them on your phone. Turn individual sources on below.
       </p>
     </div>
 
-    <div *ngIf="crowdsecAlertsLoading" class="text-body-secondary small">Loading…</div>
+    <div *ngIf="alertsLoading" class="text-body-secondary small">Loading…</div>
 
-    <div *ngIf="!crowdsecAlertsLoading && crowdsecAlerts" class="row g-3">
+    <div *ngIf="!alertsLoading && alertSettings" class="row g-3">
+      <div class="col-12 col-md-8">
+        <label class="form-label fw-semibold" for="alertTopic">ntfy topic</label>
+        <div class="input-group">
+          <input
+            id="alertTopic"
+            class="form-control font-monospace"
+            [(ngModel)]="alertTopicDraft"
+            [ngModelOptions]="{ standalone: true }"
+            maxlength="64"
+            placeholder="homelab-alerts"
+          />
+          <button
+            type="button"
+            class="btn btn-outline-primary"
+            [disabled]="savingAlerts || !alertTopicDirty || !alertTopicValid"
+            (click)="saveAlertTopic()"
+          >
+            Save topic
+          </button>
+        </div>
+        <p class="form-text mb-0" [class.text-danger]="alertTopicDraft && !alertTopicValid">
+          <ng-container *ngIf="alertTopicDraft && !alertTopicValid; else topicHint">
+            Letters, digits, hyphens and underscores only, up to 64 characters.
+          </ng-container>
+          <ng-template #topicHint>
+            ntfy topics are open by name, so anyone who knows it can read the alert stream (which
+            includes attacker IPs) — keep it non-obvious.
+          </ng-template>
+        </p>
+      </div>
+
       <div class="col-12">
+        <label class="form-label fw-semibold mb-2">Sources</label>
         <div class="form-check form-switch">
           <input
             class="form-check-input"
             type="checkbox"
             role="switch"
             id="crowdsecAlertsEnabled"
-            [checked]="crowdsecAlerts.enabled"
-            [disabled]="savingCrowdsecAlerts"
+            [checked]="alertSettings.crowdsecEnabled"
+            [disabled]="savingAlerts"
             (change)="toggleCrowdsecAlerts($any($event.target).checked)"
           />
-          <label class="form-check-label fw-semibold" for="crowdsecAlertsEnabled">
-            Push CrowdSec detections
+          <label class="form-check-label" for="crowdsecAlertsEnabled">
+            <span class="fw-semibold">CrowdSec intrusion alerts</span>
+            <span class="d-block text-body-secondary small">
+              A push whenever CrowdSec flags an IP. Applies on the next CrowdSec restart.
+            </span>
           </label>
         </div>
       </div>
-      <div class="col-12">
-        <label class="form-label fw-semibold">ntfy topic</label>
-        <input class="form-control font-monospace" [value]="crowdsecAlerts.topic" readonly />
-        <p class="form-text mb-0">
-          Subscribe to this topic in your ntfy client. It's per-deployment and unguessable so the alert
-          stream (which includes attacker IPs) isn't world-readable.
-        </p>
-      </div>
-      <div class="col-12" *ngIf="crowdsecAlertsFeedback">
+
+      <div class="col-12" *ngIf="alertsFeedback">
         <span
           class="small"
           [ngClass]="{
-            'text-success': crowdsecAlertsFeedback.type === 'success',
-            'text-danger': crowdsecAlertsFeedback.type === 'danger',
-            'text-body-secondary': crowdsecAlertsFeedback.type === 'info'
+            'text-success': alertsFeedback.type === 'success',
+            'text-danger': alertsFeedback.type === 'danger',
+            'text-body-secondary': alertsFeedback.type === 'info'
           }"
         >
-          {{ crowdsecAlertsFeedback.message }}
+          {{ alertsFeedback.message }}
         </span>
       </div>
     </div>

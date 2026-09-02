@@ -11,9 +11,9 @@
 #
 # Today `url` points at the local ntfy instance via
 # `host.docker.internal:<NTFY_PORT>` (the crowdsec service has
-# host.docker.internal:host-gateway as an extra_host) and a per-deployment
-# generated topic, so a scanner hit lands as a phone push for anyone
-# subscribed to that ntfy topic.
+# host.docker.internal:host-gateway as an extra_host) and the shared ntfy
+# alert topic from Settings → "ntfy alerts", so a scanner hit lands as a phone
+# push for anyone subscribed to that topic.
 
 type: http
 name: http_default
@@ -27,7 +27,7 @@ timeout: 10s
 format: |
   {{ .|toJson }}
 
-url: "http://host.docker.internal:10290/crowdsec-XXXXXXXX"
+url: "http://host.docker.internal:10290/homelab-alerts"
 method: POST
 headers:
   Content-Type: application/json
