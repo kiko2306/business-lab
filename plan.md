@@ -12364,3 +12364,16 @@ store is the fix if it ever proves noisy — README item.
 **Real stack:** noise-only batch → no push; a batch with one IP under two
 scenarios + a noise entry → a single push with a single line
 (`http-probing — 203.0.113.20 (US) · 7 events`). 6 n8nWorkflows tests pass.
+
+### 120a Done — Test button per source
+
+- `services/alertTest.ts`: `runAlertTest('crowdsec')` POSTs a sample alert
+  (fresh 192.0.2.x each call so repeats always deliver) to the n8n relay
+  webhook via `host.docker.internal:<N8N_PORT>`, maps 2xx→ok, 404→"start n8n",
+  else the status. `POST /api/settings/alerts/test {source}` (audit-logged).
+- settings-panel: a "Test" button on the CrowdSec source row, disabled when
+  the source is off or a test is in flight; result goes to the card's
+  feedback line.
+- Real stack: `runAlertTest('crowdsec')` → `{ok:true}` and the ntfy topic got
+  `homelab-management/alert-test — 192.0.2.86 (US) · 1 events` through the full
+  relay. 322 backend + 28 frontend tests pass.

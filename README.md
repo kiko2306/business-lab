@@ -259,12 +259,6 @@ it is done — not ticked off and left behind. Section references point at
       re-imports every boot, so a managed workflow's UI edits are replaced.
       Fine for now (matches every other generated config here); revisit
       skip-if-exists if someone needs to customise one in place.
-- [ ] **Per-source Test button in "ntfy alerts"** (§120) — each Sources row
-      gets a Test button: `POST /api/settings/alerts/test {source}` → backend
-      posts a sample alert down that source's real path (CrowdSec → the n8n
-      relay webhook → ntfy) → toast the result. Tests the delivery path +
-      subscription, not CrowdSec's own parser (no `docker exec` for
-      `cscli notifications test`).
 - [ ] **n8n's Postgres is 15; n8n 2.36 wants 17 (16 on compat)** (§118.3) —
       `apps/n8n/docker-compose.yml` runs `postgres:15-alpine`; n8n logs
       "Postgres 15 is not supported" on every start. Runs with a warning for

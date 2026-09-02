@@ -28,6 +28,7 @@ import {
   setAlertTopic,
   setCrowdsecAlertsEnabled,
 } from '../utils/alertNotify';
+import { runAlertTest, AlertSource } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
 
@@ -702,6 +703,27 @@ router.put('/alerts', async (req: Request, res: Response) => {
   } catch {
     return res.status(500).json({ error: 'Unable to save alert settings.' });
   }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/settings/alerts/test — fire a sample alert down one source's path
+// ---------------------------------------------------------------------------
+router.post('/alerts/test', async (req: Request, res: Response) => {
+  const source = req.body?.source;
+  if (source !== 'crowdsec') {
+    return res.status(400).json({ error: 'source must be one of: crowdsec.' });
+  }
+
+  const result = await runAlertTest(source as AlertSource);
+  await writeAuditLog({
+    userId: req.user?.id ?? null,
+    action: 'settings_change',
+    resource: 'ntfy_alerts_test',
+    result: result.ok ? 'success' : 'failure',
+    metadata: { source },
+  }).catch(() => {});
+
+  return res.status(result.ok ? 200 : 502).json(result);
 });
 
 export default router;

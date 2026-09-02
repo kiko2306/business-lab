@@ -134,4 +134,12 @@ export class SettingsService {
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }
+
+  testAlertSource(source: string): Observable<{ ok: boolean; message: string }> {
+    return this.http.post<{ ok: boolean; message: string }>(
+      `${API_BASE_URL}/settings/alerts/test`,
+      { source },
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
 }

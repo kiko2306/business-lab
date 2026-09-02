@@ -270,22 +270,37 @@
 
       <div class="col-12">
         <label class="form-label fw-semibold mb-2">Sources</label>
-        <div class="form-check form-switch">
-          <input
-            class="form-check-input"
-            type="checkbox"
-            role="switch"
-            id="crowdsecAlertsEnabled"
-            [checked]="alertSettings.crowdsecEnabled"
-            [disabled]="savingAlerts"
-            (change)="toggleCrowdsecAlerts($any($event.target).checked)"
-          />
-          <label class="form-check-label" for="crowdsecAlertsEnabled">
-            <span class="fw-semibold">CrowdSec intrusion alerts</span>
-            <span class="d-block text-body-secondary small">
-              A push whenever CrowdSec flags an IP. Applies on the next CrowdSec restart.
-            </span>
-          </label>
+        <div class="d-flex align-items-start gap-3">
+          <div class="form-check form-switch flex-grow-1">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              role="switch"
+              id="crowdsecAlertsEnabled"
+              [checked]="alertSettings.crowdsecEnabled"
+              [disabled]="savingAlerts"
+              (change)="toggleCrowdsecAlerts($any($event.target).checked)"
+            />
+            <label class="form-check-label" for="crowdsecAlertsEnabled">
+              <span class="fw-semibold">CrowdSec intrusion alerts</span>
+              <span class="d-block text-body-secondary small">
+                A push whenever CrowdSec flags an IP. Applies on the next CrowdSec restart.
+              </span>
+            </label>
+          </div>
+          <button
+            type="button"
+            class="btn btn-outline-secondary btn-sm flex-shrink-0"
+            [disabled]="!alertSettings.crowdsecEnabled || testingAlertSource === 'crowdsec'"
+            (click)="testAlertSource('crowdsec')"
+          >
+            <span
+              *ngIf="testingAlertSource === 'crowdsec'"
+              class="spinner-border spinner-border-sm me-1"
+              aria-hidden="true"
+            ></span>
+            Test
+          </button>
         </div>
       </div>
 

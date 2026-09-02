@@ -123,6 +123,7 @@ export class SettingsPanelComponent implements OnInit {
   // Editable copy of the ntfy topic; committed on "Save topic".
   protected alertTopicDraft = '';
   protected readonly alertTopicPattern = /^[A-Za-z0-9_-]{1,64}$/;
+  protected testingAlertSource: string | null = null;
 
   sanitizeTokenPaste(event: ClipboardEvent): void {
     const pasted = event.clipboardData?.getData('text') ?? '';
@@ -177,6 +178,25 @@ export class SettingsPanelComponent implements OnInit {
       return;
     }
     this.saveAlertSettings({ topic: this.alertTopicDraft.trim() });
+  }
+
+  testAlertSource(source: string): void {
+    this.testingAlertSource = source;
+    this.alertsFeedback = null;
+    this.settingsService
+      .testAlertSource(source)
+      .pipe(finalize(() => (this.testingAlertSource = null)))
+      .subscribe({
+        next: (res) => {
+          this.alertsFeedback = { type: res.ok ? 'success' : 'danger', message: res.message };
+        },
+        error: (error) => {
+          this.alertsFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Test failed.'),
+          };
+        },
+      });
   }
 
   private saveAlertSettings(input: { topic?: string; crowdsecEnabled?: boolean }): void {
