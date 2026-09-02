@@ -31,4 +31,8 @@
   every app database, then Duplicati) — use it to check a destination you have
   just changed rather than waiting for the next scheduled run.
 - Restore when needed.
-- Use recovery mode for emergency admin reset from localhost only.
+- Recovery mode (emergency admin-password reset) is API-only and gated to
+  localhost. On this containerized deployment a request from the host does not
+  count as localhost, so there is currently no sanctioned way to use it on a
+  headless server — see `docs/recovery-troubleshooting.md`. Tracked as an open
+  item in the README.

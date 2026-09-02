@@ -11355,3 +11355,37 @@ create is not worth it. Covered by unit tests instead: 2 in `npmClient.test.ts`
 (recover the id when the host turns up on re-query; re-throw the original when
 it does not) and 1 in `exposure.test.ts` (the recovered id lands on the failed
 `service_exposure` row). Backend typecheck + full suite 292/292.
+
+## 105. Recovery mode's localhost gate is unreachable on this deployment
+
+Flagged while reviewing the user guide's "emergency admin reset from localhost
+only" line. Recovery mode is three endpoints —
+`POST /api/recovery/{enable,reset-admin-password,disable}` — each gated on
+`isLocalRequest(req)`, i.e. `req.ip` in `127.0.0.1` / `::1` / `::ffff:127.0.0.1`.
+
+The backend runs inside a container behind a published-port mapping. A request
+from the host to `localhost:3000` is NAT'd by Docker and arrives at the
+container from the bridge gateway address, not loopback. Verified against the
+live stack:
+
+    $ curl -s -X POST http://localhost:3000/api/recovery/enable \
+        -H 'Content-Type: application/json' -d '{"confirm":"ENABLE_RECOVERY_MODE"}'
+    {"error":"Recovery mode can only be enabled from localhost."}
+
+So the documented procedure does not work. The only address that satisfies the
+gate is one issued from *inside* the container — `docker compose exec backend
+wget -qO- --post-data … http://localhost:3000/api/recovery/enable` (there is no
+`curl` in the image, only `wget` and `node`). That is exactly the `docker exec`
+runbook step §0 principle 2 forbids, and it is undiscoverable besides.
+
+Net: on a real headless deployment there is no sanctioned way to reset a
+locked-out admin. `trust proxy` is `1`, so widening the gate to honour an
+`X-Forwarded-For` from a trusted host hop is one option; others are a
+`start.sh recover` subcommand that shells into the container as the tool rather
+than a manual step, a second listener on a root-only Unix socket bind-mounted
+to the host, or a one-shot token file the backend reads from a host-mounted
+path. Not decided here.
+
+Done now: README TODO item under Security (§105), and `docs/user-guide.md` /
+`docs/recovery-troubleshooting.md` corrected to state the gap and give the
+Postgres-direct fallback rather than describing a procedure that 403s.

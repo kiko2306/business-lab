@@ -132,6 +132,16 @@ it is done — not ticked off and left behind. Section references point at
       tunnel (`homelab.tx-home-utils.com`, `api-homelab.tx-home-utils.com`),
       independent of the per-service exposure feature. Nothing in the codebase
       implements TOTP today.
+- [ ] **Recovery mode is unreachable on a headless host** (§105) — `POST
+      /api/recovery/{enable,reset-admin-password,disable}` gate on
+      `isLocalRequest` (`req.ip` ∈ `127.0.0.1`/`::1`). The backend runs in a
+      container, so a `curl` from the host arrives from the Docker bridge
+      gateway (`10.201.0.1` here) and is refused — verified, it 403s. The only
+      way in is `docker compose exec backend wget …`, which is the
+      `docker exec` runbook step §0 principle 2 rules out (and `curl` isn't in
+      the image). A locked-out admin on a real deployment has no sanctioned
+      reset. Needs a real mechanism — a `start.sh recover` subcommand, a
+      root-only Unix socket, or a one-shot token file on a host-mounted path.
 
 ### Backups
 
