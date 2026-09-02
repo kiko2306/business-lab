@@ -10749,3 +10749,36 @@ a TODO item rather than something done in passing, and it wants a test at the
 `/var/lib/containerd` removed: `/` went from 55 G used (59%) to **9.1 G (10%)**,
 about 46 GB reclaimed — more than the second SSD added to that filesystem, as
 §87.2 predicted. `/var/lib/docker` (~100 MB) is still in place.
+
+### 92.4 Understated: it is every LAN address, not just localhost
+
+§92 tested `localhost:10190` from the server itself, which was the weaker
+check — it invites the reading "a loopback quirk". Asked where `localhost` even
+resolves in this setup, since the agent session is driven from a laptop while
+the stack runs on `home-srv-01`.
+
+Worth stating plainly for the record: **every command in these sessions runs on
+the server.** `hostname` is `home-srv-01`, `DOCKER_HOST` is unset with the
+context on `unix:///var/run/docker.sock`, `docker0` is `10.201.0.1`, the repo
+lives on the `/home` volume §87 grew, and `:3000`/`:10190` listen on `0.0.0.0`
+there. The laptop is a terminal onto it. So `localhost:10190` was the server's
+own loopback reaching the published port — a valid check, but not the
+interesting one.
+
+The interesting one is what a LAN client actually sends:
+
+| `Host:` header | |
+|---|---|
+| `localhost:10190` | 400 |
+| `192.168.1.23:10190` | **400** |
+| `home-srv-01:10190` | **400** |
+| `homepage.tx-home-utils.com` | 200 |
+
+So the start page is unreachable from any machine on the LAN by any name it
+would use — which is the whole point of a start page. `.env.example` even
+carries `localhost:10190,192.168.1.23:3000` as its suggested value, so the LAN
+IP was always meant to be in that list.
+
+The lesson is the §75.7 one again, from the other side: the check that looked
+sufficient was the one run from the most convenient place. Testing from where
+the *user* is would have found this immediately.

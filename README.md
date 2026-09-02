@@ -260,9 +260,10 @@ it is done — not ticked off and left behind. Section references point at
 - [ ] **Exposure's allow-list merge ignores compose defaults** (§92) — the
       override is seeded only from the app's `.env`, so an app relying on a
       compose `${VAR:-default}` for its `allowedHosts` key loses that default
-      when exposed. Home Page is live proof: exposed, its LAN port returns
-      `400 Host validation failed` while the public hostname returns 200, and a
-      non-dashboard start flips which one works. Seed the merge from the compose
+      when exposed. Home Page is live proof: exposed, it returns
+      `400 Host validation failed` to **every** LAN address — `localhost:10190`,
+      `192.168.1.23:10190`, `home-srv-01:10190` — while the public hostname
+      returns 200, and a non-dashboard start flips which one works (§92.4). Seed the merge from the compose
       default too — `extractComposeEnvVars` already returns it — and test it at
       `computeExposureEnvOverrides`, which is pure.
 - [ ] **Periodic exposure drift reconciliation** — `POST
