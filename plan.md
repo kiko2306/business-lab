@@ -10064,3 +10064,22 @@ auth token.
 
 Still to do, both now TODO items: change that default password, and expose it
 behind Authelia. It is LAN-only as it stands.
+
+### 80.4a Closed: Home Page serves its public hostname
+
+Restarted through the dashboard, which is the only path that applies the
+exposure env overrides. The normalisation from §80.4 did what it was written
+for: the stored `https://homepage.tx-home-utils.com` reached the container as
+the bare host it has to be —
+
+    HOMEPAGE_ALLOWED_HOSTS=homepage.tx-home-utils.com
+
+and the public hostname went from `400 Host validation failed` to **200**, LAN
+included. The stored value never needed hand-editing; it just needed a start
+through the right path, which took until there was a dashboard account to do it
+with.
+
+Also confirmed on the same pass, after the user re-ran `start.sh` with §85 in
+place: no Cloudflare warning, and `filebrowser.tx-home-utils.com` answers 200
+end to end — Cloudflare Tunnel → NPM → app — so the tunnel phase ran rather
+than being skipped.
