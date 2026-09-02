@@ -190,9 +190,49 @@ export function pickLocalDigest(repoDigests: string[], repository: string): stri
       return digest ?? null;
     }
   }
-  // A single entry with a name we could not match is still this image's digest;
-  // a locally built image has none at all.
+  // A single entry with a name we could not match is still this image's digest.
+  // Note this does NOT identify a locally built image: with the containerd
+  // store those carry a RepoDigest too — see builtImageNames.
   return repoDigests.length === 1 ? repoDigests[0].split('@')[1] ?? null : null;
+}
+
+/**
+ * Image names a compose project builds itself, which no registry has ever
+ * heard of.
+ *
+ * "It has no RepoDigests" was the obvious test and it is wrong here: with the
+ * containerd image store a locally built image carries one anyway
+ * (`pantry-pantry@sha256:…`), so both custom apps reported as permanently
+ * unknown until this looked at the compose file instead. A service with a
+ * `build:` uses either its declared `image:` or compose's default name,
+ * `<project>-<service>`.
+ */
+export function builtImageNames(config: unknown, projectName: string): Set<string> {
+  const names = new Set<string>();
+  const services = (config as { services?: Record<string, { build?: unknown; image?: unknown }> })?.services;
+  if (!services) {
+    return names;
+  }
+  for (const [key, service] of Object.entries(services)) {
+    if (!service?.build) {
+      continue;
+    }
+    names.add(typeof service.image === 'string' ? service.image : `${projectName}-${key}`);
+  }
+  return names;
+}
+
+async function locallyBuiltImages(projectName: string, composeFile: string): Promise<Set<string>> {
+  try {
+    return builtImageNames(
+      JSON.parse(await run(`docker compose -p ${projectName} -f ${composeFile} config --format json`)),
+      projectName
+    );
+  } catch {
+    // Worst case the image is checked and reported unknown, which is what
+    // happened before this existed — noisy, not wrong.
+    return new Set();
+  }
 }
 
 export interface ServiceUpdateCheck {
@@ -223,11 +263,13 @@ export async function checkServiceImages(serviceName: string): Promise<ServiceUp
     return result;
   }
 
+  const built = await locallyBuiltImages(projectName, resolved.composeFile);
+
   // One entry per distinct image: a multi-container app often runs two
   // containers on the same one, and asking the registry twice is wasted quota.
   for (const name of new Set([...images.values()].map((image) => image.name))) {
     const ref = parseImageRef(name);
-    if (!ref || ref.pinned) {
+    if (!ref || ref.pinned || built.has(name) || built.has(name.replace(/:latest$/, ''))) {
       continue;
     }
 

@@ -65,25 +65,29 @@ so and leave it uncommitted rather than pushing a checkpoint.
 Check `git status` before committing — the repo is public, and `.env` files must
 never be in the diff.
 
-## Multi-part work: plan, then TODO, then ask
+## The working loop
 
-For anything with more than one piece, the order is fixed:
+Every task runs through the same six steps, in order, every time:
 
-1. **Plan it** — append a new numbered section to `plan.md` describing what is
-   being done and why, including what was considered and rejected.
-2. **Track it** — add each piece to the README TODO list.
-3. **Ask** — ask which task to start. Do not pick one and begin.
+1. **Read the README TODO list.** It is the source of what is open — not
+   memory, not the last thing discussed.
+2. **Propose.** Name the task you would do next, or show a short list to choose
+   from. Do not pick one and start.
+3. **Implement** — that one task.
+4. **Update `plan.md` and `README.md`.** A new numbered `plan.md` section
+   saying what was done and why (including what was tried and rejected), and
+   the finished item **deleted** from the README list.
+5. **Commit and push, on success.** Success means the affected workspace's
+   checks pass and anything touching Docker/exposure/networking/backups has
+   been proven against the real stack. If it is not verified, say so plainly
+   and leave it uncommitted — never push a checkpoint and never call it done.
+6. **Back to step 1.** Report, re-read the list, propose again. Do not roll
+   straight into the next item, however obviously related.
 
-A single small change still goes straight to implementation; this is for work
-that arrives as a list. The point is that intent survives a session that runs
-long or gets interrupted, and that the order things get built in stays the
-user's call.
-
-**Then stop when that change is complete.** Finish it properly — checks pass,
-verified against the real stack, committed, its TODO item deleted — and stop
-there to report. Do not roll straight on into the next item, even an obviously
-related one, and even when it was in the same plan. Picking up the next task is
-the user's call, every time.
+When work arrives as a list rather than a single task, insert a planning pass
+before step 2: append the plan to `plan.md`, add each piece to the README list,
+and then propose. That way intent survives a session that runs long or gets
+interrupted, and the order things get built in stays the user's call.
 
 ## TODOs live in README.md, and get deleted
 

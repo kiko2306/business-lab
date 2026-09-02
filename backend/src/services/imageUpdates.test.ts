@@ -5,7 +5,7 @@ vi.mock('../utils/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { parseAuthChallenge, parseImageRef, pickLocalDigest } from './imageUpdates';
+import { builtImageNames, parseAuthChallenge, parseImageRef, pickLocalDigest } from './imageUpdates';
 
 describe('parseImageRef', () => {
   it('sends a bare name to Docker Hub under library/', () => {
@@ -89,5 +89,27 @@ describe('pickLocalDigest', () => {
 
   it('returns null for a locally built image, which has no digests at all', () => {
     expect(pickLocalDigest([], 'homelab-backend')).toBeNull();
+  });
+});
+
+describe('builtImageNames', () => {
+  it('uses compose\'s default name for a service that builds without an image key', () => {
+    const config = { services: { pantry: { build: { context: './app' } } } };
+    expect([...builtImageNames(config, 'pantry')]).toEqual(['pantry-pantry']);
+  });
+
+  it('prefers a declared image name', () => {
+    const config = { services: { web: { build: '.', image: 'my/app:1.0' } } };
+    expect([...builtImageNames(config, 'proj')]).toEqual(['my/app:1.0']);
+  });
+
+  it('ignores services that only pull', () => {
+    const config = { services: { db: { image: 'postgres:16' }, web: { build: '.' } } };
+    expect([...builtImageNames(config, 'proj')]).toEqual(['proj-web']);
+  });
+
+  it('survives compose output it does not recognise', () => {
+    expect(builtImageNames(null, 'proj').size).toBe(0);
+    expect(builtImageNames({}, 'proj').size).toBe(0);
   });
 });
