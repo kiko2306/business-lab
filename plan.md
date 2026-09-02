@@ -12285,3 +12285,60 @@ Home Page tile (an unexposed app has none anyway, §112.3 — but the mandatory
 10xxx host port per the scheme) on the LAN only. This removes the NPM/tunnel
 surface but not the licence question (121.1) — the client still runs a
 proprietary MS EULA product on the box we build.
+
+### 121.5 Licence pinned — cleared, with a required acceptance gate
+
+Fetched the actual text: **Microsoft Software License Terms — SQL Server 2022
+Developer, Express, Evaluation** (updated 2022-10-21,
+microsoft.com/…/SQLServer2022_SQLServer2022DeveloperExpressEvaluation_English.pdf).
+`ACCEPT_EULA=Y` is **not** a separate container EULA — MS docs
+(learn.microsoft.com/…/linux/containers/deploy): passing it means "you express
+that you have a valid and existing license … governed by the terms of your SQL
+Server license". So this one document governs.
+
+The clauses:
+- **§1.b (Express use rights)** — "You may install and use any number of
+  copies of the software on any device including third party shared devices."
+  No production restriction.
+- **§2.b.iv (Hosting)** — commercial hosting **explicitly permitted**, four
+  conditions: (1) fully responsible for end-user usage, (2) indemnify MS,
+  (3) **No High Risk Use** — names *"conducting e-commerce transactions …
+  including any shipping, credit card, monetary or other banking
+  transactions"*, plus life-safety systems, (4) **inform users the software
+  is MS-licensed and bind them to terms protecting it at least as much as
+  this agreement.**
+- **§6 (Scope)** — "you will not … provide the software as a hosted solution
+  (except as permitted under Section 2.b.iv) … **or transfer the software or
+  this agreement to any third party**."
+
+**Verdict: cleared.** The only hard prohibition is *transfer to a third
+party* (§6). Avoided by the **client accepting the Microsoft EULA themselves
+on first start** — Express is a free public download, §1.b lets anyone install
+any number of copies, so the client becomes MS's own licensee, not a
+transferee from us. Commercial hosting/maintenance is fine via §2.b.iv. We
+must **never silently set `ACCEPT_EULA=Y`** — §2.b.iv(4) and the `ACCEPT_EULA`
+assertion require an active human acceptance asserting a valid licence.
+
+**Build requirement (new):** SQL Server gets its own acceptance gate — unlike
+every other app in `apps/` (all OSS). Dashboard shows the licence terms (or
+link + summary) → operator ticks "I have a valid SQL Server licence and accept
+these terms" → backend then sets `ACCEPT_EULA=Y` and starts. No acceptance →
+start refused with the link. Store the acceptance (who, when) in `settings`
+or the service row.
+
+**Constraints the acceptance screen / docs must state:**
+- **Not for e-commerce / payment / banking / shipping-transaction or
+  life-safety databases** (§2.b.iv No High Risk Use — a real usage limit).
+- **x86-64 only** — MS: container images "supported only on … x86-64 CPUs",
+  emulation "aren't tested or supported". No arm64 / Raspberry Pi.
+- Telemetry to MS (§3; reducible via `MSSQL_TELEMETRY`/feedback settings),
+  $5 liability cap / AS-IS / no support (§11, §16), no publishing benchmark
+  comparisons without MS approval (§5).
+- Express edition limits (SQL Server 2022 licensing guide, not this EULA):
+  10 GB max DB size, ~1 GB buffer-pool RAM, 4 cores / 1 socket.
+- Password policy (MS docs): 8-128 chars, 3 of 4 of upper/lower/digit/symbol
+  — the `MSSQL_SA_PASSWORD` generator must comply.
+
+`docs/licences.md` row: **cleared for the setup-and-maintenance model via the
+§2.b.iv hosting exception + a first-start acceptance gate; High Risk Use
+(e-commerce/payments/life-safety) excluded.**

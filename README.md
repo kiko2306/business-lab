@@ -294,15 +294,17 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Apps and integrations
 
-- [ ] **Evaluate SQL Server Express (LAN-only)** (§121) — @mat wants a
-      local-access-only MS SQL Express for apps/dev tools, no exposure.
-      **Licence decision blocks the build** (§121.1): `mcr.microsoft.com/
-      mssql/server` is a proprietary MS EULA product — run the §107-style
-      due diligence against the resale model; it may not pass. If it clears:
-      `apps/mssql/` (x86_64 only, ~2 GiB RAM, `MSSQL_PID=Express`,
-      complexity-compliant generated `MSSQL_SA_PASSWORD`), a new `mssql`
-      backup engine (`sqlcmd BACKUP DATABASE`), docs rows, and prove a
-      start + backup/restore round-trip.
+- [ ] **Add SQL Server Express (LAN-only)** (§121) — licence **cleared**
+      (§121.5): the SQL Server 2022 Express EULA permits it via the §2.b.iv
+      hosting exception **provided the client accepts the Microsoft EULA on
+      first start** — the backend must never set `ACCEPT_EULA=Y` silently. So
+      SQL Server needs its own acceptance gate (unlike every OSS app here):
+      show the terms → operator ticks accept → then start; store who/when.
+      Then `apps/mssql/` (x86-64 only, no arm64; `MSSQL_PID=Express`;
+      complexity-compliant generated `MSSQL_SA_PASSWORD`; ~1 GiB buffer-pool /
+      10 GB DB cap), a new `mssql` backup engine (`sqlcmd BACKUP DATABASE`),
+      docs rows (incl. the No-High-Risk-Use limit: no e-commerce/payments/
+      life-safety), and prove a start + backup/restore round-trip.
 - [ ] **Duplicati carries a 5.3 GB uncheckpointed WAL** (§86.4) —
       `apps/duplicati/data/config/HQFQYTBBPZ.sqlite` is 184 KB with a 5.3 GB
       `-wal` beside it, untouched since the 2026-09-01 restore test. It sits
