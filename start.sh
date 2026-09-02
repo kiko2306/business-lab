@@ -498,6 +498,63 @@ prompt_env_var() {
   set_env_var "$key" "$value"
 }
 
+# --- The dashboard is the source of truth for what a human types (§0.2) ------
+# Two copies of the same credential is one copy too many: the Cloudflare token
+# lives both here and in the dashboard's `settings` table, they drifted, and a
+# perfectly valid token in the UI produced "couldn't look up zone" on every run
+# because this script kept reading its own stale copy (plan.md §85).
+#
+# So: prefer the database when it is up and has an answer, fall back to this
+# file for a host that has no database yet, and write a freshly prompted value
+# back so the dashboard shows what is actually in use.
+db_container() {
+  docker ps -q \
+    --filter label=com.docker.compose.project=homelab-management \
+    --filter label=com.docker.compose.service=database 2>/dev/null | head -n1
+}
+
+# The compose file defaults both of these, so the environment file usually
+# does not set them at all — an empty -U would make every lookup fail silently
+# and fall back to the stale local copy, i.e. exactly the bug this fixes.
+db_user() { local v; v="$(current_value POSTGRES_USER)"; printf '%s' "${v:-homelab}"; }
+db_name() { local v; v="$(current_value POSTGRES_DB)"; printf '%s' "${v:-homelab}"; }
+
+db_setting() {
+  local key="$1" container
+  container="$(db_container)"
+  [ -n "$container" ] || return 0
+  docker exec "$container" psql -U "$(db_user)" -d "$(db_name)" -tAc \
+    "SELECT value FROM settings WHERE key = '${key}' AND value <> ''" 2>/dev/null | head -n1
+}
+
+db_setting_write() {
+  local key="$1" value="$2" container
+  container="$(db_container)"
+  [ -n "$container" ] || return 0
+  # Single-quote escaping only: these values are typed by the operator at this
+  # host's console, not supplied by anything remote.
+  docker exec "$container" psql -U "$(db_user)" -d "$(db_name)" -qtAc \
+    "INSERT INTO settings (key, value, updated_at) VALUES ('${key}', '${value//\'/\'\'}', NOW())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()" >/dev/null 2>&1 || true
+}
+
+# Resolve a value the dashboard also owns: database first, then this file,
+# then prompt — and whatever is settled on ends up in both places.
+resolve_shared_value() {
+  local key="$1" setting="$2" prompt="$3" default="${4:-}" silent="${5:-}" from_db
+  from_db="$(db_setting "$setting")"
+  if [ -n "$from_db" ]; then
+    if [ "$from_db" != "$(current_value "$key")" ]; then
+      log "Using ${key} from the dashboard (it differs from the local copy)"
+      set_env_var "$key" "$from_db"
+    fi
+    return 0
+  fi
+  prompt_env_var "$key" "$prompt" "$default" "$silent" || return 1
+  db_setting_write "$setting" "$(current_value "$key")"
+  return 0
+}
+
 # Reads a top-level field out of a Cloudflare API response. python3 rather than
 # jq because jq isn't in this script's package list and python3 already is.
 json_field() { python3 -c 'import json,sys;d=json.load(sys.stdin);print(eval("d"+sys.argv[1]) if d.get("success") else "")' "$1" 2>/dev/null || true; }
@@ -515,8 +572,8 @@ cf_api() {
 }
 
 CF_READY=0
-if prompt_env_var BASE_DOMAIN "Base domain for published services (e.g. example.com)" \
-  && prompt_env_var CLOUDFLARE_API_TOKEN "Cloudflare API token (Tunnel:Edit + DNS:Edit)" "" silent \
+if resolve_shared_value BASE_DOMAIN exposure_base_domain "Base domain for published services (e.g. example.com)" \
+  && resolve_shared_value CLOUDFLARE_API_TOKEN cloudflare_tunnel_token "Cloudflare API token (Tunnel:Edit + DNS:Edit)" "" silent \
   && prompt_env_var TUNNEL_NAME "Cloudflare Tunnel name for this host" "$(hostname -s 2>/dev/null || hostname)"; then
   CF_READY=1
 else
@@ -551,6 +608,25 @@ if [ "$CF_READY" = "1" ]; then
   ZONE_JSON="$(cf_api GET "/zones?name=${BASE_DOMAIN}")"
   CF_ZONE_ID="$(printf '%s' "$ZONE_JSON" | json_field '["result"][0]["id"]')"
   CF_ACCOUNT_ID="$(printf '%s' "$ZONE_JSON" | json_field '["result"][0]["account"]["id"]')"
+
+  # A stored credential that has just been refused is the one case where
+  # "never ask twice" is wrong: without this the same warning prints on every
+  # run forever and the tunnel is never set up (§85.2).
+  if { [ -z "$CF_ZONE_ID" ] || [ -z "$CF_ACCOUNT_ID" ]; } && [ -t 0 ]; then
+    warn "The stored Cloudflare token was refused for zone '${BASE_DOMAIN}'."
+    printf 'Cloudflare API token (Tunnel:Edit + DNS:Edit), or blank to skip: ' >&2
+    read -r -s NEW_CF_TOKEN; printf '\n' >&2
+    if [ -n "$NEW_CF_TOKEN" ]; then
+      CLOUDFLARE_API_TOKEN="$NEW_CF_TOKEN"
+      set_env_var CLOUDFLARE_API_TOKEN "$NEW_CF_TOKEN"
+      # Straight into the dashboard's copy too, so the two cannot drift again.
+      db_setting_write cloudflare_tunnel_token "$NEW_CF_TOKEN"
+      ZONE_JSON="$(cf_api GET "/zones?name=${BASE_DOMAIN}")"
+      CF_ZONE_ID="$(printf '%s' "$ZONE_JSON" | json_field '["result"][0]["id"]')"
+      CF_ACCOUNT_ID="$(printf '%s' "$ZONE_JSON" | json_field '["result"][0]["account"]["id"]')"
+      [ -n "$CF_ZONE_ID" ] && log "Token accepted — zone found, continuing"
+    fi
+  fi
 
   if [ -z "$CF_ZONE_ID" ] || [ -z "$CF_ACCOUNT_ID" ]; then
     warn "Couldn't look up zone '${BASE_DOMAIN}' with that Cloudflare token — check the token's permissions and that the domain is in this account. Skipping tunnel setup."
@@ -1063,7 +1139,13 @@ if [ -f apps/netbird-vpn/.env ]; then
   # so leaving it to a later manual step means a first run completes with a
   # NetBird that silently cannot connect any peer.
   if [ "$TS_READY" = "1" ] && [ -z "$(docker ps -q -f name=tailscale 2>/dev/null | head -n1 || true)" ]; then
-    set_app_env_var apps/tailscale/.env TAILSCALE_AUTH_KEY "$(current_value TAILSCALE_AUTH_KEY)"
+    # Seed only. The app's own value is editable from the dashboard's config
+    # panel, and copying this file's over it would silently revert a key the
+    # user had updated there — which is exactly what happened on 2026-09-02,
+    # and only on runs where this container happened to be stopped (§85.1a).
+    if [ -z "$(app_env_value apps/tailscale/.env TAILSCALE_AUTH_KEY)" ]; then
+      set_app_env_var apps/tailscale/.env TAILSCALE_AUTH_KEY "$(current_value TAILSCALE_AUTH_KEY)"
+    fi
     log "Starting the Tailscale app (NetBird signalling depends on it)"
     docker compose -f apps/tailscale/docker-compose.yml --env-file apps/tailscale/.env \
       -p tailscale up -d >/dev/null 2>&1 \

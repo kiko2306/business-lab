@@ -9921,3 +9921,38 @@ with it NetBird's signalling for no gain.
 and wrong for one that has just been rejected. After a failed zone lookup the
 script should say the stored token was refused and offer to replace it, rather
 than warning and skipping the tunnel on every run forever.
+
+### 85.3 Built
+
+`resolve_shared_value KEY SETTING PROMPT [default] [silent]` in `start.sh`:
+database first, local file second, prompt last — and a freshly prompted answer
+is written to both, so the two cannot drift again. Applied to
+`CLOUDFLARE_API_TOKEN` (`cloudflare_tunnel_token`) and `BASE_DOMAIN`
+(`exposure_base_domain`). `TUNNEL_NAME` keeps the old behaviour because the
+dashboard stores a tunnel *id*, not a name — there is no second copy to drift.
+
+The database container is found by its compose labels
+(`com.docker.compose.project=homelab-management`,
+`service=database`) rather than by name matching, which would also catch
+`itflow-itflow-db-1` and friends.
+
+**The subtle part was the credentials for reading it.** The compose file
+defaults `POSTGRES_USER`/`POSTGRES_DB` to `homelab`, so the environment file
+usually does not set them at all — and `psql -U ""` fails silently, which would
+have meant every lookup falling back to the stale local copy. That is the exact
+bug being fixed, reintroduced one layer down. `db_user`/`db_name` default to
+`homelab` to match the compose file.
+
+**§85.2**: a refused token now re-prompts on a terminal, writes the answer to
+both places, and retries the lookup immediately — `Token accepted — zone found,
+continuing` — instead of warning and skipping the tunnel forever.
+
+**§85.1a**: `set_app_env_var apps/tailscale/...` is now seed-only, guarded by
+`app_env_value` being empty, so a key updated in the dashboard is never
+overwritten by the local copy.
+
+Verified against the live stack without running the script: the label lookup
+finds the database container, and the two queries `db_setting` issues return
+`tx-home-utils.com` and the **new, working** token — so the next run resolves
+the credential that works rather than the stale one that produced the original
+warning. `bash -n` and shellcheck clean.

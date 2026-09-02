@@ -273,25 +273,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **One place for the Cloudflare token** (§85) — `start.sh` reads it from
-      the root environment file, the backend reads it from the `settings`
-      table, and they drifted apart until the tunnel bootstrap failed with a
-      token that was perfectly valid in the dashboard. Make `start.sh` prefer
-      the database and fall back to the file, so the dashboard is the only
-      place it is ever typed (§0.2). Same for `BASE_DOMAIN`, `TUNNEL_NAME` and
-      `TAILSCALE_AUTH_KEY` — the last one is worse, because `start.sh` copies
-      the root value over the dashboard's whenever the tailscale container
-      happens to be stopped (§85.1a).
-- [ ] **Re-prompt after a rejected credential** (§85.2) — `prompt_env_var`
-      never asks twice, so a stale token warns and skips the tunnel on every
-      run forever. After a failed lookup, say it was rejected and offer to
-      replace it.
-
-- [ ] **Restart Home Page from the dashboard once** (§80.4) — its stored
-      `HOMEPAGE_ALLOWED_HOSTS` is a URL rather than a bare host, so the public
-      hostname gets "Host validation failed" instead of the page. A start
-      through the dashboard now normalises it; until then the live container
-      keeps the bad value.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from
