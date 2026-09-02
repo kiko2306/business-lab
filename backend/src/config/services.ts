@@ -908,25 +908,66 @@ export interface ComposeEnvVar {
   defaultValue: string | null;
 }
 
-const ENV_VAR_PATTERN = /\$\{([A-Z0-9_]+)(?::-([^}]*))?\}/g;
+const ENV_VAR_KEY_PATTERN = /^([A-Z0-9_]+)(?::-([\s\S]*))?$/;
 
 /**
  * Every `${VAR}` / `${VAR:-default}` reference in a compose file, deduped by
  * key. A key referenced without a default anywhere counts as required, even
  * if another occurrence of the same key has one.
+ *
+ * Brace-depth tracked rather than a single regex: a default can itself
+ * reference another variable with its own default (Home Page's
+ * `HOMEPAGE_ALLOWED_HOSTS:-localhost:${HOMEPAGE_PORT:-10190}`), and a
+ * `[^}]*`-style default capture stops at that inner `}` and corrupts the
+ * parse — the outer default came back missing its close brace, run together
+ * with whatever followed it in the file.
  */
 export function extractComposeEnvVars(composeContent: string): ComposeEnvVar[] {
   const byKey = new Map<string, ComposeEnvVar>();
-  for (const match of composeContent.matchAll(ENV_VAR_PATTERN)) {
-    const [, key, defaultValue] = match;
-    const hasDefault = defaultValue !== undefined;
+
+  function record(key: string, defaultValue: string | null): void {
     const existing = byKey.get(key);
     if (!existing) {
-      byKey.set(key, { key, required: !hasDefault, defaultValue: hasDefault ? defaultValue : null });
-    } else if (!hasDefault) {
+      byKey.set(key, { key, required: defaultValue === null, defaultValue });
+    } else if (defaultValue === null) {
       existing.required = true;
     }
   }
+
+  function scan(content: string): void {
+    let i = 0;
+    while (i < content.length) {
+      const start = content.indexOf('${', i);
+      if (start === -1) {
+        return;
+      }
+      let depth = 1;
+      let j = start + 2;
+      while (j < content.length && depth > 0) {
+        if (content.startsWith('${', j)) {
+          depth++;
+          j += 2;
+        } else if (content[j] === '}') {
+          depth--;
+          j++;
+        } else {
+          j++;
+        }
+      }
+      const inner = content.slice(start + 2, depth === 0 ? j - 1 : j);
+      const match = ENV_VAR_KEY_PATTERN.exec(inner);
+      if (match) {
+        const [, key, defaultValue] = match;
+        record(key, defaultValue ?? null);
+        if (defaultValue) {
+          scan(defaultValue);
+        }
+      }
+      i = j;
+    }
+  }
+
+  scan(composeContent);
   return [...byKey.values()];
 }
 

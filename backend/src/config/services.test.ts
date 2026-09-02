@@ -33,6 +33,20 @@ describe('extractComposeEnvVars', () => {
   it('returns nothing for compose content with no variable references', () => {
     expect(extractComposeEnvVars('image: postgres:16-alpine')).toEqual([]);
   });
+
+  it('parses a default that itself references another ${VAR:-default} (Home Page\'s allow-list)', () => {
+    const vars = extractComposeEnvVars(
+      'HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS:-localhost:${HOMEPAGE_PORT:-10190}}'
+    );
+    // A `[^}]*`-style default capture would stop at the inner `}`, leaving
+    // the outer default truncated to `localhost:${HOMEPAGE_PORT`.
+    expect(vars).toContainEqual({
+      key: 'HOMEPAGE_ALLOWED_HOSTS',
+      required: false,
+      defaultValue: 'localhost:${HOMEPAGE_PORT:-10190}',
+    });
+    expect(vars).toContainEqual({ key: 'HOMEPAGE_PORT', required: false, defaultValue: '10190' });
+  });
 });
 
 describe('getPublishedUpstreamPort', () => {

@@ -10996,3 +10996,68 @@ Confirmed before deleting, not assumed: `docker info --format
 confirmed — an irreversible host deletion, not something to run unprompted).
 All 58 containers stayed up through it, since none were reading from that path.
 `/` moved from 58% used (§83.6's number) to 10%.
+
+## 97. §92 fixed: exposure's allow-list merge now seeds from the compose default too
+
+`buildExposureEnvOverrides` (`exposureEnv.ts`) previously seeded the
+`allowedHosts` merge from the app's env file alone. It now also parses the
+compose file's `${VAR:-default}` for each declared exposure key and folds
+that default in underneath any env-file value, so an app that relies purely
+on the compose default (Home Page's `HOMEPAGE_ALLOWED_HOSTS`) keeps its LAN
+entry once exposure appends the public hostname, instead of the merge
+starting from nothing.
+
+### 97.1 A real parsing bug, found trying to prove this against the real host
+
+Home Page's compose line is `HOMEPAGE_ALLOWED_HOSTS:-localhost:${HOMEPAGE_PORT:-10190}`
+— a default that itself references another `${VAR:-default}`.
+`extractComposeEnvVars`'s old regex (`[^}]*` for the default capture) stops at
+the *inner* `}`, so the outer default came back truncated and still holding an
+unresolved `${HOMEPAGE_PORT`. Rewrote it as a brace-depth-tracked scanner
+(`config/services.ts`) instead of one regex pass, so nested references parse
+correctly, and both keys get extracted (`HOMEPAGE_PORT` too, with its own
+default). `exposureEnv.ts` then does one more pass — `resolveDefault` —
+expanding any `${KEY}`/`${KEY:-default}` left inside a resolved default,
+preferring an explicit env-file value the way Compose substitution does.
+
+Verified: 4 new tests (2 in `services.test.ts` for the parser directly, 2 in
+`exposureEnv.test.ts` for the end-to-end merge using the real Home Page
+compose line verbatim), full backend suite 261/261, typecheck clean.
+
+### 97.2 Not provably closed on the real host — a different, pre-existing problem in the way
+
+Rebuilt and restarted the backend, then restarted `home-page` through the
+dashboard twice (once before finding 97.1, once after). Both times
+`HOMEPAGE_ALLOWED_HOSTS` still came back as only the public hostname. Traced
+it live — `docker exec … node -e "buildExposureEnvOverrides('homepage', …)"` —
+and found the actual cause: Home Page's own env file already holds an
+explicit `HOMEPAGE_ALLOWED_HOSTS=https://homepage.tx-home-utils.com`,
+predating this session. An explicit env-file value correctly wins over the
+compose default — same rule Compose substitution itself follows, and what
+this fix's own "still prefers the env file over the compose default" test
+locks in — so the fix is doing the right thing; this one app's env file is
+carrying stale hand-set state from an earlier diagnostic session, the exact
+kind of thing this project's own rule (this file's intro, "diagnostic, never
+a fix") warns against.
+
+The field is `managed` (read-only) in the dashboard's config panel while
+exposure is enabled for the app, so there's no in-UI way to clear it without
+first disabling exposure. Tried that: disabling Home Page's exposure to
+deprovision the NPM proxy host failed —
+
+    Exposure deprovisioning failed for homepage.tx-home-utils.com:
+    Unable to delete Nginx Proxy Manager proxy host: Internal Error
+
+— NPM's own API returning a 5xx on the delete call for that specific proxy
+host id. Unrelated to this fix; added to the README rather than chased down
+here. Home Page's LAN reachability (§92's original symptom) stays open until
+either that NPM delete is fixed or the stale value is cleared some other
+sanctioned way — but the general bug §92 described, for any app with no
+env-file override at all, is fixed and proven.
+
+### 97.3 Also seen in passing, not investigated
+
+The same session's backend logs show `itflow.tx-home-utils.com` provisioning
+failing repeatedly with `Nginx Proxy Manager host for itflow.tx-home-utils.com
+already exists and is not managed by this service` — a leftover NPM host from
+before, unrelated to today's work. Noted, not touched.

@@ -240,15 +240,21 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Exposure's allow-list merge ignores compose defaults** (§92) — the
-      override is seeded only from the app's `.env`, so an app relying on a
-      compose `${VAR:-default}` for its `allowedHosts` key loses that default
-      when exposed. Home Page is live proof: exposed, it returns
-      `400 Host validation failed` to **every** LAN address — `localhost:10190`,
-      `192.168.1.23:10190`, `home-srv-01:10190` — while the public hostname
-      returns 200, and a non-dashboard start flips which one works (§92.4). Seed the merge from the compose
-      default too — `extractComposeEnvVars` already returns it — and test it at
-      `computeExposureEnvOverrides`, which is pure.
+- [ ] **Home Page's own env file has a stale, hand-set `HOMEPAGE_ALLOWED_HOSTS`**
+      (§97.2) — the merge-from-compose-default fix landed and is tested, but
+      this one app's env file already carries an explicit value from an
+      earlier diagnostic session, which correctly wins over the compose
+      default and keeps Home Page unreachable from the LAN. The field is
+      dashboard-managed (read-only) while exposure is enabled, so clearing it
+      needs exposure disabled first — blocked by the NPM deletion bug below.
+- [ ] **NPM proxy host deletion fails with a 5xx** (§97.2) — disabling Home
+      Page's exposure to deprovision its NPM host errors with `Unable to
+      delete Nginx Proxy Manager proxy host: Internal Error`. Blocks the item
+      above; find out why NPM's own API 500s on this delete call.
+- [ ] **`itflow.tx-home-utils.com` NPM host is orphaned** (§97.3) — provisioning
+      logs repeatedly show `Nginx Proxy Manager host for
+      itflow.tx-home-utils.com already exists and is not managed by this
+      service`. A leftover host from before this session; not investigated.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from

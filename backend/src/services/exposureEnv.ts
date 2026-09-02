@@ -12,7 +12,7 @@
 
 import fs from 'fs';
 import path from 'path';
-import { buildExposureHostname, getService } from '../config/services';
+import { buildExposureHostname, extractComposeEnvVars, getService, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { ServiceExposureEnvKeys } from '../types';
@@ -94,8 +94,46 @@ export async function buildExposureEnvOverrides(
   }
 
   const hostname = buildExposureHostname(serviceName, globalConfig.baseDomain);
+
   const envFilePath = path.join(appDir, '.env');
-  const existingValues = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath) : {};
+  const envValues = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath) : {};
+
+  // An app's allow-list may come from a compose `${VAR:-default}` rather than
+  // an explicit .env value (Home Page's HOMEPAGE_ALLOWED_HOSTS, §92) — seed
+  // the merge from that default too, or exposing the app silently drops it.
+  const rawDefaults: Record<string, string> = {};
+  const resolved = resolveComposeFile(serviceName);
+  if (resolved?.composeFile) {
+    const composeContent = fs.readFileSync(resolved.composeFile, 'utf8');
+    for (const { key, defaultValue } of extractComposeEnvVars(composeContent)) {
+      if (defaultValue !== null) {
+        rawDefaults[key] = defaultValue;
+      }
+    }
+  }
+
+  // A default can itself reference another variable with its own default
+  // (HOMEPAGE_ALLOWED_HOSTS falls back to a value built from HOMEPAGE_PORT) —
+  // resolve those inline before using the default as an existing value,
+  // preferring an explicit .env value the same way Compose substitution does.
+  function resolveDefault(raw: string, seen: Set<string>): string {
+    return raw.replace(/\$\{([A-Z0-9_]+)(?::-([^{}]*))?\}/g, (_match, key: string, inlineDefault?: string) => {
+      if (envValues[key] !== undefined) {
+        return envValues[key];
+      }
+      if (rawDefaults[key] !== undefined && !seen.has(key)) {
+        return resolveDefault(rawDefaults[key], new Set(seen).add(key));
+      }
+      return inlineDefault ?? '';
+    });
+  }
+
+  const composeDefaults: Record<string, string> = {};
+  for (const [key, raw] of Object.entries(rawDefaults)) {
+    composeDefaults[key] = resolveDefault(raw, new Set([key]));
+  }
+
+  const existingValues = { ...composeDefaults, ...envValues };
 
   return computeExposureEnvOverrides(exposureEnvKeys, hostname, existingValues);
 }
