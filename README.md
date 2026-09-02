@@ -121,24 +121,13 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Security
 
-- [ ] **NEXT UP — @mat asked: `setup_server.sh` should drop the sudo password
-      prompt for the invoking user** — a `NOPASSWD` sudoers entry for
-      `TARGET_USER`, written the way `start.sh` already writes the daemon
-      config. code-server's LAN port (`:10130`), the thing that made this
-      unsafe, now requires its own login (§93) — Authelia gates the tunnel
-      hostname, code-server's own auto-generated `PASSWORD` gates the LAN
-      port — so a full `NOPASSWD ALL` entry for `TARGET_USER` is no longer an
-      open-LAN-port-to-root path. Part of splitting `setup_server.sh` out of
-      `start.sh` (see the item below) — also add a fixed-IP prompt there.
-- [ ] **Split `setup_server.sh` out of `start.sh`** — the one-time host
-      bootstrap (package installs, Docker install/enable, the daemon.json
-      address-pool widening, the optional VG-grow/data-root-move blocks, the
-      cloudflared http2 drop-in, the Compose plugin install, adding
-      `TARGET_USER` to the docker group) is host setup, not app/stack
-      bootstrap, and belongs in its own script with its own prompts. Add two
-      new prompted steps while at it: setting a fixed IP for the host, and the
-      sudoers `NOPASSWD` item above. `start.sh` should call it so `./start.sh`
-      remains the only command a human runs (§0.2).
+- [ ] **NEXT UP — verify `setup_server.sh`'s new prompts against the real
+      host** (§94) — the fixed-IP (`netplan try`) and passwordless-sudo
+      (`NOPASSWD:ALL` sudoers entry) prompts are syntax/shellcheck-verified
+      only; deliberately not exercised by an agent session, since a wrong
+      value in either can cut off the very session applying it. Run
+      `sudo ./setup_server.sh` and confirm both prompts behave as documented
+      in `docs/first-run.md`.
 - [ ] **2FA for admin accounts** — the dashboard is internet-facing via the
       tunnel (`homelab.tx-home-utils.com`, `api-homelab.tx-home-utils.com`),
       independent of the per-service exposure feature. Nothing in the codebase

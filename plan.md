@@ -10833,3 +10833,62 @@ the actual failure mode this fixes, not just "the container came up healthy".
 
 This unblocks the sudoers/NOPASSWD item below it in the README, which was
 explicitly waiting on this.
+
+## 94. Split setup_server.sh out of start.sh, and added two prompted host steps
+
+`start.sh` had grown to conflate two different jobs: one-time host bootstrap
+(packages, Docker, the daemon address-pool, the optional VG-grow/data-root
+moves, cloudflared's http2 drop-in, the Compose plugin, adding the invoking
+user to the docker group) and app/stack bootstrap (`.env` generation, per-app
+secrets, Cloudflare/NetBird setup, starting the stack). Neither needed the
+other to change.
+
+### 94.1 The split
+
+Moved the host-only half — everything from the root check through adding
+`TARGET_USER` to the docker group — verbatim into a new `setup_server.sh`.
+`start.sh` now sources it (`source ./setup_server.sh`) right after its own
+`cd`, so `TARGET_USER`, `HAS_SYSTEMD` and `IS_WSL` — which start.sh's later
+steps (the wetty key, the systemd warning repeated at the end) still read —
+stay set in the same process rather than needing to be redetected or passed
+through. `./start.sh` remains the only command a human runs (§0.2); nothing
+about the interface changed, only where the code lives. Comments referencing
+`start.sh` in the moved blocks (the `EXPAND_VG_DISK=`/`DOCKER_DATA_ROOT=`
+usage examples, the cloudflared drop-in's "Managed by" line) were updated to
+point at `setup_server.sh`.
+
+### 94.2 Two new prompted steps, added to setup_server.sh
+
+**Fixed IP.** Interactive y/N, skipped without a TTY or without `netplan`
+(anything but stock Ubuntu Server). Detects the current interface/address/
+gateway/DNS as defaults, confirms the values, then applies with
+`netplan try --timeout 45` rather than `netplan apply` — `try` auto-reverts if
+nobody presses ENTER in time, which is the actual safety net for a wrong
+gateway cutting off the SSH session applying it. Also writes
+`/etc/cloud/cloud.cfg.d/99-disable-network-config.cfg` when cloud-init is
+present, since cloud-init regenerates `50-cloud-init.yaml` from DHCP on every
+boot otherwise and would silently fight the new static config on next reboot.
+Idempotent: skips straight past if `/etc/netplan/90-homelab-fixed-ip.yaml`
+already exists.
+
+**Remove the sudo password prompt.** This was the README's oldest open
+security item, explicitly blocked on gating code-server's LAN port first —
+done in §93. Interactive, and still asks for a typed `YES` every run it
+offers (not a plain y/N) because a `NOPASSWD:ALL` sudoers entry is a real
+privilege grant regardless of what unblocked it. Writes
+`/etc/sudoers.d/90-<user>-nopasswd`, validated with `visudo -c` against a temp
+file before being installed with `install -m 0440` — an invalid snippet is
+never put where sudo would read it. Idempotent: skips if that file already
+exists.
+
+### 94.3 Verified
+
+`bash -n` on both scripts, and `shellcheck -x` against both (via the
+`koalaman/shellcheck:stable` image) — no new findings beyond three
+pre-existing `SC2015`/`SC2001` style notes already present in the code before
+the split. Diffed the untouched tail of `start.sh` (everything from
+`ENV_FILE=".env"` on) against the pre-split file to confirm the split moved
+lines rather than editing them. Not run against the live host: applying a
+fixed IP or passwordless sudo on `home-srv-01` is exactly the kind of
+irreversible-if-wrong change that belongs in the operator's hands, not an
+agent session's — same reasoning as `EXPAND_VG_DISK`'s typed confirmation.

@@ -106,6 +106,21 @@ web terminal's SSH key, host port allocation, and the Cloudflare account/zone
 Non-interactive runs (no TTY) skip the prompts and the setup they gate, then
 tell you to re-run interactively — they never hang waiting for input.
 
+### Two more prompts, from `setup_server.sh`
+
+`start.sh` sources `setup_server.sh` for the host-only half of bootstrap
+(packages, Docker, the daemon address-pool, cloudflared's transport) before
+any of the above. That file also offers two one-time, opt-in y/N prompts of
+its own, both skipped automatically without a TTY:
+
+| Prompt | What it does | Why it asks instead of just doing it |
+|---|---|---|
+| **Set a fixed IP** | Writes a netplan config for a static address, applied with `netplan try` (auto-reverts unless you press ENTER within 45s) | A wrong gateway/DNS value can cut off the very session used to fix it |
+| **Remove the sudo password prompt** | A `NOPASSWD:ALL` sudoers entry for the invoking user | Full passwordless sudo is a real privilege grant — safe now that code-server's LAN port requires its own login (plan.md §93), but still asked every time, not assumed |
+
+Say no (or just press Enter) to skip either one; re-run `./start.sh` later to
+be asked again.
+
 ## What is reachable when it finishes
 
 **The dashboard, and only the dashboard** — on the host, and publicly:
