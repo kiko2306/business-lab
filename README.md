@@ -173,13 +173,10 @@ it is done — not ticked off and left behind. Section references point at
       restarting apps the sanctioned way rather than by hand. The smoke-test
       script already expects `SMOKE_USER`/`SMOKE_PASSWORD`, so a dedicated
       account fits what is there.
-- [ ] **Move containerd's root too** (§83.6) — the data-root move relocated
-      ~100 MB. This host uses the containerd image store, so the 45 GB lives in
-      `/var/lib/containerd`, not Docker's data-root. Fold it into the existing
-      `DOCKER_DATA_ROOT` block: detect `io.containerd.snapshotter.v1`, stop
-      containerd as well, rsync, set top-level `root` in
-      `/etc/containerd/config.toml`. Moving one root and not the other is the
-      trap that produced this item.
+- [ ] **@mat: re-run the move for containerd's root** (§83.6a) — built and
+      committed; the same command, and it will skip data-root (already in
+      place) and move the 45 GB in `/var/lib/containerd`:
+      `sudo DOCKER_DATA_ROOT=/home/docker ./start.sh`
 - [ ] **Remove the old trees** (§83.4, §83.6) — after both moves have held for
       a few days: `/var/lib/docker` (~100 MB, trivial) and `/var/lib/containerd`
       (~45 GB, the actual reclaim).

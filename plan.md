@@ -9747,3 +9747,32 @@ Moving only one is precisely the trap this section documents.
   still reports one row at 98 GiB / 58%, which is the truth.
 - **`data-root` on `/home` is worth keeping.** Volumes and container state now
   land on the roomy filesystem, which is where they should be.
+
+### 83.6a Built: one opt-in, both roots
+
+The `DOCKER_DATA_ROOT` block now moves whatever is not already in place.
+`MOVES` is built from the two roots — Docker's data-root, and containerd's when
+`docker info` reports `io.containerd.snapshotter.v1` — so on this host, where
+data-root is already `/home/docker`, only containerd moves. Empty list means a
+no-op, which keeps a second run harmless.
+
+containerd's target defaults to a sibling of the given path
+(`/home/docker` → `/home/containerd`); `CONTAINERD_ROOT` overrides it. Its
+current root comes from `containerd config dump`, falling back to
+`/var/lib/containerd`.
+
+Everything is preflighted before anything stops: both trees measured with
+`du -sxk`, summed, +10%, checked against each target's filesystem. Stop order
+is `docker.socket`, `docker`, then `containerd` — Docker sits on containerd, so
+it goes down first and comes back up last.
+
+The one new subtlety is the config edit. `root` is a **top-level** TOML key, so
+writing it after a `[table]` header would silently make it that table's key
+instead. The editor replaces an existing top-level `root`, otherwise inserts
+before the first table header, otherwise appends. Tested against three shapes —
+this host's bare `disabled_plugins` file, a file with an existing `root`, and a
+file whose first line is a table header — all three parse back with the
+expected value.
+
+Verified: `bash -n` and shellcheck clean, TOML editor tested as above. The run
+itself is the user's; it needs sudo.

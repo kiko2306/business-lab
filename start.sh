@@ -136,16 +136,22 @@ fi
 # --- Optional: move Docker's storage to another filesystem -------------------
 # Ubuntu's installer hands root ~100 GiB and gives the rest of the disk to
 # /home, so a machine with plenty of free space can still run Docker out of
-# room — 98 GiB at 68% with 116 GiB idle next door, on the box this was written
-# for (plan.md §83).
-#
-# Opt-in, never automatic: this stops the daemon and copies tens of gigabytes.
+# room (plan.md §83).
 #
 #   sudo DOCKER_DATA_ROOT=/home/docker ./start.sh
 #
-# Idempotent — a second run with the same value is a no-op. The old tree is
-# left in place, so rollback is removing "data-root" from daemon.json and
-# restarting Docker.
+# Moves BOTH roots that matter. With Docker's containerd image store — the
+# default on recent installs, `Storage Driver: overlayfs` with driver-type
+# io.containerd.snapshotter.v1 — image layers live in *containerd's* root, and
+# Docker's data-root holds only containers, volumes, networks and buildkit.
+# Moving data-root alone relocated 100 MB here and left 45 GB behind (§83.6),
+# so "move Docker's storage" has to mean the bytes. containerd's target
+# defaults to a sibling of the given path; override with CONTAINERD_ROOT.
+#
+# Opt-in, never automatic: this stops the daemon and copies tens of gigabytes.
+# Idempotent — a root already in the right place is skipped, so a second run
+# with the same value is a no-op. Old trees are left in place, so rollback is
+# removing the key from the config and restarting.
 DOCKER_DATA_ROOT="${DOCKER_DATA_ROOT:-}"
 if [ -n "$DOCKER_DATA_ROOT" ]; then
   case "$DOCKER_DATA_ROOT" in
@@ -159,67 +165,89 @@ if [ -n "$DOCKER_DATA_ROOT" ]; then
     exit 1
   fi
 
-  if [ "$CURRENT_DATA_ROOT" = "$DOCKER_DATA_ROOT" ]; then
-    log "Docker storage is already at $DOCKER_DATA_ROOT — nothing to move"
-  else
-    # A target inside the tree being copied would recurse into itself.
-    case "$DOCKER_DATA_ROOT/" in
-      "$CURRENT_DATA_ROOT"/*)
-        echo "error: DOCKER_DATA_ROOT ($DOCKER_DATA_ROOT) is inside the current data root ($CURRENT_DATA_ROOT)" >&2
-        exit 1 ;;
-    esac
+  # Only when the containerd snapshotter is in use is containerd's root the
+  # place the images actually are.
+  CONTAINERD_ROOT="${CONTAINERD_ROOT:-$(dirname "$DOCKER_DATA_ROOT")/containerd}"
+  CURRENT_CONTAINERD_ROOT=""
+  if docker info 2>/dev/null | grep -q 'io.containerd.snapshotter.v1'; then
+    CURRENT_CONTAINERD_ROOT="$(containerd config dump 2>/dev/null | awk -F'[=[:space:]]+' '/^root[[:space:]]*=/ {gsub(/['"'"'"]/, "", $2); print $2; exit}')"
+    CURRENT_CONTAINERD_ROOT="${CURRENT_CONTAINERD_ROOT:-/var/lib/containerd}"
+  fi
 
+  # "source|target|label" for each root that is not already where it belongs.
+  MOVES=()
+  [ "$CURRENT_DATA_ROOT" != "$DOCKER_DATA_ROOT" ] && MOVES+=("$CURRENT_DATA_ROOT|$DOCKER_DATA_ROOT|docker")
+  if [ -n "$CURRENT_CONTAINERD_ROOT" ] && [ "$CURRENT_CONTAINERD_ROOT" != "$CONTAINERD_ROOT" ]; then
+    MOVES+=("$CURRENT_CONTAINERD_ROOT|$CONTAINERD_ROOT|containerd")
+  fi
+
+  if [ "${#MOVES[@]}" -eq 0 ]; then
+    log "Docker storage is already where it should be — nothing to move"
+  else
     if [ "$HAS_SYSTEMD" -eq 0 ]; then
-      echo "error: moving Docker's storage needs systemd to stop and start the daemon cleanly." >&2
-      echo "       Stop Docker, copy $CURRENT_DATA_ROOT to $DOCKER_DATA_ROOT, set data-root in" >&2
-      echo "       $DOCKER_DAEMON_JSON, and start it again by whatever means this host uses." >&2
+      echo "error: moving Docker's storage needs systemd to stop and start the daemons cleanly." >&2
       exit 1
     fi
 
     if ! command -v rsync >/dev/null 2>&1; then
       if command -v apt-get >/dev/null 2>&1; then
-        log "Installing rsync (needed to copy the Docker data root)"
+        log "Installing rsync (needed to copy the storage trees)"
         apt-get update -qq
         apt-get install -y -qq rsync
       else
-        echo "error: rsync is required to move the Docker data root and could not be installed." >&2
+        echo "error: rsync is required to move the storage trees and could not be installed." >&2
         exit 1
       fi
     fi
 
-    # -x: measure only the data root's own filesystem, not anything mounted
-    # underneath it (volumes bind-mounted from elsewhere are not being copied).
-    NEED_KB="$(du -sxk "$CURRENT_DATA_ROOT" | awk '{print $1}')"
-    mkdir -p "$DOCKER_DATA_ROOT"
-    FREE_KB="$(df -Pk "$DOCKER_DATA_ROOT" | awk 'NR==2 {print $4}')"
-    NEED_WITH_MARGIN_KB=$(( NEED_KB + NEED_KB / 10 ))
-    if [ "$FREE_KB" -lt "$NEED_WITH_MARGIN_KB" ]; then
-      echo "error: not enough room at $DOCKER_DATA_ROOT." >&2
-      echo "       need $(( NEED_WITH_MARGIN_KB / 1024 )) MiB (data + 10% margin), have $(( FREE_KB / 1024 )) MiB" >&2
-      exit 1
-    fi
+    # Preflight everything before stopping anything. -x measures only the
+    # tree's own filesystem, not the live overlay mounts underneath it.
+    TOTAL_NEED_KB=0
+    for move in "${MOVES[@]}"; do
+      SRC="${move%%|*}"; REST="${move#*|}"; DST="${REST%%|*}"
+      case "$DST/" in
+        "$SRC"/*) echo "error: $DST is inside $SRC — it would copy into itself" >&2; exit 1 ;;
+      esac
+      TOTAL_NEED_KB=$(( TOTAL_NEED_KB + $(du -sxk "$SRC" | awk '{print $1}') ))
+    done
+    NEED_WITH_MARGIN_KB=$(( TOTAL_NEED_KB + TOTAL_NEED_KB / 10 ))
+    for move in "${MOVES[@]}"; do
+      REST="${move#*|}"; DST="${REST%%|*}"
+      mkdir -p "$DST"
+      FREE_KB="$(df -Pk "$DST" | awk 'NR==2 {print $4}')"
+      if [ "$FREE_KB" -lt "$NEED_WITH_MARGIN_KB" ]; then
+        echo "error: not enough room at $DST." >&2
+        echo "       need $(( NEED_WITH_MARGIN_KB / 1024 )) MiB (data + 10% margin), have $(( FREE_KB / 1024 )) MiB" >&2
+        exit 1
+      fi
+    done
 
     # Recorded while the daemon is still up, to be compared after the restart.
     IMAGES_BEFORE="$(docker image ls -aq | wc -l)"
     CONTAINERS_BEFORE="$(docker ps -aq | wc -l)"
 
-    log "Moving Docker storage: $CURRENT_DATA_ROOT -> $DOCKER_DATA_ROOT ($(( NEED_KB / 1024 )) MiB)"
-    log "Every container stops until this finishes — including this dashboard."
+    log "Moving $(( TOTAL_NEED_KB / 1024 )) MiB of Docker storage. Every container stops until this finishes — including this dashboard."
 
     # docker.socket too: stopping only the service leaves systemd ready to
     # start the daemon again the moment anything touches the socket, which
-    # would be in the middle of the copy.
+    # would be in the middle of the copy. containerd last — Docker sits on it.
     systemctl stop docker.socket docker
+    [ -n "$CURRENT_CONTAINERD_ROOT" ] && systemctl stop containerd
 
-    # -H is not optional: overlay2 is full of hard links, and copying without
-    # it both inflates the result and breaks layer sharing. -A/-X keep ACLs and
-    # xattrs, --numeric-ids avoids remapping ownership through this host's
-    # name service.
-    rsync -aHAX --numeric-ids --info=progress2 "$CURRENT_DATA_ROOT"/ "$DOCKER_DATA_ROOT"/
+    for move in "${MOVES[@]}"; do
+      SRC="${move%%|*}"; REST="${move#*|}"; DST="${REST%%|*}"; KIND="${REST#*|}"
+      log "  $KIND: $SRC -> $DST"
+      # -H is not optional: both trees are full of hard links, and copying
+      # without it inflates the result and breaks layer sharing. -A/-X keep
+      # ACLs and xattrs; --numeric-ids avoids remapping ownership.
+      rsync -aHAX --numeric-ids --info=progress2 "$SRC"/ "$DST"/
+    done
 
-    # Merge rather than rewrite — default-address-pools above lives in the same
-    # file and matters just as much.
-    python3 - "$DOCKER_DAEMON_JSON" "$DOCKER_DATA_ROOT" <<'PYJSON'
+    for move in "${MOVES[@]}"; do
+      REST="${move#*|}"; DST="${REST%%|*}"; KIND="${REST#*|}"
+      if [ "$KIND" = "docker" ]; then
+        # Merge rather than rewrite — default-address-pools lives here too.
+        python3 - "$DOCKER_DAEMON_JSON" "$DST" <<'PYJSON'
 import json, os, sys
 
 path, data_root = sys.argv[1], sys.argv[2]
@@ -235,7 +263,41 @@ with open(path, 'w') as handle:
     json.dump(config, handle, indent=2)
     handle.write('\n')
 PYJSON
+      else
+        # TOML: `root` is a top-level key, so it has to land before the first
+        # table header or it silently becomes that table's key.
+        python3 - /etc/containerd/config.toml "$DST" <<'PYTOML'
+import os, sys
 
+path, root = sys.argv[1], sys.argv[2]
+lines = []
+if os.path.exists(path):
+    with open(path) as handle:
+        lines = handle.read().splitlines()
+
+out, done = [], False
+for line in lines:
+    stripped = line.strip()
+    if not done and stripped.split('#')[0].strip().startswith('root') and '=' in stripped:
+        if stripped.split('=')[0].strip() == 'root':
+            out.append(f'root = "{root}"')
+            done = True
+            continue
+    if not done and stripped.startswith('['):
+        out.append(f'root = "{root}"')
+        done = True
+    out.append(line)
+if not done:
+    out.append(f'root = "{root}"')
+
+os.makedirs(os.path.dirname(path), exist_ok=True)
+with open(path, 'w') as handle:
+    handle.write('\n'.join(out) + '\n')
+PYTOML
+      fi
+    done
+
+    [ -n "$CURRENT_CONTAINERD_ROOT" ] && systemctl start containerd
     systemctl start docker
     for _ in $(seq 1 60); do
       docker info >/dev/null 2>&1 && break
@@ -245,8 +307,8 @@ PYJSON
     NEW_DATA_ROOT="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || true)"
     if [ "$NEW_DATA_ROOT" != "$DOCKER_DATA_ROOT" ]; then
       echo "error: Docker came back on $NEW_DATA_ROOT, not $DOCKER_DATA_ROOT." >&2
-      echo "       Check $DOCKER_DAEMON_JSON and 'journalctl -u docker'. The original data is" >&2
-      echo "       untouched at $CURRENT_DATA_ROOT, so removing data-root and restarting reverts." >&2
+      echo "       Check $DOCKER_DAEMON_JSON, /etc/containerd/config.toml and 'journalctl -u docker'." >&2
+      echo "       The original trees are untouched, so reverting the config keys restores them." >&2
       exit 1
     fi
 
@@ -254,13 +316,15 @@ PYJSON
     CONTAINERS_AFTER="$(docker ps -aq | wc -l)"
     if [ "$IMAGES_AFTER" != "$IMAGES_BEFORE" ] || [ "$CONTAINERS_AFTER" != "$CONTAINERS_BEFORE" ]; then
       warn "counts differ after the move: images $IMAGES_BEFORE -> $IMAGES_AFTER, containers $CONTAINERS_BEFORE -> $CONTAINERS_AFTER"
-      warn "the old tree at $CURRENT_DATA_ROOT is intact — do not delete it until this is understood"
+      warn "the old trees are intact — do not delete them until this is understood"
     else
-      log "Docker storage moved: $IMAGES_BEFORE images and $CONTAINERS_BEFORE containers accounted for"
+      log "Storage moved: $IMAGES_BEFORE images and $CONTAINERS_BEFORE containers accounted for"
     fi
 
-    log "The old tree is still at $CURRENT_DATA_ROOT. Once you're happy, reclaim it with:"
-    log "  sudo rm -rf $CURRENT_DATA_ROOT"
+    log "The old trees are still in place. Once you're happy, reclaim them with:"
+    for move in "${MOVES[@]}"; do
+      log "  sudo rm -rf ${move%%|*}"
+    done
   fi
 fi
 
