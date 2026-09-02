@@ -11957,3 +11957,62 @@ three build options in §117.2 stand for whenever it is picked back up. The
 `cloudflare-worker-bouncer` service stays in the compose file behind the
 `edge-bouncer` profile (does not start), and `crowdsecConfig.ts` keeps
 rendering its placeholder config — nothing to rip out.
+
+## 118. Plan — CrowdSec alerts → n8n → ntfy push (§117 detection-only follow-up)
+
+@mat wants a phone push when CrowdSec flags an IP, routed through n8n (chosen
+over a direct CrowdSec→ntfy post) so the workflow can dedupe / rate-limit /
+filter scenarios / enrich before notifying. B is a superset of A: the CrowdSec
+side is identical, only the POST target differs.
+
+### 118.1 Pieces (build order)
+
+1. **CrowdSec `notification-http` rendering.** CrowdSec ships the plugin
+   (`/usr/local/lib/crowdsec/plugins/notification-http`). Backend renders, from
+   stored settings, on each CrowdSec start (`crowdsecConfig.ts`):
+   - `apps/crowdsec/config/notifications/http.yaml` — `type: http`, `name:
+     http_default`, `url`, `method: POST`, `format:` a Go template producing a
+     compact JSON body per alert (scenario, source IP + range, country/AS,
+     events_count, decision duration, `cscli` link). `group_wait` /
+     `group_threshold` to batch bursts.
+   - `apps/crowdsec/config/profiles.yaml` — the stock default profile plus
+     `notifications: [http_default]`. Must reproduce the stock profile (it is
+     what turns alerts into decisions), not replace it.
+   - compose: bind-mount both (`:ro`) at `/etc/crowdsec/notifications/http.yaml`
+     and `/etc/crowdsec/profiles.yaml`, next to the existing `acquis.yaml`
+     mount. `.example` files documenting the schema.
+   - New dashboard setting(s): alerting on/off + target (default the n8n
+     webhook path below). Same write path as the other CrowdSec config.
+   Independently verifiable by pointing `url` straight at ntfy
+   (`http://<gw>:${NTFY_PORT}/<topic>` with `Title`/`Priority`/`Tags` headers)
+   before n8n exists — proves the CrowdSec half.
+2. **Reachability.** `crowdsec` is on `crowdsec-net`, `n8n` on `n8n-net`, ntfy
+   on its own — separate bridges in separate compose projects. Options: an
+   external shared `alerts-net` both projects attach to (clean, but a new
+   cross-project network), or POST via the host-gateway IP + published port
+   (`10.201.0.1:10240`, the pattern `start.sh`/exposure already use; fragile,
+   ties into the §98 "should the backend publish a LAN port" question).
+   Leaning shared network.
+3. **n8n workflow provisioning — this is README §64, still unbuilt.** No native
+   "import workflows from a directory" for n8n's main process. Candidate: a
+   container `command` wrapper — backend renders
+   `apps/n8n/workflows/crowdsec-alert.json` (stable workflow id), compose runs
+   `n8n import:workflow --input=/workflows/... && n8n update:workflow
+   --id=<id> --active=true; n8n start`. Fragile across n8n versions and
+   re-imports every boot; needs a spike. The public REST API is the
+   alternative but needs a UI-created API key (console config, §0.2). B's
+   critical path runs through solving this.
+4. **The workflow.** Webhook trigger (`/webhook/crowdsec-alert`) → Code node
+   (drop scenarios on an allowlist-out list, dedupe by source IP within N
+   minutes via workflow static data, build title/body/priority/tags) → HTTP
+   Request → `http://ntfy/<topic>` (or gw+port). Backend renders it with the
+   topic and ntfy URL baked in.
+5. Docs (`app-credentials.md` / a new alerting note), tests for the renderers.
+
+### 118.2 Proposed start
+
+Piece 1 (CrowdSec `notification-http` + profiles rendering + setting), verified
+by posting to ntfy directly. It is on B's critical path — n8n can receive
+nothing until CrowdSec emits — and delivers a working alert this pass. Pieces
+2–4 (shared network, the §64 provisioning spike, the workflow) follow as their
+own items. Not started.

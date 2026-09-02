@@ -241,6 +241,17 @@ it is done — not ticked off and left behind. Section references point at
       Workers plan). Decided (2026-09-02) to leave it detection-only and keep
       CrowdSec for parsed-log visibility. §117.2 has the three build options
       if this is revisited.
+- [ ] **NEXT UP — CrowdSec `notification-http` rendering** (§118.1) — backend
+      renders `notifications/http.yaml` + a `profiles.yaml` carrying the stock
+      default profile plus `notifications: [http_default]`, both bind-mounted
+      like `acquis.yaml`; a dashboard setting for on/off + target URL. Verify
+      by POSTing straight to ntfy. First piece of §118 (CrowdSec → n8n → ntfy).
+- [ ] **CrowdSec↔n8n↔ntfy reachability** (§118.2) — the three apps are on
+      separate compose-project bridges. A shared external `alerts-net`, or the
+      host-gateway + published-port pattern. Depends on the item above.
+- [ ] **CrowdSec-alert n8n workflow** (§118.4) — Webhook → Code (dedupe by IP,
+      drop noisy scenarios, build title/body/priority/tags) → HTTP Request to
+      ntfy. Backend renders it with the topic baked in. Depends on §64.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from
@@ -280,8 +291,11 @@ it is done — not ticked off and left behind. Section references point at
       MeshCentral it can simply sit behind Authelia.
 - [ ] **MeshCentral** (§62.2) — still wanted, for client endpoints that will
       not join the overlay. `TLSOffload` + `certUrl` for the agent cert hash.
-- [ ] **Pre-built n8n workflows** (§64) — ship useful workflows rather than an
-      empty n8n.
+- [ ] **Pre-built n8n workflows** (§64, §118.3) — ship useful workflows rather
+      than an empty n8n. No native "import from a directory" for n8n's main
+      process; needs a spike (container-`command` import of a backend-rendered
+      JSON with a stable id + `update:workflow --active`, vs the REST API which
+      needs a UI-created key). Blocks the CrowdSec-alert workflow (§118.4).
 - [ ] **Home Assistant: identify the three unlabelled Espressif devices**
       (§77.6) — `.18`/`.19`/`.20`, no DHCP hostname. Power-cycle one appliance
       and re-sweep to identify by elimination.
