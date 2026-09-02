@@ -6,6 +6,11 @@ Every image the stack runs, against the one question that matters commercially:
 Researched 2026-09-02. Licences change — re-check any row marked ⚠️ before a
 launch, and whenever an image tag is re-pinned.
 
+**Keep this current.** Per CLAUDE.md's "Adding an app" convention, every new app
+**and every base or sidecar image in its compose file** gets a row here, with
+its licence checked against the model below, as part of the same change that
+adds it. A candidate whose licence fails that test does not get added.
+
 ## The business model this is checked against
 
 > The software is **not sold**. Business Lab sells **setup, maintenance and

@@ -121,7 +121,7 @@ passing, unless it is genuinely part of the change at hand.
 | `backend/src/routes/` | Express routes, thin. |
 | `frontend/src/app/` | Angular 18 standalone components, Bootstrap 5. |
 | `apps/<name>/` | One compose project per app: `docker-compose.yml`, `.env.example`, gitignored `.env` + `data/`. |
-| `docs/` | Operator docs — `ports.md`, `app-credentials.md`, `first-run.md` are kept current, not aspirational. |
+| `docs/` | Operator docs — `ports.md`, `app-credentials.md`, `first-run.md`, `licences.md` are kept current, not aspirational. `licences.md` gets a row per app **and per image** on every addition (see Conventions). |
 | `start.sh` | Host bootstrap: daemon config, port allocation, first run. |
 | `plan-index.md` | Generated map of `plan.md` — section titles and the `sed` range for each. |
 
@@ -137,8 +137,15 @@ passing, unless it is genuinely part of the change at hand.
   (NPM `80`/`443`, Pi-hole `53`, Home Assistant `8123`) — the allocator only
   manages compose defaults `>= 10000`.
 - **Adding an app**: `apps/<name>/` with compose + `.env.example`, an entry in
-  `services.ts`, a port per the scheme, and rows in `docs/ports.md` and
-  `docs/app-credentials.md`.
+  `services.ts`, a port per the scheme, and rows in `docs/ports.md`,
+  `docs/app-credentials.md` **and `docs/licences.md`**. The licence row is not
+  optional: every new app **and every base/sidecar image** in its compose file
+  gets its upstream licence checked against the resale model in that file
+  (software not sold; setup/maintenance/hardware sold; client operates the
+  box). Flag anything that is copyleft-on-network (AGPL), "fair-code" /
+  source-available (n8n's Sustainable Use License, RSAL/SSPL), or carries a
+  non-software ToS (WhatsApp). If a candidate app's licence fails that test, it
+  does not go in.
 - **Every app shows up on the Home Page.** Homepage (`apps/home-page/`)
   discovers apps from `homepage.*` labels on the container via the Docker
   socket, and lists one only while it is running — so an app without labels is

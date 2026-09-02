@@ -11455,3 +11455,11 @@ The ⚠️ items are operating conditions, not showstoppers — listed at the fo
 `docs/licences.md`. Kept in-repo (asked) as factual compliance reference, like
 the operator runbooks in §84.4; §84.6's "collateral stays out" covers the sales
 deck and client scenarios, not this.
+
+### 107.1 The licence check is now a standing rule for adding an app
+
+Per the user: this check runs every time an app or container is added, not once.
+CLAUDE.md's "Adding an app" convention now requires a `docs/licences.md` row per
+new app **and per base/sidecar image** in its compose file, checked against the
+resale model as part of the same change — and a candidate that fails the check
+does not get added. `docs/licences.md` carries the same instruction at its head.
