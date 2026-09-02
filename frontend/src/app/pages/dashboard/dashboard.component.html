@@ -283,9 +283,18 @@
             <ng-template #neverRun>
               <div class="small text-body-secondary">The schedule has never run.</div>
             </ng-template>
-            <button class="btn btn-sm btn-outline-primary ms-auto" [disabled]="savingSchedule" (click)="saveSchedule()">
-              Save schedule
-            </button>
+            <div class="d-flex gap-2 ms-auto">
+              <!-- §74.6: the only way a backup ran was the scheduler. This
+                   goes through the same dump-then-Duplicati path, so a manual
+                   run to check a new destination is never a generation stale.
+                   Runs ~20s (the dump is synchronous). -->
+              <button class="btn btn-sm btn-outline-secondary" [disabled]="runningAppDataBackup" (click)="runAppDataBackup()">
+                {{ runningAppDataBackup ? 'Backing up…' : 'Back up now' }}
+              </button>
+              <button class="btn btn-sm btn-outline-primary" [disabled]="savingSchedule" (click)="saveSchedule()">
+                Save schedule
+              </button>
+            </div>
           </div>
 
           <!-- §75.2: "the schedule ran" and "restorable backups exist" are

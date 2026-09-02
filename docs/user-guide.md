@@ -27,5 +27,8 @@
 ## Backup and recovery
 
 - Create backups from the dashboard.
+- "Back up now" on the schedule card runs the app-data backup on demand (dump
+  every app database, then Duplicati) — use it to check a destination you have
+  just changed rather than waiting for the next scheduled run.
 - Restore when needed.
 - Use recovery mode for emergency admin reset from localhost only.

@@ -71,6 +71,10 @@ export class OperationsService {
     return this.http.get<BackupStatusResponse>(`${API_BASE_URL}/backups/status`);
   }
 
+  runAppDataBackup(): Observable<{ ok: boolean; message: string }> {
+    return this.http.post<{ ok: boolean; message: string }>(`${API_BASE_URL}/backups/run`, {});
+  }
+
   updateBackupSchedule(config: BackupScheduleSettings): Observable<{ message: string }> {
     return this.http.put<{ message: string }>(`${API_BASE_URL}/backups/schedule`, config);
   }

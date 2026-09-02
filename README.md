@@ -144,8 +144,6 @@ it is done — not ticked off and left behind. Section references point at
       copied raw and can restore corrupt. Either snapshot them
       stop-copy-start, or record the accepted risk in `docs/`. (`portainer`
       was the third and has been dropped, §81.1a.)
-- [ ] **"Back up now" button** (§74.6) — must call `runAppDataBackup`, never
-      `runBackupJobNow`, or each manual backup is a generation stale.
 - [ ] **Prove a non-Drive destination** — `disk`/`SMB`/`NFS` are built and never
       exercised.
 - [ ] **Prove a Postgres/MySQL restore** — only SQLite has been round-tripped.

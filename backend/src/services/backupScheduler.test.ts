@@ -36,7 +36,7 @@ vi.mock('../utils/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { runScheduledBackupCheck, shouldRunScheduledBackup } from './backupScheduler';
+import { runAppDataBackup, runScheduledBackupCheck, shouldRunScheduledBackup } from './backupScheduler';
 
 describe('shouldRunScheduledBackup', () => {
   it('runs immediately when there is no prior run', () => {
@@ -244,6 +244,71 @@ describe('runAppDataBackup failure reporting', () => {
     await runScheduledBackupCheck();
 
     expect(appDataRow()?.metadata).toMatchObject({ dumped: 2, failed: 0, failures: [] });
+  });
+});
+
+describe('runAppDataBackup — the on-demand "Back up now" path (§74.6)', () => {
+  const appDataRow = () =>
+    audit.writeAuditLog.mock.calls.map((call) => call[0]).find((options) => options.resource === 'app-data');
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    appEnv.readAppEnvValue.mockReturnValue('duplicati-password');
+    dumps.dumpAllAppDatabases.mockResolvedValue({
+      ok: 3,
+      failed: 0,
+      outcomes: [{ app: 'n8n', kind: 'postgres', ok: true, detail: 'dumped 442 KB' }],
+    });
+    duplicati.runBackupJobNow.mockResolvedValue({ started: true, detail: 'queued Duplicati job 3' });
+  });
+
+  it('dumps first, then triggers Duplicati, and stamps the row as a manual run', async () => {
+    const result = await runAppDataBackup('manual');
+
+    const order = [
+      dumps.dumpAllAppDatabases.mock.invocationCallOrder[0],
+      duplicati.runBackupJobNow.mock.invocationCallOrder[0],
+    ];
+    expect(order[0]).toBeLessThan(order[1]); // dump before archive, or it is a generation stale
+    expect(appDataRow()?.metadata).toMatchObject({ trigger: 'manual', dumped: 3, failed: 0 });
+    expect(result).toEqual({ ok: true, detail: 'queued Duplicati job 3' });
+  });
+
+  it('defaults to a scheduled trigger when none is given', async () => {
+    await runAppDataBackup();
+    expect(appDataRow()?.metadata).toMatchObject({ trigger: 'scheduled' });
+  });
+
+  it('fails with a usable reason when the backup engine has no password', async () => {
+    appEnv.readAppEnvValue.mockReturnValue(null);
+    const result = await runAppDataBackup('manual');
+    expect(result).toEqual({ ok: false, detail: 'the backup engine has no password configured yet' });
+    expect(duplicati.runBackupJobNow).not.toHaveBeenCalled();
+  });
+
+  it('notes partial dump failures in the returned detail without failing the run', async () => {
+    dumps.dumpAllAppDatabases.mockResolvedValue({
+      ok: 2,
+      failed: 1,
+      outcomes: [{ app: 'immich', kind: 'postgres', ok: false, detail: 'network not found' }],
+    });
+    const result = await runAppDataBackup('manual');
+    expect(result.ok).toBe(true);
+    expect(result.detail).toBe('queued Duplicati job 3; 1 database dump failed');
+  });
+
+  it('fails when nothing dumped and the engine was never reached', async () => {
+    dumps.dumpAllAppDatabases.mockResolvedValue({
+      ok: 0,
+      failed: 2,
+      outcomes: [
+        { app: 'a', kind: 'sqlite', ok: false, detail: 'x' },
+        { app: 'b', kind: 'sqlite', ok: false, detail: 'y' },
+      ],
+    });
+    duplicati.runBackupJobNow.mockResolvedValue({ started: true, detail: 'queued' });
+    const result = await runAppDataBackup('manual');
+    expect(result.ok).toBe(false);
   });
 });
 

@@ -21,6 +21,7 @@ import {
   saveBackupScheduleConfig,
 } from '../services/backup';
 import { getBackupJobStatus } from '../services/duplicatiClient';
+import { runAppDataBackup } from '../services/backupScheduler';
 import { readAppEnvValue } from '../services/appEnv';
 
 const router = Router();
@@ -120,6 +121,37 @@ router.post('/dump-apps', async (req: Request, res: Response) => {
   } catch (error) {
     logger.error('App database dump failed', { error: (error as Error).message });
     return res.status(500).json({ error: 'Unable to dump the app databases.' });
+  }
+});
+
+/**
+ * POST /api/backups/run — run the app-data backup now (§74.6): dump every app
+ * database, then trigger Duplicati. The on-demand twin of the scheduled run,
+ * so a user who has just changed the destination can verify it end to end
+ * instead of waiting for the next scheduled run.
+ *
+ * Goes through `runAppDataBackup`, never `runBackupJobNow` directly: the dump
+ * must come first, or Duplicati archives the *previous* dump and this backup
+ * is silently a generation stale. The dump is synchronous (~20s here); the
+ * Duplicati upload it triggers is not, so success here means "queued", and the
+ * schedule card's status is where the result lands.
+ */
+router.post('/run', async (req: Request, res: Response) => {
+  try {
+    const result = await runAppDataBackup('manual');
+    if (!result.ok) {
+      // A real, user-actionable failure (no destination password, nothing
+      // dumped) — non-2xx so the dashboard surfaces the reason, not a spinner
+      // that just stops.
+      return res.status(400).json({ error: `App data backup did not start: ${result.detail}.` });
+    }
+    return res.json({
+      ok: true,
+      message: `App data backup queued — ${result.detail}. The schedule card shows the result.`,
+    });
+  } catch (error) {
+    logger.error('Manual app-data backup failed', { error: (error as Error).message, userId: req.user?.id });
+    return res.status(500).json({ error: 'Unable to run the app data backup.' });
   }
 });
 

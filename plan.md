@@ -11291,3 +11291,37 @@ registered and auth-gated (401, not 404). Backend typecheck + full suite (284,
 timestamp parser and the metadata mapping with `fetch` stubbed; 4 in
 `backup.test.ts` for `toLastAppDataDump`). Frontend `test:ci` (22) + `build`
 clean.
+
+## 103. §74.6 built: a "Back up now" button that goes through the safe path
+
+Until now the only thing that started an app-data backup was the scheduler, so
+verifying a just-changed destination meant waiting for the next scheduled run —
+or calling the service layer directly, which a user cannot do.
+
+`runAppDataBackup` in `backupScheduler.ts` is now exported and takes a
+`trigger: 'scheduled' | 'manual'` (default `'scheduled'`, so the scheduler call
+is unchanged) that lands on the audit row, and returns `{ ok, detail }` instead
+of `{ ok }` so a caller has something to show. The ordering constraint from
+§74.6 is why the button routes through here: it dumps every app database first
+and *then* triggers Duplicati — calling `runBackupJobNow` directly would
+archive the previous dump and make the manual backup a generation stale.
+
+New `POST /api/backups/run` calls `runAppDataBackup('manual')`. The dump is
+synchronous (~20s on this host, 32 databases), so 200 means "queued" — the
+Duplicati upload it kicks off is not waited on, and the §75.2 schedule card is
+where the result shows. A real failure the user can act on (no destination
+password, nothing dumped) comes back 400 with the reason in `error` so the
+dashboard surfaces it. Button sits on the schedule card next to "Save
+schedule"; on completion it refreshes the status card, so a fresh
+`trigger: manual` dump row replaces the stale one immediately.
+
+**Verified against the live stack**: the compiled `runAppDataBackup('manual')`
+run in the rebuilt backend dumped 32 databases (0 failed) in 19.6s, queued
+"Duplicati job 2", returned `{ ok: true, detail: 'queued Duplicati job 2' }`,
+and wrote an `app-data` audit row with `result: success, trigger: manual,
+dumped: 32`. `getLastAppDataDump()` — the §75.2 card's source — then returned
+that fresh manual row, replacing the 2026-09-01 failure. `POST /api/backups/run`
+is registered and auth-gated (401, not 404). Backend typecheck + full suite
+(289, +5 in `backupScheduler.test.ts` for the manual trigger, dump-before-run
+ordering, the no-password reason, the partial-failure detail string and the
+nothing-dumped failure). Frontend `test:ci` (22) + `build` clean.

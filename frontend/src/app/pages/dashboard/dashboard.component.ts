@@ -151,6 +151,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     consecutiveFailures: 0,
   };
   protected savingSchedule = false;
+  protected runningAppDataBackup = false;
   protected backupStatus: BackupStatusResponse | null = null;
   protected discoveredHosts: DiscoveredHost[] | null = null;
   protected scanningNetwork = false;
@@ -312,6 +313,27 @@ export class DashboardComponent implements OnInit, OnDestroy {
       },
       error: () => {
         this.backupStatus = null;
+      },
+    });
+  }
+
+  runAppDataBackup(): void {
+    // Dumps every app database then triggers Duplicati — the same path the
+    // scheduler takes, so a manual run is never a generation stale (§74.6).
+    // The dump is synchronous, so this request runs ~20s.
+    this.runningAppDataBackup = true;
+    this.operations.runAppDataBackup().subscribe({
+      next: (response) => {
+        this.runningAppDataBackup = false;
+        this.toast.success(response.message);
+        this.loadBackupStatus();
+      },
+      error: (error) => {
+        this.runningAppDataBackup = false;
+        this.toast.error(extractErrorMessage(error, 'Unable to run the app data backup.'));
+        // Even a run that "did not start" dumped databases and wrote an audit
+        // row — refresh the card so any dump failures show.
+        this.loadBackupStatus();
       },
     });
   }

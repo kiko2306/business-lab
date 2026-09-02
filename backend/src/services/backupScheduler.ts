@@ -134,11 +134,20 @@ const MAX_RECORDED_FAILURES = 25;
 /**
  * Dump every app database, then ask Duplicati to run.
  *
- * Never throws — the dashboard's own backup has already succeeded by this
- * point, and losing that to an app-data problem would be a poor trade. It
- * reports instead, so the caller can stamp the run with what really happened.
+ * Never throws — for the scheduler, the dashboard's own backup has already
+ * succeeded by this point and losing that to an app-data problem would be a
+ * poor trade. It reports instead, so the caller can stamp the run with what
+ * really happened.
+ *
+ * `trigger` is recorded on the audit row and is the only difference between
+ * the scheduled run and the dashboard's "Back up now" button (§74.6). The
+ * button MUST come through here rather than calling `runBackupJobNow`
+ * directly: the dump has to happen first, or Duplicati archives the *previous*
+ * dump and the manual backup is silently a generation stale.
  */
-async function runAppDataBackup(): Promise<{ ok: boolean }> {
+export async function runAppDataBackup(
+  trigger: 'scheduled' | 'manual' = 'scheduled'
+): Promise<{ ok: boolean; detail: string }> {
   const report = await dumpAllAppDatabases();
 
   // Which apps failed and why, not merely how many. §86.3: a scheduled run
@@ -162,6 +171,7 @@ async function runAppDataBackup(): Promise<{ ok: boolean }> {
 
   const password = readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD');
   if (!password) {
+    const detail = 'the backup engine has no password configured yet';
     logger.info('Skipping the app-data backup: Duplicati has no password yet');
     // Still record the dump outcome. Returning silently here is how a run
     // whose dumps all failed could leave no audit trail at all — the archive
@@ -171,25 +181,19 @@ async function runAppDataBackup(): Promise<{ ok: boolean }> {
       action: 'backup_create',
       resource: 'app-data',
       result: 'failure',
-      metadata: {
-        trigger: 'scheduled',
-        dumped: report.ok,
-        failed: report.failed,
-        failures,
-        detail: 'the backup engine has no password configured yet',
-      },
+      metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail },
     }).catch(() => {});
-    return { ok: false };
+    return { ok: false, detail };
   }
 
   const run = await runBackupJobNow(password);
-  logger.info('App-data backup', { started: run.started, detail: run.detail, dumped: report.ok });
+  logger.info('App-data backup', { started: run.started, detail: run.detail, dumped: report.ok, trigger });
   await writeAuditLog({
     userId: null,
     action: 'backup_create',
     resource: 'app-data',
     result: run.started ? 'success' : 'failure',
-    metadata: { trigger: 'scheduled', dumped: report.ok, failed: report.failed, failures, detail: run.detail },
+    metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail: run.detail },
   }).catch(() => {});
 
   // A run counts as successful when the app data reached the backup engine.
@@ -197,7 +201,12 @@ async function runAppDataBackup(): Promise<{ ok: boolean }> {
   // themselves fail the run — one app's database being unreachable should not
   // put the whole schedule into retry. A run where *nothing* dumped is
   // different: it has made nothing safe, whatever the engine then did with it.
-  return { ok: run.started && !(report.ok === 0 && report.failed > 0) };
+  const ok = run.started && !(report.ok === 0 && report.failed > 0);
+  const detail =
+    report.failed > 0
+      ? `${run.detail}; ${report.failed} database dump${report.failed === 1 ? '' : 's'} failed`
+      : run.detail;
+  return { ok, detail };
 }
 
 export function startBackupScheduler(): void {
