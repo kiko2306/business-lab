@@ -171,11 +171,10 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Next up (2026-09-02)
 
-- [ ] **Remove the old trees** (§83.4, §83.6) — both moves have now landed
-      (`Docker Root Dir: /home/docker`, containerd `root = "/home/containerd"`),
-      so once they have held for a few days: `/var/lib/docker` (~100 MB,
-      trivial) and `/var/lib/containerd` (~45 GB, the actual reclaim — more
-      than the new SSD adds to `/`).
+- [ ] **Remove `/var/lib/docker`** (§83.4) — the last stale tree, ~100 MB.
+      `/var/lib/containerd` is gone and reclaimed ~46 GB (§92.3); this one is
+      trivial in size but worth deleting so nothing mistakes it for a live
+      Docker root.
 
 ### Business Lab (§84)
 
@@ -258,6 +257,14 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Exposure's allow-list merge ignores compose defaults** (§92) — the
+      override is seeded only from the app's `.env`, so an app relying on a
+      compose `${VAR:-default}` for its `allowedHosts` key loses that default
+      when exposed. Home Page is live proof: exposed, its LAN port returns
+      `400 Host validation failed` while the public hostname returns 200, and a
+      non-dashboard start flips which one works. Seed the merge from the compose
+      default too — `extractComposeEnvVars` already returns it — and test it at
+      `computeExposureEnvOverrides`, which is pure.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from
@@ -282,12 +289,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Apps and integrations
 
-- [ ] **@mat: restart Home Page from the dashboard** (§91.1) — the healthcheck
-      is fixed in the compose file (`/api/healthcheck`, not the `/health` it was
-      404ing on), but applying it needs the container recreated, and Home Page
-      must be restarted **through the dashboard**: the `HOMEPAGE_ALLOWED_HOSTS`
-      override is never persisted, so a shell `docker compose up -d` would drop
-      it and bring back §80.4's `400 Host validation failed`.
 - [ ] **Duplicati carries a 5.3 GB uncheckpointed WAL** (§86.4) —
       `apps/duplicati/data/config/HQFQYTBBPZ.sqlite` is 184 KB with a 5.3 GB
       `-wal` beside it, untouched since the 2026-09-01 restore test. It sits

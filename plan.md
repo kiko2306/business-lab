@@ -10685,3 +10685,67 @@ success. The plan was to curl the removed route and expect a 404. It returned
 runs before route matching, so *every* unauthenticated path in that space is
 401 whether or not it exists. The endpoint check could distinguish nothing. What
 actually proved the removal was looking at the compiled output.
+
+## 92. Exposure's allow-list merge is blind to compose defaults
+
+§91.1's restart was done through the dashboard, as required, and it worked: the
+override reached the container as `HOMEPAGE_ALLOWED_HOSTS=homepage.tx-home-utils.com`
+and the public hostname returns 200. The healthcheck fix landed with it —
+`home-page` reports **healthy** for the first time.
+
+It also exposed a bug that predates today.
+
+    curl http://localhost:10190                                    -> 400
+    curl -H 'Host: homepage.tx-home-utils.com' http://localhost:10190 -> 200
+
+Same container, same port. The allow-list holds *only* the public hostname, so
+anything reaching Home Page by its LAN address gets
+`{"error":"Host validation failed."}` — including the `homepage.href` label the
+start page publishes for itself.
+
+### 92.1 Why
+
+`buildExposureEnvOverrides` seeds the merge from the app's `.env`:
+
+    const existingValues = fs.existsSync(envFilePath) ? parseEnvFile(envFilePath) : {};
+
+and `computeExposureEnvOverrides` appends the public hostname to whatever it
+finds there. Home Page's `.env` does not set `HOMEPAGE_ALLOWED_HOSTS` at all —
+it relies on the compose file's default:
+
+    HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS:-localhost:${HOMEPAGE_PORT:-10190}}
+
+So the merge starts from *nothing*, produces just the hostname, and the shell
+environment beats the compose default. Enabling exposure therefore **replaces**
+the LAN entry rather than adding to it.
+
+The two states are mutually exclusive under the current logic, which is the
+tell:
+
+| Start path | Allow-list | LAN | Public |
+|---|---|---|---|
+| dashboard (applies overrides) | public hostname only | **400** | 200 |
+| `docker compose up` (no overrides) | compose default | 200 | **400** |
+
+This also resolves §80.4a, which recorded the public hostname working "LAN
+included". It was not checked at `:10190`; under this logic it cannot have been
+true at the same time.
+
+### 92.2 Not fixed here
+
+It is a general bug — any app whose `allowedHosts` key relies on a compose
+default rather than an explicit `.env` value loses that default the moment it is
+exposed. Home Page is simply the one that declares `allowedHosts` and leans on a
+default.
+
+The fix is to seed the merge from the compose default as well as the `.env`.
+`extractComposeEnvVars` in `config/services.ts` already parses `${VAR:-default}`
+and returns `defaultValue`, so the value is available without new parsing. It is
+a TODO item rather than something done in passing, and it wants a test at the
+`computeExposureEnvOverrides` level, which is already pure and already tested.
+
+### 92.3 Also confirmed today
+
+`/var/lib/containerd` removed: `/` went from 55 G used (59%) to **9.1 G (10%)**,
+about 46 GB reclaimed — more than the second SSD added to that filesystem, as
+§87.2 predicted. `/var/lib/docker` (~100 MB) is still in place.
