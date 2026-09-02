@@ -25,6 +25,18 @@ services:
     environment:
       VIKUNJA_SERVICE_PUBLICURL: ${VIKUNJA_PUBLIC_URL:-http://localhost:3456}
       VIKUNJA_SERVICE_JWTSECRET: ${VIKUNJA_JWT_SECRET}
+      # SMTP. Injected from the dashboard's global mail settings (Settings →
+      # Email) when set — the backend derives VIKUNJA_MAILER_* via
+      # services/mailEnv.ts and flips MAILER_ENABLED to true. Vikunja tries
+      # STARTTLS by default; FORCESSL switches to implicit TLS (465). Disabled
+      # = no reset emails, as before.
+      VIKUNJA_MAILER_ENABLED: ${VIKUNJA_MAILER_ENABLED:-false}
+      VIKUNJA_MAILER_HOST: ${VIKUNJA_MAILER_HOST:-}
+      VIKUNJA_MAILER_PORT: ${VIKUNJA_MAILER_PORT:-587}
+      VIKUNJA_MAILER_USERNAME: ${VIKUNJA_MAILER_USERNAME:-}
+      VIKUNJA_MAILER_PASSWORD: ${VIKUNJA_MAILER_PASSWORD:-}
+      VIKUNJA_MAILER_FROMEMAIL: ${VIKUNJA_MAILER_FROMEMAIL:-}
+      VIKUNJA_MAILER_FORCESSL: ${VIKUNJA_MAILER_FORCESSL:-false}
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=Vikunja"

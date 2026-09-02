@@ -122,6 +122,129 @@ describe('buildMailEnvOverrides — encryption vocabulary', () => {
     mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'ssl' });
     expect(await buildMailEnvOverrides('x')).toEqual({ MAIL_ENCRYPTION: 'ssl' });
   });
+
+  it('applies only the flag set for the configured mode (Paperless / n8n shape)', async () => {
+    // Two mutually-exclusive booleans whose values differ per mode — neither a
+    // single named scheme nor one boolean can express this.
+    mockedGetService.mockReturnValue({
+      mailEnvKeys: {
+        smtpEncryptionFlags: {
+          tls: { USE_TLS: 'true', USE_SSL: 'false' },
+          ssl: { USE_TLS: 'false', USE_SSL: 'true' },
+          none: { USE_TLS: 'false', USE_SSL: 'false' },
+        },
+      },
+    } as never);
+
+    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'tls' });
+    expect(await buildMailEnvOverrides('x')).toEqual({ USE_TLS: 'true', USE_SSL: 'false' });
+
+    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'ssl' });
+    expect(await buildMailEnvOverrides('x')).toEqual({ USE_TLS: 'false', USE_SSL: 'true' });
+
+    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'none' });
+    expect(await buildMailEnvOverrides('x')).toEqual({ USE_TLS: 'false', USE_SSL: 'false' });
+  });
+});
+
+describe('mail wiring for the registry apps (§75.6 retrofit)', () => {
+  beforeEach(() => {
+    mockedGetService.mockReset();
+    mockedGetMailConfig.mockReset();
+    mockedGetMailConfig.mockResolvedValue(fullConfig); // tls, port 587
+  });
+
+  async function realKeysFor(name: string) {
+    const { SERVICES } = await vi.importActual<typeof import('../config/services')>('../config/services');
+    return SERVICES[name].mailEnvKeys;
+  }
+
+  it('BookStack: every var BookStack reads, ssl collapsed onto tls', async () => {
+    mockedGetService.mockReturnValue({ mailEnvKeys: await realKeysFor('bookstack') } as never);
+
+    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'ssl' });
+    expect(await buildMailEnvOverrides('bookstack')).toEqual({
+      BOOKSTACK_MAIL_DRIVER: 'smtp',
+      BOOKSTACK_MAIL_HOST: 'smtp.example.com',
+      BOOKSTACK_MAIL_PORT: '587',
+      BOOKSTACK_MAIL_USERNAME: 'bot@example.com',
+      BOOKSTACK_MAIL_PASSWORD: 'hunter2',
+      // Symfony mailer only knows tls/null; port 465 implies implicit TLS.
+      BOOKSTACK_MAIL_ENCRYPTION: 'tls',
+      BOOKSTACK_MAIL_FROM: 'bot@example.com',
+      BOOKSTACK_MAIL_FROM_NAME: 'Homelab',
+    });
+
+    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'none' });
+    expect((await buildMailEnvOverrides('bookstack')).BOOKSTACK_MAIL_ENCRYPTION).toBe('null');
+  });
+
+  it('n8n: turns the mode on and sets both encryption booleans explicitly', async () => {
+    mockedGetService.mockReturnValue({ mailEnvKeys: await realKeysFor('n8n') } as never);
+
+    expect(await buildMailEnvOverrides('n8n')).toEqual({
+      N8N_EMAIL_MODE: 'smtp',
+      N8N_SMTP_HOST: 'smtp.example.com',
+      N8N_SMTP_PORT: '587',
+      N8N_SMTP_USER: 'bot@example.com',
+      N8N_SMTP_PASS: 'hunter2',
+      N8N_SMTP_SENDER: 'bot@example.com',
+      // STARTTLS on 587; n8n's own default of SSL=true would break it.
+      N8N_SMTP_SSL: 'false',
+      N8N_SMTP_STARTTLS: 'true',
+    });
+
+    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'ssl' });
+    const ssl = await buildMailEnvOverrides('n8n');
+    expect([ssl.N8N_SMTP_SSL, ssl.N8N_SMTP_STARTTLS]).toEqual(['true', 'false']);
+  });
+
+  it('Paperless: sending vars only, USE_TLS/USE_SSL mutually exclusive, no IMAP', async () => {
+    mockedGetService.mockReturnValue({ mailEnvKeys: await realKeysFor('paperless') } as never);
+
+    const out = await buildMailEnvOverrides('paperless');
+    expect(out).toEqual({
+      PAPERLESS_EMAIL_HOST: 'smtp.example.com',
+      PAPERLESS_EMAIL_PORT: '587',
+      PAPERLESS_EMAIL_HOST_USER: 'bot@example.com',
+      PAPERLESS_EMAIL_HOST_PASSWORD: 'hunter2',
+      PAPERLESS_EMAIL_FROM: 'bot@example.com',
+      PAPERLESS_EMAIL_USE_TLS: 'true',
+      PAPERLESS_EMAIL_USE_SSL: 'false',
+    });
+    // Document intake stays a separate per-account UI setting.
+    expect(Object.keys(out).some((k) => k.includes('IMAP') || k.includes('MAIL_IMAP'))).toBe(false);
+  });
+
+  it('Vikunja: enables the mailer and only forces SSL for implicit TLS', async () => {
+    mockedGetService.mockReturnValue({ mailEnvKeys: await realKeysFor('vikunja') } as never);
+
+    expect(await buildMailEnvOverrides('vikunja')).toEqual({
+      VIKUNJA_MAILER_ENABLED: 'true',
+      VIKUNJA_MAILER_HOST: 'smtp.example.com',
+      VIKUNJA_MAILER_PORT: '587',
+      VIKUNJA_MAILER_USERNAME: 'bot@example.com',
+      VIKUNJA_MAILER_PASSWORD: 'hunter2',
+      VIKUNJA_MAILER_FROMEMAIL: 'bot@example.com',
+      VIKUNJA_MAILER_FORCESSL: 'false',
+    });
+
+    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'ssl' });
+    expect((await buildMailEnvOverrides('vikunja')).VIKUNJA_MAILER_FORCESSL).toBe('true');
+  });
+
+  it('all four fall back to nothing when mail is unconfigured', async () => {
+    mockedGetMailConfig.mockResolvedValue(null);
+    for (const name of ['bookstack', 'n8n', 'paperless', 'vikunja']) {
+      mockedGetService.mockReturnValue({ mailEnvKeys: await realKeysFor(name) } as never);
+      expect(await buildMailEnvOverrides(name)).toEqual({});
+    }
+  });
+
+  it('Uptime Kuma declares no mail keys — it has no SMTP env vars', async () => {
+    const { SERVICES } = await vi.importActual<typeof import('../config/services')>('../config/services');
+    expect(SERVICES['uptime-kuma'].mailEnvKeys).toBeUndefined();
+  });
 });
 
 describe('vaultwarden mail wiring', () => {

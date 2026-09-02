@@ -11185,3 +11185,64 @@ in `backupTarget.test.ts` ties `DEFAULT_BACKUP_FOLDER` to the string
 one a backup uses. Backend typecheck + full suite (264/264) clean. Not exercised
 against the live backend: the change is a read-path display fallback with no
 effect on backup execution or the target URL already in use.
+
+## 101. `mailEnvKeys` retrofit — four apps wired to the global mailbox, Uptime Kuma can't be
+
+§75.6 carry-over: n8n, BookStack, Paperless, Vikunja and Uptime Kuma were all
+listed as "global mail settings exist but the app doesn't consume them yet."
+Checked each against what it actually supports.
+
+**Uptime Kuma has no SMTP environment variables at all.** An email alert is a
+row in its SQLite `notification` table, created in the UI — there is no env
+var, no config file, only an undocumented Socket.IO API. This is the ITFlow
+situation (§62.1): wiring `mailEnvKeys` would look like it worked and silently
+do nothing. Decision (asked): skip it, document why. It now carries a `NOTE:
+deliberately no mailEnvKeys` comment in `services.ts`, a `docs/app-credentials.md`
+entry under a new "Global mail settings — who inherits them" section, and is
+dropped from the README item. The DB-seed route (a `homeAssistantHacs.ts`-shaped
+module upserting the notification row) was considered and rejected: it couples
+us to Uptime Kuma's internal schema and only gets you half a feature without
+also wiring the notification to every monitor.
+
+**The other four do support env-var SMTP**, but three of them express
+encryption as several booleans whose values differ per mode, which the
+existing `mailEnvKeys` shape (`smtpEncryptionMap` = one named scheme,
+`smtpTlsBoolean` = one boolean true for both tls and ssl) can't represent:
+
+- **n8n** — `N8N_SMTP_SSL` (implicit 465) and `N8N_SMTP_STARTTLS` (587), *both
+  default `true`* in n8n, which is wrong for almost every server.
+- **Paperless** — Django's `PAPERLESS_EMAIL_USE_TLS` / `PAPERLESS_EMAIL_USE_SSL`,
+  mutually exclusive.
+- **Vikunja** — `VIKUNJA_MAILER_FORCESSL`, true only for implicit TLS.
+
+Added one primitive for it: `smtpEncryptionFlags?: Partial<Record<'tls' |
+'ssl' | 'none', Record<string, string>>>` on `ServiceMailEnvKeys` —
+`mailEnv.ts` applies the entry for the configured mode and only that entry, so
+an app's permissive defaults can't leak through. BookStack needs none of this:
+its Symfony mailer takes only `tls` or `null`, so `smtpEncryptionMap: { tls:
+'tls', ssl: 'tls', none: 'null' }` (port 465 implies implicit TLS on its own).
+
+Per-app wiring in `services.ts` + `${…:-default}` refs added to each compose
+file (`environment:` block) + `.env.example` notes:
+
+| App | Turns on with | Encryption |
+|---|---|---|
+| BookStack | `BOOKSTACK_MAIL_DRIVER=smtp` | `MAIL_ENCRYPTION` via map |
+| n8n | `N8N_EMAIL_MODE=smtp` | `N8N_SMTP_SSL` + `N8N_SMTP_STARTTLS` per mode |
+| Paperless | (any host set) | `USE_TLS` + `USE_SSL` per mode |
+| Vikunja | `VIKUNJA_MAILER_ENABLED=true` | `FORCESSL` per mode |
+
+Compose fallbacks are inert (`N8N_EMAIL_MODE=""`, `VIKUNJA_MAILER_ENABLED=false`,
+empty hosts) so an install with no global mail settings behaves exactly as
+before. Paperless' IMAP document-intake is deliberately untouched — that stays
+a per-account setting in its own UI.
+
+**Verified**: backend typecheck + full suite (270, +7 new in `mailEnv.test.ts`
+asserting the exact env each app derives across tls/ssl/none, the
+unconfigured→`{}` fallback, and Uptime Kuma declaring no keys). `docker compose
+config` on all four real compose files, with and without the overrides the
+live mail config (`mail.portoinf.com:587`, STARTTLS) would produce — the vars
+resolve into each `environment:` block correctly and the files stay valid.
+**Not done**: starting each app and confirming a real message sends — the four
+apps are running with their pre-change env and pick this up on their next
+dashboard restart ("restart to apply", same as exposure).

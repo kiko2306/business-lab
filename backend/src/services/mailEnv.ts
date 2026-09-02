@@ -55,6 +55,12 @@ export async function buildMailEnvOverrides(serviceName: string): Promise<Record
   assign(overrides, keys.smtpPassword, config.smtpPassword);
   assign(overrides, keys.smtpEncryption, keys.smtpEncryptionMap?.[config.smtpEncryption] ?? config.smtpEncryption);
   assign(overrides, keys.smtpTlsBoolean, encryptionToBoolean(config.smtpEncryption));
+  // Apps that spread encryption across several booleans (Paperless, n8n): set
+  // exactly the vars the active mode calls for, so an app's own permissive
+  // defaults (n8n turns both SSL and STARTTLS on) can't leak through.
+  for (const [key, value] of Object.entries(keys.smtpEncryptionFlags?.[config.smtpEncryption] ?? {})) {
+    overrides[key] = value;
+  }
   assign(overrides, keys.fromAddress, config.fromAddress);
   assign(overrides, keys.fromName, config.fromName);
 

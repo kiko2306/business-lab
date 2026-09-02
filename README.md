@@ -266,9 +266,6 @@ it is done — not ticked off and left behind. Section references point at
       exposure is configured. Decide: drop the `ports:` mapping from
       `docker-compose.yml` entirely (backend becomes compose-network-only), or
       keep it published and just fix the number. Bugfix, not urgent.
-- [ ] **Retrofit `mailEnvKeys`** (§75.6) to Uptime Kuma, n8n, BookStack,
-      Paperless and Vikunja — global mail settings exist but these apps don't
-      consume them yet.
 - [ ] **Signal-port coupling is uncovered** (§69) — the port renumbering
       silently killed NetBird's signal service once; no test would catch a
       repeat.

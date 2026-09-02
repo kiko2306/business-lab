@@ -35,6 +35,19 @@ services:
       # Editor/base URL — set by the dashboard to the public URL when exposure
       # is enabled so the UI, webhooks and OAuth callbacks use it.
       N8N_EDITOR_BASE_URL: ${N8N_EDITOR_BASE_URL:-http://localhost:5678/}
+      # SMTP for user-management emails (invites, password resets). Injected
+      # from the dashboard's global mail settings (Settings → Email) when set —
+      # the backend derives these via services/mailEnv.ts and flips
+      # N8N_EMAIL_MODE to smtp. n8n defaults SSL and STARTTLS both to true, so
+      # they're always set explicitly. Empty mode = email disabled, as before.
+      N8N_EMAIL_MODE: ${N8N_EMAIL_MODE:-}
+      N8N_SMTP_HOST: ${N8N_SMTP_HOST:-}
+      N8N_SMTP_PORT: ${N8N_SMTP_PORT:-587}
+      N8N_SMTP_USER: ${N8N_SMTP_USER:-}
+      N8N_SMTP_PASS: ${N8N_SMTP_PASS:-}
+      N8N_SMTP_SENDER: ${N8N_SMTP_SENDER:-}
+      N8N_SMTP_SSL: ${N8N_SMTP_SSL:-false}
+      N8N_SMTP_STARTTLS: ${N8N_SMTP_STARTTLS:-true}
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=n8n"

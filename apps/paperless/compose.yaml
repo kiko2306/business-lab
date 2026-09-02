@@ -22,6 +22,19 @@ services:
       # Set by the dashboard alongside PAPERLESS_URL when exposure is enabled;
       # without a matching trusted origin the login POST returns a bare 400.
       PAPERLESS_CSRF_TRUSTED_ORIGINS: ${PAPERLESS_CSRF_TRUSTED_ORIGINS:-http://localhost:8000}
+      # Outgoing mail (share links, notifications). Injected from the
+      # dashboard's global mail settings (Settings → Email) when set — the
+      # backend derives PAPERLESS_EMAIL_* via services/mailEnv.ts. USE_TLS
+      # (STARTTLS) and USE_SSL (implicit) are mutually exclusive, so both are
+      # always set. Empty host = no mailer, as before. Document intake over
+      # IMAP is configured separately in Paperless' own UI.
+      PAPERLESS_EMAIL_HOST: ${PAPERLESS_EMAIL_HOST:-}
+      PAPERLESS_EMAIL_PORT: ${PAPERLESS_EMAIL_PORT:-587}
+      PAPERLESS_EMAIL_HOST_USER: ${PAPERLESS_EMAIL_HOST_USER:-}
+      PAPERLESS_EMAIL_HOST_PASSWORD: ${PAPERLESS_EMAIL_HOST_PASSWORD:-}
+      PAPERLESS_EMAIL_FROM: ${PAPERLESS_EMAIL_FROM:-}
+      PAPERLESS_EMAIL_USE_TLS: ${PAPERLESS_EMAIL_USE_TLS:-true}
+      PAPERLESS_EMAIL_USE_SSL: ${PAPERLESS_EMAIL_USE_SSL:-false}
       PAPERLESS_ENABLE_COMPRESSION: "true"
       PAPERLESS_TASK_WORKERS: 2
       PAPERLESS_THREADS_PER_WORKER: 1

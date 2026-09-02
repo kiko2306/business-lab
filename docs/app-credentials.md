@@ -76,6 +76,26 @@ Worth knowing: the container's healthcheck only probes the web server, not
 cron. If cron dies the container still reports healthy while every scheduled
 job stops.
 
+## Global mail settings — who inherits them
+
+One SMTP account is entered once in **Settings → Email**. Apps that read mail
+config from their environment get it injected automatically at start (restart
+the app to apply, same as exposure):
+
+**Vaultwarden**, **BookStack**, **n8n** (user-management emails), **Paperless**
+(sending only), **Vikunja**.
+
+Two apps keep mail config in their own database and cannot inherit it — the
+global settings are values to **copy into the app's own UI** by hand, and
+nothing warns you if you don't:
+
+- **ITFlow** — see the note above.
+- **Uptime Kuma** — an email alert is an SMTP *notification* created under
+  **Settings → Notifications**. There is no environment variable for it.
+
+Paperless' *document intake* over IMAP is also its own per-account setting
+(**Settings → Mail**), separate from the global config.
+
 ## No login of their own
 
 These have no authentication, or none enabled by default. **Every one should

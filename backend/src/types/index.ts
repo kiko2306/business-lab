@@ -84,6 +84,17 @@ export interface ServiceMailEnvKeys {
   smtpEncryptionMap?: Partial<Record<'tls' | 'ssl' | 'none', string>>;
   /** Some apps want a boolean "use TLS" rather than a named scheme. */
   smtpTlsBoolean?: string[];
+  /**
+   * Env vars set only for the configured encryption mode, as
+   * `{ mode: { KEY: value, … } }`. For apps that express encryption as one or
+   * more booleans whose values differ by mode, where neither a single named
+   * scheme (`smtpEncryptionMap`) nor one boolean (`smtpTlsBoolean`) is enough:
+   * Paperless splits it across `PAPERLESS_EMAIL_USE_TLS` /
+   * `PAPERLESS_EMAIL_USE_SSL`, n8n across `N8N_SMTP_SSL` / `N8N_SMTP_STARTTLS`
+   * (both of which default to `true` in n8n — wrong for most servers, so both
+   * have to be set explicitly). Only the entry for the active mode is applied.
+   */
+  smtpEncryptionFlags?: Partial<Record<'tls' | 'ssl' | 'none', Record<string, string>>>;
   fromAddress?: string[];
   fromName?: string[];
   imapHost?: string[];

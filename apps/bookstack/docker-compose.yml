@@ -21,6 +21,18 @@ services:
       DB_USERNAME: ${BOOKSTACK_DB_USER:-bookstack}
       DB_PASSWORD: ${BOOKSTACK_DB_PASSWORD}
       DB_DATABASE: ${BOOKSTACK_DB_NAME:-bookstack}
+      # Outgoing mail. Injected from the dashboard's global mail settings
+      # (Settings → Email) when they're set — the backend derives BOOKSTACK_MAIL_*
+      # via services/mailEnv.ts. Left at these inert defaults BookStack simply
+      # has no working mailer, exactly as before this was wired.
+      MAIL_DRIVER: ${BOOKSTACK_MAIL_DRIVER:-smtp}
+      MAIL_HOST: ${BOOKSTACK_MAIL_HOST:-localhost}
+      MAIL_PORT: ${BOOKSTACK_MAIL_PORT:-587}
+      MAIL_USERNAME: ${BOOKSTACK_MAIL_USERNAME:-null}
+      MAIL_PASSWORD: ${BOOKSTACK_MAIL_PASSWORD:-null}
+      MAIL_ENCRYPTION: ${BOOKSTACK_MAIL_ENCRYPTION:-null}
+      MAIL_FROM: ${BOOKSTACK_MAIL_FROM:-bookstack@example.com}
+      MAIL_FROM_NAME: ${BOOKSTACK_MAIL_FROM_NAME:-BookStack}
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=BookStack"
