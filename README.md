@@ -161,18 +161,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Next up (2026-09-02)
 
-- [ ] **@mat: run the data-root move** (§83.4) — the script side is built and
-      committed; this step is yours because it needs sudo:
-      `sudo DOCKER_DATA_ROOT=/home/docker ./start.sh`. Every container stops
-      for the copy (~47 GB). The old tree stays for rollback.
-- [ ] **@mat: create a dashboard admin account for Claude** — once the move is
-      verified and the stack is back up. Unblocks three things that have needed
-      a human click all along: fixing Home Page's `HOMEPAGE_ALLOWED_HOSTS` by
-      restarting it through the dashboard (the only path that applies exposure
-      env overrides), verifying UI changes visually instead of by grep, and
-      restarting apps the sanctioned way rather than by hand. The smoke-test
-      script already expects `SMOKE_USER`/`SMOKE_PASSWORD`, so a dedicated
-      account fits what is there.
 - [ ] **@mat: re-run the move for containerd's root** (§83.6a) — built and
       committed; the same command, and it will skip data-root (already in
       place) and move the 45 GB in `/var/lib/containerd`:
