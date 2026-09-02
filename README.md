@@ -1,6 +1,6 @@
-# Homelab Management
+# Business Lab
 
-Homelab Management is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
+Business Lab (repository still `homelab-management`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
 ## Documentation
 
@@ -183,9 +183,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Business Lab (§84)
 
-- [ ] **Rebrand, tier 1** (§84.2) — the three user-visible strings, the
-      favicon, and the README/docs headings. Nothing restarts, nothing
-      migrates.
 - [ ] **Rebrand, tier 2** (§84.2) — package/image/network/project names. Do it
       in the same maintenance window as the §83 data-root move; both recreate
       the management stack.

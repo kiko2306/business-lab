@@ -1,7 +1,7 @@
 {
-  "name": "Homelab Manager",
-  "short_name": "Homelab",
-  "description": "Monitor, start, and stop the services running across your homelab.",
+  "name": "Business Lab",
+  "short_name": "Business Lab",
+  "description": "Monitor, start, and stop the services running across your stack.",
   "start_url": "/?source=pwa",
   "scope": "/",
   "display": "standalone",

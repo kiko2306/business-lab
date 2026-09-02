@@ -9956,3 +9956,24 @@ finds the database container, and the two queries `db_setting` issues return
 `tx-home-utils.com` and the **new, working** token — so the next run resolves
 the credential that works rather than the stale one that produced the original
 warning. `bash -n` and shellcheck clean.
+
+### 84.2a Done: rebrand tier 1
+
+Six user-visible places now say **Business Lab**: the browser title, the
+dashboard header, the login kicker, the favicon's `aria-label` (the one a
+screen reader announces), and the PWA manifest's `name`/`short_name` — the last
+two matter because they are what an installed app is called on a phone's home
+screen. The manifest description lost its "across your homelab" while it was
+being edited.
+
+Deliberately **not** touched, per the tiering: package names, image names, the
+`homelab-net` network, the compose project, the Postgres role and database, the
+public hostnames, and the repository name. The README says so at the top rather
+than leaving the mismatch to be discovered.
+
+**The mark itself is unchanged and worth a decision.** The favicon is a house
+roof over two server rack units — the roof is precisely the part that says
+"home". Renaming its label without redrawing it leaves a logo that still reads
+as a house, and inventing a new one is not a call to make unasked.
+
+Verified: the running frontend serves `<title>Business Lab</title>`.
