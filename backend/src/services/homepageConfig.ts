@@ -131,6 +131,11 @@ export async function collectHomepageTiles(): Promise<HomepageTile[]> {
   const tiles: HomepageTile[] = [];
 
   for (const service of getAllServices()) {
+    // The Home Page doesn't list itself — a tile linking to the page you are
+    // already on is noise.
+    if (service.name === HOMEPAGE_SERVICE) {
+      continue;
+    }
     const resolved = resolveComposeFile(service.name);
     if (!resolved?.composeFile || !resolved.projectName) {
       continue;

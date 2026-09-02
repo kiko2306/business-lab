@@ -108,15 +108,18 @@ describe('collectHomepageTiles', () => {
       { name: 'waha' },
       { name: 'immich' },
       { name: 'dozzle' },
+      { name: 'homepage' },
     ] as never);
     vi.mocked(resolveComposeFile).mockImplementation(
       (name: string) => ({ composeFile: `/repo/apps/${name}/docker-compose.yml`, appDir: `/repo/apps/${name}`, projectName: name }) as never
     );
     vi.mocked(getService).mockImplementation((name: string) => (name === 'waha' ? ({ webPath: '/dashboard' }) : ({})) as never);
 
-    // waha: running + exposed. immich: running, NOT exposed. dozzle: exposed but NOT running.
+    // waha: running + exposed. immich: running, NOT exposed. dozzle: exposed
+    // but NOT running. homepage: running + exposed, but excluded — it never
+    // lists itself.
     vi.mocked(exec).mockImplementation(((_cmd: string, cb: (e: unknown, out: string) => void) => {
-      cb(null, 'waha\nimmich\n');
+      cb(null, 'waha\nimmich\nhomepage\n');
     }) as never);
     vi.mocked(getServiceExposureRow).mockImplementation(
       (name: string) =>
@@ -125,7 +128,9 @@ describe('collectHomepageTiles', () => {
             ? { enabled: true, status: 'provisioned', hostname: 'waha.example.com' }
             : name === 'dozzle'
               ? { enabled: true, status: 'provisioned', hostname: 'dozzle.example.com' }
-              : { enabled: false, status: 'not_provisioned', hostname: null }
+              : name === 'homepage'
+                ? { enabled: true, status: 'provisioned', hostname: 'homepage.example.com' }
+                : { enabled: false, status: 'not_provisioned', hostname: null }
         ) as never
     );
     vi.mocked(fs.readFile).mockResolvedValue(
@@ -144,5 +149,6 @@ describe('collectHomepageTiles', () => {
         icon: 'whatsapp.png',
       },
     ]);
+    expect(tiles.some((t) => t.name.toLowerCase().includes('home'))).toBe(false);
   });
 });

@@ -11861,3 +11861,19 @@ section of `dashboard.component.html`, above the category groups.
 - Empty result shows "No apps match …".
 
 Frontend `test:ci` (28) and `build` pass.
+
+### 115.1 The Home Page no longer lists itself
+
+Follow-up to §114: `collectHomepageTiles` skips `homepage` — a tile linking to
+the page you are already on is noise. Verified in the generated file after a
+Home Page restart.
+
+## 116. Regenerate the Home Page's services.yaml on backend boot
+
+§114 rewrites `services.yaml` on every start/stop and exposure toggle, but not
+on backend startup — so a backend restart while app state had changed, or a
+fresh deploy, left the file stale (or, on a clone, showing Homepage's seeded
+demo tiles until the next start/stop). Added a best-effort
+`regenerateHomepageServices()` call in `index.ts` beside
+`reconcileRemovedServices()`, which already runs the equivalent exposure
+reconcile on boot.

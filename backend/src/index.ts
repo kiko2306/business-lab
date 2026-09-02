@@ -20,6 +20,7 @@ import { initWebSocket, sseHandler } from './services/realtime';
 import { startupLogsHandler } from './services/serviceLogs';
 import { startBackupScheduler } from './services/backupScheduler';
 import { reconcileRemovedServices } from './services/exposure';
+import { regenerateHomepageServices } from './services/homepageConfig';
 import { startImageUpdateSweeper } from './services/imageUpdates';
 
 const apiLimiter = rateLimit({
@@ -165,6 +166,11 @@ startBackupScheduler();
 reconcileRemovedServices().catch((err: Error) => {
   console.error('Unable to reconcile exposure for removed services:', err.message);
 });
+// The Home Page's services.yaml is otherwise only rewritten on a start/stop or
+// an exposure toggle — so a backend restart after app state changed (or a
+// fresh deploy) would leave it stale. Reconcile it once on boot. Best-effort
+// inside the helper (§114).
+regenerateHomepageServices();
 startImageUpdateSweeper();
 
 const server = app.listen(PORT, () => {
