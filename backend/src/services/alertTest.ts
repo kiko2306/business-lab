@@ -13,7 +13,7 @@
 
 import { requestJson } from '../utils/httpJson';
 import { getPublishedUpstreamPort } from '../config/services';
-import { CROWDSEC_ALERT_WEBHOOK_PATH } from './n8nWorkflows';
+import { ALERT_TEST_SCENARIO, CROWDSEC_ALERT_WEBHOOK_PATH } from './n8nWorkflows';
 
 const N8N_DEFAULT_PORT = 10240;
 
@@ -31,7 +31,7 @@ function sampleCrowdsecAlert(): unknown[] {
   const now = new Date().toISOString();
   return [
     {
-      scenario: 'homelab-management/alert-test',
+      scenario: ALERT_TEST_SCENARIO,
       source: { ip, cn: 'US', scope: 'Ip', value: ip, as_name: 'Test' },
       decisions: [{ type: 'ban', duration: '5m', scope: 'Ip', value: ip, origin: 'cscli' }],
       events_count: 1,

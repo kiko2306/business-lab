@@ -11,6 +11,7 @@ describe('buildCrowdsecAlertWorkflow', () => {
   const wf = buildCrowdsecAlertWorkflow({
     topic: 'homelab-alerts',
     ntfyUrl: 'http://host.docker.internal:10290/',
+    enforced: false,
   });
 
   it('has the stable id (used as filename + import key) and is active', () => {
@@ -43,20 +44,39 @@ describe('buildCrowdsecAlertWorkflow', () => {
     expect(http.parameters.method).toBe('POST');
   });
 
-  it('the Code node dedupes by IP and drops noisy scenarios', () => {
-    const code = (wf.nodes as Array<{ name: string; parameters: { jsCode: string } }>).find(
+  function codeOf(wfObj: Record<string, unknown>): string {
+    return (wfObj.nodes as Array<{ name: string; parameters: { jsCode: string } }>).find(
       (n) => n.name === 'Format'
-    )!;
-    const js = code.parameters.jsCode;
-    // dedupe: keeps a window in workflow static data
+    )!.parameters.jsCode;
+  }
+
+  it('the Code node dedupes by IP and drops noisy scenarios', () => {
+    const js = codeOf(wf);
     expect(js).toContain("$getWorkflowStaticData('global')");
     expect(js).toContain(String(DEDUPE_WINDOW_MS));
-    // noise filter: the list is baked in and applied
     expect(js).toContain(JSON.stringify(NOISE_SCENARIOS));
     // nothing survives → no items → HTTP node never fires
     expect(js).toContain('if (kept.length === 0) return [];');
-    // no "ban" wording — nothing enforces the decision yet (§117)
-    expect(js).not.toMatch(/\bban\b/);
+  });
+
+  it('marks an all-test batch with a TEST title and the test_tube tag', () => {
+    const js = codeOf(wf);
+    expect(js).toContain("allTest ? 'TEST — '");
+    expect(js).toContain("allTest ? ['test_tube'] : ['rotating_light']");
+  });
+
+  it('appends the applied ban only when enforcement is on', () => {
+    // enforced: false → the ban clause is gated off
+    expect(codeOf(wf)).toContain('const enforced = false;');
+    expect(codeOf(wf)).toContain("(enforced && dec.type === 'ban')");
+    // enforced: true → same code, flag flipped (the §119 bouncer live)
+    const enforcedWf = buildCrowdsecAlertWorkflow({
+      topic: 'homelab-alerts',
+      ntfyUrl: 'http://host.docker.internal:10290/',
+      enforced: true,
+    });
+    expect(codeOf(enforcedWf)).toContain('const enforced = true;');
+    expect(codeOf(enforcedWf)).toContain("' · banned '");
   });
 
   it('serialises to JSON (n8n import reads a file)', () => {

@@ -44,18 +44,28 @@ export const NOISE_SCENARIOS = ['crowdsecurity/http-crawl-non_statics'];
 // (Redis) is a follow-up if it proves noisy (§118.4).
 export const DEDUPE_WINDOW_MS = 10 * 60 * 1000;
 
+// Scenario name used by the dashboard's "Test" button (services/alertTest.ts).
+// The relay tags a batch made only of these as a test.
+export const ALERT_TEST_SCENARIO = 'homelab-management/alert-test';
+
 /**
- * The CrowdSec-alert relay workflow. `topic` is baked into the Code node and
- * `ntfyUrl` into the HTTP Request node — n8n substitutes nothing at runtime
- * here, the backend does it now. The Code node drops NOISE_SCENARIOS and
- * dedupes by source IP; if nothing survives it returns no items, so the HTTP
- * node never fires.
+ * The CrowdSec-alert relay workflow. `topic` / `ntfyUrl` / `enforced` are baked
+ * into the nodes — n8n substitutes nothing at runtime here. The Code node drops
+ * NOISE_SCENARIOS, dedupes by source IP, marks a test batch, and — only when
+ * `enforced` (the §119 NPM bouncer is live) — appends the applied ban to each
+ * line. If nothing survives it returns no items, so the HTTP node never fires.
  */
-export function buildCrowdsecAlertWorkflow(opts: { topic: string; ntfyUrl: string }): Record<string, unknown> {
+export function buildCrowdsecAlertWorkflow(opts: {
+  topic: string;
+  ntfyUrl: string;
+  enforced: boolean;
+}): Record<string, unknown> {
   const jsCode = [
     `const NOISE = ${JSON.stringify(NOISE_SCENARIOS)};`,
     `const WINDOW_MS = ${DEDUPE_WINDOW_MS};`,
     `const topic = ${JSON.stringify(opts.topic)};`,
+    `const TEST_SCENARIO = ${JSON.stringify(ALERT_TEST_SCENARIO)};`,
+    `const enforced = ${opts.enforced ? 'true' : 'false'};`,
     "",
     "const input = $input.first().json;",
     "const raw = input && input.body !== undefined ? input.body : input;",
@@ -68,9 +78,11 @@ export function buildCrowdsecAlertWorkflow(opts: { topic: string; ntfyUrl: strin
     "  if (now - store.seen[k] > WINDOW_MS) delete store.seen[k];",
     "}",
     "",
+    "let allTest = alerts.length > 0;",
     "const kept = [];",
     "for (const a of alerts) {",
     "  const scenario = (a && a.scenario) ? a.scenario : 'alert';",
+    "  if (scenario !== TEST_SCENARIO) allTest = false;",
     "  if (NOISE.some((n) => scenario.indexOf(n) !== -1)) continue;",
     "  const src = (a && a.source) || {};",
     "  const ip = src.ip || src.value || 'unknown';",
@@ -78,17 +90,19 @@ export function buildCrowdsecAlertWorkflow(opts: { topic: string; ntfyUrl: strin
     "  store.seen[ip] = now;",
     "  const cn = src.cn ? ' (' + src.cn + ')' : '';",
     "  const events = (a && a.events_count) ? ' · ' + a.events_count + ' events' : '';",
-    "  kept.push(scenario + ' — ' + ip + cn + events);",
+    "  const dec = (a && a.decisions && a.decisions[0]) || {};",
+    "  const ban = (enforced && dec.type === 'ban') ? ' · banned ' + (dec.duration || '') : '';",
+    "  kept.push(scenario + ' — ' + ip + cn + events + ban);",
     "}",
     "",
     "if (kept.length === 0) return [];",
     "",
     "return [{ json: {",
     "  topic,",
-    "  title: 'CrowdSec: ' + kept.length + ' alert' + (kept.length === 1 ? '' : 's'),",
+    "  title: (allTest ? 'TEST — ' : '') + 'CrowdSec: ' + kept.length + ' alert' + (kept.length === 1 ? '' : 's'),",
     "  message: kept.join('\\n'),",
-    "  priority: 4,",
-    "  tags: ['rotating_light'],",
+    "  priority: allTest ? 3 : 4,",
+    "  tags: allTest ? ['test_tube'] : ['rotating_light'],",
     "} }];",
   ].join('\n');
 
@@ -162,7 +176,7 @@ export async function applyN8nWorkflows(serviceName: string, appDir: string): Pr
     const dir = path.join(appDir, WORKFLOWS_DIR_RELATIVE);
     await fs.mkdir(dir, { recursive: true });
 
-    const { topic, crowdsecEnabled } = await getAlertNotifyConfig();
+    const { topic, crowdsecEnabled, enforceNpm } = await getAlertNotifyConfig();
     const target = path.join(dir, `${CROWDSEC_ALERT_WORKFLOW_ID}.json`);
 
     // Only ship the relay while CrowdSec alerts are on. Removing the file
@@ -173,7 +187,11 @@ export async function applyN8nWorkflows(serviceName: string, appDir: string): Pr
       return;
     }
 
-    const workflow = buildCrowdsecAlertWorkflow({ topic, ntfyUrl: ntfyPublishUrl() });
+    const workflow = buildCrowdsecAlertWorkflow({
+      topic,
+      ntfyUrl: ntfyPublishUrl(),
+      enforced: enforceNpm,
+    });
     await fs.writeFile(target, `${JSON.stringify(workflow, null, 2)}\n`, 'utf8');
     logger.info('n8n: rendered managed workflow', { id: CROWDSEC_ALERT_WORKFLOW_ID });
   } catch (error) {

@@ -20,6 +20,12 @@ export const ALERT_NOTIFY_KEYS = {
   topic: 'ntfy_alerts_topic',
   /** Per-source flag: CrowdSec intrusion alerts. */
   crowdsecEnabled: 'crowdsec_alerts_enabled',
+  /**
+   * Whether CrowdSec bans are actually enforced (the NPM lua bouncer, §119).
+   * Set by that feature's toggle. The n8n relay reads it so the push says
+   * "banned 4h" only when the ban is real — detection-only until then (§117).
+   */
+  enforceNpm: 'crowdsec_enforce_npm',
 } as const;
 
 export const DEFAULT_ALERT_TOPIC = 'homelab-alerts';
@@ -36,6 +42,8 @@ export interface AlertNotifyConfig {
   topic: string;
   /** Whether CrowdSec intrusion alerts are sent. */
   crowdsecEnabled: boolean;
+  /** Whether CrowdSec bans are enforced at NPM (§119) — affects push wording. */
+  enforceNpm: boolean;
 }
 
 async function readSetting(key: string): Promise<string | null> {
@@ -57,19 +65,26 @@ async function writeSetting(key: string, value: string): Promise<void> {
 }
 
 export async function getAlertNotifyConfig(): Promise<AlertNotifyConfig> {
-  const [topicRaw, crowdsecRaw] = await Promise.all([
+  const [topicRaw, crowdsecRaw, enforceRaw] = await Promise.all([
     readSetting(ALERT_NOTIFY_KEYS.topic),
     readSetting(ALERT_NOTIFY_KEYS.crowdsecEnabled),
+    readSetting(ALERT_NOTIFY_KEYS.enforceNpm),
   ]);
 
   return {
     topic: isValidAlertTopic(topicRaw) ? topicRaw : DEFAULT_ALERT_TOPIC,
     crowdsecEnabled: crowdsecRaw === 'true',
+    enforceNpm: enforceRaw === 'true',
   };
 }
 
 export async function setCrowdsecAlertsEnabled(enabled: boolean): Promise<void> {
   await writeSetting(ALERT_NOTIFY_KEYS.crowdsecEnabled, enabled ? 'true' : 'false');
+}
+
+/** Set by the §119 NPM-enforcement toggle. */
+export async function setCrowdsecEnforceNpm(enabled: boolean): Promise<void> {
+  await writeSetting(ALERT_NOTIFY_KEYS.enforceNpm, enabled ? 'true' : 'false');
 }
 
 /** Caller must validate with isValidAlertTopic first. */

@@ -12377,3 +12377,24 @@ scenarios + a noise entry → a single push with a single line
 - Real stack: `runAlertTest('crowdsec')` → `{ok:true}` and the ntfy topic got
   `homelab-management/alert-test — 192.0.2.86 (US) · 1 events` through the full
   relay. 322 backend + 28 frontend tests pass.
+
+## 122. Test pushes marked "TEST"; ban wording gated on enforcement
+
+@mat feedback on §118.4/§120.
+
+- **Test pushes** — the relay's Code node marks a batch made only of the
+  `homelab-management/alert-test` scenario (what the Test button sends): title
+  gets a `TEST — ` prefix, tag `test_tube` (🧪) instead of `rotating_light`,
+  priority 3 not 4. `ALERT_TEST_SCENARIO` is exported from `n8nWorkflows.ts`
+  and imported by `alertTest.ts` so the two can't drift.
+- **Ban wording** — a new `crowdsec_enforce_npm` setting (in `alertNotify.ts`,
+  default off, with `setCrowdsecEnforceNpm` for §119's toggle to call).
+  `buildCrowdsecAlertWorkflow` takes `enforced` and bakes `const enforced` into
+  the Code node; each alert line gets ` · banned <duration>` **only when
+  enforced**. Detection-only today → no ban text (§117); when §119's NPM lua
+  bouncer lands and flips `crowdsec_enforce_npm`, the wording follows with no
+  workflow change. §119 just needs its toggle to call `setCrowdsecEnforceNpm`.
+- Verified real-stack: Test button → `TEST — CrowdSec: 1 alert … test_tube`;
+  a real-looking alert with a 4h ban decision → `crowdsecurity/http-probing —
+  203.0.113.77 (US) · 9 events` (no ban text, enforcement off). 324 backend
+  tests pass.
