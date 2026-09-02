@@ -43,10 +43,17 @@ describe('buildNpmRealIpBlock', () => {
     expect(block).toContain(NPM_REALIP_MARKER_END);
   });
 
-  it('trusts Cloudflare ranges and reads the real client IP from CF-Connecting-IP', () => {
+  it('trusts Cloudflare ranges for the real_ip module', () => {
     expect(block).toContain('set_real_ip_from 173.245.48.0/20;');
     expect(block).toContain('set_real_ip_from 2400:cb00::/32;');
-    expect(block).toContain('real_ip_header CF-Connecting-IP;');
-    expect(block).toContain('real_ip_recursive on;');
+  });
+
+  // §99: NPM's own nginx.conf unconditionally declares both, so a duplicate
+  // here fails nginx's config test and silently breaks every future
+  // proxy-host create/update/delete.
+  it('does not declare real_ip_header or real_ip_recursive, which NPM already sets', () => {
+    const directiveLines = block.split('\n').filter((line) => !line.trim().startsWith('#'));
+    expect(directiveLines.some((line) => line.includes('real_ip_header'))).toBe(false);
+    expect(directiveLines.some((line) => line.includes('real_ip_recursive'))).toBe(false);
   });
 });

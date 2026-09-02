@@ -240,21 +240,22 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Home Page's own env file has a stale, hand-set `HOMEPAGE_ALLOWED_HOSTS`**
-      (§97.2) — the merge-from-compose-default fix landed and is tested, but
-      this one app's env file already carries an explicit value from an
-      earlier diagnostic session, which correctly wins over the compose
-      default and keeps Home Page unreachable from the LAN. The field is
-      dashboard-managed (read-only) while exposure is enabled, so clearing it
-      needs exposure disabled first — blocked by the NPM deletion bug below.
-- [ ] **NPM proxy host deletion fails with a 5xx** (§97.2) — disabling Home
-      Page's exposure to deprovision its NPM host errors with `Unable to
-      delete Nginx Proxy Manager proxy host: Internal Error`. Blocks the item
-      above; find out why NPM's own API 500s on this delete call.
-- [ ] **`itflow.tx-home-utils.com` NPM host is orphaned** (§97.3) — provisioning
-      logs repeatedly show `Nginx Proxy Manager host for
-      itflow.tx-home-utils.com already exists and is not managed by this
-      service`. A leftover host from before this session; not investigated.
+- [ ] **Does CrowdSec ever actually see the real client IP?** (§99) — the
+      duplicate-directive bug that broke every NPM proxy-host create/update/
+      delete is fixed, but the underlying design is still unverified:
+      `set_real_ip_from` only takes effect when the real connecting peer is in
+      the trusted list, and everything reaches NPM through the Cloudflare
+      Tunnel connector — so the TCP peer is `cloudflared`'s own container
+      address, not a Cloudflare edge IP. Confirm whether CrowdSec's access-log
+      parsing ever resolves the true client IP in this topology, or whether it
+      has been logging (and would ban) `cloudflared`'s address all along.
+- [ ] **`ensureProxyHost` can still orphan a host on a partial NPM failure**
+      (§99.1) — if NPM's DB write and its nginx reload ever diverge again (the
+      exact failure mode §99 just fixed one cause of), the create looks
+      failed to our code while NPM keeps the host, and it stays untracked
+      until an administrator manually deletes it in NPM's own UI. Not
+      hardened, since the actual trigger seen today is fixed; worth revisiting
+      if it recurs.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from

@@ -13,11 +13,18 @@
  *     so the two ends share a secret). The bouncer then deploys a Cloudflare
  *     Worker + KV + zone routes that block flagged IPs at the edge.
  *
- *  2. Nginx Proxy Manager's data/.../nginx/custom/http_top.conf — CrowdSec only
- *     ever sees Cloudflare's edge IPs in NPM's access logs unless nginx is told
- *     to trust Cloudflare and read CF-Connecting-IP. That's an http{}-scope
- *     directive, i.e. NPM's custom-config drop-in. Best-effort: if the backend
- *     can't write into NPM's data dir it logs how to add it by hand.
+ *  2. Nginx Proxy Manager's data/.../nginx/custom/http_top.conf — trusts
+ *     Cloudflare's edge ranges for nginx's real_ip module via `set_real_ip_from`,
+ *     an http{}-scope directive, i.e. NPM's custom-config drop-in. Best-effort:
+ *     if the backend can't write into NPM's data dir it logs how to add it by
+ *     hand. Deliberately does NOT set `real_ip_header` / `real_ip_recursive` —
+ *     NPM's own nginx.conf already declares both unconditionally, and a
+ *     duplicate declaration fails nginx's config test, which breaks every
+ *     future proxy-host create/update/delete until someone notices (§99).
+ *     Whether CrowdSec ends up seeing the real client IP at all, given
+ *     traffic arrives via the Cloudflare Tunnel connector rather than a
+ *     direct connection from a Cloudflare edge IP, is a separate question —
+ *     not answered here.
  */
 
 import { exec } from 'child_process';
@@ -177,11 +184,12 @@ function writeBouncerConfig(appDir: string, lapiKey: string | null, exposure: Aw
 function buildNpmRealIpBlock(): string {
   return [
     NPM_REALIP_MARKER_BEGIN,
-    '# Trust Cloudflare and log the real visitor IP (CF-Connecting-IP) so',
-    '# CrowdSec bans real clients, not Cloudflare edge addresses.',
+    "# Trust Cloudflare's edge ranges for the real_ip module. Not real_ip_header",
+    "# or real_ip_recursive here: NPM's own nginx.conf already declares both",
+    '# unconditionally (real_ip_header X-Real-IP;), and nginx refuses to start',
+    "# with a directive declared twice, which silently breaks every future",
+    '# proxy-host create/update/delete until fixed (§99).',
     ...CLOUDFLARE_IP_RANGES.map((range) => `set_real_ip_from ${range};`),
-    'real_ip_header CF-Connecting-IP;',
-    'real_ip_recursive on;',
     NPM_REALIP_MARKER_END,
     '',
   ].join('\n');

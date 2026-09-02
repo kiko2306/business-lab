@@ -11085,3 +11085,79 @@ exposure is configured — the alternative being `docker-compose.yml` drops its
 Decided to defer rather than pick a direction now: added as a README item
 (§98) rather than acted on, since it's a real design choice (debug
 convenience vs. attack surface) and not an urgent fix either way.
+
+## 99. NPM's own nginx.conf conflicts with our real-IP config — root cause of the §97.2 delete/create failures
+
+Chased down the "Unable to delete Nginx Proxy Manager proxy host: Internal
+Error" from §97.2. NPM's logs told the real story:
+
+    [Express] warning  nginx: [emerg] "real_ip_header" directive is
+    duplicate in /data/nginx/custom/http_top.conf:26
+    nginx: configuration file /etc/nginx/nginx.conf test failed
+
+NPM's own template (`/etc/nginx/nginx.conf`) unconditionally declares
+`real_ip_header X-Real-IP;` and `real_ip_recursive on;` in its `http{}` block,
+*before* including `/data/nginx/custom/http_top.conf` — the exact drop-in
+`crowdsecConfig.ts` writes its Cloudflare real-IP block into (§23.9). That
+block also declared `real_ip_header` / `real_ip_recursive`, so nginx has
+always had two declarations of each directive on this host since CrowdSec was
+set up (2026-08-28) — nginx doesn't fail hard on this (it keeps serving its
+last-good compiled config), it just fails every subsequent config *test*,
+which every proxy-host create/update/delete triggers via a reload. NPM's API
+then reports the generic "Internal Error" instead of the real nginx message.
+
+Worse: on a **create**, NPM's DB write and its (failing) nginx reload are
+separate steps — the host row gets created, the reload fails, and NPM's API
+still answers with an error. Our code took that error at face value and never
+recorded the id, so the row looked never-provisioned while an orphaned NPM
+host silently existed underneath it. That's what actually happened to both
+`homepage` and `itflow` earlier today (§97.2, §97.3) — not a one-off, but this
+bug firing on every single provisioning attempt since two days ago.
+
+**Fix**: `buildNpmRealIpBlock()` (`crowdsecConfig.ts`) now only emits
+`set_real_ip_from` lines (safe to declare many times) and leaves
+`real_ip_header`/`real_ip_recursive` out entirely, since NPM's own template
+already sets them. Same trim applied to the checked-in manual-fallback
+snippet (`apps/nginx-proxy-manager/snippets/cloudflare-real-ip.conf`).
+Verified: `nginx -t` inside the NPM container passes again after CrowdSec
+regenerated the file; a new test locks in that the rendered block declares
+neither directive; full backend suite (262/262) and typecheck clean.
+
+Left open, deliberately: whether CrowdSec ends up reading the *correct*
+client IP at all. `set_real_ip_from` only takes effect when the real
+connecting peer's address is in the trusted list, and everything reaches NPM
+through the Cloudflare Tunnel connector — meaning the TCP peer is
+`cloudflared`'s own container address, not a Cloudflare edge IP. Whether the
+listed Cloudflare public ranges ever actually match anything in this topology
+is a separate, unresolved question — added to the README rather than chased
+further today.
+
+### 99.1 Recovering the two hosts stuck by this bug
+
+`homepage` and `itflow` each had an NPM host that existed but wasn't tracked
+(`npm_host_id` NULL, since a disable's guard — `if (npmHostId)` — never even
+attempts the delete when the id was already lost). Toggling exposure
+off/on doesn't self-heal that: `ensureProxyHost` finds the untracked host by
+domain and refuses to touch it ("already exists and is not managed by this
+service") — the same safety check that protects an administrator's own
+manually-made hosts. Recovered by deleting both orphaned hosts directly in
+NPM's own admin UI (the user's action — NPM administration, not a hand-edit
+of this project's own config) and re-provisioning through the dashboard as
+normal, which now creates and correctly tracks fresh ones (ids 40, 42).
+
+Not hardened in code: a create that fails post-write (this exact NPM quirk)
+could still orphan a host again in principle, though the actual trigger for
+today's occurrence — the duplicate-directive bug above — is now fixed. Left
+as a possible future robustness item rather than building recovery machinery
+for a now-closed root cause.
+
+### 99.2 §92's original symptom, closed
+
+With the NPM bug fixed, `HOMEPAGE_ALLOWED_HOSTS` stopped being permanently
+`managed` (read-only) once exposure was actually disabled, which finally
+allowed clearing the stale hand-set value from §97.2. Reset to
+`localhost:10190,192.168.1.23:10190`, exposure re-enabled, Home Page
+restarted. Verified end-to-end: `localhost:10190` → 200, `192.168.1.23:10190`
+→ 200, `homepage.tx-home-utils.com` → 200 — all three at once, which was
+§92's whole point and has been broken since 2026-09-01. `service_exposure`
+shows `npm_host_id 42, status provisioned`.
