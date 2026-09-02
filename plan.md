@@ -9809,3 +9809,89 @@ poll never touches a registry.
 
 The row shows it twice over: the Update button turns red, and the sub-line says
 "N images out of date". The button's tooltip names them.
+
+### 82.1b Locally built images, and a type error that reached the user's build
+
+The first sweep reported `pantry` and `price-compare` as **unknown** — two
+custom apps whose images no registry has ever heard of. The skip rule was "a
+locally built image has no RepoDigests", which is true on the classic store and
+false here: with the containerd image store they carry one anyway
+(`pantry-pantry@sha256:…`), so the check went off to ask Docker Hub about
+`library/pantry-pantry`.
+
+That is the same containerd assumption that produced §83.6, in a second
+disguise. Worth stating as a standing fact about this host: **its image store is
+containerd's, and reasoning that holds for overlay2 does not transfer.**
+
+The fix reads the compose file instead of inferring from digests —
+`builtImageNames` collects every service with a `build:`, using its declared
+`image:` or compose's default `<project>-<service>`, and those are skipped
+outright. Verified after: both custom apps report clean, and dozzle still
+correctly reports its image as outdated, so the skip did not over-reach.
+
+**The process failure is worth more than the bug.** The fix sat uncommitted
+while the Docker daemon was down for the §83.6 migration, and it contained a
+type error — `getProjectName` returns `string | null` and the new call wanted a
+`string`. It escaped because the check was run as
+`npm run typecheck && npx vitest … | grep -E "Tests|FAIL|error TS"`: the pipe
+binds to the second command only, so a typecheck failure printed outside the
+filter and stopped the chain, and an empty grep result was read as success. The
+user's `start.sh` then failed on `RUN npm run build`.
+
+Two things follow. Check exit codes rather than filtered output when the
+question is "did it pass". And a broken tree is not a safe place to leave
+unverified work when someone else may build from it — either finish it or
+revert it, but do not leave it sitting.
+
+## 85. Two sources of truth for the Cloudflare token, and only one has a UI
+
+Reported 2026-09-02: `start.sh` warned "Couldn't look up zone
+'tx-home-utils.com' with that Cloudflare token". The token itself was fine —
+verified active, sees all three zones, and `start.sh`'s exact code path (same
+curl, same `json_field`) returns both the zone and account id from it.
+
+The problem is that there are two stored copies and they had drifted:
+
+| Consumer | Reads from | Written by |
+|---|---|---|
+| `start.sh` — tunnel + DNS bootstrap | `CLOUDFLARE_API_TOKEN` in the **root environment file** | `prompt_env_var`, which never asks again once a value exists |
+| The backend — exposure provisioning | `cloudflare_tunnel_token` in the **`settings` table** | the dashboard's Settings page |
+
+The dashboard's copy was updated over its own API (the stored token ended
+`f59a`, the working one ends `7e88`) and verified — which fixes exposure
+provisioning and does nothing at all for `start.sh`. Because `prompt_env_var`
+treats "already set" as "done", a stale token there survives every future run
+silently.
+
+This violates §0.2 directly: the token is a thing a human types, and there is
+exactly one place it should be typed — the dashboard.
+
+### 85.1 The options, and the constraint that rules one out
+
+- **The dashboard writes the root environment file.** Symmetric with
+  `appEnv.ts`, which already writes the per-app ones. But the backend container
+  mounts only `APPS_DIR`, not the repo root, so it cannot reach that file
+  without a new mount — and it holds `JWT_SECRET` and the database password.
+  Mounting it into the container that serves the internet-facing API, to fix a
+  token-sync problem, is a poor trade.
+- **`start.sh` reads the database, falling back to the file.** The dashboard
+  stays the only place a token is typed, and the file remains what bootstraps a
+  host with no database yet. `start.sh` already runs as root with Docker
+  available, so `docker exec … psql -tAc` is a one-liner.
+- **Sync on every run.** More moving parts, two writers, the same drift
+  question one layer up.
+
+The second is the answer. Preference order per value: the `settings` table when
+the database is up and has one, otherwise the file, otherwise prompt. And when
+`start.sh` prompts on a host whose database is already running, write the
+answer back to the table so the dashboard shows what is actually in use.
+
+Applies to the three values the dashboard also owns: the Cloudflare token, the
+base domain, and the tunnel name.
+
+### 85.2 Worth fixing at the same time
+
+`prompt_env_var` never re-asks, which is right for a secret that still works
+and wrong for one that has just been rejected. After a failed zone lookup the
+script should say the stored token was refused and offer to replace it, rather
+than warning and skipping the tunnel on every run forever.

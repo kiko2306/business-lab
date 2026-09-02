@@ -253,6 +253,13 @@ export async function checkServiceImages(serviceName: string): Promise<ServiceUp
   }
 
   const projectName = getProjectName(serviceName);
+  if (!projectName) {
+    // No compose project means nothing to ask docker compose about — and
+    // interpolating a null into the command would ask about a project called
+    // "null".
+    return result;
+  }
+
   let images: Map<string, { id: string; name: string }> | null = null;
   try {
     images = parseComposeImages(await run(`docker compose -p ${projectName} -f ${resolved.composeFile} images --format json`));
