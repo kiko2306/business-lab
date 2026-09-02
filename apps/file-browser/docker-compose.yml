@@ -29,3 +29,17 @@ services:
     volumes:
       - ./data/database:/database
       - ./data/files:/srv
+      # The home directory, mounted under the server root at the same path it
+      # has on the host, so what the UI shows as /home/mat is /home/mat.
+      #
+      # NOTE ON BLAST RADIUS: this is read-write and reaches ~/.ssh, ~/.gnupg,
+      # ~/.docker and every apps/*/.env in the checkout — the same trade
+      # code-server made (§78.1), with one difference in our favour: File
+      # Browser has its own login, so the LAN port is not ungated. Narrow
+      # FILEBROWSER_HOME to a subdirectory (e.g. /home/mat/www) if that trade
+      # isn't wanted.
+      #
+      # Deliberately NOT added to filebrowser-init above: that container runs
+      # `chown -R 1000:1000 /srv`, which would rewrite ownership of the entire
+      # home directory.
+      - ${FILEBROWSER_HOME:-/home/mat}:/srv${FILEBROWSER_HOME:-/home/mat}

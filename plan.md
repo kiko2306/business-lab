@@ -10004,3 +10004,27 @@ the registry is now mocked and the suite no longer depends on whichever service
 happens to use the feature next. That is the right shape for them regardless of
 what is decided about the feature itself, which is a separate call and now a
 TODO item.
+
+### 81.2a Done: File Browser sees the home directory
+
+`${FILEBROWSER_HOME:-/home/mat}` is mounted at `/srv${FILEBROWSER_HOME}` —
+inside the server root, at the same absolute path it has on the host, so what
+the UI shows as `/home/mat` *is* `/home/mat`. The existing `./data/files` area
+keeps working, since the root is still `/srv`.
+
+**The trap was the init container.** `filebrowser-init` runs
+`chown -R 1000:1000 /database /srv` because the image's uid cannot otherwise
+write its own database. Adding the home mount to that service as well —
+the obvious symmetry — would have recursively rewritten the ownership of the
+entire home directory on every start. The mount is on the `filebrowser`
+service only, and the compose file says why, because the next person to tidy
+this up will be tempted.
+
+Blast radius is §78.1's, read-write: `~/.ssh`, `~/.gnupg`, `~/.docker`, every
+`apps/*/.env`. One difference in our favour over code-server — File Browser has
+its own login, so the LAN port is not ungated. `FILEBROWSER_HOME` narrows it.
+
+Verified: restarted **through the dashboard** (the sanctioned path, now that
+there is an account), `/srv/home/mat` lists the real home directory, and
+ownership on both sides is untouched — still `mat:mat` on the host, still
+1000:1000 as seen from inside.

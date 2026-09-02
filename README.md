@@ -244,8 +244,6 @@ it is done — not ticked off and left behind. Section references point at
       ServiceStatus and the dashboard UI for it are now dead code. Either find
       it a second user or remove the lot; do not leave it as furniture.
 
-- [ ] **File Browser: mount the home directory** (§81.2) — same treatment as
-      code-server in §78, same blast radius, same `*_HOME` knob to narrow it.
 - [ ] **OnlyOffice Document Server** (§81.4) — app + generated `JWT_SECRET`,
       port 10450.
 - [ ] **Wire Nextcloud to OnlyOffice** (§81.4) — installing the connector and
