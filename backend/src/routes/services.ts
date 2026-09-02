@@ -12,6 +12,7 @@ import { createStreamTicket } from '../services/realtime';
 import { getPublishedUpstreamPort, getService, isValidServiceName } from '../config/services';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { deprovisionServiceExposure, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
+import { regenerateHomepageServices } from '../services/homepageConfig';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
 import { writeAuditLog } from '../utils/audit';
@@ -255,6 +256,12 @@ router.put(
         await deprovisionServiceExposure(req.params.name, req.user!.id);
       }
 
+      // A Home Page tile is only written for a running, exposed app — so
+      // disabling exposure has to drop the tile, and (re)enabling it changes
+      // the link. The other side, provisioning, happens on the next start,
+      // which regenerates too.
+      await regenerateHomepageServices();
+
       return res.json({
         message: turnedOff
           ? 'Exposure disabled and public hostnames removed.'
@@ -294,6 +301,10 @@ router.post(
 
       const result = await provisionServiceIfEnabled(serviceName, req.user!.id);
       const updated = await getServiceExposureRow(serviceName);
+
+      // Re-provisioning can move a hostname from failed to provisioned, which
+      // is the point at which the tile becomes linkable.
+      await regenerateHomepageServices();
 
       return res.json({
         ...result,

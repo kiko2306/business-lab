@@ -809,6 +809,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     icon: 'chat',
     category: 'Productivity',
     composePath: 'apps/waha/docker-compose.yml',
+    // WAHA's UI is under /dashboard, not the root — the generated Home Page
+    // tile builds its href from the hostname plus this (plan.md §114), same
+    // as Pi-hole's /admin.
+    webPath: '/dashboard',
     healthCheck: {
       enabled: true,
       type: 'http',

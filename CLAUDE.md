@@ -146,14 +146,19 @@ passing, unless it is genuinely part of the change at hand.
   source-available (n8n's Sustainable Use License, RSAL/SSPL), or carries a
   non-software ToS (WhatsApp). If a candidate app's licence fails that test, it
   does not go in.
-- **Every app shows up on the Home Page.** Homepage (`apps/home-page/`)
-  discovers apps from `homepage.*` labels on the container via the Docker
-  socket, and lists one only while it is running — so an app without labels is
-  invisible on the start page no matter how healthy it is. A compose file
-  therefore carries `homepage.group`, `homepage.name`, `homepage.icon`,
-  `homepage.description` and, when the app has a web UI, `homepage.href`
-  pointing at its LAN port. No exceptions: the registry-wide test in
-  `services.test.ts` fails when an app is missing them.
+- **A running, publicly exposed app shows up on the Home Page.** The Home Page
+  is itself public at the bare domain (`plan.md` §111), so the dashboard owns
+  its service list: `backend/src/services/homepageConfig.ts` generates
+  `apps/home-page/data/services.yaml` from the registry, each app's live
+  `service_exposure` row, and the `homepage.*` compose labels — a tile per app
+  that is **both running and exposed**, linking to `https://<hostname>`, not
+  `localhost`. Label auto-discovery is disabled. An app with no exposure has
+  no tile (`plan.md` §112.3). The `homepage.*` labels stay **mandatory** as
+  the source of name/group/icon/description: a compose file carries
+  `homepage.group`, `homepage.name`, `homepage.icon`, `homepage.description`
+  (and `homepage.href` for a human reading the file — the generator ignores
+  it), and the registry-wide test in `services.test.ts` fails when an app is
+  missing them.
 - **Dependencies between apps** are declared in `services.ts`, in one of two
   tiers. `dependsOn` is for what an app cannot boot without (Authelia's OIDC
   provider, for something that crash-loops without it) — the API refuses the

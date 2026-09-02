@@ -11744,3 +11744,100 @@ Page. The README item loses its "confirm first" caveat; building it still
 means reworking the CLAUDE.md "every app on the Home Page" convention and the
 registry-wide `services.test.ts` label check, and it rides on §112.2's
 generated `services.yaml`.
+
+## 114. Design — Homepage's service list is backend-generated (§112.2/.3/.4)
+
+Three asks, one mechanism. The Home Page is public at the apex now (§111), so
+its tiles must link to `https://<hostname>`, not `http://localhost:<port>`; an
+app with no public exposure has no useful link and should not appear; and the
+stock *"My First Group"* demo content must never render.
+
+### 114.1 Why label discovery can't stay
+
+Homepage discovers tiles from `homepage.*` labels on running containers via
+the Docker socket (`data/docker.yaml` → `my-docker` provider). The href is
+baked into each label as `http://localhost:${<APP>_PORT}` — static in the
+compose file, which backend code must not edit (CLAUDE.md Never list). And the
+provider auto-lists **every** labelled running container, so there is no way
+to suppress the unexposed ones while the provider is active.
+
+Rejected: wrapping every `homepage.href` label in a `${VAR:-…}` and injecting
+the public URL at `docker compose up` (like `exposureEnv.ts`). It fixes the
+href but not §112.3 — an unexposed app still gets auto-listed — and it means
+editing ~28 compose files.
+
+### 114.2 Approach — generate `services.yaml`, drop the provider
+
+New `backend/src/services/homepageConfig.ts`:
+
+- `buildHomepageServicesYaml(services, runningProjects, exposureByName)` (pure,
+  tested): for each registry service that is **running AND has an enabled,
+  provisioned `service_exposure` row with a hostname**, emit a tile —
+  `href: https://<hostname><webPath>` (`webPath` from the registry, e.g.
+  Pi-hole `/admin`), `description`/`icon` from the app's `homepage.*` compose
+  labels, grouped under `homepage.group`. Groups and tiles sorted
+  alphabetically so the file only changes when the facts do.
+- `applyHomepageConfig(serviceName, appDir)`: when `serviceName === 'homepage'`,
+  also overwrite `data/docker.yaml` with a disabled stub (kills auto-discovery)
+  and `data/bookmarks.yaml` with `--- []` — both stock demo content on a
+  now-public page. `settings.yaml` / `widgets.yaml` are left alone.
+- `regenerateHomepageServices()`: the whole pipeline — one `docker ps` for
+  running compose projects, one `service_exposure` query, write
+  `data/services.yaml`. Best-effort: logs and swallows errors, never throws.
+
+Metadata stays in the compose labels (one source of truth, 30+ apps); the
+backend already parses compose files, so a small `homepage.*` label reader is
+all that is added. Losing the provider also loses the per-tile live status dot
+— acceptable: a tile exists only while the app runs, and stop regenerates the
+file without it.
+
+### 114.3 Regeneration hooks
+
+`regenerateHomepageServices()` (best-effort) after any state change that moves
+a tile in or out:
+
+- `startService` — after `provisionServiceIfEnabled`
+- `stopService` — after a successful stop
+- `PUT /api/services/:name/exposure` — after enable/disable
+- `POST /api/services/:name/exposure/verify` — after re-provision
+
+Homepage hot-reloads `services.yaml` on change, so no Homepage restart is
+needed. On Homepage's own first start, `applyHomepageConfig` runs in
+`composeUpWithManagedConfig` alongside the other generators, then
+`regenerateHomepageServices()` fills the list.
+
+### 114.4 Convention + test changes
+
+- CLAUDE.md "Every app shows up on the Home Page" → reword: a running **and
+  publicly exposed** app shows up; the `homepage.*` labels stay mandatory as
+  the metadata source (name/group/icon/description), enforced by the
+  registry-wide `services.test.ts` check, which keeps its assertion and gets
+  its comment updated.
+- `webPath: '/dashboard'` added to WAHA's registry entry — its label href is
+  the only one with a non-root path, and the generator builds href from
+  hostname + `webPath`.
+
+### 114.5 Fresh-clone note
+
+`apps/*/data/` is gitignored, so a fresh clone has no `services.yaml` /
+`docker.yaml` — Homepage seeds its samples on first start, then the backend
+overwrites them on the first `startService('homepage')`. Between container
+up and the generator running there is a few-second window where the stock
+demo tiles show; acceptable, and gone on the next reload.
+
+### 114.6 `apps/home-page/data/` was explicitly tracked — untracked the 3 generated files
+
+§114.5 assumed `apps/home-page/data/` was gitignored like every other
+`apps/*/data/`. It was not: `.gitignore` carried a deliberate
+`!apps/home-page/data/` un-ignore ("just its checked-in dashboard config, not
+runtime state"), so `services.yaml`, `docker.yaml` and `bookmarks.yaml` were
+committed — as Homepage's stock demo samples ("My First Group", the
+Github/Reddit/YouTube bookmarks, the `my-docker` provider).
+
+Now that `homepageConfig.ts` regenerates those three on every
+start/stop/exposure change they are runtime state, and leaving them tracked
+would churn the working tree on every deploy. `git rm --cached` them and added
+three re-ignore lines after the `!apps/home-page/data/**` re-include.
+`settings.yaml`, `widgets.yaml`, `custom.css/js`, `kubernetes.yaml`,
+`proxmox.yaml` stay tracked — the backend doesn't touch them, and they're the
+curated baseline a fresh clone starts from.

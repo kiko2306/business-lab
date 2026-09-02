@@ -5,10 +5,15 @@
 
 # Per-app persistent data (bind-mounted from each app's own folder)
 apps/*/data/
-# ...except Home Page's, which is just its checked-in dashboard config
-# (services.yaml, docker.yaml, etc.), not runtime state.
+# ...except Home Page's, which is mostly checked-in dashboard config
+# (settings.yaml, widgets.yaml, custom.css, etc.), not runtime state.
 !apps/home-page/data/
 !apps/home-page/data/**
+# ...but these three ARE runtime state now: homepageConfig.ts regenerates them
+# from each app's exposure state on every start/stop/exposure change (§114).
+apps/home-page/data/services.yaml
+apps/home-page/data/docker.yaml
+apps/home-page/data/bookmarks.yaml
 
 # Authelia's real user database — holds a password hash for the SSO account
 # that guards every exposed app. Keep the .example template only.

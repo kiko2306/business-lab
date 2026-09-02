@@ -19,6 +19,7 @@ import { applyKitchenConfig } from './kitchenConfig';
 import { checkServiceImages, recordImageCheck } from './imageUpdates';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
+import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getServiceStatus } from './status';
@@ -133,6 +134,10 @@ async function composeUpWithManagedConfig(
   // exist as HACS repositories, and apps/*/data/ is gitignored, so a fresh
   // clone has to be able to get there without a console step (§0.2).
   await ensureHomeAssistantHacs(serviceName);
+  // The Home Page's own start: disable label auto-discovery and clear the
+  // stock demo bookmarks before it comes up (§114). services.yaml is filled
+  // in by regenerateHomepageServices once the start completes.
+  await applyHomepageConfig(serviceName, appDir);
 
   const recreate = forceRecreate ? ' --force-recreate' : '';
   const command = `docker compose -p ${projectName} -f ${composeFile} up -d${recreate}`;
@@ -243,6 +248,11 @@ export async function startService(serviceName: string, userId: number): Promise
       logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
       return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };
     });
+
+    // A newly-started (and exposed) app gets a Home Page tile; a newly-exposed
+    // one changes its link. Regenerate after provisioning so the tile reflects
+    // the just-settled state. Best-effort inside the helper.
+    await regenerateHomepageServices();
 
     return {
       success: true,
@@ -487,6 +497,10 @@ export async function stopService(serviceName: string, userId: number): Promise<
     });
 
     logger.info(`Service stopped successfully: ${serviceName}`, { userId });
+
+    // A stopped app drops off the Home Page (a tile is only written for a
+    // running, exposed one). Best-effort inside the helper.
+    await regenerateHomepageServices();
 
     return {
       success: true,

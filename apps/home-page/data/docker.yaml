@@ -1,8 +1,0 @@
-# Wires up the Docker socket mounted into this container (see
-# docker-compose.yml) as a service-discovery provider. Every other app under
-# apps/*/ carries homepage.* labels in its own docker-compose.yml — Homepage
-# reads those directly from the Docker API, grouped by homepage.group, and
-# only lists a container while it's actually running. Nothing else needs to
-# be added here or in services.yaml for a labeled app to show up.
-my-docker:
-  socket: /var/run/docker.sock

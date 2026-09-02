@@ -416,10 +416,11 @@ const composeText = (composePath: string) => {
 };
 
 describe('Home Page discovery labels', () => {
-  // Homepage lists a container only while it is running AND labelled, so an
-  // app without these labels is invisible on the start page however healthy it
-  // is. This is the rule for every app in the registry, checked here rather
-  // than left to whoever reviews the next compose file.
+  // homepageConfig.ts generates the Home Page's services.yaml from these
+  // labels (name/group/icon/description) — a tile per running, exposed app
+  // (plan.md §114). An app missing them would generate a broken or nameless
+  // tile, so the labels stay mandatory for every app in the registry, checked
+  // here rather than left to whoever reviews the next compose file.
 
   it('are carried by every app', () => {
     for (const [name, service] of Object.entries(SERVICES)) {
