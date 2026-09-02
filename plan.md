@@ -11484,3 +11484,32 @@ ran the old image should delete the orphaned `./data/redis` (done here).
 redis://paperless-redis:6379//" and "ready". `docs/licences.md` updated (the
 redis ⚠️ row is gone; Valkey row now lists Paperless), README follow-up item
 deleted.
+
+## 109. §84.4 role runbooks: docs/webmaster.md and docs/it-admin.md
+
+The two operator role docs. Both are deliberately thin and navigational — they
+state the role's remit and the handful of things that role is uniquely
+positioned to get wrong, then link into `first-run.md` / `ports.md` /
+`app-credentials.md` / `recovery-troubleshooting.md` / `licences.md` for
+anything procedural. A fact duplicated across docs is a fact that rots (§84.4).
+
+- **`docs/webmaster.md`** — the Cloudflare side. The no-router-changes rule;
+  what exists before `start.sh` (a zone, an API token scoped to Tunnel:Edit +
+  DNS:Edit); the dashboard owning every `<app>.<domain>` ingress rule + DNS
+  record via the exposure toggle; the dashboard hostname bypassing NPM. The
+  two role-specific traps: the `cloudflared` HTTP/2 pin (the systemd drop-in
+  `setup_server.sh` writes — reinstalling the connector loses it and NetBird's
+  gRPC breaks), and NetBird signal going over Tailscale Funnel rather than the
+  tunnel. Access control is NPM+Authelia inside the stack, not Cloudflare
+  Access. Per-client: separate Cloudflare account/domain/token/tunnel each.
+- **`docs/it-admin.md`** — running the stack. The no-console-configuration
+  rule; install via first-run.md; day-to-day (start order NPM→Authelia→rest,
+  dashboard-driven config, the exposure toggle, ports, global mail, image
+  updates, never `down` the root stack); backups incl. the File Browser /
+  Stirling-PDF best-effort caveat and the recovery-mode headless gap; storage
+  flags; the licence conditions the operator works under (n8n one-box-per-
+  client, no OnlyOffice white-label, stock images only); adding an app is a
+  code change, not an ops task.
+
+Both added to the README doc index; the two TODO items deleted. Anchor links
+into the other docs were checked against their actual headings.

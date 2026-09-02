@@ -14,6 +14,8 @@ Business Lab (repository still `homelab-management`, see §84.2) is a Dockerized
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
 - Licence due diligence (every image vs the resale model): [/docs/licences.md](/docs/licences.md)
 - User guide: [/docs/user-guide.md](/docs/user-guide.md)
+- Webmaster runbook (Cloudflare / DNS / Tunnel): [/docs/webmaster.md](/docs/webmaster.md)
+- IT administrator runbook (running the stack): [/docs/it-admin.md](/docs/it-admin.md)
 - Development guide: [/docs/development-guide.md](/docs/development-guide.md)
 - SSH key access: [/docs/ssh-keys.md](/docs/ssh-keys.md)
 - Security checklist: [/docs/security-checklist.md](/docs/security-checklist.md)
@@ -180,11 +182,6 @@ it is done — not ticked off and left behind. Section references point at
       sources agree Instagram publishes normally from a dev-mode app with a
       Tester role, and that a Facebook Page post in dev mode is visible only to
       admins. Confirm both with a real app before a timeline depends on it.
-- [ ] **`docs/webmaster.md`** (§84.4) — Cloudflare role runbook: domain, DNS,
-      Tunnel, routing, Zero Trust. Links to first-run.md rather than restating
-      it.
-- [ ] **`docs/it-admin.md`** (§84.4) — deploy/configure/maintain the stack.
-      Same rule: link, do not duplicate.
 - [ ] **@mat: collect the SaaS inventory and monthly costs** (§84.7) — what you
       and your clients actually pay for today, per tool per month. Without it
       the value-proposition plan is a generic "self-hosting saves money"
