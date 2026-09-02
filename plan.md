@@ -12398,3 +12398,42 @@ scenarios + a noise entry → a single push with a single line
   a real-looking alert with a 4h ban decision → `crowdsecurity/http-probing —
   203.0.113.77 (US) · 9 events` (no ban text, enforcement off). 324 backend
   tests pass.
+
+## 123. Plan — two investigations: Mealie URL import, OnlyOffice exposure
+
+@mat added both to the TODO list. Both are "check, then decide", not builds.
+
+### 123.1 Can Mealie's "recipe from URL" be smarter?
+
+Mealie's importer uses the `recipe-scrapers` library — clean for sites with
+schema.org Recipe markup, poor for plain blogs (ingredients/steps land as one
+blob). Mealie 2.x has an **OpenAI-compatible integration** (`OPENAI_API_KEY`,
+`OPENAI_MODEL`, `OPENAI_BASE_URL`, `OPENAI_ENABLE_IMAGE_SERVICES`) that adds
+AI-assisted ingredient/instruction parsing and "create recipe from
+image/text". Investigate:
+- what exactly the AI settings improve for a *URL* import (does it re-parse a
+  bad scrape, or only help text/image import?);
+- wiring `OPENAI_*` to a key entered once in the dashboard — same
+  third-party-token pattern as Cloudflare/Tailscale and the §84.3 "Claude API
+  key in Settings" plan. `OPENAI_BASE_URL` can point at an Anthropic-compatible
+  proxy, so this could share §84.3's key rather than adding an OpenAI one;
+- cost shape (per-import token spend) and whether to gate it behind a toggle.
+Cross-ref §84.3 (content generation, Claude API key).
+
+### 123.2 Does OnlyOffice need public exposure?
+
+`onlyoffice` is currently exposed (`onlyoffice.tx-home-utils.com`,
+provisioned) and its only job is to be Nextcloud's document editor (§81.4,
+still unwired). OnlyOffice's model: the **client browser** loads the editor
+from the document server and the server posts edit callbacks — so the doc
+server URL must be reachable *by the remote browser*, not just server-to-
+server. With Nextcloud public, that implies OnlyOffice must be exposed too,
+unauthenticated (JWT-secured between the two — Authelia can't sit in front, the
+callbacks would fail forward-auth). Confirm:
+- is exposure genuinely required, or can it be LAN-only / proxied via
+  Nextcloud for the deployments that only use Nextcloud on the LAN?
+- if it must stay exposed: an OnlyOffice Document Server has had CVEs — worth
+  restricting its NPM host to Cloudflare's IP ranges, and making sure the
+  shared JWT secret is set (it is generated where?).
+- tie the finding into §81.4 so the wiring step sets the right doc-server URL
+  (public vs internal).
