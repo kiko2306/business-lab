@@ -121,27 +121,28 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Security
 
-- [ ] **@mat asked: `start.sh` should drop the sudo password prompt for the
-      invoking user** — a `NOPASSWD` sudoers entry for `TARGET_USER`, written
-      by `start.sh` the way it already writes the daemon config. It would have
-      let this session apply §87 and §83's tree removal directly instead of
-      handing back commands. **Read the item below first:** passwordless sudo
-      for `mat` turns *any* shell as `mat` into root, and `code-server` on
-      `:10130` is exactly that shell, ungated, on the LAN. Doing this while
-      that port is open converts a file-read exposure into host root. Gate
-      code-server first, or scope the sudoers entry to specific commands
-      (`lvextend`, `resize2fs`, `rm -rf /var/lib/containerd`) rather than ALL.
+- [ ] **NEXT UP — @mat asked: `setup_server.sh` should drop the sudo password
+      prompt for the invoking user** — a `NOPASSWD` sudoers entry for
+      `TARGET_USER`, written the way `start.sh` already writes the daemon
+      config. code-server's LAN port (`:10130`), the thing that made this
+      unsafe, now requires its own login (§93) — Authelia gates the tunnel
+      hostname, code-server's own auto-generated `PASSWORD` gates the LAN
+      port — so a full `NOPASSWD ALL` entry for `TARGET_USER` is no longer an
+      open-LAN-port-to-root path. Part of splitting `setup_server.sh` out of
+      `start.sh` (see the item below) — also add a fixed-IP prompt there.
+- [ ] **Split `setup_server.sh` out of `start.sh`** — the one-time host
+      bootstrap (package installs, Docker install/enable, the daemon.json
+      address-pool widening, the optional VG-grow/data-root-move blocks, the
+      cloudflared http2 drop-in, the Compose plugin install, adding
+      `TARGET_USER` to the docker group) is host setup, not app/stack
+      bootstrap, and belongs in its own script with its own prompts. Add two
+      new prompted steps while at it: setting a fixed IP for the host, and the
+      sudoers `NOPASSWD` item above. `start.sh` should call it so `./start.sh`
+      remains the only command a human runs (§0.2).
 - [ ] **2FA for admin accounts** — the dashboard is internet-facing via the
       tunnel (`homelab.tx-home-utils.com`, `api-homelab.tx-home-utils.com`),
       independent of the per-service exposure feature. Nothing in the codebase
       implements TOTP today.
-- [ ] **NEXT UP — code-server's LAN port is ungated** — its own web login is
-      disabled and only Authelia guards the exposed hostname, so `:10130` on
-      the LAN is open. Now that `~/` is mounted into it (§78.1), that reaches
-      `~/.ssh` and every `apps/*/.env`. Either gate the port or narrow
-      `CODE_SERVER_HOME`. Agreed as the next task on 2026-09-02, and it now
-      blocks the sudoers item above: passwordless sudo for `mat` would turn
-      this open port into host root.
 
 ### Backups
 

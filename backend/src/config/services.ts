@@ -196,10 +196,13 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     icon: 'code',
     category: 'Development',
     composePath: 'apps/code-server/docker-compose.yml',
-    // Container-internal only — it unlocks sudo *inside* the code-server
-    // container, never anything on the host, so there is nothing for a human
-    // to choose here.
-    hiddenGeneratedSecrets: ['CODE_SERVER_SUDO_PASSWORD'],
+    // CODE_SERVER_SUDO_PASSWORD is container-internal — it unlocks sudo
+    // *inside* the code-server container, never anything on the host.
+    // CODE_SERVER_PASSWORD gates the IDE's own web login, which is the only
+    // thing standing between the LAN and this container's :10130 (NPM/
+    // Authelia never sees LAN-direct traffic — plan.md §93). Neither needs a
+    // human to choose a value, so both are hidden and auto-generated.
+    hiddenGeneratedSecrets: ['CODE_SERVER_SUDO_PASSWORD', 'CODE_SERVER_PASSWORD'],
     healthCheck: {
       enabled: true,
       type: 'http',

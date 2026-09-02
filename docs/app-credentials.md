@@ -85,7 +85,7 @@ gate.
 | App | Why |
 |---|---|
 | **Web Terminal (wetty)** | Hands out a shell on the host. Authelia is the only thing between the internet and a root-capable session — it is not optional here. |
-| **Code Server** | Its own web login is deliberately disabled; Authelia is the gate. |
+| **Code Server** | Own web login enabled (`CODE_SERVER_PASSWORD`, auto-generated, hidden — read it from `apps/code-server/.env` if needed); Authelia additionally gates the tunnel hostname. |
 | **Dozzle** | Reads container logs, no auth. |
 | **Homepage** | Static dashboard. |
 | **Stirling PDF** | `SECURITY_ENABLELOGIN=false` by default; can be enabled instead. |

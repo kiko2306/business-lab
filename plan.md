@@ -10782,3 +10782,54 @@ IP was always meant to be in that list.
 The lesson is the §75.7 one again, from the other side: the check that looked
 sufficient was the one run from the most convenient place. Testing from where
 the *user* is would have found this immediately.
+
+## 93. code-server's LAN port had no gate at all — fixed by re-enabling its own login
+
+The README's "NEXT UP" item (agreed 2026-09-02) said code-server's `:10130` was
+reachable on the LAN with no auth: its own web login was disabled, and only
+Authelia's forward-auth in front of the tunnel hostname stood in the way.
+
+### 93.1 The tried-and-rejected part
+
+The obvious-looking fix is binding the published port to `127.0.0.1` — same
+idea as restricting any other LAN-only service. Checked against how exposure
+actually reaches an app first, and it does not work here: `provisionHostname`
+in `backend/src/services/exposure.ts` has NPM's proxy host target the docker
+**bridge gateway IP** (`getHostGatewayIp()`, this host `10.201.0.1`) plus the
+app's published host port — not the container's own network IP, not
+`localhost`. NPM is itself a container, so its traffic to code-server arrives
+over the docker bridge exactly like a LAN client's does. A loopback-only bind
+would have blocked the Cloudflare Tunnel path along with the LAN one.
+
+A host firewall rule scoped to the LAN interface only was the other option
+raised, and rejected too: it is hand configuration living outside this repo,
+the same objection that keeps `start.sh` from doing anything like it, and it
+would need to special-case "traffic from the docker bridge gateway is actually
+fine" — the exact traffic pattern a firewall rule can't distinguish from a LAN
+client without also opening the hole back up.
+
+### 93.2 What shipped
+
+Re-enabled code-server's own login instead — no changes to the exposure
+system at all. `apps/code-server/docker-compose.yml` now sets `PASSWORD` from
+`CODE_SERVER_PASSWORD`, a new `hiddenGeneratedSecret` (services.ts) generated
+the same way `CODE_SERVER_SUDO_PASSWORD` already is — no dashboard field, no
+human step, filled in by `ensureGeneratedSecrets` the moment the service next
+starts. Authelia still gates the tunnel hostname on top; code-server's own
+login now gates the LAN port, which is the traffic Authelia was never able to
+see in the first place.
+
+Updated `docs/app-credentials.md` (the "web login deliberately disabled" line
+was the accepted trade-off; no longer true) and the compose/`.env.example`
+comments that described the old trade-off.
+
+### 93.3 Verified live
+
+Backend tests + typecheck pass (251 tests, including the updated
+`generated secrets coverage` case in `services.test.ts`). Restarted the
+code-server app from the dashboard; confirmed by hitting `:10130` directly
+that it now prompts for a login instead of dropping straight into the IDE —
+the actual failure mode this fixes, not just "the container came up healthy".
+
+This unblocks the sudoers/NOPASSWD item below it in the README, which was
+explicitly waiting on this.

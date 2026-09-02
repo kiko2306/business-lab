@@ -9,11 +9,15 @@ services:
       PUID: ${PUID:-1000}
       PGID: ${PGID:-1000}
       TZ: ${TZ:-UTC}
-      # No PASSWORD/HASHED_PASSWORD set — code-server's own web login is
-      # disabled entirely; Authelia forward-auth (dashboard's Exposure
-      # settings → "Require Authelia login") is the only gate in front of
-      # it. Direct LAN access to this container's own port has no auth at
-      # all — restrict that at the network level if this box isn't trusted.
+      # code-server's own web login, gating direct LAN access to :10130.
+      # Authelia forward-auth (dashboard's Exposure settings → "Require
+      # Authelia login") additionally gates the tunnel-exposed hostname, but
+      # NPM reaches this container via the docker bridge gateway IP and
+      # published port — the same path a LAN client uses — so Authelia alone
+      # never sees LAN-direct traffic and cannot be the only gate (plan.md
+      # §93). PASSWORD is a hidden, auto-generated secret (services.ts); read
+      # it from apps/code-server/.env if you need to log in from the LAN.
+      PASSWORD: ${CODE_SERVER_PASSWORD}
       SUDO_PASSWORD: ${CODE_SERVER_SUDO_PASSWORD}
       # Open the mounted home directory on first load, so "~/" is there
       # without a File -> Open Folder step.
@@ -37,10 +41,9 @@ services:
       #
       # NOTE ON BLAST RADIUS: this hands the browser IDE everything in the home
       # directory — ~/.ssh, ~/.gnupg, ~/.docker, and every apps/*/.env in the
-      # checkout. code-server's own login is disabled (see above), so the only
-      # gate is Authelia on the exposed hostname, and direct access to this
-      # container's LAN port has no gate at all. Narrow CODE_SERVER_HOME to a
-      # subdirectory (e.g. /home/mat/www) if that trade isn't wanted.
+      # checkout. code-server's own login (PASSWORD, above) now gates both the
+      # LAN port and the tunnel hostname. Narrow CODE_SERVER_HOME to a
+      # subdirectory (e.g. /home/mat/www) if that trade still isn't wanted.
       - ${CODE_SERVER_HOME:-/home/mat}:${CODE_SERVER_HOME:-/home/mat}
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8443/healthz"]
