@@ -296,9 +296,11 @@ it is done — not ticked off and left behind. Section references point at
 
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
-- [ ] **Add Guacamole** (§84.1, §84.6) — browser RDP/VNC/SSH for our own
-      machines over the NetBird overlay. No agent, so no cert-hash problem, and
-      Authelia can gate it.
+- [ ] **@mat: change Guacamole's default login** (§84.1a) — it ships as
+      `guacadmin`/`guacadmin` and is on the LAN the moment it starts.
+- [ ] **Expose Guacamole with Authelia in front** (§84.1a) — it is LAN-only
+      today. There is no agent to break on a forward-auth redirect, so unlike
+      MeshCentral it can simply sit behind Authelia.
 - [ ] **MeshCentral** (§62.2) — still wanted, for client endpoints that will
       not join the overlay. `TLSOffload` + `certUrl` for the agent cert hash.
 - [ ] **Pre-built n8n workflows** (§64) — ship useful workflows rather than an

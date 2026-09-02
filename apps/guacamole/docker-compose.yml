@@ -1,0 +1,100 @@
+services:
+  # Generates the database schema before Postgres ever starts.
+  #
+  # Postgres only runs docker-entrypoint-initdb.d on an *empty* data directory,
+  # so the SQL has to exist before its first boot — hence a separate init
+  # service the database waits on, rather than an afterwards step. It writes
+  # once and then no-ops, so a restart does not churn the file.
+  guacamole-initdb:
+    image: guacamole/guacamole:latest
+    user: "0:0"
+    command:
+      - sh
+      - -c
+      - test -f /initdb/001-schema.sql || /opt/guacamole/bin/initdb.sh --postgresql > /initdb/001-schema.sql
+    restart: "no"
+    volumes:
+      - ./data/initdb:/initdb
+    networks:
+      - guacamole-net
+
+  # The proxy daemon that actually speaks RDP, VNC and SSH. No published port:
+  # only the web app talks to it, over the compose network.
+  guacd:
+    image: guacamole/guacd:latest
+    restart: unless-stopped
+    volumes:
+      - ./data/drive:/drive
+      - ./data/record:/record
+    networks:
+      - guacamole-net
+    healthcheck:
+      test: ["CMD-SHELL", "nc -z 127.0.0.1 4822 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  guacamole:
+    image: guacamole/guacamole:latest
+    restart: unless-stopped
+    depends_on:
+      guacamole-db:
+        condition: service_healthy
+      guacd:
+        condition: service_started
+    ports:
+      - "${GUACAMOLE_PORT:-10430}:8080"
+    environment:
+      GUACD_HOSTNAME: guacd
+      POSTGRESQL_HOSTNAME: guacamole-db
+      POSTGRESQL_DATABASE: ${GUACAMOLE_DB_NAME:-guacamole}
+      POSTGRESQL_USER: ${GUACAMOLE_DB_USER:-guacamole}
+      POSTGRESQL_PASSWORD: ${GUACAMOLE_DB_PASSWORD}
+      # Serve at / rather than /guacamole. Without this every exposed URL
+      # carries a /guacamole prefix, and the dashboard's "open" link — which
+      # points at the bare hostname — lands on a 404.
+      WEBAPP_CONTEXT: ROOT
+      # Trust the proxy's forwarded headers, so the audit log records the real
+      # client address instead of the Docker gateway for every session.
+      REMOTE_IP_VALVE_ENABLED: "true"
+      TZ: ${TZ:-UTC}
+    labels:
+      - "homepage.group=Infrastructure"
+      - "homepage.name=Guacamole"
+      - "homepage.icon=guacamole.png"
+      - "homepage.href=http://localhost:${GUACAMOLE_PORT:-10430}"
+      - "homepage.description=Browser RDP, VNC and SSH"
+    networks:
+      - guacamole-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  guacamole-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      guacamole-initdb:
+        condition: service_completed_successfully
+    environment:
+      POSTGRES_DB: ${GUACAMOLE_DB_NAME:-guacamole}
+      POSTGRES_USER: ${GUACAMOLE_DB_USER:-guacamole}
+      POSTGRES_PASSWORD: ${GUACAMOLE_DB_PASSWORD}
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+      - ./data/initdb:/docker-entrypoint-initdb.d:ro
+    networks:
+      - guacamole-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${GUACAMOLE_DB_USER:-guacamole}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  guacamole-net:
+    driver: bridge

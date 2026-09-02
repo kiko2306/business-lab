@@ -10028,3 +10028,39 @@ Verified: restarted **through the dashboard** (the sanctioned path, now that
 there is an account), `/srv/home/mat` lists the real home directory, and
 ownership on both sides is untouched — still `mat:mat` on the host, still
 1000:1000 as seen from inside.
+
+### 84.1a Done: Guacamole added
+
+`apps/guacamole/` on port **10430**, four services: `guacamole` (web),
+`guacd` (the daemon that actually speaks RDP/VNC/SSH), `guacamole-db`
+(Postgres), and a one-shot `guacamole-initdb`.
+
+Three decisions worth recording:
+
+- **The init service exists because Postgres only runs
+  `docker-entrypoint-initdb.d` on an empty data directory.** Guacamole's schema
+  therefore has to be on disk *before* the database first boots, not applied
+  afterwards — so `guacamole-initdb` generates it with the app image's own
+  `initdb.sh` and the database `depends_on` its completion. It writes once and
+  no-ops thereafter.
+- **`WEBAPP_CONTEXT: ROOT`.** Without it the app serves under `/guacamole`, and
+  the dashboard's "open" link — which points at the bare hostname — would land
+  on a 404 for every user.
+- **`REMOTE_IP_VALVE_ENABLED`**, so the session audit log records the real
+  client address rather than the Docker gateway for every connection, once it
+  is behind the proxy.
+
+**A port collision in the §81 plan surfaced here**: itflow already holds 10420,
+which §81 had earmarked for ClamAV, and itflow was missing from `docs/ports.md`
+entirely. Both fixed — itflow documented, Guacamole on 10430 — and the
+remaining §81 apps shift up accordingly when they are built.
+
+Verified end to end, started **through the dashboard** so the generated
+Postgres password went through the real path: all three long-lived containers
+healthy, the schema loaded (`guacamole_entity` populated), the web app serving
+HTTP 200 at the root context, and — the check that actually proves the database
+credential works — `POST /api/tokens` with `guacadmin`/`guacadmin` returns an
+auth token.
+
+Still to do, both now TODO items: change that default password, and expose it
+behind Authelia. It is LAN-only as it stands.

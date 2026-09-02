@@ -353,6 +353,28 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       enabled: false,
     },
   },
+  'guacamole': {
+    name: 'guacamole',
+    label: 'Guacamole',
+    description: 'Browser RDP, VNC and SSH to machines on the overlay',
+    icon: 'remote',
+    category: 'Networking & Security',
+    composePath: 'apps/guacamole/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:8080/',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // Credentials for its own bundled Postgres. Nothing outside this compose
+    // project uses them, so they are generated rather than asked for.
+    hiddenGeneratedSecrets: ['GUACAMOLE_DB_PASSWORD'],
+    // Chosen over MeshCentral for machines on the overlay (§84.1) precisely
+    // because it needs no agent: no pinned certificate hash to go wrong behind
+    // the tunnel, and Authelia can gate it without breaking anything, since
+    // there is no agent to fail a forward-auth redirect.
+  },
   'dozzle': {
     name: 'dozzle',
     label: 'Dozzle',
