@@ -124,7 +124,7 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Security
 
-- [ ] **NEXT UP — verify `setup_server.sh`'s new prompts against the real
+- [ ] **@mat: verify `setup_server.sh`'s new prompts against the real
       host** (§94) — the fixed-IP (`netplan try`) and passwordless-sudo
       (`NOPASSWD:ALL` sudoers entry) prompts are syntax/shellcheck-verified
       only; deliberately not exercised by an agent session, since a wrong
@@ -234,7 +234,7 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **CrowdSec enforcement at NPM — lua bouncer** (§119) — NPM's nginx is
+- [ ] **NEXT SESSION, START HERE — CrowdSec enforcement at NPM — lua bouncer** (§119) — NPM's nginx is
       openresty+ngx_lua, so `lua-cs-bouncer` runs inside it: per-request IP
       check against CrowdSec's decision stream, 403 for banned IPs, using the
       real client IP NPM already resolves. No Cloudflare token / Workers plan.
