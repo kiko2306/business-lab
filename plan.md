@@ -11877,3 +11877,73 @@ demo tiles until the next start/stop). Added a best-effort
 `regenerateHomepageServices()` call in `index.ts` beside
 `reconcileRemovedServices()`, which already runs the equivalent exposure
 reconcile on boot.
+
+## 117. §110.4 investigated — nothing enforces CrowdSec's decisions, and why it's not a one-liner
+
+Picked up the README item "CrowdSec detects but nothing enforces". Dug into
+the `cloudflare-worker-bouncer` crash and the alternatives; landing a decision
+here rather than half-building one path.
+
+### 117.1 What the bouncer actually needs
+
+`crowdsecConfig.ts` renders `cloudflare-worker-bouncer.yaml` with
+`token: <exposure.cloudflareApiToken>` — the **one** Cloudflare token the
+dashboard stores, scoped for the tunnel: `Account > Cloudflare Tunnel: Edit`,
+`Zone > DNS: Edit`. The bouncer uploads a Worker + KV namespace + zone routes,
+so it also needs `Account > Workers Scripts: Edit`, `Account > Workers KV
+Storage: Edit`, `Zone > Workers Routes: Edit`. A `10000 Authentication error`
+is what Cloudflare returns for a Workers call made with a token that has no
+Workers permission — i.e. the symptom is consistent with "the tunnel token was
+never re-scoped", not necessarily a token-format bug.
+
+Facts checked:
+- `cfut_` = **User** API token, `cfat_` = **Account** API token — both the new
+  "scannable" prefixed format (40 chars + checksum). Unprefixed legacy tokens
+  still work but Cloudflare no longer issues them.
+- Some older clients reject the prefixed format client-side (e.g. caddy-dns/
+  cloudflare PR #123, fixed 2026-03). **Not** our case: bouncer v0.0.18
+  (latest release, 2026-06) already vendors `cloudflare-go v0.117.0`, well
+  past that fix. `:latest` on Docker Hub = v0.0.18.
+- Upstream README: "Due to heavy usage of KV and Workers quotas on the
+  Cloudflare free plan, the **paid** Cloudflare Worker plan is recommended."
+
+So the most likely fix is boring — a properly Workers-scoped token — but it
+can't be the *tunnel* token without widening that token's blast radius, and
+proving it needs a real Worker deployed to the live zone (possibly a paid
+Workers plan). Neither is something to do blind.
+
+### 117.2 Options
+
+1. **Separate bouncer token.** New stored setting
+   (`exposure_cloudflare_worker_token` or a CrowdSec-panel field), write-only
+   in the UI like every other secret; `crowdsecConfig.ts` uses it for the
+   bouncer and keeps the placeholder-config behaviour when unset; drop the
+   `edge-bouncer` compose profile so the container starts once the token is
+   set (or keep the profile and gate it from the backend). Docs: a new
+   token-creation step (Workers Scripts + KV + Routes, account-scoped).
+   Verify: needs the user's Cloudflare account + likely the paid Workers plan.
+2. **Backend → Cloudflare IP Access Rules.** A `crowdsecSync` module polls
+   CrowdSec LAPI decisions (bouncer key already exists; backend would need to
+   reach `crowdsec:8080` — it's on `crowdsec-net`, backend isn't) and
+   creates/removes `block` rules via `/zones/:id/firewall/access_rules/rules`
+   (legacy but still live, unlike the frozen Firewall Rules API). Token scope:
+   `Zone > Firewall Services: Edit` — one more scope, no Workers plan. Cost:
+   new module + network wiring + CF client extension + reconciliation of
+   expired decisions.
+3. **nginx `deny` list at NPM.** Backend renders `deny <ip>;` from decisions
+   into NPM's `http_top.conf` custom drop-in (where `crowdsecConfig.ts`
+   already writes the real-IP block). No new token, no Workers. Cost: NPM has
+   no plain "reload" API — the drop-in only reloads on a proxy-host change or
+   restart, so a per-minute ban list would need a reload path we don't have
+   today, and a large CAPI blocklist would bloat the config (local decisions
+   only would keep it small).
+4. **Leave it detection-only.** Document that edge enforcement is deferred and
+   why; CrowdSec's value meanwhile is the parsed log + alerting.
+
+### 117.3 Where it stands
+
+Not started — needs @mat's call on cost/scope. #1 is closest to the existing
+design and the least new code, but it's the one that may cost money and needs
+Cloudflare-side setup. #2 avoids the Workers plan for one extra token scope.
+#3 needs no third-party anything but leans on an NPM reload path that doesn't
+exist yet. Split into README items per the option chosen.
