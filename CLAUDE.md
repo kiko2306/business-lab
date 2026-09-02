@@ -26,11 +26,18 @@ works by hand, delete it and make the code do it, then prove the code path.
 
 ## plan.md is the project's memory
 
-`plan.md` (~8800 lines) is the spec **and** the running session log. Numbered
+`plan.md` (~10,600 lines) is the spec **and** the running session log. Numbered
 sections; new work is appended as a new `## NN. ...` section. Read the tail
 before starting — the last section usually says where things stand and what to
 pick up. Record what was tried and rejected, not just what landed. Never rewrite
 history in it; append.
+
+It is read **a section at a time, never whole**. `plan-index.md` lists every
+section with the `sed` range that reads it; regenerate it with
+`./scripts/plan-index.sh` after appending. Summarising `plan.md` itself is not
+the answer to its size — the record of what was tried and rejected is the half
+that keeps turning out to matter (§75.7), and nothing loads the file
+automatically anyway.
 
 ## Commands
 
@@ -75,8 +82,9 @@ Every task runs through the same six steps, in order, every time:
    from. Do not pick one and start.
 3. **Implement** — that one task.
 4. **Update `plan.md` and `README.md`.** A new numbered `plan.md` section
-   saying what was done and why (including what was tried and rejected), and
-   the finished item **deleted** from the README list.
+   saying what was done and why (including what was tried and rejected), the
+   finished item **deleted** from the README list, and `./scripts/plan-index.sh`
+   re-run so the index covers the new section.
 5. **Commit and push, on success.** Success means the affected workspace's
    checks pass and anything touching Docker/exposure/networking/backups has
    been proven against the real stack. If it is not verified, say so plainly
@@ -115,6 +123,7 @@ passing, unless it is genuinely part of the change at hand.
 | `apps/<name>/` | One compose project per app: `docker-compose.yml`, `.env.example`, gitignored `.env` + `data/`. |
 | `docs/` | Operator docs — `ports.md`, `app-credentials.md`, `first-run.md` are kept current, not aspirational. |
 | `start.sh` | Host bootstrap: daemon config, port allocation, first run. |
+| `plan-index.md` | Generated map of `plan.md` — section titles and the `sed` range for each. |
 
 ## Conventions
 
