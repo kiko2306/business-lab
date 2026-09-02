@@ -145,6 +145,11 @@ it is done — not ticked off and left behind. Section references point at
       the image). A locked-out admin on a real deployment has no sanctioned
       reset. Needs a real mechanism — a `start.sh recover` subcommand, a
       root-only Unix socket, or a one-shot token file on a host-mounted path.
+- [ ] **Login page offers "create the initial administrator account" forever**
+      (§112.1) — `login.component.html` shows the *"First time here?"* prompt
+      with a link to `/setup` unconditionally. `/api/auth/setup-status` already
+      returns `{ setupRequired }`; gate the prompt on it so it disappears once
+      an admin exists. Frontend-only + spec.
 
 ### Backups
 
@@ -240,6 +245,20 @@ it is done — not ticked off and left behind. Section references point at
       `<base-domain>` (proxied apex CNAME, tunnel ingress, NPM host), fully
       public, and adds the apex to `HOMEPAGE_ALLOWED_HOSTS`. Must be verified
       against the real stack: both hostnames load, toggle off removes both.
+- [ ] **Homepage tiles link to `localhost:<port>`, not the public URL**
+      (§112.2, §112.4) — every `homepage.href` label is `http://localhost:…`,
+      static in the compose file (backend must not edit those). The Home Page
+      is public at the apex now, so those links are dead for a remote visitor.
+      Have the backend generate Homepage's `services.yaml` as a managed config
+      file from the registry + `service_exposure` (href = `https://<hostname>`),
+      refreshed on exposure change and service start — and write a clean config
+      on first start so Homepage's *"My First Group / My First Service"* demo
+      tiles never render. One piece of work.
+- [ ] **An unexposed app is left off the Homepage** (§112.3) — depends on the
+      item above. **Reverses a documented convention**: CLAUDE.md "Every app
+      shows up on the Home Page" and the registry-wide `services.test.ts` check
+      both need reworking. Confirm with @mat that a running-but-unexposed app
+      becoming invisible on the start page is intended before building it.
 - [ ] **CrowdSec detects but nothing enforces** (§110.4) — the log-path typo
       that meant CrowdSec parsed nothing for a week is fixed, and it now reads
       real client IPs from NPM's logs. But the `cloudflare-worker-bouncer` is

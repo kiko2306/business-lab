@@ -11658,3 +11658,57 @@ unauthenticated index of the stack. If mandatory exposure lands, revisit
 whether the apex should carry Authelia by default (the `autheliaProtected`
 plumbing for additional exposures already exists; it is hardcoded `false`
 today).
+
+## 112. Plan — login setup prompt, and Homepage links via exposure (2026-09-02)
+
+Four items @mat asked for. Not yet designed — captured here so intent survives,
+added to the README list, ordered by @mat.
+
+### 112.1 Login page still offers "create the initial administrator account"
+
+`frontend/src/app/pages/login/login.component.html:56-59` shows *"First time
+here? Create the initial administrator account"* with a `routerLink="/setup"`
+**unconditionally**. Once an admin exists `/setup` redirects away, so the link
+is dead — but it reads as if self-registration is open, on an internet-facing
+login page.
+
+`GET /api/auth/setup-status` already returns `{ setupRequired?: boolean }`
+(`auth.service.ts:150`). Fix: the login component reads it (or reuses the
+value `auth.service` already fetches for the guest-route guard) and
+`*ngIf`s the prompt on `setupRequired`. Frontend-only, plus a spec.
+
+### 112.2 Homepage tiles link to `localhost:<port>`, not the public URL
+
+Every app's `homepage.href` label is `http://localhost:${<APP>_PORT}` — static
+in the compose file, which the backend must not edit (CLAUDE.md Never list).
+Now that the Home Page is itself public at the apex (§111), every one of those
+links is dead for a remote visitor.
+
+Want: a tile's link is the app's **exposure URL** (`https://<hostname>`) from
+`service_exposure`. Options to weigh at design time:
+
+- Backend generates Homepage's `services.yaml` as a *managed config file*
+  (allowed — same category as `crowdsecConfig.ts`) from the registry +
+  `service_exposure`, refreshed when exposure changes and on service start.
+  Label discovery (`docker.yaml`) then stops being the source of tiles, or is
+  demoted to a fallback.
+- Keep label discovery and inject an href override another way (no clean
+  mechanism found yet — the port is baked into the label).
+
+Leaning towards the generated `services.yaml`.
+
+### 112.3 An app with no exposure is left off the Homepage
+
+Follows from 112.2: no public URL, no useful tile. **This reverses a
+documented convention** — CLAUDE.md "Every app shows up on the Home Page", and
+the registry-wide `services.test.ts` check that fails when an app lacks
+`homepage.*` labels. Both need reworking, and @mat should confirm the reversal
+is intended (a running-but-unexposed app becomes invisible on the start page).
+
+### 112.4 Strip Homepage's demo content on first start
+
+Homepage seeds *"My First Group" / "My First Service"* example tiles when its
+`services.yaml` has no real content. On first start the backend should write a
+clean config so the placeholders never render — same generated file as 112.2,
+so 112.2 and 112.4 are one piece of work. 112.3 rides on 112.2 too. 112.1 is
+independent.
