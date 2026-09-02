@@ -12,6 +12,7 @@ import {
   BackupListResponse,
   BackupScheduleConfig,
   BackupScheduleSettings,
+  DiscoveredHost,
   HealthStatus,
   ServiceEnvStatus,
   ServiceExposureConfig,
@@ -110,6 +111,10 @@ export class OperationsService {
 
   getHealth(): Observable<HealthStatus> {
     return this.http.get<HealthStatus>(`${API_BASE_URL}/health/system`);
+  }
+
+  scanNetwork(): Observable<{ hosts: DiscoveredHost[] }> {
+    return this.http.post<{ hosts: DiscoveredHost[] }>(`${API_BASE_URL}/network/scan`, {});
   }
 
   getRecoveryStatus(): Observable<{ enabled: boolean }> {

@@ -369,6 +369,68 @@
         </div>
       </div>
     </section>
+
+    <section id="utils" class="mt-5 pt-4 border-top">
+      <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+        <div>
+          <h2 class="h4 mb-1">
+            <button
+              type="button"
+              class="section-toggle"
+              [class.collapsed]="isCollapsed('utils')"
+              [attr.aria-expanded]="!isCollapsed('utils')"
+              (click)="toggleSection('utils')"
+            >
+              <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+              </svg>
+              <span>Utils</span>
+            </button>
+          </h2>
+          <p class="text-body-secondary mb-0">One-off tools that aren't tied to a specific app.</p>
+        </div>
+      </div>
+      <div class="card" *ngIf="!isCollapsed('utils')">
+        <div class="card-body">
+          <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
+            <div>
+              <h3 class="h6 mb-1">Network scan</h3>
+              <p class="text-body-secondary small mb-0">
+                Sweeps your LAN for devices that answer to a ping and lists their hostname, MAC vendor, and IP.
+              </p>
+            </div>
+            <button class="btn btn-outline-primary" (click)="scanNetwork()" [disabled]="scanningNetwork">
+              <span class="spinner-border spinner-border-sm me-1" *ngIf="scanningNetwork" aria-hidden="true"></span>
+              {{ scanningNetwork ? 'Scanning…' : 'Scan network' }}
+            </button>
+          </div>
+          <div class="table-responsive" *ngIf="discoveredHosts && discoveredHosts.length">
+            <table class="table table-sm align-middle mb-0">
+              <thead>
+                <tr>
+                  <th scope="col">Hostname</th>
+                  <th scope="col">Type</th>
+                  <th scope="col">IP</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr *ngFor="let host of discoveredHosts">
+                  <td>{{ host.hostname ?? '—' }}</td>
+                  <td>{{ host.type ?? '—' }}</td>
+                  <td>{{ host.ip }}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+          <p class="text-body-secondary small mb-0" *ngIf="discoveredHosts && !discoveredHosts.length">
+            No devices responded.
+          </p>
+          <p class="text-body-secondary small mb-0" *ngIf="!discoveredHosts && !scanningNetwork">
+            Run a scan to list devices on the network.
+          </p>
+        </div>
+      </div>
+    </section>
   </main>
 </div>
 

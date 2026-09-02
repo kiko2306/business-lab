@@ -10,6 +10,7 @@ import { OperationsService } from '../../core/operations.service';
 import {
   BackupFile,
   BackupScheduleConfig,
+  DiscoveredHost,
   DiskUsage,
   HealthStatus,
   ServiceAction,
@@ -149,6 +150,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
     consecutiveFailures: 0,
   };
   protected savingSchedule = false;
+  protected discoveredHosts: DiscoveredHost[] | null = null;
+  protected scanningNetwork = false;
 
   ngOnInit(): void {
     this.serviceState.startPolling();
@@ -321,6 +324,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.health = response;
       },
       error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load health checks.')),
+    });
+  }
+
+  // Not run on init like loadHealth() — a LAN sweep takes ~10s and sends
+  // traffic to every device on the network, so it only runs when asked for.
+  scanNetwork(): void {
+    this.scanningNetwork = true;
+    this.operations.scanNetwork().subscribe({
+      next: (response) => {
+        this.discoveredHosts = response.hosts;
+        this.scanningNetwork = false;
+      },
+      error: (error) => {
+        this.toast.error(extractErrorMessage(error, 'Unable to scan the network.'));
+        this.scanningNetwork = false;
+      },
     });
   }
 

@@ -313,6 +313,12 @@ export interface HealthStatus {
   timestamp: string;
 }
 
+export interface DiscoveredHost {
+  ip: string;
+  hostname: string | null;
+  type: string | null;
+}
+
 export type MailEncryption = 'tls' | 'ssl' | 'none';
 
 /** Shape returned by GET /settings/mail. Passwords are never sent back. */

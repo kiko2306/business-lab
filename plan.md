@@ -10892,3 +10892,91 @@ lines rather than editing them. Not run against the live host: applying a
 fixed IP or passwordless sudo on `home-srv-01` is exactly the kind of
 irreversible-if-wrong change that belongs in the operator's hands, not an
 agent session's — same reasoning as `EXPAND_VG_DISK`'s typed confirmation.
+
+## 95. Utils section: a LAN device scan the backend container can't do on its own network
+
+New user request, not from the README list: a dashboard utility that scans
+the home network and lists `hostname | type | ip`, collapsible, under a new
+"Utils" section.
+
+### 95.1 The problem the design has to solve
+
+The backend container sits on the internal `homelab-net` Docker bridge
+(§88.4's log volume, §83's data-root work — same container), not the
+physical LAN. Its own `ip route` only ever sees bridge routes; it cannot ARP
+or ping-sweep real LAN devices no matter what code runs inside it. Two apps
+already need real LAN visibility for a similar reason — `home-assistant`
+(zeroconf/SSDP/DHCP discovery) and `beszel` — and both solve it the same way:
+`network_mode: host` on that one container.
+
+Giving the backend service itself `network_mode: host` permanently was
+rejected: it is an always-on privilege grant for a feature used a few times
+a day, and it changes how the whole management stack is networked (its
+ports are currently published through the bridge; CORS, service discovery
+and the exposure system all assume that). Confirmed with the user before
+building (two-question check: scan mechanism, and what "type" means) rather
+than picking silently, since it's a real capability/security tradeoff.
+
+### 95.2 What shipped
+
+`backend/src/services/networkScan.ts` launches a short-lived
+`docker run --rm --network host --entrypoint sh <image> -c <script>`
+container per scan request, through the same `docker` CLI (`DOCKER_HOST` ->
+docker-socket-proxy) `executor.ts` already uses for compose — no new Docker
+access is granted, this reuses the fact that `CONTAINERS+POST+IMAGES` on the
+socket proxy already lets the backend create/run/pull arbitrary containers
+(the `docker-compose.yml` comment on that proxy already says as much). The
+scan container detects its own default route/CIDR (it shares the host's
+network namespace) and runs `nmap -sn <cidr>` — a plain ping sweep, not a
+port/OS scan, per the user's "MAC vendor lookup" choice over a slower,
+noisier device-type guess. `instrumentisto/nmap:latest` was picked over a
+bare `alpine` + `apk add nmap` at scan time: same total image size once
+cached, but no dependency on the Alpine package mirror being reachable at
+scan time, and it already bundles `iproute2` for the CIDR detection step.
+
+`parseNmapOutput` (the only part worth unit-testing — running Docker isn't)
+turns nmap's plain-text `-sn` output into `{ ip, hostname, type }[]`. The one
+non-obvious case: when reverse-DNS/NetBIOS/mDNS all fail to name a host,
+nmap prints that host's own MAC address in the slot a hostname would
+otherwise occupy (`Nmap scan report for AA:BB:CC:DD:EE:FF (192.168.1.3)`) —
+detected by comparing the "hostname" slot against the MAC Address line and
+treated as no hostname, not shown as one. An "Unknown" vendor maps to `null`
+rather than the literal string.
+
+`POST /api/network/scan` (new `backend/src/routes/network.ts`, mounted
+through the same `protectedGate()` as every other route in `index.ts`, own
+6/min rate limiter — a scan is ~10s and sweeps the whole LAN, cheap enough to
+click a few times, not to leave unthrottled). Frontend: `OperationsService.
+scanNetwork()`, a `DiscoveredHost` model, and a new "Utils" collapsible
+section in `dashboard.component.html`/`.ts` (same `isCollapsed`/
+`toggleSection` mechanism as Settings/Backups/Health), placed after Health.
+Unlike `loadHealth()`, the scan does not run on `ngOnInit` — it sends probe
+traffic to every device on the LAN and takes ~10s, so it only runs when the
+user clicks "Scan network".
+
+### 95.3 Verified live
+
+Backend typecheck + tests pass (258 tests, including the new
+`networkScan.test.ts` against real captured `nmap -sn` output from this
+host's actual LAN). Frontend `ng build` compiles clean (AOT, so the new
+template and component wiring type-check); `test:ci` could not run in this
+sandbox (no headless Chrome available in the plain `node:20` image used
+here — a sandbox gap, not something this change touches; CI's `ubuntu-latest`
+runner has it).
+
+Proved the real Docker path, not just the parser: ran the exact
+`docker run --network host ...` invocation by hand from inside the running
+`backend` container against the real LAN before writing any parsing code,
+which caught nothing at that stage but did fix the format assumptions the
+parser was built against. Rebuilt and recreated the `backend` service (not
+the whole stack — never `docker compose down` on the management stack) and
+called `scanLan()` directly inside the running container: it found and
+correctly labeled every device on this LAN (router, phones, a smart fridge,
+an air fryer, several ESP-based IoT devices, this server itself). That run
+caught a real bug the parser tests couldn't: `instrumentisto/nmap`'s default
+entrypoint is `nmap` itself, so the original code's `docker run <image> sh -c
+<script>` was actually invoking `nmap sh -c <script>` — fixed with an
+explicit `--entrypoint sh` override. Confirmed the HTTP route is gated the
+same way its siblings are (`curl -X POST /api/network/scan` with no token ->
+401 `Authorization header missing or malformed`, identical to `/api/health`
+et al.) without extracting real admin credentials to drive it further.

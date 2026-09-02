@@ -12,6 +12,7 @@ import backupRouter from './routes/backup';
 import healthRouter from './routes/health';
 import recoveryRouter from './routes/recovery';
 import usersRouter from './routes/users';
+import networkRouter from './routes/network';
 import { dropLegacyRoleColumn, ensureServiceExposureTable, ensureServiceExposureAutheliaColumn } from './utils/database';
 import authMiddleware from './middleware/auth';
 import setupModeMiddleware from './middleware/setupMode';
@@ -134,6 +135,7 @@ for (const prefix of ROUTE_PREFIXES) {
   app.use(`${prefix}/audit-logs`, ...protectedGate(), auditRouter);
   app.use(`${prefix}/backups`, ...protectedGate(), backupRouter);
   app.use(`${prefix}/users`, ...protectedGate(), usersRouter);
+  app.use(`${prefix}/network`, ...protectedGate(), networkRouter);
   // Mounted after the public liveness probe above, so GET /health stays public
   // while GET /health/system and /health/thresholds remain protected.
   app.use(`${prefix}/health`, ...protectedGate(), healthRouter);
