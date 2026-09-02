@@ -37,6 +37,12 @@ records or ingress rules for apps. If you see a stray `CNAME` to the tunnel
 for an app that is not exposed, that is drift worth investigating, not
 something to add to.
 
+**One exception at the zone apex**: exposing the **Home Page** also publishes
+it at the bare domain (`<your-domain>` itself), so a proxied `CNAME` at the
+apex pointing at the tunnel is *expected* whenever the Home Page is exposed —
+not drift. It is created and removed with that one toggle, same as any app
+hostname. Nothing else is ever published at the apex.
+
 The **dashboard's own hostname is the exception**: `start.sh` publishes it and
 routes the tunnel **straight to the frontend port, bypassing Nginx Proxy
 Manager**, so a broken NPM can still be repaired through the dashboard. Its

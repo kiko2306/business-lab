@@ -546,8 +546,12 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
 
   const additionalExposures = serviceDef?.additionalExposures ?? [];
   for (const extra of additionalExposures) {
-    const exposureKey = `${serviceName}:${extra.suffix}`;
-    const extraHostname = buildExposureHostname(serviceName, globalConfig.baseDomain, extra.suffix);
+    // `apex` entries key as `<service>:apex` and resolve to the bare base
+    // domain rather than a labelled subdomain (plan.md §111).
+    const exposureKey = `${serviceName}:${extra.apex ? 'apex' : extra.suffix}`;
+    const extraHostname = buildExposureHostname(serviceName, globalConfig.baseDomain, extra.suffix, {
+      apex: extra.apex,
+    });
     const extraRow = await ensureSecondaryExposureRow(exposureKey, extraHostname);
     const grpc = Boolean(extra.grpc);
 
@@ -576,7 +580,9 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
   // Reconcile secondaries the registry no longer declares — e.g. NetBird's
   // signal hostname, dropped when signal moved off the tunnel. Their rows and
   // live resources would otherwise outlive the definition that created them.
-  const declaredKeys = new Set(additionalExposures.map((extra) => `${serviceName}:${extra.suffix}`));
+  const declaredKeys = new Set(
+    additionalExposures.map((extra) => `${serviceName}:${extra.apex ? 'apex' : extra.suffix}`)
+  );
   const existingSecondaries = await query<ServiceExposureRow>(
     `SELECT * FROM service_exposure WHERE service_name LIKE $1`,
     [`${serviceName}:%`]

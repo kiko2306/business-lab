@@ -280,6 +280,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     exposureEnvKeys: {
       allowedHosts: ['HOMEPAGE_ALLOWED_HOSTS'],
     },
+    // The bare domain lands here: exposing the Home Page also publishes it at
+    // the zone apex, fully public (plan.md §111). buildExposureEnvOverrides
+    // sees this and adds <base-domain> to HOMEPAGE_ALLOWED_HOSTS alongside
+    // homepage.<base-domain>, or gethomepage 400s the apex request.
+    additionalExposures: [{ apex: true, label: 'Bare domain', portEnvVar: 'HOMEPAGE_PORT' }],
   },
   'n8n': {
     backup: { engine: 'postgres', service: 'n8n-db' },
@@ -1104,9 +1109,19 @@ export function getPublishedUpstreamPort(name: string, portEnvVar?: string): num
  * the subdomain via `exposureSubdomain` (see ServiceDefinition) when its
  * internal name isn't the name users should type. Pass `suffix` to build one
  * of the service's additionalExposures hostnames, which are stemmed from the
- * same subdomain so a rename carries through consistently.
+ * same subdomain so a rename carries through consistently. Pass
+ * `{ apex: true }` for an additionalExposures entry published at the zone
+ * apex — the bare base domain, no subdomain or suffix (plan.md §111).
  */
-export function buildExposureHostname(serviceName: string, baseDomain: string, suffix?: string): string {
+export function buildExposureHostname(
+  serviceName: string,
+  baseDomain: string,
+  suffix?: string,
+  opts?: { apex?: boolean }
+): string {
+  if (opts?.apex) {
+    return baseDomain;
+  }
   const subdomain = SERVICES[serviceName]?.exposureSubdomain ?? serviceName;
   const label = suffix ? `${subdomain}-${suffix}` : subdomain;
   return `${label}.${baseDomain}`;

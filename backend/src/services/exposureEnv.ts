@@ -37,7 +37,11 @@ function normaliseHost(value: string): string {
 export function computeExposureEnvOverrides(
   keys: ServiceExposureEnvKeys,
   hostname: string,
-  existingValues: Record<string, string>
+  existingValues: Record<string, string>,
+  // Extra Host-header values to fold into the allow-list keys beyond the
+  // primary hostname — e.g. the Home Page's apex exposure adds the bare base
+  // domain, since it is served at both <sub>.<domain> and <domain> (§111).
+  extraHosts: string[] = []
 ): Record<string, string> {
   const overrides: Record<string, string> = {};
   const separator = keys.allowedHostsSeparator ?? ',';
@@ -56,8 +60,10 @@ export function computeExposureEnvOverrides(
       .split(splitOn)
       .map((host) => normaliseHost(host))
       .filter(Boolean);
-    if (!hosts.includes(hostname)) {
-      hosts.push(hostname);
+    for (const host of [hostname, ...extraHosts]) {
+      if (!hosts.includes(host)) {
+        hosts.push(host);
+      }
     }
     overrides[key] = hosts.join(separator);
   }
@@ -135,5 +141,13 @@ export async function buildExposureEnvOverrides(
 
   const existingValues = { ...composeDefaults, ...envValues };
 
-  return computeExposureEnvOverrides(exposureEnvKeys, hostname, existingValues);
+  // A service with an apex additional exposure is reachable at the bare base
+  // domain too, and provisionServiceIfEnabled provisions that hostname
+  // whenever the primary exposure is on — so its Host-header allow-list has to
+  // carry the apex as well (§111).
+  const extraHosts = (getService(serviceName)?.additionalExposures ?? [])
+    .filter((extra) => extra.apex)
+    .map(() => globalConfig.baseDomain);
+
+  return computeExposureEnvOverrides(exposureEnvKeys, hostname, existingValues, extraHosts);
 }

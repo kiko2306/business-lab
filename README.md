@@ -235,6 +235,11 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **The bare domain serves the Home Page** (§111) — an apex variant of
+      `additionalExposures`: exposing the Home Page also provisions
+      `<base-domain>` (proxied apex CNAME, tunnel ingress, NPM host), fully
+      public, and adds the apex to `HOMEPAGE_ALLOWED_HOSTS`. Must be verified
+      against the real stack: both hostnames load, toggle off removes both.
 - [ ] **CrowdSec detects but nothing enforces** (§110.4) — the log-path typo
       that meant CrowdSec parsed nothing for a week is fixed, and it now reads
       real client IPs from NPM's logs. But the `cloudflare-worker-bouncer` is

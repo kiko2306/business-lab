@@ -270,6 +270,21 @@ describe('buildExposureHostname', () => {
   it('falls back to the service name for an unknown service', () => {
     expect(buildExposureHostname('not-a-service', 'example.com')).toBe('not-a-service.example.com');
   });
+
+  it('returns the bare base domain for an apex exposure', () => {
+    // The Home Page is served at the zone apex too (§111) — no subdomain, no
+    // suffix, whatever the service name.
+    expect(buildExposureHostname('homepage', 'example.com', undefined, { apex: true })).toBe('example.com');
+  });
+});
+
+describe('homepage apex exposure', () => {
+  it('declares an apex additionalExposures entry pointed at the Home Page port', () => {
+    const apex = (SERVICES['homepage'].additionalExposures ?? []).find((extra) => extra.apex);
+    expect(apex).toBeDefined();
+    expect(apex?.suffix).toBeUndefined();
+    expect(apex?.portEnvVar).toBe('HOMEPAGE_PORT');
+  });
 });
 
 describe('generated secrets coverage', () => {

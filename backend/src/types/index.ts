@@ -41,7 +41,12 @@ export interface ServiceExposureEnvKeys {
 
 export interface ServiceAdditionalExposure {
   // Appended to the base hostname: <service>-<suffix>.<base-domain>.
-  suffix: string;
+  // Exactly one of `suffix` / `apex` per entry.
+  suffix?: string;
+  // Publish this hostname at the zone apex — the bare <base-domain>, with no
+  // label. Cloudflare auto-flattens the proxied CNAME at the apex. Used for
+  // the Home Page (plan.md §111); an app is not a managed apex by default.
+  apex?: boolean;
   // Shown in the dashboard UI (exposure status, audit logs).
   label: string;
   // The compose ${VAR} name whose published host port this hostname should

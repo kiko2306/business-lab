@@ -11580,3 +11580,81 @@ was right.
   spoof `X-Forwarded-For`** and steer a CrowdSec ban at an arbitrary IP. This
   is NPM's default config, the LAN is semi-trusted, and tightening it risks the
   §99 duplicate-directive class of breakage — noted, not changed.
+
+## 111. The bare domain serves the Home Page (apex exposure)
+
+Ask: visiting `tx-home-utils.com` (the zone apex) should land on the Home Page
+app — the `apps/home-page/` start page that lists every running app — not the
+tunnel's `http_status:404` catch-all. Decided fully public, **no Authelia** in
+front (operator's call — a public index of the stack is accepted here).
+
+### 111.1 Why it rides the exposure system, not start.sh
+
+The apex is not a managed app, so the dashboard's exposure system — which only
+ever builds `<sub>.<base-domain>` (`buildExposureHostname`) — cannot own it as
+a primary hostname. The obvious parallel is the dashboard's own
+`homelab.<domain>`, special-cased in `start.sh`. Rejected that route:
+
+- `start.sh` would need a second bespoke publish block *and* a way to keep
+  `HOMEPAGE_ALLOWED_HOSTS` (a compose `${VAR:-default}`, no `.env` entry)
+  carrying the apex — which is a backend concern (`exposureEnv.ts`), and shell
+  `.env` writes are refused by the hook anyway.
+- Bypassing NPM (as the dashboard block does, for the repair-path reason) buys
+  nothing here: fully public, no forward-auth, edge-terminated TLS.
+
+Instead: the Home Page already declares `exposureEnvKeys.allowedHosts`, and the
+exposure system already has `additionalExposures` — secondary hostnames a
+service owns, each provisioned through the same NPM-proxy-host + tunnel-ingress
++ DNS path as the primary (`provisionServiceIfEnabled`), and torn down with it
+(`deprovisionServiceExposure` sweeps `<service>:%` rows). An
+`additionalExposures` entry today is `<sub>-<suffix>.<domain>`; this adds an
+**apex variant** whose hostname is the bare base domain.
+
+So the whole feature is: turn on "Publicly expose this service" for the Home
+Page and the apex comes with it. No new control, no `start.sh` change.
+
+### 111.2 Changes
+
+- **`ServiceAdditionalExposure`** (`types/index.ts`): `suffix` becomes
+  optional, add `apex?: boolean`. Exactly one of the two per entry.
+- **`buildExposureHostname`** (`config/services.ts`): 4th arg
+  `opts?: { apex?: boolean }` — returns the bare `baseDomain` when set.
+- **Home Page registry entry**: `additionalExposures: [{ apex: true, label:
+  'Bare domain', portEnvVar: 'HOMEPAGE_PORT' }]`.
+- **`provisionServiceIfEnabled`** (`services/exposure.ts`): in the
+  `additionalExposures` loop, an `apex` entry keys as `homepage:apex`,
+  hostname = `globalConfig.baseDomain`. `autheliaProtected: false` already
+  holds for every additional exposure. Deprovision needs no change — it works
+  off the `homepage:%` rows.
+- **`exposureEnv.ts`**: `computeExposureEnvOverrides` gains an `extraHosts`
+  param, merged (deduped) into the `allowedHosts` keys.
+  `buildExposureEnvOverrides` passes `[baseDomain]` when the service declares
+  an apex additional exposure — so `HOMEPAGE_ALLOWED_HOSTS` ends up holding
+  **both** `homepage.<domain>` and `<domain>`, or gethomepage 400s the apex
+  Host (§80, §92).
+- **Cloudflare apex CNAME**: `ensureTunnelDnsRecord` POSTs a proxied `CNAME`
+  at `name = <apex>`. Cloudflare auto-flattens proxied CNAMEs at the apex, so
+  no code change — but `docs/webmaster.md` currently calls "a stray CNAME to
+  the tunnel at the apex" drift; add the exception.
+- Tests: `services.test.ts` (apex entry passes registry checks, apex hostname
+  resolves to the bare domain), `exposureEnv.test.ts` (`extraHosts` merges +
+  dedupes), and the `buildExposureHostname` mock in `exposure.test.ts` updated
+  for the new arg.
+
+### 111.3 Verify against the real stack (the gate)
+
+Enable Home Page exposure via the dashboard, then: both `homepage.<domain>`
+and `<domain>` load the start page (Host validation passes); the tunnel config
+has an apex ingress rule; a proxied apex CNAME exists. Toggle exposure off →
+both routes and the CNAME disappear.
+
+### 111.4 Forward note — "exposure becomes non-optional"
+
+@mat is considering making exposure automatic and mandatory rather than a
+per-service toggle. This design does not block that: if exposure is always on,
+the apex `additionalExposures` entry simply always provisions. The one thing
+to weigh at that point — the bare domain would then *always* serve a public,
+unauthenticated index of the stack. If mandatory exposure lands, revisit
+whether the apex should carry Authelia by default (the `autheliaProtected`
+plumbing for additional exposures already exists; it is hardcoded `false`
+today).

@@ -60,6 +60,14 @@ describe('computeExposureEnvOverrides', () => {
   it('is empty when nothing is declared', () => {
     expect(computeExposureEnvOverrides({}, HOST, {})).toEqual({});
   });
+
+  it('folds extraHosts into every allow-list key, deduped (apex exposure, §111)', () => {
+    const out = computeExposureEnvOverrides({ allowedHosts: ['H'] }, 'homepage.example.com', {
+      H: 'localhost,example.com',
+    }, ['example.com']);
+    // example.com was already present — not added twice; the primary host is.
+    expect(out.H).toBe('localhost,example.com,homepage.example.com');
+  });
 });
 
 // §92: an app whose allow-list env var relies on a compose `${VAR:-default}`
@@ -106,7 +114,9 @@ describe('buildExposureEnvOverrides — compose default fallback', () => {
   it('keeps the compose default in the allow-list when .env does not set it', async () => {
     const { buildExposureEnvOverrides } = await import('./exposureEnv');
     const out = await buildExposureEnvOverrides('homepage', path.join(tmpDir, 'home-page'));
-    expect(out.HOMEPAGE_ALLOWED_HOSTS).toBe('localhost:10190,homepage.example.com');
+    // Trailing `example.com` is the apex additional exposure (§111) — the Home
+    // Page is served at the bare domain too, so its Host allow-list carries it.
+    expect(out.HOMEPAGE_ALLOWED_HOSTS).toBe('localhost:10190,homepage.example.com,example.com');
   });
 
   it('still prefers an explicit .env value over the compose default', async () => {
@@ -116,6 +126,6 @@ describe('buildExposureEnvOverrides — compose default fallback', () => {
     );
     const { buildExposureEnvOverrides } = await import('./exposureEnv');
     const out = await buildExposureEnvOverrides('homepage', path.join(tmpDir, 'home-page'));
-    expect(out.HOMEPAGE_ALLOWED_HOSTS).toBe('192.168.1.23:10190,homepage.example.com');
+    expect(out.HOMEPAGE_ALLOWED_HOSTS).toBe('192.168.1.23:10190,homepage.example.com,example.com');
   });
 });

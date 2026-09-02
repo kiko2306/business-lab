@@ -17,8 +17,8 @@ vi.mock('../config/services', () => ({
   getService: vi.fn(),
   // Faithful stand-in for the real default behaviour (no exposureSubdomain
   // override); the override itself is unit-tested in config/services.test.ts.
-  buildExposureHostname: (name: string, domain: string, suffix?: string) =>
-    `${suffix ? `${name}-${suffix}` : name}.${domain}`,
+  buildExposureHostname: (name: string, domain: string, suffix?: string, opts?: { apex?: boolean }) =>
+    opts?.apex ? domain : `${suffix ? `${name}-${suffix}` : name}.${domain}`,
 }));
 // Keep the real NpmProxyHostPartialCreateError — exposure.ts does an
 // `instanceof` check against it, which breaks if the class is mocked away.
@@ -302,6 +302,48 @@ describe('provisionServiceIfEnabled', () => {
         originServerName: 'netbird-vpn-api.example.com',
       })
     );
+  });
+
+  it('provisions an apex additionalExposures entry at the bare base domain (§111)', async () => {
+    mockedQuery.mockImplementation(async (text: unknown) => {
+      const sql = String(text);
+      if (sql.includes('SELECT * FROM service_exposure')) {
+        return { rows: [exposureRow({ service_name: 'homepage', hostname: 'homepage.example.com', npm_host_id: 7 })] } as never;
+      }
+      if (sql.includes('DO UPDATE SET hostname = EXCLUDED.hostname')) {
+        return {
+          rows: [exposureRow({ service_name: 'homepage:apex', hostname: 'example.com', npm_host_id: null })],
+        } as never;
+      }
+      return { rows: [] } as never;
+    });
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedGetService.mockReturnValue({
+      name: 'homepage',
+      label: 'Home Page',
+      description: '',
+      icon: '',
+      category: 'Productivity',
+      composePath: '',
+      healthCheck: { enabled: false },
+      additionalExposures: [{ apex: true, label: 'Bare domain', portEnvVar: 'HOMEPAGE_PORT' }],
+    });
+    mockedGetPublishedUpstreamPort.mockImplementation((_name, portEnvVar) => (portEnvVar ? 10190 : 10190));
+    mockedGetHostGatewayIp.mockResolvedValue('172.17.0.1');
+    mockedEnsureProxyHost.mockResolvedValue({ id: 7, created: false, updated: true });
+    mockedEnsureIngressRoute.mockResolvedValue({ dnsRecordId: 'dns-apex', created: false, updated: true } as never);
+
+    const result = await provisionServiceIfEnabled('homepage', 1);
+
+    expect(result).toEqual({ attempted: true, success: true, hostname: 'homepage.example.com' });
+    // The apex hostname is the bare domain — no subdomain, no suffix.
+    expect(mockedEnsureProxyHost).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'example.com', forwardPort: 10190, expectedHostId: null, grpc: false })
+    );
+    expect(mockedEnsureIngressRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'example.com', originUrl: 'http://npm' })
+    );
+    expect(mockedGetPublishedUpstreamPort).toHaveBeenCalledWith('homepage', 'HOMEPAGE_PORT');
   });
 
   it('does not let a secondary exposure failure affect the primary result', async () => {
