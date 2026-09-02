@@ -370,6 +370,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     },
   },
   'guacamole': {
+    // Its Postgres holds every saved connection, the user accounts and the
+    // session history — the whole app, in other words. Without this its live
+    // database files are copied raw and can restore corrupt (§88.6).
+    backup: { engine: 'postgres', service: 'guacamole-db' },
     name: 'guacamole',
     label: 'Guacamole',
     description: 'Browser RDP, VNC and SSH to machines on the overlay',

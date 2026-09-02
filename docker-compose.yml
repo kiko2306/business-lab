@@ -59,6 +59,12 @@ services:
       # (plan.md §83.3).
       - /:/hostfs:ro
       - backups-data:/app/backups
+      # The backend's own log files. On the container's writable layer they
+      # died with it, which erased the day under investigation twice in one
+      # session (plan.md §88.4) — a backup system whose failures are not
+      # legible afterwards gets debugged by guessing. The logger rotates at
+      # 5 MB so outliving the container does not mean growing without limit.
+      - logs-data:/app/logs
     depends_on:
       database:
         condition: service_healthy
@@ -122,6 +128,8 @@ volumes:
   db-data:
     driver: local
   scripts-data:
+    driver: local
+  logs-data:
     driver: local
   backups-data:
     driver: local

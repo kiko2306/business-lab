@@ -371,29 +371,69 @@ describe('dependency declarations', () => {
   });
 });
 
+// composePath is nominal — upstream projects name the file inconsistently, so
+// the app directory is probed the same way resolveComposeFile does.
+const composeText = (composePath: string) => {
+  const dir = path.resolve(__dirname, '../../..', path.dirname(composePath));
+  const found = ['compose.yaml', 'compose.yml', 'docker-compose.yml', 'docker-compose.yaml']
+    .map((file) => path.join(dir, file))
+    .find((file) => fs.existsSync(file));
+  if (!found) {
+    throw new Error(`no compose file in ${dir}`);
+  }
+  return fs.readFileSync(found, 'utf8');
+};
+
 describe('Home Page discovery labels', () => {
   // Homepage lists a container only while it is running AND labelled, so an
   // app without these labels is invisible on the start page however healthy it
   // is. This is the rule for every app in the registry, checked here rather
   // than left to whoever reviews the next compose file.
-  // composePath is nominal — upstream projects name the file inconsistently,
-  // so the app directory is probed the same way resolveComposeFile does.
-  const composeText = (composePath: string) => {
-    const dir = path.resolve(__dirname, '../../..', path.dirname(composePath));
-    const found = ['compose.yaml', 'compose.yml', 'docker-compose.yml', 'docker-compose.yaml']
-      .map((file) => path.join(dir, file))
-      .find((file) => fs.existsSync(file));
-    if (!found) {
-      throw new Error(`no compose file in ${dir}`);
-    }
-    return fs.readFileSync(found, 'utf8');
-  };
 
   it('are carried by every app', () => {
     for (const [name, service] of Object.entries(SERVICES)) {
       const text = composeText(service.composePath);
       expect(text, `${name} has no homepage.name label`).toContain('homepage.name=');
       expect(text, `${name} has no homepage.group label`).toContain('homepage.group=');
+    }
+  });
+});
+
+describe('database backup coverage', () => {
+  // An app whose compose file runs a database server needs a `backup:` entry,
+  // or the scheduled dump skips it and the file backup copies its live data
+  // files raw — which can restore corrupt, silently, and is only discovered
+  // the day someone needs it.
+  //
+  // guacamole shipped without one (§88.6) and nothing caught it, which is why
+  // this is a registry-wide rule rather than a review habit. onlyoffice is the
+  // case this cannot see: its Postgres lives inside the documentserver image
+  // rather than as its own compose service, so there is no image line to match.
+  const DB_IMAGE = /^\s+image:.*(postgres|mariadb|mysql|percona)/im;
+
+  it('declares a dump for every app that runs a database server', () => {
+    for (const [name, service] of Object.entries(SERVICES)) {
+      if (!DB_IMAGE.test(composeText(service.composePath))) {
+        continue;
+      }
+      expect(
+        service.backup,
+        `${name} runs a database container but declares no backup: entry, so nothing dumps it`
+      ).toBeDefined();
+    }
+  });
+
+  it('names a compose service that the app actually defines', () => {
+    for (const [name, service] of Object.entries(SERVICES)) {
+      if (!service.backup) {
+        continue;
+      }
+      // A typo here fails open: findContainer finds nothing and the dump is
+      // reported as "not running — skipped", which counts as a success.
+      expect(
+        composeText(service.composePath),
+        `${name} declares backup.service '${service.backup.service}', which is not a service in its compose file`
+      ).toMatch(new RegExp(`^\\s+${service.backup.service}:\\s*$`, 'm'));
     }
   });
 });

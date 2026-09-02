@@ -10474,3 +10474,68 @@ copied raw, which is the §75.4 failure mode on an app added yesterday.
 because the database is not a separate compose service.
 
 Both are new TODO items rather than fixed in passing.
+
+## 89. Two gaps from §88, closed
+
+### 89.1 The backend's logs now outlive the container
+
+`docker-compose.yml` mounts a `logs-data` named volume at `/app/logs`, and
+`LOG_DIR` is overridable so tests can point it somewhere disposable.
+
+Persisting them created a second problem that had to be solved in the same
+change. Nothing rotated these files — which was survivable only because they
+died with the container every few days, an accidental rotation nobody designed.
+Making them permanent without a cap would have traded a lost-evidence bug for an
+unbounded-growth one, on the filesystem §87 had just finished enlarging. So the
+logger rotates at 5 MB, keeping one previous generation as `<level>.log.1`.
+
+Three details worth recording:
+
+- **The size is tracked in memory, seeded from disk on first write.** Stat-ing
+  on every line would be a syscall per log entry for a number already known;
+  seeding from disk rather than starting at zero means a restart cannot let a
+  file grow past the cap.
+- **Rotation happens before the append that would cross the cap**, not after,
+  so the cap is a ceiling rather than a line the file sits above until something
+  else is logged.
+- **Both the rotation and the append are wrapped.** A full or read-only disk
+  must not crash the process over a log line, and the `console.log` above it is
+  still reaching Docker's log driver either way.
+
+Four tests in `logger.test.ts` — per-level files, appending, rotation at the cap
+keeping the previous generation, and picking up an existing file's size instead
+of restarting the count. The rotation test writes two 3 MB entries rather than
+5 MB of ordinary lines: same branch, a hundred times faster.
+
+**Proven on the real stack, against the exact failure from §88.4**: a line
+logged at 09:57:55 is still in `/app/logs/info.log` inside a container
+*created* at 09:58:09. Before this change that line would have gone with the
+old container.
+
+### 89.2 Guacamole's database is dumped, and the gap is now a test
+
+`backup: { engine: 'postgres', service: 'guacamole-db' }` on the registry entry.
+Verified against the live stack: `dumpAllAppDatabases()` returns 32 outcomes and
+0 failures, with `guacamole postgres dumped 60 KB` and a 61,482-byte
+`apps/guacamole/data/_dump/guacamole.sql` on disk.
+
+The more useful half is the registry-wide test, because guacamole shipped
+without a `backup:` entry yesterday and nothing caught it:
+
+- **Every app whose compose file runs a database image must declare `backup:`.**
+  Matching on the image (`postgres|mariadb|mysql|percona`) rather than the
+  service name catches the vendor variants this stack actually runs —
+  `lscr.io/linuxserver/mariadb`, `ghcr.io/immich-app/postgres:14-vectorchord…`,
+  `jc21`'s `mysql:8.0`. Nine apps match; all nine now declare one.
+- **A declared `backup.service` must exist in the compose file.** This one is
+  about a failure that is invisible rather than loud: `findContainer` returning
+  nothing is reported as `not running — skipped`, which counts as a *success*.
+  A typo in that field would therefore mean an app silently never backed up,
+  reported green.
+
+`composeText` was lifted from inside the Home Page describe to module scope so
+both registry-wide checks share it rather than duplicating the filename probing.
+
+**What this test cannot see** is onlyoffice: its Postgres runs inside the
+documentserver image rather than as its own compose service, so there is no
+image line to match on. That stays an open item.
