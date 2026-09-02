@@ -11325,3 +11325,33 @@ is registered and auth-gated (401, not 404). Backend typecheck + full suite
 (289, +5 in `backupScheduler.test.ts` for the manual trigger, dump-before-run
 ordering, the no-password reason, the partial-failure detail string and the
 nothing-dumped failure). Frontend `test:ci` (22) + `build` clean.
+
+## 104. §99.1 hardened: a partial NPM create no longer orphans the host
+
+The failure mode from §99: NPM writes the proxy-host row, its nginx reload
+fails, and its API returns an error anyway. `createProxyHost` threw, the caller
+never recorded the id, and the host sat untracked — `ensureProxyHost` then
+refused to touch it ("already exists and is not managed by this service"),
+disable's `if (npmHostId)` guard skipped the delete, and only a manual deletion
+in NPM's own UI could clear it.
+
+**Fix.** `ensureProxyHost` (`npmClient.ts`) now wraps the create: on failure it
+re-queries by domain, and if the host is there after all it throws a typed
+`NpmProxyHostPartialCreateError` carrying the recovered id. `provisionHostname`
+(`exposure.ts`) catches that type and records the id on the `failed` row
+(`npm_host_id = COALESCE($3, npm_host_id)` already merges it), so the host is
+tracked from then on: a retry matches `expectedHostId` and goes down the
+update/reconcile path, and a disable has an id to delete. If the re-query finds
+nothing — a genuine create failure — the original error propagates unchanged.
+
+Rollback-by-delete was rejected: NPM's delete goes through the same nginx
+reload that just failed, so it would fail too. Recording the id and letting the
+normal reconcile path fix it once the underlying issue clears is the robust
+choice.
+
+Not reproducible on the live stack — the trigger (§99's duplicate-directive
+bug) is fixed, and deliberately breaking NPM's nginx config to force a partial
+create is not worth it. Covered by unit tests instead: 2 in `npmClient.test.ts`
+(recover the id when the host turns up on re-query; re-throw the original when
+it does not) and 1 in `exposure.test.ts` (the recovered id lands on the failed
+`service_exposure` row). Backend typecheck + full suite 292/292.

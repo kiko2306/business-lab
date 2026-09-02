@@ -3,7 +3,7 @@ import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
 import { getPublishedUpstreamPort, getService } from '../config/services';
-import { deleteProxyHost, ensureProxyHost } from './npmClient';
+import { deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
 import { deprovisionServiceExposure, getNpmOriginUrl, provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
@@ -20,7 +20,13 @@ vi.mock('../config/services', () => ({
   buildExposureHostname: (name: string, domain: string, suffix?: string) =>
     `${suffix ? `${name}-${suffix}` : name}.${domain}`,
 }));
-vi.mock('./npmClient', () => ({ ensureProxyHost: vi.fn(), deleteProxyHost: vi.fn() }));
+// Keep the real NpmProxyHostPartialCreateError — exposure.ts does an
+// `instanceof` check against it, which breaks if the class is mocked away.
+vi.mock('./npmClient', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./npmClient')>()),
+  ensureProxyHost: vi.fn(),
+  deleteProxyHost: vi.fn(),
+}));
 vi.mock('./cloudflareTunnelClient', () => ({ ensureIngressRoute: vi.fn(), removeIngressRoute: vi.fn() }));
 vi.mock('../utils/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
@@ -202,6 +208,26 @@ describe('provisionServiceIfEnabled', () => {
     expect(mockedEnsureIngressRoute).not.toHaveBeenCalled();
     expect(mockedWriteAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'exposure_provision', resource: 'paperless', result: 'failure' })
+    );
+  });
+
+  it('records the recovered NPM host id on a partial-create failure, so it is not orphaned (§99.1)', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ npm_host_id: null })] } as never);
+    mockedGetExposureConfig.mockResolvedValueOnce(globalConfig);
+    mockedGetPublishedUpstreamPort.mockReturnValueOnce(8000);
+    mockedGetHostGatewayIp.mockResolvedValueOnce('172.17.0.1');
+    mockedEnsureProxyHost.mockRejectedValueOnce(
+      new NpmProxyHostPartialCreateError('Internal Error — NPM host 11 was created but not confirmed', 11)
+    );
+
+    const result = await provisionServiceIfEnabled('paperless', 1);
+
+    expect(result.success).toBe(false);
+    // The failed row carries id 11 now, so a later disable/retry can delete or
+    // reconcile it instead of ensureProxyHost refusing an untracked host.
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.stringContaining('npm_host_id = COALESCE($3, npm_host_id)'),
+      ['paperless', 'failed', 11, null, expect.stringContaining('Internal Error')]
     );
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { requestJson } from '../utils/httpJson';
-import { buildProxyHostPayload, ensureProxyHost, testNpmConnection } from './npmClient';
+import { buildProxyHostPayload, ensureProxyHost, NpmProxyHostPartialCreateError, testNpmConnection } from './npmClient';
 
 vi.mock('../utils/httpJson', () => ({
   requestJson: vi.fn(),
@@ -155,6 +155,41 @@ describe('ensureProxyHost', () => {
 
     expect(result).toEqual({ id: 5, created: true, updated: false });
     expect(mockedRequestJson).toHaveBeenCalledTimes(3);
+  });
+
+  it('recovers the id when NPM created the host but failed the reload (§99.1)', async () => {
+    mockLogin();
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: [], raw: '' }); // list — nothing yet
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 500,
+      body: { error: { message: 'Internal Error' } },
+      raw: '',
+    }); // create — NPM wrote the row, nginx reload failed, still 500
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: [{ id: 7, domain_names: ['paperless.example.com'], forward_scheme: 'http', forward_host: 'x', forward_port: 1 }],
+      raw: '',
+    }); // re-query — the host is there after all
+
+    const error = await ensureProxyHost(baseOptions).catch((e) => e);
+    expect(error).toBeInstanceOf(NpmProxyHostPartialCreateError);
+    expect(error.hostId).toBe(7);
+    expect(error.message).toMatch(/not confirmed/);
+  });
+
+  it('re-throws the original error when the create failed and left nothing behind', async () => {
+    mockLogin();
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: [], raw: '' }); // list
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 500,
+      body: { error: { message: 'Internal Error' } },
+      raw: '',
+    }); // create fails
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: [], raw: '' }); // re-query — still nothing
+
+    const error = await ensureProxyHost(baseOptions).catch((e) => e);
+    expect(error).not.toBeInstanceOf(NpmProxyHostPartialCreateError);
+    expect(error.message).toMatch(/Unable to create Nginx Proxy Manager proxy host/);
   });
 
   it('refuses to touch a host with the same domain it does not already own', async () => {

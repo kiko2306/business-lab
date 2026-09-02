@@ -23,7 +23,7 @@ import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
 import { SERVICES, buildExposureHostname, getPublishedUpstreamPort, getService } from '../config/services';
-import { deleteProxyHost, ensureProxyHost } from './npmClient';
+import { deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
@@ -409,7 +409,17 @@ async function provisionHostname({
   } catch (error) {
     const message = (error as Error).message;
     logger.error(`Exposure provisioning failed for ${hostname}`, { error: message });
-    await recordProvisioningResult(exposureKey, { status: 'failed', npmHostId: existingNpmHostId, lastError: message });
+    // If NPM created the host but did not confirm it, record the recovered id
+    // on the failed row (COALESCE keeps any prior id otherwise). Without this
+    // the id is lost and the host is orphaned until deleted by hand in NPM,
+    // because ensureProxyHost then refuses to touch a host it has no record of
+    // (§99.1).
+    const recoveredHostId = error instanceof NpmProxyHostPartialCreateError ? error.hostId : null;
+    await recordProvisioningResult(exposureKey, {
+      status: 'failed',
+      npmHostId: recoveredHostId ?? existingNpmHostId,
+      lastError: message,
+    });
 
     await writeAuditLog({
       userId,

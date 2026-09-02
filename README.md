@@ -238,13 +238,6 @@ it is done — not ticked off and left behind. Section references point at
       address, not a Cloudflare edge IP. Confirm whether CrowdSec's access-log
       parsing ever resolves the true client IP in this topology, or whether it
       has been logging (and would ban) `cloudflared`'s address all along.
-- [ ] **`ensureProxyHost` can still orphan a host on a partial NPM failure**
-      (§99.1) — if NPM's DB write and its nginx reload ever diverge again (the
-      exact failure mode §99 just fixed one cause of), the create looks
-      failed to our code while NPM keeps the host, and it stays untracked
-      until an administrator manually deletes it in NPM's own UI. Not
-      hardened, since the actual trigger seen today is fixed; worth revisiting
-      if it recurs.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from

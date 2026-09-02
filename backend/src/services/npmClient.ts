@@ -108,6 +108,24 @@ interface EnsureProxyHostResult {
   updated: boolean;
 }
 
+/**
+ * A proxy-host create that failed *after* NPM had already written its DB row.
+ * NPM does the DB write and the nginx reload as separate steps and still
+ * answers with an error when only the reload fails (§99) — so the host exists
+ * but our `createProxyHost` threw and the caller never learned its id. This
+ * carries the id recovered by re-querying, so the caller can record it instead
+ * of leaving an orphan that only a manual NPM deletion can clear (§99.1).
+ */
+export class NpmProxyHostPartialCreateError extends Error {
+  constructor(
+    message: string,
+    readonly hostId: number
+  ) {
+    super(message);
+    this.name = 'NpmProxyHostPartialCreateError';
+  }
+}
+
 interface NpmCertificate {
   id: number;
   provider: string;
@@ -406,7 +424,24 @@ export async function ensureProxyHost({
   const options = { hostname, forwardScheme, forwardHost, forwardPort, websocket, autheliaProtected, grpc, certificateId };
 
   if (!existing) {
-    const created = await createProxyHost(baseUrl, token, options);
+    let created: NpmProxyHost;
+    try {
+      created = await createProxyHost(baseUrl, token, options);
+    } catch (error) {
+      // NPM's create is a DB write followed by an nginx reload; a failed
+      // reload still returns an error while leaving the host row in place
+      // (§99). Re-query by domain: if the host is now there, NPM made it and
+      // only the reload failed — surface its id so the caller records it and
+      // a retry reconciles the host, rather than orphaning it (§99.1).
+      const recovered = await findProxyHostByDomain(baseUrl, token, hostname).catch(() => null);
+      if (recovered) {
+        throw new NpmProxyHostPartialCreateError(
+          `${(error as Error).message} — NPM host ${recovered.id} was created but not confirmed; recorded so a retry can reconcile it`,
+          recovered.id
+        );
+      }
+      throw error;
+    }
     return { id: created.id, created: true, updated: false };
   }
 
