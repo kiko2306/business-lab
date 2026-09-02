@@ -241,23 +241,16 @@ it is done — not ticked off and left behind. Section references point at
       Workers plan). Decided (2026-09-02) to leave it detection-only and keep
       CrowdSec for parsed-log visibility. §117.2 has the three build options
       if this is revisited.
-- [ ] **NEXT UP — CrowdSec↔n8n↔ntfy reachability** (§118.2) — §118.1 uses
-      `host.docker.internal:host-gateway` on the crowdsec service to reach
-      ntfy's published port; decide whether n8n's webhook is reached the same
-      way or via a shared `alerts-net` (ties into the §98 published-port
-      question).
-- [ ] **n8n workflow provisioning** (§64, §118.3) — spike done: an
-      `n8n-workflows-init` container (n8n image, command override,
-      `depends_on` db) runs `import:workflow` → `publish:workflow` per a
-      backend-rendered `apps/n8n/workflows/<id>.json`, then main n8n boots and
-      registers the webhooks. Re-import clears active+published so it re-runs
-      every boot (overwrites manual UI edits — decide skip-if-exists vs
-      accept). Build the init container + mount + a render hook.
-- [ ] **CrowdSec-alert n8n workflow** (§118.4) — the workflow JSON itself:
-      Webhook → Code (dedupe by IP, drop noisy scenarios, build
-      title/body/priority/tags) → HTTP Request to ntfy. Backend renders it with
-      the topic baked in; then repoint CrowdSec's `url` at the n8n webhook.
-      Depends on the item above.
+- [ ] **NEXT UP — CrowdSec-alert workflow: make the Code node smart** (§118.4)
+      — the relay (Webhook → Code → ntfy) is live and formats each batch, but
+      the Code node does no filtering. Add: dedupe by source IP within a
+      window (workflow static data), and drop scenarios on a noise list.
+      Everything else (provisioning, reachability, CrowdSec → n8n → ntfy) is
+      done and verified (§118.3a).
+- [ ] **n8n workflow overwrite policy** (§118.3) — `n8n-workflows-init`
+      re-imports every boot, so a managed workflow's UI edits are replaced.
+      Fine for now (matches every other generated config here); revisit
+      skip-if-exists if someone needs to customise one in place.
 - [ ] **n8n's Postgres is 15; n8n 2.36 wants 17 (16 on compat)** (§118.3) —
       `apps/n8n/docker-compose.yml` runs `postgres:15-alpine`; n8n logs
       "Postgres 15 is not supported" on every start. Runs with a warning for

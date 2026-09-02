@@ -1,0 +1,2 @@
+# Bind-mount target for backend-rendered workflow JSON (see
+# backend/src/services/n8nWorkflows.ts). The *.json files are gitignored.

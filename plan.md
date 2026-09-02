@@ -12098,3 +12098,35 @@ successfully`. Same shape as the existing `n8n-init` busybox chown.
 
 Verdict: buildable, ~1 init container + a mount + JSON rendering. The heavier
 part left is authoring the workflow graph itself (§118.4).
+
+### 118.3a Built — n8n-workflows-init + the relay workflow (folds in §118.2)
+
+- `apps/n8n/docker-compose.yml`: `x-n8n-db-env` anchor (DB + encryption key,
+  shared), new `n8n-workflows-init` container (n8n image, `entrypoint: sh -c`,
+  loops `import:workflow` → `update:workflow --active` → `publish:workflow`
+  over `/workflows/*.json`, filename = id), `depends_on` chain so it runs
+  after `n8n-init` (chown) and before `n8n`. `extra_hosts:
+  host.docker.internal:host-gateway` on `n8n` too (§118.2 — same approach as
+  crowdsec; no shared network).
+- `backend/src/services/n8nWorkflows.ts`: renders
+  `apps/n8n/workflows/homelabCrowdsecAlertRelay.json` (Webhook `POST
+  /webhook/crowdsec-alert` → Code → HTTP Request to ntfy's JSON-publish
+  endpoint on `host.docker.internal:<NTFY_PORT>`). Topic baked into the Code
+  node. Rendered from `composeUpWithManagedConfig` on n8n start; removed when
+  CrowdSec alerts are off.
+- `crowdsecConfig.ts`: `resolveAlertTarget()` now points CrowdSec's
+  notification-http at `http://host.docker.internal:<N8N_PORT>/webhook/
+  crowdsec-alert` instead of ntfy directly.
+- gitignore `apps/n8n/workflows/*.json`; `.gitkeep` holds the dir.
+
+**Real-stack:** `n8n-workflows-init` imported + published the workflow; n8n
+registered the webhook on boot; `cscli notifications test http_default`
+traversed CrowdSec → n8n (`execution_entity`: success, mode webhook) → ntfy,
+which received the **formatted** push (`title: "CrowdSec: 1 alert"`,
+`message: "test alert — 10.10.10.10 · 4h ban"`), not raw JSON. 317 backend
+tests pass.
+
+Note: `update:workflow --active=true` prints a deprecation nudge toward
+`publish:workflow` but still works; the init keeps all three steps.
+§118.4 left: make the Code node smart (dedupe by source IP within a window,
+drop scenarios on a noise list).

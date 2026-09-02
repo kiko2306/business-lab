@@ -41,6 +41,7 @@ import { getExposureConfig } from '../utils/exposureSettings';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getAlertNotifyConfig } from '../utils/alertNotify';
+import { CROWDSEC_ALERT_WEBHOOK_PATH } from './n8nWorkflows';
 
 const NPM_SERVICE = 'nginx-proxy-manager';
 const BOUNCER_CONFIG_RELATIVE = path.join('config', 'cloudflare-worker-bouncer.yaml');
@@ -48,12 +49,12 @@ const BOUNCER_KEY_ENV = 'CROWDSEC_BOUNCER_KEY';
 
 const PROFILES_CONFIG_RELATIVE = path.join('config', 'profiles.yaml');
 const HTTP_NOTIFY_CONFIG_RELATIVE = path.join('config', 'notifications', 'http.yaml');
-// The crowdsec container gets `host.docker.internal:host-gateway` as an
-// extra_host (see its compose file), so it can reach ntfy's published port on
-// the host regardless of which compose-project bridge each app sits on. A
-// later step (§118.2) may move this onto a shared network.
-const NTFY_SERVICE = 'ntfy';
-const NTFY_DEFAULT_PORT = 10290;
+// CrowdSec POSTs alerts to the n8n relay workflow (§118.3/§118.4), which
+// dedupes/formats and forwards to ntfy. The crowdsec container gets
+// `host.docker.internal:host-gateway` as an extra_host (see its compose
+// file), so it can reach n8n's published port across compose-project bridges.
+const N8N_SERVICE = 'n8n';
+const N8N_DEFAULT_PORT = 10240;
 
 const NPM_REALIP_MARKER_BEGIN = '# >>> homelab-management: crowdsec real-ip >>>';
 const NPM_REALIP_MARKER_END = '# <<< homelab-management: crowdsec real-ip <<<';
@@ -343,10 +344,10 @@ headers:
 `;
 }
 
-/** Where CrowdSec should POST alerts. Today: the local ntfy instance. */
-function resolveAlertTarget(topic: string): string {
-  const port = getPublishedUpstreamPort(NTFY_SERVICE) ?? NTFY_DEFAULT_PORT;
-  return `http://host.docker.internal:${port}/${topic}`;
+/** Where CrowdSec POSTs alerts: the n8n relay workflow's webhook. */
+function resolveAlertTarget(): string {
+  const port = getPublishedUpstreamPort(N8N_SERVICE) ?? N8N_DEFAULT_PORT;
+  return `http://host.docker.internal:${port}/webhook/${CROWDSEC_ALERT_WEBHOOK_PATH}`;
 }
 
 /**
@@ -356,8 +357,8 @@ function resolveAlertTarget(topic: string): string {
  * whether profiles.yaml references the notification.
  */
 async function writeCrowdsecAlertConfig(appDir: string): Promise<void> {
-  const { crowdsecEnabled, topic } = await getAlertNotifyConfig();
-  const target = resolveAlertTarget(topic);
+  const { crowdsecEnabled } = await getAlertNotifyConfig();
+  const target = resolveAlertTarget();
 
   const profilesChanged = writeIfChanged(
     path.join(appDir, PROFILES_CONFIG_RELATIVE),

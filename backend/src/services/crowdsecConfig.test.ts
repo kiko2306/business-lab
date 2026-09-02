@@ -65,20 +65,19 @@ describe('buildProfilesYaml', () => {
 });
 
 describe('buildHttpNotificationYaml', () => {
-  const cfg = yaml.load(buildHttpNotificationYaml('http://host.docker.internal:10290/crowdsec-abc123')) as Record<
-    string,
-    unknown
-  >;
+  const cfg = yaml.load(
+    buildHttpNotificationYaml('http://host.docker.internal:10240/webhook/crowdsec-alert')
+  ) as Record<string, unknown>;
 
   it('is the http_default plugin posting JSON to the given url', () => {
     expect(cfg.type).toBe('http');
     expect(cfg.name).toBe('http_default');
     expect(cfg.method).toBe('POST');
-    expect(cfg.url).toBe('http://host.docker.internal:10290/crowdsec-abc123');
+    expect(cfg.url).toBe('http://host.docker.internal:10240/webhook/crowdsec-alert');
     expect((cfg.headers as Record<string, string>)['Content-Type']).toBe('application/json');
   });
 
-  it('sends the raw alert list as JSON — unchanged whether the target is ntfy or n8n', () => {
+  it('sends the raw alert list as JSON — the n8n relay workflow reshapes it', () => {
     expect((cfg.format as string).trim()).toBe('{{ .|toJson }}');
   });
 

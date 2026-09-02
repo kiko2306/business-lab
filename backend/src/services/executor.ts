@@ -20,6 +20,7 @@ import { checkServiceImages, recordImageCheck } from './imageUpdates';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
+import { applyN8nWorkflows } from './n8nWorkflows';
 import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getServiceStatus } from './status';
@@ -138,6 +139,9 @@ async function composeUpWithManagedConfig(
   // stock demo bookmarks before it comes up (§114). services.yaml is filled
   // in by regenerateHomepageServices once the start completes.
   await applyHomepageConfig(serviceName, appDir);
+  // n8n: render the dashboard-managed workflow files before the app comes up,
+  // so the n8n-workflows-init container imports the current version (§118.3).
+  await applyN8nWorkflows(serviceName, appDir);
 
   const recreate = forceRecreate ? ' --force-recreate' : '';
   const command = `docker compose -p ${projectName} -f ${composeFile} up -d${recreate}`;

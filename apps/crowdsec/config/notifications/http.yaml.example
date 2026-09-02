@@ -6,14 +6,14 @@
 #
 # It configures CrowdSec's built-in notification-http plugin. profiles.yaml
 # references it as `http_default`. The body is the raw models.Alert list as
-# JSON — the same shape whether the target is ntfy directly (today) or an n8n
-# webhook that dedupes/formats before ntfy (§118.4); only `url` changes.
+# JSON; the n8n relay workflow reshapes it before ntfy.
 #
-# Today `url` points at the local ntfy instance via
-# `host.docker.internal:<NTFY_PORT>` (the crowdsec service has
-# host.docker.internal:host-gateway as an extra_host) and the shared ntfy
-# alert topic from Settings → "ntfy alerts", so a scanner hit lands as a phone
-# push for anyone subscribed to that topic.
+# `url` points at the n8n relay workflow's webhook via
+# `host.docker.internal:<N8N_PORT>` (the crowdsec service has
+# host.docker.internal:host-gateway as an extra_host). That workflow
+# (services/n8nWorkflows.ts, provisioned by n8n-workflows-init) formats the
+# alert and forwards it to the shared ntfy topic from Settings → "ntfy
+# alerts", so a scanner hit lands as a phone push for anyone subscribed.
 
 type: http
 name: http_default
@@ -27,7 +27,7 @@ timeout: 10s
 format: |
   {{ .|toJson }}
 
-url: "http://host.docker.internal:10290/homelab-alerts"
+url: "http://host.docker.internal:10240/webhook/crowdsec-alert"
 method: POST
 headers:
   Content-Type: application/json
