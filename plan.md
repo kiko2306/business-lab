@@ -11389,3 +11389,30 @@ path. Not decided here.
 Done now: README TODO item under Security (§105), and `docs/user-guide.md` /
 `docs/recovery-troubleshooting.md` corrected to state the gap and give the
 Postgres-direct fallback rather than describing a procedure that 403s.
+
+## 106. §75.4 closed: the BoltDB/H2 backup gap is documented as accepted risk
+
+Decision (asked): document rather than build stop-copy-start snapshotting for
+`file-browser` and `stirling-pdf`. `portainer`, the third app in the original
+item, was dropped (§81.1a), so this is the whole of §75.4.
+
+What each embedded database actually holds, which is why best-effort is
+acceptable:
+
+- **File Browser** — `apps/file-browser/data/database/filebrowser.db` (BoltDB,
+  64 KB): users, share links, UI settings. The served files are on separate
+  mounts (`data/files/`, the host home dir) and back up normally. A bad restore
+  → delete the file, restart, image recreates it with `admin`/`admin`, re-add
+  users/shares.
+- **Stirling-PDF** — `apps/stirling-pdf/data/configs/stirling-pdf-DB-*.mv.db`
+  (H2): nothing at the default `SECURITY_ENABLELOGIN=false` (stateless PDF
+  processing); only user accounts + API keys when login is on. `settings.yml`,
+  pipelines, custom files and tessdata are plain files and copy consistently.
+  The version-stamped `.mv.db` filename would be stale across an app upgrade
+  anyway.
+
+`findSqliteFiles` already refuses both by header (test in `appDumps.test.ts`),
+so they are uncovered, not mis-snapshotted. Written up in
+`docs/recovery-troubleshooting.md` (new "Apps without a consistent database
+snapshot" subsection, with the stop-copy-start workaround for anyone who wants
+a clean copy) and a pointer line in `docs/user-guide.md`. No code change.

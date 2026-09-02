@@ -149,11 +149,6 @@ it is done — not ticked off and left behind. Section references point at
       exposure, harder: the database is inside the documentserver container
       rather than a separate compose service, so `backup:` as it stands cannot
       reach it.
-- [ ] **Two apps have no consistent backup** (§75.4) — `file-browser` and
-      `stirling-pdf` (BoltDB/H2, 0 dump files each). Their live DB files are
-      copied raw and can restore corrupt. Either snapshot them
-      stop-copy-start, or record the accepted risk in `docs/`. (`portainer`
-      was the third and has been dropped, §81.1a.)
 - [ ] **Prove a non-Drive destination** — `disk`/`SMB`/`NFS` are built and never
       exercised.
 - [ ] **Prove a Postgres/MySQL restore** — only SQLite has been round-tripped.

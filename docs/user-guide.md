@@ -31,6 +31,10 @@
   every app database, then Duplicati) — use it to check a destination you have
   just changed rather than waiting for the next scheduled run.
 - Restore when needed.
+- File Browser and Stirling-PDF embed a database (BoltDB / H2) that is copied
+  live, not snapshotted, so it can restore corrupt — an accepted risk because
+  both hold little that isn't quickly rebuilt. See
+  `docs/recovery-troubleshooting.md`.
 - Recovery mode (emergency admin-password reset) is API-only and gated to
   localhost. On this containerized deployment a request from the host does not
   count as localhost, so there is currently no sanctioned way to use it on a
