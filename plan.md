@@ -11416,3 +11416,42 @@ so they are uncovered, not mis-snapshotted. Written up in
 `docs/recovery-troubleshooting.md` (new "Apps without a consistent database
 snapshot" subsection, with the stop-copy-start workaround for anyone who wants
 a clean copy) and a pointer line in `docs/user-guide.md`. No code change.
+
+## 107. §84.5 licence due diligence — done, and the model defuses most of it
+
+`docs/licences.md`: every registry app and every infra image against the one
+commercial question. Framed against the model the user stated mid-task — **the
+software is not sold; Business Lab sells setup, maintenance and hardware; the
+client owns and operates the box for their own internal use.**
+
+That model is the easy case. Under it, unmodified FOSS run for internal use
+carries no obligation beyond what upstream already publishes, and AGPL's
+network clause never fires (it needs modify-*and*-serve). What is left:
+
+- **n8n — Sustainable Use License (fair-code).** Hosting n8n *for* clients as a
+  commercial service is disallowed; a client-operated instance for their own
+  workflows is fine, and consulting/support is explicitly permitted. Condition:
+  keep it one-box-one-client, never a shared multi-tenant n8n.
+- **OnlyOffice — AGPL-3.0 + branding.** Must keep the ONLYOFFICE name and the
+  "original developer" About notice; no white-labeling the editor. Old
+  20-connection cap removed in Docs 9.4, moot at ≤15 seats.
+- **redis:7-alpine — now RSALv2/SSPL** (7.4+), source-available, not FOSS.
+  Internal use is fine but avoidable: switch Paperless to Valkey (BSD-3,
+  already run by Immich) or pin `redis:7.2-alpine`. New README item.
+- **WAHA — Apache-2.0 licence, but automating WhatsApp Web breaches Meta ToS.**
+  Business risk (number ban), documented as client-accepted, not warranted.
+- **Speedtest-tracker** wraps Ookla's Speedtest CLI (own EULA). Minor; or
+  LibreSpeed.
+- **Stirling-PDF** MIT core (since v1.0.0); `proprietary/` features (SSO, audit)
+  are paid — don't enable/ship those.
+- **This repo has no LICENSE** — public repo defaults to all-rights-reserved.
+  New README item; the choice is a commercial call.
+
+Duplicati is MIT now (was LGPL). Pi-hole EUPL-1.2. The AGPL cluster (Nextcloud,
+Immich, Vaultwarden, Vikunja, NocoDB, Mealie, Homebox) is all clean unmodified.
+
+**Answer to the README "blocks pricing" framing: it doesn't, under this model.**
+The ⚠️ items are operating conditions, not showstoppers — listed at the foot of
+`docs/licences.md`. Kept in-repo (asked) as factual compliance reference, like
+the operator runbooks in §84.4; §84.6's "collateral stays out" covers the sales
+deck and client scenarios, not this.

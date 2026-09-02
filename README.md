@@ -12,6 +12,7 @@ Business Lab (repository still `homelab-management`, see §84.2) is a Dockerized
 - Deployment guide: [/docs/deployment-guide.md](/docs/deployment-guide.md)
 - API reference (OpenAPI): [/docs/openapi.yaml](/docs/openapi.yaml)
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
+- Licence due diligence (every image vs the resale model): [/docs/licences.md](/docs/licences.md)
 - User guide: [/docs/user-guide.md](/docs/user-guide.md)
 - Development guide: [/docs/development-guide.md](/docs/development-guide.md)
 - SSH key access: [/docs/ssh-keys.md](/docs/ssh-keys.md)
@@ -193,8 +194,14 @@ it is done — not ticked off and left behind. Section references point at
       Artifact, not in this repo** (§84.6).
 - [ ] **Customer journey / workflows** (§84.4) — scenarios showing why each app
       earns its place. **As an Artifact** (§84.6).
-- [ ] **Licence due diligence** (§84.5) — every registry app against
-      redistribution for profit. Blocks pricing.
+- [ ] **Pick a licence for this repo** (§107) — there is no `LICENSE` file, so
+      the public repo is "all rights reserved" and contributions have no legal
+      basis. Fell out of the licence due diligence; the choice (AGPL to match
+      the copyleft apps it bundles, permissive, or source-available) is a
+      commercial call.
+- [ ] **Move Paperless off `redis:7-alpine`** (§107) — that tag is now
+      RSALv2/SSPL (source-available, not FOSS). Swap in Valkey (BSD-3, already
+      used by the Immich stack) or pin `redis:7.2-alpine`.
 - [ ] **Per-client provisioning** (§84.5, §84.7) — one host is one deployment
       today; turnkey boxes need it repeatable per client. The list is concrete:
       their domain, their Cloudflare account and API token, their tunnel, their
