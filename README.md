@@ -295,6 +295,12 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Apps and integrations
 
+- [ ] **Explore a small local LLM for text cleanup and JSON parsing** — check
+      whether a very small model (something llama.cpp-class, CPU-viable on
+      this host) is worth adding for jobs like tidying user-facing text or
+      parsing/repairing JSON from another app's output, without depending on
+      an external API key. Scope: which jobs actually need it, model size vs.
+      quality tradeoff, and how it'd be packaged (its own compose service?).
 - [ ] **Smarter Mealie "recipe from URL"** (§123.1) — the `recipe-scrapers`
       importer is poor on blogs without schema.org markup. Mealie 2.x has an
       `OPENAI_*` integration for AI-assisted parsing (incl. an
