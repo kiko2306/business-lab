@@ -35,7 +35,6 @@ once and never displayed again; rotate them there if you need a new one.
 | **Duplicati** | — | `DUPLICATI_WEB_PASSWORD` (generated) |
 | **WAHA** | dashboard user | `WAHA_DASHBOARD_PASSWORD`, `WAHA_SWAGGER_PASSWORD`, `WAHA_API_KEY` (all generated) |
 | **Vaultwarden** | — | `VAULTWARDEN_ADMIN_TOKEN` (generated, hidden) — for `/admin` only; normal accounts are self-registered |
-| **Portainer** | you choose at first visit | Protected by a **setup token** the dashboard manages — Portainer locks itself if left unclaimed too long |
 
 ## Wizard — you create the account
 

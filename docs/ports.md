@@ -74,7 +74,7 @@ hand edit can leave its copy disagreeing with the app's.
 `10250`–`10253` netbird (management, dashboard, signal, relay) ·
 `10260` nextcloud · `10270` npm-admin · `10280` nocodb · `10290` ntfy ·
 `10300` pantry · `10310` paperless · `10320` pihole-web ·
-`10330`/`10331` portainer · `10340` price-compare · `10350` speedtest ·
+`10340` price-compare · `10350` speedtest ·
 `10360` stirling-pdf · `10370` uptime-kuma · `10380` vaultwarden ·
 `10390` vikunja · `10400` waha · `10410` wetty
 
@@ -123,7 +123,7 @@ every hostname breaks at once:
 
 ### Retired ports
 
-`10170` (grocy) is retired, not free. A removed app can still have an NPM proxy
+`10170` (grocy) and `10330`/`10331` (portainer) are retired, not free. A removed app can still have an NPM proxy
 host and a Cloudflare hostname pointing at its old port for as long as it takes
 the reconciler to clear them, and handing that number to a different app would
 route the old hostname at the new app in the meantime. New apps take the next

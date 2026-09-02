@@ -149,7 +149,7 @@ it is done — not ticked off and left behind. Section references point at
       `stirling-pdf` (BoltDB/H2, 0 dump files each). Their live DB files are
       copied raw and can restore corrupt. Either snapshot them
       stop-copy-start, or record the accepted risk in `docs/`. (`portainer`
-      was the third and is being dropped, §81.1.)
+      was the third and has been dropped, §81.1a.)
 - [ ] **"Back up now" button** (§74.6) — must call `runAppDataBackup`, never
       `runBackupJobNow`, or each manual backup is a generation stale.
 - [ ] **`backup_target_folder` is blank** — falls back to the `homelab-backups`
@@ -239,9 +239,11 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Roster changes (§81)
 
-- [ ] **Drop Portainer** (§81.1) — overlaps the dashboard, unhealthy for days,
-      and the biggest privileged-socket surface in the stack. Registry entry,
-      `apps/portainer/`, both docs; ports 10330/10331 retired.
+- [ ] **Decide the fate of `setupToken`** (§81.1a) — Portainer was its only
+      user, so `services/setupToken.ts`, its routes, `setupTokenSupported` on
+      ServiceStatus and the dashboard UI for it are now dead code. Either find
+      it a second user or remove the lot; do not leave it as furniture.
+
 - [ ] **File Browser: mount the home directory** (§81.2) — same treatment as
       code-server in §78, same blast radius, same `*_HOME` knob to narrow it.
 - [ ] **OnlyOffice Document Server** (§81.4) — app + generated `JWT_SECRET`,

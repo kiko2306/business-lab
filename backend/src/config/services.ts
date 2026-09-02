@@ -399,30 +399,6 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       url: ['MEALIE_BASE_URL'],
     },
   },
-  'portainer': {
-    name: 'portainer',
-    label: 'Portainer',
-    description: 'Docker container management UI',
-    icon: 'container',
-    category: 'Monitoring & Management',
-    composePath: 'apps/portainer/docker-compose.yml',
-    // Portainer publishes both 9000 (HTTP) and 9443 (its own TLS listener).
-    // The HTTP one is what belongs behind NPM — proxying plain HTTP at 9443
-    // would just garble a TLS handshake. It happens to be declared first, so
-    // "first port in the file" already picks it, but pinning it removes the
-    // dependency on that ordering: reorder the two lines and exposure would
-    // silently move to the TLS port. Same trap that pointed netbird-vpn at
-    // signal (see the comment on netbird-vpn above).
-    exposurePortEnvVar: 'PORTAINER_HTTP_PORT',
-    healthCheck: {
-      enabled: false,
-    },
-    // Portainer prints a one-time initial-admin setup token to its logs on
-    // first start (`setup_token=<value>`), valid for 5 minutes.
-    setupToken: {
-      logPattern: 'setup_token=(\\S+)',
-    },
-  },
   'vaultwarden': {
     // Email comes from the dashboard's global mail settings rather than being
     // configured per app. SMTP_SECURITY needs the map: Vaultwarden's

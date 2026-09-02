@@ -9977,3 +9977,30 @@ roof over two server rack units — the roof is precisely the part that says
 as a house, and inventing a new one is not a call to make unasked.
 
 Verified: the running frontend serves `<title>Business Lab</title>`.
+
+### 81.1a Done: Portainer dropped
+
+Registry entry, `apps/portainer/`, its rows in `docs/app-credentials.md`,
+`docs/ports.md` and `docs/raspberry-pi.md`, and the container. Ports
+`10330`/`10331` are retired rather than freed, alongside grocy's `10170`.
+
+Exposure cleaned itself up: the startup reconciler from §81 logged
+`Removing exposure for a service that is no longer in the registry` and
+`Deprovisioned exposure for portainer.tx-home-utils.com`, and the
+`service_exposure` row is gone — NPM proxy host and Cloudflare DNS record with
+it. (A first check said the row was still there; that was a race, the
+deprovision takes a few seconds of API calls.)
+
+**What the removal exposed: a feature with no users.** `setupToken` — reading
+an app's first-run token out of its container logs — was declared by exactly
+one app, and it was Portainer. Nothing in the registry uses it now, so
+`services/setupToken.ts`, its routes, `setupTokenSupported` on ServiceStatus
+and the dashboard's UI for it are all dead code.
+
+Its tests were also written against `portainer` as their fixture and went red
+on the removal. They are about the parsing — ANSI stripping, taking the last
+match when a restart leaves a stale token — not about any particular app, so
+the registry is now mocked and the suite no longer depends on whichever service
+happens to use the feature next. That is the right shape for them regardless of
+what is decided about the feature itself, which is a separate call and now a
+TODO item.
