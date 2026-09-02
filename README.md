@@ -173,8 +173,16 @@ it is done — not ticked off and left behind. Section references point at
       restarting apps the sanctioned way rather than by hand. The smoke-test
       script already expects `SMOKE_USER`/`SMOKE_PASSWORD`, so a dedicated
       account fits what is there.
-- [ ] **Remove /var/lib/docker** (§83.4) — only after a few days of the move
-      holding. Frees ~47 GB on the root LV.
+- [ ] **Move containerd's root too** (§83.6) — the data-root move relocated
+      ~100 MB. This host uses the containerd image store, so the 45 GB lives in
+      `/var/lib/containerd`, not Docker's data-root. Fold it into the existing
+      `DOCKER_DATA_ROOT` block: detect `io.containerd.snapshotter.v1`, stop
+      containerd as well, rsync, set top-level `root` in
+      `/etc/containerd/config.toml`. Moving one root and not the other is the
+      trap that produced this item.
+- [ ] **Remove the old trees** (§83.4, §83.6) — after both moves have held for
+      a few days: `/var/lib/docker` (~100 MB, trivial) and `/var/lib/containerd`
+      (~45 GB, the actual reclaim).
 
 ### Business Lab (§84)
 

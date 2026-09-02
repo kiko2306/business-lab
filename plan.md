@@ -9680,3 +9680,70 @@ inside-the-tree guard tested on three paths; `/home` has 118 GiB free against
 ~47 GB needed, so the preflight passes.
 
 The run itself is the user's — it needs sudo, and this session has no password.
+
+## 83.6 The move worked, and moved 100 MB — this host uses the containerd image store
+
+Ran by the user on 2026-09-02. `docker info` reports `/home/docker`,
+`daemon.json` carries `data-root` alongside the address pools, all 53
+containers came back, and nothing broke. The mechanism is fine.
+
+It also freed nothing, because §83's premise was wrong:
+
+    Storage Driver: overlayfs
+      driver-type: io.containerd.snapshotter.v1
+
+    /var/lib/containerd                                45.1 GB   <- the images
+      io.containerd.snapshotter.v1.overlayfs           34.3 GB
+      io.containerd.content.v1.content                 10.8 GB
+    /home/docker (the new data-root)                   ~100 MB   <- what moved
+      containers, volumes, network, buildkit
+
+Docker on this host uses the **containerd image store**, so image layers and
+snapshots live in **containerd's** root, not Docker's `data-root`. Moving
+`data-root` relocated Docker's own metadata — containers, volumes, networks,
+buildkit — and left the 45 GB exactly where it was. `/` is still 58% full.
+
+### What went wrong in the analysis
+
+`docker system df` reports 47 GB of images and `docker info` reports a data
+root, and I put those two facts together into "there is 47 GB in
+`/var/lib/docker`" without ever measuring that directory. `du` as a non-root
+user silently skipped it, which I noticed and then explained away as "Docker's
+data is in there, unreadable" rather than checking. One `docker run --rm -v
+/:/rootfs:ro alpine du -xh -d 2 /rootfs` would have shown `/var/lib/containerd`
+at 45 GB on day one.
+
+There was also a clue in hand and misread. While building update detection
+(§82.1) the local image ID came back **identical to the RepoDigest** — which is
+containerd-store behaviour; the classic overlay2 store uses the config digest
+for image IDs. It was noted as a curiosity and passed over. It was the
+diagnosis.
+
+### What actually needs moving
+
+containerd's own root, configured in `/etc/containerd/config.toml`, which today
+carries only `disabled_plugins = ["cri"]` and therefore uses the default
+`/var/lib/containerd`. Same shape as the migration already built, one more
+service to stop:
+
+1. `systemctl stop docker.socket docker containerd`
+2. `rsync -aHAX --numeric-ids /var/lib/containerd/ /home/containerd/` —
+   the snapshotter directory is as hard-link-heavy as overlay2 was
+3. top-level `root = "/home/containerd"` in `config.toml`, merged not rewritten
+4. `systemctl start containerd docker`, verify image count and that
+   `docker info` still reports the expected roots
+
+The right change is to fold this into the existing `DOCKER_DATA_ROOT` block
+rather than add a second knob: detect `io.containerd.snapshotter.v1` and move
+both roots under the same opt-in. Someone asking to move "Docker's storage"
+means the bytes, and on a containerd-store host that is both directories.
+Moving only one is precisely the trap this section documents.
+
+### Two things that are already right
+
+- **The health check needs no change.** It measures the filesystem behind the
+  backend container's own root, and that root is a containerd overlayfs
+  snapshot — so it follows the snapshotter, which is where the bytes are. It
+  still reports one row at 98 GiB / 58%, which is the truth.
+- **`data-root` on `/home` is worth keeping.** Volumes and container state now
+  land on the roomy filesystem, which is where they should be.
