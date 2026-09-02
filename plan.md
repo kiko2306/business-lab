@@ -11947,3 +11947,13 @@ design and the least new code, but it's the one that may cost money and needs
 Cloudflare-side setup. #2 avoids the Workers plan for one extra token scope.
 #3 needs no third-party anything but leans on an NPM reload path that doesn't
 exist yet. Split into README items per the option chosen.
+
+### 117.4 Decision — detection-only
+
+@mat chose to leave CrowdSec detection-only for now (2026-09-02). No bouncer,
+no edge enforcement; CrowdSec earns its place as parsed-log visibility +
+alerting over NPM's access logs. The README item is reworded to say so; the
+three build options in §117.2 stand for whenever it is picked back up. The
+`cloudflare-worker-bouncer` service stays in the compose file behind the
+`edge-bouncer` profile (does not start), and `crowdsecConfig.ts` keeps
+rendering its placeholder config — nothing to rip out.

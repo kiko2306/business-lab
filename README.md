@@ -234,18 +234,13 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **The bare domain serves the Home Page** (§111) — an apex variant of
-      `additionalExposures`: exposing the Home Page also provisions
-      `<base-domain>` (proxied apex CNAME, tunnel ingress, NPM host), fully
-      public, and adds the apex to `HOMEPAGE_ALLOWED_HOSTS`. Must be verified
-      against the real stack: both hostnames load, toggle off removes both.
-- [ ] **CrowdSec detects but nothing enforces** (§110.4) — the log-path typo
-      that meant CrowdSec parsed nothing for a week is fixed, and it now reads
-      real client IPs from NPM's logs. But the `cloudflare-worker-bouncer` is
-      still behind the `edge-bouncer` compose profile and does not start (it
-      crash-loops on `cfut_`-prefixed Cloudflare API tokens). Until it runs, a
-      detection is a log line, not a ban. Either get a classic-format token
-      working, or find a bouncer that accepts `cfut_`.
+- [ ] **CrowdSec edge enforcement is deferred — detection-only for now**
+      (§117) — CrowdSec parses NPM's logs and makes ban decisions, but nothing
+      acts on them: the `cloudflare-worker-bouncer` needs a Workers-scoped
+      Cloudflare token separate from the tunnel token (and likely the paid
+      Workers plan). Decided (2026-09-02) to leave it detection-only and keep
+      CrowdSec for parsed-log visibility. §117.2 has the three build options
+      if this is revisited.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from
