@@ -7,6 +7,7 @@ import { extractErrorMessage } from '../../core/api';
 import { TotpStatus } from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
+import { PanelComponent } from '../../components/panel/panel.component';
 
 // Which panel is on screen. 'enrolling' and 'recovery-codes' are transient and
 // only reachable by walking through the flow — never on a fresh load.
@@ -15,7 +16,7 @@ type View = 'loading' | 'status' | 'enrolling' | 'recovery-codes';
 @Component({
   selector: 'app-account',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule],
+  imports: [CommonModule, ReactiveFormsModule, PanelComponent],
   templateUrl: './account.component.html',
   styleUrl: './account.component.css',
 })

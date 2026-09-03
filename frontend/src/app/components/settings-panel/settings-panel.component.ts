@@ -22,11 +22,12 @@ import {
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
+import { PanelComponent } from '../panel/panel.component';
 
 @Component({
   selector: 'app-settings-panel',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent],
   templateUrl: './settings-panel.component.html',
   styleUrl: './settings-panel.component.css'
 })

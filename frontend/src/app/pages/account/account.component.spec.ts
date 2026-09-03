@@ -25,6 +25,10 @@ describe('AccountComponent', () => {
   };
 
   beforeEach(async () => {
+    // SectionCollapseService persists panel state to localStorage; start each
+    // test with the panel at its collapsed-by-default state.
+    localStorage.clear();
+
     operations = jasmine.createSpyObj('OperationsService', [
       'getTotpStatus',
       'setupTotp',
@@ -47,8 +51,19 @@ describe('AccountComponent', () => {
     component = fixture.componentInstance;
   });
 
+  // The 2FA content lives inside a collapsible <app-panel> that starts
+  // collapsed, so DOM assertions need the panel opened first.
+  function openPanel(): void {
+    const toggle = (fixture.nativeElement as HTMLElement).querySelector(
+      '.panel__toggle',
+    ) as HTMLButtonElement | null;
+    toggle?.click();
+    fixture.detectChanges();
+  }
+
   it('loads status on init and shows the "set up" state when 2FA is off', () => {
     fixture.detectChanges();
+    openPanel();
 
     expect(operations.getTotpStatus).toHaveBeenCalled();
     expect(component['view']).toBe('status');
@@ -59,6 +74,7 @@ describe('AccountComponent', () => {
   it('renders the QR and secret after starting enrolment', () => {
     operations.setupTotp.and.returnValue(of(setupResponse));
     fixture.detectChanges();
+    openPanel();
 
     component.beginSetup();
     fixture.detectChanges();
@@ -78,6 +94,7 @@ describe('AccountComponent', () => {
     };
     operations.activateTotp.and.returnValue(of(activated));
     fixture.detectChanges();
+    openPanel();
     component.beginSetup();
 
     component['activateForm'].setValue({ code: '123456' });
@@ -106,6 +123,7 @@ describe('AccountComponent', () => {
   it('shows the disable form and the enrolled date when 2FA is on', () => {
     operations.getTotpStatus.and.returnValue(of(enabledStatus));
     fixture.detectChanges();
+    openPanel();
 
     const host = fixture.nativeElement as HTMLElement;
     expect(host.textContent).toContain('recovery codes left');

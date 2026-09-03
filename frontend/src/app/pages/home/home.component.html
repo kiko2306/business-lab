@@ -14,7 +14,9 @@
       <div class="card-body">
         <h2 class="h5 mb-1">{{ tile.title }}</h2>
         <p class="text-body-secondary small mb-0">{{ tile.description }}</p>
-        <span *ngIf="tile.pending" class="badge text-bg-light border mt-2">Opens in Apps</span>
+        <span *ngIf="tile.pending" class="badge text-bg-secondary border">
+          Opens in {{ tile.link === '/apps' ? 'Apps' : 'Dashboard' }}
+        </span>
       </div>
     </a>
   </div>

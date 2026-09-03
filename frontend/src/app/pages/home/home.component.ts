@@ -18,10 +18,10 @@ interface MenuTile {
 }
 
 /**
- * The post-login landing view (§131.1 slice 1): a menu of the dashboard's
- * areas. Several areas still live inside the single `/dashboard` page, so
- * their tiles deep-link into it with a fragment for now; each is repointed
- * when its area gets its own route.
+ * The post-login landing view (§131.1): a menu of the dashboard's areas. Apps
+ * has its own route; the remaining areas still live in the single `/dashboard`
+ * page, so their tiles deep-link into it with a fragment for now and carry an
+ * "Opens in …" badge. Each is repointed when its area gets its own route.
  */
 @Component({
   selector: 'app-home',
@@ -35,14 +35,12 @@ export class HomeComponent {
     {
       title: 'Apps',
       description: 'The service registry — start, stop, and configure every managed app.',
-      link: '/dashboard',
-      fragment: 'apps',
+      link: '/apps',
     },
     {
       title: 'Exposure & networking',
       description: 'Public exposure through Cloudflare and Nginx Proxy Manager, per app.',
-      link: '/dashboard',
-      fragment: 'apps',
+      link: '/apps',
       pending: true,
     },
     {
@@ -55,8 +53,7 @@ export class HomeComponent {
     {
       title: 'Updates & version control',
       description: 'Per-app image updates and the deployed Business Lab version.',
-      link: '/dashboard',
-      fragment: 'apps',
+      link: '/apps',
       pending: true,
     },
     {

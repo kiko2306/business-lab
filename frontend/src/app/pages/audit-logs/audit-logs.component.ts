@@ -5,11 +5,12 @@ import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
 import { AuditLogEntry } from '../../core/models';
 import { extractErrorMessage } from '../../core/api';
+import { PanelComponent } from '../../components/panel/panel.component';
 
 @Component({
   selector: 'app-audit-logs',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, PanelComponent],
   templateUrl: './audit-logs.component.html',
   styleUrl: './audit-logs.component.css'
 })

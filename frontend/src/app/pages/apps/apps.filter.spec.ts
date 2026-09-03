@@ -1,4 +1,4 @@
-import { filterServices } from './dashboard.component';
+import { filterServices } from './apps.component';
 import { ServiceStatus } from '../../core/models';
 
 function svc(partial: Partial<ServiceStatus>): ServiceStatus {

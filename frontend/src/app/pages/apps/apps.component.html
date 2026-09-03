@@ -1,0 +1,167 @@
+<main class="apps-page container-fluid py-4">
+  <section class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
+    <div>
+      <h1 class="h3 mb-1">Apps</h1>
+      <p class="text-body-secondary mb-0">
+        Monitor, start, and stop the services running across your homelab.
+      </p>
+    </div>
+    <button type="button" class="btn btn-outline-primary align-self-start" (click)="refresh()" [disabled]="serviceState.refreshing$ | async">
+      <span *ngIf="serviceState.refreshing$ | async" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+      Refresh status
+    </button>
+  </section>
+
+  <section class="summary-grid mb-3" *ngIf="serviceState.summary$ | async as summary">
+    <div class="summary-card">
+      <span class="summary-label">Total</span>
+      <strong>{{ summary.total }}</strong>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label text-success">Running</span>
+      <strong>{{ summary.running }}</strong>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label text-secondary">Stopped</span>
+      <strong>{{ summary.stopped }}</strong>
+    </div>
+    <div class="summary-card">
+      <span class="summary-label text-danger">Issues</span>
+      <strong>{{ summary.error }}</strong>
+    </div>
+  </section>
+
+  <section class="mb-4 small text-body-secondary d-flex align-items-center gap-2" *ngIf="serviceState.lastUpdated$ | async as lastUpdated">
+    <span class="badge text-bg-secondary border text-capitalize">{{ serviceState.connectionStatus$ | async }}</span>
+    Last refresh {{ lastUpdated | date:'dd/MM/yyyy, HH:mm' }}
+  </section>
+
+  <app-panel
+    anchor="running"
+    key="running"
+    title="Running apps"
+    subtitle="What is up right now — with its public URL and published host ports"
+  >
+    <ng-container *ngIf="serviceState.services$ | async as services; else loadingState">
+      <ng-container *ngIf="groupRunningPortsByCategory(services) as portGroups">
+        <ng-container *ngIf="portGroups.length; else noPortsState">
+          <div class="service-group mb-3" *ngFor="let group of portGroups; trackBy: trackByCategory">
+            <h3 class="h6 text-body-secondary text-uppercase mb-2">
+              {{ group.category }}
+              <span class="badge rounded-pill text-bg-secondary border fw-normal">{{ group.rows.length }}</span>
+            </h3>
+            <div class="table-responsive table-stack-wrap">
+              <table class="table table-sm table-striped table-stack align-middle mb-0">
+                <thead>
+                  <tr>
+                    <th scope="col">App</th>
+                    <th scope="col">URL</th>
+                    <th scope="col">Ports</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr *ngFor="let row of group.rows; trackBy: trackByPortRow">
+                    <td data-label="App">{{ row.label }}</td>
+                    <td data-label="URL">
+                      <a *ngIf="row.url; else noUrl" [href]="row.url" target="_blank" rel="noopener noreferrer">{{ row.url }}</a>
+                      <ng-template #noUrl><span class="text-body-secondary">&mdash;</span></ng-template>
+                    </td>
+                    <td data-label="Ports">
+                      <div class="d-flex flex-wrap gap-1">
+                        <span class="badge text-bg-secondary border" *ngFor="let port of row.ports">
+                          {{ port.hostPort }} &rarr; {{ port.containerPort }}/{{ port.protocol }}
+                        </span>
+                      </div>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </ng-container>
+        <ng-template #noPortsState>
+          <p class="text-body-secondary mb-0">No running services currently publish a host port.</p>
+        </ng-template>
+      </ng-container>
+    </ng-container>
+  </app-panel>
+
+  <app-panel
+    anchor="apps"
+    key="apps"
+    title="All apps"
+    subtitle="Every managed app — start, stop, and configure them here"
+  >
+    <ng-container *ngIf="serviceState.services$ | async as services; else loadingState">
+      <ng-container *ngIf="services.length; else emptyState">
+        <div class="app-search input-group mb-4">
+          <span class="input-group-text" aria-hidden="true">
+            <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+              <circle cx="7" cy="7" r="4.5" stroke="currentColor" stroke-width="1.6" />
+              <path d="M10.5 10.5L14 14" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" />
+            </svg>
+          </span>
+          <input
+            type="search"
+            class="form-control"
+            placeholder="Search apps by name, description or category…"
+            aria-label="Search apps"
+            [(ngModel)]="appFilter"
+            maxlength="64"
+          />
+          <button
+            *ngIf="appFilter"
+            type="button"
+            class="btn btn-outline-secondary"
+            (click)="clearAppFilter()"
+          >
+            Clear
+          </button>
+        </div>
+
+        <ng-container *ngIf="filterServices(services, appFilter) as matches">
+          <p *ngIf="!matches.length" class="text-body-secondary">
+            No apps match “{{ appFilter }}”.
+          </p>
+          <div class="service-group mb-4" *ngFor="let group of groupServicesByCategory(matches); trackBy: trackByCategory">
+            <h3 class="h6 text-body-secondary text-uppercase mb-2">
+              <button
+                type="button"
+                class="section-toggle"
+                [class.collapsed]="isAppGroupCollapsed('apps:' + group.category)"
+                [attr.aria-expanded]="!isAppGroupCollapsed('apps:' + group.category)"
+                (click)="toggleAppGroup('apps:' + group.category)"
+              >
+                <svg class="chevron" width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                  <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+                </svg>
+                <span>{{ group.category }}</span>
+                <span class="badge rounded-pill text-bg-secondary border fw-normal">{{ group.services.length }}</span>
+              </button>
+            </h3>
+            <div class="service-rows" *ngIf="!isAppGroupCollapsed('apps:' + group.category)">
+              <app-service-card
+                *ngFor="let service of group.services; trackBy: trackByService"
+                [service]="service"
+                [allServices]="services"
+                [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
+                (actionRequested)="handleAction(service.name, $event)"
+              ></app-service-card>
+            </div>
+          </div>
+        </ng-container>
+      </ng-container>
+    </ng-container>
+  </app-panel>
+</main>
+
+<ng-template #loadingState>
+  <div class="d-flex align-items-center gap-3 text-body-secondary">
+    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+    <span>Loading services…</span>
+  </div>
+</ng-template>
+
+<ng-template #emptyState>
+  <p class="text-body-secondary mb-0">No services were returned by the API.</p>
+</ng-template>

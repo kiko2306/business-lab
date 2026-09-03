@@ -1,5 +1,45 @@
 @import 'bootstrap/dist/css/bootstrap.min.css';
 
+/* ---------------------------------------------------------------------------
+   Theme tokens.
+
+   The app runs Bootstrap 5.3's dark mode (`data-bs-theme="dark"` on <html>).
+   Bootstrap recolours its own components from that; the blocks below (a) point
+   its theme variables at our palette rather than its stock greys, and (b) add
+   two semantic tokens — `--app-canvas` (the page behind the cards) and
+   `--app-surface` (a card/header surface lifted off it) — for the handful of
+   places component CSS paints a background itself. Keep both light and dark
+   definitions in step when either changes.
+   --------------------------------------------------------------------------- */
+:root {
+  --app-canvas: #f4f7fb;
+  --app-surface: #ffffff;
+  --app-surface-raised: #ffffff;
+}
+
+[data-bs-theme='dark'] {
+  /* One card colour across the whole app. The canvas sits well below it so
+     cards read as raised (border + shadow do the rest); modals use the same
+     colour, lifted only by their backdrop. */
+  --app-canvas: #0a0d12;
+  --app-surface: #1b2230;
+  --app-surface-raised: #1b2230;
+
+  --bs-body-bg: #0a0d12;
+  --bs-body-color: #e6e9ef;
+  --bs-emphasis-color: #ffffff;
+  --bs-secondary-color: #9aa4b4;
+  --bs-tertiary-bg: #232b3a;
+  --bs-secondary-bg: #2c3648;
+  --bs-border-color: #394456;
+  --bs-border-color-translucent: rgba(255, 255, 255, 0.12);
+  --bs-card-bg: #1b2230;
+  --bs-card-cap-bg: #1b2230;
+  --bs-card-border-color: #394456;
+
+  color-scheme: dark;
+}
+
 * {
   box-sizing: border-box;
 }
@@ -7,8 +47,8 @@
 body {
   margin: 0;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
-  background: #f4f7fb;
-  color: #1f2937;
+  background: var(--app-canvas);
+  color: var(--bs-body-color);
 }
 
 a {
@@ -17,6 +57,10 @@ a {
 
 .card {
   border-radius: 1rem;
+  /* A close contact shadow plus a soft wide one — cards sit above the page
+     rather than being drawn flat on it. Tuned dark; `rgba(0,0,0,…)` reads on
+     both the light and the dark canvas. */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 22px 45px -22px rgba(0, 0, 0, 0.65);
 }
 
 .auth-page {
@@ -38,6 +82,94 @@ a {
   font-size: 0.85rem;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #0d6efd;
+  color: var(--bs-primary-text-emphasis, #0d6efd);
   font-weight: 700;
+}
+
+/* ---------------------------------------------------------------------------
+   Responsive tables — collapse to a card per row on phones.
+
+   A wide `.table` inside `.table-responsive` scrolls sideways on a narrow
+   screen, which hides columns and feels broken on a phone. Add `.table-stack`
+   to the <table> (and `.table-stack-wrap` to its `.table-responsive` wrapper)
+   and, below the md breakpoint, each row becomes a block: the header is
+   removed and every cell sits on its own line, labelled from its
+   `data-label`. Every <td> needs a `data-label="Column name"`; a cell without
+   one (a colspan editor row, an empty-state message) spans the full width
+   with no label. Above the breakpoint the table is untouched.
+   --------------------------------------------------------------------------- */
+@media (max-width: 767.98px) {
+  .table-stack-wrap {
+    overflow-x: visible;
+  }
+
+  .table-stack {
+    border: 0;
+  }
+
+  /* Keep the header for assistive tech, take it out of the visual flow. */
+  .table-stack thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    padding: 0;
+    margin: -1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+    border: 0;
+  }
+
+  .table-stack tbody tr {
+    display: block;
+    padding: 0.6rem 0.15rem;
+    border-bottom: 1px solid var(--bs-border-color);
+  }
+
+  .table-stack tbody tr:last-child {
+    border-bottom: 0;
+  }
+
+  .table-stack tbody td {
+    /* neutralise Bootstrap's .table-striped per-cell background shadow */
+    --bs-table-bg-type: transparent;
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: 0.1rem 0.75rem;
+    align-items: start;
+    padding: 0.2rem 0;
+    border: 0;
+    /* beat per-page `.table td { white-space: nowrap }` and `.text-end` */
+    white-space: normal !important;
+    text-align: left !important;
+  }
+
+  .table-stack tbody td::before {
+    content: attr(data-label);
+    font-size: 0.7rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--bs-secondary-color);
+  }
+
+  /* Cells with no column (colspan rows, inline editors) go full width. */
+  .table-stack tbody td:not([data-label]),
+  .table-stack tbody td[data-label=''] {
+    display: block;
+  }
+
+  .table-stack tbody td:not([data-label])::before,
+  .table-stack tbody td[data-label='']::before {
+    content: none;
+  }
+
+  .table-stack tbody td a {
+    word-break: break-word;
+  }
+
+  /* Action clusters inside a stacked cell wrap instead of overflowing. */
+  .table-stack tbody td .btn-group {
+    flex-wrap: wrap;
+  }
 }

@@ -1,16 +1,54 @@
+/* A fixed 3-up grid on desktop: there are 9 tiles, so 3 columns fill exactly
+   three rows with no stretched straggler on the last row. Steps down to 2-up,
+   then 1-up on a phone. */
 .menu-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.5rem;
+}
+
+@media (max-width: 991.98px) {
+  .menu-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 575.98px) {
+  .menu-grid {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
 }
 
 .menu-tile {
-  transition: border-color 0.12s ease, box-shadow 0.12s ease, transform 0.12s ease;
+  min-height: 11rem;
+  transition: border-color 0.12s ease, box-shadow 0.14s ease, transform 0.14s ease;
+}
+
+.menu-tile .card-body {
+  display: flex;
+  flex-direction: column;
+  padding: 1.75rem;
+}
+
+.menu-tile .card-body h2 {
+  font-size: 1.35rem;
+}
+
+.menu-tile .card-body p {
+  font-size: 0.95rem;
+}
+
+/* Push the "Opens in …" badge to the bottom so tiles of unequal text length
+   still line their footers up. */
+.menu-tile .badge {
+  margin-top: auto;
+  align-self: flex-start;
 }
 
 .menu-tile:hover,
 .menu-tile:focus-visible {
   border-color: var(--bs-primary, #0d6efd);
-  box-shadow: 0 0.25rem 0.75rem rgba(0, 0, 0, 0.08);
-  transform: translateY(-1px);
+  box-shadow: 0 8px 18px rgba(2, 6, 23, 0.3), 0 34px 60px -24px rgba(2, 6, 23, 0.7);
+  transform: translateY(-3px);
 }

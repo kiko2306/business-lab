@@ -1,10 +1,10 @@
-import { AsyncPipe, CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit, inject } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { ServiceStateService } from '../../core/service-state.service';
-import { ServiceCardComponent } from '../../components/service-card/service-card.component';
 import { SettingsPanelComponent } from '../../components/settings-panel/settings-panel.component';
+import { PanelComponent } from '../../components/panel/panel.component';
 import { OperationsService } from '../../core/operations.service';
+import { ConfirmService } from '../../core/confirm.service';
 import {
   BackupFile,
   BackupScheduleConfig,
@@ -12,150 +12,28 @@ import {
   DiscoveredHost,
   DiskUsage,
   HealthStatus,
-  ServiceAction,
-  ServiceCategory,
-  ServiceStatus,
 } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
 
-// Fixed display order; anything without a recognized category (or an older
-// cached API response predating this field) falls back to "Other" at the end.
-const CATEGORY_ORDER: ServiceCategory[] = [
-  'Networking & Security',
-  'Monitoring & Management',
-  'Media',
-  'Backup & Storage',
-  'Productivity',
-  'Home Automation',
-  'Development',
-];
-
-// Fixed display order for both the running-apps table and the full apps
-// list, so the same category shows up in the same place in both.
-const CATEGORY_DISPLAY_ORDER: readonly string[] = [...CATEGORY_ORDER, 'Other'];
-
-function orderCategories(present: Iterable<string>): string[] {
-  const seen = new Set(present);
-  return CATEGORY_DISPLAY_ORDER.filter((category) => seen.has(category));
-}
-
-interface ServiceGroup {
-  category: string;
-  services: ServiceStatus[];
-}
-
-interface ServicePortRow {
-  serviceName: string;
-  label: string;
-  url: string | null;
-  ports: ServiceStatus['ports'];
-}
-
-interface ServicePortGroup {
-  category: string;
-  rows: ServicePortRow[];
-}
-
-// One row per running app for the "running apps" table — all of an app's
-// published ports are listed together instead of one row each. The URL is the
-// app's public hostname when it's exposed (no port — Cloudflare/NPM strip that
-// away), otherwise a LAN link to its web-UI port on whatever host is serving
-// this dashboard; either gets the registry's `webPath` appended when the UI
-// isn't at the bare root (e.g. Pi-hole's `/admin`, NPM's admin panel on :81).
-// Rows are grouped by the same category as the full apps list so the two views
-// line up.
-function buildRunningAppUrl(service: ServiceStatus): string | null {
-  const suffix = service.webPath ?? '';
-  if (service.exposedHostname) {
-    return `https://${service.exposedHostname}${suffix}`;
-  }
-  if (service.webPort) {
-    return `http://${window.location.hostname}:${service.webPort}${suffix}`;
-  }
-  return null;
-}
-
-function groupRunningPortsByCategory(services: ServiceStatus[]): ServicePortGroup[] {
-  const byCategory = new Map<string, ServicePortRow[]>();
-  for (const service of services) {
-    if (service.state !== 'running' || !service.ports?.length) {
-      continue;
-    }
-    const category = service.category ?? 'Other';
-    const url = buildRunningAppUrl(service);
-    const row: ServicePortRow = { serviceName: service.name, label: service.label, url, ports: service.ports };
-    const bucket = byCategory.get(category);
-    if (bucket) {
-      bucket.push(row);
-    } else {
-      byCategory.set(category, [row]);
-    }
-  }
-
-  for (const rows of byCategory.values()) {
-    rows.sort((a, b) => a.label.localeCompare(b.label));
-  }
-
-  return orderCategories(byCategory.keys()).map((category) => ({ category, rows: byCategory.get(category)! }));
-}
-
-// Free-text filter for the "All apps" list. Matches a space-separated query
-// against name/label/description/category so "media jelly" narrows the same
-// way typing either word alone would. Empty query returns everything.
-export function filterServices(services: ServiceStatus[], query: string): ServiceStatus[] {
-  const terms = query.toLowerCase().split(/\s+/).filter(Boolean);
-  if (!terms.length) {
-    return services;
-  }
-  return services.filter((service) => {
-    const haystack = [service.name, service.label, service.description, service.category ?? '']
-      .join(' ')
-      .toLowerCase();
-    return terms.every((term) => haystack.includes(term));
-  });
-}
-
-function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
-  const byCategory = new Map<string, ServiceStatus[]>();
-  for (const service of services) {
-    const category = service.category ?? 'Other';
-    const bucket = byCategory.get(category);
-    if (bucket) {
-      bucket.push(service);
-    } else {
-      byCategory.set(category, [service]);
-    }
-  }
-
-  return orderCategories(byCategory.keys()).map((category) => ({ category, services: byCategory.get(category)! }));
-}
-
+/**
+ * What is left of the single-page dashboard after the Apps area moved onto its
+ * own route (§131.1): the stack-wide sections — Settings, Backups, Health
+ * checks, Utils. Each is slated to get its own route in a later slice, at which
+ * point this component goes away.
+ */
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, AsyncPipe, FormsModule, ServiceCardComponent, SettingsPanelComponent],
+  imports: [CommonModule, FormsModule, SettingsPanelComponent, PanelComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
-export class DashboardComponent implements OnInit, OnDestroy {
-  protected readonly serviceState = inject(ServiceStateService);
+export class DashboardComponent implements OnInit {
   private readonly operations = inject(OperationsService);
   private readonly toast = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
 
-  private static readonly COLLAPSE_STORAGE_KEY = 'dashboard.collapsedSections';
-
-  protected readonly groupServicesByCategory = groupServicesByCategory;
-  protected readonly groupRunningPortsByCategory = groupRunningPortsByCategory;
-  protected readonly filterServices = filterServices;
-  // Bound to the "All apps" search box. While it is non-empty every category
-  // is force-expanded (isAppGroupCollapsed), so a match is never hidden inside
-  // a collapsed section.
-  protected appFilter = '';
-  // Explicit user choices only, key -> collapsed. A key that is absent falls
-  // back to defaultCollapsed(), so the defaults can change without stale
-  // localStorage pinning every existing browser to the old behaviour.
-  protected readonly sectionState = new Map<string, boolean>(this.loadSectionState());
   protected backups: BackupFile[] = [];
   protected health: HealthStatus | null = null;
   protected schedule: BackupScheduleConfig = {
@@ -174,106 +52,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected scanningNetwork = false;
 
   ngOnInit(): void {
-    this.serviceState.startPolling();
     this.loadBackups();
     this.loadHealth();
     this.loadSchedule();
     this.loadBackupStatus();
-  }
-
-  ngOnDestroy(): void {
-    this.serviceState.stopPolling();
-  }
-
-  refresh(): void {
-    this.serviceState.refresh();
-  }
-
-  handleAction(serviceName: string, action: ServiceAction): void {
-    if (action === 'start') {
-      this.serviceState.startService(serviceName);
-      return;
-    }
-    if (action === 'update') {
-      this.serviceState.updateService(serviceName);
-      return;
-    }
-
-    this.serviceState.stopService(serviceName);
-  }
-
-  trackByService(_index: number, service: { name: string }): string {
-    return service.name;
-  }
-
-  trackByCategory(_index: number, group: { category: string }): string {
-    return group.category;
-  }
-
-  trackByPortRow(_index: number, row: { serviceName: string }): string {
-    return row.serviceName;
-  }
-
-  /**
-   * Running-apps groups start collapsed: the panel is a per-category summary
-   * of what is up, and four expanded tables push the actual app list off the
-   * first screen. Everything else starts open.
-   */
-  private defaultCollapsed(key: string): boolean {
-    return key.startsWith('running:');
-  }
-
-  isCollapsed(key: string): boolean {
-    return this.sectionState.get(key) ?? this.defaultCollapsed(key);
-  }
-
-  /**
-   * Same as isCollapsed, but an active "All apps" search overrides it —
-   * results must not sit hidden inside a category the user had collapsed.
-   */
-  isAppGroupCollapsed(key: string): boolean {
-    return this.appFilter.trim() ? false : this.isCollapsed(key);
-  }
-
-  clearAppFilter(): void {
-    this.appFilter = '';
-  }
-
-  toggleSection(key: string): void {
-    this.sectionState.set(key, !this.isCollapsed(key));
-    this.persistSectionState();
-  }
-
-  /**
-   * Reads both shapes: the current key -> collapsed object, and the older
-   * array of collapsed keys, which carried no record of what had been
-   * deliberately expanded.
-   */
-  private loadSectionState(): [string, boolean][] {
-    try {
-      const raw = localStorage.getItem(DashboardComponent.COLLAPSE_STORAGE_KEY);
-      const parsed = raw ? JSON.parse(raw) : null;
-      if (Array.isArray(parsed)) {
-        return parsed.filter((entry): entry is string => typeof entry === 'string').map((key) => [key, true]);
-      }
-      if (parsed && typeof parsed === 'object') {
-        return Object.entries(parsed).filter((entry): entry is [string, boolean] => typeof entry[1] === 'boolean');
-      }
-      return [];
-    } catch {
-      return [];
-    }
-  }
-
-  private persistSectionState(): void {
-    try {
-      localStorage.setItem(
-        DashboardComponent.COLLAPSE_STORAGE_KEY,
-        JSON.stringify(Object.fromEntries(this.sectionState)),
-      );
-    } catch {
-      // Non-fatal: collapse state just won't survive a reload.
-    }
   }
 
   loadBackups(): void {
@@ -296,13 +78,22 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   restoreBackup(fileName: string): void {
-    if (!confirm(`Restore backup "${fileName}"? This will overwrite current state.`)) {
-      return;
-    }
-    this.operations.restoreBackup(fileName).subscribe({
-      next: (response) => this.toast.success(response.message),
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to restore backup.')),
-    });
+    void this.confirm
+      .ask({
+        title: 'Restore backup',
+        message: `Restore backup "${fileName}"?\nThis overwrites the current state.`,
+        confirmText: 'Restore',
+        danger: true,
+      })
+      .then((confirmed) => {
+        if (!confirmed) {
+          return;
+        }
+        this.operations.restoreBackup(fileName).subscribe({
+          next: (response) => this.toast.success(response.message),
+          error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to restore backup.')),
+        });
+      });
   }
 
   downloadBackup(fileName: string): void {

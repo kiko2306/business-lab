@@ -12,6 +12,12 @@
 }
 
 /* ---- Header ------------------------------------------------------------- */
+/* A surface lifted off the page canvas, not the flat white it used to be —
+   so it still reads as a bar once the page behind it goes dark. */
+.app-header {
+  background: var(--app-surface);
+}
+
 .app-header__bar {
   display: flex;
   align-items: center;
@@ -33,6 +39,15 @@
   gap: 0.5rem;
   flex-wrap: wrap;
   justify-content: flex-end;
+}
+
+/* Every header button is the same width, whatever its label length, so the
+   nav reads as an even row rather than a ragged one. Sized to fit the
+   longest label ("Users & roles"). */
+.app-header__actions .btn,
+.app-header__logout {
+  min-width: 8rem;
+  text-align: center;
 }
 
 /* Current section stands out from the other nav buttons. */

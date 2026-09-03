@@ -13609,3 +13609,92 @@ Verified: six-case pipe-test matrix (non-commit, clean tree, code-without-bump
 docs-only → allow), then a real blocked `git commit` through the harness and a
 clean revert. Recorded in CLAUDE.md next to the `.env`/teardown enforcement
 paragraph.
+
+## 136. §131.1 slice 2 — Apps on its own route, and a UI system pass (2026-09-03)
+
+Second slice of the multi-page restructure (§131.1), which then pulled in a
+run of UI-consistency work @mat asked for while reviewing it. Landed together
+as one feature bump (0.1.0 → 0.2.0) because the pieces touch the same files.
+Explicitly **work in progress** — @mat approved the commit to move on, with
+more tweaks expected.
+
+### 136.1 Apps → `/apps`
+
+`AppsComponent` (`frontend/src/app/pages/apps/`) holds what was the top of the
+one-page dashboard: the summary counts, the running-apps port table, and the
+full start/stop/configure list with search. `DashboardComponent` keeps the
+stack-wide areas (Backups, Health, Utils, and — see below — the Settings
+sections). Both are children of the shell route; nav gained an "Apps" and a
+"Dashboard" button, the Home menu's Apps/Exposure/Updates tiles repoint to
+`/apps`, and `setup`/`recovery` now return to `/home` (landing a fresh admin
+on the half-a-page `/dashboard` was wrong). `dashboard.filter.spec.ts` moved
+to `apps.filter.spec.ts`.
+
+The collapse state that was private to the dashboard became
+`SectionCollapseService` (`core/`), shared by every collapsible section.
+
+### 136.2 `<app-panel>` — the standard section container
+
+`components/panel/` — a card with a title, an optional one-line subtitle, a
+chevron header that toggles, and a `[panel-actions]` slot for header buttons.
+Body renders only when open. **Collapsed by default**: `defaultCollapsed`
+returns `true` for every key now, not just `running:*`. The persisted key was
+bumped `dashboard.collapsedSections` → `panels.collapsed.v2` so state recorded
+against the old "expanded by default" behaviour is dropped once.
+
+Applied to: Apps (Running apps, All apps), Dashboard (Backups, Health, Utils),
+Users (Add user, Accounts), Audit logs (Filters, Log entries), Account
+security (the 2FA card), and — 136.4 — each of the six Settings sections.
+`account.component.spec.ts` gained an `openPanel()` helper: its DOM assertions
+now open the panel first.
+
+### 136.3 Dark theme + one card colour
+
+`index.html` sets `data-bs-theme="dark"`. `styles.css` overrides Bootstrap's
+theme variables to a project palette and adds `--app-canvas` / `--app-surface`
+/ `--app-surface-raised` (all three surfaces now the same `#1b2230`, so panels,
+stat tiles, service rows, nested cards and modals share one background;
+separation is border + a two-layer shadow against the darker `#0a0d12`
+canvas). Every hardcoded light hex in component CSS moved onto tokens;
+`text-bg-light` / `bg-white` badges became `text-bg-secondary` /
+`bg-body-tertiary`. @mat iterated the palette twice for contrast — the values
+here are the third pass and still provisional.
+
+### 136.4 Settings split into six panels
+
+`settings-panel.component.html` was one stack of `<section class="card">`
+blocks; each is now its own `<app-panel>` (`settings:cloudflare`,
+`settings:exposure`, `settings:general`, `settings:ntfy`, `settings:email`,
+`settings:backup-destination`). The outer "Settings" wrapper panel on the
+Dashboard is gone — `<app-settings-panel id="settings">` renders the six
+directly, so the dashboard is a flat list of collapsible panels. `#settings`
+still anchors (host `scroll-margin-top`).
+
+### 136.5 Responsive tables, modals, dates, menu
+
+- **`.table-stack` / `.table-stack-wrap`** in `styles.css`: below `md`, a wide
+  table becomes one card per row, each cell labelled from its `data-label`.
+  Kills the horizontal scrollbar on a phone. Applied to the running-apps,
+  network-scan, users and audit-log tables (every `<td>` got a `data-label`).
+- **`ConfirmService` + `<app-confirm-dialog>`** (mounted once in
+  `AppComponent`): replaces the two `window.confirm()` calls (restore backup,
+  delete user). Enter confirms, Esc / backdrop / Cancel dismiss.
+- **Dates** render `dd/MM/yyyy` (`, HH:mm`, 24h, where a time was shown).
+- **Home menu**: fixed 3-column grid (9 tiles → clean 3×3), taller tiles.
+- **Header**: every nav button (and Logout) `min-width: 8rem`, centred.
+- **Account security**: lost its 640px max-width, full-width like the rest.
+
+### 136.6 Verified
+
+`frontend`: `npm run build` clean (pre-existing bundle-budget + one Bootstrap
+selector warning only); `npm run test:ci` 42/42 (Chrome deps + browser
+installed into the `node:20` container). Redeployed to the live stack with
+`docker compose up -d --build frontend` (no root teardown) and reviewed by
+@mat on `localhost:10001` across ~10 iterations. No backend change.
+
+### 136.7 Still open
+
+The other §131.1 areas (Exposure, Backups, Updates, Users & roles, Settings,
+Utils) still live under `/dashboard` as panels rather than their own routes —
+the README item stays, minus "Apps". More visual tweaks expected on the dark
+palette, panels and menu.

@@ -59,7 +59,7 @@ export class SetupComponent {
       .subscribe({
         next: () => {
           this.toastService.success('Administrator account created.');
-          void this.router.navigateByUrl('/dashboard');
+          void this.router.navigateByUrl('/home');
         },
         error: (error) => {
           this.errorMessage = extractErrorMessage(error, 'Unable to complete setup.');

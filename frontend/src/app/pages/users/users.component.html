@@ -1,39 +1,34 @@
 <div class="container-fluid py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <h1 class="h3 mb-1">Users</h1>
-      <p class="text-body-secondary mb-0">Manage administrator accounts. Every account has full access.</p>
-    </div>
+  <div class="mb-4">
+    <h1 class="h3 mb-1">Users</h1>
+    <p class="text-body-secondary mb-0">Manage administrator accounts. Every account has full access.</p>
   </div>
 
-  <div class="card mb-3">
-    <div class="card-header">Add user</div>
-    <div class="card-body">
-      <form class="row g-2 align-items-start" [formGroup]="createForm" (ngSubmit)="createUser()">
-        <div class="col-12 col-md-4">
-          <input class="form-control" placeholder="Username" formControlName="username" autocomplete="off" />
-          <div class="form-text text-danger" *ngIf="createForm.controls.username.touched && createForm.controls.username.invalid">
-            Username must be 3-64 characters.
-          </div>
+  <app-panel key="users:add" title="Add user" subtitle="Username and a password of at least 8 characters">
+    <form class="row g-2 align-items-start" [formGroup]="createForm" (ngSubmit)="createUser()">
+      <div class="col-12 col-md-4">
+        <input class="form-control" placeholder="Username" formControlName="username" autocomplete="off" />
+        <div class="form-text text-danger" *ngIf="createForm.controls.username.touched && createForm.controls.username.invalid">
+          Username must be 3-64 characters.
         </div>
-        <div class="col-12 col-md-4">
-          <input class="form-control" type="password" placeholder="Password" formControlName="password" autocomplete="new-password" />
-          <div class="form-text text-danger" *ngIf="createForm.controls.password.touched && createForm.controls.password.invalid">
-            Password must be at least 8 characters.
-          </div>
+      </div>
+      <div class="col-12 col-md-4">
+        <input class="form-control" type="password" placeholder="Password" formControlName="password" autocomplete="new-password" />
+        <div class="form-text text-danger" *ngIf="createForm.controls.password.touched && createForm.controls.password.invalid">
+          Password must be at least 8 characters.
         </div>
-        <div class="col-12 col-md-2 d-grid">
-          <button class="btn btn-primary" type="submit" [disabled]="creating">
-            {{ creating ? 'Creating…' : 'Create user' }}
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
+      </div>
+      <div class="col-12 col-md-2 d-grid">
+        <button class="btn btn-primary" type="submit" [disabled]="creating">
+          {{ creating ? 'Creating…' : 'Create user' }}
+        </button>
+      </div>
+    </form>
+  </app-panel>
 
-  <div class="card">
-    <div class="table-responsive">
-      <table class="table table-sm align-middle mb-0">
+  <app-panel key="users:list" title="Accounts" subtitle="Existing administrator users">
+    <div class="table-responsive table-stack-wrap">
+      <table class="table table-sm table-stack align-middle mb-0">
         <thead>
           <tr>
             <th>Username</th>
@@ -44,12 +39,12 @@
         <tbody>
           <ng-container *ngFor="let user of items">
             <tr>
-              <td>
+              <td data-label="Username">
                 {{ user.username }}
                 <span class="badge text-bg-secondary ms-1" *ngIf="user.id === currentUserId">you</span>
               </td>
-              <td>{{ user.created_at | date:'short' }}</td>
-              <td class="text-end">
+              <td data-label="Created">{{ user.created_at | date:'dd/MM/yyyy' }}</td>
+              <td data-label="Actions" class="text-end">
                 <div class="btn-group btn-group-sm">
                   <button class="btn btn-outline-secondary" (click)="startPasswordReset(user.id)">Reset password</button>
                   <button
@@ -65,7 +60,7 @@
             </tr>
             <tr *ngIf="resetPasswordId === user.id">
               <td colspan="3">
-                <div class="d-flex gap-2 align-items-center">
+                <div class="d-flex gap-2 align-items-center flex-wrap">
                   <input
                     class="form-control form-control-sm"
                     type="password"
@@ -87,5 +82,5 @@
         </tbody>
       </table>
     </div>
-  </div>
+  </app-panel>
 </div>

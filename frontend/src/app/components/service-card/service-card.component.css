@@ -8,10 +8,10 @@
   align-items: center;
   gap: 0.85rem;
   padding: 0.55rem 0.85rem;
-  background: #fff;
+  background: var(--app-surface);
   border: 1px solid var(--bs-border-color, #dee2e6);
   border-radius: 0.6rem;
-  box-shadow: 0 0.125rem 0.4rem rgba(15, 23, 42, 0.05);
+  box-shadow: 0 3px 8px rgba(2, 6, 23, 0.22), 0 18px 34px -18px rgba(2, 6, 23, 0.6);
 }
 
 .service-row.row-error {
@@ -109,7 +109,7 @@
   padding: 0.05rem 0.4rem;
   border: 1px solid var(--bs-border-color, #dee2e6);
   border-radius: 1rem;
-  background: #fff;
+  background: var(--app-surface);
   white-space: nowrap;
 }
 
@@ -182,9 +182,9 @@
   width: min(560px, 100%);
   max-height: calc(100vh - 6rem);
   overflow: hidden;
-  background: #fff;
+  background: var(--app-surface-raised);
   border-radius: 0.75rem;
-  box-shadow: 0 1rem 3rem rgba(15, 23, 42, 0.35);
+  box-shadow: 0 1rem 3rem rgba(0, 0, 0, 0.55);
 }
 
 .settings-head {

@@ -1,16 +1,16 @@
 <div class="container-fluid py-4">
-  <div class="d-flex justify-content-between align-items-center mb-3">
-    <div>
-      <h1 class="h3 mb-1">Account security</h1>
-      <p class="text-body-secondary mb-0">Two-factor authentication for your own sign-in.</p>
-    </div>
+  <div class="mb-4">
+    <h1 class="h3 mb-1">Account security</h1>
+    <p class="text-body-secondary mb-0">Two-factor authentication for your own sign-in.</p>
   </div>
 
   <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
 
-  <div class="card account-card">
-    <div class="card-header">Two-factor authentication (TOTP)</div>
-    <div class="card-body">
+  <app-panel
+    key="account:2fa"
+    title="Two-factor authentication (TOTP)"
+    subtitle="A one-time code from an authenticator app, on top of your password"
+  >
 
       <p *ngIf="view === 'loading'" class="text-body-secondary mb-0">Loading…</p>
 
@@ -19,7 +19,7 @@
         <ng-container *ngIf="status.enabled; else disabledBlock">
           <p class="mb-1">
             <span class="badge text-bg-success">On</span>
-            <span class="ms-2 text-body-secondary">Enabled {{ status.enrolledAt | date: 'medium' }}</span>
+            <span class="ms-2 text-body-secondary">Enabled {{ status.enrolledAt | date:'dd/MM/yyyy' }}</span>
           </p>
           <p class="text-body-secondary small">
             {{ status.recoveryCodesRemaining }}
@@ -124,6 +124,6 @@
         </div>
       </ng-container>
 
-    </div>
-  </div>
+  </app-panel>
 </div>
+

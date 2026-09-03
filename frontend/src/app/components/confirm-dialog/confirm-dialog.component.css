@@ -1,0 +1,48 @@
+.confirm-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1090; /* above toasts (1080) and the service-card settings modal */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  background: rgba(2, 6, 23, 0.6);
+}
+
+.confirm-dialog {
+  width: min(26rem, 100%);
+  background: var(--app-surface-raised, #fff);
+  color: var(--bs-body-color);
+  border: 1px solid var(--bs-border-color);
+  border-radius: 0.85rem;
+  box-shadow: 0 1.5rem 3.5rem rgba(0, 0, 0, 0.55);
+  overflow: hidden;
+}
+
+.confirm-body {
+  padding: 1.25rem 1.25rem 1rem;
+}
+
+.confirm-message {
+  white-space: pre-line; /* honour \n in the message */
+  color: var(--bs-secondary-color);
+}
+
+.confirm-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.85rem 1.25rem;
+  border-top: 1px solid var(--bs-border-color);
+  background: var(--bs-tertiary-bg);
+}
+
+@media (max-width: 400px) {
+  .confirm-foot {
+    flex-direction: column-reverse;
+  }
+
+  .confirm-foot .btn {
+    width: 100%;
+  }
+}

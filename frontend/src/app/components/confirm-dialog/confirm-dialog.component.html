@@ -1,0 +1,32 @@
+<div
+  class="confirm-backdrop"
+  *ngIf="confirm.request$ | async as req"
+  (click)="onBackdrop($event)"
+>
+  <div
+    class="confirm-dialog"
+    role="alertdialog"
+    aria-modal="true"
+    [attr.aria-label]="req.title || 'Confirmation required'"
+  >
+    <div class="confirm-body">
+      <h2 class="h5 mb-2" *ngIf="req.title">{{ req.title }}</h2>
+      <p class="mb-0 confirm-message">{{ req.message }}</p>
+    </div>
+    <div class="confirm-foot">
+      <button type="button" class="btn btn-outline-secondary" (click)="respond(false)">
+        {{ req.cancelText || 'Cancel' }}
+      </button>
+      <button
+        type="button"
+        class="btn"
+        [class.btn-danger]="req.danger"
+        [class.btn-primary]="!req.danger"
+        (click)="respond(true)"
+        autofocus
+      >
+        {{ req.confirmText || 'Confirm' }}
+      </button>
+    </div>
+  </div>
+</div>

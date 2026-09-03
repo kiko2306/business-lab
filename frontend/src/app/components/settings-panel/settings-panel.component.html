@@ -1,628 +1,612 @@
-<section class="card border-0 shadow-sm">
-  <div class="card-body p-4">
-    <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start mb-3">
-      <div>
-        <h2 class="h4 mb-1">Cloudflare Tunnel token</h2>
-        <p class="text-body-secondary mb-0">
-          Store a scoped token for Cloudflare Tunnel operations and DNS updates.
-        </p>
-      </div>
-      <span class="badge" [ngClass]="configuredSettings?.configured ? 'text-bg-success' : 'text-bg-secondary'">
-        {{ configuredSettings?.configured ? 'Configured' : 'Not configured' }}
-      </span>
+<app-panel
+  key="settings:cloudflare"
+  title="Cloudflare Tunnel token"
+  subtitle="A scoped token for Cloudflare Tunnel operations and DNS updates"
+>
+  <span panel-actions class="badge" [ngClass]="configuredSettings?.configured ? 'text-bg-success' : 'text-bg-secondary'">
+    {{ configuredSettings?.configured ? 'Configured' : 'Not configured' }}
+  </span>
+
+  <div *ngIf="loading" class="d-flex align-items-center gap-2 text-body-secondary">
+    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+    Loading settings...
+  </div>
+
+  <ng-container *ngIf="!loading">
+    <div *ngIf="feedback" class="alert" [ngClass]="'alert-' + feedback.type">
+      {{ feedback.message }}
     </div>
 
-    <div *ngIf="loading" class="d-flex align-items-center gap-2 text-body-secondary">
-      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      Loading settings...
+    <div class="mb-3">
+      <label class="form-label fw-semibold" for="cloudflareToken">API token</label>
+      <div class="input-group">
+        <input
+          id="cloudflareToken"
+          class="form-control"
+          [type]="showToken ? 'text' : 'password'"
+          [placeholder]="configuredSettings?.tokenMasked ?? 'Enter Cloudflare API token'"
+          [formControl]="form.controls.token"
+          autocomplete="off"
+          maxlength="4096"
+          (paste)="sanitizeTokenPaste($event)"
+        />
+        <button type="button" class="btn btn-outline-secondary" (click)="showToken = !showToken">
+          {{ showToken ? 'Hide' : 'Show' }}
+        </button>
+      </div>
+      <div class="form-text">
+        {{ configuredSettings?.permissionExplanation }}
+      </div>
+      <div *ngIf="validationMessage() && (form.controls.token.touched || form.controls.token.dirty)" class="text-danger small mt-2">
+        {{ validationMessage() }}
+      </div>
     </div>
 
-    <ng-container *ngIf="!loading">
-      <div *ngIf="feedback" class="alert" [ngClass]="'alert-' + feedback.type">
-        {{ feedback.message }}
-      </div>
+    <div class="current-token" *ngIf="configuredSettings?.configured">
+      Current saved token: <span>{{ configuredSettings?.tokenMasked }}</span>
+    </div>
 
-      <div class="mb-3">
-        <label class="form-label fw-semibold" for="cloudflareToken">API token</label>
-        <div class="input-group">
+    <div class="d-flex flex-wrap gap-2 mt-3">
+      <button type="button" class="btn btn-primary" [disabled]="saving || form.invalid" (click)="save()">
+        <span *ngIf="saving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        Save token
+      </button>
+      <button type="button" class="btn btn-outline-primary" [disabled]="testing" (click)="testConnection()">
+        <span *ngIf="testing" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        Test connection
+      </button>
+    </div>
+  </ng-container>
+</app-panel>
+
+<app-panel
+  key="settings:exposure"
+  title="First-start exposure provisioning"
+  subtitle="Auto-create a matching Nginx Proxy Manager host and Cloudflare Tunnel route when an exposed service starts"
+>
+  <span panel-actions class="badge" [ngClass]="exposureSettings?.configured ? 'text-bg-success' : 'text-bg-secondary'">
+    {{ exposureSettings?.configured ? 'Configured' : 'Not configured' }}
+  </span>
+
+  <div *ngIf="exposureLoading" class="d-flex align-items-center gap-2 text-body-secondary">
+    <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+    Loading settings...
+  </div>
+
+  <ng-container *ngIf="!exposureLoading">
+    <div *ngIf="exposureFeedback" class="alert" [ngClass]="'alert-' + exposureFeedback.type">
+      {{ exposureFeedback.message }}
+    </div>
+
+    <form [formGroup]="exposureForm" (ngSubmit)="saveExposure()">
+      <div class="row g-3">
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Base domain</label>
+          <input class="form-control" placeholder="example.com" formControlName="baseDomain" />
+          <div *ngIf="exposureValidationMessage('baseDomain', 'Base domain')" class="text-danger small mt-2">
+            {{ exposureValidationMessage('baseDomain', 'Base domain') }}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Cloudflare Tunnel ID</label>
+          <input class="form-control" formControlName="cloudflareTunnelId" />
+          <div *ngIf="exposureValidationMessage('cloudflareTunnelId', 'Cloudflare Tunnel ID')" class="text-danger small mt-2">
+            {{ exposureValidationMessage('cloudflareTunnelId', 'Cloudflare Tunnel ID') }}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Cloudflare account ID</label>
+          <input class="form-control" formControlName="cloudflareAccountId" />
+          <div *ngIf="exposureValidationMessage('cloudflareAccountId', 'Cloudflare account ID')" class="text-danger small mt-2">
+            {{ exposureValidationMessage('cloudflareAccountId', 'Cloudflare account ID') }}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Cloudflare zone ID</label>
+          <input class="form-control" formControlName="cloudflareZoneId" />
+          <div *ngIf="exposureValidationMessage('cloudflareZoneId', 'Cloudflare zone ID')" class="text-danger small mt-2">
+            {{ exposureValidationMessage('cloudflareZoneId', 'Cloudflare zone ID') }}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Nginx Proxy Manager URL</label>
+          <input class="form-control" placeholder="http://host.docker.internal:81" formControlName="npmApiUrl" />
+          <div *ngIf="exposureValidationMessage('npmApiUrl', 'Nginx Proxy Manager URL')" class="text-danger small mt-2">
+            {{ exposureValidationMessage('npmApiUrl', 'Nginx Proxy Manager URL') }}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Nginx Proxy Manager admin email</label>
+          <input class="form-control" type="email" formControlName="npmEmail" />
+          <div *ngIf="exposureValidationMessage('npmEmail', 'Nginx Proxy Manager admin email')" class="text-danger small mt-2">
+            {{ exposureValidationMessage('npmEmail', 'Nginx Proxy Manager admin email') }}
+          </div>
+        </div>
+        <div class="col-12 col-md-6">
+          <label class="form-label fw-semibold">Nginx Proxy Manager admin password</label>
           <input
-            id="cloudflareToken"
             class="form-control"
-            [type]="showToken ? 'text' : 'password'"
-            [placeholder]="configuredSettings?.tokenMasked ?? 'Enter Cloudflare API token'"
-            [formControl]="form.controls.token"
+            type="password"
             autocomplete="off"
-            maxlength="4096"
-            (paste)="sanitizeTokenPaste($event)"
+            [placeholder]="exposureSettings?.npmPasswordConfigured ? 'Leave blank to keep current password' : ''"
+            formControlName="npmPassword"
           />
-          <button type="button" class="btn btn-outline-secondary" (click)="showToken = !showToken">
-            {{ showToken ? 'Hide' : 'Show' }}
-          </button>
+          <div *ngIf="exposureValidationMessage('npmPassword', 'Nginx Proxy Manager admin password')" class="text-danger small mt-2">
+            {{ exposureValidationMessage('npmPassword', 'Nginx Proxy Manager admin password') }}
+          </div>
         </div>
-        <div class="form-text">
-          {{ configuredSettings?.permissionExplanation }}
-        </div>
-        <div *ngIf="validationMessage() && (form.controls.token.touched || form.controls.token.dirty)" class="text-danger small mt-2">
-          {{ validationMessage() }}
-        </div>
-      </div>
-
-      <div class="current-token" *ngIf="configuredSettings?.configured">
-        Current saved token: <span>{{ configuredSettings?.tokenMasked }}</span>
       </div>
 
       <div class="d-flex flex-wrap gap-2 mt-3">
-        <button type="button" class="btn btn-primary" [disabled]="saving || form.invalid" (click)="save()">
-          <span *ngIf="saving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-          Save token
+        <button type="submit" class="btn btn-primary" [disabled]="savingExposure">
+          <span *ngIf="savingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          Save exposure settings
         </button>
-        <button type="button" class="btn btn-outline-primary" [disabled]="testing" (click)="testConnection()">
-          <span *ngIf="testing" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          [disabled]="testingExposure || !exposureSettings?.configured"
+          [title]="!exposureSettings?.configured ? 'Save exposure settings before testing the connection.' : ''"
+          (click)="testExposureConnection()"
+        >
+          <span *ngIf="testingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
           Test connection
         </button>
       </div>
-    </ng-container>
-  </div>
-</section>
+    </form>
 
-<section class="card border-0 shadow-sm mt-4">
-  <div class="card-body p-4">
-    <div class="d-flex flex-wrap justify-content-between gap-3 align-items-start mb-3">
-      <div>
-        <h2 class="h4 mb-1">First-start exposure provisioning</h2>
-        <p class="text-body-secondary mb-0">
-          When a service with exposure enabled starts, automatically create a matching Nginx Proxy Manager
-          host and Cloudflare Tunnel route at <code>&lt;service&gt;.&lt;base-domain&gt;</code>.
-        </p>
+    <div *ngIf="exposureTestResult" class="mt-3">
+      <div class="alert mb-2" [ngClass]="exposureTestResult.npm.success ? 'alert-success' : 'alert-danger'">
+        <strong>Nginx Proxy Manager:</strong> {{ exposureTestResult.npm.message }}
       </div>
-      <span class="badge" [ngClass]="exposureSettings?.configured ? 'text-bg-success' : 'text-bg-secondary'">
-        {{ exposureSettings?.configured ? 'Configured' : 'Not configured' }}
+      <div class="alert mb-0" [ngClass]="exposureTestResult.cloudflare.success ? 'alert-success' : 'alert-danger'">
+        <strong>Cloudflare:</strong> {{ exposureTestResult.cloudflare.message }}
+      </div>
+    </div>
+
+    <p class="form-text mt-3 mb-0">
+      Cloudflare Tunnel API calls reuse the token configured above. Per-service exposure (enable/disable,
+      upstream host/port) is configured from each service card on the dashboard.
+    </p>
+  </ng-container>
+</app-panel>
+
+<app-panel
+  key="settings:general"
+  title="General"
+  subtitle="The timezone applied to every managed app that reads TZ"
+>
+  <p class="text-body-secondary mb-3">
+    Unless an app pins its own in its Configuration panel. Takes effect the next time each app is started.
+  </p>
+
+  <div *ngIf="generalLoading" class="text-body-secondary small">Loading…</div>
+
+  <form *ngIf="!generalLoading && generalSettings" [formGroup]="generalForm" (ngSubmit)="saveGeneral()" class="row g-3">
+    <div class="col-12 col-md-8">
+      <label class="form-label fw-semibold" for="timezone">Timezone</label>
+      <select id="timezone" class="form-select" formControlName="timezone">
+        <option *ngFor="let tz of generalSettings.timezones" [value]="tz">{{ tz }}</option>
+      </select>
+      <p class="form-text mb-0">Default: {{ generalSettings.defaultTimezone }}</p>
+    </div>
+    <div class="col-12 d-flex align-items-center gap-2">
+      <button type="submit" class="btn btn-primary" [disabled]="savingGeneral || generalForm.invalid">
+        {{ savingGeneral ? 'Saving…' : 'Save timezone' }}
+      </button>
+      <span
+        *ngIf="generalFeedback"
+        class="small"
+        [ngClass]="{
+          'text-success': generalFeedback.type === 'success',
+          'text-danger': generalFeedback.type === 'danger',
+          'text-body-secondary': generalFeedback.type === 'info'
+        }"
+      >
+        {{ generalFeedback.message }}
       </span>
     </div>
+  </form>
+</app-panel>
 
-    <div *ngIf="exposureLoading" class="d-flex align-items-center gap-2 text-body-secondary">
-      <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      Loading settings...
-    </div>
+<app-panel
+  key="settings:ntfy"
+  title="ntfy alerts"
+  subtitle="One ntfy topic every alert this dashboard raises is published to"
+>
+  <p class="text-body-secondary mb-3">
+    Subscribe to it in the ntfy app to get them on your phone. Turn individual sources on below.
+  </p>
 
-    <ng-container *ngIf="!exposureLoading">
-      <div *ngIf="exposureFeedback" class="alert" [ngClass]="'alert-' + exposureFeedback.type">
-        {{ exposureFeedback.message }}
-      </div>
+  <div *ngIf="alertsLoading" class="text-body-secondary small">Loading…</div>
 
-      <form [formGroup]="exposureForm" (ngSubmit)="saveExposure()">
-        <div class="row g-3">
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Base domain</label>
-            <input class="form-control" placeholder="example.com" formControlName="baseDomain" />
-            <div *ngIf="exposureValidationMessage('baseDomain', 'Base domain')" class="text-danger small mt-2">
-              {{ exposureValidationMessage('baseDomain', 'Base domain') }}
-            </div>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Cloudflare Tunnel ID</label>
-            <input class="form-control" formControlName="cloudflareTunnelId" />
-            <div *ngIf="exposureValidationMessage('cloudflareTunnelId', 'Cloudflare Tunnel ID')" class="text-danger small mt-2">
-              {{ exposureValidationMessage('cloudflareTunnelId', 'Cloudflare Tunnel ID') }}
-            </div>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Cloudflare account ID</label>
-            <input class="form-control" formControlName="cloudflareAccountId" />
-            <div *ngIf="exposureValidationMessage('cloudflareAccountId', 'Cloudflare account ID')" class="text-danger small mt-2">
-              {{ exposureValidationMessage('cloudflareAccountId', 'Cloudflare account ID') }}
-            </div>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Cloudflare zone ID</label>
-            <input class="form-control" formControlName="cloudflareZoneId" />
-            <div *ngIf="exposureValidationMessage('cloudflareZoneId', 'Cloudflare zone ID')" class="text-danger small mt-2">
-              {{ exposureValidationMessage('cloudflareZoneId', 'Cloudflare zone ID') }}
-            </div>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Nginx Proxy Manager URL</label>
-            <input class="form-control" placeholder="http://host.docker.internal:81" formControlName="npmApiUrl" />
-            <div *ngIf="exposureValidationMessage('npmApiUrl', 'Nginx Proxy Manager URL')" class="text-danger small mt-2">
-              {{ exposureValidationMessage('npmApiUrl', 'Nginx Proxy Manager URL') }}
-            </div>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Nginx Proxy Manager admin email</label>
-            <input class="form-control" type="email" formControlName="npmEmail" />
-            <div *ngIf="exposureValidationMessage('npmEmail', 'Nginx Proxy Manager admin email')" class="text-danger small mt-2">
-              {{ exposureValidationMessage('npmEmail', 'Nginx Proxy Manager admin email') }}
-            </div>
-          </div>
-          <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Nginx Proxy Manager admin password</label>
-            <input
-              class="form-control"
-              type="password"
-              autocomplete="off"
-              [placeholder]="exposureSettings?.npmPasswordConfigured ? 'Leave blank to keep current password' : ''"
-              formControlName="npmPassword"
-            />
-            <div *ngIf="exposureValidationMessage('npmPassword', 'Nginx Proxy Manager admin password')" class="text-danger small mt-2">
-              {{ exposureValidationMessage('npmPassword', 'Nginx Proxy Manager admin password') }}
-            </div>
-          </div>
-        </div>
-
-        <div class="d-flex flex-wrap gap-2 mt-3">
-          <button type="submit" class="btn btn-primary" [disabled]="savingExposure">
-            <span *ngIf="savingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            Save exposure settings
-          </button>
-          <button
-            type="button"
-            class="btn btn-outline-secondary"
-            [disabled]="testingExposure || !exposureSettings?.configured"
-            [title]="!exposureSettings?.configured ? 'Save exposure settings before testing the connection.' : ''"
-            (click)="testExposureConnection()"
-          >
-            <span *ngIf="testingExposure" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            Test connection
-          </button>
-        </div>
-      </form>
-
-      <div *ngIf="exposureTestResult" class="mt-3">
-        <div class="alert mb-2" [ngClass]="exposureTestResult.npm.success ? 'alert-success' : 'alert-danger'">
-          <strong>Nginx Proxy Manager:</strong> {{ exposureTestResult.npm.message }}
-        </div>
-        <div class="alert mb-0" [ngClass]="exposureTestResult.cloudflare.success ? 'alert-success' : 'alert-danger'">
-          <strong>Cloudflare:</strong> {{ exposureTestResult.cloudflare.message }}
-        </div>
-      </div>
-
-      <p class="form-text mt-3 mb-0">
-        Cloudflare Tunnel API calls reuse the token configured above. Per-service exposure (enable/disable,
-        upstream host/port) is configured from each service card on the dashboard.
-      </p>
-    </ng-container>
-  </div>
-</section>
-
-<section class="card border-0 shadow-sm mt-4">
-  <div class="card-body p-4">
-    <div class="mb-3">
-      <h2 class="h4 mb-1">General</h2>
-      <p class="text-body-secondary mb-0">
-        The timezone applied to every managed app that reads <code>TZ</code>, unless an app pins its own in
-        its Configuration panel. Takes effect the next time each app is started.
-      </p>
-    </div>
-
-    <div *ngIf="generalLoading" class="text-body-secondary small">Loading…</div>
-
-    <form *ngIf="!generalLoading && generalSettings" [formGroup]="generalForm" (ngSubmit)="saveGeneral()" class="row g-3">
-      <div class="col-12 col-md-8">
-        <label class="form-label fw-semibold" for="timezone">Timezone</label>
-        <select id="timezone" class="form-select" formControlName="timezone">
-          <option *ngFor="let tz of generalSettings.timezones" [value]="tz">{{ tz }}</option>
-        </select>
-        <p class="form-text mb-0">Default: {{ generalSettings.defaultTimezone }}</p>
-      </div>
-      <div class="col-12 d-flex align-items-center gap-2">
-        <button type="submit" class="btn btn-primary" [disabled]="savingGeneral || generalForm.invalid">
-          {{ savingGeneral ? 'Saving…' : 'Save timezone' }}
-        </button>
-        <span
-          *ngIf="generalFeedback"
-          class="small"
-          [ngClass]="{
-            'text-success': generalFeedback.type === 'success',
-            'text-danger': generalFeedback.type === 'danger',
-            'text-body-secondary': generalFeedback.type === 'info'
-          }"
+  <div *ngIf="!alertsLoading && alertSettings" class="row g-3">
+    <div class="col-12 col-md-8">
+      <label class="form-label fw-semibold" for="alertTopic">ntfy topic</label>
+      <div class="input-group">
+        <input
+          id="alertTopic"
+          class="form-control font-monospace"
+          [(ngModel)]="alertTopicDraft"
+          [ngModelOptions]="{ standalone: true }"
+          maxlength="64"
+          placeholder="homelab-alerts"
+        />
+        <button
+          type="button"
+          class="btn btn-outline-primary"
+          [disabled]="savingAlerts || !alertTopicDirty || !alertTopicValid"
+          (click)="saveAlertTopic()"
         >
-          {{ generalFeedback.message }}
-        </span>
+          Save topic
+        </button>
       </div>
-    </form>
-  </div>
-</section>
-
-<section class="card border-0 shadow-sm mt-4">
-  <div class="card-body p-4">
-    <div class="mb-3">
-      <h2 class="h4 mb-1">ntfy alerts</h2>
-      <p class="text-body-secondary mb-0">
-        One ntfy topic every alert this dashboard raises is published to. Subscribe to it in the ntfy app
-        to get them on your phone. Turn individual sources on below.
+      <p class="form-text mb-0" [class.text-danger]="alertTopicDraft && !alertTopicValid">
+        <ng-container *ngIf="alertTopicDraft && !alertTopicValid; else topicHint">
+          Letters, digits, hyphens and underscores only, up to 64 characters.
+        </ng-container>
+        <ng-template #topicHint>
+          ntfy topics are open by name, so anyone who knows it can read the alert stream (which
+          includes attacker IPs) — keep it non-obvious.
+        </ng-template>
       </p>
     </div>
 
-    <div *ngIf="alertsLoading" class="text-body-secondary small">Loading…</div>
-
-    <div *ngIf="!alertsLoading && alertSettings" class="row g-3">
-      <div class="col-12 col-md-8">
-        <label class="form-label fw-semibold" for="alertTopic">ntfy topic</label>
-        <div class="input-group">
-          <input
-            id="alertTopic"
-            class="form-control font-monospace"
-            [(ngModel)]="alertTopicDraft"
-            [ngModelOptions]="{ standalone: true }"
-            maxlength="64"
-            placeholder="homelab-alerts"
-          />
-          <button
-            type="button"
-            class="btn btn-outline-primary"
-            [disabled]="savingAlerts || !alertTopicDirty || !alertTopicValid"
-            (click)="saveAlertTopic()"
-          >
-            Save topic
-          </button>
-        </div>
-        <p class="form-text mb-0" [class.text-danger]="alertTopicDraft && !alertTopicValid">
-          <ng-container *ngIf="alertTopicDraft && !alertTopicValid; else topicHint">
-            Letters, digits, hyphens and underscores only, up to 64 characters.
-          </ng-container>
-          <ng-template #topicHint>
-            ntfy topics are open by name, so anyone who knows it can read the alert stream (which
-            includes attacker IPs) — keep it non-obvious.
-          </ng-template>
-        </p>
-      </div>
-
-      <div class="col-12">
-        <label class="form-label fw-semibold mb-2">Sources</label>
-        <div class="d-flex align-items-start gap-3">
-          <div class="form-check form-switch flex-grow-1">
-            <input
-              class="form-check-input"
-              type="checkbox"
-              role="switch"
-              id="crowdsecAlertsEnabled"
-              [checked]="alertSettings.crowdsecEnabled"
-              [disabled]="savingAlerts"
-              (change)="toggleCrowdsecAlerts($any($event.target).checked)"
-            />
-            <label class="form-check-label" for="crowdsecAlertsEnabled">
-              <span class="fw-semibold">CrowdSec intrusion alerts</span>
-              <span class="d-block text-body-secondary small">
-                A push whenever CrowdSec flags an IP. Applies on the next CrowdSec restart.
-              </span>
-            </label>
-          </div>
-          <button
-            type="button"
-            class="btn btn-outline-secondary btn-sm flex-shrink-0"
-            [disabled]="!alertSettings.crowdsecEnabled || testingAlertSource === 'crowdsec'"
-            (click)="testAlertSource('crowdsec')"
-          >
-            <span
-              *ngIf="testingAlertSource === 'crowdsec'"
-              class="spinner-border spinner-border-sm me-1"
-              aria-hidden="true"
-            ></span>
-            Test
-          </button>
-        </div>
-      </div>
-
-      <div class="col-12">
-        <label class="form-label fw-semibold mb-2">Enforcement</label>
-        <div class="form-check form-switch">
+    <div class="col-12">
+      <label class="form-label fw-semibold mb-2">Sources</label>
+      <div class="d-flex align-items-start gap-3">
+        <div class="form-check form-switch flex-grow-1">
           <input
             class="form-check-input"
             type="checkbox"
             role="switch"
-            id="crowdsecEnforceNpm"
-            [checked]="alertSettings.enforceNpm"
+            id="crowdsecAlertsEnabled"
+            [checked]="alertSettings.crowdsecEnabled"
             [disabled]="savingAlerts"
-            (change)="toggleCrowdsecEnforcement($any($event.target).checked)"
+            (change)="toggleCrowdsecAlerts($any($event.target).checked)"
           />
-          <label class="form-check-label" for="crowdsecEnforceNpm">
-            <span class="fw-semibold">Enforce CrowdSec bans at Nginx Proxy Manager</span>
+          <label class="form-check-label" for="crowdsecAlertsEnabled">
+            <span class="fw-semibold">CrowdSec intrusion alerts</span>
             <span class="d-block text-body-secondary small">
-              Off, CrowdSec only watches and alerts. On, every proxied request has its
-              client IP checked against CrowdSec's decision list and banned IPs get a
-              403 — and the alerts start saying so. Applies after restarting CrowdSec
-              and Nginx Proxy Manager.
+              A push whenever CrowdSec flags an IP. Applies on the next CrowdSec restart.
             </span>
           </label>
         </div>
-      </div>
-
-      <div class="col-12" *ngIf="alertsFeedback">
-        <span
-          class="small"
-          [ngClass]="{
-            'text-success': alertsFeedback.type === 'success',
-            'text-danger': alertsFeedback.type === 'danger',
-            'text-body-secondary': alertsFeedback.type === 'info'
-          }"
+        <button
+          type="button"
+          class="btn btn-outline-secondary btn-sm flex-shrink-0"
+          [disabled]="!alertSettings.crowdsecEnabled || testingAlertSource === 'crowdsec'"
+          (click)="testAlertSource('crowdsec')"
         >
-          {{ alertsFeedback.message }}
-        </span>
+          <span
+            *ngIf="testingAlertSource === 'crowdsec'"
+            class="spinner-border spinner-border-sm me-1"
+            aria-hidden="true"
+          ></span>
+          Test
+        </button>
       </div>
     </div>
+
+    <div class="col-12">
+      <label class="form-label fw-semibold mb-2">Enforcement</label>
+      <div class="form-check form-switch">
+        <input
+          class="form-check-input"
+          type="checkbox"
+          role="switch"
+          id="crowdsecEnforceNpm"
+          [checked]="alertSettings.enforceNpm"
+          [disabled]="savingAlerts"
+          (change)="toggleCrowdsecEnforcement($any($event.target).checked)"
+        />
+        <label class="form-check-label" for="crowdsecEnforceNpm">
+          <span class="fw-semibold">Enforce CrowdSec bans at Nginx Proxy Manager</span>
+          <span class="d-block text-body-secondary small">
+            Off, CrowdSec only watches and alerts. On, every proxied request has its
+            client IP checked against CrowdSec's decision list and banned IPs get a
+            403 — and the alerts start saying so. Applies after restarting CrowdSec
+            and Nginx Proxy Manager.
+          </span>
+        </label>
+      </div>
+    </div>
+
+    <div class="col-12" *ngIf="alertsFeedback">
+      <span
+        class="small"
+        [ngClass]="{
+          'text-success': alertsFeedback.type === 'success',
+          'text-danger': alertsFeedback.type === 'danger',
+          'text-body-secondary': alertsFeedback.type === 'info'
+        }"
+      >
+        {{ alertsFeedback.message }}
+      </span>
+    </div>
   </div>
-</section>
+</app-panel>
 
-<section class="card border-0 shadow-sm mt-4">
-  <div class="card-body">
-    <h2 class="h5 mb-1">Email</h2>
-    <p class="text-body-secondary small mb-3">
-      One mailbox, shared by every app that sends or receives email. Configured
-      once here instead of pasted into each app — changing the password later is
-      a single edit. Apps pick it up when they next start.
-    </p>
+<app-panel
+  key="settings:email"
+  title="Email"
+  subtitle="One mailbox, shared by every app that sends or receives email"
+>
+  <p class="text-body-secondary small mb-3">
+    Configured once here instead of pasted into each app — changing the password later is
+    a single edit. Apps pick it up when they next start.
+  </p>
 
-    <div *ngIf="mailLoading" class="text-body-secondary small">Loading…</div>
+  <div *ngIf="mailLoading" class="text-body-secondary small">Loading…</div>
 
-    <form *ngIf="!mailLoading" [formGroup]="mailForm" (ngSubmit)="saveMail()" class="row g-3">
-      <div class="col-12">
-        <h3 class="h6 mb-0">Sending</h3>
-      </div>
+  <form *ngIf="!mailLoading" [formGroup]="mailForm" (ngSubmit)="saveMail()" class="row g-3">
+    <div class="col-12">
+      <h3 class="h6 mb-0">Sending</h3>
+    </div>
 
-      <div class="col-md-6">
-        <label class="form-label fw-semibold" for="smtpHost">SMTP server</label>
-        <input id="smtpHost" type="text" class="form-control" formControlName="smtpHost"
-               placeholder="smtp.example.com" autocomplete="off" />
-      </div>
-      <div class="col-md-3">
-        <label class="form-label fw-semibold" for="smtpEncryption">Encryption</label>
-        <select id="smtpEncryption" class="form-select" formControlName="smtpEncryption"
-                (change)="onMailEncryptionChange('smtp')">
-          <option value="tls">STARTTLS</option>
-          <option value="ssl">SSL/TLS</option>
-          <option value="none">None</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label fw-semibold" for="smtpPort">Port</label>
-        <input id="smtpPort" type="number" inputmode="numeric" class="form-control" formControlName="smtpPort" />
-      </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold" for="smtpHost">SMTP server</label>
+      <input id="smtpHost" type="text" class="form-control" formControlName="smtpHost"
+             placeholder="smtp.example.com" autocomplete="off" />
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold" for="smtpEncryption">Encryption</label>
+      <select id="smtpEncryption" class="form-select" formControlName="smtpEncryption"
+              (change)="onMailEncryptionChange('smtp')">
+        <option value="tls">STARTTLS</option>
+        <option value="ssl">SSL/TLS</option>
+        <option value="none">None</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold" for="smtpPort">Port</label>
+      <input id="smtpPort" type="number" inputmode="numeric" class="form-control" formControlName="smtpPort" />
+    </div>
 
-      <div class="col-md-6">
-        <label class="form-label fw-semibold" for="smtpUser">Username</label>
-        <input id="smtpUser" type="text" class="form-control" formControlName="smtpUser"
-               placeholder="you@example.com" autocomplete="off" />
-      </div>
-      <div class="col-md-6">
-        <label class="form-label fw-semibold" for="smtpPassword">Password</label>
-        <input id="smtpPassword" type="password" class="form-control" formControlName="smtpPassword"
-               [placeholder]="mailSettings?.smtpPasswordConfigured ? 'configured — leave blank to keep' : 'not set'"
-               autocomplete="new-password" />
-      </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold" for="smtpUser">Username</label>
+      <input id="smtpUser" type="text" class="form-control" formControlName="smtpUser"
+             placeholder="you@example.com" autocomplete="off" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold" for="smtpPassword">Password</label>
+      <input id="smtpPassword" type="password" class="form-control" formControlName="smtpPassword"
+             [placeholder]="mailSettings?.smtpPasswordConfigured ? 'configured — leave blank to keep' : 'not set'"
+             autocomplete="new-password" />
+    </div>
 
-      <div class="col-md-6">
-        <label class="form-label fw-semibold" for="fromAddress">From address</label>
-        <input id="fromAddress" type="email" class="form-control" formControlName="fromAddress"
-               placeholder="homelab@example.com" autocomplete="off" />
-      </div>
-      <div class="col-md-6">
-        <label class="form-label fw-semibold" for="fromName">From name <span class="fw-normal text-body-secondary">(optional)</span></label>
-        <input id="fromName" type="text" class="form-control" formControlName="fromName" placeholder="Homelab" />
-      </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold" for="fromAddress">From address</label>
+      <input id="fromAddress" type="email" class="form-control" formControlName="fromAddress"
+             placeholder="homelab@example.com" autocomplete="off" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold" for="fromName">From name <span class="fw-normal text-body-secondary">(optional)</span></label>
+      <input id="fromName" type="text" class="form-control" formControlName="fromName" placeholder="Homelab" />
+    </div>
 
-      <div class="col-12 mt-4">
-        <h3 class="h6 mb-1">Receiving <span class="fw-normal text-body-secondary small">(optional)</span></h3>
-        <p class="form-text mt-0">
-          Only needed by apps that turn incoming mail into records — ticketing
-          from an inbox, for example. Leave the server blank to turn it off.
-        </p>
-      </div>
+    <div class="col-12 mt-4">
+      <h3 class="h6 mb-1">Receiving <span class="fw-normal text-body-secondary small">(optional)</span></h3>
+      <p class="form-text mt-0">
+        Only needed by apps that turn incoming mail into records — ticketing
+        from an inbox, for example. Leave the server blank to turn it off.
+      </p>
+    </div>
 
-      <div class="col-md-6">
-        <label class="form-label fw-semibold" for="imapHost">IMAP server</label>
-        <input id="imapHost" type="text" class="form-control" formControlName="imapHost"
-               placeholder="imap.example.com" autocomplete="off" />
-      </div>
-      <div class="col-md-3">
-        <label class="form-label fw-semibold" for="imapEncryption">Encryption</label>
-        <select id="imapEncryption" class="form-select" formControlName="imapEncryption"
-                (change)="onMailEncryptionChange('imap')">
-          <option value="ssl">SSL/TLS</option>
-          <option value="tls">STARTTLS</option>
-          <option value="none">None</option>
-        </select>
-      </div>
-      <div class="col-md-3">
-        <label class="form-label fw-semibold" for="imapPort">Port</label>
-        <input id="imapPort" type="number" inputmode="numeric" class="form-control" formControlName="imapPort" />
-      </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold" for="imapHost">IMAP server</label>
+      <input id="imapHost" type="text" class="form-control" formControlName="imapHost"
+             placeholder="imap.example.com" autocomplete="off" />
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold" for="imapEncryption">Encryption</label>
+      <select id="imapEncryption" class="form-select" formControlName="imapEncryption"
+              (change)="onMailEncryptionChange('imap')">
+        <option value="ssl">SSL/TLS</option>
+        <option value="tls">STARTTLS</option>
+        <option value="none">None</option>
+      </select>
+    </div>
+    <div class="col-md-3">
+      <label class="form-label fw-semibold" for="imapPort">Port</label>
+      <input id="imapPort" type="number" inputmode="numeric" class="form-control" formControlName="imapPort" />
+    </div>
 
-      <div class="col-md-6">
-        <label class="form-label fw-semibold" for="imapUser">Username</label>
-        <input id="imapUser" type="text" class="form-control" formControlName="imapUser" autocomplete="off" />
+    <div class="col-md-6">
+      <label class="form-label fw-semibold" for="imapUser">Username</label>
+      <input id="imapUser" type="text" class="form-control" formControlName="imapUser" autocomplete="off" />
+    </div>
+    <div class="col-md-6">
+      <label class="form-label fw-semibold" for="imapPassword">Password</label>
+      <input id="imapPassword" type="password" class="form-control" formControlName="imapPassword"
+             [placeholder]="mailSettings?.imapPasswordConfigured ? 'configured — leave blank to keep' : 'not set'"
+             autocomplete="new-password" />
+    </div>
+
+    <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
+      <button type="submit" class="btn btn-primary" [disabled]="savingMail">
+        {{ savingMail ? 'Saving…' : 'Save email settings' }}
+      </button>
+      <button type="button" class="btn btn-outline-secondary"
+              [disabled]="testingMail || !mailSettings?.configured" (click)="testMail()">
+        {{ testingMail ? 'Testing…' : 'Test connection' }}
+      </button>
+      <span
+        *ngIf="mailFeedback"
+        class="small"
+        [ngClass]="{
+          'text-success': mailFeedback.type === 'success',
+          'text-danger': mailFeedback.type === 'danger',
+          'text-body-secondary': mailFeedback.type === 'info'
+        }"
+      >
+        {{ mailFeedback.message }}
+      </span>
+    </div>
+
+    <!-- Per-protocol results: a working SMTP shouldn't be hidden by a
+         broken IMAP, and the detail is what makes a failure actionable. -->
+    <div *ngIf="mailTestResult" class="col-12">
+      <ul class="list-unstyled small mb-0">
+        <li [ngClass]="mailTestResult.smtp.ok ? 'text-success' : 'text-danger'">
+          <strong>Sending:</strong> {{ mailTestResult.smtp.detail }}
+        </li>
+        <li *ngIf="mailTestResult.imap" [ngClass]="mailTestResult.imap.ok ? 'text-success' : 'text-danger'">
+          <strong>Receiving:</strong> {{ mailTestResult.imap.detail }}
+        </li>
+      </ul>
+    </div>
+  </form>
+</app-panel>
+
+<app-panel
+  key="settings:backup-destination"
+  title="Backup destination"
+  subtitle="Where Duplicati writes backups"
+>
+  <p class="text-body-secondary small mb-3">
+    Until this is set they stay on this machine's own disk — which survives deleting a file,
+    and nothing else.
+  </p>
+
+  <div *ngIf="backupTargetLoading" class="text-body-secondary small">Loading…</div>
+
+  <form *ngIf="!backupTargetLoading" [formGroup]="backupTargetForm" (ngSubmit)="saveBackupTarget()" class="row g-3">
+    <div class="col-md-4">
+      <label class="form-label fw-semibold" for="backupKind">Destination</label>
+      <select id="backupKind" class="form-select" formControlName="kind">
+        <option value="disk">Another disk on this machine</option>
+        <option value="smb">Network drive (SMB / Windows share)</option>
+        <option value="nfs">NAS (NFS export)</option>
+        <option value="googledrive">Google Drive</option>
+      </select>
+    </div>
+
+    <!-- Local disk -->
+    <div class="col-md-8" *ngIf="backupTargetForm.controls.kind.value === 'disk'">
+      <label class="form-label fw-semibold" for="backupPath">Path</label>
+      <input id="backupPath" type="text" class="form-control" formControlName="path"
+             placeholder="/mnt/backups" autocomplete="off" />
+      <div class="form-text">
+        Must be a separate disk. A path on the system disk is rejected — it would
+        be lost by the same failure it is meant to protect against.
       </div>
-      <div class="col-md-6">
-        <label class="form-label fw-semibold" for="imapPassword">Password</label>
-        <input id="imapPassword" type="password" class="form-control" formControlName="imapPassword"
-               [placeholder]="mailSettings?.imapPasswordConfigured ? 'configured — leave blank to keep' : 'not set'"
-               autocomplete="new-password" />
-      </div>
+    </div>
 
-      <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
-        <button type="submit" class="btn btn-primary" [disabled]="savingMail">
-          {{ savingMail ? 'Saving…' : 'Save email settings' }}
-        </button>
-        <button type="button" class="btn btn-outline-secondary"
-                [disabled]="testingMail || !mailSettings?.configured" (click)="testMail()">
-          {{ testingMail ? 'Testing…' : 'Test connection' }}
-        </button>
-        <span
-          *ngIf="mailFeedback"
-          class="small"
-          [ngClass]="{
-            'text-success': mailFeedback.type === 'success',
-            'text-danger': mailFeedback.type === 'danger',
-            'text-body-secondary': mailFeedback.type === 'info'
-          }"
-        >
-          {{ mailFeedback.message }}
-        </span>
-      </div>
-
-      <!-- Per-protocol results: a working SMTP shouldn't be hidden by a
-           broken IMAP, and the detail is what makes a failure actionable. -->
-      <div *ngIf="mailTestResult" class="col-12">
-        <ul class="list-unstyled small mb-0">
-          <li [ngClass]="mailTestResult.smtp.ok ? 'text-success' : 'text-danger'">
-            <strong>Sending:</strong> {{ mailTestResult.smtp.detail }}
-          </li>
-          <li *ngIf="mailTestResult.imap" [ngClass]="mailTestResult.imap.ok ? 'text-success' : 'text-danger'">
-            <strong>Receiving:</strong> {{ mailTestResult.imap.detail }}
-          </li>
-        </ul>
-      </div>
-    </form>
-  </div>
-</section>
-
-<section class="card border-0 shadow-sm mt-4">
-  <div class="card-body">
-    <h2 class="h5 mb-1">Backup destination</h2>
-    <p class="text-body-secondary small mb-3">
-      Where Duplicati writes backups. Until this is set they stay on this
-      machine's own disk — which survives deleting a file, and nothing else.
-    </p>
-
-    <div *ngIf="backupTargetLoading" class="text-body-secondary small">Loading…</div>
-
-    <form *ngIf="!backupTargetLoading" [formGroup]="backupTargetForm" (ngSubmit)="saveBackupTarget()" class="row g-3">
+    <!-- SMB / NFS -->
+    <ng-container *ngIf="backupTargetForm.controls.kind.value === 'smb' || backupTargetForm.controls.kind.value === 'nfs'">
       <div class="col-md-4">
-        <label class="form-label fw-semibold" for="backupKind">Destination</label>
-        <select id="backupKind" class="form-select" formControlName="kind">
-          <option value="disk">Another disk on this machine</option>
-          <option value="smb">Network drive (SMB / Windows share)</option>
-          <option value="nfs">NAS (NFS export)</option>
-          <option value="googledrive">Google Drive</option>
-        </select>
+        <label class="form-label fw-semibold" for="backupServer">Server</label>
+        <input id="backupServer" type="text" class="form-control" formControlName="server"
+               placeholder="192.168.1.50" autocomplete="off" />
       </div>
-
-      <!-- Local disk -->
-      <div class="col-md-8" *ngIf="backupTargetForm.controls.kind.value === 'disk'">
-        <label class="form-label fw-semibold" for="backupPath">Path</label>
-        <input id="backupPath" type="text" class="form-control" formControlName="path"
-               placeholder="/mnt/backups" autocomplete="off" />
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="backupShare">
+          {{ backupTargetForm.controls.kind.value === 'nfs' ? 'Export path' : 'Share name' }}
+        </label>
+        <input id="backupShare" type="text" class="form-control" formControlName="share"
+               [placeholder]="backupTargetForm.controls.kind.value === 'nfs' ? '/volume1/backup' : 'backup'"
+               autocomplete="off" />
+      </div>
+      <div class="col-md-6" *ngIf="backupTargetForm.controls.kind.value === 'smb'">
+        <label class="form-label fw-semibold" for="backupUser">Username</label>
+        <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
+      </div>
+      <div class="col-md-6" *ngIf="backupTargetForm.controls.kind.value === 'smb'">
+        <label class="form-label fw-semibold" for="backupPassword">Password</label>
+        <input id="backupPassword" type="password" class="form-control" formControlName="password"
+               [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+               autocomplete="new-password" />
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold" for="backupOptions">
+          Extra mount options <span class="fw-normal text-body-secondary">(optional)</span>
+        </label>
+        <input id="backupOptions" type="text" class="form-control" formControlName="options"
+               placeholder="vers=2.1" autocomplete="off" />
         <div class="form-text">
-          Must be a separate disk. A path on the system disk is rejected — it would
-          be lost by the same failure it is meant to protect against.
+          Only needed for unusual setups. SMB defaults to version 3.0 — older
+          NAS boxes may need <code>vers=2.1</code> or <code>vers=1.0</code>.
         </div>
       </div>
+    </ng-container>
 
-      <!-- SMB / NFS -->
-      <ng-container *ngIf="backupTargetForm.controls.kind.value === 'smb' || backupTargetForm.controls.kind.value === 'nfs'">
-        <div class="col-md-4">
-          <label class="form-label fw-semibold" for="backupServer">Server</label>
-          <input id="backupServer" type="text" class="form-control" formControlName="server"
-                 placeholder="192.168.1.50" autocomplete="off" />
-        </div>
-        <div class="col-md-4">
-          <label class="form-label fw-semibold" for="backupShare">
-            {{ backupTargetForm.controls.kind.value === 'nfs' ? 'Export path' : 'Share name' }}
-          </label>
-          <input id="backupShare" type="text" class="form-control" formControlName="share"
-                 [placeholder]="backupTargetForm.controls.kind.value === 'nfs' ? '/volume1/backup' : 'backup'"
-                 autocomplete="off" />
-        </div>
-        <div class="col-md-6" *ngIf="backupTargetForm.controls.kind.value === 'smb'">
-          <label class="form-label fw-semibold" for="backupUser">Username</label>
-          <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
-        </div>
-        <div class="col-md-6" *ngIf="backupTargetForm.controls.kind.value === 'smb'">
-          <label class="form-label fw-semibold" for="backupPassword">Password</label>
-          <input id="backupPassword" type="password" class="form-control" formControlName="password"
-                 [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
-                 autocomplete="new-password" />
-        </div>
-        <div class="col-12">
-          <label class="form-label fw-semibold" for="backupOptions">
-            Extra mount options <span class="fw-normal text-body-secondary">(optional)</span>
-          </label>
-          <input id="backupOptions" type="text" class="form-control" formControlName="options"
-                 placeholder="vers=2.1" autocomplete="off" />
-          <div class="form-text">
-            Only needed for unusual setups. SMB defaults to version 3.0 — older
-            NAS boxes may need <code>vers=2.1</code> or <code>vers=1.0</code>.
-          </div>
-        </div>
-      </ng-container>
-
-      <!-- Google Drive -->
-      <ng-container *ngIf="backupTargetForm.controls.kind.value === 'googledrive'">
-        <div class="col-md-8">
-          <label class="form-label fw-semibold" for="backupAuthId">AuthID</label>
-          <input id="backupAuthId" type="password" class="form-control" formControlName="authId"
-                 [placeholder]="backupTarget?.authIdConfigured ? 'configured — leave blank to keep' : 'not set'"
-                 autocomplete="new-password" />
-          <div class="form-text">
-            Get one from
-            <a [href]="backupTarget?.oauthUrl" target="_blank" rel="noopener noreferrer">Duplicati's Google
-            authorisation page</a>, sign in, and paste the token here.
-            Use <em>that</em> link specifically: Duplicati's website offers a newer
-            OAuth service, but this Duplicati build only looks tokens up in the one
-            linked here, and a token from the other fails with “No such key”.
-          </div>
-        </div>
-        <div class="col-md-4">
-          <label class="form-label fw-semibold" for="backupFolder">Folder</label>
-          <input id="backupFolder" type="text" class="form-control" formControlName="folder"
-                 placeholder="homelab-backups" autocomplete="off" />
-        </div>
-        <div class="col-12">
-          <div class="alert alert-secondary small mb-0">
-            Google Drive is not mounted — Duplicati reaches it directly. <strong>Test
-            destination</strong> checks it through Duplicati itself, using the same code
-            path a backup uses, so a pass here means a backup will connect.
-          </div>
-        </div>
-      </ng-container>
-
-      <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
-        <button type="submit" class="btn btn-primary" [disabled]="savingBackupTarget">
-          {{ savingBackupTarget ? 'Saving…' : 'Save destination' }}
-        </button>
-        <button type="button" class="btn btn-outline-secondary"
-                [disabled]="testingBackupTarget || !backupTarget?.configured" (click)="testBackupTarget()">
-          {{ testingBackupTarget ? 'Testing…' : 'Test destination' }}
-        </button>
-        <button type="button" class="btn btn-outline-primary"
-                [disabled]="provisioningJob || !backupTarget?.configured" (click)="provisionBackupJob()">
-          {{ provisioningJob ? 'Creating…' : 'Create / update backup job' }}
-        </button>
-        <span
-          *ngIf="backupTargetFeedback"
-          class="small"
-          [ngClass]="{
-            'text-success': backupTargetFeedback.type === 'success',
-            'text-danger': backupTargetFeedback.type === 'danger',
-            'text-body-secondary': backupTargetFeedback.type === 'info'
-          }"
-        >
-          {{ backupTargetFeedback.message }}
-        </span>
-      </div>
-
-      <!-- The passphrase is shown once, here, and is the single thing that
-           makes a backup restorable. -->
-      <div *ngIf="backupJob" class="col-12">
-        <div class="alert alert-warning mb-0">
-          <p class="fw-semibold mb-1">Record this encryption passphrase somewhere off this machine.</p>
-          <p class="mb-2 small">
-            Duplicati backups <strong>cannot be restored without it</strong>. Losing it makes every
-            backup permanently unreadable — while they keep appearing to succeed.
-          </p>
-          <code class="user-select-all d-block p-2 bg-body-tertiary rounded">{{ backupJob.passphrase }}</code>
-          <p class="form-text mb-0">
-            Job created, scheduled {{ backupJob.scheduled }}. It runs on the backup schedule; app
-            databases are dumped automatically just before each run.
-          </p>
+    <!-- Google Drive -->
+    <ng-container *ngIf="backupTargetForm.controls.kind.value === 'googledrive'">
+      <div class="col-md-8">
+        <label class="form-label fw-semibold" for="backupAuthId">AuthID</label>
+        <input id="backupAuthId" type="password" class="form-control" formControlName="authId"
+               [placeholder]="backupTarget?.authIdConfigured ? 'configured — leave blank to keep' : 'not set'"
+               autocomplete="new-password" />
+        <div class="form-text">
+          Get one from
+          <a [href]="backupTarget?.oauthUrl" target="_blank" rel="noopener noreferrer">Duplicati's Google
+          authorisation page</a>, sign in, and paste the token here.
+          Use <em>that</em> link specifically: Duplicati's website offers a newer
+          OAuth service, but this Duplicati build only looks tokens up in the one
+          linked here, and a token from the other fails with “No such key”.
         </div>
       </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="backupFolder">Folder</label>
+        <input id="backupFolder" type="text" class="form-control" formControlName="folder"
+               placeholder="homelab-backups" autocomplete="off" />
+      </div>
+      <div class="col-12">
+        <div class="alert alert-secondary small mb-0">
+          Google Drive is not mounted — Duplicati reaches it directly. <strong>Test
+          destination</strong> checks it through Duplicati itself, using the same code
+          path a backup uses, so a pass here means a backup will connect.
+        </div>
+      </div>
+    </ng-container>
 
-      <div *ngIf="backupTargetTestResult" class="col-12">
-        <p class="small mb-0" [ngClass]="backupTargetTestResult.success ? 'text-success' : 'text-danger'">
-          {{ backupTargetTestResult.detail }}
+    <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
+      <button type="submit" class="btn btn-primary" [disabled]="savingBackupTarget">
+        {{ savingBackupTarget ? 'Saving…' : 'Save destination' }}
+      </button>
+      <button type="button" class="btn btn-outline-secondary"
+              [disabled]="testingBackupTarget || !backupTarget?.configured" (click)="testBackupTarget()">
+        {{ testingBackupTarget ? 'Testing…' : 'Test destination' }}
+      </button>
+      <button type="button" class="btn btn-outline-primary"
+              [disabled]="provisioningJob || !backupTarget?.configured" (click)="provisionBackupJob()">
+        {{ provisioningJob ? 'Creating…' : 'Create / update backup job' }}
+      </button>
+      <span
+        *ngIf="backupTargetFeedback"
+        class="small"
+        [ngClass]="{
+          'text-success': backupTargetFeedback.type === 'success',
+          'text-danger': backupTargetFeedback.type === 'danger',
+          'text-body-secondary': backupTargetFeedback.type === 'info'
+        }"
+      >
+        {{ backupTargetFeedback.message }}
+      </span>
+    </div>
+
+    <!-- The passphrase is shown once, here, and is the single thing that
+         makes a backup restorable. -->
+    <div *ngIf="backupJob" class="col-12">
+      <div class="alert alert-warning mb-0">
+        <p class="fw-semibold mb-1">Record this encryption passphrase somewhere off this machine.</p>
+        <p class="mb-2 small">
+          Duplicati backups <strong>cannot be restored without it</strong>. Losing it makes every
+          backup permanently unreadable — while they keep appearing to succeed.
+        </p>
+        <code class="user-select-all d-block p-2 bg-body-tertiary rounded">{{ backupJob.passphrase }}</code>
+        <p class="form-text mb-0">
+          Job created, scheduled {{ backupJob.scheduled }}. It runs on the backup schedule; app
+          databases are dumped automatically just before each run.
         </p>
       </div>
-    </form>
-  </div>
-</section>
+    </div>
+
+    <div *ngIf="backupTargetTestResult" class="col-12">
+      <p class="small mb-0" [ngClass]="backupTargetTestResult.success ? 'text-success' : 'text-danger'">
+        {{ backupTargetTestResult.detail }}
+      </p>
+    </div>
+  </form>
+</app-panel>

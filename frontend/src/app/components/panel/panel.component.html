@@ -1,0 +1,26 @@
+<section class="card panel" [class.panel--open]="!collapsed" [attr.id]="anchor">
+  <div class="panel__head">
+    <button
+      type="button"
+      class="panel__toggle"
+      [class.collapsed]="collapsed"
+      [attr.aria-expanded]="!collapsed"
+      (click)="toggle()"
+    >
+      <svg class="chevron" width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+        <path d="M4 6l4 4 4-4" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" />
+      </svg>
+      <span class="panel__titles">
+        <span class="panel__title">{{ title }}</span>
+        <span class="panel__subtitle" *ngIf="subtitle">{{ subtitle }}</span>
+      </span>
+    </button>
+    <div class="panel__actions" *ngIf="!collapsed">
+      <ng-content select="[panel-actions]"></ng-content>
+    </div>
+  </div>
+
+  <div class="panel__body card-body" *ngIf="!collapsed">
+    <ng-content></ng-content>
+  </div>
+</section>

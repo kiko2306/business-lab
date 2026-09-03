@@ -1,6 +1,7 @@
 import { Routes } from '@angular/router';
 import { ShellComponent } from './layout/shell/shell.component';
 import { HomeComponent } from './pages/home/home.component';
+import { AppsComponent } from './pages/apps/apps.component';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { LoginComponent } from './pages/login/login.component';
 import { SetupComponent } from './pages/setup/setup.component';
@@ -44,6 +45,12 @@ export const routes: Routes = [
         component: HomeComponent,
       },
       {
+        path: 'apps',
+        component: AppsComponent,
+      },
+      {
+        // What is left of the one-page dashboard: the stack-wide sections
+        // (Settings, Backups, Health, Utils) not yet on their own routes.
         path: 'dashboard',
         component: DashboardComponent,
       },

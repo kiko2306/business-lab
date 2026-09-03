@@ -11,6 +11,34 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.2.0] — 2026-09-03
+
+### Added
+
+- **Apps** is now its own route (`/apps`), split off the single-page
+  dashboard: service summary, the running-apps table, and the full
+  start/stop/configure list. What remains at `/dashboard` is the stack-wide
+  areas (plan.md §131.1).
+- A reusable collapsible **panel** (`<app-panel>`): title, one-line subtitle,
+  and a body that starts collapsed. Every data section on every page —
+  Apps, Dashboard (Backups / Health / Utils), the six Settings sections,
+  Users, Audit logs, Account security — is now one of these.
+- An in-app **confirm dialog** (`ConfirmService`) replacing the browser's
+  `window.confirm()` for the restore-backup and delete-user actions.
+- A dark theme (Bootstrap 5.3 `data-bs-theme`) with a project palette and
+  `--app-*` surface tokens; every card shares one background and a raised
+  shadow.
+- A `.table-stack` utility that collapses wide tables to a card per row below
+  the `md` breakpoint, so no table scrolls sideways on a phone.
+
+### Changed
+
+- Dates render as `dd/MM/yyyy` (with `HH:mm` where the time matters).
+- The post-login menu uses a fixed 3-column grid; header nav buttons are all
+  one width.
+- `setup` and `recovery` now return to `/home` rather than the (now partial)
+  `/dashboard`.
+
 ## [0.1.0] — 2026-09-03
 
 ### Added
