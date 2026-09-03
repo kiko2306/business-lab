@@ -1,4 +1,4 @@
-import { Pool, QueryResult, QueryResultRow } from 'pg';
+import { Pool, PoolClient, QueryResult, QueryResultRow } from 'pg';
 
 let pool: Pool | undefined;
 
@@ -47,12 +47,58 @@ export async function query<T extends QueryResultRow = QueryResultRow>(
 }
 
 /**
+ * Run `fn` inside a single transaction on one pooled client: BEGIN, then
+ * COMMIT if it resolves, ROLLBACK if it throws. Use when a handful of writes
+ * have to land together — e.g. enabling TOTP and inserting its recovery codes.
+ */
+export async function withTransaction<T>(
+  fn: (client: PoolClient) => Promise<T>
+): Promise<T> {
+  const client = await getPool().connect();
+  try {
+    await client.query('BEGIN');
+    const result = await fn(client);
+    await client.query('COMMIT');
+    return result;
+  } catch (error) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw error;
+  } finally {
+    client.release();
+  }
+}
+
+/**
  * Drop the legacy `role` column from `users` on databases created before
  * roles were removed from the project. No-op on fresh installs, since
  * init.sql no longer creates that column.
  */
 export async function dropLegacyRoleColumn(): Promise<void> {
   await query('ALTER TABLE users DROP COLUMN IF EXISTS role');
+}
+
+/**
+ * Add the TOTP columns to `users` and create `totp_recovery_codes` on
+ * databases that predate the second-factor feature (plan.md §127). No-op on
+ * fresh installs — init.sql already has both.
+ */
+export async function ensureTotpSchema(): Promise<void> {
+  await query(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS totp_secret TEXT,
+      ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+      ADD COLUMN IF NOT EXISTS totp_enrolled_at TIMESTAMPTZ
+  `);
+  await query(`
+    CREATE TABLE IF NOT EXISTS totp_recovery_codes (
+        id         SERIAL PRIMARY KEY,
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        code_hash  TEXT NOT NULL,
+        used_at    TIMESTAMPTZ,
+        created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query('CREATE INDEX IF NOT EXISTS totp_recovery_codes_user_id_idx ON totp_recovery_codes (user_id)');
 }
 
 /**

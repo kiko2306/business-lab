@@ -12877,3 +12877,78 @@ drop 2FA — losing the password and losing the phone are different events.
   `it-admin.md`, `app-credentials.md` note; the `recover disable-2fa` path.
 
 Build A→B→C→D→E; A and B are the security substance, each a session or less.
+
+## 128. 2FA slice A done — TOTP core + enrolment API
+
+§127 slice A. Enrolment works end to end; login is **not** yet gated on it
+(slice B).
+
+### 128.1 What landed
+
+- **Deps**: `otplib@^12` (TOTP), `qrcode@^1.5` (server-rendered enrolment QR),
+  `@types/qrcode`. All MIT, transitive deps MIT — normal bundled libraries
+  like `bcryptjs`/`jsonwebtoken`, so no `docs/licences.md` row (that covers
+  apps and images, not npm libs). `npm audit` findings are all pre-existing
+  (vitest/vite, qs/body-parser) — nothing from the new packages.
+- **`utils/totpSecret.ts`** — `sealSecret`/`openSecret`, AES-256-GCM under a
+  key derived from `JWT_SECRET` via `crypto.hkdfSync('sha256', …, info
+  "homelab-totp-secret-v1")`. Format `v1:<iv>:<tag>:<ciphertext>` base64url.
+  Nothing new to configure; rotating `JWT_SECRET` forces re-enrolment (an
+  acceptable cost, and it fails closed — `openSecret` throws rather than
+  returning garbage).
+- **`utils/totp.ts`** — `generateTotpSecret`, `totpKeyUri` (issuer "Homelab
+  Management"), `totpQrSvg` (inline `<svg>`), `verifyTotp` (±1 step window,
+  returns false on non-6-digit or malformed input rather than throwing),
+  `generateRecoveryCodes` (10 × `xxxxx-xxxxx` hex), `normaliseRecoveryCode`,
+  `hashRecoveryCode` (SHA-256 — the code is already high-entropy, a slow KDF
+  would just add latency to checking ten per attempt).
+- **Schema** (`database/init.sql` + `ensureTotpSchema()` boot migration in
+  `utils/database.ts`, called from `index.ts` beside the other `ensure*`):
+  `users.totp_secret TEXT`, `users.totp_enabled BOOLEAN DEFAULT FALSE`,
+  `users.totp_enrolled_at TIMESTAMPTZ`; `totp_recovery_codes (id, user_id FK
+  ON DELETE CASCADE, code_hash, used_at, created_at)` + a `user_id` index.
+- **`withTransaction(fn)`** added to `utils/database.ts` — BEGIN/COMMIT/
+  ROLLBACK on one pooled client, so enabling 2FA and inserting its recovery
+  codes land together (and disable clears both together).
+- **Routes** on the existing `/auth` router, all behind `authMiddleware`
+  (login is untouched):
+  - `GET /auth/totp/status` → `{enabled, enrolledAt, recoveryCodesRemaining}`.
+  - `POST /auth/totp/setup` → seals a pending secret (`totp_enabled` stays
+    false), returns `{otpauthUri, qrSvg, secret}`. 409 if already enabled.
+  - `POST /auth/totp/activate` `{code}` → verify against the pending secret,
+    then in one transaction flip `totp_enabled`, stamp `totp_enrolled_at`,
+    replace the recovery-code rows; returns the 10 codes once. `authLimiter`.
+  - `POST /auth/totp/disable` `{code}` xor `{password}` → re-verify, then clear
+    `totp_*` and delete recovery codes. `authLimiter`.
+  - Schemas `totpActivate` / `totpDisable` (`.xor('code','password')`) in
+    `middleware/validation.ts`.
+  - Audit actions `totp_activate` / `totp_disable` (success + failure).
+
+### 128.2 Verified (real stack)
+
+Backend rebuilt (lockfile in sync, image `npm ci` clean); `ensureTotpSchema`
+added the columns + table to the live DB (`\d users`, `\d totp_recovery_codes`
+confirm). Against a throwaway admin, with codes computed from the returned
+secret via `otplib` in the container:
+
+- status before → `{enabled:false, …:0}`.
+- setup → base32 secret + correct `otpauth://…issuer=Homelab%20Management…`
+  URI + `<svg>`; **DB stores `v1:…`, not the base32** — sealing works.
+- activate `000000` → 400 + `totp_activate/failure`; activate the real code →
+  `{enabled:true, recoveryCodes:[10]}`; DB has 10 rows, all 64-hex, unused.
+- status after → `{enabled:true, enrolledAt, recoveryCodesRemaining:10}`.
+- setup again → 409.
+- disable wrong password → 400 + failure audit; correct password → 200
+  `{enabled:false}`, DB: secret NULL, disabled, enrolled_at NULL, 0 codes.
+- re-enrol, disable via a **current TOTP code** (not password) → 200.
+- disable with neither / both of code+password → 422 (validation).
+- 369 backend tests pass (+16: `totp` 10, `totpSecret` 6); typecheck clean.
+- Throwaway user and its rows deleted.
+
+### 128.3 Next (slice B)
+
+`/auth/login` returns `202 {mfaRequired, mfaToken}` when `totp_enabled`;
+`POST /auth/login/totp` finishes it with a TOTP code or a recovery code
+(stamp `used_at`); rate-limit the second step hard; audit
+`login_mfa_challenge/success/failure`, `login_recovery_code_used`. Add
+`./start.sh recover disable-2fa <username>`.

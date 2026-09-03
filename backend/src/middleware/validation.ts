@@ -37,6 +37,16 @@ export const schemas = {
   authRefresh: Joi.object({
     refreshToken: Joi.string().max(2048).required(),
   }),
+  // Activating TOTP: a 6-digit code from the authenticator app.
+  totpActivate: Joi.object({
+    code: Joi.string().trim().pattern(/^\d{6}$/).required(),
+  }),
+  // Disabling TOTP: re-verify with a current 6-digit code OR the account
+  // password. Exactly one is required.
+  totpDisable: Joi.object({
+    code: Joi.string().trim().pattern(/^\d{6}$/),
+    password: Joi.string().min(1).max(128),
+  }).xor('code', 'password'),
   serviceNameParam: Joi.object({
     name: serviceNameSchema.required(),
   }),

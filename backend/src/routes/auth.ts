@@ -1,12 +1,21 @@
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { query } from '../utils/database';
+import { query, withTransaction } from '../utils/database';
 import { hashPassword, verifyPassword } from '../utils/password';
 import { signAccessToken, signRefreshToken, verifyRefreshToken, refreshTokenExpiryMs } from '../utils/jwt';
 import setupModeMiddleware from '../middleware/setupMode';
 import authMiddleware from '../middleware/auth';
 import { schemas, validateBody } from '../middleware/validation';
 import { writeAuditLog } from '../utils/audit';
+import {
+  generateRecoveryCodes,
+  generateTotpSecret,
+  hashRecoveryCode,
+  totpKeyUri,
+  totpQrSvg,
+  verifyTotp,
+} from '../utils/totp';
+import { openSecret, sealSecret } from '../utils/totpSecret';
 
 const router = Router();
 
@@ -196,5 +205,180 @@ router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (r
     return res.status(401).json({ error: 'Refresh token is invalid or expired' });
   }
 });
+
+// ---------------------------------------------------------------------------
+// TOTP second factor — enrolment (plan.md §127, slice A)
+//
+// All authenticated: a signed-in user manages their own second factor. Login
+// is not yet gated on it — that is slice B.
+// ---------------------------------------------------------------------------
+
+interface TotpUserRow {
+  username: string;
+  password_hash: string;
+  totp_secret: string | null;
+  totp_enabled: boolean;
+  totp_enrolled_at: string | null;
+}
+
+// GET /api/auth/totp/status — what the settings screen renders from.
+router.get('/totp/status', authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  try {
+    const result = await query<TotpUserRow>(
+      'SELECT totp_enabled, totp_enrolled_at FROM users WHERE id = $1',
+      [userId]
+    );
+    const row = result.rows[0];
+    if (!row) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    let recoveryCodesRemaining = 0;
+    if (row.totp_enabled) {
+      const codes = await query<{ n: string }>(
+        'SELECT COUNT(*) AS n FROM totp_recovery_codes WHERE user_id = $1 AND used_at IS NULL',
+        [userId]
+      );
+      recoveryCodesRemaining = parseInt(codes.rows[0].n, 10);
+    }
+
+    return res.json({
+      enabled: row.totp_enabled,
+      enrolledAt: row.totp_enrolled_at,
+      recoveryCodesRemaining,
+    });
+  } catch (err) {
+    console.error('TOTP status error:', (err as Error).message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/totp/setup — mint a pending secret and return the QR/URI.
+// Not enabled until /activate proves a code. Re-running replaces an abandoned
+// pending secret.
+router.post('/totp/setup', authLimiter, authMiddleware, async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  try {
+    const result = await query<TotpUserRow>('SELECT username, totp_enabled FROM users WHERE id = $1', [userId]);
+    const row = result.rows[0];
+    if (!row) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+    if (row.totp_enabled) {
+      return res.status(409).json({ error: 'Two-factor authentication is already enabled. Disable it first to re-enrol.' });
+    }
+
+    const secret = generateTotpSecret();
+    await query('UPDATE users SET totp_secret = $2, totp_enabled = FALSE WHERE id = $1', [userId, sealSecret(secret)]);
+
+    const otpauthUri = totpKeyUri(row.username, secret);
+    const qrSvg = await totpQrSvg(otpauthUri);
+    return res.json({ otpauthUri, qrSvg, secret });
+  } catch (err) {
+    console.error('TOTP setup error:', (err as Error).message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// POST /api/auth/totp/activate — verify a code against the pending secret,
+// turn 2FA on, and return the one-time recovery codes.
+router.post(
+  '/totp/activate',
+  authLimiter,
+  authMiddleware,
+  validateBody(schemas.totpActivate),
+  async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { code } = req.body;
+    try {
+      const result = await query<TotpUserRow>(
+        'SELECT totp_secret, totp_enabled FROM users WHERE id = $1',
+        [userId]
+      );
+      const row = result.rows[0];
+      if (!row) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      if (row.totp_enabled) {
+        return res.status(409).json({ error: 'Two-factor authentication is already enabled.' });
+      }
+      if (!row.totp_secret) {
+        return res.status(400).json({ error: 'No pending secret — call POST /auth/totp/setup first.' });
+      }
+
+      if (!verifyTotp(code, openSecret(row.totp_secret))) {
+        await writeAuditLog({ userId, action: 'totp_activate', resource: 'auth', result: 'failure' }).catch(() => {});
+        return res.status(400).json({ error: 'That code is not valid. Check your authenticator app and try again.' });
+      }
+
+      const recoveryCodes = generateRecoveryCodes();
+      await withTransaction(async (client) => {
+        await client.query('UPDATE users SET totp_enabled = TRUE, totp_enrolled_at = NOW() WHERE id = $1', [userId]);
+        await client.query('DELETE FROM totp_recovery_codes WHERE user_id = $1', [userId]);
+        for (const rc of recoveryCodes) {
+          await client.query('INSERT INTO totp_recovery_codes (user_id, code_hash) VALUES ($1, $2)', [
+            userId,
+            hashRecoveryCode(rc),
+          ]);
+        }
+      });
+
+      await writeAuditLog({ userId, action: 'totp_activate', resource: 'auth', result: 'success' }).catch(() => {});
+      return res.json({ enabled: true, recoveryCodes });
+    } catch (err) {
+      console.error('TOTP activate error:', (err as Error).message);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// POST /api/auth/totp/disable — turn 2FA off after re-verifying with a current
+// code or the account password.
+router.post(
+  '/totp/disable',
+  authLimiter,
+  authMiddleware,
+  validateBody(schemas.totpDisable),
+  async (req: Request, res: Response) => {
+    const userId = req.user!.id;
+    const { code, password } = req.body;
+    try {
+      const result = await query<TotpUserRow>(
+        'SELECT password_hash, totp_secret, totp_enabled FROM users WHERE id = $1',
+        [userId]
+      );
+      const row = result.rows[0];
+      if (!row) {
+        return res.status(404).json({ error: 'User not found' });
+      }
+      if (!row.totp_enabled) {
+        return res.status(400).json({ error: 'Two-factor authentication is not enabled.' });
+      }
+
+      const verified = password
+        ? await verifyPassword(password, row.password_hash)
+        : Boolean(row.totp_secret && verifyTotp(code, openSecret(row.totp_secret)));
+      if (!verified) {
+        await writeAuditLog({ userId, action: 'totp_disable', resource: 'auth', result: 'failure' }).catch(() => {});
+        return res.status(400).json({ error: 'Provide a current 6-digit code or your account password.' });
+      }
+
+      await withTransaction(async (client) => {
+        await client.query(
+          'UPDATE users SET totp_secret = NULL, totp_enabled = FALSE, totp_enrolled_at = NULL WHERE id = $1',
+          [userId]
+        );
+        await client.query('DELETE FROM totp_recovery_codes WHERE user_id = $1', [userId]);
+      });
+
+      await writeAuditLog({ userId, action: 'totp_disable', resource: 'auth', result: 'success' }).catch(() => {});
+      return res.json({ enabled: false });
+    } catch (err) {
+      console.error('TOTP disable error:', (err as Error).message);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
 
 export default router;
