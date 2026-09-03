@@ -14356,5 +14356,94 @@ full-width row between the brand/logout row and the nav strip.
 `backend`: `npm run typecheck` clean, `npm test` 380/380. `frontend`:
 `npm run build` clean (pre-existing bundle-budget + Bootstrap selector
 warnings), `npm run test:ci` 42/42. Rebuilt + redeployed backend and frontend
-(`/api/version` → `0.7.0`); no root teardown. Awaiting @mat's review on
-`localhost:10001`.
+(`/api/version` → `0.7.0`); no root teardown. Reviewed by @mat on
+`localhost:10001` — the canvas needed correcting from slate-950 to gethomepage's
+actual `#1e293b` (148.1); approved and pushed (`6d31755`).
+
+## 149. Plan — SSO slice 1: named roles that actually gate the dashboard (§131.3, 2026-09-03)
+
+Roles existed once and were pulled (`51387f0`, 2026-08-26) as "the unused role
+tier — every account is now an administrator", `users.role` dropped with a
+startup migration (`dropLegacyRoleColumn`). §131.3 brings them back, but this
+time **wired to something**: capability gates on the dashboard, and (later
+slices) the per-user SSO app-access list.
+
+### 149.1 Current state
+
+- `users`: `id, username, password_hash, is_setup_complete, created_at, totp_*`.
+  No role column.
+- Every authenticated route is behind one `authMiddleware` (JWT `{ id, username }`,
+  1h access token). No route checks anything beyond "is logged in".
+- `/api/users` (list/create/reset-password/delete) is open to any logged-in
+  user. `/api/auth/login` returns tokens; there is no `/api/auth/me`.
+
+### 149.2 Scope of slice 1
+
+Just the roles + capability gate. **Not** in this slice: the create-user form
+rework, the registry-derived app-access list, or the Authelia user writer
+(§131.3 items 2–4). Those need slice 1's role model first.
+
+Proposed shape (decisions for @mat below):
+
+- **Three roles, one per user**: `owner`, `it_admin`, `webmaster`. Seeded from
+  the §84.4 / §109 runbooks — webmaster owns the Cloudflare side, IT admin owns
+  the app stack, owner owns both plus user management. An app-only `user` role
+  (dashboard-less, SSO access only) comes with the access-list slices.
+- **Capability map** (`owner` ⊇ everything):
+
+  | capability | owner | it_admin | webmaster |
+  |---|---|---|---|
+  | start / stop / restart apps, per-app config | ✓ | ✓ | — |
+  | per-app exposure toggle | ✓ | ✓ | — |
+  | exposure **settings** (CF token, tunnel/zone IDs, NPM creds) | ✓ | — | ✓ |
+  | backups (run / restore / schedule), updates | ✓ | ✓ | — |
+  | settings (timezone, ntfy, email, backup destination) | ✓ | ✓ | — |
+  | users & roles (create / delete / set role) | ✓ | — | — |
+  | view: health, utils, audit logs; own account security | ✓ | ✓ | ✓ |
+
+- **Schema**: re-add `users.role VARCHAR(20) NOT NULL DEFAULT 'it_admin'`, plus
+  an `ensureUserRoleColumn()` startup migration that adds it **and** sets every
+  existing row to `owner` (they were all admins). `dropLegacyRoleColumn()` is
+  removed — its whole reason is reversed — but keep a one-liner note so a
+  database that still has the old text column isn't double-migrated badly
+  (the old column allowed any string; `ADD COLUMN IF NOT EXISTS` is a no-op if
+  it survived, so also normalise unknown values to `owner`).
+- **Enforcement**: a `requireCapability(cap)` middleware that does one
+  `SELECT role FROM users WHERE id = $1` (fresh, not trusting a possibly-stale
+  1h token) and 403s if the role lacks `cap`. Applied per-route-group. The
+  capability→roles table lives in one `backend/src/auth/capabilities.ts`.
+- **Token / identity**: add `role` to the `/api/auth/login` and
+  `/api/auth/refresh` responses, and add `GET /api/auth/me` returning
+  `{ id, username, role, capabilities: string[] }` so the frontend can gate
+  UI without hardcoding the matrix. `role` also goes into the access-token
+  payload for cheap reads, but the middleware still hits the DB for anything
+  that matters.
+- **Frontend**: `AuthService` exposes the current `role` / `capabilities`
+  (from `/api/auth/me`, called after login and on app load). A
+  `*appIfCapability` directive / `hasCapability()` helper hides nav entries
+  and action buttons the role can't use; the Users & roles nav item and page
+  are owner-only. The Users page gains a role column and, for the owner, a
+  role `<select>` per user (can't change your own; can't remove the last
+  owner). Component specs that assume every button renders get the capability
+  set stubbed.
+- **Recovery**: `./start.sh recover` (§126) already resets a locked-out admin;
+  make it also set that account's role to `owner` so a demotion mistake is
+  recoverable the same way.
+
+### 149.3 Decisions needed from @mat
+
+1. Role set — `owner` / `it_admin` / `webmaster` as above, or a different list?
+2. One role per user, or allow multiple (someone who is both webmaster and IT
+   admin)? Slice 1 is simpler with one; `owner` covers "both".
+3. The capability map — anything in the wrong column? Notably: should
+   `it_admin` be able to change **settings** (ntfy/email/timezone/backup dest),
+   or is that owner-only? And should `webmaster` get read access to the app
+   list at all, or a genuinely Exposure-only dashboard?
+4. New-user default role when the owner creates one — force a choice (no
+   default), or default `it_admin`?
+
+### 149.4 Not doing
+
+No change to how Authelia gates the *apps* yet — that is the access-list
+slices. No new "permissions" table; the capability map is code, not data
+(same spirit as the service registry).
