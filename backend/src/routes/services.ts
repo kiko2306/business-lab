@@ -13,6 +13,7 @@ import { createStreamTicket } from '../services/realtime';
 import { getPublishedUpstreamPort, getService, isValidServiceName } from '../config/services';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { deprovisionServiceExposure, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
+import { syncAutheliaAccessControlSafe } from '../services/autheliaAccessControl';
 import { regenerateHomepageServices } from '../services/homepageConfig';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
@@ -267,12 +268,18 @@ router.put(
       // which regenerates too.
       await regenerateHomepageServices();
 
+      // The set of Authelia-gated apps may have changed (enabled/disabled, or
+      // the authelia flag toggled) — regenerate its access-control rules and
+      // restart it if they moved (plan.md §151 slice 2d).
+      const autheliaWarning = await syncAutheliaAccessControlSafe('exposure_change', req.user!.id);
+
       return res.json({
         message: turnedOff
           ? 'Exposure disabled and public hostnames removed.'
           : 'Exposure configuration saved. Restart the service to apply it.',
         enabled: row.enabled,
         hostname: row.hostname,
+        ...(autheliaWarning ? { warning: autheliaWarning } : {}),
       });
     } catch (error) {
       const httpError = error as HttpError;

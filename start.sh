@@ -366,6 +366,14 @@ if [ -n "$BASE_DOMAIN" ]; then
     warn "apps/authelia/config/users_database.yml has a PLACEHOLDER password — set a real one before exposing anything (see the file's header, or the dashboard's Settings)"
   fi
 
+  # configuration.yml is gitignored too (plan.md §151): the dashboard rewrites
+  # its access_control block from the live set of exposed + Authelia-protected
+  # apps. A fresh clone gets the fail-closed template (deny + portal bypass).
+  if [ ! -f apps/authelia/config/configuration.yml ]; then
+    log "Creating Authelia's configuration.yml from the template"
+    cp apps/authelia/config/configuration.yml.example apps/authelia/config/configuration.yml
+  fi
+
   # Authelia's OIDC signing key can't live in the tracked config (it's a
   # private key), so it's merged in from this gitignored second file.
   if [ ! -f apps/authelia/data/oidc-secrets.yml ]; then

@@ -15156,3 +15156,58 @@ password chosen by whoever creates the account. Instead:
 So §158.3 question 2 is settled: the gate is "mailbox configured", and the
 account simply stays inactive until the password is set — no transactional
 send.
+
+## 159. §151 slice 2d done — Authelia access_control generation (2026-09-03)
+
+Closes SSO slice 2. Patch bump 0.9.4 → 0.9.5. Proven on the live stack.
+
+### 159.1 What it does
+
+- `services/autheliaAccessControl.ts`:
+  - `renderAccessControl(portalDomain, gated[])` (pure) → a marker-delimited
+    block: `default_policy: deny`, a `bypass` rule for the Authelia portal,
+    then one `one_factor` rule per gated app with `subject: ['group:admins',
+    'group:app-<name>']`. `admins` OR the app's group — a webmaster is in
+    `admins` (§157) and every granted user is in `app-<name>`.
+  - `spliceAccessControl(text, block)` (pure) — replaces the managed region:
+    anchors on the `# >>> … / # <<<` marker pair if present, else on the
+    structural `access_control:` span, else prepends. Idempotent.
+  - `syncAutheliaAccessControl(trigger)` — reads the gated apps from the live
+    `service_exposure` rows (via `getAppAccessOptions`, same source as
+    2a/2c), the portal domain from the `authelia` exposure row (or
+    `authelia.<baseDomain>`), splices the block in, and — only if the file
+    changed — `docker compose … restart authelia` (config isn't hot-reloaded
+    like the users file). `syncAutheliaAccessControlSafe` never throws;
+    audits + returns a warning.
+- Hooked into `PUT /api/services/:name/exposure` (the exposure/authelia
+  toggle) — the only place the gated-app set changes. Not hooked into user
+  mutations (rules are per-group, not per-user) or the start path.
+- `configuration.yml` is now **gitignored** and seeded from a new
+  `configuration.yml.example` by `start.sh` (mirrors `users_database.yml`).
+  The example ships fail-closed: `default_policy: deny` + only the templated
+  portal `bypass`; per-app rules appear once apps are exposed and gated.
+- 5 unit tests (`autheliaAccessControl.test.ts`). Backend `npm test` 410/410,
+  typecheck clean. (The `services.test.ts` "failures" seen mid-slice were a
+  broken docker mount from a drifted shell cwd — `-v "$PWD":/repo` mounting
+  only `backend/` — not a real regression.)
+
+### 159.2 Proven on the live stack
+
+- Ran `syncAutheliaAccessControl` in the backend container. It wrote 5 rules
+  (bookstack, code-server, netbird-vpn, nginx-proxy-manager,
+  `ssh.` → wetty), `default_policy: deny`, portal bypass, and restarted
+  Authelia.
+- Authelia v4.39.20 came back **healthy**, `Startup complete`, and the prior
+  `"no rules have been specified"` warning is gone — the rules are live.
+- Re-ran against the committed-default marker form to confirm the splice
+  finds and replaces the managed region (not just the first structural
+  block). 5 rules again, healthy.
+- **Still needs a browser check by @mat:** a `user`-role account granted one
+  app signs in via SSO → that app opens, a non-granted one 403s; and `mat`
+  (webmaster, `group:admins`) still reaches all five.
+
+### 159.3 SSO slice 2 done
+
+2a data model, 2b UI, 2c users-file sync, 2d access_control — the per-user
+SSO app-access list is now enforced end to end at Authelia. Remaining SSO
+work: the invite-based user-creation flow (§158).

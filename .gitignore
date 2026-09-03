@@ -63,3 +63,7 @@ Thumbs.db
 # Written by the backend on every start of the Kitchen switcher from live
 # exposure state and allocated ports (services/kitchenConfig.ts).
 apps/kitchen-switcher/html/config.json
+
+# configuration.yml is generated: start.sh seeds it from the .example, and the
+# dashboard rewrites its access_control block on every exposure change (plan.md §151).
+apps/authelia/config/configuration.yml

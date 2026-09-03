@@ -11,6 +11,21 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.9.5] — 2026-09-03
+
+### Added
+
+- Authelia `access_control` generation (§151, slice 2d — closes slice 2).
+  The dashboard now writes a marker-delimited block into
+  `apps/authelia/config/configuration.yml`: `default_policy: deny` plus one
+  `one_factor` rule per exposed + Authelia-protected app, each admitting
+  `group:admins` (a webmaster) or `group:app-<name>` (a granted user), and a
+  `bypass` for Authelia's own portal. An app with no rule is unreachable. It
+  regenerates whenever exposure or the Authelia flag changes (the
+  `PUT /services/:name/exposure` path) and restarts Authelia when the block
+  moved. `configuration.yml` is now gitignored and seeded from a fail-closed
+  `configuration.yml.example` by `start.sh`, like `users_database.yml`.
+
 ## [0.9.4] — 2026-09-03
 
 ### Added

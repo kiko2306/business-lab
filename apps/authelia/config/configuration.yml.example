@@ -29,8 +29,17 @@ authentication_backend:
     # Authelia restart (a restart 502s every gated app for a few seconds).
     watch: true
 
+# >>> managed by the dashboard — plan.md §151; regenerated on every exposure change, manual edits are lost
+# The dashboard replaces this whole block from the live set of exposed +
+# Authelia-protected apps: one `one_factor` rule per app admitting
+# `group:admins` or `group:app-<name>`. Ships fail-closed (deny + only the
+# portal bypass); the per-app rules appear once an app is exposed and gated.
 access_control:
-  default_policy: one_factor
+  default_policy: deny
+  rules:
+    - domain: 'authelia.{{ env "BASE_DOMAIN" }}'
+      policy: bypass
+# <<< managed by the dashboard
 
 session:
   cookies:
