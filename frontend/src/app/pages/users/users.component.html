@@ -7,7 +7,7 @@
     </p>
   </div>
 
-  <app-panel key="users:add" title="Add user" subtitle="Username, a password of at least 8 characters, one or more roles, and — for an admin — which features they get">
+  <app-panel key="users:add" title="Add user" subtitle="Username, email, a password of at least 8 characters, one or more roles, an admin's features, and the apps they can reach through SSO">
     <form class="row g-3 align-items-start" [formGroup]="createForm" (ngSubmit)="createUser()">
       <div class="col-12 col-md-4">
         <input class="form-control" placeholder="Username" formControlName="username" autocomplete="off" />
@@ -16,15 +16,16 @@
         </div>
       </div>
       <div class="col-12 col-md-4">
+        <input class="form-control" type="email" placeholder="Email" formControlName="email" autocomplete="off" />
+        <div class="form-text text-danger" *ngIf="createForm.controls.email.touched && createForm.controls.email.invalid">
+          Enter a valid email address.
+        </div>
+      </div>
+      <div class="col-12 col-md-4">
         <input class="form-control" type="password" placeholder="Password" formControlName="password" autocomplete="new-password" />
         <div class="form-text text-danger" *ngIf="createForm.controls.password.touched && createForm.controls.password.invalid">
           Password must be at least 8 characters.
         </div>
-      </div>
-      <div class="col-12 col-md-4 d-grid">
-        <button class="btn btn-primary" type="submit" [disabled]="creating">
-          {{ creating ? 'Creating…' : 'Create user' }}
-        </button>
       </div>
       <div class="col-12">
         <span class="form-label small fw-semibold d-block mb-1">Roles</span>
@@ -62,15 +63,44 @@
         </div>
         <div class="form-text text-danger" *ngIf="!newCapsValid()">An admin needs at least one feature.</div>
       </div>
+      <div class="col-12" *ngIf="appOptions.length">
+        <span class="form-label small fw-semibold d-block mb-1">SSO app access</span>
+        <p class="form-text mt-0 mb-2">
+          Which exposed apps this account may reach through single sign-on.
+          None by default.
+        </p>
+        <div class="d-flex flex-wrap gap-3">
+          <div class="form-check" *ngFor="let option of appOptions">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              [id]="'new-app-' + option.serviceName"
+              [(ngModel)]="newAppAccess[option.serviceName]"
+              [ngModelOptions]="{ standalone: true }"
+            />
+            <label class="form-check-label" [for]="'new-app-' + option.serviceName">
+              {{ option.label }}
+              <span class="text-body-secondary small" *ngIf="option.hostname"> · {{ option.hostname }}</span>
+              <span class="badge text-bg-secondary ms-1" *ngFor="let group of option.requiredGroups">{{ group }}</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      <div class="col-12 col-md-4 d-grid">
+        <button class="btn btn-primary" type="submit" [disabled]="creating">
+          {{ creating ? 'Creating…' : 'Create user' }}
+        </button>
+      </div>
     </form>
   </app-panel>
 
-  <app-panel key="users:list" title="Accounts" subtitle="Existing users, their roles, and each admin's features">
+  <app-panel key="users:list" title="Accounts" subtitle="Existing users — their email, roles, an admin's features, and the apps they reach through SSO">
     <div class="table-responsive table-stack-wrap">
       <table class="table table-sm table-stack align-middle mb-0">
         <thead>
           <tr>
             <th>Username</th>
+            <th>Email</th>
             <th>Roles</th>
             <th>Created</th>
             <th class="text-end">Actions</th>
@@ -82,6 +112,13 @@
               <td data-label="Username">
                 {{ user.username }}
                 <span class="badge text-bg-secondary ms-1" *ngIf="user.id === currentUserId">you</span>
+              </td>
+              <td data-label="Email">
+                <span *ngIf="user.email">{{ user.email }}</span>
+                <span class="text-body-secondary" *ngIf="!user.email">—</span>
+                <div class="form-text mt-0" *ngIf="user.appAccess?.length">
+                  {{ user.appAccess?.length }} SSO app{{ user.appAccess?.length === 1 ? '' : 's' }}
+                </div>
               </td>
               <td data-label="Roles">
                 <div class="d-flex flex-wrap gap-2 align-items-center">
@@ -135,6 +172,7 @@
               <td data-label="Created">{{ user.created_at | date:'dd/MM/yyyy' }}</td>
               <td data-label="Actions" class="text-end">
                 <div class="btn-group btn-group-sm">
+                  <button class="btn btn-outline-secondary" (click)="startAccessEdit(user)">Edit access</button>
                   <button class="btn btn-outline-secondary" (click)="startPasswordReset(user.id)">Reset password</button>
                   <button
                     class="btn btn-outline-danger"
@@ -148,7 +186,7 @@
               </td>
             </tr>
             <tr *ngIf="resetPasswordId === user.id">
-              <td colspan="4">
+              <td colspan="5">
                 <div class="d-flex gap-2 align-items-center flex-wrap">
                   <input
                     class="form-control form-control-sm"
@@ -164,9 +202,52 @@
                 </div>
               </td>
             </tr>
+            <tr *ngIf="accessEditId === user.id">
+              <td colspan="5">
+                <div class="mb-2">
+                  <label class="form-label small fw-semibold mb-1" [for]="'access-email-' + user.id">Email</label>
+                  <input
+                    class="form-control form-control-sm"
+                    type="email"
+                    style="max-width: 320px"
+                    [id]="'access-email-' + user.id"
+                    placeholder="name@example.com"
+                    [(ngModel)]="accessEmail"
+                    [ngModelOptions]="{ standalone: true }"
+                    autocomplete="off"
+                  />
+                </div>
+                <span class="form-label small fw-semibold d-block mb-1">SSO app access</span>
+                <div class="d-flex flex-wrap gap-3" *ngIf="appOptions.length; else noAppOptions">
+                  <div class="form-check" *ngFor="let option of appOptions">
+                    <input
+                      class="form-check-input"
+                      type="checkbox"
+                      [id]="'access-app-' + user.id + '-' + option.serviceName"
+                      [(ngModel)]="accessApps[option.serviceName]"
+                      [ngModelOptions]="{ standalone: true }"
+                    />
+                    <label class="form-check-label small" [for]="'access-app-' + user.id + '-' + option.serviceName">
+                      {{ option.label }}
+                      <span class="text-body-secondary" *ngIf="option.hostname"> · {{ option.hostname }}</span>
+                      <span class="badge text-bg-secondary ms-1" *ngFor="let group of option.requiredGroups">{{ group }}</span>
+                    </label>
+                  </div>
+                </div>
+                <ng-template #noAppOptions>
+                  <p class="form-text mt-0">No apps are exposed behind Authelia yet.</p>
+                </ng-template>
+                <div class="d-flex gap-2 mt-2">
+                  <button class="btn btn-sm btn-primary" [disabled]="savingAccess" (click)="submitAccessEdit()">
+                    {{ savingAccess ? 'Saving…' : 'Save access' }}
+                  </button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="cancelAccessEdit()">Cancel</button>
+                </div>
+              </td>
+            </tr>
           </ng-container>
           <tr *ngIf="!items.length && !loading">
-            <td colspan="4" class="text-center text-body-secondary py-4">No users found.</td>
+            <td colspan="5" class="text-center text-body-secondary py-4">No users found.</td>
           </tr>
         </tbody>
       </table>

@@ -14968,3 +14968,39 @@ the new route is mounted and gated (401 unauthenticated). No frontend change
 2b — the create-form email field + app-access checkbox list and a per-row
 Access editor. Then 2c (Authelia users-file sync) and 2d (access_control
 generation), both proven end-to-end on the live stack.
+
+## 156. §151 slice 2b done — the Access UI on Users & roles (2026-09-03)
+
+Frontend for the email field and the SSO app-access list. Patch bump
+0.9.2 → 0.9.3. No Authelia write yet (2c/2d).
+
+- **`operations.service.ts`.** `listAppAccessOptions()`; `createUser` takes an
+  options object (`{ capabilities?, email?, appAccess? }`) instead of a bare
+  `capabilities` arg; new `updateUserAccess(id, email, appAccess)`.
+- **Create form.** A required **Email** field (`Validators.email`), and an
+  **SSO app access** checkbox list built from `GET
+  /api/users/app-access-options` — label · hostname, plus a badge per required
+  Authelia group. All off by default (explicit allowlist). The Create button
+  moved below the checkbox blocks.
+- **Accounts table.** New **Email** column (shows `—` when unset, and an
+  "N SSO apps" line when the account has any). New **Edit access** action per
+  row that expands a full-width editor — email input + the same app
+  checkboxes + Save/Cancel — calling `PUT /api/users/:id/access`. Mirrors the
+  password-reset expander rather than an always-visible per-row editor, so a
+  row with roles + features + access doesn't become a wall of checkboxes.
+- Options load is a soft dependency: if the request fails the picker just
+  stays empty and user creation still works.
+
+### 156.1 Verified
+
+`frontend`: `npm run build` clean (pre-existing warnings), `npm run test:ci`
+42/42. Rebuilt + redeployed; `/api/version` → `0.9.3`. @mat's `:10001`
+sign-off pending.
+
+### 156.2 Next
+
+2c — write every managed account into Authelia's `users_database.yml` with
+`app-<name>` groups (hash copied from `users.password_hash`), synced on
+create/update/delete/password-reset/recover; `webmaster` also gets `admins`
++ every `app-*`. Proven on the live stack. Then 2d — `access_control`
+generation in `configuration.yml`.

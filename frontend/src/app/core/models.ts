@@ -386,15 +386,31 @@ export interface HealthAlert {
 export interface AdminUser {
   id: number;
   username: string;
+  email: string | null;
   created_at: string;
   roles: Role[];
   // Effective capabilities the account holds — an admin's grants (or all-on
   // when it has none), everything for a webmaster, nothing for a user.
   capabilities?: string[];
+  // Managed apps this account may reach through Authelia SSO (plan.md §151).
+  appAccess?: string[];
 }
 
 export interface AdminUserListResponse {
   items: AdminUser[];
+}
+
+/** One choice in the SSO app-access picker — GET /api/users/app-access-options. */
+export interface AppAccessOption {
+  serviceName: string;
+  label: string;
+  hostname: string | null;
+  /** Named Authelia groups a grant to this app also implies. */
+  requiredGroups: string[];
+}
+
+export interface AppAccessOptionsResponse {
+  items: AppAccessOption[];
 }
 
 export interface DiskUsage {

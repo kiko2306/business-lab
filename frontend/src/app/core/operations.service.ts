@@ -6,6 +6,7 @@ import { SKIP_AUTH, SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
 import {
   AdminUser,
   AdminUserListResponse,
+  AppAccessOptionsResponse,
   AuditLogResponse,
   AutheliaAdminUser,
   AutheliaAdminUserUpdate,
@@ -163,18 +164,35 @@ export class OperationsService {
     return this.http.get<AdminUserListResponse>(`${API_BASE_URL}/users`);
   }
 
+  listAppAccessOptions(): Observable<AppAccessOptionsResponse> {
+    return this.http.get<AppAccessOptionsResponse>(`${API_BASE_URL}/users/app-access-options`);
+  }
+
   createUser(
     username: string,
     password: string,
     roles: string[],
-    capabilities?: string[]
+    options?: { capabilities?: string[]; email?: string; appAccess?: string[] }
   ): Observable<{ user: AdminUser }> {
     return this.http.post<{ user: AdminUser }>(`${API_BASE_URL}/users`, {
       username,
       password,
       roles,
-      ...(capabilities ? { capabilities } : {}),
+      ...(options?.capabilities ? { capabilities: options.capabilities } : {}),
+      ...(options?.email ? { email: options.email } : {}),
+      ...(options?.appAccess ? { appAccess: options.appAccess } : {}),
     });
+  }
+
+  updateUserAccess(
+    id: number,
+    email: string,
+    appAccess: string[]
+  ): Observable<{ message: string; email: string; appAccess: string[] }> {
+    return this.http.put<{ message: string; email: string; appAccess: string[] }>(
+      `${API_BASE_URL}/users/${id}/access`,
+      { email, appAccess }
+    );
   }
 
   updateUserRoles(id: number, roles: string[]): Observable<{ message: string; roles: string[] }> {

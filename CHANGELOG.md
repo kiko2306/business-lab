@@ -11,6 +11,18 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.9.3] — 2026-09-03
+
+### Added
+
+- The Access UI on the Users & roles page (§151, slice 2b). The create form
+  gains a required **Email** field and an **SSO app access** checkbox list
+  built from `GET /api/users/app-access-options` — each app shows its
+  hostname and a badge for any Authelia group the grant implies. Each account
+  row gains an **Email** column and an **Edit access** action that expands to
+  an email field + the same app checkboxes, saved via `PUT
+  /api/users/:id/access`. Still no Authelia write — that is slices 2c/2d.
+
 ## [0.9.2] — 2026-09-03
 
 ### Added

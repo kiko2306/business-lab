@@ -4,7 +4,7 @@ import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angu
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
-import { AdminUser, Role } from '../../core/models';
+import { AdminUser, AppAccessOption, Role } from '../../core/models';
 import { ALL_CAPABILITIES, Capability, CAPABILITY_LABELS, ROLE_LABELS } from '../../core/capabilities';
 import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
@@ -49,6 +49,7 @@ export class UsersComponent implements OnInit {
   protected readonly createForm = this.formBuilder.nonNullable.group({
     username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
     password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(128)]],
+    email: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
   });
   // Roles for the create form, kept outside the reactive group so the
   // checkboxes bind with plain ngModel. At least one is required (§149).
@@ -56,6 +57,12 @@ export class UsersComponent implements OnInit {
   // Feature grants for a new admin (§152b). Shown only when Admin is picked
   // and Webmaster is not; starts all-on (which equals "no grant rows").
   protected newCaps: Record<Capability, boolean> = allCapsRecord(true);
+  // SSO app-access for the create form (§151/2b) — a checkbox per grantable
+  // app, all off by default (an explicit allowlist).
+  protected newAppAccess: Record<string, boolean> = {};
+
+  // The grantable apps (exposed + Authelia-protected), loaded once.
+  protected appOptions: AppAccessOption[] = [];
 
   protected items: AdminUser[] = [];
   protected loading = false;
@@ -71,6 +78,12 @@ export class UsersComponent implements OnInit {
   protected capDraft: Record<number, Record<Capability, boolean>> = {};
   protected savingCapsId: number | null = null;
 
+  // Per-user Access edit state (§151/2b) — an expanded row, like password reset.
+  protected accessEditId: number | null = null;
+  protected accessEmail = '';
+  protected accessApps: Record<string, boolean> = {};
+  protected savingAccess = false;
+
   protected resetPasswordId: number | null = null;
   protected resetPasswordValue = '';
   protected resetting = false;
@@ -78,6 +91,16 @@ export class UsersComponent implements OnInit {
   ngOnInit(): void {
     this.auth.user$.subscribe((user) => (this.currentUserId = user?.id ?? null));
     this.load();
+    this.operations.listAppAccessOptions().subscribe({
+      next: (response) => {
+        this.appOptions = response.items;
+        for (const option of this.appOptions) {
+          this.newAppAccess[option.serviceName] ??= false;
+        }
+      },
+      // A soft failure — the picker just stays empty, user creation still works.
+      error: () => (this.appOptions = []),
+    });
   }
 
   load(): void {
@@ -150,6 +173,10 @@ export class UsersComponent implements OnInit {
     return now !== [...(user.capabilities ?? [])].sort().join(',');
   }
 
+  private pickedApps(record: Record<string, boolean>): string[] {
+    return this.appOptions.map((o) => o.serviceName).filter((name) => record[name]);
+  }
+
   createUser(): void {
     if (this.createForm.invalid || !this.newRolesValid() || !this.newCapsValid()) {
       this.createForm.markAllAsTouched();
@@ -161,13 +188,18 @@ export class UsersComponent implements OnInit {
       return;
     }
 
-    const { username, password } = this.createForm.getRawValue();
+    const { username, password, email } = this.createForm.getRawValue();
     // Only send a feature set for an admin-not-webmaster; the backend ignores
     // it otherwise, and an all-on set is equivalent to sending none.
     const caps = this.newCapsShown() ? this.selectedCaps(this.newCaps) : undefined;
+    const appAccess = this.pickedApps(this.newAppAccess);
     this.creating = true;
     this.operations
-      .createUser(username, password, this.selected(this.newRoles), caps)
+      .createUser(username, password, this.selected(this.newRoles), {
+        capabilities: caps,
+        email: email.trim(),
+        appAccess: appAccess.length ? appAccess : undefined,
+      })
       .pipe(finalize(() => (this.creating = false)))
       .subscribe({
         next: () => {
@@ -175,9 +207,53 @@ export class UsersComponent implements OnInit {
           this.createForm.reset();
           this.newRoles = { webmaster: false, admin: true, user: false };
           this.newCaps = allCapsRecord(true);
+          this.newAppAccess = {};
           this.load();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to create user.')),
+      });
+  }
+
+  // --- Per-row Access editor (email + SSO app list) ---
+
+  protected startAccessEdit(user: AdminUser): void {
+    this.accessEditId = user.id;
+    this.accessEmail = user.email ?? '';
+    this.accessApps = {};
+    for (const option of this.appOptions) {
+      this.accessApps[option.serviceName] = (user.appAccess ?? []).includes(option.serviceName);
+    }
+  }
+
+  protected cancelAccessEdit(): void {
+    this.accessEditId = null;
+    this.accessEmail = '';
+    this.accessApps = {};
+  }
+
+  private emailLooksValid(value: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+  }
+
+  protected submitAccessEdit(): void {
+    if (this.accessEditId === null) {
+      return;
+    }
+    if (!this.emailLooksValid(this.accessEmail)) {
+      this.toast.error('Enter a valid email address.');
+      return;
+    }
+    this.savingAccess = true;
+    this.operations
+      .updateUserAccess(this.accessEditId, this.accessEmail.trim(), this.pickedApps(this.accessApps))
+      .pipe(finalize(() => (this.savingAccess = false)))
+      .subscribe({
+        next: () => {
+          this.toast.success('Access updated.');
+          this.cancelAccessEdit();
+          this.load();
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to update access.')),
       });
   }
 
