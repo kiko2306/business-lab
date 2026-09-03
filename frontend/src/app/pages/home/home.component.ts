@@ -7,12 +7,10 @@ interface MenuTile {
   description: string;
   /** Router path the tile links to. */
   link: string;
-  /** Optional in-page anchor on the target route. */
-  fragment?: string;
   /**
-   * True while the area still lives inside the one-page dashboard and this
-   * tile only deep-links into it. Cleared as each area moves onto its own
-   * route in later §131.1 slices.
+   * True while the area has no page of its own yet — the tile deep-links to a
+   * stand-in (`/apps`) and shows an "Opens in Apps" badge. Only "Updates &
+   * version control" (§131.4) is still pending; cleared when it is built.
    */
   pending?: boolean;
   /**
@@ -24,10 +22,10 @@ interface MenuTile {
 }
 
 /**
- * The post-login landing view (§131.1): a menu of the dashboard's areas. Apps
- * has its own route; the remaining areas still live in the single `/dashboard`
- * page, so their tiles deep-link into it with a fragment for now and carry an
- * "Opens in …" badge. Each is repointed when its area gets its own route.
+ * The post-login landing view (§131.1): a bento menu of the app's areas, each
+ * its own route. "Updates & version control" is the last `pending` tile — the
+ * feature is unbuilt (§131.4), so it deep-links to `/apps` with an "Opens in …"
+ * badge until it exists.
  */
 @Component({
   selector: 'app-home',
@@ -73,10 +71,8 @@ export class HomeComponent {
     },
     {
       title: 'Utils',
-      description: 'One-off tools such as the LAN device scan and health checks.',
-      link: '/dashboard',
-      fragment: 'utils',
-      pending: true,
+      description: 'Stack health checks and one-off tools such as the LAN device scan.',
+      link: '/utils',
     },
     {
       title: 'Audit logs',

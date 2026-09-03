@@ -5,7 +5,7 @@ import { AppsComponent } from './pages/apps/apps.component';
 import { BackupsComponent } from './pages/backups/backups.component';
 import { ExposureComponent } from './pages/exposure/exposure.component';
 import { SettingsComponent } from './pages/settings/settings.component';
-import { DashboardComponent } from './pages/dashboard/dashboard.component';
+import { UtilsComponent } from './pages/utils/utils.component';
 import { LoginComponent } from './pages/login/login.component';
 import { SetupComponent } from './pages/setup/setup.component';
 import { AccountComponent } from './pages/account/account.component';
@@ -64,10 +64,8 @@ export const routes: Routes = [
         component: SettingsComponent,
       },
       {
-        // What is left of the one-page dashboard: the stack-wide sections
-        // (Health checks, Utils) not yet on their own routes.
-        path: 'dashboard',
-        component: DashboardComponent,
+        path: 'utils',
+        component: UtilsComponent,
       },
       {
         path: 'audit-logs',

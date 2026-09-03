@@ -14106,3 +14106,60 @@ backend, now serving `/api/version` → `0.5.0`; no root teardown. Awaiting
 Utils is the last panel on `/dashboard` (with Health checks). One more slice —
 Utils onto its own route — empties the page and lets `DashboardComponent` be
 deleted. "Updates & version control" (§131.4) is new work, not a move.
+
+## 145. §131.1 slice 6 — Utils on its own route, and the Dashboard page retired (2026-09-03)
+
+Sixth and last slice of the multi-page dashboard split (§131.1). Feature bump
+0.5.0 → 0.6.0.
+
+### 145.1 Utils → `/utils`, with Health checks
+
+`git mv pages/dashboard/ → pages/utils/`, files renamed
+`dashboard.component.* → utils.component.*`, class
+`DashboardComponent → UtilsComponent`, selector `app-dashboard → app-utils`.
+The page keeps both panels it already held: **Health checks** (database, disk,
+memory, load — and all its formatting helpers) and **Utils** (the LAN device
+scan). They are grouped because neither fills a page alone and both are
+stack-wide operational tools rather than an app — and the Utils menu tile has
+described it as "the LAN device scan and health checks" since §134. Heading is
+now "Utils". No API change.
+
+### 145.2 The Dashboard route is gone
+
+`/dashboard` had nothing left once Settings moved (§144). Removed: the route,
+the `DashboardComponent` import in `app.routes.ts`, and the "Dashboard" nav
+button (replaced by "Utils"). Nothing redirected to `/dashboard` — every
+post-login landing goes to `/home` (§136.1), and the `**` wildcard route
+resolves to `/home` too.
+
+### 145.3 Menu cleanup
+
+- The Utils tile repoints from `/dashboard#utils` to `/utils`, loses its
+  badge.
+- `MenuTile.fragment` is deleted — no tile deep-links with a fragment any
+  more, now that every area is its own route. The `[fragment]` binding and
+  the `link === '/apps' ? 'Apps' : 'Dashboard'` badge ternary go with it;
+  the badge is a plain "Opens in Apps".
+- **"Updates & version control" is the one remaining `pending` tile** — the
+  feature is unbuilt (§131.4), so it still deep-links to `/apps`. `pending`
+  and its badge stay until Updates exists.
+- Docstrings in `home.component.ts` and `apps.component.ts` that described the
+  one-page dashboard are updated.
+
+### 145.4 Verified
+
+`frontend`: `npm run build` clean (pre-existing bundle-budget + Bootstrap
+selector warnings only); `npm run test:ci` 42/42. Redeployed with
+`docker compose up -d --build frontend`; the version bump also recreated the
+backend, now serving `/api/version` → `0.6.0`; no root teardown. Reviewed by
+@mat on `localhost:10001`.
+
+### 145.5 §131.1 multi-page restructure: done
+
+Every area is its own route — Apps (§136), Backups (§140), Exposure (§143),
+Settings (§144), Utils + Health (§145), plus Users, Audit logs and Account
+security which were already routed. The post-login bento menu (§134, §141.2)
+is the only landing page. The README "Move each dashboard area onto its own
+route" item is deleted. What is left under §131.1 is the Pantry/Price-Compare
+icon assets (a separate item) and the new "Updates & version control" area
+(§131.4), which is a build, not a move.

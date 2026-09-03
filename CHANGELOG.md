@@ -11,6 +11,16 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.6.0] — 2026-09-03
+
+### Changed
+
+- Utils moved onto its own `/utils` route (§131.1 slice 6), taking the Health
+  checks panel with it — both are stack-wide operational tools. This was the
+  last content on `/dashboard`, so the Dashboard route, its nav button and
+  `DashboardComponent` are **removed**. Every dashboard area is now its own
+  route; the post-login menu is the only landing page.
+
 ## [0.5.0] — 2026-09-03
 
 ### Changed

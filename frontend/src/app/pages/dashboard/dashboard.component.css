@@ -1,2 +1,0 @@
-/* The dashboard's sections are all <app-panel>s now; their collapse chrome and
-   anchor offset live in panel.component.css. Nothing page-specific remains. */

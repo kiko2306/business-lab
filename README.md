@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.5.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.6.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -158,11 +158,6 @@ Home Page / dashboard:
       custom apps with no upstream icon; today they use generic `mdi-*`
       placeholders. Design a small logo per app, ship it as the app's favicon
       and a Home-Page-servable file, point `homepage.icon` at it.
-- [ ] **Move each dashboard area onto its own route** (§131.1) — Apps (§136),
-      Backups (§140), Exposure (§143) and Settings (§144) are done; Utils is
-      the last panel on `/dashboard` alongside Health checks. One more slice
-      (Utils → its own route) empties the Dashboard page and retires
-      `DashboardComponent`. Updates is new work (§131.4), not a move.
 
 SSO / roles:
 

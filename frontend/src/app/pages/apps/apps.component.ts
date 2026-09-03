@@ -121,9 +121,9 @@ function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
 
 /**
  * The Apps area (§131.1): the service registry — summary counts, the
- * running-apps port table, and the full start/stop/configure list. Split off
- * the single-page dashboard as the first area to get its own route; the rest
- * (settings, backups, health, utils) still live in `DashboardComponent`.
+ * running-apps port table, and the full start/stop/configure list. The first
+ * area split off the single-page dashboard onto its own route (§136); the
+ * one-page `DashboardComponent` is gone entirely as of §145.
  */
 @Component({
   selector: 'app-apps',

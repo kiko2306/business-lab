@@ -8,19 +8,20 @@ import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
 
 /**
- * What is left of the single-page dashboard after the Apps (§136), Backups
- * (§140), Exposure (§143) and Settings (§144) areas moved onto their own
- * routes: Health checks and Utils. Both are slated to get their own route in a
- * later slice, at which point this component goes away.
+ * Utils on its own route (§131.1 slice 6, §145) — the last areas to leave the
+ * one-page dashboard, which is retired with this move: stack health checks
+ * (database, disk, memory, load) and the one-off LAN device scan. Grouped
+ * because neither fills a page alone and both are stack-wide operational tools
+ * rather than an app.
  */
 @Component({
-  selector: 'app-dashboard',
+  selector: 'app-utils',
   standalone: true,
   imports: [CommonModule, FormsModule, PanelComponent],
-  templateUrl: './dashboard.component.html',
-  styleUrl: './dashboard.component.css'
+  templateUrl: './utils.component.html',
+  styleUrl: './utils.component.css'
 })
-export class DashboardComponent implements OnInit {
+export class UtilsComponent implements OnInit {
   private readonly operations = inject(OperationsService);
   private readonly toast = inject(ToastService);
 
