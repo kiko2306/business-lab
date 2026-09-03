@@ -226,6 +226,13 @@ export interface ServiceDefinition {
   // editor Nextcloud embeds, but it is infrastructure, not a destination.
   // The `homepage.*` labels stay mandatory regardless (services.test.ts).
   hideFromHomePage?: boolean;
+  // This app serves a non-HTTP LAN protocol (Samba/SMB on 445) that the
+  // Cloudflare Tunnel + Nginx Proxy Manager path cannot carry (§0 principle
+  // 1). It publishes a host port, so getPublishedUpstreamPort would otherwise
+  // report it as exposable — this flag makes the dashboard refuse to offer or
+  // enable public exposure for it. It still gets no Home Page tile (that
+  // keys off a provisioned exposure, which can never happen here).
+  lanOnly?: boolean;
   // Named Authelia groups this app's forward-auth rule requires, on top of
   // the synthetic per-user `app-<name>` group the dashboard manages (plan.md
   // §151/§152). Most apps need none — "is this user allowed this app" is the

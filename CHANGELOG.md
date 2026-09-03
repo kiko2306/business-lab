@@ -11,6 +11,21 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.11.0] — 2026-09-03
+
+### Added
+
+- **Samba** — a LAN-only SMB file share as a managed app (`apps/samba/`,
+  §131.5). Windows-reachable on port 445 (a documented sub-10000 pin, like
+  Pi-hole's 53); the dashboard generates the account password and renders the
+  share definition to `data/smb.conf` before every start
+  (`backend/src/services/sambaConfig.ts`), so there is no hand-edited config.
+  A new `lanOnly` flag on the service registry keeps a non-HTTP app that
+  publishes a port from being offered for public exposure — SMB never goes
+  through the Cloudflare Tunnel. No Home Page tile (it is never "running and
+  exposed"). Rows added to `docs/ports.md`, `docs/app-credentials.md` and
+  `docs/licences.md` (Samba GPL-3.0, `dockurr/samba` wrapper MIT).
+
 ## [0.10.1] — 2026-09-03
 
 ### Added

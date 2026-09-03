@@ -16,6 +16,7 @@ import { ensureGeneratedSecrets } from './appEnv';
 import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { applyKitchenConfig } from './kitchenConfig';
+import { applySambaConfig } from './sambaConfig';
 import { checkServiceImages, recordImageCheck } from './imageUpdates';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
@@ -170,6 +171,10 @@ async function composeUpWithManagedConfig(
   // The Kitchen switcher embeds its siblings, so it needs their URLs — which
   // only the dashboard knows (exposure state + allocated ports).
   await applyKitchenConfig(serviceName, appDir);
+  // Samba: render the share's smb.conf before the app comes up. Unlike the
+  // Kitchen config this is load-bearing — a missing data/smb.conf makes
+  // Docker create the bind source as a directory and the entrypoint aborts.
+  await applySambaConfig(serviceName, appDir);
   // HACS: the appliance integrations this house needs (HomeWhiz, Ariston) only
   // exist as HACS repositories, and apps/*/data/ is gitignored, so a fresh
   // clone has to be able to get there without a console step (§0.2).

@@ -61,6 +61,18 @@ export async function upsertServiceExposureConfig(
     throw error;
   }
 
+  // A LAN-only app (Samba/SMB) does publish a port, but it isn't HTTP — the
+  // Cloudflare Tunnel + NPM path can't carry it (§0 principle 1). Reject
+  // enabling exposure rather than provisioning an NPM host that forwards
+  // nothing.
+  if (enabled && getService(serviceName)?.lanOnly) {
+    const error: HttpError = {
+      message: `${serviceName} is a LAN-only service and cannot be exposed through the tunnel.`,
+      statusCode: 400,
+    };
+    throw error;
+  }
+
   const globalConfig = await getExposureConfig();
   const hostname = globalConfig ? buildExposureHostname(serviceName, globalConfig.baseDomain) : null;
 

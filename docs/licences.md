@@ -70,6 +70,7 @@ operate within, listed again at the end.
 | Paperless-ngx | GPL-3.0 | ✅ Clean | |
 | Pi-hole | EUPL-1.2 | ✅ Clean | weak copyleft, commercial use permitted |
 | Price Compare | *ours* — no LICENSE file | ⚠️ Decide | |
+| Samba (`dockurr/samba`) | GPL-3.0 (Samba); MIT (image wrapper) | ✅ Clean | stock unmodified Samba for internal LAN file sharing — GPL-3.0 places no restriction on running it; not modified, not redistributed |
 | Speedtest (speedtest-tracker) | MIT | ⚠️ Condition | wraps **Ookla Speedtest CLI**, which has its own EULA the operator must accept (free, but not FOSS and not for "commercial" measurement without Ookla's OK). Swap for LibreSpeed if that matters. |
 | Stirling-PDF | **MIT** (core, since v1.0.0) | ✅ Clean | login / SSO / audit features under `app/proprietary/` are paywalled — don't enable or redistribute those |
 | Tailscale | BSD-3-Clause (client) | ✅ Clean | coordination is Tailscale's paid SaaS (a subscription cost, not a licence issue); or self-host headscale (BSD-3) |
@@ -88,7 +89,7 @@ operate within, listed again at the end.
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | could standardise on MariaDB |
 | valkey:9-alpine (Immich, Paperless) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (which is now RSALv2/SSPL). |
 | nginx:alpine (Kitchen switcher) | BSD-2-Clause | ✅ Clean | |
-| alpine | MIT | ✅ Clean | |
+| alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |
 | LinuxServer.io images (BookStack, Code Server, Duplicati, MariaDB, Speedtest) | image build scripts GPL-3.0; bundled apps keep their own licence | ✅ Clean | GPL applies to the packaging scripts, adds no restriction on running the app |
 

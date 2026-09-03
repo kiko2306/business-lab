@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.10.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.11.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -167,12 +167,6 @@ Updates:
 
 Infrastructure:
 
-- [ ] **`apps/samba/` — LAN-only SMB share** (§131.5) — Windows-reachable file
-      share, generated credentials + generated `smb.conf`, data under the app
-      dir. No Cloudflare Tunnel, no NPM host, no Home Page tile; mandatory
-      `homepage.*` labels (group "Files"); rows in `ports.md` (SMB 445, a
-      documented sub-10000 pin), `app-credentials.md`, `licences.md`
-      (Samba GPL-3.0).
 - [ ] **Browser E2E framework** (§131.5) — Playwright-in-Docker driving the
       real dashboard (login, 2FA, create user, start/stop, exposure, backup);
       its own CI job or local-only like the smoke tests.

@@ -218,6 +218,24 @@ describe('getPublishedUpstreamPort', () => {
   });
 });
 
+describe('samba is LAN-only', () => {
+  // Samba publishes 445, so getPublishedUpstreamPort reports a port — the
+  // lanOnly flag is what keeps the dashboard from treating that as
+  // exposable (routes/services.ts) and from provisioning an NPM host for a
+  // non-HTTP protocol (services/exposure.ts).
+  it('carries lanOnly and a homepage group but no exposure port var', () => {
+    expect(SERVICES['samba'].lanOnly).toBe(true);
+    expect(SERVICES['samba'].exposurePortEnvVar).toBeUndefined();
+  });
+
+  it('has no other app flagged lanOnly by accident', () => {
+    const lanOnly = Object.entries(SERVICES)
+      .filter(([, s]) => s.lanOnly)
+      .map(([name]) => name);
+    expect(lanOnly).toEqual(['samba']);
+  });
+});
+
 describe('netbird-vpn exposures', () => {
   const netbird = SERVICES['netbird-vpn'];
 

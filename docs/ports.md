@@ -11,7 +11,7 @@ Almost all of them get there by publishing a port from a Docker bridge; one
 |---|---|
 | `10000`–`10099` | Core stack (`BACKEND_PORT=10000`, `FRONTEND_PORT=10001`) |
 | `10100`+ | Managed apps, alphabetical, in steps of 10 |
-| below `10000` | **Only** the three exceptions below |
+| below `10000` | **Only** the exceptions below |
 
 ### Exceptions, and why
 
@@ -19,6 +19,7 @@ Almost all of them get there by publishing a port from a Docker bridge; one
 |---|---|---|
 | `80` / `443` | Nginx Proxy Manager | The Cloudflare Tunnel connector points at these as its origin |
 | `53` | Pi-hole | DNS clients expect port 53 |
+| `445` | Samba | Windows SMB clients connect to 445 and cannot be told to use another; LAN-only, never through the tunnel |
 | `8123` | Home Assistant | Runs with `network_mode: host` so its zeroconf/SSDP/DHCP discovery can see the LAN; host networking cannot remap ports |
 
 That "below 10000 means deliberate" rule is what protects them: the allocator
@@ -84,6 +85,9 @@ These are the defaults. The allocator may have moved one on your host if
 something else already held the port — check the app's `.env` for the truth.
 
 `10180` is free: it was Home Assistant's before it moved to host networking.
+
+Samba is not in this list — it publishes SMB on `445` only (see the
+exceptions above), no `10xxx` port.
 
 ## The host-networked app
 

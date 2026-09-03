@@ -199,7 +199,11 @@ router.get(
       // hostname/error from a stored row for a service that was briefly
       // (mis)configured before this check existed — see
       // upsertServiceExposureConfig in exposure.ts for the write-side guard.
-      const exposable = getPublishedUpstreamPort(req.params.name) !== null;
+      // A `lanOnly` app (Samba) publishes a port but serves a non-HTTP
+      // protocol the tunnel/NPM path can't carry — never exposable, whatever
+      // the compose file publishes.
+      const exposable =
+        !getService(req.params.name)?.lanOnly && getPublishedUpstreamPort(req.params.name) !== null;
 
       const row = await getServiceExposureRow(req.params.name);
       if (!row) {
