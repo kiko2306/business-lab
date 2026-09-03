@@ -15211,3 +15211,48 @@ Closes SSO slice 2. Patch bump 0.9.4 → 0.9.5. Proven on the live stack.
 2a data model, 2b UI, 2c users-file sync, 2d access_control — the per-user
 SSO app-access list is now enforced end to end at Authelia. Remaining SSO
 work: the invite-based user-creation flow (§158).
+
+### 158.5 Decisions from @mat (2026-09-03) + sub-slices
+
+- **Mail sender:** add `nodemailer` (the repo has only a raw-socket *tester*,
+  `services/mailTest.ts`; there is no sender). Thin wrapper `utils/mailSend.ts`
+  over `getMailConfig()`. STARTTLS/SSL/auth handled by the library.
+- **Invite TTL:** 72 hours. Resend mints a fresh token and invalidates the old.
+- **Password reset** (`PUT /users/:id/password`): unchanged — a direct
+  operator set. The invite flow is new-account only this slice.
+- **Link base URL:** `settings.dashboard_url`, editable in Settings, pre-filled
+  with `https://dashboard.<baseDomain>` derived from the exposure base domain
+  when blank. Invite creation is refused if neither the mailbox nor a
+  resolvable dashboard URL is available.
+
+**158a — backend**
+- `nodemailer` dep + `utils/mailSend.ts` (`sendMail({ to, subject, text })`).
+- `ensureUserInvitationsSchema()`: `ALTER TABLE users ... password_hash DROP
+  NOT NULL`; `user_invitations(id, user_id FK ON DELETE CASCADE, token_hash,
+  expires_at, accepted_at, created_at)` — SHA-256 hash only, like
+  `totp_recovery_codes`. `init.sql` too.
+- `services/userInvitations.ts`: `createInvitation(userId)`,
+  `verifyInvitation(token)` → row or null (unexpired, unaccepted),
+  `acceptInvitation(token, passwordHash)` (tx: set hash, stamp `accepted_at`,
+  delete siblings), `getDashboardBaseUrl()`.
+- `POST /api/users`: drop `password` from `userCreate`; require
+  `getMailConfig()` and a dashboard URL; insert `password_hash = NULL`; mint
+  token; `sendMail` best-effort; response `{ user, invitePending: true,
+  warning? }`. Account is **inactive** (`password_hash IS NULL`) until accepted.
+- Public, rate-limited: `GET /api/auth/invitation/:token` → `{ username,
+  email }` or 410; `POST /api/auth/invitation/:token` `{ password }` → accept,
+  `syncAutheliaUsersSafe`, issue a session.
+- `POST /api/users/:id/invitation/resend` (`users:manage`).
+- `GET /api/users` items gain `active: boolean`.
+- `/auth/login` already fails a NULL-hash account (verify against `''`); make
+  it explicit with a clear "invite not yet accepted" message.
+- Tests: invitation lifecycle, expiry, single-use, mail-not-configured refusal.
+
+**158b — frontend**
+- Create form: remove the password field; add "an invite email is sent to the
+  new user" note; disable submit + link to Settings when mail is unconfigured.
+- New unauthenticated `/set-password?token=` route: shows username/email from
+  the token, takes a password twice, calls accept, logs in.
+- Users list: "Pending invite" badge on an inactive row + a "Resend invite"
+  action.
+- Settings: a "Dashboard URL" field (pre-filled with the derived default).

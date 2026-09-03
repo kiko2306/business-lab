@@ -154,18 +154,20 @@ it is done — not ticked off and left behind. Section references point at
 
 SSO / roles:
 
-- [ ] **Invite-based user creation** (§158) — the create-user form drops the
-      password field: the backend emails the new user their username, email
-      and a set-password link (single-use, expiring token; `password_hash`
-      nullable until accepted). Creation needs the mailbox *configured*; the
-      account is then created **inactive** and the invite sent best-effort —
-      it flips to **active** only when the invitee sets a password (an
-      account is inactive whenever `password_hash IS NULL`). New public
-      `/api/auth/invitation/:token` (validate + accept) and a `/set-password`
-      page; "Inactive / Pending invite" badge + "Resend invite" on the Users
-      list. `/setup` (first webmaster) and `./start.sh recover` keep their
-      direct password path. Open questions in §158.3 (TTL; reset-by-link;
-      base-URL source).
+- [ ] **Invite flow 158a — backend** (§158) — add `nodemailer` + a
+      `mailSend` wrapper; `password_hash` nullable + a `user_invitations`
+      table (72 h single-use token, SHA-256 hash only). `POST /api/users`
+      drops the password field, needs the mailbox configured + a dashboard
+      URL, creates the account **inactive** and emails a set-password link.
+      New public `GET/POST /api/auth/invitation/:token` and
+      `POST /api/users/:id/invitation/resend`; the users list reports
+      `active`. `/setup` and `./start.sh recover` keep their direct password
+      path. Tests.
+- [ ] **Invite flow 158b — frontend** (§158) — create form loses the
+      password field (mail-unconfigured guard + link to Settings); new
+      unauthenticated `/set-password?token=` page; "Pending invite" badge +
+      "Resend invite" on the Users list; a "Dashboard URL" field in Settings.
+      Visual review.
 
 Updates:
 
