@@ -15064,3 +15064,75 @@ The dashboard now owns Authelia's file-backend user database. Patch bump
 `app-<name>` group + `admins`), hooked into the exposure-toggle path, proven
 end to end: a `user`-role account with access to one app signs in through SSO,
 that app opens, a non-listed one 403s.
+
+## 158. Plan — invite-based user creation: no creator-set password, email a setup link (2026-09-03)
+
+@mat's change to the create-user flow. Today `POST /api/users` takes a
+password chosen by whoever creates the account. Instead:
+
+- The creator supplies **username + email + roles (+ features/app-access)** —
+  **no password field**.
+- The backend mints a single-use, expiring, signed token, stores only its
+  hash, and emails the new user their username, their email, and a link to a
+  **set-password** page.
+- The new account has **no `password_hash`** until the invitee follows the
+  link and sets one. Until then it can't log in, and (slice 2c) it is skipped
+  by the Authelia sync — so it appears in Authelia only once a password
+  exists.
+- **A user can't be created unless the shared mailbox is configured and the
+  invite actually sends.** Account creation is transactional with the send: if
+  the SMTP send fails, the row is not created and the API 4xx/5xx's with why.
+  "Proven to work" = the invite send itself is the proof; the create form
+  should also surface the existing `POST /api/settings/mail/test` result and
+  refuse to submit when mail is unconfigured.
+
+### 158.1 Exceptions
+
+- **`/setup` (first admin) keeps password-on-create.** There is no mailbox at
+  bootstrap, and the first webmaster has to be able to log in to configure
+  one. Unchanged.
+- **`./start.sh recover` keeps its offline password reset.** Unchanged.
+- **Password *reset* of an existing account** stays as `PUT
+  /users/:id/password` for now (an operator-set reset). A future tweak could
+  route it through the same email-a-link flow; not in this change.
+
+### 158.2 Shape
+
+- Schema: `password_hash` becomes nullable; new
+  `user_invitations(id, user_id, token_hash, expires_at, accepted_at,
+  created_at)` — single-use, short TTL (e.g. 72 h), only the SHA-256 hash
+  stored (same pattern as `totp_recovery_codes`).
+- `POST /api/users`: drop `password` from `userCreate`; require the mailbox to
+  be configured; create the row with `password_hash = NULL`, mint the token,
+  send the invite in the same handler, roll back (or 424) if the send fails.
+- New public, rate-limited routes:
+  - `GET /api/auth/invitation/:token` — validate a token, return
+    `{ username, email }` for the set-password screen (or 410 if
+    expired/used).
+  - `POST /api/auth/invitation/:token` — `{ password }`; set the hash, mark
+    the invitation accepted, revoke sibling invitations, run the Authelia sync
+    (the account now has a hash), return a session.
+- `POST /api/users/:id/invitation/resend` (`users:manage`) — mint a fresh
+  token and re-send; invalidate the previous one.
+- Email: a plain-text template through the existing mail sender
+  (`services/mailEnv.ts` / whatever `POST /settings/mail/test` uses),
+  `${DASHBOARD_URL}/set-password?token=...`. The dashboard base URL is derived
+  from the exposure hostname where possible, else a configured value.
+- Frontend: the create form loses the password field, gains a note that an
+  invite email is sent; it checks mail-configured state and disables submit
+  with a link to Settings → Mail when unconfigured. New unauthenticated
+  `/set-password` route (token in the query) — shows username/email, takes a
+  new password twice, calls the accept endpoint, logs in. The Users list shows
+  a "Pending invite" badge for an account with no `password_hash` and a
+  "Resend invite" action.
+
+### 158.3 Open questions for @mat (decide when the slice starts)
+
+1. Invite TTL — 72 h? 7 days?
+2. "Proven to work" — is "the invite send succeeded" enough, or must a
+   `POST /settings/mail/test` have passed within some window before the form
+   will submit?
+3. Does an operator-initiated **password reset** also switch to emailing a
+   link (consistent), or stay a direct set for now?
+4. What is the dashboard base URL for the link on a deployment that isn't
+   publicly exposed — a Settings field, or derive-and-require exposure?
