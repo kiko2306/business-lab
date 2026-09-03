@@ -20,6 +20,12 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/bash-guards.sh\"",
             "timeout": 10,
             "statusMessage": "Checking for a management-stack teardown"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-version-bump.sh\"",
+            "timeout": 10,
+            "statusMessage": "Checking the version bump + changelog"
           }
         ]
       }

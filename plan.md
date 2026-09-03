@@ -13577,3 +13577,35 @@ The other §131.1 item: move each dashboard area (Apps, Exposure, Backups,
 Updates, Users & roles, Settings, Utils) onto its own route, one slice at a
 time, repointing the menu tile and updating that area's component spec as it
 moves.
+
+## 135. A hook that enforces the version bump (2026-09-03)
+
+@mat asked for the versioning rule ([[version-bump-every-behavioural-commit]])
+to be *enforced*, not just remembered — a subagent was considered and rejected
+(the changelog line needs the context of what changed; a cold agent re-derives
+that expensively for ~5 mechanical edits).
+
+**`.claude/hooks/require-version-bump.sh`** — a second `PreToolUse`/`Bash` hook
+alongside `bash-guards.sh`. It blocks a `git commit` when:
+
+- the change (staged, plus tracked-unstaged for `git commit -a`) touches a
+  non-`*.test.ts`/`*.spec.ts` file under `backend/src/` or `frontend/src/`, and
+- the same commit does **not** bump `"version"` in both `package.json` files
+  **and** stage `CHANGELOG.md`.
+
+The deny message also reminds about the `**Version X.Y.Z**` line under the
+README title. Docs-only, `plan:`-prefixed, and test-only commits never touch
+those source paths, so they pass untouched. The `git commit` match handles the
+`git add -A && git commit …` form the working loop uses, so no `if:` filter on
+the hook (the script exits fast for non-commit commands).
+
+Implementation note: the script runs `set -eu` **without** `pipefail` — a
+`git diff … | grep -q` pipeline SIGPIPEs the diff the moment grep matches, and
+with `pipefail` that marked the check failed and inverted the result. Diffs are
+captured into a variable and grepped from a here-string instead.
+
+Verified: six-case pipe-test matrix (non-commit, clean tree, code-without-bump
+→ deny, code+bump+changelog → allow, code+changelog-no-version → deny,
+docs-only → allow), then a real blocked `git commit` through the harness and a
+clean revert. Recorded in CLAUDE.md next to the `.env`/teardown enforcement
+paragraph.

@@ -192,3 +192,9 @@ covers what per-tool rules cannot: it refuses a root `docker compose down`, and
 refuses a shell command that reads or writes a real `.env` (`.env.example`
 templates, `ls`, `find` and `git` are left alone). A refusal from either is the
 rule working — find another way rather than routing around it.
+
+The version-bump rule is enforced the same way: `.claude/hooks/require-version-bump.sh`
+blocks a `git commit` that changes a non-test file under `backend/src` or
+`frontend/src` unless the same commit bumps `version` in both `package.json`
+files and adds a `CHANGELOG.md` entry (also update the `**Version X.Y.Z**` line
+under the README title). Docs/plan/test-only commits are untouched.
