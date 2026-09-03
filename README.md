@@ -120,6 +120,19 @@ backup + restore verified byte-identical.
 tried and rejected, is recorded there in numbered sections. Read its last section
 for where things stand.
 
+## Environments
+
+The deployment this repo is developed against, `tx-home-utils.com`, is a
+**dev/test box with no uptime or data-durability guarantee** — services may go
+down and data may be changed or lost. It exists to prove changes against a real
+stack; anything on it is disposable.
+
+A production / per-client deployment is a **separate install** with its own
+domain and its own credentials and tokens, where uptime and data *do* matter.
+It uses the same internet-exposure model (Cloudflare Tunnel + Nginx Proxy
+Manager), so being reachable from the internet is not what distinguishes the
+two — the guarantees are.
+
 ## TODO
 
 **This list is the single place open work is tracked.** An item is deleted when
@@ -187,14 +200,6 @@ Infrastructure:
 - [ ] **Browser E2E framework** (§131.5) — Playwright-in-Docker driving the
       real dashboard (login, 2FA, create user, start/stop, exposure, backup);
       its own CI job or local-only like the smoke tests.
-- [ ] **"This box carries no uptime/data guarantee" rule** (§131.5) — write it
-      into CLAUDE.md (principle / "Never") and the README: on
-      `tx-home-utils.com`, services may go down and data may be changed or
-      lost — it's disposable dev/test. Production boxes are *also* internet-
-      exposed but with their own domain/tokens and real uptime + data
-      guarantees. Verification model unchanged: this stays the stack changes
-      are proven against.
-
 Strategy:
 
 - [ ] **Rewrite the README business rules** (§131.6) — the app is Free to Use;

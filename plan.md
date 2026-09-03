@@ -13741,3 +13741,23 @@ Prose against the shipped code: response shapes and status codes read out of
 the `homelab-totp-secret-v1` / `homelab-mfa-token-v1` HKDF infos out of
 `utils/totp.ts` / `utils/totpSecret.ts` / `utils/jwt.ts`. No code or tests
 touched; nothing to run.
+
+## 138. §131.5 — the no-guarantees dev/test rule, written down (2026-09-03)
+
+The §131.5 clarification (production is *also* internet-exposed; what separates
+test from production is the guarantees, not the exposure) was only in the plan.
+Captured it where it constrains work:
+
+- **`CLAUDE.md`** — a new section "This host is a no-guarantees dev/test box"
+  right after the non-negotiable principles: `tx-home-utils.com` has no uptime
+  or data-durability guarantee, anything on it is disposable, don't build
+  features/tests/docs that assume its state survives; a production/per-client
+  box is a separate deployment with its own domain and credentials; the
+  verification model is unchanged. Plus a matching **"Never"** bullet
+  ("Assume data on `tx-home-utils.com` is safe or that a service there must
+  stay up").
+- **`README.md`** — a short "Environments" section between "Project status"
+  and the TODO list, same two points in user-facing terms.
+
+The fuller README business-rules rewrite (Free to Use, billable services
+scoped to three things) stays its own open item (§131.6). TODO item deleted.

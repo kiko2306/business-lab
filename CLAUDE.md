@@ -24,6 +24,25 @@ Fixing something by hand on the live host is a diagnostic, never a fix: it
 evaporates on the next fresh clone, since `apps/*/data/` is gitignored. Once it
 works by hand, delete it and make the code do it, then prove the code path.
 
+## This host is a no-guarantees dev/test box
+
+The deployment this repo is developed against — `tx-home-utils.com` — carries
+**no uptime guarantee and no data-durability guarantee**. Services going down
+on it is fine. Data on it being changed or lost is fine. It exists to prove
+code paths against a real stack (principle 3 above), and anything on it is
+disposable. Do not build features, tests, or docs that assume state on this
+host survives, or that a service must stay running.
+
+Being internet-exposed is **not** what makes it dev/test. A production /
+per-client deployment is *also* internet-exposed — same Cloudflare Tunnel + NPM
+model — but is a **separate deployment** with its own domain and its own
+credentials/tokens, and there uptime and client data do matter. The difference
+is the promises, not the exposure.
+
+The verification model is unchanged: this box stays the stack every
+Docker/exposure/networking/backup change is proven against before it is called
+done — that is exactly what a no-guarantees dev/test box is for.
+
 ## plan.md is the project's memory
 
 `plan.md` (~10,600 lines) is the spec **and** the running session log. Numbered
@@ -185,6 +204,9 @@ passing, unless it is genuinely part of the change at hand.
 - Claim something works because it type-checks. This project's history is full
   of things that passed CI and failed on the host — verify against the real
   stack when the change touches Docker, exposure, networking or backups.
+- Assume data on `tx-home-utils.com` is safe or that a service there must stay
+  up — it is a no-guarantees dev/test box (see the section above). Production
+  is a separate, per-client deployment.
 
 The first two of those are enforced, not just asked for. `.claude/settings.json`
 denies the Read/Edit/Write tools on `.env` files, and `.claude/hooks/bash-guards.sh`
