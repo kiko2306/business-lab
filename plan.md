@@ -12762,3 +12762,118 @@ Backend rebuilt with the script in `dist/`, against the live database:
   not this section.
 - 2FA for admin accounts (separate README item) is the larger security gap and
   wants its own planned build.
+
+## 127. Plan — 2FA (TOTP) for admin accounts
+
+The dashboard is internet-facing over the tunnel (`homelab.tx-home-utils.com`,
+`api-homelab.tx-home-utils.com`), independent of the per-service exposure
+feature, and login is username + bcrypt password only. Add TOTP (RFC 6238) as a
+second factor, per account, opt-in per account but enforced once enabled.
+
+Not Authelia: Authelia already fronts *exposed apps*, but the management
+dashboard's own auth is this backend's `/auth/*`, and putting Authelia in front
+of it would couple the tool that starts Authelia to Authelia being up. This is
+a change to the backend's own login.
+
+### 127.1 What exists (survey)
+
+- `POST /auth/login` {username,password} → bcrypt check → `{accessToken (1h
+  JWT), refreshToken (7d JWT, row in `refresh_tokens`), user}`. Also `/setup`
+  (first admin), `/refresh`, `/logout`. `middleware/auth.ts` verifies the
+  access JWT.
+- `users`: `id, username, password_hash, is_setup_complete, created_at`.
+  Schema lives in `database/init.sql` **and** as idempotent
+  `ALTER/CREATE ... IF NOT EXISTS` functions called fire-and-forget from
+  `index.ts` at boot (`dropLegacyRoleColumn`, `ensureServiceExposureTable`,
+  …) — both get updated together.
+- Frontend: Angular standalone. `pages/login`, `pages/users` (admin list +
+  password reset + delete), `core/auth.service.ts` (persists the whole
+  session to `localStorage` `homelab.session`), `interceptors/auth.interceptor.ts`,
+  `guards/auth.guard.ts`. No per-user "account/security" page yet.
+- `./start.sh recover` (§126) is the lockout escape hatch.
+- No OTP/QR library in either `package.json`.
+
+### 127.2 Design decisions
+
+- **Library**: `otplib` (pure JS, no native deps — fine on node:20-alpine) for
+  TOTP; `qrcode` (pure JS) to render the enrolment QR **server-side** as an SVG
+  data URI, so the frontend needs no new dependency. Both MIT. They are normal
+  bundled npm deps like `bcryptjs`/`jsonwebtoken`, so **no `docs/licences.md`
+  row** (that convention covers apps and base/sidecar images, not libraries).
+- **Secret at rest**: AES-256-GCM, key = HKDF-SHA256(`JWT_SECRET`,
+  info `"totp-secret-v1"`). Nothing new to configure — matches §0 principle 3.
+  A helper `utils/totpSecret.ts` (`sealSecret`/`openSecret`), unit-tested.
+- **Recovery codes**: 10 per enrolment, single-use, shown once. Store only
+  SHA-256 hashes (the codes are high-entropy random, so a fast hash is fine and
+  bcrypt's cost is pointless at 10/user).
+- **Login stays one endpoint until MFA passes**: password-OK + `totp_enabled`
+  returns `202 {mfaRequired:true, mfaToken}` where `mfaToken` is a 5-minute
+  JWT with `purpose:"mfa"` and no API authority; `POST /auth/login/totp`
+  {mfaToken, code} finishes it (code = 6-digit TOTP, window ±1, or a recovery
+  code). Hard rate limit on the second step.
+- **Enrolment is authenticated**: a logged-in user turns on their own 2FA.
+  Admins do not enrol on behalf of others (they can already reset a password;
+  forcing a factor onto someone else's phone is not a flow we need).
+
+### 127.3 Schema
+
+```sql
+ALTER TABLE users
+  ADD COLUMN IF NOT EXISTS totp_secret TEXT,             -- sealed; NULL until enrolled
+  ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT FALSE,
+  ADD COLUMN IF NOT EXISTS totp_enrolled_at TIMESTAMPTZ;
+
+CREATE TABLE IF NOT EXISTS totp_recovery_codes (
+  id         SERIAL PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  code_hash  TEXT NOT NULL,
+  used_at    TIMESTAMPTZ,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+```
+
+`init.sql` gets the same, and `ensureTotpColumns()` / `ensureTotpRecoveryTable()`
+join the boot migration calls in `index.ts`.
+
+### 127.4 Endpoints
+
+| Method | Path | Auth | Purpose |
+|---|---|---|---|
+| POST | `/auth/totp/setup` | access JWT | make a pending secret, return `{otpauthUri, qrSvg, secret}` |
+| POST | `/auth/totp/activate` | access JWT | `{code}` → verify pending secret, `totp_enabled=true`, return the 10 recovery codes once |
+| POST | `/auth/totp/disable` | access JWT | `{code}` **or** `{password}` re-check, clear secret + codes |
+| GET  | `/auth/totp/status` | access JWT | `{enabled, enrolledAt, recoveryCodesRemaining}` |
+| POST | `/auth/totp/recovery-codes` | access JWT | `{code}` → regenerate, invalidate old (may fold into a later slice) |
+| POST | `/auth/login/totp` | mfaToken | `{mfaToken, code}` → tokens |
+
+`/auth/login` unchanged shape on the happy path; adds the `202` branch.
+
+### 127.5 Lockout interaction
+
+Add `./start.sh recover disable-2fa <username>` (new command in
+`scripts/recover-admin.sh` + `recoverAdmin.ts`): clears `totp_*` and deletes
+that user's recovery codes. `reset-password` deliberately does **not** also
+drop 2FA — losing the password and losing the phone are different events.
+
+### 127.6 Slices (each shippable + verifiable on its own)
+
+- **A — TOTP core + enrolment API (backend).** deps, schema + migrations,
+  `utils/totpSecret.ts`, `utils/totp.ts` (generate/verify/recovery codes),
+  `/auth/totp/{setup,activate,disable,status}`, tests. No login change yet.
+  Verify: enrol with `curl` + a real authenticator app, `status` reflects it,
+  `disable` needs a valid code.
+- **B — enforce at login (backend).** `/auth/login` `202` branch,
+  `/auth/login/totp`, recovery-code path, rate limits, audit actions
+  (`login_mfa_challenge/success/failure`, `login_recovery_code_used`).
+  `./start.sh recover disable-2fa`. Verify: full round-trip with a TOTP code
+  and with a recovery code; lockout cleared by the recover command.
+- **C — frontend login step.** Login component becomes 2-step on
+  `202 mfaRequired` (mfaToken in memory only), "use a recovery code" toggle;
+  `auth.service.ts` + `models.ts`. Verify: sign in through the UI with 2FA on.
+- **D — frontend enrolment UI.** New Account/Security page (or section):
+  status, set up (render `qrSvg`), activate, show/download recovery codes,
+  disable. Verify: enrol and disable entirely through the UI.
+- **E — docs.** `docs/two-factor.md`, `openapi.yaml`, `user-guide.md`,
+  `it-admin.md`, `app-credentials.md` note; the `recover disable-2fa` path.
+
+Build A→B→C→D→E; A and B are the security substance, each a session or less.

@@ -131,10 +131,26 @@ it is done — not ticked off and left behind. Section references point at
       value in either can cut off the very session applying it. Run
       `sudo ./setup_server.sh` and confirm both prompts behave as documented
       in `docs/first-run.md`.
-- [ ] **2FA for admin accounts** — the dashboard is internet-facing via the
-      tunnel (`homelab.tx-home-utils.com`, `api-homelab.tx-home-utils.com`),
-      independent of the per-service exposure feature. Nothing in the codebase
-      implements TOTP today.
+- [ ] **2FA slice A — TOTP core + enrolment API** (§127) — `otplib`/`qrcode`
+      deps, `users.totp_*` columns + `totp_recovery_codes` table (init.sql +
+      boot migration), `utils/totpSecret.ts` (AES-GCM, key from `JWT_SECRET`),
+      `utils/totp.ts`, `POST /auth/totp/{setup,activate,disable}` +
+      `GET /auth/totp/status`, tests. No login change yet. Verify by enrolling
+      with a real authenticator app.
+- [ ] **2FA slice B — enforce at login** (§127) — `/auth/login` returns
+      `202 {mfaRequired, mfaToken}` when `totp_enabled`; `POST /auth/login/totp`
+      finishes it (TOTP code or recovery code); hard rate limit; audit actions.
+      Add `./start.sh recover disable-2fa <username>`. Verify a full round-trip
+      and a lockout recovery.
+- [ ] **2FA slice C — frontend login step** (§127) — login component becomes
+      two-step on `202 mfaRequired` (mfaToken in memory only), "use a recovery
+      code" toggle; `auth.service.ts` + `models.ts`.
+- [ ] **2FA slice D — frontend enrolment UI** (§127) — Account/Security page:
+      status, set up (render server `qrSvg`), activate, show/download recovery
+      codes, disable.
+- [ ] **2FA slice E — docs** (§127) — `docs/two-factor.md`, `openapi.yaml`,
+      `user-guide.md`, `it-admin.md`, `app-credentials.md`, and the
+      `recover disable-2fa` path.
 
 ### Backups
 
