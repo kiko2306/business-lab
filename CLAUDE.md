@@ -177,7 +177,10 @@ passing, unless it is genuinely part of the change at hand.
   `homepage.group`, `homepage.name`, `homepage.icon`, `homepage.description`
   (and `homepage.href` for a human reading the file — the generator ignores
   it), and the registry-wide test in `services.test.ts` fails when an app is
-  missing them.
+  missing them. An app whose exposure exists only to serve another app, not a
+  person (OnlyOffice, which Nextcloud's browser-side editor loads), sets
+  `hideFromHomePage: true` in `services.ts` — running and exposed, but no
+  tile. The `homepage.*` labels stay mandatory for it all the same.
 - **Dependencies between apps** are declared in `services.ts`, in one of two
   tiers. `dependsOn` is for what an app cannot boot without (Authelia's OIDC
   provider, for something that crash-loops without it) — the API refuses the

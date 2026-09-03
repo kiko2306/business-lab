@@ -13761,3 +13761,41 @@ Captured it where it constrains work:
 
 The fuller README business-rules rewrite (Free to Use, billable services
 scoped to three things) stays its own open item (§131.6). TODO item deleted.
+
+## 139. §131.2 — hide OnlyOffice from the Home Page (2026-09-03)
+
+The "running + exposed → Home Page tile" rule (§112.3) gave OnlyOffice a tile,
+but nobody opens OnlyOffice directly — its exposure exists only so a remote
+browser can load the editor Nextcloud embeds. Infrastructure, not a
+destination.
+
+### 139.1 What landed
+
+- **`hideFromHomePage?: boolean`** on `ServiceDefinition` (`types/index.ts`).
+  Chose a registry flag over a `homepage.*` label sentinel: the decision
+  ("this is infra") is a registry-level fact like `dependsOn`, and the compose
+  file is read-only to the backend anyway.
+- `onlyoffice` in `services.ts` sets `hideFromHomePage: true`.
+- `collectHomepageTiles` (`services/homepageConfig.ts`) skips a service whose
+  registry entry has the flag, right after the existing "the Home Page never
+  lists itself" skip — before the exposure lookup, so a flagged app is out
+  whether or not it is exposed.
+- The `homepage.*` labels stay **mandatory** for it: `services.test.ts`'s
+  registry-wide label check is unchanged and still iterates every entry, plus
+  a focused case asserts `onlyoffice.hideFromHomePage === true` and that it
+  still carries the labels.
+- Tests: +1 in `homepageConfig.test.ts` (a flagged app that is running and
+  provisioned-exposed produces no tile), +1 in `services.test.ts`.
+- Doc: the flag is described in CLAUDE.md's Home Page convention bullet.
+
+### 139.2 Verified (real stack)
+
+Backend rebuilt (`docker compose up -d --build backend`, no root teardown).
+`apps/home-page/data/services.yaml` before the change carried an `OnlyOffice`
+tile under Productivity (the app is running and exposed at
+`onlyoffice.tx-home-utils.com`). Ran `regenerateHomepageServices()` in the
+backend container afterwards: 31 tiles → 30, `grep -i onlyoffice` on the file
+now empty, Productivity group otherwise intact. Homepage hot-reloads the file,
+so the public page drops the tile with no restart.
+
+380 backend tests pass (+2); typecheck clean. Frontend untouched.

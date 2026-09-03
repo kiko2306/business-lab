@@ -216,6 +216,12 @@ export interface ServiceDefinition {
   // `/admin`, so its bare hostname just 403s / redirects. Leading slash, no
   // trailing slash; unset for the common "UI is at /" case.
   webPath?: string;
+  // Keep this app off the public Home Page even when it is running and
+  // exposed. For an app whose exposure exists only to serve another app, not
+  // a person — OnlyOffice is reachable so the remote browser can load the
+  // editor Nextcloud embeds, but it is infrastructure, not a destination.
+  // The `homepage.*` labels stay mandatory regardless (services.test.ts).
+  hideFromHomePage?: boolean;
 }
 
 export type ServiceState = 'running' | 'stopped' | 'starting' | 'error' | 'unknown';

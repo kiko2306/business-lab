@@ -151,4 +151,36 @@ describe('collectHomepageTiles', () => {
     ]);
     expect(tiles.some((t) => t.name.toLowerCase().includes('home'))).toBe(false);
   });
+
+  it('skips an app the registry flags hideFromHomePage, even when running and exposed', async () => {
+    const { getAllServices, getService, resolveComposeFile } = await import('../config/services');
+    const { getServiceExposureRow } = await import('./exposure');
+    const { exec } = await import('child_process');
+    const fs = (await import('fs/promises')).default;
+
+    vi.mocked(getAllServices).mockReturnValue([{ name: 'waha' }, { name: 'onlyoffice' }] as never);
+    vi.mocked(resolveComposeFile).mockImplementation(
+      (name: string) => ({ composeFile: `/repo/apps/${name}/docker-compose.yml`, appDir: `/repo/apps/${name}`, projectName: name }) as never
+    );
+    // onlyoffice carries the flag; waha does not.
+    vi.mocked(getService).mockImplementation(
+      (name: string) => (name === 'onlyoffice' ? ({ hideFromHomePage: true }) : ({})) as never
+    );
+    vi.mocked(exec).mockImplementation(((_cmd: string, cb: (e: unknown, out: string) => void) => {
+      cb(null, 'waha\nonlyoffice\n');
+    }) as never);
+    // Both running + provisioned-exposed.
+    vi.mocked(getServiceExposureRow).mockImplementation(
+      (name: string) =>
+        Promise.resolve({ enabled: true, status: 'provisioned', hostname: `${name}.example.com` }) as never
+    );
+    vi.mocked(fs.readFile).mockResolvedValue(
+      '    labels:\n      - "homepage.group=Productivity"\n      - "homepage.name=X"\n' as never
+    );
+
+    const { collectHomepageTiles } = await import('./homepageConfig');
+    const tiles = await collectHomepageTiles();
+
+    expect(tiles.map((t) => t.name)).toEqual(['X']); // waha only; onlyoffice skipped
+  });
 });

@@ -11,6 +11,16 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.2.1] — 2026-09-03
+
+### Changed
+
+- OnlyOffice no longer gets a Home Page tile. Its public exposure exists only
+  so a remote browser can load the editor Nextcloud embeds — it is
+  infrastructure, not a destination. A `hideFromHomePage` registry flag
+  (`services.ts`) suppresses the tile while keeping the app running and
+  exposed; the mandatory `homepage.*` labels are unaffected (plan.md §131.2).
+
 ## [0.2.0] — 2026-09-03
 
 ### Added

@@ -429,6 +429,16 @@ describe('Home Page discovery labels', () => {
       expect(text, `${name} has no homepage.group label`).toContain('homepage.group=');
     }
   });
+
+  // An app flagged hideFromHomePage still needs the labels — the registry-wide
+  // check above covers it, and the flag only suppresses the tile, not the
+  // metadata (§131.2).
+  it('are still required for an app that is hidden from the Home Page', () => {
+    expect(SERVICES['onlyoffice'].hideFromHomePage).toBe(true);
+    const text = composeText(SERVICES['onlyoffice'].composePath);
+    expect(text).toContain('homepage.name=');
+    expect(text).toContain('homepage.group=');
+  });
 });
 
 describe('database backup coverage', () => {

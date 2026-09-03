@@ -136,6 +136,12 @@ export async function collectHomepageTiles(): Promise<HomepageTile[]> {
     if (service.name === HOMEPAGE_SERVICE) {
       continue;
     }
+    // Some apps are exposed only to serve another app, not a person (e.g.
+    // OnlyOffice, which Nextcloud's browser-side editor loads). The registry
+    // flags those — running + exposed, but still no tile (§131.2).
+    if (getService(service.name)?.hideFromHomePage) {
+      continue;
+    }
     const resolved = resolveComposeFile(service.name);
     if (!resolved?.composeFile || !resolved.projectName) {
       continue;

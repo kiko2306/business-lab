@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.2.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.2.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository still `homelab-management`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -292,11 +292,6 @@ Strategy:
       does HACS, not as a runbook step. Give Nextcloud the **internal**
       doc-server URL for the server-to-server leg. Part of the "prioritise
       roster wiring debt before new apps" push (§131.2).
-- [ ] **Hide OnlyOffice from the Home Page** (§131.2) — it's infrastructure for
-      Nextcloud, not a destination. Add a Home Page opt-out (registry flag or
-      label sentinel `homepageConfig.ts` honours) so the "running + exposed →
-      tile" rule (§112.3) skips it; document the flag by the Home Page
-      convention.
 - [ ] **Does OnlyOffice need public exposure?** (§123.2, §131.2) — the
       browser-loads-the-editor model means the doc-server URL must be reachable
       by the remote browser. Confirm exposure is genuinely required (vs
