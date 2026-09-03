@@ -6,6 +6,7 @@
 import { Router, Request, Response, NextFunction } from 'express';
 import rateLimit from 'express-rate-limit';
 import auth from '../middleware/auth';
+import { requireCapability } from '../middleware/requireCapability';
 import * as executor from '../services/executor';
 import * as status from '../services/status';
 import { createStreamTicket } from '../services/realtime';
@@ -76,6 +77,7 @@ router.post(
   '/:name/start',
   serviceLimiter,
   auth,
+  requireCapability('apps:control'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   async (req: Request, res: Response) => {
@@ -113,6 +115,7 @@ router.post(
   '/:name/stop',
   serviceLimiter,
   auth,
+  requireCapability('apps:control'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   async (req: Request, res: Response) => {
@@ -151,6 +154,7 @@ router.post(
   '/:name/update',
   serviceLimiter,
   auth,
+  requireCapability('apps:control'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   async (req: Request, res: Response) => {
@@ -239,6 +243,7 @@ router.get(
 router.put(
   '/:name/exposure',
   auth,
+  requireCapability('apps:expose'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   validateBody(schemas.serviceExposureUpdate),
@@ -288,6 +293,7 @@ router.post(
   '/:name/exposure/verify',
   serviceLimiter,
   auth,
+  requireCapability('apps:expose'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   async (req: Request, res: Response) => {
@@ -327,6 +333,7 @@ router.post(
 router.get(
   '/:name/env',
   auth,
+  requireCapability('apps:config'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   async (req: Request, res: Response) => {
@@ -347,6 +354,7 @@ router.get(
 router.put(
   '/:name/env',
   auth,
+  requireCapability('apps:config'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   validateBody(schemas.serviceEnvUpdate),
@@ -379,6 +387,7 @@ router.put(
 router.get(
   '/:name/admin-user',
   auth,
+  requireCapability('apps:config'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   requireAdminUserSupport,
@@ -402,6 +411,7 @@ router.get(
 router.put(
   '/:name/admin-user',
   auth,
+  requireCapability('apps:config'),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   requireAdminUserSupport,

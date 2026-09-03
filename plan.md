@@ -14447,3 +14447,122 @@ Proposed shape (decisions for @mat below):
 No change to how Authelia gates the *apps* yet — that is the access-list
 slices. No new "permissions" table; the capability map is code, not data
 (same spirit as the service registry).
+
+### 149.5 Decisions (answered 2026-09-03)
+
+1. **Role set: `owner` / `it_admin` / `webmaster` / `user`.** `user` is
+   included now (fixed enum early) — dashboard-less, its capability set is
+   empty; it exists to be the subject of the SSO access-list slices. A
+   `user`-only account can log in but sees only `/home` (empty) and
+   `/account`.
+2. **Multiple roles per user.** `user_roles(user_id, role)` join table,
+   `PRIMARY KEY (user_id, role)`, `ON DELETE CASCADE`. Effective capabilities
+   = union across the user's roles. So "webmaster **and** it_admin" is a real
+   combination without needing `owner`.
+3. **`it_admin` owns Settings** — timezone, ntfy, email **and** the backup
+   destination are under `settings:manage`, which `it_admin` has.
+4. **Create-user form forces a role choice** — at least one role, no default
+   pre-selected.
+
+Finalised capability map (`capabilitiesFor` unions these):
+
+| role | capabilities |
+|---|---|
+| `owner` | every capability below + `users:manage` |
+| `it_admin` | `apps:control`, `apps:config`, `apps:expose`, `backups:manage`, `settings:manage`, `audit:view` |
+| `webmaster` | `exposure:settings` |
+| `user` | *(none)* |
+
+- `users:manage` — `owner` only.
+- `webmaster` gets a genuinely Exposure-only dashboard for now (no
+  `audit:view`); revisit if @mat wants them to see the trail.
+- Read endpoints (`GET /services…`, `GET /health`) and `/home` `/account`
+  `GET /api/auth/me` need only a valid JWT — no capability.
+
+Route wiring:
+
+- Router-level: `/users` → `users:manage`; `/audit-logs` → `audit:view`;
+  `/backups` → `backups:manage`.
+- `/services`: state changes → `apps:control`; env config `PUT` →
+  `apps:config`; exposure toggle → `apps:expose`; GETs open.
+- `/settings`: the Cloudflare-token and exposure-provisioning routes →
+  `exposure:settings`; general / ntfy / email / backup-destination →
+  `settings:manage`.
+- `/network` (LAN scan) → `apps:control`. `PUT /health/thresholds` →
+  `settings:manage`.
+- Token payload carries `roles: string[]`; `requireCapability` still does a
+  fresh `SELECT role FROM user_roles WHERE user_id = $1` so a revoke isn't
+  stale for the token's hour.
+
+## 150. §131.3 slice 1 done — named roles gate the dashboard (2026-09-03)
+
+Slice 1 of the SSO work, per the §149 decisions. Feature bump 0.7.0 → 0.8.0.
+
+### 150.1 Backend
+
+- **Schema.** `user_roles(user_id, role, PRIMARY KEY (user_id, role))` in
+  `init.sql`; `ensureUserRolesTable()` (replacing `dropLegacyRoleColumn`)
+  creates it on upgrade, drops the long-dead `users.role` text column if a
+  very old DB still has it, and backfills `owner` for every account with no
+  rows yet — which is every account on an upgrading box (all were admins) and
+  the first `/setup` admin before the migration next runs. Verified on the
+  live DB: table present, `mat → owner`.
+- **`auth/capabilities.ts`.** `ROLES`, `CAPABILITIES`, the role→capability map,
+  `capabilitiesFor(roles)` (union), `roleHasCapability`. `owner` = all;
+  `it_admin` = apps/backups/settings/audit; `webmaster` = `exposure:settings`
+  only; `user` = none. 8 unit tests.
+- **`middleware/requireCapability.ts`.** 403s unless the caller's roles —
+  read **fresh** from `user_roles`, not the token — grant the capability. 4
+  tests (grant, deny, unauthenticated, stale-token-ignored).
+- **Route wiring.** Router-level: `/users` → `users:manage`, `/audit-logs` →
+  `audit:view`, `/backups` → `backups:manage`, `/network` → `apps:control`.
+  Per-route in `/services` (start/stop/update → `apps:control`; env
+  get/put + admin-user get/put → `apps:config`; exposure put + verify →
+  `apps:expose`; status/exposure GET stay open). `/settings` gates by path:
+  `/cloudflare-token` + `/exposure` → `exposure:settings`, the rest →
+  `settings:manage`. `PUT /health/thresholds` → `settings:manage`; `GET
+  /health` stays open (the header strip needs it for everyone).
+- **Identity.** Access-token payload carries `roles: string[]`;
+  `/auth/login`, `/auth/login/totp`, `/auth/setup`, `/auth/refresh` responses
+  include roles; new `GET /api/auth/me` → `{ id, username, roles,
+  capabilities }`. `/setup` assigns `owner`; `recoverAdmin` (`create-admin`
+  and `reset-password`) ensures `owner` so a demotion mistake is recoverable
+  like a lost password.
+- **Users API.** List includes `roles`; `POST /users` requires a non-empty
+  validated `roles` array (`rolesSchema`); new `PUT /users/:id/roles`.
+  Guards: can't change your own roles; can't demote or delete the last
+  `owner`.
+
+### 150.2 Frontend
+
+- **`core/capabilities.ts`** mirrors the backend map (deviates from §149's
+  "use `/api/auth/me`" — a synchronous constant avoids a frame where the nav
+  is wrong while a request is in flight; the backend is still the authority,
+  drift only ever shows a control the API then refuses). `AuthService` gains
+  `roles$`, `capabilities$`, `hasCapability()`, `currentRoles()` off the
+  persisted session (login/refresh already return roles).
+- **Nav + menu.** `shell.component` hides each nav entry on its capability;
+  `home.component` filters the bento tiles the same way (and drops the
+  two-column spans once the list is short, so a lesser role's menu isn't
+  ragged). `guards/capability.guard.ts` bounces a typed-in URL to `/home`.
+- **Users page.** Title "Users & roles"; a Roles column of per-account
+  checkboxes with an inline "Save roles" that appears when dirty (disabled
+  for your own row); the create form gained a required role picker
+  (`it_admin` pre-ticked as a starting point, but the form still refuses an
+  empty set).
+
+### 150.3 Verified
+
+`backend`: `npm run typecheck` clean, `npm test` 392/392 (+12). `frontend`:
+`npm run build` clean (pre-existing warnings), `npm run test:ci` 42/42.
+Rebuilt + redeployed; `/api/version` → `0.8.0`; migration confirmed on the
+live DB. **End-to-end role enforcement not curl-tested** — `mat` has 2FA, so
+a scripted login isn't possible; needs @mat on `localhost:10001`: log in,
+check `GET /api/auth/me`, create a `webmaster`-only user, sign in as them and
+confirm the nav shows only Exposure + Security and `/api/users` 403s.
+
+### 150.4 Still open (§131.3 slices 2–4)
+
+Email field + registry-derived app-access list on the create form; writing
+dashboard users into Authelia's user database. The role model this slice
+lands is the foundation those build on.

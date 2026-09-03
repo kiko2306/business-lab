@@ -94,6 +94,14 @@ async function resetPassword(): Promise<void> {
   }
   const userId = rows[0].id;
 
+  // Recovery has to restore *control*, not just access: make sure the account
+  // is an owner so a role mistake (demoting the last owner) is fixable the
+  // same way as a lost password (plan.md §149).
+  await query(
+    "INSERT INTO user_roles (user_id, role) VALUES ($1, 'owner') ON CONFLICT DO NOTHING",
+    [userId]
+  );
+
   // A password reset is also the answer to a suspected compromise, so drop
   // every outstanding session for the account rather than leaving stolen
   // refresh tokens live.
@@ -126,6 +134,9 @@ async function createAdmin(): Promise<void> {
     'INSERT INTO users (username, password_hash, is_setup_complete) VALUES ($1, $2, TRUE) RETURNING id',
     [username, passwordHash]
   );
+  await query("INSERT INTO user_roles (user_id, role) VALUES ($1, 'owner') ON CONFLICT DO NOTHING", [
+    rows[0].id,
+  ]);
 
   await writeAuditLog({
     userId: rows[0].id,

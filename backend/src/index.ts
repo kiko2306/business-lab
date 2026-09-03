@@ -15,13 +15,14 @@ import usersRouter from './routes/users';
 import networkRouter from './routes/network';
 import { APP_VERSION } from './version';
 import {
-  dropLegacyRoleColumn,
+  ensureUserRolesTable,
   ensureServiceExposureTable,
   ensureServiceExposureAutheliaColumn,
   ensureTotpSchema,
 } from './utils/database';
 import authMiddleware from './middleware/auth';
 import setupModeMiddleware from './middleware/setupMode';
+import { requireCapability } from './middleware/requireCapability';
 import { initWebSocket, sseHandler } from './services/realtime';
 import { startupLogsHandler } from './services/serviceLogs';
 import { startBackupScheduler } from './services/backupScheduler';
@@ -143,13 +144,15 @@ for (const prefix of ROUTE_PREFIXES) {
     res.json({ message: 'Homelab API v1' });
   });
 
-  // Remaining routes require setup to be complete and a valid JWT
+  // Remaining routes require setup to be complete and a valid JWT. Capability
+  // gates (plan.md §149): the whole-router ones live here; `/services` and
+  // `/settings` mix concerns, so those gate per-route inside the router.
   app.use(`${prefix}/services`, ...protectedGate(), servicesRouter);
   app.use(`${prefix}/settings`, ...protectedGate(), settingsRouter);
-  app.use(`${prefix}/audit-logs`, ...protectedGate(), auditRouter);
-  app.use(`${prefix}/backups`, ...protectedGate(), backupRouter);
-  app.use(`${prefix}/users`, ...protectedGate(), usersRouter);
-  app.use(`${prefix}/network`, ...protectedGate(), networkRouter);
+  app.use(`${prefix}/audit-logs`, ...protectedGate(), requireCapability('audit:view'), auditRouter);
+  app.use(`${prefix}/backups`, ...protectedGate(), requireCapability('backups:manage'), backupRouter);
+  app.use(`${prefix}/users`, ...protectedGate(), requireCapability('users:manage'), usersRouter);
+  app.use(`${prefix}/network`, ...protectedGate(), requireCapability('apps:control'), networkRouter);
   // Mounted after the public liveness probe above, so GET /health stays public
   // while GET /health/system and /health/thresholds remain protected.
   app.use(`${prefix}/health`, ...protectedGate(), healthRouter);
@@ -164,8 +167,8 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   return res.status(500).json({ error: 'Internal server error' });
 });
 
-dropLegacyRoleColumn().catch((err: Error) => {
-  console.error('Unable to drop legacy users.role column:', err.message);
+ensureUserRolesTable().catch((err: Error) => {
+  console.error('Unable to ensure user_roles table:', err.message);
 });
 ensureServiceExposureTable().catch((err: Error) => {
   console.error('Unable to ensure service_exposure table:', err.message);

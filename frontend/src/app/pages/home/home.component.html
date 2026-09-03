@@ -6,9 +6,9 @@
 
   <div class="menu-grid">
     <a
-      *ngFor="let tile of tiles"
+      *ngFor="let tile of visibleTiles"
       class="menu-tile card text-decoration-none text-reset"
-      [class.menu-tile--wide]="tile.wide"
+      [class.menu-tile--wide]="tile.wide && useBento"
       [class.menu-tile--pending]="tile.pending"
       [routerLink]="tile.link"
     >

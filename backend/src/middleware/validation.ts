@@ -1,5 +1,13 @@
 import { NextFunction, Request, Response } from 'express';
 import Joi, { ObjectSchema, ValidationError } from 'joi';
+import { ROLES } from '../auth/capabilities';
+
+// At least one role, each a known name, no duplicates (plan.md §149).
+const rolesSchema = Joi.array()
+  .items(Joi.string().valid(...ROLES))
+  .min(1)
+  .unique()
+  .required();
 
 const validationOptions = {
   abortEarly: false,
@@ -141,12 +149,16 @@ export const schemas = {
   userCreate: Joi.object({
     username: usernameSchema.required(),
     password: passwordSchema.required(),
+    roles: rolesSchema,
   }),
   userIdParam: Joi.object({
     id: Joi.number().integer().positive().required(),
   }),
   userPasswordUpdate: Joi.object({
     password: passwordSchema.required(),
+  }),
+  userRolesUpdate: Joi.object({
+    roles: rolesSchema,
   }),
   recoveryResetAdminPassword: Joi.object({
     username: usernameSchema.required(),

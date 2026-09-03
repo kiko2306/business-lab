@@ -3,6 +3,7 @@ import os from 'os';
 import { execFile } from 'child_process';
 import { query } from '../utils/database';
 import { schemas, validateBody } from '../middleware/validation';
+import { requireCapability } from '../middleware/requireCapability';
 
 const router = Router();
 
@@ -192,7 +193,7 @@ router.get('/thresholds', async (_req: Request, res: Response) => {
   }
 });
 
-router.put('/thresholds', validateBody(schemas.healthThresholds), async (req: Request, res: Response) => {
+router.put('/thresholds', requireCapability('settings:manage'), validateBody(schemas.healthThresholds), async (req: Request, res: Response) => {
   const { diskPercent, memoryPercent, loadPerCpu } = req.body;
 
   try {

@@ -14,6 +14,8 @@ import setupModeMiddleware from '../middleware/setupMode';
 import authMiddleware from '../middleware/auth';
 import { schemas, validateBody } from '../middleware/validation';
 import { writeAuditLog } from '../utils/audit';
+import { capabilitiesFor } from '../auth/capabilities';
+import { getUserRoles, setUserRoles } from '../services/userRoles';
 import {
   generateRecoveryCodes,
   generateTotpSecret,
@@ -60,9 +62,10 @@ interface UserRow {
 async function issueSession(user: { id: number; username: string }): Promise<{
   accessToken: string;
   refreshToken: string;
-  user: { id: number; username: string };
+  user: { id: number; username: string; roles: string[] };
 }> {
-  const accessToken = signAccessToken({ id: user.id, username: user.username });
+  const roles = await getUserRoles(user.id);
+  const accessToken = signAccessToken({ id: user.id, username: user.username, roles });
   const refreshToken = signRefreshToken({ id: user.id });
   const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
   await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [
@@ -70,7 +73,7 @@ async function issueSession(user: { id: number; username: string }): Promise<{
     refreshToken,
     refreshExpiry,
   ]);
-  return { accessToken, refreshToken, user: { id: user.id, username: user.username } };
+  return { accessToken, refreshToken, user: { id: user.id, username: user.username, roles } };
 }
 
 // ---------------------------------------------------------------------------
@@ -110,7 +113,11 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
     );
     const user = result.rows[0];
 
-    const accessToken = signAccessToken({ id: user.id, username: user.username });
+    // The first account owns everything, including user management.
+    await setUserRoles(user.id, ['owner']);
+    const roles = ['owner'];
+
+    const accessToken = signAccessToken({ id: user.id, username: user.username, roles });
     const refreshToken = signRefreshToken({ id: user.id });
 
     const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
@@ -127,7 +134,9 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
       'success',
     ]);
 
-    return res.status(201).json({ accessToken, refreshToken, user: { id: user.id, username: user.username } });
+    return res
+      .status(201)
+      .json({ accessToken, refreshToken, user: { id: user.id, username: user.username, roles } });
   } catch (err) {
     const error = err as { code?: string; message: string };
     if (error.code === '23505') {
@@ -294,10 +303,32 @@ router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (r
       return res.status(401).json({ error: 'Refresh token is invalid or expired' });
     }
 
-    const accessToken = signAccessToken({ id: decoded.id, username: row.username });
-    return res.json({ accessToken });
+    const roles = await getUserRoles(decoded.id);
+    const accessToken = signAccessToken({ id: decoded.id, username: row.username, roles });
+    return res.json({ accessToken, roles });
   } catch {
     return res.status(401).json({ error: 'Refresh token is invalid or expired' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/auth/me — the signed-in user's identity, roles and the dashboard
+// capabilities those roles grant. The frontend gates nav and buttons on the
+// capability list rather than re-deriving the role→capability map.
+// ---------------------------------------------------------------------------
+router.get('/me', authMiddleware, async (req: Request, res: Response) => {
+  try {
+    const userId = req.user!.id;
+    const result = await query<{ username: string }>('SELECT username FROM users WHERE id = $1', [userId]);
+    const row = result.rows[0];
+    if (!row) {
+      return res.status(404).json({ error: 'Account not found.' });
+    }
+    const roles = await getUserRoles(userId);
+    return res.json({ id: userId, username: row.username, roles, capabilities: capabilitiesFor(roles) });
+  } catch (err) {
+    console.error('Auth me error:', (err as Error).message);
+    return res.status(500).json({ error: 'Internal server error' });
   }
 });
 

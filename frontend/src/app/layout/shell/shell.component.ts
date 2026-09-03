@@ -24,6 +24,9 @@ export class ShellComponent implements OnInit {
   private readonly operations = inject(OperationsService);
 
   protected readonly user$ = this.authService.user$;
+  // The template gates each nav entry on a capability (plan.md §149); a
+  // webmaster sees only Exposure + Security, a bare `user` only Security.
+  protected readonly caps$ = this.authService.capabilities$;
 
   // Shown in the footer. Empty until the probe resolves so nothing flashes;
   // a failure just leaves it blank (the footer text is conditional on it).

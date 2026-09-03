@@ -1,6 +1,20 @@
 export interface User {
   id: number;
   username: string;
+  // Named roles (plan.md §149). The login / setup / refresh responses carry
+  // this; `AuthService` derives the effective capability set from it.
+  roles?: Role[];
+}
+
+export type Role = 'owner' | 'it_admin' | 'webmaster' | 'user';
+
+/** One account in the Users & roles list. */
+export interface ManagedUser {
+  id: number;
+  username: string;
+  createdAt?: string;
+  created_at?: string;
+  roles: Role[];
 }
 
 export interface AuthResponse {
@@ -367,6 +381,7 @@ export interface AdminUser {
   id: number;
   username: string;
   created_at: string;
+  roles: Role[];
 }
 
 export interface AdminUserListResponse {

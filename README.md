@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.7.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.8.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -154,11 +154,9 @@ it is done — not ticked off and left behind. Section references point at
 
 SSO / roles:
 
-- [ ] **Activate named roles in the dashboard** (§131.3) — seed the role set
-      from §109 / §84.4 (webmaster, IT admin, …); roles gate dashboard
-      capabilities and feed the per-user app access list.
-- [ ] **Users & roles page — create-user form** (§131.3) — username, email,
-      password, and an app access list (multi-select of SSO-reachable apps).
+- [ ] **Users & roles page — email + app access list** (§131.3) — the create
+      form takes username, password and roles (§150); still to add is an email
+      field and the multi-select of SSO-reachable apps the user may reach.
 - [ ] **Derive the app access list from the registry** (§131.3) — only
       exposed / Authelia-gated / group-requiring apps appear; not a static
       checklist.

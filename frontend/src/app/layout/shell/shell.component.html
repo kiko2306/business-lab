@@ -12,16 +12,23 @@
           </div>
         </a>
         <app-resource-strip class="app-header__resources"></app-resource-strip>
-        <nav class="app-header__actions">
+        <nav class="app-header__actions" *ngIf="caps$ | async as caps">
           <a class="app-nav__link" routerLink="/home" routerLinkActive="active"
              [routerLinkActiveOptions]="{ exact: true }">Menu</a>
-          <a class="app-nav__link" routerLink="/apps" routerLinkActive="active">Apps</a>
-          <a class="app-nav__link" routerLink="/backups" routerLinkActive="active">Backups</a>
-          <a class="app-nav__link" routerLink="/exposure" routerLinkActive="active">Exposure</a>
-          <a class="app-nav__link" routerLink="/settings" routerLinkActive="active">Settings</a>
-          <a class="app-nav__link" routerLink="/utils" routerLinkActive="active">Utils</a>
-          <a class="app-nav__link" routerLink="/users" routerLinkActive="active">Users &amp; roles</a>
-          <a class="app-nav__link" routerLink="/audit-logs" routerLinkActive="active">Audit logs</a>
+          <a class="app-nav__link" routerLink="/apps" routerLinkActive="active"
+             *ngIf="caps.has('apps:control')">Apps</a>
+          <a class="app-nav__link" routerLink="/backups" routerLinkActive="active"
+             *ngIf="caps.has('backups:manage')">Backups</a>
+          <a class="app-nav__link" routerLink="/exposure" routerLinkActive="active"
+             *ngIf="caps.has('exposure:settings')">Exposure</a>
+          <a class="app-nav__link" routerLink="/settings" routerLinkActive="active"
+             *ngIf="caps.has('settings:manage')">Settings</a>
+          <a class="app-nav__link" routerLink="/utils" routerLinkActive="active"
+             *ngIf="caps.has('apps:control')">Utils</a>
+          <a class="app-nav__link" routerLink="/users" routerLinkActive="active"
+             *ngIf="caps.has('users:manage')">Users &amp; roles</a>
+          <a class="app-nav__link" routerLink="/audit-logs" routerLinkActive="active"
+             *ngIf="caps.has('audit:view')">Audit logs</a>
           <a class="app-nav__link" routerLink="/account" routerLinkActive="active">Security</a>
           <a class="app-nav__link app-nav__link--warning" routerLink="/recovery">Recovery</a>
         </nav>

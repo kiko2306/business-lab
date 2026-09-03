@@ -3,6 +3,7 @@ import { Router, Request, Response } from 'express';
 import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { schemas, validateBody } from '../middleware/validation';
+import { requireCapability } from '../middleware/requireCapability';
 import {
   BACKUP_TARGET_KEYS,
   DEFAULT_BACKUP_FOLDER,
@@ -35,6 +36,19 @@ import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
 
 const router = Router();
+
+/**
+ * Capability gate for the whole settings router (plan.md §149). The Cloudflare
+ * token and exposure-provisioning routes are the webmaster's remit
+ * (`exposure:settings`); everything else — timezone, ntfy, mail, backup
+ * destination — is the IT admin's (`settings:manage`). The split matches the
+ * two frontend pages: `/exposure` calls the first group, `/settings` the rest.
+ */
+router.use((req: Request, res: Response, next) => {
+  const isExposure =
+    req.path.startsWith('/cloudflare-token') || req.path.startsWith('/exposure');
+  return requireCapability(isExposure ? 'exposure:settings' : 'settings:manage')(req, res, next);
+});
 
 const CLOUDFLARE_TOKEN_KEY = 'cloudflare_tunnel_token';
 const PERMISSION_EXPLANATION =

@@ -1,12 +1,16 @@
 import { NgFor, NgIf } from '@angular/common';
-import { Component } from '@angular/core';
+import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
+import { AuthService } from '../../core/auth.service';
+import { Capability } from '../../core/capabilities';
 
 interface MenuTile {
   title: string;
   description: string;
   /** Router path the tile links to. */
   link: string;
+  /** Hidden unless the signed-in user's role grants this (plan.md §149). */
+  capability?: Capability;
   /**
    * True while the area has no page of its own yet — the tile deep-links to a
    * stand-in (`/apps`) and shows an "Opens in Apps" badge. Only "Updates &
@@ -35,49 +39,59 @@ interface MenuTile {
   styleUrl: './home.component.css',
 })
 export class HomeComponent {
-  protected readonly tiles: MenuTile[] = [
+  private readonly auth = inject(AuthService);
+
+  private readonly tiles: MenuTile[] = [
     {
       title: 'Apps',
       description: 'The service registry — start, stop, and configure every managed app.',
       link: '/apps',
+      capability: 'apps:control',
       wide: true,
     },
     {
       title: 'Exposure & networking',
       description: 'The Cloudflare Tunnel token and first-start provisioning for Nginx Proxy Manager.',
       link: '/exposure',
+      capability: 'exposure:settings',
     },
     {
       title: 'Backups & restore',
       description: 'Backup schedule, on-demand runs, and restoring from a snapshot.',
       link: '/backups',
+      capability: 'backups:manage',
       wide: true,
     },
     {
       title: 'Updates & version control',
       description: 'Per-app image updates and the deployed Business Lab version.',
       link: '/apps',
+      capability: 'apps:control',
       pending: true,
     },
     {
       title: 'Users & roles',
-      description: 'Administrator accounts and, ahead, named roles and per-app access.',
+      description: 'Accounts, the roles they hold, and — ahead — per-app SSO access.',
       link: '/users',
+      capability: 'users:manage',
     },
     {
       title: 'Settings',
       description: 'The timezone, ntfy alert pushes, the shared mailbox, and the backup destination.',
       link: '/settings',
+      capability: 'settings:manage',
     },
     {
       title: 'Utils',
       description: 'Stack health checks and one-off tools such as the LAN device scan.',
       link: '/utils',
+      capability: 'apps:control',
     },
     {
       title: 'Audit logs',
       description: 'A record of user actions and system operations, exportable as CSV.',
       link: '/audit-logs',
+      capability: 'audit:view',
     },
     {
       title: 'Account security',
@@ -86,4 +100,17 @@ export class HomeComponent {
       wide: true,
     },
   ];
+
+  /** Tiles the current role can reach. */
+  protected get visibleTiles(): MenuTile[] {
+    return this.tiles.filter((tile) => !tile.capability || this.auth.hasCapability(tile.capability));
+  }
+
+  /**
+   * The bento spans (§141.2) only divide evenly with the full nine tiles.
+   * Once the list is filtered for a lesser role, drop back to a plain grid.
+   */
+  protected get useBento(): boolean {
+    return this.visibleTiles.length === this.tiles.length;
+  }
 }

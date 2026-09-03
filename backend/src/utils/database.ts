@@ -69,12 +69,33 @@ export async function withTransaction<T>(
 }
 
 /**
- * Drop the legacy `role` column from `users` on databases created before
- * roles were removed from the project. No-op on fresh installs, since
- * init.sql no longer creates that column.
+ * Bring the `user_roles` join table into being (plan.md §149) and make sure
+ * every existing account has a role. Roles were removed once (`51387f0`) and
+ * are back, wired to capability gates this time.
+ *
+ * - Creates `user_roles` if absent.
+ * - Drops the long-dead `users.role` text column if a very old database still
+ *   carries it (its values were never enforced; the join table replaces it).
+ * - Backfills `owner` for any account with no roles yet — that is every
+ *   account on an upgrading database (they were all admins,
+ *   `51387f0`), and also the first admin created by `/setup` before this
+ *   migration ran on a subsequent boot.
  */
-export async function dropLegacyRoleColumn(): Promise<void> {
+export async function ensureUserRolesTable(): Promise<void> {
+  await query(`
+    CREATE TABLE IF NOT EXISTS user_roles (
+        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        role    VARCHAR(20) NOT NULL,
+        PRIMARY KEY (user_id, role)
+    )
+  `);
   await query('ALTER TABLE users DROP COLUMN IF EXISTS role');
+  await query(`
+    INSERT INTO user_roles (user_id, role)
+    SELECT u.id, 'owner'
+    FROM users u
+    WHERE NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id)
+  `);
 }
 
 /**

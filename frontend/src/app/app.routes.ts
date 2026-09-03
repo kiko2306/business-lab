@@ -14,6 +14,7 @@ import { UsersComponent } from './pages/users/users.component';
 import { RecoveryComponent } from './pages/recovery/recovery.component';
 import { authGuard } from './guards/auth.guard';
 import { guestGuard } from './guards/guest.guard';
+import { requireCapability } from './guards/capability.guard';
 
 export const routes: Routes = [
   {
@@ -50,30 +51,37 @@ export const routes: Routes = [
       {
         path: 'apps',
         component: AppsComponent,
+        canActivate: [requireCapability('apps:control')],
       },
       {
         path: 'backups',
         component: BackupsComponent,
+        canActivate: [requireCapability('backups:manage')],
       },
       {
         path: 'exposure',
         component: ExposureComponent,
+        canActivate: [requireCapability('exposure:settings')],
       },
       {
         path: 'settings',
         component: SettingsComponent,
+        canActivate: [requireCapability('settings:manage')],
       },
       {
         path: 'utils',
         component: UtilsComponent,
+        canActivate: [requireCapability('apps:control')],
       },
       {
         path: 'audit-logs',
         component: AuditLogsComponent,
+        canActivate: [requireCapability('audit:view')],
       },
       {
         path: 'users',
         component: UsersComponent,
+        canActivate: [requireCapability('users:manage')],
       },
       {
         path: 'account',

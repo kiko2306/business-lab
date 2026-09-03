@@ -1,6 +1,10 @@
 export interface AuthAccessPayload {
   id: number;
   username: string;
+  // Snapshot of the user's roles at token-issue time. Cheap reads (e.g. the
+  // frontend) can trust this; anything that gates a real action re-checks the
+  // database (see requireCapability) so a demotion isn't stale for the hour.
+  roles: string[];
 }
 
 export interface AuthRefreshPayload {

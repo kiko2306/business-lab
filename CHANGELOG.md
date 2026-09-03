@@ -11,6 +11,21 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.8.0] — 2026-09-03
+
+### Added
+
+- Named roles that gate the dashboard (§131.3 / §150). Four roles —
+  **owner**, **it_admin**, **webmaster**, **user** — held in a new `user_roles`
+  join table (a user may hold several; capabilities are the union). Every
+  existing account is migrated to `owner`. The API enforces a capability per
+  route (`requireCapability`); the frontend hides nav entries and the menu
+  tiles a role can't reach, and route guards bounce a typed-in URL. The Users
+  page gains a role column and a per-account role editor, and the create form
+  now requires picking at least one role. `GET /api/auth/me` returns the
+  caller's roles and capabilities; `./start.sh recover` restores the `owner`
+  role alongside the password.
+
 ## [0.7.0] — 2026-09-03
 
 ### Added

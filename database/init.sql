@@ -1,7 +1,6 @@
 -- Homelab Manager — initial database schema
 -- This script runs automatically when the PostgreSQL container is first created.
 
--- Every account is an administrator; there is no restricted role tier.
 CREATE TABLE IF NOT EXISTS users (
     id                SERIAL PRIMARY KEY,
     username          VARCHAR(100) NOT NULL UNIQUE,
@@ -27,6 +26,16 @@ CREATE TABLE IF NOT EXISTS totp_recovery_codes (
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 CREATE INDEX IF NOT EXISTS totp_recovery_codes_user_id_idx ON totp_recovery_codes (user_id);
+
+-- Named roles per account (plan.md §149). A user may hold several; effective
+-- dashboard capabilities are the union (backend/src/auth/capabilities.ts).
+-- The first admin (from /setup) and every account on a database that predates
+-- this table are backfilled with 'owner' by ensureUserRolesTable().
+CREATE TABLE IF NOT EXISTS user_roles (
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    role    VARCHAR(20) NOT NULL,
+    PRIMARY KEY (user_id, role)
+);
 
 CREATE TABLE IF NOT EXISTS settings (
     key         VARCHAR(200) PRIMARY KEY,

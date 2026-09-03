@@ -4,7 +4,8 @@ import { Router, UrlTree } from '@angular/router';
 import { BehaviorSubject, Observable, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
 import { API_BASE_URL } from './api';
 import { SKIP_AUTH, SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
-import { AuthResponse, LoginResult, User, isMfaChallenge } from './models';
+import { AuthResponse, LoginResult, Role, User, isMfaChallenge } from './models';
+import { Capability, capabilitiesFor } from './capabilities';
 
 @Injectable({
   providedIn: 'root'
@@ -22,6 +23,21 @@ export class AuthService {
   private refreshRequest$?: Observable<string>;
 
   readonly user$ = this.userSubject.asObservable();
+
+  /** The signed-in user's roles, or `[]` when signed out. */
+  readonly roles$ = this.userSubject.pipe(map((user) => user?.roles ?? []));
+
+  /** Effective dashboard capabilities for the current roles (plan.md §149). */
+  readonly capabilities$ = this.userSubject.pipe(map((user) => capabilitiesFor(user?.roles)));
+
+  /** Synchronous capability check for template/guard use. */
+  hasCapability(capability: Capability): boolean {
+    return capabilitiesFor(this.userSubject.value?.roles).has(capability);
+  }
+
+  currentRoles(): Role[] {
+    return this.userSubject.value?.roles ?? [];
+  }
 
   login(username: string, password: string): Observable<LoginResult> {
     return this.http
@@ -97,7 +113,7 @@ export class AuthService {
 
     if (!this.refreshRequest$) {
       this.refreshRequest$ = this.http
-        .post<{ accessToken: string }>(
+        .post<{ accessToken: string; roles?: Role[] }>(
           `${API_BASE_URL}/auth/refresh`,
           { refreshToken: this.refreshTokenSubject.value },
           {
@@ -107,8 +123,8 @@ export class AuthService {
           }
         )
         .pipe(
+          tap((response) => this.updateAccessToken(response.accessToken, response.roles)),
           map((response) => response.accessToken),
-          tap((accessToken) => this.updateAccessToken(accessToken)),
           finalize(() => {
             this.refreshRequest$ = undefined;
           }),
@@ -199,15 +215,22 @@ export class AuthService {
     localStorage.setItem(this.storageKey, JSON.stringify(response));
   }
 
-  private updateAccessToken(accessToken: string): void {
+  private updateAccessToken(accessToken: string, roles?: Role[]): void {
     const current = this.readStoredSession();
+    // A refresh also re-reports the user's roles — fold them into the stored
+    // user so a session opened before roles existed (or across a role change)
+    // picks up the new capability set without a full re-login.
+    const user = current.user && roles ? { ...current.user, roles } : current.user;
     const updatedSession = {
       accessToken,
       refreshToken: current.refreshToken,
-      user: current.user,
+      user,
     };
 
     this.accessTokenSubject.next(accessToken);
+    if (user !== current.user) {
+      this.userSubject.next(user);
+    }
     localStorage.setItem(this.storageKey, JSON.stringify(updatedSession));
   }
 
