@@ -14241,3 +14241,57 @@ in `services.yaml`.
 Touches `apps/**` and docs only — nothing under `backend/src` or
 `frontend/src`, so the dashboard version is unchanged (the require-version-bump
 hook agrees).
+
+## 147. Plan — Homepage's palette in the dashboard, and a resource strip on the menu (2026-09-03)
+
+Two-part ask from @mat, both frontend-only and visual (so: iterate on
+`localhost:10001` before commit, [[visual-changes-need-approval]]). Recorded as
+a planning pass ([[plan-first-then-todo]]); each part is a README item.
+
+### 147.1 Match the dark palette to gethomepage
+
+The Home Page (`apps/home-page/`, gethomepage) runs its defaults — `theme:
+dark`, `color: slate` — i.e. the Tailwind **slate** scale. The dashboard's dark
+tokens (§136.3, tweaked in §141) are already in that family (`--bs-secondary-color`
+is slate-300 exactly) but on ad-hoc hexes. Snap them to the slate ramp so the
+two surfaces read as one product:
+
+| token | now | → slate |
+|---|---|---|
+| `--app-canvas` / `--bs-body-bg` | `#0a0d12` | `#020617` (950) |
+| `--app-surface*` / card bg | `#1b2230` | `#1e293b` (800) |
+| `--bs-body-color` | `#e6e9ef` | `#e2e8f0` (200) |
+| `--bs-secondary-color` | `#cbd5e1` | keep `#cbd5e1` (300) |
+| `--bs-border-color` | `#394456` | `#334155` (700) |
+| `--bs-tertiary-bg` | `#232b3a` | `#0f172a` (900) |
+| `--bs-secondary-bg` | `#2c3648` | `#334155` (700) |
+
+`styles.css` only; the shadow recipe stays. Keep a blue `--bs-primary` accent
+for buttons/active states (gethomepage is monochrome, but the dashboard has
+real actions that need to pop). @mat reviews the exact values.
+
+### 147.2 Resource strip at the top of the menu
+
+gethomepage shows a `resources` widget (cpu / memory / disk `/`) — @mat wants
+the same at "the head of the dashboard". Post-§145 the landing page is `/home`
+(the bento menu), so: a compact row of meters **above the tiles** on
+`HomeComponent`.
+
+- Data: `GET /api/health` already returns `disks[]` (percentUsed), `memory`
+  (percentUsed), `load` (loadPerCpu). No instantaneous CPU %; use **load per
+  CPU** as the CPU proxy (what the Utils Health panel already shows), or add a
+  cheap CPU-sample to the health route — decide with @mat. Poll ~30s while the
+  menu is mounted; best-effort, a failure just hides the strip (it is not why
+  the page exists).
+- Form: three small labelled bars — Load / Memory / Disk — each `value% of
+  total`, turning amber/red past the same thresholds `/api/health` reports.
+  Reuse the meter styling once it exists; likely a tiny `ResourceStrip`
+  component so `/utils` Health could adopt it later.
+- Scope guard: this duplicates data that lives on `/utils`. That is the point
+  (glanceable on landing); the Health panel stays the detailed view.
+
+### 147.3 Not doing
+
+No backend change if load-per-CPU is accepted as the CPU figure. No new route,
+no persistence. The strip is display-only — no "refresh" button, it just
+polls.
