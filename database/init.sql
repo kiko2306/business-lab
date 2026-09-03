@@ -13,7 +13,11 @@ CREATE TABLE IF NOT EXISTS users (
     -- code.
     totp_secret       TEXT,
     totp_enabled      BOOLEAN NOT NULL DEFAULT FALSE,
-    totp_enrolled_at  TIMESTAMPTZ
+    totp_enrolled_at  TIMESTAMPTZ,
+    -- Contact address, and the address written into Authelia's user database
+    -- for an SSO account (plan.md §151). Nullable: accounts created before
+    -- this column keep NULL until edited; the users API requires it on create.
+    email             VARCHAR(255)
 );
 
 -- Single-use TOTP recovery codes: only the SHA-256 hash is kept. Replaced
@@ -47,6 +51,17 @@ CREATE TABLE IF NOT EXISTS user_capabilities (
     user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     capability VARCHAR(40) NOT NULL,
     PRIMARY KEY (user_id, capability)
+);
+
+-- Which managed apps an account may reach through Authelia SSO (plan.md
+-- §151). Explicit allowlist: no rows means no SSO app access. The set of
+-- valid service_name values is the apps that are currently exposed and
+-- Authelia-protected; the dashboard writes matching group membership into
+-- Authelia's user database from these rows.
+CREATE TABLE IF NOT EXISTS user_app_access (
+    user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    service_name VARCHAR(100) NOT NULL,
+    PRIMARY KEY (user_id, service_name)
 );
 
 CREATE TABLE IF NOT EXISTS settings (

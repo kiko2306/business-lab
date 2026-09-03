@@ -1,7 +1,8 @@
 /**
  * User management API (`users:manage` — gated at the mount in index.ts).
- * Create, reset password, delete, assign named roles, and set an admin's
- * per-feature grants (plan.md §149, §152).
+ * Create, reset password, delete, assign named roles, set an admin's
+ * per-feature grants, and set an account's email + SSO app-access list
+ * (plan.md §149, §151, §152).
  */
 
 import { Router, Request, Response } from 'express';
@@ -18,23 +19,59 @@ import {
   setUserRoles,
   webmasterCount,
 } from '../services/userRoles';
+import {
+  getAppAccessForUsers,
+  getAppAccessOptionNames,
+  getAppAccessOptions,
+  setUserAppAccess,
+} from '../services/userAppAccess';
 
 const router = Router();
 
 interface UserRow {
   id: number;
   username: string;
+  email: string | null;
   created_at: string;
 }
+
+/** Reject any submitted app name that isn't currently grantable. */
+async function rejectUnknownAppAccess(appAccess: string[]): Promise<string | null> {
+  if (appAccess.length === 0) {
+    return null;
+  }
+  const allowed = await getAppAccessOptionNames();
+  const unknown = appAccess.filter((name) => !allowed.has(name));
+  return unknown.length ? `Not an SSO-reachable app: ${unknown.join(', ')}.` : null;
+}
+
+// ---------------------------------------------------------------------------
+// GET /api/users/app-access-options — the apps an account can be granted SSO
+// access to: those currently exposed and Authelia-protected (plan.md §151).
+// ---------------------------------------------------------------------------
+router.get('/app-access-options', async (_req: Request, res: Response) => {
+  try {
+    return res.json({ items: await getAppAccessOptions() });
+  } catch (error) {
+    console.error('App access options error:', (error as Error).message);
+    return res.status(500).json({ error: 'Unable to load the app list.' });
+  }
+});
 
 // ---------------------------------------------------------------------------
 // GET /api/users — list accounts with their roles
 // ---------------------------------------------------------------------------
 router.get('/', async (_req: Request, res: Response) => {
   try {
-    const result = await query<UserRow>('SELECT id, username, created_at FROM users ORDER BY id ASC');
+    const result = await query<UserRow>(
+      'SELECT id, username, email, created_at FROM users ORDER BY id ASC'
+    );
     const ids = result.rows.map((row) => row.id);
-    const [roles, grants] = await Promise.all([getRolesForUsers(ids), getCapabilitiesForUsers(ids)]);
+    const [roles, grants, appAccess] = await Promise.all([
+      getRolesForUsers(ids),
+      getCapabilitiesForUsers(ids),
+      getAppAccessForUsers(ids),
+    ]);
     const items = result.rows.map((row) => ({
       ...row,
       roles: roles[row.id] ?? [],
@@ -42,6 +79,7 @@ router.get('/', async (_req: Request, res: Response) => {
       // all-on when it has none), everything for a webmaster, nothing for a
       // user. The Roles/Features editor pre-ticks from this.
       capabilities: effectiveCapabilities(roles[row.id] ?? [], grants[row.id] ?? []),
+      appAccess: appAccess[row.id] ?? [],
     }));
     return res.json({ items });
   } catch (error) {
@@ -55,16 +93,23 @@ router.get('/', async (_req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Response) => {
   const { username, password } = req.body;
+  const email = (req.body.email as string | undefined)?.trim() || null;
   const roles = req.body.roles as Role[];
   const capabilities = (req.body.capabilities ?? []) as Capability[];
+  const appAccess = (req.body.appAccess ?? []) as string[];
 
   try {
+    const badApp = await rejectUnknownAppAccess(appAccess);
+    if (badApp) {
+      return res.status(400).json({ error: badApp });
+    }
+
     const passwordHash = await hashPassword(password);
     const result = await query<UserRow>(
-      `INSERT INTO users (username, password_hash, is_setup_complete)
-       VALUES ($1, $2, TRUE)
-       RETURNING id, username, created_at`,
-      [username.trim(), passwordHash]
+      `INSERT INTO users (username, password_hash, email, is_setup_complete)
+       VALUES ($1, $2, $3, TRUE)
+       RETURNING id, username, email, created_at`,
+      [username.trim(), passwordHash, email]
     );
     const user = result.rows[0];
     await setUserRoles(user.id, roles);
@@ -73,6 +118,9 @@ router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Res
     // a webmaster or a user.
     if (roles.includes('admin') && capabilities.length) {
       await setUserCapabilities(user.id, capabilities);
+    }
+    if (appAccess.length) {
+      await setUserAppAccess(user.id, appAccess);
     }
     const effective = effectiveCapabilities(roles, roles.includes('admin') ? capabilities : []);
 
@@ -83,7 +131,9 @@ router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Res
       result: 'success',
     }).catch(() => {});
 
-    return res.status(201).json({ user: { ...user, roles, capabilities: effective } });
+    return res
+      .status(201)
+      .json({ user: { ...user, roles, capabilities: effective, appAccess } });
   } catch (error) {
     const err = error as { code?: string; message: string };
     if (err.code === '23505') {
@@ -188,6 +238,50 @@ router.put(
     } catch (error) {
       console.error('Update user capabilities error:', (error as Error).message);
       return res.status(500).json({ error: 'Unable to update features.' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// PUT /api/users/:id/access — replace an account's email and SSO app-access
+// list (plan.md §151). Applies to any account; Authelia sync is slice 2c.
+// ---------------------------------------------------------------------------
+router.put(
+  '/:id/access',
+  validateParams(schemas.userIdParam),
+  validateBody(schemas.userAccessUpdate),
+  async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const { email } = req.body;
+    const appAccess = req.body.appAccess as string[];
+
+    try {
+      const badApp = await rejectUnknownAppAccess(appAccess);
+      if (badApp) {
+        return res.status(400).json({ error: badApp });
+      }
+
+      const target = await query<{ username: string }>(
+        'UPDATE users SET email = $2 WHERE id = $1 RETURNING username',
+        [id, email.trim()]
+      );
+      if (!target.rows[0]) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      await setUserAppAccess(id, appAccess);
+
+      await writeAuditLog({
+        userId: req.user?.id ?? null,
+        action: 'user_access_update',
+        resource: `${target.rows[0].username} → [${appAccess.join(', ') || 'no apps'}]`,
+        result: 'success',
+      }).catch(() => {});
+
+      return res.json({ message: 'Access updated.', email: email.trim(), appAccess });
+    } catch (error) {
+      console.error('Update user access error:', (error as Error).message);
+      return res.status(500).json({ error: 'Unable to update access.' });
     }
   }
 );

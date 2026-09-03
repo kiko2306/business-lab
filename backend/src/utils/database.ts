@@ -151,6 +151,25 @@ export async function ensureRoleModelReshape(): Promise<void> {
 }
 
 /**
+ * Add `users.email` and the `user_app_access` allowlist table (plan.md §151).
+ * `email` is nullable — existing accounts keep NULL until edited; the users
+ * API requires it on create. `user_app_access` holds which managed apps an
+ * account may reach through Authelia SSO; a row per (user, service). No rows
+ * means no SSO app access (an explicit allowlist). No-op on a fresh install —
+ * init.sql already has both.
+ */
+export async function ensureUserAppAccessSchema(): Promise<void> {
+  await query('ALTER TABLE users ADD COLUMN IF NOT EXISTS email VARCHAR(255)');
+  await query(`
+    CREATE TABLE IF NOT EXISTS user_app_access (
+        user_id      INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        service_name VARCHAR(100) NOT NULL,
+        PRIMARY KEY (user_id, service_name)
+    )
+  `);
+}
+
+/**
  * Add the TOTP columns to `users` and create `totp_recovery_codes` on
  * databases that predate the second-factor feature (plan.md §127). No-op on
  * fresh installs — init.sql already has both.

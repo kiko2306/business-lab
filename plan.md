@@ -14913,3 +14913,58 @@ The role reshape is complete: webmaster / admin / user, admin features
 per-account. Next: §151 SSO slice 2a — user email + app-access data model
 and API — with 151.4's Authelia groups keyed on `webmaster` → `admins` +
 every `app-*`.
+
+## 155. §151 slice 2a done — user email + app-access data model and API (2026-09-03)
+
+Backend groundwork for the SSO app-access list. Patch bump 0.9.1 → 0.9.2.
+Nothing is written into Authelia yet (slices 2c/2d); this just persists and
+serves the data.
+
+### 155.1 Schema
+
+- `users.email VARCHAR(255)` (nullable) and `user_app_access(user_id,
+  service_name, PRIMARY KEY (user_id, service_name), ON DELETE CASCADE)` —
+  `ensureUserAppAccessSchema()` in `index.ts`, plus `init.sql`. Verified on
+  the live DB: column and table present, no errors.
+- `ServiceDefinition.autheliaGroups?: string[]` (optional, **not** in the
+  mandatory `homepage.*` registry test) — named Authelia groups an app's rule
+  needs on top of the synthetic `app-<name>` group.
+
+### 155.2 Service module
+
+`services/userAppAccess.ts`:
+
+- `getAppAccessOptions()` — `service_exposure` rows that are `enabled AND
+  authelia_protected AND service_name <> 'authelia'`, mapped to `{ serviceName,
+  label, hostname, requiredGroups }` (label + groups from the registry, name
+  fallback), sorted by label.
+- `getAppAccessOptionNames()` — the grantable-name set, for validation.
+- `getUserAppAccess(id)` / `getAppAccessForUsers(ids)` / `setUserAppAccess(id,
+  names)` — read one, read many (grouped, every id defaulted to `[]`), replace
+  wholesale in a transaction.
+
+10 unit tests (`userAppAccess.test.ts`).
+
+### 155.3 API (all under `users:manage`)
+
+- `GET /api/users/app-access-options` → `{ items: AppAccessOption[] }`.
+- `GET /api/users` items now carry `email` and `appAccess: string[]`.
+- `POST /api/users` accepts `email` (valid if present — **kept optional at the
+  API**; the 2b form makes it a required field, and the column is nullable so
+  a missing address just means "set it later") and `appAccess: string[]` (each
+  name checked against the current options; empty allowed).
+- `PUT /api/users/:id/access` (new) — replace `email` + `appAccess`; `email`
+  required here, `appAccess` may be `[]` ("no SSO app access").
+
+### 155.4 Verified
+
+`backend`: `npm run typecheck` clean, `npm test` 400/400 (+6). Backend rebuilt
++ redeployed; migration confirmed on the live DB; `/api/version` → `0.9.2`;
+the new route is mounted and gated (401 unauthenticated). No frontend change
+(that is 2b).
+
+### 155.5 Next
+
+2b — the create-form email field + app-access checkbox list and a per-row
+Access editor. Then 2c (Authelia users-file sync) and 2d (access_control
+generation), both proven end-to-end on the live stack.

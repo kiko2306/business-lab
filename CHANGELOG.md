@@ -11,6 +11,19 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.9.2] — 2026-09-03
+
+### Added
+
+- Data model + API for per-user email and the SSO app-access list (§151,
+  slice 2a). New `users.email` column and `user_app_access` allowlist table;
+  an optional `autheliaGroups` field on the service registry. `GET
+  /api/users/app-access-options` lists the apps an account can be granted —
+  those currently exposed and Authelia-protected, Authelia excluded. `POST
+  /api/users` accepts `email` and `appAccess`; new `PUT /api/users/:id/access`
+  replaces an account's email + app list. The users list now carries both.
+  Nothing is written into Authelia yet — that is slices 2c/2d.
+
 ## [0.9.1] — 2026-09-03
 
 ### Added

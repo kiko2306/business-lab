@@ -29,7 +29,13 @@ const usernameSchema = Joi.string()
   .pattern(/^[a-zA-Z0-9_.@-]+$/);
 
 const passwordSchema = Joi.string().min(8).max(128);
+const emailSchema = Joi.string().trim().email().max(255);
 const serviceNameSchema = Joi.string().trim().min(1).max(64).pattern(/^[a-z0-9-]+$/);
+
+// The per-user SSO app-access list (plan.md §151): known managed-app names,
+// deduplicated. May be empty — that is "no SSO app access". The route checks
+// each name against the currently grantable apps.
+const appAccessSchema = Joi.array().items(serviceNameSchema).unique();
 const backupNameSchema = Joi.string().trim().max(255).pattern(/^[a-zA-Z0-9._-]+$/);
 const domainSchema = Joi.string()
   .trim()
@@ -156,10 +162,17 @@ export const schemas = {
   userCreate: Joi.object({
     username: usernameSchema.required(),
     password: passwordSchema.required(),
+    // A valid address if given. The create form (slice 2b) makes it a required
+    // field; the API stays lenient so a missing email just means "set it later
+    // on the Access editor" rather than a hard failure — the column is
+    // nullable and Authelia sync (2c) skips an account with no email.
+    email: emailSchema.optional(),
     roles: rolesSchema,
     // Seeds an admin's feature grants; ignored for a webmaster/user. Omitted
     // or empty leaves an admin at the all-on default.
     capabilities: capabilitiesSchema.optional(),
+    // SSO app-access list; omitted means none.
+    appAccess: appAccessSchema.optional(),
   }),
   userIdParam: Joi.object({
     id: Joi.number().integer().positive().required(),
@@ -174,6 +187,12 @@ export const schemas = {
   // an admin with no features left is a role with nothing to do.
   userCapabilitiesUpdate: Joi.object({
     capabilities: capabilitiesSchema.min(1).required(),
+  }),
+  // Replace an account's email and SSO app-access list (plan.md §151). Both
+  // keys required; appAccess may be an empty array ("no SSO app access").
+  userAccessUpdate: Joi.object({
+    email: emailSchema.required(),
+    appAccess: appAccessSchema.required(),
   }),
   recoveryResetAdminPassword: Joi.object({
     username: usernameSchema.required(),

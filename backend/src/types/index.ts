@@ -226,6 +226,14 @@ export interface ServiceDefinition {
   // editor Nextcloud embeds, but it is infrastructure, not a destination.
   // The `homepage.*` labels stay mandatory regardless (services.test.ts).
   hideFromHomePage?: boolean;
+  // Named Authelia groups this app's forward-auth rule requires, on top of
+  // the synthetic per-user `app-<name>` group the dashboard manages (plan.md
+  // §151/§152). Most apps need none — "is this user allowed this app" is the
+  // whole check. Declare one only where the app itself keys behaviour off an
+  // Authelia group. Surfaced in the Users & roles app-access picker so the
+  // operator sees what a grant implies. Optional, so not in the mandatory
+  // `homepage.*` registry test.
+  autheliaGroups?: string[];
 }
 
 export type ServiceState = 'running' | 'stopped' | 'starting' | 'error' | 'unknown';

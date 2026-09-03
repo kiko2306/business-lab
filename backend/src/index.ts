@@ -17,6 +17,7 @@ import { APP_VERSION } from './version';
 import {
   ensureUserRolesTable,
   ensureRoleModelReshape,
+  ensureUserAppAccessSchema,
   ensureServiceExposureTable,
   ensureServiceExposureAutheliaColumn,
   ensureTotpSchema,
@@ -175,6 +176,9 @@ ensureUserRolesTable()
   .catch((err: Error) => {
     console.error('Unable to ensure the role model:', err.message);
   });
+ensureUserAppAccessSchema().catch((err: Error) => {
+  console.error('Unable to ensure the user app-access schema:', err.message);
+});
 ensureServiceExposureTable().catch((err: Error) => {
   console.error('Unable to ensure service_exposure table:', err.message);
 });
