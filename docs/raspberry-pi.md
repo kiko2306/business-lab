@@ -107,7 +107,7 @@ above-MSRP resale onto Amazon and eBay.
 Identical to the normal path — see [Quick start](/README.md#quick-start):
 
 ```bash
-git clone <this repo> && cd homelab-management
+git clone <this repo> && cd business-lab
 sudo ./start.sh
 ```
 

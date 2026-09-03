@@ -47,7 +47,7 @@ if grep -qE "$ENV_PATH" <<<"$cmd" && ! grep -qE '\\\.env' <<<"$cmd"; then
   if grep -qE "$CONTENT_CMD" <<<"$cmd" \
     || grep -qE "$SOURCE_DOT" <<<"$cmd" \
     || grep -qE '>[[:space:]]*(\./|[[:alnum:]_.~-]*/)*\.env([[:space:]]|$)' <<<"$cmd"; then
-    deny "Refused by .claude/hooks: that command reads or writes a real .env file. This repo is public (kiko2306/homelab-management) and .env files hold JWT secrets, DB passwords and per-app credentials — settings.json already denies the Read/Edit/Write tools, and this closes the shell path. Use the matching .env.example template, or ask the user for the value."
+    deny "Refused by .claude/hooks: that command reads or writes a real .env file. This repo is public (kiko2306/business-lab) and .env files hold JWT secrets, DB passwords and per-app credentials — settings.json already denies the Read/Edit/Write tools, and this closes the shell path. Use the matching .env.example template, or ask the user for the value."
   fi
 fi
 

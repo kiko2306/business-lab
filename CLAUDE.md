@@ -199,7 +199,7 @@ passing, unless it is genuinely part of the change at hand.
 ## Never
 
 - Commit any `.env`, secret, token or password. The repo is **public**
-  (`kiko2306/homelab-management`). `.env.example` templates only.
+  (`kiko2306/business-lab`). `.env.example` templates only.
 - `docker compose down` the management stack — it tears down the running
   dashboard. Restart individual services instead.
 - Edit an app's compose file from backend code. Backend generates `.env` files

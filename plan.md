@@ -13922,3 +13922,39 @@ Nothing here changes routing or components' behaviour — it is CSS + the two
 templates. The badge/`pending` mechanism itself stays until the last area
 (§131.1) moves onto its own route, at which point every tile is a real link
 and the badge code is deleted.
+
+## 142. Renamed the GitHub repo to `business-lab` (2026-09-03)
+
+@mat asked for the repo rename outright, ahead of the rest of the §84.2
+rebrand. `gh repo rename business-lab` — GitHub keeps a redirect from the old
+`kiko2306/homelab-management` URL and `gh` updated `origin` in place
+(`https://github.com/kiko2306/business-lab.git`); `git ls-remote` confirms
+fetch/push still work.
+
+Updated the in-repo references that named the repository or its clone
+directory:
+
+- `README.md` — the "(repository still `homelab-management`)" parenthetical
+  now reads `business-lab`, and the quick-start / `cd` target is
+  `business-lab`.
+- `docs/raspberry-pi.md` — same `cd` target.
+- `CLAUDE.md` and `.claude/hooks/bash-guards.sh` — the "repo is public
+  (`kiko2306/…`)" identity strings.
+- `setup_test/README.md` — the clone URL and the `~/homelab-management`
+  checkout dir it creates (left `/home/mat/www/homelab-management`, which is
+  this box's existing working copy, untouched).
+
+**Deliberately not touched** — this is the repo name only, not §84.2 tiers 2/3:
+
+- The compose project name / `com.docker.compose.project=homelab-management`
+  (`start.sh:147`), the `homelab-net` network, `image: homelab-backend|frontend`,
+  and the `homelab-*` npm package names — Tier 2, recreates the management
+  stack, still slated for the §83 maintenance window.
+- Backend marker strings (`crowdsecConfig.ts`, `exposureConfigFiles.ts`) and
+  `ALERT_TEST_SCENARIO = 'homelab-management/alert-test'` (`n8nWorkflows.ts`,
+  asserted in `alertTest.test.ts`) — internal identifiers, Tier 2/3.
+- `plan.md` history (§84.2, §84.4 and older sections name the old repo) —
+  never rewritten; this section is the forward record.
+
+CI needed no change (`actions/checkout` is repo-agnostic; no hardcoded name in
+`.github/`).

@@ -167,13 +167,13 @@ files (`users_database.yml`, `data/management.json`, `oidc-secrets.yml`, every
 `.env`) really are absent and get regenerated.
 
 ```bash
-git clone https://github.com/kiko2306/homelab-management.git ~/homelab-management
+git clone https://github.com/kiko2306/business-lab.git ~/business-lab
 ```
 
 ### 3.2 Prepare the root `.env` — the only manual prep
 
 ```bash
-cd ~/homelab-management && cp .env.example .env && chmod 600 .env
+cd ~/business-lab && cp .env.example .env && chmod 600 .env
 ```
 
 Then set **one** value, and deliberately leave the rest alone:
@@ -205,7 +205,7 @@ sed -i 's/^TUNNEL_NAME=.*/TUNNEL_NAME=setup-test/' .env && grep -E '^(TUNNEL_NAM
 ### 3.3 Run
 
 ```bash
-cd ~/homelab-management && sudo ./start.sh
+cd ~/business-lab && sudo ./start.sh
 ```
 
 It should ask exactly **two** questions: base domain, then the Cloudflare API
@@ -300,7 +300,7 @@ subdomain base would need a suffix-match fallback.
 ## 8. Teardown
 
 ```bash
-cd ~/homelab-management && sudo docker compose down -v
+cd ~/business-lab && sudo docker compose down -v
 ```
 
 Then delete the **`setup-test`** tunnel in the Cloudflare dashboard (check the
