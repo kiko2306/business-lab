@@ -190,11 +190,13 @@ Infrastructure:
 - [ ] **Browser E2E framework** (§131.5) — Playwright-in-Docker driving the
       real dashboard (login, 2FA, create user, start/stop, exposure, backup);
       its own CI job or local-only like the smoke tests.
-- [ ] **"Web-exposed server is dev/test only" rule** (§131.5) — write it into
-      CLAUDE.md (principle / "Never") and the README: no real client data on
-      the internet-reachable box, its backups are disposable, destructive
-      tests only here; turnkey/per-client boxes are a separate non-exposed
-      class.
+- [ ] **"This box carries no uptime/data guarantee" rule** (§131.5) — write it
+      into CLAUDE.md (principle / "Never") and the README: on
+      `tx-home-utils.com`, services may go down and data may be changed or
+      lost — it's disposable dev/test. Production boxes are *also* internet-
+      exposed but with their own domain/tokens and real uptime + data
+      guarantees. Verification model unchanged: this stays the stack changes
+      are proven against.
 
 Strategy:
 

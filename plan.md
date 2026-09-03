@@ -13239,14 +13239,26 @@ tests if it needs the full stack). This is what lets the feature list in this
 section be *checked* rather than asserted.
 
 **Treat this web-exposed server strictly as a dev/test environment.**
-Architecture rule, not a feature: the box reachable from the internet
-(`tx-home-utils.com`) is **development/test**, never a customer's production
-data. It exists to prove the code path against a real stack (§0). Consequences
-to write down: no real client data on it, its backups are disposable,
-destructive tests are allowed here and nowhere else, and the turnkey/
-per-client boxes (§84.7) are a separate, non-exposed deployment class. Capture
-this in CLAUDE.md (a principle or a "Never") and in the README business rules
-(§131.6) so it isn't lost.
+Architecture rule, not a feature. @mat's clarification (2026-09-03):
+*production* deployments are **also** internet-exposed — each with its own
+domain and its own API keys / tokens — so "exposed vs not" is **not** what
+separates test from production. What separates them is the guarantees:
+
+- **This box (`tx-home-utils.com`) carries no uptime guarantee and no
+  data-durability guarantee.** Services going down here is fine. Data being
+  changed or lost here is fine. It exists to prove the code path against a
+  real stack (§0), and anything on it is disposable.
+- **A production / per-client box is a separate deployment** with its own
+  domain and credentials, where uptime and client data *do* matter. Same
+  exposure model, different promises.
+- **The verification model is unchanged** (@mat: "no change"): this box stays
+  the stack every Docker/exposure/networking/backup change is proven against
+  before it is called done. That is exactly what a no-guarantees dev/test box
+  is for.
+
+Capture the no-guarantees rule in CLAUDE.md (a principle or a "Never" —
+"never assume data on this host is safe or that a service must stay up") and
+in the README business rules (§131.6) so it isn't lost.
 
 ### 131.6 Strategy — drop SaaS goals, "Free to Use", billable services scoped
 
@@ -13317,3 +13329,34 @@ Strategy:
 - Rescope/drop the §84.7 SaaS-inventory and value-proposition items.
 - Sales catalogue Artifact: app list + features + alternatives only.
 - Pick a repo licence (§107) consistent with the Free-to-Use claim.
+
+### 131.8 Clarifications from @mat (2026-09-03)
+
+Answers to the open questions on this brief, so the intent survives:
+
+- **Strategy scope (§131.6):** *keep both* the social-media publishing stream
+  (§84.3 — Postiz, content generation) and the turnkey-hardware-box sale
+  (§84.7) on the roadmap; only drop the "SaaS" framing. So §131.6 is a
+  relabel + the Free-to-Use statement + the billable-services list, **not** a
+  deletion of §84.3/§84.7 work. The billable-services list ("domain
+  management, custom configs, server maintenance") describes what is *sold as
+  a service*; it doesn't forbid selling hardware (§84.7) or bundling social
+  publishing as a free feature.
+- **SSO roles (§131.3):** *full role set* — webmaster / IT-admin / end-user
+  (seed from §84.4, §109) — and the dashboard **owns** users: it generates
+  the Authelia entries and password hashes and keeps them in sync.
+  `/setup` still bootstraps the first admin.
+- **Update mechanism (§131.4):** *managed override file*. Compose files stay
+  read-only to the backend (CLAUDE.md "Never"). The update button writes a
+  per-app `docker-compose.override.yml` (or an image-tag env var the compose
+  file already interpolates) to pin the new tag, then `pull` + `up -d`. No
+  CLAUDE.md exception needed.
+- **Dev/test rule (§131.5):** production is *also* internet-exposed, with its
+  own domain and tokens — see the rewritten §131.5 above. The rule is
+  no-uptime / no-data guarantees on this box; verification model unchanged.
+
+Still open (not blocking the plan, decide when the slice starts): whether
+"Kitchen Pantry" means `pantry` alone or `pantry` + `kitchen-switcher` and
+whether icon assets exist; the multi-page dashboard layout; FTP vs FTPS vs
+SFTP; whether "prioritise wiring" is a hard stop on the app backlog;
+Playwright vs Cypress for E2E.
