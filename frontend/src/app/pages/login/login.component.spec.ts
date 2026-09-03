@@ -4,7 +4,7 @@ import { of, throwError } from 'rxjs';
 import { LoginComponent } from './login.component';
 import { AuthService } from '../../core/auth.service';
 import { ToastService } from '../../core/toast.service';
-import { AuthResponse } from '../../core/models';
+import { AuthResponse, MfaChallenge } from '../../core/models';
 
 describe('LoginComponent', () => {
   let fixture: ComponentFixture<LoginComponent>;
@@ -14,7 +14,7 @@ describe('LoginComponent', () => {
   let toastService: jasmine.SpyObj<ToastService>;
 
   beforeEach(async () => {
-    authService = jasmine.createSpyObj('AuthService', ['login', 'isSetupRequired']);
+    authService = jasmine.createSpyObj('AuthService', ['login', 'completeMfaLogin', 'isSetupRequired']);
     authService.isSetupRequired.and.returnValue(of(false));
     toastService = jasmine.createSpyObj('ToastService', ['success']);
 
@@ -51,6 +51,57 @@ describe('LoginComponent', () => {
     expect(toastService.success).toHaveBeenCalled();
     expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard');
     expect(component['submitting']).toBe(false);
+  });
+
+  it('switches to the MFA step on a 202 challenge instead of navigating', () => {
+    authService.login.and.returnValue(of({ mfaRequired: true, mfaToken: 'mfa-token' } as MfaChallenge));
+    component['form'].setValue({ username: 'admin', password: 'password123' });
+
+    component.submit();
+
+    expect(component['stage']).toBe('mfa');
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+    expect(component['submitting']).toBe(false);
+  });
+
+  it('completes the MFA step with the held token and navigates on success', () => {
+    authService.login.and.returnValue(of({ mfaRequired: true, mfaToken: 'mfa-token' } as MfaChallenge));
+    authService.completeMfaLogin.and.returnValue(
+      of({ user: { id: 1, username: 'admin' }, accessToken: 'a', refreshToken: 'r' } as AuthResponse)
+    );
+    component['form'].setValue({ username: 'admin', password: 'password123' });
+    component.submit();
+
+    component['mfaForm'].setValue({ code: '123456' });
+    component.submitMfa();
+
+    expect(authService.completeMfaLogin).toHaveBeenCalledWith('mfa-token', '123456');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard');
+  });
+
+  it('shows an error and stays on the MFA step when the code is rejected', () => {
+    authService.login.and.returnValue(of({ mfaRequired: true, mfaToken: 'mfa-token' } as MfaChallenge));
+    authService.completeMfaLogin.and.returnValue(throwError(() => new Error('That code was not accepted.')));
+    component['form'].setValue({ username: 'admin', password: 'password123' });
+    component.submit();
+
+    component['mfaForm'].setValue({ code: '000000' });
+    component.submitMfa();
+
+    expect(component['errorMessage']).toBe('That code was not accepted.');
+    expect(component['stage']).toBe('mfa');
+    expect(router.navigateByUrl).not.toHaveBeenCalled();
+  });
+
+  it('"start over" clears the MFA step and returns to credentials', () => {
+    authService.login.and.returnValue(of({ mfaRequired: true, mfaToken: 'mfa-token' } as MfaChallenge));
+    component['form'].setValue({ username: 'admin', password: 'password123' });
+    component.submit();
+
+    component.backToCredentials();
+
+    expect(component['stage']).toBe('credentials');
+    expect(component['mfaForm'].controls.code.value).toBe('');
   });
 
   it('surfaces an error message and stops submitting when login fails', () => {

@@ -4,7 +4,7 @@ import { Router, UrlTree } from '@angular/router';
 import { BehaviorSubject, Observable, catchError, finalize, map, of, shareReplay, tap, throwError } from 'rxjs';
 import { API_BASE_URL } from './api';
 import { SKIP_AUTH, SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
-import { AuthResponse, User } from './models';
+import { AuthResponse, LoginResult, User, isMfaChallenge } from './models';
 
 @Injectable({
   providedIn: 'root'
@@ -23,11 +23,34 @@ export class AuthService {
 
   readonly user$ = this.userSubject.asObservable();
 
-  login(username: string, password: string): Observable<AuthResponse> {
+  login(username: string, password: string): Observable<LoginResult> {
     return this.http
-      .post<AuthResponse>(
+      .post<LoginResult>(
         `${API_BASE_URL}/auth/login`,
         { username: username.trim(), password },
+        {
+          context: new HttpContext()
+            .set(SKIP_AUTH, true)
+            .set(SKIP_GLOBAL_ERROR_HANDLING, true),
+        }
+      )
+      .pipe(
+        tap((result) => {
+          // A 202 MFA challenge carries no session — leave the caller to run
+          // the second step. Only a full token pair is persisted.
+          if (!isMfaChallenge(result)) {
+            this.persistSession(result);
+          }
+        })
+      );
+  }
+
+  /** Second step of a 2FA login: exchange the challenge token + a code for a session. */
+  completeMfaLogin(mfaToken: string, code: string): Observable<AuthResponse> {
+    return this.http
+      .post<AuthResponse>(
+        `${API_BASE_URL}/auth/login/totp`,
+        { mfaToken, code: code.trim() },
         {
           context: new HttpContext()
             .set(SKIP_AUTH, true)

@@ -69,6 +69,28 @@ describe('AuthService', () => {
     expect(localStorage.getItem('homelab.session')).toBeNull();
   });
 
+  it('does not persist a session when login returns a 202 MFA challenge', () => {
+    service.login('admin', 'password').subscribe();
+
+    const req = httpMock.expectOne(`${API_BASE_URL}/auth/login`);
+    req.flush({ mfaRequired: true, mfaToken: 'mfa-token' }, { status: 202, statusText: 'Accepted' });
+
+    expect(service.isAuthenticated()).toBe(false);
+    expect(localStorage.getItem('homelab.session')).toBeNull();
+  });
+
+  it('completeMfaLogin posts the token and code, then persists the session', () => {
+    service.completeMfaLogin('mfa-token', '  123456 ').subscribe();
+
+    const req = httpMock.expectOne(`${API_BASE_URL}/auth/login/totp`);
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ mfaToken: 'mfa-token', code: '123456' });
+    req.flush(authResponse);
+
+    expect(service.isAuthenticated()).toBe(true);
+    expect(service.getAccessToken()).toBe('access-token');
+  });
+
   it('reports no refresh token available before any login', () => {
     expect(service.hasRefreshToken()).toBe(false);
     service.refreshAccessToken().subscribe({

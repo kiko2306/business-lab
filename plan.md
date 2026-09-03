@@ -13025,3 +13025,55 @@ container:
 Angular login: on `202 mfaRequired`, swap to a code step (mfaToken kept in
 memory only), POST `/auth/login/totp`, with a "use a recovery code" toggle;
 `auth.service.ts` + `models.ts`.
+
+## 130. 2FA slice C done — the login screen's second step
+
+§127 slice C. The Angular login page now handles the `202` challenge from
+slice B.
+
+### 130.1 What landed
+
+- **`core/models.ts`**: `MfaChallenge { mfaRequired: true; mfaToken }`,
+  `LoginResult = AuthResponse | MfaChallenge`, and an `isMfaChallenge()`
+  guard.
+- **`core/auth.service.ts`**:
+  - `login()` now returns `Observable<LoginResult>` and only calls
+    `persistSession` when the result is a real token pair — a `202` challenge
+    is passed straight through, no session written.
+  - New `completeMfaLogin(mfaToken, code)` → `POST /auth/login/totp`, trims the
+    code, persists the session on success. Both use `SKIP_AUTH` +
+    `SKIP_GLOBAL_ERROR_HANDLING` like the other auth calls.
+- **`pages/login/login.component.ts`**: a `stage` of `'credentials' | 'mfa'`.
+  On `isMfaChallenge`, stash the `mfaToken` in a private field (memory only,
+  never localStorage), switch to `stage === 'mfa'`. A second reactive form
+  (`code`, 6–32 chars) submits via `submitMfa()`. `toggleRecoveryCode()`
+  flips the field's label / `inputmode` / `autocomplete` / placeholder
+  between a 6-digit code and `xxxxx-xxxxx`. `backToCredentials()` ("Start
+  over") clears the token and code and returns to step one — needed because
+  the `mfaToken` dies after 5 minutes.
+- **`login.component.html`**: the credentials `<form>` is `*ngIf="stage ===
+  'credentials'"`; a new MFA `<form>` for the other stage, with the
+  recovery-code toggle and "Start over" as `btn-link`s. Heading/subtitle
+  switch with the stage; the `/setup` prompt only shows on step one.
+- Specs: 4 new in `login.component.spec.ts` (challenge → `stage='mfa'` and no
+  nav; `submitMfa` calls `completeMfaLogin` and navigates; a rejected code
+  keeps the stage and shows the error; "Start over" resets), 2 in
+  `auth.service.spec.ts` (a 202 body is not persisted; `completeMfaLogin`
+  posts `{mfaToken, code}` trimmed and persists).
+
+### 130.2 Verified
+
+- `npm run test:ci` — 34 frontend specs pass; `npm run build` — exit 0
+  (the bundle-budget and `.form-floating` CSS warnings are pre-existing).
+- Frontend image rebuilt and running; `/login` serves 200 and the production
+  `main.js` contains `auth/login/totp`, i.e. the new path shipped.
+- A full browser click-through is left to a manual check / slice D's UI work;
+  the two-step contract is what the specs and the slice-B end-to-end run
+  already exercised.
+
+### 130.3 Next (slice D)
+
+An Account/Security page: `GET /auth/totp/status`, "Set up" (render the
+server `qrSvg` + show the secret), activate, show/download the recovery
+codes, disable. After D, a real user can turn 2FA on from the UI — which is
+also when it becomes safe to.

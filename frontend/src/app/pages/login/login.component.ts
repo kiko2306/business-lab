@@ -6,6 +6,7 @@ import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
 import { sanitizePastedText } from '../../core/input-sanitize';
+import { isMfaChallenge } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 
 @Component({
@@ -26,8 +27,20 @@ export class LoginComponent implements OnInit {
     password: ['', [Validators.required, Validators.maxLength(128)]],
   });
 
+  protected readonly mfaForm = this.formBuilder.nonNullable.group({
+    code: ['', [Validators.required, Validators.minLength(6), Validators.maxLength(32)]],
+  });
+
   protected submitting = false;
   protected errorMessage = '';
+
+  // Which step is on screen. 'mfa' appears only after the backend answers the
+  // credentials step with a 202 challenge.
+  protected stage: 'credentials' | 'mfa' = 'credentials';
+  // Held in memory only — never persisted. Expires server-side in 5 minutes.
+  private mfaToken = '';
+  // Toggles the code field between "authenticator app" and "recovery code".
+  protected useRecoveryCode = false;
 
   // Only offer "create the initial administrator account" while there genuinely
   // is no admin — otherwise the link reads as open self-registration on an
@@ -61,7 +74,14 @@ export class LoginComponent implements OnInit {
       .login(username, password)
       .pipe(finalize(() => (this.submitting = false)))
       .subscribe({
-        next: () => {
+        next: (result) => {
+          if (isMfaChallenge(result)) {
+            this.mfaToken = result.mfaToken;
+            this.stage = 'mfa';
+            this.mfaForm.reset();
+            this.useRecoveryCode = false;
+            return;
+          }
           this.toastService.success('Signed in successfully.');
           void this.router.navigateByUrl('/dashboard');
         },
@@ -69,5 +89,41 @@ export class LoginComponent implements OnInit {
           this.errorMessage = extractErrorMessage(error, 'Unable to sign in.');
         },
       });
+  }
+
+  submitMfa(): void {
+    if (this.mfaForm.invalid) {
+      this.mfaForm.markAllAsTouched();
+      return;
+    }
+
+    this.errorMessage = '';
+    this.submitting = true;
+
+    this.authService
+      .completeMfaLogin(this.mfaToken, this.mfaForm.getRawValue().code)
+      .pipe(finalize(() => (this.submitting = false)))
+      .subscribe({
+        next: () => {
+          this.toastService.success('Signed in successfully.');
+          void this.router.navigateByUrl('/dashboard');
+        },
+        error: (error) => {
+          this.errorMessage = extractErrorMessage(error, 'That code was not accepted.');
+        },
+      });
+  }
+
+  toggleRecoveryCode(): void {
+    this.useRecoveryCode = !this.useRecoveryCode;
+    this.mfaForm.controls.code.reset();
+  }
+
+  backToCredentials(): void {
+    this.stage = 'credentials';
+    this.mfaToken = '';
+    this.errorMessage = '';
+    this.mfaForm.reset();
+    this.form.controls.password.reset();
   }
 }

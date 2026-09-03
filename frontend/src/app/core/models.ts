@@ -9,6 +9,22 @@ export interface AuthResponse {
   user: User;
 }
 
+/**
+ * What POST /auth/login returns (202) when the password is right but the
+ * account has a TOTP second factor. The mfaToken is spent at
+ * POST /auth/login/totp and is never persisted.
+ */
+export interface MfaChallenge {
+  mfaRequired: true;
+  mfaToken: string;
+}
+
+export type LoginResult = AuthResponse | MfaChallenge;
+
+export function isMfaChallenge(result: LoginResult): result is MfaChallenge {
+  return (result as MfaChallenge).mfaRequired === true;
+}
+
 export type ServiceCategory =
   | 'Networking & Security'
   | 'Monitoring & Management'

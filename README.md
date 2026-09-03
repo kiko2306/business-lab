@@ -131,10 +131,7 @@ it is done — not ticked off and left behind. Section references point at
       value in either can cut off the very session applying it. Run
       `sudo ./setup_server.sh` and confirm both prompts behave as documented
       in `docs/first-run.md`.
-- [ ] **2FA slice C — frontend login step** (§127, §129) — login component becomes
-      two-step on `202 mfaRequired` (mfaToken in memory only), "use a recovery
-      code" toggle; `auth.service.ts` + `models.ts`.
-- [ ] **2FA slice D — frontend enrolment UI** (§127) — Account/Security page:
+- [ ] **2FA slice D — frontend enrolment UI** (§127, §130) — Account/Security page:
       status, set up (render server `qrSvg`), activate, show/download recovery
       codes, disable.
 - [ ] **2FA slice E — docs** (§127) — `docs/two-factor.md`, `openapi.yaml`,
