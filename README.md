@@ -218,11 +218,13 @@ Infrastructure:
       dashboard) that exercises them, local-only like the smoke tests.
 Strategy:
 
-- [ ] **Rescope or drop the SaaS-inventory items** (§131.6) — §84.7 "collect
-      the SaaS inventory" and "Sales / value-proposition plan" become "app
-      list + features + alternatives", not subscription-cost arithmetic.
-- [ ] **Sales catalogue Artifact** (§131.6) — per app: what it does and what
-      it stands in for. Out of this public repo (§84.6).
+- [ ] **Sales catalogue Artifact** (§131.6, §166) — one row per managed
+      app: what it does, and what commercial/SaaS product it stands in for.
+      No pricing, no monthly-cost arithmetic, no named client scenarios.
+      **As an Artifact, out of this public repo** (§84.6). This is the single
+      canonical sales-doc item — the old §84.4/§84.7 "SaaS inventory +
+      monthly costs", "value-proposition plan" and "customer journey"
+      items were folded into it (§166).
 
 ### Backups
 
@@ -267,15 +269,6 @@ Strategy:
       sources agree Instagram publishes normally from a dev-mode app with a
       Tester role, and that a Facebook Page post in dev mode is visible only to
       admins. Confirm both with a real app before a timeline depends on it.
-- [ ] **@mat: collect the SaaS inventory and monthly costs** (§84.7) — what you
-      and your clients actually pay for today, per tool per month. Without it
-      the value-proposition plan is a generic "self-hosting saves money"
-      leaflet; with it, it names the bill it removes. Blocks the item below.
-- [ ] **Sales / value-proposition plan** (§84.4) — SaaS replaced per app, and
-      the monthly cost removed, priced for offices of 2-15 (§84.7). **As an
-      Artifact, not in this repo** (§84.6).
-- [ ] **Customer journey / workflows** (§84.4) — scenarios showing why each app
-      earns its place. **As an Artifact** (§84.6).
 - [ ] **Pick a licence for this repo** (§107) — there is no `LICENSE` file, so
       the public repo is "all rights reserved" and contributions have no legal
       basis. Fell out of the licence due diligence; the choice (AGPL to match

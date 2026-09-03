@@ -13765,3 +13765,28 @@ left for @mat to green-light: the NetBird saga (§20/§24/§46–§55, closed by
 "Tailscale Funnel replaces Cloudflare for signal"), the backup build-out
 (§66–§90), the 2FA slices (§127–§137). Each needs the same
 nothing-later-depends-on-it check.
+
+## 166. §131.6 — rescoped the §84 SaaS-inventory / value-proposition TODO items (2026-09-03)
+
+§131.6 called for the §84.4/§84.7 sales-doc items to be rescoped away from
+"the subscription we're undercutting" toward "the app list and what each
+replaces". §163 did the README business-rules relabel; this closes the
+TODO-item half.
+
+### What changed (README TODO only)
+
+- Deleted **"@mat: collect the SaaS inventory and monthly costs"** (§84.7) —
+  the Free-to-Use model has no monthly-cost arithmetic to feed, so there is
+  nothing to collect.
+- Deleted **"Sales / value-proposition plan"** (§84.4) and **"Customer
+  journey / workflows"** (§84.4) — §131.6 rules out pricing decks and named
+  client scenarios. Their surviving intent (a plain per-app "what it does /
+  what it replaces" catalogue) is already covered by the **"Sales catalogue
+  Artifact"** item.
+- Deleted the **"Rescope or drop the SaaS-inventory items"** item itself
+  (this task) and rewrote **"Sales catalogue Artifact"** to state it is now
+  the single canonical sales-doc item: one row per managed app — what it
+  does, what commercial product it stands in for, no pricing, no scenarios,
+  as an Artifact out of this public repo.
+
+Docs/plan only; no code, no version bump.
