@@ -17,16 +17,22 @@ import {
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
-import { PanelComponent } from '../panel/panel.component';
+import { PanelComponent } from '../../components/panel/panel.component';
 
+/**
+ * Stack-wide settings on its own route (§131.1): the timezone, ntfy alert
+ * pushes, the shared mailbox and the backup destination. The Cloudflare token
+ * and exposure provisioning left for `/exposure` in §143; what remains here is
+ * everything that isn't networking.
+ */
 @Component({
-  selector: 'app-settings-panel',
+  selector: 'app-settings',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent],
-  templateUrl: './settings-panel.component.html',
-  styleUrl: './settings-panel.component.css'
+  templateUrl: './settings.component.html',
+  styleUrl: './settings.component.css'
 })
-export class SettingsPanelComponent implements OnInit {
+export class SettingsComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly settingsService = inject(SettingsService);
   private readonly toastService = inject(ToastService);

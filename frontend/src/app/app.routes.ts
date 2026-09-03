@@ -4,6 +4,7 @@ import { HomeComponent } from './pages/home/home.component';
 import { AppsComponent } from './pages/apps/apps.component';
 import { BackupsComponent } from './pages/backups/backups.component';
 import { ExposureComponent } from './pages/exposure/exposure.component';
+import { SettingsComponent } from './pages/settings/settings.component';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { LoginComponent } from './pages/login/login.component';
 import { SetupComponent } from './pages/setup/setup.component';
@@ -59,8 +60,12 @@ export const routes: Routes = [
         component: ExposureComponent,
       },
       {
+        path: 'settings',
+        component: SettingsComponent,
+      },
+      {
         // What is left of the one-page dashboard: the stack-wide sections
-        // (Settings, Health, Utils) not yet on their own routes.
+        // (Health checks, Utils) not yet on their own routes.
         path: 'dashboard',
         component: DashboardComponent,
       },

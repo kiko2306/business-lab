@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { SettingsPanelComponent } from '../../components/settings-panel/settings-panel.component';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { OperationsService } from '../../core/operations.service';
 import { DiscoveredHost, DiskUsage, HealthStatus } from '../../core/models';
@@ -9,15 +8,15 @@ import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
 
 /**
- * What is left of the single-page dashboard after the Apps (§131.1 slice 2) and
- * Backups (§131.1 slice 3) areas moved onto their own routes: the stack-wide
- * sections — Settings, Health checks, Utils. Each is slated to get its own
- * route in a later slice, at which point this component goes away.
+ * What is left of the single-page dashboard after the Apps (§136), Backups
+ * (§140), Exposure (§143) and Settings (§144) areas moved onto their own
+ * routes: Health checks and Utils. Both are slated to get their own route in a
+ * later slice, at which point this component goes away.
  */
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, FormsModule, SettingsPanelComponent, PanelComponent],
+  imports: [CommonModule, FormsModule, PanelComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })

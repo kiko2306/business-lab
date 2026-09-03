@@ -9,8 +9,8 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideRouter(
       routes,
-      // The menu tiles deep-link into the one-page dashboard with a fragment
-      // (#backups, #settings, …); without this the router ignores the anchor.
+      // Keep fragment links working (the panels still expose `#health`/`#utils`
+      // anchors) and restore scroll position on back/forward navigation.
       withInMemoryScrolling({ anchorScrolling: 'enabled', scrollPositionRestoration: 'enabled' }),
     ),
     provideHttpClient(withInterceptors([authInterceptor, apiErrorInterceptor])),

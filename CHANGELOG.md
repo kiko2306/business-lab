@@ -11,6 +11,17 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.5.0] — 2026-09-03
+
+### Changed
+
+- Settings moved off the Dashboard onto its own `/settings` route (§131.1
+  slice 5). The `settings-panel` component became the `SettingsComponent` page
+  (`pages/settings/`), with a "Settings" nav button and the Home menu tile
+  repointed. Same four panels (General, ntfy alerts, email, backup
+  destination), no API change. The Dashboard route now holds only Health
+  checks and Utils.
+
 ## [0.4.0] — 2026-09-03
 
 ### Changed

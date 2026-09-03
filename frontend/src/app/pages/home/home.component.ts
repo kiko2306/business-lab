@@ -68,10 +68,8 @@ export class HomeComponent {
     },
     {
       title: 'Settings',
-      description: 'Third-party tokens, the shared mailbox, and other stack-wide settings.',
-      link: '/dashboard',
-      fragment: 'settings',
-      pending: true,
+      description: 'The timezone, ntfy alert pushes, the shared mailbox, and the backup destination.',
+      link: '/settings',
     },
     {
       title: 'Utils',

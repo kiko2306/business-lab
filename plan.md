@@ -14058,3 +14058,51 @@ backend, now serving `/api/version` → `0.4.0`; no root teardown. Awaiting
 Updates, Users & roles, Settings and Utils still live under `/dashboard` (or
 `/users`) rather than their own routes — the README item stays, minus Apps,
 Backups and Exposure.
+
+## 144. §131.1 slice 5 — Settings on its own route (2026-09-03)
+
+Fifth slice of the multi-page dashboard split. `<app-settings-panel>` was a
+one-use component mounted only on `/dashboard`, so this is a straight
+promotion, not an extraction like Exposure (§143). Feature bump 0.4.0 → 0.5.0.
+
+### 144.1 Settings → `/settings`
+
+`git mv components/settings-panel/ → pages/settings/`, files renamed
+`settings-panel.component.* → settings.component.*`, class
+`SettingsPanelComponent → SettingsComponent`, selector
+`app-settings-panel → app-settings`. The template gained the standard
+`<main class="container-fluid py-4">` + title/subtitle header; the `:host`
+`scroll-margin-top` for the old `#settings` fragment is gone (it is a route
+now). The `../panel/panel.component` import became
+`../../components/panel/panel.component`. All four panels (General, ntfy
+alerts, email, backup destination) and every method are unchanged.
+
+### 144.2 Wiring
+
+- `app.routes.ts`: `path: 'settings'` between `exposure` and `dashboard`.
+- Shell header: a "Settings" nav button after "Exposure".
+- Home menu: the "Settings" tile repoints from `/dashboard#settings` to
+  `/settings`, loses the badge, and its description now names the four
+  panels rather than "third-party tokens" (those left for `/exposure`).
+- `DashboardComponent` drops the `SettingsPanelComponent` import and its
+  `imports` entry; heading subtitle is now "Health checks and one-off
+  utilities". It holds only the Health and Utils panels.
+- `app.config.ts`: the `withInMemoryScrolling` comment no longer claims the
+  tiles deep-link with a fragment — none do now; `anchorScrolling` stays on
+  for the `#health`/`#utils` panel anchors and `scrollPositionRestoration`.
+
+No spec covered settings-panel or the dashboard, so none needed updating.
+
+### 144.3 Verified
+
+`frontend`: `npm run build` clean (pre-existing bundle-budget + Bootstrap
+selector warnings only); `npm run test:ci` 42/42. Redeployed with
+`docker compose up -d --build frontend`; the version bump also recreated the
+backend, now serving `/api/version` → `0.5.0`; no root teardown. Awaiting
+@mat's review on `localhost:10001`.
+
+### 144.4 Still open
+
+Utils is the last panel on `/dashboard` (with Health checks). One more slice —
+Utils onto its own route — empties the page and lets `DashboardComponent` be
+deleted. "Updates & version control" (§131.4) is new work, not a move.
