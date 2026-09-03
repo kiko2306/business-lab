@@ -170,18 +170,27 @@ export class OperationsService {
 
   createUser(
     username: string,
-    password: string,
+    email: string,
     roles: string[],
-    options?: { capabilities?: string[]; email?: string; appAccess?: string[] }
-  ): Observable<{ user: AdminUser }> {
-    return this.http.post<{ user: AdminUser }>(`${API_BASE_URL}/users`, {
-      username,
-      password,
-      roles,
-      ...(options?.capabilities ? { capabilities: options.capabilities } : {}),
-      ...(options?.email ? { email: options.email } : {}),
-      ...(options?.appAccess ? { appAccess: options.appAccess } : {}),
-    });
+    options?: { capabilities?: string[]; appAccess?: string[] }
+  ): Observable<{ user: AdminUser; invitePending: boolean; warning?: string }> {
+    return this.http.post<{ user: AdminUser; invitePending: boolean; warning?: string }>(
+      `${API_BASE_URL}/users`,
+      {
+        username,
+        email,
+        roles,
+        ...(options?.capabilities ? { capabilities: options.capabilities } : {}),
+        ...(options?.appAccess ? { appAccess: options.appAccess } : {}),
+      }
+    );
+  }
+
+  resendInvite(id: number): Observable<{ message: string; warning?: string }> {
+    return this.http.post<{ message: string; warning?: string }>(
+      `${API_BASE_URL}/users/${id}/invitation/resend`,
+      {}
+    );
   }
 
   updateUserAccess(

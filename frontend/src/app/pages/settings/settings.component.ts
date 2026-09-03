@@ -72,6 +72,9 @@ export class SettingsComponent implements OnInit {
 
   protected readonly generalForm = this.formBuilder.nonNullable.group({
     timezone: ['', [Validators.required]],
+    // Base URL for links the dashboard emails (invites, §158). Blank = use the
+    // derived guess.
+    dashboardUrl: ['', [Validators.maxLength(255), Validators.pattern(/^$|^https?:\/\/[^\s/]+\/?$/)]],
   });
 
   protected generalSettings: GeneralSettings | null = null;
@@ -203,6 +206,7 @@ export class SettingsComponent implements OnInit {
         next: (settings) => {
           this.generalSettings = settings;
           this.generalForm.controls.timezone.setValue(settings.timezone);
+          this.generalForm.controls.dashboardUrl.setValue(settings.dashboardUrl ?? '');
         },
         error: (error) => {
           this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to load general settings.') };
@@ -217,15 +221,16 @@ export class SettingsComponent implements OnInit {
     }
     this.savingGeneral = true;
     this.settingsService
-      .saveGeneralSettings(this.generalForm.controls.timezone.value)
+      .saveGeneralSettings(
+        this.generalForm.controls.timezone.value,
+        this.generalForm.controls.dashboardUrl.value.trim()
+      )
       .pipe(finalize(() => (this.savingGeneral = false)))
       .subscribe({
         next: (response) => {
           this.generalFeedback = { type: 'success', message: response.message };
-          this.toastService.success('Timezone saved.');
-          if (this.generalSettings) {
-            this.generalSettings = { ...this.generalSettings, timezone: response.timezone };
-          }
+          this.toastService.success('Settings saved.');
+          this.loadGeneralSettings();
         },
         error: (error) => {
           this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save timezone.') };

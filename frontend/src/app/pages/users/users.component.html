@@ -7,24 +7,25 @@
     </p>
   </div>
 
-  <app-panel key="users:add" title="Add user" subtitle="Username, email, a password of at least 8 characters, one or more roles, an admin's features, and the apps they can reach through SSO">
+  <app-panel key="users:add" title="Add user" subtitle="Username, email, roles, an admin's features, and the apps they reach through SSO — the new user gets an email to set their own password">
+    <div class="alert alert-warning" *ngIf="mailConfigured === false">
+      New users are invited by email, so the shared mailbox has to be set up first.
+      <a routerLink="/settings">Configure it in Settings</a>.
+    </div>
     <form class="row g-3 align-items-start" [formGroup]="createForm" (ngSubmit)="createUser()">
-      <div class="col-12 col-md-4">
+      <div class="col-12 col-md-6">
         <input class="form-control" placeholder="Username" formControlName="username" autocomplete="off" />
         <div class="form-text text-danger" *ngIf="createForm.controls.username.touched && createForm.controls.username.invalid">
           Username must be 3-64 characters.
         </div>
       </div>
-      <div class="col-12 col-md-4">
+      <div class="col-12 col-md-6">
         <input class="form-control" type="email" placeholder="Email" formControlName="email" autocomplete="off" />
+        <div class="form-text" *ngIf="createForm.controls.email.valid || !createForm.controls.email.touched">
+          A set-password link is emailed here; the account stays inactive until it's used.
+        </div>
         <div class="form-text text-danger" *ngIf="createForm.controls.email.touched && createForm.controls.email.invalid">
           Enter a valid email address.
-        </div>
-      </div>
-      <div class="col-12 col-md-4">
-        <input class="form-control" type="password" placeholder="Password" formControlName="password" autocomplete="new-password" />
-        <div class="form-text text-danger" *ngIf="createForm.controls.password.touched && createForm.controls.password.invalid">
-          Password must be at least 8 characters.
         </div>
       </div>
       <div class="col-12">
@@ -87,8 +88,8 @@
         </div>
       </div>
       <div class="col-12 col-md-4 d-grid">
-        <button class="btn btn-primary" type="submit" [disabled]="creating">
-          {{ creating ? 'Creating…' : 'Create user' }}
+        <button class="btn btn-primary" type="submit" [disabled]="creating || mailConfigured === false">
+          {{ creating ? 'Sending invite…' : 'Create user &amp; send invite' }}
         </button>
       </div>
     </form>
@@ -112,6 +113,7 @@
               <td data-label="Username">
                 {{ user.username }}
                 <span class="badge text-bg-secondary ms-1" *ngIf="user.id === currentUserId">you</span>
+                <span class="badge text-bg-warning ms-1" *ngIf="user.active === false">Pending invite</span>
               </td>
               <td data-label="Email">
                 <span *ngIf="user.email">{{ user.email }}</span>
@@ -172,8 +174,16 @@
               <td data-label="Created">{{ user.created_at | date:'dd/MM/yyyy' }}</td>
               <td data-label="Actions" class="text-end">
                 <div class="btn-group btn-group-sm">
+                  <button
+                    class="btn btn-outline-secondary"
+                    *ngIf="user.active === false"
+                    [disabled]="resendingId === user.id"
+                    (click)="resendInvite(user)"
+                  >
+                    {{ resendingId === user.id ? 'Sending…' : 'Resend invite' }}
+                  </button>
                   <button class="btn btn-outline-secondary" (click)="startAccessEdit(user)">Edit access</button>
-                  <button class="btn btn-outline-secondary" (click)="startPasswordReset(user.id)">Reset password</button>
+                  <button class="btn btn-outline-secondary" *ngIf="user.active !== false" (click)="startPasswordReset(user.id)">Reset password</button>
                   <button
                     class="btn btn-outline-danger"
                     (click)="deleteUser(user)"

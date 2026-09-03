@@ -191,6 +191,17 @@ export interface GeneralSettings {
   timezone: string;
   defaultTimezone: string;
   timezones: string[];
+  // Operator-set base URL for links the dashboard emails (invites, §158);
+  // '' when unset. `dashboardUrlEffective` is what will actually be used — the
+  // stored value or a derived `dashboard.<domain>` guess, or null.
+  dashboardUrl?: string;
+  dashboardUrlEffective?: string | null;
+}
+
+/** GET /api/auth/invitation/:token — what the set-password screen shows. */
+export interface InvitationInfo {
+  username: string;
+  email: string;
 }
 
 export interface AlertNotifySettings {
@@ -394,6 +405,8 @@ export interface AdminUser {
   capabilities?: string[];
   // Managed apps this account may reach through Authelia SSO (plan.md §151).
   appAccess?: string[];
+  // false while the account's set-password invite is still outstanding (§158).
+  active?: boolean;
 }
 
 export interface AdminUserListResponse {

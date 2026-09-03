@@ -1,12 +1,14 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
 import { AdminUser, AppAccessOption, Role } from '../../core/models';
 import { ALL_CAPABILITIES, Capability, CAPABILITY_LABELS, ROLE_LABELS } from '../../core/capabilities';
 import { OperationsService } from '../../core/operations.service';
+import { SettingsService } from '../../core/settings.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
@@ -30,13 +32,14 @@ function capsRecord(caps: readonly string[] | undefined): Record<Capability, boo
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent],
   templateUrl: './users.component.html',
   styleUrl: './users.component.css'
 })
 export class UsersComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly operations = inject(OperationsService);
+  private readonly settings = inject(SettingsService);
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
@@ -48,9 +51,12 @@ export class UsersComponent implements OnInit {
 
   protected readonly createForm = this.formBuilder.nonNullable.group({
     username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
-    password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(128)]],
     email: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
   });
+  // The new account is invited by email (§158) — creation needs a working
+  // mailbox. Null until the check resolves.
+  protected mailConfigured: boolean | null = null;
+  protected resendingId: number | null = null;
   // Roles for the create form, kept outside the reactive group so the
   // checkboxes bind with plain ngModel. At least one is required (§149).
   protected newRoles: Record<Role, boolean> = { webmaster: false, admin: true, user: false };
@@ -91,6 +97,10 @@ export class UsersComponent implements OnInit {
   ngOnInit(): void {
     this.auth.user$.subscribe((user) => (this.currentUserId = user?.id ?? null));
     this.load();
+    this.settings.getMailSettings().subscribe({
+      next: (mail) => (this.mailConfigured = mail.configured),
+      error: () => (this.mailConfigured = false),
+    });
     this.operations.listAppAccessOptions().subscribe({
       next: (response) => {
         this.appOptions = response.items;
@@ -188,22 +198,25 @@ export class UsersComponent implements OnInit {
       return;
     }
 
-    const { username, password, email } = this.createForm.getRawValue();
+    const { username, email } = this.createForm.getRawValue();
     // Only send a feature set for an admin-not-webmaster; the backend ignores
     // it otherwise, and an all-on set is equivalent to sending none.
     const caps = this.newCapsShown() ? this.selectedCaps(this.newCaps) : undefined;
     const appAccess = this.pickedApps(this.newAppAccess);
     this.creating = true;
     this.operations
-      .createUser(username, password, this.selected(this.newRoles), {
+      .createUser(username, email.trim(), this.selected(this.newRoles), {
         capabilities: caps,
-        email: email.trim(),
         appAccess: appAccess.length ? appAccess : undefined,
       })
       .pipe(finalize(() => (this.creating = false)))
       .subscribe({
-        next: () => {
-          this.toast.success('User created successfully.');
+        next: (response) => {
+          if (response.warning) {
+            this.toast.error(response.warning);
+          } else {
+            this.toast.success(`Invite sent to ${email.trim()}.`);
+          }
           this.createForm.reset();
           this.newRoles = { webmaster: false, admin: true, user: false };
           this.newCaps = allCapsRecord(true);
@@ -211,6 +224,20 @@ export class UsersComponent implements OnInit {
           this.load();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to create user.')),
+      });
+  }
+
+  protected resendInvite(user: AdminUser): void {
+    this.resendingId = user.id;
+    this.operations
+      .resendInvite(user.id)
+      .pipe(finalize(() => (this.resendingId = null)))
+      .subscribe({
+        next: (response) =>
+          response.warning
+            ? this.toast.error(response.warning)
+            : this.toast.success(`Invite re-sent to ${user.username}.`),
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to resend the invite.')),
       });
   }
 

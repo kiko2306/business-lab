@@ -8,6 +8,7 @@ import { SettingsComponent } from './pages/settings/settings.component';
 import { UtilsComponent } from './pages/utils/utils.component';
 import { LoginComponent } from './pages/login/login.component';
 import { SetupComponent } from './pages/setup/setup.component';
+import { SetPasswordComponent } from './pages/set-password/set-password.component';
 import { AccountComponent } from './pages/account/account.component';
 import { AuditLogsComponent } from './pages/audit-logs/audit-logs.component';
 import { UsersComponent } from './pages/users/users.component';
@@ -31,6 +32,11 @@ export const routes: Routes = [
     // Recovery is reached while locked out, so it stays outside the shell.
     path: 'recovery',
     component: RecoveryComponent,
+  },
+  {
+    // Public invite landing (plan.md §158): reachable signed out, no guard.
+    path: 'set-password',
+    component: SetPasswordComponent,
   },
   {
     // The authenticated shell: one header/footer around every signed-in page.

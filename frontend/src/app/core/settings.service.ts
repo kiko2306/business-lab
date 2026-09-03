@@ -109,10 +109,13 @@ export class SettingsService {
       .pipe(retry({ count: 1, delay: 400 }));
   }
 
-  saveGeneralSettings(timezone: string): Observable<{ timezone: string; message: string }> {
-    return this.http.put<{ timezone: string; message: string }>(
+  saveGeneralSettings(
+    timezone: string,
+    dashboardUrl?: string
+  ): Observable<{ timezone: string; dashboardUrl?: string; message: string }> {
+    return this.http.put<{ timezone: string; dashboardUrl?: string; message: string }>(
       `${API_BASE_URL}/settings/general`,
-      { timezone },
+      { timezone, ...(dashboardUrl === undefined ? {} : { dashboardUrl }) },
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }

@@ -15309,3 +15309,50 @@ a real mailbox + the 158b UI — proven there.
 158b — the frontend: create form loses the password field (mail-unconfigured
 guard), a public `/set-password` page, a "Pending invite" badge + "Resend
 invite" on the Users list, and the Dashboard URL field in Settings.
+
+## 161. §158 slice 158b done — invite-flow UI (2026-09-03)
+
+Frontend half of §158. Patch bump 0.10.0 → 0.10.1. Closes §158.
+
+- **Add-user form** (`users.component`): the password field is gone; a note
+  says a set-password link is emailed and the account stays inactive until
+  used. When `GET /api/settings/mail` reports `configured: false` a warning
+  with a link to Settings shows and the submit button (now "Create user &
+  send invite") is disabled. On success the toast reports the invite went to
+  the address, or surfaces the `warning` if the send failed.
+- **`/set-password?token=` page** (new `SetPasswordComponent`, public route,
+  no guard): calls `GET /auth/invitation/:token`; on a bad/expired token
+  shows the error and a sign-in link, otherwise a password + confirm form
+  that calls `POST /auth/invitation/:token`, persists the returned session
+  and lands on `/home`.
+- **Users list**: a "Pending invite" badge on any row with `active === false`,
+  a "Resend invite" action for it (`POST /users/:id/invitation/resend`), and
+  "Reset password" is hidden until the account is active.
+- **Settings → General**: a "Dashboard URL" field (validated as a bare
+  http(s) origin), showing `dashboardUrlEffective`; blank uses the derived
+  `dashboard.<baseDomain>` guess. `saveGeneralSettings` now sends it too and
+  reloads.
+- `AuthService.getInvitation` / `acceptInvitation`; `operations.createUser`
+  drops the password arg and returns `{ user, invitePending, warning? }`;
+  `operations.resendInvite`.
+
+### 161.1 Verified
+
+`frontend`: `npm run build` clean (pre-existing warnings), `npm run test:ci`
+42/42. Redeployed; `/api/version` → `0.10.1`; `/set-password` route serves.
+
+### 161.2 Needs a live round-trip by @mat
+
+The box now has a real mailbox. To close the loop: set the Dashboard URL in
+Settings → General to the real dashboard hostname, create a test user, follow
+the emailed link, set a password, and confirm the account flips to active,
+signs in, and appears in Authelia's `users_database.yml` (the accept path
+runs the §157 sync). Also confirm login on an un-activated account gives the
+"check your email" message.
+
+### 161.3 §158 done
+
+Dashboard-created users are now invited by email end to end: no
+creator-chosen password, 72-hour single-use link, inactive until accepted,
+then synced into Authelia. `/setup` and `./start.sh recover` keep their
+direct password path.

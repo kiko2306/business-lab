@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.10.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.10.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -151,14 +151,6 @@ it is done — not ticked off and left behind. Section references point at
       in `docs/first-run.md`.
 
 ### Features & architecture (§131)
-
-SSO / roles:
-
-- [ ] **Invite flow 158b — frontend** (§158) — create form loses the
-      password field (mail-unconfigured guard + link to Settings); new
-      unauthenticated `/set-password?token=` page; "Pending invite" badge +
-      "Resend invite" on the Users list; a "Dashboard URL" field in Settings.
-      Visual review.
 
 Updates:
 

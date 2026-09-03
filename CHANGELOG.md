@@ -11,6 +11,20 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.10.1] — 2026-09-03
+
+### Added
+
+- The invite flow's UI (§158, slice 158b — frontend). The Add-user form drops
+  the password field, warns (with a link to Settings) when the mailbox isn't
+  configured, and its button now reads "Create user & send invite". A new
+  public **`/set-password?token=…`** page validates the link, takes a
+  password, activates the account and signs in. The Users list shows a
+  **"Pending invite"** badge on inactive rows with a **"Resend invite"**
+  action (and hides "Reset password" until the account is active). Settings →
+  General gains a **Dashboard URL** field (shows the effective value, blank
+  falls back to the derived guess).
+
 ## [0.10.0] — 2026-09-03
 
 ### Changed

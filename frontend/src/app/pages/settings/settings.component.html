@@ -26,9 +26,29 @@
       </select>
       <p class="form-text mb-0">Default: {{ generalSettings.defaultTimezone }}</p>
     </div>
+    <div class="col-12 col-md-8">
+      <label class="form-label fw-semibold" for="dashboardUrl">Dashboard URL</label>
+      <input
+        id="dashboardUrl"
+        type="url"
+        class="form-control"
+        formControlName="dashboardUrl"
+        placeholder="https://dashboard.example.com"
+      />
+      <p class="form-text mb-0">
+        Used for the set-password links emailed to new users.
+        <ng-container *ngIf="generalSettings.dashboardUrlEffective">
+          Currently: <code>{{ generalSettings.dashboardUrlEffective }}</code>.
+        </ng-container>
+        Leave blank to use that guess.
+      </p>
+      <div class="form-text text-danger" *ngIf="generalForm.controls.dashboardUrl.touched && generalForm.controls.dashboardUrl.invalid">
+        Enter a full http(s):// address with no path.
+      </div>
+    </div>
     <div class="col-12 d-flex align-items-center gap-2">
       <button type="submit" class="btn btn-primary" [disabled]="savingGeneral || generalForm.invalid">
-        {{ savingGeneral ? 'Saving…' : 'Save timezone' }}
+        {{ savingGeneral ? 'Saving…' : 'Save' }}
       </button>
       <span
         *ngIf="generalFeedback"

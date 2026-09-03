@@ -88,6 +88,25 @@ export class AuthService {
       .pipe(tap((response) => this.persistSession(response)));
   }
 
+  /** The account behind a set-password invite token (plan.md §158), or an error. */
+  getInvitation(token: string): Observable<{ username: string; email: string }> {
+    return this.http.get<{ username: string; email: string }>(
+      `${API_BASE_URL}/auth/invitation/${encodeURIComponent(token)}`,
+      { context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
+  /** Redeem the invite: set the password, activate the account, and sign in. */
+  acceptInvitation(token: string, password: string): Observable<AuthResponse> {
+    return this.http
+      .post<AuthResponse>(
+        `${API_BASE_URL}/auth/invitation/${encodeURIComponent(token)}`,
+        { password },
+        { context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+      )
+      .pipe(tap((response) => this.persistSession(response)));
+  }
+
   setup(username: string, password: string): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(
