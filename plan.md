@@ -15136,3 +15136,23 @@ password chosen by whoever creates the account. Instead:
    link (consistent), or stay a direct set for now?
 4. What is the dashboard base URL for the link on a deployment that isn't
    publicly exposed — a Settings field, or derive-and-require exposure?
+
+### 158.4 Clarifications from @mat (2026-09-03)
+
+1. **`/setup` keeps password-on-create — and the first account is a
+   `webmaster`** (not "admin"; §158.1's wording was loose). The bootstrap
+   webmaster sets its own password directly, as today.
+2. **The account is created inactive, not rolled back.** `POST /api/users`
+   still requires the shared mailbox to be *configured* (no mailbox → refuse),
+   but once that holds the row is created immediately in an **inactive**
+   state and the invite is sent best-effort. A failed send does not undo the
+   creation — "Resend invite" covers it.
+3. **"Active" is derived, not a column.** An account is *inactive / pending
+   invite* while `password_hash IS NULL` and becomes *active* the moment the
+   invitee sets a password through the link. Login refuses a NULL-hash
+   account; the Authelia sync already skips it (§157); the Users list shows an
+   **Inactive** / "Pending invite" badge until then.
+
+So §158.3 question 2 is settled: the gate is "mailbox configured", and the
+account simply stays inactive until the password is set — no transactional
+send.
