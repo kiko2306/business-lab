@@ -109,9 +109,12 @@ that is the one case the allocator cannot cover for you.
 Manager the moment you started it — on a fresh install, before you had done
 anything wrong. Both core ports now sit in the reserved range.
 
-`BACKEND_PORT` only controls the *host* publish. The frontend reaches the
-backend at `http://backend:3000` over the compose network, so changing it
-never affects the dashboard itself.
+`BACKEND_PORT` only controls the *host* publish, and that publish is bound to
+`127.0.0.1` — reachable from the host itself (debug `curl`,
+`scripts/smoke-tests.sh`) but not from the LAN. The frontend reaches the
+backend at `http://backend:3000` over the compose network, and public ingress
+is Cloudflare → NPM → backend, so neither the dashboard nor exposure depends
+on this publish at all (plan.md §167).
 
 ## Two couplings worth knowing
 

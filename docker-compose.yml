@@ -23,7 +23,14 @@ services:
         DOCKER_GID: ${DOCKER_GID:-999}
     image: homelab-backend
     ports:
-      - "${BACKEND_PORT:-10000}:3000"
+      # Bound to loopback only. The dashboard never uses this publish — the
+      # frontend proxies /api/ to backend:3000 over the compose network
+      # (docs/ports.md) — and public ingress is Cloudflare -> NPM -> backend.
+      # Its only consumers are host-local: `curl localhost` while debugging
+      # and scripts/smoke-tests.sh (API_BASE_URL defaults to localhost:3000).
+      # None of those need it on the LAN, and an ungated API on every host
+      # interface is attack surface, so it stays on 127.0.0.1 (plan.md §167).
+      - "127.0.0.1:${BACKEND_PORT:-10000}:3000"
     environment:
       NODE_ENV: ${NODE_ENV:-production}
       PORT: 3000

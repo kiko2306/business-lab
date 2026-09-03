@@ -13790,3 +13790,40 @@ TODO-item half.
   as an Artifact out of this public repo.
 
 Docs/plan only; no code, no version bump.
+
+## 167. §98 closed — the backend's host port is bound to loopback (2026-09-03)
+
+§98 left a decision open: drop the backend's `ports:` mapping from
+`docker-compose.yml` entirely, or keep it and just fix the number. Neither
+extreme is right.
+
+- **Not dropped.** `scripts/smoke-tests.sh` defaults `API_BASE_URL` to
+  `http://localhost:3000`, and ad-hoc `curl localhost:3000/api/...` while
+  debugging on the host is genuinely useful (§98 did exactly that). Dropping
+  the publish outright breaks the host-side smoke tests.
+- **Not left wide open.** On this host the publish was `0.0.0.0:3000` — the
+  API, auth-gated but present, on every interface including the LAN. Nothing
+  needs that: the frontend proxies `/api/` to `backend:3000` over the compose
+  network, and public ingress is Cloudflare → NPM → backend.
+
+Change: `docker-compose.yml` now publishes `127.0.0.1:${BACKEND_PORT:-10000}:3000`.
+Host-local consumers keep working; the LAN can no longer reach it.
+`docs/ports.md` updated to say so.
+
+### Verified against the real stack
+
+Recreated the backend container (`docker compose up -d backend`, no root
+`down`). `docker port` now shows `3000/tcp -> 127.0.0.1:3000`. From the host:
+`localhost:3000/api/health` → 401 (reachable, auth-gated, as before);
+`192.168.1.23:3000` (the host's LAN address) → connection refused. The
+dashboard is unaffected — `localhost:10001` serves 200 and its proxied
+`/api/health` answers.
+
+### Not done here
+
+The documented number itself (`BACKEND_PORT=10000`) — this host's root `.env`
+carries `3000`, pre-existing drift from before the §59 renumbering. The root
+`.env` is hand-written and gitignored, not touched by the allocator, so
+there is no code path to "fix"; `.env.example` and `docs/ports.md` already
+say `10000`. Correcting the live value is a one-line local `.env` edit for
+whoever operates this box.

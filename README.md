@@ -339,15 +339,6 @@ Strategy:
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from
       `service_exposure`.
-- [ ] **Should the backend publish a LAN port at all?** (§98) — confirmed the
-      frontend never uses it (it reaches the backend at `http://backend:3000`
-      over the compose network regardless — `docs/ports.md` already says so);
-      `BACKEND_PORT`'s host publish only exists for direct API/debug access.
-      This host's value (3000, not the documented 10000 — predating the port
-      renumbering) is a symptom of that being genuinely unnecessary once
-      exposure is configured. Decide: drop the `ports:` mapping from
-      `docker-compose.yml` entirely (backend becomes compose-network-only), or
-      keep it published and just fix the number. Bugfix, not urgent.
 - [ ] **Signal-port coupling is uncovered** (§69) — the port renumbering
       silently killed NetBird's signal service once; no test would catch a
       repeat.
