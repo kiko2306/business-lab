@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.6.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.7.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -151,17 +151,6 @@ it is done — not ticked off and left behind. Section references point at
       in `docs/first-run.md`.
 
 ### Features & architecture (§131)
-
-UI:
-
-- [ ] **Match the dashboard dark palette to gethomepage** (§147.1) — the Home
-      Page runs Tailwind `slate`; snap `styles.css`'s dark tokens (canvas,
-      surface, borders, body text) onto the exact slate ramp so the dashboard
-      and the Home Page read as one product. Keep a blue accent for actions.
-- [ ] **Resource strip at the top of the menu** (§147.2) — a compact row of
-      Load / Memory / Disk meters above the bento tiles on `/home`, from
-      `GET /api/health` (load-per-CPU as the CPU proxy), polling ~30s,
-      colour-coded on the thresholds the API already returns.
 
 SSO / roles:
 

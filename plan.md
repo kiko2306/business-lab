@@ -14295,3 +14295,66 @@ the same at "the head of the dashboard". Post-§145 the landing page is `/home`
 No backend change if load-per-CPU is accepted as the CPU figure. No new route,
 no persistence. The strip is display-only — no "refresh" button, it just
 polls.
+
+## 148. §147 done — slate palette, and a resource strip in the header (2026-09-03)
+
+Both parts of §147 in one pass, per @mat's call. Feature bump 0.6.0 → 0.7.0.
+
+### 148.1 Palette → Tailwind slate (§147.1)
+
+`frontend/src/styles.css` `[data-bs-theme='dark']` only. The ad-hoc hexes
+became slate ramp values — the scale gethomepage runs.
+
+**First cut used slate-950 (`#020617`) for the canvas; @mat: "background
+doesn't match".** gethomepage's dark page background is `--bg-color` =
+`--color-800` = **`#1e293b`** (its slate stops at 900 — there is no 950), and
+its tiles are a barely-there `white/5` lift on top. So the canvas is now
+`#1e293b` exactly, and the dashboard's one card colour is a deliberate step
+above it (`#26303f`) — the dashboard keeps a stronger raised-card look (border
++ two-layer shadow, §136.3) than gethomepage's flat tiles, but the *page*
+they sit on is the same colour.
+
+| token | was | now |
+|---|---|---|
+| `--app-canvas` / `--bs-body-bg` | `#0a0d12` | `#1e293b` (800, = gethomepage bg) |
+| `--app-surface*` / `--bs-card-bg` / `-cap-bg` | `#1b2230` | `#26303f` (one step up) |
+| `--bs-body-color` | `#e6e9ef` | `#e2e8f0` (200) |
+| `--bs-border-color` / `--bs-card-border-color` | `#394456` | `#334155` (700) |
+| `--bs-tertiary-bg` | `#232b3a` | `#0f172a` (900) |
+| `--bs-secondary-bg` | `#2c3648` | `#334155` (700) |
+| `--bs-secondary-color` | `#cbd5e1` | `#cbd5e1` (300, unchanged) |
+
+`--bs-primary` (blue) is untouched — gethomepage is monochrome but the
+dashboard has real actions that need to pop. Provisional, @mat iterates.
+
+### 148.2 CPU % in `/api/health` (§147.2 backend)
+
+`GET /api/health` gains `cpu: { percentUsed }`. `readCpuPercent()` in
+`routes/health.ts` diffs `os.cpus()` cumulative idle/total ticks against a
+module-level snapshot from the previous call — so a 30s-spaced poll gets the
+30s average for free. If too little time has passed (calls close together, or
+the first call after boot) it takes a fresh 150ms sample instead. **Not
+thresholded** — it does not feed `status`, so a transient CPU spike can't
+flip the box to "degraded"; the header strip colours it client-side.
+`health.test.ts` only covers `parseDfOutput`, so nothing there changed.
+
+### 148.3 The header strip (§147.2 frontend)
+
+`layout/shell/resource-strip.component.*` — `<app-resource-strip>`, mounted in
+`shell.component.html` between the brand and the nav. Three compact meters
+(CPU / RAM / DISK), each label + 52px bar + `NN%`, `tabular-nums`. Polls
+`operations.getHealth()` on mount then every 30s (`timer(0, 30000)` +
+`switchMap` + `takeUntilDestroyed`); a failed poll leaves the last numbers up,
+and nothing renders before the first success. Colours: CPU amber ≥ 75 / red ≥
+90 (fixed); RAM and DISK use `thresholds.memoryPercent` / `diskPercent` from
+the API for red and `threshold − 15` for amber; DISK shows the worst of
+`disks[]`. Below the 992px header breakpoint the strip drops to its own
+full-width row between the brand/logout row and the nav strip.
+
+### 148.4 Verified
+
+`backend`: `npm run typecheck` clean, `npm test` 380/380. `frontend`:
+`npm run build` clean (pre-existing bundle-budget + Bootstrap selector
+warnings), `npm run test:ci` 42/42. Rebuilt + redeployed backend and frontend
+(`/api/version` → `0.7.0`); no root teardown. Awaiting @mat's review on
+`localhost:10001`.

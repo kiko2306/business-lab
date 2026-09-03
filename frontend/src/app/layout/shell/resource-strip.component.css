@@ -1,0 +1,80 @@
+:host {
+  display: block;
+}
+
+.rs {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+}
+
+.rs__meter {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--bs-secondary-color);
+  white-space: nowrap;
+}
+
+.rs__label {
+  min-width: 2.2rem;
+}
+
+.rs__track {
+  display: inline-block;
+  width: 52px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--bs-tertiary-bg);
+  overflow: hidden;
+}
+
+.rs__fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--bs-primary);
+  transition: width 0.4s ease;
+}
+
+.rs__val {
+  min-width: 2.4rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  color: var(--bs-body-color);
+}
+
+.rs__meter[data-level='warn'] .rs__fill {
+  background: var(--bs-warning, #f59e0b);
+}
+
+.rs__meter[data-level='warn'] .rs__val {
+  color: var(--bs-warning-text-emphasis, #f59e0b);
+}
+
+.rs__meter[data-level='crit'] .rs__fill {
+  background: var(--bs-danger, #ef4444);
+}
+
+.rs__meter[data-level='crit'] .rs__val {
+  color: var(--bs-danger-text-emphasis, #ef4444);
+}
+
+/* Below the header's wrap breakpoint the strip drops onto its own full-width
+   row above the nav; keep it from squeezing the brand on the first row. */
+@media (max-width: 991.98px) {
+  .rs {
+    width: 100%;
+    justify-content: space-between;
+    gap: 0.5rem;
+  }
+
+  .rs__track {
+    flex: 1 1 auto;
+    width: auto;
+    max-width: 96px;
+  }
+}

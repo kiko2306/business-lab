@@ -6,6 +6,56 @@ import { schemas, validateBody } from '../middleware/validation';
 
 const router = Router();
 
+/**
+ * Cumulative CPU tick counts across all cores. CPU utilisation is a rate, not
+ * a level, so it has to be measured as the change between two of these — one
+ * snapshot on its own says nothing.
+ */
+function cpuSnapshot(): { idle: number; total: number } {
+  let idle = 0;
+  let total = 0;
+  for (const cpu of os.cpus()) {
+    for (const value of Object.values(cpu.times)) {
+      total += value;
+    }
+    idle += cpu.times.idle;
+  }
+  return { idle, total };
+}
+
+// Updated on every read so the *next* read can diff against it. Seeded at
+// module load; the first real read falls back to a short inline sample
+// because too little time has passed for the diff to mean anything.
+let lastCpu = cpuSnapshot();
+
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Percent of CPU time spent non-idle. When reads are spaced out (the header
+ * strip polls every ~30s) this is the average over that gap, computed for
+ * free from the running tick counters. When called again too soon — or for
+ * the first time after boot — it takes a fresh 150ms sample instead so a
+ * near-zero interval can't produce a garbage number.
+ */
+async function readCpuPercent(): Promise<number> {
+  const clamp = (fraction: number): number => Math.max(0, Math.min(100, Math.round(fraction * 100)));
+  const now = cpuSnapshot();
+  const idleDelta = now.idle - lastCpu.idle;
+  const totalDelta = now.total - lastCpu.total;
+  // ~200 ticks/core (2s at 100Hz) is comfortably enough signal; below that,
+  // sample directly.
+  if (totalDelta > 200 * (os.cpus().length || 1)) {
+    lastCpu = now;
+    return clamp(1 - idleDelta / totalDelta);
+  }
+  await sleep(150);
+  const after = cpuSnapshot();
+  lastCpu = after;
+  const sampledIdle = after.idle - now.idle;
+  const sampledTotal = after.total - now.total;
+  return sampledTotal > 0 ? clamp(1 - sampledIdle / sampledTotal) : 0;
+}
+
 interface Thresholds {
   diskPercent: number;
   memoryPercent: number;
@@ -171,10 +221,11 @@ router.put('/thresholds', validateBody(schemas.healthThresholds), async (req: Re
 
 async function systemHealthHandler(_req: Request, res: Response) {
   try {
-    const [dbResult, thresholds, disks] = await Promise.all([
+    const [dbResult, thresholds, disks, cpuPercent] = await Promise.all([
       query<{ ok: number }>('SELECT 1 AS ok'),
       getThresholds(),
       getDisks(),
+      readCpuPercent(),
     ]);
 
     const memTotal = os.totalmem();
@@ -207,6 +258,7 @@ async function systemHealthHandler(_req: Request, res: Response) {
       status: alerts.length ? 'degraded' : 'ok',
       database: dbResult.rows[0]?.ok === 1 ? 'ok' : 'error',
       disks,
+      cpu: { percentUsed: cpuPercent },
       memory: { percentUsed: memoryPercent, totalBytes: memTotal, usedBytes: memUsed },
       load: { oneMinute: oneMinuteLoad, loadPerCpu },
       thresholds,

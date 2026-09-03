@@ -41,6 +41,12 @@
   justify-content: flex-end;
 }
 
+/* Sits between the brand (which has margin-right:auto) and the nav, so it
+   rides on the right of the first row on desktop. */
+.app-header__resources {
+  flex: 0 0 auto;
+}
+
 /* Plain text links, not outlined buttons — the row of borders was heavy and
    the fixed 8rem width left big gaps between short labels. The active route
    gets a solid, borderless pill instead. */
@@ -90,6 +96,13 @@
   .app-header__logout {
     order: 2;
     flex: 0 0 auto;
+  }
+
+  /* Own row between the brand/logout row and the nav strip. */
+  .app-header__resources {
+    order: 1;
+    width: 100%;
+    margin-top: 0.4rem;
   }
 
   /* Full-width, single-line, swipeable strip — never grows the header height. */

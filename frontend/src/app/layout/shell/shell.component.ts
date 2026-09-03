@@ -3,6 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { OperationsService } from '../../core/operations.service';
+import { ResourceStripComponent } from './resource-strip.component';
 
 /**
  * The authenticated app shell: one persistent header + footer around every
@@ -14,7 +15,7 @@ import { OperationsService } from '../../core/operations.service';
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, AsyncPipe, NgIf],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, AsyncPipe, NgIf, ResourceStripComponent],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.css',
 })

@@ -390,6 +390,10 @@ export interface HealthStatus {
   // filesystem until the data root is moved off it, and the API sends one
   // entry while that is true.
   disks: DiskUsage[];
+  // Percent of CPU time spent non-idle since the previous poll (or a short
+  // inline sample when polls are too close together). Not thresholded — it
+  // does not feed `status` — the header strip colours it on its own.
+  cpu: { percentUsed: number };
   memory: { percentUsed: number; totalBytes: number; usedBytes: number };
   load: { oneMinute: number; loadPerCpu: number };
   thresholds: { diskPercent: number; memoryPercent: number; loadPerCpu: number };

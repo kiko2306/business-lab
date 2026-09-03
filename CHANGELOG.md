@@ -11,6 +11,24 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.7.0] — 2026-09-03
+
+### Added
+
+- A CPU / RAM / disk read-out in the shell header (§147.2), polling
+  `GET /api/health` every 30s and colour-coding each meter on the thresholds
+  the API reports. `GET /api/health` now also returns `cpu.percentUsed` —
+  non-idle CPU time since the previous poll (or a short inline sample when
+  polls are close together); it does not feed the `status` field.
+
+### Changed
+
+- The dark theme is now Tailwind's `slate` ramp (§147.1) — the same palette
+  gethomepage runs on the Home Page — so the dashboard and the Home Page read
+  as one product. The page background matches gethomepage's exactly
+  (`#1e293b`), with card panels lifted one step above it; a blue accent stays
+  for buttons and active states.
+
 ## [0.6.0] — 2026-09-03
 
 ### Changed
