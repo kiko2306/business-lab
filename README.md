@@ -171,10 +171,18 @@ Updates:
       sequenced through the safe backup path (§103). Compose files are
       read-only to the backend, so this needs a managed tag-override
       mechanism, not an in-place compose edit.
-- [ ] **Dashboard self-update panel** (§131.4) — current vs upstream commit;
-      a confirm-gated button that runs `git pull` and restarts the management
-      services individually (never a root `docker compose down`). Always
-      prompts; no silent self-update.
+- [ ] **Displayed app version** (§131.4) — a semver string in the dashboard
+      footer (`Business Lab v0.0.1`), read from the backend so it reflects
+      what's deployed. One source of truth (root `package.json` version /
+      a single `VERSION`), starting `0.0.1`. From then on the assistant bumps
+      it in the same commit as each change — PATCH for a fix, MINOR for a
+      feature or breaking change, MAJOR stays `0` until a deliberate `1.0.0` —
+      and adds a matching `CHANGELOG.md` line.
+- [ ] **Dashboard self-update panel** (§131.4) — separate from the version
+      display: current version/commit vs `origin/main`; a confirm-gated button
+      that runs `git pull` and restarts the management services individually
+      (never a root `docker compose down`). Always prompts; no silent
+      self-update.
 
 Infrastructure:
 

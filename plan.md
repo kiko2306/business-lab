@@ -13110,7 +13110,8 @@ big areas become their own routed pages —
 - Apps (the service registry + cards, start/stop/config),
 - Exposure & networking,
 - Backups & restore,
-- Updates & version control (new, see §131.4),
+- Updates & version control (new — the update button, the displayed app
+  version, and the self-update panel; see §131.4),
 - Users & roles (new, see §131.3),
 - Settings (third-party tokens, mailbox, etc.),
 - Utils (§95 LAN scan and friends).
@@ -13192,14 +13193,30 @@ comment), `docker compose pull` the new image, then `up -d` to recreate the
 container. Report success/failure per app. Sequence it through the safe path
 the "Back up now" button uses (§103) so an update can't run mid-backup.
 
-**Dashboard version control — ask permission to `git pull` and restart.** The
-management stack updates by `git pull` + `./start.sh`. Give the dashboard a
-"check for updates to Business Lab itself" panel: show current vs upstream
-commit, and a button that — **after an explicit confirm** — runs `git pull`
-and restarts the management containers (never `docker compose down` the root
-stack, §Never — restart services individually, or hand off to a
-`start.sh`-driven path). Outward-facing + hard to reverse, so it always
-prompts; no silent self-update.
+**A displayed app version, maintained by the assistant (§131.8 clarification).**
+Two distinct things, both under "version control":
+
+1. **A visible semver version string in the dashboard footer** — `Business Lab
+   v0.0.1` — starting at **`0.0.1`** and bumped **by the assistant** in the
+   same commit as the change it describes, following semver for a pre-1.0
+   project: **PATCH** for a fix or a small internal change, **MINOR** for a
+   new user-facing feature or a breaking change, **MAJOR** stays `0` until a
+   `1.0.0` is declared deliberately. One source of truth (root `package.json`
+   `version`, with `backend`/`frontend` kept in step, or a single
+   `version.ts`/`VERSION` the build reads); a `CHANGELOG.md` gets a matching
+   entry per bump. The footer reads the value from the backend (extend the
+   health/`/api/version` response) so it reflects what's actually deployed,
+   not what the frontend was built with. Every future working-loop commit that
+   changes behaviour now also bumps this and adds the changelog line.
+
+2. **A "git pull + restart" self-update panel** — separate feature. The
+   management stack updates by `git pull` + `./start.sh`; give the dashboard a
+   "check for updates to Business Lab itself" panel that shows the current
+   version / commit vs `origin/main`, and a button that — **after an explicit
+   confirm** — runs `git pull` and restarts the management containers (never
+   `docker compose down` the root stack, §Never — restart services
+   individually, or hand off to a `start.sh`-driven path). Outward-facing +
+   hard to reverse, so it always prompts; no silent self-update.
 
 **Per-application backup/restore alongside the global backups.** The backup
 system is global today (schedule + "Back up now" §103, restore §75.3/§106).
@@ -13309,8 +13326,11 @@ SSO / roles:
 Updates & backups:
 - Update button: rewrite image tag → `pull` → `up -d`, per app, through the
   safe path.
-- Dashboard self-update panel: current vs upstream commit, confirm-gated
-  `git pull` + individual-service restart.
+- Displayed app version in the dashboard footer, starting `0.0.1`, bumped by
+  the assistant per semver in the same commit as each change + a
+  `CHANGELOG.md` line; footer reads it from the backend.
+- Dashboard self-update panel (separate): current version/commit vs
+  `origin/main`, confirm-gated `git pull` + individual-service restart.
 - Per-app backup / snapshot list / restore on each app's card.
 - Add `ftp`/`ftps` backup destination; prove it (covers "prove a non-Drive
   destination").
@@ -13354,6 +13374,12 @@ Answers to the open questions on this brief, so the intent survives:
 - **Dev/test rule (§131.5):** production is *also* internet-exposed, with its
   own domain and tokens — see the rewritten §131.5 above. The rule is
   no-uptime / no-data guarantees on this box; verification model unchanged.
+- **"Version control" (§131.4):** the primary want is a **visible semver
+  version on the dashboard**, shown **in the footer**, starting at **`0.0.1`**,
+  and bumped **by the assistant** as part of each change (PATCH = fix, MINOR =
+  feature/breaking, MAJOR stays 0 pre-1.0), with a `CHANGELOG.md` entry to
+  match. The "git pull + restart" self-update button is a *separate* feature
+  and stays on the list. See the rewritten §131.4 above.
 
 Still open (not blocking the plan, decide when the slice starts): whether
 "Kitchen Pantry" means `pantry` alone or `pantry` + `kitchen-switcher` and
