@@ -1,0 +1,13 @@
+{
+  "name": "homelab-e2e",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Browser E2E tests that drive the real dashboard (plan.md §131.5). Run via scripts/e2e-tests.sh, not from the host directly.",
+  "scripts": {
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.48.0",
+    "otplib": "12.0.1"
+  }
+}

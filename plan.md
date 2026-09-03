@@ -15453,3 +15453,73 @@ removes" (§84.4/§84.5) framing is *superseded here*, not edited there.
   this one.
 
 Docs-only; no version bump, no code paths touched.
+
+## 164. §131.5 — browser E2E framework: Playwright driving the real dashboard (2026-09-03)
+
+From the §131.5 Infrastructure list. Adds an `e2e/` workspace and
+`scripts/e2e-tests.sh`: Playwright, in the official container image, driving
+the frontend that `docker-compose.test.yml` publishes — a real browser
+against the real Angular app and the real API, not a mock.
+
+### What landed
+
+- **`e2e/`** — `@playwright/test` + `otplib`, `playwright.config.ts`
+  (single chromium project, `workers: 1` because the suite shares one
+  database and the first-admin account), a `setup` project that creates or
+  signs into that admin once and saves `storageState`, and specs:
+  - `auth.setup.ts` — `/setup` first admin (or `/login` if already done),
+    lands on `/home`, saves the session.
+  - `nav.spec.ts` — every shell page (Apps, Backups, Exposure, Settings,
+    Utils, Users, Audit logs, Security) loads from its nav link and shows
+    its `h1`; logout returns to the sign-in screen.
+  - `users.spec.ts` — the invite flow's Add-user form is disabled and warns
+    with no mailbox configured (its real state on the test stack), and the
+    first admin is listed with the "you" badge.
+  - `two-factor.spec.ts` — the whole TOTP journey: enrol from Account
+    security (read the manual key, compute a code with `otplib`, activate,
+    acknowledge recovery codes), sign out, sign back in through the MFA
+    challenge with a fresh code, then disable it so the suite is left as it
+    started. `otplib`'s defaults match `backend/src/utils/totp.ts`.
+
+- **`scripts/e2e-tests.sh`** — builds the frontend in `node:20`, brings up
+  `docker-compose.test.yml`, waits on `:13000/health` and `:18080`, then runs
+  Playwright in `mcr.microsoft.com/playwright:v1.48.0-jammy` with
+  `--network host`. `KEEP_STACK=1` leaves the stack up. Everything is a
+  container — no host Node, matching the rest of the project.
+
+- **`.github/workflows/ci.yml`** — new `e2e` job running that script, with
+  the Playwright HTML report uploaded as an artifact on failure. CLAUDE.md's
+  CI paragraph updated to list it.
+
+- **`docker-compose.test.yml`** — dropped the hardcoded `172.28.0.0/16`
+  subnet and the static per-service IPs; services now resolve each other by
+  compose service name (`POSTGRES_HOST: database`). The fixed subnet
+  collided with whatever else held `172.28/16` on a given host — on this box,
+  the `beszel` app — which blocked the stack from coming up at all. The API
+  smoke path (`docker-e2e-test.sh`) never depended on the static IPs.
+
+  Two more gaps the browser path surfaced that the API smoke tests never hit:
+  - the backend image's entrypoint `chown`s `/app/backups` (normally the
+    backups-data volume) under `set -e` and aborts when it is missing — the
+    test compose now gives it a `tmpfs: [/app/backups]`;
+  - `nginx.test.conf` had no `/api/` proxy, so the SPA (which calls
+    same-origin `/api`) could not reach the backend at all. Dropped that
+    file; the test frontend now mounts the same `frontend/nginx.conf`
+    production ships.
+
+### 164.1 Verified against the real host
+
+`scripts/e2e-tests.sh` run on `home-srv-01`: frontend build in `node:20`,
+test stack up, `wait_for_http` on backend + frontend, Playwright suite green —
+auth setup + nav (9) + users (2) + the full 2FA enrol/challenge/disable
+journey (13 tests). Stack torn down after (`down -v`). Each spec's data lives
+in a collapsed `<app-panel>`, so the specs expand the panel they need first
+(`expandPanel` in `tests/helpers.ts`).
+
+### 164.2 Not done here
+
+The test backend has no Docker socket, so start/stop an app, exposure and
+backup can't be exercised there. Left as a README item: a live-stack mode
+(`E2E_BASE_URL` at a real dashboard) for those, local-only like the smoke
+tests. Playwright vs Cypress (§131.8 open question): Playwright, for the
+container image with browsers bundled and no host Node.

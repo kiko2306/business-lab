@@ -73,8 +73,12 @@ Swap `npm test` for `npm run typecheck`, or `-w /repo/frontend` with
 against an already-running backend.
 
 CI (`.github/workflows/ci.yml`) runs backend typecheck+test, frontend
-test:ci+build, and `apps/price-compare/app` tests; the smoke tests are
-local-only. Run the affected workspace's checks before saying a change is done.
+test:ci+build, `apps/price-compare/app` tests, and the browser E2E job
+(`scripts/e2e-tests.sh` — Playwright against the `docker-compose.test.yml`
+stack). The host-only smoke tests (`scripts/smoke-tests.sh`) are not in CI.
+Run the affected workspace's checks before saying a change is done; run
+`scripts/e2e-tests.sh` when a change touches auth, the shell/nav, the Users
+page or the 2FA flow.
 
 ## After a change lands, commit and push
 
