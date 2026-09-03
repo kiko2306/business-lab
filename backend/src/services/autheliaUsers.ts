@@ -35,7 +35,7 @@ export interface AutheliaAdminUserUpdate {
   password?: string;
 }
 
-interface RawAutheliaUser {
+export interface RawAutheliaUser {
   disabled?: boolean;
   displayname?: string;
   password?: string;
@@ -43,11 +43,11 @@ interface RawAutheliaUser {
   groups?: string[];
 }
 
-interface UsersDatabaseFile {
+export interface UsersDatabaseFile {
   users?: Record<string, RawAutheliaUser>;
 }
 
-function getUsersDatabasePath(): string | null {
+export function getUsersDatabasePath(): string | null {
   const resolved = resolveComposeFile('authelia');
   if (!resolved) {
     return null;
@@ -60,7 +60,7 @@ function getUsersDatabasePath(): string | null {
  * above `users:`) and the parsed document, so a save can rewrite just the
  * `users:` section and leave the preamble intact.
  */
-function readUsersDatabase(filePath: string): { preamble: string; data: UsersDatabaseFile } {
+export function readUsersDatabase(filePath: string): { preamble: string; data: UsersDatabaseFile } {
   const raw = fs.readFileSync(filePath, 'utf8');
   const marker = raw.indexOf('\nusers:');
   const splitIndex = raw.startsWith('users:') ? 0 : marker === -1 ? -1 : marker + 1;

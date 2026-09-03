@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.9.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.9.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -154,10 +154,6 @@ it is done — not ticked off and left behind. Section references point at
 
 SSO / roles:
 
-- [ ] **SSO slice 2c — Authelia users-file sync** (§151) — every managed
-      account written into `users_database.yml` with `app-<name>` groups, the
-      bcrypt hash copied from `users.password_hash`; synced on
-      create/update/delete/password-reset/recover. Proven on the live stack.
 - [ ] **SSO slice 2d — Authelia access_control generation** (§151) —
       marker region in `configuration.yml`, `default_policy: deny`, a
       per-app group rule per exposed+gated app, Authelia restart, hooked into

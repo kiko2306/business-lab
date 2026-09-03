@@ -15004,3 +15004,63 @@ sign-off pending.
 create/update/delete/password-reset/recover; `webmaster` also gets `admins`
 + every `app-*`. Proven on the live stack. Then 2d — `access_control`
 generation in `configuration.yml`.
+
+## 157. §151 slice 2c done — Authelia users-file sync (2026-09-03)
+
+The dashboard now owns Authelia's file-backend user database. Patch bump
+0.9.3 → 0.9.4. Proven on the live stack.
+
+### 157.1 What it does
+
+- `services/autheliaSync.ts`:
+  - `syncAutheliaUsers(trigger)` rebuilds the `users:` block of
+    `apps/authelia/config/users_database.yml` from the `users` table. Each
+    account with an email **and** a password hash becomes an entry:
+    `disabled: false`, `displayname` (kept from the existing entry if a human
+    set one, else the username), `password` = `users.password_hash` verbatim
+    (bcryptjs digests validate against Authelia's file backend — §132),
+    `email`, and `groups`.
+  - `groups` — `admins` + every `app-<name>` for a `webmaster`; otherwise
+    `app-<name>` per `user_app_access` row plus any `autheliaGroups` the app
+    declares.
+  - **Never writes an empty user list** — that state means "no dashboard
+    account has an email yet", not "delete everyone"; it logs and returns
+    `no-eligible-users` instead.
+  - `syncAutheliaUsersSafe(trigger, userId)` — never throws, audits a failure,
+    returns a short `warning` string for the route to pass through.
+- Wired into `routes/users.ts` (create, `PUT :id/access`, `PUT :id/roles`,
+  `PUT :id/password`, `DELETE`) — each adds `warning` to its response when the
+  sync didn't land — and `scripts/recoverAdmin.ts` (`create-admin`,
+  `reset-password`). `PUT :id/capabilities` does **not** sync (features don't
+  touch Authelia). `/setup` doesn't either (no email at that point).
+- `apps/authelia/config/configuration.yml`:
+  `authentication_backend.file.watch: true` so Authelia hot-reloads the file
+  with no restart (a restart 502s every gated app).
+- 5 unit tests (`autheliaSync.test.ts`). Backend `npm test` 405/405,
+  typecheck clean.
+
+### 157.2 Proven on the live stack
+
+- Restarted Authelia to pick up `watch: true` — log:
+  `"Watching file for changes" file=/config/users_database.yml watcher=users`.
+  v4.39.20, healthy.
+- Ran `syncAutheliaUsers('manual-verify')` in the backend container against
+  live data. `mat` (webmaster, email set via the 2b Access editor during
+  review) was written with
+  `groups: [admins, app-code-server, app-netbird-vpn, app-nginx-proxy-manager,
+  app-wetty]` — `admins` plus every currently gated app — `displayname:
+  Miguel` preserved, bcrypt hash (`$2b$`) copied from the dashboard account.
+- Authelia log immediately after: `"Reloaded successfully"
+  file=/config/users_database.yml op=WRITE watcher=users`. Hot-reload works
+  end to end.
+- **Note for @mat:** `mat`'s Authelia password is now the dashboard password
+  (hash copied across). If those differed, the SSO login for
+  code-server / wetty / NPM / NetBird now uses the dashboard one.
+
+### 157.3 Next
+
+2d — generate `access_control` rules in `configuration.yml` (marker region,
+`default_policy: deny`, one `one_factor` rule per gated app allowing its
+`app-<name>` group + `admins`), hooked into the exposure-toggle path, proven
+end to end: a `user`-role account with access to one app signs in through SSO,
+that app opens, a non-listed one 403s.

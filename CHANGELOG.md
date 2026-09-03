@@ -11,6 +11,23 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.9.4] — 2026-09-03
+
+### Added
+
+- Authelia users-file sync (§151, slice 2c). The dashboard now owns
+  `apps/authelia/config/users_database.yml`: every managed account with an
+  email is written as an Authelia user, its bcrypt password hash copied from
+  the dashboard account verbatim, and its groups derived from the SSO
+  app-access list — `admins` + every `app-<name>` for a webmaster, the granted
+  `app-<name>` groups (plus any the app declares) for everyone else. The sync
+  runs best-effort after every create / access change / password reset / role
+  change / delete and from `./start.sh recover`; a failure is surfaced as a
+  `warning` on the response, never rolled back. Authelia's file backend is now
+  configured with `watch: true`, so it reloads the file with no restart. The
+  rebuild never writes an empty user list (that would lock every gated app
+  out). Access-control rules per app are still to come (slice 2d).
+
 ## [0.9.3] — 2026-09-03
 
 ### Added

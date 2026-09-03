@@ -25,6 +25,7 @@ import {
   getAppAccessOptions,
   setUserAppAccess,
 } from '../services/userAppAccess';
+import { syncAutheliaUsersSafe } from '../services/autheliaSync';
 
 const router = Router();
 
@@ -131,9 +132,11 @@ router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Res
       result: 'success',
     }).catch(() => {});
 
+    const warning = await syncAutheliaUsersSafe('user_create', req.user?.id ?? null);
+
     return res
       .status(201)
-      .json({ user: { ...user, roles, capabilities: effective, appAccess } });
+      .json({ user: { ...user, roles, capabilities: effective, appAccess }, ...(warning ? { warning } : {}) });
   } catch (error) {
     const err = error as { code?: string; message: string };
     if (err.code === '23505') {
@@ -191,7 +194,11 @@ router.put(
         result: 'success',
       }).catch(() => {});
 
-      return res.json({ message: 'Roles updated.', roles });
+      // webmaster ↔ not changes Authelia group membership (the `admins` group
+      // and every `app-*`).
+      const warning = await syncAutheliaUsersSafe('user_roles_update', req.user?.id ?? null);
+
+      return res.json({ message: 'Roles updated.', roles, ...(warning ? { warning } : {}) });
     } catch (error) {
       console.error('Update user roles error:', (error as Error).message);
       return res.status(500).json({ error: 'Unable to update roles.' });
@@ -278,7 +285,14 @@ router.put(
         result: 'success',
       }).catch(() => {});
 
-      return res.json({ message: 'Access updated.', email: email.trim(), appAccess });
+      const warning = await syncAutheliaUsersSafe('user_access_update', req.user?.id ?? null);
+
+      return res.json({
+        message: 'Access updated.',
+        email: email.trim(),
+        appAccess,
+        ...(warning ? { warning } : {}),
+      });
     } catch (error) {
       console.error('Update user access error:', (error as Error).message);
       return res.status(500).json({ error: 'Unable to update access.' });
@@ -315,7 +329,10 @@ router.put(
         result: 'success',
       }).catch(() => {});
 
-      return res.json({ message: 'Password updated successfully.' });
+      // The hash Authelia holds for this account has to follow the reset.
+      const warning = await syncAutheliaUsersSafe('user_password_reset', req.user?.id ?? null);
+
+      return res.json({ message: 'Password updated successfully.', ...(warning ? { warning } : {}) });
     } catch (error) {
       console.error('Update user password error:', (error as Error).message);
       return res.status(500).json({ error: 'Unable to update password.' });
@@ -361,7 +378,9 @@ router.delete('/:id', validateParams(schemas.userIdParam), async (req: Request, 
       result: 'success',
     }).catch(() => {});
 
-    return res.json({ message: 'User deleted successfully.' });
+    const warning = await syncAutheliaUsersSafe('user_delete', req.user?.id ?? null);
+
+    return res.json({ message: 'User deleted successfully.', ...(warning ? { warning } : {}) });
   } catch (error) {
     console.error('Delete user error:', (error as Error).message);
     return res.status(500).json({ error: 'Unable to delete user.' });

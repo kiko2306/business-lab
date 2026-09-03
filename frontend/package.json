@@ -1,6 +1,6 @@
 {
   "name": "homelab-frontend",
-  "version": "0.9.3",
+  "version": "0.9.4",
   "description": "Homelab management Angular frontend",
   "scripts": {
     "ng": "ng",

@@ -23,6 +23,19 @@
 import { getPool, query } from '../utils/database';
 import { hashPassword } from '../utils/password';
 import { writeAuditLog } from '../utils/audit';
+import { syncAutheliaUsers } from '../services/autheliaSync';
+
+/** Best-effort: keep Authelia's copy of the account in step after a recovery write. */
+async function syncAutheliaQuietly(trigger: string): Promise<void> {
+  try {
+    const result = await syncAutheliaUsers(trigger);
+    if (result.synced) {
+      console.log(`Authelia users_database.yml updated (${result.count} user(s)).`);
+    }
+  } catch (err) {
+    console.warn(`Could not update Authelia (${(err as Error).message}); fix it from the dashboard once you're in.`);
+  }
+}
 
 // Mirrors passwordSchema in middleware/validation.ts — kept in step by hand so
 // a recovery reset can't set a password the normal login flow would reject.
@@ -117,6 +130,8 @@ async function resetPassword(): Promise<void> {
     metadata: { username, via: 'start.sh recover', refreshTokensRevoked: revoked.rowCount ?? 0 },
   });
 
+  await syncAutheliaQuietly('recovery_reset_password');
+
   console.log(`Reset the password for "${username}" (id ${userId}); revoked ${revoked.rowCount ?? 0} active session(s).`);
   console.log('Log in at the dashboard with the new password now.');
 }
@@ -144,6 +159,8 @@ async function createAdmin(): Promise<void> {
     resource: 'users',
     metadata: { username, via: 'start.sh recover' },
   });
+
+  await syncAutheliaQuietly('recovery_create_admin');
 
   console.log(`Created admin "${username}" (id ${rows[0].id}). Log in at the dashboard.`);
 }

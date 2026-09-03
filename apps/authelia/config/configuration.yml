@@ -24,6 +24,10 @@ totp:
 authentication_backend:
   file:
     path: /config/users_database.yml
+    # The dashboard rewrites users_database.yml whenever a managed account
+    # changes (plan.md §151) — watch it so those edits take effect without an
+    # Authelia restart (a restart 502s every gated app for a few seconds).
+    watch: true
 
 access_control:
   default_policy: one_factor
