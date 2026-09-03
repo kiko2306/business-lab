@@ -14693,3 +14693,124 @@ Generalise `autheliaUsers.ts` (or a sibling `autheliaSync.ts`) from
 LDAP backend (file backend only). Group definitions beyond the synthetic
 `app-*` + an app's declared `autheliaGroups`. Any change to the OIDC clients
 (NetBird). Per-app *2FA* policy — every gated app stays `one_factor` for now.
+
+## 152. Plan — role model reshape: webmaster / admin / user, per-admin feature grants (2026-09-03)
+
+@mat's change, supersedes the §149.5 / §150 role set. `/setup` should create a
+**webmaster**, not an owner; the webmaster has full access and cannot be
+restricted; a single **admin** role is powerful by default but a webmaster can
+switch individual dashboard features off per admin account; `user` is
+unchanged (dashboard-less, SSO app access only). `owner` and `it_admin` are
+removed. Confirmed with previews 2026-09-03.
+
+### 152.1 Role set (replaces §149.5)
+
+| role | capabilities |
+|---|---|
+| `webmaster` | every capability, always. Created by `/setup`; `./start.sh recover` restores it. Never narrowed by `user_capabilities`. |
+| `admin` | effective = (all capabilities) ∩ that account's `user_capabilities` grants. **An admin with no grant rows = all-on**, so an admin created and left alone is a full admin; a webmaster then unticks features. |
+| `user` | none. SSO app access only (§151). |
+
+- The capability strings in `auth/capabilities.ts` are unchanged
+  (`apps:control`, `apps:config`, `apps:expose`, `exposure:settings`,
+  `backups:manage`, `settings:manage`, `audit:view`, `users:manage`). Only the
+  role→capability shape changes.
+- `users:manage` is a grantable feature for an admin like any other, but the
+  last-webmaster guard is the real safety net: an admin with `users:manage`
+  still cannot demote or delete the last `webmaster`.
+
+### 152.2 Schema / migration
+
+- New `user_capabilities(user_id INT REFERENCES users(id) ON DELETE CASCADE,
+  capability VARCHAR(40), PRIMARY KEY (user_id, capability))`. Consulted only
+  for accounts holding `admin` (and not `webmaster`). Empty = all-on.
+- `ensureRoleModelReshape()` — runs after `ensureUserRolesTable()`:
+  - `UPDATE user_roles SET role = 'webmaster' WHERE role = 'owner'`
+  - `UPDATE user_roles SET role = 'admin' WHERE role = 'it_admin'`
+  - written collision-safe (delete-then-insert with `ON CONFLICT DO NOTHING`)
+    in case an account somehow holds both an old and a new name; on the live
+    box every account holds exactly one role so it is a straight rename.
+  - `CREATE TABLE IF NOT EXISTS user_capabilities (...)`.
+  - idempotent: the `WHERE role IN ('owner','it_admin')` is a no-op on a
+    second run.
+- `init.sql`: refresh the `user_roles` comment, add `user_capabilities`, note
+  the roles are webmaster / admin / user.
+- §150's `ensureUserRolesTable()` stays as-is — its `owner` backfill still
+  fires first for a pre-`user_roles` database, then the reshape flips it to
+  `webmaster`.
+
+### 152.3 Backend code
+
+- `auth/capabilities.ts`: `ROLES = ['webmaster', 'admin', 'user']`. Replace
+  `capabilitiesFor(roles)` / `roleHasCapability` with an account-aware
+  `effectiveCapabilities(roles, grants)`:
+  - `webmaster` in roles → all capabilities;
+  - else `admin` in roles → `grants.length ? grants : all`;
+  - else → `[]`.
+- `services/userRoles.ts`: add `getUserCapabilities(userId)`,
+  `setUserCapabilities(userId, caps)`, `webmasterCount()` (replaces
+  `ownerCount()`), and an `effectiveCapabilitiesFor(userId)` that joins roles
+  + grants.
+- `middleware/requireCapability.ts`: load roles **and** grants fresh, compute
+  effective, 403 unless the capability is in it. Still not trusting the token.
+- `routes/auth.ts`: `/setup` assigns `webmaster`. `/auth/me` returns `roles` +
+  the **effective** `capabilities`. Login / refresh / totp responses include
+  `roles` and the effective `capabilities` (frontend needs the latter to gate
+  an admin's nav — the role constant alone can't know the grants).
+- `routes/users.ts`:
+  - `GET /users` items: `roles`, and `capabilities: string[]` = each account's
+    effective set (so an admin row pre-ticks correctly; a webmaster row shows
+    all, read-only).
+  - `POST /users`: role enum updated; when `roles` includes `admin`, an
+    optional `capabilities` array (default = all) seeds `user_capabilities`.
+  - `PUT /users/:id/capabilities` (new): replace an admin's grants; 400 if the
+    target holds `webmaster` or does not hold `admin`.
+  - `owner` → `webmaster` throughout: `ownerCount`→`webmasterCount`, the
+    last-one guards in `PUT /:id/roles` and `DELETE`, all error strings.
+- `scripts/recoverAdmin.ts`: ensure `webmaster` (was `owner`).
+- Route wiring (`index.ts`, per-route `requireCapability(...)`): unchanged —
+  same capability strings.
+
+### 152.4 Frontend
+
+- `core/capabilities.ts`: `ROLES` / `ROLE_LABELS` → `webmaster`, `admin`,
+  `user`. Role→capability constant: `webmaster` = all, `admin` = all
+  (optimistic), `user` = none. **Deviation from §150:** for an `admin` the nav
+  must gate on the session's effective `capabilities` array (from
+  login/refresh/me), not the constant, since the constant can't know the
+  grants. `AuthService.hasCapability()` prefers the session capability list
+  when present, falls back to the role constant otherwise.
+- `core/auth.service.ts` / `models.ts`: session carries `capabilities` +
+  `roles`; `AdminUser` gains `capabilities: string[]`.
+- `pages/users/users.component`:
+  - role checkboxes: Webmaster / Admin / SSO user (drop Owner, IT admin).
+  - a **Features** sub-editor shown when a row's roles include `admin` (and
+    not `webmaster`): a checkbox per capability, pre-ticked from the row's
+    effective set, dirty-save → `PUT /users/:id/capabilities`.
+  - create form: same Features checkboxes appear when Admin is picked
+    (default all ticked).
+- Visual change — build + deploy to `localhost:10001` for @mat before any
+  commit ([[visual-changes-need-approval]]).
+
+### 152.5 Effect on §151 (SSO slice 2)
+
+§151's `user_app_access` / Authelia work is unchanged in shape. Only 151.4's
+group logic adjusts: `webmaster` → Authelia `admins` group + every `app-*`
+group; `admin` / `user` → `app-*` groups from their `user_app_access` list
+only. §152 lands **before** §151's 2a–2d; the reshape is a prerequisite.
+
+### 152.6 Not doing
+
+More than one restrictable role (only `admin` is). Restricting a `webmaster`.
+`user_capabilities` rows for a `user` account (it has no capabilities by
+definition). Renaming the capability strings.
+
+### 152.7 Build order (README items)
+
+- **152a** — backend: role enum, `ensureRoleModelReshape()`,
+  `user_capabilities`, `effectiveCapabilities`, users API,
+  `/setup` + recover, `owner`→`webmaster` guards. Backend tests. No visual.
+- **152b** — frontend: role checkboxes → webmaster/admin/user, the per-admin
+  Features editor (create + per-row), effective-capability nav gating.
+  Visual review on `:10001`. Feature bump to 0.9.0.
+- then resume §151 slice 2a–2d with the adjusted group logic.
