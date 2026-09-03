@@ -142,6 +142,15 @@ backend starts and stops on your behalf.
   ```
   The specs in `e2e/tests/` also run against a live deployment — point
   `E2E_BASE_URL` at it and run `npx playwright test` from `e2e/`.
+- Live-stack E2E — `e2e/tests/live-stack.spec.ts` covers the flows the
+  socket-less test stack can't (start/stop an app, the Backups page, the
+  Exposure test-connection check). Opt-in and local-only, so CI skips it:
+  ```bash
+  E2E_LIVE_STACK=1 E2E_BASE_URL=https://your-dashboard \
+  E2E_ADMIN_USER=admin E2E_ADMIN_PASSWORD=… \
+  npx playwright test live-stack   # from e2e/
+  ```
+  Optionally set `E2E_LIVE_APP` (default `samba`) to the app it bounces.
 
 ## Project status
 
@@ -176,12 +185,12 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Housekeeping
 
-- [ ] **@mat: review the plan.md compaction, decide whether to continue**
-      (§165) — pass 1 collapsed the Price Compare build-out (§25–§45, ~1,790
-      lines) into one §25 as its own `plan:` commit; CLAUDE.md now permits
-      this for fully-superseded runs. Review that diff, then say whether to
-      run the same pass on the NetBird saga (§20/§24/§46–§55), the backup
-      build-out (§66–§90) and the 2FA slices (§127–§137).
+- [ ] **@mat: run the E2E live-stack specs against a real dashboard once**
+      (§171) — `e2e/tests/live-stack.spec.ts` (start/stop, Backups render,
+      Exposure test-connection) is gated on `E2E_LIVE_STACK=1` and verified
+      only against the socket-less test stack (specs skip there). Run it once
+      with `E2E_LIVE_STACK=1 E2E_BASE_URL=<dashboard> E2E_ADMIN_USER=… ADMIN_PASSWORD=…`
+      and report any selector drift.
 
 ### Security
 

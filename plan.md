@@ -13760,11 +13760,12 @@ rewrite.
 
 ### Not done here
 
-The rest of plan.md is untouched. Other candidate runs for a later pass —
-left for @mat to green-light: the NetBird saga (§20/§24/§46–§55, closed by
-"Tailscale Funnel replaces Cloudflare for signal"), the backup build-out
-(§66–§90), the 2FA slices (§127–§137). Each needs the same
-nothing-later-depends-on-it check.
+The rest of plan.md is untouched. **Pass 2 was scoped and dropped (§172):** on
+inspection the NetBird saga, the backup build-out and the 2FA slices are all
+cross-referenced by still-active later sections — the NetBird "Option B" range
+(§50–§52) alone is cited by ~9 subsection anchors across 8 sections — so they
+fail the "nothing later depends on it" bar the rule sets. Price Compare was a
+genuine island; the other large runs are not.
 
 ## 166. §131.6 — rescoped the §84 SaaS-inventory / value-proposition TODO items (2026-09-03)
 
@@ -13912,3 +13913,66 @@ logs a warning and leaves `healthy` at the running default (same as an app
 with no check configured). Three tests in `status.test.ts`.
 
 Backend `npm run typecheck` clean, `npm test` 428/428. Patch bump 0.11.1.
+
+## 171. §131.5 — E2E live-stack mode for the Docker-touching flows (2026-09-03)
+
+The Playwright suite (§164) runs against `docker-compose.test.yml`, whose
+backend has no Docker socket, no real backup destination and no exposure
+rows — so start/stop, backup and exposure could not be covered. This adds an
+opt-in mode for them.
+
+- **`e2e/tests/live-stack.spec.ts`** — gated `test.skip(!E2E_LIVE_STACK)`,
+  the same local-only shape as `scripts/smoke-tests.sh`:
+  - **start / stop** an app (`E2E_LIVE_APP`, default `samba`): reads its
+    current state badge, drives it to the opposite and back, asserts the
+    transitions, leaves it as found. This is the one that genuinely needs a
+    Docker socket.
+  - **Backups page** renders the live Schedule, the "Back up now" button and
+    the Destination line — without clicking a real 90-minute run.
+  - **Exposure page** runs the non-mutating "Test connection" check (NPM +
+    Cloudflare reachability) and asserts the UI shows a verdict; if exposure
+    is unconfigured on the target it asserts the disabled-button reason
+    instead.
+- `scripts/e2e-tests.sh` is unchanged and never sets `E2E_LIVE_STACK`, so CI
+  keeps skipping the file. README's validation section documents the
+  invocation.
+
+### Verified
+
+`npx playwright test --list` discovers all three specs (16 tests in 5 files).
+The full `scripts/e2e-tests.sh` run against the test stack passes with the
+three live-stack specs **skipped** — no CI impact, gating works.
+
+### Not done here
+
+The authenticated run against a real dashboard — it needs that deployment's
+admin credentials (`E2E_ADMIN_USER` / `E2E_ADMIN_PASSWORD`), which this
+session does not hold. README TODO carries a @mat item to do that run once
+and report any selector drift.
+
+## 172. plan.md compaction pass 2 — scoped and dropped as unsafe (2026-09-03)
+
+Pass 1 (§165) collapsed the Price Compare build-out cleanly because nothing
+else in plan.md referenced §25–§45. §165 named three candidates for a pass 2:
+the NetBird saga, the backup build-out (§66–§90), the 2FA slices
+(§127–§137). Checking each against the rule CLAUDE.md now carries — *never
+compact a section that later sections still build on or cross-reference* —
+they all fail it:
+
+- **NetBird (§20/§24/§46–§55).** The dead "Option B" range §50–§52 alone is
+  cited by §50.2, §50.3, §50.4, §50.9, §51.1, §51.6, §52.2, §52.5 and bare
+  §50/§51/§52 from §20, §21, §43, §48, §53, §54, §55, §56, §62 and §80.
+  §46.10, §46.13, §48.7 and §54.4 are likewise referenced from §56/§57/§69.
+- **Backup build-out (§66–§90).** The still-open Kopia migration (§81.5) and
+  the "prove a non-Drive destination" / "prove a Postgres restore" TODOs all
+  lean on this machinery.
+- **2FA (§128–§132).** §132 ("validate against Authelia's file backend") is
+  cited by the later SSO work (§149–§159).
+
+An in-place shrink that preserved every referenced anchor was considered and
+rejected: for the NetBird range it would have to keep most subsections
+anyway, so the saving is small and the risk of silently breaking a
+cross-reference in a file this size is not worth it. plan.md is already 1,790
+lines lighter after pass 1, and `plan-index.md` makes the length a non-issue
+for reading. No further compaction unless a run genuinely closes out with
+nothing pointing back at it.
