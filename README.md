@@ -138,15 +138,92 @@ it is done — not ticked off and left behind. Section references point at
       `user-guide.md`, `it-admin.md`, `app-credentials.md`, and the
       `recover disable-2fa` path.
 
+### Features & architecture (§131)
+
+Home Page / dashboard:
+
+- [ ] **Real icon assets for Pantry and Price Compare** (§131.1) — both are
+      custom apps with no upstream icon; today they use generic `mdi-*`
+      placeholders. Design a small logo per app, ship it as the app's favicon
+      and a Home-Page-servable file, point `homepage.icon` at it.
+- [ ] **Multi-page dashboard shell + post-login menu** (§131.1) — promote the
+      single dashboard route into a nav shell; land it slice 1 (shell + menu),
+      keep the "All apps" search reachable.
+- [ ] **Move each dashboard area onto its own route** (§131.1) — Apps,
+      Exposure, Backups, Updates, Users & roles, Settings, Utils — one slice
+      per area, updating the affected component specs as each moves.
+
+SSO / roles:
+
+- [ ] **Activate named roles in the dashboard** (§131.3) — seed the role set
+      from §109 / §84.4 (webmaster, IT admin, …); roles gate dashboard
+      capabilities and feed the per-user app access list.
+- [ ] **Users & roles page — create-user form** (§131.3) — username, email,
+      password, and an app access list (multi-select of SSO-reachable apps).
+- [ ] **Derive the app access list from the registry** (§131.3) — only
+      exposed / Authelia-gated / group-requiring apps appear; not a static
+      checklist.
+- [ ] **Write dashboard-created users into Authelia** (§131.3) — hashed
+      password into Authelia's user database, kept in sync on change/delete.
+      Check file-backend vs LDAP before designing the writer.
+
+Updates:
+
+- [ ] **Update button does the full job** (§131.4) — rewrite the app's image
+      tag, `docker compose pull`, `up -d` to recreate; per-app result;
+      sequenced through the safe backup path (§103). Compose files are
+      read-only to the backend, so this needs a managed tag-override
+      mechanism, not an in-place compose edit.
+- [ ] **Dashboard self-update panel** (§131.4) — current vs upstream commit;
+      a confirm-gated button that runs `git pull` and restarts the management
+      services individually (never a root `docker compose down`). Always
+      prompts; no silent self-update.
+
+Infrastructure:
+
+- [ ] **`apps/samba/` — LAN-only SMB share** (§131.5) — Windows-reachable file
+      share, generated credentials + generated `smb.conf`, data under the app
+      dir. No Cloudflare Tunnel, no NPM host, no Home Page tile; mandatory
+      `homepage.*` labels (group "Files"); rows in `ports.md` (SMB 445, a
+      documented sub-10000 pin), `app-credentials.md`, `licences.md`
+      (Samba GPL-3.0).
+- [ ] **Browser E2E framework** (§131.5) — Playwright-in-Docker driving the
+      real dashboard (login, 2FA, create user, start/stop, exposure, backup);
+      its own CI job or local-only like the smoke tests.
+- [ ] **"Web-exposed server is dev/test only" rule** (§131.5) — write it into
+      CLAUDE.md (principle / "Never") and the README: no real client data on
+      the internet-reachable box, its backups are disposable, destructive
+      tests only here; turnkey/per-client boxes are a separate non-exposed
+      class.
+
+Strategy:
+
+- [ ] **Rewrite the README business rules** (§131.6) — the app is Free to Use;
+      billable services are domain management, custom configuration, and
+      server maintenance only; drop the SaaS / tiered framing from
+      §84.2/§84.4.
+- [ ] **Rescope or drop the SaaS-inventory items** (§131.6) — §84.7 "collect
+      the SaaS inventory" and "Sales / value-proposition plan" become "app
+      list + features + alternatives", not subscription-cost arithmetic.
+- [ ] **Sales catalogue Artifact** (§131.6) — per app: what it does and what
+      it stands in for. Out of this public repo (§84.6).
+
 ### Backups
 
 - [ ] **`onlyoffice`'s bundled Postgres is never dumped** (§88.6) — same
       exposure, harder: the database is inside the documentserver container
       rather than a separate compose service, so `backup:` as it stands cannot
       reach it.
-- [ ] **Prove a non-Drive destination** — `disk`/`SMB`/`NFS` are built and never
-      exercised.
+- [ ] **Add an FTP/FTPS backup destination** (§131.4) — alongside
+      `disk`/`SMB`/`NFS`/Drive, in the stored-destination model and the
+      Duplicati (and later Kopia) translation.
+- [ ] **Prove a non-Drive destination** (§131.4) — `disk`/`SMB`/`NFS` are built
+      and never exercised; prove FTP in the same pass.
 - [ ] **Prove a Postgres/MySQL restore** — only SQLite has been round-tripped.
+- [ ] **Per-application backup / restore** (§131.4) — a per-app action on each
+      app's card: back up just this app's data + database, list its snapshots,
+      restore just this app. Reuses the existing engines; pairs with the
+      multi-page Backups view (§131.1).
 
 ### Business Lab (§84)
 
@@ -205,16 +282,22 @@ it is done — not ticked off and left behind. Section references point at
 ### Roster changes (§81)
 
 
-- [ ] **Wire Nextcloud to OnlyOffice** (§81.4) — installing the connector and
-      setting the document-server URL + JWT secret is `occ` inside the
-      Nextcloud container. Do it from the backend the way `homeAssistantHacs.ts`
-      does HACS, not as a runbook step.
-- [ ] **Does OnlyOffice need public exposure?** (§123.2) — it's exposed today;
-      its only job is Nextcloud's editor, and OnlyOffice's browser-loads-the-
-      editor model means the doc-server URL must be reachable by the remote
-      browser. Confirm exposure is genuinely required (vs LAN-only / proxied
-      via Nextcloud), and if it must stay, restrict its NPM host to
-      Cloudflare's ranges and verify the shared JWT secret. Feeds §81.4.
+- [ ] **Wire Nextcloud to OnlyOffice internally** (§81.4, §131.2) — install the
+      connector and set the document-server URL + JWT secret via `occ` inside
+      the Nextcloud container, from the backend the way `homeAssistantHacs.ts`
+      does HACS, not as a runbook step. Give Nextcloud the **internal**
+      doc-server URL for the server-to-server leg. Part of the "prioritise
+      roster wiring debt before new apps" push (§131.2).
+- [ ] **Hide OnlyOffice from the Home Page** (§131.2) — it's infrastructure for
+      Nextcloud, not a destination. Add a Home Page opt-out (registry flag or
+      label sentinel `homepageConfig.ts` honours) so the "running + exposed →
+      tile" rule (§112.3) skips it; document the flag by the Home Page
+      convention.
+- [ ] **Does OnlyOffice need public exposure?** (§123.2, §131.2) — the
+      browser-loads-the-editor model means the doc-server URL must be reachable
+      by the remote browser. Confirm exposure is genuinely required (vs
+      LAN-only / proxied via Nextcloud); if it must stay, restrict its NPM host
+      to Cloudflare's ranges and verify the shared JWT secret.
 - [ ] **Kopia app, auto-configured** (§81.5) — repository created on first
       start, credentials generated by the dashboard, nothing typed.
 - [ ] **`kopiaClient.ts`** (§81.5) — same shape as `duplicatiClient.ts`:

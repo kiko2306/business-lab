@@ -13077,3 +13077,243 @@ An Account/Security page: `GET /auth/totp/status`, "Set up" (render the
 server `qrSvg` + show the secret), activate, show/download the recovery
 codes, disable. After D, a real user can turn 2FA on from the UI — which is
 also when it becomes safe to.
+
+## 131. Plan — features & architecture rules: multi-page dashboard, wiring priority, SSO roles, updates/backups, infra, strategy (2026-09-03)
+
+A six-part brief from @mat. Parts 1–5 are builds; part 6 rewrites what the
+product *is* and is mostly docs. Recorded here so the order stays @mat's call
+([[plan-first-then-todo]]); each concrete piece is added to the README list.
+Several parts land on top of existing open items rather than replacing them —
+those cross-refs are called out so the older item isn't done twice.
+
+### 131.1 Home Page — official icons + a multi-page dashboard
+
+**Official app icons for Pantry and Price Compare.** Both are custom
+single-container apps (`apps/pantry/app/`, `apps/price-compare/app/`), so
+there is no upstream project to borrow an icon from — today their
+`homepage.icon` labels point at generic Material Design Icons
+(`mdi-fridge-outline.png`, `mdi-cart-outline.png`). "Official" here means each
+app gets its **own** icon asset: design/commission a small logo, ship it as
+the app's favicon *and* as a file the Home Page can serve, and point
+`homepage.icon` at that asset instead of the `mdi-*` placeholder. The Home
+Page generator (`homepageConfig.ts`) already passes `homepage.icon` through
+verbatim, so this is an asset + label change, not a code change — but confirm
+the icon path resolves the same way a bundled Homepage icon does (local file
+vs `mdi-`/`si-` prefix lookup).
+
+**Restructure the dashboard into a multi-page layout with a post-login menu.**
+Today the dashboard is effectively one long page (service cards + the "All
+apps" search box §115, running panel §80, backups, settings). The ask is a
+navigable app: after login the user lands on a **menu / home** view, and the
+big areas become their own routed pages —
+
+- Apps (the service registry + cards, start/stop/config),
+- Exposure & networking,
+- Backups & restore,
+- Updates & version control (new, see §131.4),
+- Users & roles (new, see §131.3),
+- Settings (third-party tokens, mailbox, etc.),
+- Utils (§95 LAN scan and friends).
+
+Angular routing already exists (`/login`, `/setup`); this promotes the single
+dashboard route into a shell with a nav menu and lazy-loaded feature routes.
+Keep the "All apps" search reachable from the shell. This is a frontend
+restructure — no API changes — but it is large enough to land in slices
+(shell + menu first, then move one area at a time), and every existing
+component spec that assumes the one-page layout will need updating.
+
+### 131.2 OnlyOffice — wire it to Nextcloud internally, hide it from the Home Page
+
+Extends the two existing items (§81.4 "Wire Nextcloud to OnlyOffice", §123.2
+"Does OnlyOffice need public exposure?") with two decisions now made:
+
+- **Wire it internally.** The connector install + document-server URL + shared
+  JWT secret is `occ` inside the Nextcloud container, done from the backend
+  the way `homeAssistantHacs.ts` drives HACS — not a runbook step. The
+  doc-server URL Nextcloud is given should be the **internal** address
+  (container/compose network or LAN), not the public hostname, for the
+  server-to-server callback leg.
+- **Do not show OnlyOffice on the Home Page.** OnlyOffice is infrastructure
+  for Nextcloud, not a destination a user clicks. Even if it keeps a public
+  NPM host for the browser-loads-the-editor leg (§123.2), it must not get a
+  Home Page tile. The generator's rule is "running **and** exposed → tile"
+  (`plan.md` §112.3, CLAUDE.md Home Page convention), so this needs an
+  explicit opt-out: a registry flag (e.g. `homepageHidden: true`) or a
+  sentinel in the `homepage.*` labels that `homepageConfig.ts` honours.
+  Document the flag next to the existing Home Page convention. Whatever
+  exposure OnlyOffice ends up needing, restrict its NPM host to Cloudflare's
+  ranges and verify the JWT secret is set (§123.2).
+
+**Prioritise apps that need wiring.** Before pulling new apps from the backlog
+(§22 / README "App backlog"), close out the integration debt on apps already
+in the roster: OnlyOffice ↔ Nextcloud (§81.4), ClamAV ↔ Nextcloud + Paperless
+(§81.7), and any other "installed but not talking to its neighbour" pair.
+These are the `occ`-shaped backend integration jobs; they make the current
+roster actually work before it grows.
+
+### 131.3 SSO — activate roles in the dashboard, and a real user-creation flow
+
+Authelia SSO sits in front of exposed apps already; what is missing is
+**role-aware user management in the dashboard itself**.
+
+- **Activate roles in the dashboard.** The backend has an admin concept
+  (`/setup` first admin, recover-admin §126); promote that into named roles.
+  The role runbooks already written (§109 `docs/webmaster.md`,
+  `docs/it-admin.md`; §84.4 four role plans) name the roles the product
+  expects — use those as the seed set rather than inventing new ones. Roles
+  gate dashboard capabilities (who can start/stop, who can change exposure,
+  who can manage users) and feed the per-app access list below.
+- **User creation takes username, email, password, and an app access list.**
+  One form in the new Users & roles page. Username + email + password create
+  the account; the app access list is a multi-select of managed apps the user
+  is allowed to reach through SSO.
+- **Inject the app list dynamically based on app needs.** The access-list
+  choices are not a static checkbox list — they are derived from the
+  registry: which apps are exposed, which sit behind Authelia, which define
+  their own group/role requirements. An app that isn't SSO-gated doesn't
+  appear; an app that needs a specific Authelia group shows that. Same
+  "derive it, don't ask" spirit as §0.3.
+- **Map passwords to Authelia.** A user created here must become an Authelia
+  user — write the entry into Authelia's user database (`users_database.yml`
+  or whatever backend Authelia is pointed at) with the hashed password, and
+  keep it in sync on change/delete. This is the piece that makes the form
+  real rather than dashboard-local. Check how Authelia is configured today
+  (file backend vs LDAP) before designing the writer; a file backend means
+  generating argon2 hashes and reloading Authelia.
+
+### 131.4 Updates & Backups
+
+**The update button must actually update.** Today there is an update *check*
+(§82, Watchtower removed). Make the button do the full job: rewrite the app's
+compose/YAML to the new image tag (generated file, per CLAUDE.md — but the
+compose file is read-only to the backend, so this needs care: either a
+backend-managed image-tag override file, or an explicit exception with a
+comment), `docker compose pull` the new image, then `up -d` to recreate the
+container. Report success/failure per app. Sequence it through the safe path
+the "Back up now" button uses (§103) so an update can't run mid-backup.
+
+**Dashboard version control — ask permission to `git pull` and restart.** The
+management stack updates by `git pull` + `./start.sh`. Give the dashboard a
+"check for updates to Business Lab itself" panel: show current vs upstream
+commit, and a button that — **after an explicit confirm** — runs `git pull`
+and restarts the management containers (never `docker compose down` the root
+stack, §Never — restart services individually, or hand off to a
+`start.sh`-driven path). Outward-facing + hard to reverse, so it always
+prompts; no silent self-update.
+
+**Per-application backup/restore alongside the global backups.** The backup
+system is global today (schedule + "Back up now" §103, restore §75.3/§106).
+Add a per-app action on each app's card / page: back up just this app's
+data + database now, list that app's snapshots, restore just this app. Reuses
+the existing engines (`postgres`/`mysql`/`sqlite`, plus the onlyoffice-PG and
+mssql gaps noted elsewhere). Pairs naturally with the multi-page Backups view
+(§131.1).
+
+**FTP as a backup destination.** Add `ftp` (and likely `ftps`) alongside the
+existing `disk`/`SMB`/`NFS`/Drive destinations — the stored-destination model,
+the Duplicati translation, and (when it lands) the Kopia translation
+(§81.5). Note the existing README item "Prove a non-Drive destination" — FTP
+should be proven in the same pass.
+
+### 131.5 Infrastructure
+
+**Samba / SMB container for Windows network file sharing.** A new managed app
+`apps/samba/` exposing a Windows-reachable SMB share on the LAN. LAN-only (no
+Cloudflare Tunnel — SMB is not HTTP, §0 principle 1), so no NPM host, no Home
+Page tile; still the mandatory `homepage.*` labels for the registry test
+(group "Files"). Port/protocol per `docs/ports.md` (SMB 445 is below 10000 and
+deliberate, like Pi-hole 53 — document it there). Generated credentials, a
+generated `smb.conf` (managed config file, `appEnv.ts`-style), share path
+under the app's data dir. Rows in `ports.md`, `app-credentials.md`,
+`licences.md` (Samba is GPL-3.0 — fine under the resale model: not sold,
+client operates the box; add the row anyway). Decide whether the share
+overlaps File Browser / Nextcloud or is a distinct "map a drive letter" use.
+
+**Integrate an E2E testing framework to automate feature checks.** There is a
+Dockerized deployment test (`scripts/docker-e2e-test.sh`) and smoke tests
+(`scripts/smoke-tests.sh`), but no browser-level E2E. Add one (Playwright is
+the likely pick — runs in a container, no host Node) that drives the real
+dashboard: login, 2FA, create a user, start/stop an app, configure exposure,
+run a backup. Wire it into CI as its own job (or local-only like the smoke
+tests if it needs the full stack). This is what lets the feature list in this
+section be *checked* rather than asserted.
+
+**Treat this web-exposed server strictly as a dev/test environment.**
+Architecture rule, not a feature: the box reachable from the internet
+(`tx-home-utils.com`) is **development/test**, never a customer's production
+data. It exists to prove the code path against a real stack (§0). Consequences
+to write down: no real client data on it, its backups are disposable,
+destructive tests are allowed here and nowhere else, and the turnkey/
+per-client boxes (§84.7) are a separate, non-exposed deployment class. Capture
+this in CLAUDE.md (a principle or a "Never") and in the README business rules
+(§131.6) so it isn't lost.
+
+### 131.6 Strategy — drop SaaS goals, "Free to Use", billable services scoped
+
+Rewrites the commercial framing in §84 and the README.
+
+- **Drop the SaaS goals.** Business Lab is not a hosted/multi-tenant SaaS and
+  the plan should stop implying one. Remove/annotate the SaaS-replacement
+  framing where it reads as "we sell a service"; the §84.7 "collect the SaaS
+  inventory" and "Sales / value-proposition plan" items get rescoped or
+  dropped to match (they become "here is the app list and what each replaces",
+  not "here is the subscription we're undercutting").
+- **Sales docs need only: the app list, each app's features, and
+  alternatives.** A plain catalogue — for every managed app, what it does and
+  what commercial/SaaS product it stands in for. No pricing decks, no named
+  client scenarios, no monthly-cost arithmetic. Still **as an Artifact / out
+  of this public repo** (§84.6), but much smaller in scope.
+- **The app is Free to Use.** State it plainly in the README and CLAUDE.md:
+  the software is free to use. (This also finally forces the §107 "pick a
+  licence" decision — a Free-to-Use claim needs a licence file that backs it.)
+- **Billable services are restricted to three things:** domain management,
+  custom configuration, and server maintenance. Nothing else is sold — not the
+  software, not per-seat access, not hosting. Write this as the business-rules
+  section of the README, replacing the tiered/SaaS language from §84.2/§84.4.
+
+### 131.7 README items added
+
+Home Page / dashboard:
+- Ship real icon assets for Pantry and Price Compare (replace the `mdi-*`
+  placeholders).
+- Multi-page dashboard shell + post-login menu (slice 1).
+- Move each dashboard area onto its own route (slices, one area at a time).
+
+OnlyOffice / wiring priority:
+- Wire Nextcloud → OnlyOffice internally via `occ` (folds in §81.4), using the
+  internal doc-server URL.
+- Home Page opt-out flag; hide OnlyOffice from the tile list (§112.3).
+- Prioritise roster wiring debt (OnlyOffice, ClamAV §81.7) before new apps.
+
+SSO / roles:
+- Activate named roles in the dashboard (seed from §109 / §84.4 role set).
+- Users & roles page with a create-user form (username, email, password, app
+  access list).
+- Derive the app access list from the registry (exposed / Authelia-gated /
+  group-requiring apps only).
+- Write dashboard-created users into Authelia's user database and keep them in
+  sync (check file-backend vs LDAP first).
+
+Updates & backups:
+- Update button: rewrite image tag → `pull` → `up -d`, per app, through the
+  safe path.
+- Dashboard self-update panel: current vs upstream commit, confirm-gated
+  `git pull` + individual-service restart.
+- Per-app backup / snapshot list / restore on each app's card.
+- Add `ftp`/`ftps` backup destination; prove it (covers "prove a non-Drive
+  destination").
+
+Infrastructure:
+- `apps/samba/` — LAN-only SMB share, generated creds + `smb.conf`, docs rows,
+  no Home Page tile.
+- Browser E2E framework (Playwright-in-Docker) driving the real dashboard;
+  CI job.
+- Add the "web-exposed server is dev/test only" rule to CLAUDE.md and the
+  README.
+
+Strategy:
+- Rewrite README business rules: Free to Use; billable = domain management +
+  custom configs + server maintenance only; drop SaaS framing.
+- Rescope/drop the §84.7 SaaS-inventory and value-proposition items.
+- Sales catalogue Artifact: app list + features + alternatives only.
+- Pick a repo licence (§107) consistent with the Free-to-Use claim.
