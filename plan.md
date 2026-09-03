@@ -13857,3 +13857,68 @@ stack with `docker compose up -d --build frontend` — the version bump in
 Exposure, Updates, Users & roles, Settings and Utils still live under
 `/dashboard` (or `/users`) as panels rather than their own routes — the
 README item stays, minus Apps and Backups.
+
+## 141. Plan — UI polish pass: contrast, home bento grid, nav bar, tile badges (2026-09-03)
+
+Design feedback from @mat after reviewing §140 on `localhost:10001`. Frontend
+only, all on top of the still-provisional dark palette (§136.3). Recorded as a
+planning pass ([[plan-first-then-todo]]); each bucket goes on the README list
+and @mat picks the order. Split into three because they touch different files
+and can land (and be reviewed) independently.
+
+### 141.1 Typography & contrast (bucket 1 — foundational, do first)
+
+The palette tokens, not per-component fixes:
+
+- **Secondary/description text is too dark on the near-black canvas.**
+  `--bs-secondary-color` is `#9aa4b4` today; `.text-body-secondary` (card
+  subtitles, tile descriptions, "Pick an area to manage") rides on it. Lift
+  to the `#94A3B8`–`#CBD5E1` range @mat gave. Check it against both the
+  `#0a0d12` canvas and the `#1b2230` surface, since the same class is used on
+  both.
+- **Titles crisp white.** `h1`–`h6` inside cards/panels should resolve to
+  `#ffffff` (`--bs-emphasis-color` is already `#ffffff` — audit whether the
+  headings actually pick it up or are falling back to `--bs-body-color`
+  `#e6e9ef`; add a rule if so).
+- **"Signed in as …" in the header** (`shell.component.html`, the `.small
+  .text-body-secondary` under the brand) bleeds into the bar. Same
+  secondary-colour lift fixes it; verify against `--app-surface`.
+
+One commit, tokens + any heading rule. Everything downstream inherits it.
+
+### 141.2 Home menu layout + nav bar (bucket 2)
+
+- **Menu grid.** Today `home.component.css` is a fixed `repeat(3, 1fr)` with
+  `min-height: 11rem`; uneven description lengths still make the row of card
+  bodies ragged. @mat picked a bento layout: the high-traffic tiles (Apps,
+  Backups) span two columns, the rest one, on a fixed row height so the
+  bodies line up. Steps down to a plain 2-up then 1-up on narrow screens
+  (spans collapse).
+- **Nav bar.** `shell.component.html` / `.css`: drop the per-button
+  `btn-outline-secondary` border treatment and the `min-width: 8rem`. Render
+  the nav as plain text links; the **active** route gets a solid subtle pill
+  (`--bs-secondary-bg` fill, no border, slight radius). Keep the mobile
+  horizontal-scroll strip (§ media query) working — pills must not grow the
+  header height. "Recovery" (warning) and "Logout" (danger) stay visually
+  distinct from the plain nav links.
+
+### 141.3 Tile badges + hover (bucket 3)
+
+- **"Opens in …" badge position.** Currently bottom-left, pushed down with
+  `margin-top: auto`, which leaves a void on short tiles. Move it to the
+  **top-right** of the card (absolute-positioned within the tile, or a
+  flex header row). After §140 only Exposure, Updates, Settings and Utils
+  are still `pending`, so this is four tiles — but it wants to look
+  deliberate, not stray.
+- **Whole-card link + hover.** Already done in substance — `.menu-tile` is an
+  `<a>` wrapping the whole card with a `translateY(-3px)` + border-glow hover
+  (`home.component.css`). If @mat wants it stronger (scale, brighter glow),
+  tune those values; no structural change needed. Note this so it is not
+  rebuilt from scratch.
+
+### 141.4 Not doing
+
+Nothing here changes routing or components' behaviour — it is CSS + the two
+templates. The badge/`pending` mechanism itself stays until the last area
+(§131.1) moves onto its own route, at which point every tile is a real link
+and the badge code is deleted.
