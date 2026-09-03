@@ -125,6 +125,13 @@ export class OperationsService {
     return this.http.get<HealthStatus>(`${API_BASE_URL}/health/system`);
   }
 
+  /** Public: the running backend's version, shown in the dashboard footer. */
+  getAppVersion(): Observable<{ version: string }> {
+    return this.http.get<{ version: string }>(`${API_BASE_URL}/version`, {
+      context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
+  }
+
   scanNetwork(): Observable<{ hosts: DiscoveredHost[] }> {
     return this.http.post<{ hosts: DiscoveredHost[] }>(`${API_BASE_URL}/network/scan`, {});
   }

@@ -176,6 +176,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected backupStatus: BackupStatusResponse | null = null;
   protected discoveredHosts: DiscoveredHost[] | null = null;
   protected scanningNetwork = false;
+  // Shown in the footer. Empty until the probe resolves so nothing flashes;
+  // a failure just leaves it blank (the footer text is conditional on it).
+  protected appVersion = '';
 
   ngOnInit(): void {
     this.serviceState.startPolling();
@@ -183,6 +186,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadHealth();
     this.loadSchedule();
     this.loadBackupStatus();
+    this.loadVersion();
   }
 
   ngOnDestroy(): void {
@@ -388,6 +392,13 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.toast.error(extractErrorMessage(error, 'Unable to update backup schedule.'));
         this.savingSchedule = false;
       },
+    });
+  }
+
+  loadVersion(): void {
+    this.operations.getAppVersion().subscribe({
+      next: (response) => (this.appVersion = response.version),
+      error: () => (this.appVersion = ''),
     });
   }
 

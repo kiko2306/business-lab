@@ -510,6 +510,12 @@
       </div>
     </section>
   </main>
+
+  <footer class="app-footer text-body-secondary">
+    <div class="container-fluid py-3">
+      Business Lab<span *ngIf="appVersion"> v{{ appVersion }}</span>
+    </div>
+  </footer>
 </div>
 
 <ng-template #loadingState>

@@ -1,5 +1,14 @@
 .dashboard-shell {
+  display: flex;
+  flex-direction: column;
   min-height: 100vh;
+}
+
+/* ---- Footer ----------------------------------------------------------- */
+.app-footer {
+  margin-top: auto; /* pin to the bottom when the page is short */
+  border-top: 1px solid var(--bs-border-color, #dee2e6);
+  font-size: 0.8rem;
 }
 
 /* ---- Header ------------------------------------------------------------- */

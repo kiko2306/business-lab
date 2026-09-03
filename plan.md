@@ -13455,3 +13455,54 @@ the two-step login, but nothing offered enrolment through the UI).
 Docs: `docs/two-factor.md`, `openapi.yaml` (the six endpoints + the `202`
 login branch), `user-guide.md`, `it-admin.md`, an `app-credentials.md` note,
 and document `./start.sh recover disable-2fa <username>`.
+
+## 133. §131.4 — the displayed app version (`0.0.1`)
+
+First piece of §131.4's "version control". A semver string now shows in the
+dashboard footer, served by the backend so it's the version that's actually
+running, not the one the frontend was built with.
+
+### 133.1 What landed
+
+- **Source of truth**: `backend/package.json` `version`, read at boot by
+  **`backend/src/version.ts`** (`APP_VERSION`). The Docker runtime stage
+  already `COPY`s `package*.json`, so `join(__dirname, '..', 'package.json')`
+  resolves in both the container (`dist/`) and vitest (`src/`).
+  `frontend/package.json` carries the same value (kept in step by hand); both
+  lockfiles bumped so `npm ci` stays happy.
+- **Backend**: `GET /version` and `GET /api/version` → `{version}`, public
+  (no auth, no setup gate) — registered next to `/health` / `/ping`. `version`
+  also added to the `/health` body.
+- **Frontend**: `OperationsService.getAppVersion()` (public, `SKIP_AUTH`);
+  `DashboardComponent.loadVersion()` on init; a `<footer class="app-footer">`
+  in the dashboard shell reading `Business Lab v{{ appVersion }}` (the
+  `v…` is `*ngIf="appVersion"` so a failed probe just shows "Business Lab").
+  Shell became a flex column with `margin-top:auto` on the footer to pin it
+  low on short pages.
+- **`CHANGELOG.md`** at the repo root — Keep a Changelog format, seeded with
+  the `0.0.1` entry. This is now the human-readable half of the version bump.
+- **Test**: `backend/src/version.test.ts` — `APP_VERSION` equals
+  `package.json` and is `\d+\.\d+\.\d+`.
+
+### 133.2 The standing rule this creates
+
+From here on, **every working-loop commit that changes behaviour bumps the
+version** (in `backend/package.json` + `frontend/package.json` + both
+lockfiles) **and adds a `CHANGELOG.md` entry**: PATCH for a fix or small
+internal change, MINOR for a user-facing feature or a breaking change, MAJOR
+stays `0` until a deliberate `1.0.0`. Plan/README/docs-only commits don't bump
+it. Recorded as a memory so it survives a fresh session.
+
+### 133.3 Verified (real stack)
+
+Backend: `npm run typecheck` clean, `npm test` — **378 pass** (+2). Frontend:
+`test:ci` — 42 pass, `npm run build` — exit 0 (pre-existing warnings).
+Both images rebuilt and recreated. `GET /version` and `GET /api/version` both
+return `{"version":"0.0.1"}` direct and through the frontend's nginx `/api/`
+proxy; `GET /health` now carries `"version":"0.0.1"`; the production bundle
+contains the `/version` call and the footer string.
+
+### 133.4 Next
+
+The other half of §131.4: the confirm-gated "git pull + restart" self-update
+panel (still its own README item).

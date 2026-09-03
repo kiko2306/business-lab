@@ -13,6 +13,7 @@ import healthRouter from './routes/health';
 import recoveryRouter from './routes/recovery';
 import usersRouter from './routes/users';
 import networkRouter from './routes/network';
+import { APP_VERSION } from './version';
 import {
   dropLegacyRoleColumn,
   ensureServiceExposureTable,
@@ -105,12 +106,19 @@ app.use(mutationLimiter);
 
 // Health check — always available
 app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', version: APP_VERSION, timestamp: new Date().toISOString() });
 });
 
 // Ping check — always available, unauthenticated
 app.get('/ping', (_req: Request, res: Response) => {
   res.status(200).json({ statusCode: 200, message: 'Pong' });
+});
+
+// App version — public, unauthenticated. Powers the "Business Lab vX.Y.Z"
+// line in the dashboard footer; served from the backend (not baked into the
+// frontend bundle) so it reflects what is actually running (plan.md §131.4).
+app.get(['/version', '/api/version'], (_req: Request, res: Response) => {
+  res.json({ version: APP_VERSION });
 });
 
 // Every router is served both at the root (e.g. /auth/login) and under the
