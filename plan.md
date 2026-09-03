@@ -15421,3 +15421,35 @@ The "map a drive letter" vs File Browser / Nextcloud overlap question from
 the §131.5 spec is a product call, not a blocker — left for whoever scopes
 the small-office app profile. No frontend change: the new service card is
 rendered by the existing registry-driven components.
+
+## 163. §131.6 — README states the Free-to-Use model, drops the SaaS/tier framing (2026-09-03)
+
+From the §131.6 strategy list, per the §131.8 clarification: this is a
+**relabel + a positive statement of the model**, not a deletion of the
+§84.3 (social publishing) or §84.7 (turnkey hardware) roadmap work.
+
+`plan.md` is append-only, so the "three tiers, only one of which is free"
+(§84.2 heading) and "which SaaS each app replaces / the monthly cost it
+removes" (§84.4/§84.5) framing is *superseded here*, not edited there.
+
+### What changed
+
+- **README** gains a short **"What it is, and how it's sold"** section right
+  after the intro: the software is free to use — no tiers, no subscription,
+  no hosted multi-tenant service; one deployment is one client who owns and
+  operates their own box. What is sold is **service** — domain management,
+  custom configuration, server maintenance — with turnkey hardware optionally
+  alongside. Bundled features (scheduled social publishing) are part of the
+  free software, not a paid tier. It names §84.2/§84.4 as superseded and
+  points at `docs/licences.md`.
+- **docs/licences.md** — the "business model this is checked against" block
+  reworded to lead with "free to use", name the three billable services
+  explicitly (was "setup, maintenance and hardware"), and cross-reference the
+  new README section. The licence-vs-model test itself is unchanged: still
+  "client operates their own instance for their own internal business".
+- **README TODO** — the "Rewrite the README business rules" item deleted. The
+  separate "Rescope the SaaS-inventory items" and "Sales catalogue Artifact"
+  items stay: those rescope *other* deliverables (§84.7 inventory work), not
+  this one.
+
+Docs-only; no version bump, no code paths touched.

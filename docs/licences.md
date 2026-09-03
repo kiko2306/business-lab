@@ -13,10 +13,12 @@ adds it. A candidate whose licence fails that test does not get added.
 
 ## The business model this is checked against
 
-> The software is **not sold**. Business Lab sells **setup, maintenance and
-> hardware**. The client owns the box, runs it on their own domain / Cloudflare
-> account / user set (§84.7), and uses the apps for their **own internal
-> business** — not to resell access to anyone else.
+> The software is **free to use** — not sold, no tiers, no hosted service.
+> Business Lab sells **domain management, custom configuration and server
+> maintenance** (and turnkey hardware alongside). The client owns the box,
+> runs it on their own domain / Cloudflare account / user set (§84.7), and
+> uses the apps for their **own internal business** — not to resell access to
+> anyone else. See the README's "What it is, and how it's sold".
 
 That model is the easy case for almost every licence here. The only things that
 can still bite, and the rows to read carefully, are:

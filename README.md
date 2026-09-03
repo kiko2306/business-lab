@@ -5,6 +5,32 @@
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
+## What it is, and how it's sold
+
+Business Lab — the software in this repository — is **free to use**. There are
+no tiers, no subscription, and no hosted multi-tenant service: one deployment
+is one client, who owns the box and runs it on their own domain, Cloudflare
+account and user set, for their own internal business.
+
+What is sold is **service, not software**:
+
+- **Domain management** — the Cloudflare account, DNS, the Tunnel and Zero
+  Trust policies (the [webmaster runbook](/docs/webmaster.md)).
+- **Custom configuration** — standing up the app set a given office needs and
+  wiring it to their accounts and data.
+- **Server maintenance** — keeping the stack patched, backed up and healthy
+  (the [IT administrator runbook](/docs/it-admin.md)).
+
+Turnkey hardware — a pre-built box — may be sold alongside that service. The
+apps are never resold or run as a service for third parties; each client
+operates their own instance. Bundled features such as scheduled social
+publishing are part of the free software, not a paid add-on.
+
+This supersedes the "three tiers, only one of which is free" and "which SaaS
+each app replaces" framing in earlier `plan.md` sections (§84.2, §84.4). The
+licence due diligence in [docs/licences.md](/docs/licences.md) is checked
+against this model.
+
 ## Documentation
 
 - Setup guide: [/docs/setup-guide.md](/docs/setup-guide.md)
@@ -172,10 +198,6 @@ Infrastructure:
       its own CI job or local-only like the smoke tests.
 Strategy:
 
-- [ ] **Rewrite the README business rules** (§131.6) — the app is Free to Use;
-      billable services are domain management, custom configuration, and
-      server maintenance only; drop the SaaS / tiered framing from
-      §84.2/§84.4.
 - [ ] **Rescope or drop the SaaS-inventory items** (§131.6) — §84.7 "collect
       the SaaS inventory" and "Sales / value-proposition plan" become "app
       list + features + alternatives", not subscription-cost arithmetic.
