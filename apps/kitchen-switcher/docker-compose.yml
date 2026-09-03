@@ -10,7 +10,9 @@ services:
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=Kitchen"
-      - "homepage.icon=mdi-silverware-fork-knife.png"
+      # Custom app, no upstream icon — its own logo, served from Homepage's
+      # config/icons/ (a copy of html/favicon.svg). §131.1.
+      - "homepage.icon=/icons/kitchen.svg"
       - "homepage.href=http://localhost:${KITCHEN_SWITCHER_PORT:-10220}"
       - "homepage.description=One-click switcher between Mealie and Pantry"
     healthcheck:

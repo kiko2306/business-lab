@@ -14,6 +14,12 @@ services:
       HOMEPAGE_ALLOWED_HOSTS: ${HOMEPAGE_ALLOWED_HOSTS:-localhost:${HOMEPAGE_PORT:-10190}}
     volumes:
       - ./data:/app/config
+      # Custom app logos (Pantry, Price Compare — no upstream icon) referenced
+      # as `/icons/<name>.svg` in services.yaml. Homepage serves `/icons/*`
+      # from `public/icons/`, and Next.js snapshots `public/` at boot, so the
+      # files must be present when the container starts — a plain bind mount,
+      # not a copy-on-start. §131.1.
+      - ./data/icons:/app/public/icons:ro
       # Read-only Docker access for label-based service discovery: every
       # other app in apps/*/docker-compose.yml carries homepage.* labels, and
       # Homepage only lists a labeled container while it's actually running

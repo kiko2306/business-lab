@@ -14163,3 +14163,81 @@ is the only landing page. The README "Move each dashboard area onto its own
 route" item is deleted. What is left under §131.1 is the Pantry/Price-Compare
 icon assets (a separate item) and the new "Updates & version control" area
 (§131.4), which is a build, not a move.
+
+## 146. Official icons for Pantry, Price Compare and Kitchen (§131.1, 2026-09-03)
+
+All three are custom apps with no upstream project to borrow an icon from;
+their `homepage.icon` labels pointed at generic MDI glyphs
+(`mdi-fridge-outline.png`, `mdi-cart-outline.png`,
+`mdi-silverware-fork-knife.png`). Now each has its own logo, shipped as the
+app's favicon and as a file the Home Page serves. (The README item named
+Pantry and Price Compare; Kitchen — `apps/kitchen-switcher/` — is the same
+case and @mat flagged it in the same pass.)
+
+### 146.1 The icons
+
+Hand-drawn SVGs, one `<rect>` badge (`#3d7bfd`, the accent all three apps
+already use) plus a white mark:
+
+- **Pantry** — `apps/pantry/app/public/favicon.svg`: a storage jar (lid +
+  body) with a two-line label window. Pantry had no favicon at all before.
+- **Price Compare** — `apps/price-compare/app/public/favicon.svg`: an open-"C"
+  euro sign built from an arc + two bars. Matches the euro-on-blue raster
+  icons the app already ships (`favicon.ico`, `icon-192/512.png`), so its PWA
+  icons stay consistent and were left as-is.
+- **Kitchen** — `apps/kitchen-switcher/html/favicon.svg`: a bold "K" (stem +
+  two round-capped diagonal arms). Matches the white-K-on-blue raster icons
+  that app already ships.
+
+Each `index.html` gained `<link rel="icon" type="image/svg+xml"
+href="favicon.svg">` (Price Compare / Kitchen keep their existing icon lines
+after it as fallback).
+
+### 146.2 Serving them to the Home Page
+
+Homepage resolves a bare `name.png` against its bundled dashboard-icons set;
+a **custom** local icon is referenced as `/icons/<file>` and served from
+`public/icons/`. Two facts made this more than a label change:
+
+- The icon files must live somewhere Homepage can serve. Copied to
+  `apps/home-page/data/icons/{pantry,price-compare,kitchen}.svg` (that tree is
+  checked in — only the three generated YAMLs are gitignored). They are
+  duplicates of each app's `favicon.svg`; the compose comment says so.
+- **Next.js 16 (standalone) snapshots `public/` at boot** — a file bind-mounted
+  or copied in after the server starts 404s. gethomepage's entrypoint does
+  *not* copy `config/icons` anywhere. So `apps/home-page/docker-compose.yml`
+  got a second mount, `./data/icons:/app/public/icons:ro`, and the container
+  must be recreated (not just restarted) for a *new* icon file to show — an
+  existing one changing in place is fine.
+- Because the mount forces a homepage recreate, do it through the **dashboard**
+  (or the managed executor) — a bare `docker compose up -d homepage` from the
+  app dir skips `buildExposureEnvOverrides`, so `HOMEPAGE_ALLOWED_HOSTS` comes
+  back with only `localhost` + the LAN IP and gethomepage answers every
+  `tx-home-utils.com` / `homepage.tx-home-utils.com` request with
+  `{"error":"Host validation failed"}` (§92). Hit during this work; fixed by
+  recreating with `HOMEPAGE_ALLOWED_HOSTS` set to
+  `localhost:10190,<lan-ip>:10190,homepage.<domain>,<domain>` in the shell,
+  which is exactly what the managed path injects.
+
+`homepage.icon` is now `/icons/{pantry,price-compare,kitchen}.svg`.
+`homepageConfig.ts` passes it through verbatim (confirmed: `parseHomepageLabels`
+keeps the leading slash), so no backend code changed. Zero `mdi-` icons remain
+in `services.yaml`.
+
+### 146.3 Proven on the live stack
+
+- `curl https://homepage.tx-home-utils.com/icons/{pantry,price-compare,kitchen}.svg`
+  → 200, `Content-Type: image/svg+xml`, after `--force-recreate` of the
+  homepage container (each new file needs a fresh boot snapshot).
+- Backend restarted → `services.yaml` regenerated with all three
+  `icon: /icons/*.svg`; Homepage's `/api/services` echoes them; apex and
+  `homepage.<domain>` both still 200.
+- Pantry and Price Compare rebuilt (`COPY public` bakes the favicon at build
+  time); Kitchen bind-mounts `./html`, so its `favicon.svg` served with no
+  rebuild. Each app serves `/favicon.svg` (200) and links it in `<head>`.
+
+### 146.4 No version bump
+
+Touches `apps/**` and docs only — nothing under `backend/src` or
+`frontend/src`, so the dashboard version is unchanged (the require-version-bump
+hook agrees).

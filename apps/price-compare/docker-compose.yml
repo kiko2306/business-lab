@@ -42,7 +42,9 @@ services:
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=Price Compare"
-      - "homepage.icon=mdi-cart-outline.png"
+      # Custom app, no upstream icon — its own logo, served from Homepage's
+      # config/icons/ (a copy of app/public/favicon.svg). §131.1.
+      - "homepage.icon=/icons/price-compare.svg"
       - "homepage.href=http://localhost:${PRICE_COMPARE_PORT:-10340}"
       - "homepage.description=Compare grocery prices across Continente, Pingo Doce, Lidl, Auchan"
     healthcheck:

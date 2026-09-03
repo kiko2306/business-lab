@@ -152,13 +152,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Features & architecture (§131)
 
-Home Page / dashboard:
-
-- [ ] **Real icon assets for Pantry and Price Compare** (§131.1) — both are
-      custom apps with no upstream icon; today they use generic `mdi-*`
-      placeholders. Design a small logo per app, ship it as the app's favicon
-      and a Home-Page-servable file, point `homepage.icon` at it.
-
 SSO / roles:
 
 - [ ] **Activate named roles in the dashboard** (§131.3) — seed the role set

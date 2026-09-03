@@ -13,7 +13,9 @@ services:
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=Pantry"
-      - "homepage.icon=mdi-fridge-outline.png"
+      # Custom app, no upstream icon — its own logo, served from Homepage's
+      # config/icons/ (a copy of app/public/favicon.svg). §131.1.
+      - "homepage.icon=/icons/pantry.svg"
       - "homepage.href=http://localhost:${PANTRY_PORT:-10300}"
       - "homepage.description=Custom pantry stock tracker (expiration dates, use-item flow, shopping list)"
     healthcheck:
