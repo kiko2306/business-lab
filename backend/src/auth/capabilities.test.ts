@@ -1,49 +1,57 @@
 import { describe, it, expect } from 'vitest';
-import { CAPABILITIES, capabilitiesFor, roleHasCapability } from './capabilities';
+import { CAPABILITIES, effectiveCapabilities, hasCapability } from './capabilities';
 
-describe('capabilitiesFor', () => {
-  it('gives owner every capability', () => {
-    expect(capabilitiesFor(['owner']).sort()).toEqual([...CAPABILITIES].sort());
+const ALL = [...CAPABILITIES].sort();
+
+describe('effectiveCapabilities', () => {
+  it('gives a webmaster every capability, ignoring any grant rows', () => {
+    expect(effectiveCapabilities(['webmaster']).sort()).toEqual(ALL);
+    // A stray grant row must not be able to *narrow* a webmaster.
+    expect(effectiveCapabilities(['webmaster'], ['audit:view']).sort()).toEqual(ALL);
   });
 
-  it('gives user nothing', () => {
-    expect(capabilitiesFor(['user'])).toEqual([]);
+  it('gives a user nothing', () => {
+    expect(effectiveCapabilities(['user'])).toEqual([]);
+    expect(effectiveCapabilities(['user'], ['apps:control'])).toEqual([]);
   });
 
-  it('scopes it_admin to the app stack, not exposure settings or user management', () => {
-    const caps = capabilitiesFor(['it_admin']);
-    expect(caps).toContain('apps:control');
-    expect(caps).toContain('settings:manage');
-    expect(caps).toContain('backups:manage');
-    expect(caps).not.toContain('exposure:settings');
-    expect(caps).not.toContain('users:manage');
+  it('gives an admin with no grant rows every capability (all-on default)', () => {
+    expect(effectiveCapabilities(['admin']).sort()).toEqual(ALL);
   });
 
-  it('scopes webmaster to exposure settings only', () => {
-    expect(capabilitiesFor(['webmaster'])).toEqual(['exposure:settings']);
+  it('scopes an admin to exactly its grant rows when it has some', () => {
+    const caps = effectiveCapabilities(['admin'], ['apps:control', 'backups:manage']);
+    expect(caps).toEqual(['apps:control', 'backups:manage']);
   });
 
-  it('unions the capabilities of several roles', () => {
-    const caps = capabilitiesFor(['webmaster', 'it_admin']);
-    expect(caps).toContain('exposure:settings'); // from webmaster
-    expect(caps).toContain('apps:control'); // from it_admin
-    expect(caps).not.toContain('users:manage'); // neither grants it
+  it('ignores unknown grant names and de-dupes', () => {
+    const caps = effectiveCapabilities(['admin'], ['apps:control', 'apps:control', 'nonsense']);
+    expect(caps).toEqual(['apps:control']);
   });
 
-  it('deduplicates and ignores unknown role names', () => {
-    expect(capabilitiesFor(['it_admin', 'it_admin', 'nonsense'])).toEqual(capabilitiesFor(['it_admin']));
+  it('returns capabilities in canonical order regardless of grant order', () => {
+    expect(effectiveCapabilities(['admin'], ['backups:manage', 'apps:control'])).toEqual([
+      'apps:control',
+      'backups:manage',
+    ]);
   });
 
-  it('returns capabilities in the canonical order regardless of role order', () => {
-    expect(capabilitiesFor(['it_admin', 'webmaster'])).toEqual(capabilitiesFor(['webmaster', 'it_admin']));
+  it('takes the webmaster path when an account holds both roles', () => {
+    expect(effectiveCapabilities(['admin', 'webmaster'], ['audit:view']).sort()).toEqual(ALL);
+  });
+
+  it('gives an unknown / empty role set nothing', () => {
+    expect(effectiveCapabilities([])).toEqual([]);
+    expect(effectiveCapabilities(['nonsense'])).toEqual([]);
   });
 });
 
-describe('roleHasCapability', () => {
-  it('is true only when a held role grants it', () => {
-    expect(roleHasCapability(['webmaster'], 'exposure:settings')).toBe(true);
-    expect(roleHasCapability(['webmaster'], 'apps:control')).toBe(false);
-    expect(roleHasCapability(['user'], 'apps:control')).toBe(false);
-    expect(roleHasCapability(['owner'], 'users:manage')).toBe(true);
+describe('hasCapability', () => {
+  it('is true only when the effective set contains it', () => {
+    expect(hasCapability(['webmaster'], [], 'users:manage')).toBe(true);
+    expect(hasCapability(['admin'], [], 'users:manage')).toBe(true); // all-on default
+    expect(hasCapability(['admin'], ['audit:view'], 'users:manage')).toBe(false);
+    expect(hasCapability(['admin'], ['audit:view'], 'audit:view')).toBe(true);
+    expect(hasCapability(['user'], [], 'apps:control')).toBe(false);
   });
 });

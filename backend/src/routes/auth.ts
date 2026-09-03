@@ -14,8 +14,8 @@ import setupModeMiddleware from '../middleware/setupMode';
 import authMiddleware from '../middleware/auth';
 import { schemas, validateBody } from '../middleware/validation';
 import { writeAuditLog } from '../utils/audit';
-import { capabilitiesFor } from '../auth/capabilities';
-import { getUserRoles, setUserRoles } from '../services/userRoles';
+import { effectiveCapabilities } from '../auth/capabilities';
+import { getUserCapabilities, getUserRoles, setUserRoles } from '../services/userRoles';
 import {
   generateRecoveryCodes,
   generateTotpSecret,
@@ -62,9 +62,10 @@ interface UserRow {
 async function issueSession(user: { id: number; username: string }): Promise<{
   accessToken: string;
   refreshToken: string;
-  user: { id: number; username: string; roles: string[] };
+  user: { id: number; username: string; roles: string[]; capabilities: string[] };
 }> {
-  const roles = await getUserRoles(user.id);
+  const [roles, grants] = await Promise.all([getUserRoles(user.id), getUserCapabilities(user.id)]);
+  const capabilities = effectiveCapabilities(roles, grants);
   const accessToken = signAccessToken({ id: user.id, username: user.username, roles });
   const refreshToken = signRefreshToken({ id: user.id });
   const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
@@ -73,7 +74,11 @@ async function issueSession(user: { id: number; username: string }): Promise<{
     refreshToken,
     refreshExpiry,
   ]);
-  return { accessToken, refreshToken, user: { id: user.id, username: user.username, roles } };
+  return {
+    accessToken,
+    refreshToken,
+    user: { id: user.id, username: user.username, roles, capabilities },
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -113,9 +118,10 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
     );
     const user = result.rows[0];
 
-    // The first account owns everything, including user management.
-    await setUserRoles(user.id, ['owner']);
-    const roles = ['owner'];
+    // The first account is the webmaster — every capability, always (§152).
+    await setUserRoles(user.id, ['webmaster']);
+    const roles = ['webmaster'];
+    const capabilities = effectiveCapabilities(roles);
 
     const accessToken = signAccessToken({ id: user.id, username: user.username, roles });
     const refreshToken = signRefreshToken({ id: user.id });
@@ -134,9 +140,11 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
       'success',
     ]);
 
-    return res
-      .status(201)
-      .json({ accessToken, refreshToken, user: { id: user.id, username: user.username, roles } });
+    return res.status(201).json({
+      accessToken,
+      refreshToken,
+      user: { id: user.id, username: user.username, roles, capabilities },
+    });
   } catch (err) {
     const error = err as { code?: string; message: string };
     if (error.code === '23505') {
@@ -303,9 +311,12 @@ router.post('/refresh', authLimiter, validateBody(schemas.authRefresh), async (r
       return res.status(401).json({ error: 'Refresh token is invalid or expired' });
     }
 
-    const roles = await getUserRoles(decoded.id);
+    const [roles, grants] = await Promise.all([
+      getUserRoles(decoded.id),
+      getUserCapabilities(decoded.id),
+    ]);
     const accessToken = signAccessToken({ id: decoded.id, username: row.username, roles });
-    return res.json({ accessToken, roles });
+    return res.json({ accessToken, roles, capabilities: effectiveCapabilities(roles, grants) });
   } catch {
     return res.status(401).json({ error: 'Refresh token is invalid or expired' });
   }
@@ -324,8 +335,13 @@ router.get('/me', authMiddleware, async (req: Request, res: Response) => {
     if (!row) {
       return res.status(404).json({ error: 'Account not found.' });
     }
-    const roles = await getUserRoles(userId);
-    return res.json({ id: userId, username: row.username, roles, capabilities: capabilitiesFor(roles) });
+    const [roles, grants] = await Promise.all([getUserRoles(userId), getUserCapabilities(userId)]);
+    return res.json({
+      id: userId,
+      username: row.username,
+      roles,
+      capabilities: effectiveCapabilities(roles, grants),
+    });
   } catch (err) {
     console.error('Auth me error:', (err as Error).message);
     return res.status(500).json({ error: 'Internal server error' });

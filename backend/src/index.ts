@@ -16,6 +16,7 @@ import networkRouter from './routes/network';
 import { APP_VERSION } from './version';
 import {
   ensureUserRolesTable,
+  ensureRoleModelReshape,
   ensureServiceExposureTable,
   ensureServiceExposureAutheliaColumn,
   ensureTotpSchema,
@@ -167,9 +168,13 @@ app.use((err: Error, _req: Request, res: Response, _next: NextFunction) => {
   return res.status(500).json({ error: 'Internal server error' });
 });
 
-ensureUserRolesTable().catch((err: Error) => {
-  console.error('Unable to ensure user_roles table:', err.message);
-});
+ensureUserRolesTable()
+  // Chained, not concurrent: the reshape (§152) renames rows the table
+  // migration may have just backfilled.
+  .then(() => ensureRoleModelReshape())
+  .catch((err: Error) => {
+    console.error('Unable to ensure the role model:', err.message);
+  });
 ensureServiceExposureTable().catch((err: Error) => {
   console.error('Unable to ensure service_exposure table:', err.message);
 });

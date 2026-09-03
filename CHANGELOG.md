@@ -11,6 +11,22 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.9.0] — 2026-09-03
+
+### Changed
+
+- Reshaped the role model to **webmaster / admin / user** (§152, backend
+  slice 152a). `/setup` and `./start.sh recover` now create/restore a
+  **webmaster** — every capability, always, never restrictable. **admin** is
+  full by default but a webmaster can switch individual dashboard features off
+  per account (new `user_capabilities` grant table; no rows means all-on).
+  **user** is unchanged. `owner` and `it_admin` are gone: a startup migration
+  renames `owner` → `webmaster` and `it_admin` → `admin` (seeding the six
+  features the old it_admin role granted so migrated admins keep exactly their
+  reach). New `PUT /api/users/:id/capabilities`; `/api/users` and the auth
+  responses now carry each account's effective capability set. The "last
+  owner" guards are now "last webmaster".
+
 ## [0.8.0] — 2026-09-03
 
 ### Added

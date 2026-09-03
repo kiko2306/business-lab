@@ -11,7 +11,7 @@ import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
 
-const ALL_ROLES: Role[] = ['owner', 'it_admin', 'webmaster', 'user'];
+const ALL_ROLES: Role[] = ['webmaster', 'admin', 'user'];
 
 @Component({
   selector: 'app-users',
@@ -36,7 +36,9 @@ export class UsersComponent implements OnInit {
   });
   // Roles for the create form, kept outside the reactive group so the
   // checkboxes bind with plain ngModel. At least one is required (§149).
-  protected newRoles: Record<Role, boolean> = { owner: false, it_admin: true, webmaster: false, user: false };
+  protected newRoles: Record<Role, boolean> = { webmaster: false, admin: true, user: false };
+  // §152b adds the per-admin Features editor here; 152a keeps the role
+  // checkboxes only.
 
   protected items: AdminUser[] = [];
   protected loading = false;
@@ -77,9 +79,8 @@ export class UsersComponent implements OnInit {
 
   private toRecord(roles: Role[]): Record<Role, boolean> {
     return {
-      owner: roles.includes('owner'),
-      it_admin: roles.includes('it_admin'),
       webmaster: roles.includes('webmaster'),
+      admin: roles.includes('admin'),
       user: roles.includes('user'),
     };
   }
@@ -115,7 +116,7 @@ export class UsersComponent implements OnInit {
         next: () => {
           this.toast.success('User created successfully.');
           this.createForm.reset();
-          this.newRoles = { owner: false, it_admin: true, webmaster: false, user: false };
+          this.newRoles = { webmaster: false, admin: true, user: false };
           this.load();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to create user.')),

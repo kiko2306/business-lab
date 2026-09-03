@@ -1,6 +1,6 @@
 import { NextFunction, Request, Response } from 'express';
 import Joi, { ObjectSchema, ValidationError } from 'joi';
-import { ROLES } from '../auth/capabilities';
+import { CAPABILITIES, ROLES } from '../auth/capabilities';
 
 // At least one role, each a known name, no duplicates (plan.md §149).
 const rolesSchema = Joi.array()
@@ -8,6 +8,13 @@ const rolesSchema = Joi.array()
   .min(1)
   .unique()
   .required();
+
+// A feature-grant set for an admin account (plan.md §152): known capability
+// names, no duplicates. Optional and possibly empty on create (empty = the
+// all-on default); required and non-empty when replacing an admin's grants.
+const capabilitiesSchema = Joi.array()
+  .items(Joi.string().valid(...CAPABILITIES))
+  .unique();
 
 const validationOptions = {
   abortEarly: false,
@@ -150,6 +157,9 @@ export const schemas = {
     username: usernameSchema.required(),
     password: passwordSchema.required(),
     roles: rolesSchema,
+    // Seeds an admin's feature grants; ignored for a webmaster/user. Omitted
+    // or empty leaves an admin at the all-on default.
+    capabilities: capabilitiesSchema.optional(),
   }),
   userIdParam: Joi.object({
     id: Joi.number().integer().positive().required(),
@@ -159,6 +169,11 @@ export const schemas = {
   }),
   userRolesUpdate: Joi.object({
     roles: rolesSchema,
+  }),
+  // Replace an admin account's feature grants (plan.md §152). At least one —
+  // an admin with no features left is a role with nothing to do.
+  userCapabilitiesUpdate: Joi.object({
+    capabilities: capabilitiesSchema.min(1).required(),
   }),
   recoveryResetAdminPassword: Joi.object({
     username: usernameSchema.required(),

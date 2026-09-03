@@ -1,12 +1,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response } from 'express';
 
-// `vi.hoisted` runs before the hoisted `vi.mock` factory below, so the spy
-// exists when the mock is registered and stays referenceable from the tests.
-const { getUserRoles } = vi.hoisted(() => ({
+// `vi.hoisted` runs before the hoisted `vi.mock` factory below, so the spies
+// exist when the mock is registered and stay referenceable from the tests.
+const { getUserRoles, getUserCapabilities } = vi.hoisted(() => ({
   getUserRoles: vi.fn<(id: number) => Promise<string[]>>(),
+  getUserCapabilities: vi.fn<(id: number) => Promise<string[]>>(),
 }));
-vi.mock('../services/userRoles', () => ({ getUserRoles }));
+vi.mock('../services/userRoles', () => ({ getUserRoles, getUserCapabilities }));
 
 import { requireCapability } from './requireCapability';
 
@@ -26,10 +27,13 @@ function mockRes() {
 describe('requireCapability', () => {
   beforeEach(() => {
     getUserRoles.mockReset();
+    getUserCapabilities.mockReset();
+    getUserCapabilities.mockResolvedValue([]);
   });
 
-  it('calls next() when a held role grants the capability', async () => {
-    getUserRoles.mockResolvedValue(['it_admin']);
+  it('calls next() when the effective capability set grants it', async () => {
+    getUserRoles.mockResolvedValue(['admin']);
+    getUserCapabilities.mockResolvedValue(['apps:control']);
     const req = { user: { id: 7 } } as unknown as Request;
     const res = mockRes();
     const next = vi.fn();
@@ -40,8 +44,9 @@ describe('requireCapability', () => {
     expect(res.status).not.toHaveBeenCalled();
   });
 
-  it('403s when no held role grants the capability', async () => {
-    getUserRoles.mockResolvedValue(['webmaster']);
+  it('403s when the effective set does not grant it', async () => {
+    getUserRoles.mockResolvedValue(['admin']);
+    getUserCapabilities.mockResolvedValue(['audit:view']);
     const req = { user: { id: 7 } } as unknown as Request;
     const res = mockRes();
     const next = vi.fn();
@@ -63,16 +68,29 @@ describe('requireCapability', () => {
     expect(getUserRoles).not.toHaveBeenCalled();
   });
 
-  it('reads roles fresh on every call (not from the token)', async () => {
-    getUserRoles.mockResolvedValue(['owner']);
+  it('reads roles and grants fresh on every call (not from the token)', async () => {
+    getUserRoles.mockResolvedValue(['webmaster']);
     const req = { user: { id: 1, roles: ['user'] } } as unknown as Request;
     const res = mockRes();
     const next = vi.fn();
 
     await requireCapability('users:manage')(req, res, next);
 
-    // The stale token said ['user'] (no capability); the DB said ['owner'].
+    // The stale token said ['user'] (no capability); the DB said ['webmaster'].
     expect(getUserRoles).toHaveBeenCalledWith(1);
+    expect(getUserCapabilities).toHaveBeenCalledWith(1);
+    expect(next).toHaveBeenCalledOnce();
+  });
+
+  it('treats an admin with no grant rows as all-on', async () => {
+    getUserRoles.mockResolvedValue(['admin']);
+    getUserCapabilities.mockResolvedValue([]);
+    const req = { user: { id: 3 } } as unknown as Request;
+    const res = mockRes();
+    const next = vi.fn();
+
+    await requireCapability('settings:manage')(req, res, next);
+
     expect(next).toHaveBeenCalledOnce();
   });
 });

@@ -27,14 +27,26 @@ CREATE TABLE IF NOT EXISTS totp_recovery_codes (
 );
 CREATE INDEX IF NOT EXISTS totp_recovery_codes_user_id_idx ON totp_recovery_codes (user_id);
 
--- Named roles per account (plan.md §149). A user may hold several; effective
--- dashboard capabilities are the union (backend/src/auth/capabilities.ts).
--- The first admin (from /setup) and every account on a database that predates
--- this table are backfilled with 'owner' by ensureUserRolesTable().
+-- Named roles per account (plan.md §149, reshaped §152). Roles are
+-- 'webmaster' (every capability, always), 'admin' (per-account feature grants
+-- in user_capabilities below — no rows means all-on) and 'user' (no dashboard;
+-- SSO app access only). A user may hold several. The first admin (from /setup)
+-- and every account on a database that predates this table are backfilled with
+-- 'webmaster' by ensureUserRolesTable(); ensureRoleModelReshape() renames any
+-- legacy 'owner'/'it_admin' rows.
 CREATE TABLE IF NOT EXISTS user_roles (
     user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
     role    VARCHAR(20) NOT NULL,
     PRIMARY KEY (user_id, role)
+);
+
+-- Per-admin dashboard feature grants (plan.md §152). Only consulted for an
+-- account holding 'admin' (and not 'webmaster'); no rows for such an account
+-- means every feature is on. A webmaster ticks features off here.
+CREATE TABLE IF NOT EXISTS user_capabilities (
+    user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    capability VARCHAR(40) NOT NULL,
+    PRIMARY KEY (user_id, capability)
 );
 
 CREATE TABLE IF NOT EXISTS settings (

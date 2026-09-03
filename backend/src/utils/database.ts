@@ -76,10 +76,10 @@ export async function withTransaction<T>(
  * - Creates `user_roles` if absent.
  * - Drops the long-dead `users.role` text column if a very old database still
  *   carries it (its values were never enforced; the join table replaces it).
- * - Backfills `owner` for any account with no roles yet — that is every
- *   account on an upgrading database (they were all admins,
- *   `51387f0`), and also the first admin created by `/setup` before this
- *   migration ran on a subsequent boot.
+ * - Backfills `webmaster` for any account with no roles yet — that is every
+ *   account on an upgrading database (they were all admins, `51387f0`), and
+ *   also the first admin created by `/setup` before this migration ran on a
+ *   subsequent boot. `webmaster` is the §152 superuser role.
  */
 export async function ensureUserRolesTable(): Promise<void> {
   await query(`
@@ -92,10 +92,62 @@ export async function ensureUserRolesTable(): Promise<void> {
   await query('ALTER TABLE users DROP COLUMN IF EXISTS role');
   await query(`
     INSERT INTO user_roles (user_id, role)
-    SELECT u.id, 'owner'
+    SELECT u.id, 'webmaster'
     FROM users u
     WHERE NOT EXISTS (SELECT 1 FROM user_roles r WHERE r.user_id = u.id)
   `);
+}
+
+/**
+ * Reshape the role model to webmaster / admin / user (plan.md §152). Runs
+ * after `ensureUserRolesTable()`.
+ *
+ * `owner` was the superuser and becomes `webmaster` (every capability, always,
+ * never narrowed per account). `it_admin` becomes `admin`, whose dashboard
+ * features are per-account grant rows in the new `user_capabilities` table —
+ * so before the rename, every `it_admin` account is seeded with exactly the
+ * six capabilities that role used to grant, rather than being widened to the
+ * "no rows = all-on" default an admin otherwise gets.
+ *
+ * Idempotent: the rename matches nothing on a second run, and the seed is
+ * guarded by `ON CONFLICT DO NOTHING`.
+ */
+export async function ensureRoleModelReshape(): Promise<void> {
+  await query(`
+    CREATE TABLE IF NOT EXISTS user_capabilities (
+        user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        capability VARCHAR(40) NOT NULL,
+        PRIMARY KEY (user_id, capability)
+    )
+  `);
+
+  // Freeze each legacy it_admin's reach before the rename widens the role.
+  await query(`
+    INSERT INTO user_capabilities (user_id, capability)
+    SELECT r.user_id, c.capability
+    FROM user_roles r
+    CROSS JOIN (VALUES
+      ('apps:control'), ('apps:config'), ('apps:expose'),
+      ('backups:manage'), ('settings:manage'), ('audit:view')
+    ) AS c(capability)
+    WHERE r.role = 'it_admin'
+    ON CONFLICT DO NOTHING
+  `);
+
+  // Rename: insert the new-name row (absorbed if a user already holds it),
+  // then drop the old-name rows. Avoids a PK collision an UPDATE would hit for
+  // a user holding both an old and a new name.
+  await query(`
+    INSERT INTO user_roles (user_id, role)
+    SELECT user_id, 'webmaster' FROM user_roles WHERE role = 'owner'
+    ON CONFLICT DO NOTHING
+  `);
+  await query(`
+    INSERT INTO user_roles (user_id, role)
+    SELECT user_id, 'admin' FROM user_roles WHERE role = 'it_admin'
+    ON CONFLICT DO NOTHING
+  `);
+  await query(`DELETE FROM user_roles WHERE role IN ('owner', 'it_admin')`);
 }
 
 /**

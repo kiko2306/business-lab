@@ -14814,3 +14814,68 @@ definition). Renaming the capability strings.
   Features editor (create + per-row), effective-capability nav gating.
   Visual review on `:10001`. Feature bump to 0.9.0.
 - then resume §151 slice 2a–2d with the adjusted group logic.
+
+## 153. §152 slice 152a done — the role model reshape, backend (2026-09-03)
+
+Backend half of §152. Feature bump 0.8.0 → 0.9.0.
+
+### 153.1 Backend
+
+- **`auth/capabilities.ts`.** `ROLES` is now `['webmaster', 'admin', 'user']`.
+  `capabilitiesFor` / `roleHasCapability` replaced by
+  `effectiveCapabilities(roles, grants)` and `hasCapability(roles, grants,
+  cap)`: `webmaster` → every capability (grants ignored, so a stray row can't
+  narrow it); `admin` → the grant rows, or every capability when there are
+  none; anything else → none. 9 unit tests.
+- **Schema / migration.** `ensureUserRolesTable()` now backfills `webmaster`
+  (not `owner`) for role-less accounts. New `ensureRoleModelReshape()`, chained
+  after it in `index.ts` (not fired concurrently — it renames rows the first
+  migration may have just written): creates `user_capabilities(user_id,
+  capability)`, seeds each legacy `it_admin` with the six capabilities that
+  role granted **before** the rename widens it, then `owner` → `webmaster` and
+  `it_admin` → `admin` (insert-new-then-delete-old, collision-safe). Idempotent.
+  `init.sql` gains `user_capabilities` and refreshed comments.
+- **`services/userRoles.ts`.** `ownerCount()` → `webmasterCount()`; new
+  `getUserCapabilities`, `getCapabilitiesForUsers`, `setUserCapabilities`.
+- **`middleware/requireCapability.ts`.** Loads roles **and** grants fresh
+  (`Promise.all`), 403s unless `hasCapability` passes. 6 tests.
+- **`routes/auth.ts`.** `/setup` assigns `webmaster`. `issueSession`,
+  `/refresh` and `/me` all return the effective `capabilities` array now, not
+  just `roles`.
+- **`routes/users.ts`.** `GET /users` items carry `capabilities` (effective).
+  `POST /users` accepts an optional `capabilities` array, seeded only for an
+  `admin`. New `PUT /users/:id/capabilities` — 400 for a webmaster ("always
+  full") or a non-admin, `min(1)` (an admin keeps ≥1 feature). Changing an
+  account's roles away from `admin` clears its grant rows. All "last owner"
+  guards are "last webmaster".
+- **`scripts/recoverAdmin.ts`.** `create-admin` / `reset-password` ensure
+  `webmaster`.
+
+### 153.2 Frontend (compat only — the UI work is 152b)
+
+- `models.ts`: `Role` = `webmaster | admin | user`; `User` /
+  `AdminUser` / `ManagedUser` gain `capabilities?: string[]`.
+- `core/capabilities.ts`: role→capability constant reduced to the three roles
+  (`owner` / `it_admin` kept as legacy aliases for a pre-§152 stored session
+  until its token refreshes — remove a release later); `ROLE_LABELS` →
+  Webmaster / Admin / SSO user; `CAPABILITY_LABELS` + `ALL_CAPABILITIES`
+  added for 152b.
+- `core/auth.service.ts`: `hasCapability` / `capabilities$` prefer the
+  session's authoritative `capabilities` array, falling back to the role
+  constant only when it is absent. `/refresh` folds `capabilities` in like
+  `roles`.
+- `pages/users/users.component.ts`: role list → the three roles. The
+  Features editor is 152b.
+
+### 153.3 Verified
+
+`backend`: `npm run typecheck` clean, `npm test` 394/394 (+2). `frontend`:
+`npm run build` clean (pre-existing warnings), `npm run test:ci` 42/42.
+Migration on the live DB and @mat's `:10001` sign-off: pending at time of
+writing (see the working-loop hand-off).
+
+### 153.4 Still open
+
+152b — the per-admin Features editor (create form + per-row checkboxes) and
+nav gating polish. Then §151 SSO slice 2a–2d, with 151.4's Authelia group
+logic keyed on `webmaster` → `admins` + every `app-*` group.

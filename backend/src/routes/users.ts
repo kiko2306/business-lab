@@ -1,7 +1,7 @@
 /**
- * User management API (`owner` capability `users:manage` — gated at the mount
- * in index.ts). Create, reset password, delete, and assign named roles
- * (plan.md §149).
+ * User management API (`users:manage` — gated at the mount in index.ts).
+ * Create, reset password, delete, assign named roles, and set an admin's
+ * per-feature grants (plan.md §149, §152).
  */
 
 import { Router, Request, Response } from 'express';
@@ -9,8 +9,15 @@ import { query } from '../utils/database';
 import { hashPassword } from '../utils/password';
 import { schemas, validateBody, validateParams } from '../middleware/validation';
 import { writeAuditLog } from '../utils/audit';
-import { Role } from '../auth/capabilities';
-import { getRolesForUsers, ownerCount, setUserRoles } from '../services/userRoles';
+import { Capability, effectiveCapabilities, Role } from '../auth/capabilities';
+import {
+  getCapabilitiesForUsers,
+  getRolesForUsers,
+  getUserRoles,
+  setUserCapabilities,
+  setUserRoles,
+  webmasterCount,
+} from '../services/userRoles';
 
 const router = Router();
 
@@ -26,8 +33,16 @@ interface UserRow {
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const result = await query<UserRow>('SELECT id, username, created_at FROM users ORDER BY id ASC');
-    const roles = await getRolesForUsers(result.rows.map((row) => row.id));
-    const items = result.rows.map((row) => ({ ...row, roles: roles[row.id] ?? [] }));
+    const ids = result.rows.map((row) => row.id);
+    const [roles, grants] = await Promise.all([getRolesForUsers(ids), getCapabilitiesForUsers(ids)]);
+    const items = result.rows.map((row) => ({
+      ...row,
+      roles: roles[row.id] ?? [],
+      // The effective set the account actually holds — an admin's grants (or
+      // all-on when it has none), everything for a webmaster, nothing for a
+      // user. The Roles/Features editor pre-ticks from this.
+      capabilities: effectiveCapabilities(roles[row.id] ?? [], grants[row.id] ?? []),
+    }));
     return res.json({ items });
   } catch (error) {
     console.error('List users error:', (error as Error).message);
@@ -41,6 +56,7 @@ router.get('/', async (_req: Request, res: Response) => {
 router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Response) => {
   const { username, password } = req.body;
   const roles = req.body.roles as Role[];
+  const capabilities = (req.body.capabilities ?? []) as Capability[];
 
   try {
     const passwordHash = await hashPassword(password);
@@ -52,6 +68,13 @@ router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Res
     );
     const user = result.rows[0];
     await setUserRoles(user.id, roles);
+    // Seed feature grants only for an admin that asked for a specific set;
+    // an admin with no rows is all-on (§152), and grants are meaningless for
+    // a webmaster or a user.
+    if (roles.includes('admin') && capabilities.length) {
+      await setUserCapabilities(user.id, capabilities);
+    }
+    const effective = effectiveCapabilities(roles, roles.includes('admin') ? capabilities : []);
 
     await writeAuditLog({
       userId: req.user?.id ?? null,
@@ -60,7 +83,7 @@ router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Res
       result: 'success',
     }).catch(() => {});
 
-    return res.status(201).json({ user: { ...user, roles } });
+    return res.status(201).json({ user: { ...user, roles, capabilities: effective } });
   } catch (error) {
     const err = error as { code?: string; message: string };
     if (err.code === '23505') {
@@ -92,19 +115,24 @@ router.put(
         return res.status(404).json({ error: 'User not found.' });
       }
 
-      // Don't let the last `owner` be demoted — that would leave nobody able
-      // to manage users (recoverable only via `./start.sh recover`).
-      if (!roles.includes('owner')) {
-        const currentlyOwner = await query<{ n: number }>(
-          "SELECT COUNT(*)::int AS n FROM user_roles WHERE user_id = $1 AND role = 'owner'",
+      // Don't let the last `webmaster` be demoted — that would leave nobody
+      // with unrestricted access (recoverable only via `./start.sh recover`).
+      if (!roles.includes('webmaster')) {
+        const currentlyWebmaster = await query<{ n: number }>(
+          "SELECT COUNT(*)::int AS n FROM user_roles WHERE user_id = $1 AND role = 'webmaster'",
           [id]
         );
-        if (currentlyOwner.rows[0].n > 0 && (await ownerCount()) <= 1) {
-          return res.status(400).json({ error: 'At least one account must keep the owner role.' });
+        if (currentlyWebmaster.rows[0].n > 0 && (await webmasterCount()) <= 1) {
+          return res.status(400).json({ error: 'At least one account must keep the webmaster role.' });
         }
       }
 
       await setUserRoles(id, roles);
+      // Feature grants only mean anything for an admin; drop them when the
+      // account is no longer one, so they don't silently resurface later.
+      if (!roles.includes('admin')) {
+        await setUserCapabilities(id, []);
+      }
 
       await writeAuditLog({
         userId: req.user?.id ?? null,
@@ -117,6 +145,49 @@ router.put(
     } catch (error) {
       console.error('Update user roles error:', (error as Error).message);
       return res.status(500).json({ error: 'Unable to update roles.' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// PUT /api/users/:id/capabilities — replace an admin account's feature grants
+// ---------------------------------------------------------------------------
+router.put(
+  '/:id/capabilities',
+  validateParams(schemas.userIdParam),
+  validateBody(schemas.userCapabilitiesUpdate),
+  async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    const capabilities = req.body.capabilities as Capability[];
+
+    try {
+      const target = await query<{ username: string }>('SELECT username FROM users WHERE id = $1', [id]);
+      if (!target.rows[0]) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+
+      const roles = await getUserRoles(id);
+      if (roles.includes('webmaster')) {
+        return res.status(400).json({ error: 'A webmaster always has every feature; nothing to restrict.' });
+      }
+      if (!roles.includes('admin')) {
+        return res.status(400).json({ error: 'Only an admin account has per-feature grants.' });
+      }
+
+      await setUserCapabilities(id, capabilities);
+      const effective = effectiveCapabilities(roles, capabilities);
+
+      await writeAuditLog({
+        userId: req.user?.id ?? null,
+        action: 'user_capabilities_update',
+        resource: `${target.rows[0].username} → [${effective.join(', ')}]`,
+        result: 'success',
+      }).catch(() => {});
+
+      return res.json({ message: 'Features updated.', capabilities: effective });
+    } catch (error) {
+      console.error('Update user capabilities error:', (error as Error).message);
+      return res.status(500).json({ error: 'Unable to update features.' });
     }
   }
 );
@@ -174,13 +245,13 @@ router.delete('/:id', validateParams(schemas.userIdParam), async (req: Request, 
       return res.status(400).json({ error: 'At least one account must remain.' });
     }
 
-    // Removing the last owner would lock user management out entirely.
-    const targetIsOwner = await query<{ n: number }>(
-      "SELECT COUNT(*)::int AS n FROM user_roles WHERE user_id = $1 AND role = 'owner'",
+    // Removing the last webmaster would leave nobody with unrestricted access.
+    const targetIsWebmaster = await query<{ n: number }>(
+      "SELECT COUNT(*)::int AS n FROM user_roles WHERE user_id = $1 AND role = 'webmaster'",
       [id]
     );
-    if (targetIsOwner.rows[0].n > 0 && (await ownerCount()) <= 1) {
-      return res.status(400).json({ error: 'At least one account must keep the owner role.' });
+    if (targetIsWebmaster.rows[0].n > 0 && (await webmasterCount()) <= 1) {
+      return res.status(400).json({ error: 'At least one account must keep the webmaster role.' });
     }
 
     const result = await query<{ username: string }>('DELETE FROM users WHERE id = $1 RETURNING username', [id]);

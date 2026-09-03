@@ -27,12 +27,24 @@ export class AuthService {
   /** The signed-in user's roles, or `[]` when signed out. */
   readonly roles$ = this.userSubject.pipe(map((user) => user?.roles ?? []));
 
-  /** Effective dashboard capabilities for the current roles (plan.md §149). */
-  readonly capabilities$ = this.userSubject.pipe(map((user) => capabilitiesFor(user?.roles)));
+  /**
+   * Effective dashboard capabilities for the signed-in account (plan.md §149,
+   * §152). The backend puts an authoritative `capabilities` array on the
+   * session; fall back to the optimistic role→capability constant only for a
+   * session opened before §152 (no array yet).
+   */
+  readonly capabilities$ = this.userSubject.pipe(map((user) => this.capabilitySet(user)));
 
   /** Synchronous capability check for template/guard use. */
   hasCapability(capability: Capability): boolean {
-    return capabilitiesFor(this.userSubject.value?.roles).has(capability);
+    return this.capabilitySet(this.userSubject.value).has(capability);
+  }
+
+  private capabilitySet(user: User | null): Set<Capability> {
+    if (user?.capabilities) {
+      return new Set(user.capabilities as Capability[]);
+    }
+    return capabilitiesFor(user?.roles);
   }
 
   currentRoles(): Role[] {
@@ -113,7 +125,7 @@ export class AuthService {
 
     if (!this.refreshRequest$) {
       this.refreshRequest$ = this.http
-        .post<{ accessToken: string; roles?: Role[] }>(
+        .post<{ accessToken: string; roles?: Role[]; capabilities?: string[] }>(
           `${API_BASE_URL}/auth/refresh`,
           { refreshToken: this.refreshTokenSubject.value },
           {
@@ -123,7 +135,9 @@ export class AuthService {
           }
         )
         .pipe(
-          tap((response) => this.updateAccessToken(response.accessToken, response.roles)),
+          tap((response) =>
+            this.updateAccessToken(response.accessToken, response.roles, response.capabilities)
+          ),
           map((response) => response.accessToken),
           finalize(() => {
             this.refreshRequest$ = undefined;
@@ -215,12 +229,20 @@ export class AuthService {
     localStorage.setItem(this.storageKey, JSON.stringify(response));
   }
 
-  private updateAccessToken(accessToken: string, roles?: Role[]): void {
+  private updateAccessToken(accessToken: string, roles?: Role[], capabilities?: string[]): void {
     const current = this.readStoredSession();
-    // A refresh also re-reports the user's roles — fold them into the stored
-    // user so a session opened before roles existed (or across a role change)
-    // picks up the new capability set without a full re-login.
-    const user = current.user && roles ? { ...current.user, roles } : current.user;
+    // A refresh also re-reports the user's roles and effective capabilities —
+    // fold them into the stored user so a session opened before §152 (or
+    // across a role / feature change) picks up the new set without a full
+    // re-login.
+    const user =
+      current.user && (roles || capabilities)
+        ? {
+            ...current.user,
+            ...(roles ? { roles } : {}),
+            ...(capabilities ? { capabilities } : {}),
+          }
+        : current.user;
     const updatedSession = {
       accessToken,
       refreshToken: current.refreshToken,

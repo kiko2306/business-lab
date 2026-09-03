@@ -1,12 +1,17 @@
 export interface User {
   id: number;
   username: string;
-  // Named roles (plan.md §149). The login / setup / refresh responses carry
-  // this; `AuthService` derives the effective capability set from it.
+  // Named roles (plan.md §149, §152). The login / setup / refresh responses
+  // carry this.
   roles?: Role[];
+  // The effective dashboard capabilities the backend computed for this account
+  // (plan.md §152). Authoritative for gating — the role→capability constant
+  // can't know an admin's per-account feature grants. Absent on sessions
+  // opened before §152; `AuthService` then falls back to the role constant.
+  capabilities?: string[];
 }
 
-export type Role = 'owner' | 'it_admin' | 'webmaster' | 'user';
+export type Role = 'webmaster' | 'admin' | 'user';
 
 /** One account in the Users & roles list. */
 export interface ManagedUser {
@@ -15,6 +20,7 @@ export interface ManagedUser {
   createdAt?: string;
   created_at?: string;
   roles: Role[];
+  capabilities?: string[];
 }
 
 export interface AuthResponse {
@@ -382,6 +388,9 @@ export interface AdminUser {
   username: string;
   created_at: string;
   roles: Role[];
+  // Effective capabilities the account holds — an admin's grants (or all-on
+  // when it has none), everything for a webmaster, nothing for a user.
+  capabilities?: string[];
 }
 
 export interface AdminUserListResponse {

@@ -1,16 +1,24 @@
 /**
  * Named roles and the dashboard capabilities each one grants (§131.3 / plan.md
- * §149). Roles were removed once (`51387f0`) as "unused"; they are back because
- * this map is now enforced — `requireCapability` gates the routes, and the
- * frontend hides what a role can't reach.
+ * §149, reshaped in §152). The map is enforced — `requireCapability` gates the
+ * routes and the frontend hides what an account can't reach.
  *
- * A user can hold several roles (`user_roles` join table); their effective
- * capabilities are the union. The map is code, not data — same reasoning as
- * the service registry: it changes with a deploy, reviewed in a diff, never at
- * runtime.
+ * Three roles (`user_roles` join table; a user may hold several):
+ *
+ *  - `webmaster` — every capability, always. Created by `/setup`, restored by
+ *    `./start.sh recover`. Never narrowed per account.
+ *  - `admin` — every capability by default, but a webmaster can switch
+ *    individual features off for one admin account via the `user_capabilities`
+ *    grant table. **No grant rows means all-on** (a fresh admin is full); the
+ *    users API refuses to leave an admin with an empty grant set.
+ *  - `user` — no dashboard capability at all; the account exists only to be
+ *    granted SSO app access (plan.md §151).
+ *
+ * The map is code, not data — same reasoning as the service registry: it
+ * changes with a deploy, reviewed in a diff, never at runtime.
  */
 
-export const ROLES = ['owner', 'it_admin', 'webmaster', 'user'] as const;
+export const ROLES = ['webmaster', 'admin', 'user'] as const;
 export type Role = (typeof ROLES)[number];
 
 export const CAPABILITIES = [
@@ -21,47 +29,50 @@ export const CAPABILITIES = [
   'backups:manage', // run / restore / schedule backups
   'settings:manage', // timezone, ntfy alerts, mailbox, backup destination
   'audit:view', // read the audit log
-  'users:manage', // create / delete users, assign roles
+  'users:manage', // create / delete users, assign roles and features
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
-
-/**
- * The IT admin runs and maintains the app stack; the webmaster owns the
- * Cloudflare side and nothing else; the owner is both plus user management;
- * `user` is a dashboard-less account that exists only to be granted SSO app
- * access in a later slice.
- */
-const ROLE_CAPABILITIES: Record<Role, readonly Capability[]> = {
-  owner: CAPABILITIES,
-  it_admin: [
-    'apps:control',
-    'apps:config',
-    'apps:expose',
-    'backups:manage',
-    'settings:manage',
-    'audit:view',
-  ],
-  webmaster: ['exposure:settings'],
-  user: [],
-};
 
 export function isRole(value: unknown): value is Role {
   return typeof value === 'string' && (ROLES as readonly string[]).includes(value);
 }
 
-/** Effective capabilities for a set of roles — the union, deduplicated. */
-export function capabilitiesFor(roles: readonly string[]): Capability[] {
-  const out = new Set<Capability>();
-  for (const role of roles) {
-    if (isRole(role)) {
-      for (const capability of ROLE_CAPABILITIES[role]) {
-        out.add(capability);
-      }
-    }
-  }
-  return CAPABILITIES.filter((capability) => out.has(capability));
+export function isCapability(value: unknown): value is Capability {
+  return typeof value === 'string' && (CAPABILITIES as readonly string[]).includes(value);
 }
 
-export function roleHasCapability(roles: readonly string[], capability: Capability): boolean {
-  return capabilitiesFor(roles).includes(capability);
+/**
+ * The capabilities an account actually holds, from its roles and its
+ * per-account grant rows:
+ *
+ *  - holds `webmaster` → every capability, `grants` ignored;
+ *  - else holds `admin` → the granted capabilities, or **every** capability
+ *    when there are no grant rows (a fresh admin is full — a webmaster narrows
+ *    it afterwards);
+ *  - otherwise → none.
+ *
+ * Always returned in the canonical `CAPABILITIES` order.
+ */
+export function effectiveCapabilities(
+  roles: readonly string[],
+  grants: readonly string[] = []
+): Capability[] {
+  if (roles.includes('webmaster')) {
+    return [...CAPABILITIES];
+  }
+  if (roles.includes('admin')) {
+    const granted = grants.filter(isCapability);
+    const allowed = granted.length ? new Set<Capability>(granted) : new Set<Capability>(CAPABILITIES);
+    return CAPABILITIES.filter((capability) => allowed.has(capability));
+  }
+  return [];
+}
+
+/** Whether an account with these roles + grant rows holds `capability`. */
+export function hasCapability(
+  roles: readonly string[],
+  grants: readonly string[],
+  capability: Capability
+): boolean {
+  return effectiveCapabilities(roles, grants).includes(capability);
 }
