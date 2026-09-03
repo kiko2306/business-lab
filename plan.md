@@ -14566,3 +14566,130 @@ confirm the nav shows only Exposure + Security and `/api/users` 403s.
 Email field + registry-derived app-access list on the create form; writing
 dashboard users into Authelia's user database. The role model this slice
 lands is the foundation those build on.
+
+## 151. Plan — SSO slice 2: per-user email, app-access list, Authelia enforcement (§131.3, 2026-09-03)
+
+Folds the three open §131.3 SSO items into one slice: the email field, the
+registry-derived app-access list, and the Authelia writer (was going to be
+slice 3). §150 landed the role model this builds on.
+
+### 151.1 Decisions (from @mat, 2026-09-03)
+
+1. **Access-list source: live exposure *plus* registry groups.** The choices
+   are the managed apps currently `enabled AND authelia_protected` in
+   `service_exposure`, and an app may additionally declare a named Authelia
+   group it requires via a new optional `autheliaGroups?: string[]` in
+   `services.ts`. An app that isn't exposed-and-gated does not appear.
+2. **Email required on create, editable afterwards.** New `users.email`
+   column, nullable (existing rows stay NULL until edited); the create API
+   requires a valid address, and a per-row Access editor can set it later.
+3. **Empty access list = no SSO app access.** Explicit allowlist. A
+   `user`-role account with an empty list authenticates at Authelia but every
+   gated app denies it.
+4. **Authelia enforcement is in scope.** The dashboard owns Authelia's file
+   backend: every managed account is written into `users_database.yml`, and
+   `access_control` in `configuration.yml` is generated from each user's
+   allowlist. Kept in sync on create / update / delete / password reset and
+   when an exposure toggle changes which apps are gated.
+
+### 151.2 Data model
+
+- `users.email VARCHAR(255)` — `ensureUserEmailColumn()` migration
+  (`ADD COLUMN IF NOT EXISTS`), nullable. API-level required on create.
+- `user_app_access(user_id INT REFERENCES users(id) ON DELETE CASCADE,
+  service_name VARCHAR(100), PRIMARY KEY (user_id, service_name))` — the
+  allowlist. `ensureUserAppAccessTable()`. Rows for a service name no longer
+  in the registry are ignored by the reader and swept on the next write.
+- `services.ts`: optional `autheliaGroups?: string[]` on a service; most apps
+  omit it (membership in the app's synthetic group is enough). Not added to
+  the mandatory-field test — it is genuinely optional.
+
+### 151.3 Backend — API
+
+- `GET /api/users/app-access-options` (`users:manage`): for each managed
+  service `enabled AND authelia_protected` (Authelia itself excluded — it
+  cannot gate itself), return `{ serviceName, label, hostname,
+  requiredGroups: string[] }`. `requiredGroups` is the app's declared
+  `autheliaGroups` (the synthetic `app-<name>` group is implicit, not shown).
+- `POST /api/users`: body gains `email` (Joi `.email().required()`) and
+  `appAccess: string[]` (service names; each must be a current option; empty
+  allowed). Persists to `users`, `user_roles`, `user_app_access`.
+- `PUT /api/users/:id/access` (new, mirrors `/:id/roles`): `{ email,
+  appAccess }`. Cannot be used to strand the last owner's own access (owner
+  reaches everything regardless, so this is informational only).
+- `GET /api/users` items gain `email` and `appAccess: string[]`.
+- Every user mutation calls the Authelia sync (151.4), best-effort: a failed
+  Authelia write is audit-logged and surfaced in the response `warning` but
+  does not roll back the dashboard-side change.
+
+### 151.4 Backend — Authelia writer
+
+Generalise `autheliaUsers.ts` (or a sibling `autheliaSync.ts`) from
+"one admin entry" to "own the whole file":
+
+- **`users_database.yml`.** Rebuild the `users:` block from the `users` table:
+  every account with a non-NULL email becomes an entry `{ disabled: false,
+  displayname: <username>, password: <users.password_hash verbatim>, email,
+  groups }`. The hash is copied straight across — `bcryptjs` digests already
+  validate against Authelia's file backend (established in §132 / the existing
+  `autheliaUsers.ts` header), so no re-hash and no plaintext is needed.
+  `groups` = `app-<serviceName>` for each `user_app_access` row + the app's
+  declared `autheliaGroups` (union) + `admins` for any account holding the
+  `owner` role (owner reaches everything). The file preamble is preserved.
+- **`configuration.yml` `access_control`.** Regenerate a marker-delimited
+  region (`# >>> managed-access-control` / `# <<<`, generalising the
+  preamble/body split already in `autheliaUsers.ts` — but mid-file, since
+  `session:`/`storage:`/`identity_providers:` follow it):
+  ```
+  access_control:
+    default_policy: deny
+    rules:
+      - domain: 'authelia.<base>'
+        policy: bypass
+      - domain: '<app hostname>'
+        policy: one_factor
+        subject: ['group:app-<name>', 'group:admins']
+  ```
+  `default_policy` flips `one_factor` → `deny`, so a gated app with no rule is
+  unreachable. `<base>` and hostnames come from the live `service_exposure`
+  rows (same source as `homepageConfig.ts`).
+- **Reload.** `restartService('authelia', userId)` after either file changes —
+  it re-substitutes env and recreates the container. Restarting Authelia
+  briefly 502s every gated app; acceptable on this box, noted in the code.
+
+### 151.5 Frontend
+
+- `models.ts`: `AdminUser` gains `email`, `appAccess: string[]`; new
+  `AppAccessOption`.
+- `operations.service.ts`: `listAppAccessOptions()`, `createUser` gains
+  `email` + `appAccess`, new `updateUserAccess(id, email, appAccess)`.
+- `users.component`: the create form gains a required `email` input and a
+  checkbox list from the options (label + hostname + a badge per required
+  group). A per-row **Access** editor mirrors the roles editor: email field +
+  the same checkbox list, dirty-save. Component spec stubs the new endpoint.
+- Visual change — build + deploy to `localhost:10001` for @mat before any
+  commit ([[visual-changes-need-approval]]).
+
+### 151.6 Sub-slices (build order, one commit each)
+
+- **2a — data model + user API.** Migrations, `user_app_access`,
+  `autheliaGroups` field, `GET app-access-options`, `POST`/`PUT`/`GET` user
+  changes, backend tests. No Authelia writes; frontend untouched. Fully
+  unit-testable.
+- **2b — frontend.** Email field + app-access checkboxes on the create form
+  and the per-row Access editor. Visual review on `:10001`.
+- **2c — Authelia users-file sync.** Every account → `users_database.yml`
+  entry with `app-<name>` groups, hash copied from `users.password_hash`.
+  Sync on create/update/delete/password-reset/recover. Proven on the live
+  stack.
+- **2d — Authelia access_control generation.** Marker region in
+  `configuration.yml`, `default_policy: deny`, per-app group rules, Authelia
+  restart, hook into the exposure-toggle path. Proven end-to-end on the live
+  stack: a `user`-role account with access to one app signs in through SSO,
+  that app opens, a non-listed one 403s.
+
+### 151.7 Not doing
+
+LDAP backend (file backend only). Group definitions beyond the synthetic
+`app-*` + an app's declared `autheliaGroups`. Any change to the OIDC clients
+(NetBird). Per-app *2FA* policy — every gated app stays `one_factor` for now.

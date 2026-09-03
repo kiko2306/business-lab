@@ -154,15 +154,22 @@ it is done — not ticked off and left behind. Section references point at
 
 SSO / roles:
 
-- [ ] **Users & roles page — email + app access list** (§131.3) — the create
-      form takes username, password and roles (§150); still to add is an email
-      field and the multi-select of SSO-reachable apps the user may reach.
-- [ ] **Derive the app access list from the registry** (§131.3) — only
-      exposed / Authelia-gated / group-requiring apps appear; not a static
-      checklist.
-- [ ] **Write dashboard-created users into Authelia** (§131.3) — hashed
-      password into Authelia's user database, kept in sync on change/delete.
-      Check file-backend vs LDAP before designing the writer.
+- [ ] **SSO slice 2a — user email + app-access data model & API** (§151) —
+      `users.email` column, `user_app_access` allowlist table, optional
+      `autheliaGroups` on the registry, `GET /api/users/app-access-options`
+      (derived from live exposure), and email + `appAccess` on the create /
+      update user APIs. Backend + tests only.
+- [ ] **SSO slice 2b — create form email field + app-access checkboxes**
+      (§151) — required email input, a checkbox list from the derived options,
+      and a per-row Access editor mirroring the roles editor. Visual review.
+- [ ] **SSO slice 2c — Authelia users-file sync** (§151) — every managed
+      account written into `users_database.yml` with `app-<name>` groups, the
+      bcrypt hash copied from `users.password_hash`; synced on
+      create/update/delete/password-reset/recover. Proven on the live stack.
+- [ ] **SSO slice 2d — Authelia access_control generation** (§151) —
+      marker region in `configuration.yml`, `default_policy: deny`, a
+      per-app group rule per exposed+gated app, Authelia restart, hooked into
+      the exposure-toggle path. Proven end-to-end on the live stack.
 
 Updates:
 
