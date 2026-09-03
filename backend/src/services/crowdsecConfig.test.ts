@@ -175,11 +175,44 @@ describe('buildNpmBouncerBlock', () => {
     expect(block).toMatch(/lua_shared_dict\s+crowdsec_cache\s+\d+m;/);
   });
 
-  // The whole point of running here rather than at the edge: nginx's real_ip
-  // module has already rewritten remote_addr to the client Cloudflare saw.
-  it('checks remote_addr, so bans target the real client and not cloudflared', () => {
-    expect(block).toContain('cs.Allow(ngx.var.remote_addr)');
+  // The whole point of running here rather than at the edge: the check sees the
+  // real client, not cloudflared. It no longer trusts $remote_addr directly
+  // (§124.5) — that is spoofable from the LAN — but a computed variable.
+  it('checks $crowdsec_client_ip, so bans target the real client and not cloudflared', () => {
+    expect(block).toContain('cs.Allow(ip)');
+    expect(block).toContain('local ip = ngx.var.crowdsec_client_ip');
     expect(block).not.toContain('$proxy_add_x_forwarded_for');
+  });
+
+  // §124.5: NPM trusts every RFC1918 range for real_ip and that list can't be
+  // narrowed from a custom include, so a LAN client hitting NPM directly could
+  // forge X-Forwarded-For / X-Real-IP. The geo block keys off
+  // $realip_remote_addr — the unspoofable TCP peer — and only a peer inside
+  // Docker's address space (i.e. a request re-originated by docker-proxy, which
+  // is how cloudflared's traffic arrives) is allowed to name the client via
+  // CF-Connecting-IP. A LAN client keeps its real 192.168.x/10.x address and
+  // hits the default branch.
+  it('derives the client IP from the unspoofable peer via a geo/map pair', () => {
+    expect(block).toContain('geo $realip_remote_addr $crowdsec_peer_is_internal {');
+    expect(block).toContain('map $crowdsec_peer_is_internal $crowdsec_client_ip {');
+    expect(block).toContain('default  $realip_remote_addr;');
+    expect(block).toContain('"1"      $http_cf_connecting_ip;');
+  });
+
+  it('trusts only Docker address ranges — never a whole RFC1918 block — as internal', () => {
+    expect(block).toContain('10.201.0.0/16  1;');
+    expect(block).toContain('172.31.0.0/16  1;');
+    expect(block).toContain('127.0.0.0/8  1;');
+    // A LAN in 10.0.0.0/8 or 192.168.0.0/16 must not be treated as internal.
+    expect(block).not.toContain('10.0.0.0/8  1;');
+    expect(block).not.toContain('192.168.0.0/16  1;');
+    expect(block).not.toContain('172.16.0.0/12  1;');
+  });
+
+  // A tunnelled request with no CF-Connecting-IP must not become cs.Allow("").
+  it('falls back to remote_addr when the computed client IP is empty', () => {
+    expect(block).toContain('if ip == nil or ip == "" then');
+    expect(block).toContain('ip = ngx.var.remote_addr');
   });
 
   // Upstream's snippet names this `$unix`, which is far too generic to add to

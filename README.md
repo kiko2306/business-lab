@@ -240,12 +240,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **NEXT SESSION, START HERE — XFF-spoofing hardening at NPM** (§119.2, §124.5) — enforcement is
-      live now, so this is the open hole:
-      NPM trusts all RFC1918 for `real_ip` with `real_ip_recursive on`, so a
-      LAN client can spoof `X-Forwarded-For` and steer or dodge a ban. Tighten
-      `set_real_ip_from` to the cloudflared gateway only — carefully (§99:
-      a duplicate real_ip directive wedges every proxy-host write).
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch

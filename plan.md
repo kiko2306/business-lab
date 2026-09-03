@@ -12553,3 +12553,133 @@ Note: `cscli bouncers list` grows an alias per container IP
   is unavailable (the pre-existing real-IP code has the same warning path). The
   dashboard says to restart CrowdSec and NPM, and the two restarts do different
   halves — CrowdSec registers the bouncer key, NPM loads the Lua.
+
+## 125. XFF-spoofing hardening at NPM — the ban check no longer trusts $remote_addr
+
+§124.5 left this open: with enforcement live, the Lua bouncer called
+`cs.Allow(ngx.var.remote_addr)`, and `$remote_addr` is forgeable from the LAN.
+NPM's own `nginx.conf` declares `set_real_ip_from 10.0.0.0/8; 172.16.0.0/12;
+192.168.0.0/16;` with `real_ip_header X-Real-IP; real_ip_recursive on;`, so a
+client connecting straight to NPM from any RFC1918 address is a trusted proxy:
+it sends `X-Real-IP: <anything>` and nginx rewrites `$remote_addr` to it. A
+banned LAN host dodges its ban; any LAN host can get an arbitrary IP 403'd.
+
+Verified on the real stack — the request matrix below is the point of the
+section, not the diff.
+
+### 125.1 Why the README's framing ("tighten `set_real_ip_from`") could not work
+
+`set_real_ip_from` is **additive** and nginx has no directive to remove an entry
+from the trusted set. NPM's RFC1918 trust is baked into the image's
+`/etc/nginx/nginx.conf`, `include`d *before* our `http_top.conf` drop-in. So no
+custom include — the only sanctioned hook — can narrow it. Overriding
+`real_ip_header` / `real_ip_recursive` in `http_top.conf` is the §99 minefield
+(same http-scope, duplicate directive → `nginx -t` fails → every proxy-host
+write wedges). Overriding them per-server via `server_proxy.conf` parses, but
+still leaves the LAN peer trusted, so the forged header still wins. The trust
+list is the root cause and it is immovable from where we're allowed to write.
+
+### 125.2 What landed instead
+
+The bouncer stops reading `$remote_addr` and reads a value it derives itself,
+in its own marker-fenced block (`buildNpmBouncerBlock`, `crowdsecConfig.ts`):
+
+```
+geo $realip_remote_addr $crowdsec_peer_is_internal {
+        default  0;
+        127.0.0.0/8  1;
+        10.201.0.0/16  1;
+        172.17.0.0/16  1;
+        172.31.0.0/16  1;
+}
+map $crowdsec_peer_is_internal $crowdsec_client_ip {
+        default  $realip_remote_addr;
+        "1"      $http_cf_connecting_ip;
+}
+```
+
+and `access_by_lua_block` does `cs.Allow(ngx.var.crowdsec_client_ip)` with a
+fallback to `remote_addr` if that comes out empty.
+
+- `$realip_remote_addr` is the **raw TCP peer**, before any real_ip rewrite. It
+  cannot be forged without owning the connection.
+- With `userland-proxy` on (this host's default), a request that arrived
+  through cloudflared — a host process hitting the published port — is
+  re-originated by `docker-proxy` from **inside Docker's address space**
+  (observed here as `10.201.17.1`, a per-app-network gateway). A LAN client
+  DNAT'd straight through keeps its real `192.168.x` / `10.x` address. So
+  "peer ∈ Docker's ranges" is a sound proxy for "came via the tunnel", and
+  only then is `CF-Connecting-IP` (set by Cloudflare's edge) trusted to name
+  the client. Every other peer is taken at face value.
+- The ranges are Docker's, not whole RFC1918 blocks: `10.201.0.0/16` +
+  `172.31.0.0/16` are the pool bases `setup_server.sh` writes to
+  `daemon.json`, `172.17/16` is `docker0`, `127/8` is a local health check /
+  curl. A home/office LAN in `192.168.x` or `10.0.x` never matches. (Residual:
+  a site that numbered its LAN inside `10.201/16` or `172.17|31/16` would
+  weaken this — noted, not fixed; even then the header must be *present* to
+  matter, and browsers don't send `CF-Connecting-IP`.)
+
+Why `geo` and not `map` with the peer directly: `map` keys are exact-match or
+regex only, `geo` does CIDR. Both are http-scope, both parse fine alongside
+NPM's own config — this does **not** touch `real_ip_header` /
+`real_ip_recursive` / `set_real_ip_from`, so it is not the §99 hazard.
+
+### 125.3 A dead end that got built and reverted first
+
+The first cut pinned a single trusted peer — `getHostGatewayIp()` →
+`host.docker.internal` → `10.201.0.1` — as a `map $realip_remote_addr` key.
+It rendered, `nginx -t` passed, and the LAN-spoof case tested clean… but the
+**gateway path** (`CF-Connecting-IP` from a host-origin request) returned 200
+where 403 was expected. The peer for a `docker-proxy`-forwarded connection on
+this host is `10.201.17.1` (a per-app-network gateway), **not** `10.201.0.1`
+(the backend's own bridge). `host.docker.internal` from the backend resolves to
+the wrong gateway for this purpose, and which one `docker-proxy` uses depends on
+network attach order and renumbers on recreate (§124.4 saw the same drift with
+`nginx@10.201.17.x`). Replaced with the CIDR `geo` block, which is correct
+regardless of which gateway wins.
+
+### 125.4 Verified (real stack)
+
+Enforcement on; backend rebuilt from the new code; NPM re-rendered + restarted
+(`[Crowdsec] Initialisation done`, `nginx -t` successful inside the running
+container — the §99 gate).
+
+**A — LAN-equivalent direct client** (alpine container on `npm-net`, peer
+`172.22.0.4`, not in the trusted ranges):
+
+| case | result |
+|---|---|
+| clean, plain | 200 |
+| real peer banned, plain | 403 |
+| + `X-Real-IP: 8.8.8.8` (unbanned) | **403** — spoof ignored |
+| + `X-Forwarded-For: 8.8.8.8` | **403** |
+| + `CF-Connecting-IP: 8.8.8.8` | **403** |
+| peer clean, `8.8.8.8` banned, `X-Real-IP: 8.8.8.8` | **200** — can't frame another IP |
+
+Under the old code, row 3 returned 200 (the bypass §124.5 describes).
+
+**B — gateway path** (host `curl localhost:80` → `docker-proxy`, peer in
+`10.201.0.0/16`):
+
+| case | result |
+|---|---|
+| clean, plain | 200 |
+| `CF-Connecting-IP: 203.0.113.99` (banned) | 403 — trusted peer names the client |
+| `CF-Connecting-IP: 1.1.1.1` (unbanned) | 200 |
+| no CF header, plain (peer not banned) | 200 — falls back to `remote_addr` |
+
+349 backend tests pass; typecheck clean. `crowdsecConfig.test.ts` gains cases
+for the `geo`/`map` pair, the "Docker ranges only, never a whole RFC1918 block"
+assertion, and the empty-`$crowdsec_client_ip` fallback.
+
+### 125.5 Not done here
+
+- **Access-log spoofing.** `$remote_addr` in NPM's logs is still forgeable by a
+  LAN client, so CrowdSec's *detection* parse of those logs (§110/§117) can
+  still be fed a framed IP. Separate pipeline from enforcement; its own follow-
+  up if it ever matters.
+- **The `real_ip` trust list itself** is unchanged — narrowing it needs an
+  `nginx.conf` override (custom image / entrypoint, against §0 principle 2) or
+  a network-layer change (bind NPM's `:80`/`:443` off the LAN, which
+  split-horizon DNS clients depend on). Neither is worth it now that the ban
+  check is independent of it.

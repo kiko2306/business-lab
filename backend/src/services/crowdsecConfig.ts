@@ -37,6 +37,10 @@
  *     a second marker-fenced block in the same `http_top.conf`, which loads
  *     the vendored library and runs a per-request check against CrowdSec's
  *     decision stream. Off = neither is present and nginx runs no Lua at all.
+ *     The block checks a client IP it derives itself, not `$remote_addr`:
+ *     NPM trusts every RFC1918 range for `real_ip` and that list can't be
+ *     narrowed from a custom include, so `$remote_addr` is spoofable by a LAN
+ *     client connecting straight to NPM. See buildNpmBouncerBlock (§124.5).
  *
  *     Both blocks share one read-modify-write of `http_top.conf`, followed by
  *     starting nginx for real in a throwaway container built from NPM's own
@@ -93,6 +97,18 @@ const NPM_BOUNCER_MOUNT = '/crowdsec';
 // Reported to LAPI, and what `cscli bouncers list` shows. The version is the
 // vendored lua-cs-bouncer tag — see crowdsec-bouncer/README.md.
 const NPM_BOUNCER_USER_AGENT = 'crowdsec-nginx-bouncer/v1.0.18';
+
+// Docker's own address space, as the set of peer addresses NPM can see for a
+// request that reached it through cloudflared rather than straight off the LAN.
+// With userland-proxy on (the default), a connection from a host process to a
+// published port is re-originated by docker-proxy from the bridge gateway, so
+// cloudflared shows up as one of these; a LAN client DNAT'd straight through
+// keeps its real 192.168.x/10.x address and never matches. The pool bases are
+// what setup_server.sh writes to /etc/docker/daemon.json (10.201.0.0/16,
+// 172.31.0.0/16, deliberately picked not to clash with a home LAN); 172.17/16
+// is docker0; 127/8 covers a local health check or curl. See §124.5 for why
+// this list, not `set_real_ip_from`, is where the anti-spoofing lives.
+const DOCKER_INTERNAL_RANGES = ['127.0.0.0/8', '10.201.0.0/16', '172.17.0.0/16', '172.31.0.0/16'];
 
 // Cloudflare's published edge ranges (https://www.cloudflare.com/ips/). Stable
 // for years; refresh if edge requests start showing up un-rewritten in logs.
@@ -251,10 +267,11 @@ function buildNpmRealIpBlock(): string {
  * The nginx side of the Lua bouncer: everything that has to live in http{}.
  * Kept as close to upstream's `crowdsec_nginx.conf` as possible so that
  * comparing against a newer lua-cs-bouncer release is a readable diff — the
- * only deliberate changes are the two paths (this stack mounts the library at
- * /crowdsec rather than installing it system-wide) and renaming upstream's
+ * deliberate changes are the two paths (this stack mounts the library at
+ * /crowdsec rather than installing it system-wide), renaming upstream's
  * `$unix` variable, which is far too generic to introduce into someone else's
- * nginx.conf.
+ * nginx.conf, and the `$crowdsec_client_ip` geo/map pair that makes the ban
+ * check immune to X-Forwarded-For spoofing from the LAN (§124.5 — see below).
  */
 function buildNpmBouncerBlock(): string {
   return [
@@ -287,6 +304,32 @@ function buildNpmBouncerBlock(): string {
     '        "~unix:" 1;',
     '}',
     '',
+    '# Which address the ban check treats as the client.',
+    '#',
+    "# nginx's real_ip module rewrites $remote_addr from X-Forwarded-For /",
+    "# X-Real-IP for any peer in a trusted range, and NPM's own nginx.conf trusts",
+    '# every RFC1918 block (10/8, 172.16/12, 192.168/16). That list is',
+    '# additive-only — a custom include like this one cannot narrow it (§99,',
+    '# §124.5) — so a client on the LAN connecting straight to NPM would be',
+    '# "trusted" and could forge those headers to dodge a ban, or get another IP',
+    '# banned, if the check simply read $remote_addr.',
+    '#',
+    '# $realip_remote_addr is the raw TCP peer, before any rewrite; it cannot be',
+    '# forged without controlling the connection. A request that came in through',
+    '# cloudflared is re-originated by docker-proxy from inside Docker\'s address',
+    '# space; a LAN client DNAT\'d straight to NPM keeps its real address. So only',
+    "# a peer in Docker's ranges is allowed to name the client (via Cloudflare's",
+    '# CF-Connecting-IP header); every other peer is taken at face value.',
+    'geo $realip_remote_addr $crowdsec_peer_is_internal {',
+    '        default  0;',
+    ...DOCKER_INTERNAL_RANGES.map((cidr) => `        ${cidr}  1;`),
+    '}',
+    '',
+    'map $crowdsec_peer_is_internal $crowdsec_client_ip {',
+    '        default  $realip_remote_addr;',
+    '        "1"      $http_cf_connecting_ip;',
+    '}',
+    '',
     'init_worker_by_lua_block {',
     '        cs = require "crowdsec"',
     '        local mode = cs.get_mode()',
@@ -303,9 +346,16 @@ function buildNpmBouncerBlock(): string {
     '        if ngx.var.crowdsec_unix == "1" then',
     '                ngx.log(ngx.DEBUG, "[Crowdsec] Unix socket request, ignoring")',
     '        else',
-    '                -- remote_addr, not the raw peer: nginx\'s real_ip module has',
-    '                -- already rewritten it to the client Cloudflare saw (§110.2).',
-    '                cs.Allow(ngx.var.remote_addr)',
+    '                -- $crowdsec_client_ip is the unspoofable TCP peer for a direct',
+    '                -- client, or CF-Connecting-IP when that peer is inside Docker',
+    '                -- (i.e. it came via cloudflared) — see the geo/map above. Fall',
+    '                -- back to remote_addr if a tunnelled request carries no',
+    '                -- CF-Connecting-IP.',
+    '                local ip = ngx.var.crowdsec_client_ip',
+    '                if ip == nil or ip == "" then',
+    '                        ip = ngx.var.remote_addr',
+    '                end',
+    '                cs.Allow(ip)',
     '        end',
     '}',
     NPM_BOUNCER_MARKER_END,
