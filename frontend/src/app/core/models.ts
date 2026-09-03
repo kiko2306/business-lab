@@ -503,7 +503,7 @@ export interface MailTestResponse {
   imap: { ok: boolean; detail: string } | null;
 }
 
-export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 'googledrive';
+export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 'googledrive' | 'ftp' | 'ftps';
 
 /** GET /settings/backup-target. Secrets report only whether they are set. */
 export interface BackupTargetSettings {

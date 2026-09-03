@@ -40,6 +40,12 @@
 
 ## Backup and recovery
 
+- Choose where backups are written on the **Settings** page: another disk on
+  the machine, an SMB/Windows share, an NFS export, an FTP or FTPS server, or
+  Google Drive. Disk/SMB/NFS are mounted; FTP/FTPS and Google Drive are
+  reached by Duplicati directly, so **Test destination** checks them through
+  Duplicati itself. For FTP, put the host (or `host:port`) in **Server** and
+  the remote directory in **Remote directory**.
 - Create backups from the dashboard.
 - "Back up now" on the schedule card runs the app-data backup on demand (dump
   every app database, then Duplicati) — use it to check a destination you have

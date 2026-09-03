@@ -334,6 +334,8 @@
         <option value="disk">Another disk on this machine</option>
         <option value="smb">Network drive (SMB / Windows share)</option>
         <option value="nfs">NAS (NFS export)</option>
+        <option value="ftp">FTP server</option>
+        <option value="ftps">FTP over TLS (FTPS)</option>
         <option value="googledrive">Google Drive</option>
       </select>
     </div>
@@ -383,6 +385,39 @@
         <div class="form-text">
           Only needed for unusual setups. SMB defaults to version 3.0 — older
           NAS boxes may need <code>vers=2.1</code> or <code>vers=1.0</code>.
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- FTP / FTPS — Duplicati connects directly, no mount -->
+    <ng-container *ngIf="backupTargetForm.controls.kind.value === 'ftp' || backupTargetForm.controls.kind.value === 'ftps'">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="backupFtpServer">Server</label>
+        <input id="backupFtpServer" type="text" class="form-control" formControlName="server"
+               placeholder="192.168.1.50 or ftp.example.com:2121" autocomplete="off" />
+        <div class="form-text">Add <code>:port</code> if the server does not use 21.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="backupFtpDir">Remote directory</label>
+        <input id="backupFtpDir" type="text" class="form-control" formControlName="share"
+               placeholder="backups" autocomplete="off" />
+        <div class="form-text">Relative to the login directory. Leave blank for the FTP root.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="backupFtpUser">Username</label>
+        <input id="backupFtpUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="backupFtpPassword">Password</label>
+        <input id="backupFtpPassword" type="password" class="form-control" formControlName="password"
+               [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+               autocomplete="new-password" />
+      </div>
+      <div class="col-12">
+        <div class="alert alert-secondary small mb-0">
+          {{ backupTargetForm.controls.kind.value === 'ftps' ? 'FTPS uses explicit TLS (AUTH TLS) on port 21.' : 'Plain FTP — credentials and data are unencrypted; use FTPS or a NAS share if the link is not trusted.' }}
+          Not mounted — <strong>Test destination</strong> checks it through Duplicati itself,
+          the same code path a backup uses.
         </div>
       </div>
     </ng-container>

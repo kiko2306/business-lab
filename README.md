@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.11.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.12.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -246,11 +246,13 @@ Strategy:
       `backup: { engine: 'postgres', service: 'onlyoffice-db' }` — the
       existing dump path then covers it. Do it with §81.4 (Nextcloud →
       OnlyOffice wiring), which also needs a working doc server.
-- [ ] **Add an FTP/FTPS backup destination** (§131.4) — alongside
-      `disk`/`SMB`/`NFS`/Drive, in the stored-destination model and the
-      Duplicati (and later Kopia) translation.
-- [ ] **Prove a non-Drive destination** (§131.4) — `disk`/`SMB`/`NFS` are built
-      and never exercised; prove FTP in the same pass.
+- [ ] **Prove a non-Drive destination end to end** (§131.4, §173) — FTP/FTPS
+      are built (§173) and proven as far as connect + auth against real
+      Duplicati, but a completed transfer failed against throwaway
+      containerised FTP servers. `disk`/`SMB`/`NFS` are built and never
+      exercised at all. Prove one of them writes and restores against a
+      production-like server (a NAS, or the live dashboard). Also covers the
+      Kopia translation later.
 - [ ] **Prove a Postgres/MySQL restore** — only SQLite has been round-tripped.
 - [ ] **Per-application backup / restore** (§131.4) — a per-app action on each
       app's card: back up just this app's data + database, list its snapshots,

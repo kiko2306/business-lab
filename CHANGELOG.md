@@ -11,6 +11,19 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.12.0] — 2026-09-03
+
+### Added
+
+- **FTP / FTPS backup destinations** (§131.4) — pick FTP or FTPS on the
+  Settings page alongside disk/SMB/NFS/Google Drive. Like Google Drive it is
+  a Duplicati-backend destination (no mount): the dashboard builds an
+  `aftp://` target URL and **Test destination** verifies it through Duplicati
+  itself. Reuses the SMB/NFS fields — server (`host` or `host:port`), remote
+  directory, username, password. Verified against a real Duplicati that the
+  URL is parsed, connects and authenticates; a completed transfer still needs
+  a production-like FTP server (the "prove a non-Drive destination" item).
+
 ## [0.11.1] — 2026-09-03
 
 ### Fixed

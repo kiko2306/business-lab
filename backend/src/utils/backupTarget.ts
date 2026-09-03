@@ -76,11 +76,16 @@ export const DEFAULT_BACKUP_FOLDER = 'homelab-backups';
  *   MOUNTED   disk / smb / nfs — the kernel mounts them, Docker's local driver
  *             does the work, and Duplicati just sees a directory. Testable here
  *             by mounting and writing.
- *   BACKEND   googledrive — no kernel filesystem exists for it. Duplicati
- *             talks to the API itself via a target URL, so there is nothing to
- *             mount and nothing this process can meaningfully write to.
+ *   BACKEND   googledrive / ftp / ftps — no kernel filesystem is mounted.
+ *             Duplicati speaks the protocol itself via a target URL, so there
+ *             is nothing to mount and nothing this process writes to directly;
+ *             the destination is tested and provisioned through Duplicati.
+ *
+ * FTP reuses the SMB/NFS fields — `server` (host, or `host:port`), `share`
+ * (the remote directory), `username`, `password` — because a mount and an
+ * `aftp://` URL need the same four facts.
  */
-export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 'googledrive';
+export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 'googledrive' | 'ftp' | 'ftps';
 
 /** True when the kind is something the kernel can mount. */
 export function isMountedKind(kind: BackupTargetKind): boolean {
@@ -122,7 +127,7 @@ export async function getBackupTarget(): Promise<BackupTarget | null> {
   const values = Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
 
   const kind = values[BACKUP_TARGET_KEYS.kind];
-  if (kind !== 'disk' && kind !== 'smb' && kind !== 'nfs' && kind !== 'googledrive') {
+  if (kind !== 'disk' && kind !== 'smb' && kind !== 'nfs' && kind !== 'googledrive' && kind !== 'ftp' && kind !== 'ftps') {
     return null;
   }
 
@@ -146,6 +151,25 @@ export async function getBackupTarget(): Promise<BackupTarget | null> {
  * so the "destination" is just the path the volume is mounted at.
  */
 export function toDuplicatiUrl(target: BackupTarget): string | null {
+  if (target.kind === 'ftp' || target.kind === 'ftps') {
+    // Duplicati's `aftp://` backend is the FluentFTP one — the maintained
+    // implementation, and the only one that handles passive mode and TLS
+    // reliably. `server` may carry a `host:port`; it drops straight into the
+    // authority. The remote directory is `share`, same field SMB/NFS use.
+    const dir = target.share.trim().replace(/^\/+|\/+$/g, '');
+    // Built by hand rather than with URLSearchParams: that encodes a space as
+    // `+`, and Duplicati's URL parser takes `+` literally, so a password with
+    // a space would be sent wrong. encodeURIComponent uses `%20`.
+    const params: string[] = [];
+    if (target.username) params.push(`auth-username=${encodeURIComponent(target.username)}`);
+    if (target.password) params.push(`auth-password=${encodeURIComponent(target.password)}`);
+    // Explicit FTPS (AUTH TLS on the control channel) for `ftps`; plain FTP
+    // otherwise. Duplicati's default is no encryption, so `ftp` needs nothing.
+    if (target.kind === 'ftps') params.push('aftp-encryption-mode=Explicit');
+    const query = params.length ? `?${params.join('&')}` : '';
+    return `aftp://${target.server.trim()}/${encodeURI(dir)}${query}`;
+  }
+
   if (target.kind !== 'googledrive') return null;
   const folder = target.folder.trim().replace(/^\/+|\/+$/g, '') || DEFAULT_BACKUP_FOLDER;
 
@@ -207,14 +231,26 @@ export function toMountSpec(target: BackupTarget): BackupMountSpec {
 
 /** Human-readable validation. Returns null when the target is usable. */
 export function validateTarget(target: BackupTarget): string | null {
-  const commaFields: [string, string][] = [
-    ['username', target.username],
-    ['password', target.password],
-  ];
-  for (const [name, value] of commaFields) {
-    if (value.includes(',')) {
-      return `The ${name} cannot contain a comma — mount options are comma-separated, so it would corrupt the mount.`;
+  // A comma in a credential corrupts the comma-separated mount options — but
+  // only for a mount. FTP credentials go into a URL, percent-encoded, where a
+  // comma is fine, so this check does not apply to them.
+  if (isMountedKind(target.kind)) {
+    for (const [name, value] of [['username', target.username], ['password', target.password]] as const) {
+      if (value.includes(',')) {
+        return `The ${name} cannot contain a comma — mount options are comma-separated, so it would corrupt the mount.`;
+      }
     }
+  }
+
+  if (target.kind === 'ftp' || target.kind === 'ftps') {
+    if (!target.server) return 'Enter the FTP server hostname or IP address (add `:port` if it is not 21).';
+    // server, username and password land in an aftp:// URL. A space or a URL
+    // metacharacter in the host would split it; credentials are percent-encoded
+    // so they are unrestricted.
+    if (/[\s/?#@]/.test(target.server)) {
+      return 'The server must be a bare host or host:port — no slashes, spaces or credentials.';
+    }
+    return null;
   }
 
   if (target.kind === 'googledrive') {

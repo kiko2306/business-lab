@@ -13976,3 +13976,69 @@ cross-reference in a file this size is not worth it. plan.md is already 1,790
 lines lighter after pass 1, and `plan-index.md` makes the length a non-issue
 for reading. No further compaction unless a run genuinely closes out with
 nothing pointing back at it.
+
+## 173. §131.4 — FTP / FTPS backup destination (2026-09-03)
+
+Adds `ftp` and `ftps` as backup destinations alongside disk/SMB/NFS/Google
+Drive.
+
+### Design
+
+FTP is a **Duplicati-backend** destination, not a mounted one — there is no
+practical kernel filesystem for it, so Duplicati speaks the protocol itself
+via a target URL, exactly like Google Drive. That means it rides the code
+paths that already exist: `isMountedKind` stays false for `ftp`/`ftps`, so
+`provisionBackupJob`, `testDestinationUrl` and `ensureDestinationFolder` in
+`duplicatiClient.ts` need **no change** — they already branch on
+`isMountedKind ? MOUNTED_TARGET : toDuplicatiUrl(target)`.
+
+- **`backupTarget.ts`** — `BackupTargetKind` gains `'ftp' | 'ftps'`;
+  `getBackupTarget` accepts them; `toDuplicatiUrl` builds
+  `aftp://<server>/<dir>?auth-username=…&auth-password=…[&aftp-encryption-mode=Explicit]`.
+  `aftp://` is Duplicati's FluentFTP backend — the maintained one, and the
+  only one that does passive mode and TLS properly. Credentials go in as
+  percent-encoded query params (built by hand, not `URLSearchParams`, because
+  that emits `+` for a space and Duplicati's URL parser takes `+` literally).
+  `ftps` adds explicit TLS (`AUTH TLS` on the control channel); plain `ftp`
+  adds nothing since Duplicati's default is no encryption.
+- **`backupTarget.ts` `validateTarget`** — `ftp`/`ftps` require a `server`
+  and reject one carrying a slash, space or `user@` (it lands in the URL
+  authority). The comma-in-credential check is now scoped to mounted kinds:
+  FTP credentials are percent-encoded into a URL where a comma is fine.
+- **FTP reuses the SMB/NFS fields** — `server` (host or `host:port`), `share`
+  (remote directory), `username`, `password` — a mount and an `aftp://` URL
+  need the same four facts, so no new settings keys, no migration.
+- **`validation.ts`** — `kind` valid list gains `ftp`, `ftps`.
+- **Frontend** — `BackupTargetKind` widened; `backupTargetIsMounted` now
+  false for ftp/ftps; the Settings destination form gains an FTP fieldset
+  (server, remote directory, username, password) and a note that it is tested
+  through Duplicati.
+
+### Verified
+
+- `backupTarget.test.ts` — 21 tests (7 new): the `aftp://` URL shape,
+  percent-encoding (`p@ss word` → `p%40ss%20word`, never `+`), explicit-TLS
+  only for `ftps`, the anonymous case, the `validateTarget` rules, and
+  `isMountedKind`/`toMountSpec` treating ftp/ftps as backend-family. Backend
+  `npm run typecheck` clean, full suite **432/432**. Frontend `npm run build`
+  clean (Angular template type-check passes).
+- **Against real Duplicati** (`duplicati-cli` in the running
+  `duplicati-duplicati-1`, pointed at a throwaway FTP-server container on
+  Duplicati's own network): Duplicati parsed and accepted the exact
+  `aftp://…?auth-username=…&auth-password=…` URL `toDuplicatiUrl` emits,
+  connected, **authenticated** (server log: `OK LOGIN`), listed and changed
+  to the remote directory, and issued `STOR`. So the URL format and the
+  credential-param convention are correct end to end.
+
+### Not done here
+
+A **completed** transfer was not observed: `duplicati-cli`'s uploads failed
+at the data-connection leg against two different containerised FTP-server
+images (a plain `curl` upload from the same container succeeded, so it is a
+FluentFTP-vs-throwaway-server interaction in a container-to-container setup,
+not the URL or this code). The real target is a NAS / FTP appliance — a
+different server — so the "prove a non-Drive destination" README item stays
+open, now narrowed to the data-path proof against a production-like server or
+the live dashboard.
+
+Minor bump 0.11.1 → 0.12.0 (new user-facing feature).

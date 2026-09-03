@@ -255,9 +255,9 @@ export class SettingsComponent implements OnInit {
     }
   }
 
-  /** Google Drive is reached by Duplicati itself, so there is no mount. */
+  /** Google Drive and FTP are reached by Duplicati itself, so there is no mount. */
   protected get backupTargetIsMounted(): boolean {
-    return this.backupTargetForm.controls.kind.value !== 'googledrive';
+    return !['googledrive', 'ftp', 'ftps'].includes(this.backupTargetForm.controls.kind.value);
   }
 
   /**

@@ -11,13 +11,17 @@ describe('backup destination families', () => {
     expect(isMountedKind('disk')).toBe(true);
     expect(isMountedKind('smb')).toBe(true);
     expect(isMountedKind('nfs')).toBe(true);
-    // No kernel filesystem exists for Google Drive; treating it as mountable
-    // would produce a volume that only fails when a backup runs.
+    // No kernel filesystem is mounted for these; Duplicati speaks the protocol
+    // itself, so treating them as mountable would produce a volume that only
+    // fails when a backup runs.
     expect(isMountedKind('googledrive')).toBe(false);
+    expect(isMountedKind('ftp')).toBe(false);
+    expect(isMountedKind('ftps')).toBe(false);
   });
 
   it('refuses to build a mount spec for a backend destination', () => {
     expect(() => toMountSpec({ ...base, kind: 'googledrive', authId: 'x' })).toThrow(/not a mounted destination/);
+    expect(() => toMountSpec({ ...base, kind: 'ftp', server: 'h' })).toThrow(/not a mounted destination/);
   });
 });
 
@@ -79,6 +83,24 @@ describe('toDuplicatiUrl', () => {
   it('returns null for mounted kinds, which have no target URL', () => {
     expect(toDuplicatiUrl({ ...base, kind: 'disk', path: '/mnt/b' })).toBeNull();
   });
+
+  it('builds an aftp:// URL for FTP, credentials as percent-encoded params', () => {
+    const url = toDuplicatiUrl({ ...base, kind: 'ftp', server: 'nas:2121', share: '/backups/', username: 'bkp', password: 'p@ss word' });
+    expect(url).toBe('aftp://nas:2121/backups?auth-username=bkp&auth-password=p%40ss%20word');
+    // A space becomes %20, never + — Duplicati's parser takes + literally.
+    expect(url).not.toContain('+');
+  });
+
+  it('adds explicit TLS for ftps and nothing for plain ftp', () => {
+    expect(toDuplicatiUrl({ ...base, kind: 'ftps', server: 'h', share: 'b', username: 'u', password: 'p' }))
+      .toContain('aftp-encryption-mode=Explicit');
+    expect(toDuplicatiUrl({ ...base, kind: 'ftp', server: 'h', share: 'b', username: 'u', password: 'p' }))
+      .not.toContain('aftp-encryption-mode');
+  });
+
+  it('omits the query entirely for an anonymous FTP destination', () => {
+    expect(toDuplicatiUrl({ ...base, kind: 'ftp', server: 'h', share: 'b' })).toBe('aftp://h/b');
+  });
 });
 
 describe('validateTarget', () => {
@@ -104,6 +126,16 @@ describe('validateTarget', () => {
     // These would split or truncate the query string.
     expect(validateTarget({ ...base, kind: 'googledrive', authId: 'a&b' })).toMatch(/cannot appear/);
     expect(validateTarget({ ...base, kind: 'googledrive', authId: 'a b' })).toMatch(/cannot appear/);
+  });
+
+  it('requires a server for FTP and rejects one carrying a path or credentials', () => {
+    expect(validateTarget({ ...base, kind: 'ftp', server: '' })).toMatch(/FTP server/);
+    expect(validateTarget({ ...base, kind: 'ftps', server: 'nas:2121', share: 'b', username: 'u', password: 'p' })).toBeNull();
+    // host:port only — a slash, space or user@ would break the aftp:// URL.
+    expect(validateTarget({ ...base, kind: 'ftp', server: 'nas/backups' })).toMatch(/bare host/);
+    expect(validateTarget({ ...base, kind: 'ftp', server: 'user@nas' })).toMatch(/bare host/);
+    // A comma in an FTP password is fine — it goes into a URL, not mount options.
+    expect(validateTarget({ ...base, kind: 'ftp', server: 'nas', password: 'a,b' })).toBeNull();
   });
 });
 
