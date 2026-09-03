@@ -12,6 +12,13 @@ services:
       # the worker bouncer below can authenticate to the local API. Keep it in
       # sync with crowdsec_config.lapi_key in cloudflare-worker-bouncer.yaml.
       BOUNCER_KEY_cloudflare: ${CROWDSEC_BOUNCER_KEY}
+      # Same mechanism for the Lua bouncer running inside Nginx Proxy Manager
+      # (§119): registers a bouncer named "nginx" with this key on startup, so
+      # NPM's per-request check can authenticate to the local API. The key is
+      # generated into this app's .env and rendered into NPM's
+      # crowdsec-bouncer/crowdsec-nginx-bouncer.conf by the dashboard backend
+      # (services/crowdsecConfig.ts) — the two ends can't drift.
+      BOUNCER_KEY_nginx: ${CROWDSEC_NGINX_BOUNCER_KEY}
     # So the notification-http plugin can reach ntfy's published port on the
     # host regardless of which compose-project bridge each app is on
     # (services/crowdsecConfig.ts renders the URL against this). plan.md §118.1.
@@ -37,6 +44,10 @@ services:
       - ../nginx-proxy-manager/data/app/logs:/var/log/npm:ro
     networks:
       - crowdsec-net
+      # Lets Nginx Proxy Manager — a separate compose project — reach the local
+      # API at http://crowdsec:8080 for the Lua bouncer's decision stream
+      # (§119), without publishing LAPI to the host or the LAN.
+      - crowdsec-lapi
     # Homepage discovers running containers by these labels. No homepage.href:
     # CrowdSec has no web UI at all, so a tile that linked somewhere would be
     # a dead end — it shows as a name and a description while it is up.
@@ -84,3 +95,9 @@ services:
 networks:
   crowdsec-net:
     driver: bridge
+  # Shared with the nginx-proxy-manager compose project. External so both
+  # projects join the same network rather than each creating its own; the
+  # backend creates it before starting either (config/services.ts
+  # `externalNetworks`).
+  crowdsec-lapi:
+    external: true

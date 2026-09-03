@@ -1,0 +1,45 @@
+# Template only — documents the shape of the file the dashboard generates.
+#
+# The real crowdsec-nginx-bouncer.conf is rendered beside this one by
+# backend/src/services/crowdsecConfig.ts on every CrowdSec start and whenever
+# the "Enforce CrowdSec bans at NPM" toggle changes. It holds the LAPI key, so
+# it is gitignored. Do not hand-edit either file (plan.md §0.2).
+#
+# Paths are container paths: apps/nginx-proxy-manager/crowdsec-bouncer/ is
+# mounted read-only at /crowdsec inside the NPM container.
+
+ENABLED=true
+
+# CrowdSec's local API, over the shared `crowdsec-lapi` docker network. Not
+# published to the host or the LAN — NPM and CrowdSec live in separate compose
+# projects, and this external network is the only thing joining them.
+API_URL=http://crowdsec:8080
+API_KEY=<generated into apps/crowdsec/.env as CROWDSEC_NGINX_BOUNCER_KEY>
+
+# stream: a background timer pulls the decision list from LAPI every
+# UPDATE_FREQUENCY seconds into the crowdsec_cache shared dict, and the
+# per-request check only reads that cache. This is also what makes a CrowdSec
+# outage fail *open* — a cache miss returns "allow", so LAPI being unreachable
+# means no new decisions rather than a blocked site.
+MODE=stream
+UPDATE_FREQUENCY=10
+REQUEST_TIMEOUT=1000
+
+# Only enforce outright bans. CrowdSec can also hand out `captcha`, which needs
+# a recaptcha/hcaptcha/turnstile account — a third-party signup this stack
+# deliberately does not require.
+BOUNCING_ON_TYPE=ban
+
+# FALLBACK_REMEDIATION is deliberately absent. It only governs what happens
+# when the *AppSec* component fails, and AppSec is off here (APPSEC_URL empty).
+# It is also validated against {ban, captcha} only: the `bypass` value §119
+# originally specified would be rejected and silently coerced to `ban`, i.e.
+# fail-closed — the opposite of what was wanted.
+
+BAN_TEMPLATE_PATH=/crowdsec/templates/ban.html
+
+# Captcha and AppSec are unused; left empty so the parser takes its defaults.
+CAPTCHA_PROVIDER=
+SECRET_KEY=
+SITE_KEY=
+APPSEC_URL=

@@ -107,6 +107,40 @@ async function resolveTimezoneOverride(appDir: string): Promise<Record<string, s
 }
 
 /**
+ * Create any docker network this service's compose file declares as
+ * `external: true`, if it isn't there yet.
+ *
+ * Compose refuses to start a project whose external network is missing
+ * ("network X declared as external, but could not be found"), and the entire
+ * point of an external network here is that two compose projects share one —
+ * so neither project can be the one that creates it. That leaves the backend,
+ * which is also the only place it can happen without a console step (§0.2).
+ * Names come from the registry, never from a request.
+ *
+ * Best-effort: if creation fails, compose's own error is the clearer one to
+ * surface, so this logs and lets the start proceed to it.
+ */
+async function ensureExternalNetworks(serviceName: string): Promise<void> {
+  for (const network of getService(serviceName)?.externalNetworks ?? []) {
+    try {
+      const { stdout } = await executeCommand(
+        `docker network ls --filter name=^${network}$ --format "{{.Name}}"`
+      );
+      if (stdout.split('\n').some((line) => line.trim() === network)) {
+        continue;
+      }
+      await executeCommand(`docker network create ${network}`);
+      logger.info(`Created external docker network ${network} for ${serviceName}`, { service: serviceName });
+    } catch (error) {
+      logger.warn(`Could not ensure external docker network ${network} for ${serviceName}`, {
+        service: serviceName,
+        error: (error as Error).message,
+      });
+    }
+  }
+}
+
+/**
  * `docker compose up -d` for a service with every piece of managed config
  * re-applied first: generatable secrets, the exposure env overrides + config
  * files (Host/CSRF/URL knobs derived from the public hostname), CrowdSec's
@@ -122,6 +156,11 @@ async function composeUpWithManagedConfig(
   composeFile: string,
   { forceRecreate }: { forceRecreate: boolean }
 ): Promise<CommandResult> {
+  // Before anything else: a missing external network fails `compose up`
+  // outright, so there is no point rendering config for a start that can't
+  // happen.
+  await ensureExternalNetworks(serviceName);
+
   const envOverrides = await buildExposureEnvOverrides(serviceName, appDir);
   // Mail settings are global and injected the same way — one mailbox
   // configured once, inherited by every app that declares mailEnvKeys.
@@ -571,6 +610,13 @@ export async function restartService(serviceName: string, userId: number): Promi
       timestamp: new Date(),
     };
   }
+
+  // Same as start: a secret this service has only just declared — because the
+  // registry gained one, as CrowdSec did with the NPM bouncer key (§119) —
+  // has to materialise here too. A restart is exactly what an operator does
+  // after changing something in the dashboard, and without this the app comes
+  // back up with the new variable substituted to an empty string.
+  await ensureGeneratedSecrets(serviceName);
 
   try {
     logger.info(`Restarting service: ${serviceName}`, { userId, service: serviceName });

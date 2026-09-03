@@ -47,7 +47,7 @@ operate within, listed again at the end.
 | BookStack | MIT (LinuxServer image scripts GPL-3.0) | ✅ Clean | |
 | ClamAV | GPL-2.0 | ✅ Clean | internal use |
 | Code Server | MIT | ✅ Clean | VS Code OSS build |
-| CrowdSec | MIT | ✅ Clean | Cloudflare bouncer MIT |
+| CrowdSec | MIT | ✅ Clean | Cloudflare bouncer MIT; NPM Lua bouncer MIT, see vendored code below |
 | Dozzle | MIT | ✅ Clean | |
 | Duplicati | MIT (since 2024-03; was LGPL-2.1) | ✅ Clean | |
 | File Browser | Apache-2.0 | ✅ Clean | |
@@ -91,6 +91,20 @@ operate within, listed again at the end.
 | alpine | MIT | ✅ Clean | |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |
 | LinuxServer.io images (BookStack, Code Server, Duplicati, MariaDB, Speedtest) | image build scripts GPL-3.0; bundled apps keep their own licence | ✅ Clean | GPL applies to the packaging scripts, adds no restriction on running the app |
+
+## Vendored source
+
+Third-party source checked into this repo rather than pulled from an image.
+Same question, one extra wrinkle: it is *distributed* with the repo (which is
+public), so the licence has to permit redistribution, not just use.
+
+| Code | Upstream | Licence | Status | Note |
+|---|---|---|---|---|
+| `apps/nginx-proxy-manager/crowdsec-bouncer/lua/crowdsec.lua`, `lua/plugins/crowdsec/*` | crowdsecurity/lua-cs-bouncer v1.0.18 | MIT | ✅ Clean | unmodified; `LICENSE.lua-cs-bouncer` kept beside it |
+| `apps/nginx-proxy-manager/crowdsec-bouncer/lua/resty/http*.lua` | ledgetech/lua-resty-http v0.17.2 | BSD-2-Clause | ✅ Clean | unmodified; `LICENSE.lua-resty-http` kept beside it. Vendored because the NPM image ships no `resty.http` |
+
+Both permit redistribution with the copyright notice retained, which is why the
+upstream `LICENSE` files travel with the code rather than being summarised here.
 
 ## This repository has no licence
 

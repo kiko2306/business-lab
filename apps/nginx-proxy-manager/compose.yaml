@@ -26,6 +26,13 @@ services:
       # host's Advanced config to put it behind Authelia. See
       # apps/authelia/config/configuration.yml for the SSO side of this.
       - ./snippets:/snippets:ro
+      # CrowdSec's Lua bouncer: the vendored library, the ban page, and the
+      # backend-rendered crowdsec-nginx-bouncer.conf that holds the LAPI key
+      # (§119). Mounted whether or not enforcement is on — the http_top.conf
+      # block that actually loads it is what the dashboard toggle controls.
+      # The *directory* is mounted, not the files inside it, so a not-yet-
+      # rendered .conf can't make Docker auto-create a directory in its place.
+      - ./crowdsec-bouncer:/crowdsec:ro
     depends_on:
       npm-db:
         condition: service_healthy
@@ -33,6 +40,12 @@ services:
       - "host.docker.internal:host-gateway"
     networks:
       - npm-net
+      # Reaches CrowdSec's local API at http://crowdsec:8080 for the decision
+      # stream. CrowdSec is a separate compose project, so this is an external
+      # network both projects attach to — created by the backend before either
+      # starts (config/services.ts `externalNetworks`). Keeping LAPI here
+      # rather than on a published port keeps it off the LAN entirely.
+      - crowdsec-lapi
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:81/health"]
       interval: 30s
@@ -61,3 +74,8 @@ services:
 networks:
   npm-net:
     driver: bridge
+  # Shared with the crowdsec compose project; see the nginx-proxy-manager
+  # service above. Declared external so both projects join the same network
+  # instead of each creating its own <project>_crowdsec-lapi.
+  crowdsec-lapi:
+    external: true

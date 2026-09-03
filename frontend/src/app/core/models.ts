@@ -143,6 +143,10 @@ export interface AlertNotifySettings {
   topic: string;
   // Per-source flags.
   crowdsecEnabled: boolean;
+  // Whether CrowdSec's bans are actually enforced, by the Lua bouncer inside
+  // Nginx Proxy Manager. Detection-only when off — and the alert wording
+  // follows it, so a push only says "banned" when the ban is real.
+  enforceNpm: boolean;
 }
 
 export interface ExposureSettingsInput {

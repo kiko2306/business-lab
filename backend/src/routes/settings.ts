@@ -27,7 +27,9 @@ import {
   isValidAlertTopic,
   setAlertTopic,
   setCrowdsecAlertsEnabled,
+  setCrowdsecEnforceNpm,
 } from '../utils/alertNotify';
+import { applyNpmCrowdsecConfig } from '../services/crowdsecConfig';
 import { runAlertTest, AlertSource } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
@@ -662,12 +664,16 @@ router.put('/alerts', async (req: Request, res: Response) => {
   const body = req.body ?? {};
   const hasTopic = 'topic' in body;
   const hasCrowdsec = 'crowdsecEnabled' in body;
+  const hasEnforce = 'enforceNpm' in body;
 
-  if (!hasTopic && !hasCrowdsec) {
-    return res.status(400).json({ error: 'Provide "topic" and/or "crowdsecEnabled".' });
+  if (!hasTopic && !hasCrowdsec && !hasEnforce) {
+    return res.status(400).json({ error: 'Provide "topic", "crowdsecEnabled" and/or "enforceNpm".' });
   }
   if (hasCrowdsec && typeof body.crowdsecEnabled !== 'boolean') {
     return res.status(400).json({ error: 'crowdsecEnabled must be true or false.' });
+  }
+  if (hasEnforce && typeof body.enforceNpm !== 'boolean') {
+    return res.status(400).json({ error: 'enforceNpm must be true or false.' });
   }
   if (hasTopic && !isValidAlertTopic(body.topic)) {
     return res
@@ -682,6 +688,14 @@ router.put('/alerts', async (req: Request, res: Response) => {
     if (hasCrowdsec) {
       await setCrowdsecAlertsEnabled(body.crowdsecEnabled);
     }
+    if (hasEnforce) {
+      await setCrowdsecEnforceNpm(body.enforceNpm);
+      // Render NPM's bouncer config + http_top.conf block now rather than at
+      // the next CrowdSec start: nginx runs the bouncer's init while parsing
+      // its config, so a problem with it is a problem worth surfacing while
+      // the operator is still looking at the switch (§119.4).
+      await applyNpmCrowdsecConfig();
+    }
     await writeAuditLog({
       userId: req.user?.id ?? null,
       action: 'settings_change',
@@ -690,15 +704,20 @@ router.put('/alerts', async (req: Request, res: Response) => {
       metadata: {
         ...(hasTopic ? { topic: body.topic } : {}),
         ...(hasCrowdsec ? { crowdsecEnabled: body.crowdsecEnabled } : {}),
+        ...(hasEnforce ? { enforceNpm: body.enforceNpm } : {}),
       },
     }).catch(() => {});
 
     const saved = await getAlertNotifyConfig();
     return res.json({
       ...saved,
-      message: saved.crowdsecEnabled
-        ? 'Saved. Restart CrowdSec to apply, then subscribe to the topic in ntfy.'
-        : 'Saved. Restart CrowdSec to apply.',
+      message: hasEnforce
+        ? // Two restarts, and each does a different half: CrowdSec registers
+          // the `nginx` bouncer key, NPM loads (or drops) the Lua block.
+          `Saved. Restart CrowdSec and Nginx Proxy Manager to ${saved.enforceNpm ? 'start enforcing bans' : 'stop enforcing bans'}.`
+        : saved.crowdsecEnabled
+          ? 'Saved. Restart CrowdSec to apply, then subscribe to the topic in ntfy.'
+          : 'Saved. Restart CrowdSec to apply.',
     });
   } catch {
     return res.status(500).json({ error: 'Unable to save alert settings.' });

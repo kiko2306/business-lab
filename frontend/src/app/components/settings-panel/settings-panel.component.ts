@@ -173,6 +173,10 @@ export class SettingsPanelComponent implements OnInit {
     this.saveAlertSettings({ crowdsecEnabled: enabled });
   }
 
+  toggleCrowdsecEnforcement(enabled: boolean): void {
+    this.saveAlertSettings({ enforceNpm: enabled });
+  }
+
   saveAlertTopic(): void {
     if (!this.alertTopicValid) {
       return;
@@ -199,7 +203,7 @@ export class SettingsPanelComponent implements OnInit {
       });
   }
 
-  private saveAlertSettings(input: { topic?: string; crowdsecEnabled?: boolean }): void {
+  private saveAlertSettings(input: { topic?: string; crowdsecEnabled?: boolean; enforceNpm?: boolean }): void {
     this.savingAlerts = true;
     this.alertsFeedback = null;
     this.settingsService
@@ -207,7 +211,11 @@ export class SettingsPanelComponent implements OnInit {
       .pipe(finalize(() => (this.savingAlerts = false)))
       .subscribe({
         next: (response) => {
-          this.alertSettings = { topic: response.topic, crowdsecEnabled: response.crowdsecEnabled };
+          this.alertSettings = {
+            topic: response.topic,
+            crowdsecEnabled: response.crowdsecEnabled,
+            enforceNpm: response.enforceNpm,
+          };
           this.alertTopicDraft = response.topic;
           this.alertsFeedback = { type: 'success', message: response.message };
         },

@@ -126,7 +126,7 @@ export class SettingsService {
   }
 
   saveAlertSettings(
-    input: { topic?: string; crowdsecEnabled?: boolean }
+    input: { topic?: string; crowdsecEnabled?: boolean; enforceNpm?: boolean }
   ): Observable<AlertNotifySettings & { message: string }> {
     return this.http.put<AlertNotifySettings & { message: string }>(
       `${API_BASE_URL}/settings/alerts`,

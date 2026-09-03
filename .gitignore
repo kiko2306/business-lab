@@ -28,6 +28,11 @@ apps/crowdsec/config/*-bouncer.yaml
 apps/crowdsec/config/profiles.yaml
 apps/crowdsec/config/notifications/http.yaml
 
+# NPM's CrowdSec Lua bouncer config holds the LAPI key — rendered by the
+# backend on each CrowdSec start (§119). Keep the .example template and the
+# vendored lua/ + templates/ beside it.
+apps/nginx-proxy-manager/crowdsec-bouncer/crowdsec-nginx-bouncer.conf
+
 # n8n workflows are rendered by the backend on each n8n start
 # (services/n8nWorkflows.ts) — runtime state. Keep the directory (.gitkeep).
 apps/n8n/workflows/*.json

@@ -115,8 +115,12 @@ gate.
 ## Services with no web UI
 
 **CrowdSec**, **Tailscale** — no login, nothing to expose.
-CrowdSec's bouncer key and Tailscale's auth key are handled by the dashboard
-and `start.sh`.
+CrowdSec's bouncer keys and Tailscale's auth key are handled by the dashboard
+and `start.sh`. CrowdSec generates two: `CROWDSEC_BOUNCER_KEY` for the
+Cloudflare worker bouncer and `CROWDSEC_NGINX_BOUNCER_KEY` for the Lua bouncer
+inside Nginx Proxy Manager, kept separate so either can be revoked on its own
+(`cscli bouncers delete nginx`). Both are generated on first start and baked
+into the right config file; neither is ever typed.
 
 ## Rotating a credential
 

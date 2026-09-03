@@ -304,6 +304,30 @@
         </div>
       </div>
 
+      <div class="col-12">
+        <label class="form-label fw-semibold mb-2">Enforcement</label>
+        <div class="form-check form-switch">
+          <input
+            class="form-check-input"
+            type="checkbox"
+            role="switch"
+            id="crowdsecEnforceNpm"
+            [checked]="alertSettings.enforceNpm"
+            [disabled]="savingAlerts"
+            (change)="toggleCrowdsecEnforcement($any($event.target).checked)"
+          />
+          <label class="form-check-label" for="crowdsecEnforceNpm">
+            <span class="fw-semibold">Enforce CrowdSec bans at Nginx Proxy Manager</span>
+            <span class="d-block text-body-secondary small">
+              Off, CrowdSec only watches and alerts. On, every proxied request has its
+              client IP checked against CrowdSec's decision list and banned IPs get a
+              403 — and the alerts start saying so. Applies after restarting CrowdSec
+              and Nginx Proxy Manager.
+            </span>
+          </label>
+        </div>
+      </div>
+
       <div class="col-12" *ngIf="alertsFeedback">
         <span
           class="small"

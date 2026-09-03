@@ -156,6 +156,14 @@ export interface ServiceDefinition {
   // down. Kept separate from dependsOn deliberately: gating start on these
   // would make "the reverse proxy is stopped" mean "nothing can be started".
   requires?: string[];
+  // Docker networks this service's compose file declares as `external: true`
+  // — the way two compose projects share one network, since each project
+  // otherwise namespaces its own. Compose refuses to start a project whose
+  // external network does not exist yet, so the executor creates any listed
+  // here (idempotently) before `compose up`. Currently only `crowdsec-lapi`,
+  // which joins Nginx Proxy Manager to CrowdSec's local API for the Lua
+  // bouncer's decision stream (§119) without publishing LAPI to the LAN.
+  externalNetworks?: string[];
   // The host port this service listens on when it runs with
   // `network_mode: host` (currently Home Assistant, which needs host
   // networking for its zeroconf/SSDP/DHCP discovery). Such a service

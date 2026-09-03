@@ -240,18 +240,8 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **NEXT SESSION, START HERE — CrowdSec enforcement at NPM — lua bouncer** (§119, §122) — NPM's nginx is
-      openresty+ngx_lua, so `lua-cs-bouncer` runs inside it: per-request IP
-      check against CrowdSec's decision stream, 403 for banned IPs, using the
-      real client IP NPM already resolves. No Cloudflare token / Workers plan.
-      Supersedes the deferred `cloudflare-worker-bouncer` route (§117). Pieces:
-      vendor the lua lib; shared NPM↔CrowdSec network; generate + register a
-      `nginx` bouncer key; `crowdsecConfig.ts` renders the `.conf` + a
-      marker-fenced lua block in NPM `http_top.conf` behind a setting; a
-      dashboard toggle (**must call `setCrowdsecEnforceNpm` so the ntfy
-      pushes start saying "banned 4h"** — §122 already wired the relay to it);
-      prove a ban round-trips (403 → delete → 200, fail-open on CrowdSec down).
-- [ ] **XFF-spoofing hardening at NPM** (§119.2) — needed once §119 enforces:
+- [ ] **NEXT SESSION, START HERE — XFF-spoofing hardening at NPM** (§119.2, §124.5) — enforcement is
+      live now, so this is the open hole:
       NPM trusts all RFC1918 for `real_ip` with `real_ip_recursive on`, so a
       LAN client can spoof `X-Forwarded-For` and steer or dodge a ban. Tighten
       `set_real_ip_from` to the cloudflared gateway only — carefully (§99:
