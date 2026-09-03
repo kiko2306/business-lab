@@ -131,12 +131,7 @@ it is done — not ticked off and left behind. Section references point at
       value in either can cut off the very session applying it. Run
       `sudo ./setup_server.sh` and confirm both prompts behave as documented
       in `docs/first-run.md`.
-- [ ] **2FA slice B — enforce at login** (§127, §128) — `/auth/login` returns
-      `202 {mfaRequired, mfaToken}` when `totp_enabled`; `POST /auth/login/totp`
-      finishes it (TOTP code or recovery code); hard rate limit; audit actions.
-      Add `./start.sh recover disable-2fa <username>`. Verify a full round-trip
-      and a lockout recovery.
-- [ ] **2FA slice C — frontend login step** (§127) — login component becomes
+- [ ] **2FA slice C — frontend login step** (§127, §129) — login component becomes
       two-step on `202 mfaRequired` (mfaToken in memory only), "use a recovery
       code" toggle; `auth.service.ts` + `models.ts`.
 - [ ] **2FA slice D — frontend enrolment UI** (§127) — Account/Security page:

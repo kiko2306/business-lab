@@ -4,6 +4,7 @@
 #   ./start.sh recover list             # show the usernames that exist
 #   ./start.sh recover reset-password   # set a new password for an existing user
 #   ./start.sh recover create-admin     # add an admin when there is none
+#   ./start.sh recover disable-2fa      # clear a user's TOTP second factor
 #
 # Invoked by `./start.sh recover` (which forwards its arguments here) so the
 # only command a human types is still `./start.sh`. The HTTP /api/recovery/*
@@ -27,14 +28,16 @@ Usage: ./start.sh recover <subcommand>
   list             show the usernames that exist
   reset-password   set a new password for an existing user
   create-admin     add an admin account when there is none
+  disable-2fa      clear a user's TOTP second factor (lost authenticator)
 
 reset-password and create-admin prompt for the username (or take it as the
-next argument) and for the new password (hidden, entered twice).
+next argument) and for the new password (hidden, entered twice). disable-2fa
+takes just the username.
 EOF
 }
 
 case "$sub" in
-  list | reset-password | create-admin) ;;
+  list | reset-password | create-admin | disable-2fa) ;;
   "" | -h | --help | help)
     usage
     exit 0
@@ -67,10 +70,15 @@ if [ "$sub" = "list" ]; then
   exit $?
 fi
 
-# reset-password / create-admin
+# reset-password / create-admin / disable-2fa
 username="${2:-}"
 if [ -z "$username" ]; then
   read -rp "Username: " username
+fi
+
+if [ "$sub" = "disable-2fa" ]; then
+  RECOVER_USERNAME="$username" run_in_backend -e RECOVER_USERNAME
+  exit $?
 fi
 
 read -rsp "New password (8-128 chars): " password

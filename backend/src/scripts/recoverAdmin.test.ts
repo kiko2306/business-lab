@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseCredentials } from './recoverAdmin';
+import { parseCredentials, parseUsername } from './recoverAdmin';
 
 // Dummy values only: parseCredentials is a pure emptiness/length check and
 // never touches a database, so these authenticate to nothing. Built with
@@ -33,5 +33,16 @@ describe('parseCredentials', () => {
 
   it('does not treat a missing password as valid', () => {
     expect(() => parseCredentials({ RECOVER_USERNAME: 'admin' })).toThrow(/8.128/);
+  });
+});
+
+describe('parseUsername', () => {
+  it('trims and returns the username, ignoring any password', () => {
+    expect(parseUsername({ RECOVER_USERNAME: '  alice  ' })).toBe('alice');
+  });
+
+  it('rejects an empty or whitespace-only username', () => {
+    expect(() => parseUsername({})).toThrow(/RECOVER_USERNAME is empty/);
+    expect(() => parseUsername({ RECOVER_USERNAME: '  ' })).toThrow(/RECOVER_USERNAME is empty/);
   });
 });

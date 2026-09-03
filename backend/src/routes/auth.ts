@@ -2,7 +2,14 @@ import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { query, withTransaction } from '../utils/database';
 import { hashPassword, verifyPassword } from '../utils/password';
-import { signAccessToken, signRefreshToken, verifyRefreshToken, refreshTokenExpiryMs } from '../utils/jwt';
+import {
+  signAccessToken,
+  signRefreshToken,
+  signMfaToken,
+  verifyMfaToken,
+  verifyRefreshToken,
+  refreshTokenExpiryMs,
+} from '../utils/jwt';
 import setupModeMiddleware from '../middleware/setupMode';
 import authMiddleware from '../middleware/auth';
 import { schemas, validateBody } from '../middleware/validation';
@@ -42,6 +49,28 @@ interface UserRow {
   id: number;
   username: string;
   password_hash?: string;
+  totp_enabled?: boolean;
+}
+
+/**
+ * Issue an access + refresh token pair for a fully-authenticated user and
+ * persist the refresh token. The shared tail of a password-only login and the
+ * second step of a 2FA login.
+ */
+async function issueSession(user: { id: number; username: string }): Promise<{
+  accessToken: string;
+  refreshToken: string;
+  user: { id: number; username: string };
+}> {
+  const accessToken = signAccessToken({ id: user.id, username: user.username });
+  const refreshToken = signRefreshToken({ id: user.id });
+  const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
+  await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [
+    user.id,
+    refreshToken,
+    refreshExpiry,
+  ]);
+  return { accessToken, refreshToken, user: { id: user.id, username: user.username } };
 }
 
 // ---------------------------------------------------------------------------
@@ -116,9 +145,10 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
   const { username, password } = req.body;
 
   try {
-    const result = await query<UserRow>('SELECT id, username, password_hash FROM users WHERE username = $1', [
-      username,
-    ]);
+    const result = await query<UserRow>(
+      'SELECT id, username, password_hash, totp_enabled FROM users WHERE username = $1',
+      [username]
+    );
     const user = result.rows[0];
 
     if (!user || !(await verifyPassword(password, user.password_hash ?? ''))) {
@@ -130,21 +160,86 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
-    const accessToken = signAccessToken({ id: user.id, username: user.username });
-    const refreshToken = signRefreshToken({ id: user.id });
+    // Password is right but a second factor is due: hand back a short-lived
+    // token to spend at /auth/login/totp. No session is created yet.
+    if (user.totp_enabled) {
+      await writeAuditLog({ userId: user.id, action: 'login_mfa_challenge', resource: 'auth', result: 'success' }).catch(
+        () => {}
+      );
+      return res.status(202).json({ mfaRequired: true, mfaToken: signMfaToken(user.id) });
+    }
 
-    const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
-    await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [
-      user.id,
-      refreshToken,
-      refreshExpiry,
-    ]);
-
+    const session = await issueSession(user);
     await writeAuditLog({ userId: user.id, action: 'login', resource: 'auth', result: 'success' });
-
-    return res.json({ accessToken, refreshToken, user: { id: user.id, username: user.username } });
+    return res.json(session);
   } catch (err) {
     console.error('Login error:', (err as Error).message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/login/totp — second step of a 2FA login
+//
+// Takes the mfaToken from /auth/login plus a 6-digit TOTP code or a recovery
+// code. On success it issues the real session.
+// ---------------------------------------------------------------------------
+router.post('/login/totp', authLimiter, validateBody(schemas.authLoginTotp), async (req: Request, res: Response) => {
+  const { mfaToken, code } = req.body as { mfaToken: string; code: string };
+
+  let userId: number;
+  try {
+    userId = verifyMfaToken(mfaToken).id;
+  } catch {
+    return res.status(401).json({ error: 'This login attempt has expired. Start again.' });
+  }
+
+  try {
+    const result = await query<{ id: number; username: string; totp_secret: string | null; totp_enabled: boolean }>(
+      'SELECT id, username, totp_secret, totp_enabled FROM users WHERE id = $1',
+      [userId]
+    );
+    const user = result.rows[0];
+    if (!user || !user.totp_enabled || !user.totp_secret) {
+      return res.status(401).json({ error: 'This login attempt has expired. Start again.' });
+    }
+
+    const trimmed = code.trim();
+    const isTotpShape = /^\d{6}$/.test(trimmed);
+
+    let ok = false;
+    let viaRecoveryCode = false;
+
+    if (isTotpShape) {
+      ok = verifyTotp(trimmed, openSecret(user.totp_secret));
+    } else {
+      // Recovery code: consume it in the same statement that checks it, so a
+      // replay or a race can't spend it twice.
+      const consumed = await query<{ id: number }>(
+        `UPDATE totp_recovery_codes SET used_at = NOW()
+         WHERE user_id = $1 AND code_hash = $2 AND used_at IS NULL
+         RETURNING id`,
+        [userId, hashRecoveryCode(trimmed)]
+      );
+      ok = consumed.rowCount === 1;
+      viaRecoveryCode = ok;
+    }
+
+    if (!ok) {
+      await writeAuditLog({ userId, action: 'login_mfa', resource: 'auth', result: 'failure' }).catch(() => {});
+      return res.status(401).json({ error: 'That code is not valid.' });
+    }
+
+    const session = await issueSession(user);
+    await writeAuditLog({ userId, action: 'login_mfa', resource: 'auth', result: 'success' });
+    if (viaRecoveryCode) {
+      await writeAuditLog({ userId, action: 'login_recovery_code_used', resource: 'auth', result: 'success' }).catch(
+        () => {}
+      );
+    }
+    return res.json(session);
+  } catch (err) {
+    console.error('TOTP login error:', (err as Error).message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 });

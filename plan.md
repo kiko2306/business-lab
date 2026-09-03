@@ -12952,3 +12952,76 @@ secret via `otplib` in the container:
 (stamp `used_at`); rate-limit the second step hard; audit
 `login_mfa_challenge/success/failure`, `login_recovery_code_used`. Add
 `./start.sh recover disable-2fa <username>`.
+
+## 129. 2FA slice B done — TOTP enforced at login
+
+§127 slice B. A user with `totp_enabled` now needs a code to log in.
+
+### 129.1 What landed
+
+- **`utils/jwt.ts`**
+  - `signMfaToken(userId)` / `verifyMfaToken` — a 5-minute hand-off token,
+    payload `{ id, purpose: 'mfa' }`, signed with a key of its own
+    (HKDF-SHA256 of `JWT_SECRET`, info `homelab-mfa-token-v1`). Signing it with
+    a distinct key means it can never be replayed as an access token even on a
+    deployment where `JWT_REFRESH_SECRET` is unset; `verifyMfaToken` also
+    checks the `purpose` claim.
+  - **`signRefreshToken` now adds a random `jti`.** Latent bug slice B
+    surfaced: the refresh payload was just `{ id }`, so two tokens minted for
+    the same user in the same wall-clock second were byte-identical and the
+    second `INSERT` hit `refresh_tokens.token`'s UNIQUE constraint (a 500). A
+    2FA login issues a token seconds after `/auth/login` handed back the
+    challenge, so this went from "nobody logs in twice a second" to routine.
+    `jti` makes every token unique; the DB still keys on the token string, no
+    schema change.
+- **`routes/auth.ts`**
+  - `/auth/login`: password OK **and** `totp_enabled` → `202 { mfaRequired:
+    true, mfaToken }`, no session created. Audit `login_mfa_challenge`.
+  - `POST /auth/login/totp` `{ mfaToken, code }` — verify the hand-off token,
+    then a 6-digit `code` is checked as TOTP, anything else as a recovery
+    code. Recovery codes are consumed in the same `UPDATE … SET used_at =
+    NOW() WHERE … AND used_at IS NULL RETURNING id` that checks them, so a
+    replay/race can't spend one twice. Success → `issueSession` (extracted:
+    the shared token-issue + refresh-row tail). Audit `login_mfa`
+    (success/failure) and `login_recovery_code_used`.
+  - Schema `authLoginTotp` in `middleware/validation.ts`.
+- **`./start.sh recover disable-2fa <username>`** — new subcommand in
+  `recoverAdmin.ts` (`disableTotp`, uses a new pure `parseUsername` helper —
+  no password) and `scripts/recover-admin.sh` (username only, no password
+  prompt). Clears `totp_*`, deletes recovery codes, audits
+  `recovery_disable_2fa`. `reset-password` still leaves 2FA alone — a lost
+  password and a lost phone are separate events.
+- Docs: the `disable-2fa` line added to `recovery-troubleshooting.md`.
+
+### 129.2 Frontend note (until slice C)
+
+The Angular login page still expects `/auth/login` to always return a session.
+Nobody has enrolled (the enrolment UI is slice D), so nothing is broken today
+— but **do not enable 2FA on your own account via curl before slice C ships**,
+or that account's dashboard login will bounce.
+
+### 129.3 Verified (real stack)
+
+Backend rebuilt. Against a throwaway admin, codes computed with `otplib` in the
+container:
+
+- password login while enrolled → `202 {mfaRequired, mfaToken}`, no tokens.
+- `/auth/login/totp`: wrong code → 401 + `login_mfa/failure`; correct TOTP →
+  `{accessToken, refreshToken, user}`; the issued access token works on
+  `/api/users` (200) and the refresh token on `/auth/refresh` (200); the
+  `mfaToken` itself on `/api/users` → 401.
+- recovery code: first use → 200, `used_at` stamped, `login_recovery_code_used`
+  audited; reuse → 401; DB shows 1/10 used.
+- garbage `mfaToken` and an access token passed as `mfaToken` → 401.
+- three logins for one user in quick succession → all 200 (the `jti` fix; was
+  a 500 on the second before it).
+- `./start.sh recover disable-2fa` → `totp_enabled` false, secret NULL, 0
+  recovery rows; password-only login returns a session again.
+- 376 backend tests pass (+7: jwt 5, recoverAdmin `parseUsername` 2);
+  typecheck + shellcheck clean.
+
+### 129.4 Next (slice C)
+
+Angular login: on `202 mfaRequired`, swap to a code step (mfaToken kept in
+memory only), POST `/auth/login/totp`, with a "use a recovery code" toggle;
+`auth.service.ts` + `models.ts`.

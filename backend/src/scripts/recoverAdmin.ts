@@ -39,16 +39,22 @@ interface Credentials {
  * environment. Pure and exported so the rules have a test without a database.
  */
 export function parseCredentials(env: NodeJS.ProcessEnv): Credentials {
-  const username = (env.RECOVER_USERNAME ?? '').trim();
+  const username = parseUsername(env);
   const password = env.RECOVER_PASSWORD ?? '';
 
-  if (!username) {
-    throw new Error('RECOVER_USERNAME is empty — run this through `./start.sh recover`, which prompts for it.');
-  }
   if (password.length < MIN_PASSWORD_LEN || password.length > MAX_PASSWORD_LEN) {
     throw new Error(`Password must be ${MIN_PASSWORD_LEN}–${MAX_PASSWORD_LEN} characters.`);
   }
   return { username, password };
+}
+
+/** Just the username, for commands that take no password (e.g. disable-2fa). */
+export function parseUsername(env: NodeJS.ProcessEnv): string {
+  const username = (env.RECOVER_USERNAME ?? '').trim();
+  if (!username) {
+    throw new Error('RECOVER_USERNAME is empty — run this through `./start.sh recover`, which prompts for it.');
+  }
+  return username;
 }
 
 interface UserRow {
@@ -131,6 +137,38 @@ async function createAdmin(): Promise<void> {
   console.log(`Created admin "${username}" (id ${rows[0].id}). Log in at the dashboard.`);
 }
 
+async function disableTotp(): Promise<void> {
+  const username = parseUsername(process.env);
+
+  const { rows } = await query<{ id: number; totp_enabled: boolean }>(
+    'SELECT id, totp_enabled FROM users WHERE username = $1',
+    [username]
+  );
+  if (rows.length === 0) {
+    throw new Error(`No user named "${username}". Run "list" to see which usernames exist.`);
+  }
+  const { id: userId, totp_enabled } = rows[0];
+
+  await query(
+    'UPDATE users SET totp_secret = NULL, totp_enabled = FALSE, totp_enrolled_at = NULL WHERE id = $1',
+    [userId]
+  );
+  await query('DELETE FROM totp_recovery_codes WHERE user_id = $1', [userId]);
+
+  await writeAuditLog({
+    userId,
+    action: 'recovery_disable_2fa',
+    resource: 'users',
+    metadata: { username, via: 'start.sh recover', wasEnabled: totp_enabled },
+  });
+
+  console.log(
+    totp_enabled
+      ? `Disabled two-factor authentication for "${username}" (id ${userId}). They can log in with just their password now.`
+      : `Two-factor was not enabled for "${username}"; cleared any leftover enrolment state anyway.`
+  );
+}
+
 async function main(): Promise<void> {
   const command = process.argv[2];
   switch (command) {
@@ -143,9 +181,13 @@ async function main(): Promise<void> {
     case 'create-admin':
       await createAdmin();
       break;
+    case 'disable-2fa':
+      await disableTotp();
+      break;
     default:
-      console.error('Usage: recoverAdmin.js <list | reset-password | create-admin>');
+      console.error('Usage: recoverAdmin.js <list | reset-password | create-admin | disable-2fa>');
       console.error('  reset-password / create-admin take RECOVER_USERNAME and RECOVER_PASSWORD from the environment.');
+      console.error('  disable-2fa takes RECOVER_USERNAME only.');
       process.exitCode = 1;
   }
 }

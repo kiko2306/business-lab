@@ -37,6 +37,12 @@ export const schemas = {
   authRefresh: Joi.object({
     refreshToken: Joi.string().max(2048).required(),
   }),
+  // Second step of a 2FA login: the hand-off token from /auth/login plus a
+  // 6-digit TOTP code or a recovery code (the handler tells them apart).
+  authLoginTotp: Joi.object({
+    mfaToken: Joi.string().max(2048).required(),
+    code: Joi.string().trim().min(6).max(32).required(),
+  }),
   // Activating TOTP: a 6-digit code from the authenticator app.
   totpActivate: Joi.object({
     code: Joi.string().trim().pattern(/^\d{6}$/).required(),

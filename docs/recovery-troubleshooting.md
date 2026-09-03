@@ -9,13 +9,16 @@ Run this on the host — it is the one exception to "the only command is
 ./start.sh recover list             # which usernames exist
 ./start.sh recover reset-password   # set a new password for one of them
 ./start.sh recover create-admin     # only if there is no account at all
+./start.sh recover disable-2fa      # clear a user's TOTP second factor
 ```
 
 `reset-password` / `create-admin` ask for the username (or take it as the next
 word: `./start.sh recover reset-password alice`) and then for the new password
 twice, hidden. The reset also revokes that account's existing sessions, so a
-stolen token can't outlive it. Every run is written to `audit_logs`
-(`recovery_reset_password` / `recovery_create_admin`).
+stolen token can't outlive it. `disable-2fa` takes just the username and turns
+off two-factor for someone who has lost their authenticator (their password
+still works). Every run is written to `audit_logs` (`recovery_reset_password`,
+`recovery_create_admin`, `recovery_disable_2fa`).
 
 Under the hood `start.sh` runs the reset *inside* the backend container, as the
 tool — there is no `docker exec` for you to type, and nothing new is exposed on
