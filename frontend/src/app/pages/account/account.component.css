@@ -1,0 +1,31 @@
+.account-card {
+  max-width: 640px;
+}
+
+.qr {
+  width: 220px;
+  max-width: 100%;
+}
+
+/* The QR SVG is injected via [innerHTML], so it carries no view-encapsulation
+   attribute — reach it with ::ng-deep to make it fill the fixed-size box
+   (the backend emits an <svg> with only a viewBox, no width/height). */
+:host ::ng-deep .qr svg {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+
+.activate-code {
+  max-width: 12rem;
+  letter-spacing: 0.3em;
+}
+
+.recovery-codes {
+  columns: 2;
+}
+
+.recovery-codes li {
+  font-size: 1rem;
+  letter-spacing: 0.03em;
+}

@@ -25,6 +25,26 @@ export function isMfaChallenge(result: LoginResult): result is MfaChallenge {
   return (result as MfaChallenge).mfaRequired === true;
 }
 
+/** GET /auth/totp/status — what the Account security page renders from. */
+export interface TotpStatus {
+  enabled: boolean;
+  enrolledAt: string | null;
+  recoveryCodesRemaining: number;
+}
+
+/** POST /auth/totp/setup — a pending (not yet active) secret plus its QR. */
+export interface TotpSetupResponse {
+  otpauthUri: string;
+  qrSvg: string;
+  secret: string;
+}
+
+/** POST /auth/totp/activate — the one-time recovery codes, shown only now. */
+export interface TotpActivateResponse {
+  enabled: true;
+  recoveryCodes: string[];
+}
+
 export type ServiceCategory =
   | 'Networking & Security'
   | 'Monitoring & Management'

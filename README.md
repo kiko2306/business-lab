@@ -131,9 +131,6 @@ it is done — not ticked off and left behind. Section references point at
       value in either can cut off the very session applying it. Run
       `sudo ./setup_server.sh` and confirm both prompts behave as documented
       in `docs/first-run.md`.
-- [ ] **2FA slice D — frontend enrolment UI** (§127, §130) — Account/Security page:
-      status, set up (render server `qrSvg`), activate, show/download recovery
-      codes, disable.
 - [ ] **2FA slice E — docs** (§127) — `docs/two-factor.md`, `openapi.yaml`,
       `user-guide.md`, `it-admin.md`, `app-credentials.md`, and the
       `recover disable-2fa` path.

@@ -2,6 +2,7 @@ import { Routes } from '@angular/router';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { LoginComponent } from './pages/login/login.component';
 import { SetupComponent } from './pages/setup/setup.component';
+import { AccountComponent } from './pages/account/account.component';
 import { AuditLogsComponent } from './pages/audit-logs/audit-logs.component';
 import { UsersComponent } from './pages/users/users.component';
 import { RecoveryComponent } from './pages/recovery/recovery.component';
@@ -37,6 +38,11 @@ export const routes: Routes = [
   {
     path: 'users',
     component: UsersComponent,
+    canActivate: [authGuard],
+  },
+  {
+    path: 'account',
+    component: AccountComponent,
     canActivate: [authGuard],
   },
   {

@@ -19,6 +19,9 @@ import {
   ServiceExposureConfig,
   ServiceExposureUpdate,
   ServiceExposureVerifyResult,
+  TotpActivateResponse,
+  TotpSetupResponse,
+  TotpStatus,
 } from './models';
 
 @Injectable({
@@ -163,6 +166,27 @@ export class OperationsService {
 
   deleteUser(id: number): Observable<{ message: string }> {
     return this.http.delete<{ message: string }>(`${API_BASE_URL}/users/${id}`);
+  }
+
+  // --- Own-account 2FA (TOTP) enrolment. All behind the access JWT; the
+  // login-time second factor lives on AuthService instead (it runs without a
+  // session). ---
+
+  getTotpStatus(): Observable<TotpStatus> {
+    return this.http.get<TotpStatus>(`${API_BASE_URL}/auth/totp/status`);
+  }
+
+  setupTotp(): Observable<TotpSetupResponse> {
+    return this.http.post<TotpSetupResponse>(`${API_BASE_URL}/auth/totp/setup`, {});
+  }
+
+  activateTotp(code: string): Observable<TotpActivateResponse> {
+    return this.http.post<TotpActivateResponse>(`${API_BASE_URL}/auth/totp/activate`, { code });
+  }
+
+  /** The backend takes a current 6-digit code XOR the account password. */
+  disableTotp(proof: { code: string } | { password: string }): Observable<{ enabled: false }> {
+    return this.http.post<{ enabled: false }>(`${API_BASE_URL}/auth/totp/disable`, proof);
   }
 
   resetAdminPassword(username: string, password: string): Observable<{ message: string }> {

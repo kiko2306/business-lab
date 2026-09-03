@@ -13360,3 +13360,72 @@ Still open (not blocking the plan, decide when the slice starts): whether
 whether icon assets exist; the multi-page dashboard layout; FTP vs FTPS vs
 SFTP; whether "prioritise wiring" is a hard stop on the app backlog;
 Playwright vs Cypress for E2E.
+
+## 132. 2FA slice D done — the Account security page
+
+§127 slice D. A logged-in user can now turn their own 2FA on and off entirely
+from the dashboard. After this, 2FA is safe to enable (slice C already handled
+the two-step login, but nothing offered enrolment through the UI).
+
+### 132.1 What landed
+
+- **`core/models.ts`**: `TotpStatus`, `TotpSetupResponse`,
+  `TotpActivateResponse` — the three response shapes from the slice-A
+  endpoints.
+- **`core/operations.service.ts`**: `getTotpStatus()`, `setupTotp()`,
+  `activateTotp(code)`, `disableTotp({code} | {password})` — plain
+  access-JWT calls to `/auth/totp/{status,setup,activate,disable}`. They sit
+  here (not `AuthService`) because they run with a session; the login-time
+  second factor stays on `AuthService` where it runs without one.
+- **`pages/account/`** — new standalone `AccountComponent`, route `/account`
+  behind `authGuard`, "Security" link added to the dashboard header. One card
+  with a four-state view machine (`loading → status`, then `enrolling` and
+  `recovery-codes` reachable only by walking the flow):
+  - **status**: badge + enrolled date + recovery-codes-remaining when on;
+    "Set up two-factor authentication" when off.
+  - **enrolling**: `setupTotp()` → render the server `qrSvg` (via
+    `DomSanitizer.bypassSecurityTrustHtml` — it's our own backend's SVG, and
+    Angular would otherwise strip the `<path>`s) + the secret as
+    `user-select-all` text for manual entry; a 6-digit field →
+    `activateTotp()`. "Cancel" drops back to status (the pending secret is
+    inert until activated).
+  - **recovery-codes**: shown once, straight after activate. Download (a
+    `Blob` + synthetic `<a download>` — this is the real app, not an
+    Artifact, so a client-side download is fine) and Copy
+    (`navigator.clipboard`) buttons; "I've saved them" reloads status.
+  - **disable** (inline in status): a current 6-digit code *or* the account
+    password — neither field individually required, `disable()` rejects the
+    submit only if both are empty, then sends `{code}` xor `{password}` to
+    match the backend's `.xor()` schema.
+- **`account.component.css`**: fixes the QR box at 220px and scales the
+  injected SVG with `:host ::ng-deep .qr svg` (the `[innerHTML]` content
+  carries no encapsulation attribute, and the backend's `<svg>` has only a
+  `viewBox`). `::ng-deep` is deprecated-without-replacement and the standard
+  idiom for exactly this; first use in the codebase.
+- **`account.component.spec.ts`**: 8 specs — status load → correct panel;
+  setup renders QR + secret; activate shows the codes and toasts; a rejected
+  code keeps `enrolling` and surfaces the message; enabled state renders the
+  disable form + enrolled date; disable with neither field is a no-op with a
+  message; disable with a (trimmed) code and with a password each call the
+  service with the right body and reload status.
+
+### 132.2 Verified
+
+- `npm run test:ci` — **42 specs pass** (34 from slice C + 8 new); `npm run
+  build` — exit 0 (the bundle-budget and `.form-floating` CSS warnings are
+  pre-existing, §130.2).
+- Frontend image rebuilt and recreated in the running stack; `GET /` and
+  `GET /account` both 200, and the production `main-*.js` contains all four
+  `auth/totp/{status,setup,activate,disable}` paths.
+- The backend side of every one of these calls was already proven end-to-end
+  against the real stack in slice A (§128.2: setup → activate → status →
+  disable round-trip with codes from `otplib`). What's left is a human
+  click-through with a real authenticator app (scan the QR, activate, sign
+  out, sign back in through the slice-C two-step, disable) — the one step an
+  agent session can't do.
+
+### 132.3 Next (slice E)
+
+Docs: `docs/two-factor.md`, `openapi.yaml` (the six endpoints + the `202`
+login branch), `user-guide.md`, `it-admin.md`, an `app-credentials.md` note,
+and document `./start.sh recover disable-2fa <username>`.
