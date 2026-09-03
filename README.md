@@ -174,6 +174,15 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
+### Housekeeping
+
+- [ ] **@mat: review the plan.md compaction, decide whether to continue**
+      (§165) — pass 1 collapsed the Price Compare build-out (§25–§45, ~1,790
+      lines) into one §25 as its own `plan:` commit; CLAUDE.md now permits
+      this for fully-superseded runs. Review that diff, then say whether to
+      run the same pass on the NetBird saga (§20/§24/§46–§55), the backup
+      build-out (§66–§90) and the 2FA slices (§127–§137).
+
 ### Security
 
 - [ ] **@mat: verify `setup_server.sh`'s new prompts against the real

@@ -45,18 +45,26 @@ done — that is exactly what a no-guarantees dev/test box is for.
 
 ## plan.md is the project's memory
 
-`plan.md` (~10,600 lines) is the spec **and** the running session log. Numbered
+`plan.md` is the spec **and** the running session log. Numbered
 sections; new work is appended as a new `## NN. ...` section. Read the tail
 before starting — the last section usually says where things stand and what to
-pick up. Record what was tried and rejected, not just what landed. Never rewrite
-history in it; append.
+pick up. Record what was tried and rejected, not just what landed. Do not
+rewrite an active section's history; append.
+
+A **fully-superseded** run of sections — one app or one investigation, closed,
+with its outcome captured in code/tests/docs — may be compacted in a bounded,
+reviewable pass: replace the run with one short section that keeps the durable
+facts, the **conclusion** of each rejected approach (not the blow-by-blow), and
+any still-open threads, titled `... (former §X–§Y, compacted <date>)`. Do this
+as its own `plan:` commit so the diff can be reviewed and reverted. Never
+compact a section that later sections still build on or cross-reference.
 
 It is read **a section at a time, never whole**. `plan-index.md` lists every
 section with the `sed` range that reads it; regenerate it with
-`./scripts/plan-index.sh` after appending. Summarising `plan.md` itself is not
-the answer to its size — the record of what was tried and rejected is the half
-that keeps turning out to matter (§75.7), and nothing loads the file
-automatically anyway.
+`./scripts/plan-index.sh` after appending or compacting. The record of what was
+tried and rejected is the half that keeps turning out to matter (§75.7) — a
+compaction keeps that, it just drops the iteration detail once the code is the
+source of truth. Nothing loads the file automatically anyway.
 
 ## Commands
 
