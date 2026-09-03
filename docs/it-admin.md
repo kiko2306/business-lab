@@ -49,6 +49,11 @@ other app is started from the dashboard.
   Watchtower — `plan.md` §82). Restart individual services to apply.
   **Never `docker compose down` the root stack** — that tears down the running
   dashboard, backend and database.
+- **Two-factor auth**: each admin can add a TOTP code to their own dashboard
+  login from **Account security** ([two-factor.md](two-factor.md)). If someone
+  loses their authenticator and their recovery codes, clear it on the host
+  with `./start.sh recover disable-2fa <username>` — username only, no
+  password. Rotating `JWT_SECRET` invalidates every enrolment.
 
 ## Backups
 

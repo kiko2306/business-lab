@@ -6,6 +6,20 @@
 - Start/stop allowlisted services.
 - Inspect health and audit sections.
 
+## Two-factor authentication
+
+- The dashboard login can take a time-based one-time code (TOTP) on top of your
+  password. It is per account and opt-in.
+- Turn it on from **Account security** in the user menu: scan the QR into an
+  authenticator app, enter a code to activate, then **save the ten recovery
+  codes** — they are shown once.
+- Once on, signing in asks for a 6-digit code after the password. No code? Use
+  one of the recovery codes (each works once).
+- Turn it off from the same page with a current code or your password.
+- Lost the authenticator *and* the recovery codes? That is a lockout — the
+  host operator runs `./start.sh recover disable-2fa <username>`.
+- Full details: [two-factor.md](two-factor.md).
+
 ## Settings
 
 - Save Cloudflare token in the Settings panel.

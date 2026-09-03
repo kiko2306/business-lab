@@ -15,6 +15,15 @@ Three kinds of app, and the difference matters:
 > publishing it. A first-run wizard reachable from the internet is an open
 > invitation to have your instance claimed by someone else.
 
+## The dashboard's own login
+
+Not an app — the management dashboard itself. The first admin account is
+created at `/setup` on first run (you choose the username and password). After
+that, each admin can add a TOTP second factor to their own login from
+**Account security**; it is optional and per account. See
+[two-factor.md](two-factor.md). Locked out: `./start.sh recover` on the host
+([recovery-troubleshooting.md](recovery-troubleshooting.md)).
+
 ## Fixed defaults — change these first
 
 | App | Default | Notes |

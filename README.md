@@ -14,6 +14,7 @@ Business Lab (repository still `homelab-management`, see §84.2) is a Dockerized
 - Deployment guide: [/docs/deployment-guide.md](/docs/deployment-guide.md)
 - API reference (OpenAPI): [/docs/openapi.yaml](/docs/openapi.yaml)
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
+- Two-factor authentication (TOTP) for the dashboard login: [/docs/two-factor.md](/docs/two-factor.md)
 - Licence due diligence (every image vs the resale model): [/docs/licences.md](/docs/licences.md)
 - Version history: [/CHANGELOG.md](/CHANGELOG.md)
 - User guide: [/docs/user-guide.md](/docs/user-guide.md)
@@ -134,9 +135,6 @@ it is done — not ticked off and left behind. Section references point at
       value in either can cut off the very session applying it. Run
       `sudo ./setup_server.sh` and confirm both prompts behave as documented
       in `docs/first-run.md`.
-- [ ] **2FA slice E — docs** (§127) — `docs/two-factor.md`, `openapi.yaml`,
-      `user-guide.md`, `it-admin.md`, `app-credentials.md`, and the
-      `recover disable-2fa` path.
 
 ### Features & architecture (§131)
 

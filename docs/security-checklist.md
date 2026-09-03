@@ -10,3 +10,7 @@
 - [x] Frontend form validation and invalid submission prevention
 - [x] Clipboard paste sanitization for login/setup/settings forms
 - [x] Smoke tests for auth/services/settings/health/audit/SSE/error paths
+- [x] Optional TOTP two-factor on the dashboard login, per account, enforced
+      once enabled ([two-factor.md](two-factor.md)) — secret sealed with
+      AES-256-GCM, recovery codes stored as SHA-256 hashes and consumed
+      atomically, dedicated 5-minute hand-off token for the second step

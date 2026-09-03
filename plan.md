@@ -13698,3 +13698,46 @@ The other §131.1 areas (Exposure, Backups, Updates, Users & roles, Settings,
 Utils) still live under `/dashboard` as panels rather than their own routes —
 the README item stays, minus "Apps". More visual tweaks expected on the dark
 palette, panels and menu.
+
+## 137. 2FA slice E done — the docs (2026-09-03)
+
+§127 slice E, closing the 2FA epic (slices A–D: §128–130, §132). Docs only, no
+code.
+
+### 137.1 What landed
+
+- **`docs/two-factor.md`** (new) — the reference page: threat model (the
+  dashboard is internet-facing, password-only; not Authelia and why), the
+  turn-on flow via Account security, the two-step sign-in, recovery codes,
+  turning it off, the `./start.sh recover disable-2fa <username>` lockout
+  path, and a "How it works" section (otplib/qrcode, AES-256-GCM secret at
+  rest under an HKDF of `JWT_SECRET` — so rotating it forces re-enrolment —
+  SHA-256 recovery-code hashes consumed atomically, the 5-minute `purpose:mfa`
+  hand-off token). Plus the audit-action table and a pointer to openapi.yaml.
+- **`docs/openapi.yaml`** — added the `202 {mfaRequired, mfaToken}` branch to
+  `/auth/login`, and `/auth/login/totp` + `/auth/totp/{status,setup,activate,
+  disable}` with request/response shapes and the real status codes (409 on
+  setup-when-enabled, 400 on wrong activate code, 422 on the `.xor` violation
+  at disable).
+- **`docs/user-guide.md`** — a "Two-factor authentication" section.
+- **`docs/it-admin.md`** — a Day-to-day bullet: enrolment is self-service, the
+  `recover disable-2fa` escape hatch is username-only, and rotating
+  `JWT_SECRET` invalidates every enrolment.
+- **`docs/app-credentials.md`** — a short "The dashboard's own login" section
+  (it is the first login a user makes, before any managed app) linking
+  two-factor.md.
+- **`docs/security-checklist.md`** — a checked line for the feature.
+- **`README.md`** — two-factor.md added to the Documentation list; the "2FA
+  slice E — docs" TODO item deleted.
+
+`docs/recovery-troubleshooting.md` already documented `disable-2fa` (added in
+slice B, §129.1), so it was left as is.
+
+### 137.2 Verified
+
+Prose against the shipped code: response shapes and status codes read out of
+`routes/auth.ts` and `middleware/validation.ts`; the issuer string
+("Homelab Management"), recovery-code format (`xxxxx-xxxxx`, 10, SHA-256) and
+the `homelab-totp-secret-v1` / `homelab-mfa-token-v1` HKDF infos out of
+`utils/totp.ts` / `utils/totpSecret.ts` / `utils/jwt.ts`. No code or tests
+touched; nothing to run.

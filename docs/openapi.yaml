@@ -40,6 +40,10 @@ paths:
   /auth/login:
     post:
       summary: Login
+      description: >
+        On success returns a session. If the account has TOTP two-factor
+        enabled and the password is correct, returns 202 with a short-lived
+        `mfaToken` to spend at `/auth/login/totp` — no session is created yet.
       requestBody:
         required: true
         content:
@@ -52,8 +56,129 @@ paths:
                 password: { type: string }
       responses:
         '200': { description: Logged in }
+        '202':
+          description: Password accepted, second factor required
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  mfaRequired: { type: boolean, enum: [true] }
+                  mfaToken: { type: string, description: 5-minute hand-off token }
         '401': { description: Invalid credentials }
         '422': { description: Invalid input }
+  /auth/login/totp:
+    post:
+      summary: Complete a two-factor login
+      description: >
+        Second step of a 2FA sign-in. `code` is a 6-digit TOTP code or one of
+        the account's single-use recovery codes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [mfaToken, code]
+              properties:
+                mfaToken: { type: string }
+                code: { type: string, minLength: 6, maxLength: 32 }
+      responses:
+        '200': { description: Logged in }
+        '401': { description: Expired hand-off token or invalid code }
+        '422': { description: Invalid input }
+  /auth/totp/status:
+    get:
+      security:
+        - bearerAuth: []
+      summary: TOTP enrolment status for the current account
+      responses:
+        '200':
+          description: Status
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean }
+                  enrolledAt: { type: string, format: date-time, nullable: true }
+                  recoveryCodesRemaining: { type: integer }
+        '401': { description: Not authenticated }
+  /auth/totp/setup:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Begin TOTP enrolment
+      description: >
+        Mints a pending secret (2FA stays off until activated) and returns the
+        enrolment QR and key URI.
+      responses:
+        '200':
+          description: Pending secret created
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  otpauthUri: { type: string }
+                  qrSvg: { type: string, description: inline SVG }
+                  secret: { type: string, description: base32, for manual entry }
+        '401': { description: Not authenticated }
+        '409': { description: Two-factor is already enabled }
+  /auth/totp/activate:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Activate TOTP after verifying a code
+      description: >
+        Verifies a 6-digit code against the pending secret, turns 2FA on, and
+        returns the ten single-use recovery codes once.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [code]
+              properties:
+                code: { type: string, pattern: '^\d{6}$' }
+      responses:
+        '200':
+          description: Two-factor enabled
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  enabled: { type: boolean, enum: [true] }
+                  recoveryCodes:
+                    type: array
+                    items: { type: string }
+        '400': { description: Wrong code, or no pending secret }
+        '401': { description: Not authenticated }
+        '422': { description: Invalid input }
+  /auth/totp/disable:
+    post:
+      security:
+        - bearerAuth: []
+      summary: Disable TOTP
+      description: >
+        Re-verifies with exactly one of a current 6-digit code or the account
+        password, then clears the secret and all recovery codes.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                code: { type: string, pattern: '^\d{6}$' }
+                password: { type: string }
+      responses:
+        '200': { description: Two-factor disabled }
+        '400': { description: Re-verification failed }
+        '401': { description: Not authenticated }
+        '422': { description: Both or neither of code/password supplied }
   /auth/refresh:
     post:
       summary: Refresh access token
