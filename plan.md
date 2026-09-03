@@ -13875,3 +13875,24 @@ functioning doc server), so it belongs with that work, not as a standalone
 backup fix. README item rewritten to say this.
 
 Docs/plan only.
+
+## 169. §69 covered — a test that the NetBird signal port agrees everywhere (2026-09-03)
+
+§69's residual: the §59 renumbering moved signal from 8086 to 10252 but left
+`start.sh`'s Tailscale Funnel fallback on 8086, so Funnel proxied a dead port
+and no peer could pair — and nothing in the repo would have caught it.
+
+Added a `NetBird signal port coupling` block to `services.test.ts` (same
+shape as the `home-assistant host networking` guard): it reads the three
+checked-in places that carry the port —
+`apps/netbird-vpn/docker-compose.yml`'s `${NETBIRD_SIGNAL_PORT:-N}:80`,
+`apps/netbird-vpn/.env.example`'s `NETBIRD_SIGNAL_PORT=N`, and `start.sh`'s
+`SIGNAL_PORT="${SIGNAL_PORT:-N}"` fallback — and fails if they disagree. The
+exact §69 drift (start.sh on 8086, compose on 10252) now fails CI.
+
+Does not cover a runtime dashboard change of the port (still no re-assert of
+Funnel on `NETBIRD_SIGNAL_PORT` change, and no probe of the Funnel
+hostname) — that stays a known gap, but it is no longer the *silent* one: a
+renumbering that forgets `start.sh` is caught before merge.
+
+Backend `npm run typecheck` clean, `npm test` 425/425. Test-only.

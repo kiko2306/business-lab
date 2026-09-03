@@ -369,6 +369,39 @@ describe('home-assistant host networking', () => {
   });
 });
 
+describe('NetBird signal port coupling', () => {
+  // plan.md §69: the §59 port renumbering moved signal from 8086 to 10252 but
+  // left start.sh's Tailscale Funnel fallback on 8086, so Funnel proxied a
+  // dead port and every peer failed to pair — with nothing in the repo or
+  // Docker keeping the two in sync. Three checked-in places carry that port
+  // and nothing else forces them to agree, so this test does.
+  const repoRoot = path.resolve(__dirname, '../../..');
+  const read = (rel: string) => fs.readFileSync(path.join(repoRoot, rel), 'utf8');
+
+  const composeDefault = read('apps/netbird-vpn/docker-compose.yml').match(
+    /\$\{NETBIRD_SIGNAL_PORT:-(\d+)\}:80/
+  )?.[1];
+  const envExample = read('apps/netbird-vpn/.env.example').match(
+    /^NETBIRD_SIGNAL_PORT=(\d+)/m
+  )?.[1];
+  // start.sh: SIGNAL_PORT="${SIGNAL_PORT:-10252}" — the fallback used on a host
+  // whose netbird-vpn/.env never set the variable (exactly the §69 case).
+  const startShFallback = read('start.sh').match(
+    /SIGNAL_PORT="\$\{SIGNAL_PORT:-(\d+)\}"/
+  )?.[1];
+
+  it('finds the port declared in all three places', () => {
+    expect(composeDefault, 'compose ${NETBIRD_SIGNAL_PORT:-N}:80').toBeDefined();
+    expect(envExample, '.env.example NETBIRD_SIGNAL_PORT=N').toBeDefined();
+    expect(startShFallback, 'start.sh SIGNAL_PORT fallback').toBeDefined();
+  });
+
+  it('agrees on the port everywhere, so Funnel never points at a dead one', () => {
+    expect(envExample).toBe(composeDefault);
+    expect(startShFallback).toBe(composeDefault);
+  });
+});
+
 describe('dependency declarations', () => {
   const entries = Object.entries(SERVICES);
 

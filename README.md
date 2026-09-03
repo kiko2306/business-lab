@@ -344,9 +344,6 @@ Strategy:
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from
       `service_exposure`.
-- [ ] **Signal-port coupling is uncovered** (§69) — the port renumbering
-      silently killed NetBird's signal service once; no test would catch a
-      repeat.
 - [ ] **Health checks for a container with no published port** — the port is now
       resolved from the compose file, and host-networked apps declare
       `hostNetworkPort`, so the common cases are right. A container publishing
