@@ -175,6 +175,22 @@ function resolveHealthTarget(rawUrl: string, publishedPort: number | null): { ur
 }
 
 /**
+ * Whether a running service can actually be reached for an HTTP health probe.
+ *
+ * The probe connects to the service's *published* host port (`webPort`), or —
+ * for a host-networked app — the port it declares (`hostNetworkPort`). A
+ * container that publishes nothing and declares neither has no address the
+ * backend container can reach: `resolveHealthTarget` would fall back to the
+ * container port on `SERVICE_HEALTH_HOST`, where nothing is listening, and the
+ * probe would fail — reporting a perfectly healthy app as unhealthy. No
+ * registry app hits this today; this stops a future portless one from getting
+ * a spurious red (plan.md §170).
+ */
+export function healthProbeReachable(webPort: number | null, hostNetworkPort: number | undefined): boolean {
+  return webPort !== null || hostNetworkPort !== undefined;
+}
+
+/**
  * Check service health via HTTP
  */
 function checkHealthHttp(target: { url: string; hostHeader?: string }, timeout = 5000): Promise<boolean> {
@@ -231,10 +247,16 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
     let healthy = state === 'running';
     if (service.healthCheck?.enabled && state === 'running') {
       if (service.healthCheck.type === 'http' && service.healthCheck.url) {
-        healthy = await checkHealthHttp(
-          resolveHealthTarget(service.healthCheck.url, webPort),
-          service.healthCheck.timeout
-        );
+        if (healthProbeReachable(webPort, service.hostNetworkPort)) {
+          healthy = await checkHealthHttp(
+            resolveHealthTarget(service.healthCheck.url, webPort),
+            service.healthCheck.timeout
+          );
+        } else {
+          // Nothing to probe against — leave `healthy` at its running default
+          // rather than run a check that can only fail.
+          logger.warn('Skipping health check: service publishes no reachable host port', { service: serviceName });
+        }
       }
     }
 

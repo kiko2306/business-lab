@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.11.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.11.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -344,11 +344,6 @@ Strategy:
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from
       `service_exposure`.
-- [ ] **Health checks for a container with no published port** — the port is now
-      resolved from the compose file, and host-networked apps declare
-      `hostNetworkPort`, so the common cases are right. A container publishing
-      nothing and declaring nothing still falls back to `localhost:<container
-      port>` and would misreport. No app hits this today.
 
 ### Apps and integrations
 

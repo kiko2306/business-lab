@@ -13896,3 +13896,19 @@ hostname) — that stays a known gap, but it is no longer the *silent* one: a
 renumbering that forgets `start.sh` is caught before merge.
 
 Backend `npm run typecheck` clean, `npm test` 425/425. Test-only.
+
+## 170. "Health check with no reachable port" guarded (2026-09-03)
+
+README residual: a running app that publishes no host port and declares no
+`hostNetworkPort` would still be health-probed. `resolveHealthTarget` falls
+back to the container port on `SERVICE_HEALTH_HOST`, nothing listens there, so
+the probe fails and a healthy app reads red. No registry app is portless
+today; this stops a future one from a spurious red.
+
+`status.ts` gains a pure `healthProbeReachable(webPort, hostNetworkPort)` —
+true iff there is a published port or a declared host-network port.
+`getServiceStatus` only runs the HTTP check when it returns true; otherwise it
+logs a warning and leaves `healthy` at the running default (same as an app
+with no check configured). Three tests in `status.test.ts`.
+
+Backend `npm run typecheck` clean, `npm test` 428/428. Patch bump 0.11.1.

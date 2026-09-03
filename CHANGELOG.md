@@ -11,6 +11,16 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.11.1] — 2026-09-03
+
+### Fixed
+
+- **Health checks** — a running service that publishes no host port and
+  declares no `hostNetworkPort` is no longer probed at an address nothing
+  listens on and marked unhealthy; the check is skipped (with a warning) and
+  the service keeps its running-is-healthy default. No registry app hits this
+  today — it guards a future portless one (§170).
+
 ## [0.11.0] — 2026-09-03
 
 ### Added

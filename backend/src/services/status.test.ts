@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateContainerState, hostNetworkPortMappings } from './status';
+import { aggregateContainerState, healthProbeReachable, hostNetworkPortMappings } from './status';
 
 describe('aggregateContainerState', () => {
   it('is unknown with no containers', () => {
@@ -31,6 +31,22 @@ describe('aggregateContainerState', () => {
 
   it('is stopped when every container has exited', () => {
     expect(aggregateContainerState(['exited', 'exited'])).toBe('stopped');
+  });
+});
+
+describe('healthProbeReachable', () => {
+  it('is true when the container publishes a host port', () => {
+    expect(healthProbeReachable(8222, undefined)).toBe(true);
+  });
+
+  it('is true for a host-networked app that declares its port', () => {
+    expect(healthProbeReachable(null, 8123)).toBe(true);
+  });
+
+  it('is false when there is no published port and no declared one', () => {
+    // resolveHealthTarget would probe the container port on a host nothing is
+    // listening on, so the check could only ever fail — skip it instead.
+    expect(healthProbeReachable(null, undefined)).toBe(false);
   });
 });
 
