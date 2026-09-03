@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.9.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.9.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -154,12 +154,6 @@ it is done — not ticked off and left behind. Section references point at
 
 SSO / roles:
 
-- [ ] **Role model reshape 152b — frontend** (§152) — a per-admin Features
-      editor on the create form and each Users-page row (a checkbox per
-      dashboard capability, dirty-save → `PUT /users/:id/capabilities`),
-      pre-ticked from the row's effective set. 152a already renamed the role
-      checkboxes and switched nav gating to the session's effective
-      capabilities. Visual review.
 - [ ] **SSO slice 2a — user email + app-access data model & API** (§151) —
       `users.email` column, `user_app_access` allowlist table, optional
       `autheliaGroups` on the registry, `GET /api/users/app-access-options`

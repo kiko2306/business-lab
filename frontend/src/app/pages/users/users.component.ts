@@ -5,13 +5,27 @@ import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
 import { AdminUser, Role } from '../../core/models';
-import { ROLE_LABELS } from '../../core/capabilities';
+import { ALL_CAPABILITIES, Capability, CAPABILITY_LABELS, ROLE_LABELS } from '../../core/capabilities';
 import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
 
 const ALL_ROLES: Role[] = ['webmaster', 'admin', 'user'];
+
+function allCapsRecord(on: boolean): Record<Capability, boolean> {
+  return ALL_CAPABILITIES.reduce(
+    (acc, cap) => ({ ...acc, [cap]: on }),
+    {} as Record<Capability, boolean>
+  );
+}
+
+function capsRecord(caps: readonly string[] | undefined): Record<Capability, boolean> {
+  return ALL_CAPABILITIES.reduce(
+    (acc, cap) => ({ ...acc, [cap]: (caps ?? []).includes(cap) }),
+    {} as Record<Capability, boolean>
+  );
+}
 
 @Component({
   selector: 'app-users',
@@ -29,6 +43,8 @@ export class UsersComponent implements OnInit {
 
   protected readonly allRoles = ALL_ROLES;
   protected readonly roleLabel = ROLE_LABELS;
+  protected readonly allCapabilities = ALL_CAPABILITIES;
+  protected readonly capabilityLabel = CAPABILITY_LABELS;
 
   protected readonly createForm = this.formBuilder.nonNullable.group({
     username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
@@ -37,8 +53,9 @@ export class UsersComponent implements OnInit {
   // Roles for the create form, kept outside the reactive group so the
   // checkboxes bind with plain ngModel. At least one is required (§149).
   protected newRoles: Record<Role, boolean> = { webmaster: false, admin: true, user: false };
-  // §152b adds the per-admin Features editor here; 152a keeps the role
-  // checkboxes only.
+  // Feature grants for a new admin (§152b). Shown only when Admin is picked
+  // and Webmaster is not; starts all-on (which equals "no grant rows").
+  protected newCaps: Record<Capability, boolean> = allCapsRecord(true);
 
   protected items: AdminUser[] = [];
   protected loading = false;
@@ -49,6 +66,10 @@ export class UsersComponent implements OnInit {
   // is currently saving.
   protected roleDraft: Record<number, Record<Role, boolean>> = {};
   protected savingRolesId: number | null = null;
+
+  // Per-user Features edit state — populated for admin rows only (§152b).
+  protected capDraft: Record<number, Record<Capability, boolean>> = {};
+  protected savingCapsId: number | null = null;
 
   protected resetPasswordId: number | null = null;
   protected resetPasswordValue = '';
@@ -65,8 +86,12 @@ export class UsersComponent implements OnInit {
       next: (response) => {
         this.items = response.items;
         this.roleDraft = {};
+        this.capDraft = {};
         for (const user of this.items) {
           this.roleDraft[user.id] = this.toRecord(user.roles);
+          if (this.showFeatures(user)) {
+            this.capDraft[user.id] = capsRecord(user.capabilities);
+          }
         }
         this.loading = false;
       },
@@ -98,25 +123,58 @@ export class UsersComponent implements OnInit {
     return draft !== [...user.roles].sort().join(',');
   }
 
+  private selectedCaps(record: Record<Capability, boolean>): Capability[] {
+    return ALL_CAPABILITIES.filter((cap) => record[cap]);
+  }
+
+  /** The create form needs a feature set only for an admin that isn't also a webmaster. */
+  protected newCapsShown(): boolean {
+    return this.newRoles.admin && !this.newRoles.webmaster;
+  }
+
+  protected newCapsValid(): boolean {
+    return !this.newCapsShown() || this.selectedCaps(this.newCaps).length > 0;
+  }
+
+  /** A row gets the Features editor when it is an admin and not a webmaster. */
+  protected showFeatures(user: AdminUser): boolean {
+    return user.roles.includes('admin') && !user.roles.includes('webmaster');
+  }
+
+  protected capsDirty(user: AdminUser): boolean {
+    const draft = this.capDraft[user.id];
+    if (!draft) {
+      return false;
+    }
+    const now = this.selectedCaps(draft).sort().join(',');
+    return now !== [...(user.capabilities ?? [])].sort().join(',');
+  }
+
   createUser(): void {
-    if (this.createForm.invalid || !this.newRolesValid()) {
+    if (this.createForm.invalid || !this.newRolesValid() || !this.newCapsValid()) {
       this.createForm.markAllAsTouched();
       if (!this.newRolesValid()) {
         this.toast.error('Pick at least one role for the new account.');
+      } else if (!this.newCapsValid()) {
+        this.toast.error('An admin needs at least one feature.');
       }
       return;
     }
 
     const { username, password } = this.createForm.getRawValue();
+    // Only send a feature set for an admin-not-webmaster; the backend ignores
+    // it otherwise, and an all-on set is equivalent to sending none.
+    const caps = this.newCapsShown() ? this.selectedCaps(this.newCaps) : undefined;
     this.creating = true;
     this.operations
-      .createUser(username, password, this.selected(this.newRoles))
+      .createUser(username, password, this.selected(this.newRoles), caps)
       .pipe(finalize(() => (this.creating = false)))
       .subscribe({
         next: () => {
           this.toast.success('User created successfully.');
           this.createForm.reset();
           this.newRoles = { webmaster: false, admin: true, user: false };
+          this.newCaps = allCapsRecord(true);
           this.load();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to create user.')),
@@ -139,6 +197,25 @@ export class UsersComponent implements OnInit {
           this.load();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to update roles.')),
+      });
+  }
+
+  saveCaps(user: AdminUser): void {
+    const caps = this.selectedCaps(this.capDraft[user.id] ?? {});
+    if (caps.length === 0) {
+      this.toast.error('An admin must keep at least one feature.');
+      return;
+    }
+    this.savingCapsId = user.id;
+    this.operations
+      .updateUserCapabilities(user.id, caps)
+      .pipe(finalize(() => (this.savingCapsId = null)))
+      .subscribe({
+        next: () => {
+          this.toast.success(`Features updated for ${user.username}.`);
+          this.load();
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to update features.')),
       });
   }
 

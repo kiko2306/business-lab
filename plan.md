@@ -14879,3 +14879,37 @@ writing (see the working-loop hand-off).
 152b — the per-admin Features editor (create form + per-row checkboxes) and
 nav gating polish. Then §151 SSO slice 2a–2d, with 151.4's Authelia group
 logic keyed on `webmaster` → `admins` + every `app-*` group.
+
+## 154. §152 slice 152b done — the per-admin Features editor (2026-09-03)
+
+Frontend half of §152. Patch bump 0.9.0 → 0.9.1 (UI addition, no backend
+change — the API landed in 152a).
+
+- **`operations.service.ts`.** `createUser` takes an optional `capabilities`
+  array; new `updateUserCapabilities(id, caps)` → `PUT /users/:id/capabilities`.
+- **Users & roles page.** When an account is an `admin` and **not** a
+  `webmaster`:
+  - the create form shows a checkbox per capability (`ALL_CAPABILITIES` /
+    `CAPABILITY_LABELS` from `core/capabilities.ts`), all ticked by default —
+    which equals "no grant rows"; the form only sends `capabilities` in that
+    case, and refuses an empty set.
+  - the account's row shows the same checkboxes, pre-ticked from its effective
+    `capabilities`, with an inline "Save features" that appears when the set
+    is dirty (disabled for your own row). Empty is refused client-side too;
+    the backend's `min(1)` is the real guard.
+  A webmaster row shows no Features editor (it always has everything); a
+  `user` row shows none (no capabilities).
+- Panel subtitles reworded to mention features.
+
+### 154.1 Verified
+
+`frontend`: `npm run build` clean (pre-existing warnings), `npm run test:ci`
+42/42. Rebuilt + redeployed; `/api/version` → `0.9.1`. @mat's `:10001`
+sign-off pending (see the hand-off).
+
+### 154.2 §152 done
+
+The role reshape is complete: webmaster / admin / user, admin features
+per-account. Next: §151 SSO slice 2a — user email + app-access data model
+and API — with 151.4's Authelia groups keyed on `webmaster` → `admins` +
+every `app-*`.

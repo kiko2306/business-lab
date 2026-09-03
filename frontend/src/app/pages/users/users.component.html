@@ -7,7 +7,7 @@
     </p>
   </div>
 
-  <app-panel key="users:add" title="Add user" subtitle="Username, a password of at least 8 characters, and one or more roles">
+  <app-panel key="users:add" title="Add user" subtitle="Username, a password of at least 8 characters, one or more roles, and — for an admin — which features they get">
     <form class="row g-3 align-items-start" [formGroup]="createForm" (ngSubmit)="createUser()">
       <div class="col-12 col-md-4">
         <input class="form-control" placeholder="Username" formControlName="username" autocomplete="off" />
@@ -42,10 +42,30 @@
         </div>
         <div class="form-text text-danger" *ngIf="!newRolesValid()">Pick at least one role.</div>
       </div>
+      <div class="col-12" *ngIf="newCapsShown()">
+        <span class="form-label small fw-semibold d-block mb-1">Features</span>
+        <p class="form-text mt-0 mb-2">
+          Which parts of the dashboard this admin can use. All on by default; a
+          webmaster always has every feature.
+        </p>
+        <div class="d-flex flex-wrap gap-3">
+          <div class="form-check" *ngFor="let cap of allCapabilities">
+            <input
+              class="form-check-input"
+              type="checkbox"
+              [id]="'new-cap-' + cap"
+              [(ngModel)]="newCaps[cap]"
+              [ngModelOptions]="{ standalone: true }"
+            />
+            <label class="form-check-label" [for]="'new-cap-' + cap">{{ capabilityLabel[cap] }}</label>
+          </div>
+        </div>
+        <div class="form-text text-danger" *ngIf="!newCapsValid()">An admin needs at least one feature.</div>
+      </div>
     </form>
   </app-panel>
 
-  <app-panel key="users:list" title="Accounts" subtitle="Existing users and their roles">
+  <app-panel key="users:list" title="Accounts" subtitle="Existing users, their roles, and each admin's features">
     <div class="table-responsive table-stack-wrap">
       <table class="table table-sm table-stack align-middle mb-0">
         <thead>
@@ -86,6 +106,31 @@
                   </button>
                 </div>
                 <div class="form-text" *ngIf="user.id === currentUserId">You can't change your own roles.</div>
+
+                <div class="mt-2" *ngIf="showFeatures(user)">
+                  <span class="form-label small fw-semibold d-block mb-1">Features</span>
+                  <div class="d-flex flex-wrap gap-2 align-items-center">
+                    <div class="form-check form-check-inline m-0" *ngFor="let cap of allCapabilities">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        [id]="'cap-' + user.id + '-' + cap"
+                        [(ngModel)]="capDraft[user.id][cap]"
+                        [ngModelOptions]="{ standalone: true }"
+                        [disabled]="user.id === currentUserId"
+                      />
+                      <label class="form-check-label small" [for]="'cap-' + user.id + '-' + cap">{{ capabilityLabel[cap] }}</label>
+                    </div>
+                    <button
+                      class="btn btn-sm btn-primary"
+                      *ngIf="capsDirty(user) && user.id !== currentUserId"
+                      [disabled]="savingCapsId === user.id"
+                      (click)="saveCaps(user)"
+                    >
+                      {{ savingCapsId === user.id ? 'Saving…' : 'Save features' }}
+                    </button>
+                  </div>
+                </div>
               </td>
               <td data-label="Created">{{ user.created_at | date:'dd/MM/yyyy' }}</td>
               <td data-label="Actions" class="text-end">

@@ -11,6 +11,18 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.9.1] — 2026-09-03
+
+### Added
+
+- The per-admin **Features** editor on the Users & roles page (§152, slice
+  152b). When an account is an admin (and not a webmaster), the create form
+  and its row show a checkbox per dashboard capability — start/stop apps, app
+  config, exposure toggle, exposure settings, backups, settings, audit log,
+  users & roles — pre-ticked from what the account currently holds, with an
+  inline "Save features" that appears when the set changes. All on by default;
+  an admin must keep at least one.
+
 ## [0.9.0] — 2026-09-03
 
 ### Changed

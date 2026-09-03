@@ -163,12 +163,32 @@ export class OperationsService {
     return this.http.get<AdminUserListResponse>(`${API_BASE_URL}/users`);
   }
 
-  createUser(username: string, password: string, roles: string[]): Observable<{ user: AdminUser }> {
-    return this.http.post<{ user: AdminUser }>(`${API_BASE_URL}/users`, { username, password, roles });
+  createUser(
+    username: string,
+    password: string,
+    roles: string[],
+    capabilities?: string[]
+  ): Observable<{ user: AdminUser }> {
+    return this.http.post<{ user: AdminUser }>(`${API_BASE_URL}/users`, {
+      username,
+      password,
+      roles,
+      ...(capabilities ? { capabilities } : {}),
+    });
   }
 
   updateUserRoles(id: number, roles: string[]): Observable<{ message: string; roles: string[] }> {
     return this.http.put<{ message: string; roles: string[] }>(`${API_BASE_URL}/users/${id}/roles`, { roles });
+  }
+
+  updateUserCapabilities(
+    id: number,
+    capabilities: string[]
+  ): Observable<{ message: string; capabilities: string[] }> {
+    return this.http.put<{ message: string; capabilities: string[] }>(
+      `${API_BASE_URL}/users/${id}/capabilities`,
+      { capabilities }
+    );
   }
 
   updateUserPassword(id: number, password: string): Observable<{ message: string }> {
