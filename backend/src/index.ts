@@ -18,6 +18,7 @@ import {
   ensureUserRolesTable,
   ensureRoleModelReshape,
   ensureUserAppAccessSchema,
+  ensureUserInvitationsSchema,
   ensureServiceExposureTable,
   ensureServiceExposureAutheliaColumn,
   ensureTotpSchema,
@@ -176,9 +177,11 @@ ensureUserRolesTable()
   .catch((err: Error) => {
     console.error('Unable to ensure the role model:', err.message);
   });
-ensureUserAppAccessSchema().catch((err: Error) => {
-  console.error('Unable to ensure the user app-access schema:', err.message);
-});
+ensureUserAppAccessSchema()
+  .then(() => ensureUserInvitationsSchema())
+  .catch((err: Error) => {
+    console.error('Unable to ensure the user app-access / invitations schema:', err.message);
+  });
 ensureServiceExposureTable().catch((err: Error) => {
   console.error('Unable to ensure service_exposure table:', err.message);
 });

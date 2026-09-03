@@ -22,7 +22,16 @@ import { readAppEnvValue } from '../services/appEnv';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
 import { testMailConnection } from '../services/mailTest';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig } from '../utils/exposureSettings';
-import { DEFAULT_TIMEZONE, getAppTimezone, isValidTimezone, setAppTimezone } from '../utils/generalSettings';
+import {
+  DEFAULT_TIMEZONE,
+  getAppTimezone,
+  getDashboardBaseUrl,
+  getStoredDashboardUrl,
+  isValidDashboardUrl,
+  isValidTimezone,
+  setAppTimezone,
+  setDashboardUrl,
+} from '../utils/generalSettings';
 import {
   getAlertNotifyConfig,
   isValidAlertTopic,
@@ -626,6 +635,11 @@ router.get('/general', async (_req: Request, res: Response) => {
       defaultTimezone: DEFAULT_TIMEZONE,
       // A snapshot of what this Node build recognises, for the UI picker.
       timezones: Intl.supportedValuesOf('timeZone'),
+      // What the operator has set (may be ''); `dashboardUrlEffective` is what
+      // the invite links (plan.md §158) will actually use — the stored value
+      // or a `dashboard.<domain>` guess, or null if neither is available.
+      dashboardUrl: await getStoredDashboardUrl(),
+      dashboardUrlEffective: await getDashboardBaseUrl(),
     });
   } catch {
     return res.status(500).json({ error: 'Unable to load general settings.' });
@@ -643,16 +657,31 @@ router.put('/general', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Unknown timezone. Use an IANA name like "Europe/Lisbon".' });
   }
 
+  // Optional; '' clears it (back to the derived guess). Anything else must be
+  // a bare absolute http(s) origin.
+  const dashboardUrl = req.body?.dashboardUrl;
+  const hasDashboardUrl = dashboardUrl !== undefined && dashboardUrl !== null;
+  if (hasDashboardUrl && dashboardUrl !== '' && !isValidDashboardUrl(dashboardUrl)) {
+    return res.status(400).json({ error: 'Dashboard URL must be a full https:// address with no path.' });
+  }
+
   try {
     await setAppTimezone(timezone);
+    if (hasDashboardUrl) {
+      await setDashboardUrl(dashboardUrl);
+    }
     await writeAuditLog({
       userId: req.user?.id ?? null,
       action: 'settings_change',
-      resource: 'app_timezone',
+      resource: hasDashboardUrl ? 'app_timezone, dashboard_url' : 'app_timezone',
       result: 'success',
     }).catch(() => {});
 
-    return res.json({ timezone, message: 'Timezone saved. Restart apps to apply.' });
+    return res.json({
+      timezone,
+      ...(hasDashboardUrl ? { dashboardUrl: await getStoredDashboardUrl() } : {}),
+      message: 'Settings saved. Restart apps to apply the timezone.',
+    });
   } catch {
     return res.status(500).json({ error: 'Unable to save general settings.' });
   }

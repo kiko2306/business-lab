@@ -11,6 +11,23 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.10.0] — 2026-09-03
+
+### Changed
+
+- Dashboard-created accounts are now **invited by email**, not given a
+  password by their creator (§158, slice 158a — backend). `POST /api/users`
+  drops the `password` field and now requires `email`, a configured mailbox
+  and a dashboard URL; it creates the account **inactive** (`password_hash`
+  is now nullable) and emails a single-use, 72-hour set-password link. New
+  public `GET`/`POST /api/auth/invitation/:token` (view / redeem — redeeming
+  activates the account and returns a session) and
+  `POST /api/users/:id/invitation/resend`. The users list reports `active`.
+  Login refuses an un-activated account with a clear message. `/setup` and
+  `./start.sh recover` still set a password directly. New `nodemailer`
+  dependency (the repo had only a connection tester); a **Dashboard URL**
+  setting feeds the link, pre-filled from the exposure base domain.
+
 ## [0.9.5] — 2026-09-03
 
 ### Added

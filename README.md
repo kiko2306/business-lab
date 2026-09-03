@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.9.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.10.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -154,15 +154,6 @@ it is done — not ticked off and left behind. Section references point at
 
 SSO / roles:
 
-- [ ] **Invite flow 158a — backend** (§158) — add `nodemailer` + a
-      `mailSend` wrapper; `password_hash` nullable + a `user_invitations`
-      table (72 h single-use token, SHA-256 hash only). `POST /api/users`
-      drops the password field, needs the mailbox configured + a dashboard
-      URL, creates the account **inactive** and emails a set-password link.
-      New public `GET/POST /api/auth/invitation/:token` and
-      `POST /api/users/:id/invitation/resend`; the users list reports
-      `active`. `/setup` and `./start.sh recover` keep their direct password
-      path. Tests.
 - [ ] **Invite flow 158b — frontend** (§158) — create form loses the
       password field (mail-unconfigured guard + link to Settings); new
       unauthenticated `/set-password?token=` page; "Pending invite" badge +

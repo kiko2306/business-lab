@@ -170,6 +170,30 @@ export async function ensureUserAppAccessSchema(): Promise<void> {
 }
 
 /**
+ * Invite-based user creation (plan.md §158): a dashboard-created account has
+ * no password until the invitee follows an emailed link, so `password_hash`
+ * becomes nullable, and `user_invitations` holds the single-use, expiring
+ * token (SHA-256 hash only, like `totp_recovery_codes`). No-op on a fresh
+ * install — init.sql already matches.
+ */
+export async function ensureUserInvitationsSchema(): Promise<void> {
+  await query('ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL');
+  await query(`
+    CREATE TABLE IF NOT EXISTS user_invitations (
+        id          SERIAL PRIMARY KEY,
+        user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+        token_hash  TEXT NOT NULL,
+        expires_at  TIMESTAMPTZ NOT NULL,
+        accepted_at TIMESTAMPTZ,
+        created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+    )
+  `);
+  await query(
+    'CREATE INDEX IF NOT EXISTS user_invitations_token_hash_idx ON user_invitations (token_hash)'
+  );
+}
+
+/**
  * Add the TOTP columns to `users` and create `totp_recovery_codes` on
  * databases that predate the second-factor feature (plan.md §127). No-op on
  * fresh installs — init.sql already has both.

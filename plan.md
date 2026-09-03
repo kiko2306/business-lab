@@ -15256,3 +15256,56 @@ work: the invite-based user-creation flow (§158).
 - Users list: "Pending invite" badge on an inactive row + a "Resend invite"
   action.
 - Settings: a "Dashboard URL" field (pre-filled with the derived default).
+
+## 160. §158 slice 158a done — invite-based user creation, backend (2026-09-03)
+
+Backend half of §158. Minor bump 0.9.5 → 0.10.0 (breaking API change:
+`POST /api/users` drops `password`).
+
+### 160.1 What changed
+
+- **`nodemailer`** dependency + `utils/mailSend.ts` (`sendMail({to,subject,
+  text})`, `mailIsConfigured()`) — the repo had only the raw-socket *tester*
+  (`services/mailTest.ts`), no sender.
+- **Schema.** `password_hash` is now nullable (`ensureUserInvitationsSchema()`
+  + `init.sql`); new `user_invitations(id, user_id FK CASCADE, token_hash,
+  expires_at, accepted_at, created_at)` + a `token_hash` index — SHA-256 hash
+  only, like `totp_recovery_codes`. Verified on the live DB.
+- **`services/userInvitations.ts`** — `createInvitation(userId)` (72 h TTL,
+  supersedes any prior unaccepted invite, returns the plaintext token once),
+  `verifyInvitation(token)` (live token → `{userId,username,email}`),
+  `acceptInvitation(token, hash)` (single-transaction claim → set hash → drop
+  siblings; `null` if the token isn't claimable, so a race can't set a
+  password twice).
+- **`POST /api/users`** — no `password`; `email` now required. Refuses unless
+  the mailbox is configured **and** a dashboard base URL resolves. Creates the
+  row with `password_hash = NULL` (inactive), mints an invite, emails the
+  `<baseUrl>/set-password?token=…` link best-effort (a send failure →
+  `warning`, not a rollback). No Authelia sync yet — a hash-less account is
+  skipped by it (§157).
+- **`POST /api/users/:id/invitation/resend`** (`users:manage`) — fresh token +
+  re-send, only while the account is still pending.
+- **`GET /api/users`** items gain `active` (`password_hash IS NOT NULL`).
+- **`routes/auth.ts`** — public `GET /api/auth/invitation/:token` →
+  `{username,email}` or 410; `POST /api/auth/invitation/:token` `{password}` →
+  accept, Authelia sync, issue a session. `/login` now 403s a hash-less
+  account with "not activated yet — check your email".
+- **Dashboard URL** — `settings.dashboard_url` (via `generalSettings.ts`),
+  surfaced on `GET/PUT /api/settings/general`; `getDashboardBaseUrl()` returns
+  it, or a `https://dashboard.<baseDomain>` guess, or null.
+- `/setup` and `./start.sh recover` unchanged — they still set a password.
+- 5 new unit tests (`userInvitations.test.ts`). Backend `npm test` 415/415,
+  typecheck clean.
+
+### 160.2 Verified on the live stack
+
+Backend redeployed at 0.10.0. `users.password_hash` now nullable,
+`user_invitations` table + index present, no migration errors. `GET
+/api/auth/invitation/<bad>` → 410. Full invite→email→accept round-trip needs
+a real mailbox + the 158b UI — proven there.
+
+### 160.3 Next
+
+158b — the frontend: create form loses the password field (mail-unconfigured
+guard), a public `/set-password` page, a "Pending invite" badge + "Resend
+invite" on the Users list, and the Dashboard URL field in Settings.

@@ -161,12 +161,10 @@ export const schemas = {
   }),
   userCreate: Joi.object({
     username: usernameSchema.required(),
-    password: passwordSchema.required(),
-    // A valid address if given. The create form (slice 2b) makes it a required
-    // field; the API stays lenient so a missing email just means "set it later
-    // on the Access editor" rather than a hard failure — the column is
-    // nullable and Authelia sync (2c) skips an account with no email.
-    email: emailSchema.optional(),
+    // No password: a dashboard-created account is invited by email and sets
+    // its own (plan.md §158). Email is required — the invite has nowhere to
+    // go without it.
+    email: emailSchema.required(),
     roles: rolesSchema,
     // Seeds an admin's feature grants; ignored for a webmaster/user. Omitted
     // or empty leaves an admin at the all-on default.
@@ -193,6 +191,13 @@ export const schemas = {
   userAccessUpdate: Joi.object({
     email: emailSchema.required(),
     appAccess: appAccessSchema.required(),
+  }),
+  // Redeem a set-password invitation (plan.md §158).
+  invitationToken: Joi.object({
+    token: Joi.string().trim().pattern(/^[A-Za-z0-9_-]{20,256}$/).required(),
+  }),
+  invitationAccept: Joi.object({
+    password: passwordSchema.required(),
   }),
   recoveryResetAdminPassword: Joi.object({
     username: usernameSchema.required(),

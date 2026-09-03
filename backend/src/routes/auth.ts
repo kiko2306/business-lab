@@ -12,10 +12,12 @@ import {
 } from '../utils/jwt';
 import setupModeMiddleware from '../middleware/setupMode';
 import authMiddleware from '../middleware/auth';
-import { schemas, validateBody } from '../middleware/validation';
+import { schemas, validateBody, validateParams } from '../middleware/validation';
 import { writeAuditLog } from '../utils/audit';
 import { effectiveCapabilities } from '../auth/capabilities';
 import { getUserCapabilities, getUserRoles, setUserRoles } from '../services/userRoles';
+import { acceptInvitation, verifyInvitation } from '../services/userInvitations';
+import { syncAutheliaUsersSafe } from '../services/autheliaSync';
 import {
   generateRecoveryCodes,
   generateTotpSecret,
@@ -103,6 +105,65 @@ router.get('/setup-status', statusLimiter, async (_req: Request, res: Response) 
 });
 
 // ---------------------------------------------------------------------------
+// GET /api/auth/invitation/:token — public; what the set-password screen
+// renders. 410 when the token is unknown, spent or expired (plan.md §158).
+// ---------------------------------------------------------------------------
+router.get(
+  '/invitation/:token',
+  authLimiter,
+  validateParams(schemas.invitationToken),
+  async (req: Request, res: Response) => {
+    try {
+      const target = await verifyInvitation(req.params.token);
+      if (!target) {
+        return res.status(410).json({ error: 'This invitation link is no longer valid. Ask for a new one.' });
+      }
+      return res.json({ username: target.username, email: target.email });
+    } catch (err) {
+      console.error('Invitation lookup error:', (err as Error).message);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// POST /api/auth/invitation/:token — public; redeem the token by setting a
+// password. Activates the account and returns a session (plan.md §158).
+// ---------------------------------------------------------------------------
+router.post(
+  '/invitation/:token',
+  authLimiter,
+  validateParams(schemas.invitationToken),
+  validateBody(schemas.invitationAccept),
+  async (req: Request, res: Response) => {
+    const { password } = req.body as { password: string };
+    try {
+      const passwordHash = await hashPassword(password);
+      const activated = await acceptInvitation(req.params.token, passwordHash);
+      if (!activated) {
+        return res.status(410).json({ error: 'This invitation link is no longer valid. Ask for a new one.' });
+      }
+
+      await writeAuditLog({
+        userId: activated.userId,
+        action: 'invitation_accepted',
+        resource: activated.username,
+        result: 'success',
+      }).catch(() => {});
+
+      // The account now has a password hash — write it into Authelia (§157).
+      await syncAutheliaUsersSafe('invitation_accepted', activated.userId);
+
+      const session = await issueSession({ id: activated.userId, username: activated.username });
+      return res.json(session);
+    } catch (err) {
+      console.error('Invitation accept error:', (err as Error).message);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
 // POST /api/auth/setup — create the first admin user
 // ---------------------------------------------------------------------------
 router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schemas.authSetup), async (req: Request, res: Response) => {
@@ -167,6 +228,14 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
       [username]
     );
     const user = result.rows[0];
+
+    // An invited account has no password hash yet (plan.md §158) — it can't be
+    // logged into, and saying so is more useful than "invalid credentials".
+    if (user && !user.password_hash) {
+      return res
+        .status(403)
+        .json({ error: "This account hasn't been activated yet — check your email for the set-password link." });
+    }
 
     if (!user || !(await verifyPassword(password, user.password_hash ?? ''))) {
       await writeAuditLog({

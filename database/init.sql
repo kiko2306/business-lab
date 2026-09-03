@@ -4,7 +4,11 @@
 CREATE TABLE IF NOT EXISTS users (
     id                SERIAL PRIMARY KEY,
     username          VARCHAR(100) NOT NULL UNIQUE,
-    password_hash     TEXT NOT NULL,
+    -- Nullable: a dashboard-invited account (plan.md §158) has no password
+    -- until the invitee follows the emailed set-password link. Such an
+    -- account is "inactive" and cannot log in. /setup and recovery still
+    -- create accounts with a hash directly.
+    password_hash     TEXT,
     is_setup_complete BOOLEAN NOT NULL DEFAULT FALSE,
     created_at        TIMESTAMPTZ NOT NULL DEFAULT NOW(),
     -- Optional TOTP second factor (plan.md §127). totp_secret holds the
@@ -52,6 +56,19 @@ CREATE TABLE IF NOT EXISTS user_capabilities (
     capability VARCHAR(40) NOT NULL,
     PRIMARY KEY (user_id, capability)
 );
+
+-- Single-use, expiring set-password tokens for invited accounts (plan.md
+-- §158). Only the SHA-256 hash is stored; a fresh invite (resend) deletes the
+-- old rows for that user. accepted_at is stamped when the link is used.
+CREATE TABLE IF NOT EXISTS user_invitations (
+    id          SERIAL PRIMARY KEY,
+    user_id     INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    token_hash  TEXT NOT NULL,
+    expires_at  TIMESTAMPTZ NOT NULL,
+    accepted_at TIMESTAMPTZ,
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+CREATE INDEX IF NOT EXISTS user_invitations_token_hash_idx ON user_invitations (token_hash);
 
 -- Which managed apps an account may reach through Authelia SSO (plan.md
 -- §151). Explicit allowlist: no rows means no SSO app access. The set of

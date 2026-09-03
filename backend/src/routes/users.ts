@@ -26,6 +26,9 @@ import {
   setUserAppAccess,
 } from '../services/userAppAccess';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
+import { createInvitation } from '../services/userInvitations';
+import { sendMail, mailIsConfigured } from '../utils/mailSend';
+import { getDashboardBaseUrl } from '../utils/generalSettings';
 
 const router = Router();
 
@@ -34,6 +37,44 @@ interface UserRow {
   username: string;
   email: string | null;
   created_at: string;
+  active?: boolean;
+}
+
+const SET_PASSWORD_PATH = '/set-password';
+
+/** The plain-text invite email body. */
+function inviteEmailBody(username: string, link: string): string {
+  return [
+    `Hi ${username},`,
+    '',
+    'An account has been created for you on Business Lab. Set your password to activate it:',
+    '',
+    link,
+    '',
+    'This link is valid for 72 hours. If it expires, ask whoever invited you to resend it.',
+  ].join('\n');
+}
+
+/**
+ * Mint an invitation for a freshly-created (or re-invited) account and email
+ * the set-password link. Best-effort: returns a warning string instead of
+ * throwing when the send fails, so the account still exists to be re-invited.
+ */
+async function sendInvitation(
+  userId: number,
+  username: string,
+  email: string,
+  baseUrl: string
+): Promise<string | null> {
+  const token = await createInvitation(userId);
+  const link = `${baseUrl}${SET_PASSWORD_PATH}?token=${token}`;
+  try {
+    await sendMail({ to: email, subject: 'Set your Business Lab password', text: inviteEmailBody(username, link) });
+    return null;
+  } catch (error) {
+    console.error('Invite email failed:', (error as Error).message);
+    return 'The account was created but the invite email could not be sent — use “Resend invite”.';
+  }
 }
 
 /** Reject any submitted app name that isn't currently grantable. */
@@ -65,7 +106,7 @@ router.get('/app-access-options', async (_req: Request, res: Response) => {
 router.get('/', async (_req: Request, res: Response) => {
   try {
     const result = await query<UserRow>(
-      'SELECT id, username, email, created_at FROM users ORDER BY id ASC'
+      'SELECT id, username, email, created_at, (password_hash IS NOT NULL) AS active FROM users ORDER BY id ASC'
     );
     const ids = result.rows.map((row) => row.id);
     const [roles, grants, appAccess] = await Promise.all([
@@ -75,6 +116,8 @@ router.get('/', async (_req: Request, res: Response) => {
     ]);
     const items = result.rows.map((row) => ({
       ...row,
+      // false while the invite is still outstanding (plan.md §158).
+      active: Boolean(row.active),
       roles: roles[row.id] ?? [],
       // The effective set the account actually holds — an admin's grants (or
       // all-on when it has none), everything for a webmaster, nothing for a
@@ -90,27 +133,40 @@ router.get('/', async (_req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// POST /api/users — create an account with an explicit, non-empty role set
+// POST /api/users — create an account and email it a set-password invite
+// (plan.md §158). No password is set here; the account is inactive until the
+// invitee follows the link.
 // ---------------------------------------------------------------------------
 router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Response) => {
-  const { username, password } = req.body;
-  const email = (req.body.email as string | undefined)?.trim() || null;
+  const { username } = req.body;
+  const email = (req.body.email as string).trim();
   const roles = req.body.roles as Role[];
   const capabilities = (req.body.capabilities ?? []) as Capability[];
   const appAccess = (req.body.appAccess ?? []) as string[];
 
   try {
+    if (!(await mailIsConfigured())) {
+      return res
+        .status(400)
+        .json({ error: 'Configure the shared mailbox in Settings before inviting users.' });
+    }
+    const baseUrl = await getDashboardBaseUrl();
+    if (!baseUrl) {
+      return res
+        .status(400)
+        .json({ error: 'Set the Dashboard URL in Settings so the invite link can be built.' });
+    }
+
     const badApp = await rejectUnknownAppAccess(appAccess);
     if (badApp) {
       return res.status(400).json({ error: badApp });
     }
 
-    const passwordHash = await hashPassword(password);
     const result = await query<UserRow>(
-      `INSERT INTO users (username, password_hash, email, is_setup_complete)
-       VALUES ($1, $2, $3, TRUE)
+      `INSERT INTO users (username, email, is_setup_complete)
+       VALUES ($1, $2, TRUE)
        RETURNING id, username, email, created_at`,
-      [username.trim(), passwordHash, email]
+      [username.trim(), email]
     );
     const user = result.rows[0];
     await setUserRoles(user.id, roles);
@@ -132,11 +188,15 @@ router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Res
       result: 'success',
     }).catch(() => {});
 
-    const warning = await syncAutheliaUsersSafe('user_create', req.user?.id ?? null);
+    // No Authelia sync yet — an account with no password hash is skipped by
+    // the sync (§157); it lands there when the invite is accepted.
+    const warning = await sendInvitation(user.id, user.username, email, baseUrl);
 
-    return res
-      .status(201)
-      .json({ user: { ...user, roles, capabilities: effective, appAccess }, ...(warning ? { warning } : {}) });
+    return res.status(201).json({
+      user: { ...user, active: false, roles, capabilities: effective, appAccess },
+      invitePending: true,
+      ...(warning ? { warning } : {}),
+    });
   } catch (error) {
     const err = error as { code?: string; message: string };
     if (err.code === '23505') {
@@ -296,6 +356,55 @@ router.put(
     } catch (error) {
       console.error('Update user access error:', (error as Error).message);
       return res.status(500).json({ error: 'Unable to update access.' });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// POST /api/users/:id/invitation/resend — mint a fresh set-password link and
+// email it again (plan.md §158). Only for an account still pending its invite.
+// ---------------------------------------------------------------------------
+router.post(
+  '/:id/invitation/resend',
+  validateParams(schemas.userIdParam),
+  async (req: Request, res: Response) => {
+    const id = Number(req.params.id);
+    try {
+      const target = await query<{ username: string; email: string | null; password_hash: string | null }>(
+        'SELECT username, email, password_hash FROM users WHERE id = $1',
+        [id]
+      );
+      const user = target.rows[0];
+      if (!user) {
+        return res.status(404).json({ error: 'User not found.' });
+      }
+      if (user.password_hash) {
+        return res.status(400).json({ error: 'This account is already active — nothing to resend.' });
+      }
+      if (!user.email) {
+        return res.status(400).json({ error: 'This account has no email address to send to.' });
+      }
+      if (!(await mailIsConfigured())) {
+        return res.status(400).json({ error: 'The shared mailbox is not configured.' });
+      }
+      const baseUrl = await getDashboardBaseUrl();
+      if (!baseUrl) {
+        return res.status(400).json({ error: 'Set the Dashboard URL in Settings first.' });
+      }
+
+      const warning = await sendInvitation(id, user.username, user.email, baseUrl);
+
+      await writeAuditLog({
+        userId: req.user?.id ?? null,
+        action: 'user_invitation_resend',
+        resource: user.username,
+        result: warning ? 'failure' : 'success',
+      }).catch(() => {});
+
+      return res.json({ message: 'Invite re-sent.', ...(warning ? { warning } : {}) });
+    } catch (error) {
+      console.error('Resend invitation error:', (error as Error).message);
+      return res.status(500).json({ error: 'Unable to resend the invite.' });
     }
   }
 );
