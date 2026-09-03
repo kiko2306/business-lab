@@ -11,6 +11,17 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.4.0] — 2026-09-03
+
+### Changed
+
+- Exposure & networking moved off the Settings stack onto its own `/exposure`
+  route (§131.1 slice 4). The Cloudflare Tunnel token and the first-start
+  exposure-provisioning form (base domain, tunnel/zone IDs, Nginx Proxy
+  Manager credentials) are now an `ExposureComponent`, with an "Exposure" nav
+  button and the Home menu tile repointed at it. Same forms, no API change.
+  Settings keeps General, ntfy alerts, email and the backup destination.
+
 ## [0.3.1] — 2026-09-03
 
 ### Changed

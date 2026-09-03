@@ -3,6 +3,7 @@ import { ShellComponent } from './layout/shell/shell.component';
 import { HomeComponent } from './pages/home/home.component';
 import { AppsComponent } from './pages/apps/apps.component';
 import { BackupsComponent } from './pages/backups/backups.component';
+import { ExposureComponent } from './pages/exposure/exposure.component';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { LoginComponent } from './pages/login/login.component';
 import { SetupComponent } from './pages/setup/setup.component';
@@ -52,6 +53,10 @@ export const routes: Routes = [
       {
         path: 'backups',
         component: BackupsComponent,
+      },
+      {
+        path: 'exposure',
+        component: ExposureComponent,
       },
       {
         // What is left of the one-page dashboard: the stack-wide sections

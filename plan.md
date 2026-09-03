@@ -14002,3 +14002,59 @@ directory:
 
 CI needed no change (`actions/checkout` is repo-agnostic; no hardcoded name in
 `.github/`).
+
+## 143. §131.1 slice 4 — Exposure & networking on its own route (2026-09-03)
+
+Fourth slice of the multi-page dashboard split. Unlike Apps (§136) and
+Backups (§140), "Exposure" was never a single panel on `/dashboard` — it was
+the first two of the six `<app-panel>`s inside `SettingsPanelComponent`
+(§136.4): **Cloudflare Tunnel token** and **first-start exposure
+provisioning**. They are the networking half of that stack and share the same
+token, so they move together. Feature bump 0.3.1 → 0.4.0.
+
+### 143.1 Exposure → `/exposure`
+
+`ExposureComponent` (`frontend/src/app/pages/exposure/`) holds both panels
+verbatim: the token form (`form`, `save`, `testConnection`, `validationMessage`,
+`sanitizeTokenPaste`, `loadSettings`) and the provisioning form (`exposureForm`,
+`saveExposure`, `testExposureConnection`, `loadExposureSettings`,
+`exposureValidationMessage`), plus the state each needs. No API change — it
+calls the same `SettingsService` methods. The `.current-token` callout style
+moved with it. The panel keys stay `settings:cloudflare` / `settings:exposure`
+so `SectionCollapseService` keeps their collapse state.
+
+### 143.2 SettingsPanelComponent shrinks
+
+`settings-panel.component.{ts,html,css}` lose ~210 lines of TS and the first
+172 lines of template. `ngOnInit` drops `loadSettings()` / `loadExposureSettings()`;
+the `CloudflareSettings` / `ExposureSettings` / `ExposureSettingsInput` /
+`ExposureTestResponse` model imports and `sanitizePastedText` go. What remains:
+General (timezone), ntfy alerts, email, backup destination. Still mounted as
+`<app-settings-panel id="settings">` on `/dashboard`; the `#settings` anchor
+and its `scroll-margin-top` are unchanged.
+
+### 143.3 Wiring
+
+- `app.routes.ts`: `path: 'exposure'` as a shell child, between `backups` and
+  `dashboard`.
+- Shell header: an "Exposure" nav button after "Backups".
+- Home menu: the "Exposure & networking" tile repoints from `/apps` (it was a
+  `pending` deep link) to `/exposure`, loses the badge, and its description
+  now names what the page actually holds.
+
+No component spec covered settings-panel or the new page, so none needed
+updating (same as §140).
+
+### 143.4 Verified
+
+`frontend`: `npm run build` clean (pre-existing bundle-budget + Bootstrap
+selector warnings only); `npm run test:ci` 42/42. Redeployed with
+`docker compose up -d --build frontend`; the version bump also recreated the
+backend, now serving `/api/version` → `0.4.0`; no root teardown. Awaiting
+@mat's review on `localhost:10001`.
+
+### 143.5 Still open
+
+Updates, Users & roles, Settings and Utils still live under `/dashboard` (or
+`/users`) rather than their own routes — the README item stays, minus Apps,
+Backups and Exposure.

@@ -46,9 +46,8 @@ export class HomeComponent {
     },
     {
       title: 'Exposure & networking',
-      description: 'Public exposure through Cloudflare and Nginx Proxy Manager, per app.',
-      link: '/apps',
-      pending: true,
+      description: 'The Cloudflare Tunnel token and first-start provisioning for Nginx Proxy Manager.',
+      link: '/exposure',
     },
     {
       title: 'Backups & restore',
