@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.3.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.3.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -162,18 +162,6 @@ Home Page / dashboard:
       and Backups (§140) are done; Exposure, Updates, Users & roles, Settings,
       Utils still live under `/dashboard` as `<app-panel>`s — one slice per
       area, updating the affected component specs as each moves.
-- [ ] **UI polish — typography & contrast** (§141.1) — lift
-      `--bs-secondary-color` out of the too-dark range so description text and
-      the header's "Signed in as …" read on the near-black canvas; make card
-      titles resolve to crisp white. Palette tokens, done first — the rest
-      inherits it.
-- [ ] **UI polish — home menu layout & nav bar** (§141.2) — even out the
-      ragged menu grid with a bento layout (Apps/Backups span two columns);
-      restyle the nav as plain text links with a solid subtle pill on the
-      active route, no per-button borders, mobile scroll strip intact.
-- [ ] **UI polish — tile badges & hover** (§141.3) — move the "Opens in …"
-      badge to the tile's top-right so short tiles have no void; tune the
-      already-present whole-card hover if @mat wants it stronger.
 
 SSO / roles:
 

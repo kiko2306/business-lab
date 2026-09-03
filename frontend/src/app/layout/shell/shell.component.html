@@ -12,15 +12,15 @@
           </div>
         </a>
         <nav class="app-header__actions">
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/home" routerLinkActive="active"
+          <a class="app-nav__link" routerLink="/home" routerLinkActive="active"
              [routerLinkActiveOptions]="{ exact: true }">Menu</a>
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/apps" routerLinkActive="active">Apps</a>
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/backups" routerLinkActive="active">Backups</a>
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/users" routerLinkActive="active">Users &amp; roles</a>
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/audit-logs" routerLinkActive="active">Audit logs</a>
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/account" routerLinkActive="active">Security</a>
-          <a class="btn btn-outline-warning btn-sm" routerLink="/recovery">Recovery</a>
+          <a class="app-nav__link" routerLink="/apps" routerLinkActive="active">Apps</a>
+          <a class="app-nav__link" routerLink="/backups" routerLinkActive="active">Backups</a>
+          <a class="app-nav__link" routerLink="/dashboard" routerLinkActive="active">Dashboard</a>
+          <a class="app-nav__link" routerLink="/users" routerLinkActive="active">Users &amp; roles</a>
+          <a class="app-nav__link" routerLink="/audit-logs" routerLinkActive="active">Audit logs</a>
+          <a class="app-nav__link" routerLink="/account" routerLinkActive="active">Security</a>
+          <a class="app-nav__link app-nav__link--warning" routerLink="/recovery">Recovery</a>
         </nav>
         <button type="button" class="btn btn-outline-danger btn-sm app-header__logout" (click)="logout()">Logout</button>
       </div>

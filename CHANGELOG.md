@@ -11,6 +11,21 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.3.1] — 2026-09-03
+
+### Changed
+
+- Dark-theme polish pass (§141). `--bs-secondary-color` lifted from `#9aa4b4`
+  into the slate-200/300 range so `.text-body-secondary` (card subtitles, menu
+  descriptions, the header's "Signed in as …") reads against the near-black
+  canvas; headings and panel titles now resolve to pure white.
+- The post-login menu is a bento grid — Apps, Backups and Account security span
+  two columns, on a fixed row height so every card body lines up. The
+  "Opens in …" badge moved to each tile's top-right corner instead of a
+  bottom-aligned slot that left a void on short tiles.
+- The shell nav is plain text links with a solid borderless pill on the active
+  route, replacing the row of fixed-width outlined buttons.
+
 ## [0.3.0] — 2026-09-03
 
 ### Changed

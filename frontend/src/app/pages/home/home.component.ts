@@ -15,6 +15,12 @@ interface MenuTile {
    * route in later §131.1 slices.
    */
   pending?: boolean;
+  /**
+   * Spans two columns in the bento grid (§141.2). Reserved for the tiles a
+   * user reaches most often, plus one on the closing row so the grid divides
+   * evenly (3 doubles + 6 singles = 12 = four clean rows of three).
+   */
+  wide?: boolean;
 }
 
 /**
@@ -36,6 +42,7 @@ export class HomeComponent {
       title: 'Apps',
       description: 'The service registry — start, stop, and configure every managed app.',
       link: '/apps',
+      wide: true,
     },
     {
       title: 'Exposure & networking',
@@ -47,6 +54,7 @@ export class HomeComponent {
       title: 'Backups & restore',
       description: 'Backup schedule, on-demand runs, and restoring from a snapshot.',
       link: '/backups',
+      wide: true,
     },
     {
       title: 'Updates & version control',
@@ -82,6 +90,7 @@ export class HomeComponent {
       title: 'Account security',
       description: 'Two-factor authentication for your own sign-in.',
       link: '/account',
+      wide: true,
     },
   ];
 }

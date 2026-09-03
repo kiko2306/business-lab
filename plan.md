@@ -13923,6 +13923,50 @@ templates. The badge/`pending` mechanism itself stays until the last area
 (§131.1) moves onto its own route, at which point every tile is a real link
 and the badge code is deleted.
 
+### 141.5 Done — all three buckets in one pass (0.3.0 → 0.3.1)
+
+**Contrast (141.1).** `frontend/src/styles.css` dark block:
+`--bs-secondary-color` `#9aa4b4` → `#cbd5e1`, and a new
+`--bs-heading-color: #ffffff` (Bootstrap leaves it `inherit`, so headings
+were rendering at the dimmed `--bs-body-color`). `panel.component.css`
+`.panel__title` is a `<span>`, so it took an explicit
+`color: var(--bs-heading-color)`. The header's "Signed in as …" needed no
+own rule — it rides `.text-body-secondary` and picked up the token.
+
+**Menu + nav (141.2).** `home.component.*`: the grid is
+`repeat(3, 1fr)` with `grid-auto-rows: 12rem`; a `wide` flag on the
+`MenuTile` model adds `grid-column: span 2` to Apps, Backups and Account
+security — 3 doubles + 6 singles = 12 cells = four even rows. Title and
+description are line-clamped (2 / 3 lines) so a long one can't break the
+fixed height. Below `lg` the doubles go full width; below `sm` the grid is
+1-up and row height goes back to `auto`.
+`shell.component.*`: the nav `<a>`s dropped `btn btn-outline-secondary btn-sm`
++ `min-width: 8rem` for a new `.app-nav__link` — text link, no border, pill
+radius; `.active` gets a solid `--bs-secondary-bg` fill; hover a
+`--bs-tertiary-bg` fill. Recovery keeps a warning tint via
+`.app-nav__link--warning`. Gap tightened `0.5rem` → `0.15rem`. The mobile
+scroll strip is unchanged bar the selector rename.
+
+**Badges (141.3).** The "Opens in …" badge moved out of the card body to an
+absolutely-positioned `.menu-tile__badge` at `top/right: 1rem`; the
+`margin-top: auto` bottom-align rule is gone. A `.menu-tile--pending`
+modifier pads the title `padding-right: 6rem` so a two-line title clears the
+badge. The whole-card link + `translateY(-3px)` border-glow hover was
+already in place (an `<a class="menu-tile card">` wrapping the body) — left
+as is.
+
+After §140 the pending tiles are Exposure, Updates, Settings and Utils; the
+badge code and the `pending`/`wide` flags all go when the last §131.1 area
+moves onto its own route.
+
+### 141.6 Verified
+
+`frontend`: `npm run build` clean (pre-existing bundle-budget + Bootstrap
+selector warnings only); `npm run test:ci` 42/42. Redeployed with
+`docker compose up -d --build frontend`; the version bump also recreated the
+backend, now serving `/api/version` → `0.3.1`; no root teardown. Awaiting
+@mat's review on `localhost:10001`.
+
 ## 142. Renamed the GitHub repo to `business-lab` (2026-09-03)
 
 @mat asked for the repo rename outright, ahead of the rest of the §84.2

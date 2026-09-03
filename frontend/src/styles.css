@@ -28,7 +28,14 @@
   --bs-body-bg: #0a0d12;
   --bs-body-color: #e6e9ef;
   --bs-emphasis-color: #ffffff;
-  --bs-secondary-color: #9aa4b4;
+  /* Headings resolve to pure white (Bootstrap leaves --bs-heading-color as
+     `inherit`, which on this canvas is the slightly-dimmed body colour). */
+  --bs-heading-color: #ffffff;
+  /* Drives `.text-body-secondary` (card subtitles, tile descriptions, the
+     header's "Signed in as …"). The old #9aa4b4 sat too close to the canvas
+     to read comfortably at `small` sizes — lifted into the slate-200/300
+     range. */
+  --bs-secondary-color: #cbd5e1;
   --bs-tertiary-bg: #232b3a;
   --bs-secondary-bg: #2c3648;
   --bs-border-color: #394456;

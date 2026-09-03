@@ -1,49 +1,85 @@
-/* A fixed 3-up grid on desktop: there are 9 tiles, so 3 columns fill exactly
-   three rows with no stretched straggler on the last row. Steps down to 2-up,
-   then 1-up on a phone. */
+/* A bento grid (§141.2): three columns on desktop, with the high-traffic
+   tiles (Apps, Backups) and one closing tile spanning two columns. Nine
+   tiles = 3 doubles + 6 singles = 12 cells = four even rows, no ragged
+   straggler. A fixed row height lines every card body up regardless of how
+   long its description runs. Steps down to 2-up (doubles go full width) then
+   1-up on a phone. */
 .menu-grid {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
+  grid-auto-rows: 12rem;
   gap: 1.5rem;
+}
+
+.menu-tile--wide {
+  grid-column: span 2;
 }
 
 @media (max-width: 991.98px) {
   .menu-grid {
     grid-template-columns: repeat(2, 1fr);
   }
+
+  .menu-tile--wide {
+    grid-column: 1 / -1;
+  }
 }
 
 @media (max-width: 575.98px) {
   .menu-grid {
     grid-template-columns: 1fr;
+    grid-auto-rows: auto;
     gap: 1rem;
+  }
+
+  .menu-tile--wide {
+    grid-column: auto;
   }
 }
 
 .menu-tile {
-  min-height: 11rem;
+  position: relative;
   transition: border-color 0.12s ease, box-shadow 0.14s ease, transform 0.14s ease;
 }
 
 .menu-tile .card-body {
   display: flex;
   flex-direction: column;
-  padding: 1.75rem;
+  gap: 0.4rem;
+  padding: 1.6rem;
+  overflow: hidden;
 }
 
 .menu-tile .card-body h2 {
-  font-size: 1.35rem;
+  font-size: 1.3rem;
+  /* Two titles wrap to two lines ("Exposure & networking"); cap there so a
+     wrap can't push the description out of a fixed-height card. */
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-.menu-tile .card-body p {
+/* Keep the wrapping title clear of the top-right badge. */
+.menu-tile--pending .card-body h2 {
+  padding-right: 6rem;
+}
+
+.menu-tile__desc {
   font-size: 0.95rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
 }
 
-/* Push the "Opens in …" badge to the bottom so tiles of unequal text length
-   still line their footers up. */
-.menu-tile .badge {
-  margin-top: auto;
-  align-self: flex-start;
+/* Top-right, out of the text flow — a short description no longer leaves a
+   void where a bottom-aligned badge used to sit. */
+.menu-tile__badge {
+  position: absolute;
+  top: 1rem;
+  right: 1rem;
+  font-weight: 500;
 }
 
 .menu-tile:hover,

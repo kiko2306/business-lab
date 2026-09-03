@@ -7,17 +7,19 @@
   <div class="menu-grid">
     <a
       *ngFor="let tile of tiles"
-      class="menu-tile card text-decoration-none text-reset h-100"
+      class="menu-tile card text-decoration-none text-reset"
+      [class.menu-tile--wide]="tile.wide"
+      [class.menu-tile--pending]="tile.pending"
       [routerLink]="tile.link"
       [fragment]="tile.fragment"
     >
       <div class="card-body">
         <h2 class="h5 mb-1">{{ tile.title }}</h2>
-        <p class="text-body-secondary small mb-0">{{ tile.description }}</p>
-        <span *ngIf="tile.pending" class="badge text-bg-secondary border">
-          Opens in {{ tile.link === '/apps' ? 'Apps' : 'Dashboard' }}
-        </span>
+        <p class="menu-tile__desc text-body-secondary small mb-0">{{ tile.description }}</p>
       </div>
+      <span *ngIf="tile.pending" class="menu-tile__badge badge text-bg-secondary">
+        Opens in {{ tile.link === '/apps' ? 'Apps' : 'Dashboard' }}
+      </span>
     </a>
   </div>
 </main>
