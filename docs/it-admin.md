@@ -58,10 +58,9 @@ other app is started from the dashboard.
 - **File Browser** and **Stirling-PDF** embed a database that is copied live,
   not snapshotted, and can restore corrupt — an accepted risk documented in
   [recovery-troubleshooting.md](recovery-troubleshooting.md#apps-without-a-consistent-database-snapshot).
-- Restore, and emergency admin-password reset, are in
-  [recovery-troubleshooting.md](recovery-troubleshooting.md). Note the recovery
-  endpoints are not currently reachable from a headless host — that page says
-  what to do instead.
+- Restore is in [recovery-troubleshooting.md](recovery-troubleshooting.md).
+  Locked out of the dashboard: `./start.sh recover reset-password` on the host
+  (same page for the details).
 
 ## Storage
 

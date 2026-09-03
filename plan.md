@@ -12683,3 +12683,82 @@ assertion, and the empty-`$crowdsec_client_ip` fallback.
   a network-layer change (bind NPM's `:80`/`:443` off the LAN, which
   split-horizon DNS clients depend on). Neither is worth it now that the ban
   check is independent of it.
+
+## 126. §105 closed: `./start.sh recover` resets a locked-out admin
+
+§105 established that the HTTP recovery endpoints
+(`POST /api/recovery/{enable,reset-admin-password,disable}`) can't do their job
+on this deployment: they gate on `isLocalRequest` (`req.ip` ∈ loopback), and a
+request from the host to the published port reaches the containerised backend
+from the Docker bridge gateway, not `127.0.0.1`. The only address that
+satisfies the gate is one issued from *inside* the container — the `docker
+exec` runbook step §0 principle 2 forbids. So a locked-out admin on a real box
+had no sanctioned way back in.
+
+### 126.1 Mechanism chosen
+
+Of the options §105 floated — widen the gate to trust an `X-Forwarded-For`
+hop, a `start.sh recover` subcommand, a root-only Unix socket, a one-shot
+host-mounted token file — the subcommand is the only one that adds **no new
+attack surface** (no second listener, no relaxed network check) and matches
+principle 2 exactly: the human still types only `./start.sh`, and the script
+does the container plumbing *as the tool*, not as a step in a runbook.
+
+### 126.2 What landed
+
+- **`backend/src/scripts/recoverAdmin.ts`** — a standalone script, never
+  imported by the HTTP server, reusing the app's `DATABASE_URL`. Three
+  commands:
+  - `list` — id / setup-complete / created / username for every row in
+    `users`, so the operator knows what to target.
+  - `reset-password` — bcrypt-hash a new password onto an existing user, and
+    **revoke that user's outstanding refresh tokens** (a reset is also the
+    response to a suspected compromise). Audited as `recovery_reset_password`.
+  - `create-admin` — insert a new `is_setup_complete = TRUE` user when there
+    is none. Audited as `recovery_create_admin`.
+  - Username/password come from `RECOVER_USERNAME` / `RECOVER_PASSWORD` in the
+    environment, never argv, so the password never lands in the container's
+    process list. `parseCredentials()` is pure and unit-tested; it mirrors
+    `passwordSchema`'s 8–128 bound so a recovery reset can't set a password
+    the login flow would then reject.
+- **`scripts/recover-admin.sh`** — prompts for the username (or takes it as
+  `$2`) and the new password (hidden, twice), then runs the script in the
+  backend container. `docker compose exec` into the running container when it
+  is up; `docker compose run --rm --no-deps` (a throwaway container, still
+  wired to `DATABASE_URL` and the compose network) when it is not — which is
+  exactly when someone may be recovering.
+- **`start.sh`** — `if [ "$1" = "recover" ]; then exec ./scripts/recover-admin.sh …`,
+  placed **before** `source ./setup_server.sh` so recovery doesn't drag in the
+  host bootstrap (package installs, daemon config, prompts) or the root check.
+- **Docs** — `recovery-troubleshooting.md`, `user-guide.md`, `it-admin.md`
+  rewritten around `./start.sh recover`; the §105 "edit Postgres directly"
+  fallback is gone. The HTTP endpoints are documented as bare-metal-only, not
+  removed — they are correct for a non-container deploy, just unreachable here.
+
+### 126.3 Verified (real stack)
+
+Backend rebuilt with the script in `dist/`, against the live database:
+
+- `./start.sh recover list` (and `./start.sh recover` → usage, exit 0;
+  `… frobnicate` → error + usage, exit 1).
+- `create-admin recovtest` → user id 3 created; login with the initial
+  password → 200.
+- Captured a refresh token, then `reset-password recovtest` → "revoked 2
+  active session(s)". Old password → **401**, new password → **200**, the
+  pre-reset refresh token → **401**.
+- `reset-password no-such-user` → clear error, exit 1, no write. Password
+  mismatch at the prompt → exit 1, no write.
+- One-off-container path (`docker compose run --rm --no-deps`) → `list` works
+  with the stack's backend still up; `--rm` left nothing behind.
+- `audit_logs` has `recovery_create_admin` and `recovery_reset_password` rows
+  with `{via: "start.sh recover", …}` metadata.
+- Test user and its rows deleted afterwards. 353 backend tests pass (+4),
+  typecheck clean, shellcheck clean on the new script.
+
+### 126.4 Not done
+
+- The dead `isRecoveryModeEnabled` / recovery-mode setting and the three
+  routes are left in place (valid on bare metal). Removing them is tidy-up,
+  not this section.
+- 2FA for admin accounts (separate README item) is the larger security gap and
+  wants its own planned build.

@@ -13,6 +13,16 @@ set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
 
+# `./start.sh recover [...]` — reset a locked-out admin without the dashboard.
+# Handled before sourcing setup_server.sh so it doesn't drag in the host
+# bootstrap (package installs, daemon config, prompts) or the root check: this
+# path only needs `docker compose`. See scripts/recover-admin.sh and plan.md
+# §105/§126 for why the HTTP /api/recovery/* endpoints can't do this job.
+if [ "${1:-}" = "recover" ]; then
+  shift
+  exec ./scripts/recover-admin.sh "$@"
+fi
+
 # shellcheck source=setup_server.sh
 source ./setup_server.sh
 

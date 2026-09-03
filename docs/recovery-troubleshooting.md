@@ -1,30 +1,34 @@
 # Recovery and Troubleshooting
 
-## Recovery procedures
+## Locked out of the dashboard
 
-> **Known gap.** These endpoints only accept requests whose `req.ip` is
-> `127.0.0.1`/`::1`. The backend runs in a container, so a `curl` from the host
-> arrives from the Docker bridge gateway and is refused — the endpoints below
-> are not reachable from a headless host as written. The only current path is
-> `docker compose exec backend wget …` from inside the container, which the
-> project's no-console principle rules out of a runbook. A proper host-side
-> mechanism is an open item (see the README TODO). Until then, resetting a
-> locked-out admin means editing the `users` table in Postgres directly.
+Run this on the host — it is the one exception to "the only command is
+`./start.sh`", and it is still `./start.sh`:
 
-### Enable recovery mode (localhost only)
-`POST /api/recovery/enable` with:
-```json
-{"confirm":"ENABLE_RECOVERY_MODE"}
+```bash
+./start.sh recover list             # which usernames exist
+./start.sh recover reset-password   # set a new password for one of them
+./start.sh recover create-admin     # only if there is no account at all
 ```
 
-### Reset admin password
-`POST /api/recovery/reset-admin-password`
-```json
-{"username":"admin","password":"new-password"}
-```
+`reset-password` / `create-admin` ask for the username (or take it as the next
+word: `./start.sh recover reset-password alice`) and then for the new password
+twice, hidden. The reset also revokes that account's existing sessions, so a
+stolen token can't outlive it. Every run is written to `audit_logs`
+(`recovery_reset_password` / `recovery_create_admin`).
 
-### Disable recovery mode
-`POST /api/recovery/disable`
+Under the hood `start.sh` runs the reset *inside* the backend container, as the
+tool — there is no `docker exec` for you to type, and nothing new is exposed on
+the network. It works whether or not the stack is currently up (it falls back
+to a one-off container). See plan.md §105/§126.
+
+### The HTTP `/api/recovery/*` endpoints
+
+`POST /api/recovery/{enable,reset-admin-password,disable}` still exist, but they
+gate on `req.ip` being loopback — which, with the backend in a container, only
+a request from *inside* that container satisfies. They are therefore usable
+only on a bare-metal (non-container) deployment. On the normal containerised
+install, use `./start.sh recover` above.
 
 ## Backup/restore
 

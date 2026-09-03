@@ -35,8 +35,8 @@
   live, not snapshotted, so it can restore corrupt — an accepted risk because
   both hold little that isn't quickly rebuilt. See
   `docs/recovery-troubleshooting.md`.
-- Recovery mode (emergency admin-password reset) is API-only and gated to
-  localhost. On this containerized deployment a request from the host does not
-  count as localhost, so there is currently no sanctioned way to use it on a
-  headless server — see `docs/recovery-troubleshooting.md`. Tracked as an open
-  item in the README.
+- Locked out of the dashboard? Run `./start.sh recover reset-password` on the
+  host — it prompts for the username and a new password and resets it inside
+  the backend container. `./start.sh recover list` shows the usernames; add
+  `create-admin` if no account exists at all. See
+  `docs/recovery-troubleshooting.md`.
