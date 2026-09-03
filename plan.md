@@ -13506,3 +13506,74 @@ contains the `/version` call and the footer string.
 
 The other half of §131.4: the confirm-gated "git pull + restart" self-update
 panel (still its own README item).
+
+## 134. §131.1 slice 1 — the app shell and the post-login menu (2026-09-03)
+
+First slice of the multi-page dashboard restructure (§131.1). The goal for this
+slice was the *shell*, not moving any area's content: one persistent header +
+footer around every signed-in page, and a menu the user lands on after login.
+Splitting the dashboard's sections onto their own routes stays a later slice
+(the still-open README item "Move each dashboard area onto its own route").
+
+### 134.1 What changed
+
+- **New `ShellComponent`** (`frontend/src/app/layout/shell/`). Holds the header
+  (brand → `/home`, "Signed in as", nav buttons, Logout) and the footer with
+  the version string, with a `<router-outlet>` between them. The header nav
+  uses `routerLinkActive` so the current section's button is highlighted.
+- **New `HomeComponent`** (`frontend/src/app/pages/home/`). The post-login
+  menu: a responsive grid of tiles, one per area from the §131.1 list (Apps,
+  Exposure & networking, Backups & restore, Updates & version control, Users &
+  roles, Settings, Utils) plus Audit logs and Account security. Areas that
+  still live inside the one-page dashboard deep-link into it with a fragment
+  (`/dashboard#backups` etc.) and show an "Opens in Apps" badge; each tile gets
+  repointed as its area moves onto its own route.
+- **Routing** (`app.routes.ts`). The authenticated routes are now children of
+  a single `ShellComponent` route that carries `canActivate: [authGuard]` once,
+  instead of the guard repeating on every route. `''` redirects to `home`.
+  `login`, `setup` and `recovery` stay outside the shell (recovery is reached
+  while locked out, so it must not sit behind the shell's chrome).
+- **Anchor scrolling** (`app.config.ts`). `withInMemoryScrolling({
+  anchorScrolling: 'enabled', scrollPositionRestoration: 'enabled' })` so the
+  menu tiles' `#fragment` links actually scroll to the dashboard section.
+- **Dashboard** lost its inline `<header>` and `<footer>` (moved to the shell)
+  and, with them, its `AuthService` dependency, `user$`, `logout()`,
+  `appVersion` / `loadVersion()` and the `RouterLink` import. The header/footer
+  CSS moved to `shell.component.css`; the `section[id] { scroll-margin-top }`
+  rule stayed in `dashboard.component.css` where the anchored sections are.
+- **Post-login target** is now `/home`, not `/dashboard`: `guestGuard`'s
+  authenticated redirect, and both `navigateByUrl` calls in `LoginComponent`.
+  Specs updated to match (`login.component.spec.ts`, `guest.guard.spec.ts`).
+- **Sub-pages** (`users`, `audit-logs`, `account`) dropped their lone "Back to
+  dashboard" buttons — the shell nav replaces them — and their now-unused
+  `RouterLink` imports.
+
+### 134.2 Versioning — MINOR bump, and the README line
+
+New user-facing feature, so `0.0.1` → `0.1.0` (pre-1.0 semver:
+[[version-bump-every-behavioural-commit]]). Bumped in `backend/package.json`,
+`frontend/package.json` and both `package-lock.json` files (top-level +
+`packages.""`), with a matching `CHANGELOG.md` entry.
+
+@mat also asked (this session) that the README carry the current version right
+under the title and link the changelog as the version history, and to keep that
+line's wording plain for non-technical readers. Done:
+`**Version 0.1.0** — full history in the [changelog](/CHANGELOG.md).` under the
+`# Business Lab` title, plus a "Version history" link in the Documentation list.
+The memory note now records the README line as step 3 of the bump.
+
+### 134.3 Verified
+
+`frontend`: `npm run build` clean (pre-existing bundle-budget + CSS warnings
+only), `npm run test:ci` 42/42 green (Chrome deps installed into the `node:20`
+container — plain `node:20` has no `libnss3`). `backend`: `npm run typecheck`
+clean, `version.test.ts` green against the new number. Not yet redeployed to the
+live stack — frontend-only routing/layout change, nothing touching
+Docker/exposure/networking/backups.
+
+### 134.4 Next
+
+The other §131.1 item: move each dashboard area (Apps, Exposure, Backups,
+Updates, Users & roles, Settings, Utils) onto its own route, one slice at a
+time, repointing the menu tile and updating that area's component spec as it
+moves.

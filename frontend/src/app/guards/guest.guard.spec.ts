@@ -7,12 +7,12 @@ import { AuthService } from '../core/auth.service';
 describe('guestGuard', () => {
   let authService: jasmine.SpyObj<AuthService>;
   let router: jasmine.SpyObj<Router>;
-  const dashboardTree = {} as UrlTree;
+  const menuTree = {} as UrlTree;
 
   beforeEach(() => {
     authService = jasmine.createSpyObj('AuthService', ['isAuthenticated', 'resolveGuestRoute']);
     router = jasmine.createSpyObj('Router', ['parseUrl']);
-    router.parseUrl.and.returnValue(dashboardTree);
+    router.parseUrl.and.returnValue(menuTree);
 
     TestBed.configureTestingModule({
       providers: [
@@ -27,11 +27,11 @@ describe('guestGuard', () => {
     return TestBed.runInInjectionContext(() => guestGuard(route, {} as never));
   }
 
-  it('redirects to the dashboard when already authenticated', () => {
+  it('redirects to the menu when already authenticated', () => {
     authService.isAuthenticated.and.returnValue(true);
 
-    expect(runGuard('login')).toBe(dashboardTree);
-    expect(router.parseUrl).toHaveBeenCalledWith('/dashboard');
+    expect(runGuard('login')).toBe(menuTree);
+    expect(router.parseUrl).toHaveBeenCalledWith('/home');
     expect(authService.resolveGuestRoute).not.toHaveBeenCalled();
   });
 

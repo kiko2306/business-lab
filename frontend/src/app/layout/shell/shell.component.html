@@ -1,0 +1,35 @@
+<div class="app-shell">
+  <header class="app-header border-bottom bg-white sticky-top">
+    <div class="container-fluid py-2">
+      <div class="app-header__bar">
+        <a class="app-header__brand text-decoration-none text-reset" routerLink="/home">
+          <div class="app-header__title fw-semibold d-flex align-items-center gap-2">
+            <img src="favicon.svg" alt="" width="26" height="26" />
+            Business Lab
+          </div>
+          <div class="small text-body-secondary text-truncate" *ngIf="user$ | async as user">
+            Signed in as {{ user.username }}
+          </div>
+        </a>
+        <nav class="app-header__actions">
+          <a class="btn btn-outline-secondary btn-sm" routerLink="/home" routerLinkActive="active"
+             [routerLinkActiveOptions]="{ exact: true }">Menu</a>
+          <a class="btn btn-outline-secondary btn-sm" routerLink="/dashboard" routerLinkActive="active">Apps</a>
+          <a class="btn btn-outline-secondary btn-sm" routerLink="/users" routerLinkActive="active">Users &amp; roles</a>
+          <a class="btn btn-outline-secondary btn-sm" routerLink="/audit-logs" routerLinkActive="active">Audit logs</a>
+          <a class="btn btn-outline-secondary btn-sm" routerLink="/account" routerLinkActive="active">Security</a>
+          <a class="btn btn-outline-warning btn-sm" routerLink="/recovery">Recovery</a>
+        </nav>
+        <button type="button" class="btn btn-outline-danger btn-sm app-header__logout" (click)="logout()">Logout</button>
+      </div>
+    </div>
+  </header>
+
+  <router-outlet></router-outlet>
+
+  <footer class="app-footer text-body-secondary">
+    <div class="container-fluid py-3">
+      Business Lab<span *ngIf="appVersion"> v{{ appVersion }}</span>
+    </div>
+  </footer>
+</div>

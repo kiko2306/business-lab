@@ -1,8 +1,6 @@
 import { AsyncPipe, CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
-import { AuthService } from '../../core/auth.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ServiceCardComponent } from '../../components/service-card/service-card.component';
 import { SettingsPanelComponent } from '../../components/settings-panel/settings-panel.component';
@@ -136,19 +134,17 @@ function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
 @Component({
   selector: 'app-dashboard',
   standalone: true,
-  imports: [CommonModule, AsyncPipe, FormsModule, RouterLink, ServiceCardComponent, SettingsPanelComponent],
+  imports: [CommonModule, AsyncPipe, FormsModule, ServiceCardComponent, SettingsPanelComponent],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.css'
 })
 export class DashboardComponent implements OnInit, OnDestroy {
-  private readonly authService = inject(AuthService);
   protected readonly serviceState = inject(ServiceStateService);
   private readonly operations = inject(OperationsService);
   private readonly toast = inject(ToastService);
 
   private static readonly COLLAPSE_STORAGE_KEY = 'dashboard.collapsedSections';
 
-  protected readonly user$ = this.authService.user$;
   protected readonly groupServicesByCategory = groupServicesByCategory;
   protected readonly groupRunningPortsByCategory = groupRunningPortsByCategory;
   protected readonly filterServices = filterServices;
@@ -176,9 +172,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
   protected backupStatus: BackupStatusResponse | null = null;
   protected discoveredHosts: DiscoveredHost[] | null = null;
   protected scanningNetwork = false;
-  // Shown in the footer. Empty until the probe resolves so nothing flashes;
-  // a failure just leaves it blank (the footer text is conditional on it).
-  protected appVersion = '';
 
   ngOnInit(): void {
     this.serviceState.startPolling();
@@ -186,15 +179,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadHealth();
     this.loadSchedule();
     this.loadBackupStatus();
-    this.loadVersion();
   }
 
   ngOnDestroy(): void {
     this.serviceState.stopPolling();
-  }
-
-  logout(): void {
-    this.authService.logout();
   }
 
   refresh(): void {
@@ -392,13 +380,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
         this.toast.error(extractErrorMessage(error, 'Unable to update backup schedule.'));
         this.savingSchedule = false;
       },
-    });
-  }
-
-  loadVersion(): void {
-    this.operations.getAppVersion().subscribe({
-      next: (response) => (this.appVersion = response.version),
-      error: () => (this.appVersion = ''),
     });
   }
 

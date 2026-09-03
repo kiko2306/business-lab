@@ -41,7 +41,7 @@ describe('LoginComponent', () => {
     expect(component['form'].controls.password.touched).toBe(true);
   });
 
-  it('logs in, shows a success toast, and navigates to the dashboard on success', () => {
+  it('logs in, shows a success toast, and navigates to the menu on success', () => {
     authService.login.and.returnValue(of({ user: { id: 1, username: 'admin' }, accessToken: 'a', refreshToken: 'r' } as AuthResponse));
     component['form'].setValue({ username: 'admin', password: 'password123' });
 
@@ -49,7 +49,7 @@ describe('LoginComponent', () => {
 
     expect(authService.login).toHaveBeenCalledWith('admin', 'password123');
     expect(toastService.success).toHaveBeenCalled();
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/home');
     expect(component['submitting']).toBe(false);
   });
 
@@ -76,7 +76,7 @@ describe('LoginComponent', () => {
     component.submitMfa();
 
     expect(authService.completeMfaLogin).toHaveBeenCalledWith('mfa-token', '123456');
-    expect(router.navigateByUrl).toHaveBeenCalledWith('/dashboard');
+    expect(router.navigateByUrl).toHaveBeenCalledWith('/home');
   });
 
   it('shows an error and stays on the MFA step when the code is rejected', () => {

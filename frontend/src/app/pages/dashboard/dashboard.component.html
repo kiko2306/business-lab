@@ -1,29 +1,4 @@
-<div class="dashboard-shell">
-  <header class="app-header border-bottom bg-white sticky-top">
-    <div class="container-fluid py-2">
-      <div class="app-header__bar">
-        <div class="app-header__brand">
-          <div class="app-header__title fw-semibold d-flex align-items-center gap-2">
-            <img src="favicon.svg" alt="" width="26" height="26" />
-            Business Lab
-          </div>
-          <div class="small text-body-secondary text-truncate" *ngIf="user$ | async as user">
-            Signed in as {{ user.username }}
-          </div>
-        </div>
-        <nav class="app-header__actions">
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/audit-logs">Audit logs</a>
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/users">Users</a>
-          <a class="btn btn-outline-secondary btn-sm" routerLink="/account">Security</a>
-          <a class="btn btn-outline-warning btn-sm" routerLink="/recovery">Recovery</a>
-          <a class="btn btn-outline-secondary btn-sm" href="#settings">Settings</a>
-        </nav>
-        <button type="button" class="btn btn-outline-danger btn-sm app-header__logout" (click)="logout()">Logout</button>
-      </div>
-    </div>
-  </header>
-
-  <main class="container-fluid py-4">
+<main class="container-fluid py-4">
     <section class="d-flex flex-column flex-lg-row align-items-lg-center justify-content-between gap-3 mb-4">
       <div>
         <h1 class="h3 mb-1">Service dashboard</h1>
@@ -510,13 +485,6 @@
       </div>
     </section>
   </main>
-
-  <footer class="app-footer text-body-secondary">
-    <div class="container-fluid py-3">
-      Business Lab<span *ngIf="appVersion"> v{{ appVersion }}</span>
-    </div>
-  </footer>
-</div>
 
 <ng-template #loadingState>
   <div class="card border-0 shadow-sm">

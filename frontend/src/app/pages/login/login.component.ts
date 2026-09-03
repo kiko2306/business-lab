@@ -83,7 +83,7 @@ export class LoginComponent implements OnInit {
             return;
           }
           this.toastService.success('Signed in successfully.');
-          void this.router.navigateByUrl('/dashboard');
+          void this.router.navigateByUrl('/home');
         },
         error: (error) => {
           this.errorMessage = extractErrorMessage(error, 'Unable to sign in.');
@@ -106,7 +106,7 @@ export class LoginComponent implements OnInit {
       .subscribe({
         next: () => {
           this.toastService.success('Signed in successfully.');
-          void this.router.navigateByUrl('/dashboard');
+          void this.router.navigateByUrl('/home');
         },
         error: (error) => {
           this.errorMessage = extractErrorMessage(error, 'That code was not accepted.');

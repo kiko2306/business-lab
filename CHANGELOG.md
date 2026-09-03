@@ -11,6 +11,20 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.1.0] — 2026-09-03
+
+### Added
+
+- A post-login menu page and a shared app shell (one header and footer around
+  every signed-in page). Signing in now lands on the menu; each area is
+  reachable from the header nav or a menu tile (plan.md §131.1).
+
+### Changed
+
+- The dashboard's own header and footer moved into the shared shell, so the
+  version string and navigation are the same on every page. The per-page
+  "Back to dashboard" buttons are gone — the header nav replaces them.
+
 ## [0.0.1] — 2026-09-03
 
 ### Added

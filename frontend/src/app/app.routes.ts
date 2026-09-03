@@ -1,4 +1,6 @@
 import { Routes } from '@angular/router';
+import { ShellComponent } from './layout/shell/shell.component';
+import { HomeComponent } from './pages/home/home.component';
 import { DashboardComponent } from './pages/dashboard/dashboard.component';
 import { LoginComponent } from './pages/login/login.component';
 import { SetupComponent } from './pages/setup/setup.component';
@@ -11,11 +13,6 @@ import { guestGuard } from './guards/guest.guard';
 
 export const routes: Routes = [
   {
-    path: '',
-    pathMatch: 'full',
-    redirectTo: 'dashboard',
-  },
-  {
     path: 'login',
     component: LoginComponent,
     canActivate: [guestGuard],
@@ -26,31 +23,46 @@ export const routes: Routes = [
     canActivate: [guestGuard],
   },
   {
-    path: 'dashboard',
-    component: DashboardComponent,
-    canActivate: [authGuard],
-  },
-  {
-    path: 'audit-logs',
-    component: AuditLogsComponent,
-    canActivate: [authGuard],
-  },
-  {
-    path: 'users',
-    component: UsersComponent,
-    canActivate: [authGuard],
-  },
-  {
-    path: 'account',
-    component: AccountComponent,
-    canActivate: [authGuard],
-  },
-  {
+    // Recovery is reached while locked out, so it stays outside the shell.
     path: 'recovery',
     component: RecoveryComponent,
   },
   {
+    // The authenticated shell: one header/footer around every signed-in page.
+    // The guard runs once here rather than on each child.
+    path: '',
+    component: ShellComponent,
+    canActivate: [authGuard],
+    children: [
+      {
+        path: '',
+        pathMatch: 'full',
+        redirectTo: 'home',
+      },
+      {
+        path: 'home',
+        component: HomeComponent,
+      },
+      {
+        path: 'dashboard',
+        component: DashboardComponent,
+      },
+      {
+        path: 'audit-logs',
+        component: AuditLogsComponent,
+      },
+      {
+        path: 'users',
+        component: UsersComponent,
+      },
+      {
+        path: 'account',
+        component: AccountComponent,
+      },
+    ],
+  },
+  {
     path: '**',
-    redirectTo: 'dashboard',
+    redirectTo: '',
   },
 ];

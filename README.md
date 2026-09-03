@@ -1,5 +1,7 @@
 # Business Lab
 
+**Version 0.1.0** — full history in the [changelog](/CHANGELOG.md).
+
 Business Lab (repository still `homelab-management`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
 ## Documentation
@@ -13,6 +15,7 @@ Business Lab (repository still `homelab-management`, see §84.2) is a Dockerized
 - API reference (OpenAPI): [/docs/openapi.yaml](/docs/openapi.yaml)
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
 - Licence due diligence (every image vs the resale model): [/docs/licences.md](/docs/licences.md)
+- Version history: [/CHANGELOG.md](/CHANGELOG.md)
 - User guide: [/docs/user-guide.md](/docs/user-guide.md)
 - Webmaster runbook (Cloudflare / DNS / Tunnel): [/docs/webmaster.md](/docs/webmaster.md)
 - IT administrator runbook (running the stack): [/docs/it-admin.md](/docs/it-admin.md)
@@ -143,9 +146,6 @@ Home Page / dashboard:
       custom apps with no upstream icon; today they use generic `mdi-*`
       placeholders. Design a small logo per app, ship it as the app's favicon
       and a Home-Page-servable file, point `homepage.icon` at it.
-- [ ] **Multi-page dashboard shell + post-login menu** (§131.1) — promote the
-      single dashboard route into a nav shell; land it slice 1 (shell + menu),
-      keep the "All apps" search reachable.
 - [ ] **Move each dashboard area onto its own route** (§131.1) — Apps,
       Exposure, Backups, Updates, Users & roles, Settings, Utils — one slice
       per area, updating the affected component specs as each moves.

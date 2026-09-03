@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { RouterLink } from '@angular/router';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
 import { AuditLogEntry } from '../../core/models';
@@ -10,7 +9,7 @@ import { extractErrorMessage } from '../../core/api';
 @Component({
   selector: 'app-audit-logs',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule],
   templateUrl: './audit-logs.component.html',
   styleUrl: './audit-logs.component.css'
 })
