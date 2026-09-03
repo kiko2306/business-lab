@@ -11,6 +11,17 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.3.0] — 2026-09-03
+
+### Changed
+
+- Backups & restore moved off the one-page dashboard onto its own `/backups`
+  route (§131.1 slice 3), with a "Backups" nav button in the shell header and
+  the Home menu tile repointed at it. The schedule, "Back up now", the
+  Duplicati status line and the archive list are unchanged — same components,
+  no API change. The dashboard now carries only Settings, Health checks and
+  Utils.
+
 ## [0.2.1] — 2026-09-03
 
 ### Changed

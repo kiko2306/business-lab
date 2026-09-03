@@ -46,9 +46,7 @@ export class HomeComponent {
     {
       title: 'Backups & restore',
       description: 'Backup schedule, on-demand runs, and restoring from a snapshot.',
-      link: '/dashboard',
-      fragment: 'backups',
-      pending: true,
+      link: '/backups',
     },
     {
       title: 'Updates & version control',

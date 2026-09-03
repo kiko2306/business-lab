@@ -13799,3 +13799,61 @@ now empty, Productivity group otherwise intact. Homepage hot-reloads the file,
 so the public page drops the tile with no restart.
 
 380 backend tests pass (+2); typecheck clean. Frontend untouched.
+
+## 140. §131.1 slice 3 — Backups on its own route (2026-09-03)
+
+Third slice of the multi-page restructure (§131.1), same shape as the Apps
+move (§136.1). Feature bump 0.2.1 → 0.3.0.
+
+### 140.1 Backups → `/backups`
+
+`BackupsComponent` (`frontend/src/app/pages/backups/`) holds what was the
+"Backups" `<app-panel>` on `/dashboard`: the schedule (enable, frequency,
+retention), the "Back up now" run that goes through the dump-then-Duplicati
+safe path (§74.6), the Duplicati status line (destination, version count,
+last app-database dump — §75.2), and the list of restorable archives with
+download/restore. Lifted verbatim — the panel markup, the eight methods
+(`loadBackups`/`createBackup`/`restoreBackup`/`downloadBackup`/`loadSchedule`/
+`loadBackupStatus`/`runAppDataBackup`/`saveSchedule`) and their comments are
+unchanged. No API change; `restoreBackup` still routes through
+`ConfirmService`.
+
+The panel key stays `backups`, so `SectionCollapseService` carries the
+collapse state across the move. Collapsed by default like every panel since
+§136.2 — a single-panel page that opens collapsed is a little odd, but
+matches Account security and keeps the persisted-state contract simple; if
+@mat wants Backups to land open, that is a `defaultCollapsed` special-case,
+not a structural change.
+
+### 140.2 Wiring
+
+- `app.routes.ts`: `path: 'backups'` as a shell child, between `apps` and
+  `dashboard`.
+- Shell header: a "Backups" nav button after "Apps".
+- Home menu: the "Backups & restore" tile repoints from
+  `/dashboard#backups` to `/backups` and loses its `pending` badge.
+- `DashboardComponent` drops the backup fields, the eight methods, the
+  `BackupFile`/`BackupScheduleConfig`/`BackupStatusResponse` imports,
+  `ConfirmService`, and `extractErrorMessage`'s only remaining backup use —
+  `ngOnInit` is now just `loadHealth()`. Its heading subtitle and class
+  docstring lose "backups". The page now carries only Settings, Health
+  checks and Utils.
+
+No component spec covered the dashboard or backups, so none needed updating
+(the Apps move had `dashboard.filter.spec.ts` → `apps.filter.spec.ts`; there
+is no equivalent here).
+
+### 140.3 Verified
+
+`frontend`: `npm run build` clean (pre-existing bundle-budget + Bootstrap
+selector warnings only); `npm run test:ci` 42/42. Redeployed to the live
+stack with `docker compose up -d --build frontend` — the version bump in
+`package.json` also rebuilt/recreated the backend, which now serves
+`/api/version` → `0.3.0`; no root teardown. Awaiting @mat's review on
+`localhost:10001`.
+
+### 140.4 Still open
+
+Exposure, Updates, Users & roles, Settings and Utils still live under
+`/dashboard` (or `/users`) as panels rather than their own routes — the
+README item stays, minus Apps and Backups.
