@@ -45,6 +45,13 @@ apps/*/compose.override.yml
 apps/*/compose.override.yaml
 apps/*/docker-compose.override.yaml
 
+# A second dashboard-managed compose file (config/services.ts
+# MANAGED_COMPOSE_FILENAME) — adds what the backend can't put in .env and the
+# Update button mustn't wipe. Currently Paperless's PAPERLESS_PRE_CONSUME_SCRIPT
+# (services/paperlessClamav.ts). Runtime state, per-host. The scanner script it
+# points at is rendered into apps/paperless/data/, already ignored above.
+apps/*/docker-compose.managed.yml
+
 # Node modules
 node_modules/
 */node_modules/

@@ -23,6 +23,7 @@ import { withMaintenanceLock } from './maintenanceLock';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
 import { reconcileNextcloudClamav } from './nextcloudClamav';
+import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
@@ -192,9 +193,27 @@ async function composeUpWithManagedConfig(
   // n8n: render the dashboard-managed workflow files before the app comes up,
   // so the n8n-workflows-init container imports the current version (§118.3).
   await applyN8nWorkflows(serviceName, appDir);
+  // Paperless: render the pre-consume ClamAV scanner script + the managed
+  // compose fragment that carries PAPERLESS_PRE_CONSUME_SCRIPT (§81.7). Both
+  // must exist before the container starts.
+  await reconcilePaperlessClamav(serviceName, appDir);
+
+  // The reconciler above may have created OR removed docker-compose.managed.yml
+  // since composeArgs was resolved at the top of the start — a fresh clone's
+  // first Paperless start creates it, and dropping ClamAV from the deployment
+  // removes it. Re-derive just that one `-f` from what's on disk now: a stale
+  // `-f` to a deleted file makes `compose up` fail outright, and a missing one
+  // means the fragment doesn't apply on the very run that wrote it. The
+  // image-pin override is left exactly as passed — the update path gives
+  // base-only args on purpose (§176).
+  const managedFragment = managedComposeFragmentPath(appDir);
+  let effectiveArgs = composeArgs.split(` -f ${managedFragment}`).join('');
+  if (fs.existsSync(managedFragment)) {
+    effectiveArgs = `${effectiveArgs} -f ${managedFragment}`;
+  }
 
   const recreate = forceRecreate ? ' --force-recreate' : '';
-  const command = `docker compose -p ${projectName} ${composeArgs} up -d${recreate}`;
+  const command = `docker compose -p ${projectName} ${effectiveArgs} up -d${recreate}`;
   const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
     ...(await resolveTimezoneOverride(appDir)),
     ...mailOverrides,

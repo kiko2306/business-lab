@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.15.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.16.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -305,18 +305,6 @@ Strategy:
       restored from a snapshot, before anything is switched off.
 - [ ] **Remove Duplicati** (§81.5) — last, and only once the restore above is
       proven. Closes §75.3 (its restore API writes nothing) and §74.6.
-- [ ] **Virus-scan Paperless intake against ClamAV** (§81.7, §179) — Nextcloud
-      is done (§179). Paperless-ngx has **no native antivirus**: the only hook
-      is `PAPERLESS_PRE_CONSUME_SCRIPT` (a non-zero exit aborts consumption).
-      That needs (a) a small script in the container that speaks clamd's
-      `INSTREAM` over TCP to `<gateway>:<CLAMAV_PORT>` — Python is in the image,
-      no extra package — placed under `apps/paperless/data/` (writable), and
-      (b) the `PAPERLESS_PRE_CONSUME_SCRIPT` env var, which the compose file
-      doesn't reference, so it needs a managed compose override (generalise
-      §176's `composeOverride.ts` beyond image pins, or a second managed
-      override file). Lower value than Nextcloud — Paperless intake is usually
-      already-trusted scans — so it can wait.
-
 ### Exposure and platform
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node

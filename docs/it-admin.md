@@ -49,6 +49,13 @@ other app is started from the dashboard.
   Watchtower — `plan.md` §82). Restart individual services to apply.
   **Never `docker compose down` the root stack** — that tears down the running
   dashboard, backend and database.
+- **Virus scanning**: if ClamAV is in the deployment, Nextcloud uploads
+  (`files_antivirus`) and Paperless document intake (a pre-consume script) are
+  both scanned automatically — no setup. A document Paperless rejects as
+  infected stays in `apps/paperless/data/consume/` and shows as a failed task
+  in the Paperless UI; delete the file to clear it. Both fail *open* if ClamAV
+  is stopped (intake keeps working, unscanned), so the dashboard only warns —
+  it never blocks a start on ClamAV being down.
 - **Two-factor auth**: each admin can add a TOTP code to their own dashboard
   login from **Account security** ([two-factor.md](two-factor.md)). If someone
   loses their authenticator and their recovery codes, clear it on the host

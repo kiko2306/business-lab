@@ -11,6 +11,24 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.16.0] — 2026-09-04
+
+### Added
+
+- **Paperless document intake is virus-scanned against ClamAV** (§81.7) — the
+  Paperless half of the roster wiring §179 started for Nextcloud. Paperless has
+  no native antivirus, so the backend renders a `PAPERLESS_PRE_CONSUME_SCRIPT`
+  (Python, in the image already) that streams each document to clamd's
+  `INSTREAM` over TCP and aborts consumption on a `FOUND` verdict; an
+  unreachable clamd fails open (exit 0), matching Nextcloud's
+  `av_block_unreachable=false`. Since the base compose file can't carry that
+  env var, a second dashboard-managed compose file
+  (`docker-compose.managed.yml`) was added — separate from the Update button's
+  image-pin override so an update can't wipe it. `clamav` added to Paperless's
+  `requires`. Proven end to end on the live stack: an EICAR file is rejected
+  (left in the consume dir, never imported), a clean file consumes normally,
+  and with ClamAV stopped both pass.
+
 ## [0.15.1] — 2026-09-04
 
 ### Fixed

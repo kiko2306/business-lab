@@ -14695,3 +14695,122 @@ the conventions keep out of the unit suite ("don't test Docker itself"). The
 proof lives here and in the doc.
 
 Docs + plan only — no version bump.
+
+## 184. §81.7 — Paperless document intake virus-scanned against ClamAV (2026-09-04)
+
+The Paperless half of the ClamAV roster wiring; §179 did Nextcloud. README
+item closed.
+
+### Why it needs a compose fragment, not just a script
+
+Paperless-ngx has no native antivirus. Its one intake hook is
+`PAPERLESS_PRE_CONSUME_SCRIPT`: a program run against every document before
+consumption whose non-zero exit becomes a `ConsumerError` and aborts the
+import (`src/documents/consumer.py:run_pre_consume_script` →
+`run_subprocess(check_exit_code=True)` → `check_returncode()` → `_fail`).
+Confirmed by reading the image.
+
+Two obstacles, both real:
+
+- **The script has to be inside the container.** `apps/paperless/data/data`
+  is bind-mounted at `/usr/src/paperless/data` (`PAPERLESS_DATA_DIR`) and is
+  writable, so `services/paperlessClamav.ts` renders
+  `pre-consume-clamav.py` there on every start. It gets **no argv** — Paperless
+  passes the path in `DOCUMENT_WORKING_PATH` / `DOCUMENT_SOURCE_PATH` env — and
+  is run directly as `argv[0]`, so it needs `0o755` + a shebang.
+- **`PAPERLESS_PRE_CONSUME_SCRIPT` can't be set.** The base compose file
+  doesn't reference `${PAPERLESS_PRE_CONSUME_SCRIPT}` and has no `env_file:`,
+  so a value in `.env` never reaches the container. Paperless's own
+  `paperless.conf` search path (`../paperless.conf`, `/etc/paperless.conf`,
+  `/usr/local/etc/paperless.conf`) is all outside the bind mounts — checked in
+  the image — so that route needs a mount we can't add either. It needs a
+  compose override.
+
+### The second managed compose file
+
+Rejected reusing `docker-compose.override.yml` (§176): the Update button calls
+`clearImagePins` — which deletes that file wholesale — before every pull, so
+anything else living in it evaporates on the next update. Instead added a
+**second** dashboard-managed compose file, `docker-compose.managed.yml`
+(`config/services.ts` `MANAGED_COMPOSE_FILENAME`), merged by `resolveComposeFile`
+as `-f base -f override -f managed`. The pin override and the fragment touch
+disjoint keys (`image:` vs `environment:`) so their relative order is moot; the
+fragment goes **last** so `composeUpWithManagedConfig` can re-derive that one
+`-f` by trimming the tail — it creates the file on a fresh clone's first start
+and removes it when ClamAV leaves the deployment, both after `composeArgs` was
+resolved, and a stale `-f` to a deleted file fails `compose up` outright. It
+carries only:
+
+```yaml
+services:
+  paperless-ngx:
+    environment:
+      PAPERLESS_PRE_CONSUME_SCRIPT: /usr/src/paperless/data/pre-consume-clamav.py
+```
+
+Static — clamd's host/port are baked into the rendered script, not here, so
+the fragment never churns. `composeUpWithManagedConfig` splices this one `-f`
+in for the `up` that first creates it (the args were resolved before the
+reconciler ran); the update path's deliberate base-only args (§176) are left
+alone. `.gitignore`: `apps/*/docker-compose.managed.yml`.
+
+### The scanner
+
+`renderPreConsumeScript(host, port)` → a self-contained Python 3 script (in
+the image already). Opens a TCP socket to `<host-gateway>:<CLAMAV_PORT>` —
+same cross-project reach as `nextcloudClamav.ts`, ClamAV being its own compose
+project — speaks clamd's `zINSTREAM\0` framing (4-byte length-prefixed chunks,
+zero-length terminator), and:
+
+- verdict ends `FOUND` → stderr + **exit 1** (document rejected)
+- verdict ends `OK` → exit 0
+- clamd unreachable, or any other reply (e.g. `INSTREAM size limit exceeded`)
+  → logged + **exit 0 (fail open)**
+
+Fail-open matches the Nextcloud `av_block_unreachable=false` choice (§179): a
+stopped ClamAV must not halt all document intake. `clamav` added to
+Paperless's `requires` (not `dependsOn`) so the dashboard warns without
+blocking.
+
+### Verified on the live stack
+
+Rendered the script + fragment to the real paths, recreated `paperless-ngx`
+with `-f compose.yaml -f docker-compose.managed.yml`:
+
+- `docker compose config` merges the env var; the container has
+  `PAPERLESS_PRE_CONSUME_SCRIPT=/usr/src/paperless/data/pre-consume-clamav.py`
+  and the file is present, `0755`.
+- Direct script runs: EICAR (via `DOCUMENT_WORKING_PATH` and
+  `DOCUMENT_SOURCE_PATH`) → `exit 1`, `stream: Eicar-Test-Signature FOUND`;
+  clean text → `exit 0`.
+- ClamAV stopped → clean **and** EICAR both `exit 0`, "clamd unreachable …
+  failing open" on stderr.
+- **End to end through the consume dir**: dropped `hlm-clean-test.txt` and
+  `hlm-eicar-test.txt` into `apps/paperless/data/consume/`. Paperless log:
+  clean → `pre-consume script … exited 0` → "consumption finished",
+  `document_id: 1`; EICAR → `exited 1` → `ConsumerError` →
+  `Task documents.tasks.consume_file … raised`. The infected file is **left in
+  the consume dir**, never imported. Test document + files deleted afterward
+  (no-guarantees box, but no reason to leave litter).
+- Backend image rebuilt and the container recreated (`up -d --no-deps
+  backend`, not a root `compose down`); `/api/version` → `0.16.0`, Homepage
+  `services.yaml` regenerated fine (31 tiles) through the changed
+  `resolveComposeFile`.
+
+Not exercised through the authenticated API (no dashboard creds in an agent
+session, §176 precedent): the reconciler is called from
+`composeUpWithManagedConfig` alongside the other `apply*Config` writers, and
+the Docker-touching mechanism — the compose merge and the pre-consume contract
+— is proven above.
+
+### Tests
+
+`paperlessClamav.test.ts` (11): plan null/fallback/absent, script shape
+(shebang, baked host/port, INSTREAM, FOUND→exit 1, fail-open, reads the env
+not argv), fragment shape (only the one env key, no `image:`), reconcile
+writes an executable script + fragment, removes both when ClamAV leaves,
+never throws. Backend suite 479 passing (11 new), frontend build clean.
+
+### Minor bump 0.15.1 → 0.16.0
+
+New user-facing feature.
