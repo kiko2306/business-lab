@@ -16729,3 +16729,34 @@ found most of the log too cross-referenced to safely compact further) — no
 further action taken here since the file is already read section-at-a-time via
 `plan-index.md`, and forcing more compaction risks breaking a section a later
 one still cites.
+
+## 212. `scripts/bump-version.sh` — the version-bump ritual, automated
+
+Follow-up to §211's token/session-time investigation, looking specifically at
+the working loop's step 5 (commit and push) and the version-bump hook.
+
+The hook (`require-version-bump.sh`) only checks that both `package.json`
+versions moved and `CHANGELOG.md` was touched — it does **not** check the
+lockfiles' `packages[""].version` or the README version line, even though
+CLAUDE.md asks for both. Nothing was keeping those honest: found
+`backend/package-lock.json` and `frontend/package-lock.json` both had their
+nested self-entry version stuck at `0.15.1` while the root version (and
+everything else) had moved on to `0.29.0` — drift nothing had caught,
+fixed as part of this commit.
+
+Every commit shipping code means hand-editing 4-5 files the same way each
+time (both `package.json`s, both lockfiles' two version fields each, README,
+CHANGELOG) — real per-commit tool-call and token overhead, and a source of
+exactly the drift found above. `scripts/bump-version.sh <patch|minor>
+<Category> "<bullet>"` does all of it from one call: reads the current
+version from `backend/package.json`, computes the bump, and rewrites all six
+files (self-healing the lockfile drift regardless of its current value; that
+field is matched loosely rather than requiring it start in sync). Verified
+against a scratch copy of the real files, not the live repo, before applying
+the same drift-fix live. CLAUDE.md's versioning section now points at it.
+
+Step 3 (implement) and the six-step loop's per-item overhead were the other
+things flagged in this investigation — no changes made there: batching items
+or shrinking plan.md sections both trade off against the durability the loop
+is deliberately designed for, so that's a call for the user, not something to
+change unilaterally.

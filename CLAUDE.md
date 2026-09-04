@@ -248,3 +248,10 @@ blocks a `git commit` that changes a non-test file under `backend/src` or
 `frontend/src` unless the same commit bumps `version` in both `package.json`
 files and adds a `CHANGELOG.md` entry (also update the `**Version X.Y.Z**` line
 under the README title). Docs/plan/test-only commits are untouched.
+
+Do that bump with `scripts/bump-version.sh <patch|minor> <Category> "<bullet>"`
+rather than editing the five files by hand — it bumps both `package.json`s,
+both `package-lock.json`s (including the nested `packages[""].version`, which
+has drifted out of sync with the root before with nothing catching it), the
+README line, and inserts the `CHANGELOG.md` entry, all from one source of
+truth. Review its diff before committing.
