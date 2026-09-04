@@ -44,6 +44,7 @@ once and never displayed again; rotate them there if you need a new one.
 | **Nextcloud** | `NEXTCLOUD_ADMIN_USER` | `NEXTCLOUD_ADMIN_PASSWORD` (generated) |
 | **Paperless-ngx** | `PAPERLESS_ADMIN_USER` | `PAPERLESS_ADMIN_PASSWORD` (generated) |
 | **Duplicati** | — | `DUPLICATI_WEB_PASSWORD` (generated) |
+| **Kopia** | `kopia` (fixed) | `KOPIA_SERVER_PASSWORD` (generated) for the web UI / REST API. `KOPIA_PASSWORD` is the repository encryption password — also generated, and the one to keep safe: without it the snapshots can't be read on a rebuild. |
 | **Samba** | `SAMBA_USER` (default `labshare`) | `SAMBA_PASSWORD` — generated on first start. Set your own in the config panel if you need to know it to map the drive from Windows (`\\<host>\<SAMBA_SHARE_NAME>`). |
 | **WAHA** | dashboard user | `WAHA_DASHBOARD_PASSWORD`, `WAHA_SWAGGER_PASSWORD`, `WAHA_API_KEY` (all generated) |
 | **Vaultwarden** | — | `VAULTWARDEN_ADMIN_TOKEN` (generated, hidden) — for `/admin` only; normal accounts are self-registered |

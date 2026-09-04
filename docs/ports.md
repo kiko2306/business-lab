@@ -79,7 +79,7 @@ hand edit can leave its copy disagreeing with the app's.
 `10360` stirling-pdf · `10370` uptime-kuma · `10380` vaultwarden ·
 `10390` vikunja · `10400` waha · `10410` wetty · `10420` itflow ·
 `10430` guacamole · `10440` homebox · `10450` clamav (clamd, no UI) ·
-`10460` onlyoffice
+`10460` onlyoffice · `10470` kopia (server UI on container `51515`)
 
 These are the defaults. The allocator may have moved one on your host if
 something else already held the port — check the app's `.env` for the truth.
