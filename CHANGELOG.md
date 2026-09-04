@@ -11,6 +11,22 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.14.0] — 2026-09-04
+
+### Added
+
+- **Nextcloud is wired to OnlyOffice automatically** (§81.4, §178). On every
+  Nextcloud start the backend installs and enables the `onlyoffice` connector
+  and points it at the document server via `occ` inside a throwaway
+  `docker compose run` container — the same no-console-step pattern HACS uses.
+  It sets the browser-facing URL (OnlyOffice's public hostname when exposed,
+  else the host-gateway URL), the internal server-to-server URL
+  (`http://<gateway>:<port>/`), the callback/storage URL, and the shared JWT
+  secret (read from OnlyOffice's generated `.env`, passed through the
+  environment so it never hits `ps` or the log). Idempotent; never blocks the
+  start. Proven end to end — `occ onlyoffice:documentserver --check` reports
+  the document server successfully connected.
+
 ## [0.13.0] — 2026-09-04
 
 ### Changed

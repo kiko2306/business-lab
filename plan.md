@@ -14333,3 +14333,64 @@ The docs-only remainder from §175. No code.
 README item deleted. The §81.4 Nextcloud→OnlyOffice wiring is the next task and
 is unblocked by this — the doc server works fine for what that integration
 needs, it just doesn't persist co-editing sessions across a restart.
+
+## 178. §81.4 — Nextcloud's OnlyOffice connector wired automatically (2026-09-04)
+
+The roster-wiring-debt task from §131.2. Nextcloud's ONLYOFFICE connector is
+now installed and configured by the backend on every Nextcloud start — no
+`occ` runbook step (§0.2).
+
+### Shape
+
+`services/nextcloudOnlyOffice.ts`, `reconcileNextcloudOnlyOffice(serviceName)`,
+called from `composeUpWithManagedConfig` — but **after** the `docker compose up`,
+not before like `ensureHomeAssistantHacs`: `occ` needs Nextcloud's own database,
+which is only up once the container is. A throwaway
+`docker compose run --rm --no-deps -T --user www-data --entrypoint /bin/sh
+nextcloud` runs a base64'd script (HACS pattern; `docker compose exec` is out —
+the socket-proxy blocks exec). The script waits for `occ status` (20 × 3s),
+installs the connector only if absent (`app:getpath` check; a failed
+app-store fetch exits 0 and the next start retries), enables it, and sets:
+
+| connector key | value | why |
+|---|---|---|
+| `DocumentServerUrl` | `https://<oo-public-host>/`, or the internal URL when OnlyOffice isn't exposed | the **browser** loads the editor from here (§123.2) |
+| `DocumentServerInternalUrl` | `http://<host-gateway>:<ONLYOFFICE_PORT>/` | Nextcloud → DS server-to-server |
+| `StorageUrl` | `http://<host-gateway>:<NEXTCLOUD_PORT>/` | DS → Nextcloud callback |
+| `jwt_secret` | `ONLYOFFICE_JWT_SECRET` from `apps/onlyoffice/.env` | shared HMAC secret |
+| `jwt_header` | `ONLYOFFICE_JWT_HEADER` or `Authorization` | must match the DS env |
+
+Cross-project networking is the host-gateway-IP + published-port trick the
+exposure code and ClamAV already use (`getHostGatewayIp()` resolves
+`host.docker.internal`). The JWT secret is passed to the run container via
+`-e OO_JWT_SECRET` (pass-through form, no value on the command line) so it
+stays out of host `ps`; `occ config:app:set jwt_secret … >/dev/null` plus a
+`output.split(secret).join('***')` scrub keep it out of the backend log too
+(`occ` echoes the value it stored).
+
+### Verified against the live stack
+
+Ran the compiled `reconcileNextcloudOnlyOffice('nextcloud')` in the rebuilt
+backend container:
+
+- `onlyoffice 10.1.2 installed`, `onlyoffice enabled`, all five config values
+  set to the values above (`documentServerUrl https://onlyoffice.tx-home-utils.com/`,
+  `internalUrl http://10.201.0.1:10460/`, `storageUrl http://10.201.0.1:10260/`).
+- `php occ onlyoffice:documentserver --check` →
+  **"Document server https://onlyoffice.tx-home-utils.com/ version 9.4.0.129
+  is successfully connected"** — connectivity **and** JWT signature both good.
+- From a Nextcloud `run` container: `curl http://10.201.0.1:10460/healthcheck`
+  → `true`, `curl http://10.201.0.1:10260/status.php` → 200 — both internal
+  legs reachable.
+- Second run is idempotent ("Config value were not updated" ×4, no reinstall)
+  and logs no secret.
+
+### Not in scope
+
+Restricting OnlyOffice's NPM host to Cloudflare IP ranges, and a true LAN-only
+mode — folded into the reworded "Harden OnlyOffice's exposure" README item
+(§123.2). OnlyOffice's own side needs nothing configured: the JWT secret is
+already shared through its compose env.
+
+Minor bump 0.13.0 → 0.14.0 (new user-facing automation). README "Wire Nextcloud
+to OnlyOffice internally" item deleted.

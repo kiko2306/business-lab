@@ -21,6 +21,7 @@ import { checkServiceImages, recordImageCheck, pickLocalDigest, parseImageRef } 
 import { clearImagePins, writeImagePins } from './composeOverride';
 import { withMaintenanceLock } from './maintenanceLock';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
+import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
@@ -193,13 +194,20 @@ async function composeUpWithManagedConfig(
 
   const recreate = forceRecreate ? ' --force-recreate' : '';
   const command = `docker compose -p ${projectName} ${composeArgs} up -d${recreate}`;
-  return executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
+  const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
     ...(await resolveTimezoneOverride(appDir)),
     ...mailOverrides,
     // Exposure last: if a service somehow named the same var in both, the
     // hostname-derived value is the more specific one.
     ...envOverrides,
   });
+
+  // Nextcloud's ONLYOFFICE connector: install + point it at the document
+  // server via `occ`. After `up`, not before — unlike HACS this needs the
+  // app's own database, which is only up once the container is (§81.4).
+  await reconcileNextcloudOnlyOffice(serviceName);
+
+  return result;
 }
 
 function requiredSecretsFromCompose(composeFilePath: string): string[] {
