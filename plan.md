@@ -17681,3 +17681,13 @@ Not built. The plan:
 
 Docs-only — no code written, no version bump. New README item added for
 this shape rather than the old generic "wire up Beszel" line.
+
+## 230. Claude CLI execution guide (2026-09-04)
+
+Added `step-by-step.md` as the operator's token- and session-efficient guide
+for Claude CLI and Ponytail use. It begins with the `.claude` configuration
+and guard check, then gives compact session prompts, explicit `/compact` and
+`/clear` boundaries, and orders work into agent-only tasks, live actions owned
+by @mat, and tasks blocked on those live proofs. It also preserves the
+no-console, no-router, secret-handling, verification, plan/index, and commit
+rules already enforced by this repository.
