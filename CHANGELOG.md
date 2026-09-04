@@ -11,6 +11,18 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.19.0] — 2026-09-04
+
+### Added
+
+- **Per-app backups in the dashboard** (§185 slice 4) — a "Backups" section on
+  every app's Settings modal: **Back up now**, and a list of that app's local
+  snapshots (timestamp, size, DB engine, any failed dumps) each with
+  **Download**, **Restore** and **Delete**. Restore and Delete confirm through
+  the app's in-page modal (`ConfirmService`) — no browser dialog — and Restore
+  reports any warnings and refreshes the card since the app is bounced. Drives
+  the slice 2–3 API; `OperationsService` gains the five calls.
+
 ## [0.18.0] — 2026-09-04
 
 ### Added

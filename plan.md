@@ -15149,3 +15149,54 @@ pre-test state (no-guarantees box regardless).
 
 Minor bump 0.17.0 → 0.18.0 (new API surface). The backend loop (backup +
 restore) is complete; slice 4 is the UI.
+
+## 189. §185 slice 4 — per-app backups in the service card (2026-09-04)
+
+First frontend piece of §185. A "Backups" section on every app's Settings
+modal (`service-card.component`), between Exposure and Admin account:
+
+- **Back up now** → `POST …/backup`; toasts success, or an error toast when
+  the response carries `dumpFailures`.
+- A list of the app's snapshots (newest first): `{{ createdAt | date:'medium' }}`
+  and a `413 KB · postgres · 1 dump failed` detail line built from the
+  manifest (`· details unavailable` when the sidecar is missing).
+- Per row: **Download** (blob → anchor click, like the global Backups page),
+  **Restore**, **Delete**. `backupBusyFile` puts a spinner on the acting row
+  and disables the others.
+
+Restore and Delete go through the app-wide `ConfirmService` modal
+(`confirm.ask({ danger: true, … })`) rather than a new modal or
+`window.confirm` — that service already exists for exactly this and mounts one
+`ConfirmDialogComponent` in `AppComponent`. On a successful restore the toast
+includes any `warnings`, and `serviceState.refresh()` runs because the backend
+stopped and started the app.
+
+`OperationsService` gains `listAppBackups` / `createAppBackup` /
+`restoreAppBackup` / `deleteAppBackup` / `downloadAppBackup`; the response
+shapes went into `core/models.ts` (`AppBackupEntry`, `AppBackupManifest`,
+`AppRestoreResponse`, …). The list loads on `openSettings()`.
+
+### Layout
+
+Rows are `d-flex flex-wrap` — on a narrow modal the action buttons wrap under
+the timestamp/detail column instead of overflowing (no horizontal scroll,
+`ui-design-rules`). Only one real CSS rule (`.app-backup-meta { min-width: 0;
+flex: 1 1 12rem }`) — everything else is Bootstrap utilities — after the first
+cut tripped the component's 4.10 kB CSS budget by ~400 bytes.
+
+### Verified
+
+- Frontend `npm run build` clean (no new budget warnings); `npm run test:ci`
+  **46** (+5: the detail-line formatter incl. the failed-dump and
+  no-manifest cases, restore/delete gated on confirm, list loads on open).
+- `scripts/e2e-tests.sh` — the browser suite (auth, nav across all pages,
+  Users, the full TOTP journey) still green: **13 passed, 3 skipped**.
+- Backend + frontend images rebuilt and recreated (`up -d --no-deps`, not a
+  root `compose down`); dashboard serves 200 on `0.19.0`.
+- Not click-tested through the live authenticated UI in this session (no
+  dashboard creds to an agent); the API it drives is proven end to end in
+  §187/§188, the component logic is unit-tested, and the shell is covered by
+  the E2E run above.
+
+Minor bump 0.18.0 → 0.19.0 (user-facing UI). Slice 5 (docs + optional Backups-
+page table) is all that's left of §185.

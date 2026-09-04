@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.18.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.19.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -242,13 +242,10 @@ Strategy:
 Per-application backup / restore (§131.4, §185) — a self-contained local
 `.tar.gz` per app, separate from the offsite Duplicati job. Sliced:
 
-- [ ] **Service-card Backups UI** (§185 slice 4) — Back up now, snapshot list,
-      Restore (confirm modal) / Download / Delete, `service-state` calls,
-      specs. Slices 1–3 (archive + API + restore) are done. Run
-      `scripts/e2e-tests.sh`.
 - [ ] **Per-app backup docs + Backups-page overview** (§185 slice 5) —
       `recovery-troubleshooting.md` / `it-admin.md` on per-app vs offsite and
-      the manual restore; optional per-app table on the Backups page.
+      the manual restore; optional per-app table on the Backups page. Slices
+      1–4 (archive + API + restore + service-card UI) are done.
 
 ### Business Lab (§84)
 

@@ -328,6 +328,77 @@
         </ng-container>
       </section>
 
+      <!-- Backups -->
+      <section class="settings-section">
+        <h3 class="settings-section-title">Backups</h3>
+        <p class="small text-body-secondary mb-2">
+          A local snapshot of this app's data and database — a quick rollback point,
+          kept separate from the scheduled off-site backup.
+        </p>
+
+        <button
+          type="button"
+          class="btn btn-outline-primary btn-sm mb-2"
+          [disabled]="backupsCreating || backupBusyFile !== null"
+          (click)="createAppBackup()"
+        >
+          <span *ngIf="backupsCreating" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
+          Back up now
+        </button>
+
+        <div *ngIf="backupsLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
+          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
+          Loading…
+        </div>
+
+        <ng-container *ngIf="!backupsLoading">
+          <div *ngIf="!appBackups.length" class="small text-body-secondary">No snapshots yet.</div>
+
+          <ul *ngIf="appBackups.length" class="list-unstyled d-flex flex-column gap-2 mb-0">
+            <li
+              *ngFor="let b of appBackups"
+              class="d-flex flex-wrap align-items-center gap-2 p-2 border rounded bg-body-tertiary"
+            >
+              <div class="app-backup-meta d-flex flex-column">
+                <span class="fw-semibold small">{{ b.createdAt | date: 'medium' }}</span>
+                <span class="small text-body-secondary">{{ appBackupDetail(b) }}</span>
+              </div>
+              <div class="d-flex flex-wrap align-items-center gap-1 ms-auto">
+                <span
+                  *ngIf="backupBusyFile === b.file"
+                  class="spinner-border spinner-border-sm text-body-secondary"
+                  aria-hidden="true"
+                ></span>
+                <button
+                  type="button"
+                  class="btn btn-outline-secondary btn-sm"
+                  [disabled]="backupBusyFile !== null"
+                  (click)="downloadAppBackup(b)"
+                >
+                  Download
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline-primary btn-sm"
+                  [disabled]="backupBusyFile !== null || backupsCreating"
+                  (click)="restoreAppBackup(b)"
+                >
+                  Restore
+                </button>
+                <button
+                  type="button"
+                  class="btn btn-outline-danger btn-sm"
+                  [disabled]="backupBusyFile !== null"
+                  (click)="deleteAppBackup(b)"
+                >
+                  Delete
+                </button>
+              </div>
+            </li>
+          </ul>
+        </ng-container>
+      </section>
+
       <!-- Admin account -->
       <section class="settings-section" *ngIf="service.adminUserManagementSupported">
         <h3 class="settings-section-title">Admin account</h3>

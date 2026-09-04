@@ -1,9 +1,11 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { of } from 'rxjs';
 import { ServiceCardComponent } from './service-card.component';
+import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ToastService } from '../../core/toast.service';
-import { ServiceStatus } from '../../core/models';
+import { AppBackupEntry, ServiceEnvStatus, ServiceExposureConfig, ServiceStatus } from '../../core/models';
 
 const service = (name: string, state: ServiceStatus['state'], extra: Partial<ServiceStatus> = {}): ServiceStatus => ({
   name,
@@ -108,5 +110,82 @@ describe('ServiceCardComponent dependencies', () => {
     expect(component.dependencies()).toEqual([
       { name: 'authelia', label: 'authelia', running: false, blocking: true },
     ]);
+  });
+});
+
+describe('ServiceCardComponent per-app backups', () => {
+  let component: ServiceCardComponent;
+  let operations: jasmine.SpyObj<OperationsService>;
+  let confirm: jasmine.SpyObj<ConfirmService>;
+
+  const entry = (over: Partial<AppBackupEntry> = {}): AppBackupEntry => ({
+    file: 'paperless-2026-01-01T00-00-00-000Z.tar.gz',
+    bytes: 422_912,
+    createdAt: '2026-01-01T00:00:00.000Z',
+    manifest: { app: 'paperless', createdAt: '2026-01-01T00:00:00.000Z', dashboardVersion: '0.18.0', engine: 'postgres', archiveBytes: 422_912, dumps: [], dumpFailures: [] },
+    ...over,
+  });
+
+  beforeEach(async () => {
+    operations = jasmine.createSpyObj('OperationsService', [
+      'getServiceExposure',
+      'getServiceEnv',
+      'listAppBackups',
+      'createAppBackup',
+      'restoreAppBackup',
+      'deleteAppBackup',
+      'downloadAppBackup',
+    ]);
+    operations.listAppBackups.and.returnValue(of({ items: [] }));
+    operations.getServiceExposure.and.returnValue(
+      of({ enabled: false, autheliaProtected: false, exposable: false } as unknown as ServiceExposureConfig)
+    );
+    operations.getServiceEnv.and.returnValue(of({ fields: [] } as unknown as ServiceEnvStatus));
+    confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
+
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: operations },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: confirm },
+      ],
+    }).compileComponents();
+
+    component = TestBed.createComponent(ServiceCardComponent).componentInstance;
+    component.service = service('paperless', 'running');
+  });
+
+  it('summarises a snapshot as size · engine, and flags failed dumps', () => {
+    expect(component['appBackupDetail'](entry())).toBe('413 KB · postgres');
+    expect(
+      component['appBackupDetail'](
+        entry({ manifest: { ...entry().manifest!, dumpFailures: [{ target: '', kind: 'postgres', bytes: null, detail: 'x' }] } })
+      )
+    ).toBe('413 KB · postgres · 1 dump failed');
+    expect(component['appBackupDetail'](entry({ manifest: null }))).toBe('413 KB · details unavailable');
+  });
+
+  it('restores only after the user confirms', async () => {
+    confirm.ask.and.resolveTo(false);
+    await component.restoreAppBackup(entry());
+    expect(operations.restoreAppBackup).not.toHaveBeenCalled();
+
+    confirm.ask.and.resolveTo(true);
+    operations.restoreAppBackup.and.returnValue(of({ success: true, service: 'paperless', file: entry().file, fileRestore: '', databaseRestore: null, warnings: [], message: 'ok' }));
+    await component.restoreAppBackup(entry());
+    expect(operations.restoreAppBackup).toHaveBeenCalledWith('paperless', entry().file);
+  });
+
+  it('deletes only after the user confirms', async () => {
+    confirm.ask.and.resolveTo(false);
+    await component.deleteAppBackup(entry());
+    expect(operations.deleteAppBackup).not.toHaveBeenCalled();
+  });
+
+  it('loads the app\'s backups when the settings modal opens', () => {
+    component.openSettings();
+    expect(operations.listAppBackups).toHaveBeenCalledWith('paperless');
   });
 });

@@ -336,6 +336,56 @@ export interface BackupListResponse {
   items: BackupFile[];
 }
 
+// ---- Per-app backup / restore (plan.md §185) ----
+
+export interface AppBackupDump {
+  target: string;
+  kind: string;
+  bytes: number | null;
+  detail: string;
+}
+
+export interface AppBackupManifest {
+  app: string;
+  createdAt: string;
+  dashboardVersion: string;
+  engine: string | null;
+  archiveBytes: number;
+  dumps: AppBackupDump[];
+  dumpFailures: AppBackupDump[];
+}
+
+export interface AppBackupEntry {
+  file: string;
+  bytes: number;
+  createdAt: string;
+  /** null when the manifest sidecar is missing or unreadable. */
+  manifest: AppBackupManifest | null;
+}
+
+export interface AppBackupListResponse {
+  items: AppBackupEntry[];
+}
+
+export interface AppBackupCreateResponse {
+  success: boolean;
+  service: string;
+  file: string;
+  manifest: AppBackupManifest;
+  dumpFailures: AppBackupDump[];
+  message: string;
+}
+
+export interface AppRestoreResponse {
+  success: boolean;
+  service: string;
+  file: string;
+  fileRestore: string;
+  databaseRestore: AppBackupDump | null;
+  warnings: string[];
+  message: string;
+}
+
 export type BackupScheduleFrequency = 'daily' | 'weekly';
 
 /** The three values the user actually chooses; the rest is run history. */

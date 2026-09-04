@@ -15,6 +15,7 @@ import { FormsModule } from '@angular/forms';
 import { Subscription, filter, finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import {
+  AppBackupEntry,
   AutheliaAdminUser,
   ServiceEnvField,
   ServiceEnvStatus,
@@ -23,6 +24,7 @@ import {
   ServiceStatus,
   StartupActionEvent,
 } from '../../core/models';
+import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ToastService } from '../../core/toast.service';
@@ -50,6 +52,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly operations = inject(OperationsService);
   private readonly serviceState = inject(ServiceStateService);
   private readonly toast = inject(ToastService);
+  private readonly confirm = inject(ConfirmService);
 
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
@@ -79,6 +82,14 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   protected adminUserSaving = false;
   protected adminUser: AutheliaAdminUser | null = null;
   protected adminUserForm = { username: '', displayName: '', email: '', password: '' };
+
+  // Per-app backup archives (plan.md §185). A local rollback point, distinct
+  // from the scheduled off-site backup.
+  protected backupsLoading = false;
+  protected backupsCreating = false;
+  protected appBackups: AppBackupEntry[] = [];
+  /** The file currently being restored / deleted, so its row can show a spinner. */
+  protected backupBusyFile: string | null = null;
 
   protected startupLogsOpen = false;
   protected startupLogLines: string[] = [];
@@ -158,6 +169,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     if (this.service.adminUserManagementSupported && !this.adminUser) {
       this.loadAdminUser();
     }
+    this.loadAppBackups();
   }
 
   closeSettings(): void {
@@ -573,6 +585,125 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save admin account.')),
       });
+  }
+
+  loadAppBackups(): void {
+    this.backupsLoading = true;
+    this.operations
+      .listAppBackups(this.service.name)
+      .pipe(finalize(() => (this.backupsLoading = false)))
+      .subscribe({
+        next: (response) => (this.appBackups = response.items),
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load this app\'s backups.')),
+      });
+  }
+
+  createAppBackup(): void {
+    this.backupsCreating = true;
+    this.operations
+      .createAppBackup(this.service.name)
+      .pipe(finalize(() => (this.backupsCreating = false)))
+      .subscribe({
+        next: (response) => {
+          if (response.dumpFailures.length) {
+            this.toast.error(response.message);
+          } else {
+            this.toast.success(response.message);
+          }
+          this.loadAppBackups();
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, `Unable to back up ${this.service.label}.`)),
+      });
+  }
+
+  async restoreAppBackup(entry: AppBackupEntry): Promise<void> {
+    const when = new Date(entry.createdAt).toLocaleString();
+    const confirmed = await this.confirm.ask({
+      title: `Restore ${this.service.label}`,
+      message:
+        `Restore from the snapshot taken ${when}?\n` +
+        `This stops ${this.service.label}, replaces its data with the snapshot, ` +
+        `and starts it again. Anything changed since then is lost.`,
+      confirmText: 'Restore',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    this.backupBusyFile = entry.file;
+    this.operations
+      .restoreAppBackup(this.service.name, entry.file)
+      .pipe(finalize(() => (this.backupBusyFile = null)))
+      .subscribe({
+        next: (response) => {
+          if (response.warnings.length) {
+            this.toast.error(`${response.message} ${response.warnings.join(' ')}`);
+          } else {
+            this.toast.success(response.message);
+          }
+          // The app was stopped and restarted by the restore — refresh the
+          // card, and reload the list (a restore doesn't add a snapshot but
+          // its mtimes/manifests are worth re-reading).
+          this.serviceState.refresh();
+          this.loadAppBackups();
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, `Unable to restore ${this.service.label}.`)),
+      });
+  }
+
+  async deleteAppBackup(entry: AppBackupEntry): Promise<void> {
+    const when = new Date(entry.createdAt).toLocaleString();
+    const confirmed = await this.confirm.ask({
+      title: 'Delete snapshot',
+      message: `Delete the ${this.service.label} snapshot from ${when}? This can't be undone.`,
+      confirmText: 'Delete',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
+    this.backupBusyFile = entry.file;
+    this.operations
+      .deleteAppBackup(this.service.name, entry.file)
+      .pipe(finalize(() => (this.backupBusyFile = null)))
+      .subscribe({
+        next: (response) => {
+          this.toast.success(response.message);
+          this.loadAppBackups();
+        },
+        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to delete the snapshot.')),
+      });
+  }
+
+  downloadAppBackup(entry: AppBackupEntry): void {
+    this.operations.downloadAppBackup(this.service.name, entry.file).subscribe({
+      next: (blob) => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = entry.file;
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to download the snapshot.')),
+    });
+  }
+
+  /** Short "· postgres · 2 dumps · 1 failed" line under a snapshot's timestamp. */
+  protected appBackupDetail(entry: AppBackupEntry): string {
+    const parts = [`${(entry.bytes / 1024).toFixed(0)} KB`];
+    const m = entry.manifest;
+    if (!m) {
+      parts.push('details unavailable');
+      return parts.join(' · ');
+    }
+    if (m.engine) {
+      parts.push(m.engine);
+    }
+    if (m.dumpFailures.length) {
+      parts.push(`${m.dumpFailures.length} dump${m.dumpFailures.length === 1 ? '' : 's'} failed`);
+    }
+    return parts.join(' · ');
   }
 
   serviceIcon(icon: string): string {

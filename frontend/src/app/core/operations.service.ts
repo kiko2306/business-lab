@@ -7,6 +7,9 @@ import {
   AdminUser,
   AdminUserListResponse,
   AppAccessOptionsResponse,
+  AppBackupCreateResponse,
+  AppBackupListResponse,
+  AppRestoreResponse,
   AuditLogResponse,
   AutheliaAdminUser,
   AutheliaAdminUserUpdate,
@@ -81,6 +84,32 @@ export class OperationsService {
 
   updateBackupSchedule(config: BackupScheduleSettings): Observable<{ message: string }> {
     return this.http.put<{ message: string }>(`${API_BASE_URL}/backups/schedule`, config);
+  }
+
+  // ---- Per-app backup / restore (plan.md §185) ----
+
+  listAppBackups(serviceName: string): Observable<AppBackupListResponse> {
+    return this.http.get<AppBackupListResponse>(`${API_BASE_URL}/services/${serviceName}/backups`);
+  }
+
+  createAppBackup(serviceName: string): Observable<AppBackupCreateResponse> {
+    return this.http.post<AppBackupCreateResponse>(`${API_BASE_URL}/services/${serviceName}/backup`, {});
+  }
+
+  restoreAppBackup(serviceName: string, file: string): Observable<AppRestoreResponse> {
+    return this.http.post<AppRestoreResponse>(`${API_BASE_URL}/services/${serviceName}/backup/restore`, { file });
+  }
+
+  deleteAppBackup(serviceName: string, file: string): Observable<{ message: string }> {
+    return this.http.delete<{ message: string }>(
+      `${API_BASE_URL}/services/${serviceName}/backups/${encodeURIComponent(file)}`
+    );
+  }
+
+  downloadAppBackup(serviceName: string, file: string): Observable<Blob> {
+    return this.http.get(`${API_BASE_URL}/services/${serviceName}/backups/${encodeURIComponent(file)}`, {
+      responseType: 'blob',
+    });
   }
 
   getServiceExposure(serviceName: string): Observable<ServiceExposureConfig> {
