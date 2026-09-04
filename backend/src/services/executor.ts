@@ -22,6 +22,7 @@ import { clearImagePins, writeImagePins } from './composeOverride';
 import { withMaintenanceLock } from './maintenanceLock';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
+import { reconcileNextcloudClamav } from './nextcloudClamav';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
@@ -202,10 +203,11 @@ async function composeUpWithManagedConfig(
     ...envOverrides,
   });
 
-  // Nextcloud's ONLYOFFICE connector: install + point it at the document
-  // server via `occ`. After `up`, not before — unlike HACS this needs the
-  // app's own database, which is only up once the container is (§81.4).
+  // Nextcloud roster wiring via `occ`. After `up`, not before — unlike HACS
+  // these need the app's own database, which is only up once the container is
+  // (§81.4/§81.7). Both no-op for every other service.
   await reconcileNextcloudOnlyOffice(serviceName);
+  await reconcileNextcloudClamav(serviceName);
 
   return result;
 }

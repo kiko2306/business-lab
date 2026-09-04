@@ -28,53 +28,28 @@
  * a broken Nextcloud.
  */
 
-import { exec } from 'child_process';
 import logger from '../utils/logger';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { readAppEnvValue } from './appEnv';
 import { getServiceExposureRow } from './exposure';
 import { getHostGatewayIp } from '../utils/network';
+import { runNextcloudOccScript } from './nextcloudOcc';
 
 const NEXTCLOUD_SERVICE = 'nextcloud';
 const ONLYOFFICE_SERVICE = 'onlyoffice';
 
-function run(command: string, env: NodeJS.ProcessEnv, timeoutMs = 180_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(command, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024, env }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.toString() || error.message));
-        return;
-      }
-      resolve(stdout.toString());
-    });
-  });
-}
-
 /**
- * The /bin/sh script that runs inside the throwaway Nextcloud container, as
- * www-data. The JWT secret comes in through the environment ($OO_JWT_SECRET),
- * never on the command line, so it stays out of `ps` on the host.
+ * The occ command lines that install + configure the connector. Run through
+ * runNextcloudOccScript, which prepends `set -e`, the `cd`, and the
+ * occ-readiness wait. The JWT secret comes in through the environment
+ * ($OO_JWT_SECRET), never on the command line, so it stays out of `ps`.
  *
  * Idempotent: `config:app:set` overwrites, and the connector is only installed
  * when absent. A connector install needs the Nextcloud app store (network); if
  * that fails the script exits 0 and the next start retries.
  */
-function buildWiringScript(documentServerUrl: string, internalUrl: string, storageUrl: string): string {
+function buildWiringScript(documentServerUrl: string, internalUrl: string, storageUrl: string): string[] {
   return [
-    'set -e',
-    'cd /var/www/html',
-    // `up -d` returns before Nextcloud has finished its own first-run install,
-    // so give occ a little while to answer before giving up (the next start
-    // retries anyway).
-    'i=0',
-    'while ! php occ status >/dev/null 2>&1; do',
-    '  i=$((i+1))',
-    '  if [ $i -ge 20 ]; then',
-    '    echo "hlm: Nextcloud is not ready (occ status failed); skipping OnlyOffice wiring"',
-    '    exit 0',
-    '  fi',
-    '  sleep 3',
-    'done',
     'if ! php occ app:getpath onlyoffice >/dev/null 2>&1; then',
     '  if ! php occ app:install onlyoffice; then',
     '    echo "hlm: could not install the onlyoffice connector (app store unreachable?); skipping"',
@@ -90,7 +65,7 @@ function buildWiringScript(documentServerUrl: string, internalUrl: string, stora
     'php occ config:app:set onlyoffice jwt_secret --value "$OO_JWT_SECRET" >/dev/null',
     'php occ config:app:set onlyoffice jwt_header --value "$OO_JWT_HEADER"',
     'echo "hlm: OnlyOffice connector configured"',
-  ].join('\n');
+  ];
 }
 
 export interface NextcloudOnlyOfficePlan {
@@ -159,25 +134,20 @@ export async function reconcileNextcloudOnlyOffice(serviceName: string): Promise
       return;
     }
 
-    const scriptB64 = Buffer.from(
-      buildWiringScript(plan.documentServerUrl, plan.internalUrl, plan.storageUrl)
-    ).toString('base64');
-    const command =
-      `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
-      `--user www-data -e OO_JWT_SECRET -e OO_JWT_HEADER ` +
-      `--entrypoint /bin/sh nextcloud -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
-
-    const output = await run(command, {
-      ...process.env,
-      OO_JWT_SECRET: plan.jwtSecret,
-      OO_JWT_HEADER: plan.jwtHeader,
-    });
+    const result = await runNextcloudOccScript(
+      buildWiringScript(plan.documentServerUrl, plan.internalUrl, plan.storageUrl),
+      {
+        env: { ...process.env, OO_JWT_SECRET: plan.jwtSecret, OO_JWT_HEADER: plan.jwtHeader },
+        passEnv: ['OO_JWT_SECRET', 'OO_JWT_HEADER'],
+      }
+    );
     // Belt-and-braces: never let the secret reach the log even if a future occ
     // prints it somewhere the script's `>/dev/null` doesn't catch.
-    const safeOutput = output.split(plan.jwtSecret).join('***').trim();
+    const safeOutput = result.output.split(plan.jwtSecret).join('***').trim();
     logger.info('Nextcloud/OnlyOffice connector reconciled', {
       documentServerUrl: plan.documentServerUrl,
       internalUrl: plan.internalUrl,
+      ok: result.ok,
       output: safeOutput || '(no output)',
     });
   } catch (error) {

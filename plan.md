@@ -14394,3 +14394,70 @@ already shared through its compose env.
 
 Minor bump 0.13.0 → 0.14.0 (new user-facing automation). README "Wire Nextcloud
 to OnlyOffice internally" item deleted.
+
+## 179. §81.7 — Nextcloud's antivirus wired to ClamAV automatically (2026-09-04)
+
+Roster-wiring debt, the ClamAV half. Nextcloud's `files_antivirus` app is now
+installed + configured on every Nextcloud start; Paperless is split off (see
+below).
+
+### Shared occ scaffold
+
+Factored the throwaway-container plumbing out of `nextcloudOnlyOffice.ts` into
+`services/nextcloudOcc.ts` — `runNextcloudOccScript(bodyLines, { env, passEnv,
+timeoutMs })`. It base64s `set -e` + `cd /var/www/html` + a 60s `occ status`
+wait + the caller's lines, and runs them in
+`docker compose run --rm --no-deps -T --user www-data --entrypoint /bin/sh
+nextcloud`. `passEnv` forwards named vars with bare `-e NAME` (value stays off
+the command line). Returns `{ ok, output }`, never throws. Both reconcilers now
+build on it; `nextcloudOnlyOffice.ts` shrank accordingly.
+
+### The ClamAV wiring — `services/nextcloudClamav.ts`
+
+`reconcileNextcloudClamav(serviceName)`, called from
+`composeUpWithManagedConfig` right after `reconcileNextcloudOnlyOffice` (after
+`up`, occ needs the DB). No-op unless `serviceName === 'nextcloud'` and
+`clamav` is in the registry. Then:
+
+- `app:install files_antivirus` (only if absent) → `app:enable`
+- `av_mode=daemon`, `av_host=<host-gateway>`, `av_port=<CLAMAV_PORT>` (10450
+  here) — daemon/TCP because ClamAV is a separate compose project reachable
+  only via the gateway, the same trick §178 uses. `--type integer` on the port.
+- `av_infected_action=delete` — the background scan removes an infected file
+  already in storage (upload-time detection blocks it regardless).
+- `av_block_unreachable=false` (`--type boolean`, so `"false"` isn't coerced to
+  bool-true by the new typed config store). Deliberate: a stopped ClamAV must
+  not mean "no upload works". The background scanner's first pass is
+  "files never scanned", so anything missed while ClamAV was down gets caught
+  when it returns. `clamav` added to Nextcloud's `requires` (not `dependsOn`)
+  so the dashboard warns when it's down without blocking a start.
+
+### Verified against the live stack
+
+- Ran the compiled `reconcileNextcloudClamav('nextcloud')` in the rebuilt
+  backend: `files_antivirus 6.4.0 installed` + enabled, `av_mode=daemon`,
+  `av_host=10.201.0.1`, `av_port=10450` (stored integer), `av_infected_action=delete`,
+  `av_block_unreachable=0` (stored boolean).
+- `occ files_antivirus:test`:
+  - `Scanning regular text: ✓` (scanner reachable, no false positive)
+  - `Scanning EICAR test file: ✓` (real 68-byte EICAR **detected**)
+  - `Scanning modified EICAR test file: ❌ file not detected` — **expected**:
+    the app appends `uniqid()` to the EICAR string, and ClamAV's EICAR
+    signature is an exact full-file match by the EICAR standard, so
+    EICAR+junk is legitimately clean. The two that matter both pass.
+
+### Paperless split off
+
+Paperless-ngx has **no native antivirus**. The only hook is
+`PAPERLESS_PRE_CONSUME_SCRIPT` (a non-zero exit aborts consumption —
+confirmed in `src/documents/consumer.py`: `run_subprocess` defaults
+`check_exit_code=True` → `_fail` → `ConsumerError`). Wiring it needs a
+clamd-INSTREAM script in the container (Python is present; place it under the
+writable `apps/paperless/data/`) **and** the `PAPERLESS_PRE_CONSUME_SCRIPT`
+env var, which the compose file doesn't reference — so it needs a managed
+compose override, i.e. generalising §176's `composeOverride.ts` past image
+pins. Lower value (Paperless intake is usually trusted scans), so it's its own
+README item now, not blocking.
+
+Minor bump 0.14.0 → 0.15.0. README "Wire ClamAV into Nextcloud and Paperless"
+item replaced with the narrower Paperless-only follow-up.

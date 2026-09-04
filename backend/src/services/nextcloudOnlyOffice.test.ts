@@ -45,7 +45,9 @@ beforeEach(() => {
 });
 
 describe('buildWiringScript', () => {
-  const script = __test.buildWiringScript('https://oo.example.com/', 'http://10.201.0.1:10460/', 'http://10.201.0.1:10260/');
+  const script = __test
+    .buildWiringScript('https://oo.example.com/', 'http://10.201.0.1:10460/', 'http://10.201.0.1:10260/')
+    .join('\n');
 
   it('installs the connector only when absent, then always enables it', () => {
     expect(script).toContain('if ! php occ app:getpath onlyoffice');
@@ -62,10 +64,6 @@ describe('buildWiringScript', () => {
   it('passes the JWT secret through the environment, never inline', () => {
     expect(script).toContain('jwt_secret --value "$OO_JWT_SECRET"');
     expect(script).not.toContain('shhh-secret');
-  });
-
-  it('waits for occ to answer before giving up', () => {
-    expect(script).toMatch(/while ! php occ status[\s\S]*sleep 3[\s\S]*done/);
   });
 });
 

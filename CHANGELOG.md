@@ -11,6 +11,21 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.15.0] — 2026-09-04
+
+### Added
+
+- **Nextcloud's antivirus is wired to ClamAV automatically** (§81.7, §179). On
+  every Nextcloud start the backend installs + enables the `files_antivirus`
+  app and points it at the ClamAV daemon (`daemon` mode, host-gateway IP +
+  `CLAMAV_PORT`), via `occ` — the same throwaway-container pattern as the
+  OnlyOffice connector, now factored into a shared `nextcloudOcc` helper.
+  `av_infected_action=delete`; `av_block_unreachable=false` so a stopped
+  ClamAV can't block all uploads (the background scan catches up), with
+  `clamav` added to Nextcloud's `requires` so the dashboard still warns when
+  it's down. Proven end to end — `occ files_antivirus:test` detects the EICAR
+  test signature and passes a clean file.
+
 ## [0.14.0] — 2026-09-04
 
 ### Added
