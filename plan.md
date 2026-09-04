@@ -16190,3 +16190,25 @@ to someone editing the code (`backend/src/config`, `backend/src/services`,
 table already covers those for agent work; this one is for a reader of the
 README, not a contributor map. New folders get a row only when they're
 something a user/operator would open, per this same rule, going forward.
+
+## 203. §202 follow-up: two open questions settled
+
+Two of §202's open questions came back decided, not just discussed:
+
+**Cloudflare account model is the client's own call, not a standard to
+pick.** §84.7's "their Cloudflare account" and §202's shared-account
+question aren't in tension after all — the provisioning flow doesn't choose
+one model, it supports both: **self-controlled** (the client runs their own
+Cloudflare account, full ownership) or **contracted** (a reseller-managed
+account handles it for them, scoped per-zone tokens same as before). Which
+one applies is a per-client contract term, decided at onboarding, not a
+platform default. Updated the README "Per-client provisioning" item to say
+so directly instead of parking the account question on the still-open data
+protection item.
+
+**Skip draw.io hosting — settled, not just recommended.** §202 recommended
+against self-hosting `jgraph/drawio` since `.drawio` XML doesn't need a
+server to be useful. Confirmed: no `apps/drawio/`, no README item for it.
+Diagrams (if the Activity/Sequence-diagram item above goes ahead) get
+authored with `app.diagrams.net` or the desktop app and checked in as
+`.drawio` files, same as any other doc asset.

@@ -255,15 +255,15 @@ Strategy:
       Artifact. This is the single canonical sales-doc item — the old
       §84.4/§84.7 "SaaS inventory + monthly costs", "value-proposition plan"
       and "customer journey" items were folded into it (§166).
-- [ ] **Which dashboard actions deserve Activity/Sequence diagrams** (§202)
-      — the dashboard has ~40 backend actions of wildly different
+- [ ] **Which dashboard actions deserve Activity/Sequence diagrams** (§202,
+      §203) — the dashboard has ~40 backend actions of wildly different
       complexity; worth a diagram where the multi-service handoff is hard to
       hold in your head from the code alone (exposure provisioning, the
       self-update walk, a backup/restore round-trip), not for a
       single-service CRUD action. Make that list first, then draw the
       worthwhile ones as `.drawio` XML in `docs/` — author with
-      `app.diagrams.net` or the desktop app, no need to self-host
-      `jgraph/drawio` for a one-shot, not-co-edited diagram.
+      `app.diagrams.net` or the desktop app; self-hosting `jgraph/drawio` is
+      decided against (§203), not just deferred.
 
 ### Backups
 
@@ -297,15 +297,15 @@ Strategy:
       sources agree Instagram publishes normally from a dev-mode app with a
       Tester role, and that a Facebook Page post in dev mode is visible only to
       admins. Confirm both with a real app before a timeline depends on it.
-- [ ] **Per-client provisioning** (§84.5, §84.7, §202) — one host is one
-      deployment today; turnkey boxes need it repeatable per client. The list
-      is concrete: their domain, their Cloudflare account and API token,
-      their tunnel, their Authelia users, their backup destination. Whether
-      "their Cloudflare account" means each client's own account or a shared
-      reseller account with per-zone-scoped tokens is a data-protection/
-      control call, not a technical one (§202) — fold it into the data
-      protection position item below rather than deciding it here. Lands in
-      the setup flow.
+- [ ] **Per-client provisioning** (§84.5, §84.7, §202, §203) — one host is
+      one deployment today; turnkey boxes need it repeatable per client. The
+      list is concrete: their domain, their Cloudflare account and API
+      token, their tunnel, their Authelia users, their backup destination.
+      Decided (§203): whose Cloudflare account holds the domain is the
+      client's own call, not ours to standardise — self-controlled (their
+      own account) or contracted (a reseller-managed account) — so the
+      provisioning flow must support both, with per-zone-scoped API tokens
+      required either way. Lands in the setup flow.
 - [ ] **Turnkey build spec** (§84.7) — Dell/16 GiB/500 GB/€400 is proven (this
       stack runs on 14.84 GiB, 4 CPUs, 53 containers, 8 GB used). The trap is
       the disk: Ubuntu's installer defaults to a ~100 GiB root LV, which is how
