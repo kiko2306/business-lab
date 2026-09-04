@@ -3,6 +3,7 @@ import { requestJson } from '../utils/httpJson';
 import {
   guacamoleCreateUser,
   guacamoleGetUser,
+  guacamoleListUsers,
   guacamoleLogin,
   guacamoleLogout,
   guacamoleSetPassword,
@@ -151,6 +152,30 @@ describe('guacamoleGetUser', () => {
     mockedRequestJson.mockResolvedValueOnce({ statusCode: 500, body: null, raw: '' });
 
     await expect(guacamoleGetUser('http://guac:8080', session, 'alice')).rejects.toThrow('500');
+  });
+});
+
+describe('guacamoleListUsers', () => {
+  it('GETs the directory and returns the username-keyed map as-is', async () => {
+    const body = {
+      guacadmin: { username: 'guacadmin', disabled: false, attributes: {} },
+      alice: { username: 'alice', disabled: true, attributes: {} },
+    };
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body, raw: '' });
+
+    const users = await guacamoleListUsers('http://guac:8080', session);
+
+    expect(users).toEqual(body);
+    expect(mockedRequestJson).toHaveBeenCalledWith(
+      'http://guac:8080/api/session/data/postgresql/users',
+      expect.objectContaining({ headers: { 'Guacamole-Token': 'tok' } })
+    );
+  });
+
+  it('throws on a non-200 response', async () => {
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 500, body: null, raw: '' });
+
+    await expect(guacamoleListUsers('http://guac:8080', session)).rejects.toThrow('500');
   });
 });
 

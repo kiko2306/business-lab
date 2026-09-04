@@ -16357,3 +16357,62 @@ no user-facing effect until slice 3 wires them into a real sync.
 **Next**: slice 3, `guacamoleSync.ts` — the actual policy (which dashboard
 users get a Guacamole account) and the trigger wiring, mirroring
 `autheliaSync.ts`.
+
+## 207. §200 slice 3 done — guacamoleSync.ts auto-provisions Guacamole accounts
+
+Mirrors `autheliaSync.ts`'s shape exactly, over REST instead of a rewritten
+file: rebuild the wanted set from `users` (active — email + password_hash
+both set, same test as Authelia's sync, not a status column — with
+`app-guacamole` granted or webmaster), diff it against
+`guacamoleListUsers()`, create what's missing, enable what's wanted-but-
+disabled, **disable** (never delete) what's no-longer-wanted. `guacadmin` is
+excluded from the diff in both directions — this client authenticates as
+it, so disabling it would lock the sync out of its own account.
+
+One real design decision beyond a straight `autheliaSync.ts` mirror:
+`guacamoleSetUserDisabled` (§206) already does GET-modify-PUT and is already
+a no-op when the state already matches, so `reconcileUser` doesn't need its
+own "is this actually a change" check before calling it — it only needs to
+know *whether* to call create vs. enable vs. disable, not whether the call
+will be a no-op. Kept a thin `reconcileUser` helper per-username rather than
+inlining it in the loop so a single user's REST failure (`try`/`catch` around
+each call) can't abort the rest of the pass — matches `autheliaSync.ts`'s
+"never throws, logs and moves on" posture but at per-user rather than
+per-sync granularity, since this is N REST calls instead of one file write.
+
+**New account passwords are throwaway.** `crypto.randomBytes(32)`, generated
+and immediately discarded — nobody is ever told it. Until slice 4's
+`guacamole-auth-header` extension is wired, these accounts can't usefully be
+logged into directly (matches §200's own note that the password field
+stops mattering once that extension authenticates by header alone); this
+slice only prepares the account for it.
+
+**Wired into the same trigger points as `syncAutheliaUsersSafe`** — deleted
+`invitation_accepted` (auth.ts), `user_roles_update`/`user_access_update`/
+`user_delete` (users.ts) — plus `exposure_change` (services.ts), gated to
+only fire when the service being exposed/hidden is Guacamole itself, since
+that's the one case where `app-guacamole`'s very existence as a grantable
+option changes. Not wired into `user_password_reset` — Guacamole holds its
+own independent generated password, so a dashboard password reset has
+nothing for this sync to react to. Every route response that already
+surfaced an Authelia sync warning now merges it with a Guacamole one
+(`[autheliaWarning, guacamoleWarning].filter(Boolean).join(' ')`) rather than
+adding a second warning field.
+
+**Verified**: backend `npm run typecheck` + `npm test` (53 files, 570 tests,
+15 new in `guacamoleSync.test.ts` covering install/reachability/rotation
+gates, create/enable/disable/skip-no-email/guacadmin-exclusion, and
+continuing past one user's REST failure). Live proof was scoped to what's
+actually new and Docker/network-facing: `guacamoleListUsers` (the one REST
+call slice 2 hadn't already exercised) round-tripped against the real
+Guacamole on `tx-home-utils.com` — listed the directory (just `guacadmin`),
+created a throwaway test account, confirmed it appeared in the listing with
+the same shape `guacamoleGetUser` already proved (§206), deleted it. The
+DB-query/set-diff logic itself has no live-infra dependency to prove beyond
+what the 15 unit tests already cover — didn't attempt a full live run of
+`syncGuacamoleUsers` against the real DB, since that would need the
+Postgres password from a real `.env`, off-limits per this repo's own rule.
+
+Version bumped to `0.28.0` (minor — a genuine new capability: dashboard
+users now really do get Guacamole accounts). Still no login-screen skip:
+that's slice 4, next.

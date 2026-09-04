@@ -25,10 +25,12 @@ import { getHostGatewayIp } from '../utils/network';
 import { readAppEnvValue } from './appEnv';
 import { guacamoleLogin, guacamoleLogout, guacamoleSetPassword } from './guacamoleClient';
 
-const GUACAMOLE_SERVICE = 'guacamole';
-const DEFAULT_USERNAME = 'guacadmin';
+export const GUACAMOLE_SERVICE = 'guacamole';
+export const GUACAMOLE_ADMIN_USERNAME = 'guacadmin';
+export const GUACAMOLE_ADMIN_PASSWORD_KEY = 'GUACAMOLE_ADMIN_PASSWORD';
+const DEFAULT_USERNAME = GUACAMOLE_ADMIN_USERNAME;
 const DEFAULT_PASSWORD = 'guacadmin';
-const GENERATED_PASSWORD_KEY = 'GUACAMOLE_ADMIN_PASSWORD';
+const GENERATED_PASSWORD_KEY = GUACAMOLE_ADMIN_PASSWORD_KEY;
 // Guacamole has no published port env var fallback needed here — the compose
 // file always sets one (${GUACAMOLE_PORT:-10430}); this default only covers
 // a getPublishedUpstreamPort() parse miss.
@@ -41,7 +43,13 @@ const RETRY_DELAY_MS = 3000;
 
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function resolveBaseUrl(): Promise<string> {
+/**
+ * Guacamole's base URL as reached from any other container on this host —
+ * shared with guacamoleSync.ts (§200 slice 3), which needs the exact same
+ * cross-project host-gateway + published-port resolution to drive the same
+ * REST API as an authenticated admin.
+ */
+export async function resolveGuacamoleBaseUrl(): Promise<string> {
   const port = getPublishedUpstreamPort(GUACAMOLE_SERVICE) ?? FALLBACK_PORT;
   const host = await getHostGatewayIp();
   return `http://${host}:${port}`;
@@ -62,7 +70,7 @@ export async function reconcileGuacamoleAdminPassword(serviceName: string): Prom
   }
 
   try {
-    const baseUrl = await resolveBaseUrl();
+    const baseUrl = await resolveGuacamoleBaseUrl();
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
       let session;

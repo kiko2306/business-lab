@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.27.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.28.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -401,12 +401,6 @@ Strategy:
       minor). No dashboard mechanism catches "there's a newer Guacamole
       release" — someone has to check upstream by hand and bump the pin
       (re-verifying the extension jar version alongside it).
-- [ ] **Guacamole SSO, slice 3: `guacamoleSync.ts`** (§200) — mirrors
-      `autheliaSync.ts`: provision/enable a Guacamole account for every
-      active dashboard user with `app-guacamole` granted (or webmaster),
-      disable it otherwise, using `guacamoleClient.ts`'s
-      create/get/set-disabled (slice 2, done). Same trigger points as
-      `syncAutheliaUsersSafe` plus `exposure_change`.
 - [ ] **Guacamole SSO, slice 4: the `guacamole-auth-header` extension**
       (§200) — a `guacamole-initdb`-shaped one-shot service fetches the
       version-matched extension jar into a new `./data/extensions` volume;

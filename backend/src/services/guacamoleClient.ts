@@ -105,6 +105,25 @@ export async function guacamoleGetUser(
 }
 
 /**
+ * GET /api/session/data/{dataSource}/users. The full directory, keyed by
+ * username — `DirectoryResource.getObjects()`'s shape, not a paginated list.
+ */
+export async function guacamoleListUsers(
+  baseUrl: string,
+  session: GuacamoleSession
+): Promise<Record<string, GuacamoleUser>> {
+  const response = await requestJson<Record<string, GuacamoleUser>>(
+    `${baseUrl}/api/session/data/${session.dataSource}/users`,
+    { headers: { 'Guacamole-Token': session.authToken } }
+  );
+
+  if (response.statusCode !== 200 || !response.body) {
+    throw new Error(`Unable to list Guacamole users: ${response.statusCode}`);
+  }
+  return response.body;
+}
+
+/**
  * POST /api/session/data/{dataSource}/users. Creates an enabled user with no
  * attributes — connection/permission grants stay a manual Guacamole-UI step
  * (§200's own scope line), not something this client touches.

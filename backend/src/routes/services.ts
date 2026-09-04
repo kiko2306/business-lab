@@ -16,6 +16,7 @@ import { clearImagePins, pinnedImages } from '../services/composeOverride';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { deprovisionServiceExposure, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { syncAutheliaAccessControlSafe } from '../services/autheliaAccessControl';
+import { syncGuacamoleUsersSafe } from '../services/guacamoleSync';
 import { regenerateHomepageServices } from '../services/homepageConfig';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
@@ -541,6 +542,12 @@ router.put(
       // the authelia flag toggled) — regenerate its access-control rules and
       // restart it if they moved (plan.md §151 slice 2d).
       const autheliaWarning = await syncAutheliaAccessControlSafe('exposure_change', req.user!.id);
+      // Exposing/hiding Guacamole changes whether `app-guacamole` is even a
+      // grantable option (getAppAccessOptions keys off live exposure), so
+      // its account set can go stale the same way (§200 slice 3).
+      const guacamoleWarning =
+        req.params.name === 'guacamole' ? await syncGuacamoleUsersSafe('exposure_change', req.user!.id) : null;
+      const warning = [autheliaWarning, guacamoleWarning].filter(Boolean).join(' ') || null;
 
       return res.json({
         message: turnedOff
@@ -548,7 +555,7 @@ router.put(
           : 'Exposure configuration saved. Restart the service to apply it.',
         enabled: row.enabled,
         hostname: row.hostname,
-        ...(autheliaWarning ? { warning: autheliaWarning } : {}),
+        ...(warning ? { warning } : {}),
       });
     } catch (error) {
       const httpError = error as HttpError;

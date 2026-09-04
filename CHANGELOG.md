@@ -11,6 +11,20 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.28.0] — 2026-09-04
+
+### Added
+
+- **Dashboard users are now auto-provisioned into Guacamole** (§200 slice
+  3): every active account with `app-guacamole` granted (or the webmaster
+  role) gets a Guacamole account, created and enabled automatically; an
+  account that loses that access gets disabled, never deleted, so any
+  connections/permissions set up for it by hand in Guacamole's own UI
+  aren't lost. Runs on the same triggers as the existing Authelia sync
+  (invitation accepted, roles/access changed, account deleted) plus
+  Guacamole's own exposure changing. `guacadmin` is never touched. Note:
+  this doesn't skip Guacamole's own login screen yet — that's slice 4.
+
 ## [0.27.1] — 2026-09-04
 
 ### Changed

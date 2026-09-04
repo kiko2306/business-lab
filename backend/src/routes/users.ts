@@ -26,6 +26,7 @@ import {
   setUserAppAccess,
 } from '../services/userAppAccess';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
+import { syncGuacamoleUsersSafe } from '../services/guacamoleSync';
 import { createInvitation } from '../services/userInvitations';
 import { sendMail, mailIsConfigured } from '../utils/mailSend';
 import { getDashboardBaseUrl } from '../utils/generalSettings';
@@ -255,8 +256,11 @@ router.put(
       }).catch(() => {});
 
       // webmaster ↔ not changes Authelia group membership (the `admins` group
-      // and every `app-*`).
-      const warning = await syncAutheliaUsersSafe('user_roles_update', req.user?.id ?? null);
+      // and every `app-*`), and Guacamole account eligibility the same way
+      // (webmaster implies app-guacamole).
+      const autheliaWarning = await syncAutheliaUsersSafe('user_roles_update', req.user?.id ?? null);
+      const guacamoleWarning = await syncGuacamoleUsersSafe('user_roles_update', req.user?.id ?? null);
+      const warning = [autheliaWarning, guacamoleWarning].filter(Boolean).join(' ') || null;
 
       return res.json({ message: 'Roles updated.', roles, ...(warning ? { warning } : {}) });
     } catch (error) {
@@ -345,7 +349,9 @@ router.put(
         result: 'success',
       }).catch(() => {});
 
-      const warning = await syncAutheliaUsersSafe('user_access_update', req.user?.id ?? null);
+      const autheliaWarning = await syncAutheliaUsersSafe('user_access_update', req.user?.id ?? null);
+      const guacamoleWarning = await syncGuacamoleUsersSafe('user_access_update', req.user?.id ?? null);
+      const warning = [autheliaWarning, guacamoleWarning].filter(Boolean).join(' ') || null;
 
       return res.json({
         message: 'Access updated.',
@@ -487,7 +493,9 @@ router.delete('/:id', validateParams(schemas.userIdParam), async (req: Request, 
       result: 'success',
     }).catch(() => {});
 
-    const warning = await syncAutheliaUsersSafe('user_delete', req.user?.id ?? null);
+    const autheliaWarning = await syncAutheliaUsersSafe('user_delete', req.user?.id ?? null);
+    const guacamoleWarning = await syncGuacamoleUsersSafe('user_delete', req.user?.id ?? null);
+    const warning = [autheliaWarning, guacamoleWarning].filter(Boolean).join(' ') || null;
 
     return res.json({ message: 'User deleted successfully.', ...(warning ? { warning } : {}) });
   } catch (error) {
