@@ -232,18 +232,6 @@ Strategy:
 
 ### Backups
 
-- [ ] **Document OnlyOffice's non-persistent co-editing state** (§88.6, §168,
-      §175) — the sidecar-database fix was tried and abandoned: the **community**
-      `documentserver` image hard-codes `DB_AVAILABLE=false` (external DB is a
-      commercial-edition feature) and ships no `psql`, so `onlyoffice-db` /
-      `onlyoffice-rabbitmq` containers would just sit unused (§175 has the
-      entrypoint evidence). Documents themselves live in Nextcloud; only
-      transient co-editing session state is lost on a restart. Remaining work is
-      a docs note (`app-credentials.md` / `recovery-troubleshooting.md`) that
-      this is a known limitation of the free image, in the same
-      accepted-risk bucket as §106 — nothing to add to `services.ts` or the
-      compose file. Revisit only if §81.4 (Nextcloud → OnlyOffice wiring) shows
-      co-editing loss actually bites.
 - [ ] **Prove a non-Drive destination end to end** (§131.4, §173) — FTP/FTPS
       are built (§173) and proven as far as connect + auth against real
       Duplicati, but a completed transfer failed against throwaway

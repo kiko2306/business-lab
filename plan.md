@@ -14312,3 +14312,24 @@ the spec.
 Minor bump 0.12.0 → 0.13.0 (user-facing behaviour change). README "Update
 button does the full job" item deleted; "Dashboard self-update panel" stays
 (separate feature).
+
+## 177. §175 follow-up — OnlyOffice's no-state limitation written into the docs (2026-09-04)
+
+The docs-only remainder from §175. No code.
+
+- `docs/recovery-troubleshooting.md` — new "OnlyOffice keeps no persistent
+  state" subsection under "Apps without a consistent database snapshot",
+  framed as an accepted limitation like the File Browser / Stirling-PDF DB
+  gap: community `documentserver` has no DB/queue, external one is
+  paid-edition-only (`DB_AVAILABLE` hard-coded false, no `psql`), documents
+  live in Nextcloud, only transient co-editing session state is lost on a
+  restart, nothing to restore.
+- `docs/app-credentials.md` — OnlyOffice added to the "No login of their own"
+  table (it was absent from the file entirely): JWT-signed server-to-server,
+  no human login, with a link to the recovery-troubleshooting note.
+- `docs/licences.md` already carried the "bundled DB removed" fact from an
+  earlier pass; left as is.
+
+README item deleted. The §81.4 Nextcloud→OnlyOffice wiring is the next task and
+is unblocked by this — the doc server works fine for what that integration
+needs, it just doesn't persist co-editing sessions across a restart.

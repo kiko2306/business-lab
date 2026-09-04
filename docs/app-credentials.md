@@ -121,6 +121,7 @@ gate.
 | **Stirling PDF** | `SECURITY_ENABLELOGIN=false` by default; can be enabled instead. |
 | **Speedtest**, **Kitchen Switcher**, **Pantry**, **Price Compare** | No auth of their own. |
 | **ntfy** | Open by default; supports its own ACLs if you configure them. |
+| **OnlyOffice** | No human login — Nextcloud embeds it and every request is signed with a generated JWT secret (`ONLYOFFICE_JWT_SECRET`, read it in the config panel to paste into Nextcloud's connector). Keeps no persistent state of its own — see [recovery-troubleshooting.md](recovery-troubleshooting.md#onlyoffice-keeps-no-persistent-state). |
 
 ## Services with no web UI
 

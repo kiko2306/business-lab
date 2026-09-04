@@ -77,6 +77,32 @@ easily rebuilt:
 scheduled backup (or "Back up now") complete, then start it again — the file is
 quiescent while Duplicati reads it.
 
+### OnlyOffice keeps no persistent state
+
+The community `onlyoffice/documentserver` image (9.x) has **no database and no
+message queue**. Upstream removed the bundled PostgreSQL/RabbitMQ after 8.0,
+and the image only wires up an *external* one under a paid edition
+(`PRODUCT_EDITION` set) — it hard-codes `DB_AVAILABLE=false` otherwise and
+ships no `psql` client, so pointing `DB_HOST`/`AMQP_URI` at sidecar containers
+does nothing (verified — `plan.md` §175). There is therefore nothing for the
+app-data backup to dump, and `apps/onlyoffice/data/db` is empty.
+
+**This is an accepted limitation**, in the same bucket as the two apps above:
+
+- The documents themselves are stored in **Nextcloud**, which has a proper
+  Postgres dump. OnlyOffice only fetches a file, holds the live editing
+  session in memory, and writes the result back to Nextcloud via its callback.
+- What the missing database *would* hold is transient: active co-editing
+  sessions, the change cache, the callback command queue. A restart of the
+  document-server container drops any in-progress co-editing session (the
+  shutdown hook forces a save to Nextcloud first); single-user editing and
+  save-back are unaffected, and no saved document is at risk.
+- Nothing to restore, nothing to rebuild. If co-editing misbehaves, restart
+  the `onlyoffice` service from the dashboard.
+
+Revisit only if the Nextcloud↔OnlyOffice integration shows co-editing loss
+actually biting in practice.
+
 ## Troubleshooting
 
 - API health: `GET /health`
