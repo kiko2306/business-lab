@@ -11,6 +11,27 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.25.0] — 2026-09-04
+
+### Added
+
+- **Dashboard self-update panel** (`plan.md` §131.4), gated to a new
+  `system:update` capability (webmaster/admin only, same role model as every
+  other capability). A new `/updates` page shows the running version, the
+  current commit vs. `origin/main`, and how many commits behind; "Check now"
+  re-fetches, "Update now" (confirm-gated) runs `git pull --ff-only` +
+  `docker compose build` + `up -d --build` for `frontend` then `backend` —
+  never `docker compose down`. The run survives the backend's own restart via
+  a `self_update_runs` Postgres row (`state`: `checking` → `pulling` →
+  `building` → `restarting_frontend` → `restarting_backend` → `done`/`error`);
+  a boot-time reconciler closes out a dangling row as proof the new process
+  came up. A build failure stops before anything is restarted, leaving the
+  old containers running on the old code. Needs a new `REPO_ROOT`-mounted
+  bind (auto-set by `start.sh`, same as `APPS_DIR`), `git` in the backend
+  image, and `BUILD: 1` on `docker-socket-proxy` (the one exception to it
+  never building images — every managed-app update still only pulls a
+  prebuilt registry image).
+
 ## [0.24.0] — 2026-09-04
 
 ### Removed

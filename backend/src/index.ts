@@ -13,6 +13,7 @@ import healthRouter from './routes/health';
 import recoveryRouter from './routes/recovery';
 import usersRouter from './routes/users';
 import networkRouter from './routes/network';
+import selfUpdateRouter from './routes/selfUpdate';
 import { APP_VERSION } from './version';
 import {
   ensureUserRolesTable,
@@ -33,6 +34,7 @@ import { reconcileRemovedServices } from './services/exposure';
 import { startExposureReconciler } from './services/exposureReconciler';
 import { regenerateHomepageServices } from './services/homepageConfig';
 import { startImageUpdateSweeper } from './services/imageUpdates';
+import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -157,6 +159,7 @@ for (const prefix of ROUTE_PREFIXES) {
   app.use(`${prefix}/backups`, ...protectedGate(), requireCapability('backups:manage'), backupRouter);
   app.use(`${prefix}/users`, ...protectedGate(), requireCapability('users:manage'), usersRouter);
   app.use(`${prefix}/network`, ...protectedGate(), requireCapability('apps:control'), networkRouter);
+  app.use(`${prefix}/self-update`, ...protectedGate(), requireCapability('system:update'), selfUpdateRouter);
   // Mounted after the public liveness probe above, so GET /health stays public
   // while GET /health/system and /health/thresholds remain protected.
   app.use(`${prefix}/health`, ...protectedGate(), healthRouter);
@@ -192,6 +195,11 @@ ensureServiceExposureAutheliaColumn().catch((err: Error) => {
 ensureTotpSchema().catch((err: Error) => {
   console.error('Unable to ensure TOTP schema:', err.message);
 });
+ensureSelfUpdateTable()
+  .then(() => reconcileDanglingSelfUpdateRun())
+  .catch((err: Error) => {
+    console.error('Unable to ensure self-update schema:', err.message);
+  });
 startBackupScheduler();
 // An app dropped from the registry keeps its NPM proxy host and Cloudflare
 // hostname otherwise, with no page left in the dashboard to switch them off.
@@ -208,6 +216,7 @@ startExposureReconciler();
 // inside the helper (§114).
 regenerateHomepageServices();
 startImageUpdateSweeper();
+startSelfUpdateCheckSweeper();
 
 const server = app.listen(PORT, () => {
   console.log(`Homelab backend listening on port ${PORT}`);

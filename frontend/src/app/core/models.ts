@@ -591,3 +591,35 @@ export interface BackupTargetTestResponse {
   message: string;
   detail: string;
 }
+
+export type SelfUpdateRunState =
+  | 'checking'
+  | 'pulling'
+  | 'building'
+  | 'restarting_frontend'
+  | 'restarting_backend'
+  | 'done'
+  | 'error';
+
+export interface SelfUpdateRun {
+  id: number;
+  state: SelfUpdateRunState;
+  fromCommit: string | null;
+  toCommit: string | null;
+  errorMessage: string | null;
+  startedAt: string;
+  finishedAt: string | null;
+}
+
+export interface SelfUpdateCheck {
+  currentCommit: string;
+  remoteCommit: string;
+  commitsBehind: number;
+  checkedAt: string;
+}
+
+export interface SelfUpdateStatus {
+  appVersion: string;
+  check: SelfUpdateCheck | null;
+  latestRun: SelfUpdateRun | null;
+}

@@ -15755,3 +15755,111 @@ now "prove disk/SMB/NFS against a real external destination". "A Kopia-native
 remote backend" reworded to not lean on Duplicati for context. "Duplicati
 carries a 5.3 GB uncheckpointed WAL" deleted — resolved by removing
 `apps/duplicati/` outright.
+
+## 198. §131.4 — dashboard self-update panel (2026-09-04)
+
+The other half of §131.4 (the footer version string shipped in §133): a
+"check for updates to Business Lab itself" panel with a confirm-gated
+`git pull` + rebuild + restart button, restricted to `webmaster`/`admin`
+accounts per the user's request when picking up this task.
+
+### Role gating
+
+Added `'system:update'` to `CAPABILITIES` in `backend/src/auth/capabilities.ts`
+and its frontend mirror (`frontend/src/app/core/capabilities.ts`) — the
+existing role model exactly: `webmaster` always has it, `admin` has it by
+default (narrowable per-account), `user` never does. No new gating mechanism.
+
+### Infra — a genuine widening, done deliberately
+
+Nothing in the codebase could `git pull` or build an image before this:
+
+- `docker-compose.yml`: a new `REPO_ROOT` bind mount on `backend`, read-write,
+  same "same absolute path" convention as `APPS_DIR` — needed so `git pull`
+  can write and `docker compose build` can resolve the root compose file's
+  relative `context: ./frontend` / `./backend` paths. `start.sh` now sets
+  `REPO_ROOT` the same way it already sets `APPS_DIR` (derived from `pwd`,
+  never asked for) and `chgrp -R $DOCKER_GID` + `chmod -R g+rwX` the whole
+  checkout on every run, mirroring the existing per-`apps/<name>/` loop.
+- `backend/Dockerfile`: added `git` to the `apk add` line.
+- `backend/docker-entrypoint.sh`: `git config --global --add safe.directory
+  "$REPO_ROOT"` as `appuser` before exec — git refuses to operate in a repo
+  whose owning uid doesn't match the running user even when group-writable.
+- `docker-socket-proxy`: added `BUILD: 1`. This is the one deliberate
+  exception — every managed-app update still only ever does `docker compose
+  pull` of a prebuilt registry image (`update-container.sh`,
+  `executor.ts`'s per-app update path); nothing else in the system builds an
+  image through the proxy.
+
+### Backend
+
+`backend/src/services/selfUpdate.ts` (new): `checkForUpdate()` (`git fetch`
++ `rev-parse HEAD`/`origin/main` + `rev-list --count`, cached in-memory,
+refreshed by `startSelfUpdateCheckSweeper()` every 6h — mirrors
+`imageUpdates.ts`'s cached-daily-sweep shape, never a live git fetch from a
+status poll). `triggerSelfUpdate()` inserts a `self_update_runs` Postgres row
+and returns immediately — the actual sequence (`runSelfUpdateSequence`) is
+not awaited by the route handler, since the process serving that request is
+the one the last step replaces.
+
+The sequence: fetch+compare (no-op back to `done` if already current) →
+`pull --ff-only` → `state='building'`, `docker compose build frontend
+backend` (**a failure here stops with `state='error'`, nothing gets
+restarted, the old containers keep running the old code** — the repo can sit
+ahead of the running build until someone fixes it) → `restarting_frontend`,
+`up -d --build frontend` (awaited — that container isn't the one running
+this code) → `restarting_backend` with `finished_at` set *before* the final
+`up -d --build backend`, which is `spawn(...).unref()`'d detached rather than
+awaited, since this container is about to replace the process issuing the
+command. Never `docker compose down` anywhere in the sequence.
+
+Run state lives in Postgres, not in-memory like `withMaintenanceLock`
+(`maintenanceLock.ts`'s own doc comment: process-local, cannot survive a
+restart) — the row written before the restart is the only record the restart
+was ever supposed to happen. `reconcileDanglingSelfUpdateRun()`, called once
+on boot next to `reconcileRemovedServices`, flips a dangling
+`restarting_backend` row to `done` and audits it — this process booting is
+the proof the restart worked; without the explicit flip the panel would have
+no way to distinguish "still restarting" from "restarted fine" once it can
+reach the API again.
+
+`backend/src/routes/selfUpdate.ts`: `GET /status`, `POST /check`,
+`POST /trigger` — wired in `index.ts` exactly like `backupRouter`:
+`requireCapability('system:update')` at the router mount.
+
+### Frontend
+
+New standalone route `/updates` (`SelfUpdateComponent`), not a card on
+Settings — matches "one capability, one dedicated route" like `backups`/
+`users`/`network`, so narrowing `system:update` off an admin works
+independent of `settings:manage`. Nav entry gated the same
+`*ngIf="caps.has(...)"` pattern as every other link. Confirm flow reuses
+`ConfirmService` exactly as `users.component.ts`'s delete-user flow does.
+Progress polling reuses the `timer(3000, 3000).pipe(switchMap(...))` shape
+from `service-state.service.ts`'s SSE-fallback poller, swallowing request
+failures (`catchError`) so the backend's own restart window doesn't surface
+as an error toast — it just keeps trying until the new container answers.
+
+### Verified
+
+- Backend `npm run typecheck` + `npm test`: 528 passed, including new
+  `selfUpdate.test.ts` (8 tests: no-op when current, the full state walk
+  with a real "commits behind" fixture, build-failure stops before any
+  restart, refuses a second trigger while one is in progress, dangling-row
+  reconciliation flips to `done`).
+- Frontend `ng build` clean; `npm run test:ci` — 50/50 (Chrome installed into
+  the throwaway `node:20` container first, as usual). New
+  `self-update.component.spec.ts` (4 tests) covers status rendering,
+  confirm-gating, triggering + poll start, and tolerating a poll failure
+  mid-restart without erroring.
+
+### Not yet proven against the live stack
+
+The infra changes (`REPO_ROOT` mount, `git` in the image, `BUILD: 1` on the
+socket proxy, `start.sh`'s new chgrp step) have not been applied to
+`tx-home-utils.com` yet — that requires recreating `backend`,
+`docker-socket-proxy` and `frontend` by hand once, which this session did
+not do. Added to the README TODO as the follow-up: apply the infra changes,
+then click "Update now" for real and confirm the whole walk (fetch → pull →
+build → restart-frontend → restart-backend → reconnect) end to end, plus
+that a `user`-role account gets 403 and no nav entry.

@@ -42,6 +42,7 @@ services:
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:80}
       SCRIPTS_DIR: /scripts
       APPS_DIR: ${APPS_DIR:?APPS_DIR must be set to an absolute path in .env}
+      REPO_ROOT: ${REPO_ROOT:?REPO_ROOT must be set to an absolute path in .env}
       # Health check URLs target the host, which is not "localhost" in here.
       SERVICE_HEALTH_HOST: ${SERVICE_HEALTH_HOST:-host.docker.internal}
       # The docker CLI (used for `docker ps` / `docker compose up|down`)
@@ -59,6 +60,14 @@ services:
       # Compose files themselves are only ever read, never written, by
       # backend code.
       - ${APPS_DIR:?APPS_DIR must be set to an absolute path in .env}:${APPS_DIR}
+      # The repo itself, read-write, same "same absolute path" reasoning as
+      # APPS_DIR above — needed for the self-update panel (§131.4) to
+      # `git pull` and to resolve the root docker-compose.yml's relative
+      # `context: ./frontend` / `./backend` build paths against the real
+      # repo layout. Every other Docker/compose-touching action here still
+      # only ever reads/writes apps/<name>/ — this mount exists solely for
+      # the dashboard to update its own checkout.
+      - ${REPO_ROOT:?REPO_ROOT must be set to an absolute path in .env}:${REPO_ROOT}
       # Read-only view of the host root, purely so the health check can df it.
       # Without this the only filesystem the backend can measure is its own
       # overlay — which follows Docker's data-root, so moving that storage to
@@ -84,12 +93,17 @@ services:
   # Scopes the backend's Docker access instead of mounting the raw host
   # socket into it directly. Only the categories `docker ps` and
   # `docker compose up|down` actually need are enabled — notably EXEC,
-  # BUILD, SECRETS, SWARM, and PLUGINS stay off; the backend never uses them.
+  # SECRETS, SWARM, and PLUGINS stay off; the backend never uses them.
   # This narrows things like arbitrary `docker exec` into any container on
   # the host, but can't fully sandbox compose itself: CONTAINERS+POST is
   # inherently enough to create a container with its own bind mounts, so
   # this is a reduction in blast radius, not a full jail — the backend is
   # still meant for trusted operators only.
+  # BUILD is the one deliberate exception: every managed app still only
+  # ever gets `docker compose pull` of a prebuilt registry image (no build
+  # capability needed), but the self-update panel (§131.4) rebuilds the
+  # dashboard's own frontend/backend images from the freshly `git pull`ed
+  # source, which the Build API gates separately from plain POST.
   docker-socket-proxy:
     image: tecnativa/docker-socket-proxy:latest
     environment:
@@ -98,6 +112,7 @@ services:
       NETWORKS: 1
       VOLUMES: 1
       POST: 1
+      BUILD: 1
       ALLOW_START: 1
       ALLOW_STOP: 1
       INFO: 1

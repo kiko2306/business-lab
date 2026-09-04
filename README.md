@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.24.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.25.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -206,11 +206,16 @@ it is done — not ticked off and left behind. Section references point at
 
 Updates:
 
-- [ ] **Dashboard self-update panel** (§131.4) — separate from the version
-      display: current version/commit vs `origin/main`; a confirm-gated button
-      that runs `git pull` and restarts the management services individually
-      (never a root `docker compose down`). Always prompts; no silent
-      self-update.
+- [ ] **@mat: apply the self-update panel's infra changes and prove it live**
+      (§131.4, §198) — the panel itself is built and gated to
+      `webmaster`/`admin` (`system:update`), but its `docker-compose.yml`
+      changes (`REPO_ROOT` mount, `BUILD: 1` on `docker-socket-proxy`) and
+      `backend/Dockerfile`'s new `git` dependency have not been applied to
+      `tx-home-utils.com` yet. Recreate `backend`/`docker-socket-proxy`/
+      `frontend` individually once, then click "Update now" on `/updates`
+      for real and confirm the whole walk (fetch → pull → build →
+      restart-frontend → restart-backend → reconnect) end to end, plus that
+      a `user`-role account gets 403 and no nav entry.
 
 Infrastructure:
 

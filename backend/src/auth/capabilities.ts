@@ -30,6 +30,7 @@ export const CAPABILITIES = [
   'settings:manage', // timezone, ntfy alerts, mailbox, backup destination
   'audit:view', // read the audit log
   'users:manage', // create / delete users, assign roles and features
+  'system:update', // check for and apply a git pull + rebuild of the dashboard itself
 ] as const;
 export type Capability = (typeof CAPABILITIES)[number];
 

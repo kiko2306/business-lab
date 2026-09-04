@@ -29,6 +29,8 @@
              *ngIf="caps.has('users:manage')">Users &amp; roles</a>
           <a class="app-nav__link" routerLink="/audit-logs" routerLinkActive="active"
              *ngIf="caps.has('audit:view')">Audit logs</a>
+          <a class="app-nav__link" routerLink="/updates" routerLinkActive="active"
+             *ngIf="caps.has('system:update')">Updates</a>
           <a class="app-nav__link" routerLink="/account" routerLinkActive="active">Security</a>
           <a class="app-nav__link app-nav__link--warning" routerLink="/recovery">Recovery</a>
         </nav>

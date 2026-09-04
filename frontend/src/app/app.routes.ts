@@ -12,6 +12,7 @@ import { SetPasswordComponent } from './pages/set-password/set-password.componen
 import { AccountComponent } from './pages/account/account.component';
 import { AuditLogsComponent } from './pages/audit-logs/audit-logs.component';
 import { UsersComponent } from './pages/users/users.component';
+import { SelfUpdateComponent } from './pages/self-update/self-update.component';
 import { RecoveryComponent } from './pages/recovery/recovery.component';
 import { authGuard } from './guards/auth.guard';
 import { guestGuard } from './guards/guest.guard';
@@ -88,6 +89,11 @@ export const routes: Routes = [
         path: 'users',
         component: UsersComponent,
         canActivate: [requireCapability('users:manage')],
+      },
+      {
+        path: 'updates',
+        component: SelfUpdateComponent,
+        canActivate: [requireCapability('system:update')],
       },
       {
         path: 'account',

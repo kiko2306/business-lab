@@ -21,7 +21,8 @@ export type Capability =
   | 'backups:manage'
   | 'settings:manage'
   | 'audit:view'
-  | 'users:manage';
+  | 'users:manage'
+  | 'system:update';
 
 export const ALL_CAPABILITIES: Capability[] = [
   'apps:control',
@@ -32,6 +33,7 @@ export const ALL_CAPABILITIES: Capability[] = [
   'settings:manage',
   'audit:view',
   'users:manage',
+  'system:update',
 ];
 
 const ROLE_CAPABILITIES: Record<string, Capability[]> = {
@@ -59,6 +61,7 @@ export const CAPABILITY_LABELS: Record<Capability, string> = {
   'settings:manage': 'Settings',
   'audit:view': 'Audit log',
   'users:manage': 'Users & roles',
+  'system:update': 'Dashboard self-update',
 };
 
 /** Optimistic capability set from roles alone — see the file header. */

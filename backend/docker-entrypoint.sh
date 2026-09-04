@@ -23,4 +23,13 @@ if [ -n "${APPS_DIR:-}" ] && [ -d "$APPS_DIR" ]; then
   done
 fi
 
+# git refuses to operate in a repo whose owning uid doesn't match the
+# running user ("dubious ownership") even when it's group-writable — the
+# self-update panel (§131.4) needs this exemption for its `git pull`
+# against the REPO_ROOT mount, which start.sh keeps group-writable for
+# DOCKER_GID the same way it does for APPS_DIR.
+if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT/.git" ]; then
+  su-exec appuser git config --global --add safe.directory "$REPO_ROOT" 2>/dev/null || true
+fi
+
 exec su-exec appuser "$@"

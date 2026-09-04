@@ -73,6 +73,11 @@ ensure_secret POSTGRES_PASSWORD
 log "Setting APPS_DIR to $(pwd)/apps"
 set_env_var APPS_DIR "$(pwd)/apps"
 
+# Same reasoning, for the repo root itself — the self-update panel (§131.4)
+# needs it to `git pull` and rebuild against the real compose file location.
+log "Setting REPO_ROOT to $(pwd)"
+set_env_var REPO_ROOT "$(pwd)"
+
 # ---------------------------------------------------------------------------
 # Cloudflare / base-domain bootstrap
 #
@@ -448,6 +453,17 @@ if [ -S /var/run/docker.sock ]; then
     for app_dir in "${FAILED_APP_DIRS[@]}"; do
       echo "  sudo chgrp -R ${DOCKER_GID} ${app_dir} && sudo chmod -R g+rwX ${app_dir}" >&2
     done
+  fi
+
+  # Same reasoning, for the whole repo checkout — the self-update panel
+  # (§131.4) runs `git pull` and a rebuild as DOCKER_GID inside the backend
+  # container, which needs write access to .git and every tracked file a
+  # pull might touch, not just apps/.
+  if { chgrp -R "$DOCKER_GID" . && chmod -R g+rwX .; } 2>/dev/null; then
+    log "Set repo checkout group ownership to gid $DOCKER_GID so the dashboard can self-update"
+  else
+    echo "warning: couldn't chgrp/chmod the repo checkout to gid ${DOCKER_GID} — the self-update panel will fail until you run:" >&2
+    echo "  sudo chgrp -R ${DOCKER_GID} $(pwd) && sudo chmod -R g+rwX $(pwd)" >&2
   fi
 else
   echo "warning: /var/run/docker.sock not found — leaving DOCKER_GID as-is." >&2

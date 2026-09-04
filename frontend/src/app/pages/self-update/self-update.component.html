@@ -1,0 +1,73 @@
+<main class="container-fluid py-4">
+  <div class="mb-4">
+    <h1 class="h3 mb-1">Updates</h1>
+    <p class="text-body-secondary mb-0">
+      Check for and apply updates to Business Lab itself.
+    </p>
+  </div>
+
+  <app-panel
+    anchor="self-update"
+    key="self-update"
+    title="Business Lab"
+    subtitle="Pull the latest code from main, rebuild, and restart the dashboard"
+  >
+    <div class="card mb-3" *ngIf="status as s">
+      <div class="card-body p-4">
+        <dl class="row mb-0 small">
+          <dt class="col-sm-4 text-body-secondary">Running version</dt>
+          <dd class="col-sm-8 font-monospace">v{{ s.appVersion }}</dd>
+
+          <ng-container *ngIf="s.check as check">
+            <dt class="col-sm-4 text-body-secondary">Current commit</dt>
+            <dd class="col-sm-8 font-monospace">{{ check.currentCommit.slice(0, 12) }}</dd>
+
+            <dt class="col-sm-4 text-body-secondary">Latest on main</dt>
+            <dd class="col-sm-8 font-monospace">{{ check.remoteCommit.slice(0, 12) }}</dd>
+
+            <dt class="col-sm-4 text-body-secondary">Status</dt>
+            <dd class="col-sm-8">
+              <span *ngIf="check.commitsBehind === 0" class="badge text-bg-success">Up to date</span>
+              <span *ngIf="check.commitsBehind > 0" class="badge text-bg-warning">
+                {{ check.commitsBehind }} commit{{ check.commitsBehind === 1 ? '' : 's' }} behind
+              </span>
+            </dd>
+
+            <dt class="col-sm-4 text-body-secondary">Last checked</dt>
+            <dd class="col-sm-8">{{ check.checkedAt | date: 'medium' }}</dd>
+          </ng-container>
+          <ng-container *ngIf="!s.check">
+            <dt class="col-sm-4 text-body-secondary">Status</dt>
+            <dd class="col-sm-8 text-body-secondary">Not checked yet.</dd>
+          </ng-container>
+        </dl>
+
+        <div class="alert alert-info small mt-3 mb-0" *ngIf="runInProgress && s.latestRun as run">
+          {{ progressLabels[run.state] }}
+        </div>
+        <div class="alert alert-danger small mt-3 mb-0" *ngIf="!runInProgress && s.latestRun?.state === 'error'">
+          Last update failed: {{ s.latestRun?.errorMessage }}
+        </div>
+
+        <div class="d-flex gap-2 mt-3">
+          <button
+            type="button"
+            class="btn btn-sm btn-outline-secondary"
+            [disabled]="checking || runInProgress"
+            (click)="checkNow()"
+          >
+            {{ checking ? 'Checking…' : 'Check now' }}
+          </button>
+          <button
+            type="button"
+            class="btn btn-sm btn-primary"
+            [disabled]="triggering || runInProgress || !s.check || s.check.commitsBehind === 0"
+            (click)="updateNow()"
+          >
+            {{ triggering || runInProgress ? 'Updating…' : 'Update now' }}
+          </button>
+        </div>
+      </div>
+    </div>
+  </app-panel>
+</main>

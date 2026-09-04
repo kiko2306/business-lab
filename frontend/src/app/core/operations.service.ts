@@ -23,6 +23,9 @@ import {
   ServiceExposureConfig,
   ServiceExposureUpdate,
   ServiceExposureVerifyResult,
+  SelfUpdateCheck,
+  SelfUpdateRun,
+  SelfUpdateStatus,
   TotpActivateResponse,
   TotpSetupResponse,
   TotpStatus,
@@ -76,6 +79,18 @@ export class OperationsService {
 
   getBackupStatus(): Observable<BackupStatusResponse> {
     return this.http.get<BackupStatusResponse>(`${API_BASE_URL}/backups/status`);
+  }
+
+  getSelfUpdateStatus(): Observable<SelfUpdateStatus> {
+    return this.http.get<SelfUpdateStatus>(`${API_BASE_URL}/self-update/status`);
+  }
+
+  checkForSelfUpdate(): Observable<SelfUpdateCheck> {
+    return this.http.post<SelfUpdateCheck>(`${API_BASE_URL}/self-update/check`, {});
+  }
+
+  triggerSelfUpdate(): Observable<SelfUpdateRun> {
+    return this.http.post<SelfUpdateRun>(`${API_BASE_URL}/self-update/trigger`, {});
   }
 
   runAppDataBackup(): Observable<{ ok: boolean; message: string }> {

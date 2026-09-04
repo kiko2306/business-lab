@@ -28,7 +28,9 @@ ARG DOCKER_GID=999
 # su-exec lets the entrypoint fix volume ownership as root, then drop to appuser.
 # openssl generates the self-signed cert gRPC exposures upload to NPM — see
 # ensureGrpcCertificate in npmClient.ts.
-RUN apk add --no-cache docker-cli docker-cli-compose postgresql16-client su-exec openssl
+# git is required by the self-update panel (§131.4) to `git pull` the
+# mounted REPO_ROOT checkout.
+RUN apk add --no-cache docker-cli docker-cli-compose postgresql16-client su-exec openssl git
 
 RUN set -eux; \
     addgroup -S appgroup; \
