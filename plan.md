@@ -16820,3 +16820,18 @@ No other pin's *tag* changed (comment-only), so nothing else needed a live
 recreate.
 
 Docs + compose only — no version bump (matches §181, §108, §210).
+
+## 215. `docs/sales-catalogue.md` written (§131.6, §166, §202)
+
+The single canonical sales-doc item, rescoped at §202 from an Artifact to a
+plain repo doc since the content (app / what it does / what it replaces, no
+pricing, no client scenarios) carries no business secret once pricing and
+named clients are excluded. Written: one row per managed app, sourced from
+`backend/src/config/services.ts`'s registry (38 apps, checked the row count
+against `grep name: services.ts` to make sure none were missed or duplicated)
+grouped into six categories for readability (business ops, files/photos/
+media, communication, home/lifestyle, security/identity/networking, platform/
+ops), each row's "what it does" drawn from the app's own `homepage.description`
+compose label. Linked from the README docs list. TODO item deleted.
+
+Docs only — no version bump.

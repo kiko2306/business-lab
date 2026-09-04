@@ -43,6 +43,7 @@ against this model.
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
 - Two-factor authentication (TOTP) for the dashboard login: [/docs/two-factor.md](/docs/two-factor.md)
 - Licence due diligence (every image vs the resale model): [/docs/licences.md](/docs/licences.md)
+- Sales catalogue (what each app replaces): [/docs/sales-catalogue.md](/docs/sales-catalogue.md)
 - Version history: [/CHANGELOG.md](/CHANGELOG.md)
 - User guide: [/docs/user-guide.md](/docs/user-guide.md)
 - Webmaster runbook (Cloudflare / DNS / Tunnel): [/docs/webmaster.md](/docs/webmaster.md)
@@ -248,14 +249,6 @@ Infrastructure:
       dashboard) that exercises them, local-only like the smoke tests.
 Strategy:
 
-- [ ] **Sales catalogue doc** (§131.6, §166, §202) — one row per managed
-      app: what it does, and what commercial/SaaS product it stands in for.
-      No pricing, no monthly-cost arithmetic, no named client scenarios — none
-      of that is a business secret once excluded, so it's a plain
-      `docs/sales-catalogue.md` linked from the README docs list, not an
-      Artifact. This is the single canonical sales-doc item — the old
-      §84.4/§84.7 "SaaS inventory + monthly costs", "value-proposition plan"
-      and "customer journey" items were folded into it (§166).
 - [ ] **Which dashboard actions deserve Activity/Sequence diagrams** (§202,
       §203) — the dashboard has ~40 backend actions of wildly different
       complexity; worth a diagram where the multi-service handoff is hard to
