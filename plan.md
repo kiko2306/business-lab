@@ -17580,3 +17580,16 @@ path was read directly out of the live container instead, which is what
 establishes the flag does what's claimed once an account exists.
 
 Compose-only — no `backend/src`/`frontend/src` touched, no version bump.
+
+## 228. Beszel proxy-trust rechecked — still blocked, a second gap found
+
+Quick recheck of §227's Beszel block: the upstream Authelia+nginx 401
+report (discussions#1505) still has zero replies. Also found a second,
+independent blocker in a different discussion (#1358): Beszel's
+`BESZEL_HUB_USER_CREATION` flag doesn't actually auto-create an account for
+a trusted-header login despite the name — a maintainer confirmed it there
+("it makes sense to create the user, since the header is trusted") and said
+they'd file an issue, but nothing's landed. So even setting the header
+right, a first login would still 401 on a non-existent user. No change to
+the README wording needed — still correctly parked, just now for two
+reasons instead of one. Docs-only, no version bump.
