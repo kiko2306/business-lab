@@ -4,25 +4,12 @@ This is the working instruction file for Claude CLI in this repository. The
 goal is to finish the project with the fewest tokens and session resets while
 preserving the project's safety rules.
 
-## 0. First instruction: inspect Claude configuration
+## 0. Claude configuration is auto-summarized, not a manual step
 
-**Estimated session time:** 5-10 minutes.
-
-At the start of every session, do this before reading code or selecting a task:
-
-```text
-Check .claude/settings.json and every file in .claude/hooks/ that applies to
-this task. Summarize the active permissions and guards in 3-6 bullets. Do not
-read real .env files. Do not bypass a guard; adapt the command or ask me for a
-value through the UI/live-operation step when required.
-```
-
-The current configuration denies Read/Edit/Write access to the root and app
-`.env` files. `bash-guards.sh` also blocks shell access to real `.env` contents
-and blocks root `docker compose down`. `require-version-bump.sh` requires a
-version bump in both packages, matching lockfile versions, a CHANGELOG entry,
-and the README version line when a commit ships non-test code under
-`backend/src` or `frontend/src`.
+A `SessionStart` hook (`.claude/hooks/session-summary.sh`) echoes the active
+`.claude` guard summary as context at the start of every session — no prompt
+needed. Do not bypass a guard it names; adapt the command or ask for a value
+through the UI/live-operation step when required.
 
 ## 1. Session opening
 
@@ -226,13 +213,6 @@ or tests can answer. Never work around `.claude` guards, the no-router rule,
 the no-console-configuration rule, or the no-guarantees dev/test boundary.
 
 ## 6. Exact inputs in order
-
-```text
-Check .claude/settings.json and every file in .claude/hooks/ that applies to
-this task. Summarize the active permissions and guards in 3-6 bullets. Do not
-read real .env files. Do not bypass a guard; adapt the command or ask me for a
-value through the UI/live-operation step when required.
-```
 
 ```text
 Read README.md's TODO section first. Then read plan-index.md and only the

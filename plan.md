@@ -17691,3 +17691,22 @@ and guard check, then gives compact session prompts, explicit `/compact` and
 by @mat, and tasks blocked on those live proofs. It also preserves the
 no-console, no-router, secret-handling, verification, plan/index, and commit
 rules already enforced by this repository.
+
+## 231. §230's config-check step automated as a SessionStart hook (2026-09-04)
+
+`step-by-step.md` §0 asked the operator to paste a prompt each session so
+Claude would read `.claude/settings.json` and the hooks, then summarize them
+in prose. That summary is deterministic — it doesn't change unless the guard
+files change — so having an LLM re-derive and re-word it every session was
+pure waste.
+
+Added `.claude/hooks/session-summary.sh`, wired as a `SessionStart` hook in
+`.claude/settings.json` (same mechanism the Ponytail plugin already uses to
+announce its mode). It echoes a fixed four-bullet guard summary as session
+context automatically — no prompt needed. Rewrote `step-by-step.md` §0 to
+describe this instead of asking for the paste, and dropped the now-redundant
+copy of that prompt from §6's "exact inputs in order" list.
+
+Nothing else in `step-by-step.md` changed: the session-opening, work-order,
+and queue-handoff prompts still involve real judgment calls (which TODO to
+pick up, whether a live proof is safe) that a static hook can't make.
