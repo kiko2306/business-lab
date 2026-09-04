@@ -14814,3 +14814,120 @@ never throws. Backend suite 479 passing (11 new), frontend build clean.
 ### Minor bump 0.15.1 → 0.16.0
 
 New user-facing feature.
+
+## 185. Plan — per-application backup / restore (§131.4, 2026-09-04)
+
+Picked from the README. Multi-part, so this is the planning pass
+([[plan-first-then-todo]]): design here, slices to the README list, then @mat
+picks the first one.
+
+### Where backups stand, and why per-app is a *separate* store
+
+Two backup mechanisms exist today and neither can do one app:
+
+- **The management-stack archive** (`backup.ts` `createBackupArchive`) — the
+  dashboard's own Postgres + a settings/users slice, `.tar.gz` under
+  `backups/`. Restored by `routes/backup.ts POST /restore` (`psql -f`). Nothing
+  to do with the managed apps.
+- **The Duplicati job** (`duplicatiClient.ts`) — ONE job over the whole
+  `/source/apps` tree, driven by the dashboard scheduler after
+  `dumpAllAppDatabases` writes `apps/*/data/_dump/*.sql`. It is the offsite,
+  versioned, encrypted story. But: its restore API writes nothing (§75.3), it
+  is slated for replacement by Kopia (§81.5), and "restore just this app" from
+  it means a path-filtered partial restore of a tree archive — exactly the
+  fiddly CLI operation §75.3 says not to build a button on yet.
+
+So per-app backup is built as its **own local, self-contained archive**, not a
+slice of Duplicati:
+
+- independent of the Duplicati→Kopia churn — usable today, unchanged after;
+- self-contained: one `.tar.gz` per app with its consistent DB dump(s) +
+  SQLite snapshot(s) + the rest of `data/`, restorable on its own;
+- the §183-proven replay path (`psql` / `mysql` / `sqlite .restore`) is the
+  restore engine — that verification was the groundwork for this.
+
+Duplicati/Kopia stays the offsite/versioned backup. Per-app is the
+"I'm about to reconfigure this app, give me a five-second rollback point" tool.
+The distinction goes in the UI and `docs/`.
+
+### Design
+
+**Archive** — `services/appBackup.ts`:
+
+- `backupOneApp(name)`: take the maintenance lock (so it can't race an update
+  or the scheduled dump, §176/§103), dump *this app's* database(s) into
+  `apps/<name>/data/_dump/` and snapshot its SQLite files (reuse the
+  `appDumps.ts` internals — factor `dumpServerDatabase` / a single-app SQLite
+  path out as exported helpers), then
+  `tar -czf backups/apps/<name>/<name>-<ISO>.tar.gz -C apps/<name> data`
+  with the same live-DB exclusions Duplicati uses (`data/db/`, `data/pgdata/`,
+  `*-wal`, `*-shm`) — the `_dump/*.sql` and `*.sqlite` files ARE included, they
+  are the consistent copy. Write a small `manifest.json` into the archive:
+  app, timestamp, `backup.engine`, dashboard version (`version.ts`), byte
+  sizes, list of dumps.
+- `listAppBackups(name)`: `readdir backups/apps/<name>/`, newest first, with
+  size + ctime + parsed manifest.
+- `deleteAppBackup(name, file)` / `resolveAppBackupPath` with the same
+  `safeBackupFileName` guard as `backup.ts`.
+- Per-app retention: keep last N (reuse the global `retentionCount`, or a
+  dedicated setting — decide in the slice).
+
+**Restore** — `restoreOneApp(name, file)`:
+
+1. stop the app (`executor.stopService`) — the DB *container* stays up;
+2. extract the archive to a temp dir;
+3. replay `_dump/*.sql` into the running DB container (§183: `psql` for
+   postgres, `mariadb`/`mysql` for maria/mysql) and `.restore` each `*.sqlite`
+   over its live file;
+4. copy the non-DB `data/` payload back over `apps/<name>/data/` (rsync-style,
+   deleting removed files) — skipping the live-DB dirs, which step 3 owns;
+5. start the app.
+
+Confirm-gated (destructive, outward-facing). Never a root `compose down`.
+
+**Gaps carried, not solved** (each gets a UI note, mirroring §75.4 /
+`recovery-troubleshooting.md`):
+
+- **OnlyOffice bundled PG** — no online dump path; per-app backup is a raw
+  copy of `data/` while stopped, restore is file-level.
+- **BoltDB / H2 apps** (file-browser, stirling-pdf) — `findSqliteFiles`
+  rejects them by header; raw file copy, stop-restore-start, accepted-risk.
+- Apps with **no `backup` field and no SQLite** — just a `data/` tarball,
+  which is already correct.
+
+**Routes** — on the service resource, behind the existing `backups:manage`
+capability:
+
+- `POST /api/services/:name/backup` — back up now
+- `GET  /api/services/:name/backups` — list this app's snapshots
+- `GET  /api/services/:name/backups/:file` — download
+- `DELETE /api/services/:name/backups/:file` — delete
+- `POST /api/services/:name/backup/restore` — restore `{ file }`, confirm-gated
+
+Audit rows reuse `action: 'backup_create'` / a new `'backup_restore'` with
+`resource: '<name>'`.
+
+**UI** — a "Backups" section on the service card (`service-card.component`):
+"Back up now", a snapshot list with **Restore** (confirm modal, per the UI
+rules — no native dialog), **Download**, **Delete**. `service-state.service.ts`
+gains the calls. The multi-page Backups page (§131.1) can later grow a
+per-app overview table, but that is optional and folded into the last slice.
+
+### Slices (to the README)
+
+1. **`appBackup.ts` — archive + list + delete** (backend) — the archive
+   writer, the lister, retention, path-safety; factor per-app dump helpers out
+   of `appDumps.ts`. Unit tests (manifest, naming, retention, traversal
+   guard).
+2. **Per-app backup routes** (backend) — the four non-restore routes above,
+   audit rows, wired behind `backups:manage`. Prove a backup archive is
+   produced for a Postgres app and a SQLite app on the live stack.
+3. **Per-app restore** (backend) — `restoreOneApp` + the confirm-gated route.
+   Prove a Postgres app and a SQLite app round-trip (change data → restore →
+   data back) on the live stack.
+4. **Service-card UI** (frontend) — the Backups section, list, Back up now,
+   Restore/Download/Delete, confirm modal, service-state calls, specs. Run
+   `scripts/e2e-tests.sh` (touches the service card).
+5. **Docs + Backups-page overview** (frontend/docs) — `recovery-troubleshooting.md`
+   and `it-admin.md` on what a per-app archive is vs the offsite backup and how
+   to restore one by hand; optional per-app table on the Backups page.

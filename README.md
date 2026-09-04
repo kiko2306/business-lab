@@ -239,10 +239,26 @@ Strategy:
       exercised at all. Prove one of them writes and restores against a
       production-like server (a NAS, or the live dashboard). Also covers the
       Kopia translation later.
-- [ ] **Per-application backup / restore** (§131.4) — a per-app action on each
-      app's card: back up just this app's data + database, list its snapshots,
-      restore just this app. Reuses the existing engines; pairs with the
-      multi-page Backups view (§131.1).
+Per-application backup / restore (§131.4, §185) — a self-contained local
+`.tar.gz` per app, separate from the offsite Duplicati job. Sliced:
+
+- [ ] **`appBackup.ts` — per-app archive + list + delete** (§185 slice 1) —
+      the archive writer (this app's DB dump(s) + SQLite snapshot(s) + `data/`,
+      live-DB dirs excluded), the lister, retention, path-safety; factor
+      per-app dump helpers out of `appDumps.ts`. Unit tests.
+- [ ] **Per-app backup routes** (§185 slice 2) — `POST/GET/DELETE
+      /api/services/:name/backup[s]` + download, audit rows, behind
+      `backups:manage`. Prove an archive for a Postgres app and a SQLite app on
+      the live stack.
+- [ ] **Per-app restore** (§185 slice 3) — `restoreOneApp` (stop → replay
+      dumps via the §183 path → copy `data/` back → start) + a confirm-gated
+      route. Prove a Postgres and a SQLite app round-trip on the live stack.
+- [ ] **Service-card Backups UI** (§185 slice 4) — Back up now, snapshot list,
+      Restore (confirm modal) / Download / Delete, `service-state` calls,
+      specs. Run `scripts/e2e-tests.sh`.
+- [ ] **Per-app backup docs + Backups-page overview** (§185 slice 5) —
+      `recovery-troubleshooting.md` / `it-admin.md` on per-app vs offsite and
+      the manual restore; optional per-app table on the Backups page.
 
 ### Business Lab (§84)
 
