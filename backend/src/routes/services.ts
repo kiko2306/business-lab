@@ -4,6 +4,7 @@
  */
 
 import { Router, Request, Response, NextFunction } from 'express';
+import fs from 'fs/promises';
 import rateLimit from 'express-rate-limit';
 import auth from '../middleware/auth';
 import { requireCapability } from '../middleware/requireCapability';
@@ -19,6 +20,7 @@ import { regenerateHomepageServices } from '../services/homepageConfig';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
 import { writeAuditLog } from '../utils/audit';
+import * as appBackup from '../services/appBackup';
 import logger from '../utils/logger';
 import { HttpError } from '../types';
 
@@ -241,6 +243,156 @@ router.post(
         service: serviceName,
         message: httpError.message,
       });
+    }
+  }
+);
+
+// ---------------------------------------------------------------------------
+// Per-application backup (plan.md §185). A self-contained local .tar.gz per
+// app — a quick rollback point before reconfiguring it — separate from the
+// offsite Duplicati/Kopia job. `backups:manage` gates all four, the same
+// capability the global /api/backups routes use.
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /api/services/:name/backup
+ * Dump this app's database(s) and archive its data/ now.
+ */
+router.post(
+  '/:name/backup',
+  serviceLimiter,
+  auth,
+  requireCapability('backups:manage'),
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  async (req: Request, res: Response) => {
+    const serviceName = req.params.name;
+    const userId = req.user!.id;
+    try {
+      const result = await appBackup.backupOneApp(serviceName);
+      await writeAuditLog({
+        userId,
+        action: 'backup_create',
+        resource: serviceName,
+        result: result.dumpFailures.length ? 'failure' : 'success',
+        metadata: {
+          trigger: 'per-app',
+          file: result.file,
+          dumped: result.manifest.dumps.length,
+          dumpFailed: result.dumpFailures.length,
+        },
+      }).catch(() => {});
+      return res.status(201).json({
+        success: true,
+        service: serviceName,
+        file: result.file,
+        manifest: result.manifest,
+        dumpFailures: result.dumpFailures,
+        message: result.dumpFailures.length
+          ? `Backed up ${serviceName}, but ${result.dumpFailures.length} database dump${
+              result.dumpFailures.length === 1 ? '' : 's'
+            } failed — the archive still holds the last good copy.`
+          : `Backed up ${serviceName}.`,
+      });
+    } catch (error) {
+      const httpError = error as HttpError;
+      logger.error(`Per-app backup failed: ${serviceName}`, { userId, error: httpError.message });
+      await writeAuditLog({
+        userId,
+        action: 'backup_create',
+        resource: serviceName,
+        result: 'failure',
+        metadata: { trigger: 'per-app', error: httpError.message },
+      }).catch(() => {});
+      return res.status(httpError.statusCode || 500).json({
+        error: 'Failed to back up the app',
+        service: serviceName,
+        message: httpError.message,
+      });
+    }
+  }
+);
+
+/**
+ * GET /api/services/:name/backups
+ * List this app's local backup archives, newest first.
+ */
+router.get(
+  '/:name/backups',
+  serviceLimiter,
+  auth,
+  requireCapability('backups:manage'),
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  async (req: Request, res: Response) => {
+    try {
+      return res.json({ items: await appBackup.listAppBackups(req.params.name) });
+    } catch (error) {
+      logger.error(`Listing per-app backups failed: ${req.params.name}`, { error: (error as Error).message });
+      return res.status(500).json({ error: 'Unable to list backups for this app.' });
+    }
+  }
+);
+
+/**
+ * GET /api/services/:name/backups/:file
+ * Download one archive.
+ */
+router.get(
+  '/:name/backups/:file',
+  serviceLimiter,
+  auth,
+  requireCapability('backups:manage'),
+  validateParams(schemas.serviceBackupFileParams),
+  validateServiceAllowlist,
+  async (req: Request, res: Response) => {
+    const { name, file } = req.params;
+    let archivePath: string;
+    try {
+      archivePath = appBackup.resolveAppBackupPath(name, file);
+    } catch {
+      return res.status(400).json({ error: 'Invalid backup name.' });
+    }
+    try {
+      await fs.access(archivePath);
+    } catch {
+      return res.status(404).json({ error: 'Backup file not found.' });
+    }
+    return res.download(archivePath, file);
+  }
+);
+
+/**
+ * DELETE /api/services/:name/backups/:file
+ * Delete one archive and its manifest sidecar.
+ */
+router.delete(
+  '/:name/backups/:file',
+  serviceLimiter,
+  auth,
+  requireCapability('backups:manage'),
+  validateParams(schemas.serviceBackupFileParams),
+  validateServiceAllowlist,
+  async (req: Request, res: Response) => {
+    const { name, file } = req.params;
+    const userId = req.user!.id;
+    try {
+      await appBackup.deleteAppBackup(name, file);
+      await writeAuditLog({
+        userId,
+        action: 'backup_delete',
+        resource: name,
+        result: 'success',
+        metadata: { file },
+      }).catch(() => {});
+      return res.json({ success: true, service: name, file, message: 'Backup deleted.' });
+    } catch (error) {
+      const message = (error as Error).message;
+      if (/Invalid backup/.test(message)) {
+        return res.status(400).json({ error: 'Invalid backup name.' });
+      }
+      logger.error(`Deleting a per-app backup failed: ${name}`, { userId, error: message });
+      return res.status(500).json({ error: 'Unable to delete the backup.' });
     }
   }
 );

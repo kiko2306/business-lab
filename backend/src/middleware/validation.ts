@@ -77,6 +77,11 @@ export const schemas = {
   serviceNameParam: Joi.object({
     name: serviceNameSchema.required(),
   }),
+  // A per-app backup archive: /api/services/:name/backups/:file
+  serviceBackupFileParams: Joi.object({
+    name: serviceNameSchema.required(),
+    file: backupNameSchema.required(),
+  }),
   cloudflareTokenUpdate: Joi.object({
     token: Joi.string().trim().min(20).max(4096).required(),
   }),

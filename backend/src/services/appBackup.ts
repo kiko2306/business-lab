@@ -24,6 +24,7 @@
  */
 
 import fs from 'fs/promises';
+import os from 'os';
 import path from 'path';
 import { APP_VERSION } from '../version';
 import { getService, resolveComposeFile } from '../config/services';
@@ -54,6 +55,9 @@ export const APP_BACKUP_RETENTION = 10;
  * dump `commitDump` has not renamed yet.
  */
 const TAR_EXCLUDES = ['data/db', 'data/pgdata', '*-wal', '*-shm', '*.part'];
+
+/** Longer than `runCommand`'s 2-minute default — a large `data/` tree can take a while. */
+const ARCHIVE_TIMEOUT_MS = 10 * 60 * 1000;
 
 export interface AppBackupDump {
   target: string;
@@ -133,6 +137,83 @@ function toDump(o: { target: string; kind: string; bytes?: number; detail: strin
 }
 
 /**
+ * The docker volume backing `backups/` (mounted at `/app/backups`). Cached.
+ * `null` when the backend is not a container with that volume — dev only
+ * (unsupported per CLAUDE.md), where the process owns the tree and can tar it
+ * directly.
+ */
+let backupsVolume: string | null | undefined;
+async function backupsVolumeName(): Promise<string | null> {
+  if (backupsVolume !== undefined) {
+    return backupsVolume;
+  }
+  try {
+    const out = await runCommand('docker', [
+      'inspect',
+      os.hostname(),
+      '--format',
+      '{{range .Mounts}}{{if eq .Destination "/app/backups"}}{{.Name}}{{end}}{{end}}',
+    ]);
+    backupsVolume = out.trim() || null;
+  } catch {
+    backupsVolume = null;
+  }
+  return backupsVolume;
+}
+
+/**
+ * Archive `<appDir>/data` into `backups/apps/<name>/<file>`, minus the live DB
+ * dirs.
+ *
+ * Runs `tar` as **root in a throwaway alpine container** — the backend process
+ * runs as a non-root user and cannot read every app's data (files owned by
+ * root or the app's own uid, mode 0600), the same reason `appDumps` snapshots
+ * SQLite in a container. busybox tar honours `--exclude` and a single `-C`
+ * (verified; it does *not* support repeated `-C`). The per-app directory is
+ * created by the caller as the backend user, so the sidecar write and later
+ * prune succeed; only the archive file lands root:root 0644, which the backend
+ * can still stat, serve and unlink from a directory it owns.
+ */
+async function writeArchive(name: string, appDir: string, file: string): Promise<void> {
+  const vol = await backupsVolumeName();
+  if (vol) {
+    await runCommand(
+      'docker',
+      [
+        'run',
+        '--rm',
+        '-v',
+        `${appDir}:/src:ro`,
+        '-v',
+        `${vol}:/out`,
+        'alpine:latest',
+        'tar',
+        '-czf',
+        `/out/apps/${name}/${file}`,
+        ...TAR_EXCLUDES.flatMap((pattern) => ['--exclude', pattern]),
+        '-C',
+        '/src',
+        'data',
+      ],
+      { timeout: ARCHIVE_TIMEOUT_MS }
+    );
+    return;
+  }
+  await runCommand(
+    'tar',
+    [
+      '-czf',
+      path.join(APP_BACKUP_ROOT, name, file),
+      ...TAR_EXCLUDES.flatMap((pattern) => ['--exclude', pattern]),
+      '-C',
+      appDir,
+      'data',
+    ],
+    { timeout: ARCHIVE_TIMEOUT_MS }
+  );
+}
+
+/**
  * Back up one app now: dump its database(s), then archive `data/` (minus the
  * live DB dirs) to `backups/apps/<name>/<name>-<timestamp>.tar.gz` with a
  * manifest sidecar, and prune to the retention count.
@@ -163,14 +244,7 @@ export async function backupOneApp(name: string): Promise<AppBackupResult> {
     const base = `${name}-${stamp.toISOString().replace(/[:.]/g, '-')}`;
     const archivePath = path.join(dir, `${base}.tar.gz`);
 
-    await runCommand('tar', [
-      '-czf',
-      archivePath,
-      ...TAR_EXCLUDES.flatMap((pattern) => ['--exclude', pattern]),
-      '-C',
-      appDir,
-      'data',
-    ]);
+    await writeArchive(name, appDir, `${base}.tar.gz`);
 
     const archiveBytes = (await fs.stat(archivePath)).size;
     const dumps = report.outcomes.filter((o) => o.ok).map(toDump);

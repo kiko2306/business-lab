@@ -15007,3 +15007,78 @@ name.
   - Smoke archives removed from the backups volume afterward.
 
 Patch bump 0.16.0 → 0.16.1 (internal, no user-facing surface yet).
+
+## 187. §185 slice 2 — the per-app backup API (2026-09-04)
+
+Four routes on the service resource (`routes/services.ts`), all behind
+`backups:manage` (the same capability `/api/backups/*` uses):
+
+| Route | Does |
+|---|---|
+| `POST /api/services/:name/backup` | `appBackup.backupOneApp` — dump + archive now |
+| `GET  /api/services/:name/backups` | `listAppBackups` — newest first, with the manifest |
+| `GET  /api/services/:name/backups/:file` | `res.download` the archive |
+| `DELETE /api/services/:name/backups/:file` | `deleteAppBackup` — archive + sidecar |
+
+`schemas.serviceBackupFileParams` validates `:name` + `:file` (Joi's
+`backupNameSchema`, `^[a-zA-Z0-9._-]+$`), so a traversal name is a 422 before
+the handler. Audit rows: `backup_create` / `backup_delete` with
+`resource: <serviceName>` and `metadata.trigger: 'per-app'` (kept distinct
+from the scheduler's `resource: 'app-data'` so `getLastAppDataDump` is
+unaffected).
+
+### The archive step had to move out of the backend process
+
+First live call through the API failed:
+
+    tar: can't open 'data/valkey/dump.rdb': Permission denied
+    tar: can't open 'data/data/index/.managed.json': Permission denied
+
+The backend runs as a non-root user (`appuser`, Dockerfile). App data files
+are owned by root or the app's own uid, often mode 0600 — `appuser` genuinely
+cannot read them. The slice-1 "live" check passed only because it was run via
+`docker exec` (root). `findSqliteFiles` already knows this ("unreadable app
+data … is not our business") and `dumpSqliteBatch` already works around it by
+snapshotting **in a container**.
+
+So `writeArchive` now runs `tar` as root in a throwaway
+`alpine:latest` container: `-v <appDir>:/src:ro -v <backupsVolume>:/out`,
+`tar -czf /out/apps/<name>/<file> --exclude … -C /src data`. busybox tar
+honours `--exclude` and a single `-C` (repeated `-C` it does **not** — checked
+against the image, §184 notes the same). The backups volume name is found
+once via `docker inspect $(hostname) --format '…Destination "/app/backups"…'`
+and cached; when it can't be found (non-containerised dev, unsupported per
+CLAUDE.md) it falls back to in-process `tar`.
+
+**Ownership works out:** the caller creates `backups/apps/<name>/` as
+`appuser`, so the manifest sidecar write and the retention prune succeed;
+only the archive file lands `root:root 0644`, which `appuser` can still
+`fs.stat`, `res.download`, and `fs.rm` (unlink needs write on the *directory*,
+which it owns — not the file).
+
+### Verified through the authenticated API on the live stack
+
+Minted a `webmaster` access token (signed with the backend's `JWT_SECRET`) —
+no dashboard creds in an agent session, §176 precedent — and called every
+route against `tx-home-utils.com`'s backend:
+
+- `POST …/paperless/backup` → 201, fresh `pg_dump` (580 KB), 414 KB archive.
+  `tar -tzf` confirms **no** `data/db/`, `-wal`, `-shm`, `.part`; **has**
+  `data/_dump/paperless.sql`, `data/media/documents/…`, and
+  `data/valkey/dump.rdb` — the file that failed before, now readable.
+- `GET …/paperless/backups` → the entry with a parsed manifest.
+- `GET …/paperless/backups/<file>` → 200, 424448 bytes, valid gzip/tar.
+- `POST …/vaultwarden/backup` → `engine: null`, `dumps: [{kind: "sqlite"}]`.
+- `user`-role token → **403**; unknown app → **400**; missing file → **404**;
+  `..%2Fevil` file name → **422** (Joi). Audit rows present for create +
+  delete. `DELETE` → list empty. Smoke archives + audit rows removed after.
+
+### Tests
+
+`appBackup.test.ts` +1 (20): the new one asserts `writeArchive` issues
+`docker run --rm -v <appDir>:/src:ro -v <vol>:/out alpine:latest tar … -C /src
+data` when `docker inspect` reports a volume; the rest still exercise the
+in-process fallback. Suite 499. No route-layer test — thin handlers over the
+tested service, no HTTP harness in this project (§176 precedent).
+
+Minor bump 0.16.1 → 0.17.0 (new API surface).

@@ -11,6 +11,22 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.17.0] — 2026-09-04
+
+### Added
+
+- **Per-app backup API** (§185 slice 2) — four routes on the service resource,
+  behind `backups:manage`: `POST /api/services/:name/backup` (dump + archive
+  now), `GET …/backups` (list, newest first, with the manifest), `GET
+  …/backups/:file` (download), `DELETE …/backups/:file`. The archive step now
+  runs `tar` as **root in a throwaway alpine container** rather than in the
+  backend process — the backend runs unprivileged and cannot read every app's
+  data files (e.g. `valkey/dump.rdb`, Paperless index files, mode 0600), which
+  a first live test against Paperless surfaced immediately. Proven through the
+  authenticated API on the live stack: Postgres (Paperless) and SQLite
+  (Vaultwarden) archives, download, delete, `user`-role → 403, unknown app →
+  400, missing file → 404, traversal name → 422.
+
 ## [0.16.1] — 2026-09-04
 
 ### Added

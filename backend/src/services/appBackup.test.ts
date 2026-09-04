@@ -51,10 +51,13 @@ beforeEach(async () => {
       : { appDir: srcAppDir(name), composeFile: null }
   );
 
-  // The real archive step is a `tar` child process; stand in for it by
-  // touching the file tar would have produced (its path is args[1]).
-  runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
-    fs.writeFileSync(args[1], 'PK\x03\x04 fake archive');
+  // `runCommand` is used for two things: probing the backups volume name
+  // (`docker inspect …`) and the archive itself (`tar …` in-process, or
+  // `docker run … tar` in a container). Default: no volume (in-process tar),
+  // and stand in for tar by touching the file it would have produced (args[1]).
+  runCommand.mockImplementation(async (cmd: string, args: string[]) => {
+    if (cmd === 'docker' && args[0] === 'inspect') return ''; // no /app/backups volume
+    if (cmd === 'tar') fs.writeFileSync(args[1], 'PK\x03\x04 fake archive');
     return '';
   });
   dumpOneApp.mockResolvedValue({ outcomes: [], ok: 0, failed: 0 });
@@ -99,7 +102,6 @@ describe('resolveAppBackupPath', () => {
 
 describe('backupOneApp', () => {
   it('dumps, archives data minus the live DB dirs, and writes a manifest sidecar', async () => {
-    fs.mkdirSync(path.join(root, '..'), { recursive: true }); // no-op; keep tmp stable
     dumpOneApp.mockResolvedValue({
       outcomes: [
         { app: 'nocodb', kind: 'postgres', target: '/apps/nocodb/data/_dump/nocodb.sql', ok: true, bytes: 2048, detail: 'dumped 2 KB' },
@@ -111,8 +113,9 @@ describe('backupOneApp', () => {
     const res = await mod.backupOneApp('nocodb');
 
     expect(dumpOneApp).toHaveBeenCalledWith('nocodb');
-    const [cmd, args] = runCommand.mock.calls[0];
-    expect(cmd).toBe('tar');
+    const tarCall = runCommand.mock.calls.find(([cmd]) => cmd === 'tar');
+    expect(tarCall).toBeDefined();
+    const args = tarCall![1];
     expect(args).toContain('-czf');
     expect(args.slice(-3)).toEqual(['-C', srcAppDir('nocodb'), 'data']);
     for (const pattern of ['data/db', 'data/pgdata', '*-wal', '*-shm', '*.part']) {
@@ -147,8 +150,35 @@ describe('backupOneApp', () => {
 
     const res = await mod.backupOneApp('nocodb');
 
-    expect(runCommand).toHaveBeenCalledOnce();
+    expect(runCommand.mock.calls.some(([cmd]) => cmd === 'tar')).toBe(true);
     expect(res.dumpFailures).toEqual([{ target: '', kind: 'postgres', bytes: null, detail: 'connection refused' }]);
+  });
+
+  it('archives via a throwaway root container when the backups volume is found', async () => {
+    runCommand.mockImplementation(async (cmd: string, args: string[]) => {
+      if (cmd === 'docker' && args[0] === 'inspect') return 'homelab-management_backups-data\n';
+      if (cmd === 'docker' && args[0] === 'run') {
+        // tar's -f target inside the container; write a stand-in where the
+        // backend will stat it (the volume == APP_BACKUP_ROOT/..).
+        const out = args[args.indexOf('-czf') + 1].replace('/out/', '');
+        const full = path.join(root, 'backups', out);
+        fs.mkdirSync(path.dirname(full), { recursive: true });
+        fs.writeFileSync(full, 'container archive');
+      }
+      return '';
+    });
+
+    const res = await mod.backupOneApp('nocodb');
+
+    const runCall = runCommand.mock.calls.find(([cmd, a]) => cmd === 'docker' && a[0] === 'run');
+    expect(runCall).toBeDefined();
+    const a = runCall![1];
+    expect(a).toContain('--rm');
+    expect(a.some((x: string) => x === `${srcAppDir('nocodb')}:/src:ro`)).toBe(true);
+    expect(a.some((x: string) => x === 'homelab-management_backups-data:/out')).toBe(true);
+    expect(a).toContain('alpine:latest');
+    expect(a.slice(-3)).toEqual(['-C', '/src', 'data']);
+    expect(res.file).toMatch(/^nocodb-.*\.tar\.gz$/);
   });
 
   it('works for a data-only app with no server database (engine null)', async () => {
