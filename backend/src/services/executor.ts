@@ -24,6 +24,7 @@ import { withMaintenanceLock } from './maintenanceLock';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
 import { reconcileNextcloudClamav } from './nextcloudClamav';
+import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
@@ -234,6 +235,10 @@ async function composeUpWithManagedConfig(
   // (§81.4/§81.7). Both no-op for every other service.
   await reconcileNextcloudOnlyOffice(serviceName);
   await reconcileNextcloudClamav(serviceName);
+  // Guacamole: rotate the shipped guacadmin/guacadmin default the first time
+  // it's reachable (§200 slice 1). Also after `up`, not before — it's a
+  // REST call against the running webapp, not a file it needs before boot.
+  await reconcileGuacamoleAdminPassword(serviceName);
 
   return result;
 }

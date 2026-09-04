@@ -16212,3 +16212,88 @@ server to be useful. Confirmed: no `apps/drawio/`, no README item for it.
 Diagrams (if the Activity/Sequence-diagram item above goes ahead) get
 authored with `app.diagrams.net` or the desktop app and checked in as
 `.drawio` files, same as any other doc asset.
+
+## 204. §200 slice 1 done — Guacamole's default admin password auto-rotates
+
+`guacamole/guacamole` and `guacamole/guacd` pinned to `1.6.0` (were
+`:latest`) — checked Docker Hub tags directly rather than guessing; `1.6.0`
+is current stable for both images, matching. `GUACAMOLE_ADMIN_PASSWORD`
+added to `hiddenGeneratedSecrets` (§200's plan); unlike every other
+generated secret on this registry it is never passed to the container's
+`environment:` at all — Guacamole never sees it as a start-time value, it's
+set after the fact over the REST API.
+
+**Endpoints weren't guessed.** Guacamole's REST API docs don't spell out
+exact paths/field names, and this drives a real credential change on a
+system other apps' Authelia gating depends on, so the endpoints were read
+straight out of the `apache/guacamole-client` source at the pinned `1.6.0`
+tag: `POST /api/tokens` takes **form-encoded** `username`/`password`
+(`@FormParam`, not JSON — the one place this client doesn't mirror
+`npmClient.ts`) and returns `{authToken, dataSource, ...}`; the auth token
+travels as a `Guacamole-Token` header (or a `token` query param — header
+used here) on every subsequent call; `PUT
+/api/session/data/{dataSource}/users/{username}/password` is Guacamole's own
+self-service password-change endpoint — it re-verifies `oldPassword`
+server-side against the *target* username in the URL, not the caller's own
+identity, which is exactly the shape this needs (log in as `guacadmin`,
+change `guacadmin`'s own password).
+
+**Built**, per §200's slice 1 design:
+
+- `backend/src/services/guacamoleClient.ts` — `guacamoleLogin`,
+  `guacamoleLogout`, `guacamoleSetPassword`. Thin, mirrors `npmClient.ts`'s
+  shape; slice 2 extends this file with user create/enable/disable rather
+  than starting a new one.
+- `backend/src/services/guacamoleAdminRotate.ts` — the slice-1-specific
+  orchestration: poll `guacamoleLogin(guacadmin, guacadmin)` for up to 60s
+  (20×3s, same budget as `nextcloudOcc.ts`'s `WAIT_FOR_OCC` — `docker compose
+  up` returns long before the webapp finishes booting); a network-level
+  failure retries, a reachable-but-rejected login means it's already
+  rotated (stop, nothing to do), a successful login rotates it via
+  `guacamoleSetPassword` to the value `readAppEnvValue` finds in `.env`.
+  Never throws — logs and returns on every failure path.
+- Wired into `executor.ts`'s `composeUpWithManagedConfig`, alongside the
+  Nextcloud roster reconcilers, called after `docker compose up` for every
+  Guacamole start; no-op for every other service.
+- `docs/app-credentials.md`/README: the "@mat: change Guacamole's default
+  login" item (§84.1a, §199) is **deleted**, not ticked, per §200's own
+  instruction — it's superseded, not done-by-hand.
+
+**Verified live, not just typechecked** (CLAUDE.md: Docker/exposure changes
+get proven against the real stack). Couldn't recreate the live backend
+container itself to prove this through the actual dashboard start flow —
+`docker-compose.yml`'s `REPO_ROOT` variable is still unset in `.env` on
+`tx-home-utils.com` (§198's still-open TODO), so any `docker compose`
+invocation against the management stack fails outright, and setting
+`REPO_ROOT` unilaterally to route around that would be reaching into a
+task explicitly flagged `@mat`. Same shape of blocker §199 hit, same fix:
+proved it in an isolated throwaway container instead, same as that session.
+
+1. `cd apps/guacamole && docker compose pull && docker compose up -d` —
+   sanctioned "restart an individual service" (never touched the management
+   stack); confirmed both containers now run `guacamole/guacamole:1.6.0` /
+   `guacamole/guacd:1.6.0` and came up healthy.
+2. A throwaway `node:20` container (backend source + `apps/` bind-mounted at
+   matching paths, `--add-host=host.docker.internal:host-gateway`,
+   `APPS_DIR` pointed at the mount — no `DOCKER_HOST`/socket needed, since
+   this reconciler never touches Docker, only files and HTTP) ran a small
+   throwaway script exercising the real flow: `ensureGeneratedSecrets` →
+   `reconcileGuacamoleAdminPassword` → `guacamoleLogin` against the live
+   container to check both the old and new credentials directly. Output:
+   secret generated (64 hex chars), rotation logged
+   `Rotated Guacamole's default admin password`, `guacadmin`/`guacadmin`
+   **no longer logs in**, the generated password **does**. Ran the same
+   script a second time: `ensureGeneratedSecrets` wrote nothing (already
+   set), the reconciler logged
+   `Guacamole's default admin credentials are no longer active; nothing to
+   rotate` and made no API call — the idempotent path, proven, not just
+   argued. The throwaway script was deleted after, never committed.
+
+Backend `npm run typecheck` and `npm test` (52 files, 545 tests, including
+15 new ones across `guacamoleClient.test.ts` and
+`guacamoleAdminRotate.test.ts`) both green. Version bumped to 0.27.0.
+
+**Open**: slices 2-4 (`guacamoleClient.ts` user CRUD, `guacamoleSync.ts`,
+the `guacamole-auth-header` extension) — still README items, unchanged by
+this slice beyond slice 2's item now pointing at the file that already
+exists rather than one still to create.

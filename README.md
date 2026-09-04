@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.26.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.27.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -389,23 +389,12 @@ Strategy:
       life-safety), and prove a start + backup/restore round-trip.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
-- [ ] **@mat: change Guacamole's default login** (§84.1a, §199) — it still
-      ships as `guacadmin`/`guacadmin`. Now more urgent than "on the LAN":
-      Guacamole is exposed at `guacamole.tx-home-utils.com` behind Authelia
-      as of §199, so a compromised Authelia session (or an admin-group
-      account) reaches a default-credentialed RDP/VNC/SSH gateway. Superseded
-      by §200 slice 1 once that lands (auto-rotates it, no human step) —
-      delete this item then instead of ticking it.
-- [ ] **Guacamole SSO, slice 1: pin the version + auto-rotate the default
-      admin password** (§200) — pin `guacamole/guacamole` and
-      `guacamole/guacd` off `:latest` to a specific tag (needed before slice
-      4's extension can be version-matched), add `GUACAMOLE_ADMIN_PASSWORD`
-      as a `hiddenGeneratedSecret`, and rotate `guacadmin`'s password to it
-      via the REST API on first successful default-credential login.
-- [ ] **Guacamole SSO, slice 2: `guacamoleClient.ts`** (§200) — a REST
-      client mirroring `npmClient.ts`, for creating/enabling/disabling a
-      Guacamole user under the `postgresql` auth provider. No
-      connection/permission calls — those stay a manual Guacamole-UI step.
+- [ ] **Guacamole SSO, slice 2: extend `guacamoleClient.ts`** (§200) — the
+      REST client (`backend/src/services/guacamoleClient.ts`) exists already,
+      built for slice 1 (login/logout/set-password); extend it with
+      creating/enabling/disabling a Guacamole user under the `postgresql`
+      auth provider. No connection/permission calls — those stay a manual
+      Guacamole-UI step.
 - [ ] **Guacamole SSO, slice 3: `guacamoleSync.ts`** (§200) — mirrors
       `autheliaSync.ts`: provision/enable a Guacamole account for every
       active dashboard user with `app-guacamole` granted (or webmaster),

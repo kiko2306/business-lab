@@ -6,7 +6,7 @@ services:
   # service the database waits on, rather than an afterwards step. It writes
   # once and then no-ops, so a restart does not churn the file.
   guacamole-initdb:
-    image: guacamole/guacamole:latest
+    image: guacamole/guacamole:1.6.0
     user: "0:0"
     command:
       - sh
@@ -21,7 +21,7 @@ services:
   # The proxy daemon that actually speaks RDP, VNC and SSH. No published port:
   # only the web app talks to it, over the compose network.
   guacd:
-    image: guacamole/guacd:latest
+    image: guacamole/guacd:1.6.0
     restart: unless-stopped
     volumes:
       - ./data/drive:/drive
@@ -35,8 +35,12 @@ services:
       retries: 3
       start_period: 10s
 
+  # Pinned rather than :latest (§200 slice 1): guacamole-auth-header (a later
+  # slice) is a separate jar version-locked to this webapp build — a
+  # mismatched pair refuses to load, and :latest can drift out from under it
+  # silently on a routine restart.
   guacamole:
-    image: guacamole/guacamole:latest
+    image: guacamole/guacamole:1.6.0
     restart: unless-stopped
     depends_on:
       guacamole-db:

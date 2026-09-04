@@ -491,9 +491,12 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       interval: 30000,
       timeout: 5000,
     },
-    // Credentials for its own bundled Postgres. Nothing outside this compose
-    // project uses them, so they are generated rather than asked for.
-    hiddenGeneratedSecrets: ['GUACAMOLE_DB_PASSWORD'],
+    // GUACAMOLE_DB_PASSWORD: its own bundled Postgres, nothing outside this
+    // compose project uses it. GUACAMOLE_ADMIN_PASSWORD is never passed to
+    // the container at all — guacamoleAdminRotate.ts generates it, then sets
+    // it over Guacamole's own REST API the first time guacadmin/guacadmin
+    // logs in successfully, replacing the shipped default (§200 slice 1).
+    hiddenGeneratedSecrets: ['GUACAMOLE_DB_PASSWORD', 'GUACAMOLE_ADMIN_PASSWORD'],
     // Chosen over MeshCentral for machines on the overlay (§84.1) precisely
     // because it needs no agent: no pinned certificate hash to go wrong behind
     // the tunnel, and Authelia can gate it without breaking anything, since

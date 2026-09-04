@@ -11,6 +11,20 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.27.0] — 2026-09-04
+
+### Added
+
+- **Guacamole's shipped `guacadmin`/`guacadmin` default admin password now
+  auto-rotates**, closing the gap left once it was exposed at a real
+  hostname (§199): on the first successful login with the default
+  credentials after a start, the backend generates a random password and
+  sets it over Guacamole's own REST API — no human step, and idempotent by
+  construction (a rejected default-credential login just means it already
+  happened). `guacamole/guacamole` and `guacamole/guacd` are pinned to
+  `1.6.0` rather than `:latest`, needed so a later SSO extension can be
+  version-matched to the webapp build.
+
 ## [0.26.0] — 2026-09-04
 
 ### Changed
