@@ -17507,3 +17507,76 @@ specifically for this), not a custom script.
   sidecar process exists.
 
 No `backend/src`/`frontend/src` touched — compose-only, no version bump.
+
+## 227. §216/§217's trust-the-proxy group — Stirling-PDF and Uptime Kuma done, Beszel/File Browser flagged
+
+Picked up the header/IP-trust group §216 filed. Checked each candidate
+before wiring anything, and two of the seven turned out not to be simple
+config flips.
+
+### File Browser and Beszel: flagged, not wired
+
+- **File Browser** — its own compose file already documents why its login
+  can't go yet: it bind-mounts the operator's home directory
+  (`~/.ssh`, `~/.gnupg`, every `apps/*/.env`) and calls out its own login as
+  the only gate on that while §180's LAN-direct bypass is open. Dropping it
+  now would remove the one thing standing between a LAN client and that
+  mount. Left wired to its own login; unblocks when §180 does.
+- **Beszel** — real mechanism exists (`TRUSTED_AUTH_HEADER`, expects an
+  email; the NPM `authelia-authrequest.conf` snippet already forwards
+  `Remote-Email`, so wiring is trivial). But a live upstream discussion
+  (github.com/henrygd/beszel/discussions/1505, unresolved as of this
+  writing) reports exactly this combination — Authelia, nginx auth_request,
+  `TRUSTED_AUTH_HEADER=Remote-Email` — failing with a 401 and no known fix.
+  Not worth debugging an open upstream bug blind; parked until that closes
+  or someone confirms a workaround.
+
+### Stirling-PDF: already done
+
+Checked the live container rather than assuming from the compose file:
+`SECURITY_ENABLELOGIN=false`/`DOCKER_ENABLE_SECURITY=false` are already the
+running env (confirmed via `docker inspect`), and hitting it directly
+returns 200 with no login/username/password string anywhere in the page.
+This was shipped when the app was added, just never checked off the
+§216/§217 list. No change needed — removed from the README bullet.
+
+### Uptime Kuma: `disableAuth` has no env var, wired via a DB write
+
+Checked live (`docker exec ... sqlite3 kuma.db ".schema setting"` and read
+`/app/server/settings.js`/`server.js`/`auth.js` straight out of the running
+container, v1.23.17): "Disable Auth" only exists as a row in the `setting`
+table — `key='disableAuth'`, `value` JSON-stringified, `type='general'` —
+written by the Security page's save handler. No env var; a
+github.com/louislam/uptime-kuma/issues/6459 request for one is still open.
+`server.js`'s socket handler confirms the consuming side:
+`if (await setting("disableAuth")) { afterLogin(socket, await
+R.findOne("user")); socket.emit("autoLogin"); }` — auto-logs every
+connection in as the first user row the moment the flag is true.
+
+Added `uptime-kuma-init` to `apps/uptime-kuma/docker-compose.yml`: reuses
+the app's own image (already ships `sqlite3`, no extra package fetch needed
+the way `beszel-init` needs `apk add`), `depends_on:
+service_healthy`, one idempotent `INSERT ... ON CONFLICT DO UPDATE`. Doesn't
+touch the `user` table — an empty one still forces the first-run setup
+wizard regardless of this flag (`docs/app-credentials.md` already documents
+that step; unaffected by this change).
+
+**Found and fixed in passing**: `uptime-kuma`'s own healthcheck
+(`wget -qO- ...`) was silently failing — the current image doesn't ship
+`wget`, only `curl` — so `service_healthy` never actually passed and
+blocked `uptime-kuma-init` from starting at all until this was noticed and
+switched to `curl -fsS`. Unrelated to the disableAuth work but was blocking
+verifying it, so fixed here rather than filed separately.
+
+**Verified live on `tx-home-utils.com`**: `uptime-kuma` container turned
+healthy after the `curl` fix; `uptime-kuma-init` ran and the `setting` row
+landed (`disableAuth|true|general`); re-ran it a second time to confirm the
+upsert is idempotent (no error, same row). **Not verified**: an actual
+browser round-trip skipping the login screen — this instance has zero rows
+in its `user` table (`needSetup` still true, the app shows its own
+first-run wizard regardless of `disableAuth`), and claiming that account is
+the operator's call, not something to do unprompted. The consuming code
+path was read directly out of the live container instead, which is what
+establishes the flag does what's claimed once an account exists.
+
+Compose-only — no `backend/src`/`frontend/src` touched, no version bump.

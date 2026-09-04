@@ -19,8 +19,37 @@ services:
     volumes:
       - ./data:/app/data
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3001 || exit 1"]
+      # wget isn't in the image any more (upstream base change, unrelated to
+      # this file) — curl is. Was silently unhealthy until this.
+      test: ["CMD-SHELL", "curl -fsS http://localhost:3001 || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 15s
+
+  # "Disable Auth" (plan.md §227, §216) has no env var upstream — it is a
+  # plain row in the `setting` table (key `disableAuth`, JSON-stringified
+  # value, type `general`), only ever written by the Security page's save
+  # handler. Idempotent upsert after every boot so Authelia stays the only
+  # gate once this lands, the same shape as beszel-init's direct sqlite
+  # write. Reuses the app's own image — it already ships the sqlite3 CLI,
+  # so no extra package fetch like beszel-init needs. Doesn't touch the
+  # `user` table: an empty one still forces the first-run setup wizard
+  # (`docs/app-credentials.md`), same as before this change.
+  uptime-kuma-init:
+    image: louislam/uptime-kuma:1
+    restart: "no"
+    depends_on:
+      uptime-kuma:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        set -e
+        sqlite3 /app/data/kuma.db ".timeout 15000" "
+          INSERT INTO setting (key, value, type) VALUES ('disableAuth', 'true', 'general')
+          ON CONFLICT(key) DO UPDATE SET value = 'true', type = 'general';
+        "
+        echo "uptime-kuma-init: disableAuth set"
