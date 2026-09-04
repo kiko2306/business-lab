@@ -44,6 +44,11 @@ against this model.
 - Two-factor authentication (TOTP) for the dashboard login: [/docs/two-factor.md](/docs/two-factor.md)
 - Licence due diligence (every image vs the resale model): [/docs/licences.md](/docs/licences.md)
 - Sales catalogue (what each app replaces): [/docs/sales-catalogue.md](/docs/sales-catalogue.md)
+- Sequence diagrams for the three multi-service backend actions (open with
+  [app.diagrams.net](https://app.diagrams.net) or the desktop app):
+  [exposure provisioning](/docs/exposure-provisioning.drawio),
+  [the self-update walk](/docs/self-update-walk.drawio),
+  [the backup/restore round trip](/docs/backup-restore-roundtrip.drawio)
 - Version history: [/CHANGELOG.md](/CHANGELOG.md)
 - User guide: [/docs/user-guide.md](/docs/user-guide.md)
 - Webmaster runbook (Cloudflare / DNS / Tunnel): [/docs/webmaster.md](/docs/webmaster.md)
@@ -249,15 +254,6 @@ Infrastructure:
       dashboard) that exercises them, local-only like the smoke tests.
 Strategy:
 
-- [ ] **Which dashboard actions deserve Activity/Sequence diagrams** (§202,
-      §203) — the dashboard has ~40 backend actions of wildly different
-      complexity; worth a diagram where the multi-service handoff is hard to
-      hold in your head from the code alone (exposure provisioning, the
-      self-update walk, a backup/restore round-trip), not for a
-      single-service CRUD action. Make that list first, then draw the
-      worthwhile ones as `.drawio` XML in `docs/` — author with
-      `app.diagrams.net` or the desktop app; self-hosting `jgraph/drawio` is
-      decided against (§203), not just deferred.
 
 ### Backups
 

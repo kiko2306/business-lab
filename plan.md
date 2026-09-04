@@ -16963,3 +16963,67 @@ folded into the fix-candidate list; BookStack moves to the "no known full
 fix" list alongside its already-noted missing header-trust feature.
 
 Docs only — no version bump.
+
+## 218. Which dashboard actions deserve a diagram — surveyed, three drawn (§202, §203)
+
+The README item: the dashboard has on the order of 40 backend actions
+(counted the actual route handlers across `backend/src/routes/`: 16 in
+`services.ts`, 9 each in `auth.ts`/`backup.ts`, 4 each in `recovery.ts`/
+`users.ts`/`health.ts`, 17 in `settings.ts`, 3 in `selfUpdate.ts`, 2 in
+`audit.ts`, 1 in `network.ts` — 69 routes total, most of them thin
+single-service CRUD). §202 decided a diagram earns its place only where the
+multi-service handoff is genuinely hard to hold in your head from the code
+alone — not for a single-service action, however long its handler is.
+
+### Surveyed and drawn (docs/*.drawio, app.diagrams.net XML)
+
+- **`docs/exposure-provisioning.drawio`** — `provisionServiceIfEnabled`
+  (`services/exposure.ts`). Three external systems in a specific order that
+  matters (NPM before Cloudflare; reversed on teardown), state persisted to
+  Postgres between every hop so a crash mid-sequence is recoverable, and it
+  runs on every service start with exposure enabled — the highest-traffic
+  complex path in the app.
+- **`docs/self-update-walk.drawio`** — `triggerSelfUpdate` /
+  `runSelfUpdateSequence` (`services/selfUpdate.ts`). The one action that
+  recreates the very backend container running it — everything after the
+  detached, unref'd final `compose up -d --build backend` happens in a
+  process that no longer exists, which is why run state lives in Postgres
+  and a dangling row is reconciled on the next boot. The step most likely to
+  confuse a reader who assumes normal request/response control flow.
+- **`docs/backup-restore-roundtrip.drawio`** — `runScheduledBackupCheck` +
+  the Kopia client (`services/backup.ts`, `backupScheduler.ts`,
+  `kopiaClient.ts`). Ordering matters here too (dump before snapshot, or
+  every backup is a generation stale) and it spans the management DB, every
+  installed app's own DB container, and Kopia's HTTP API — plus the restore
+  half is a separate, differently-shaped flow (list → restore → poll) worth
+  showing on the same diagram for contrast.
+
+### Surveyed and not drawn
+
+- **Authelia/Guacamole user sync** (`autheliaSync.ts`, `guacamoleSync.ts`,
+  fired from the users routes) — considered and set aside. The Authelia half
+  is a single file write with no round trip at all (Authelia's own
+  file-watcher reloads it out of band); the Guacamole half is a real HTTP
+  API dance (login → list → create/disable → logout) but touches exactly one
+  external system, not the two-or-three-system spread that made the three
+  above worth drawing. Borderline; revisit if it grows.
+- **Start/stop with `dependsOn` resolution, per-app backup/dump/restore,
+  network scan, config-generation actions** (Samba/CrowdSec/kitchen-switcher/
+  Nextcloud↔OnlyOffice/HomeAssistant HACS) — each touches at most one
+  external system (Docker, or one app's own config file) with no ordering
+  hazard across systems. Long handlers, not hard-to-hold-in-your-head ones.
+- **Every `settings.ts`/`users.ts`/`recovery.ts`/`health.ts`/`audit.ts`
+  route** — single-service CRUD against Postgres, plus at most one
+  connectivity-test call. Textbook, not diagram material.
+
+### Not done here
+
+`jgraph/drawio` stays not self-hosted (§202 already decided this — the file
+format needs no server, only live co-editing would, and nothing here wants
+that). The three `.drawio` files are plain XML, hand-authored to valid
+mxGraph structure and opened with `app.diagrams.net` or the desktop app for
+any visual cleanup — layout is mechanical (evenly spaced actors, numbered
+arrows top to bottom) rather than hand-tuned, so treat them as a correct
+first draft, not a finished polish pass.
+
+Docs only — no version bump.
