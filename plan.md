@@ -14530,3 +14530,56 @@ LAN-only too").
 
 Patch bump 0.15.0 → 0.15.1 (fixes a §178 regression). README item removed; a
 new "LAN can bypass Cloudflare on NPM's :80" item added under Exposure.
+
+## 181. §118.3 — n8n's Postgres 15 → 17 (2026-09-04)
+
+n8n 2.36.9 logged `Postgres 15 is not supported. n8n supports Postgres 17 and
+newer, with 16 on compatibility support.` on every boot. `apps/n8n/data/db`
+was a PG 15.19 cluster and stock `postgres:17-alpine` will not open it, so a
+plain tag bump would strand the database (workflows, credentials, executions).
+
+### Approach
+
+`apps/n8n/docker-compose.yml` `n8n-db` image `postgres:15-alpine` →
+**`pgautoupgrade/pgautoupgrade:17-alpine`** (MIT — licence row added). It is a
+drop-in for `postgres:17-alpine`: same entrypoint/env/config, but on start it
+detects an older cluster in `PGDATA` and runs `pg_upgrade --link` in place,
+then serves normally. A fresh clone has no data dir, so it just `initdb`s 17
+with no upgrade step. Kept permanently rather than switched back to stock
+postgres afterwards — it *is* postgres plus an entrypoint wrapper, and it makes
+the next major bump a one-line tag change.
+
+Rejected: a hand-rolled two-service dump/restore across `db` → `db17`
+(stock `postgres:17` has no PG15 binaries, so it needs the old image running to
+dump — 3 services, a scratch volume, careful ordering, an idempotency guard,
+for one app). `tianon/postgres-upgrade` is pairwise (15→16, 16→17 = two hops).
+
+`--link` **consumes the old cluster** (no rollback dir — pg_upgrade renames
+`global/pg_control` to `.old`). The rollback path is the scheduled `pg_dump`
+(`backup.engine=postgres` for n8n, §75). Added `start_period: 90s` to the
+`n8n-db` healthcheck so `n8n-workflows-init` (which waits on
+`condition: service_healthy`) doesn't bail during the one-time upgrade;
+normal boots skip it and are ready in seconds.
+
+### Verified on the live stack
+
+Took an independent `pg_dump` first (537 KB). Then recreated `n8n-db`:
+
+- pg_upgrade ran clean — schema + globals dumped, `--link` mode, VACUUM +
+  `reindexdb` after. `PG_VERSION` 15 → **17**; `postgres --version` 17.11;
+  container healthy.
+- Data intact: 129 public tables (unchanged), the `homelabCrowdsecAlertRelay`
+  workflow still present and active, 22 `execution_entity` rows preserved.
+- Recreated n8n: 2.36.9 healthy, `/healthz` `{"status":"ok"}`, and **zero**
+  `Postgres 15 is not supported` lines in the log (was every boot).
+  `n8n-workflows-init` re-imported + published the relay workflow against the
+  upgraded DB.
+
+### Left for later
+
+`apps/paperless/compose.yaml` is also on `postgres:15-alpine` and Paperless
+logs its own PG-version notice — same pgautoupgrade swap when it's picked up.
+Not done here to keep the change to one app + one live upgrade.
+
+Compose + docs + plan only — no version bump (matches the Paperless→Valkey
+image swap, §108).

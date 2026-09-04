@@ -113,7 +113,15 @@ services:
       start_period: 30s
 
   n8n-db:
-    image: postgres:15-alpine
+    # pgautoupgrade is a drop-in for postgres:17-alpine: same entrypoint, env
+    # and config, but on start it runs `pg_upgrade --link` in place if it finds
+    # an older cluster in PGDATA. n8n 2.36 logs "Postgres 15 is not supported"
+    # every boot (plan.md §118.3) and stock postgres:17 will not open a v15
+    # data dir, so a plain tag bump would strand the database. `--link` consumes
+    # the old cluster (no rollback dir) — the scheduled `pg_dump`
+    # (backup.engine=postgres for n8n) is the fallback. A fresh clone has no
+    # data dir, so it just initdb's 17 with no upgrade step. MIT-licensed.
+    image: pgautoupgrade/pgautoupgrade:17-alpine
     restart: unless-stopped
     environment:
       POSTGRES_DB: ${N8N_DB_NAME:-n8n}
@@ -128,6 +136,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # The one-time in-place pg_upgrade runs before postgres accepts
+      # connections; suppress unhealthy during it so n8n-workflows-init doesn't
+      # bail on the upgrade boot. Normal boots skip the upgrade and are ready
+      # in seconds.
+      start_period: 90s
 
 networks:
   n8n-net:

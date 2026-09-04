@@ -330,11 +330,11 @@ Strategy:
       re-imports every boot, so a managed workflow's UI edits are replaced.
       Fine for now (matches every other generated config here); revisit
       skip-if-exists if someone needs to customise one in place.
-- [ ] **n8n's Postgres is 15; n8n 2.36 wants 17 (16 on compat)** (§118.3) —
-      `apps/n8n/docker-compose.yml` runs `postgres:15-alpine`; n8n logs
-      "Postgres 15 is not supported" on every start. Runs with a warning for
-      now. Needs a PG major upgrade (dump/restore, or a versioned data dir
-      swap) — same care as the other DB apps. Independent of §118.
+- [ ] **Paperless's Postgres is still 15** (§118.3, §181) — n8n moved to
+      `pgautoupgrade/pgautoupgrade:17-alpine` (auto `pg_upgrade` in place,
+      §181). `apps/paperless/compose.yaml` runs `postgres:15-alpine` and
+      Paperless logs its own PG-version notice — same one-line swap + a live
+      upgrade to prove it, when it's picked up.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from

@@ -87,6 +87,7 @@ operate within, listed again at the end.
 | Image | Licence | Status | Note |
 |---|---|---|---|
 | postgres:14/15/16-alpine | PostgreSQL License (BSD-like) | ✅ Clean | |
+| pgautoupgrade/pgautoupgrade:17-alpine (n8n) | **MIT** ("Docker PostgreSQL Authors") | ✅ Clean | drop-in for `postgres:17-alpine` that runs `pg_upgrade` in place on a major bump; bundled PostgreSQL keeps the PostgreSQL License. n8n needs PG ≥ 16 (§118.3). |
 | mariadb:10.11 (ITFlow, BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | could standardise on MariaDB |
 | valkey:9-alpine (Immich, Paperless) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (which is now RSALv2/SSPL). |
