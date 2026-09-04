@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.19.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.20.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -312,10 +312,6 @@ Strategy:
       re-imports every boot, so a managed workflow's UI edits are replaced.
       Fine for now (matches every other generated config here); revisit
       skip-if-exists if someone needs to customise one in place.
-- [ ] **Periodic exposure drift reconciliation** — `POST
-      /api/services/:name/exposure/verify` re-verifies one service on demand,
-      but nothing notices on its own when NPM or Cloudflare drifts from
-      `service_exposure`.
 - [ ] **The LAN can bypass Cloudflare on NPM's :80** (§180) — the tunnel
       origin is the host LAN IP, so NPM's plain-HTTP proxy port answers any
       `Host:` header from anywhere on the LAN, skipping Cloudflare's WAF/Access

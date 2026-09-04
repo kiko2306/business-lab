@@ -30,6 +30,7 @@ import { initWebSocket, sseHandler } from './services/realtime';
 import { startupLogsHandler } from './services/serviceLogs';
 import { startBackupScheduler } from './services/backupScheduler';
 import { reconcileRemovedServices } from './services/exposure';
+import { startExposureReconciler } from './services/exposureReconciler';
 import { regenerateHomepageServices } from './services/homepageConfig';
 import { startImageUpdateSweeper } from './services/imageUpdates';
 
@@ -197,6 +198,10 @@ startBackupScheduler();
 reconcileRemovedServices().catch((err: Error) => {
   console.error('Unable to reconcile exposure for removed services:', err.message);
 });
+// Then, on a slow cadence, re-assert every still-exposed service against the
+// live NPM/Cloudflare state so hand-edits or a rotated token that broke
+// provisioning get caught and fixed instead of sitting silently broken.
+startExposureReconciler();
 // The Home Page's services.yaml is otherwise only rewritten on a start/stop or
 // an exposure toggle — so a backend restart after app state changed (or a
 // fresh deploy) would leave it stale. Reconcile it once on boot. Best-effort

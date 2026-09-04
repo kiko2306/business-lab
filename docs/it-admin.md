@@ -39,7 +39,12 @@ other app is started from the dashboard.
 - **Exposure**: per app, toggle "Publicly expose this service" and "Require
   Authelia login" (leave the second on unless the app has its own solid
   auth). Provisioning creates the NPM proxy host, the tunnel ingress rule and
-  the DNS record automatically; turning it off removes all three.
+  the DNS record automatically; turning it off removes all three. Every ~6 h
+  the backend re-asserts all exposed hostnames against the live NPM/Cloudflare
+  state, so a hand-edit in NPM or a change made in the Cloudflare dashboard is
+  put back automatically; a hostname it can't repair gets an
+  `exposure_reconcile` failure in the audit log and a `last_error` on the app's
+  card. **Re-verify** on a card runs the same check for one app on demand.
 - **Ports**: [ports.md](ports.md). `start.sh` allocates from 10100 upward and
   logs any app it had to move.
 - **Global mail**: set it once in Settings → Email. Apps that inherit it are

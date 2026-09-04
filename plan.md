@@ -15235,3 +15235,59 @@ Per-app backup / restore is complete: `appBackup.ts` + `dumpOneApp` /
 Proven end to end on the live stack throughout. No open threads.
 
 Docs only — no version bump.
+
+## 191. Periodic exposure drift reconciliation (2026-09-04)
+
+README item — `POST /exposure/verify` re-asserts one service's hostname on
+demand, but nothing did it on its own, so an NPM proxy host hand-edited to the
+wrong upstream, a Cloudflare ingress rule deleted in their dashboard, or a
+token rotated after the fact would sit broken until someone clicked Re-verify.
+
+### `services/exposureReconciler.ts`
+
+`reconcileExposureDrift()` — every enabled **primary** `service_exposure` row
+(`WHERE enabled = true AND service_name NOT LIKE '%:%'`; secondaries ride
+along inside `provisionServiceIfEnabled`, orphans are
+`reconcileRemovedServices`' job), run `provisionServiceIfEnabled(name, 0)` —
+the same idempotent NPM `ensureProxyHost` + Cloudflare `ensureIngressRoute`
+path the verify route uses. `userId 0` is the "system" sentinel
+`reconcileRemovedServices` already uses. A 2 s pause between services keeps it
+a trickle. Returns `{ checked, reconciled, failed: [{ service, error }] }`, or
+`null` when the registry is empty or no global exposure config is set.
+
+Bookkeeping:
+- Heartbeat setting `exposure_reconcile_last_run_at` written each pass.
+- `regenerateHomepageServices()` once at the end — a hostname flipping
+  `failed → provisioned` makes its tile linkable.
+- **Audit row only on failure** (`exposure_reconcile`, `result: 'failure'`,
+  `userId: null`) — a clean pass is a log line, not audit-log spam every 6 h.
+  A service that won't come back is also already visible as `last_error` on
+  its card, which `provisionServiceIfEnabled` records on the row.
+
+`startExposureReconciler()` (wired in `index.ts` after
+`reconcileRemovedServices`): first pass **delayed 10 min** past boot — on a
+cold start NPM/Cloudflare/the apps are still settling and each app's own start
+already provisions its exposure, so the first reconcile should be a real drift
+check, not startup noise — then `setInterval` every 6 h.
+
+No settings toggle: re-asserting an exposure is safe and always wanted where
+exposure is used, and it no-ops when nothing is exposed.
+
+### Verified
+
+- `exposureReconciler.test.ts` — 7 tests (empty registry / no global config
+  bail, clean pass shape + `userId 0`, heartbeat write, secondary/orphan
+  filtering, a `status: failed` row → `summary.failed` + audit row, a thrown
+  provisioning error caught not crashed). Backend suite 504 → 511.
+- **Live stack**: ran the compiled `reconcileExposureDrift()` in the backend
+  container — 33 hostnames checked, **33 reconciled, 0 failed** in 130 s
+  (mostly the pauses), `exposure_reconcile_last_run_at` written, no audit row.
+- **Drift correction**: PUT dozzle's NPM proxy host (id 14) to
+  `forward_port: 9999`, then `provisionServiceIfEnabled('dozzle', 0)` — NPM
+  host back to `10140`, `success: true`, `https://dozzle.tx-home-utils.com`
+  still 200 throughout.
+- Docs: `it-admin.md` (the ~6 h re-assert, `exposure_reconcile` failures,
+  Re-verify is the on-demand twin) and `webmaster.md` (a change made in the
+  Cloudflare dashboard to a managed hostname is reverted on the next pass).
+
+Minor bump 0.19.0 → 0.20.0.

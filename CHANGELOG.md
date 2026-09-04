@@ -11,6 +11,23 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.20.0] — 2026-09-04
+
+### Added
+
+- **Periodic exposure drift reconciliation** — the backend now re-asserts
+  every enabled public hostname against the live NPM + Cloudflare state on a
+  ~6 h cadence (`services/exposureReconciler.ts`), the same idempotent path
+  `POST /exposure/verify` runs for one app on demand. A hand-edit in NPM or a
+  change made in the Cloudflare dashboard is reverted automatically; a
+  hostname that can't be brought back to `provisioned` writes an
+  `exposure_reconcile` failure to the audit log (the card already shows the
+  `last_error`). No settings toggle — it no-ops when nothing is exposed or
+  global exposure config is missing, and the first pass is delayed 10 min past
+  boot to skip cold-start noise. Proven on the live stack: a clean pass over
+  33 hostnames, and NPM drift on one host (wrong forward port) corrected on
+  the next reconcile.
+
 ## [0.19.0] — 2026-09-04
 
 ### Added

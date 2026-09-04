@@ -37,6 +37,11 @@ records or ingress rules for apps. If you see a stray `CNAME` to the tunnel
 for an app that is not exposed, that is drift worth investigating, not
 something to add to.
 
+The dashboard also **re-asserts** every exposed hostname (its ingress rule and
+DNS record) against your Cloudflare account roughly every 6 hours. A change you
+make in the Cloudflare dashboard to an app hostname it manages will be
+reverted on the next pass — configure exposure from the dashboard, not here.
+
 **One exception at the zone apex**: exposing the **Home Page** also publishes
 it at the bare domain (`<your-domain>` itself), so a proxied `CNAME` at the
 apex pointing at the tunnel is *expected* whenever the Home Page is exposed —
