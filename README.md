@@ -277,12 +277,6 @@ Strategy:
 - [ ] **Ship against the Tier A networks first** (§84.3a) — Bluesky, Mastodon,
       own Instagram, own LinkedIn profile all publish today with no approval
       and no cost. That is a release on its own.
-- [ ] **Per-client Meta app onboarding** (§84.7) — clients post to their own
-      accounts under their own business registration, so each client's box
-      holds their own developer app. Instagram works immediately in dev mode
-      with a Tester role; a publicly visible Facebook Page post still needs
-      that client's App Review, 2-4 weeks. Write it up as a billable
-      onboarding step, started on day one of an engagement.
 - [ ] **Verify Meta development-mode publishing empirically** (§84.3a) —
       sources agree Instagram publishes normally from a dev-mode app with a
       Tester role, and that a Facebook Page post in dev mode is visible only to

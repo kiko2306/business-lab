@@ -17296,3 +17296,12 @@ bucket reads as reachable" gap (above) is documented, not fixed.
 
 Backend/frontend code — version bumped (0.29.0 → 0.30.0, minor: a real
 user-facing feature).
+
+## 222. Dropped the "Per-client Meta app onboarding" README item
+
+User call: no longer wanted. Deleted (§84.7); §84.3a's "Verify Meta
+development-mode publishing empirically" stays — it's a separate factual
+question (does dev-mode Instagram/Facebook publishing actually work the way
+sources claim) that doesn't depend on the onboarding write-up existing.
+
+Docs only — no version bump.
