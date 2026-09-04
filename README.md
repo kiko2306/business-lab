@@ -388,19 +388,12 @@ Strategy:
 
 ### Apps and integrations
 
-- [ ] **@mat: register Nextcloud's shared-tree mount** (§219, §220) — the
+- [ ] **@mat: register Nextcloud's shared-tree mount** (§219, §224) — the
       `/shared` bind mount and `www-data` write permission are in place, but
       registering it with Nextcloud (Admin settings -> External Storage) needs
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
-- [ ] **Nextcloud never runs its background jobs** (§220) — `backgroundjobs_mode`
-      is `cron` but no cron sidecar exists in `apps/nextcloud/docker-compose.yml`
-      and the image's own `/cron.sh` isn't running, so trash/version expiry,
-      share-expiry notices, activity mail and `files_antivirus`'s background
-      rescan (needed once External Storage is registered, above) all silently
-      never fire. Add the standard sidecar: same image, `entrypoint: /cron.sh`,
-      same `./data/app` volume.
 - [ ] **Smarter Mealie "recipe from URL"** (§123.1) — the `recipe-scrapers`
       importer is poor on blogs without schema.org markup. Mealie 2.x has an
       `OPENAI_*` integration for AI-assisted parsing (incl. an

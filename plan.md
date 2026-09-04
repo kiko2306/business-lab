@@ -17370,7 +17370,7 @@ Docs only (`docs/licences.md` — the bundled extension is the same
 Apache-2.0 project, noted on the existing Guacamole row) plus the one
 compose env var — no backend/frontend code, no version bump.
 
-## 220. Nextcloud onto the shared file tree (§219) — mount done, registration is upstream-blocked
+## 224. Nextcloud onto the shared file tree (§219) — mount done, registration is upstream-blocked
 
 The last open piece of §219's shared-tree decision: bind-mount the File
 Browser/Samba tree into Nextcloud at a path outside its webroot, register it
@@ -17427,7 +17427,7 @@ Compose + docs, verified live on `tx-home-utils.com` (§219's mount and
 permission questions only, per the box's own no-guarantees rule) — no
 `backend/src`/`frontend/src` touched, no version bump.
 
-## 221. Paperless's one-way drop box onto the shared file tree (§219, §220)
+## 225. Paperless's one-way drop box onto the shared file tree (§219, §224)
 
 The other open piece of §219: Paperless's `consume/` isn't a symmetric
 shared folder like File Browser/Samba's, it's a one-way inbox that ingests
@@ -17445,9 +17445,9 @@ dedicated `to-paperless/` subfolder of the shared tree, bind-mounted into
   wired into `executor.ts` next to `applySambaConfig`/`ensureKopiaRepoDir` —
   same "must exist before `compose up`" placement. `0777`, not a `chown`,
   because whichever app's container gets there first (Paperless is uid 1000,
-  matching File Browser's tree already; Nextcloud's `www-data` from §220 is
+  matching File Browser's tree already; Nextcloud's `www-data` from §224 is
   uid 33) needs write access without the backend having to predict a uid —
-  the same reasoning as `filebrowser-init`'s `chmod -R o+rwX /srv` from §220.
+  the same reasoning as `filebrowser-init`'s `chmod -R o+rwX /srv` from §224.
 - Old `./data/consume` left in place, unused — same call as §219 made for
   Samba's now-unused `./data/share`.
 
@@ -17475,3 +17475,35 @@ the permission fix, the actual consume pipeline) is exactly what the
 manual proof above exercised.
 
 Touches `backend/src` — version bumped to 0.30.1 (`scripts/bump-version.sh`).
+
+## 226. Nextcloud's background jobs — cron sidecar added (§224)
+
+§224 found `backgroundjobs_mode: cron` set but nothing ever running it — no
+sidecar existed and the image's own `/cron.sh` wasn't running in the app
+container. Filed as its own README item rather than folded into §224
+because it's an independent fix with its own live proof.
+
+### What shipped
+
+`apps/nextcloud/docker-compose.yml`: a `nextcloud-cron` service — same
+image, `entrypoint: /cron.sh`, same DB env and `./data/app` volume as the
+`nextcloud` service, `depends_on: nextcloud: condition: service_healthy`.
+This is upstream's own documented pattern (the image ships `/cron.sh`
+specifically for this), not a custom script.
+
+### Verified live on `tx-home-utils.com`
+
+- `docker compose up -d nextcloud-cron` started cleanly alongside the
+  existing `nextcloud`/`nextcloud-db` containers.
+- Inside the sidecar, `busybox crond` is running and
+  `/var/spool/cron/crontabs/www-data` holds the image's own
+  `*/5 * * * * php -f /var/www/html/cron.php` entry (nothing custom to
+  maintain).
+- `occ config:app:get core lastcron` (run against the `nextcloud`
+  container, which is what actually executes the job) read 2026-09-02 —
+  stale, confirming cron genuinely never ran before this. After waiting
+  for a tick, it moved to a live-second timestamp (4s old at check time),
+  confirming cron.php now runs on schedule end to end, not just that the
+  sidecar process exists.
+
+No `backend/src`/`frontend/src` touched — compose-only, no version bump.

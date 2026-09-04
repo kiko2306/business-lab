@@ -47,6 +47,29 @@ services:
       retries: 3
       start_period: 60s
 
+  # `backgroundjobs_mode` is `cron` (Nextcloud's own recommended mode) but
+  # nothing was ever running it (plan.md §224) — trash/version expiry,
+  # share-expiry notices, activity mail and files_antivirus's background
+  # rescan all silently never fired. Upstream's own documented fix: the same
+  # image, entrypoint swapped to its bundled /cron.sh, sharing the app volume
+  # so it sees the same config/data as the web container.
+  nextcloud-cron:
+    image: nextcloud:latest
+    restart: unless-stopped
+    entrypoint: /cron.sh
+    environment:
+      POSTGRES_HOST: nextcloud-db
+      POSTGRES_DB: ${NEXTCLOUD_DB_NAME:-nextcloud}
+      POSTGRES_USER: ${NEXTCLOUD_DB_USER:-nextcloud}
+      POSTGRES_PASSWORD: ${NEXTCLOUD_DB_PASSWORD}
+    volumes:
+      - ./data/app:/var/www/html
+    depends_on:
+      nextcloud:
+        condition: service_healthy
+    networks:
+      - nextcloud-net
+
   # Nextcloud's own admin docs put 16 at the top of the officially-supported
   # range; 17+ isn't validated by upstream yet, so this isn't a stale pin.
   nextcloud-db:

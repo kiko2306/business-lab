@@ -48,7 +48,7 @@ services:
       - ./data/data:/usr/src/paperless/data
       - ./data/media:/usr/src/paperless/media
       - ./data/export:/usr/src/paperless/export
-      # The shared tree's one-way drop box (plan.md §219/§220), not
+      # The shared tree's one-way drop box (plan.md §219/§224), not
       # Paperless's own ./data/consume — moving a file into
       # file-browser/data/files/to-paperless/ (visible there and over Samba)
       # is the deliberate way to file it with Paperless. Ensured to exist and
