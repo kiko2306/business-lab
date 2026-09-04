@@ -314,6 +314,58 @@ router.post(
 );
 
 /**
+ * POST /api/services/:name/backup/restore
+ * Restore this app from one of its archives: stop it, put data/ back, replay
+ * the DB dump, start it. Destructive — the UI confirms before calling.
+ */
+router.post(
+  '/:name/backup/restore',
+  serviceLimiter,
+  auth,
+  requireCapability('backups:manage'),
+  validateParams(schemas.serviceNameParam),
+  validateBody(schemas.serviceBackupRestore),
+  validateServiceAllowlist,
+  async (req: Request, res: Response) => {
+    const serviceName = req.params.name;
+    const userId = req.user!.id;
+    const file = req.body.file as string;
+    try {
+      const result = await appBackup.restoreOneApp(serviceName, file, userId);
+      await writeAuditLog({
+        userId,
+        action: 'backup_restore',
+        resource: serviceName,
+        result: result.warnings.length ? 'failure' : 'success',
+        metadata: { file, warnings: result.warnings },
+      }).catch(() => {});
+      return res.json({
+        success: true,
+        ...result,
+        message: result.warnings.length
+          ? `Restored ${serviceName} with warnings — see the details.`
+          : `Restored ${serviceName} from ${file}.`,
+      });
+    } catch (error) {
+      const httpError = error as HttpError;
+      logger.error(`Per-app restore failed: ${serviceName}`, { userId, error: httpError.message });
+      await writeAuditLog({
+        userId,
+        action: 'backup_restore',
+        resource: serviceName,
+        result: 'failure',
+        metadata: { file, error: httpError.message },
+      }).catch(() => {});
+      return res.status(httpError.statusCode || 500).json({
+        error: 'Failed to restore the app',
+        service: serviceName,
+        message: httpError.message,
+      });
+    }
+  }
+);
+
+/**
  * GET /api/services/:name/backups
  * List this app's local backup archives, newest first.
  */

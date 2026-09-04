@@ -82,6 +82,10 @@ export const schemas = {
     name: serviceNameSchema.required(),
     file: backupNameSchema.required(),
   }),
+  // Body of POST /api/services/:name/backup/restore
+  serviceBackupRestore: Joi.object({
+    file: backupNameSchema.required(),
+  }),
   cloudflareTokenUpdate: Joi.object({
     token: Joi.string().trim().min(20).max(4096).required(),
   }),

@@ -386,3 +386,93 @@ export async function dumpOneApp(name: string): Promise<DumpReport> {
   logger.info('Per-app database dump finished', { app: name, ok, failed });
   return { outcomes, ok, failed };
 }
+
+/**
+ * Replay `apps/<name>/data/_dump/<name>.sql` back into the app's server
+ * database — the server-DB half of a per-app restore (services/appBackup.ts,
+ * plan.md §185 slice 3). SQLite is handled by the file restore itself
+ * (the consistent `.sqlite` snapshot copied over the live file).
+ *
+ * Mirrors `dumpServerDatabase`: a throwaway container on the same image and
+ * network as the DB, credentials read from the running container. The DB
+ * container must already be up — the caller brings it up alone before the
+ * rest of the app. Postgres replays with `psql -f` (the dump carries
+ * `--clean --if-exists`, so it drops and recreates over the existing
+ * database); MySQL/MariaDB pipe the file into the client.
+ *
+ * Never throws: returns a failed `DumpOutcome` so the caller can still bring
+ * the app back up and report what did not restore.
+ */
+export async function restoreServerDatabase(name: string): Promise<DumpOutcome> {
+  const definition = SERVICES[name];
+  const base: DumpOutcome = {
+    app: name,
+    kind: definition?.backup?.engine ?? 'postgres',
+    target: '',
+    ok: false,
+    detail: '',
+  };
+  if (!definition?.backup) {
+    return { ...base, ok: true, detail: 'no server database — nothing to replay' };
+  }
+
+  const { service, engine } = definition.backup;
+  const dumpPath = path.join(getAppsDir(), name, 'data', DUMP_DIR, `${name}.sql`);
+  base.target = dumpPath;
+  if (!fs.existsSync(dumpPath)) {
+    return { ...base, ok: false, detail: 'the archive has no _dump/<name>.sql to replay' };
+  }
+
+  const container = await findContainer(name, service);
+  if (!container) {
+    return { ...base, ok: false, detail: `${service} is not running; cannot replay the dump` };
+  }
+  const { env, image, network } = await inspectDb(container);
+  if (!network) {
+    return { ...base, ok: false, detail: 'the database container is not on a reachable network' };
+  }
+
+  let args: string[];
+  if (engine === 'postgres') {
+    const user = env.POSTGRES_USER || 'postgres';
+    const db = env.POSTGRES_DB || user;
+    args = [
+      'run', '--rm', '--network', network,
+      '-e', `PGPASSWORD=${env.POSTGRES_PASSWORD ?? ''}`,
+      '-v', `${dumpPath}:/restore.sql:ro`,
+      // --entrypoint psql for the same reason dumpServerDatabase overrides it:
+      // several images wrap the entrypoint in an init system that never runs
+      // the argument.
+      '--entrypoint', 'psql', image,
+      '-h', service, '-U', user,
+      // Keep going on individual errors — a fresh target has nothing for the
+      // DROPs to remove, exactly like the restore proof in §183.
+      '-v', 'ON_ERROR_STOP=0',
+      '-f', '/restore.sql', db,
+    ];
+  } else {
+    const user = env.MARIADB_USER || env.MYSQL_USER || 'root';
+    const password =
+      env.MARIADB_PASSWORD || env.MYSQL_PASSWORD || env.MARIADB_ROOT_PASSWORD || env.MYSQL_ROOT_PASSWORD || '';
+    const db = env.MARIADB_DATABASE || env.MYSQL_DATABASE || '';
+    if (!db) {
+      return { ...base, ok: false, detail: 'could not determine the database name from the container' };
+    }
+    args = [
+      'run', '--rm', '--network', network,
+      '-e', `MYSQL_PWD=${password}`,
+      '-e', `RH=${service}`, '-e', `RU=${user}`, '-e', `RD=${db}`,
+      '-v', `${dumpPath}:/restore.sql:ro`,
+      '--entrypoint', 'sh', image,
+      // `mysql` in mysql:8, `mariadb` in current MariaDB images (the `mysql`
+      // compat symlink is gone in 11.x). The client reads the dump from stdin.
+      '-c', 'if command -v mariadb >/dev/null 2>&1; then M=mariadb; else M=mysql; fi; exec "$M" -h "$RH" -u "$RU" "$RD" < /restore.sql',
+    ];
+  }
+
+  const result = await run('docker', args);
+  if (result.code !== 0) {
+    return { ...base, ok: false, detail: (result.stderr || 'the replay produced an error').trim().slice(0, 300) };
+  }
+  return { ...base, ok: true, detail: 'database replayed from the dump' };
+}

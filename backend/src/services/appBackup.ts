@@ -29,7 +29,8 @@ import path from 'path';
 import { APP_VERSION } from '../version';
 import { getService, resolveComposeFile } from '../config/services';
 import { withMaintenanceLock } from './maintenanceLock';
-import { dumpOneApp } from './appDumps';
+import { dumpOneApp, restoreServerDatabase } from './appDumps';
+import { startService, stopService } from './executor';
 import { runCommand, safeBackupFileName } from './backup';
 import logger from '../utils/logger';
 
@@ -350,4 +351,171 @@ export async function pruneAppBackups(name: string, keep: number): Promise<strin
     }
   }
   return deleted;
+}
+
+// ---------------------------------------------------------------------------
+// Restore (plan.md §185 slice 3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Wipe `data/` (bar the live server DB dir) and repopulate it from the
+ * archive, then copy each consistent `_dump/*.sqlite` snapshot over its live
+ * file. busybox is enough — no `apk add`, so it works with no network.
+ * `/data/db` is preserved because the server DB is restored by replaying its
+ * SQL dump into the running container, not by swapping files.
+ */
+const FILE_RESTORE_SCRIPT = `
+set -e
+rm -rf /tmp/x && mkdir /tmp/x
+tar -xzf "$ARCHIVE" -C /tmp/x
+[ -d /tmp/x/data ] || { echo "archive has no data/ directory"; exit 3; }
+find /data -mindepth 1 -maxdepth 1 ! -name db -exec rm -rf {} +
+cp -a /tmp/x/data/. /data/
+if [ -d /data/_dump ]; then
+  for snap in /data/_dump/*.sqlite; do
+    [ -e "$snap" ] || continue
+    bn=$(basename "$snap" .sqlite)
+    match=$(find /data -path /data/_dump -prune -o -type f \\( -name "$bn.sqlite" -o -name "$bn.sqlite3" -o -name "$bn.db" \\) -print | head -n1)
+    if [ -n "$match" ]; then cp "$snap" "$match"; echo "sqlite:$match"; fi
+  done
+fi
+`;
+
+/** Poll a compose service's container until its healthcheck passes, or time out. */
+async function waitForContainerHealthy(project: string, service: string, timeoutMs: number): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    try {
+      const id = (
+        await runCommand('docker', [
+          'ps',
+          '-q',
+          '-f',
+          `label=com.docker.compose.project=${project}`,
+          '-f',
+          `label=com.docker.compose.service=${service}`,
+        ])
+      ).trim().split('\n')[0];
+      if (id) {
+        const status = (
+          await runCommand('docker', ['inspect', '-f', '{{if .State.Health}}{{.State.Health.Status}}{{else}}{{.State.Running}}{{end}}', id])
+        ).trim();
+        // "healthy" for a service with a healthcheck (all the DB services
+        // here have one); "true" for one without.
+        if (status === 'healthy' || status === 'true') {
+          return true;
+        }
+      }
+    } catch {
+      /* container not up yet — keep polling */
+    }
+    await new Promise((r) => setTimeout(r, 2000));
+  }
+  return false;
+}
+
+export interface AppRestoreResult {
+  service: string;
+  file: string;
+  /** Human summary of the file-level restore. */
+  fileRestore: string;
+  /** The server-DB replay outcome, or null for a SQLite-only / data-only app. */
+  databaseRestore: AppBackupDump | null;
+  /** Non-fatal problems — the app was still brought back up. */
+  warnings: string[];
+}
+
+/**
+ * Restore one app from one of its archives: stop it, put `data/` back, replay
+ * the server DB dump (if any) into a freshly-started DB container, then bring
+ * the whole app back up. Destructive and outward-facing — the route is
+ * confirm-gated in the UI.
+ *
+ * Under the maintenance lock (can't race an update or a backup). `stopService`
+ * / `startService` are the same ones the dashboard buttons use, so exposure
+ * re-provisioning and the Home Page tile follow automatically.
+ */
+export async function restoreOneApp(name: string, file: string, userId: number): Promise<AppRestoreResult> {
+  const appDir = requireAppDir(name);
+  const archivePath = resolveAppBackupPath(name, file);
+  try {
+    await fs.access(archivePath);
+  } catch {
+    const err = new Error('Backup file not found.') as Error & { statusCode?: number };
+    err.statusCode = 404;
+    throw err;
+  }
+
+  const resolved = resolveComposeFile(name);
+  const projectName = resolved?.projectName ?? name;
+  const composeArgs = (resolved?.composeArgs ?? '').split(' ').filter(Boolean);
+  const backup = getService(name)?.backup ?? null;
+  const warnings: string[] = [];
+
+  return withMaintenanceLock(`restore:app:${name}`, async () => {
+    logger.info('Per-app restore starting', { app: name, file });
+
+    // 1. Stop the whole app (compose down).
+    await stopService(name, userId);
+
+    // 2. File restore, as root — the backend user cannot rewrite app data.
+    //    The archive lives in the backups volume (a path that only exists
+    //    inside the backend container), so mount the volume and address it by
+    //    its path within — the same reason the archive write in slice 2 mounts
+    //    the volume rather than a container-local path. `data/` is the bind-
+    //    mounted apps tree, a real host path, so that mount is direct.
+    const vol = await backupsVolumeName();
+    const archiveMount = vol
+      ? ['-v', `${vol}:/backups:ro`]
+      : ['-v', `${archivePath}:/archive.tar.gz:ro`];
+    const archiveInContainer = vol ? `/backups/apps/${name}/${file}` : '/archive.tar.gz';
+    await runCommand(
+      'docker',
+      [
+        'run',
+        '--rm',
+        '-e',
+        `ARCHIVE=${archiveInContainer}`,
+        ...archiveMount,
+        '-v',
+        `${path.join(appDir, 'data')}:/data`,
+        'alpine:latest',
+        'sh',
+        '-c',
+        FILE_RESTORE_SCRIPT,
+      ],
+      { timeout: ARCHIVE_TIMEOUT_MS }
+    );
+
+    // 3. Server DB replay: bring the DB up alone, wait for it, replay the dump.
+    let databaseRestore: AppBackupDump | null = null;
+    if (backup) {
+      await runCommand(
+        'docker',
+        ['compose', '-p', projectName, ...composeArgs, 'up', '-d', backup.service],
+        { timeout: 120_000 }
+      );
+      if (!(await waitForContainerHealthy(projectName, backup.service, 90_000))) {
+        warnings.push(`${backup.service} did not become ready in time — the database was not replayed.`);
+      } else {
+        const outcome = await restoreServerDatabase(name);
+        databaseRestore = toDump(outcome);
+        if (!outcome.ok) {
+          warnings.push(`Database replay failed: ${outcome.detail}`);
+        }
+      }
+    }
+
+    // 4. Bring the whole app back up.
+    await startService(name, userId);
+
+    logger.info('Per-app restore finished', { app: name, file, warnings });
+    return {
+      service: name,
+      file,
+      fileRestore: "data/ replaced from the archive (live 'data/db' preserved for the SQL replay)",
+      databaseRestore,
+      warnings,
+    };
+  });
 }

@@ -11,6 +11,21 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.18.0] — 2026-09-04
+
+### Added
+
+- **Per-app restore** (§185 slice 3) — `POST /api/services/:name/backup/restore`
+  `{ file }`, behind `backups:manage`: stop the app, replace its `data/` from
+  the archive (the live `data/db` server-DB dir is kept), replay the SQL dump
+  into a freshly-started DB container (§183's `psql` / `mariadb` path), then
+  bring the whole app back up. `appDumps.ts` gains `restoreServerDatabase`.
+  Warnings (e.g. a failed replay) don't stop the app coming back. Proven end
+  to end through the API on the live stack: n8n (Postgres) — 22 execution rows
+  and the workflow name rolled back, a sentinel file gone, app healthy after;
+  Vaultwarden (SQLite) — the wiped table restored from the `.sqlite` snapshot,
+  sentinel gone, app healthy.
+
 ## [0.17.0] — 2026-09-04
 
 ### Added

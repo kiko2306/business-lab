@@ -4,11 +4,15 @@ import path from 'path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const dumpOneApp = vi.fn();
+const restoreServerDatabase = vi.fn();
 const runCommand = vi.fn();
 const getService = vi.fn();
 const resolveComposeFile = vi.fn();
+const startService = vi.fn();
+const stopService = vi.fn();
 
-vi.mock('./appDumps', () => ({ dumpOneApp }));
+vi.mock('./appDumps', () => ({ dumpOneApp, restoreServerDatabase }));
+vi.mock('./executor', () => ({ startService, stopService }));
 vi.mock('./maintenanceLock', () => ({
   withMaintenanceLock: (_label: string, fn: () => Promise<unknown>) => fn(),
 }));
@@ -32,7 +36,11 @@ beforeEach(async () => {
   vi.spyOn(process, 'cwd').mockReturnValue(root);
   vi.resetModules();
 
-  for (const fn of [dumpOneApp, runCommand, getService, resolveComposeFile]) fn.mockReset();
+  for (const fn of [dumpOneApp, restoreServerDatabase, runCommand, getService, resolveComposeFile, startService, stopService])
+    fn.mockReset();
+  startService.mockResolvedValue({ success: true });
+  stopService.mockResolvedValue({ success: true });
+  restoreServerDatabase.mockResolvedValue({ app: 'nocodb', kind: 'postgres', target: '', ok: true, detail: 'database replayed from the dump' });
 
   // Real source dirs so backupOneApp's `data/` existence check passes.
   for (const name of ['nocodb', 'vaultwarden']) {
@@ -262,5 +270,75 @@ describe('pruneAppBackups', () => {
   it('does nothing when under the limit', async () => {
     writeArchive('nocodb', 'a.tar.gz', 10);
     expect(await mod.pruneAppBackups('nocodb', 5)).toEqual([]);
+  });
+});
+
+describe('restoreOneApp', () => {
+  const FILE = 'nocodb-2026-01-01T00-00-00-000Z.tar.gz';
+
+  // `docker inspect` is used for two things: the backups-volume probe (has
+  // `/app/backups` in the format string) and the container health probe.
+  const restoreRun = async (cmd: string, args: string[]): Promise<string> => {
+    if (cmd !== 'docker') return '';
+    if (args[0] === 'inspect' && args.join(' ').includes('/app/backups')) return ''; // no volume -> dev path
+    if (args[0] === 'inspect') return 'healthy\n'; // container health
+    if (args[0] === 'ps') return 'deadbeef\n';
+    return '';
+  };
+
+  beforeEach(() => {
+    writeArchive('nocodb', FILE, 1, { app: 'nocodb' });
+    writeArchive('vaultwarden', 'vaultwarden-x.tar.gz', 1, { app: 'vaultwarden' });
+    runCommand.mockImplementation(restoreRun);
+  });
+
+  it('stops, restores files, replays the DB, then starts — in that order', async () => {
+    const order: string[] = [];
+    stopService.mockImplementation(async () => void order.push('stop'));
+    startService.mockImplementation(async () => void order.push('start'));
+    restoreServerDatabase.mockImplementation(async () => {
+      order.push('replay');
+      return { app: 'nocodb', kind: 'postgres', target: '', ok: true, detail: 'ok' };
+    });
+    runCommand.mockImplementation(async (cmd: string, args: string[]) => {
+      if (cmd === 'docker' && args[0] === 'run') order.push('files');
+      if (cmd === 'docker' && args[0] === 'compose') order.push('db-up');
+      return restoreRun(cmd, args);
+    });
+
+    const res = await mod.restoreOneApp('nocodb', FILE, 1);
+
+    expect(order).toEqual(['stop', 'files', 'db-up', 'replay', 'start']);
+    expect(res.warnings).toEqual([]);
+    expect(res.databaseRestore).toMatchObject({ kind: 'postgres' });
+
+    const runCall = runCommand.mock.calls.find(([c, a]) => c === 'docker' && a[0] === 'run');
+    const a = runCall![1];
+    expect(a.some((x: string) => x.endsWith(`/${FILE}:/archive.tar.gz:ro`))).toBe(true);
+    expect(a.some((x: string) => x === `${srcAppDir('nocodb')}/data:/data`)).toBe(true);
+    expect(a).toContain('ARCHIVE=/archive.tar.gz');
+  });
+
+  it('skips the DB replay for a data-only / SQLite app', async () => {
+    await mod.restoreOneApp('vaultwarden', 'vaultwarden-x.tar.gz', 1);
+    expect(restoreServerDatabase).not.toHaveBeenCalled();
+    expect(runCommand.mock.calls.some(([c, a]) => c === 'docker' && a[0] === 'compose')).toBe(false);
+    expect(startService).toHaveBeenCalled();
+  });
+
+  it('still brings the app back up, with a warning, when the replay fails', async () => {
+    restoreServerDatabase.mockResolvedValue({ app: 'nocodb', kind: 'postgres', target: '', ok: false, detail: 'connection refused' });
+    const res = await mod.restoreOneApp('nocodb', FILE, 1);
+    expect(res.warnings).toEqual(['Database replay failed: connection refused']);
+    expect(startService).toHaveBeenCalled();
+  });
+
+  it('404s on a missing archive, without stopping the app', async () => {
+    await expect(mod.restoreOneApp('nocodb', 'nocodb-nope.tar.gz', 1)).rejects.toMatchObject({ statusCode: 404 });
+    expect(stopService).not.toHaveBeenCalled();
+  });
+
+  it('rejects a traversal file name', async () => {
+    await expect(mod.restoreOneApp('nocodb', '../evil', 1)).rejects.toThrow(/Invalid backup/);
   });
 });

@@ -15082,3 +15082,70 @@ in-process fallback. Suite 499. No route-layer test — thin handlers over the
 tested service, no HTTP harness in this project (§176 precedent).
 
 Minor bump 0.16.1 → 0.17.0 (new API surface).
+
+## 188. §185 slice 3 — per-app restore (2026-09-04)
+
+`POST /api/services/:name/backup/restore` `{ file }` → `appBackup.restoreOneApp`,
+behind `backups:manage`. Body validated by `schemas.serviceBackupRestore`.
+Audit row `backup_restore`, `resource: <serviceName>`, `metadata.warnings`.
+
+### `restoreOneApp(name, file, userId)`, under the maintenance lock
+
+1. **`stopService`** — the same one the dashboard button uses (`compose down`),
+   so exposure teardown / Home Page follow.
+2. **File restore in a root alpine container**: `tar -xzf` the archive to a
+   scratch dir, `find /data -mindepth 1 -maxdepth 1 ! -name db -exec rm -rf`
+   then `cp -a` the archive's `data/.` back. `data/db` (the live server-DB
+   directory) is deliberately kept — the server DB is restored by replaying
+   its SQL dump, not by swapping files. Then for each `data/_dump/*.sqlite`,
+   `cp` the consistent snapshot over the live file it matches by basename.
+   Root because the backend user cannot rewrite app data (slice 2's finding).
+3. **Server-DB replay** (`backup.engine` set): `docker compose … up -d
+   <db-service>` alone, poll its healthcheck (`docker inspect …
+   .State.Health.Status`), then `appDumps.restoreServerDatabase` — a throwaway
+   container on the DB's image/network, `psql -f /restore.sql` (the dump
+   carries `--clean --if-exists`) or `mysql`/`mariadb < /restore.sql`, creds
+   read from the running container. The `mysql`-vs-`mariadb` binary name is
+   picked at run time (`command -v mariadb`), since the `mysql` compat symlink
+   is gone from MariaDB 11.
+4. **`startService`** — full app back up.
+
+A failed replay or a DB that never goes healthy is a **warning**, not a
+failure: the app is still brought back up. `databaseRestore` is `null` for a
+SQLite-only / data-only app.
+
+### Two bugs found while proving it
+
+- **`tar: invalid magic`** on the first live call. `restoreOneApp` mounted the
+  archive as `-v ${archivePath}:/archive.tar.gz` — but `archivePath`
+  (`/app/backups/apps/<name>/<file>`) only exists *inside the backend
+  container*; `docker run -v` resolves paths on the **host**, so the bind
+  created an empty file. Same lesson as slice 2's archive write: mount the
+  backups **volume** (`-v <vol>:/backups:ro`) and address the archive by its
+  path within it. The `data/` mount stays a direct host path — the apps tree
+  is bind-mounted at the same absolute path host and container.
+- The health-probe format string `{{if .State.Health}}…{{else}}{{.State.Running}}{{end}}`
+  needed the `else` branch for DB images without a healthcheck (none here, but
+  defensive).
+
+### Verified end to end through the authenticated API on the live stack
+
+- **n8n (Postgres)**: backed up (1 workflow, 22 `execution_entity`). Mutated —
+  deleted all executions, renamed the workflow to "MUTATED BEFORE RESTORE",
+  dropped a sentinel file into `data/n8n/`. `POST …/n8n/backup/restore` (39 s,
+  no warnings). After: **22** executions, workflow name **"CrowdSec alert
+  relay (managed)"**, 129 tables, **sentinel gone**, all three n8n containers
+  healthy, `/healthz` `{"status":"ok"}`.
+- **Vaultwarden (SQLite)**: backed up (1 user, 1 cipher). Mutated —
+  `delete from ciphers`, sentinel file. Restore (5 s, `databaseRestore: null`,
+  no warnings). After: **1** cipher again (from the `_dump/db.sqlite` snapshot
+  copied over the live file), sentinel gone, container healthy.
+- Unit: `appBackup.test.ts` +5 (25) — the stop→files→db-up→replay→start order,
+  the SQLite/data-only skip, warning-on-replay-failure, 404 on a missing
+  archive (without stopping the app), traversal name. Suite 504.
+
+Smoke archives + audit rows removed after; the dev box is back to its
+pre-test state (no-guarantees box regardless).
+
+Minor bump 0.17.0 → 0.18.0 (new API surface). The backend loop (backup +
+restore) is complete; slice 4 is the UI.
