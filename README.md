@@ -207,7 +207,7 @@ it is done — not ticked off and left behind. Section references point at
 Updates:
 
 - [ ] **@mat: apply the self-update panel's infra changes and prove it live**
-      (§131.4, §198) — the panel itself is built and gated to
+      (§131.4, §198, §199) — the panel itself is built and gated to
       `webmaster`/`admin` (`system:update`), but its `docker-compose.yml`
       changes (`REPO_ROOT` mount, `BUILD: 1` on `docker-socket-proxy`) and
       `backend/Dockerfile`'s new `git` dependency have not been applied to
@@ -215,7 +215,12 @@ Updates:
       `frontend` individually once, then click "Update now" on `/updates`
       for real and confirm the whole walk (fetch → pull → build →
       restart-frontend → restart-backend → reconnect) end to end, plus that
-      a `user`-role account gets 403 and no nav entry.
+      a `user`-role account gets 403 and no nav entry. While recreating
+      `backend`, also confirm `docker-entrypoint.sh`'s new chown of
+      `apps/authelia/config/{configuration,users_database}.yml` actually
+      takes on the real container (§199 only proved it in an isolated
+      throwaway container, then unblocked tonight's Guacamole proof with a
+      by-hand `chown` that this recreate makes redundant).
 
 Infrastructure:
 
@@ -347,11 +352,11 @@ Strategy:
       life-safety), and prove a start + backup/restore round-trip.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
-- [ ] **@mat: change Guacamole's default login** (§84.1a) — it ships as
-      `guacadmin`/`guacadmin` and is on the LAN the moment it starts.
-- [ ] **Expose Guacamole with Authelia in front** (§84.1a) — it is LAN-only
-      today. There is no agent to break on a forward-auth redirect, so unlike
-      MeshCentral it can simply sit behind Authelia.
+- [ ] **@mat: change Guacamole's default login** (§84.1a, §199) — it still
+      ships as `guacadmin`/`guacadmin`. Now more urgent than "on the LAN":
+      Guacamole is exposed at `guacamole.tx-home-utils.com` behind Authelia
+      as of §199, so a compromised Authelia session (or an admin-group
+      account) reaches a default-credentialed RDP/VNC/SSH gateway.
 - [ ] **MeshCentral** (§62.2) — still wanted, for client endpoints that will
       not join the overlay. `TLSOffload` + `certUrl` for the agent cert hash.
 - [ ] **Pre-built n8n workflows** (§64, §118.3) — ship useful workflows rather

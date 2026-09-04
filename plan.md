@@ -15863,3 +15863,74 @@ not do. Added to the README TODO as the follow-up: apply the infra changes,
 then click "Update now" for real and confirm the whole walk (fetch → pull →
 build → restart-frontend → restart-backend → reconnect) end to end, plus
 that a `user`-role account gets 403 and no nav entry.
+
+## 199. §84.1a — Guacamole exposed behind Authelia, and a real permission bug found along the way
+
+Turned on exposure + the Authelia-protected checkbox for Guacamole on the
+live dashboard. No registry/exposure code was needed — `autheliaProtected` is
+already a generic per-exposure toggle (`backend/src/services/exposure.ts`,
+`npmClient.ts`), and Guacamole had no special disqualification, exactly as
+§84.1a's note ("no agent to break on a forward-auth redirect") predicted.
+
+**What the first attempt actually surfaced**: the toggle silently failed to
+gate anything. Exposure itself (NPM proxy host + Cloudflare Tunnel route +
+DNS record) provisioned fine, but the Authelia `access_control` rule never
+got written — `autheliaAccessControl.ts`'s `fs.writeFileSync` on
+`apps/authelia/config/configuration.yml` hit `EACCES`, logged but not
+surfaced to the UI (the exposure API's contract is "never blocks a Docker
+start" — see `provisionHostname`'s doc comment — so a downstream Authelia
+sync failure doesn't fail the request). The dashboard reported success; the
+app was actually reachable with no gate.
+
+**Root cause**: `configuration.yml` and `users_database.yml` are the only
+two files outside `apps/<name>/.env` that the backend writes into directly
+(`autheliaAccessControl.ts`, `autheliaUsers.ts`), and both start life created
+by `start.sh` on first run (`cp *.example`) — so they're owned by the host
+user, not `appuser` (uid 100 in the backend container). `docker-entrypoint.sh`
+already chowns each `apps/<name>/` dir shell plus its `.env`/`.env.example`
+for exactly this reason (host-created, container-written), but never
+extended that to authelia's two config files. `users_database.yml` happened
+to still be group-writable from some earlier by-hand fix; `configuration.yml`
+wasn't, which is why this had never been caught — every previous
+Authelia-protected app (bookstack, wetty, code-server, netbird-vpn, NPM)
+happened to get exposed after whatever earlier session fixed that file's
+group, or the write silently failed then too and nobody checked
+`configuration.yml` against what was actually running.
+
+**Fix**: `backend/docker-entrypoint.sh` now chowns both files (if present)
+to `appuser:appgroup` alongside the existing `.env` loop, so a fresh clone —
+where `start.sh` creates them as the host user before the backend container
+ever runs — self-heals on every container start rather than needing a
+by-hand `chown` (§0 principle 3).
+
+**Verified live**: built the new image (`docker build ./backend`), proved
+the chown in an isolated throwaway container (`docker run --rm` with the
+same `APPS_DIR` mount, overriding the entrypoint's CMD to check
+`su-exec appuser test -w ...` — deliberately *not* recreating the live
+`homelab-management-backend-1`, since that requires the still-unapplied
+`REPO_ROOT` mount from §198 and this shouldn't get tangled up with that
+separate pending task). Confirmed both files chown from host-owned to
+`appuser:appgroup` inside the test container.
+
+To unblock proving the actual feature today without waiting on §198's
+container recreate, `chown 100:101` was run by hand against the live files
+(the sanctioned diagnostic path — CLAUDE.md's "fixing something by hand is a
+diagnostic, never a fix": the code fix already exists and will reapply
+itself on the next real recreate; the by-hand chown only unblocks tonight's
+proof). Re-saving the exposure then logged
+`Authelia access_control (exposure_change): wrote 6 rule(s); restarting
+Authelia to apply`, and `apps/authelia/config/configuration.yml` now carries
+a `guacamole.tx-home-utils.com` rule (`one_factor`, `group:admins` /
+`group:app-guacamole`).
+
+End-to-end proof: `curl -sSI https://guacamole.tx-home-utils.com/` returns
+`HTTP/2 302` with `location: https://authelia.tx-home-utils.com/?rd=...` —
+the forward-auth gate is live, through the real tunnel, not just configured.
+`dig` against a nonexistent subdomain on the same zone returns nothing,
+ruling out a wildcard record as the explanation.
+
+Still open: the entrypoint fix itself hasn't been proven against the *live*
+container yet (only an isolated throwaway one) — folded into the existing
+§198 "recreate backend/docker-socket-proxy/frontend" TODO rather than a
+new item, since it's the same recreate. The by-hand `chown` done tonight
+will be redundant, not undone, once that happens.

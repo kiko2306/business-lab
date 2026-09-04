@@ -28,6 +28,20 @@ fi
 # self-update panel (§131.4) needs this exemption for its `git pull`
 # against the REPO_ROOT mount, which start.sh keeps group-writable for
 # DOCKER_GID the same way it does for APPS_DIR.
+# start.sh (run by the host user on first run) creates these two from their
+# .example templates, so they start out owned by the host user rather than
+# appuser. Everything else the backend rewrites in place lives under
+# apps/<name>/.env (handled above) or apps/<name>/data/ (owned by the app's
+# own container) — these two are the only host-created files outside data/
+# that the backend also writes into directly (autheliaAccessControl.ts,
+# autheliaUsers.ts), so a stale host-owned copy 403s every such write with
+# EACCES until the next `chown` happens to touch it.
+if [ -n "${APPS_DIR:-}" ] && [ -d "$APPS_DIR/authelia/config" ]; then
+  for f in configuration.yml users_database.yml; do
+    [ -f "$APPS_DIR/authelia/config/$f" ] && chown appuser:appgroup "$APPS_DIR/authelia/config/$f" 2>/dev/null || true
+  done
+fi
+
 if [ -n "${REPO_ROOT:-}" ] && [ -d "$REPO_ROOT/.git" ]; then
   su-exec appuser git config --global --add safe.directory "$REPO_ROOT" 2>/dev/null || true
 fi
