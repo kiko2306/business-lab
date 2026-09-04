@@ -345,17 +345,26 @@ Strategy:
       until this closes, no app's own login is safely droppable in favor
       of "Authelia-only" — the LAN-direct path has no gate at all without
       it (code-server keeps its own login for exactly this reason today).
-- [ ] **Audit which Authelia-protected apps still show their own login**
-      (§210.2) — double-login (Authelia's gate, then the app's own form)
-      is only actually fixed for one app so far (Dozzle, via
-      `DOZZLE_AUTH_PROVIDER: none`) plus Guacamole in progress (§200 slice
-      4). The other ~30 exposed apps haven't been checked one by one for
-      whether they show a native login at all, or have an equivalent
-      "trust the proxy" knob. Blocked on §180 for any app whose own login
-      turns out to be load-bearing on the LAN-direct path (code-server is
-      — kept deliberately, §93); Vaultwarden's master password is never a
-      candidate regardless — it's the vault's encryption key check, not a
-      redundant gate.
+- [ ] **Wire up the "trust the proxy" knobs the §210.2 audit found** (§216)
+      — seven apps ship a real, upstream-supported way to stop showing
+      their own login on top of Authelia's, the same shape as the
+      already-fixed Dozzle/Guacamole: File Browser (`auth.method=proxy`),
+      Paperless-ngx (`PAPERLESS_ENABLE_HTTP_REMOTE_USER` — upstream has an
+      open bug report of this misbehaving behind nginx specifically, verify
+      before wiring), Beszel (trusted-proxy header + `DISABLE_PASSWORD_AUTH`),
+      Stirling-PDF (`SECURITY_ENABLELOGIN=false`), Uptime Kuma (Settings →
+      Security → Disable Auth), Nextcloud (`user_saml`'s "Environment
+      mode"), Home Assistant (`trusted_networks`/`trusted_proxies` — IP-based,
+      weaker, lower priority). Each needs its own config change and its own
+      live proof; Nextcloud and Home Assistant's fixes probably also want a
+      §180 conversation about whether the LAN-direct bypass matters for that
+      specific app first. Vikunja/Mealie/NocoDB/Homebox/BookStack/Immich
+      have OIDC/SAML support that could point at Authelia's own provider,
+      but that adds a second-screen *option* rather than removing the first
+      screen — a bigger lift, only worth it if this is ever prioritized.
+      ITFlow, NPM's own admin UI, Pi-hole, Kopia, WAHA, n8n (Enterprise-only
+      SSO) and Jellyfin (core has no header-trust, only a community plugin)
+      have no known fix — parked, not blocked on anything actionable.
 - [ ] **A VPN/overlay-only flag for sensitive apps** (§210.3) — distinct
       from the existing `lanOnly` (`services.ts`), which means "this
       protocol can't physically be tunneled" (Samba/SMB) and is enforced

@@ -16835,3 +16835,100 @@ ops), each row's "what it does" drawn from the app's own `homepage.description`
 compose label. Linked from the README docs list. TODO item deleted.
 
 Docs only — no version bump.
+
+## 216. §210.2 — audited all ~30 Authelia-protected apps for a native login
+
+The double-login audit the README item called for: every non-infra app
+behind Authelia's forward-auth gate (everything except `home-page`, which
+skips protection deliberately), checked one by one for whether it still
+shows its own login on top of Authelia's, and whether it has a real "trust
+the proxy" knob. 30 apps matches the item's own "~30" estimate exactly —
+38 registered minus `authelia`/`home-page` minus the four with no web UI at
+all (`clamav`, `crowdsec`, `tailscale`, `samba`).
+
+Method: live `curl` against each app's LAN-direct port (docs/ports.md) for
+apps where a login page is visible in the HTML; upstream docs/GitHub issues
+for the ones behind a JS SPA shell (curl on the raw HTML can't see a
+client-rendered login form) and for what "trust the proxy" options each
+project actually ships, not just discusses.
+
+### Already closed, no action needed
+
+- **Dozzle** — fixed already (`DOZZLE_AUTH_PROVIDER: none`).
+- **Guacamole** — in progress (§200 slice 4, `guacamole-auth-header`).
+- **NetBird VPN** — already delegates fully to Authelia's own OIDC provider
+  (`dependsOn: ['authelia']` in services.ts, confirmed in the compose
+  comments) — no native login shown at all. Nothing to do.
+- **Pantry, Price Compare, Kitchen Switcher** — custom-built apps in this
+  repo with no auth code and no `AUTH`/`LOGIN`/`PASSWORD` env var in their
+  compose files. Confirmed by `curl`: no login markers. Authelia's gate is
+  already the only gate.
+- **Ntfy** — ships with auth disabled by default and this stack never sets
+  `NTFY_ENABLE_LOGIN`/`NTFY_AUTH_FILE`. Confirmed by `curl`: no login shown.
+- **OnlyOffice** — `hideFromHomePage: true`; nobody opens it directly, it's
+  JWT-secured traffic between Nextcloud and the editor container. Not a
+  user-facing login to begin with — out of scope for this audit.
+
+### Kept deliberately (not a candidate)
+
+- **Code-server**, **Wetty** — full shell/SSH access; the app's own login
+  is the real gate on the LAN-direct path (§180 not yet closed), same
+  reasoning as §93.
+- **Vaultwarden** — master password is the vault's encryption-key check,
+  not a redundant auth screen. Never a candidate regardless of §180.
+
+### Real "trust the proxy" knob exists — good candidates for a future fix
+
+Same shape as Dozzle/Guacamole: an upstream-shipped, documented mechanism,
+not a hack.
+
+| App | Mechanism |
+|---|---|
+| File Browser | `auth.method=proxy` + `auth.header=<name>` — reads the username straight from a header the reverse proxy sets |
+| Paperless-ngx | `PAPERLESS_ENABLE_HTTP_REMOTE_USER` (+ `PAPERLESS_HTTP_REMOTE_USER_HEADER_NAME`) — same shape, but upstream has an open, unresolved bug report of it misbehaving specifically behind an nginx-family proxy (this stack's NPM is one) — verify before wiring, don't assume it just works |
+| Beszel | Reads the authenticated user's email from a configurable HTTP header when the request comes from a trusted reverse proxy; `DISABLE_PASSWORD_AUTH=true` turns off the local form entirely |
+| Stirling-PDF | `SECURITY_ENABLELOGIN=false` — turns its login off entirely, leaving Authelia as the only gate |
+| Uptime Kuma | In-app Settings → Security → "Disable Auth", built for exactly this reverse-proxy scenario |
+| Nextcloud | The official `user_saml` app's "Environment mode" reads the user from a header an authenticating reverse proxy sets (not a real SAML flow) |
+| Home Assistant | `trusted_networks`/`trusted_proxies` auth provider bypasses login by source IP — weaker than header trust (bypass sessions don't persist a cookie, and auto-select needs exactly one user per network), so lower priority |
+
+### OIDC/SAML exists, but doesn't remove the second screen by itself
+
+These support logging in against Authelia's own OIDC/SAML provider, but
+(unlike the header-trust group above) that adds an *option* next to the
+local form rather than replacing it — a true single-screen result needs the
+local form disabled too, which most of these support as a separate setting.
+Real, supported paths, just a bigger lift than the table above:
+
+- **Vikunja** — OIDC native, Authelia publishes a matching integration guide.
+- **Mealie** — OIDC v2 native.
+- **NocoDB** — OIDC native and free (SAML is the enterprise-only one).
+- **Homebox** — OIDC native (`HBOX_OIDC_ENABLED`).
+- **BookStack** — SAML2/OIDC/LDAP native; header-trust itself is only a
+  requested, unbuilt feature.
+- **Immich** — OIDC native, but the maintainers have explicitly said they
+  will not add header-trust — OIDC is the only path here, ever.
+
+### No known mechanism found — double-login stays, no easy fix
+
+- **n8n** — SAML/OIDC is Enterprise-licence-only; the only "free" path is an
+  unsupported custom external-hook hack, not a real option.
+- **Jellyfin** — a community SSO plugin exists (not core); header-trust is
+  an open, unresolved core feature request.
+- **ITFlow, Nginx Proxy Manager (its own admin UI), Pi-hole, Kopia, WAHA** —
+  no SSO or header-trust mechanism found in any of the five. Kopia's is HTTP
+  Basic auth (a browser credential popup, stacking with Authelia's page
+  rather than a form on the page); WAHA's is a bearer API token, not really
+  a "login form" in the same sense the others are.
+
+### Not done here
+
+No config changed — this was the audit itself. The real "trust the proxy"
+group (File Browser, Paperless-ngx, Beszel, Stirling-PDF, Uptime Kuma,
+Nextcloud, Home Assistant) is real follow-on work — each needs its own
+config change, its own live proof, and for a couple of them (Nextcloud,
+Home Assistant) probably its own §180 conversation about whether the
+LAN-direct bypass matters for that specific app. New README item added
+rather than expanding this one, since §210.2 itself — the audit — is done.
+
+Docs only — no version bump.
