@@ -104,7 +104,7 @@ export const schemas = {
     retentionCount: Joi.number().integer().min(1).max(365).required(),
   }),
   backupTarget: Joi.object({
-    kind: Joi.string().valid('disk', 'smb', 'nfs').required(),
+    kind: Joi.string().valid('disk', 'smb', 'nfs', 's3').required(),
     path: Joi.string().trim().max(500).allow('').optional(),
     server: Joi.string().trim().max(255).allow('').optional(),
     share: Joi.string().trim().max(500).allow('').optional(),

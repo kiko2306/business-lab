@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.30.0] — 2026-09-04
+
+### Added
+
+- A Kopia-native S3-compatible backup destination (AWS S3, MinIO, B2, Wasabi, …), alongside disk/SMB/NFS
+
 ## [0.29.0] — 2026-09-04
 
 ### Changed

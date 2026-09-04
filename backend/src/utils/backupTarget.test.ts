@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BackupTarget, toKopiaRepositoryMount, toMountSpec, validateTarget } from './backupTarget';
+import { BackupTarget, toKopiaRepositoryMount, toMountSpec, toS3ConnectArgs, validateTarget } from './backupTarget';
 
 const base: BackupTarget = {
   kind: 'disk', path: '', server: '', share: '', username: '', password: '',
@@ -31,6 +31,29 @@ describe('toMountSpec', () => {
     const spec = toMountSpec({ ...base, kind: 'smb', server: 'h', share: 's', username: 'u', options: 'vers=2.1' });
     expect(spec.o.match(/vers=/g)).toHaveLength(1);
   });
+
+  it('refuses an s3 target — there is no mount for it, use toS3ConnectArgs', () => {
+    expect(() => toMountSpec({ ...base, kind: 's3', share: 'bucket', username: 'ak', password: 'sk' })).toThrow();
+  });
+});
+
+describe('toS3ConnectArgs', () => {
+  it('maps the shared form fields onto their s3 meaning', () => {
+    expect(toS3ConnectArgs({
+      ...base, kind: 's3', share: 'my-bucket', server: 'minio.lan:9000',
+      username: 'accesskey', password: 'secretkey', options: '--region=us-east-1 --disable-tls',
+    })).toEqual({
+      bucket: 'my-bucket',
+      endpoint: 'minio.lan:9000',
+      accessKeyId: 'accesskey',
+      secretAccessKey: 'secretkey',
+      extraArgs: '--region=us-east-1 --disable-tls',
+    });
+  });
+
+  it('leaves endpoint blank to mean AWS S3 itself', () => {
+    expect(toS3ConnectArgs({ ...base, kind: 's3', share: 'b', username: 'a', password: 'p' }).endpoint).toBe('');
+  });
 });
 
 describe('toKopiaRepositoryMount', () => {
@@ -59,5 +82,15 @@ describe('validateTarget', () => {
     expect(validateTarget({ ...base, kind: 'nfs', server: '' })).toMatch(/hostname or IP/);
     expect(validateTarget({ ...base, kind: 'smb', server: 'h', share: 's', username: '' })).toMatch(/username/);
     expect(validateTarget({ ...base, kind: 'smb', server: 'h', share: 's', username: 'u' })).toBeNull();
+  });
+
+  it('requires a bucket and an access key for s3, but not an endpoint (blank = AWS)', () => {
+    expect(validateTarget({ ...base, kind: 's3', share: '' })).toMatch(/bucket/);
+    expect(validateTarget({ ...base, kind: 's3', share: 'b', username: '' })).toMatch(/access key/);
+    expect(validateTarget({ ...base, kind: 's3', share: 'b', username: 'ak' })).toBeNull();
+  });
+
+  it('does not reject a comma in an s3 secret key — no comma-joined mount options to corrupt', () => {
+    expect(validateTarget({ ...base, kind: 's3', share: 'b', username: 'ak', password: 'has,a,comma' })).toBeNull();
   });
 });

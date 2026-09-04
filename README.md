@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.29.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.30.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -309,14 +309,13 @@ Strategy:
 ### Roster changes (§81)
 
 
-- [ ] **A Kopia-native remote backend** (§81.5, §194, §197) — disk/SMB/NFS
-      translate into Kopia's `/repository` volume; that's the only destination
-      family left now that Duplicati (and its Google Drive / FTP support) is
-      gone (§197). Kopia has no plain-FTP backend, and its `gdrive` backend
-      needs a GCP service-account JSON, not an OAuth AuthID. Add a
-      Kopia-native remote option — S3 / B2 / SFTP / `gdrive` — with its own
-      credential fields, so a non-mounted destination can be real offsite for
-      Kopia too, not a local fallback.
+- [ ] **B2/SFTP/gdrive as further Kopia-native remotes** (§81.5, §194, §197,
+      §221) — s3 is done (§221): a Kopia-native remote (no Docker mount,
+      Kopia talks to the bucket directly), covering AWS S3 and any
+      S3-compatible endpoint (MinIO, B2, Wasabi, …). Native B2 (Backblaze's
+      own non-S3-compatible API), SFTP and `gdrive` (needs a GCP
+      service-account JSON, not an OAuth AuthID) are still open if a
+      destination that isn't S3-shaped is ever wanted.
 ### Exposure and platform
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node

@@ -27,6 +27,19 @@ services:
       KOPIA_SERVER_USERNAME: kopia
       KOPIA_SERVER_PASSWORD: ${KOPIA_SERVER_PASSWORD}
       KOPIA_SERVER_CONTROL_PASSWORD: ${KOPIA_SERVER_CONTROL_PASSWORD}
+      # Which repository entrypoint.sh connects to — filesystem (the
+      # /repository mount below) or s3 (a Kopia-native remote, no mount at
+      # all, plan.md §221). Written by services/kopiaTargetApply.ts.
+      BACKUP_REPO_KIND: ${BACKUP_REPO_KIND:-filesystem}
+      BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
+      # Blank connects to AWS S3 itself; set for MinIO/B2/Wasabi/any other
+      # S3-compatible endpoint.
+      BACKUP_S3_ENDPOINT: ${BACKUP_S3_ENDPOINT:-}
+      BACKUP_S3_ACCESS_KEY_ID: ${BACKUP_S3_ACCESS_KEY_ID:-}
+      BACKUP_S3_SECRET_ACCESS_KEY: ${BACKUP_S3_SECRET_ACCESS_KEY:-}
+      # Raw extra `kopia repository connect s3` flags, e.g. `--region=us-east-1`
+      # or `--disable-tls` for a plain-HTTP endpoint. Appended verbatim.
+      BACKUP_S3_EXTRA_ARGS: ${BACKUP_S3_EXTRA_ARGS:-}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Kopia"
@@ -41,13 +54,15 @@ services:
       - ./data/config:/app/config
       - ./data/cache:/app/cache
       - ./data/logs:/app/logs
-      # Where the Kopia repository lives. The dashboard's Backup destination
-      # (Settings) is translated into a three-option local-driver volume by
-      # services/kopiaTargetApply.ts and written to this app's .env. The
-      # default is a local directory — on the SAME DISK as the data it
-      # protects, so set a real destination before relying on it. Only
-      # disk/SMB/NFS are supported today; a Kopia-native remote (S3/B2/SFTP/
-      # gdrive) is a separate, still-open task (plan.md §194).
+      # Where the Kopia repository lives when BACKUP_REPO_KIND=filesystem
+      # (disk/SMB/NFS — a three-option local-driver volume, translated by
+      # services/kopiaTargetApply.ts). Still declared even for an s3 target:
+      # a compose volume can't be conditional, so it falls back to the same
+      # local default and just goes unused (entrypoint.sh never reads
+      # /repository in that case). The default is a local directory — on the
+      # SAME DISK as the data it protects, so set a real destination before
+      # relying on it. B2/SFTP/gdrive are still open (plan.md §194); s3
+      # covers most on-prem/NAS object storage too (MinIO, etc), not just AWS.
       - backup-target:/repository
       # The managed apps/ tree (per-app data + .env) mounted read-only as the
       # backup source, so Kopia has something to snapshot out of the box.

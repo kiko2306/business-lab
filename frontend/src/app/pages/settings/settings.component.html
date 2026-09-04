@@ -334,6 +334,7 @@
         <option value="disk">Another disk on this machine</option>
         <option value="smb">Network drive (SMB / Windows share)</option>
         <option value="nfs">NAS (NFS export)</option>
+        <option value="s3">S3-compatible bucket (AWS S3, MinIO, B2, Wasabi…)</option>
       </select>
     </div>
 
@@ -382,6 +383,45 @@
         <div class="form-text">
           Only needed for unusual setups. SMB defaults to version 3.0 — older
           NAS boxes may need <code>vers=2.1</code> or <code>vers=1.0</code>.
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- S3-compatible bucket -->
+    <ng-container *ngIf="backupTargetForm.controls.kind.value === 's3'">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="backupServer">
+          Endpoint <span class="fw-normal text-body-secondary">(optional)</span>
+        </label>
+        <input id="backupServer" type="text" class="form-control" formControlName="server"
+               placeholder="minio.lan:9000" autocomplete="off" />
+        <div class="form-text">Leave blank to connect to AWS S3 itself.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="backupShare">Bucket</label>
+        <input id="backupShare" type="text" class="form-control" formControlName="share"
+               placeholder="my-backup-bucket" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="backupUser">Access key ID</label>
+        <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="backupPassword">Secret access key</label>
+        <input id="backupPassword" type="password" class="form-control" formControlName="password"
+               [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+               autocomplete="new-password" />
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold" for="backupOptions">
+          Extra connection flags <span class="fw-normal text-body-secondary">(optional)</span>
+        </label>
+        <input id="backupOptions" type="text" class="form-control" formControlName="options"
+               placeholder="--region=us-east-1 --disable-tls" autocomplete="off" />
+        <div class="form-text">
+          Passed straight to Kopia's <code>repository connect s3</code>.
+          <code>--disable-tls</code> for a plain-HTTP endpoint (a LAN MinIO,
+          say); <code>--region=…</code> if your endpoint needs one.
         </div>
       </div>
     </ng-container>

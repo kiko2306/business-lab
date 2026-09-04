@@ -500,8 +500,9 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
     return res.json({
       message: applied.detail,
       restarted: applied.restarted,
-      mount: toMountSpec(target),
-      kopiaRepository: toKopiaRepositoryMount(target),
+      // No Docker mount at all for an s3 target (§221) — toMountSpec throws
+      // for that kind on purpose, so it's simply omitted here.
+      ...(target.kind === 's3' ? {} : { mount: toMountSpec(target), kopiaRepository: toKopiaRepositoryMount(target) }),
     });
   } catch {
     return res.status(500).json({ error: 'Unable to save the backup destination.' });
@@ -521,7 +522,7 @@ router.post('/backup-target/test', async (_req: Request, res: Response) => {
     return res.status(400).json({ error: problem });
   }
 
-  const result = await testBackupTarget(toMountSpec(target));
+  const result = await testBackupTarget(target);
   return res.status(result.success ? 200 : 400).json(result);
 });
 

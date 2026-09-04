@@ -1,26 +1,36 @@
 /**
- * Where backups are written: another disk, a NAS, or a network drive.
+ * Where backups are written: another disk, a NAS, a network drive, or (§221)
+ * an S3-compatible bucket Kopia talks to directly.
  *
  * The whole point is that a backup living on the same disk as the data does
  * not survive the failure that matters most.
  *
- * The three supported types are expressed as ONE volume shape, because
- * Docker's local driver takes the same three options for each:
+ * `disk`/`smb`/`nfs` are expressed as ONE volume shape, because Docker's
+ * local driver takes the same three options for each:
  *
  *   disk  type=none  o=bind                     device=/mnt/backups
  *   nfs   type=nfs   o=addr=10.0.0.5,rw         device=:/volume1/backup
  *   smb   type=cifs  o=username=x,password=y,…  device=//10.0.0.5/backup
  *
- * So the dashboard only has to compute three strings, and the compose file
- * needs a single templated volume rather than a branch per protocol.
+ * `s3` is a different shape entirely — Kopia connects to it directly over
+ * the network (`kopia repository connect s3 …`), no kernel mount involved —
+ * so it reuses the same five form fields with different meanings rather than
+ * inventing new ones: `server` is the endpoint (blank = AWS), `share` is the
+ * bucket, `username`/`password` are the access key ID / secret access key,
+ * and `options` is raw extra `kopia repository connect s3` flags (e.g.
+ * `--region=us-east-1` or `--disable-tls` for a plain-HTTP endpoint like a
+ * LAN MinIO) — the same "escape hatch, appended verbatim" role `options`
+ * already plays for SMB/NFS mount options.
  *
  * Google Drive and FTP/FTPS destinations existed here while Duplicati was the
  * backup engine (plan.md §81.5) — Duplicati spoke those protocols directly,
  * with no kernel filesystem to mount. Removing Duplicati (§196) removed them
  * too: Kopia has no plain-FTP backend and its `gdrive` backend needs a GCP
  * service-account JSON, not an OAuth AuthID, so there was nothing left to
- * translate them into. A Kopia-native remote (S3/B2/SFTP/`gdrive`) is a
- * separate, still-open task (§194) with its own credential fields.
+ * translate them into. B2/SFTP/`gdrive` are still open (§194) — S3 is the
+ * first Kopia-native remote, done at §221 because it's also how you talk to
+ * B2 and most NAS/on-prem object storage (MinIO, etc) — a real S3 endpoint
+ * isn't the only thing "S3" buys here.
  */
 
 import { query } from './database';
@@ -35,7 +45,7 @@ export const BACKUP_TARGET_KEYS = {
   options: 'backup_target_options',
 } as const;
 
-export type BackupTargetKind = 'disk' | 'smb' | 'nfs';
+export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 's3';
 
 export interface BackupTarget {
   kind: BackupTargetKind;
@@ -65,7 +75,7 @@ export async function getBackupTarget(): Promise<BackupTarget | null> {
   const values = Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
 
   const kind = values[BACKUP_TARGET_KEYS.kind];
-  if (kind !== 'disk' && kind !== 'smb' && kind !== 'nfs') {
+  if (kind !== 'disk' && kind !== 'smb' && kind !== 'nfs' && kind !== 's3') {
     return null;
   }
 
@@ -86,8 +96,14 @@ export async function getBackupTarget(): Promise<BackupTarget | null> {
  * Mount options are joined with commas, so a value containing one would be
  * read as a separate option — a password with a comma in it would silently
  * mangle the mount rather than fail. Rejected up front instead.
+ *
+ * `s3` has no mount at all — call `toS3ConnectArgs` for that kind instead.
  */
 export function toMountSpec(target: BackupTarget): BackupMountSpec {
+  if (target.kind === 's3') {
+    throw new Error('toMountSpec does not apply to an s3 target — use toS3ConnectArgs.');
+  }
+
   const extra = target.options.trim();
 
   if (target.kind === 'disk') {
@@ -132,11 +148,38 @@ export function toKopiaRepositoryMount(target: BackupTarget): BackupMountSpec {
   return toMountSpec(target);
 }
 
+/**
+ * Translate an `s3` destination into the flags `kopia repository connect s3`
+ * / `create s3` take. No kernel mount involved — Kopia talks to the bucket
+ * over HTTPS itself, which is also why there is no `BackupMountSpec` here.
+ */
+export interface S3ConnectArgs {
+  /** Bucket name. */
+  bucket: string;
+  /** Custom endpoint (MinIO, B2, Wasabi, …). Blank connects to AWS S3. */
+  endpoint: string;
+  accessKeyId: string;
+  secretAccessKey: string;
+  /** Raw extra flags, e.g. `--region=us-east-1` or `--disable-tls`. */
+  extraArgs: string;
+}
+
+export function toS3ConnectArgs(target: BackupTarget): S3ConnectArgs {
+  return {
+    bucket: target.share,
+    endpoint: target.server,
+    accessKeyId: target.username,
+    secretAccessKey: target.password,
+    extraArgs: target.options.trim(),
+  };
+}
+
 /** Human-readable validation. Returns null when the target is usable. */
 export function validateTarget(target: BackupTarget): string | null {
-  // A comma in a credential corrupts the comma-separated mount options.
+  // A comma in a credential corrupts the comma-separated mount options —
+  // moot for s3 (no comma-joined option string) but harmless to keep general.
   for (const [name, value] of [['username', target.username], ['password', target.password]] as const) {
-    if (value.includes(',')) {
+    if (target.kind !== 's3' && value.includes(',')) {
       return `The ${name} cannot contain a comma — mount options are comma-separated, so it would corrupt the mount.`;
     }
   }
@@ -147,6 +190,12 @@ export function validateTarget(target: BackupTarget): string | null {
     if (/^\/(home|root|var\/lib\/docker)(\/|$)/.test(target.path)) {
       return 'That path is on the system disk. Choose a separate disk or a network share, or the backup dies with the machine.';
     }
+    return null;
+  }
+
+  if (target.kind === 's3') {
+    if (!target.share) return 'Enter the bucket name.';
+    if (!target.username) return 'Enter the access key ID.';
     return null;
   }
 
