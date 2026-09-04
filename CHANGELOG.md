@@ -11,6 +11,19 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.16.1] — 2026-09-04
+
+### Added
+
+- **Per-app backup foundation** (§185 slice 1, internal) — `services/appBackup.ts`:
+  `backupOneApp` writes a self-contained `backups/apps/<name>/<name>-<ts>.tar.gz`
+  (that app's fresh DB dump(s) + SQLite snapshot(s) + `data/`, live-DB dirs
+  excluded the same way the Duplicati job excludes them) plus a manifest
+  sidecar, then prunes to a per-app retention count; `listAppBackups`,
+  `deleteAppBackup`, `pruneAppBackups`, path-traversal guard. `appDumps.ts`
+  gains `dumpOneApp`. No routes or UI yet (slices 2–4). Proven on the live
+  stack against a Postgres app (Paperless) and a SQLite app (Vaultwarden).
+
 ## [0.16.0] — 2026-09-04
 
 ### Added

@@ -14931,3 +14931,79 @@ per-app overview table, but that is optional and folded into the last slice.
 5. **Docs + Backups-page overview** (frontend/docs) — `recovery-troubleshooting.md`
    and `it-admin.md` on what a per-app archive is vs the offsite backup and how
    to restore one by hand; optional per-app table on the Backups page.
+
+## 186. §185 slice 1 — the per-app backup archive (2026-09-04)
+
+`services/appBackup.ts` + `appDumps.dumpOneApp`. Backend only, no routes/UI
+(slices 2–4).
+
+### What it does
+
+`backupOneApp(name)`, under the shared maintenance lock (can't race an image
+update or the scheduled dump, §103/§176):
+
+1. `dumpOneApp(name)` — the per-app twin of `dumpAllAppDatabases`: dumps this
+   app's server DB if it has a `backup` entry (reusing the existing
+   `dumpServerDatabase`), and snapshots its SQLite files
+   (`findSqliteFiles(...).filter(app)` → `dumpSqliteBatch`). Same never-throws
+   contract; an unreachable DB is a failed `DumpOutcome`, not an exception.
+2. `tar -czf backups/apps/<name>/<name>-<ISO>.tar.gz --exclude data/db
+   --exclude data/pgdata --exclude '*-wal' --exclude '*-shm' --exclude '*.part'
+   -C apps/<name> data`. The exclude set is the Duplicati job's filter set
+   (duplicatiClient.ts): the live DB directory and SQLite side-files restore
+   torn — the consistent copy is the `_dump/*.sql` / `*.sqlite` files, which
+   are inside `data/` and therefore in the archive.
+3. A `<base>.manifest.json` sidecar: app, ISO timestamp, `APP_VERSION`,
+   `backup.engine` (null for a SQLite-only/data-only app), archive bytes, the
+   `dumps[]` that succeeded and `dumpFailures[]` that did not.
+4. `pruneAppBackups(name, 10)` — keep the 10 newest, oldest first, sidecars
+   too.
+
+Plus `listAppBackups` (newest first, parsed sidecar, tolerates a
+missing/corrupt one), `deleteAppBackup` (archive + sidecar), and
+`resolveAppBackupPath` — the same `safeBackupFileName` + `resolve().startsWith`
+traversal guard `backup.ts` uses, applied to **both** the app name and the file
+name.
+
+### Decisions
+
+- **Its own local store, not a slice of Duplicati.** Reasons in §185: the
+  Duplicati restore API writes nothing (§75.3), Duplicati is leaving for Kopia
+  (§81.5), and a path-filtered partial restore of a tree archive is exactly the
+  fiddly CLI op §75.3 says not to build a button on. A standalone per-app
+  `.tar.gz` is usable today and unchanged by the engine swap. The offsite job
+  stays the versioned/encrypted story; this is the five-second rollback point.
+- **Manifest is a sidecar, not inside the archive.** busybox tar in the
+  runtime image (`node:20-alpine`) supports neither repeated `-C` (to add a
+  member from another dir) nor safe selective `--dereference`, and a downloaded
+  archive doesn't need our bookkeeping to be restored by hand — it needs
+  `data/_dump/*.sql`, which is in it. The lister reads the sidecar without
+  unpacking. (§185 said "into the archive"; changed here for that reason.)
+- **`APP_BACKUP_ROOT` from `process.cwd()`**, not imported from `backup.ts`'s
+  `BACKUP_DIR`. `vi.mock('./backup', importOriginal)` does not re-run its
+  factory on `vi.resetModules()`, so a `BACKUP_DIR` pulled through it froze at
+  the first test's tmpdir. Deriving from `process.cwd()` directly matches how
+  `backup.ts` does it and lets the test stub cwd the same way
+  `backup.test.ts` does for `pruneOldBackups`.
+- **Retention 10, a module const.** Local rollback points, not history; a
+  dedicated setting can come if asked.
+
+### Verified
+
+- `appBackup.test.ts` — 19 tests: traversal guard (name + file), tar args
+  (excludes present, `-C <appDir> data`), manifest shape, data-only app
+  (`engine: null`), dump-failure still archives + surfaces, retention prune
+  oldest-first, list newest-first + corrupt-sidecar tolerance, delete removes
+  both. Backend suite 479 → 498.
+- **Live stack** (built + recreated backend, ran the compiled module in the
+  container so it goes through docker-socket-proxy exactly like production):
+  - `backupOneApp('paperless')` — fresh `pg_dump` (579 KB), 422 KB archive.
+    `tar -tzf` confirms **no** `data/db/`, `-wal`, `-shm`, `.part`; **has**
+    `data/_dump/paperless.sql`, `data/media/…`, `data/consume/…`. Sidecar
+    written, `listAppBackups` reads it back.
+  - `backupOneApp('vaultwarden')` ×2 — `engine: null`, `dumps: ["sqlite"]`,
+    archive has `data/_dump/db.sqlite` (the `.backup` snapshot). Two archives,
+    prune left both (< 10).
+  - Smoke archives removed from the backups volume afterward.
+
+Patch bump 0.16.0 → 0.16.1 (internal, no user-facing surface yet).

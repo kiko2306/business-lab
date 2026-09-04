@@ -345,3 +345,44 @@ export async function dumpAllAppDatabases(): Promise<DumpReport> {
   logger.info('App database dump finished', { ok, failed });
   return { outcomes, ok, failed };
 }
+
+/**
+ * Dump one app's database(s) — the server DB if it has one, plus any SQLite
+ * files under its data dir — into `apps/<name>/data/_dump/`. The per-app
+ * counterpart of `dumpAllAppDatabases`, for the per-app backup archive
+ * (services/appBackup.ts, plan.md §185).
+ *
+ * Same never-throws contract: an unreachable database yields a failed
+ * `DumpOutcome`, not an exception, so the archive step can still capture the
+ * rest of the app's data. An unknown name, or one with no server DB and no
+ * SQLite, returns an empty report.
+ */
+export async function dumpOneApp(name: string): Promise<DumpReport> {
+  const definition = SERVICES[name];
+  const appsDir = getAppsDir();
+  const outcomes: DumpOutcome[] = [];
+
+  if (definition?.backup) {
+    const { service, engine } = definition.backup;
+    const appDir = path.join(appsDir, name);
+    try {
+      outcomes.push(await dumpServerDatabase(name, service, engine, appDir));
+    } catch (error) {
+      outcomes.push({ app: name, kind: engine, target: '', ok: false, detail: (error as Error).message });
+    }
+  }
+
+  if (definition) {
+    try {
+      const files = findSqliteFiles(appsDir).filter((f) => f.app === name);
+      outcomes.push(...(await dumpSqliteBatch(files, appsDir)));
+    } catch (error) {
+      logger.error('SQLite snapshot failed', { app: name, error: (error as Error).message });
+    }
+  }
+
+  const ok = outcomes.filter((o) => o.ok).length;
+  const failed = outcomes.length - ok;
+  logger.info('Per-app database dump finished', { app: name, ok, failed });
+  return { outcomes, ok, failed };
+}

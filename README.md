@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.16.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.16.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -242,14 +242,10 @@ Strategy:
 Per-application backup / restore (§131.4, §185) — a self-contained local
 `.tar.gz` per app, separate from the offsite Duplicati job. Sliced:
 
-- [ ] **`appBackup.ts` — per-app archive + list + delete** (§185 slice 1) —
-      the archive writer (this app's DB dump(s) + SQLite snapshot(s) + `data/`,
-      live-DB dirs excluded), the lister, retention, path-safety; factor
-      per-app dump helpers out of `appDumps.ts`. Unit tests.
 - [ ] **Per-app backup routes** (§185 slice 2) — `POST/GET/DELETE
       /api/services/:name/backup[s]` + download, audit rows, behind
-      `backups:manage`. Prove an archive for a Postgres app and a SQLite app on
-      the live stack.
+      `backups:manage`. `appBackup.ts` (slice 1) is done. Prove an archive for
+      a Postgres app and a SQLite app through the API on the live stack.
 - [ ] **Per-app restore** (§185 slice 3) — `restoreOneApp` (stop → replay
       dumps via the §183 path → copy `data/` back → start) + a confirm-gated
       route. Prove a Postgres and a SQLite app round-trip on the live stack.
