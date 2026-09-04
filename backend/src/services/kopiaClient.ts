@@ -366,6 +366,24 @@ export async function runSnapshotNow(password: string): Promise<{ started: boole
   }
 }
 
+/**
+ * The single call the backup scheduler makes: register the managed source if
+ * it is not already (idempotent), then snapshot it. Mirrors
+ * `duplicatiClient.runBackupJobNow` — one call, never throws.
+ *
+ * Provisioning here rather than in a separate settings route (as Duplicati
+ * does) is deliberate: it is cheap and idempotent, so the first scheduled run
+ * sets Kopia up with no extra operator step.
+ */
+export async function snapshotAppData(password: string): Promise<{ started: boolean; detail: string }> {
+  try {
+    await provisionBackupSource(password);
+  } catch (error) {
+    return { started: false, detail: `could not provision the Kopia backup source: ${(error as Error).message}` };
+  }
+  return runSnapshotNow(password);
+}
+
 // ---------------------------------------------------------------------------
 // list snapshots
 // ---------------------------------------------------------------------------

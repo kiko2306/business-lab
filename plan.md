@@ -15553,3 +15553,52 @@ save. Response gains `kopiaRestarted` + `kopiaRepository`, and `message` gets a
 Minor bump 0.21.1 → 0.22.0 (observable: a destination save now recreates
 Kopia). README TODO "Backup destination → Kopia" deleted; new item added for a
 Kopia-native remote backend (Drive/S3/B2/SFTP).
+
+## 195. §81.5 slice 4 — the scheduler snapshots Kopia (2026-09-04)
+
+`backupScheduler.runAppDataBackupLocked` now triggers a Kopia snapshot right
+after the per-app database dumps, in parallel with the existing Duplicati call.
+Both the scheduled cycle and the manual "Back up now" button go through here,
+so both drive Kopia too.
+
+### `kopiaClient.snapshotAppData(password)`
+
+The single call the scheduler makes, mirroring
+`duplicatiClient.runBackupJobNow`: `provisionBackupSource` (idempotent) then
+`runSnapshotNow`, never throws, returns `{ started, detail }`. Provisioning
+here rather than via a separate settings route (Duplicati's model) is
+deliberate — it is cheap and idempotent, so the first scheduled run registers
+the source with no extra operator step.
+
+### Scheduler wiring
+
+- `snapshotKopiaAppData()` reads `KOPIA_SERVER_PASSWORD` from `apps/kopia/.env`
+  (same `readAppEnvValue` pattern Duplicati uses), returns
+  `{ started:false, detail:'Kopia has no password configured yet' }` when
+  unset, else calls `snapshotAppData`.
+- It runs **before** the Duplicati branch and unconditionally (as long as
+  Kopia has a password) — so Kopia still snapshots even when Duplicati has no
+  password and the run is failing on that.
+- Its result rides on the `app-data` audit row as `metadata.kopia` and on the
+  info log line. It does **not** affect `result` (success/failure) or the
+  returned `ok` — Duplicati stays the sole gate until "Remove Duplicati".
+- No change to the maintenance lock: the whole body is already inside
+  `withMaintenanceLock`, so the Kopia snapshot is serialised against image
+  updates too, and it snapshots the freshly-dumped tree.
+
+### Verified
+
+- Backend `npm run typecheck` clean; suite **546 → 550** (+4: Kopia recorded
+  on the row, a Kopia failure not changing the outcome, skipped-when-no-
+  password, still-runs-when-Duplicati-has-no-password). Existing scheduler
+  tests unchanged — the `readAppEnvValue` mock gained an args-aware shape and
+  `./kopiaClient` is mocked.
+- **Against a live Kopia server** (real image + `apps/kopia/entrypoint.sh`,
+  fresh repo): `snapshotAppData` on first call registered the source and
+  snapshotted (`started:true`), second call snapshotted again, `listSnapshots`
+  showed the result; a wrong password returned
+  `{ started:false, detail:'could not provision … rejected the credentials' }`
+  with no throw. Test container removed.
+
+Minor bump 0.22.0 → 0.23.0. README TODO "Scheduler → Kopia" deleted; "Prove a
+Kopia restore" and "Remove Duplicati" remain.

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.22.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.23.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -287,8 +287,6 @@ Strategy:
 ### Roster changes (§81)
 
 
-- [ ] **Scheduler → Kopia** (§81.5) — `backupScheduler` calls Kopia after the
-      app-database dumps, with Duplicati still running in parallel.
 - [ ] **A Kopia-native remote backend** (§81.5, §194) — disk/SMB/NFS now
       translate into Kopia's `/repository` volume, but Google Drive / FTP do
       not (Kopia has no plain-FTP backend, and its `gdrive` backend needs a

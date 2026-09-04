@@ -11,6 +11,20 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.23.0] — 2026-09-04
+
+### Changed
+
+- **The backup scheduler now snapshots Kopia alongside Duplicati**
+  (`plan.md` §81.5). After the per-app database dumps, `backupScheduler`
+  triggers a Kopia snapshot of `/source/apps` via a new
+  `kopiaClient.snapshotAppData` (provision-if-needed + snapshot, one call,
+  never throws). Runs on both the scheduled cycle and the manual "Back up
+  now" button. Kopia's outcome is recorded in the `app-data` audit row's
+  `kopia` metadata but does **not** gate the run — Duplicati stays the source
+  of truth until it is removed. Kopia is skipped quietly when it has no
+  password, and a Kopia failure never disturbs the Duplicati-gated result.
+
 ## [0.22.0] — 2026-09-04
 
 ### Changed
