@@ -239,7 +239,6 @@ Strategy:
       exercised at all. Prove one of them writes and restores against a
       production-like server (a NAS, or the live dashboard). Also covers the
       Kopia translation later.
-- [ ] **Prove a Postgres/MySQL restore** — only SQLite has been round-tripped.
 - [ ] **Per-application backup / restore** (§131.4) — a per-app action on each
       app's card: back up just this app's data + database, list its snapshots,
       restore just this app. Reuses the existing engines; pairs with the

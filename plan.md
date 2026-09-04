@@ -14635,3 +14635,63 @@ pinned `postgres:14-vectorchord` image; none is flagged by its app, so no
 open PG-major-bump item remains.
 
 Compose + docs + plan only — no version bump (matches §181, §108).
+
+## 183. Backups — Postgres / MySQL / MariaDB restore proven end to end (2026-09-04)
+
+TODO item "Prove a Postgres/MySQL restore — only SQLite has been
+round-tripped". `appDumps.ts` has produced `apps/<app>/data/_dump/<app>.sql`
+via `pg_dump --clean --if-exists` and `mariadb-dump --single-transaction`
+since §70, and nothing had ever replayed one. The SQLite `.backup` snapshots
+were round-tripped in §75/§86; the SQL path (`psql -f` / `mysql` import — what
+`routes/backup.ts` restore uses, and what a per-app restore would use) was
+assumed, not tested.
+
+### What was done
+
+No code change — this is a verification. For each engine, dumped exactly as
+`dumpServerDatabase` does (same image as the server, `--entrypoint pg_dump` /
+`mysqldump`, same flags) and replayed into a **throwaway scratch server** of
+the same image, then compared the scratch database to the live one. Scratch
+containers only — the live apps were read, never written — and removed after.
+
+| App | Engine / image | Dump | Replay | Parity check |
+|---|---|---|---|---|
+| Paperless | Postgres 17 (`pgautoupgrade:17-alpine`, post-§182) | 585 KB | `psql`, 0 errors | 74 tables, 242 migrations, 2 users — identical |
+| n8n | Postgres 17 (same image) | 587 KB | `psql`, 0 errors | 129 tables, 999 columns, 1 workflow, 22 `execution_entity` rows, `md5(workflow names)` — identical |
+| nginx-proxy-manager | MySQL 8.0 | 121 KB | `mysql`, exit 0 | 15 tables, 46 `proxy_host`, 116 `audit_log`, 1 user — identical |
+| BookStack | MariaDB (`lscr.io/linuxserver/mariadb`, s6 init) | 57 KB | `mariadb`, exit 0 | 41 tables identical, all 41 per-table row counts identical (296 rows), all 41 `CHECKSUM TABLE … EXTENDED` identical |
+
+### Findings
+
+- **The dumps are sound and restorable.** `pg_dump --clean --if-exists`
+  replays with zero errors on an **empty** target too (the `DROP … IF EXISTS`
+  lines just no-op), so the same file works whether restoring over an existing
+  database or into a fresh one.
+- **`--entrypoint mysqldump` is load-bearing for the LSIO image.** BookStack's
+  DB is `lscr.io/linuxserver/mariadb`, whose default entrypoint is s6; the
+  override (already in `appDumps.ts`, commented) is what makes the dump run at
+  all. Confirmed by the dump succeeding.
+- **`mariadb-dump` emits a `/*M!999999\- enable the sandbox mode */` first
+  line.** Harmless — it is a MariaDB conditional comment; a stock `mysql:8.0`
+  client treats it as a plain comment. Restoring with a `mariadb` client is
+  still the right call and is what the doc now says.
+- **A whole-file `md5` of `mariadb-dump --no-create-info` output differs
+  between live and restored** even when the data is identical — `mysqldump`
+  emits rows in storage-scan order with no `ORDER BY`, and a freshly loaded
+  InnoDB table enumerates differently. Row counts and `CHECKSUM TABLE …
+  EXTENDED` (order-independent) are the checks that mean something; both
+  matched on every table.
+- **No per-app restore endpoint exists.** `POST /api/backups/restore` only
+  restores the management stack's own DB. Restoring an app dump is a manual
+  `docker exec … psql/mariadb <` — now written up in
+  `docs/recovery-troubleshooting.md` with the scratch-database dry-run as the
+  safe path. The dashboard button is the separate "Per-application backup /
+  restore" TODO.
+
+### Not added
+
+No vitest test — a dump→replay round-trip is a Docker integration test, which
+the conventions keep out of the unit suite ("don't test Docker itself"). The
+proof lives here and in the doc.
+
+Docs + plan only — no version bump.

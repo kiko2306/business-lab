@@ -39,6 +39,44 @@ install, use `./start.sh recover` above.
 - Restore backup: `POST /api/backups/restore`
 - Download backup: `GET /api/backups/download/:fileName`
 
+These three cover the **management stack's own** database (the dashboard's
+Postgres) plus its settings. The per-app SQL/SQLite dumps under
+`apps/<app>/data/_dump/` have no restore button yet — restore them by hand
+(below).
+
+### Restoring one app's database from its dump
+
+The scheduled app-data backup leaves a plain-SQL dump at
+`apps/<app>/data/_dump/<app>.sql` for every Postgres/MySQL/MariaDB app
+(`pg_dump --clean --if-exists` / `mariadb-dump --single-transaction`), and a
+`.sqlite` snapshot per embedded SQLite database. To restore one app:
+
+1. Stop the app from the dashboard.
+2. Replay the dump into its **running database container** (the DB container
+   stays up — only the app is stopped):
+
+   ```bash
+   # Postgres — the dump carries DROP ... IF EXISTS, so it replaces objects in place
+   docker exec -i -e PGPASSWORD=<pw> <app>-db-1 \
+     psql -U <user> -d <db> < apps/<app>/data/_dump/<app>.sql
+
+   # MySQL / MariaDB
+   docker exec -i -e MYSQL_PWD=<pw> <app>-db-1 \
+     mariadb -u <user> <db> < apps/<app>/data/_dump/<app>.sql
+   ```
+
+   Credentials are in `apps/<app>/.env` (or `docker inspect` the DB container).
+3. For an embedded-SQLite app, replace the live file instead:
+   `sqlite3 <live.db> ".restore 'apps/<app>/data/_dump/<name>.sqlite'"` while
+   the app is stopped.
+4. Start the app.
+
+Restoring into a scratch database first (a throwaway `docker run` of the same
+image) is the safe way to check a dump before touching the live one. The
+Postgres, MySQL and MariaDB dump→replay paths are verified end to end against
+the live stack (`plan.md` §183): zero replay errors, table lists and row/
+checksum parity on n8n, Paperless, NPM and BookStack.
+
 ### Apps without a consistent database snapshot
 
 The scheduled app-data backup dumps every SQL database (`pg_dump` /
