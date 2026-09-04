@@ -17305,3 +17305,67 @@ question (does dev-mode Instagram/Facebook publishing actually work the way
 sources claim) that doesn't depend on the onboarding write-up existing.
 
 Docs only — no version bump.
+
+## 223. §200 slice 4 done — Guacamole skips its own login behind Authelia
+
+The last slice of the Guacamole SSO series (§204/§206/§207 built the pieces:
+admin-password rotation, REST user management, account auto-provisioning).
+This one wires the actual skip-the-form behaviour.
+
+**What the README item assumed vs. what was actually needed.** The item
+described a `guacamole-initdb`-shaped one-shot service that fetches the
+`guacamole-auth-header` extension jar into a new `./data/extensions` volume.
+Built that first — a scratch Alpine one-shot service (`wget`/`tar`, both
+built into busybox, no extra image) pulling the jar from
+`archive.apache.org`'s permanent archive (not the `closer.lua` mirror
+redirector, which picks a rotating mirror unsuitable for a pinned,
+reproducible fetch) — and proved it fetches, is idempotent on restart, and
+the resulting jar loads. Then, checking the loaded-extensions log line,
+found `guacamole-auth-header.jar` already loading from
+`/opt/guacamole/extensions/guacamole-auth-header/` — the official
+`guacamole/guacamole:1.6.0` image ships this extension pre-bundled, and its
+own `entrypoint.d/700-configure-features.sh` auto-symlinks any bundled
+extension into `GUACAMOLE_HOME/extensions` the moment a same-prefixed env
+var is present (confirmed by reading the image's `guacamole-docker/` build
+scripts on GitHub). So the entire fetch service, its volume, and the
+`depends_on` wiring were dead weight — deleted before commit. The fix is one
+line: `HTTP_AUTH_HEADER: Remote-User` in the `guacamole` service's
+environment, read via the image's own `enable-environment-properties`
+passthrough (a `guacamole.properties` key becomes its upper-snake-case env
+var automatically, confirmed by reading
+`entrypoint.d/100-generate-guacamole-home.sh`) — no properties file to
+write, no extension to install.
+
+**Verified on a scratch compose stack** (`docker compose -p guactest`, a
+copy of the real `docker-compose.yml`, a throwaway `.env`-equivalent file
+outside `apps/` and a scratch `data/` dir — never touched the real
+`guacamole-guacamole-1` container or its Postgres). Confirmed via the log
+line (`Extension "HTTP Header Authentication Extension" (header) loaded`)
+and by exercising `/api/tokens` directly:
+
+- No `Remote-User` header, no credentials → `INVALID_CREDENTIALS` (the local
+  form still works — this extension is additive, not a replacement, so
+  direct LAN access without going through NPM still needs a real login).
+- `Remote-User: guacadmin`, no credentials → 200, a real auth token,
+  `"dataSource":"header"`.
+- `Remote-User: nobody-such-user` (no matching JDBC account) → also
+  authenticates (the header extension only identifies a user, it doesn't
+  check the JDBC user table), but sees zero connections — confirmed via
+  `/api/session/data/postgresql/connections` returning `{}` for both the
+  known and unknown header identity in this connection-less test instance.
+  This is the boundary `guacamoleSync.ts` (§207) exists to close: only a
+  dashboard-provisioned username can ever see anything.
+
+Scratch stack fully torn down after (containers removed individually, the
+compose network removed, `data/` wiped via a throwaway container since
+Postgres/Tomcat leave root-owned files behind).
+
+**Not done here**: no live proof against the real `tx-home-utils.com`
+NPM → Authelia → Guacamole path (needs the real `authelia-authrequest.conf`
+snippet actually applied to Guacamole's proxy host, which is an exposure
+change on the live host, out of scope for this slice — the mechanism itself
+is what §200 needed and is now proven).
+
+Docs only (`docs/licences.md` — the bundled extension is the same
+Apache-2.0 project, noted on the existing Guacamole row) plus the one
+compose env var — no backend/frontend code, no version bump.

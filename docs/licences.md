@@ -52,7 +52,7 @@ operate within, listed again at the end.
 | CrowdSec | MIT | ✅ Clean | Cloudflare bouncer MIT; NPM Lua bouncer MIT, see vendored code below |
 | Dozzle | MIT | ✅ Clean | |
 | File Browser | Apache-2.0 | ✅ Clean | |
-| Guacamole | Apache-2.0 | ✅ Clean | |
+| Guacamole | Apache-2.0 | ✅ Clean | incl. bundled `guacamole-auth-header` extension, same licence |
 | Home Assistant | Apache-2.0 | ✅ Clean | |
 | Homebox | **AGPL-3.0** | ✅ Clean | unmodified; see AGPL note |
 | Home Page (gethomepage) | GPL-3.0 | ✅ Clean | internal use |

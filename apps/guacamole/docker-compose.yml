@@ -62,6 +62,19 @@ services:
       # Trust the proxy's forwarded headers, so the audit log records the real
       # client address instead of the Docker gateway for every session.
       REMOTE_IP_VALVE_ENABLED: "true"
+      # guacamole-auth-header (§200 slice 4): the image bundles this
+      # extension already (/opt/guacamole/extensions/guacamole-auth-header)
+      # and auto-enables it the moment any HTTP_AUTH_* variable is set
+      # (guacamole-docker's own entrypoint.d/700-configure-features.sh) — no
+      # jar to fetch, no properties file to hand-write. Trusts the same
+      # Remote-User header NPM's authelia-authrequest.conf snippet sets from
+      # Authelia's forward-auth response, so a login that already passed
+      # Authelia skips Guacamole's own form. guacamoleSync.ts (§200 slice 3)
+      # is what makes the header value resolve to a real account: this
+      # extension only identifies the user, the JDBC extension still holds
+      # their permissions, so a header naming a username with no matching
+      # JDBC account authenticates but sees zero connections.
+      HTTP_AUTH_HEADER: Remote-User
       TZ: ${TZ:-UTC}
     labels:
       - "homepage.group=Infrastructure"

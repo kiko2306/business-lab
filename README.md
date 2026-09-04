@@ -212,6 +212,11 @@ it is done — not ticked off and left behind. Section references point at
       only against the socket-less test stack (specs skip there). Run it once
       with `E2E_LIVE_STACK=1 E2E_BASE_URL=<dashboard> E2E_ADMIN_USER=… ADMIN_PASSWORD=…`
       and report any selector drift.
+- [ ] **@mat: prove Guacamole SSO live** (§200, §223) — `HTTP_AUTH_HEADER`
+      is wired and proven against a scratch stack, but not against the real
+      NPM proxy host: apply Guacamole's `authelia-authrequest.conf` snippet
+      there, then log in through Authelia and confirm it lands in Guacamole
+      with no second form.
 
 ### Security
 
@@ -420,12 +425,6 @@ Strategy:
       life-safety), and prove a start + backup/restore round-trip.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
-- [ ] **Guacamole SSO, slice 4: the `guacamole-auth-header` extension**
-      (§200) — a `guacamole-initdb`-shaped one-shot service fetches the
-      version-matched extension jar into a new `./data/extensions` volume;
-      configure it to trust the `Remote-User` header NPM's
-      `authelia-authrequest.conf` snippet already forwards. Proof: log in
-      through Authelia and land in Guacamole with no second form.
 - [ ] **MeshCentral** (§62.2) — still wanted, for client endpoints that will
       not join the overlay. `TLSOffload` + `certUrl` for the agent cert hash.
 - [ ] **Pre-built n8n workflows** (§64, §118.3) — ship useful workflows rather
