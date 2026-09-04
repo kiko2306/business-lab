@@ -15934,3 +15934,94 @@ container yet (only an isolated throwaway one) — folded into the existing
 §198 "recreate backend/docker-socket-proxy/frontend" TODO rather than a
 new item, since it's the same recreate. The by-hand `chown` done tonight
 will be redundant, not undone, once that happens.
+
+## 200. Plan — Guacamole SSO: auto-provision accounts from dashboard users, drop its own login
+
+Follow-up to §199. Two things came out of getting Guacamole behind Authelia:
+double-login (Authelia's gate, then Guacamole's own form), and Guacamole
+still shipping the `guacadmin`/`guacadmin` default — now more exposed than
+before since it's reachable at a real hostname, gated only by whatever
+Authelia session an attacker has. Both are the same underlying fix: stop
+treating Guacamole's own account store as something a human maintains by
+hand, and drive it from the dashboard's `users` table the same way
+`autheliaSync.ts` already drives `users_database.yml`.
+
+**Confirmed by reading the code before planning further:**
+
+- `apps/nginx-proxy-manager/snippets/authelia-authrequest.conf` already
+  forwards `Remote-User` (and `Remote-Groups`/`Remote-Email`/`Remote-Name`)
+  to every Authelia-protected origin — Guacamole already receives it today,
+  unused. No NPM/Authelia-side change is needed for header-based SSO; only
+  Guacamole needs to be told to trust it.
+- "Active" already has a working definition in this codebase:
+  `autheliaSync.ts` treats a row as eligible once it has both `email` and
+  `password_hash` (i.e. the invite was accepted) — not a separate `status`
+  column. The new sync should use the same test, not a bare "active" flag,
+  so it can't drift from what Authelia itself considers a real account.
+- `userAppAccess.ts` / `user_app_access` is already the per-app SSO grant
+  list, and a webmaster already gets every gated app implicitly
+  (`autheliaSync.ts`'s `isWebmaster` branch adds every `app-<name>` group,
+  not just granted ones). Guacamole provisioning should key off exactly this
+  — `app-guacamole` granted, or webmaster — not a new concept.
+- Guacamole's `guacamole-auth-header` extension authenticates solely on the
+  header being present and non-empty **and matching an existing username**;
+  it does not check a password at all on that path. So the dashboard only
+  ever needs to create/enable/disable the account — Guacamole's own password
+  field becomes irrelevant once the extension is active, which is why
+  rotating `guacadmin`'s default password (below) only has to happen once,
+  not be kept in sync.
+- `apps/guacamole/docker-compose.yml` currently pins `image:
+  guacamole/guacamole:latest`. Guacamole's extensions are strictly
+  version-locked to the webapp jar (a mismatched `guacamole-auth-header`
+  build refuses to load) — `:latest` can silently drift out from under a
+  pinned extension download. This needs pinning to a specific tag before the
+  extension piece can be built reliably; unrelated to SSO itself but a
+  prerequisite for it.
+
+**Design, four slices:**
+
+1. **Pin Guacamole's version + auto-rotate the default admin password.**
+   Pin `guacamole/guacamole` and `guacamole/guacd` to a specific tag (not
+   `latest`) in the compose file. Add `GUACAMOLE_ADMIN_PASSWORD` as a
+   `hiddenGeneratedSecret` (matches the existing `GUACAMOLE_DB_PASSWORD`
+   pattern). On first successful login as `guacadmin`/`guacadmin`, call
+   Guacamole's REST API to set its password to the generated value and never
+   touch it again (idempotent: if the default login fails, rotation already
+   happened, skip silently). This alone finishes the README's
+   "@mat: change Guacamole's default login" item without a human step,
+   per §0 principle 3 — delete that TODO once proven, don't just tick it.
+
+2. **`guacamoleClient.ts`** — a thin REST client mirroring `npmClient.ts`'s
+   shape: authenticate against `/api/tokens` (the same endpoint §84.1a's
+   verification already proved works), then create/enable/disable a user
+   under the `postgresql` auth provider via
+   `/api/session/data/postgresql/users`. No connection/permission calls —
+   that stays a human step in Guacamole's own UI (§199's discussion: which
+   machines an account can reach is a per-machine-credential decision the
+   dashboard doesn't otherwise own).
+
+3. **`guacamoleSync.ts`** — mirrors `autheliaSync.ts`: rebuild the wanted set
+   (active dashboard users with `app-guacamole` granted, or webmaster) and
+   diff it against Guacamole's actual users via the client, creating/
+   enabling/disabling as needed. Wired into the same trigger points
+   `autheliaSync` already uses (`invitation_accepted`, `user_roles_update`,
+   `user_access_update`, `user_delete`) plus `exposure_change` (granting
+   Authelia protection to Guacamole is itself what makes `app-guacamole` a
+   grantable option at all, per `getAppAccessOptions`'s live-exposure
+   query) — same fire-and-forget-with-audit contract as
+   `syncAutheliaUsersSafe`, never blocking the user-management response.
+
+4. **The header-auth extension itself.** A one-shot init service (same
+   shape as `guacamole-initdb`) fetches the `guacamole-auth-header` build
+   matching the pinned version from slice 1 and places the jar in a new
+   `./data/extensions` volume mounted at Guacamole's extensions directory;
+   a rendered `guacamole.properties` (or the image's equivalent env-var
+   hook — needs checking against the current image's docs at
+   implementation time, not assumed here) points it at the `Remote-User`
+   header. Proof: log in through Authelia and land straight in Guacamole
+   with no second form, for an account slice 3 provisioned.
+
+**Deliberately out of scope**: auto-granting *which* RDP/VNC/SSH connections
+a provisioned account can see. That stays a manual Guacamole-UI step per
+machine, same reasoning as §199's original SSO discussion — those are
+per-machine credentials, not dashboard-owned state.

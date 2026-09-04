@@ -356,7 +356,30 @@ Strategy:
       ships as `guacadmin`/`guacadmin`. Now more urgent than "on the LAN":
       Guacamole is exposed at `guacamole.tx-home-utils.com` behind Authelia
       as of §199, so a compromised Authelia session (or an admin-group
-      account) reaches a default-credentialed RDP/VNC/SSH gateway.
+      account) reaches a default-credentialed RDP/VNC/SSH gateway. Superseded
+      by §200 slice 1 once that lands (auto-rotates it, no human step) —
+      delete this item then instead of ticking it.
+- [ ] **Guacamole SSO, slice 1: pin the version + auto-rotate the default
+      admin password** (§200) — pin `guacamole/guacamole` and
+      `guacamole/guacd` off `:latest` to a specific tag (needed before slice
+      4's extension can be version-matched), add `GUACAMOLE_ADMIN_PASSWORD`
+      as a `hiddenGeneratedSecret`, and rotate `guacadmin`'s password to it
+      via the REST API on first successful default-credential login.
+- [ ] **Guacamole SSO, slice 2: `guacamoleClient.ts`** (§200) — a REST
+      client mirroring `npmClient.ts`, for creating/enabling/disabling a
+      Guacamole user under the `postgresql` auth provider. No
+      connection/permission calls — those stay a manual Guacamole-UI step.
+- [ ] **Guacamole SSO, slice 3: `guacamoleSync.ts`** (§200) — mirrors
+      `autheliaSync.ts`: provision/enable a Guacamole account for every
+      active dashboard user with `app-guacamole` granted (or webmaster),
+      disable it otherwise. Same trigger points as `syncAutheliaUsersSafe`
+      plus `exposure_change`.
+- [ ] **Guacamole SSO, slice 4: the `guacamole-auth-header` extension**
+      (§200) — a `guacamole-initdb`-shaped one-shot service fetches the
+      version-matched extension jar into a new `./data/extensions` volume;
+      configure it to trust the `Remote-User` header NPM's
+      `authelia-authrequest.conf` snippet already forwards. Proof: log in
+      through Authelia and land in Guacamole with no second form.
 - [ ] **MeshCentral** (§62.2) — still wanted, for client endpoints that will
       not join the overlay. `TLSOffload` + `certUrl` for the agent cert hash.
 - [ ] **Pre-built n8n workflows** (§64, §118.3) — ship useful workflows rather
