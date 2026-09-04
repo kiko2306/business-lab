@@ -11,7 +11,6 @@ import {
   BackupTargetKind,
   BackupTargetSettings,
   BackupTargetTestResponse,
-  BackupJobProvisionResponse,
   GeneralSettings,
   AlertNotifySettings,
 } from '../../core/models';
@@ -66,8 +65,6 @@ export class SettingsComponent implements OnInit {
     username: [''],
     password: [''],
     options: [''],
-    authId: [''],
-    folder: [''],
   });
 
   protected readonly generalForm = this.formBuilder.nonNullable.group({
@@ -93,8 +90,6 @@ export class SettingsComponent implements OnInit {
   protected testingBackupTarget = false;
   protected backupTargetFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected backupTargetTestResult: BackupTargetTestResponse | null = null;
-  protected provisioningJob = false;
-  protected backupJob: BackupJobProvisionResponse | null = null;
   protected alertSettings: AlertNotifySettings | null = null;
   protected alertsLoading = true;
   protected savingAlerts = false;
@@ -255,34 +250,6 @@ export class SettingsComponent implements OnInit {
     }
   }
 
-  /** Google Drive and FTP are reached by Duplicati itself, so there is no mount. */
-  protected get backupTargetIsMounted(): boolean {
-    return !['googledrive', 'ftp', 'ftps'].includes(this.backupTargetForm.controls.kind.value);
-  }
-
-  /**
-   * Create the backup job in Duplicati from the saved destination. Until this
-   * runs there is no job, so nothing is ever backed up however the schedule is
-   * configured.
-   */
-  provisionBackupJob(): void {
-    this.provisioningJob = true;
-    this.settingsService
-      .provisionBackupJob()
-      .pipe(finalize(() => (this.provisioningJob = false)))
-      .subscribe({
-        next: (result) => {
-          this.backupJob = result;
-          this.backupTargetFeedback = { type: 'success', message: result.message };
-        },
-        error: (error) =>
-          (this.backupTargetFeedback = {
-            type: 'danger',
-            message: extractErrorMessage(error, 'Could not create the backup job.'),
-          }),
-      });
-  }
-
   loadBackupTarget(): void {
     this.backupTargetLoading = true;
     this.settingsService
@@ -298,7 +265,6 @@ export class SettingsComponent implements OnInit {
             share: settings.share ?? '',
             username: settings.username ?? '',
             options: settings.options ?? '',
-            folder: settings.folder ?? '',
           });
         },
         error: () =>
@@ -310,10 +276,7 @@ export class SettingsComponent implements OnInit {
     const value = this.backupTargetForm.getRawValue();
     const payload: BackupTargetInput = { kind: value.kind };
 
-    if (value.kind === 'googledrive') {
-      payload.folder = value.folder.trim();
-      if (value.authId) payload.authId = value.authId.trim();
-    } else if (value.kind === 'disk') {
+    if (value.kind === 'disk') {
       payload.path = value.path.trim();
     } else {
       payload.server = value.server.trim();
@@ -332,7 +295,6 @@ export class SettingsComponent implements OnInit {
         next: (response) => {
           this.backupTargetFeedback = { type: 'success', message: response.message };
           this.backupTargetForm.controls.password.reset('');
-          this.backupTargetForm.controls.authId.reset('');
           this.loadBackupTarget();
         },
         error: (error) =>

@@ -11,6 +11,25 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.24.0] — 2026-09-04
+
+### Removed
+
+- **Duplicati is gone; Kopia is the sole backup engine** (`plan.md` §81.5,
+  §197). `apps/duplicati/`, `duplicatiClient.ts`, `backupTargetApply.ts` and
+  every route/service/frontend reference are deleted. `backupScheduler` now
+  gates the app-data run on Kopia directly instead of running it "alongside
+  Duplicati". `GET /api/backups/status` now returns Kopia's status shape
+  (`repositoryDescription`/`storageType`/`snapshotCount`/`lastSnapshotAt`/…)
+  instead of Duplicati's. `POST /api/settings/backup-target/provision-job` is
+  removed — Kopia registers its snapshot source itself, with no separate
+  provisioning step.
+- **`googledrive`/`ftp`/`ftps` backup destinations are removed** — Duplicati
+  spoke those protocols directly; Kopia has no plain-FTP backend and its
+  `gdrive` backend needs different credentials (a GCP service-account JSON,
+  not an OAuth AuthID). Only `disk`/`smb`/`nfs` remain. A Kopia-native remote
+  (S3/B2/SFTP/`gdrive`) is tracked separately in the README TODO.
+
 ## [0.23.0] — 2026-09-04
 
 ### Changed

@@ -28,8 +28,8 @@ kopia policy set --global \
   --keep-weekly 8 --keep-monthly 6 --keep-annual 2 || true
 
 # --insecure: plain HTTP behind basic auth. LAN-direct traffic never reaches
-# NPM/Authelia (§93), so the server credentials are the gate — same model as
-# Duplicati's web password. Exposure (TLS at the tunnel) is a later slice.
+# NPM/Authelia (§93), so the server credentials are the gate. Exposure (TLS
+# at the tunnel) is a later slice.
 exec kopia server start \
   --address="http://0.0.0.0:51515" \
   --insecure \

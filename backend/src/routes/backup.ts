@@ -20,7 +20,7 @@ import {
   safeBackupFileName,
   saveBackupScheduleConfig,
 } from '../services/backup';
-import { getBackupJobStatus } from '../services/duplicatiClient';
+import { getBackupSourceStatus } from '../services/kopiaClient';
 import { runAppDataBackup } from '../services/backupScheduler';
 import { readAppEnvValue } from '../services/appEnv';
 
@@ -52,14 +52,14 @@ router.get('/', async (_req: Request, res: Response) => {
 
 /**
  * GET /api/backups/status — read-only backup state for the schedule card
- * (§75.2): what Duplicati actually holds and where, and how the last
+ * (§75.2): what Kopia actually holds and where, and how the last
  * app-database dump went. The schedule's own run history stays on
  * GET /schedule; this is the half that was never visible.
  */
 router.get('/status', async (_req: Request, res: Response) => {
   try {
     const [job, lastAppData] = await Promise.all([
-      getBackupJobStatus(readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD')),
+      getBackupSourceStatus(readAppEnvValue('kopia', 'KOPIA_SERVER_PASSWORD')),
       getLastAppDataDump(),
     ]);
     return res.json({ job, lastAppData });
@@ -126,14 +126,14 @@ router.post('/dump-apps', async (req: Request, res: Response) => {
 
 /**
  * POST /api/backups/run — run the app-data backup now (§74.6): dump every app
- * database, then trigger Duplicati. The on-demand twin of the scheduled run,
- * so a user who has just changed the destination can verify it end to end
+ * database, then trigger a Kopia snapshot. The on-demand twin of the scheduled
+ * run, so a user who has just changed the destination can verify it end to end
  * instead of waiting for the next scheduled run.
  *
- * Goes through `runAppDataBackup`, never `runBackupJobNow` directly: the dump
- * must come first, or Duplicati archives the *previous* dump and this backup
- * is silently a generation stale. The dump is synchronous (~20s here); the
- * Duplicati upload it triggers is not, so success here means "queued", and the
+ * Goes through `runAppDataBackup`, never Kopia's client directly: the dump
+ * must come first, or Kopia snapshots the *previous* dump and this backup is
+ * silently a generation stale. The dump is synchronous (~20s here); the Kopia
+ * snapshot it triggers is not, so success here means "queued", and the
  * schedule card's status is where the result lands.
  */
 router.post('/run', async (req: Request, res: Response) => {

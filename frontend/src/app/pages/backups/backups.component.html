@@ -87,7 +87,7 @@
           </ng-template>
           <div class="d-flex gap-2 ms-auto">
             <!-- §74.6: the only way a backup ran was the scheduler. This
-                 goes through the same dump-then-Duplicati path, so a manual
+                 goes through the same dump-then-snapshot path, so a manual
                  run to check a new destination is never a generation stale.
                  Runs ~20s (the dump is synchronous). -->
             <button class="btn btn-sm btn-outline-secondary" [disabled]="runningAppDataBackup" (click)="runAppDataBackup()">
@@ -101,24 +101,24 @@
 
         <!-- §75.2: "the schedule ran" and "restorable backups exist" are
              different facts, and only the first was ever visible. This is
-             what Duplicati actually holds, where, and how the last
-             app-database dump went. -->
+             what Kopia actually holds, where, and how the last app-database
+             dump went. -->
         <div class="border-top mt-3 pt-3 small d-flex flex-column gap-1" *ngIf="backupStatus as st">
           <div>
             <span class="text-body-secondary">Destination:</span>
             <ng-container *ngIf="st.job.configured; else noJob">
-              <code>{{ st.job.destination || 'unknown' }}</code>
-              <span class="text-body-secondary" *ngIf="st.job.versionCount !== null">
-                &middot; {{ st.job.versionCount }} version{{ st.job.versionCount === 1 ? '' : 's' }}</span>
-              <span class="text-body-secondary" *ngIf="st.job.destinationSize">
-                &middot; {{ st.job.destinationSize }}</span>
+              <code>{{ st.job.repositoryDescription || st.job.storageType || 'unknown' }}</code>
+              <span class="text-body-secondary" *ngIf="st.job.snapshotCount !== null">
+                &middot; {{ st.job.snapshotCount }} snapshot{{ st.job.snapshotCount === 1 ? '' : 's' }}</span>
+              <span class="text-body-secondary" *ngIf="st.job.lastSnapshotSizeBytes">
+                &middot; {{ formatBytes(st.job.lastSnapshotSizeBytes) }}</span>
             </ng-container>
             <ng-template #noJob>
-              <span class="text-body-secondary">{{ st.job.reachable ? 'no backup job has been created yet' : 'Duplicati is unreachable' }}</span>
+              <span class="text-body-secondary">{{ st.job.reachable ? 'no backup source has been registered yet' : 'Kopia is unreachable' }}</span>
             </ng-template>
           </div>
-          <div class="text-danger" *ngIf="st.job.configured && st.job.lastErrorMessage">
-            Destination error {{ st.job.lastErrorAt | date:'dd/MM/yyyy, HH:mm' }}: {{ st.job.lastErrorMessage }}
+          <div class="text-danger" *ngIf="st.job.configured && st.job.lastSnapshotErrorCount">
+            Last snapshot at {{ st.job.lastSnapshotAt | date:'dd/MM/yyyy, HH:mm' }} had {{ st.job.lastSnapshotErrorCount }} file error{{ st.job.lastSnapshotErrorCount === 1 ? '' : 's' }}.
           </div>
           <div>
             <span class="text-body-secondary">Last app-database dump:</span>

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.23.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.24.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -232,13 +232,12 @@ Strategy:
 
 ### Backups
 
-- [ ] **Prove a non-Drive destination end to end** (§131.4, §173) — FTP/FTPS
-      are built (§173) and proven as far as connect + auth against real
-      Duplicati, but a completed transfer failed against throwaway
-      containerised FTP servers. `disk`/`SMB`/`NFS` are built and never
-      exercised at all. Prove one of them writes and restores against a
-      production-like server (a NAS, or the live dashboard). Also covers the
-      Kopia translation later.
+- [ ] **Prove a real external destination end to end** (§131.4, §173, §196) —
+      `disk`/`SMB`/`NFS` are the only destination kinds left now that
+      Duplicati (and its FTP/Google Drive support) is gone. The restore proof
+      (§196) used Kopia's local-fallback repository, not a real external
+      mount. Prove one of the three writes and restores against a
+      production-like server (a NAS, or the live dashboard).
 ### Business Lab (§84)
 
 - [ ] **Rebrand, tier 2** (§84.2) — package/image/network/project names. Do it
@@ -287,17 +286,14 @@ Strategy:
 ### Roster changes (§81)
 
 
-- [ ] **A Kopia-native remote backend** (§81.5, §194) — disk/SMB/NFS now
-      translate into Kopia's `/repository` volume, but Google Drive / FTP do
-      not (Kopia has no plain-FTP backend, and its `gdrive` backend needs a
-      GCP service-account JSON, not Duplicati's OAuth AuthID). Add a
+- [ ] **A Kopia-native remote backend** (§81.5, §194, §197) — disk/SMB/NFS
+      translate into Kopia's `/repository` volume; that's the only destination
+      family left now that Duplicati (and its Google Drive / FTP support) is
+      gone (§197). Kopia has no plain-FTP backend, and its `gdrive` backend
+      needs a GCP service-account JSON, not an OAuth AuthID. Add a
       Kopia-native remote option — S3 / B2 / SFTP / `gdrive` — with its own
       credential fields, so a non-mounted destination can be real offsite for
       Kopia too, not a local fallback.
-- [ ] **Remove Duplicati** (§81.5, §196) — the restore proof it was waiting on
-      is done (a real SQLite app and a real Postgres app both restored and
-      opened cleanly). Closes §75.3 (its restore API writes nothing) and
-      §74.6.
 ### Exposure and platform
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
@@ -344,12 +340,6 @@ Strategy:
       10 GB DB cap), a new `mssql` backup engine (`sqlcmd BACKUP DATABASE`),
       docs rows (incl. the No-High-Risk-Use limit: no e-commerce/payments/
       life-safety), and prove a start + backup/restore round-trip.
-- [ ] **Duplicati carries a 5.3 GB uncheckpointed WAL** (§86.4) —
-      `apps/duplicati/data/config/HQFQYTBBPZ.sqlite` is 184 KB with a 5.3 GB
-      `-wal` beside it, untouched since the 2026-09-01 restore test. It sits
-      inside `apps/`, which is the tree Duplicati is pointed at, so the engine
-      is backing up its own WAL. Goes away with Duplicati (§81.5) — but check
-      Kopia's source tree excludes the equivalent.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
 - [ ] **@mat: change Guacamole's default login** (§84.1a) — it ships as

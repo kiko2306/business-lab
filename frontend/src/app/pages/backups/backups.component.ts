@@ -10,10 +10,10 @@ import { extractErrorMessage } from '../../core/api';
 
 /**
  * Backups & restore on its own route (§131.1): the schedule, the on-demand
- * "Back up now" run, what Duplicati actually holds, and the list of restorable
+ * "Back up now" run, what Kopia actually holds, and the list of restorable
  * archives. Lifted verbatim from the one-page dashboard — no API change — so
- * that upcoming backups work (per-app backup/restore, an FTP destination) has a
- * page to grow on rather than another panel on an already-long dashboard.
+ * that upcoming backups work (per-app backup/restore) has a page to grow on
+ * rather than another panel on an already-long dashboard.
  */
 @Component({
   selector: 'app-backups',
@@ -110,7 +110,7 @@ export class BackupsComponent implements OnInit {
 
   loadBackupStatus(): void {
     // Best-effort: this panel is extra detail, not the reason the page exists.
-    // A Duplicati that is down or unprovisioned is a state the card renders,
+    // A Kopia that is down or unprovisioned is a state the card renders,
     // not a toast.
     this.operations.getBackupStatus().subscribe({
       next: (response) => {
@@ -123,8 +123,8 @@ export class BackupsComponent implements OnInit {
   }
 
   runAppDataBackup(): void {
-    // Dumps every app database then triggers Duplicati — the same path the
-    // scheduler takes, so a manual run is never a generation stale (§74.6).
+    // Dumps every app database then triggers a Kopia snapshot — the same path
+    // the scheduler takes, so a manual run is never a generation stale (§74.6).
     // The dump is synchronous, so this request runs ~20s.
     this.runningAppDataBackup = true;
     this.operations.runAppDataBackup().subscribe({
@@ -141,6 +141,24 @@ export class BackupsComponent implements OnInit {
         this.loadBackupStatus();
       },
     });
+  }
+
+  /**
+   * Sizes are reported in bytes; show them in the unit a person would use.
+   * Binary units (KiB steps), matching the utils page's formatter.
+   */
+  protected formatBytes(bytes: number): string {
+    if (!bytes || bytes < 0) {
+      return '—';
+    }
+    const units = ['B', 'KiB', 'MiB', 'GiB', 'TiB', 'PiB'];
+    let value = bytes;
+    let unit = 0;
+    while (value >= 1024 && unit < units.length - 1) {
+      value /= 1024;
+      unit += 1;
+    }
+    return `${value >= 10 || unit <= 1 ? Math.round(value) : value.toFixed(1)} ${units[unit]}`;
   }
 
   saveSchedule(): void {

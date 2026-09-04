@@ -15,12 +15,9 @@ const dumps = vi.hoisted(() => ({
     outcomes: [] as { app: string; kind: string; ok: boolean; detail: string }[],
   })),
 }));
-const duplicati = vi.hoisted(() => ({ runBackupJobNow: vi.fn(async () => ({ started: true, detail: 'ok' })) }));
 const kopia = vi.hoisted(() => ({
   snapshotAppData: vi.fn(async () => ({ started: true, detail: 'triggered a Kopia snapshot of /source/apps' })),
 }));
-// readAppEnvValue is shared by both engines; the key it is called with tells
-// them apart. Default: neither has a password.
 const appEnv = vi.hoisted(() => ({ readAppEnvValue: vi.fn((_app: string, _key: string): string | null => null) }));
 const audit = vi.hoisted(() => ({
   writeAuditLog: vi.fn(
@@ -34,7 +31,6 @@ const audit = vi.hoisted(() => ({
 
 vi.mock('./backup', () => backup);
 vi.mock('./appDumps', () => dumps);
-vi.mock('./duplicatiClient', () => duplicati);
 vi.mock('./kopiaClient', () => kopia);
 vi.mock('./appEnv', () => appEnv);
 vi.mock('../utils/audit', () => audit);
@@ -170,8 +166,8 @@ describe('runAppDataBackup failure reporting', () => {
     vi.clearAllMocks();
     backup.pruneOldBackups.mockResolvedValue([]);
     backup.getBackupScheduleConfig.mockResolvedValue(due);
-    appEnv.readAppEnvValue.mockReturnValue('duplicati-password');
-    duplicati.runBackupJobNow.mockResolvedValue({ started: true, detail: 'ok' });
+    appEnv.readAppEnvValue.mockReturnValue('kopia-password');
+    kopia.snapshotAppData.mockResolvedValue({ started: true, detail: 'ok' });
   });
 
   it('records which apps failed to dump and why, not just how many', async () => {
@@ -218,7 +214,7 @@ describe('runAppDataBackup failure reporting', () => {
       failed: 1,
       failures: [{ app: 'paperless', kind: 'postgres', detail: 'connection refused' }],
     });
-    expect(duplicati.runBackupJobNow).not.toHaveBeenCalled();
+    expect(kopia.snapshotAppData).not.toHaveBeenCalled();
   });
 
   it('caps the recorded failures while keeping the true count', async () => {
@@ -259,25 +255,25 @@ describe('runAppDataBackup — the on-demand "Back up now" path (§74.6)', () =>
 
   beforeEach(() => {
     vi.clearAllMocks();
-    appEnv.readAppEnvValue.mockReturnValue('duplicati-password');
+    appEnv.readAppEnvValue.mockReturnValue('kopia-password');
     dumps.dumpAllAppDatabases.mockResolvedValue({
       ok: 3,
       failed: 0,
       outcomes: [{ app: 'n8n', kind: 'postgres', ok: true, detail: 'dumped 442 KB' }],
     });
-    duplicati.runBackupJobNow.mockResolvedValue({ started: true, detail: 'queued Duplicati job 3' });
+    kopia.snapshotAppData.mockResolvedValue({ started: true, detail: 'triggered a Kopia snapshot of /source/apps' });
   });
 
-  it('dumps first, then triggers Duplicati, and stamps the row as a manual run', async () => {
+  it('dumps first, then triggers Kopia, and stamps the row as a manual run', async () => {
     const result = await runAppDataBackup('manual');
 
     const order = [
       dumps.dumpAllAppDatabases.mock.invocationCallOrder[0],
-      duplicati.runBackupJobNow.mock.invocationCallOrder[0],
+      kopia.snapshotAppData.mock.invocationCallOrder[0],
     ];
-    expect(order[0]).toBeLessThan(order[1]); // dump before archive, or it is a generation stale
+    expect(order[0]).toBeLessThan(order[1]); // dump before snapshot, or it is a generation stale
     expect(appDataRow()?.metadata).toMatchObject({ trigger: 'manual', dumped: 3, failed: 0 });
-    expect(result).toEqual({ ok: true, detail: 'queued Duplicati job 3' });
+    expect(result).toEqual({ ok: true, detail: 'triggered a Kopia snapshot of /source/apps' });
   });
 
   it('defaults to a scheduled trigger when none is given', async () => {
@@ -289,7 +285,7 @@ describe('runAppDataBackup — the on-demand "Back up now" path (§74.6)', () =>
     appEnv.readAppEnvValue.mockReturnValue(null);
     const result = await runAppDataBackup('manual');
     expect(result).toEqual({ ok: false, detail: 'the backup engine has no password configured yet' });
-    expect(duplicati.runBackupJobNow).not.toHaveBeenCalled();
+    expect(kopia.snapshotAppData).not.toHaveBeenCalled();
   });
 
   it('notes partial dump failures in the returned detail without failing the run', async () => {
@@ -300,7 +296,7 @@ describe('runAppDataBackup — the on-demand "Back up now" path (§74.6)', () =>
     });
     const result = await runAppDataBackup('manual');
     expect(result.ok).toBe(true);
-    expect(result.detail).toBe('queued Duplicati job 3; 1 database dump failed');
+    expect(result.detail).toBe('triggered a Kopia snapshot of /source/apps; 1 database dump failed');
   });
 
   it('fails when nothing dumped and the engine was never reached', async () => {
@@ -312,7 +308,7 @@ describe('runAppDataBackup — the on-demand "Back up now" path (§74.6)', () =>
         { app: 'b', kind: 'sqlite', ok: false, detail: 'y' },
       ],
     });
-    duplicati.runBackupJobNow.mockResolvedValue({ started: true, detail: 'queued' });
+    kopia.snapshotAppData.mockResolvedValue({ started: true, detail: 'queued' });
     const result = await runAppDataBackup('manual');
     expect(result.ok).toBe(false);
   });
@@ -333,8 +329,8 @@ describe('recording what the run actually did', () => {
     vi.clearAllMocks();
     backup.pruneOldBackups.mockResolvedValue([]);
     backup.getBackupScheduleConfig.mockResolvedValue(due);
-    appEnv.readAppEnvValue.mockReturnValue('duplicati-password');
-    duplicati.runBackupJobNow.mockResolvedValue({ started: true, detail: 'ok' });
+    appEnv.readAppEnvValue.mockReturnValue('kopia-password');
+    kopia.snapshotAppData.mockResolvedValue({ started: true, detail: 'ok' });
     dumps.dumpAllAppDatabases.mockResolvedValue({ ok: 3, failed: 0, outcomes: [] });
   });
 
@@ -344,7 +340,7 @@ describe('recording what the run actually did', () => {
       order.push('dump');
       return { ok: 3, failed: 0, outcomes: [] };
     });
-    duplicati.runBackupJobNow.mockImplementation(async () => {
+    kopia.snapshotAppData.mockImplementation(async () => {
       order.push('engine');
       return { started: true, detail: 'ok' };
     });
@@ -365,7 +361,7 @@ describe('recording what the run actually did', () => {
   });
 
   it('records failure when the engine refused to start', async () => {
-    duplicati.runBackupJobNow.mockResolvedValue({ started: false, detail: 'rejected the password' });
+    kopia.snapshotAppData.mockResolvedValue({ started: false, detail: 'rejected the password' });
 
     await runScheduledBackupCheck();
 
@@ -403,68 +399,6 @@ describe('recording what the run actually did', () => {
     await runScheduledBackupCheck();
 
     expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
-  });
-});
-
-describe('Kopia runs in parallel with Duplicati (§81.5)', () => {
-  const appDataRow = () =>
-    audit.writeAuditLog.mock.calls.map((call) => call[0]).find((options) => options.resource === 'app-data');
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    dumps.dumpAllAppDatabases.mockResolvedValue({ ok: 3, failed: 0, outcomes: [] });
-    duplicati.runBackupJobNow.mockResolvedValue({ started: true, detail: 'queued Duplicati job 3' });
-    kopia.snapshotAppData.mockResolvedValue({ started: true, detail: 'triggered a Kopia snapshot of /source/apps' });
-  });
-
-  it('snapshots Kopia with its own password and records the outcome on the audit row', async () => {
-    appEnv.readAppEnvValue.mockImplementation((app: string) =>
-      app === 'kopia' ? 'kopia-password' : 'duplicati-password'
-    );
-
-    await runAppDataBackup('manual');
-
-    expect(kopia.snapshotAppData).toHaveBeenCalledWith('kopia-password');
-    expect(appDataRow()?.metadata).toMatchObject({
-      kopia: { started: true, detail: 'triggered a Kopia snapshot of /source/apps' },
-    });
-  });
-
-  it('does not let a Kopia failure change the run outcome — Duplicati still gates it', async () => {
-    appEnv.readAppEnvValue.mockReturnValue('a-password');
-    kopia.snapshotAppData.mockResolvedValue({ started: false, detail: 'Kopia is not reachable' });
-
-    const result = await runAppDataBackup('manual');
-
-    expect(result).toEqual({ ok: true, detail: 'queued Duplicati job 3' });
-    expect(appDataRow()?.result).toBe('success');
-    expect(appDataRow()?.metadata).toMatchObject({ kopia: { started: false } });
-  });
-
-  it('skips Kopia quietly when it has no password, and still records that', async () => {
-    appEnv.readAppEnvValue.mockImplementation((app: string) =>
-      app === 'kopia' ? null : 'duplicati-password'
-    );
-
-    await runAppDataBackup('manual');
-
-    expect(kopia.snapshotAppData).not.toHaveBeenCalled();
-    expect(appDataRow()?.metadata).toMatchObject({
-      kopia: { started: false, detail: 'Kopia has no password configured yet' },
-    });
-  });
-
-  it('still snapshots Kopia when Duplicati has no password', async () => {
-    appEnv.readAppEnvValue.mockImplementation((app: string) =>
-      app === 'kopia' ? 'kopia-password' : null
-    );
-
-    const result = await runAppDataBackup('manual');
-
-    expect(kopia.snapshotAppData).toHaveBeenCalledWith('kopia-password');
-    // Duplicati still gates: no password there is a failed run.
-    expect(result.ok).toBe(false);
-    expect(appDataRow()?.metadata).toMatchObject({ kopia: { started: true } });
   });
 });
 

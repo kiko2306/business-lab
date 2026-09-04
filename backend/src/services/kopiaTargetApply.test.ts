@@ -12,7 +12,7 @@ import { ensureKopiaRepoDir } from './kopiaTargetApply';
 // Only ensureKopiaRepoDir takes an explicit appDir and touches nothing else,
 // so it is the one piece worth a unit test — applyKopiaTarget / readApplied*
 // are a thin shell over `docker` + the real registry, proven against the live
-// stack (plan.md §194), the same way backupTargetApply.ts is left untested.
+// stack instead (plan.md §194).
 describe('ensureKopiaRepoDir', () => {
   let dir: string;
 

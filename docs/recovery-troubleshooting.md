@@ -39,10 +39,10 @@ There are **two** backups, for different jobs:
 
 | | The scheduled off-site backup | Per-app snapshots |
 |---|---|---|
-| What | The whole `apps/` tree, one encrypted, versioned archive at your chosen destination (disk / SMB / NFS / Drive / FTP) via Duplicati | One `.tar.gz` per app, kept locally in `backups/apps/<app>/` (the `backups-data` volume) |
+| What | The whole `apps/` tree, one encrypted, deduplicated snapshot at your chosen destination (disk / SMB / NFS) via Kopia | One `.tar.gz` per app, kept locally in `backups/apps/<app>/` (the `backups-data` volume) |
 | For | Disaster recovery — the box is gone, or you need last week's state | A quick rollback point *before* you reconfigure or update an app |
 | Where | Dashboard → **Backups** page (schedule, retention, "Back up now", destination) | Each app's card → **Settings → Backups** (Back up now / Restore / Download / Delete) |
-| Retention | Configurable (`7D:1D,4W:1W,12M:1M` inside Duplicati) | Last 10 per app |
+| Retention | Kopia's ladder (10 latest, 24 hourly, 14 daily, 8 weekly, 6 monthly, 2 annual) | Last 10 per app |
 
 ### Management-stack backup (the dashboard's own database)
 
@@ -104,7 +104,7 @@ the live stack (`plan.md` §183).
 
 The scheduled app-data backup dumps every SQL database (`pg_dump` /
 `mariadb-dump`) and snapshots every SQLite file (`sqlite3 .backup`) before
-Duplicati copies `apps/`. Two apps embed a database with no equivalent
+Kopia snapshots `apps/`. Two apps embed a database with no equivalent
 online-dump path, so their live DB file is copied as-is:
 
 | App | Engine | File |
@@ -136,7 +136,7 @@ easily rebuilt:
 
 **If you need a clean copy anyway:** stop the app from the dashboard, let one
 scheduled backup (or "Back up now") complete, then start it again — the file is
-quiescent while Duplicati reads it.
+quiescent while Kopia reads it.
 
 ### OnlyOffice keeps no persistent state
 

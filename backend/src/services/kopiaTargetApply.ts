@@ -1,8 +1,8 @@
 /**
- * Makes a saved backup destination take effect for Kopia, alongside
- * `backupTargetApply.ts` which does the same for Duplicati (plan.md §81.5).
+ * Makes a saved backup destination take effect for Kopia (plan.md §81.5,
+ * §196 — the only engine now that Duplicati is gone).
  *
- * The mechanics are identical to Duplicati's, and for the same two reasons:
+ * Saving the choice is not enough, for two reasons that are easy to miss:
  *
  *   1. `apps/kopia/docker-compose.yml` reads BACKUP_MOUNT_TYPE / OPTIONS /
  *      DEVICE from that app's `.env` to template its `backup-target` volume.
@@ -119,13 +119,13 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
   const mount = toKopiaRepositoryMount(target);
 
   try {
-    writeMountEnv(resolved.appDir, mount.spec);
+    writeMountEnv(resolved.appDir, mount);
     ensureKopiaRepoDir(resolved.appDir);
   } catch (error) {
     return { applied: false, restarted: false, detail: `Could not write Kopia's config: ${(error as Error).message}` };
   }
 
-  const savedNote = mount.supported ? 'Saved.' : `Saved. ${mount.reason}`;
+  const savedNote = 'Saved.';
 
   const running = await run('docker', ['ps', '-q', '-f', 'name=kopia'], 10_000);
   if (!running.output.trim()) {
@@ -155,7 +155,7 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
     };
   }
 
-  logger.info('Applied the backup destination and recreated Kopia', { supported: mount.supported });
+  logger.info('Applied the backup destination and recreated Kopia');
   return {
     applied: true,
     restarted: true,

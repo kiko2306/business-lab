@@ -1,17 +1,12 @@
 /**
  * Talks to the Kopia server's REST API, so the dashboard is the only place
- * backups are configured and driven — the same role `duplicatiClient.ts` plays
- * for Duplicati, and the first half of replacing it (plan.md §81.5).
+ * backups are configured and driven. Kopia replaced Duplicati as the backup
+ * engine (plan.md §81.5, §196).
  *
- * Kopia stays the engine: it does content-addressed dedup, encryption,
- * retention and restore properly (and unlike Duplicati its restore API
- * actually writes files — §75.3). The dashboard owns the *decisions* — which
- * source, what retention, when to snapshot, where to restore — and pushes them
- * in over this client.
- *
- * Slice 2 is this module and its tests only. Wiring it into the scheduler, the
- * Settings panel and the backup-destination translation are later slices; until
- * then Duplicati still runs in parallel.
+ * Kopia does content-addressed dedup, encryption, retention and restore
+ * properly (and unlike Duplicati its restore API actually writes files —
+ * §75.3). The dashboard owns the *decisions* — which source, what retention,
+ * when to snapshot, where to restore — and pushes them in over this client.
  *
  * ## Auth
  *
@@ -28,8 +23,7 @@ import logger from '../utils/logger';
 
 /**
  * What Kopia snapshots: the managed apps/ tree, mounted read-only into the
- * container by `apps/kopia/docker-compose.yml` as `/source/apps`. Matches
- * Duplicati's `SOURCE_PATH` so the two engines back up exactly the same tree.
+ * container by `apps/kopia/docker-compose.yml` as `/source/apps`.
  */
 const SOURCE_PATH = '/source/apps';
 
@@ -63,7 +57,7 @@ const DEFAULT_RETENTION: KopiaRetention = {
 function apiBase(): string {
   // host.docker.internal resolves to the host gateway from inside the
   // management container (compose adds the extra_hosts entry), so this reaches
-  // Kopia's published port the same way duplicatiClient reaches Duplicati's.
+  // Kopia's published port.
   return process.env.KOPIA_API_URL || 'http://host.docker.internal:10470';
 }
 
@@ -223,7 +217,7 @@ async function localSourceId(session: Session, path: string): Promise<KopiaSourc
 /**
  * Check the server is reachable and its repository is connected, without
  * changing anything. Never throws — returns `ok:false` with a reason, the same
- * contract `duplicatiClient.testDestinationUrl` uses.
+ * contract a destination-test call should always use.
  */
 export async function checkKopiaConnection(password: string): Promise<{ ok: boolean; detail: string }> {
   try {
@@ -290,7 +284,8 @@ export interface ProvisionSourceResult {
  * empty per-source policy so it inherits the global retention ladder. Safe to
  * call repeatedly. Throws on a real failure — this is provisioning, and a
  * caller that asked for it wants to know it did not happen (mirrors
- * `duplicatiClient.provisionBackupJob`).
+ * provisioning generally: a caller that asked for it wants to know it did
+ * not happen.)
  */
 export async function provisionBackupSource(password: string): Promise<ProvisionSourceResult> {
   const session = await openSession(password);
@@ -369,11 +364,11 @@ export async function runSnapshotNow(password: string): Promise<{ started: boole
 /**
  * The single call the backup scheduler makes: register the managed source if
  * it is not already (idempotent), then snapshot it. Mirrors
- * `duplicatiClient.runBackupJobNow` — one call, never throws.
+ * one call, never throws.
  *
- * Provisioning here rather than in a separate settings route (as Duplicati
- * does) is deliberate: it is cheap and idempotent, so the first scheduled run
- * sets Kopia up with no extra operator step.
+ * Provisioning here rather than in a separate settings route is deliberate:
+ * it is cheap and idempotent, so the first scheduled run sets Kopia up with
+ * no extra operator step.
  */
 export async function snapshotAppData(password: string): Promise<{ started: boolean; detail: string }> {
   try {
@@ -547,8 +542,7 @@ export async function getRestoreTaskStatus(password: string, taskId: string): Pr
 
 // ---------------------------------------------------------------------------
 // Read-only status for the dashboard's schedule card (later slices).
-// Mirrors duplicatiClient.getBackupJobStatus: never throws, degrades to
-// "unreachable" so the page still renders.
+// Never throws — degrades to "unreachable" so the page still renders.
 // ---------------------------------------------------------------------------
 
 export interface KopiaBackupStatus {

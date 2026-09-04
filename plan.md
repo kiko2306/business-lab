@@ -15651,3 +15651,107 @@ nothing in `src/` changed.
 README TODO: "Prove a Kopia restore" deleted. "Remove Duplicati" now
 unblocked — the restore proof it was waiting on is done; "A Kopia-native
 remote backend" stays open, unrelated to this proof.
+
+## 197. §81.5 — Duplicati removed (2026-09-04)
+
+Duplicati is gone: `apps/duplicati/`, `duplicatiClient.ts` (+ its test),
+`backupTargetApply.ts`, its registry entry, and every route/service/frontend
+reference. Kopia is now the sole backup engine — no more "runs in parallel"
+qualifier anywhere.
+
+### Scope decision
+
+Removing Duplicati also removes `googledrive`/`ftp`/`ftps` as destination
+kinds: Duplicati spoke those protocols directly (OAuth AuthID, `aftp://`
+URLs), and Kopia has no equivalent yet — no plain-FTP backend, and its
+`gdrive` backend wants a GCP service-account JSON, not an AuthID. Confirmed
+with the user before starting (a real functional narrowing, not just a
+refactor): only `disk`/`smb`/`nfs` remain as destination kinds. "A
+Kopia-native remote backend" (§194) stays open, separately, for whoever wants
+S3/B2/SFTP/`gdrive` back.
+
+### Backend
+
+- `backupScheduler.ts`: `runAppDataBackupLocked` now reads
+  `KOPIA_SERVER_PASSWORD` directly and calls `snapshotAppData` as the gating
+  call — no more "Kopia runs alongside, Duplicati still gates" split. The
+  `snapshotKopiaAppData` wrapper folded into the main path since there was
+  only one caller left.
+- `routes/backup.ts`: `GET /status` now calls `kopiaClient.getBackupSourceStatus`
+  instead of `duplicatiClient.getBackupJobStatus` — a materially different
+  shape (`repositoryDescription`/`storageType`/`snapshotCount`/
+  `lastSnapshotAt`/`lastSnapshotSizeBytes`/`lastSnapshotFileCount`/
+  `lastSnapshotErrorCount`/`sourceStatus` vs. Duplicati's `destination`/
+  `versionCount`/`lastBackupAt`/`lastErrorMessage`).
+- `routes/settings.ts`: `PUT /backup-target` now applies only through
+  `applyKopiaTarget`; the "backend destination" test branch (which spoke to
+  Duplicati) and the whole `POST /backup-target/provision-job` route are gone
+  — Kopia's `snapshotAppData` already registers its source idempotently on
+  first run, so there was never a separate "provision the job" step for it.
+  `GET /backup-target` drops `folder`/`authIdConfigured`/`oauthUrl`.
+- `utils/backupTarget.ts`: `BackupTargetKind` narrowed to `'disk'|'smb'|'nfs'`.
+  Dropped `toDuplicatiUrl`, both `DUPLICATI_OAUTH_*` constants,
+  `DEFAULT_BACKUP_FOLDER`, `isMountedKind` (every kind is mounted now) and the
+  `authId`/`folder` fields. `toKopiaRepositoryMount` is now a straight
+  `toMountSpec` call — no more `{spec, supported, reason}` wrapper, since
+  there is no unsupported case left to report.
+- `kopiaTargetApply.ts`: `toKopiaRepositoryMount` return type simplified to
+  match; doc comment no longer cites `backupTargetApply.ts` as a sibling.
+- `config/services.ts`: `duplicati` entry deleted.
+- `middleware/validation.ts`: `backupTarget` schema's `kind` enum narrowed;
+  `authId`/`folder` dropped.
+
+### Frontend
+
+- `models.ts`: `BackupJobStatus` now mirrors `KopiaBackupStatus`.
+  `BackupTargetKind` narrowed; `BackupTargetSettings`/`BackupTargetInput`
+  drop `folder`/`authIdConfigured`/`oauthUrl`/`authId`. `BackupJobProvisionResponse`
+  deleted.
+- `settings.component.ts`/`.html`: the destination `<select>` drops FTP/FTPS/
+  Google Drive; their three form fields, the `backupTargetIsMounted` getter,
+  `provisionBackupJob()` and the one-time passphrase warning block are gone —
+  there is no "create the job" step for Kopia to begin with.
+- `backups.component.html`: the status card reads Kopia's fields
+  (`repositoryDescription`/`snapshotCount`/`lastSnapshotSizeBytes`/
+  `lastSnapshotErrorCount`) instead of Duplicati's; added a `formatBytes`
+  helper (same formula as the Utils page) since Kopia reports raw bytes, not
+  a pre-formatted string.
+
+### Docs
+
+`app-credentials.md`, `ports.md` (§10150 added to "retired ports"),
+`licences.md` (row + LinuxServer.io mention), `raspberry-pi.md`,
+`user-guide.md`, `recovery-troubleshooting.md` — every Duplicati mention
+updated or removed. `apps/kopia/docker-compose.yml`, `.env.example` and
+`entrypoint.sh` had comments that described themselves relative to Duplicati
+("same shape as apps/duplicati/…", "Google Drive/FTP have no Kopia-native
+equivalent yet") — reworded to stand on their own.
+
+### Verified
+
+- Backend `npm run typecheck` + `npm test`: 520 passed. `backupScheduler.test.ts`
+  rewritten for the single-engine flow (dropped the `duplicati` mock and the
+  "runs in parallel" describe block); `backupTarget.test.ts` rewritten,
+  dropping every Duplicati-URL/OAuth/backend-family test.
+- Frontend `ng build` clean; `npm run test:ci` — 46/46 (Chrome + its shared
+  libs had to be installed into the throwaway `node:20` container first; not
+  present by default).
+- **Against the live stack** (this host doubles as `tx-home-utils.com`):
+  rebuilt and recreated `backend`/`frontend` individually (never a root
+  `docker compose down`). On boot, `reconcileRemovedServices` found
+  `duplicati` gone from the registry and deprovisioned its exposure
+  unprompted — the same mechanism proven in the Watchtower removal (§82.2a).
+  `docker compose -p duplicati down -v` removed the container and its volume;
+  `apps/duplicati/` deleted from disk (its `data/` was 75 MB, gitignored).
+  Called `runAppDataBackup('manual')` in-process against the built `dist/`:
+  30 databases dumped, Kopia snapshot triggered, `{ok:true}` — Kopia gating
+  the run end to end with Duplicati completely gone. `getBackupSourceStatus`
+  confirmed the running repository, matching the shape the frontend now
+  expects.
+
+README TODO: "Remove Duplicati" deleted (done). "Prove a non-Drive
+destination end to end" reworded — FTP/FTPS no longer exist to prove, so it's
+now "prove disk/SMB/NFS against a real external destination". "A Kopia-native
+remote backend" reworded to not lean on Duplicati for context. "Duplicati
+carries a 5.3 GB uncheckpointed WAL" deleted — resolved by removing
+`apps/duplicati/` outright.

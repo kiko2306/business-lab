@@ -406,20 +406,25 @@ export interface BackupScheduleConfig extends BackupScheduleSettings {
   consecutiveFailures: number;
 }
 
-/** Read-only view of what Duplicati actually holds — see GET /backups/status. */
+/** Read-only view of what Kopia actually holds — see GET /backups/status. */
 export interface BackupJobStatus {
+  /** Kopia's web server answered. false → everything below is null/false. */
   reachable: boolean;
+  /** The managed app-data source is registered as a snapshot source. */
   configured: boolean;
-  destination: string | null;
-  versionCount: number | null;
-  destinationSize: string | null;
-  destinationSizeBytes: number | null;
-  sourceSize: string | null;
-  lastBackupAt: string | null;
-  lastBackupFinishedAt: string | null;
-  lastBackupDuration: string | null;
-  lastErrorAt: string | null;
-  lastErrorMessage: string | null;
+  /** Human-readable repository description, e.g. "Repository in Filesystem: /repository". */
+  repositoryDescription: string | null;
+  /** Backend kind, e.g. "filesystem", "s3", "gcs". */
+  storageType: string | null;
+  /** Restore points currently held for the managed source. */
+  snapshotCount: number | null;
+  lastSnapshotAt: string | null;
+  lastSnapshotSizeBytes: number | null;
+  lastSnapshotFileCount: number | null;
+  /** File-level errors in the last snapshot (a non-zero here is worth a warning). */
+  lastSnapshotErrorCount: number | null;
+  /** Source state: `IDLE`, `UPLOADING`, `PENDING`, … */
+  sourceStatus: string | null;
 }
 
 export interface BackupAppDumpFailure {
@@ -557,7 +562,7 @@ export interface MailTestResponse {
   imap: { ok: boolean; detail: string } | null;
 }
 
-export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 'googledrive' | 'ftp' | 'ftps';
+export type BackupTargetKind = 'disk' | 'smb' | 'nfs';
 
 /** GET /settings/backup-target. Secrets report only whether they are set. */
 export interface BackupTargetSettings {
@@ -569,10 +574,6 @@ export interface BackupTargetSettings {
   username: string | null;
   passwordConfigured: boolean;
   options: string | null;
-  folder: string | null;
-  authIdConfigured: boolean;
-  /** Where the user obtains a Google Drive AuthID. */
-  oauthUrl: string;
 }
 
 export interface BackupTargetInput {
@@ -583,21 +584,10 @@ export interface BackupTargetInput {
   username?: string;
   password?: string;
   options?: string;
-  authId?: string;
-  folder?: string;
 }
 
 export interface BackupTargetTestResponse {
   success: boolean;
   message: string;
   detail: string;
-}
-
-export interface BackupJobProvisionResponse {
-  message: string;
-  jobId: string;
-  targetUrl: string;
-  /** Shown once so it can be recorded off-box — backups are unrestorable without it. */
-  passphrase: string;
-  scheduled: string;
 }

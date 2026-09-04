@@ -109,7 +109,7 @@ describe('toLastAppDataDump', () => {
     const row = {
       result: 'failure',
       created_at: new Date('2026-09-01T19:40:39Z'),
-      metadata: { detail: 'Duplicati rejected the password.', dumped: 18, failed: 8, trigger: 'scheduled' },
+      metadata: { detail: 'Kopia rejected the password.', dumped: 18, failed: 8, trigger: 'scheduled' },
     };
     const mapped = toLastAppDataDump(row);
     expect(mapped?.failed).toBe(8);

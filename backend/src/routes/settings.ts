@@ -6,21 +6,13 @@ import { schemas, validateBody } from '../middleware/validation';
 import { requireCapability } from '../middleware/requireCapability';
 import {
   BACKUP_TARGET_KEYS,
-  DEFAULT_BACKUP_FOLDER,
   getBackupTarget,
-  DUPLICATI_OAUTH_LOGIN_URL,
-  isMountedKind,
-  toDuplicatiUrl,
   toKopiaRepositoryMount,
   toMountSpec,
   validateTarget,
 } from '../utils/backupTarget';
-import logger from '../utils/logger';
 import { testBackupTarget } from '../services/backupTargetTest';
-import { ensureDestinationFolder, provisionBackupJob, testDestinationUrl } from '../services/duplicatiClient';
-import { applyBackupTarget } from '../services/backupTargetApply';
 import { applyKopiaTarget } from '../services/kopiaTargetApply';
-import { readAppEnvValue } from '../services/appEnv';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
 import { testMailConnection } from '../services/mailTest';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig } from '../utils/exposureSettings';
@@ -442,12 +434,6 @@ router.get('/backup-target', async (_req: Request, res: Response) => {
       username: values[BACKUP_TARGET_KEYS.username] ?? null,
       passwordConfigured: Boolean(values[BACKUP_TARGET_KEYS.password]),
       options: values[BACKUP_TARGET_KEYS.options] ?? null,
-      // A blank folder still resolves to a real one at backup time
-      // (toDuplicatiUrl), so report the folder actually in use rather than an
-      // empty field the operator can't interpret.
-      folder: values[BACKUP_TARGET_KEYS.folder] || DEFAULT_BACKUP_FOLDER,
-      authIdConfigured: Boolean(values[BACKUP_TARGET_KEYS.authId]),
-      oauthUrl: DUPLICATI_OAUTH_LOGIN_URL,
     });
   } catch {
     return res.status(500).json({ error: 'Unable to load the backup destination.' });
@@ -468,8 +454,6 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
     // Keep the stored password when the field is left blank.
     password: req.body.password || existing?.password || '',
     options: (req.body.options ?? '').trim(),
-    authId: req.body.authId || existing?.authId || '',
-    folder: (req.body.folder ?? '').trim(),
   };
 
   const problem = validateTarget(target);
@@ -485,11 +469,9 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
     [BACKUP_TARGET_KEYS.username]: target.username,
     [BACKUP_TARGET_KEYS.options]: target.options,
   };
-  values[BACKUP_TARGET_KEYS.folder] = target.folder;
   // Secrets only overwrite when supplied, so saving with the field blank keeps
   // the stored value — same convention as every other credential here.
   if (req.body.password) values[BACKUP_TARGET_KEYS.password] = req.body.password;
-  if (req.body.authId) values[BACKUP_TARGET_KEYS.authId] = req.body.authId;
 
   try {
     for (const [key, value] of Object.entries(values)) {
@@ -509,22 +491,16 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
       result: 'success',
     }).catch(() => {});
 
-    // Saving alone leaves Duplicati mounted at the previous destination while
-    // the UI claims otherwise, so apply it here rather than asking the user to
+    // Saving alone leaves Kopia mounted at the previous destination while the
+    // UI claims otherwise, so apply it here rather than asking the user to
     // remember a restart — and a restart alone is not enough, because Docker
-    // reuses a named volume whose definition changed (see backupTargetApply).
-    const applied = await applyBackupTarget(target);
-    // Kopia follows the same destination (§81.5). Both run in parallel during
-    // the migration; a Kopia apply failure must not fail the save.
-    const kopiaApplied = await applyKopiaTarget(target);
+    // reuses a named volume whose definition changed (see kopiaTargetApply).
+    const applied = await applyKopiaTarget(target);
 
     return res.json({
-      message: `${applied.detail} (Kopia: ${kopiaApplied.detail})`,
+      message: applied.detail,
       restarted: applied.restarted,
-      kopiaRestarted: kopiaApplied.restarted,
-      // Only one of these is meaningful, depending on the family.
-      mount: isMountedKind(target.kind) ? toMountSpec(target) : null,
-      duplicatiUrl: toDuplicatiUrl(target),
+      mount: toMountSpec(target),
       kopiaRepository: toKopiaRepositoryMount(target),
     });
   } catch {
@@ -545,91 +521,8 @@ router.post('/backup-target/test', async (_req: Request, res: Response) => {
     return res.status(400).json({ error: problem });
   }
 
-  if (!isMountedKind(target.kind)) {
-    // A backend destination cannot be mounted, so it is tested through
-    // Duplicati itself — the same code path a backup uses, which makes this
-    // authoritative rather than indicative. Previously this returned an
-    // honest "cannot verify", which meant a broken credential was only
-    // discovered by a failed backup.
-    const url = toDuplicatiUrl(target);
-    const password = readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD');
-    if (!url || !password) {
-      return res.status(400).json({
-        error: 'Start the Duplicati app once so the dashboard can test this destination through it.',
-      });
-    }
-    let outcome = await testDestinationUrl(password, url);
-
-    // A missing folder is not a reason to fail a test the user cannot act on
-    // from here — creating it is the only sensible thing they would do next.
-    // Only ever attempted when the destination reports exactly that, so it
-    // cannot paper over a credential or connectivity problem.
-    let created = false;
-    if (!outcome.ok && /missing-folder/i.test(outcome.detail)) {
-      const folder = await ensureDestinationFolder(password, url);
-      created = folder.ok;
-      if (folder.ok) {
-        outcome = await testDestinationUrl(password, url);
-      }
-    }
-
-    return res.status(outcome.ok ? 200 : 400).json({
-      success: outcome.ok,
-      message: outcome.ok
-        ? created
-          ? 'Destination created and verified by Duplicati.'
-          : 'Destination verified by Duplicati.'
-        : 'Duplicati could not use this destination.',
-      detail: outcome.detail,
-    });
-  }
-
   const result = await testBackupTarget(toMountSpec(target));
   return res.status(result.success ? 200 : 400).json(result);
-});
-
-// ---------------------------------------------------------------------------
-// POST /api/settings/backup-target/provision-job
-// Push the chosen destination into Duplicati as a real backup job, so the
-// dashboard is the only place backups are configured.
-// ---------------------------------------------------------------------------
-router.post('/backup-target/provision-job', async (req: Request, res: Response) => {
-  try {
-    const password = readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD');
-    if (!password) {
-      return res.status(400).json({
-        error: 'Duplicati has no password set yet — start the Duplicati app once so the dashboard can generate one.',
-      });
-    }
-
-    const scheduleRow = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [
-      'backup_schedule_frequency',
-    ]);
-    const frequency = scheduleRow.rows[0]?.value === 'weekly' ? 'weekly' : 'daily';
-
-    const result = await provisionBackupJob(password, frequency);
-
-    await writeAuditLog({
-      userId: req.user?.id ?? null,
-      action: 'settings_change',
-      resource: 'backup_job',
-      result: 'success',
-      metadata: { created: result.created, jobId: result.jobId },
-    }).catch(() => {});
-
-    return res.json({
-      message: result.created ? 'Backup job created in Duplicati.' : 'Backup job updated in Duplicati.',
-      jobId: result.jobId,
-      // Masked — the AuthID is embedded in a Google Drive target URL.
-      targetUrl: result.targetUrl.replace(/authid=[^&]+/, 'authid=***'),
-      passphrase: result.passphrase,
-      scheduled: frequency,
-    });
-  } catch (error) {
-    const message = (error as Error).message;
-    logger.error('Backup job provisioning failed', { error: message });
-    return res.status(400).json({ error: message });
-  }
 });
 
 // ---------------------------------------------------------------------------

@@ -250,7 +250,7 @@ router.post(
 // ---------------------------------------------------------------------------
 // Per-application backup (plan.md §185). A self-contained local .tar.gz per
 // app — a quick rollback point before reconfiguring it — separate from the
-// offsite Duplicati/Kopia job. `backups:manage` gates all four, the same
+// offsite Kopia job. `backups:manage` gates all four, the same
 // capability the global /api/backups routes use.
 // ---------------------------------------------------------------------------
 

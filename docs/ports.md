@@ -69,7 +69,7 @@ hand edit can leave its copy disagreeing with the app's.
 ## Current allocation
 
 `10100` authelia · `10110` beszel · `10120` bookstack · `10130` code-server ·
-`10140` dozzle · `10150` duplicati · `10160` file-browser ·
+`10140` dozzle · `10160` file-browser ·
 `10190` home-page · `10200` immich · `10210` jellyfin ·
 `10220` kitchen-switcher · `10230` mealie · `10240` n8n ·
 `10250`–`10253` netbird (management, dashboard, signal, relay) ·
@@ -132,7 +132,7 @@ every hostname breaks at once:
 
 ### Retired ports
 
-`10170` (grocy) and `10330`/`10331` (portainer) are retired, not free. A removed app can still have an NPM proxy
+`10150` (duplicati), `10170` (grocy) and `10330`/`10331` (portainer) are retired, not free. A removed app can still have an NPM proxy
 host and a Cloudflare hostname pointing at its old port for as long as it takes
 the reconciler to clear them, and handing that number to a different app would
 route the old hostname at the new app in the meantime. New apps take the next

@@ -391,8 +391,8 @@ async function assertPortsAvailable(
 /**
  * Read a single value from an app's `.env`.
  *
- * For values the dashboard generated and now needs itself — e.g. Duplicati's
- * web password, so it can drive Duplicati's own API rather than asking the
+ * For values the dashboard generated and now needs itself — e.g. Kopia's
+ * server password, so it can drive Kopia's own API rather than asking the
  * user to re-enter a password the dashboard chose.
  */
 export function readAppEnvValue(serviceName: string, key: string): string | null {

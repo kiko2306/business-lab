@@ -1,6 +1,6 @@
 /**
  * Per-application backup archives — a self-contained local `.tar.gz` per app,
- * separate from the offsite Duplicati/Kopia job (plan.md §185).
+ * separate from the offsite Kopia job (plan.md §185).
  *
  * The offsite job is one archive over the whole `apps/` tree, versioned and
  * encrypted, and its restore path is the CLI (§75.3). This is the other thing:
@@ -9,7 +9,7 @@
  * consistent database dump(s) + SQLite snapshot(s) (written into
  * `data/_dump/` first, reusing `appDumps.dumpOneApp`) and the rest of its
  * `data/` directory, with the live database directories excluded the same way
- * the Duplicati job excludes them — a running Postgres data dir or an open
+ * the Kopia job excludes them — a running Postgres data dir or an open
  * SQLite WAL restores torn.
  *
  * A sidecar `<base>.manifest.json` sits next to each archive: dashboard
@@ -51,9 +51,8 @@ export const APP_BACKUP_RETENTION = 10;
 
 /**
  * Live database directories and side-files, excluded from the archive — the
- * `_dump/*.sql` and `*.sqlite` snapshots are the consistent copy. Matches the
- * Duplicati job's filter set (duplicatiClient.ts). `*.part` is an in-progress
- * dump `commitDump` has not renamed yet.
+ * `_dump/*.sql` and `*.sqlite` snapshots are the consistent copy. `*.part` is
+ * an in-progress dump `commitDump` has not renamed yet.
  */
 const TAR_EXCLUDES = ['data/db', 'data/pgdata', '*-wal', '*-shm', '*.part'];
 

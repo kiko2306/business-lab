@@ -51,7 +51,6 @@ operate within, listed again at the end.
 | Code Server | MIT | ✅ Clean | VS Code OSS build |
 | CrowdSec | MIT | ✅ Clean | Cloudflare bouncer MIT; NPM Lua bouncer MIT, see vendored code below |
 | Dozzle | MIT | ✅ Clean | |
-| Duplicati | MIT (since 2024-03; was LGPL-2.1) | ✅ Clean | |
 | File Browser | Apache-2.0 | ✅ Clean | |
 | Guacamole | Apache-2.0 | ✅ Clean | |
 | Home Assistant | Apache-2.0 | ✅ Clean | |
@@ -95,7 +94,7 @@ operate within, listed again at the end.
 | nginx:alpine (Kitchen switcher) | BSD-2-Clause | ✅ Clean | |
 | alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |
-| LinuxServer.io images (BookStack, Code Server, Duplicati, MariaDB, Speedtest) | image build scripts GPL-3.0; bundled apps keep their own licence | ✅ Clean | GPL applies to the packaging scripts, adds no restriction on running the app |
+| LinuxServer.io images (BookStack, Code Server, MariaDB, Speedtest) | image build scripts GPL-3.0; bundled apps keep their own licence | ✅ Clean | GPL applies to the packaging scripts, adds no restriction on running the app |
 
 ## Vendored source
 

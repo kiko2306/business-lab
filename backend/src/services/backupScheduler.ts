@@ -1,6 +1,5 @@
 import { writeAuditLog } from '../utils/audit';
 import { dumpAllAppDatabases } from './appDumps';
-import { runBackupJobNow } from './duplicatiClient';
 import { snapshotAppData as snapshotKopiaAppDataNow } from './kopiaClient';
 import { readAppEnvValue } from './appEnv';
 import { withMaintenanceLock } from './maintenanceLock';
@@ -90,10 +89,10 @@ export async function runScheduledBackupCheck(): Promise<void> {
     await prune(config.retentionCount);
 
     // The dashboard's own archive above covers the control plane. App data is
-    // Duplicati's job, and it needs consistent dumps first — copying live
+    // Kopia's job, and it needs consistent dumps first — copying live
     // Postgres files and open SQLite WALs can restore torn (§70).
     //
-    // Ordering is the whole point: dump, then back up. Running Duplicati first
+    // Ordering is the whole point: dump, then back up. Snapshotting first
     // would archive the *previous* dump, silently making every backup a day
     // stale.
     const appData = await runAppDataBackup();
@@ -134,7 +133,7 @@ async function prune(retentionCount: number): Promise<void> {
 const MAX_RECORDED_FAILURES = 25;
 
 /**
- * Dump every app database, then ask Duplicati to run.
+ * Dump every app database, then ask Kopia to snapshot them.
  *
  * Never throws — for the scheduler, the dashboard's own backup has already
  * succeeded by this point and losing that to an app-data problem would be a
@@ -143,8 +142,8 @@ const MAX_RECORDED_FAILURES = 25;
  *
  * `trigger` is recorded on the audit row and is the only difference between
  * the scheduled run and the dashboard's "Back up now" button (§74.6). The
- * button MUST come through here rather than calling `runBackupJobNow`
- * directly: the dump has to happen first, or Duplicati archives the *previous*
+ * button MUST come through here rather than calling `snapshotKopiaAppDataNow`
+ * directly: the dump has to happen first, or Kopia snapshots the *previous*
  * dump and the manual backup is silently a generation stale.
  */
 export async function runAppDataBackup(
@@ -181,16 +180,10 @@ async function runAppDataBackupLocked(
     logger.warn('Some app databases could not be dumped', { failed: report.failed, failures });
   }
 
-  // Kopia runs in parallel with Duplicati through the migration (§81.5). Its
-  // outcome is recorded on the audit row but does not gate the run — Duplicati
-  // stays the source of truth until it is removed. Dumps are already done, so
-  // Kopia snapshots the same freshly-dumped tree.
-  const kopia = await snapshotKopiaAppData();
-
-  const password = readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD');
+  const password = readAppEnvValue('kopia', 'KOPIA_SERVER_PASSWORD');
   if (!password) {
     const detail = 'the backup engine has no password configured yet';
-    logger.info('Skipping the app-data backup: Duplicati has no password yet');
+    logger.info('Skipping the app-data backup: Kopia has no password yet');
     // Still record the dump outcome. Returning silently here is how a run
     // whose dumps all failed could leave no audit trail at all — the archive
     // row above would be the only trace, and it says "success".
@@ -199,19 +192,19 @@ async function runAppDataBackupLocked(
       action: 'backup_create',
       resource: 'app-data',
       result: 'failure',
-      metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail, kopia },
+      metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail },
     }).catch(() => {});
     return { ok: false, detail };
   }
 
-  const run = await runBackupJobNow(password);
-  logger.info('App-data backup', { started: run.started, detail: run.detail, dumped: report.ok, trigger, kopia });
+  const run = await snapshotKopiaAppDataNow(password);
+  logger.info('App-data backup', { started: run.started, detail: run.detail, dumped: report.ok, trigger });
   await writeAuditLog({
     userId: null,
     action: 'backup_create',
     resource: 'app-data',
     result: run.started ? 'success' : 'failure',
-    metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail: run.detail, kopia },
+    metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail: run.detail },
   }).catch(() => {});
 
   // A run counts as successful when the app data reached the backup engine.
@@ -225,22 +218,6 @@ async function runAppDataBackupLocked(
       ? `${run.detail}; ${report.failed} database dump${report.failed === 1 ? '' : 's'} failed`
       : run.detail;
   return { ok, detail };
-}
-
-/**
- * Trigger the parallel Kopia snapshot. Reads Kopia's own password (like
- * Duplicati's, from the app's `.env`), skips quietly when it is not set, and
- * never throws — a Kopia problem must not disturb the Duplicati-gated run
- * while the two engines run side by side (§81.5).
- */
-async function snapshotKopiaAppData(): Promise<{ started: boolean; detail: string }> {
-  const password = readAppEnvValue('kopia', 'KOPIA_SERVER_PASSWORD');
-  if (!password) {
-    return { started: false, detail: 'Kopia has no password configured yet' };
-  }
-  const result = await snapshotKopiaAppDataNow(password);
-  logger.info('Kopia app-data snapshot', result);
-  return result;
 }
 
 export function startBackupScheduler(): void {
