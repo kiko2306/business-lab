@@ -390,20 +390,24 @@ Strategy:
 
 ### Apps and integrations
 
-- [ ] **A shared file tree across File Browser, Samba, Nextcloud and
-      Paperless, scanned by ClamAV** (§202) — today each mounts its own
-      separate `./data/...` tree (File Browser `data/files`, Samba
-      `data/share`, Nextcloud `data/app`, Paperless `data/{media,consume,
-      export}`); nothing overlaps, so a file uploaded through one isn't
-      visible in another. Needs a design pass, not just a mount change: which
-      one directory (or a symlinked/bind-mounted common subset) makes sense
-      across a general file browser, an SMB share, Nextcloud's own storage
-      model and Paperless's structured `consume`/`media`/`export` layout
-      without breaking any of their own antivirus wiring (Nextcloud's
-      `files_antivirus`, Paperless's pre-consume script — both already
-      ClamAV-scanned, §179/§184). Stirling-PDF doesn't hold user files (it's
-      processed-per-request, its mounts are tool config) — check whether it
-      belongs in this list at all before building it in.
+- [ ] **Nextcloud External Storage onto the shared file tree** (§219) — File
+      Browser and Samba already share one tree (§219, done). Nextcloud can't
+      just bind-mount the same directory — `./data/app` is its whole webroot
+      and writing into it from outside corrupts its file cache — so this is
+      the supported path instead: extend `backend/src/services/nextcloudOcc.ts`
+      to register the shared tree via `occ files_external:create` on start
+      (same reconcile-on-start shape as `nextcloudClamav.ts`), and set
+      `files_antivirus`'s **background scan** mode for it — the default
+      upload-scan hook never fires for a file that arrives some other way.
+- [ ] **Paperless one-way drop box onto the shared file tree** (§219) —
+      Paperless's `consume/` isn't a shared folder, it's an inbox that
+      ingests and deletes whatever lands there, so the fit is a dedicated
+      `shared/to-paperless/` subfolder bind-mounted into `consume/` —
+      moving a file there is the deliberate way to file it with Paperless,
+      not "everything in the shared tree is visible to it." Generate/ensure
+      the subfolder the same way `sambaConfig.ts` generates `smb.conf`. The
+      existing pre-consume ClamAV hook (§179/§184) covers it automatically,
+      no new scanning gap.
 - [ ] **Explore a small local LLM for text cleanup and JSON parsing** — check
       whether a very small model (something llama.cpp-class, CPU-viable on
       this host) is worth adding for jobs like tidying user-facing text or

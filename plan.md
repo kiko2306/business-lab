@@ -17027,3 +17027,99 @@ arrows top to bottom) rather than hand-tuned, so treat them as a correct
 first draft, not a finished polish pass.
 
 Docs only — no version bump.
+
+## 219. Shared file tree design pass (§202) — decided per app, one piece done live
+
+The README item asked for a design pass before any mount change: File
+Browser (`./data/files`), Samba (`./data/share`), Nextcloud (`./data/app` —
+its whole webroot, data included) and Paperless
+(`./data/{media,consume,export}`) each mount their own separate tree today,
+so a file uploaded through one isn't visible in another. Checked every
+app's actual mounts (`docker-compose.yml`/`compose.yaml`) and what each
+project's storage model actually tolerates before deciding anything.
+
+### Decision: no single shared root — three different treatments
+
+A literal one-directory-for-everyone bind mount is wrong for two of the
+four apps, not just inconvenient:
+
+- **Nextcloud's `./data/app` is not a plain folder** — it's the *whole
+  webroot* (`/var/www/html`), and user files live inside it under
+  Nextcloud's own tracked/cached layout. Writing into that tree from outside
+  Nextcloud (via Samba or File Browser) leaves Nextcloud's file cache and
+  the actual filesystem disagreeing until a rescan. Nextcloud's own
+  supported answer for "let me see an external folder" is the bundled
+  **External Storage** app (`files_external`) — mount a host path at a
+  *different* container path and register it with
+  `occ files_external:create`, which is how Nextcloud is designed to pick
+  up externally-managed files without touching its own data tree.
+- **Paperless's `consume/` is a one-way inbox, not a shared folder** — the
+  consumer watches it, OCRs/tags whatever lands there, files the result
+  into `media/`, and (by default) deletes the original from `consume/`. A
+  symmetric "everyone sees the same tree" design would mean Paperless
+  eating unrelated files dropped there by File Browser/Samba users. The fit
+  here is a **one-way drop box**: a subfolder of the shared tree that's
+  bind-mounted into Paperless's `consume/`, so "move a file into
+  `shared/to-paperless/`" is the deliberate, opt-in way to file something —
+  not "everything in the shared tree is visible to Paperless."
+- **File Browser and Samba are genuinely the same shape** — both are just a
+  browsable/writable folder with no owning app tracking file identity or
+  location. These two *can* share one literal directory with no design
+  compromise at all.
+- **Stirling-PDF confirmed out of scope.** Its mounts
+  (`tessdata`/`configs`/`customFiles`/`pipeline`) are tool config — OCR
+  language packs, saved pipelines — not user documents; it receives a file
+  per request and returns a result. Nothing to add it to.
+
+### ClamAV coverage, checked against the decision above
+
+- File Browser and Samba: **no scan today, none added by this change**.
+  Neither runs a write-time hook (unlike Nextcloud's `files_antivirus` and
+  Paperless's pre-consume script, §179/§184). Merging their trees doesn't
+  reduce coverage — both were already unscanned — but doesn't add any
+  either; a `clamdscan`-on-write sidecar for this shared tree is its own
+  future item if it's ever wanted, not part of this pass.
+- Paperless's one-way drop box inherits the existing pre-consume ClamAV
+  hook automatically — a file moved into `shared/to-paperless/` gets
+  scanned exactly like any other file dropped into `consume/` today. No new
+  gap.
+- Nextcloud's External Storage mount needs `files_antivirus`'s **background
+  scan** mode, not just its default upload-scan hook — upload-scan only
+  fires on Nextcloud's own upload event, which an externally-added file
+  never triggers. Flagging this now so whoever wires the External Storage
+  piece doesn't ship it half-covered.
+
+### Done now: File Browser + Samba merged, verified live
+
+The zero-compromise half of the decision, and both trees were empty
+(`file-browser/data/files`: an empty `home` mount-point stub; `samba/data/share`:
+empty) so there was nothing to reconcile. `apps/samba/docker-compose.yml`'s
+`./data/share` bind now points at `../file-browser/data/files` instead —
+matching precedent already in the repo for a cross-app relative bind mount
+(`crowdsec` reads NPM's logs the same way). Same UID/GID on both sides
+already (`1000:1000` — File Browser's init container and Samba's default
+`SAMBA_UID`/`SAMBA_GID`), so no permission mismatch.
+
+Verified on the live stack: recreated `samba`, wrote a test file into the
+SMB share, confirmed it appeared in File Browser's UI at the same path and
+back out — then removed the test file. `apps/samba/data/share/` (now
+unused) left in place rather than deleted; nothing reads it any more but
+deleting a data directory isn't this change's call to make silently.
+
+### Left open — real feature work, not a design question any more
+
+Two README items replace the old single "needs a design pass" item, now
+that the design questions are answered:
+
+- **Nextcloud External Storage wiring** — extend
+  `backend/src/services/nextcloudOcc.ts` (already runs `occ` commands for
+  other maintenance) to register the shared tree via
+  `occ files_external:create` on start, matching the `nextcloudClamav.ts`
+  reconcile-on-start pattern, and set `files_antivirus`'s background-scan
+  mode for it.
+- **Paperless one-way drop box** — bind-mount a `shared/to-paperless/`
+  subfolder into `paperless-ngx`'s `consume/`, generated/ensured the same
+  way `sambaConfig.ts` generates `smb.conf`.
+
+Compose + docs change, verified live — no version bump (no `backend/src`/
+`frontend/src` touched).
