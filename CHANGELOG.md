@@ -11,6 +11,22 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.22.0] — 2026-09-04
+
+### Changed
+
+- **Saving a backup destination now reconfigures Kopia too**, alongside
+  Duplicati (`plan.md` §81.5). `services/kopiaTargetApply.ts` translates the
+  chosen destination into `apps/kopia/`'s `backup-target` volume: a mounted
+  destination (disk/SMB/NFS) is used exactly as Duplicati uses it — Kopia's
+  filesystem repository just sees a directory. Google Drive / FTP have no
+  Kopia-native equivalent for the credentials stored here, so those leave
+  Kopia on a local repository and the save response says so. `apps/kopia`'s
+  `/repository` mount changed from a fixed bind to the same three-option
+  templated volume Duplicati uses. `PUT /api/settings/backup-target` gains
+  `kopiaRestarted` and `kopiaRepository` in its response and appends a
+  `(Kopia: …)` note to `message`.
+
 ## [0.21.1] — 2026-09-04
 
 ### Added

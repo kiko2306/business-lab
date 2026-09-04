@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.21.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.22.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -287,11 +287,15 @@ Strategy:
 ### Roster changes (§81)
 
 
-- [ ] **Backup destination → Kopia** (§81.5) — translate the stored
-      disk/SMB/NFS/Drive destination into a Kopia backend, alongside the
-      existing Duplicati translation.
 - [ ] **Scheduler → Kopia** (§81.5) — `backupScheduler` calls Kopia after the
       app-database dumps, with Duplicati still running in parallel.
+- [ ] **A Kopia-native remote backend** (§81.5, §194) — disk/SMB/NFS now
+      translate into Kopia's `/repository` volume, but Google Drive / FTP do
+      not (Kopia has no plain-FTP backend, and its `gdrive` backend needs a
+      GCP service-account JSON, not Duplicati's OAuth AuthID). Add a
+      Kopia-native remote option — S3 / B2 / SFTP / `gdrive` — with its own
+      credential fields, so a non-mounted destination can be real offsite for
+      Kopia too, not a local fallback.
 - [ ] **Prove a Kopia restore** (§81.5) — one SQLite app and one Postgres app,
       restored from a snapshot, before anything is switched off.
 - [ ] **Remove Duplicati** (§81.5) — last, and only once the restore above is

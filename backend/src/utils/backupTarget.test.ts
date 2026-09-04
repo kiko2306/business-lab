@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BackupTarget, DEFAULT_BACKUP_FOLDER, DUPLICATI_OAUTH_LOGIN_URL, DUPLICATI_OAUTH_REFRESH_URL, isMountedKind, toDuplicatiUrl, toMountSpec, validateTarget } from './backupTarget';
+import { BackupTarget, DEFAULT_BACKUP_FOLDER, DUPLICATI_OAUTH_LOGIN_URL, DUPLICATI_OAUTH_REFRESH_URL, isMountedKind, KOPIA_LOCAL_REPOSITORY_DEVICE, toDuplicatiUrl, toKopiaRepositoryMount, toMountSpec, validateTarget } from './backupTarget';
 
 const base: BackupTarget = {
   kind: 'disk', path: '', server: '', share: '', username: '', password: '',
@@ -100,6 +100,33 @@ describe('toDuplicatiUrl', () => {
 
   it('omits the query entirely for an anonymous FTP destination', () => {
     expect(toDuplicatiUrl({ ...base, kind: 'ftp', server: 'h', share: 'b' })).toBe('aftp://h/b');
+  });
+});
+
+describe('toKopiaRepositoryMount', () => {
+  it('translates a mounted destination exactly like Duplicati (Kopia sees a directory)', () => {
+    const disk = toKopiaRepositoryMount({ ...base, kind: 'disk', path: '/mnt/backups' });
+    expect(disk).toEqual({
+      spec: { type: 'none', o: 'bind', device: '/mnt/backups' },
+      supported: true,
+      reason: null,
+    });
+    expect(toKopiaRepositoryMount({ ...base, kind: 'nfs', server: '10.0.0.5', share: '/v1/b' }).spec)
+      .toEqual({ type: 'nfs', o: 'addr=10.0.0.5,rw', device: ':/v1/b' });
+  });
+
+  it('falls back to a local repository for a backend destination Kopia cannot speak', () => {
+    for (const kind of ['googledrive', 'ftp', 'ftps'] as const) {
+      const mount = toKopiaRepositoryMount({ ...base, kind, authId: 'x', server: 'h' });
+      expect(mount.supported).toBe(false);
+      expect(mount.spec).toEqual({ type: 'none', o: 'bind', device: KOPIA_LOCAL_REPOSITORY_DEVICE });
+      expect(mount.reason).toBeTruthy();
+    }
+  });
+
+  it('names the destination in the unsupported reason', () => {
+    expect(toKopiaRepositoryMount({ ...base, kind: 'googledrive', authId: 'x' }).reason).toMatch(/Google Drive/);
+    expect(toKopiaRepositoryMount({ ...base, kind: 'ftps', server: 'h' }).reason).toMatch(/FTPS/);
   });
 });
 

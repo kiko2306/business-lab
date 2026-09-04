@@ -229,6 +229,51 @@ export function toMountSpec(target: BackupTarget): BackupMountSpec {
   return { type: 'cifs', o: parts.join(','), device: `//${target.server}/${share}` };
 }
 
+/** The local directory Kopia keeps its repository in when nothing else fits. */
+export const KOPIA_LOCAL_REPOSITORY_DEVICE = './data/repository';
+
+export interface KopiaRepositoryMount {
+  /** Docker local-driver options for Kopia's `/repository` volume. */
+  spec: BackupMountSpec;
+  /**
+   * false → `spec` is the local fallback, not the chosen destination. The
+   * caller should surface `reason` so the operator knows Kopia is not yet
+   * writing offsite.
+   */
+  supported: boolean;
+  /** Why the destination could not be translated. null when supported. */
+  reason: string | null;
+}
+
+/**
+ * Translate a saved destination into the mount for Kopia's `/repository`.
+ *
+ * Kopia's `filesystem` repository is just a directory, so a MOUNTED
+ * destination (disk/smb/nfs) is translated exactly like Duplicati's — the
+ * kernel mounts it, Kopia writes the repository into it.
+ *
+ * A BACKEND destination has no clean equivalent: Kopia's own remote backends
+ * (S3/B2/GCS/Azure/SFTP/WebDAV/rclone) want different credentials and
+ * protocols than the OAuth AuthID / FTP fields stored here, and Kopia has no
+ * plain-FTP backend at all. So for googledrive/ftp/ftps this returns the
+ * local fallback with `supported: false` rather than a spec that would fail at
+ * mount time. Wiring a Kopia-native remote backend is its own task.
+ */
+export function toKopiaRepositoryMount(target: BackupTarget): KopiaRepositoryMount {
+  if (isMountedKind(target.kind)) {
+    return { spec: toMountSpec(target), supported: true, reason: null };
+  }
+  const label = target.kind === 'googledrive' ? 'Google Drive' : target.kind.toUpperCase();
+  return {
+    spec: { type: 'none', o: 'bind', device: KOPIA_LOCAL_REPOSITORY_DEVICE },
+    supported: false,
+    reason:
+      `Kopia cannot use a ${label} destination yet, so it keeps a local repository ` +
+      `on this host. Duplicati still writes to ${label}; a Kopia-native remote ` +
+      `backend is a separate step.`,
+  };
+}
+
 /** Human-readable validation. Returns null when the target is usable. */
 export function validateTarget(target: BackupTarget): string | null {
   // A comma in a credential corrupts the comma-separated mount options — but

@@ -15478,3 +15478,78 @@ the old id. Pinned it. Verified `repo/status` then reports `"hostname":
 Patch bump 0.21.0 → 0.21.1 (internal — no route or UI yet). README TODO:
 `kopiaClient.ts` item deleted; the destination/scheduler/restore-proof/remove
 items stay.
+
+## 194. §81.5 slice 3 — backup destination → Kopia (2026-09-04)
+
+The dashboard's Backup destination (Settings) now drives Kopia's repository
+location as well as Duplicati's. Both run in parallel through the migration.
+
+### What translates, and what does not
+
+`toKopiaRepositoryMount(target)` in `utils/backupTarget.ts`:
+
+- **disk / smb / nfs** — Kopia's `filesystem` repository is a directory, so
+  these translate *exactly* like Duplicati: reuse `toMountSpec`, the kernel
+  mounts the destination, Kopia writes the repo into it. `supported: true`.
+- **googledrive / ftp / ftps** — no clean equivalent. Kopia's own remote
+  backends (S3/B2/GCS/Azure/SFTP/WebDAV/rclone) need different credentials and
+  protocols than the OAuth AuthID / FTP fields stored here, and Kopia has *no
+  plain-FTP backend at all*. So these return the **local fallback**
+  (`./data/repository`) with `supported: false` and a reason string. Wiring a
+  Kopia-native remote backend is a separate task (new README item).
+
+This is the honest scope: the README item said "disk/SMB/NFS/Drive", but Drive
+genuinely cannot be translated from a Duplicati AuthID. Faking it with a
+`gdrive://` spec would just fail at mount time.
+
+### `services/kopiaTargetApply.ts`
+
+Mirrors `backupTargetApply.ts`: write `BACKUP_MOUNT_TYPE/OPTIONS/DEVICE` into
+`apps/kopia/.env`, and if Kopia is running `down` → `docker volume rm -f
+kopia_backup-target` → `up -d` (Docker will not redefine a named volume whose
+opts changed). On the way back up the entrypoint's `connect || create` does
+the right thing: an empty new location gets a brand-new repository (keyed by
+`KOPIA_PASSWORD`), an existing one is reconnected.
+
+Extra vs Duplicati: `ensureKopiaRepoDir(appDir)` — a Docker `local`/`o=bind`
+volume does **not** create its device path (verified: it fails "no such file
+or directory"), and `apps/*/data/` is gitignored, so a local repo dir has to
+be `mkdir`ed before `compose up`. Called from `applyKopiaTarget` and from the
+executor's pre-start path (`executor.ts`, next to `applySambaConfig`, same
+reason). No-op for nfs/cifs.
+
+### Compose
+
+`apps/kopia/docker-compose.yml`: `/repository` changed from `- ./data/repository:/repository`
+to the named `backup-target` volume with the three-option `driver_opts` block,
+identical shape to `apps/duplicati/`. `.env.example` documents the three vars.
+
+### Route
+
+`PUT /api/settings/backup-target` calls `applyKopiaTarget(target)` after
+`applyBackupTarget(target)`; never-throws, so a Kopia failure cannot fail the
+save. Response gains `kopiaRestarted` + `kopiaRepository`, and `message` gets a
+`(Kopia: …)` suffix.
+
+### Verified
+
+- Backend `npm run typecheck` clean; suite **542 → 546** (+4
+  `ensureKopiaRepoDir`; +3 `toKopiaRepositoryMount` minus 3 renumbered — net
+  as counted). `toKopiaRepositoryMount` covered for all six kinds.
+- **Against the live Docker daemon**, real `apps/kopia/docker-compose.yml` +
+  a scratch `--env-file`:
+  - Fresh `up` with `BACKUP_MOUNT_DEVICE=<absolute repoA>` — templated
+    `backup-target` volume mounts, entrypoint creates the repo in repoA,
+    container **healthy**.
+  - Rewrote the env-file's device to repoB, ran the exact `down` →
+    `volume rm -f kopiaslice3_backup-target` → `up -d` sequence
+    `applyKopiaTarget` performs — entrypoint logged "no repository … creating
+    one", container **healthy**, `repoB/kopia.repository.f` written, **repoA
+    left intact**.
+  - Test project torn down (`down -v`), `apps/kopia/data` + scratch removed.
+- `ensureKopiaRepoDir` unit-tested against a real tmpdir (relative device,
+  absolute device, nfs skip, missing `.env` → default).
+
+Minor bump 0.21.1 → 0.22.0 (observable: a destination save now recreates
+Kopia). README TODO "Backup destination → Kopia" deleted; new item added for a
+Kopia-native remote backend (Drive/S3/B2/SFTP).

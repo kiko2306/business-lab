@@ -17,6 +17,7 @@ import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { applyKitchenConfig } from './kitchenConfig';
 import { applySambaConfig } from './sambaConfig';
+import { ensureKopiaRepoDir } from './kopiaTargetApply';
 import { checkServiceImages, recordImageCheck, pickLocalDigest, parseImageRef } from './imageUpdates';
 import { clearImagePins, writeImagePins } from './composeOverride';
 import { withMaintenanceLock } from './maintenanceLock';
@@ -182,6 +183,12 @@ async function composeUpWithManagedConfig(
   // Kitchen config this is load-bearing — a missing data/smb.conf makes
   // Docker create the bind source as a directory and the entrypoint aborts.
   await applySambaConfig(serviceName, appDir);
+  // Kopia: a local (type=none) repository bind fails to mount if its directory
+  // does not exist yet, and apps/*/data/ is gitignored — so create it before
+  // `compose up`, the same reason applySambaConfig runs here.
+  if (serviceName === 'kopia') {
+    ensureKopiaRepoDir(appDir);
+  }
   // HACS: the appliance integrations this house needs (HomeWhiz, Ariston) only
   // exist as HACS repositories, and apps/*/data/ is gitignored, so a fresh
   // clone has to be able to get there without a console step (§0.2).

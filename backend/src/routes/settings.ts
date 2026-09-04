@@ -11,6 +11,7 @@ import {
   DUPLICATI_OAUTH_LOGIN_URL,
   isMountedKind,
   toDuplicatiUrl,
+  toKopiaRepositoryMount,
   toMountSpec,
   validateTarget,
 } from '../utils/backupTarget';
@@ -18,6 +19,7 @@ import logger from '../utils/logger';
 import { testBackupTarget } from '../services/backupTargetTest';
 import { ensureDestinationFolder, provisionBackupJob, testDestinationUrl } from '../services/duplicatiClient';
 import { applyBackupTarget } from '../services/backupTargetApply';
+import { applyKopiaTarget } from '../services/kopiaTargetApply';
 import { readAppEnvValue } from '../services/appEnv';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
 import { testMailConnection } from '../services/mailTest';
@@ -512,13 +514,18 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
     // remember a restart — and a restart alone is not enough, because Docker
     // reuses a named volume whose definition changed (see backupTargetApply).
     const applied = await applyBackupTarget(target);
+    // Kopia follows the same destination (§81.5). Both run in parallel during
+    // the migration; a Kopia apply failure must not fail the save.
+    const kopiaApplied = await applyKopiaTarget(target);
 
     return res.json({
-      message: applied.detail,
+      message: `${applied.detail} (Kopia: ${kopiaApplied.detail})`,
       restarted: applied.restarted,
+      kopiaRestarted: kopiaApplied.restarted,
       // Only one of these is meaningful, depending on the family.
       mount: isMountedKind(target.kind) ? toMountSpec(target) : null,
       duplicatiUrl: toDuplicatiUrl(target),
+      kopiaRepository: toKopiaRepositoryMount(target),
     });
   } catch {
     return res.status(500).json({ error: 'Unable to save the backup destination.' });

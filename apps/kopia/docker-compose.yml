@@ -41,13 +41,14 @@ services:
       - ./data/config:/app/config
       - ./data/cache:/app/cache
       - ./data/logs:/app/logs
-      # Where snapshots actually land. A local directory so a fresh install
-      # works, but it is on the SAME DISK as the data it protects — that
-      # guards against a deleted file and nothing else. Translating the
-      # dashboard's Backup destination (disk/SMB/NFS/Drive) into a Kopia
-      # backend is a later slice of §81.5; until then, point this somewhere
-      # real by hand if you rely on it.
-      - ./data/repository:/repository
+      # Where the Kopia repository lives. Same three-option volume shape as
+      # Duplicati's destination: the dashboard's Backup destination (Settings)
+      # is translated into these by services/kopiaTargetApply.ts and written to
+      # this app's .env. The default is a local directory — on the SAME DISK as
+      # the data it protects, so set a real destination before relying on it.
+      # Google Drive / FTP have no Kopia-native equivalent yet, so choosing one
+      # of those leaves this at the local default (see toKopiaRepositoryMount).
+      - backup-target:/repository
       # The managed apps/ tree (per-app data + .env) mounted read-only as the
       # backup source, so Kopia has something to snapshot out of the box.
       # APPS_DIR is the absolute host path when the dashboard starts this;
@@ -64,3 +65,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 20s
+
+volumes:
+  # Same shape as apps/duplicati/docker-compose.yml: one templated volume whose
+  # three local-driver options serve a bind, an NFS export or an SMB share.
+  # Written by services/kopiaTargetApply.ts from the dashboard's Backup
+  # destination; the default keeps the repository in this app's own data dir.
+  backup-target:
+    driver: local
+    driver_opts:
+      type: ${BACKUP_MOUNT_TYPE:-none}
+      o: ${BACKUP_MOUNT_OPTIONS:-bind}
+      device: ${BACKUP_MOUNT_DEVICE:-./data/repository}
