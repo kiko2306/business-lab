@@ -17759,3 +17759,27 @@ Proved from a drifted cwd (`cd backend && ../scripts/check.sh backend
 typecheck`) — passes, where the old `$PWD` mount would have silently mounted
 only `backend/`. Updated CLAUDE.md's Commands section to point at it instead
 of the raw `docker run` lines.
+
+## 235. `secret-scan.sh` — a second net for secrets outside `.env` (2026-09-04)
+
+`bash-guards.sh` blocks reading/writing real `.env` files, but nothing
+caught a secret pasted somewhere else — a script, a compose override, a
+fixture — before it lands in this public repo. CLAUDE.md and the standing
+session instructions already ask for a manual double-check of staged diffs
+before every commit; that's a real, repeated reasoning step this automates
+away the same way `require-version-bump.sh` did for the version-bump check.
+
+Added `.claude/hooks/secret-scan.sh`, wired as a third `PreToolUse`/`git
+commit` guard alongside `bash-guards.sh` and `require-version-bump.sh`. It
+greps the commit's added lines (staged + `commit -a` unstaged, `*.md`
+excluded) for a narrow set of high-confidence secret formats — PEM private
+key headers, AWS access key IDs, Google API keys, GitHub tokens, Slack
+tokens — deliberately not broader patterns like generic JWTs or hex hashes,
+which would cry wolf on ordinary code and get worked around.
+
+Verified: a synthetic `AKIA...` key in a throwaway repo is denied; this
+repo's entire commit history (`git log --all -p`) has zero matches, so the
+guard starts silent on real usage. It is a second net, not a replacement for
+looking at `git diff --cached` — deliberately narrow patterns will miss most
+real secrets (generic API tokens, passwords, connection strings have no
+recognizable shape).
