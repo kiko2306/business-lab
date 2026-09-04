@@ -389,6 +389,18 @@ Strategy:
       life-safety), and prove a start + backup/restore round-trip.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
+- [ ] **Guacamole's image pin is invisible to the Update button** (§200,
+      §204) — `guacamole/guacamole`/`guacamole/guacd` are pinned to an exact
+      release (`1.6.0`), needed so the `guacamole-auth-header` extension
+      (slice 4) stays version-matched to the webapp build. The per-app update
+      check (`imageUpdates.ts`) compares the registry digest for the *tag
+      already in the compose file* against the local one — for a fixed
+      version tag that digest never changes, so it silently never reports
+      an update, unlike a floating tag (`:latest`, or `mariadb:10.11`
+      elsewhere in this repo, which still catches patch pushes under that
+      minor). No dashboard mechanism catches "there's a newer Guacamole
+      release" — someone has to check upstream by hand and bump the pin
+      (re-verifying the extension jar version alongside it).
 - [ ] **Guacamole SSO, slice 2: extend `guacamoleClient.ts`** (§200) — the
       REST client (`backend/src/services/guacamoleClient.ts`) exists already,
       built for slice 1 (login/logout/set-password); extend it with

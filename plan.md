@@ -16297,3 +16297,23 @@ Backend `npm run typecheck` and `npm test` (52 files, 545 tests, including
 the `guacamole-auth-header` extension) — still README items, unchanged by
 this slice beyond slice 2's item now pointing at the file that already
 exists rather than one still to create.
+
+## 205. §204 follow-up: the exact-version pin means the Update button goes blind for Guacamole
+
+Asked directly: does pinning `guacamole/guacamole`/`guacamole/guacd` to
+`1.6.0` (§204) break the per-app Update button? Checked `imageUpdates.ts`:
+`checkServiceImages` fetches the registry digest for **the tag already in
+the compose file** and compares it to the local image's digest for that same
+tag — it has no notion of "a newer tag exists," only "did this exact tag's
+content change." A floating tag (`:latest`, or `mariadb:10.11` elsewhere in
+this repo — a minor version that still receives patch pushes under that same
+tag) reliably flags outdated. `1.6.0` is a full release tag Docker Hub never
+republishes content under, so the digest never changes and the check stays
+permanently silent — not "up to date," just nothing to compare.
+
+Confirmed as a real, accepted gap rather than something to fix here — the
+pin itself is required (§204: `guacamole-auth-header`, slice 4, is
+version-locked to the exact webapp build, and `:latest` could drift under it
+silently). Added a README item rather than leaving it undiscoverable: moving
+Guacamole to a newer release now needs a human to check upstream and bump
+the pin by hand, re-verifying the extension jar version alongside it.
