@@ -16416,3 +16416,36 @@ Postgres password from a real `.env`, off-limits per this repo's own rule.
 Version bumped to `0.28.0` (minor — a genuine new capability: dashboard
 users now really do get Guacamole accounts). Still no login-screen skip:
 that's slice 4, next.
+
+## 208. §205 follow-up: the stale-cache trap, hit for real
+
+User reported Guacamole's card showing "update available" right after §204
+pinned it to `1.6.0` — seemingly contradicting §205's claim that the pin
+would make the check go silent. Not a contradiction: ran the app's own
+`checkServiceImages('guacamole')` for real (throwaway container, Docker
+socket mounted, no code changes) and it correctly returned
+`{"outdated":[],"unknown":[]}` — the pin logic is right. The dashboard card
+was reading a **stale row**: `service_image_updates` still held the result
+from 15:34, before the pin, literally recording
+`"guacamole/guacamole:latest"` as outdated. That table only refreshes via
+the dashboard's own "Update now" action (`executor.ts`'s `updateService`)
+or a sweep that runs once every 24h (`imageUpdates.ts`) — and the pin's own
+recreate tonight was done by hand outside the dashboard (§204/§206/§207's
+verification runs), so nothing triggered a refresh.
+
+Tried writing the corrected row directly via SQL to fix it immediately —
+blocked by the auto-mode classifier, correctly: that's exactly the
+"fixing something by hand is a diagnostic, never a fix" trap (a hand-edit to
+live DB state that isn't the code doing it, and would evaporate on the next
+real check anyway). Asked the user instead: they'll click "Update now" on
+Guacamole's card themselves, which is safe and idempotent for an
+already-current pinned tag (re-pulls the same digest, recreates, refreshes
+the check row) — no dashboard code change needed, this was a cache-timing
+artifact of manual verification, not a bug.
+
+**Worth remembering**: any time an app's image is recreated by hand outside
+the dashboard (as every live-verification step in §204/§206/§207 did), its
+`service_image_updates` row goes stale until the next sweep or an
+"Update now" click — expected, not a regression, but worth checking for
+before reporting "verified live" as fully clean next time this pattern
+comes up.
