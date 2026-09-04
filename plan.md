@@ -14583,3 +14583,55 @@ Not done here to keep the change to one app + one live upgrade.
 
 Compose + docs + plan only — no version bump (matches the Paperless→Valkey
 image swap, §108).
+
+## 182. §118.3 — Paperless's Postgres 15 → 17 (2026-09-04)
+
+The follow-up left open by §181. `apps/paperless/compose.yaml` `paperless-db`
+was on `postgres:15-alpine` over an `apps/paperless/data/db` PG 15.19 cluster —
+one major behind n8n and the same trap: stock `postgres:17-alpine` will not
+open a v15 data dir, so a plain tag bump strands the database.
+
+### Approach
+
+Identical to §181, deliberately: `paperless-db` image →
+**`pgautoupgrade/pgautoupgrade:17-alpine`** (MIT — licence row extended to list
+Paperless). Drop-in for `postgres:17-alpine`; on start it runs `pg_upgrade
+--link` in place against an older cluster in `PGDATA`, then serves normally. A
+fresh clone has no data dir, so it just `initdb`s 17. Kept permanently — it is
+postgres plus an entrypoint wrapper, and it makes the next major a one-line
+tag change. Added `start_period: 90s` to the `paperless-db` healthcheck so
+`paperless-ngx` (`depends_on: … condition: service_healthy`) doesn't bail
+during the one-time upgrade; normal boots skip it.
+
+`--link` consumes the old cluster (no rollback dir). The rollback path is the
+scheduled `pg_dump` (`backup.engine: postgres`, `service: paperless-db` in
+`services.ts`).
+
+### Verified on the live stack
+
+Independent `pg_dump` first (540 KB). Then recreated `paperless-db` on the new
+image:
+
+- pg_upgrade ran clean — `--link` mode, globals + schemas restored, then
+  `vacuumdb --all --analyze-in-stages`. pgautoupgrade also ran its own
+  `delete_old_cluster.sh`, so no `data/old` left behind (`data` is 53.5 MB,
+  no bloat). `PG_VERSION` 15 → **17**; `postgres --version` 17.11; container
+  healthy in ~15 s.
+- Data intact: 74 public tables and 2 `auth_user` rows, unchanged
+  (`documents_document` is 0 — nothing has been ingested on this box).
+- Restarted `paperless-ngx` (v3.1.2): init connected to PG, `Apply all
+  migrations` → "No migrations to apply", `System check identified no issues`,
+  existing superuser `mat` detected, container healthy, `GET /api/` → 302
+  (login redirect). The pre-existing `DisallowedHost` / early-boot Redis
+  traceback lines in the log predate this change (2026-09-02) and are
+  unrelated.
+
+### Left for later
+
+Nothing from this thread — no app is on `postgres:15-alpine` any more.
+Guacamole / Nextcloud / NocoDB run `postgres:16-alpine` (n8n's driver notice
+put 16 on "compatibility support", not deprecated) and Immich is on its own
+pinned `postgres:14-vectorchord` image; none is flagged by its app, so no
+open PG-major-bump item remains.
+
+Compose + docs + plan only — no version bump (matches §181, §108).

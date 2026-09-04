@@ -330,11 +330,6 @@ Strategy:
       re-imports every boot, so a managed workflow's UI edits are replaced.
       Fine for now (matches every other generated config here); revisit
       skip-if-exists if someone needs to customise one in place.
-- [ ] **Paperless's Postgres is still 15** (§118.3, §181) — n8n moved to
-      `pgautoupgrade/pgautoupgrade:17-alpine` (auto `pg_upgrade` in place,
-      §181). `apps/paperless/compose.yaml` runs `postgres:15-alpine` and
-      Paperless logs its own PG-version notice — same one-line swap + a live
-      upgrade to prove it, when it's picked up.
 - [ ] **Periodic exposure drift reconciliation** — `POST
       /api/services/:name/exposure/verify` re-verifies one service on demand,
       but nothing notices on its own when NPM or Cloudflare drifts from
