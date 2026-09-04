@@ -16546,3 +16546,141 @@ Version bumped to `0.29.0` (minor: removes a user-facing feature/API
 surface). Slice 4 of the Guacamole SSO series (§200) is next, unaffected
 by this detour beyond `guacamole/guacamole`'s image no longer being
 touchable by a per-app Update click either.
+
+## 210. Plan — three follow-ups: pinned-version rationale, Authelia-vs-native-login audit, VPN-only tagging
+
+Three items requested together; a planning pass per the working loop —
+researched each before writing anything down, findings below, nothing
+implemented yet.
+
+### 210.1 Comment every pinned (non-`:latest`) image with why, or float it
+
+Surveyed every `image:` line across `apps/*/docker-compose.yml` and
+`compose.yaml`. Some pins already carry a real comment explaining the
+constraint — keep these as the model to match:
+
+- `pgautoupgrade/pgautoupgrade:17-alpine` (n8n, paperless) — pinned because
+  a plain `postgres:17` won't open a v15 data dir; explained in place, cites
+  plan.md sections.
+- `ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0` (immich) —
+  pinned because it's the vendor's own image with vector-search extensions
+  baked in; a generic postgres image doesn't work. Explained in place.
+- `guacamole/guacamole:1.6.0` / `guacamole/guacd:1.6.0` — pinned so the
+  (in-progress) `guacamole-auth-header` extension stays version-matched to
+  the webapp build. Explained in place (§204).
+
+**No comment at all**, found by this survey — each needs either a reason
+written in or the pin dropped to `:latest`:
+
+- `postgres:16-alpine` — **three separate apps** (guacamole-db, nextcloud-db,
+  nocodb-db), no comment on any of them. Worth checking whether there's a
+  real reason (e.g. an extension/behaviour that breaks on 17) or whether
+  this is just historical and should float, matching immich/n8n/paperless's
+  already-current major version.
+- `mariadb:10.11` (itflow-db) — no comment. `lscr.io/linuxserver/mariadb`
+  elsewhere in the same file (bookstack) floats on `:latest` for comparison.
+- `mysql:8.0` (npm-db) — no comment.
+- `docker.io/valkey/valkey:9-alpine` (immich-redis, paperless-redis) — no
+  comment on the major-version pin.
+- `alpine:3` (beszel-init) — no comment; a one-shot init container, lowest
+  stakes of the list.
+- `louislam/uptime-kuma:1` — no comment on the major-version pin.
+
+**Not evaluated this pass** (they're compose-provided defaults or
+env-overridable, a different shape of "pin" than a hardcoded tag):
+`busybox:stable` (file-browser/n8n/vikunja init containers — a stable
+multi-arch tag by design, not really "a version"), `devlikeapro/waha:${WAHA_IMAGE_TAG:-latest}`
+(already user-overridable via env, floats by default).
+
+Next step: for each no-comment pin, find out *why* it's pinned (check
+plan.md's history for that app, check upstream release notes for a known
+breaking change) and either write the reason in, matching the three good
+examples' style, or bump it to `:latest` if there turns out to be no
+reason. Six pins to resolve.
+
+### 210.2 Which Authelia-protected apps still show their own login (double-login)
+
+Every exposed app is Authelia-protected by default since §201
+(`skipAutheliaProtection` is only set on `homepage` and `authelia`
+themselves). That does not mean every app skips its own login screen after
+Authelia's — only Guacamole has that fix in progress (§200 slice 4, the
+`guacamole-auth-header` extension), and only one app in the whole registry
+was found already doing it correctly on its own:
+
+- **Dozzle** already sets `DOZZLE_AUTH_PROVIDER: none` — it defers to
+  Authelia entirely, no double login. The one existing example of "done
+  right" to match.
+
+**Found a real complication, not just a to-do list**: `code-server`'s own
+login is **deliberately kept**, not an oversight — its compose file has a
+comment explaining why (plan.md §93): NPM reaches every app via the docker
+bridge gateway IP and published port, the *same path a LAN-direct client
+uses*, so Authelia's forward-auth (which only gates the tunnel-exposed
+hostname) never sees LAN-direct traffic at all. Dropping code-server's own
+login would leave the LAN-direct path with **no gate whatsoever**. This is
+the same root cause as the still-open README item "The LAN can bypass
+Cloudflare on NPM's :80" (§180) — until that's fixed, "Authelia-only" isn't
+actually safe for any app reachable LAN-direct through NPM's published port,
+which by the exposure model is *every* exposed app, not just code-server.
+
+So the rule can't be "every app that needs login goes Authelia-only" as
+stated — it has to be "every app that needs login goes Authelia-only, **once
+§180 closes the LAN-bypass gap**, and only for apps whose own login isn't
+otherwise load-bearing" (Vaultwarden's master password is the vault's
+encryption key check, not a redundant gate — dropping it isn't "fixing a
+double login", it's removing the encryption boundary; that one stays
+native no matter what).
+
+**Not yet inventoried**: which of the other ~30 exposed apps present a
+native login screen at all, and whether each has an existing "trust the
+proxy" knob like Dozzle's (`TRUSTED_PROXIES` env vars exist on a couple of
+apps already — nextcloud, speedtest — but those are for reporting the real
+client IP, a different concern from disabling the login form itself; only
+Dozzle's `AUTH_PROVIDER` knob actually does that). Building the real list
+needs checking each app's own docs/env vars, not guessing from memory.
+
+### 210.3 A VPN/overlay-only tag for sensitive apps, distinct from `lanOnly`
+
+The registry already has a `lanOnly` flag (`services.ts`, currently only
+Samba) — but it means something narrower than what's being asked for here:
+"this app speaks a non-HTTP LAN protocol the Cloudflare Tunnel physically
+cannot carry" (SMB on 445), enforced in `exposure.ts` by refusing to enable
+exposure at all. Guacamole is the opposite case: it's plain HTTP and *can*
+be tunneled — the ask is a **policy** call ("this is a keys-to-the-kingdom
+RDP/VNC/SSH gateway, don't put it on the open Cloudflare Tunnel even behind
+Authelia, only reach it over the NetBird/Tailscale overlay") not a protocol
+constraint. Reusing `lanOnly` for that would blur two different reasons
+behind one flag and one error message. Proposing a **separate** flag
+(name TBD — `restrictToOverlay`? `sensitiveGateway`?) with the same
+enforcement shape in `exposure.ts` but its own doc comment and refusal
+message ("X is a sensitive gateway — expose it over the NetBird/Tailscale
+overlay, not the public tunnel" rather than "cannot be carried").
+
+Candidates to evaluate for the new flag, not yet decided — each needs a
+real risk judgement, not a guess:
+
+- **Guacamole** — named directly. RDP/VNC/SSH to every machine on the
+  overlay behind one login; the highest-value target in the registry once
+  slice 4 gives it no visible second factor of its own.
+- **code-server** / **wetty** — full shell / dev-environment access.
+  Already flagged as a LAN-bypass edge case in 210.2; worth deciding
+  alongside that, not separately.
+- **nginx-proxy-manager**, **netbird-vpn** (dashboard/management) — control
+  the ingress path and the VPN control plane themselves; compromising
+  either has estate-wide blast radius.
+- **pihole** — DNS admin; lower stakes than the above but still
+  infrastructure control.
+
+Deliberately **not** flagging apps whose exposure is the entire point of
+running them (Vaultwarden — needs WAN reach from a phone away from home;
+Home Assistant — remote convenience is why it's exposed at all) even though
+they're also high-value targets — VPN-only would defeat their purpose,
+so for those the answer is "harden the login," not "hide it."
+
+### Cross-cutting note
+
+210.2 and 210.3 both bottom out on the same open question: **is an app's
+own login load-bearing for the LAN-direct path (§180), or purely redundant
+with Authelia?** Worth resolving §180 (or at least confirming its scope)
+before either 210.2 or 210.3 goes further, since the answer changes what
+"go Authelia-only" or "VPN-only" safely means for every app on the list.

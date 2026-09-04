@@ -340,14 +340,56 @@ Strategy:
       re-imports every boot, so a managed workflow's UI edits are replaced.
       Fine for now (matches every other generated config here); revisit
       skip-if-exists if someone needs to customise one in place.
-- [ ] **The LAN can bypass Cloudflare on NPM's :80** (§180) — the tunnel
-      origin is the host LAN IP, so NPM's plain-HTTP proxy port answers any
-      `Host:` header from anywhere on the LAN, skipping Cloudflare's WAF/Access
-      for *every* exposed app. `:443` is already closed (no cert/vhost). Fixing
-      it means moving the tunnel origin to loopback **and** binding NPM's
-      `80`/`443` to `127.0.0.1` — estate-wide and outage-risky (verify every
-      exposed hostname still works through the tunnel), so its own task. Not
-      OnlyOffice-specific; low priority on the no-guarantees box.
+- [ ] **The LAN can bypass Cloudflare on NPM's :80** (§180, §210) — the
+      tunnel origin is the host LAN IP, so NPM's plain-HTTP proxy port
+      answers any `Host:` header from anywhere on the LAN, skipping
+      Cloudflare's WAF/Access for *every* exposed app. `:443` is already
+      closed (no cert/vhost). Fixing it means moving the tunnel origin to
+      loopback **and** binding NPM's `80`/`443` to `127.0.0.1` —
+      estate-wide and outage-risky (verify every exposed hostname still
+      works through the tunnel), so its own task. Not OnlyOffice-specific;
+      low priority on the no-guarantees box. **Blocks §210.2/§210.3**:
+      until this closes, no app's own login is safely droppable in favor
+      of "Authelia-only" — the LAN-direct path has no gate at all without
+      it (code-server keeps its own login for exactly this reason today).
+- [ ] **Comment every pinned (non-`:latest`) image with why, or float it**
+      (§210.1) — six pins found with no rationale in the compose file:
+      `postgres:16-alpine` (guacamole-db, nextcloud-db, nocodb-db —
+      three separate apps), `mariadb:10.11` (itflow-db), `mysql:8.0`
+      (npm-db), `valkey:9-alpine` (immich-redis, paperless-redis),
+      `alpine:3` (beszel-init), `louislam/uptime-kuma:1`. Three other pins
+      already do this right and are the model to match:
+      `pgautoupgrade/pgautoupgrade:17-alpine` (n8n/paperless),
+      `ghcr.io/immich-app/postgres:14-vectorchord…` (immich),
+      `guacamole/guacamole:1.6.0`/`guacd:1.6.0` (§204). For each: find the
+      real reason (check plan.md's history for that app, or upstream
+      release notes for a known break) and write it in, or bump to
+      `:latest` if there isn't one.
+- [ ] **Audit which Authelia-protected apps still show their own login**
+      (§210.2) — double-login (Authelia's gate, then the app's own form)
+      is only actually fixed for one app so far (Dozzle, via
+      `DOZZLE_AUTH_PROVIDER: none`) plus Guacamole in progress (§200 slice
+      4). The other ~30 exposed apps haven't been checked one by one for
+      whether they show a native login at all, or have an equivalent
+      "trust the proxy" knob. Blocked on §180 for any app whose own login
+      turns out to be load-bearing on the LAN-direct path (code-server is
+      — kept deliberately, §93); Vaultwarden's master password is never a
+      candidate regardless — it's the vault's encryption key check, not a
+      redundant gate.
+- [ ] **A VPN/overlay-only flag for sensitive apps** (§210.3) — distinct
+      from the existing `lanOnly` (`services.ts`), which means "this
+      protocol can't physically be tunneled" (Samba/SMB) and is enforced
+      as a hard refusal in `exposure.ts`. This would be a policy flag for
+      apps that *can* be tunneled but shouldn't be, given what they
+      control: Guacamole (RDP/VNC/SSH to everything on the overlay behind
+      one login — named directly), code-server/wetty (full shell access,
+      tie to §210.2's LAN-bypass question), nginx-proxy-manager/netbird-vpn
+      (control the ingress path / VPN control plane), pihole (DNS admin).
+      Not Vaultwarden or Home Assistant — their WAN reach is the point of
+      running them, so the answer there is "harden the login," not "hide
+      it." Same enforcement shape as `lanOnly` in `exposure.ts`, a
+      separate flag and message so the two reasons ("can't" vs
+      "shouldn't") don't blur together.
 
 ### Apps and integrations
 
