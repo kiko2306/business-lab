@@ -12,6 +12,7 @@ const PROGRESS_LABELS: Record<SelfUpdateRunState, string> = {
   checking: 'Checking for updates…',
   pulling: 'Pulling the latest code…',
   building: 'Building the frontend and backend images…',
+  updating_apps: 'Pulling and recreating managed apps on their pinned images…',
   restarting_frontend: 'Restarting the frontend…',
   restarting_backend: 'Restarting the backend — the dashboard will reconnect on its own…',
   done: 'Up to date.',
@@ -22,6 +23,7 @@ const IN_PROGRESS_STATES: SelfUpdateRunState[] = [
   'checking',
   'pulling',
   'building',
+  'updating_apps',
   'restarting_frontend',
   'restarting_backend',
 ];

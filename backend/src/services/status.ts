@@ -10,7 +10,6 @@ import http from 'http';
 import logger from '../utils/logger';
 import { getAllServices, getService, getProjectName, getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getServiceExposureRow } from './exposure';
-import { getImageUpdateRow } from './imageUpdates';
 import { pinnedImages } from './composeOverride';
 import { ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
 
@@ -273,10 +272,10 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
           ? hostNetworkPortMappings(service.hostNetworkPort)
           : await getContainerPorts(getProjectName(serviceName));
     const exposedHostname = state === 'running' ? await getExposedHostname(serviceName) : null;
-    const updates = await getImageUpdateRow(serviceName).catch(() => null);
-    // Image digests the Update button pinned into docker-compose.override.yml
-    // (composeOverride.ts). Non-empty means the app is frozen on a specific
-    // build until "Unpin" — surfaced so the card can say so.
+    // Image digests the last self-update (§209) pinned into
+    // docker-compose.override.yml (composeOverride.ts). Non-empty means the
+    // app is frozen on a specific build until "Unpin" — surfaced so the card
+    // can say so.
     const resolvedForPins = resolveComposeFile(serviceName);
     const pinned = resolvedForPins?.appDir ? [...pinnedImages(resolvedForPins.appDir).values()] : [];
 
@@ -292,8 +291,6 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       adminUserManagementSupported: Boolean(service.supportsAdminUserManagement),
       dependsOn: service.dependsOn,
       requires: service.requires,
-      updateImages: updates?.outdated ?? [],
-      updateCheckedAt: updates?.checkedAt ?? null,
       pinnedImages: pinned,
       ports,
       exposedHostname,

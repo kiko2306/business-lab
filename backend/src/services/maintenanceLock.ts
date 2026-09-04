@@ -1,16 +1,18 @@
 /**
  * A single in-process serial lock shared by the operations that must not run
  * while an app's containers are being recreated: the app-data backup dump
- * (backupScheduler.runAppDataBackup) and the per-app image update
- * (executor.updateService).
+ * (backupScheduler.runAppDataBackup) and an app's own pull+recreate as part
+ * of a self-update's app-update batch (executor.pullAndRecreateService,
+ * called from updateAllInstalledApps — §209).
  *
- * Why they conflict: `updateService` does `docker compose pull` + `up -d
- * --force-recreate`, which stops and replaces a container. If that lands
- * mid-dump, `pg_dump`/`mariadb-dump` against that app aborts and the backup is
- * silently short a database (§103 is the ordering rule for the dump itself;
- * this is the same rule extended to updates). Serialising them is enough — an
- * update waiting ~20s for a dump to finish, or a scheduled dump waiting for a
- * pull, is fine; both retry or re-run on their own cadence.
+ * Why they conflict: `pullAndRecreateService` does `docker compose pull` +
+ * `up -d --force-recreate`, which stops and replaces a container. If that
+ * lands mid-dump, `pg_dump`/`mariadb-dump` against that app aborts and the
+ * backup is silently short a database (§103 is the ordering rule for the
+ * dump itself; this is the same rule extended to updates). Serialising them
+ * is enough — an update waiting ~20s for a dump to finish, or a scheduled
+ * dump waiting for a pull, is fine; both retry or re-run on their own
+ * cadence.
  *
  * Deliberately process-local, not a Postgres advisory lock: there is exactly
  * one backend process driving compose, and a DB-backed lock would add a

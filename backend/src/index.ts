@@ -22,6 +22,7 @@ import {
   ensureUserInvitationsSchema,
   ensureServiceExposureTable,
   dropServiceExposureAutheliaColumn,
+  dropServiceImageUpdatesTable,
   ensureTotpSchema,
 } from './utils/database';
 import authMiddleware from './middleware/auth';
@@ -33,7 +34,6 @@ import { startBackupScheduler } from './services/backupScheduler';
 import { reconcileRemovedServices } from './services/exposure';
 import { startExposureReconciler } from './services/exposureReconciler';
 import { regenerateHomepageServices } from './services/homepageConfig';
-import { startImageUpdateSweeper } from './services/imageUpdates';
 import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
 
 const apiLimiter = rateLimit({
@@ -194,6 +194,9 @@ ensureServiceExposureTable()
 ensureTotpSchema().catch((err: Error) => {
   console.error('Unable to ensure TOTP schema:', err.message);
 });
+dropServiceImageUpdatesTable().catch((err: Error) => {
+  console.error('Unable to drop service_image_updates:', err.message);
+});
 ensureSelfUpdateTable()
   .then(() => reconcileDanglingSelfUpdateRun())
   .catch((err: Error) => {
@@ -214,7 +217,6 @@ startExposureReconciler();
 // fresh deploy) would leave it stale. Reconcile it once on boot. Best-effort
 // inside the helper (§114).
 regenerateHomepageServices();
-startImageUpdateSweeper();
 startSelfUpdateCheckSweeper();
 
 const server = app.listen(PORT, () => {

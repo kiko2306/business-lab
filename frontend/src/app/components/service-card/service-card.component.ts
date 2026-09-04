@@ -21,6 +21,7 @@ import {
   ServiceEnvStatus,
   ServiceAction,
   ServiceExposureConfig,
+  ServiceOperation,
   ServiceStatus,
   StartupActionEvent,
 } from '../../core/models';
@@ -56,7 +57,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
-  @Input() loadingAction: ServiceAction | null = null;
+  @Input() loadingAction: ServiceOperation | null = null;
 
   @Output() actionRequested = new EventEmitter<ServiceAction>();
 
@@ -100,20 +101,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   @ViewChild('startupLogBody') private startupLogBody?: ElementRef<HTMLElement>;
 
-  /** An image the daily sweep found a newer version of (§82.1). */
-  protected updateAvailable(): boolean {
-    return (this.service.updateImages?.length ?? 0) > 0;
-  }
-
-  protected updateTitle(): string {
-    const images = this.service.updateImages ?? [];
-    if (!images.length) {
-      return 'Pull newer images and recreate the container';
-    }
-    return `Newer image${images.length === 1 ? '' : 's'} available: ${images.join(', ')}`;
-  }
-
-  /** The Update button pinned this app to a specific image digest (§131.4). */
+  /** The last self-update (§209) pinned this app to a specific image digest. */
   protected pinned(): boolean {
     return (this.service.pinnedImages?.length ?? 0) > 0;
   }
@@ -127,10 +115,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   }
 
   requestAction(action: ServiceAction): void {
-    // An update pulls and recreates, so it produces exactly the output a start
-    // does — and is the one most worth watching, since a new image is the most
-    // likely thing to come up broken.
-    if (action !== 'stop') {
+    if (action === 'start') {
       void this.openStartupLogs();
     }
     this.actionRequested.emit(action);

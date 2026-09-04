@@ -2,7 +2,8 @@
   <div class="mb-4">
     <h1 class="h3 mb-1">Updates</h1>
     <p class="text-body-secondary mb-0">
-      Check for and apply updates to Business Lab itself.
+      Check for and apply updates to Business Lab — this is also the only way
+      managed apps' images update, so the whole stack moves together.
     </p>
   </div>
 
@@ -10,7 +11,7 @@
     anchor="self-update"
     key="self-update"
     title="Business Lab"
-    subtitle="Pull the latest code from main, rebuild, and restart the dashboard"
+    subtitle="Pull the latest code from main, rebuild the dashboard, pull and recreate every managed app on its pinned images, then restart"
   >
     <div class="card mb-3" *ngIf="status as s">
       <div class="card-body p-4">

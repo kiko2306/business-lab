@@ -71,6 +71,18 @@ vi.mock('../utils/logger', () => ({
 }));
 vi.mock('../version', () => ({ APP_VERSION: '0.24.0' }));
 
+// executor.ts pulls in the whole compose-execution/registry dependency graph
+// (npmClient, exposure, etc.) — irrelevant here and heavy to load for real,
+// so only the one function this module calls is mocked.
+interface AppUpdateResult {
+  serviceName: string;
+  ok: boolean;
+  message?: string;
+  error?: string;
+}
+const executor = vi.hoisted(() => ({ updateAllInstalledApps: vi.fn(async (): Promise<AppUpdateResult[]> => []) }));
+vi.mock('./executor', () => executor);
+
 import {
   checkForUpdate,
   getSelfUpdateStatus,
@@ -108,6 +120,8 @@ beforeEach(() => {
   });
   audit.writeAuditLog.mockClear();
   spawnMock.mockClear();
+  executor.updateAllInstalledApps.mockReset();
+  executor.updateAllInstalledApps.mockResolvedValue([]);
   process.env.REPO_ROOT = '/repo';
 });
 
@@ -147,8 +161,13 @@ describe('triggerSelfUpdate', () => {
     expect(status.latestRun).toMatchObject({ state: 'restarting_backend', fromCommit: 'old111', toCommit: 'new222' });
     expect(status.latestRun?.finishedAt).not.toBeNull();
     expect(audit.writeAuditLog).toHaveBeenCalledWith(
-      expect.objectContaining({ action: 'self_update_trigger', metadata: { fromCommit: 'old111', toCommit: 'new222' } })
+      expect.objectContaining({
+        action: 'self_update_trigger',
+        metadata: expect.objectContaining({ fromCommit: 'old111', toCommit: 'new222' }),
+      })
     );
+    // The managed-app update batch ran as part of the same sequence (§209).
+    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7);
     // Never a `down` — every compose call is `up -d --build` or `build`.
     const composeCalls = backup.runCommand.mock.calls.filter(([cmd]) => cmd === 'docker');
     expect(composeCalls.length).toBeGreaterThan(0);
@@ -162,6 +181,26 @@ describe('triggerSelfUpdate', () => {
       expect.objectContaining({ detached: true })
     );
     expect(spawnMock.mock.calls[0][1]).not.toContain('down');
+  });
+
+  it('continues past a failed app update and records the summary in the audit metadata', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1);
+    executor.updateAllInstalledApps.mockResolvedValue([
+      { serviceName: 'nextcloud', ok: true },
+      { serviceName: 'guacamole', ok: false, error: 'pull failed' },
+    ]);
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun).toMatchObject({ state: 'restarting_backend' });
+    expect(audit.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'self_update_trigger',
+        metadata: expect.objectContaining({ appsUpdated: 1, appsFailed: ['guacamole'] }),
+      })
+    );
   });
 
   it('stops with state=error and leaves nothing recreated when the build fails', async () => {

@@ -50,8 +50,13 @@ other app is started from the dashboard.
 - **Global mail**: set it once in Settings → Email. Apps that inherit it are
   listed in [app-credentials.md](app-credentials.md#global-mail-settings--who-inherits-them);
   ITFlow and Uptime Kuma need it copied into their own UI.
-- **Updates**: the dashboard has an image-update check (there is no
-  Watchtower — `plan.md` §82). Restart individual services to apply.
+- **Updates**: there is no per-app Update button and no Watchtower
+  (`plan.md` §82, §209). Managed-app images only ever move as part of a
+  Business Lab self-update on the Updates page: `git pull`, rebuild the
+  dashboard, then pull and recreate every installed app on whatever tags
+  that pull just landed in its compose file — so the whole stack always
+  matches one commit of the repository rather than any one app drifting
+  ahead on its own.
   **Never `docker compose down` the root stack** — that tears down the running
   dashboard, backend and database.
 - **Virus scanning**: if ClamAV is in the deployment, Nextcloud uploads

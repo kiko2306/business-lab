@@ -25,9 +25,6 @@
       <span *ngIf="dependenciesSatisfied() && degradedBy().length" class="text-warning-emphasis">
         · {{ degradedTitle() }}
       </span>
-      <span *ngIf="updateAvailable()" class="text-danger">
-        · {{ service.updateImages?.length }} image{{ service.updateImages?.length === 1 ? '' : 's' }} out of date
-      </span>
       <span *ngIf="pinned()" class="text-info-emphasis" [title]="pinnedTitle()">
         · 📌 pinned to a fixed image
       </span>
@@ -60,18 +57,6 @@
     >
       <span *ngIf="loadingAction === 'start'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
       <span *ngIf="loadingAction !== 'start'">Start</span>
-    </button>
-    <button
-      type="button"
-      class="btn btn-sm"
-      [class.btn-danger]="updateAvailable()"
-      [class.btn-outline-secondary]="!updateAvailable()"
-      [disabled]="loadingAction !== null"
-      [title]="updateTitle()"
-      (click)="requestAction('update')"
-    >
-      <span *ngIf="loadingAction === 'update'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      <span *ngIf="loadingAction !== 'update'">Update</span>
     </button>
     <button
       *ngIf="pinned()"

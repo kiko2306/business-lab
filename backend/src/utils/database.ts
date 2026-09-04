@@ -255,3 +255,17 @@ export async function dropServiceExposureAutheliaColumn(): Promise<void> {
     DROP COLUMN IF EXISTS authelia_protected
   `);
 }
+
+/**
+ * Drop `service_image_updates` on databases that still carry it from the
+ * per-app "Update" button era (§209 removed it — managed-app images now only
+ * ever update as a batch step of a Business Lab self-update, never
+ * independently per app, so there is nothing left to cache a per-app
+ * outdated/unknown check against). It was created programmatically
+ * (`ensureImageUpdatesTable`, now deleted), never via `init.sql`, so a fresh
+ * install never had it in the first place — this only matters for a
+ * database from before this change.
+ */
+export async function dropServiceImageUpdatesTable(): Promise<void> {
+  await query(`DROP TABLE IF EXISTS service_image_updates`);
+}

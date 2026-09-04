@@ -16449,3 +16449,100 @@ the dashboard (as every live-verification step in §204/§206/§207 did), its
 "Update now" click — expected, not a regression, but worth checking for
 before reporting "verified live" as fully clean next time this pattern
 comes up.
+
+## 209. Removed the per-app Update button — managed-app images now only move via a self-update batch
+
+Requested directly, interrupting §200 slice 4 mid-research: no app should
+have its own "Update" action. Updates to managed-app images should only
+happen as part of a Business Lab self-update (`git pull` + rebuild), so
+the dev controls exactly what's running by advancing a pin in the repo and
+pushing, not by a per-app click that can leave 36 apps independently ahead
+of whatever commit the dashboard itself is on.
+
+**Two decisions taken before touching code** (asked, not guessed):
+1. The per-app "outdated" badge/check goes away entirely, not just the
+   button — no read-only "there's a newer image" signal left on the card.
+2. A self-update pulls and recreates **every installed app, every time**,
+   not just the ones whose compose file changed in that `git pull` — the
+   simplest, most literal reading of "keep integrity in the stack."
+
+**What moved, not what was rebuilt.** The actual pull/recreate/pin
+mechanics (`docker compose pull` → `up -d --force-recreate` →
+`docker image inspect` → write the digest into
+`docker-compose.override.yml`) are unchanged from the old `updateService` —
+renamed to `pullAndRecreateService` (`executor.ts`) since it is no longer a
+route handler's whole job, just the per-app primitive a batch now calls in
+a loop. New: `updateAllInstalledApps(userId)` iterates every registry entry,
+skips anything not installed, and — the one genuinely new piece of
+behaviour — tolerates any single app's failure (logs it, keeps going)
+rather than letting one broken pull block the other 35.
+
+**Where the batch runs**: `selfUpdate.ts`'s `runSelfUpdateSequence`, as a
+new `updating_apps` state between `building` and `restarting_frontend` —
+after the dashboard's own image is built (so `git pull`'s new compose-file
+pins are already on disk) but before the self-replacing backend restart
+(so this process is still alive to await and log every app's result, not
+split across the process boundary that step causes). The final
+`self_update_trigger` audit entry now also carries `appsUpdated`/
+`appsFailed` counts.
+
+**Deleted wholesale**: `imageUpdates.ts` and its test file — the entire
+registry-digest-vs-local-digest "is there an update" check, its Postgres
+cache table, and the once-a-day sweep that kept it warm. Two small pure
+functions it held (`parseImageRef`, `pickLocalDigest`) are still needed by
+the pin-writer, so they moved into `composeOverride.ts`, the module that
+already owns pin reading/writing — not a new file, since they only ever
+served that one remaining purpose now. `service_image_updates` is dropped
+via a new migration (`dropServiceImageUpdatesTable`, `database.ts`),
+mirroring §201's `authelia_protected` column drop; it was created
+programmatically, never via `init.sql`, so a fresh install never had it.
+
+**Removed from the route layer**: `POST /:name/update` is gone outright.
+`POST /:name/update/unpin` stays — dropping a pin to float an app back to
+its base compose tags is still a legitimate manual escape hatch under the
+new model, it just no longer says "the Update button wrote this."
+
+**Frontend**: `ServiceAction` narrowed to `'start' | 'stop'` — a new
+`ServiceOperation = ServiceAction | 'unpin'` covers the Unpin button's own
+loading-indicator tag, which posts to its own endpoint and was piggy-backing
+on the `'update'` tag before. Removed `updateAvailable()`/`updateTitle()`,
+the "N images out of date" badge, and the Update button itself from
+`service-card.component`. `apps.component.handleAction` no longer branches
+on `'update'`. The self-update panel gained an `updating_apps` progress
+label and its subtitle now says what it actually does — including the app
+batch, not just the dashboard's own rebuild.
+
+**Verified.** Backend `npm run typecheck` + `npm test` (52 files, 565
+tests — `imageUpdates.test.ts`'s `parseImageRef`/`pickLocalDigest` cases
+moved into `composeOverride.test.ts`; `selfUpdate.test.ts` mocks
+`./executor` now, since it would otherwise drag in the whole compose/
+registry dependency graph just to load, and gained a test for the
+continue-past-one-failure behaviour and the audit-metadata counts).
+Frontend `npm run test:ci` (50 tests, after installing headless Chrome's
+missing shared libs in the plain `node:20` container used to run it
+locally) and `npm run build`, both green.
+
+**Live proof, not just unit tests** (CLAUDE.md: Docker-touching changes get
+proven against the real stack): built nothing new for this — ran
+`pullAndRecreateService('dozzle', 0)` for real from a throwaway container
+with the Docker socket mounted, against Dozzle on `tx-home-utils.com`
+(small, low-risk image, sanctioned "restart an individual service").
+Confirmed live: a new image was actually pulled, the container's ID
+changed (a real recreate, not a no-op), `docker-compose.override.yml` was
+written with the new §209-worded header and a real `image@sha256:…` pin,
+and the function tolerated the DB being unreachable in this throwaway
+context (audit log write failed and logged, exposure provisioning failed
+and logged, the update itself still reported `success: true`) — exactly
+the "never let a secondary failure look like the update failed" behaviour
+the code claims. Reverted the override file afterward so Dozzle is back to
+floating on `:latest`, its pre-test state. Did not run the full batch
+across all ~36 apps or through the actual self-update sequence — the live
+backend still can't be recreated (§198's `REPO_ROOT` gap, unchanged, the
+same blocker §204/§206/§207 hit) — so `selfUpdate.ts`'s wiring of the new
+`updating_apps` step rests on its unit test plus this proof that the
+primitive it calls in a loop works for real.
+
+Version bumped to `0.29.0` (minor: removes a user-facing feature/API
+surface). Slice 4 of the Guacamole SSO series (§200) is next, unaffected
+by this detour beyond `guacamole/guacamole`'s image no longer being
+touchable by a per-app Update click either.

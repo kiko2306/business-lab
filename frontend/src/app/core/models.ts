@@ -80,9 +80,14 @@ export interface ServicePortMapping {
   protocol: string;
 }
 
-// What the row's buttons can ask for. `update` pulls newer images and
-// recreates the container — the deliberate replacement for Watchtower.
-export type ServiceAction = 'start' | 'stop' | 'update';
+// What the row's Start/Stop buttons can ask for. There is no per-app
+// `update` action any more (§209) — managed-app images only ever move as a
+// batch step of a Business Lab self-update, never independently per app.
+export type ServiceAction = 'start' | 'stop';
+
+// The above, plus "unpin" — a loading-indicator tag for the Unpin button,
+// which posts to its own endpoint rather than `/services/:name/:action`.
+export type ServiceOperation = ServiceAction | 'unpin';
 
 export interface ServiceStatus {
   name: string;
@@ -101,12 +106,7 @@ export interface ServiceStatus {
   // Needed for the app to work properly, but not to boot: listed with live
   // state and warned about, never blocking.
   requires?: string[];
-  // Images the daily sweep found newer versions of, and when it last looked.
-  // An empty list after a check means up to date; a null timestamp means it
-  // has never been checked, which is not the same thing.
-  updateImages?: string[];
-  updateCheckedAt?: string | null;
-  // Image refs the Update button pinned into the app's managed
+  // Image refs the last self-update (§209) pinned into the app's managed
   // docker-compose.override.yml (`repo:tag@sha256:…`). Non-empty means the app
   // is frozen on that build until "Unpin".
   pinnedImages?: string[];
@@ -594,6 +594,7 @@ export type SelfUpdateRunState =
   | 'checking'
   | 'pulling'
   | 'building'
+  | 'updating_apps'
   | 'restarting_frontend'
   | 'restarting_backend'
   | 'done'

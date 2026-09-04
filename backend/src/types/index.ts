@@ -273,13 +273,9 @@ export interface ServiceStatusPayload {
   adminUserManagementSupported?: boolean;
   dependsOn?: string[];
   requires?: string[];
-  // From the cached daily sweep (services/imageUpdates.ts), never a live
-  // registry call — a status poll must not spend rate limit.
-  updateImages?: string[];
-  updateCheckedAt?: string | null;
-  // Image refs (`repo:tag@sha256:…`) the Update button pinned into the app's
-  // managed docker-compose.override.yml. Non-empty = frozen on that build
-  // until the operator clears it with "Unpin".
+  // Image refs (`repo:tag@sha256:…`) the last self-update (§209) pinned into
+  // the app's managed docker-compose.override.yml. Non-empty = frozen on
+  // that build until the operator clears it with "Unpin".
   pinnedImages?: string[];
   ports?: ServicePortMapping[];
   // The service's public hostname, only when exposure is enabled and
@@ -315,7 +311,7 @@ export interface ResolvedComposeFile {
   composeFile: string | null;
   // The `-f` flags for a `docker compose` command: the base compose file, plus
   // the dashboard-managed `docker-compose.override.yml` when it exists (image
-  // pins from the Update button — services/composeOverride.ts). Empty string
+  // pins from the last self-update, §209 — services/composeOverride.ts). Empty string
   // when there is no compose file. Use this for command strings; keep reading
   // `composeFile` for parsing the app's own compose content.
   composeArgs: string;

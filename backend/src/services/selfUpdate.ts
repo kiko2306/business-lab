@@ -2,6 +2,15 @@
  * The "git pull + rebuild + restart" half of the self-update panel (plan.md
  * §131.4) — the other half, the footer version string, is version.ts.
  *
+ * Also the *only* place managed-app images move any more (§209): once the
+ * dashboard's own rebuild is done but before the (self-replacing) backend
+ * restart, `executor.updateAllInstalledApps` pulls and recreates every
+ * installed app against whatever tags the `git pull` that just landed pinned
+ * in their compose files. There is no per-app "Update" action left — every
+ * app's image now only ever advances because this ran, tying every
+ * container's version to a specific commit of this repository rather than
+ * letting any one app drift ahead of it independently.
+ *
  * The tricky part isn't the git/compose commands, it's that the last step
  * recreates the very backend container running this code. Everything up to
  * and including the frontend restart is awaited normally; the final
@@ -15,8 +24,8 @@
  * closes it out on the next boot.
  *
  * Never `docker compose down` (CLAUDE.md, §Never) — every step here is
- * `up -d --build` against one or two named services, same as `executor.ts`'s
- * per-app update path.
+ * `up -d --build` against one or two named services, same as
+ * `executor.ts`'s per-app compose calls.
  */
 
 import { spawn } from 'child_process';
@@ -24,6 +33,7 @@ import logger from '../utils/logger';
 import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { runCommand } from './backup';
+import { updateAllInstalledApps } from './executor';
 import { APP_VERSION } from '../version';
 import { HttpError } from '../types';
 
@@ -39,6 +49,7 @@ export type SelfUpdateRunState =
   | 'checking'
   | 'pulling'
   | 'building'
+  | 'updating_apps'
   | 'restarting_frontend'
   | 'restarting_backend'
   | 'done'
@@ -153,7 +164,7 @@ async function updateRun(
  * `git fetch` + compare against `origin/main`. Deliberately not called from
  * a live status poll — a fetch against a slow/unreachable remote shouldn't
  * hang the panel — so it's cached here and refreshed by the sweeper (and by
- * the "Check now" button), mirroring imageUpdates.ts's cached-check pattern.
+ * the "Check now" button) rather than on every poll.
  */
 export async function checkForUpdate(): Promise<SelfUpdateCheck> {
   const repoRoot = requireRepoRoot();
@@ -246,6 +257,21 @@ async function runSelfUpdateSequence(
       { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER }
     );
 
+    // Every installed app's image, pulled and recreated against whatever the
+    // `git pull` above just landed in its compose file (§209) — the only
+    // place this happens now, replacing the old per-app "Update" button.
+    // Best-effort: updateAllInstalledApps never throws, it logs a per-app
+    // failure and moves on, so one app's broken pull can't block the
+    // dashboard's own rebuild/restart from completing below.
+    await updateRun(runId, { state: 'updating_apps' });
+    const appResults = await updateAllInstalledApps(userId);
+    const appsFailed = appResults.filter((r) => !r.ok);
+    if (appsFailed.length) {
+      logger.warn(`Self-update: ${appsFailed.length}/${appResults.length} app(s) failed to update`, {
+        failed: appsFailed.map((r) => r.serviceName),
+      });
+    }
+
     await updateRun(runId, { state: 'restarting_frontend' });
     await runCommand(
       'docker',
@@ -262,7 +288,12 @@ async function runSelfUpdateSequence(
       userId,
       action: 'self_update_trigger',
       resource: toCommit,
-      metadata: { fromCommit: check.currentCommit, toCommit },
+      metadata: {
+        fromCommit: check.currentCommit,
+        toCommit,
+        appsUpdated: appResults.length - appsFailed.length,
+        appsFailed: appsFailed.map((r) => r.serviceName),
+      },
     }).catch(() => {});
 
     const child = spawn(

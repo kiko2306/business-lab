@@ -17,7 +17,7 @@
  *      does not reference and cannot be injected via `.env` (no `env_file:`,
  *      no `${...}` for it). That needs a managed compose fragment —
  *      `docker-compose.managed.yml` (config/services.ts MANAGED_COMPOSE_FILENAME),
- *      kept separate from the Update button's image-pin override so an update
+ *      kept separate from a self-update's image-pin override (§209) so a self-update
  *      cannot wipe it.
  *
  * ClamAV runs as its own compose project, reachable from Paperless's network

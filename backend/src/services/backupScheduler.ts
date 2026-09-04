@@ -149,10 +149,11 @@ const MAX_RECORDED_FAILURES = 25;
 export async function runAppDataBackup(
   trigger: 'scheduled' | 'manual' = 'scheduled'
 ): Promise<{ ok: boolean; detail: string }> {
-  // Serialise against the per-app image update (executor.updateService): a
-  // `docker compose up --force-recreate` landing mid-dump aborts pg_dump for
-  // that app and the run is silently short a database. The dump is ~20s, so an
-  // update waiting on it — or a scheduled dump waiting on a pull — is fine.
+  // Serialise against a self-update's app-update batch
+  // (executor.pullAndRecreateService, §209): a `docker compose up
+  // --force-recreate` landing mid-dump aborts pg_dump for that app and the
+  // run is silently short a database. The dump is ~20s, so an update
+  // waiting on it — or a scheduled dump waiting on a pull — is fine.
   return withMaintenanceLock(`backup:app-data:${trigger}`, () => runAppDataBackupLocked(trigger));
 }
 

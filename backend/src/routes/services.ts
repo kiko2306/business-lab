@@ -151,46 +151,11 @@ router.post(
 );
 
 /**
- * POST /api/services/:name/update
- * Pull newer images for a service and recreate it on them. Replaces
- * Watchtower's unattended updates with a deliberate, per-app action (§81.3).
- */
-router.post(
-  '/:name/update',
-  serviceLimiter,
-  auth,
-  requireCapability('apps:control'),
-  validateParams(schemas.serviceNameParam),
-  validateServiceAllowlist,
-  async (req: Request, res: Response) => {
-    const serviceName = req.params.name;
-    const userId = req.user!.id;
-
-    try {
-      logger.info(`Service update request: ${serviceName}`, { userId, service: serviceName });
-
-      const result = await executor.updateService(serviceName, userId);
-      res.json(result);
-    } catch (error) {
-      const httpError = error as HttpError;
-      logger.error(`Service update failed: ${serviceName}`, { userId, error: httpError.message });
-
-      const statusCode = httpError.statusCode || 500;
-      res.status(statusCode).json({
-        error: 'Failed to update service',
-        service: serviceName,
-        message: httpError.message,
-        details: httpError.details,
-      });
-    }
-  }
-);
-
-/**
  * POST /api/services/:name/update/unpin
- * Drop the managed docker-compose.override.yml image pins the Update button
- * wrote, so the app floats back to the tags in its base compose file. Recreates
- * the container when it is running so the change takes effect now.
+ * Drop the managed docker-compose.override.yml image pins a self-update
+ * (§209) wrote, so the app floats back to the tags in its base compose file
+ * until the next self-update pulls and re-pins it. Recreates the container
+ * when it is running so the change takes effect now.
  */
 router.post(
   '/:name/update/unpin',

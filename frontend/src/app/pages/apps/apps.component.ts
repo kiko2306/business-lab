@@ -162,10 +162,6 @@ export class AppsComponent implements OnInit, OnDestroy {
       this.serviceState.startService(serviceName);
       return;
     }
-    if (action === 'update') {
-      this.serviceState.updateService(serviceName);
-      return;
-    }
 
     this.serviceState.stopService(serviceName);
   }

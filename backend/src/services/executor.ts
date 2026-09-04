@@ -18,8 +18,7 @@ import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { applyKitchenConfig } from './kitchenConfig';
 import { applySambaConfig } from './sambaConfig';
 import { ensureKopiaRepoDir } from './kopiaTargetApply';
-import { checkServiceImages, recordImageCheck, pickLocalDigest, parseImageRef } from './imageUpdates';
-import { clearImagePins, writeImagePins } from './composeOverride';
+import { clearImagePins, writeImagePins, pickLocalDigest, parseImageRef } from './composeOverride';
 import { withMaintenanceLock } from './maintenanceLock';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
@@ -29,7 +28,7 @@ import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperles
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
-import { extractComposeEnvVars, getService, isValidServiceName, resolveComposeFile } from '../config/services';
+import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getServiceStatus } from './status';
 import { HttpError } from '../types';
@@ -162,7 +161,7 @@ async function composeUpWithManagedConfig(
   projectName: string | null,
   appDir: string,
   // The `-f` flags (base compose + managed override), not just the base file,
-  // so a recreate honours the image pins the Update button wrote.
+  // so a recreate honours the image pins the last self-update wrote (§209).
   composeArgs: string,
   { forceRecreate }: { forceRecreate: boolean }
 ): Promise<CommandResult> {
@@ -391,9 +390,14 @@ export async function startService(serviceName: string, userId: number): Promise
  * This is what replaced Watchtower (§81.3). Watchtower did the same thing
  * unattended, to every container that had not opted out — which is why the
  * management stack carries four `com.centurylinklabs.watchtower.enable=false`
- * labels. Recreating an app while someone is using it, on an image whose
- * changes nobody has read, is a decision rather than a background chore; it
- * belongs on a button.
+ * labels. Recreating an app on an image whose changes nobody has read is a
+ * decision, not a background chore — but the decision now belongs to
+ * whoever advances the pinned tag in `apps/<name>/docker-compose.yml` and
+ * pushes that commit, not to a per-app click. There is no longer a
+ * standalone "Update" action per service: `updateAllInstalledApps` (below)
+ * is the only caller, run once as a batch step of a Business Lab self-update
+ * (§209) — so every managed app's images move in lockstep with what the
+ * repository itself says should be running, never independently ahead of it.
  *
  * Image IDs before and after say whether anything actually changed.
  * Recreation goes through composeUpWithManagedConfig like every other start,
@@ -409,7 +413,7 @@ export async function startService(serviceName: string, userId: number): Promise
  *    point at that day. The pins are cleared first, so the pull always fetches
  *    the tags in the base compose file rather than re-fetching a pinned digest.
  */
-export async function updateService(serviceName: string, userId: number): Promise<ServiceActionResult> {
+export async function pullAndRecreateService(serviceName: string, userId: number): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
     throw { statusCode: 400, message: `Invalid service name: ${serviceName}` } as HttpError;
   }
@@ -467,12 +471,6 @@ export async function updateService(serviceName: string, userId: number): Promis
         : null;
     });
 
-    // The cached "out of date" answer is stale the moment this succeeds, and
-    // leaving the button red after a successful update reads as a failure.
-    await checkServiceImages(serviceName)
-      .then((check) => recordImageCheck(serviceName, check))
-      .catch((error: Error) => logger.warn('Could not refresh the update check', { serviceName, error: error.message }));
-
     await logAuditEvent(userId, 'SERVICE_UPDATE', serviceName, 'success', {
       updated: updated ?? 'unknown',
       duration: new Date().getTime() - startTime.getTime(),
@@ -505,6 +503,62 @@ export async function updateService(serviceName: string, userId: number): Promis
       details: httpError.stderr,
     } as HttpError;
   }
+}
+
+// A self-update has no signed-in request behind it once it reaches this
+// step (it can be triggered by a human, but runs detached) — same "system
+// actor" convention exposureReconciler.ts uses for its own unattended runs.
+const SYSTEM_USER_ID = 0;
+
+// A short pause between apps: back-to-back `docker compose pull`s across the
+// whole ~36-app roster is bursty registry traffic for no benefit, since this
+// now only ever runs once per self-update rather than on a recurring sweep.
+const BETWEEN_APPS_MS = 2000;
+
+export interface AppUpdateResult {
+  serviceName: string;
+  ok: boolean;
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Pull + recreate every currently-installed app, one at a time — the
+ * managed-apps half of a Business Lab self-update (§209). Replaces the old
+ * per-app "Update" button entirely: there is no other caller of
+ * `pullAndRecreateService` any more, so every app's image now only ever
+ * moves because a self-update pulled whatever tag is pinned in the compose
+ * file that came down with the same `git pull`, never independently ahead
+ * of what the repository says should be running.
+ *
+ * Never aborts on one app's failure — logs it and moves on to the next, so
+ * one broken pull doesn't leave the other apps un-updated. Not installed
+ * (`resolveComposeFile` finds no compose file) just means "skip it", not an
+ * error.
+ */
+export async function updateAllInstalledApps(userId: number | null): Promise<AppUpdateResult[]> {
+  const results: AppUpdateResult[] = [];
+
+  for (const service of getAllServices()) {
+    if (!resolveComposeFile(service.name)?.composeFile) {
+      continue;
+    }
+    try {
+      const result = await pullAndRecreateService(service.name, userId ?? SYSTEM_USER_ID);
+      results.push({ serviceName: service.name, ok: true, message: result.message });
+    } catch (error) {
+      const message = (error as HttpError).message || (error as Error).message;
+      logger.error(`Self-update: failed to update ${service.name}`, { error: message });
+      results.push({ serviceName: service.name, ok: false, error: message });
+    }
+    await new Promise((resolve) => setTimeout(resolve, BETWEEN_APPS_MS));
+  }
+
+  const failed = results.filter((r) => !r.ok);
+  logger.info(`Self-update: updated ${results.length - failed.length}/${results.length} installed app(s)`, {
+    failed: failed.map((r) => r.serviceName),
+  });
+  return results;
 }
 
 export function describeUpdate(updated: string[] | null): string {

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.28.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.29.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -229,8 +229,9 @@ Updates:
       `tx-home-utils.com` yet. Recreate `backend`/`docker-socket-proxy`/
       `frontend` individually once, then click "Update now" on `/updates`
       for real and confirm the whole walk (fetch → pull → build →
-      restart-frontend → restart-backend → reconnect) end to end, plus that
-      a `user`-role account gets 403 and no nav entry. While recreating
+      **pull/recreate every installed app (§209)** → restart-frontend →
+      restart-backend → reconnect) end to end, plus that a `user`-role
+      account gets 403 and no nav entry. While recreating
       `backend`, also confirm `docker-entrypoint.sh`'s new chown of
       `apps/authelia/config/{configuration,users_database}.yml` actually
       takes on the real container (§199 only proved it in an isolated
@@ -389,18 +390,6 @@ Strategy:
       life-safety), and prove a start + backup/restore round-trip.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
-- [ ] **Guacamole's image pin is invisible to the Update button** (§200,
-      §204) — `guacamole/guacamole`/`guacamole/guacd` are pinned to an exact
-      release (`1.6.0`), needed so the `guacamole-auth-header` extension
-      (slice 4) stays version-matched to the webapp build. The per-app update
-      check (`imageUpdates.ts`) compares the registry digest for the *tag
-      already in the compose file* against the local one — for a fixed
-      version tag that digest never changes, so it silently never reports
-      an update, unlike a floating tag (`:latest`, or `mariadb:10.11`
-      elsewhere in this repo, which still catches patch pushes under that
-      minor). No dashboard mechanism catches "there's a newer Guacamole
-      release" — someone has to check upstream by hand and bump the pin
-      (re-verifying the extension jar version alongside it).
 - [ ] **Guacamole SSO, slice 4: the `guacamole-auth-header` extension**
       (§200) — a `guacamole-initdb`-shaped one-shot service fetches the
       version-matched extension jar into a new `./data/extensions` volume;

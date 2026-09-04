@@ -11,7 +11,28 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
-## [0.28.0] — 2026-09-04
+## [0.29.0] — 2026-09-04
+
+### Changed
+
+- **Removed the per-app "Update" button** — managed-app images no longer
+  update independently per app. The only way any app's image moves now is
+  as a batch step of a Business Lab self-update (`/updates`, "Update now"):
+  after the dashboard's own rebuild, every installed app is pulled and
+  recreated against whatever tag its compose file carries in the commit
+  that `git pull` just landed, one at a time, tolerating any single app's
+  failure without blocking the rest. This ties the whole stack's image
+  versions to one commit of the repository instead of letting any one app
+  drift ahead independently — the dev controls what "current" means by
+  advancing a pin and pushing, not by clicking a per-app button.
+- Removed the daily per-app "image update available" check and its
+  `service_image_updates` table along with it — there is no longer a
+  per-app action for it to inform, and the outdated/unknown badge is gone
+  from the service card. `docker-compose.override.yml`'s image pins are
+  still written and still shown ("📌 pinned"), now by the self-update batch
+  instead of the old button; "Unpin" still works the same way.
+
+
 
 ### Added
 

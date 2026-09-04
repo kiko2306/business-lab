@@ -16,8 +16,8 @@ const COMPOSE_FILENAMES = ['compose.yaml', 'compose.yml', 'docker-compose.yml', 
 /**
  * A second dashboard-managed compose file, separate from the image-pin
  * `docker-compose.override.yml` (services/composeOverride.ts). The pin override
- * is wiped and rewritten wholesale by the Update button; anything the backend
- * needs to add to a compose file that must survive an update goes here instead.
+ * is wiped and rewritten wholesale by a self-update (§209); anything the
+ * backend needs to add to a compose file that must survive one goes here instead.
  * Currently only Paperless's `PAPERLESS_PRE_CONSUME_SCRIPT` env
  * (services/paperlessClamav.ts), which the base compose file cannot reference.
  * It only ever sets `environment:` keys, disjoint from the pin override's
