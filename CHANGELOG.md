@@ -11,6 +11,27 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.21.1] — 2026-09-04
+
+### Added
+
+- **`services/kopiaClient.ts`** — the client that drives the Kopia server's
+  REST API, mirroring `duplicatiClient.ts` (`plan.md` §81.5, slice 2):
+  `checkKopiaConnection`, `setRetentionPolicy`, `provisionBackupSource`,
+  `runSnapshotNow`, `listSnapshots`, `restoreSnapshot` +
+  `getRestoreTaskStatus`, and a never-throwing `getBackupSourceStatus` for a
+  future schedule card. Handles Kopia's basic-auth + per-request CSRF-token
+  dance (fetch `/`, scrape the `<meta>` token, replay it with the session
+  cookies). Not wired into any route or the scheduler yet — that is a later
+  slice; Duplicati still runs in parallel.
+
+### Changed
+
+- `apps/kopia/docker-compose.yml` pins `hostname: kopia` so a container
+  recreate (an image update) does not orphan existing snapshots — Kopia keys
+  every source by `(user, host, path)` and the host otherwise defaults to the
+  container id.
+
 ## [0.21.0] — 2026-09-04
 
 ### Added

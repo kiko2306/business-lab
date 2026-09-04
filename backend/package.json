@@ -1,6 +1,6 @@
 {
   "name": "homelab-backend",
-  "version": "0.21.0",
+  "version": "0.21.1",
   "description": "Homelab management API server",
   "main": "dist/index.js",
   "scripts": {

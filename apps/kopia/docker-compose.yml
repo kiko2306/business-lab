@@ -2,6 +2,12 @@ services:
   kopia:
     image: kopia/kopia:latest
     restart: unless-stopped
+    # Kopia identifies every snapshot source by (user, host, path). The host
+    # defaults to the container's hostname, which Docker sets to the container
+    # ID — so a `--force-recreate` (an image update) would orphan every
+    # existing snapshot under the old ID. Pin it so snapshot history survives
+    # a recreate.
+    hostname: kopia
     # The stock image entrypoint is `kopia` itself. entrypoint.sh connects (or,
     # first time, creates) the filesystem repository before handing off to
     # `kopia server start` — Kopia has no create-if-missing server mode.

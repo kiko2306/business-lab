@@ -15396,3 +15396,85 @@ compose-parse time).
 Minor bump 0.20.0 → 0.21.0. README TODO: "Kopia app, auto-configured" deleted;
 the four dependent items (`kopiaClient.ts`, destination → Kopia, scheduler →
 Kopia, prove a restore, remove Duplicati) stay.
+
+## 193. §81.5 slice 2 — kopiaClient.ts (2026-09-04)
+
+`backend/src/services/kopiaClient.ts` — the dashboard's client for the Kopia
+server's REST API, same role and roughly the same surface as
+`duplicatiClient.ts`. Module + tests only this slice; no route, no scheduler
+wiring, Duplicati still runs in parallel.
+
+### The auth dance
+
+The Kopia server (`--server-username kopia --server-password …`, `--insecure`)
+gates **everything** — UI and `/api/**` — behind HTTP basic auth, and on top of
+that requires a CSRF token on every API call, GET included. The token is in a
+`<meta name="kopia-csrf-token">` tag in the served HTML and is bound to the
+session cookies handed out with that same response. So every call sequence
+begins with `openSession(password)`: `GET /` with the basic-auth header, keep
+the `Set-Cookie` values, scrape the meta token, then replay
+`Cookie` + `X-Kopia-Csrf-Token` on the real calls. `getSetCookie()` (Node 20+)
+is used for the un-folded cookie list; `extractCsrfToken` / `cookieHeader` are
+exported as pure functions and unit-tested directly.
+
+Base URL: `KOPIA_API_URL` or `http://host.docker.internal:10470` — the same
+host-gateway route `duplicatiClient` uses for Duplicati's port.
+
+### Exports
+
+- `checkKopiaConnection` → `{ ok, detail }`, never throws (the "connect" check;
+  `detail` is the repo description on success).
+- `setRetentionPolicy(pw, retention?)` → PUTs the **global** policy
+  (`?userName=&host=&path=`). Default ladder matches the
+  `kopia policy set --global` line in `apps/kopia/entrypoint.sh`, so a no-arg
+  call re-asserts rather than changes.
+- `provisionBackupSource(pw)` → registers `/source/apps` as a source if absent,
+  `{ created, source }`. **Throws** on failure (it is provisioning). The POST
+  body carries an inline empty `policy: {}` — a bare `POST /sources` fails
+  `missing policy`; empty means "inherit the global policy".
+- `runSnapshotNow(pw)` → `POST /sources/upload`, `{ started, detail }`, never
+  throws; returns `started:false, "no dashboard-managed backup source exists
+  yet"` when the source is not registered (mirrors `runBackupJobNow`).
+- `listSnapshots(pw, path?)` → `KopiaSnapshotInfo[]` oldest-first (`id`,
+  `rootId`, times, size, fileCount, retention reasons), `[]` on any failure.
+- `restoreSnapshot(pw, { rootId, targetPath, overwrite? })` → `{ taskId }`,
+  **throws** on failure. Forces a full restore:
+  `restoreDirEntryAtDepth: 2147483647` + `minSizeForPlaceholder: 0` — without
+  those Kopia does a *shallow* restore, writing `<name>.kopia-entry`
+  placeholder files instead of real content below a small depth (found the
+  hard way against the live server).
+- `getRestoreTaskStatus(pw, taskId)` → polls `/api/v1/tasks/<id>`; a `FAILED`
+  task is a normal return with `succeeded:false` + `error`, only a failed
+  lookup throws.
+- `getBackupSourceStatus(pw | null)` → never-throws read-only view for a future
+  schedule card (mirrors `getBackupJobStatus`): reachable / configured /
+  repo description / storage kind / snapshot count / last-snapshot stats.
+
+### Compose change
+
+`apps/kopia/docker-compose.yml` gains `hostname: kopia`. Kopia keys every
+source by `(user, host, path)`; the host defaults to the container id, so a
+`--force-recreate` (image update) would orphan every existing snapshot under
+the old id. Pinned it. Verified `repo/status` then reports `"hostname":
+"kopia"` and the client addresses the source as `host: kopia`.
+
+### Verified
+
+- Backend `npm run typecheck` clean; suite **511 → 539** (+28: `kopiaClient`
+  helpers, and every fetch-driven export against a stubbed `fetch` — happy
+  path, "source absent", non-200, unreachable, null-password).
+- **Against a live Kopia server** (the real `apps/kopia` image + entrypoint,
+  `--hostname kopia`, `KOPIA_API_URL` pointed at it, compiled client run via
+  `ts-node`): `checkKopiaConnection` ok; `setRetentionPolicy` ok;
+  `provisionBackupSource` idempotent (`created:false` on the second call);
+  `runSnapshotNow` `started:true` and a new snapshot appeared;
+  `listSnapshots` mapped it; `restoreSnapshot` → task id, and
+  **`example.env` was written to the target with its real contents** — the
+  Duplicati-restore-writes-nothing failure (§75.3) does not repeat;
+  `getRestoreTaskStatus` → `SUCCESS` with byte/file counters;
+  `getBackupSourceStatus` full mapping, and `null` → UNREACHABLE with no
+  fetch. Test container + probe script removed afterwards.
+
+Patch bump 0.21.0 → 0.21.1 (internal — no route or UI yet). README TODO:
+`kopiaClient.ts` item deleted; the destination/scheduler/restore-proof/remove
+items stay.
