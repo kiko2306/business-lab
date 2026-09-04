@@ -16932,3 +16932,34 @@ LAN-direct bypass matters for that specific app. New README item added
 rather than expanding this one, since §210.2 itself — the audit — is done.
 
 Docs only — no version bump.
+
+## 217. §216's OIDC group re-checked — five of six can drop the local form too
+
+§216 filed Vikunja/Mealie/NocoDB/Homebox/BookStack/Immich as "OIDC exists,
+but that adds a login option rather than removing the local one" — true as
+far as it went, but incomplete: it didn't check whether each project has a
+separate flag to hide the local form once OIDC is wired up. Asked and
+checked one by one. Five do:
+
+| App | Flag |
+|---|---|
+| Immich | Admin Settings → disable password login entirely (OAuth-only); CLI recovery path if the IdP ever breaks |
+| Vikunja | `VIKUNJA_AUTH_LOCAL_ENABLED=false` |
+| Mealie | `ALLOW_PASSWORD_LOGIN=false` (`OIDC_AUTO_REDIRECT=true` also skips Mealie's own login-selector page, going straight to Authelia) — one community report of the flag not working on some version, verify live before relying on it |
+| Homebox | `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN=false` |
+| NocoDB | `NC_DISABLE_EMAIL_AUTH=true` — without it, SSO hides the email form by default but a "double-click the logo" fallback still reveals it |
+
+**BookStack is the one that can't**: `AUTH_METHOD=oidc` makes OIDC the
+primary method but does not hide the standard login form, and a 2018
+upstream feature request for exactly that is still open and unimplemented.
+BookStack alone stays in "adds an option, doesn't remove the second screen."
+
+This promotes five apps from §216's "bigger lift" bucket into the same tier
+as the header-trust group: wire OIDC against Authelia's provider, log in
+once to auto-create the account, then set the disable-local-login flag.
+Genuinely two config steps, not the open-ended "SSO integration project"
+§216 implied. README's follow-on item corrected to match — the five are
+folded into the fix-candidate list; BookStack moves to the "no known full
+fix" list alongside its already-noted missing header-trust feature.
+
+Docs only — no version bump.
