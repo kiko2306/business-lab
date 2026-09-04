@@ -14135,3 +14135,88 @@ Each is a behavioural change → version bump + CHANGELOG per commit
 ([[version-bump-every-behavioural-commit]]). Frontend touch is small for both
 (OnlyOffice: none; Update button: maybe surface the pinned tag / an "unpin"
 control — decide when building).
+
+## 175. §168 fix abandoned — community OnlyOffice Docs cannot use an external database (2026-09-04)
+
+Started §174 piece A: added `onlyoffice-db` (`postgres:16-alpine`) and
+`onlyoffice-rabbitmq` (`rabbitmq:4-alpine`) sidecars to
+`apps/onlyoffice/docker-compose.yml`, wired `DB_TYPE`/`DB_HOST`/`DB_NAME`/
+`DB_USER`/`DB_PWD` + `AMQP_URI`, made the passwords `hiddenGeneratedSecrets`,
+added `backup: { engine: 'postgres', service: 'onlyoffice-db' }`, licence rows,
+bumped to 0.13.0. Backend suite stayed green (432). Then verified against a
+throwaway `documentserver:latest` (9.4.0-129) stack — and it does not work.
+
+### What the image actually does
+
+The container entrypoint `/app/ds/run-document-server.sh`, line 131–132:
+
+```
+[ -n "${PRODUCT_EDITION}" ] && _is_commercial=true || _is_commercial=false
+REDIS_AVAILABLE=${_is_commercial} RABBITMQ_AVAILABLE=${_is_commercial} DB_AVAILABLE=${_is_commercial} ADMINPANEL_AVAILABLE=${_is_commercial}
+```
+
+`DB_AVAILABLE` / `RABBITMQ_AVAILABLE` / `REDIS_AVAILABLE` are set
+**unconditionally** to `_is_commercial`, which is `true` only when
+`PRODUCT_EDITION` is set (the Enterprise/Developer editions, which need a paid
+licence). Every later use is gated `if [ ${DB_AVAILABLE} = "true" ]` —
+`read_setting`'s DB block (l.164), the schema create (l.725, l.787),
+`waiting_for_db` (l.796). In the **community** image that whole path is dead
+code. Passing `DB_TYPE=postgres` + `DB_HOST=…` in the environment does
+nothing; passing `DB_AVAILABLE=true` explicitly is overwritten by l.132.
+
+Confirmed empirically on this host:
+
+- With the sidecars wired as designed: OnlyOffice came up healthy, but
+  `onlyoffice-db` stayed **empty** (`\dt` → "Did not find any relations"),
+  RabbitMQ showed **no connections**, docservice's log had no DB/AMQP line at
+  all — it just `Express server listening on port 8000`.
+- Re-run with `-e DB_AVAILABLE=true -e RABBITMQ_AVAILABLE=true` forced: still
+  no schema, still no connection. l.132 wins.
+- The community image ships **no** `postgresql-*` / `rabbitmq-server` /
+  `redis-server` packages and **no `psql` binary** — even if the gate were
+  open there is no client to create the schema on a remote server. Only
+  `docservice`, `converter`, `nginx` run under supervisor.
+
+So §168's premise ("9.x expects [PG + RabbitMQ] to be provided") is half
+right: 9.x *dropped* the bundled ones, but the **community** image did not gain
+the ability to use external ones — that capability is commercial-only. This
+deployment's OnlyOffice runs, and will keep running, with **no database and no
+message queue**, and there is no fix inside the free image.
+
+### What this means in practice
+
+OnlyOffice here exists only as the editor Nextcloud embeds. Document *content*
+lives in Nextcloud: the editor fetches the file, edits happen in the browser +
+docservice memory, and the callback writes the result back to Nextcloud. The
+DB/queue would hold **transient co-editing state** — active sessions, the
+change cache, the callback command queue — not the documents. Without it:
+
+- A docservice restart drops any **in-progress** co-editing session. The
+  shutdown hook (`documentserver-prepare4shutdown.sh`) still forces a save
+  first, and saved documents are safe in Nextcloud regardless.
+- Single-user editing and save-back work. Real-time multi-user co-editing
+  across a restart, and anything that reads back the change history, do not
+  persist.
+
+For a ≤15-seat homelab where the doc server is disposable (this box has no
+uptime guarantee anyway), that is an acceptable limitation, in the same
+category as §106 (the BoltDB/H2 backup gap accepted as documented risk). It is
+**not** something to paper over with two sidecar containers OnlyOffice never
+talks to.
+
+### Decision
+
+- Reverted every code change (compose, `services.ts`, `services.test.ts`,
+  `.env.example`, `docs/licences.md`, `CHANGELOG.md`, `README.md`,
+  `package.json`/lockfile bumps) — working tree back to `e78c3ed`. No commit
+  of the sidecar approach.
+- README item rewritten from "add `onlyoffice-db` + `onlyoffice-rabbitmq`" to:
+  accept that community Docs has no DB, document it as a known limitation
+  alongside §106, and revisit only if the §81.4 Nextcloud→OnlyOffice wiring
+  shows co-editing is lossy enough to matter in practice. The
+  `services.test.ts` comment that says OnlyOffice "is the case this cannot
+  see" (no DB image line to match) stays accurate and stays.
+- §174 piece B (the Update button) is unaffected — proceeding with it next.
+- Still to write (small, docs-only, not blocking): a
+  `docs/recovery-troubleshooting.md` or `docs/app-credentials.md` note that
+  OnlyOffice co-editing state is non-persistent by design of the free image.
