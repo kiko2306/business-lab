@@ -64,13 +64,21 @@ other app is started from the dashboard.
 
 ## Backups
 
-- Schedule, retention, "Back up now" and the destination are all in the
-  dashboard. The schedule card shows the last run and its outcome, the
-  destination actually in use, and how many versions are on it.
+- **Off-site (disaster recovery)**: schedule, retention, "Back up now" and the
+  destination are all on the **Backups** page. The schedule card shows the last
+  run and its outcome, the destination actually in use, and how many versions
+  are on it.
+- **Per-app snapshots (rollback point)**: each app's card → **Settings →
+  Backups** — "Back up now", plus Restore / Download / Delete for that app's
+  local snapshots (last 10). Take one before reconfiguring or updating an app;
+  Restore stops it, rolls its data and database back to the snapshot, and
+  starts it again. Separate from the off-site backup — see the comparison in
+  [recovery-troubleshooting.md](recovery-troubleshooting.md#backuprestore).
 - **File Browser** and **Stirling-PDF** embed a database that is copied live,
   not snapshotted, and can restore corrupt — an accepted risk documented in
   [recovery-troubleshooting.md](recovery-troubleshooting.md#apps-without-a-consistent-database-snapshot).
-- Restore is in [recovery-troubleshooting.md](recovery-troubleshooting.md).
+- Full restore detail is in
+  [recovery-troubleshooting.md](recovery-troubleshooting.md#backuprestore).
   Locked out of the dashboard: `./start.sh recover reset-password` on the host
   (same page for the details).
 

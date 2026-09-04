@@ -50,6 +50,13 @@
 - "Back up now" on the schedule card runs the app-data backup on demand (dump
   every app database, then Duplicati) — use it to check a destination you have
   just changed rather than waiting for the next scheduled run.
+- **Per-app snapshot** — on an app's card, open **Settings → Backups** and
+  click **Back up now**. That takes a local copy of just that app's data and
+  database, kept alongside its last few snapshots. Handy right before you
+  change an app's configuration or update its image: if it goes wrong,
+  **Restore** rolls that one app back (it stops, restores, and starts again;
+  anything changed since the snapshot is lost). This is separate from, and
+  does not replace, the scheduled off-site backup.
 - Restore when needed.
 - File Browser and Stirling-PDF embed a database (BoltDB / H2) that is copied
   live, not snapshotted, so it can restore corrupt — an accepted risk because

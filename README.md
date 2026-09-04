@@ -239,14 +239,6 @@ Strategy:
       exercised at all. Prove one of them writes and restores against a
       production-like server (a NAS, or the live dashboard). Also covers the
       Kopia translation later.
-Per-application backup / restore (§131.4, §185) — a self-contained local
-`.tar.gz` per app, separate from the offsite Duplicati job. Sliced:
-
-- [ ] **Per-app backup docs + Backups-page overview** (§185 slice 5) —
-      `recovery-troubleshooting.md` / `it-admin.md` on per-app vs offsite and
-      the manual restore; optional per-app table on the Backups page. Slices
-      1–4 (archive + API + restore + service-card UI) are done.
-
 ### Business Lab (§84)
 
 - [ ] **Rebrand, tier 2** (§84.2) — package/image/network/project names. Do it

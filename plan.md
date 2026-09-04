@@ -15200,3 +15200,38 @@ cut tripped the component's 4.10 kB CSS budget by ~400 bytes.
 
 Minor bump 0.18.0 → 0.19.0 (user-facing UI). Slice 5 (docs + optional Backups-
 page table) is all that's left of §185.
+
+## 190. §185 slice 5 — per-app backup docs; §185 closed (2026-09-04)
+
+Docs only.
+
+- **`docs/recovery-troubleshooting.md`** — reworked the Backup/restore section
+  around the fact that there are now **two** backups: a table contrasting the
+  scheduled off-site archive (whole `apps/` tree, versioned, encrypted, DR)
+  with per-app snapshots (one local `.tar.gz` per app, last 10, a rollback
+  point). Documented the five `/api/services/:name/backup[s]` endpoints and
+  what Restore actually does (stop → replace `data/` keeping `data/db` →
+  replay the SQL dump → SQLite snapshots over live files → start; a failed
+  replay is a warning). The manual `psql`/`mariadb` replay stays as the
+  "check a dump first / backend is down" fallback, no longer the only path.
+- **`docs/it-admin.md`** — the Backups section now names both mechanisms and
+  where each lives (Backups page vs an app's Settings → Backups).
+- **`docs/user-guide.md`** — a plain-language bullet: take a per-app snapshot
+  before reconfiguring or updating an app; Restore rolls that one app back.
+
+### Backups-page overview table — dropped
+
+§185 slice 5 offered an optional per-app table on the Backups page. Not built:
+a useful version needs a new aggregation endpoint (per-app counts / last-backup
+across ~36 apps) and a table of mostly-empty rows, for information already one
+click away on each app's card. If a fleet-wide view is wanted later it's its
+own small feature, not backup plumbing.
+
+### §185 done
+
+Per-app backup / restore is complete: `appBackup.ts` + `dumpOneApp` /
+`restoreServerDatabase` (§186), the four archive/list/download/delete routes
+(§187), the restore route (§188), the service-card UI (§189), and these docs.
+Proven end to end on the live stack throughout. No open threads.
+
+Docs only — no version bump.

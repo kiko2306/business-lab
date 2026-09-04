@@ -35,25 +35,50 @@ install, use `./start.sh recover` above.
 
 ## Backup/restore
 
-- Create backup: `POST /api/backups/create`
-- Restore backup: `POST /api/backups/restore`
-- Download backup: `GET /api/backups/download/:fileName`
+There are **two** backups, for different jobs:
 
-These three cover the **management stack's own** database (the dashboard's
-Postgres) plus its settings. The per-app SQL/SQLite dumps under
-`apps/<app>/data/_dump/` have no restore button yet — restore them by hand
-(below).
+| | The scheduled off-site backup | Per-app snapshots |
+|---|---|---|
+| What | The whole `apps/` tree, one encrypted, versioned archive at your chosen destination (disk / SMB / NFS / Drive / FTP) via Duplicati | One `.tar.gz` per app, kept locally in `backups/apps/<app>/` (the `backups-data` volume) |
+| For | Disaster recovery — the box is gone, or you need last week's state | A quick rollback point *before* you reconfigure or update an app |
+| Where | Dashboard → **Backups** page (schedule, retention, "Back up now", destination) | Each app's card → **Settings → Backups** (Back up now / Restore / Download / Delete) |
+| Retention | Configurable (`7D:1D,4W:1W,12M:1M` inside Duplicati) | Last 10 per app |
 
-### Restoring one app's database from its dump
+### Management-stack backup (the dashboard's own database)
 
-The scheduled app-data backup leaves a plain-SQL dump at
-`apps/<app>/data/_dump/<app>.sql` for every Postgres/MySQL/MariaDB app
-(`pg_dump --clean --if-exists` / `mariadb-dump --single-transaction`), and a
-`.sqlite` snapshot per embedded SQLite database. To restore one app:
+- Create: `POST /api/backups/create` · Restore: `POST /api/backups/restore` ·
+  Download: `GET /api/backups/download/:fileName`
+- Covers the dashboard's Postgres plus a slice of its settings/users. Nothing
+  to do with the managed apps.
 
-1. Stop the app from the dashboard.
-2. Replay the dump into its **running database container** (the DB container
-   stays up — only the app is stopped):
+### Per-app snapshots
+
+- List: `GET /api/services/:name/backups` · Create: `POST
+  /api/services/:name/backup` · Download: `GET
+  /api/services/:name/backups/:file` · Delete: `DELETE
+  /api/services/:name/backups/:file` · Restore: `POST
+  /api/services/:name/backup/restore` `{ "file": "…" }`
+- **Create** dumps that app's database(s) (`pg_dump --clean --if-exists` /
+  `mariadb-dump` / `sqlite3 .backup`) into `apps/<app>/data/_dump/`, then tars
+  `apps/<app>/data` — excluding the live DB directory (`data/db`) and SQLite
+  side-files, which restore torn. A `manifest.json` sidecar records the
+  timestamp, dashboard version, engine and dump results.
+- **Restore** stops the app, replaces its `data/` from the archive (the live
+  `data/db` is kept), replays the SQL dump into a freshly-started DB container,
+  copies each `_dump/*.sqlite` snapshot over its live file, then starts the app
+  again. A failed DB replay is a warning, not a failure — the app still comes
+  back up. Anything changed since the snapshot is lost.
+- Proven end to end on the live stack (`plan.md` §187–§188): n8n (Postgres)
+  and Vaultwarden (SQLite) — data and files rolled back, apps healthy after.
+
+### Restoring one app's database by hand
+
+If you need to replay a dump without the dashboard (checking it first, or the
+backend is down), the dump under `apps/<app>/data/_dump/<app>.sql` is plain
+SQL:
+
+1. Stop the app; leave its DB container running.
+2. Replay:
 
    ```bash
    # Postgres — the dump carries DROP ... IF EXISTS, so it replaces objects in place
@@ -66,16 +91,14 @@ The scheduled app-data backup leaves a plain-SQL dump at
    ```
 
    Credentials are in `apps/<app>/.env` (or `docker inspect` the DB container).
-3. For an embedded-SQLite app, replace the live file instead:
-   `sqlite3 <live.db> ".restore 'apps/<app>/data/_dump/<name>.sqlite'"` while
-   the app is stopped.
+3. Embedded SQLite instead: `sqlite3 <live.db> ".restore
+   'apps/<app>/data/_dump/<name>.sqlite'"` while the app is stopped.
 4. Start the app.
 
-Restoring into a scratch database first (a throwaway `docker run` of the same
+Replaying into a scratch database first (a throwaway `docker run` of the same
 image) is the safe way to check a dump before touching the live one. The
 Postgres, MySQL and MariaDB dump→replay paths are verified end to end against
-the live stack (`plan.md` §183): zero replay errors, table lists and row/
-checksum parity on n8n, Paperless, NPM and BookStack.
+the live stack (`plan.md` §183).
 
 ### Apps without a consistent database snapshot
 
