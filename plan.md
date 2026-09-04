@@ -17720,3 +17720,20 @@ all mechanical fetches, no judgment involved. `session-summary.sh` now dumps
 those four alongside the guard summary, so the opening prompt shrinks to just
 the one line that needs actual reasoning: "propose the next task." Updated
 §1 and §6 in `step-by-step.md` to match.
+
+## 233. plan-index.md regeneration automated (PostToolUse hook) (2026-09-04)
+
+The last automatable piece of `step-by-step.md`'s manual steps: every prompt
+in the file told Claude to run `./scripts/plan-index.sh` after touching
+`plan.md`, and it's easy to forget mid-loop (the exact "trusting memory"
+failure mode `require-version-bump.sh` already guards against for version
+bumps). Added `.claude/hooks/regen-plan-index.sh`, wired as a `PostToolUse`
+hook on `Edit|Write` — it checks the touched file path and no-ops unless it
+ends in `plan.md`, then reruns the index script (~20ms). Dropped the
+"regenerate plan-index.md" instruction from `step-by-step.md`'s §1 checklist
+and its three prompt blocks (§2, §4, §6) — it's no longer something to
+remember.
+
+Nothing else in the file automates further: `/compact`/`/clear` boundaries,
+queue classification (A/B/C), and the handoff prompts all require judgment
+about what to do next, not just fetching or regenerating files.

@@ -36,9 +36,10 @@ For each approved task, Claude should:
 2. Make the smallest edit that tests that hypothesis.
 3. Immediately run the narrowest relevant test, typecheck, lint, or live check.
 4. Repair and rerun that same check before widening the investigation.
-5. Append a numbered `plan.md` section recording the result and rejected paths.
-6. Update `README.md` by deleting the completed TODO item, then regenerate
-	`plan-index.md` with `./scripts/plan-index.sh`.
+5. Append a numbered `plan.md` section recording the result and rejected paths
+	(`plan-index.md` regenerates itself via a `PostToolUse` hook — no separate
+	step).
+6. Update `README.md` by deleting the completed TODO item.
 7. Check the diff and status. Commit and push only after the required checks
 	pass. Never commit `.env`, secrets, or an unverified checkpoint.
 
@@ -54,8 +55,7 @@ Work only on this one TODO item. Read the smallest relevant plan range and
 nearby implementation/test. Prefer existing helpers and patterns. After the
 first edit, run focused validation immediately. Keep updates concise. Do not
 explore unrelated backlog items. Record the outcome in plan.md, remove the
-finished README TODO, regenerate plan-index.md, and commit/push only when
-verified.
+finished README TODO, and commit/push only when verified.
 ```
 
 Use `/compact` when a milestone is complete: the focused check passes, the
@@ -192,7 +192,7 @@ After you return live evidence:
 Use this live evidence only for the named TODO. Read its plan section and
 nearby code, reconcile the result, and make only the necessary follow-up edit.
 Run the focused validation, append the plan outcome, delete the completed
-README item, regenerate plan-index.md, and commit/push if verified.
+README item, and commit/push if verified.
 ```
 
 When a Queue B result unlocks Queue C, start a new topic with `/clear`, then
@@ -224,8 +224,7 @@ Work only on this one TODO item. Read the smallest relevant plan range and
 nearby implementation/test. Prefer existing helpers and patterns. After the
 first edit, run focused validation immediately. Keep updates concise. Do not
 explore unrelated backlog items. Record the outcome in plan.md, remove the
-finished README TODO, regenerate plan-index.md, and commit/push only when
-verified.
+finished README TODO, and commit/push only when verified.
 ```
 
 ```text
@@ -252,7 +251,7 @@ Do not perform the live-host action or request secrets in chat.
 Use this live evidence only for the named TODO. Read its plan section and
 nearby code, reconcile the result, and make only the necessary follow-up edit.
 Run the focused validation, append the plan outcome, delete the completed
-README item, regenerate plan-index.md, and commit/push if verified.
+README item, and commit/push if verified.
 ```
 
 ```text
