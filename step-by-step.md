@@ -4,27 +4,27 @@ This is the working instruction file for Claude CLI in this repository. The
 goal is to finish the project with the fewest tokens and session resets while
 preserving the project's safety rules.
 
-## 0. Claude configuration is auto-summarized, not a manual step
+## 0. Claude configuration and session state are auto-loaded, not a manual step
 
 A `SessionStart` hook (`.claude/hooks/session-summary.sh`) echoes the active
-`.claude` guard summary as context at the start of every session — no prompt
-needed. Do not bypass a guard it names; adapt the command or ask for a value
-through the UI/live-operation step when required.
+`.claude` guard summary, README's TODO section, `git status`, and the tail of
+`plan.md` as context at the start of every session — no prompt needed. Do not
+bypass a guard it names; adapt the command or ask for a value through the
+UI/live-operation step when required.
 
 ## 1. Session opening
 
-**Estimated session time:** 10-15 minutes.
+**Estimated session time:** under 5 minutes.
 
-Paste this as the first prompt after the configuration check:
+The file-reading step is already done by the hook above. Just say:
 
 ```text
-Read README.md's TODO section first. Then read plan-index.md and only the
-plan.md section(s) referenced by the TODO I am taking up, plus the tail of
-plan.md for the current stopping point. Check git status. Do not map the whole
-repository. Propose the next smallest coherent task and its cheapest focused
-validation; wait for my approval before editing.
+Propose the next smallest coherent task from the TODO list and its cheapest
+focused validation; wait for my approval before editing.
 ```
 
+If the task needs a `plan.md` section the auto-loaded tail didn't cover,
+Claude reads it through the range in `plan-index.md` — never the whole file.
 Use `plan.md` as the project memory. Read one section at a time through the
 ranges in `plan-index.md`; never load the whole file. Use nearby code, tests,
 and existing implementations as the primary design reference.
@@ -215,11 +215,8 @@ the no-console-configuration rule, or the no-guarantees dev/test boundary.
 ## 6. Exact inputs in order
 
 ```text
-Read README.md's TODO section first. Then read plan-index.md and only the
-plan.md section(s) referenced by the TODO I am taking up, plus the tail of
-plan.md for the current stopping point. Check git status. Do not map the whole
-repository. Propose the next smallest coherent task and its cheapest focused
-validation; wait for my approval before editing.
+Propose the next smallest coherent task from the TODO list and its cheapest
+focused validation; wait for my approval before editing.
 ```
 
 ```text

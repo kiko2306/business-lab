@@ -17710,3 +17710,13 @@ copy of that prompt from §6's "exact inputs in order" list.
 Nothing else in `step-by-step.md` changed: the session-opening, work-order,
 and queue-handoff prompts still involve real judgment calls (which TODO to
 pick up, whether a live proof is safe) that a static hook can't make.
+
+## 232. §231 extended — TODO/git-status/plan-tail also auto-loaded (2026-09-04)
+
+Same reasoning as §231, applied one step further: `step-by-step.md` §1's
+session-opening prompt asked Claude to read README's TODO section,
+`plan-index.md`, `plan.md`'s tail and `git status` before proposing a task —
+all mechanical fetches, no judgment involved. `session-summary.sh` now dumps
+those four alongside the guard summary, so the opening prompt shrinks to just
+the one line that needs actual reasoning: "propose the next task." Updated
+§1 and §6 in `step-by-step.md` to match.
