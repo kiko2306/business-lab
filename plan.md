@@ -16760,3 +16760,14 @@ things flagged in this investigation — no changes made there: batching items
 or shrinking plan.md sections both trade off against the durability the loop
 is deliberately designed for, so that's a call for the user, not something to
 change unilaterally.
+
+## 213. §212's two remaining ideas, approved and written into the loop
+
+User approved both. CLAUDE.md's working loop (step 4) now scales a section to
+the work — full narrative for a real investigation, a few lines for a
+mechanical item — instead of every item paying for prose it doesn't need.
+Step 6 now allows a pre-approved batch of independent, already-planned items
+to run through steps 3-5 back to back without re-proposing between each one;
+each item still gets its own sized plan.md section and its own commit, and
+the batch stops the moment one item's outcome would change a later one.
+Default stays the un-batched loop.

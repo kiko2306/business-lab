@@ -126,20 +126,39 @@ Every task runs through the same six steps, in order, every time:
    from. Do not pick one and start.
 3. **Implement** — that one task.
 4. **Update `plan.md` and `README.md`.** A new numbered `plan.md` section
-   saying what was done and why (including what was tried and rejected), the
-   finished item **deleted** from the README list, and `./scripts/plan-index.sh`
-   re-run so the index covers the new section.
+   saying what was done and why, the finished item **deleted** from the
+   README list, and `./scripts/plan-index.sh` re-run so the index covers the
+   new section. Scale the section to the work: a real investigation or
+   decision gets the full narrative, including what was tried and rejected —
+   that record is what makes the section worth reading later. A small,
+   mechanical item (a rename, a one-line config fix, something with no
+   dead ends behind it) gets a few lines: what changed and why, no more.
+   Padding a trivial item to look like an investigation is exactly the
+   token/session-time cost this convention should avoid.
 5. **Commit and push, on success.** Success means the affected workspace's
    checks pass and anything touching Docker/exposure/networking/backups has
    been proven against the real stack. If it is not verified, say so plainly
    and leave it uncommitted — never push a checkpoint and never call it done.
-6. **Back to step 1.** Report, re-read the list, propose again. Do not roll
-   straight into the next item, however obviously related.
+6. **Back to step 1.** Report, re-read the list, propose again — unless the
+   item just finished was part of a pre-approved batch (below), in which case
+   move to the next item in that batch without re-proposing.
 
 When work arrives as a list rather than a single task, insert a planning pass
-before step 2: append the plan to `plan.md`, add each piece to the README list,
-and then propose. That way intent survives a session that runs long or gets
-interrupted, and the order things get built in stays the user's call.
+before step 2: append the plan to `plan.md`, add each piece to the README
+list, and then propose. That way intent survives a session that runs long or
+gets interrupted, and the order things get built in stays the user's call.
+
+That proposal can ask for batch approval: naming several independent,
+already-planned items and asking to run all of them through steps 3-5 without
+stopping to re-propose each one. Each item still gets its own step 4 (sized
+per the rule above) and its own step 5 commit — batching removes the
+between-item pause, not the per-item record or the one-commit-per-change rule.
+Reserve it for items that are genuinely independent (no item's output feeds
+the next) and were already agreed to in the plan just proposed; stop the batch
+and re-propose the moment one item's outcome changes what a later one should
+do. Default to the un-batched loop — batch only when asked for, or when
+proposing a list of small, clearly independent items where re-asking after
+each one would be pure overhead.
 
 ## TODOs live in README.md, and get deleted
 
