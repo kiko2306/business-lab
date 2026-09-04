@@ -2,6 +2,7 @@
   "name": "homelab-backend",
   "version": "0.26.0",
   "description": "Homelab management API server",
+  "license": "GPL-3.0-or-later",
   "main": "dist/index.js",
   "scripts": {
     "build": "tsc",

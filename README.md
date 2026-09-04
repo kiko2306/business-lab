@@ -92,6 +92,21 @@ enabling public exposure — is done from the dashboard itself; no more manual
 
 </details>
 
+## Folder structure
+
+The folders a user or operator actually needs to open — internal code
+directories are covered in `CLAUDE.md` instead. Add a row here only when a
+new top-level folder is something a user/operator would navigate to, not
+every new directory.
+
+| Path | What |
+|---|---|
+| `apps/<name>/` | One Docker Compose stack per managed app — its `.env` and data live here (gitignored). |
+| `docs/` | Operator docs — setup, credentials, ports, runbooks, licence due diligence. |
+| `frontend/` | The Angular dashboard. |
+| `backend/` | The Node/Express API that drives Docker on the dashboard's behalf. |
+| `start.sh` | The one command a human runs on the host — see Quick start above. |
+
 ## Managed app stacks
 
 Each app under `apps/<name>/` is an independent Docker Compose stack that the
@@ -232,13 +247,23 @@ Infrastructure:
       dashboard) that exercises them, local-only like the smoke tests.
 Strategy:
 
-- [ ] **Sales catalogue Artifact** (§131.6, §166) — one row per managed
+- [ ] **Sales catalogue doc** (§131.6, §166, §202) — one row per managed
       app: what it does, and what commercial/SaaS product it stands in for.
-      No pricing, no monthly-cost arithmetic, no named client scenarios.
-      **As an Artifact, out of this public repo** (§84.6). This is the single
-      canonical sales-doc item — the old §84.4/§84.7 "SaaS inventory +
-      monthly costs", "value-proposition plan" and "customer journey"
-      items were folded into it (§166).
+      No pricing, no monthly-cost arithmetic, no named client scenarios — none
+      of that is a business secret once excluded, so it's a plain
+      `docs/sales-catalogue.md` linked from the README docs list, not an
+      Artifact. This is the single canonical sales-doc item — the old
+      §84.4/§84.7 "SaaS inventory + monthly costs", "value-proposition plan"
+      and "customer journey" items were folded into it (§166).
+- [ ] **Which dashboard actions deserve Activity/Sequence diagrams** (§202)
+      — the dashboard has ~40 backend actions of wildly different
+      complexity; worth a diagram where the multi-service handoff is hard to
+      hold in your head from the code alone (exposure provisioning, the
+      self-update walk, a backup/restore round-trip), not for a
+      single-service CRUD action. Make that list first, then draw the
+      worthwhile ones as `.drawio` XML in `docs/` — author with
+      `app.diagrams.net` or the desktop app, no need to self-host
+      `jgraph/drawio` for a one-shot, not-co-edited diagram.
 
 ### Backups
 
@@ -268,21 +293,19 @@ Strategy:
       with a Tester role; a publicly visible Facebook Page post still needs
       that client's App Review, 2-4 weeks. Write it up as a billable
       onboarding step, started on day one of an engagement.
-- [ ] **Decide on X** (§84.3a) — pay-per-use since April 2026: ~$0.015 a post,
-      **$0.200 if it contains a URL**. A budget decision, not a build one.
 - [ ] **Verify Meta development-mode publishing empirically** (§84.3a) —
       sources agree Instagram publishes normally from a dev-mode app with a
       Tester role, and that a Facebook Page post in dev mode is visible only to
       admins. Confirm both with a real app before a timeline depends on it.
-- [ ] **Pick a licence for this repo** (§107) — there is no `LICENSE` file, so
-      the public repo is "all rights reserved" and contributions have no legal
-      basis. Fell out of the licence due diligence; the choice (AGPL to match
-      the copyleft apps it bundles, permissive, or source-available) is a
-      commercial call.
-- [ ] **Per-client provisioning** (§84.5, §84.7) — one host is one deployment
-      today; turnkey boxes need it repeatable per client. The list is concrete:
-      their domain, their Cloudflare account and API token, their tunnel, their
-      Authelia users, their backup destination. Lands in the setup flow.
+- [ ] **Per-client provisioning** (§84.5, §84.7, §202) — one host is one
+      deployment today; turnkey boxes need it repeatable per client. The list
+      is concrete: their domain, their Cloudflare account and API token,
+      their tunnel, their Authelia users, their backup destination. Whether
+      "their Cloudflare account" means each client's own account or a shared
+      reseller account with per-zone-scoped tokens is a data-protection/
+      control call, not a technical one (§202) — fold it into the data
+      protection position item below rather than deciding it here. Lands in
+      the setup flow.
 - [ ] **Turnkey build spec** (§84.7) — Dell/16 GiB/500 GB/€400 is proven (this
       stack runs on 14.84 GiB, 4 CPUs, 53 containers, 8 GB used). The trap is
       the disk: Ubuntu's installer defaults to a ~100 GiB root LV, which is how
@@ -327,6 +350,20 @@ Strategy:
 
 ### Apps and integrations
 
+- [ ] **A shared file tree across File Browser, Samba, Nextcloud and
+      Paperless, scanned by ClamAV** (§202) — today each mounts its own
+      separate `./data/...` tree (File Browser `data/files`, Samba
+      `data/share`, Nextcloud `data/app`, Paperless `data/{media,consume,
+      export}`); nothing overlaps, so a file uploaded through one isn't
+      visible in another. Needs a design pass, not just a mount change: which
+      one directory (or a symlinked/bind-mounted common subset) makes sense
+      across a general file browser, an SMB share, Nextcloud's own storage
+      model and Paperless's structured `consume`/`media`/`export` layout
+      without breaking any of their own antivirus wiring (Nextcloud's
+      `files_antivirus`, Paperless's pre-consume script — both already
+      ClamAV-scanned, §179/§184). Stirling-PDF doesn't hold user files (it's
+      processed-per-request, its mounts are tool config) — check whether it
+      belongs in this list at all before building it in.
 - [ ] **Explore a small local LLM for text cleanup and JSON parsing** — check
       whether a very small model (something llama.cpp-class, CPU-viable on
       this host) is worth adding for jobs like tidying user-facing text or

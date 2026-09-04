@@ -16075,3 +16075,118 @@ ones in `services.test.ts` asserting `homepage`/`authelia` are exempt and an
 arbitrary app isn't) — all green. Frontend `npm run test:ci` (50 tests) and
 `npm run build` — all green. Version bumped to 0.26.0 (behavioural change to
 `backend/src`/`frontend/src`).
+
+## 202. Six decisions/questions from one message: licence, X, sales doc, diagrams, shared storage, per-client Cloudflare
+
+Six items from one user message, batched as one plan pass per the working
+loop. Decisions are recorded here and reflected in the README TODO; the two
+open questions are answered below; the two new ideas become TODO items
+rather than being built now.
+
+**Pick a licence (§107) — decided: GPL.** Added `/LICENSE` (GPLv3, official
+text from gnu.org, unmodified — the boilerplate "how to apply" footer stays
+as GNU distributes it) and `"license": "GPL-3.0-or-later"` in both
+`backend/package.json` and `frontend/package.json`. Docs-only/metadata
+change, no `backend/src`/`frontend/src` behaviour touched, so no version
+bump. GPL rather than AGPL: the resale model already established (§107) is
+"client owns and operates the box, nothing is served back to Business Lab
+over a network," so AGPL's network clause was never doing anything for this
+repo specifically — GPL is the plain match. Doesn't change the licence
+compliance table in `docs/licences.md`; that tracks the *bundled apps*'
+licences, not this repo's own.
+
+**Decide on X (§84.3a) — no-go.** Pay-per-post pricing (~$0.015, $0.200 with
+a URL) since April 2026 makes it a recurring per-post cost with no free tier,
+unlike every other Tier A network (§84.3a). Dropped from the roadmap; deleted
+the README item. Ship against Bluesky/Mastodon/Instagram/LinkedIn only.
+
+**Sales catalogue (§131.6, §166) — rescoped from Artifact to a plain doc.**
+Re-examined: the content (one row per managed app, what it does, what
+SaaS/commercial product it stands in for — no pricing, no client scenarios)
+carries no business secret once pricing and named clients are excluded, so
+routing it through the Artifact tool for privacy control was solving a
+problem that doesn't exist here and adding friction (a second surface to
+keep in sync, not grep-able, not in git history). Rescoped to a normal
+`docs/sales-catalogue.md`, linked from the README docs list like every other
+operator doc. Still not written — the README item stays open, just retargeted
+at a file instead of an Artifact.
+
+**Which dashboard actions deserve Activity/Sequence diagrams — new TODO.**
+Not attempted yet: the dashboard has ~40 backend actions (start/stop, exposure
+provisioning, backup/restore, SSO sync, self-update) of wildly different
+complexity. A diagram is worth it where a change keeps landing back here
+because the multi-service handoff is hard to hold in your head from the code
+alone (exposure provisioning — NPM + Authelia + Cloudflare DNS; the
+self-update walk; a Kopia backup/restore round-trip) and not worth it for a
+single-service CRUD action. New README item to actually make that list
+before drawing anything, output as `.drawio` XML (draw.io/diagrams.net
+format — see below) checked into `docs/`.
+
+**Is there a container to host draw.io? — yes, but probably not needed.**
+`jgraph/drawio` is the official self-hosted image of diagrams.net (Apache-2.0
+— clean against the resale model, no network-copyleft, no ToS issue). It
+would run the *editor* as a web app; the actual diagrams are just `.drawio`
+XML files, which draw.io's desktop app and the free `app.diagrams.net` also
+open and edit with no server at all — the file format doesn't need
+self-hosting to be useful, only the collaborative-editing UI does, and
+nothing here calls for that (diagrams get authored once, checked into
+`docs/`, not co-edited live). Recommendation: skip hosting it, use
+`app.diagrams.net` or the desktop app to author, commit the `.drawio` files.
+Noted, not added to the README — no work follows from this unless the
+diagrams item above turns out to want live collaboration.
+
+**Shared folder across File Browser, Samba, Paperless, Nextcloud,
+Stirling-PDF, scanned by ClamAV — new TODO, and it's a bigger change than it
+sounds.** Checked the current compose files: every app already mounts its
+*own* separate `./data/...` tree — File Browser `./data/files:/srv` (plus an
+opt-in host-home mount), Samba `./data/share:/storage`, Nextcloud
+`./data/app:/var/www/html`, Paperless `./data/{media,consume,export}`. None
+of them share storage today. ClamAV is already wired, but per-app and
+on-intake, not against a shared tree: Nextcloud's `files_antivirus` app
+scans on upload, Paperless has a pre-consume script (§179, §184) — both
+`av_block_unreachable=false`, fail-open. Stirling-PDF doesn't hold user
+files at all; its mounts (`tessdata`/`configs`/`customFiles`/`pipeline`) are
+tool config, not documents — it receives files per-request and returns a
+result, so "the mapped folder it uses" doesn't exist in the same sense as
+the other four. Flagged as an open question in the new README item rather
+than assumed away.
+
+**Per-client Cloudflare account reuse across multiple turnkey boxes — not a
+technical blocker, but it reopens a decision already made at §84.7.**
+§84.7 recorded "each client gets their own Cloudflare domain... their
+Cloudflare account and API token" as part of the per-client provisioning
+list. Nothing in Cloudflare stops one account holding many zones and many
+Tunnels — the old one-domain-per-free-account cap is long gone, and Zero
+Trust seat limits don't apply here since Access/Zero Trust isn't in this
+stack's auth path (Authelia behind NPM behind the tunnel does the gating,
+not Cloudflare Access policies). Scoped per-zone API tokens (Cloudflare
+supports "Zone : Zone Resources : Specific zone") mean one client's
+provisioning automation can be denied any reach into another client's zone
+even on a shared account — that scoping has to be real in the dashboard's
+token-issuing flow regardless of which account model ships, so it's not new
+work either way.
+
+What *does* change under a shared account: whoever owns the account has
+final control of every client's DNS/Tunnel/zone — transferring a domain out
+if a client relationship ends needs that account holder's cooperation, and
+a token leak or dashboard bug with a scoping mistake has every zone as its
+blast radius instead of one. That's a control/data-protection question, not
+a capacity one — it belongs with the already-open §84.5 "Data protection
+position" item (controller vs processor) rather than being decided here.
+Recommendation if asked to pick: keep §84.7's original call (client's own
+account) as the default for any client who has or wants one, since it's the
+cleaner ownership story and ordinary Cloudflare accounts are free; treat a
+shared reseller-owned account as a fallback for a client who explicitly
+doesn't want to manage their own Cloudflare login, with the scoped-token
+requirement written down as non-optional in that case. No README item — no
+build follows until the data-protection position item above is picked up.
+
+**Folder-structure table in the README — added, user-relevant folders only.**
+Mirrors the `Layout` table already in `CLAUDE.md` for AI-agent context, but
+trimmed to what a human operator/client would actually navigate: `apps/`,
+`docs/`, `frontend/`, `backend/`, `start.sh`. Internal dirs that only matter
+to someone editing the code (`backend/src/config`, `backend/src/services`,
+`backend/src/routes`, `plan-index.md`) are left out on purpose — the CLAUDE.md
+table already covers those for agent work; this one is for a reader of the
+README, not a contributor map. New folders get a row only when they're
+something a user/operator would open, per this same rule, going forward.
