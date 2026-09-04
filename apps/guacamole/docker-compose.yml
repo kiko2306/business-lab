@@ -78,6 +78,10 @@ services:
       retries: 3
       start_period: 60s
 
+  # Guacamole's own JDBC auth extension doesn't gate a Postgres version, but
+  # 16 is kept in lockstep with nextcloud-db/nocodb-db elsewhere in this
+  # stack, which do have a real ceiling (§210.1) — no reason to run a third
+  # major for this one alone.
   guacamole-db:
     image: postgres:16-alpine
     restart: unless-stopped

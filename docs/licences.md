@@ -88,8 +88,8 @@ operate within, listed again at the end.
 |---|---|---|---|
 | postgres:14/15/16-alpine | PostgreSQL License (BSD-like) | ✅ Clean | |
 | pgautoupgrade/pgautoupgrade:17-alpine (n8n, Paperless) | **MIT** ("Docker PostgreSQL Authors") | ✅ Clean | drop-in for `postgres:17-alpine` that runs `pg_upgrade` in place on a major bump; bundled PostgreSQL keeps the PostgreSQL License. n8n needs PG ≥ 16 (§118.3); Paperless moved off `postgres:15-alpine` for the same deprecation notice (§182). |
-| mariadb:10.11 (ITFlow, BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
-| mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | could standardise on MariaDB |
+| mariadb:latest (ITFlow), lscr.io/linuxserver/mariadb:latest (BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
+| mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | not standardisable on MariaDB — its JSON column type breaks NPM's own migrations (§210.1) |
 | valkey:9-alpine (Immich, Paperless) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (which is now RSALv2/SSPL). |
 | nginx:alpine (Kitchen switcher) | BSD-2-Clause | ✅ Clean | |
 | alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |

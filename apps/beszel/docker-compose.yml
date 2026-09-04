@@ -31,6 +31,9 @@ services:
   #   1. exports the hub's public SSH key next to its private key, and
   #   2. registers a stable universal token in the hub database
   # so beszel-agent below can self-enroll with zero dashboard clicks.
+  # `:3` is Alpine's stable release track (`:latest` also tracks it — Alpine
+  # hasn't cut a major since 2015); pinned only to stay off `:edge`, not
+  # because this one-shot script needs a specific version.
   beszel-init:
     image: alpine:3
     restart: "no"

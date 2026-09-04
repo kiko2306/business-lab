@@ -39,6 +39,8 @@ services:
       retries: 3
       start_period: 60s
 
+  # Nextcloud's own admin docs put 16 at the top of the officially-supported
+  # range; 17+ isn't validated by upstream yet, so this isn't a stale pin.
   nextcloud-db:
     image: postgres:16-alpine
     restart: unless-stopped

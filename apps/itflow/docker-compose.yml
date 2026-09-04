@@ -46,8 +46,13 @@ services:
       retries: 3
       start_period: 60s
 
+  # No pinned-major reason found (§210.1 survey): ITFlow's own install docs
+  # just say "MariaDB, not MySQL" with no version floor/ceiling, and 10.11
+  # predates a real requirement being written down here. Floats on :latest,
+  # matching bookstack-db (lscr.io/linuxserver/mariadb:latest) elsewhere in
+  # this repo.
   itflow-db:
-    image: mariadb:10.11
+    image: mariadb:latest
     restart: unless-stopped
     environment:
       TZ: ${TZ:-UTC}

@@ -352,19 +352,6 @@ Strategy:
       until this closes, no app's own login is safely droppable in favor
       of "Authelia-only" — the LAN-direct path has no gate at all without
       it (code-server keeps its own login for exactly this reason today).
-- [ ] **Comment every pinned (non-`:latest`) image with why, or float it**
-      (§210.1) — six pins found with no rationale in the compose file:
-      `postgres:16-alpine` (guacamole-db, nextcloud-db, nocodb-db —
-      three separate apps), `mariadb:10.11` (itflow-db), `mysql:8.0`
-      (npm-db), `valkey:9-alpine` (immich-redis, paperless-redis),
-      `alpine:3` (beszel-init), `louislam/uptime-kuma:1`. Three other pins
-      already do this right and are the model to match:
-      `pgautoupgrade/pgautoupgrade:17-alpine` (n8n/paperless),
-      `ghcr.io/immich-app/postgres:14-vectorchord…` (immich),
-      `guacamole/guacamole:1.6.0`/`guacd:1.6.0` (§204). For each: find the
-      real reason (check plan.md's history for that app, or upstream
-      release notes for a known break) and write it in, or bump to
-      `:latest` if there isn't one.
 - [ ] **Audit which Authelia-protected apps still show their own login**
       (§210.2) — double-login (Authelia's gate, then the app's own form)
       is only actually fixed for one app so far (Dozzle, via

@@ -16771,3 +16771,52 @@ to run through steps 3-5 back to back without re-proposing between each one;
 each item still gets its own sized plan.md section and its own commit, and
 the batch stops the moment one item's outcome would change a later one.
 Default stays the un-batched loop.
+
+## 214. §210.1's six no-comment image pins resolved
+
+Six pins the §210.1 survey flagged with no rationale. Researched each
+against upstream docs/release notes and wrote the reason in, or floated the
+tag where none held up:
+
+- `postgres:16-alpine` (guacamole-db, nextcloud-db, nocodb-db) — kept.
+  Nextcloud's admin docs put 16 at the top of its officially-supported
+  range; NocoDB officially supports Postgres up to 16 too. Guacamole itself
+  doesn't gate a version, so its comment says it's kept in lockstep with the
+  other two rather than running a third major for no reason.
+- `mysql:8.0` (npm-db) — kept. NPM's own setup docs recommend MySQL 8 over
+  MariaDB specifically: MariaDB's JSON column type doesn't match NPM's
+  migration schema and throws parse errors on init, a long-standing class of
+  upstream issue. Also fixed `docs/licences.md`'s note, which had this
+  backwards ("could standardise on MariaDB").
+- `docker.io/valkey/valkey:9-alpine` (immich-redis, paperless-redis) — kept.
+  Matches Immich's own upstream `docker-compose.yml` (pins the same
+  `valkey:9`) and paperless-ngx's own bundled compose, which is moving its
+  default broker to Valkey 9 too.
+- `louislam/uptime-kuma:1` — kept. v2 is a breaking major: a one-time DB
+  migration that can take hours on a large history, Alpine images dropped,
+  minimum Node 20.4, changed internal API shapes. Worth doing on purpose,
+  not as a silent `:latest` drift.
+- `alpine:3` (beszel-init) — kept, comment added. Lowest stakes of the six
+  (one-shot init container); `:3` and `:latest` track the same release line
+  since Alpine hasn't cut a major since 2015, so this was never really a
+  meaningful pin either way — noted that instead of over-explaining it.
+- `mariadb:10.11` (itflow-db) — **floated to `:latest`**. No version
+  requirement found anywhere in ITFlow's install docs or install script
+  beyond "MariaDB, not MySQL" (already satisfied); 10.11 had no discoverable
+  reason. Now matches bookstack-db (`lscr.io/linuxserver/mariadb:latest`)
+  elsewhere in the repo. Also fixed the same stale `docs/licences.md` row,
+  which listed ITFlow and BookStack under one `mariadb:10.11` image even
+  though BookStack actually runs the LinuxServer image.
+
+### Verified on the live stack
+
+`itflow-db`'s schema was empty (dump before the change showed no
+`CREATE TABLE` statements — the installer wizard hadn't been run), so this
+was a clean version bump, not a data migration. Pulled `mariadb:latest`
+(12.3.3), recreated `itflow-db` against the existing `./data/db` — came up
+`healthy` immediately. Restarted `itflow` — Apache came back with no DB
+connection error, `GET /` still redirects to the install wizard as before.
+No other pin's *tag* changed (comment-only), so nothing else needed a live
+recreate.
+
+Docs + compose only — no version bump (matches §181, §108, §210).

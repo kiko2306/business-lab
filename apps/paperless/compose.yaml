@@ -105,6 +105,10 @@ services:
     # left behind. This is only a Celery broker + result backend — no durable
     # state — so starting empty just re-queues tasks. Delete the stale
     # ./data/redis on any host that ran the old image.
+    #
+    # Major pinned to 9, not floated: matches Immich's own upstream-pinned
+    # `valkey:9` and paperless-ngx's own bundled compose, which is moving its
+    # default broker to Valkey 9 too — not an arbitrary version.
     image: docker.io/valkey/valkey:9-alpine
     restart: unless-stopped
     volumes:

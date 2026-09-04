@@ -45,6 +45,8 @@ services:
     networks:
       - immich-net
 
+  # Major pinned to 9, matching Immich's own upstream docker-compose.yml,
+  # which pins the same `valkey:9` — not an arbitrary version.
   immich-redis:
     image: docker.io/valkey/valkey:9-alpine
     restart: unless-stopped

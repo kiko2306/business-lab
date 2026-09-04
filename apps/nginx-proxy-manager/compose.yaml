@@ -53,6 +53,11 @@ services:
       retries: 3
       start_period: 40s
 
+  # MySQL, not MariaDB, and pinned to 8: NPM's own setup docs recommend MySQL
+  # 8 specifically — MariaDB's JSON column type doesn't match NPM's migration
+  # schema and throws parse errors on init (a long-standing, still-open class
+  # of upstream issue). This is the one DB pin in this file that isn't
+  # MariaDB, and that's deliberate, not an oversight.
   npm-db:
     image: mysql:8.0
     restart: unless-stopped
