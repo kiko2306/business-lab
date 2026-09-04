@@ -17593,3 +17593,91 @@ they'd file an issue, but nothing's landed. So even setting the header
 right, a first login would still 401 on a non-existent user. No change to
 the README wording needed — still correctly parked, just now for two
 reasons instead of one. Docs-only, no version bump.
+
+## 229. Beszel proxy-trust — root cause found in source, real fix planned (not built)
+
+§228 rechecked the two upstream discussions and left Beszel parked as an
+open bug. Went further this time: pulled Beszel's actual Go source
+(`henrygd/beszel` at the hub's live tag, v0.18.8, via `gh api
+search/code` + raw fetch, not docs or discussion guesses) to find the real
+cause.
+
+### The mechanism, read straight from `internal/hub/api.go`
+
+`TRUSTED_AUTH_HEADER`'s middleware does exactly one thing per request:
+
+```go
+e.Auth, err = e.App.FindAuthRecordByEmail("users", email)
+if err != nil || !isAuthRefresh {
+    return e.Next()
+}
+```
+
+Lookup only — no fallback creation. `USER_CREATION` (`internal/hub/
+collections.go`) looked like it should cover that, but it only relaxes the
+`users` collection's create-rule for the **OAuth2** flow
+(`@request.context = 'oauth2'`); it's unrelated to the trusted-header path.
+So both failing discussions (§228) have the same explanation: the header
+carried an email with no matching Beszel account, `FindAuthRecordByEmail`
+errored, and the request fell through unauthenticated. Not an upstream bug
+to wait out — the feature is "authenticate as an already-existing user",
+full stop, and confirmed nobody in either discussion had pre-created one.
+
+### The fix that's actually available, and why it's clean
+
+`internal/users/users.go`'s `CreateFirstUser` (first-run only, gated
+`totalUsers == 0`) does something worth knowing beyond its own scope: it
+creates the first `users` record **and** a matching record in PocketBase's
+own `_superusers` collection, same email/password —
+`BESZEL_ADMIN_EMAIL`/`BESZEL_ADMIN_PASSWORD` from
+`apps/beszel/docker-compose.yml` become a real PocketBase superuser, not
+just an app-level "admin" role. A PocketBase superuser can authenticate
+against the standard `_superusers` auth-with-password endpoint and then use
+PocketBase's ordinary Records API to create/update `users` rows — the
+`users` collection's create-rule is `null` (superuser-only, confirmed in
+`internal/migrations/0_collections_snapshot_0_19_0.go`), which a superuser
+bypasses. That means the fix needs **no raw sqlite writes** (unlike
+`beszel-init`'s existing `universal_tokens` insert, which has no REST
+equivalent at all) — it's the same "use the app's own supported API"
+shape as `guacamoleSync.ts`, not a schema-replication risk.
+
+### Planned shape: `beszelSync.ts`, mirroring `guacamoleSync.ts`
+
+Not built. The plan:
+
+- Same trigger points as `syncGuacamoleUsersSafe`: `invitation_accepted`
+  (`routes/auth.ts`), `user_roles_update`/`user_access_update`/
+  `user_delete` (`routes/users.ts`), `exposure_change` scoped to
+  `serviceName === 'beszel'` (`routes/services.ts`) — gated on a new
+  `app-beszel` permission key, same generic per-app convention as
+  `app-guacamole`.
+- Auth: read `BESZEL_ADMIN_EMAIL`/`BESZEL_ADMIN_PASSWORD` via
+  `readAppEnvValue` (already used by `guacamoleSync.ts`), POST
+  `/api/collections/_superusers/auth-with-password` for a token.
+- Per active dashboard user granted `app-beszel` (or webmaster): look up
+  `/api/collections/users/records?filter=email='...'`; create if missing
+  (throwaway random password, like `guacamoleSync.ts` — the trusted-header
+  path never reads it) with `role` mapped from the dashboard role. Beszel's
+  role enum is 3-tier (`admin` / a middle default role the `InitializeUserRole`
+  hook calls `"user"` / `"readonly"`, confirmed in `api.go`'s
+  `requireAdminRole`/`excludeReadOnlyRole` middlewares) — map
+  webmaster/admin → `admin`, everyone else granted the app → `readonly`
+  unless a real need for write access shows up.
+- Revoke path needs one open question resolved during the build, not here:
+  Guacamole sync disables rather than deletes (preserves manually-configured
+  connections); Beszel's `users` collection wasn't checked for an
+  equivalent disable field, so the build should check before picking
+  delete-vs-disable.
+- Compose: `TRUSTED_AUTH_HEADER: Remote-Email` on the `beszel` service,
+  same shape as Guacamole's `HTTP_AUTH_HEADER: Remote-User`.
+  `DISABLE_PASSWORD_AUTH` stays **off** until a live proof confirms the
+  header path actually resolves a session — flipping it first risks a
+  lockout with no way back in except by hand.
+- Verification plan: same scratch-stack shape as §223 — throwaway compose
+  project, a dashboard test user granted `app-beszel`, run the sync, confirm
+  the PocketBase record lands, then forge the trusted header on
+  `/api/collections/users/auth-refresh` (the exact request both failing
+  discussions used) and confirm 200 + a real token instead of 401.
+
+Docs-only — no code written, no version bump. New README item added for
+this shape rather than the old generic "wire up Beszel" line.

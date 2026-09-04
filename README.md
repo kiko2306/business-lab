@@ -348,15 +348,12 @@ Strategy:
         gate on the sensitive home-directory mount while the LAN can bypass
         Authelia), Paperless-ngx (`PAPERLESS_ENABLE_HTTP_REMOTE_USER` —
         upstream has an open bug report of this misbehaving behind nginx
-        specifically, verify before wiring), Beszel (`TRUSTED_AUTH_HEADER` +
-        `DISABLE_PASSWORD_AUTH` — a matching, unresolved upstream bug report
-        exists for this exact Authelia+nginx combo, check it's fixed before
-        attempting), Nextcloud (`user_saml`'s "Environment mode"), Home
-        Assistant (`trusted_networks`/`trusted_proxies` — IP-based, weaker,
-        lower priority). Stirling-PDF and Uptime Kuma are done (§227):
-        Stirling-PDF already shipped with `SECURITY_ENABLELOGIN=false` by
-        default; Uptime Kuma's `disableAuth` (a DB setting, no env var) is
-        now set by an idempotent init sidecar.
+        specifically, verify before wiring), Nextcloud (`user_saml`'s
+        "Environment mode"), Home Assistant (`trusted_networks`/
+        `trusted_proxies` — IP-based, weaker, lower priority). Stirling-PDF
+        and Uptime Kuma are done (§227): Stirling-PDF already shipped with
+        `SECURITY_ENABLELOGIN=false` by default; Uptime Kuma's `disableAuth`
+        (a DB setting, no env var) is now set by an idempotent init sidecar.
       - **OIDC against Authelia's own provider, then disable the local
         form** (two config steps: wire OIDC, log in once to auto-create the
         account, then flip the flag below): Immich (Admin Settings, OAuth-only,
@@ -365,6 +362,23 @@ Strategy:
         not working on some version, verify live), Homebox
         (`HBOX_OPTIONS_ALLOW_LOCAL_LOGIN=false`), NocoDB
         (`NC_DISABLE_EMAIL_AUTH=true`).
+
+- [ ] **Build `beszelSync.ts` so Beszel's proxy-trust actually has an
+      account to find** (§229) — `TRUSTED_AUTH_HEADER` only looks up an
+      existing user by the forwarded email (`FindAuthRecordByEmail`, no
+      creation fallback — confirmed by reading Beszel's own source, not the
+      two open discussions reporting a 401 with no explanation). Plan is set:
+      mirror `guacamoleSync.ts`'s shape (same trigger points, same
+      `app-beszel` permission convention), but authenticate to Beszel's
+      standard PocketBase `_superusers` API using
+      `BESZEL_ADMIN_EMAIL`/`BESZEL_ADMIN_PASSWORD` (the first-run bootstrap
+      makes that a real PocketBase superuser, confirmed in
+      `internal/users/users.go`), then create/update `users` records over
+      the normal Records API — no raw sqlite, no hash replication. Full
+      design in `plan.md` §229. Wire `TRUSTED_AUTH_HEADER: Remote-Email` on
+      the `beszel` service once the sync exists; leave
+      `DISABLE_PASSWORD_AUTH` off until a live proof confirms the header
+      path resolves a session.
 
       Each needs its own config change and its own live proof; Nextcloud and
       Home Assistant's fixes probably also want a §180 conversation about
