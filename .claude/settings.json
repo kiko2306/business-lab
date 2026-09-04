@@ -5,9 +5,7 @@
       "Read(./.env)",
       "Read(./apps/*/.env)",
       "Edit(./.env)",
-      "Edit(./apps/*/.env)",
-      "Write(./.env)",
-      "Write(./apps/*/.env)"
+      "Edit(./apps/*/.env)"
     ]
   },
   "hooks": {
