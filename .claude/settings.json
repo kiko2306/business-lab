@@ -35,6 +35,12 @@
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-version-bump.sh\"",
             "timeout": 10,
             "statusMessage": "Checking the version bump + changelog"
+          },
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/secret-scan.sh\"",
+            "timeout": 10,
+            "statusMessage": "Scanning the commit for known secret formats"
           }
         ]
       }
