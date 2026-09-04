@@ -1,0 +1,16 @@
+# Test image for the frontend workspace: plain node:20 has neither Chrome nor
+# the shared libraries headless Chrome needs, and `docker run --rm` throws away
+# anything a container downloads mid-run. Baking both into an image, built once
+# and reused, is what makes `npm run test:ci` actually runnable — see plan.md
+# for the investigation that found this.
+FROM node:20
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 \
+      libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 \
+      libpango-1.0-0 libpangocairo-1.0-0 libgtk-3-0 fonts-liberation ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Version pinned to match frontend/package-lock.json's resolved puppeteer
+# version — must be bumped here if that lockfile entry changes.
+RUN npx --yes puppeteer@23.0.2 browsers install chrome

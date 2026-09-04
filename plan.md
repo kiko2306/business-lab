@@ -16684,3 +16684,48 @@ own login load-bearing for the LAN-direct path (§180), or purely redundant
 with Authelia?** Worth resolving §180 (or at least confirming its scope)
 before either 210.2 or 210.3 goes further, since the answer changes what
 "go Authelia-only" or "VPN-only" safely means for every app on the list.
+
+## 211. Frontend `npm run test:ci` never actually ran against plain `node:20`
+
+Investigating why sessions in this repo run long, `npm run test:ci`
+(Karma/Jasmine + headless Chrome) was the biggest concrete find: it cannot
+pass with the `docker run ... node:20 npm run test:ci` command CLAUDE.md
+documented. Reproduced the failure in two layers:
+
+1. Puppeteer's Chrome download lives at `/root/.cache/puppeteer`, inside the
+   `--rm` container's own filesystem — never persisted, so every run either
+   re-downloads or (if download is skipped for any reason) fails with
+   "Could not find Chrome".
+2. Even with Chrome downloaded into a bind-mounted, persistent cache dir, it
+   fails to launch: `libnss3.so: cannot open shared object file`. Plain
+   `node:20`'s Debian base is missing the ~15 shared libraries headless
+   Chrome needs (libnss3, libatk, libgtk, etc) — a known Puppeteer-in-Docker
+   gap, not something `npm install` can fix.
+
+Net effect: any session asked to verify a frontend change against
+`test:ci` either burned time rediscovering this from scratch each time, or
+silently skipped verification — against the CLAUDE.md rule that a type-check
+pass doesn't mean "done". Nothing persisted the finding, so it kept costing
+time repeatedly instead of once.
+
+**Fix**: `frontend/Dockerfile.test` — `node:20` plus the apt-get'd Chrome
+runtime libs, plus `npx puppeteer@23.0.2 browsers install chrome` baked in at
+build time (version pinned to match `frontend/package-lock.json`'s resolved
+`puppeteer` version, 23.0.2 → Chrome 127.0.6533.99). Built once
+(`docker build -t homelab-frontend-test -f frontend/Dockerfile.test frontend`),
+then reused for every `npm run test:ci` run — no download, no missing libs.
+Verified: all 50 frontend unit tests pass in ~12s using the built image.
+CLAUDE.md's Commands section updated with the working invocation and the
+rebuild-on-puppeteer-bump note.
+
+Scope check: `scripts/e2e-tests.sh` (Playwright, browser E2E) was not
+affected — its `node:20` step only builds the frontend bundle; the browser
+itself runs in Playwright's own image, unrelated to this gap.
+
+Not fixed as part of this pass: `plan.md` itself (currently ~16.7k lines) is
+the other plausible source of session-time overhead raised in the same
+investigation. Two compaction passes have already happened (§25, and §165/§172
+found most of the log too cross-referenced to safely compact further) — no
+further action taken here since the file is already read section-at-a-time via
+`plan-index.md`, and forcing more compaction risks breaking a section a later
+one still cites.
