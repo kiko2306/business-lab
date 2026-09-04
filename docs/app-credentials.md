@@ -68,6 +68,20 @@ Open these privately and claim them before exposing.
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |
 | **ITFlow** | Setup wizard creates the first admin. See the note below — it needs two things switched on afterwards. |
 
+### Nextcloud — register the shared tree once (External Storage)
+
+The tree File Browser and Samba already share (§202/§219) is bind-mounted
+into the Nextcloud container at `/shared`, but Nextcloud won't show it until
+you register it as external storage — and that one step can't be scripted:
+Nextcloud's own create API for it requires a fresh interactive password
+confirmation (`#[PasswordConfirmationRequired(strict: true)]`), which no
+API/Basic-Auth call can satisfy, and the `occ files_external:create` command
+older docs describe no longer exists in current Nextcloud.
+
+**Admin settings -> External Storage -> Add storage**: name it (e.g.
+`Shared`), type **Local**, path `/shared`, Auth `None`, leave it applicable
+to all users, then **Save**. Takes effect immediately, no restart needed.
+
 ### ITFlow — two things to do after the wizard
 
 Neither is obvious, and both fail *silently* if missed.

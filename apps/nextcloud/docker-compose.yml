@@ -27,6 +27,14 @@ services:
       - "homepage.description=File sync, calendar, and contacts"
     volumes:
       - ./data/app:/var/www/html
+      # The tree File Browser and Samba already share (plan.md §202/§219),
+      # mounted at a path outside the webroot — writing into ./data/app
+      # directly would desync Nextcloud's own file cache. Register it once
+      # via Admin settings -> External Storage (local, /shared): the create
+      # API is #[PasswordConfirmationRequired(strict: true)] upstream, which
+      # only a real interactive session can satisfy, so this one step can't
+      # be scripted (see docs/app-credentials.md).
+      - ../file-browser/data/files:/shared
     depends_on:
       nextcloud-db:
         condition: service_healthy

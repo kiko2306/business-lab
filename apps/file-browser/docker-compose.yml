@@ -2,11 +2,14 @@
 services:
   # filebrowser's image runs as uid/gid 1000 but Docker creates the
   # bind-mounted dirs root-owned, so a fresh install can't write its DB.
-  # One-off chown before the app starts; exits 0.
+  # One-off chown before the app starts; exits 0. /srv also gets a world
+  # write/traverse bit: Nextcloud's External Storage app (§219) mounts this
+  # same tree as www-data (uid 33 in its own container), a uid this chown
+  # can't predict or match, so group ownership alone isn't enough.
   filebrowser-init:
     image: busybox:stable
     user: "0:0"
-    command: ["chown", "-R", "1000:1000", "/database", "/srv"]
+    command: ["sh", "-c", "chown -R 1000:1000 /database /srv && chmod -R o+rwX /srv"]
     restart: "no"
     volumes:
       - ./data/database:/database

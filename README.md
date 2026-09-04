@@ -388,15 +388,19 @@ Strategy:
 
 ### Apps and integrations
 
-- [ ] **Nextcloud External Storage onto the shared file tree** (§219) — File
-      Browser and Samba already share one tree (§219, done). Nextcloud can't
-      just bind-mount the same directory — `./data/app` is its whole webroot
-      and writing into it from outside corrupts its file cache — so this is
-      the supported path instead: extend `backend/src/services/nextcloudOcc.ts`
-      to register the shared tree via `occ files_external:create` on start
-      (same reconcile-on-start shape as `nextcloudClamav.ts`), and set
-      `files_antivirus`'s **background scan** mode for it — the default
-      upload-scan hook never fires for a file that arrives some other way.
+- [ ] **@mat: register Nextcloud's shared-tree mount** (§219, §220) — the
+      `/shared` bind mount and `www-data` write permission are in place, but
+      registering it with Nextcloud (Admin settings -> External Storage) needs
+      a real interactive login — Nextcloud's create API requires a fresh
+      password confirmation no API call can satisfy. Steps in
+      `docs/app-credentials.md`.
+- [ ] **Nextcloud never runs its background jobs** (§220) — `backgroundjobs_mode`
+      is `cron` but no cron sidecar exists in `apps/nextcloud/docker-compose.yml`
+      and the image's own `/cron.sh` isn't running, so trash/version expiry,
+      share-expiry notices, activity mail and `files_antivirus`'s background
+      rescan (needed once External Storage is registered, above) all silently
+      never fire. Add the standard sidecar: same image, `entrypoint: /cron.sh`,
+      same `./data/app` volume.
 - [ ] **Paperless one-way drop box onto the shared file tree** (§219) —
       Paperless's `consume/` isn't a shared folder, it's an inbox that
       ingests and deletes whatever lands there, so the fit is a dedicated

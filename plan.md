@@ -17369,3 +17369,60 @@ is what §200 needed and is now proven).
 Docs only (`docs/licences.md` — the bundled extension is the same
 Apache-2.0 project, noted on the existing Guacamole row) plus the one
 compose env var — no backend/frontend code, no version bump.
+
+## 220. Nextcloud onto the shared file tree (§219) — mount done, registration is upstream-blocked
+
+The last open piece of §219's shared-tree decision: bind-mount the File
+Browser/Samba tree into Nextcloud at a path outside its webroot, register it
+with `occ files_external:create`, and check `files_antivirus`'s background
+scan covers it.
+
+### The occ command §219 assumed no longer exists
+
+Checked live against the running stack (Nextcloud 34.0.3): `occ list` has no
+`files_external:*` namespace at all — no Command classes exist anywhere
+under `apps/files_external` in this version. Registering a mount is web/API
+only now, via `GlobalStoragesController::create`
+(`/apps/files_external/globalstorages`). That endpoint carries
+`#[PasswordConfirmationRequired(strict: true)]`, which checks a
+recently-confirmed-password timestamp on the *session* — not obtainable
+through a stateless Basic-Auth API call the way Guacamole's admin-rotate
+REST calls are (`guacamoleAdminRotate.ts`). This looks like deliberate
+upstream hardening (external storage is a filesystem-write primitive; gating
+its creation behind a fresh manual auth makes sense), not an oversight to
+work around. Asked the user rather than reimplementing a browser-style
+login+CSRF+password-confirm session dance to fight it: register it once by
+hand, same class of one-time action as claiming a Wizard app's first account.
+
+### What shipped
+
+- `apps/nextcloud/docker-compose.yml`: `../file-browser/data/files:/shared`
+  bind mount (same relative cross-app pattern Samba already uses for the
+  same tree).
+- `apps/file-browser/docker-compose.yml`: `filebrowser-init` now also
+  `chmod -R o+rwX /srv` after its existing chown. Necessary because Nextcloud
+  writes as `www-data` (uid 33 inside its own container) — a uid the
+  File Browser side's `chown -R 1000:1000` can't predict or match, so
+  group ownership alone doesn't cover it. Verified live: `www-data` inside
+  `nextcloud-nextcloud-1` can create and remove a file under `/shared`, and
+  File Browser's own view of `/srv` is unaffected.
+- `docs/app-credentials.md`: new "Nextcloud — register the shared tree once"
+  note (Admin settings -> External Storage -> Local, path `/shared`, Auth
+  None), explaining why it can't be automated.
+
+### Background scan: turned out to be moot for now, and a bigger gap besides
+
+`files_antivirus`'s background scan needs no extra config — `occ
+background-job:list` shows it self-registers a `BackgroundScanner` job the
+moment the app is enabled (already true here via `nextcloudClamav.ts`). But
+nothing on this stack ever runs Nextcloud's cron: `backgroundjobs_mode` is
+`cron` (the correct setting), yet `apps/nextcloud/docker-compose.yml` has no
+cron sidecar and the shipped `/cron.sh` isn't running in the app container
+(`ps aux` shows only apache2). So background jobs — antivirus rescans,
+trash/version expiry, share-expiry notices, activity mail — silently never
+fire at all, independent of this change. Out of scope for a shared-tree
+mount; filed as a new README item instead of expanding this one.
+
+Compose + docs, verified live on `tx-home-utils.com` (§219's mount and
+permission questions only, per the box's own no-guarantees rule) — no
+`backend/src`/`frontend/src` touched, no version bump.
