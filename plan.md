@@ -17123,3 +17123,65 @@ that the design questions are answered:
 
 Compose + docs change, verified live — no version bump (no `backend/src`/
 `frontend/src` touched).
+
+## 220. Small local LLM — researched, not adding it now
+
+The README item asked whether a small CPU-viable model (llama.cpp-class) is
+worth adding for text cleanup / JSON repair, scoped as: which jobs actually
+need it, model size vs. quality, and how it'd be packaged. Researched all
+three; the answer is no, not right now — recorded here so the reasoning
+doesn't have to be redone if this comes up again.
+
+### Which jobs actually need it — none, currently
+
+Grepped the backend for the kind of fragile parsing this would exist to
+fix (`JSON.parse`/malformed/sanitize/repair). Every hit is well-formed JSON
+from a real API (Kopia, NPM, Cloudflare) that already parses cleanly — no
+"another app's messy output" problem exists in this codebase today.
+
+The two plausible future jobs both already have a different plan:
+
+- **Mealie recipe-from-URL** (the next README item, §123.1) is scoped to
+  reuse Mealie's own `OPENAI_*` integration against the **external** Claude
+  API key, same Settings-panel pattern as everything else that needs a
+  third-party token (§84.3). Not a local-model job.
+- **Business Lab content generation** (§84.3) explicitly plans "a Claude
+  API key entered once in Settings" too — social copy needs a genuinely
+  capable model, not a 1–4B CPU-quantized one.
+
+Nothing left needing "good enough locally, no API key" — the one property
+a local model would uniquely buy.
+
+### The host is not idle — this has a real cost right now
+
+`free -h` on the live stack: 513 MiB free RAM, swap sitting at 3.8/4.0 GiB
+in steady state (not a spike — checked twice, minutes apart), 53+
+containers already running for ~36 apps. Adding any always-on service
+competes with that headroom, and a model server is exactly that: resident
+in RAM the whole time, not spun up per request. Even the smallest usable
+option below is a real cost on a box already leaning on swap, not a
+theoretical one.
+
+### If a job ever does need it — what it'd look like
+
+For the record, so this doesn't need re-researching:
+
+- **Model**: something in the 0.5B–1.5B range, Q4 GGUF — Qwen2.5-1.5B or
+  Llama-3.2-1B are the current CPU-viable options for JSON-repair-class
+  tasks, roughly 1 GiB resident. Phi-4-mini (3.8B, ~2.3 GiB, ~12 tok/s on a
+  modern CPU) is the next tier up if quality mattered more than footprint —
+  probably too heavy for this host's current headroom regardless.
+- **Packaging**: `ghcr.io/ggml-org/llama.cpp` server image, its own compose
+  service (`apps/local-llm/` or similar), serving an OpenAI-compatible
+  `/v1/chat/completions` — the same shape Mealie's `OPENAI_BASE_URL`
+  already expects, so pointing an app at "local" vs. "Claude" would be a
+  one-line config difference if this were ever built.
+
+### Not done here
+
+README item deleted — this is a completed research task whose conclusion
+is "don't build it now," not open work. Revisit if a concrete job shows up
+that specifically needs offline/no-API-key inference and the host has RAM
+to spare.
+
+Docs only — no version bump.
