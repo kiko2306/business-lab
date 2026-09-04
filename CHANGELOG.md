@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.30.1] — 2026-09-04
+
+### Roster
+
+- Paperless's document intake now watches a shared-tree drop box instead of its own isolated consume folder
+
 ## [0.30.0] — 2026-09-04
 
 ### Added

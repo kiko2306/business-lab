@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.30.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.30.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -401,15 +401,6 @@ Strategy:
       rescan (needed once External Storage is registered, above) all silently
       never fire. Add the standard sidecar: same image, `entrypoint: /cron.sh`,
       same `./data/app` volume.
-- [ ] **Paperless one-way drop box onto the shared file tree** (§219) —
-      Paperless's `consume/` isn't a shared folder, it's an inbox that
-      ingests and deletes whatever lands there, so the fit is a dedicated
-      `shared/to-paperless/` subfolder bind-mounted into `consume/` —
-      moving a file there is the deliberate way to file it with Paperless,
-      not "everything in the shared tree is visible to it." Generate/ensure
-      the subfolder the same way `sambaConfig.ts` generates `smb.conf`. The
-      existing pre-consume ClamAV hook (§179/§184) covers it automatically,
-      no new scanning gap.
 - [ ] **Smarter Mealie "recipe from URL"** (§123.1) — the `recipe-scrapers`
       importer is poor on blogs without schema.org markup. Mealie 2.x has an
       `OPENAI_*` integration for AI-assisted parsing (incl. an

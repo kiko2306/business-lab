@@ -17426,3 +17426,52 @@ mount; filed as a new README item instead of expanding this one.
 Compose + docs, verified live on `tx-home-utils.com` (§219's mount and
 permission questions only, per the box's own no-guarantees rule) — no
 `backend/src`/`frontend/src` touched, no version bump.
+
+## 221. Paperless's one-way drop box onto the shared file tree (§219, §220)
+
+The other open piece of §219: Paperless's `consume/` isn't a symmetric
+shared folder like File Browser/Samba's, it's a one-way inbox that ingests
+and deletes whatever lands there — so the fit decided in §219 was a
+dedicated `to-paperless/` subfolder of the shared tree, bind-mounted into
+`consume/`.
+
+### What shipped
+
+- `apps/paperless/compose.yaml`: `consume/`'s bind now points at
+  `../file-browser/data/files/to-paperless` instead of `./data/consume` —
+  same cross-app relative-mount trick Samba already uses for the same tree.
+- `backend/src/services/paperlessDropbox.ts` (new): `ensurePaperlessDropbox`
+  creates that subfolder and `chmod`s it `0777` before every Paperless start,
+  wired into `executor.ts` next to `applySambaConfig`/`ensureKopiaRepoDir` —
+  same "must exist before `compose up`" placement. `0777`, not a `chown`,
+  because whichever app's container gets there first (Paperless is uid 1000,
+  matching File Browser's tree already; Nextcloud's `www-data` from §220 is
+  uid 33) needs write access without the backend having to predict a uid —
+  the same reasoning as `filebrowser-init`'s `chmod -R o+rwX /srv` from §220.
+- Old `./data/consume` left in place, unused — same call as §219 made for
+  Samba's now-unused `./data/share`.
+
+### Verified live on `tx-home-utils.com`
+
+Recreated `paperless-ngx` (base + managed compose fragment, so the ClamAV
+pre-consume wiring from §81.7 stayed intact) and confirmed the full pipeline
+through the new mount, not just the mount itself:
+
+- A malformed hand-built PDF dropped into
+  `file-browser/data/files/to-paperless/` was picked up, ran through the
+  ClamAV pre-consume hook (passed), then failed at PDF parsing — proving the
+  watch → scan → consume chain fires correctly, and that a failed
+  consumption leaves the original in place rather than silently eating it.
+- A real PDF (`reportlab`, built in a throwaway `alpine` container) dropped
+  the same way was consumed successfully within ~10s and the original
+  deleted from `to-paperless/` — the intended round trip. Removed the test
+  document from Paperless's DB afterward (`manage.py shell`).
+
+Did not rebuild/recreate the `backend` container to exercise
+`ensurePaperlessDropbox` through a real dashboard-triggered start — that
+risks the running management stack for a function that's trivial
+(mkdir + chmod), unit-tested, and whose Docker-facing half (the mount,
+the permission fix, the actual consume pipeline) is exactly what the
+manual proof above exercised.
+
+Touches `backend/src` — version bumped to 0.30.1 (`scripts/bump-version.sh`).

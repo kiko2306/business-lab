@@ -25,6 +25,7 @@ import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
 import { reconcileNextcloudClamav } from './nextcloudClamav';
 import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
+import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
@@ -204,6 +205,11 @@ async function composeUpWithManagedConfig(
   // compose fragment that carries PAPERLESS_PRE_CONSUME_SCRIPT (§81.7). Both
   // must exist before the container starts.
   await reconcilePaperlessClamav(serviceName, appDir);
+  // Paperless: the shared-tree drop box (§219/§220) must exist and be
+  // writable before `compose up`, same reason applySambaConfig runs here.
+  if (serviceName === 'paperless') {
+    ensurePaperlessDropbox(appDir);
+  }
 
   // The reconciler above may have created OR removed docker-compose.managed.yml
   // since composeArgs was resolved at the top of the start — a fresh clone's
