@@ -1007,14 +1007,20 @@ export function resolveComposeFile(name: string): ResolvedComposeFile | null {
   const appDir = path.join(getAppsDir(), projectName);
   const configured = path.basename(service.composePath);
 
+  // The dashboard-managed image-pin override (services/composeOverride.ts). An
+  // explicit `-f` on the base file suppresses Compose's own override discovery,
+  // so it is listed here by hand — which also picks up a hand-placed one.
+  const overrideFile = path.join(appDir, 'docker-compose.override.yml');
+  const overrideArg = fs.existsSync(overrideFile) ? ` -f ${overrideFile}` : '';
+
   for (const candidate of [configured, ...COMPOSE_FILENAMES]) {
     const composeFile = path.join(appDir, candidate);
     if (fs.existsSync(composeFile)) {
-      return { projectName, appDir, composeFile };
+      return { projectName, appDir, composeFile, composeArgs: `-f ${composeFile}${overrideArg}` };
     }
   }
 
-  return { projectName, appDir, composeFile: null };
+  return { projectName, appDir, composeFile: null, composeArgs: '' };
 }
 
 export interface ComposeEnvVar {

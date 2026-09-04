@@ -110,7 +110,7 @@ export async function ensureHomeAssistantHacs(serviceName: string): Promise<void
   try {
     const scriptB64 = Buffer.from(buildHacsInstallScript()).toString('base64');
     const command =
-      `docker compose -p ${resolved.projectName} -f ${resolved.composeFile} run --rm --no-deps -T ` +
+      `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
       `--entrypoint /bin/sh home-assistant -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
 
     const output = await run(command);

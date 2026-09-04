@@ -11,6 +11,22 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.13.0] — 2026-09-04
+
+### Changed
+
+- **The Update button now does the full job** (§131.4, §176). It still pulls
+  and recreates, but the pull now runs under a shared maintenance lock so it
+  can never land mid-backup-dump (and vice-versa — a scheduled dump waits for
+  a running update), and afterwards it records the exact digest of every image
+  it pulled into a dashboard-managed `apps/<name>/docker-compose.override.yml`.
+  A fresh clone then recreates the same containers instead of whatever the
+  tags point at that day. Every `docker compose` invocation now passes that
+  override as a second `-f`. A **📌 pinned** marker and an **Unpin** button on
+  the app card clear the pins (`POST /api/services/:name/update/unpin`) and
+  drop the app back to its compose-file tags. Compose files stay read-only to
+  the backend — the override is a generated file, like `.env`.
+
 ## [0.12.0] — 2026-09-03
 
 ### Added

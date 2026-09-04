@@ -64,6 +64,7 @@ describe('applyExposureConfigFiles — home-assistant', () => {
       projectName: 'home-assistant',
       appDir: '/apps/home-assistant',
       composeFile: '/apps/home-assistant/docker-compose.yml',
+      composeArgs: '-f /apps/home-assistant/docker-compose.yml',
     });
     execSucceeds();
   });

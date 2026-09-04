@@ -2,6 +2,7 @@ import { writeAuditLog } from '../utils/audit';
 import { dumpAllAppDatabases } from './appDumps';
 import { runBackupJobNow } from './duplicatiClient';
 import { readAppEnvValue } from './appEnv';
+import { withMaintenanceLock } from './maintenanceLock';
 import logger from '../utils/logger';
 import {
   BackupRunOutcome,
@@ -147,6 +148,16 @@ const MAX_RECORDED_FAILURES = 25;
  */
 export async function runAppDataBackup(
   trigger: 'scheduled' | 'manual' = 'scheduled'
+): Promise<{ ok: boolean; detail: string }> {
+  // Serialise against the per-app image update (executor.updateService): a
+  // `docker compose up --force-recreate` landing mid-dump aborts pg_dump for
+  // that app and the run is silently short a database. The dump is ~20s, so an
+  // update waiting on it — or a scheduled dump waiting on a pull — is fine.
+  return withMaintenanceLock(`backup:app-data:${trigger}`, () => runAppDataBackupLocked(trigger));
+}
+
+async function runAppDataBackupLocked(
+  trigger: 'scheduled' | 'manual'
 ): Promise<{ ok: boolean; detail: string }> {
   const report = await dumpAllAppDatabases();
 

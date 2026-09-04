@@ -115,6 +115,33 @@ export class ServiceStateService {
   }
 
   /**
+   * Drop the image pins the Update button wrote into the app's managed
+   * docker-compose.override.yml, so it floats back to the tags in its base
+   * compose file. The backend recreates the container when it is running.
+   */
+  unpinService(serviceName: string): void {
+    this.operatingSubject.next({ ...this.operatingSubject.value, [serviceName]: 'update' });
+    this.http
+      .post<{ message: string }>(
+        `${API_BASE_URL}/services/${serviceName}/update/unpin`,
+        {},
+        { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+      )
+      .pipe(
+        tap((response) => this.toast.success(response.message)),
+        switchMap(() => this.fetchServices(false)),
+        finalize(() => {
+          this.operatingSubject.next({ ...this.operatingSubject.value, [serviceName]: null });
+        }),
+        catchError((error) => {
+          this.toast.error(extractErrorMessage(error, `Unable to unpin ${serviceName}.`));
+          return EMPTY;
+        })
+      )
+      .subscribe();
+  }
+
+  /**
    * Build a ticket-authenticated URL for the service's startup log SSE
    * stream (an EventSource can't send an Authorization header). Returns null
    * if no ticket could be obtained (e.g. not logged in).

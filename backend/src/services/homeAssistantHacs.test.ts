@@ -60,6 +60,7 @@ describe('ensureHomeAssistantHacs', () => {
       projectName: 'home-assistant',
       appDir: '/apps/home-assistant',
       composeFile: '/apps/home-assistant/docker-compose.yml',
+      composeArgs: '-f /apps/home-assistant/docker-compose.yml',
     });
   });
 
@@ -88,6 +89,7 @@ describe('ensureHomeAssistantHacs', () => {
       projectName: 'home-assistant',
       appDir: '/apps/home-assistant',
       composeFile: null,
+      composeArgs: '',
     });
     await ensureHomeAssistantHacs('home-assistant');
     expect(mockedExec).not.toHaveBeenCalled();

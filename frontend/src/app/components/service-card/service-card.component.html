@@ -28,6 +28,9 @@
       <span *ngIf="updateAvailable()" class="text-danger">
         · {{ service.updateImages?.length }} image{{ service.updateImages?.length === 1 ? '' : 's' }} out of date
       </span>
+      <span *ngIf="pinned()" class="text-info-emphasis" [title]="pinnedTitle()">
+        · 📌 pinned to a fixed image
+      </span>
       <span *ngIf="service.error" class="text-danger">· {{ service.error }}</span>
     </div>
 
@@ -69,6 +72,16 @@
     >
       <span *ngIf="loadingAction === 'update'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
       <span *ngIf="loadingAction !== 'update'">Update</span>
+    </button>
+    <button
+      *ngIf="pinned()"
+      type="button"
+      class="btn btn-outline-secondary btn-sm"
+      [disabled]="loadingAction !== null"
+      [title]="pinnedTitle()"
+      (click)="unpin()"
+    >
+      Unpin
     </button>
     <button
       type="button"

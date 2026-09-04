@@ -17,7 +17,9 @@ import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { applyKitchenConfig } from './kitchenConfig';
 import { applySambaConfig } from './sambaConfig';
-import { checkServiceImages, recordImageCheck } from './imageUpdates';
+import { checkServiceImages, recordImageCheck, pickLocalDigest, parseImageRef } from './imageUpdates';
+import { clearImagePins, writeImagePins } from './composeOverride';
+import { withMaintenanceLock } from './maintenanceLock';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
@@ -154,7 +156,9 @@ async function composeUpWithManagedConfig(
   serviceName: string,
   projectName: string | null,
   appDir: string,
-  composeFile: string,
+  // The `-f` flags (base compose + managed override), not just the base file,
+  // so a recreate honours the image pins the Update button wrote.
+  composeArgs: string,
   { forceRecreate }: { forceRecreate: boolean }
 ): Promise<CommandResult> {
   // Before anything else: a missing external network fails `compose up`
@@ -188,7 +192,7 @@ async function composeUpWithManagedConfig(
   await applyN8nWorkflows(serviceName, appDir);
 
   const recreate = forceRecreate ? ' --force-recreate' : '';
-  const command = `docker compose -p ${projectName} -f ${composeFile} up -d${recreate}`;
+  const command = `docker compose -p ${projectName} ${composeArgs} up -d${recreate}`;
   return executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
     ...(await resolveTimezoneOverride(appDir)),
     ...mailOverrides,
@@ -256,7 +260,12 @@ export async function startService(serviceName: string, userId: number): Promise
   }
 
   const resolved = resolveComposeFile(serviceName);
-  const { projectName, appDir, composeFile } = resolved ?? { projectName: null, appDir: '', composeFile: null };
+  const { projectName, appDir, composeFile, composeArgs } = resolved ?? {
+    projectName: null,
+    appDir: '',
+    composeFile: null,
+    composeArgs: '',
+  };
 
   if (!composeFile) {
     throw {
@@ -279,7 +288,7 @@ export async function startService(serviceName: string, userId: number): Promise
     // Keep the app's own reverse-proxy config in step with its exposed
     // hostname before it (re)starts: env overrides for most apps, a config
     // file for the few that need it (Home Assistant).
-    const result = await composeUpWithManagedConfig(serviceName, projectName, appDir, composeFile, {
+    const result = await composeUpWithManagedConfig(serviceName, projectName, appDir, composeArgs, {
       forceRecreate: false,
     });
 
@@ -349,6 +358,15 @@ export async function startService(serviceName: string, userId: number): Promise
  * Recreation goes through composeUpWithManagedConfig like every other start,
  * so the exposure env overrides and managed config files are re-applied to the
  * new container.
+ *
+ * Two things happen around the pull:
+ *  - It runs under the shared maintenance lock (maintenanceLock.ts) so a
+ *    recreate can't land mid-backup-dump (§103, extended to updates).
+ *  - Afterwards the digest of each image it pulled is pinned into the
+ *    dashboard-managed `docker-compose.override.yml` (composeOverride.ts), so a
+ *    fresh clone recreates the same containers instead of whatever the tags
+ *    point at that day. The pins are cleared first, so the pull always fetches
+ *    the tags in the base compose file rather than re-fetching a pinned digest.
  */
 export async function updateService(serviceName: string, userId: number): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
@@ -356,7 +374,12 @@ export async function updateService(serviceName: string, userId: number): Promis
   }
 
   const resolved = resolveComposeFile(serviceName);
-  const { projectName, appDir, composeFile } = resolved ?? { projectName: null, appDir: '', composeFile: null };
+  const { projectName, appDir, composeFile, composeArgs } = resolved ?? {
+    projectName: null,
+    appDir: '',
+    composeFile: null,
+    composeArgs: '',
+  };
 
   if (!composeFile) {
     throw {
@@ -368,25 +391,31 @@ export async function updateService(serviceName: string, userId: number): Promis
   await ensureGeneratedSecrets(serviceName);
   ensureServiceSecrets(serviceName, appDir, composeFile);
 
+  // The pull recreates against the base compose tags, not the current pins.
+  const baseArgs = `-f ${composeFile}`;
   const startTime = new Date();
   try {
-    logger.info(`Updating service: ${serviceName}`, { userId, service: serviceName });
+    const updated = await withMaintenanceLock(`update:${serviceName}`, async () => {
+      logger.info(`Updating service: ${serviceName}`, { userId, service: serviceName });
 
-    const before = await getServiceImageIds(projectName, composeFile);
-    await executeCommand(`docker compose -p ${projectName} -f ${composeFile} pull`, COMPOSE_UP_TIMEOUT_MS);
+      const before = await getServiceImageIds(projectName, composeArgs);
+      clearImagePins(appDir);
+      await executeCommand(`docker compose -p ${projectName} ${baseArgs} pull`, COMPOSE_UP_TIMEOUT_MS);
 
-    // forceRecreate: `up -d` alone leaves a running container on its old image
-    // when the compose config has not changed, so the pull would look like it
-    // did nothing.
-    await composeUpWithManagedConfig(serviceName, projectName, appDir, composeFile, {
-      forceRecreate: true,
-    });
-    const after = await getServiceImageIds(projectName, composeFile);
+      // forceRecreate: `up -d` alone leaves a running container on its old image
+      // when the compose config has not changed, so the pull would look like it
+      // did nothing.
+      await composeUpWithManagedConfig(serviceName, projectName, appDir, baseArgs, {
+        forceRecreate: true,
+      });
+      const after = await getServiceImageIds(projectName, baseArgs);
 
-    // Compared by container, since a multi-container app can move one image
-    // and not the others. Either side missing means "cannot tell".
-    const updated =
-      before && after
+      // Pin whatever was just pulled so it survives a fresh clone.
+      await pinPulledImages(serviceName, projectName, appDir, composeFile);
+
+      // Compared by container, since a multi-container app can move one image
+      // and not the others. Either side missing means "cannot tell".
+      return before && after
         ? [
             ...new Set(
               [...after.entries()]
@@ -395,6 +424,7 @@ export async function updateService(serviceName: string, userId: number): Promis
             ),
           ]
         : null;
+    });
 
     // The cached "out of date" answer is stale the moment this succeeds, and
     // leaving the button red after a successful update reads as a failure.
@@ -493,19 +523,78 @@ export function parseComposeImages(stdout: string): Map<string, ComposeImage> | 
  */
 async function getServiceImageIds(
   projectName: string | null,
-  composeFile: string
+  composeArgs: string
 ): Promise<Map<string, ComposeImage> | null> {
   if (!projectName) {
     return null;
   }
   try {
     const { stdout } = await executeCommand(
-      `docker compose -p ${projectName} -f ${composeFile} images --format json`,
+      `docker compose -p ${projectName} ${composeArgs} images --format json`,
       30_000
     );
     return parseComposeImages(stdout);
   } catch {
     return null;
+  }
+}
+
+/**
+ * After a pull + recreate, record the exact digest of each image compose now
+ * resolves for the service into the managed override file, so the next fresh
+ * clone lands on the same images. Best-effort: a service whose digest can't be
+ * read is left unpinned (it just floats on its tag, as before this existed).
+ * Images built locally (`build:`) and refs already pinned to a digest in the
+ * base compose file are skipped.
+ */
+async function pinPulledImages(
+  serviceName: string,
+  projectName: string | null,
+  appDir: string,
+  composeFile: string
+): Promise<void> {
+  if (!projectName) {
+    return;
+  }
+  let config: { services?: Record<string, { image?: unknown; build?: unknown }> };
+  try {
+    const { stdout } = await executeCommand(
+      `docker compose -p ${projectName} -f ${composeFile} config --format json`,
+      30_000
+    );
+    config = JSON.parse(stdout);
+  } catch (error) {
+    logger.warn('Could not read compose config to pin images', { serviceName, error: (error as Error).message });
+    return;
+  }
+
+  const pins = new Map<string, string | null>();
+  for (const [composeService, def] of Object.entries(config.services ?? {})) {
+    if (!def || typeof def.image !== 'string' || def.build) {
+      continue;
+    }
+    const ref = parseImageRef(def.image);
+    if (!ref || ref.pinned) {
+      continue;
+    }
+    let repoDigests: string[] = [];
+    try {
+      const { stdout } = await executeCommand(
+        `docker image inspect ${def.image} --format '{{json .RepoDigests}}'`,
+        15_000
+      );
+      repoDigests = JSON.parse(stdout);
+    } catch {
+      continue;
+    }
+    const digest = pickLocalDigest(repoDigests, ref.repository);
+    if (digest) {
+      pins.set(composeService, `${def.image}@${digest}`);
+    }
+  }
+
+  if (pins.size) {
+    writeImagePins(appDir, pins);
   }
 }
 
@@ -518,7 +607,12 @@ export async function stopService(serviceName: string, userId: number): Promise<
   }
 
   const resolved = resolveComposeFile(serviceName);
-  const { projectName, appDir, composeFile } = resolved ?? { projectName: null, appDir: '', composeFile: null };
+  const { projectName, appDir, composeFile, composeArgs } = resolved ?? {
+    projectName: null,
+    appDir: '',
+    composeFile: null,
+    composeArgs: '',
+  };
 
   if (!composeFile) {
     throw {
@@ -534,7 +628,7 @@ export async function stopService(serviceName: string, userId: number): Promise<
     logger.info(`Stopping service: ${serviceName}`, { userId, service: serviceName });
 
     // Execute docker compose down
-    const command = `docker compose -p ${projectName} -f ${composeFile} down`;
+    const command = `docker compose -p ${projectName} ${composeArgs} down`;
     const result = await executeCommand(command, 60000); // 60s timeout for shutdown
 
     // Log the successful operation
@@ -597,7 +691,12 @@ export async function restartService(serviceName: string, userId: number): Promi
   }
 
   const resolved = resolveComposeFile(serviceName);
-  const { projectName, appDir, composeFile } = resolved ?? { projectName: null, appDir: '', composeFile: null };
+  const { projectName, appDir, composeFile, composeArgs } = resolved ?? {
+    projectName: null,
+    appDir: '',
+    composeFile: null,
+    composeArgs: '',
+  };
 
   if (!composeFile) {
     throw {
@@ -626,7 +725,7 @@ export async function restartService(serviceName: string, userId: number): Promi
   try {
     logger.info(`Restarting service: ${serviceName}`, { userId, service: serviceName });
 
-    const result = await composeUpWithManagedConfig(serviceName, projectName, appDir, composeFile, {
+    const result = await composeUpWithManagedConfig(serviceName, projectName, appDir, composeArgs, {
       forceRecreate: true,
     });
 

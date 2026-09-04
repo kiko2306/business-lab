@@ -130,7 +130,7 @@ async function reconcileHomeAssistantProxyConfig(serviceName: string): Promise<v
   // HA's own image + volume mounts, entrypoint overridden so HA never boots —
   // this only edits the bind-mounted /config as root. `--rm` cleans up.
   const command =
-    `docker compose -p ${resolved.projectName} -f ${resolved.composeFile} run --rm --no-deps -T ` +
+    `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
     `--entrypoint /bin/sh home-assistant -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
 
   const output = await run(command);

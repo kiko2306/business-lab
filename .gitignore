@@ -37,6 +37,14 @@ apps/nginx-proxy-manager/crowdsec-bouncer/crowdsec-nginx-bouncer.conf
 # (services/n8nWorkflows.ts) — runtime state. Keep the directory (.gitkeep).
 apps/n8n/workflows/*.json
 
+# Per-app image pins written by the dashboard's Update button
+# (services/composeOverride.ts) — points the app at the exact digest last
+# pulled. Runtime state, per-host; the base docker-compose.yml is the spec.
+apps/*/docker-compose.override.yml
+apps/*/compose.override.yml
+apps/*/compose.override.yaml
+apps/*/docker-compose.override.yaml
+
 # Node modules
 node_modules/
 */node_modules/

@@ -103,6 +103,19 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     return `Newer image${images.length === 1 ? '' : 's'} available: ${images.join(', ')}`;
   }
 
+  /** The Update button pinned this app to a specific image digest (§131.4). */
+  protected pinned(): boolean {
+    return (this.service.pinnedImages?.length ?? 0) > 0;
+  }
+
+  protected pinnedTitle(): string {
+    return `Pinned to ${(this.service.pinnedImages ?? []).join(', ')} — Unpin to follow the compose-file tags again`;
+  }
+
+  protected unpin(): void {
+    this.serviceState.unpinService(this.service.name);
+  }
+
   requestAction(action: ServiceAction): void {
     // An update pulls and recreates, so it produces exactly the output a start
     // does — and is the one most worth watching, since a new image is the most

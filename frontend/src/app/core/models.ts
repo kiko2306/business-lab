@@ -106,6 +106,10 @@ export interface ServiceStatus {
   // has never been checked, which is not the same thing.
   updateImages?: string[];
   updateCheckedAt?: string | null;
+  // Image refs the Update button pinned into the app's managed
+  // docker-compose.override.yml (`repo:tag@sha256:…`). Non-empty means the app
+  // is frozen on that build until "Unpin".
+  pinnedImages?: string[];
   ports?: ServicePortMapping[];
   exposedHostname?: string | null;
   // URL path suffix for the app's web UI when it isn't the bare root

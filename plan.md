@@ -14220,3 +14220,95 @@ talks to.
 - Still to write (small, docs-only, not blocking): a
   `docs/recovery-troubleshooting.md` or `docs/app-credentials.md` note that
   OnlyOffice co-editing state is non-persistent by design of the free image.
+
+## 176. §131.4 — the Update button does the full job (2026-09-04)
+
+§174 piece B. `executor.updateService` already pulled + recreated + reported
+per image (§133 fixed the "always says nothing changed" bug). Two things from
+the §131.4 brief were missing: it wasn't sequenced against the backup, and it
+left no record of *what* it moved the app to. Both added here, as one commit.
+
+### Maintenance lock — `services/maintenanceLock.ts`
+
+A single process-local serial lock. `withMaintenanceLock(label, fn)` chains
+`fn` after every previously-queued holder and resets the queue tail to a
+never-rejecting continuation, so one failed holder can't wedge it. Taken by:
+
+- `executor.updateService` — around the pull + recreate + repin.
+- `backupScheduler.runAppDataBackup` — around the whole dump-then-Duplicati
+  body (split into `runAppDataBackupLocked`).
+
+So a `docker compose up --force-recreate` can't land mid-`pg_dump` (§103's
+ordering rule, extended from "dump before Duplicati" to "no recreate during a
+dump"). Not a Postgres advisory lock: one backend process drives compose, and
+a DB lock only adds a stuck-after-crash failure mode. Unit-tested for ordering,
+result/rejection pass-through, and not-wedging-on-failure (3 tests).
+
+### Managed image pins — `services/composeOverride.ts`
+
+After a successful pull+recreate, `pinPulledImages` reads `docker compose …
+config --format json`, and for every service with a registry `image:` (not
+`build:`, not already digest-pinned in the base file) runs `docker image
+inspect … {{json .RepoDigests}}` and writes
+`services.<svc>.image: <repo>:<tag>@sha256:<digest>` into a managed
+`apps/<name>/docker-compose.override.yml`. A fresh clone (where the override,
+like `apps/*/data`, is gitignored) then recreates the exact images the last
+update verified, instead of whatever the tags point at that day.
+
+- The pull **clears** the pins first (`clearImagePins`) and runs against
+  `-f <base>` only, so it always fetches the base-file tag, never re-fetches a
+  pinned digest. Then it re-pins to what it got. This is what stops the
+  override freezing future updates.
+- `resolveComposeFile` now returns `composeArgs` — `-f <base>` plus
+  `-f <override>` when the file exists — because an explicit `-f` suppresses
+  Compose's own override discovery. Threaded through every command string that
+  acts on the project's containers: `composeUpWithManagedConfig` (start /
+  restart), `stopService` down, `getServiceImageIds`, and the `run --rm`
+  throwaways in `homeAssistantHacs` / `exposureConfigFiles`. Deliberately
+  **not** `imageUpdates.ts` — the daily sweep wants the base tag's registry
+  digest vs the running (pinned) digest, which it already gets via `docker
+  image inspect` on the tag; adding the override there would change nothing.
+- Unit-tested (`composeOverride.test.ts`, 7 tests): header + YAML shape, merge,
+  single-pin clear with `null`, file removed when empty, unparseable file
+  treated as no pins, absent file.
+
+### Unpin
+
+`POST /api/services/:name/update/unpin` → `clearImagePins` + `restartService`
+when running, so the app drops back to its compose-file tags immediately.
+Status payload gains `pinnedImages: string[]` (from `composeOverride.pinnedImages`).
+Service card shows a "📌 pinned to a fixed image" note and an **Unpin** button
+(both only when pinned); `service-state.service.ts` gains `unpinService`.
+
+### `.gitignore`
+
+`apps/*/docker-compose.override.yml` (+ the three other override filenames
+Compose accepts) — per-host runtime state, the base `docker-compose.yml` stays
+the spec.
+
+### Verified
+
+- Backend `npm run typecheck` clean; suite **441/441** (+9: maintenanceLock 3,
+  composeOverride 7 — minus a couple absorbed). Frontend `npm run build` clean.
+- **Against the live stack**: ran the exact command sequence `updateService`
+  builds against the real Docker daemon for `dozzle` — `pull` + `up -d
+  --force-recreate` (base only), read `config`/`RepoDigests`, wrote the
+  override pinning `amir20/dozzle:latest@sha256:7f01…`, then confirmed
+  `config` / `images` / `up -d` / `down` all accept `-f base -f override` and
+  resolve the digest pin; a second `up -d` with both `-f` is a no-op (stable
+  after the one config-hash recreate); unpin (rm override + force-recreate
+  base-only) returned the app to `amir20/dozzle:latest`, running. dozzle left
+  in its original unpinned state.
+- Backend image rebuilt and the service recreated (not a root `compose
+  down`); `/version` reports `0.13.0`, `POST …/update/unpin` is auth-gated
+  (401, not 404), Homepage `services.yaml` regenerated fine through the
+  changed `resolveComposeFile`.
+- Not exercised through the authenticated API on this host (no dashboard
+  creds available to an agent session, and resetting live auth mid-session is
+  not worth it): the route layer is thin and typechecked, the audit write is
+  the standard helper, and the Docker-touching mechanism — the part that has
+  burned this project before — is proven above.
+
+Minor bump 0.12.0 → 0.13.0 (user-facing behaviour change). README "Update
+button does the full job" item deleted; "Dashboard self-update panel" stays
+(separate feature).

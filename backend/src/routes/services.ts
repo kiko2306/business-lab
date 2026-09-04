@@ -10,7 +10,8 @@ import { requireCapability } from '../middleware/requireCapability';
 import * as executor from '../services/executor';
 import * as status from '../services/status';
 import { createStreamTicket } from '../services/realtime';
-import { getPublishedUpstreamPort, getService, isValidServiceName } from '../config/services';
+import { getPublishedUpstreamPort, getService, isValidServiceName, resolveComposeFile } from '../config/services';
+import { clearImagePins, pinnedImages } from '../services/composeOverride';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { deprovisionServiceExposure, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { syncAutheliaAccessControlSafe } from '../services/autheliaAccessControl';
@@ -177,6 +178,68 @@ router.post(
         service: serviceName,
         message: httpError.message,
         details: httpError.details,
+      });
+    }
+  }
+);
+
+/**
+ * POST /api/services/:name/update/unpin
+ * Drop the managed docker-compose.override.yml image pins the Update button
+ * wrote, so the app floats back to the tags in its base compose file. Recreates
+ * the container when it is running so the change takes effect now.
+ */
+router.post(
+  '/:name/update/unpin',
+  serviceLimiter,
+  auth,
+  requireCapability('apps:control'),
+  validateParams(schemas.serviceNameParam),
+  validateServiceAllowlist,
+  async (req: Request, res: Response) => {
+    const serviceName = req.params.name;
+    const userId = req.user!.id;
+
+    try {
+      const resolved = resolveComposeFile(serviceName);
+      if (!resolved?.appDir || !resolved.composeFile) {
+        return res.status(404).json({ error: 'Service is not installed', service: serviceName });
+      }
+
+      const had = pinnedImages(resolved.appDir).size;
+      clearImagePins(resolved.appDir);
+      await writeAuditLog({
+        userId,
+        action: 'service_update_unpin',
+        resource: serviceName,
+        result: 'success',
+        metadata: { hadPins: had },
+      }).catch(() => {});
+
+      let recreated = false;
+      if (had) {
+        const state = (await status.getServiceStatus(serviceName)).state;
+        if (state === 'running') {
+          await executor.restartService(serviceName, userId);
+          recreated = true;
+        }
+      }
+
+      return res.json({
+        success: true,
+        service: serviceName,
+        message: had
+          ? `Cleared ${had} image pin${had === 1 ? '' : 's'}${recreated ? ' and recreated the container' : ''}.`
+          : 'No image pins to clear.',
+        recreated,
+      });
+    } catch (error) {
+      const httpError = error as HttpError;
+      logger.error(`Unpin failed: ${serviceName}`, { userId, error: httpError.message });
+      return res.status(httpError.statusCode || 500).json({
+        error: 'Failed to unpin service images',
+        service: serviceName,
+        message: httpError.message,
       });
     }
   }

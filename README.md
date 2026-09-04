@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.12.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.13.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -206,11 +206,6 @@ it is done — not ticked off and left behind. Section references point at
 
 Updates:
 
-- [ ] **Update button does the full job** (§131.4) — rewrite the app's image
-      tag, `docker compose pull`, `up -d` to recreate; per-app result;
-      sequenced through the safe backup path (§103). Compose files are
-      read-only to the backend, so this needs a managed tag-override
-      mechanism, not an in-place compose edit.
 - [ ] **Dashboard self-update panel** (§131.4) — separate from the version
       display: current version/commit vs `origin/main`; a confirm-gated button
       that runs `git pull` and restarts the management services individually
