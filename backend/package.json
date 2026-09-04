@@ -1,6 +1,6 @@
 {
   "name": "homelab-backend",
-  "version": "0.27.0",
+  "version": "0.27.1",
   "description": "Homelab management API server",
   "license": "GPL-3.0-or-later",
   "main": "dist/index.js",

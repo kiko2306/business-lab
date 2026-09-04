@@ -11,6 +11,14 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.27.1] — 2026-09-04
+
+### Changed
+
+- **Internal: `guacamoleClient.ts` gained user create/get/enable-disable**
+  (§200 slice 2) — no user-facing effect yet, nothing calls it until slice 3
+  wires it into an actual sync.
+
 ## [0.27.0] — 2026-09-04
 
 ### Added

@@ -16317,3 +16317,43 @@ version-locked to the exact webapp build, and `:latest` could drift under it
 silently). Added a README item rather than leaving it undiscoverable: moving
 Guacamole to a newer release now needs a human to check upstream and bump
 the pin by hand, re-verifying the extension jar version alongside it.
+
+## 206. §200 slice 2 done — guacamoleClient.ts gains user create/get/enable-disable
+
+Extended `guacamoleClient.ts` (built for slice 1) rather than starting a new
+file, per the README item's own framing. Three additions, all read from the
+`guacamole-client` source at the pinned `1.6.0` tag rather than assumed —
+same discipline as slice 1, since this drives real account creation:
+
+- `guacamoleGetUser` — `GET .../users/{username}`, null on a 404.
+- `guacamoleCreateUser` — `POST .../users`, always enabled, no attributes.
+  Connection/permission grants stay the manual Guacamole-UI step §200
+  scoped out from the start.
+- `guacamoleSetUserDisabled` — GET-modify-PUT. The one thing worth getting
+  right here: `disabled` is a real top-level boolean on Guacamole's user
+  object (`APIUser.isDisabled()`), not an attribute, but Guacamole's PUT is
+  a full replace, not a patch — a blind `{username, disabled}` body with no
+  `attributes` would silently wipe whatever attributes existed (full name,
+  email, valid-from/until, etc.), even though nothing here ever sets them.
+  So it fetches the current object first and echoes its `attributes` back
+  unchanged. Also a no-op when the user already has the wanted disabled
+  state, so slice 3's sync can call it unconditionally every pass without
+  writing on every no-change tick.
+
+**Verified live**, same throwaway-container approach as §204 (still can't
+recreate the live backend — §198's `REPO_ROOT` gap is unchanged). Logged in
+as `guacadmin` with the password §204 rotated, then round-tripped a real
+test account end to end against the live Guacamole on `tx-home-utils.com`:
+created `hlm-slice2-proof` → confirmed it didn't exist beforehand → the new
+account could log in with its own password → disabled it → confirmed the
+disabled account's login was rejected → re-enabled it → confirmed it could
+log in again → deleted it via a raw API call (not part of the shipped
+client — slice 2 doesn't add delete, cleanup only). Every step matched what
+the code claims. Backend `npm run typecheck` + `npm test` (52 files, 553
+tests, 16 new in `guacamoleClient.test.ts`) green. Version bumped to
+`0.27.1` — patch, not minor: nothing calls these functions yet, so there is
+no user-facing effect until slice 3 wires them into a real sync.
+
+**Next**: slice 3, `guacamoleSync.ts` — the actual policy (which dashboard
+users get a Guacamole account) and the trigger wiring, mirroring
+`autheliaSync.ts`.
