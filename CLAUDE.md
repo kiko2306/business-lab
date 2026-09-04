@@ -68,30 +68,22 @@ source of truth. Nothing loads the file automatically anyway.
 
 ## Commands
 
-**There is no Node on this host** — everything runs in containers. Mount the
-repo root (not just the workspace: some tests resolve paths up to it) and run
-the workspace script inside `node:20`:
+**There is no Node on this host** — everything runs in containers. Use
+`./scripts/check.sh <backend|frontend> <test|typecheck|build>`, e.g.
+`./scripts/check.sh backend test` or `./scripts/check.sh frontend test`. It
+resolves the repo root itself, so it works even if the shell's cwd has
+drifted into `backend/` or `frontend/` — mounting `$PWD` directly breaks
+there, since some backend tests resolve paths up to the repo root, not just
+their own workspace. `frontend test` builds the `homelab-frontend-test`
+image on first use if it's missing (Karma/Jasmine + headless Chrome doesn't
+run on plain `node:20` — no Chrome, and `node:20`'s Debian base is missing
+the shared libraries headless Chrome needs). `./scripts/smoke-tests.sh` runs
+on the host against an already-running backend.
 
-```bash
-docker run --rm -v "$PWD":/repo -w /repo/backend node:20 npm test
-```
-
-Swap `npm test` for `npm run typecheck`, or `-w /repo/frontend` with
-`npm run build`. `./scripts/smoke-tests.sh` runs on the host against an
-already-running backend.
-
-`npm run test:ci` (frontend, Karma/Jasmine + headless Chrome) does **not**
-work against plain `node:20`: Chrome isn't installed, and even installed,
-`node:20`'s Debian base is missing the shared libraries headless Chrome needs
-(`libnss3` etc). Build the test image once — `docker build -t
-homelab-frontend-test -f frontend/Dockerfile.test frontend` — then:
-
-```bash
-docker run --rm -v "$PWD":/repo -w /repo/frontend homelab-frontend-test npm run test:ci
-```
-
-Rebuild the image if `frontend/package-lock.json`'s `puppeteer` version
-changes (`Dockerfile.test` pins a matching Chrome download).
+Rebuild `homelab-frontend-test` (`docker build -t homelab-frontend-test -f
+frontend/Dockerfile.test frontend`) if `frontend/package-lock.json`'s
+`puppeteer` version changes (`Dockerfile.test` pins a matching Chrome
+download).
 
 CI (`.github/workflows/ci.yml`) runs backend typecheck+test, frontend
 test:ci+build, `apps/price-compare/app` tests, and the browser E2E job

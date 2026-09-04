@@ -17737,3 +17737,25 @@ remember.
 Nothing else in the file automates further: `/compact`/`/clear` boundaries,
 queue classification (A/B/C), and the handoff prompts all require judgment
 about what to do next, not just fetching or regenerating files.
+
+## 234. `scripts/check.sh` wraps the Docker test/typecheck/build commands (2026-09-04)
+
+CLAUDE.md's Commands section had operators retype long `docker run --rm -v
+"$PWD":/repo -w /repo/<workspace> ...` invocations, and `$PWD` silently
+mounts the wrong tree if the shell's cwd has drifted into `backend/` or
+`frontend/` mid-session (hit before — see the `backend-test-mount-absolute-path`
+memory). Not a candidate for a hook (these take real time — a build, a test
+run — so auto-firing on every edit would cost more than it saves), but a
+one-word wrapper removes both the retyping and the drift bug.
+
+Added `scripts/check.sh`, following `plan-index.sh`'s pattern of resolving
+its own root via `BASH_SOURCE` rather than `$PWD`:
+
+- `./scripts/check.sh backend test|typecheck`
+- `./scripts/check.sh frontend build|test` — `test` builds the
+  `homelab-frontend-test` image on first use if missing.
+
+Proved from a drifted cwd (`cd backend && ../scripts/check.sh backend
+typecheck`) — passes, where the old `$PWD` mount would have silently mounted
+only `backend/`. Updated CLAUDE.md's Commands section to point at it instead
+of the raw `docker run` lines.
