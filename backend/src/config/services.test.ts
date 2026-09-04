@@ -2,7 +2,13 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
-import { SERVICES, buildExposureHostname, extractComposeEnvVars, getPublishedUpstreamPort } from './services';
+import {
+  SERVICES,
+  buildExposureHostname,
+  extractComposeEnvVars,
+  getPublishedUpstreamPort,
+  isAutheliaProtectionRequired,
+} from './services';
 
 describe('extractComposeEnvVars', () => {
   it('treats a bare ${VAR} as required', () => {
@@ -302,6 +308,18 @@ describe('homepage apex exposure', () => {
     expect(apex).toBeDefined();
     expect(apex?.suffix).toBeUndefined();
     expect(apex?.portEnvVar).toBe('HOMEPAGE_PORT');
+  });
+});
+
+describe('Authelia login is mandatory by default', () => {
+  it('exempts only Home Page and Authelia itself', () => {
+    expect(isAutheliaProtectionRequired('homepage')).toBe(false);
+    expect(isAutheliaProtectionRequired('authelia')).toBe(false);
+  });
+
+  it('requires it for every other exposed app, regardless of any stored state', () => {
+    expect(isAutheliaProtectionRequired('paperless')).toBe(true);
+    expect(isAutheliaProtectionRequired('vaultwarden')).toBe(true);
   });
 });
 

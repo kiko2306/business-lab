@@ -226,6 +226,12 @@ export interface ServiceDefinition {
   // editor Nextcloud embeds, but it is infrastructure, not a destination.
   // The `homepage.*` labels stay mandatory regardless (services.test.ts).
   hideFromHomePage?: boolean;
+  // Every exposed app requires an Authelia login by default — this flag is
+  // the named exception. Set on `homepage` (deliberately the public front
+  // door, plan.md §111) and `authelia` (it can't forward-auth-gate its own
+  // login page). Not user-configurable per app — see
+  // isAutheliaProtectionRequired in services.ts.
+  skipAutheliaProtection?: boolean;
   // This app serves a non-HTTP LAN protocol (Samba/SMB on 445) that the
   // Cloudflare Tunnel + Nginx Proxy Manager path cannot carry (§0 principle
   // 1). It publishes a host port, so getPublishedUpstreamPort would otherwise
@@ -343,7 +349,6 @@ export interface ServiceExposureRow {
   upstream_host: string | null;
   upstream_port: number | null;
   websocket: boolean;
-  authelia_protected: boolean;
   npm_host_id: number | null;
   cf_hostname_id: string | null;
   status: string;
@@ -353,7 +358,6 @@ export interface ServiceExposureRow {
 
 export interface ServiceExposureInput {
   enabled: boolean;
-  autheliaProtected?: boolean;
 }
 
 export interface ExposureProvisionResult {

@@ -16025,3 +16025,53 @@ hand, and drive it from the dashboard's `users` table the same way
 a provisioned account can see. That stays a manual Guacamole-UI step per
 machine, same reasoning as §199's original SSO discussion — those are
 per-machine credentials, not dashboard-owned state.
+
+## 201. Authelia login mandatory by default, per-app toggle removed
+
+The per-app "Require Authelia login" checkbox (`service_exposure.authelia_protected`,
+default `FALSE`) meant every newly-exposed app was reachable with no SSO gate
+until someone remembered to flip a switch — the opposite of what a system
+built on "no console configuration, everything through the dashboard" wants,
+and a stale/never-toggled row was a silent security gap, not a loud one.
+
+Requested directly: make Authelia protection an always-on fixed policy for
+every exposed app, except the Home Page (deliberately the public front door,
+§111) and the dashboard (which was never in scope — it has no entry in
+`services.ts` and never had this toggle to begin with).
+
+**What changed:**
+
+- Added `skipAutheliaProtection?: boolean` to `ServiceDefinition`
+  (`backend/src/types/index.ts`), next to the existing `hideFromHomePage`
+  flag. Set `true` on `homepage` and `authelia` (`backend/src/config/services.ts`).
+- New `isAutheliaProtectionRequired(name)` in `services.ts` — the single
+  place this is decided, always computed from the registry, never read from
+  storage.
+- `exposure.ts`: `provisionHostname`'s `autheliaProtected` now comes from
+  `isAutheliaProtectionRequired(serviceName)` instead of a stored column or
+  the ad hoc `serviceName === 'authelia'` special case.
+  `upsertServiceExposureConfig` no longer accepts a client-supplied
+  `autheliaProtected` — the input type (`ServiceExposureInput`) only carries
+  `enabled` now.
+- Dropped `service_exposure.authelia_protected` entirely: removed from
+  `init.sql`, and a new `dropServiceExposureAutheliaColumn()` migration
+  (`backend/src/utils/database.ts`, run from `index.ts` after
+  `ensureServiceExposureTable`) drops it from any existing database. It was
+  dead weight once the decision is computed, not stored — no risk of a row
+  drifting out of sync with the policy again.
+- `userAppAccess.ts`'s `getAppAccessOptions()` query changed from
+  `authelia_protected = TRUE AND service_name <> 'authelia'` to
+  `service_name NOT IN ('authelia', 'homepage')` — same two named
+  exceptions, no column dependency.
+- Frontend: deleted the "Require Authelia login" checkbox from
+  `service-card.component.html`/`.ts`; `autheliaProtected` removed from
+  `ServiceExposureConfig`/`ServiceExposureUpdate` (`core/models.ts`).
+- Docs updated: `docs/app-credentials.md`, `docs/first-run.md`,
+  `docs/webmaster.md` — all described the old toggle, now describe the fixed
+  policy.
+
+**Verified:** backend typecheck + `npm test` (530 tests, including two new
+ones in `services.test.ts` asserting `homepage`/`authelia` are exempt and an
+arbitrary app isn't) — all green. Frontend `npm run test:ci` (50 tests) and
+`npm run build` — all green. Version bumped to 0.26.0 (behavioural change to
+`backend/src`/`frontend/src`).

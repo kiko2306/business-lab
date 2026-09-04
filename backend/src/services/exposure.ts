@@ -22,7 +22,7 @@ import { parseEnvFile } from '../utils/envFile';
 import { query } from '../utils/database';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
-import { SERVICES, buildExposureHostname, getPublishedUpstreamPort, getService } from '../config/services';
+import { SERVICES, buildExposureHostname, getPublishedUpstreamPort, getService, isAutheliaProtectionRequired } from '../config/services';
 import { deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
@@ -46,7 +46,7 @@ export async function getServiceExposureRow(serviceName: string): Promise<Servic
 
 export async function upsertServiceExposureConfig(
   serviceName: string,
-  { enabled, autheliaProtected }: ServiceExposureInput
+  { enabled }: ServiceExposureInput
 ): Promise<ServiceExposureRow> {
   // Some services (e.g. tailscale — a VPN client sidecar with no web UI,
   // no `ports:` in its compose file at all) have nothing a reverse proxy
@@ -80,16 +80,15 @@ export async function upsertServiceExposureConfig(
   // provisionServiceIfEnabled) rather than entered by the user; left
   // unset here and populated on the next successful service start.
   const result = await query<ServiceExposureRow>(
-    `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, authelia_protected, status, updated_at)
-     VALUES ($1, $2, $3, $4, $5, $6, 'not_provisioned', NOW())
+    `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, status, updated_at)
+     VALUES ($1, $2, $3, $4, $5, 'not_provisioned', NOW())
      ON CONFLICT (service_name)
      DO UPDATE SET
        enabled = EXCLUDED.enabled,
        hostname = EXCLUDED.hostname,
-       authelia_protected = EXCLUDED.authelia_protected,
        updated_at = NOW()
      RETURNING *`,
-    [serviceName, enabled, hostname, UPSTREAM_SCHEME, ALLOW_WEBSOCKET_UPGRADE, Boolean(autheliaProtected)]
+    [serviceName, enabled, hostname, UPSTREAM_SCHEME, ALLOW_WEBSOCKET_UPGRADE]
   );
   return result.rows[0];
 }
@@ -102,8 +101,8 @@ export async function upsertServiceExposureConfig(
  */
 async function ensureSecondaryExposureRow(exposureKey: string, hostname: string): Promise<ServiceExposureRow> {
   const result = await query<ServiceExposureRow>(
-    `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, authelia_protected, status, updated_at)
-     VALUES ($1, true, $2, $3, $4, false, 'not_provisioned', NOW())
+    `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, status, updated_at)
+     VALUES ($1, true, $2, $3, $4, 'not_provisioned', NOW())
      ON CONFLICT (service_name)
      DO UPDATE SET hostname = EXCLUDED.hostname, updated_at = NOW()
      RETURNING *`,
@@ -546,9 +545,7 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
     hostname,
     upstreamPort: getPublishedUpstreamPort(serviceName, serviceDef?.exposurePortEnvVar),
     existingNpmHostId: exposureRow.npm_host_id,
-    // Authelia can't gate itself — the auth_request call would loop back
-    // into its own unauthenticated login page.
-    autheliaProtected: serviceName === 'authelia' ? false : exposureRow.authelia_protected,
+    autheliaProtected: isAutheliaProtectionRequired(serviceName),
     grpc: false,
     globalConfig,
     originUrl,

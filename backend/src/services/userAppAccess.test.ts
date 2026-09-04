@@ -44,13 +44,12 @@ describe('getAppAccessOptions', () => {
     ]);
   });
 
-  it('only asks for exposed, Authelia-protected apps and never Authelia itself', async () => {
+  it('only asks for exposed apps, excluding Home Page and Authelia itself', async () => {
     query.mockResolvedValue({ rows: [] });
     await getAppAccessOptions();
     const sql = query.mock.calls[0][0] as string;
     expect(sql).toMatch(/enabled = TRUE/);
-    expect(sql).toMatch(/authelia_protected = TRUE/);
-    expect(sql).toMatch(/service_name <> 'authelia'/);
+    expect(sql).toMatch(/service_name NOT IN \('authelia', 'homepage'\)/);
   });
 
   it('falls back to the service name when the registry has no entry', async () => {

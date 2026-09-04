@@ -82,8 +82,8 @@ Forward-auth is done **inside the stack** by Nginx Proxy Manager + Authelia,
 not by Cloudflare Access. You normally configure no Cloudflare Access
 policies. If you do put Cloudflare Access in front of a hostname, it stacks on
 top of Authelia — the user then passes two gates, which is rarely what anyone
-wants. Leave access control to the IT administrator's "Require Authelia login"
-toggle unless there is a specific reason not to.
+wants. Every exposed app is gated by Authelia automatically (Home Page is the
+only exception); there is no per-app toggle to leave alone or turn off.
 
 ## OnlyOffice: expose it, or keep Nextcloud LAN-only too
 

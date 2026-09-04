@@ -70,7 +70,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   protected exposure: ServiceExposureConfig | null = null;
 
   protected exposureEnabled = false;
-  protected exposureAutheliaProtected = false;
 
   protected envLoading = false;
   protected envSaving = false;
@@ -425,7 +424,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
         next: (config) => {
           this.exposure = config;
           this.exposureEnabled = config.enabled;
-          this.exposureAutheliaProtected = config.autheliaProtected;
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load exposure configuration.')),
       });
@@ -436,7 +434,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     this.operations
       .updateServiceExposure(this.service.name, {
         enabled: this.exposureEnabled,
-        autheliaProtected: this.exposureAutheliaProtected,
       })
       .pipe(finalize(() => (this.exposureSaving = false)))
       .subscribe({

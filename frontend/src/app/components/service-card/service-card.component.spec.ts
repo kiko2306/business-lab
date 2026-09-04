@@ -138,7 +138,7 @@ describe('ServiceCardComponent per-app backups', () => {
     ]);
     operations.listAppBackups.and.returnValue(of({ items: [] }));
     operations.getServiceExposure.and.returnValue(
-      of({ enabled: false, autheliaProtected: false, exposable: false } as unknown as ServiceExposureConfig)
+      of({ enabled: false, exposable: false } as unknown as ServiceExposureConfig)
     );
     operations.getServiceEnv.and.returnValue(of({ fields: [] } as unknown as ServiceEnvStatus));
     confirm = jasmine.createSpyObj('ConfirmService', ['ask']);

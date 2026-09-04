@@ -21,7 +21,7 @@ import {
   ensureUserAppAccessSchema,
   ensureUserInvitationsSchema,
   ensureServiceExposureTable,
-  ensureServiceExposureAutheliaColumn,
+  dropServiceExposureAutheliaColumn,
   ensureTotpSchema,
 } from './utils/database';
 import authMiddleware from './middleware/auth';
@@ -186,12 +186,11 @@ ensureUserAppAccessSchema()
   .catch((err: Error) => {
     console.error('Unable to ensure the user app-access / invitations schema:', err.message);
   });
-ensureServiceExposureTable().catch((err: Error) => {
-  console.error('Unable to ensure service_exposure table:', err.message);
-});
-ensureServiceExposureAutheliaColumn().catch((err: Error) => {
-  console.error('Unable to ensure service_exposure.authelia_protected column:', err.message);
-});
+ensureServiceExposureTable()
+  .then(() => dropServiceExposureAutheliaColumn())
+  .catch((err: Error) => {
+    console.error('Unable to ensure service_exposure table:', err.message);
+  });
 ensureTotpSchema().catch((err: Error) => {
   console.error('Unable to ensure TOTP schema:', err.message);
 });

@@ -242,13 +242,16 @@ export async function ensureServiceExposureTable(): Promise<void> {
 }
 
 /**
- * Add the `authelia_protected` column to `service_exposure` on databases
- * created before Authelia forward-auth support was added. No-op on fresh
- * installs, since init.sql already creates it.
+ * Drop the `authelia_protected` column from `service_exposure` on databases
+ * that still carry it from when Authelia protection was a per-app toggle.
+ * It's now a fixed policy (every exposed app except Home Page and Authelia
+ * itself — see isAutheliaProtectionRequired in config/services.ts), computed
+ * rather than stored, so the column is dead weight. No-op on fresh installs,
+ * since init.sql no longer creates it.
  */
-export async function ensureServiceExposureAutheliaColumn(): Promise<void> {
+export async function dropServiceExposureAutheliaColumn(): Promise<void> {
   await query(`
     ALTER TABLE service_exposure
-    ADD COLUMN IF NOT EXISTS authelia_protected BOOLEAN NOT NULL DEFAULT FALSE
+    DROP COLUMN IF EXISTS authelia_protected
   `);
 }

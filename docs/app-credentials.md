@@ -108,16 +108,16 @@ Paperless' *document intake* over IMAP is also its own per-account setting
 
 ## No login of their own
 
-These have no authentication, or none enabled by default. **Every one should
-have "Require Authelia login" turned on when exposed** — that is their only
-gate.
+These have no authentication, or none enabled by default. Every exposed app
+gets an Authelia login automatically — that is their only gate, and it is no
+longer a per-app setting (Home Page is the sole exception: it's the
+deliberately public front door).
 
 | App | Why |
 |---|---|
 | **Web Terminal (wetty)** | Hands out a shell on the host. Authelia is the only thing between the internet and a root-capable session — it is not optional here. |
 | **Code Server** | Own web login enabled (`CODE_SERVER_PASSWORD`, auto-generated, hidden — read it from `apps/code-server/.env` if needed); Authelia additionally gates the tunnel hostname. |
 | **Dozzle** | Reads container logs, no auth. |
-| **Homepage** | Static dashboard. |
 | **Stirling PDF** | `SECURITY_ENABLELOGIN=false` by default; can be enabled instead. |
 | **Speedtest**, **Kitchen Switcher**, **Pantry**, **Price Compare** | No auth of their own. |
 | **ntfy** | Open by default; supports its own ACLs if you configure them. |

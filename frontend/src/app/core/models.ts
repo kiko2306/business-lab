@@ -241,14 +241,12 @@ export interface ServiceExposureConfig {
   upstreamHost: string | null;
   upstreamPort: number | null;
   websocket: boolean;
-  autheliaProtected: boolean;
   status: string;
   lastError: string | null;
 }
 
 export interface ServiceExposureUpdate {
   enabled: boolean;
-  autheliaProtected?: boolean;
 }
 
 export interface ServiceExposureVerifyResult {

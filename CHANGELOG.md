@@ -11,6 +11,19 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.26.0] — 2026-09-04
+
+### Changed
+
+- **Authelia login is now mandatory by default for every exposed app**,
+  instead of a per-app "Require Authelia login" toggle that defaulted off.
+  The toggle is removed from the UI; the policy is now fixed (and no longer
+  stored per app) via a `skipAutheliaProtection` registry flag, set only on
+  the Home Page (deliberately the public front door) and Authelia itself (it
+  can't forward-auth-gate its own login). The now-unused
+  `service_exposure.authelia_protected` column is dropped by a startup
+  migration.
+
 ## [0.25.0] — 2026-09-04
 
 ### Added

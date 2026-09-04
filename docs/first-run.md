@@ -157,8 +157,8 @@ look like unrelated bugs:
 1. **Nginx Proxy Manager** — every public hostname is served through it, so
    nothing can be exposed until it runs. Log in and change its default
    credentials immediately (see [app-credentials.md](app-credentials.md)).
-2. **Authelia** — the login gate in front of protected apps. Anything with
-   "Require Authelia login" enabled returns errors until Authelia is up, and
+2. **Authelia** — the login gate in front of every exposed app but Home
+   Page. Anything you expose returns errors until Authelia is up, and
    NetBird refuses to start at all without it.
 3. **Everything else**, in any order.
 
@@ -167,8 +167,9 @@ look like unrelated bugs:
 - Start it from the dashboard.
 - Set any config it needs (the dashboard pre-fills generated secrets — just
   save).
-- Turn on **Publicly expose this service**, and **Require Authelia login**
-  unless the app has its own solid authentication.
+- Turn on **Publicly expose this service**. Authelia protection is applied
+  automatically — there's nothing to toggle, except for Home Page, which
+  stays public by design.
 
 Exposure provisioning creates the NPM proxy host, the tunnel ingress rule and
 the DNS record automatically. Turning exposure off removes all three.

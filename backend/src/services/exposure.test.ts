@@ -15,6 +15,7 @@ vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn() }));
 vi.mock('../config/services', () => ({
   getPublishedUpstreamPort: vi.fn(),
   getService: vi.fn(),
+  isAutheliaProtectionRequired: vi.fn().mockReturnValue(true),
   // Faithful stand-in for the real default behaviour (no exposureSubdomain
   // override); the override itself is unit-tested in config/services.test.ts.
   buildExposureHostname: (name: string, domain: string, suffix?: string, opts?: { apex?: boolean }) =>
@@ -62,7 +63,6 @@ function exposureRow(overrides: Partial<ServiceExposureRow> = {}): ServiceExposu
     upstream_host: null,
     upstream_port: null,
     websocket: true,
-    authelia_protected: false,
     npm_host_id: null,
     cf_hostname_id: null,
     status: 'not_provisioned',

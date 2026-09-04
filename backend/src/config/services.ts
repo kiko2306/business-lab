@@ -304,6 +304,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // sees this and adds <base-domain> to HOMEPAGE_ALLOWED_HOSTS alongside
     // homepage.<base-domain>, or gethomepage 400s the apex request.
     additionalExposures: [{ apex: true, label: 'Bare domain', portEnvVar: 'HOMEPAGE_PORT' }],
+    // The public front door (plan.md §111) — every other exposed app
+    // requires an Authelia login, this one deliberately doesn't.
+    skipAutheliaProtection: true,
   },
   'n8n': {
     backup: { engine: 'postgres', service: 'n8n-db' },
@@ -651,6 +654,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       'AUTHELIA_JWT_SECRET',
       'AUTHELIA_OIDC_HMAC_SECRET',
     ],
+    // Can't forward-auth-gate its own login page — the auth_request call
+    // would loop back into itself.
+    skipAutheliaProtection: true,
   },
   'kopia': {
     name: 'kopia',
@@ -994,6 +1000,16 @@ export function getService(name: string): ServiceDefinition | undefined {
 
 export function isValidServiceName(name: unknown): name is string {
   return typeof name === 'string' && Object.prototype.hasOwnProperty.call(SERVICES, name);
+}
+
+/**
+ * Whether a public exposure of this app should sit behind Authelia's
+ * forward-auth login. Every app does by default; `skipAutheliaProtection`
+ * is the only opt-out (Home Page and Authelia itself). Not a per-app
+ * setting — always computed, never stored.
+ */
+export function isAutheliaProtectionRequired(name: string): boolean {
+  return !getService(name)?.skipAutheliaProtection;
 }
 
 /**
