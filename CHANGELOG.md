@@ -11,6 +11,21 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.15.1] — 2026-09-04
+
+### Fixed
+
+- **OnlyOffice wiring: the LAN-only fallback produced a broken config**
+  (§180). §178 set `DocumentServerUrl` to the plain-HTTP gateway URL whenever
+  OnlyOffice wasn't exposed — but the Nextcloud connector rejects a `http://`
+  document server on an `https://` page ("HTTPS address for ONLYOFFICE Docs is
+  required"). Now the gateway URL is only used when Nextcloud is *also*
+  LAN-only; a public Nextcloud with an unexposed OnlyOffice wires the internal
+  legs + secret, leaves `DocumentServerUrl` unset, and logs that OnlyOffice
+  must be exposed. New "OnlyOffice: expose it, or keep Nextcloud LAN-only too"
+  section in the webmaster runbook — including why a Cloudflare-Tunnel setup
+  has no "Cloudflare IP ranges" to restrict NPM to.
+
 ## [0.15.0] — 2026-09-04
 
 ### Added

@@ -14461,3 +14461,72 @@ README item now, not blocking.
 
 Minor bump 0.14.0 → 0.15.0. README "Wire ClamAV into Nextcloud and Paperless"
 item replaced with the narrower Paperless-only follow-up.
+
+## 180. §123.2/§178 — OnlyOffice exposure: what "harden" actually means, and a fallback bug (2026-09-04)
+
+The README "Harden OnlyOffice's exposure" item. Investigated §123.2's two
+questions and found the first premise doesn't fit this architecture and the
+"LAN-only mode" §178 assumed doesn't work as written.
+
+### "Restrict its NPM host to Cloudflare's IP ranges" — not applicable
+
+Traced the ingress path on the real deployment:
+
+- `exposure_npm_api_url = http://192.168.1.23:10270` → the tunnel origin is
+  `http://192.168.1.23:80` (the host **LAN IP**, NPM's HTTP port).
+- With a Cloudflare **Tunnel**, `cloudflared` (host systemd, §webmaster.md)
+  connects **outbound** to Cloudflare. **No Cloudflare edge IP ever connects
+  to NPM** — there is no range to allow-list.
+- NPM's `:80` on `0.0.0.0` therefore answers any `Host:` header from anywhere
+  on the LAN. Verified: `curl -H 'Host: onlyoffice.tx-home-utils.com'
+  http://<host>/healthcheck` → `200 true`, from the host and from a second
+  container via the gateway. This is true for **every** exposed app.
+- NPM's `:443` direct is already closed — `curl --resolve …:443:127.0.0.1`
+  hangs (`000`): no cert, no vhost, because Cloudflare terminates TLS and the
+  tunnel speaks plain HTTP to the origin.
+- Docker SNAT flattens the source IP, so a per-host NPM access list can't
+  distinguish `cloudflared` from a LAN client anyway.
+
+So there is no per-app NPM tweak that "restricts to Cloudflare". The residual
+LAN-bypass is estate-wide; fixing it (tunnel origin → loopback + bind NPM
+`80`/`443` to `127.0.0.1`) is outage-risky and its own README item now. The
+controls that **do** apply to OnlyOffice: `JWT_ENABLED=true` with the
+dashboard-generated shared secret (verified — `occ onlyoffice:documentserver
+--check` passes), `block_exploits` on every NPM host, and not exposing it when
+the deployment doesn't need it.
+
+### The §178 LAN-only fallback was broken for a public Nextcloud
+
+§178 set `DocumentServerUrl` to `http://<gateway>:<port>/` whenever OnlyOffice
+wasn't exposed. Tested that directly: set the connector's `DocumentServerUrl`
+to the internal URL and ran `occ onlyoffice:documentserver --check` →
+
+    Error connection: Mixed Active Content is not allowed.
+    HTTPS address for ONLYOFFICE Docs is required.
+
+Nextcloud's connector refuses a plain-HTTP document server when Nextcloud
+itself is HTTPS. So the fallback is only valid when Nextcloud is **also**
+LAN-only (HTTP). Fixed `buildNextcloudOnlyOfficePlan`:
+
+| Nextcloud | OnlyOffice | `DocumentServerUrl` |
+|---|---|---|
+| public | exposed | `https://<oo-host>/` (unchanged) |
+| LAN-only | LAN-only | `http://<gateway>:<port>/` |
+| public | LAN-only | **null** — script skips the `DocumentServerUrl` line, still wires the internal legs + secret, logs a warning to expose OnlyOffice |
+
+`NextcloudOnlyOfficePlan.documentServerUrl` is now `string | null`;
+`buildWiringScript` conditionally emits the line. New unit tests for the
+null case and the both-LAN-only case (468 pass). Documented the whole
+decision in `docs/webmaster.md` ("OnlyOffice: expose it, or keep Nextcloud
+LAN-only too").
+
+### Verified
+
+- Backend `npm run typecheck` clean, suite 468/468.
+- Live: the internal-URL `--check` failure above (reverted immediately); the
+  exposed path still reports "successfully connected"; re-ran the reconcile
+  through the new code — OnlyOffice exposed here, so the `https://` branch,
+  config unchanged.
+
+Patch bump 0.15.0 → 0.15.1 (fixes a §178 regression). README item removed; a
+new "LAN can bypass Cloudflare on NPM's :80" item added under Exposure.

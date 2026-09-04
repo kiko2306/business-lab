@@ -65,6 +65,16 @@ describe('buildWiringScript', () => {
     expect(script).toContain('jwt_secret --value "$OO_JWT_SECRET"');
     expect(script).not.toContain('shhh-secret');
   });
+
+  it('omits DocumentServerUrl (but still wires the rest) when there is no valid one', () => {
+    const noBrowserUrl = __test
+      .buildWiringScript(null, 'http://10.201.0.1:10460/', 'http://10.201.0.1:10260/')
+      .join('\n');
+    expect(noBrowserUrl).not.toContain('config:app:set onlyoffice DocumentServerUrl');
+    expect(noBrowserUrl).toContain('config:app:set onlyoffice DocumentServerInternalUrl');
+    expect(noBrowserUrl).toContain('jwt_secret --value "$OO_JWT_SECRET"');
+    expect(noBrowserUrl).toContain('expose OnlyOffice');
+  });
 });
 
 describe('buildNextcloudOnlyOfficePlan', () => {
@@ -85,9 +95,25 @@ describe('buildNextcloudOnlyOfficePlan', () => {
     });
   });
 
-  it('falls back to the internal gateway URL for the browser leg when OnlyOffice is LAN-only', async () => {
+  it('uses the internal gateway URL when both OnlyOffice and Nextcloud are LAN-only', async () => {
+    // beforeEach mocks every exposure row as null.
     const plan = await buildNextcloudOnlyOfficePlan();
     expect(plan?.documentServerUrl).toBe('http://10.201.0.1:10460/');
+  });
+
+  it('has no browser URL when OnlyOffice is LAN-only but Nextcloud is public (§180)', async () => {
+    mockedExposure.mockImplementation(async (name: string) =>
+      name === 'nextcloud'
+        ? ({ enabled: true, status: 'provisioned', hostname: 'cloud.example.com' } as Awaited<
+            ReturnType<typeof getServiceExposureRow>
+          >)
+        : null
+    );
+    const plan = await buildNextcloudOnlyOfficePlan();
+    expect(plan?.documentServerUrl).toBeNull();
+    // the internal legs + secret are still there
+    expect(plan?.internalUrl).toBe('http://10.201.0.1:10460/');
+    expect(plan?.jwtSecret).toBe('shhh-secret');
   });
 
   it('returns null (does not wire) when OnlyOffice has no generated JWT secret yet', async () => {

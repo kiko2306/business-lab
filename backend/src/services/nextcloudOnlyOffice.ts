@@ -17,10 +17,23 @@
  * Cross-project networking (Nextcloud and OnlyOffice are separate compose
  * projects on separate bridges): the same trick the exposure code and ClamAV
  * use — the host gateway IP plus each app's published port. So the internal
- * legs are `http://<gateway>:<port>/`, and the browser-facing URL is
- * OnlyOffice's public hostname when it is exposed (§123.2: it must be, the
- * remote browser loads the editor from it), falling back to the gateway URL
- * for a LAN-only deployment.
+ * server-to-server legs are `http://<gateway>:<port>/`.
+ *
+ * The browser-facing `DocumentServerUrl` is the awkward one (§123.2/§180):
+ *  - OnlyOffice exposed  → its public `https://` hostname. This is the normal
+ *    case for a public Nextcloud.
+ *  - OnlyOffice LAN-only *and* Nextcloud LAN-only → the plain-HTTP gateway URL
+ *    works, because Nextcloud is HTTP too (no mixed content).
+ *  - OnlyOffice LAN-only but Nextcloud PUBLIC → there is no valid value. The
+ *    connector rejects a plain-HTTP `DocumentServerUrl` served into an HTTPS
+ *    page ("HTTPS address for ONLYOFFICE Docs is required"), and the gateway
+ *    IP isn't reachable from a remote browser anyway. The wiring sets the
+ *    internal legs + secret and logs that OnlyOffice must be exposed.
+ *
+ * Note there is nothing to "restrict to Cloudflare IP ranges" here (§180):
+ * with a Cloudflare *Tunnel*, cloudflared connects outbound, so no Cloudflare
+ * edge IP ever reaches NPM. The controls that do apply are JWT_ENABLED between
+ * the two and not exposing OnlyOffice when the deployment doesn't need it.
  *
  * Runs on every Nextcloud start, like HACS: a fresh clone, a reinstall and a
  * changed OnlyOffice hostname all converge on the right config, and nothing
@@ -48,7 +61,11 @@ const ONLYOFFICE_SERVICE = 'onlyoffice';
  * when absent. A connector install needs the Nextcloud app store (network); if
  * that fails the script exits 0 and the next start retries.
  */
-function buildWiringScript(documentServerUrl: string, internalUrl: string, storageUrl: string): string[] {
+function buildWiringScript(
+  documentServerUrl: string | null,
+  internalUrl: string,
+  storageUrl: string
+): string[] {
   return [
     'if ! php occ app:getpath onlyoffice >/dev/null 2>&1; then',
     '  if ! php occ app:install onlyoffice; then',
@@ -57,7 +74,12 @@ function buildWiringScript(documentServerUrl: string, internalUrl: string, stora
     '  fi',
     'fi',
     'php occ app:enable onlyoffice >/dev/null',
-    `php occ config:app:set onlyoffice DocumentServerUrl --value "${documentServerUrl}"`,
+    // Only set the browser URL when there is a valid one — a public Nextcloud
+    // with a LAN-only OnlyOffice has none (§180). Leave whatever is there
+    // rather than writing a value the connector rejects.
+    ...(documentServerUrl
+      ? [`php occ config:app:set onlyoffice DocumentServerUrl --value "${documentServerUrl}"`]
+      : ['echo "hlm: OnlyOffice is not exposed and Nextcloud is public — DocumentServerUrl left unset; expose OnlyOffice"']),
     `php occ config:app:set onlyoffice DocumentServerInternalUrl --value "${internalUrl}"`,
     `php occ config:app:set onlyoffice StorageUrl --value "${storageUrl}"`,
     // >/dev/null: `config:app:set` echoes the value it stored, and this one is
@@ -69,16 +91,26 @@ function buildWiringScript(documentServerUrl: string, internalUrl: string, stora
 }
 
 export interface NextcloudOnlyOfficePlan {
-  documentServerUrl: string;
+  /**
+   * The browser-facing document-server URL, or null when the deployment has
+   * no valid one (public Nextcloud + LAN-only OnlyOffice, §180). The other
+   * legs and the secret are still wired.
+   */
+  documentServerUrl: string | null;
   internalUrl: string;
   storageUrl: string;
   jwtSecret: string;
   jwtHeader: string;
 }
 
+/** The provisioned public hostname on an exposure row, or null. */
+function provisionedHostname(row: Awaited<ReturnType<typeof getServiceExposureRow>>): string | null {
+  return row?.enabled && row.status === 'provisioned' && row.hostname ? row.hostname : null;
+}
+
 /**
- * Work out the four connector values, or null when the wiring can't/shouldn't
- * run yet (OnlyOffice not in the registry, no JWT secret generated, ports
+ * Work out the connector values, or null when the wiring can't/shouldn't run
+ * yet (OnlyOffice not in the registry, no JWT secret generated, ports
  * unknown). Exported for the unit test.
  */
 export async function buildNextcloudOnlyOfficePlan(): Promise<NextcloudOnlyOfficePlan | null> {
@@ -105,10 +137,17 @@ export async function buildNextcloudOnlyOfficePlan(): Promise<NextcloudOnlyOffic
   const internalUrl = `http://${gateway}:${onlyofficePort}/`;
   const storageUrl = `http://${gateway}:${nextcloudPort}/`;
 
-  const exposure = await getServiceExposureRow(ONLYOFFICE_SERVICE).catch(() => null);
-  const publicHost =
-    exposure?.enabled && exposure.status === 'provisioned' && exposure.hostname ? exposure.hostname : null;
-  const documentServerUrl = publicHost ? `https://${publicHost}/` : internalUrl;
+  const onlyofficeHost = provisionedHostname(await getServiceExposureRow(ONLYOFFICE_SERVICE).catch(() => null));
+  let documentServerUrl: string | null;
+  if (onlyofficeHost) {
+    documentServerUrl = `https://${onlyofficeHost}/`;
+  } else {
+    // LAN-only OnlyOffice: the plain-HTTP gateway URL is only a valid
+    // DocumentServerUrl when Nextcloud is served over HTTP too — the connector
+    // refuses a http:// doc server on an https:// Nextcloud page (§180).
+    const nextcloudHost = provisionedHostname(await getServiceExposureRow(NEXTCLOUD_SERVICE).catch(() => null));
+    documentServerUrl = nextcloudHost ? null : internalUrl;
+  }
 
   return { documentServerUrl, internalUrl, storageUrl, jwtSecret, jwtHeader };
 }
@@ -145,11 +184,17 @@ export async function reconcileNextcloudOnlyOffice(serviceName: string): Promise
     // prints it somewhere the script's `>/dev/null` doesn't catch.
     const safeOutput = result.output.split(plan.jwtSecret).join('***').trim();
     logger.info('Nextcloud/OnlyOffice connector reconciled', {
-      documentServerUrl: plan.documentServerUrl,
+      documentServerUrl: plan.documentServerUrl ?? '(unset — expose OnlyOffice)',
       internalUrl: plan.internalUrl,
       ok: result.ok,
       output: safeOutput || '(no output)',
     });
+    if (!plan.documentServerUrl) {
+      logger.warn(
+        'OnlyOffice editing will not work: Nextcloud is publicly exposed but OnlyOffice is not. ' +
+          'The browser cannot load the editor from a plain-HTTP address. Expose OnlyOffice.'
+      );
+    }
   } catch (error) {
     logger.error('Failed to wire Nextcloud to OnlyOffice', { error: (error as Error).message });
   }
