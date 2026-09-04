@@ -15602,3 +15602,52 @@ the source with no extra operator step.
 
 Minor bump 0.22.0 → 0.23.0. README TODO "Scheduler → Kopia" deleted; "Prove a
 Kopia restore" and "Remove Duplicati" remain.
+
+## 196. §81.5 — proved a Kopia restore (2026-09-04)
+
+No code change — a live-stack verification, closing the "Prove a Kopia
+restore" README item before Duplicati can be removed.
+
+### What was run
+
+The management backend's own start-service code path (`startService('kopia',
+0)`, called in-process against the built `dist/`, not through HTTP — no admin
+session was open) started `apps/kopia` for the first time on this host,
+generating its three secrets exactly as the dashboard would on a real click.
+`snapshotAppData` then registered `/source/apps` and triggered a snapshot of
+the whole real `apps/` tree — 5,441,113,294 bytes, 50,306 files, ~40s upload.
+
+`restoreSnapshot` restored that snapshot's root into a scratch path inside the
+Kopia container; `getRestoreTaskStatus` polled to `SUCCESS` with
+**restoredBytes/restoredFiles matching the snapshot exactly** — no shallow
+placeholders (§193's `restoreDirEntryAtDepth` fix held under a real 50k-file
+tree, not just the earlier single-file check).
+
+### The two apps
+
+- **SQLite — Beszel** (`apps/beszel/data/data.db`, PocketBase): `docker cp`'d
+  out of the restore, opened cold with `sqlite3` (no relation to the running
+  Beszel container). `PRAGMA integrity_check` → `ok`; `sqlite_master` listed
+  real tables (`_migrations`, `_collections`, `_superusers`, …).
+- **Postgres — n8n** (`apps/n8n/data/db`, the `n8n-db` service's data
+  directory): restored dir mounted into a throwaway
+  `pgautoupgrade/pgautoupgrade:17-alpine` container (same image n8n-db runs).
+  Postgres ran crash recovery against the restored WAL/data files
+  unprompted, came up clean, and `psql -U n8n -d n8n` listed the real schema
+  and returned a live row from `workflow_entity` — the database is not just
+  present bytes, it opens and answers queries.
+
+Both scratch containers and the restore-proof directories (host scratch +
+inside the Kopia container) were removed afterwards. Kopia itself was left
+running — it is meant to (the scheduler already drives it, §195) — with the
+one real snapshot now sitting in its repository.
+
+### Verified
+
+Against the live stack only (nothing here is a unit test — the restore
+mechanics were already covered in §193's suite). No `npm test` run since
+nothing in `src/` changed.
+
+README TODO: "Prove a Kopia restore" deleted. "Remove Duplicati" now
+unblocked — the restore proof it was waiting on is done; "A Kopia-native
+remote backend" stays open, unrelated to this proof.

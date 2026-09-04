@@ -294,10 +294,10 @@ Strategy:
       Kopia-native remote option — S3 / B2 / SFTP / `gdrive` — with its own
       credential fields, so a non-mounted destination can be real offsite for
       Kopia too, not a local fallback.
-- [ ] **Prove a Kopia restore** (§81.5) — one SQLite app and one Postgres app,
-      restored from a snapshot, before anything is switched off.
-- [ ] **Remove Duplicati** (§81.5) — last, and only once the restore above is
-      proven. Closes §75.3 (its restore API writes nothing) and §74.6.
+- [ ] **Remove Duplicati** (§81.5, §196) — the restore proof it was waiting on
+      is done (a real SQLite app and a real Postgres app both restored and
+      opened cleanly). Closes §75.3 (its restore API writes nothing) and
+      §74.6.
 ### Exposure and platform
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
