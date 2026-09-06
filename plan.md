@@ -17869,3 +17869,77 @@ tracks the remaining per-app calls.
 
 Backend typecheck + 596 tests (10 new in `exposure.test.ts`), frontend 50
 tests — all pass.
+
+## 238. §123.1 investigated — Mealie AI recipe parsing (2026-09-06)
+
+`plan.md` §123.1 asked whether Mealie's AI settings help a *URL* import, and
+whether to wire `OPENAI_*` through the dashboard. Both answers changed since
+that plan was written — it assumed a Mealie that no longer ships.
+
+### Does AI improve URL import? Yes, automatically.
+
+From Mealie's own AI docs (`ai-providers.md`, feature list):
+
+- **"When importing a recipe via URL, if the default recipe scraper is
+  unable to read the recipe data from a webpage, the webpage contents will
+  be parsed by AI"** (v1.9.0). No separate flow — the normal "Import from
+  URL" transparently falls back to AI on a bad `recipe-scrapers` scrape.
+  This is exactly the §123.1 ask.
+- Dedicated **"Import with AI"** page (Create → Import with AI, v3.23.0):
+  URL + pasted text/HTML/JSON + photos + video, combined into one recipe.
+- Also: OpenAI ingredient parser (re-parse the ingredient blob as an
+  alternative to NLP/brute-force), organizer matching against existing
+  tags/categories, recipe translation, video-audio transcription (needs an
+  audio provider, e.g. `whisper-1`), image import (needs a vision model).
+
+### The `OPENAI_*` env vars in §123.1 no longer exist
+
+An "AI Providers" feature landed mid-2026 (DB migration
+`2026-05-18 …_add_table_for_ai_providers`, in-app announcement 2026-05-21).
+`mealie/core/settings/settings.py` now keeps only `OPENAI_CUSTOM_PROMPT_DIR`
+(+ yt-dlp knobs for video). `OPENAI_API_KEY` / `OPENAI_BASE_URL` /
+`OPENAI_MODEL` / `OPENAI_WORKERS` / `OPENAI_ENABLE_IMAGE_SERVICES` — all the
+vars §123.1 named — are gone.
+
+Config is now **per-group, in the database**, via UI or REST:
+
+- `POST /api/groups/ai-providers/providers` — body
+  `{name, base_url, api_key, model, timeout=300, request_headers,
+  request_params}`. `api_key` is `Field("", exclude=True)`: write-only,
+  never echoed back (same shape as our own secret fields).
+- `PUT /api/groups/ai-providers/settings` — point `default_provider_id` /
+  `audio_provider_id` / `image_provider_id` at created providers.
+  `ai_enabled` is computed = `default_provider_id is not None`.
+- `base_url` takes any OpenAI-compatible endpoint. **Anthropic's API is not
+  natively OpenAI-shaped** — sharing §84.3's Claude key means pointing
+  `base_url` at a LiteLLM-style shim (or Anthropic's partial OpenAI-compat
+  endpoint), not the raw API. `request_headers` can carry
+  `anthropic-version` etc.
+
+### Decision: park it behind §84.3
+
+This is no longer an `.env` line — it's a small `mealieAiSync.ts` that
+drives Mealie's REST API (`guacamoleSync.ts` / `beszelSync.ts` shape: one
+`POST providers` + one `PUT settings`, idempotent). It has two hard
+prerequisites that don't exist yet:
+
+1. **§84.3's "Claude API key in Settings"** — no dashboard-level LLM key
+   store exists. Mealie's wiring should reuse it, not add a second key.
+2. **An OpenAI-compat proxy** for that key, since Anthropic isn't
+   OpenAI-shaped. §84.3 (content generation) will likely need the same
+   thing, so decide it there.
+
+Plus an auth path to Mealie's API (an admin-credential problem like
+Guacamole's `guacamoleAdminRotate.ts`). Not worth building in isolation
+now — the value is real but small, and it rides on §84.3's infrastructure.
+README item rewritten to say "wire it, blocked on §84.3" rather than
+"investigate".
+
+No code changed. Docs/plan only.
+
+### Caveat noted for whoever builds it
+
+Open upstream bug `mealie-recipes/mealie#5012`: Mealie sends the page HTML
+to the AI provider *even when the HTTP fetch failed*, i.e. it can spend
+tokens on a page it never actually retrieved. Worth a look before turning
+this loose on arbitrary URLs.
