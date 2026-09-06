@@ -273,9 +273,15 @@ Strategy:
 - [ ] **Rebrand, tier 2** (§84.2) — package/image/network/project names. Do it
       in the same maintenance window as the §83 data-root move; both recreate
       the management stack.
-- [ ] **Add Postiz** (§84.3a) — adopt rather than build. Four containers
-      (Temporal + Postgres + Redis), AGPL-3.0, and credentials per platform in
-      its own env block: it removes the OAuth code, not the approvals.
+- [ ] **Add Postiz** (§84.3a, §243 — scoping spike done) — adopt rather than
+      build, AGPL-3.0. Trimmed stack is **5 containers** (Postiz + its
+      Postgres + its Redis + Temporal + Temporal's Postgres — Elasticsearch
+      confirmed droppable). Costs are real: **5.66 GiB image**, ~2.7 GiB RAM
+      for the stack. **Blocker found:** the Postiz backend (`:3000`) never
+      came up in the spike — silent hang, nginx 502 throughout, pm2 process
+      "online" but not listening. Root-cause that on a throwaway before any
+      registry work. Still also gated behind §84.3's unbuilt generation half
+      and §84.7's strategy inversion.
 - [ ] **Content generation** (§84.3) — prompt + a Claude API key entered once
       in Settings, same third-party-token pattern as Cloudflare/Tailscale;
       n8n for "generate on a schedule, queue in Postiz".

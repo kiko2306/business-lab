@@ -18125,3 +18125,87 @@ Proven live on `tx-home-utils.com`: container healthy, `/rest/noauth/health`
 200, spoofed-Host GUI request 200, config.xml + certs generated, relay
 joined. Torn down after. Backend 596 + frontend 50 tests pass. Minor bump
 0.33.0 → 0.34.0.
+
+## 243. Postiz scoping spike — trimmed stack runs, but the backend hangs (§84.3a, 2026-09-06)
+
+The README "Add Postiz" item, approached as a spike rather than a build:
+stand the stack up by hand on `tx-home-utils.com`, learn its real shape and
+cost, decide whether the full registry integration is worth a session. No
+`apps/postiz/`, no registry entry, no version bump. Spike compose kept only
+in the session scratchpad.
+
+### What the upstream compose actually is
+
+`gitroomhq/postiz-app`'s `docker-compose.yaml` is **9 containers**: `postiz`,
+`postiz-postgres`, `postiz-redis`, `temporal`, `temporal-postgresql`,
+`temporal-elasticsearch`, `temporal-ui`, `temporal-admin-tools`, and a
+Sentry `spotlight` debug sidecar. Temporal is a hard dependency now — there's
+a whole `libraries/nestjs-libraries/src/temporal/` module and
+`TEMPORAL_ADDRESS` is required; there is no lighter scheduler path.
+
+### Trimmed to 5, and it starts
+
+Dropped `temporal-elasticsearch`, `temporal-ui`, `temporal-admin-tools`,
+`spotlight`. Ran Temporal `auto-setup` with **no `ENABLE_ES`** so visibility
+falls back to the SQL store. Result: `postiz` + `postiz-postgres` +
+`postiz-redis` + `temporal` + `temporal-postgresql` all came up, Temporal
+registered its `default` namespace, and Postiz's orchestrator connected and
+started **~40 platform task-queue workers** (bluesky, mastodon, twitter, …)
+all `RUNNING`. **Elasticsearch is genuinely droppable** — that's the main
+positive finding.
+
+### The costs are real
+
+- **Image: 5.66 GiB on disk** (1.07 GiB compressed pull). By far the largest
+  in the estate — the next biggest is `immich-app/postgres` at ~1 GiB.
+- **RAM: ~2.7 GiB for the 5 containers**, dominated by the single `postiz`
+  container at 1.8–2.2 GiB (it runs frontend + backend + orchestrator +
+  nginx + pm2 all in one). Temporal ~230 MiB, Temporal's PG ~190 MiB,
+  Postiz's PG ~80 MiB, Redis ~4 MiB.
+- On this 14.84 GiB box already ~53 % used, that's a ~18 % RAM hit and a
+  significant disk hit — has to be weighed against §84.7's turnkey-box
+  sizing (16 GiB / 500 GB), where it's a much bigger fraction.
+
+### Blocker: the backend never came up
+
+`/api/*` returned nginx **502 for 7+ minutes** and never recovered. The
+`backend` pm2 process reported `online` but:
+
+- port `3000` stayed closed (`ECONNREFUSED` from inside the container),
+- `backend-error.log` and `backend-out.log` were **empty** past the npm
+  banner — no stack trace, no "listening", no restart loop,
+- only the `orchestrator` pm2 app logged anything.
+
+So it's a **silent hang, not a slow boot**. Likely suspects for next time:
+Temporal namespace/schema readiness timing, the `node
+--experimental-require-module` flag in the backend start script, or an env
+var the backend needs and doesn't warn about. This has to be root-caused on
+a clean throwaway **before** any `apps/postiz/` work — a registry entry for
+a service that 502s is worse than nothing.
+
+### Architecture smell
+
+Everything-in-one-container (pm2 running frontend/backend/orchestrator/nginx)
+means a wedged sub-process — exactly what happened — doesn't fail the
+container, and a container healthcheck can't distinguish "nginx up, backend
+dead" from healthy without probing `/api` specifically.
+
+### Recommendation
+
+**Not ready for the real add.** Order of operations when it's picked up:
+
+1. Root-cause the backend hang on a scratch stack (own time, not a
+   dashboard session).
+2. Explicitly accept the 5.66 GiB image + ~2.7 GiB RAM against §84.7 sizing,
+   or decide Postiz only ships on boxes with headroom.
+3. Only then: `apps/postiz/` (5-container compose, Temporal dynamicconfig
+   handling, `MAIN_URL`/`FRONTEND_URL`/`NEXT_PUBLIC_BACKEND_URL` via
+   `exposureEnvKeys.url`, `JWT_SECRET` generated, DB creds static like
+   guacamole-db since nothing else touches that PG, `DISABLE_REGISTRATION`
+   posture), registry entry, `licences.md` rows (Postiz AGPL-3.0; Temporal
+   MIT; `temporalio/auto-setup` bundles PostgreSQL tooling), docs.
+4. Still gated behind §84.3's generation half and the §84.7 strategy
+   inversion regardless.
+
+README item updated from "adopt, four containers" to point at these
+findings.
