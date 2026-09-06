@@ -1,0 +1,42 @@
+services:
+  scrutiny:
+    # Omnibus image: web UI + InfluxDB + collector in one container. Pinned
+    # to a tagged release, not `latest-omnibus`/`nightly-omnibus` — upstream's
+    # own docs warn those update the image with no notice, which is exactly
+    # what a client box must not do. Bump this deliberately.
+    image: ghcr.io/analogj/scrutiny:v0.9.3-omnibus
+    restart: unless-stopped
+    # SMART data needs raw access to every physical disk. The upstream example
+    # enumerates `devices: [/dev/sda, /dev/sdb, ...]` — a host-specific list
+    # in this file, which principle 2 (no hand-edited YAML) rules out. Running
+    # privileged instead gives the container all of /dev with no per-host
+    # edit. The backend that manages this stack is already root-equivalent on
+    # the host (README), so this doesn't widen the real trust boundary.
+    # ponytail: privileged over a per-host `devices:` list someone has to keep
+    # current every time a disk is added or swapped.
+    privileged: true
+    ports:
+      - "${SCRUTINY_PORT:-10480}:8080"
+    environment:
+      # SMART history is timestamped; without this it's all UTC. Inherited
+      # from the dashboard-wide timezone (Settings).
+      TZ: ${TZ:-UTC}
+    volumes:
+      # udev metadata so disks show up by model/serial, not bare sdX.
+      - /run/udev:/run/udev:ro
+      - ./data/config:/opt/scrutiny/config
+      - ./data/influxdb:/opt/scrutiny/influxdb
+    labels:
+      - "homepage.group=Monitoring & Backup"
+      - "homepage.name=Scrutiny"
+      - "homepage.icon=scrutiny.png"
+      - "homepage.href=http://localhost:${SCRUTINY_PORT:-10480}"
+      - "homepage.description=Hard drive SMART health and failure prediction"
+    healthcheck:
+      # /api/summary returns 200 with an empty payload even before the first
+      # collector run, so it's a clean "web + DB are up" probe.
+      test: ["CMD", "curl", "-f", "http://localhost:8080/api/summary"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

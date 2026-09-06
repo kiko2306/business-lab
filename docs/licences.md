@@ -73,6 +73,7 @@ operate within, listed again at the end.
 | Pi-hole | EUPL-1.2 | ✅ Clean | weak copyleft, commercial use permitted |
 | Price Compare | *ours* — no LICENSE file | ⚠️ Decide | |
 | Samba (`dockurr/samba`) | GPL-3.0 (Samba); MIT (image wrapper) | ✅ Clean | stock unmodified Samba for internal LAN file sharing — GPL-3.0 places no restriction on running it; not modified, not redistributed |
+| Scrutiny (`ghcr.io/analogj/scrutiny`, omnibus) | **MIT** | ✅ Clean | stock unmodified. The omnibus image bundles InfluxDB 2 OSS (MIT), smartmontools (GPL-2.0+) and s6-overlay (ISC) — all clean for internal use, none redistributed as software |
 | Speedtest (speedtest-tracker) | MIT | ⚠️ Condition | wraps **Ookla Speedtest CLI**, which has its own EULA the operator must accept (free, but not FOSS and not for "commercial" measurement without Ookla's OK). Swap for LibreSpeed if that matters. |
 | Stirling-PDF | **MIT** (core, since v1.0.0) | ✅ Clean | login / SSO / audit features under `app/proprietary/` are paywalled — don't enable or redistribute those |
 | Tailscale | BSD-3-Clause (client) | ✅ Clean | coordination is Tailscale's paid SaaS (a subscription cost, not a licence issue); or self-host headscale (BSD-3) |

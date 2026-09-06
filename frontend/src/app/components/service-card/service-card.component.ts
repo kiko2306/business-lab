@@ -721,6 +721,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       cart: '🛒',
       remote: '🖥️',
       box: '📦',
+      disk: '💽',
     };
 
     return icons[icon] ?? '🖥️';

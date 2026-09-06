@@ -132,6 +132,7 @@ deliberately public front door).
 | **Web Terminal (wetty)** | Hands out a shell on the host. Authelia is the only thing between the internet and a root-capable session — it is not optional here. |
 | **Code Server** | Own web login enabled (`CODE_SERVER_PASSWORD`, auto-generated, hidden — read it from `apps/code-server/.env` if needed); Authelia additionally gates the tunnel hostname. |
 | **Dozzle** | Reads container logs, no auth. |
+| **Scrutiny** | Disk SMART health dashboard, no auth of its own. |
 | **Stirling PDF** | `SECURITY_ENABLELOGIN=false` by default; can be enabled instead. |
 | **Speedtest**, **Kitchen Switcher**, **Pantry**, **Price Compare** | No auth of their own. |
 | **ntfy** | Open by default; supports its own ACLs if you configure them. |

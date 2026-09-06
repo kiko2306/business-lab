@@ -1618,10 +1618,21 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       requirement is that the Cloudflare API token also carries **Account →
       Account Filter Lists → Edit** and **Zone → Firewall Services → Edit**
       (now in the Settings permission hint).
-- [ ] **Scrutiny** — `analogj/scrutiny`. SMART attributes + failure
-      prediction for the host's disks — a real gap (Beszel doesn't do SMART).
-      Needs `/dev/disk` + `SYS_RAWIO`. No Host validation. **Priority: P2** —
-      **Estimate: S**
+- [x] **Scrutiny** — `ghcr.io/analogj/scrutiny:v0.9.3-omnibus`. Added
+      2026-09-06 (§240): `apps/scrutiny/` (`docker-compose.yml` +
+      `.env.example`), host port `${SCRUTINY_PORT:-10480}` → `:8080`,
+      config + bundled InfluxDB under `./data/{config,influxdb}`,
+      `curl /api/summary` healthcheck. Registry entry (Monitoring &
+      Management, new `disk` icon 💽), no `exposureEnvKeys` (no Host
+      validation, no own login — Authelia is the only gate, like
+      stirling-pdf). **`privileged: true`** rather than a per-host
+      `devices:` list — principle 2 forbids the hand-edited device
+      enumeration, and the backend is already root-equivalent. Proven live:
+      container healthy in ~12s, collector found both real disks
+      (`/dev/sda` SATA + `/dev/nvme0` NVMe) and published SMART data,
+      `/api/summary` 200. Docs rows in `ports.md`, `app-credentials.md`
+      ("no login of their own"), `licences.md` (MIT; bundled InfluxDB 2 /
+      smartmontools / s6-overlay all clean).
 - [ ] **NetAlertX** — `jokobsk/netalertx` (ex Pi.Alert). LAN scan with
       new-device / device-down / presence alerts. `network_mode: host`.
       **Priority: P3** — **Estimate: S**
@@ -17979,3 +17990,46 @@ One-line data change in `services.ts` (`overlayOnly: true` on
 Patch bump 0.31.1 → 0.31.2. New `@mat` README item: the flag refuses new
 exposure but doesn't tear down an already-provisioned `npm.<domain>` route
 (same limitation as `lanOnly`), so a live one needs a manual toggle-off.
+
+## 240. Scrutiny added — disk SMART health (§22.6, 2026-09-06)
+
+Pulled `Scrutiny` off the §22 backlog. It fills a real monitoring gap:
+Beszel watches CPU/RAM/disk-usage but not SMART, so nothing here would warn
+before a drive fails — and §84.7 already calls the disk the weak point of
+the turnkey boxes.
+
+**Shape:**
+
+- `ghcr.io/analogj/scrutiny:v0.9.3-omnibus` — the all-in-one image (web +
+  InfluxDB + collector). Pinned to a tagged release, not
+  `latest-`/`nightly-omnibus`, which upstream's own docs warn auto-update
+  with no notice — unacceptable on a client box.
+- **`privileged: true`**, not `devices: [/dev/sda, ...]`. The upstream
+  example enumerates block devices, which would be a host-specific list in
+  the compose file — principle 2 (no hand-edited YAML) rules that out.
+  Privileged gives the container all of `/dev` with no per-host edit; the
+  backend that manages the stack is already root-equivalent on the host, so
+  the real trust boundary doesn't move. `ponytail:` comment in the compose
+  names the trade.
+- Only the web port is published (`10480:8080`); the example's `8086:8086`
+  InfluxDB admin publish is dropped — nothing outside the container needs
+  it.
+- No `exposureEnvKeys`: Scrutiny does no Host-header validation and has no
+  login of its own, so exposure is Authelia-only, same as stirling-pdf.
+- `TZ: ${TZ:-UTC}` so SMART history timestamps follow the dashboard-wide
+  timezone (the `.env.example` `TZ` key gets the global pre-fill via
+  `appEnv.ts`).
+- New `disk` → 💽 icon in `service-card.component.ts`.
+
+**Proven live** (not just typechecked): started it by hand on
+`tx-home-utils.com`, container went **healthy in ~12s**, the collector ran
+`smartctl --scan` and found both real disks — `/dev/sda` (SATA) and
+`/dev/nvme0` (NVMe, which needs the `SYS_ADMIN` cap that `privileged`
+covers) — collected and published SMART data to the bundled InfluxDB,
+`/api/summary` returned 200. Torn down afterwards; the dashboard's own
+start path is the registry entry.
+
+Docs: `ports.md` (`10480 scrutiny`), `app-credentials.md` ("no login of
+their own" table), `licences.md` (Scrutiny MIT; bundled InfluxDB 2 OSS MIT,
+smartmontools GPL-2.0+, s6-overlay ISC — all clean for internal use).
+Backend 596 tests + frontend 50 pass. Minor bump 0.31.2 → 0.32.0.

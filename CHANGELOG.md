@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.32.0] — 2026-09-06
+
+### Added
+
+- Scrutiny (`ghcr.io/analogj/scrutiny` omnibus) — hard-drive SMART health and failure prediction, a monitoring gap Beszel doesn't cover (§22.6); runs privileged for host-agnostic disk access
+
 ## [0.31.2] — 2026-09-06
 
 ### Security
