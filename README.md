@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.31.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.31.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -385,14 +385,12 @@ Strategy:
       SSO), Jellyfin (core has no header-trust, only a community plugin) and
       BookStack have no known full fix — parked, not blocked on anything
       actionable.
-- [ ] **Decide the rest of `overlayOnly`'s roster** (§210.3, §237) — the
-      flag ships (`services.ts`/`exposure.ts`/`getExposability`, tagged on
-      Guacamole and Pi-hole). Still undecided per app: nginx-proxy-manager
-      and netbird-vpn (ingress path / VPN control plane — estate-wide blast
-      radius, but they need their admin UIs reachable somehow), and
-      code-server/wetty (full shell access — §210.3 says decide alongside
-      the open §180 LAN-bypass question, and they keep their own login
-      today per §93). Add the tag per app once each risk call is made.
+- [ ] **`@mat`: confirm NPM's overlay path, deprovision any live public NPM
+      exposure** (§239) — `nginx-proxy-manager` is now `overlayOnly`, so the
+      dashboard refuses to *enable* its exposure, but an already-provisioned
+      `npm.<domain>` route isn't torn down automatically (same as `lanOnly`).
+      Check whether the live host has one and toggle it off if so, and
+      confirm the admin UI is reachable over NetBird/Tailscale.
 
 ### Apps and integrations
 

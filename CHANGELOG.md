@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.31.2] — 2026-09-06
+
+### Security
+
+- Tag nginx-proxy-manager `overlayOnly`: its admin UI controls all ingress + holds the TLS certs, so it's reachable over the overlay only, not the public tunnel (§210.3)
+
 ## [0.31.1] — 2026-09-06
 
 ### Added

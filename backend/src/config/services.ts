@@ -57,6 +57,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // the alternative (an app whose compose file changes with a setting)
     // would mean backend code editing a compose file.
     externalNetworks: ['crowdsec-lapi'],
+    // Exposure points at the admin UI (see exposurePortEnvVar above), which
+    // controls every ingress route and holds the issued TLS certs — total
+    // blast radius. No end user needs it; the webmaster reaches it over the
+    // NetBird/Tailscale overlay, not the public tunnel (plan.md §210.3/§239).
+    overlayOnly: true,
   },
   'netbird-vpn': {
     name: 'netbird-vpn',

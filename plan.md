@@ -17943,3 +17943,39 @@ Open upstream bug `mealie-recipes/mealie#5012`: Mealie sends the page HTML
 to the AI provider *even when the HTTP fetch failed*, i.e. it can spend
 tokens on a page it never actually retrieved. Worth a look before turning
 this loose on arbitrary URLs.
+
+## 239. §210.3 roster — `nginx-proxy-manager` tagged `overlayOnly` (2026-09-06)
+
+Followed up §237's "decide the rest of the roster" README item. Asked which
+of the four deferred apps (nginx-proxy-manager, netbird-vpn, code-server,
+wetty) to tag.
+
+**Decision: only `nginx-proxy-manager`.**
+
+- **nginx-proxy-manager** — tagged. Its exposure points at the admin UI
+  (`exposurePortEnvVar: NPM_ADMIN_PORT`), which controls every ingress route
+  and holds the issued TLS certs. No end user needs it; the webmaster
+  reaches it over the overlay.
+- **netbird-vpn** — left unflagged, deliberately. Its `additionalExposures`
+  management-API leg (`<name>-api.<domain>`) is hit by native gRPC clients
+  (mobile/desktop/CLI) that are **not yet on the overlay** — that endpoint
+  is how they join. `overlayOnly` would break peer enrollment from off-LAN.
+  This is the inverse of `lanOnly`: it *must* stay publicly reachable.
+- **code-server / wetty** — left unflagged (operator's call). Both keep a
+  gate today (wetty is Authelia-only per its `dependsOn: authelia` + the
+  compose comment; code-server keeps its own login per §93). The operator
+  uses them remotely and chose to keep the tunnel path.
+
+Clarified while deciding: **`overlayOnly` is not blocked on §180.** §210.3
+tied code-server/wetty to the §180 LAN-bypass question, but that question is
+only about whether an app's *own login* is safely droppable in favour of
+"Authelia-only". `overlayOnly` drops no login — it removes the public tunnel
+path, leaving `(LAN-direct + existing gate)`, which is strictly safer than
+`(LAN-direct + existing gate + public tunnel)`. The two decisions are
+independent.
+
+One-line data change in `services.ts` (`overlayOnly: true` on
+`nginx-proxy-manager`), covered by §237's existing `getExposability` tests.
+Patch bump 0.31.1 → 0.31.2. New `@mat` README item: the flag refuses new
+exposure but doesn't tear down an already-provisioned `npm.<domain>` route
+(same limitation as `lanOnly`), so a live one needs a manual toggle-off.
