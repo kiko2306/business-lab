@@ -1588,11 +1588,19 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       `pdf` icon 📕). No Host validation → **no `exposureEnvKeys`** (put it
       behind Authelia rather than the app's own optional login). The natural
       companion to Paperless.
-- [ ] **Syncthing** — `syncthing/syncthing`. Continuous peer-to-peer folder
-      sync across machines (no server of record) — complements Nextcloud.
-      Its GUI enforces a Host check → `exposureEnvKeys.allowedHosts` or the
-      `gui.insecureSkipHostcheck` config knob. **Priority: P2** —
-      **Estimate: S**
+- [x] **Syncthing** — `syncthing/syncthing:1`. Added 2026-09-06 (§242):
+      `apps/syncthing/` (`docker-compose.yml` + `.env.example`), GUI
+      `${SYNCTHING_PORT:-10500}` → `:8384`, sync `22000/tcp+udp` +
+      discovery `21027/udp` on fixed numbers (hardcoded so the allocator
+      skips them). Registry entry (Backup & Storage, new `sync` icon 🔃),
+      **no `exposureEnvKeys`** — the Host check the backlog worried about
+      only fires when the GUI binds loopback, and the image binds
+      `0.0.0.0:8384`, so a spoofed `Host:` header returns 200 (proven
+      live). GUI has no login by default → Authelia is the gate. No router
+      forwarding for sync (principle 1): off-LAN peers use Syncthing's
+      public relay pool (confirmed joining a relay live), LAN peers
+      direct. Docs rows in `ports.md` (incl. the fixed-port note),
+      `app-credentials.md`, `licences.md` (MPL-2.0).
 
 ### 22.6 Security, network & hardware health
 - [x] **CrowdSec** — `crowdsecurity/crowdsec` + **Cloudflare** bouncer
@@ -18068,3 +18076,52 @@ Proven live on `tx-home-utils.com`: container healthy, SPA root returns 200
 with the right `<title>`. Torn down after — the dashboard's start path is
 the registry entry. Backend 596 + frontend 50 tests pass. Minor bump
 0.32.0 → 0.33.0.
+
+## 242. Syncthing added — peer-to-peer folder sync (§22.5, 2026-09-06)
+
+Pulled `Syncthing` off the §22 backlog. Continuous file sync with no server
+of record — complements Nextcloud (which is a server of record).
+
+### The Host-check worry was moot
+
+The backlog line said "GUI enforces a Host check → need
+`exposureEnvKeys.allowedHosts` or `gui.insecureSkipHostcheck`". Read the
+actual code (`lib/api/api.go`): the localhost/Host-check middleware is only
+installed `if addressIsLocalhost(guiCfg.Address()) && !InsecureSkipHostCheck`.
+The `syncthing/syncthing` image sets `ENV STGUIADDRESS=0.0.0.0:8384`, so the
+GUI address isn't loopback and the check is never installed. Verified live:
+`curl -H 'Host: syncthing.example.com' http://localhost:10500/` → 200. So
+**no `exposureEnvKeys`, no config patching** — same "just works behind the
+proxy" story as stirling-pdf.
+
+### Ports
+
+- GUI/REST `${SYNCTHING_PORT:-10500}` → `:8384` — allocator-managed, the
+  only leg the tunnel carries (behind Authelia).
+- `22000/tcp`, `22000/udp` (sync), `21027/udp` (local discovery) —
+  **hardcoded**, not `${VAR:-default}`. Every other Syncthing device expects
+  22000, and the port allocator's regex only matches `${VAR:-default}:`
+  mappings, so a bare number is left alone. Documented in `ports.md` next to
+  the Samba note.
+- No router forward for 22000 (principle 1). Off-LAN peers fall back to
+  Syncthing's public relay pool (confirmed live: "Joined relay
+  relay://49.13.223.236:22067"); LAN peers connect directly. NAT-PMP probe
+  fails harmlessly (no UPnP on this router, by design).
+
+### Rest
+
+- `syncthing/syncthing:1` — major-version pin, floats within v1.x. The
+  image ships its own HEALTHCHECK (`curl /rest/noauth/health`), so compose
+  doesn't redeclare one; the registry `healthCheck` points at the same
+  unauthenticated endpoint.
+- Volume `./data:/var/syncthing` — holds `config/` (device ID + API key,
+  generated first run) and the default sync folder. `PUID`/`PGID` env
+  (default 1000) so the entrypoint's chown matches the host dir owner.
+- New `sync` → 🔃 icon. GUI has no login by default → "no login of their
+  own" row in `app-credentials.md`, Authelia is the gate.
+- Licence MPL-2.0 (file-level copyleft, no obligation from running it).
+
+Proven live on `tx-home-utils.com`: container healthy, `/rest/noauth/health`
+200, spoofed-Host GUI request 200, config.xml + certs generated, relay
+joined. Torn down after. Backend 596 + frontend 50 tests pass. Minor bump
+0.33.0 → 0.34.0.

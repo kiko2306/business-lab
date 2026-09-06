@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.34.0] — 2026-09-06
+
+### Added
+
+- Syncthing (`syncthing/syncthing`) — continuous peer-to-peer folder sync; GUI via tunnel behind Authelia, sync over LAN-direct + relay pool, no router changes (§22.5)
+
 ## [0.33.0] — 2026-09-06
 
 ### Added

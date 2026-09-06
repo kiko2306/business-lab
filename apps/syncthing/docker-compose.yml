@@ -1,0 +1,35 @@
+services:
+  syncthing:
+    image: syncthing/syncthing:1
+    restart: unless-stopped
+    environment:
+      # The image already binds the GUI to 0.0.0.0:8384 by default, which is
+      # what disables Syncthing's localhost Host-header check (it only applies
+      # when the GUI address is a loopback — verified in lib/api/api.go), so
+      # no reverse-proxy allow-list or insecureSkipHostcheck config is needed.
+      PUID: ${SYNCTHING_PUID:-1000}
+      PGID: ${SYNCTHING_PGID:-1000}
+    ports:
+      # GUI / REST API — the only leg carried by the tunnel (behind Authelia).
+      - "${SYNCTHING_PORT:-10500}:8384"
+      # Sync + local discovery. Hardcoded, not ${VAR:-default}: these are
+      # Syncthing's wire protocol ports and every other device expects 22000 —
+      # the port allocator only touches `${VAR:-default}:` mappings, so a bare
+      # number is left alone. No router forwarding for these (principle 1);
+      # off-LAN peers fall back to the public relay pool, LAN peers connect
+      # direct.
+      - "22000:22000/tcp"
+      - "22000:22000/udp"
+      - "21027:21027/udp"
+    volumes:
+      # Holds config/ (device ID + API key, generated on first run) and the
+      # default sync folder.
+      - ./data:/var/syncthing
+    labels:
+      - "homepage.group=Files"
+      - "homepage.name=Syncthing"
+      - "homepage.icon=syncthing.png"
+      - "homepage.href=http://localhost:${SYNCTHING_PORT:-10500}"
+      - "homepage.description=Continuous peer-to-peer folder sync"
+    # The image ships its own HEALTHCHECK (curl of /rest/noauth/health) — no
+    # need to redeclare it here.

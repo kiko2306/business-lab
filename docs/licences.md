@@ -77,6 +77,7 @@ operate within, listed again at the end.
 | Scrutiny (`ghcr.io/analogj/scrutiny`, omnibus) | **MIT** | ✅ Clean | stock unmodified. The omnibus image bundles InfluxDB 2 OSS (MIT), smartmontools (GPL-2.0+) and s6-overlay (ISC) — all clean for internal use, none redistributed as software |
 | Speedtest (speedtest-tracker) | MIT | ⚠️ Condition | wraps **Ookla Speedtest CLI**, which has its own EULA the operator must accept (free, but not FOSS and not for "commercial" measurement without Ookla's OK). Swap for LibreSpeed if that matters. |
 | Stirling-PDF | **MIT** (core, since v1.0.0) | ✅ Clean | login / SSO / audit features under `app/proprietary/` are paywalled — don't enable or redistribute those |
+| Syncthing (`syncthing/syncthing`) | **MPL-2.0** | ✅ Clean | stock unmodified; file-level copyleft only, no obligation from running it. Uses the community relay pool by default — no cost, no account |
 | Tailscale | BSD-3-Clause (client) | ✅ Clean | coordination is Tailscale's paid SaaS (a subscription cost, not a licence issue); or self-host headscale (BSD-3) |
 | Uptime Kuma | MIT | ✅ Clean | |
 | Vaultwarden | **AGPL-3.0** | ✅ Clean | unmodified |
