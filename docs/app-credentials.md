@@ -129,6 +129,15 @@ gets an Authelia login automatically — that is their only gate, and it is no
 longer a per-app setting (Home Page is the sole exception: it's the
 deliberately public front door).
 
+A separate set *do* have their own login but skip it behind Authelia, so an
+SSO login lands with no second form: **Guacamole** (`HTTP_AUTH_HEADER`) and
+**Paperless-ngx** (`PAPERLESS_ENABLE_HTTP_REMOTE_USER`) trust the
+`Remote-User` header NPM sets from the Authelia forward-auth. They still show
+their own login on LAN-direct access (no header). This is a fixed per-app
+property, not a setting. (**Beszel** has the same header path wired via
+`TRUSTED_AUTH_HEADER` but keeps password auth enabled until it's proven
+live.)
+
 | App | Why |
 |---|---|
 | **Web Terminal (wetty)** | Hands out a shell on the host. Authelia is the only thing between the internet and a root-capable session — it is not optional here. |

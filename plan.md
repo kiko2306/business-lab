@@ -18452,3 +18452,32 @@ handle. Left as-is.
 
 No code, no README item (self-raised during the working loop), no version
 bump.
+
+## 251. Doc pass — reconcile it-admin.md / app-credentials.md with the current Authelia model (§210.2, §223, §247)
+
+Reconciling `docs/` after §246–§250. Two real fixes, both about how Authelia
+gating is described:
+
+- **`it-admin.md` "Exposure" bullet** still told the operator to toggle
+  "Publicly expose this service" **and** "Require Authelia login" ("leave the
+  second on unless the app has its own solid auth"). That per-app toggle was
+  removed at §210.2 — `skipAutheliaProtection` is a fixed per-app property
+  (`types/index.ts`, `isAutheliaProtectionRequired` in `services.ts`), set
+  only on `homepage` and `authelia`. `webmaster.md` and `first-run.md`
+  already describe it correctly; `it-admin.md` was the straggler. Rewrote it
+  to match and to point at `app-credentials.md` for the apps that skip their
+  *own* login behind Authelia.
+- **`app-credentials.md` "No login of their own"** now also names the apps
+  that *have* a login but skip it behind Authelia via header trust —
+  Guacamole (`HTTP_AUTH_HEADER`) and Paperless-ngx
+  (`PAPERLESS_ENABLE_HTTP_REMOTE_USER`, §247), with Beszel noted as wired
+  (`TRUSTED_AUTH_HEADER`) but still password-auth-enabled until proven live
+  (README `@mat` item). Previously this was only in Guacamole's own row and
+  the new Paperless row, never stated as a category.
+
+Checked and found fine: §246's B2 support — `recovery-troubleshooting.md`
+already lists "S3-compatible bucket" as a Kopia destination kind, which
+covers B2. §248/§249/§250 were internal decisions with nothing operator-
+facing to update.
+
+Docs only — no code, no version bump.

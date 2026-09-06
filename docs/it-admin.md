@@ -36,10 +36,14 @@ other app is started from the dashboard.
 - **Per-app config**: the dashboard pre-fills generated secrets — just Save.
   First-login credentials for each app are in
   [app-credentials.md](app-credentials.md).
-- **Exposure**: per app, toggle "Publicly expose this service" and "Require
-  Authelia login" (leave the second on unless the app has its own solid
-  auth). Provisioning creates the NPM proxy host, the tunnel ingress rule and
-  the DNS record automatically; turning it off removes all three. Every ~6 h
+- **Exposure**: per app, toggle "Publicly expose this service". Every exposed
+  app is gated by Authelia automatically — there is no per-app toggle for it
+  (only Home Page, the deliberate public front door, is exempt). A handful of
+  apps additionally skip their *own* login behind Authelia so there's no
+  second form; that's a fixed per-app property, listed in
+  [app-credentials.md](app-credentials.md), not a setting. Provisioning
+  creates the NPM proxy host, the tunnel ingress rule and the DNS record
+  automatically; turning it off removes all three. Every ~6 h
   the backend re-asserts all exposed hostnames against the live NPM/Cloudflare
   state, so a hand-edit in NPM or a change made in the Cloudflare dashboard is
   put back automatically; a hostname it can't repair gets an
