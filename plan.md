@@ -17783,3 +17783,52 @@ guard starts silent on real usage. It is a second net, not a replacement for
 looking at `git diff --cached` — deliberately narrow patterns will miss most
 real secrets (generic API tokens, passwords, connection strings have no
 recognizable shape).
+
+## 236. `beszelSync.ts` built — Beszel SSO account provisioning (2026-09-06)
+
+§229 planned this; now built. Beszel's `TRUSTED_AUTH_HEADER` middleware only
+*looks up* an existing `users` record by the forwarded email
+(`FindAuthRecordByEmail`, no creation fallback), so SSO can't work until the
+account exists. `beszelSync.ts` makes it exist, mirroring `guacamoleSync.ts`.
+
+**Shape as built:**
+
+- `beszelClient.ts` — thin PocketBase REST client. Auth as a **superuser**:
+  `POST /api/collections/_superusers/auth-with-password` with
+  `BESZEL_ADMIN_EMAIL`/`BESZEL_ADMIN_PASSWORD` (§229 confirmed first-run
+  `CreateFirstUser` seeds a real `_superusers` record with those creds). The
+  token goes in a bare `Authorization` header (PocketBase convention, no
+  `Bearer`). CRUD on `users` records via the stock Records API — a superuser
+  bypasses the collection's superuser-only create rule, so no raw sqlite
+  (unlike `beszel-init`'s universal-token insert).
+- `beszelSync.ts` — same trigger points as `syncGuacamoleUsersSafe`:
+  `invitation_accepted` (auth.ts), `user_roles_update` /
+  `user_access_update` / `user_delete` (users.ts), and `exposure_change`
+  scoped to `beszel` (services.ts). Keyed on `user_app_access.service_name =
+  'beszel'` — the generic per-app grant, no registry change needed
+  (`getAppAccessOptions` already surfaces any exposed app).
+- Role mapping: dashboard `webmaster`/`admin` → Beszel `admin`; anyone else
+  granted access → `readonly`. Beszel's 3-tier enum (`admin`/`user`/
+  `readonly`) from §229.
+- **Revoke = delete**, not disable — resolved the §229 open question by
+  reading it off the schema: PocketBase auth records have no disable flag.
+  Safe here because this sync is the only thing that creates Beszel accounts
+  on the stack, and the first-run seed admin (the universal-token owner) is
+  excluded from the delete pass by email and is never in the wanted set.
+- Emails matched case-insensitively both directions (dashboard `users.email`
+  vs Beszel `users.email`).
+- Compose: `TRUSTED_AUTH_HEADER: Remote-Email` added to the `beszel`
+  service. NPM's shared `authelia-authrequest.conf` snippet already forwards
+  `Remote-Email` to every protected host, so no per-app proxy config is
+  needed (unlike Guacamole, which predated the shared snippet).
+  `DISABLE_PASSWORD_AUTH` deliberately left **off** until a live proof — a
+  wrong turn there locks everyone out with no non-manual way back.
+
+**Not yet proven live.** New README item covers the scratch-stack proof
+(§223 shape): provision a test user, forge the `Remote-Email` header on
+`/api/collections/users/auth-refresh`, confirm 200 + a real token. Only
+after that does `DISABLE_PASSWORD_AUTH` get flipped.
+
+19 unit tests in `beszelSync.test.ts` (create/promote/delete/seed-admin
+exemption/case-insensitivity/unreachable/not-installed/per-user-failure).
+Backend typecheck + 590 tests pass.

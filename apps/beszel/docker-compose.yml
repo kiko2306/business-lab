@@ -11,6 +11,15 @@ services:
       # Change the password from the Beszel UI after first start.
       USER_EMAIL: "${BESZEL_ADMIN_EMAIL:-admin@homelab.local}"
       USER_PASSWORD: "${BESZEL_ADMIN_PASSWORD:-changeme-beszel}"
+      # SSO via Authelia forward-auth: trust the Remote-Email header NPM's
+      # authelia-authrequest.conf snippet already sets on every protected
+      # host, and log the matching Beszel account straight in (plan.md §229).
+      # The account is provisioned by backend/src/services/beszelSync.ts —
+      # Beszel only *looks up* an existing user by this email, it never
+      # creates one. DISABLE_PASSWORD_AUTH stays off until a live proof
+      # confirms the header path resolves a session (a wrong turn here locks
+      # everyone out with no way back except by hand).
+      TRUSTED_AUTH_HEADER: "Remote-Email"
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Beszel"

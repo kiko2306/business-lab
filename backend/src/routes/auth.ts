@@ -19,6 +19,7 @@ import { getUserCapabilities, getUserRoles, setUserRoles } from '../services/use
 import { acceptInvitation, verifyInvitation } from '../services/userInvitations';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
 import { syncGuacamoleUsersSafe } from '../services/guacamoleSync';
+import { syncBeszelUsersSafe } from '../services/beszelSync';
 import {
   generateRecoveryCodes,
   generateTotpSecret,
@@ -156,6 +157,7 @@ router.post(
       // and, if it was granted Guacamole access, provision it there too (§200).
       await syncAutheliaUsersSafe('invitation_accepted', activated.userId);
       await syncGuacamoleUsersSafe('invitation_accepted', activated.userId);
+      await syncBeszelUsersSafe('invitation_accepted', activated.userId);
 
       const session = await issueSession({ id: activated.userId, username: activated.username });
       return res.json(session);

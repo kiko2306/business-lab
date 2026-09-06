@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.31.0] — 2026-09-06
+
+### Added
+
+- Beszel SSO account sync: dashboard users granted Beszel access are provisioned as Beszel accounts over its PocketBase API, so its TRUSTED_AUTH_HEADER path has an account to resolve (§229)
+
 ## [0.30.1] — 2026-09-04
 
 ### Roster

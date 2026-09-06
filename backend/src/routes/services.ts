@@ -17,6 +17,7 @@ import { schemas, validateParams, validateBody } from '../middleware/validation'
 import { deprovisionServiceExposure, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { syncAutheliaAccessControlSafe } from '../services/autheliaAccessControl';
 import { syncGuacamoleUsersSafe } from '../services/guacamoleSync';
+import { syncBeszelUsersSafe } from '../services/beszelSync';
 import { regenerateHomepageServices } from '../services/homepageConfig';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
@@ -512,7 +513,11 @@ router.put(
       // its account set can go stale the same way (§200 slice 3).
       const guacamoleWarning =
         req.params.name === 'guacamole' ? await syncGuacamoleUsersSafe('exposure_change', req.user!.id) : null;
-      const warning = [autheliaWarning, guacamoleWarning].filter(Boolean).join(' ') || null;
+      // Same reasoning for Beszel: exposing/hiding it changes whether `beszel`
+      // is a grantable app-access option, so its account set can go stale (§229).
+      const beszelWarning =
+        req.params.name === 'beszel' ? await syncBeszelUsersSafe('exposure_change', req.user!.id) : null;
+      const warning = [autheliaWarning, guacamoleWarning, beszelWarning].filter(Boolean).join(' ') || null;
 
       return res.json({
         message: turnedOff

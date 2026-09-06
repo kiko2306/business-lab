@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.30.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.31.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -363,22 +363,17 @@ Strategy:
         (`HBOX_OPTIONS_ALLOW_LOCAL_LOGIN=false`), NocoDB
         (`NC_DISABLE_EMAIL_AUTH=true`).
 
-- [ ] **Build `beszelSync.ts` so Beszel's proxy-trust actually has an
-      account to find** (§229) — `TRUSTED_AUTH_HEADER` only looks up an
-      existing user by the forwarded email (`FindAuthRecordByEmail`, no
-      creation fallback — confirmed by reading Beszel's own source, not the
-      two open discussions reporting a 401 with no explanation). Plan is set:
-      mirror `guacamoleSync.ts`'s shape (same trigger points, same
-      `app-beszel` permission convention), but authenticate to Beszel's
-      standard PocketBase `_superusers` API using
-      `BESZEL_ADMIN_EMAIL`/`BESZEL_ADMIN_PASSWORD` (the first-run bootstrap
-      makes that a real PocketBase superuser, confirmed in
-      `internal/users/users.go`), then create/update `users` records over
-      the normal Records API — no raw sqlite, no hash replication. Full
-      design in `plan.md` §229. Wire `TRUSTED_AUTH_HEADER: Remote-Email` on
-      the `beszel` service once the sync exists; leave
-      `DISABLE_PASSWORD_AUTH` off until a live proof confirms the header
-      path resolves a session.
+- [ ] **@mat: prove Beszel SSO live, then flip `DISABLE_PASSWORD_AUTH`**
+      (§229, §236) — `beszelSync.ts` is built and `TRUSTED_AUTH_HEADER:
+      Remote-Email` is on the `beszel` service, but unproven against the real
+      proxy. Scratch-stack proof (§223 shape): provision a test dashboard
+      user granted `beszel` access, confirm the PocketBase `users` record
+      lands, then forge `Remote-Email` on `/api/collections/users/auth-refresh`
+      (the request the two failing upstream discussions used) and confirm
+      200 + a real token instead of 401. Only then add
+      `DISABLE_PASSWORD_AUTH: "true"` to the compose file — flipping it
+      before the header path is proven risks a lockout with no non-manual
+      way back.
 
       Each needs its own config change and its own live proof; Nextcloud and
       Home Assistant's fixes probably also want a §180 conversation about
