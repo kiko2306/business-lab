@@ -47,6 +47,7 @@ once and never displayed again; rotate them there if you need a new one.
 | **Samba** | `SAMBA_USER` (default `labshare`) | `SAMBA_PASSWORD` — generated on first start. Set your own in the config panel if you need to know it to map the drive from Windows (`\\<host>\<SAMBA_SHARE_NAME>`). |
 | **WAHA** | dashboard user | `WAHA_DASHBOARD_PASSWORD`, `WAHA_SWAGGER_PASSWORD`, `WAHA_API_KEY` (all generated) |
 | **Vaultwarden** | — | `VAULTWARDEN_ADMIN_TOKEN` (generated, hidden) — for `/admin` only; normal accounts are self-registered |
+| **Miniflux** | `MINIFLUX_ADMIN_USERNAME` (default `admin`) | `MINIFLUX_ADMIN_PASSWORD` (generated) — created from env on first boot, no wizard |
 
 ## Wizard — you create the account
 

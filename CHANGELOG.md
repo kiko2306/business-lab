@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.36.0] — 2026-09-06
+
+### Added
+
+- Miniflux (`miniflux/miniflux`) — minimalist RSS/Atom feed reader over a companion Postgres; schema self-migrates on boot, admin created from env, no wizard (§22.8)
+
 ## [0.35.0] — 2026-09-06
 
 ### Added

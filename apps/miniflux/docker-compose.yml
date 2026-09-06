@@ -1,0 +1,62 @@
+services:
+  miniflux:
+    image: miniflux/miniflux:latest
+    restart: unless-stopped
+    ports:
+      - "${MINIFLUX_PORT:-10520}:8080"
+    environment:
+      # Miniflux keeps everything (feeds, entries, cached icons, sessions) in
+      # Postgres — no on-disk state of its own. The DB user is the database's
+      # owner/superuser, so RUN_MIGRATIONS can CREATE EXTENSION on first boot;
+      # no init sidecar needed.
+      DATABASE_URL: "postgres://${MINIFLUX_DB_USER:-miniflux}:${MINIFLUX_DB_PASSWORD}@miniflux-db/${MINIFLUX_DB_NAME:-miniflux}?sslmode=disable"
+      RUN_MIGRATIONS: "1"
+      # Creates the admin account on first boot only. Left set afterwards is a
+      # harmless "user already exists" log line on current images.
+      CREATE_ADMIN: "1"
+      ADMIN_USERNAME: ${MINIFLUX_ADMIN_USERNAME:-admin}
+      ADMIN_PASSWORD: ${MINIFLUX_ADMIN_PASSWORD}
+      # Absolute URLs (cookie path, share links, PWA manifest) are built from
+      # this — the dashboard rewrites it to the public https:// hostname once
+      # exposure is enabled. Restart to apply.
+      BASE_URL: ${MINIFLUX_BASE_URL:-http://localhost:10520}
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=Miniflux"
+      - "homepage.icon=miniflux.png"
+      - "homepage.href=http://localhost:${MINIFLUX_PORT:-10520}"
+      - "homepage.description=Minimalist RSS/Atom feed reader"
+    depends_on:
+      miniflux-db:
+        condition: service_healthy
+    networks:
+      - miniflux-net
+    healthcheck:
+      # Miniflux ships its own healthcheck subcommand — no curl/wget in the
+      # image to rely on.
+      test: ["CMD", "/usr/bin/miniflux", "-healthcheck", "auto"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+
+  miniflux-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${MINIFLUX_DB_NAME:-miniflux}
+      POSTGRES_USER: ${MINIFLUX_DB_USER:-miniflux}
+      POSTGRES_PASSWORD: ${MINIFLUX_DB_PASSWORD}
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    networks:
+      - miniflux-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${MINIFLUX_DB_USER:-miniflux}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  miniflux-net:
+    driver: bridge
