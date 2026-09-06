@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.31.1] — 2026-09-06
+
+### Added
+
+- `overlayOnly` service flag: refuses public tunnel exposure for sensitive gateways (Guacamole, Pi-hole), which must be reached over the NetBird/Tailscale overlay (§210.3)
+
 ## [0.31.0] — 2026-09-06
 
 ### Added

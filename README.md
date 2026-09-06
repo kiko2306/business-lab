@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.31.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.31.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -385,20 +385,14 @@ Strategy:
       SSO), Jellyfin (core has no header-trust, only a community plugin) and
       BookStack have no known full fix — parked, not blocked on anything
       actionable.
-- [ ] **A VPN/overlay-only flag for sensitive apps** (§210.3) — distinct
-      from the existing `lanOnly` (`services.ts`), which means "this
-      protocol can't physically be tunneled" (Samba/SMB) and is enforced
-      as a hard refusal in `exposure.ts`. This would be a policy flag for
-      apps that *can* be tunneled but shouldn't be, given what they
-      control: Guacamole (RDP/VNC/SSH to everything on the overlay behind
-      one login — named directly), code-server/wetty (full shell access,
-      tie to §210.2's LAN-bypass question), nginx-proxy-manager/netbird-vpn
-      (control the ingress path / VPN control plane), pihole (DNS admin).
-      Not Vaultwarden or Home Assistant — their WAN reach is the point of
-      running them, so the answer there is "harden the login," not "hide
-      it." Same enforcement shape as `lanOnly` in `exposure.ts`, a
-      separate flag and message so the two reasons ("can't" vs
-      "shouldn't") don't blur together.
+- [ ] **Decide the rest of `overlayOnly`'s roster** (§210.3, §237) — the
+      flag ships (`services.ts`/`exposure.ts`/`getExposability`, tagged on
+      Guacamole and Pi-hole). Still undecided per app: nginx-proxy-manager
+      and netbird-vpn (ingress path / VPN control plane — estate-wide blast
+      radius, but they need their admin UIs reachable somehow), and
+      code-server/wetty (full shell access — §210.3 says decide alongside
+      the open §180 LAN-bypass question, and they keep their own login
+      today per §93). Add the tag per app once each risk call is made.
 
 ### Apps and integrations
 

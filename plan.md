@@ -17832,3 +17832,40 @@ after that does `DISABLE_PASSWORD_AUTH` get flipped.
 19 unit tests in `beszelSync.test.ts` (create/promote/delete/seed-admin
 exemption/case-insensitivity/unreachable/not-installed/per-user-failure).
 Backend typecheck + 590 tests pass.
+
+## 237. `overlayOnly` — a policy flag against tunnelling sensitive gateways (2026-09-06)
+
+§210.3 planned this; built now. `lanOnly` (services.ts, Samba) already
+means "this protocol physically can't be carried by the tunnel/NPM path" —
+a hard refusal in `exposure.ts`. `overlayOnly` is the *policy* sibling: the
+app **can** be tunnelled, but it's a keys-to-the-kingdom gateway that
+shouldn't sit on the public Cloudflare Tunnel even behind Authelia. Reach it
+over the NetBird/Tailscale overlay instead.
+
+**Built:**
+
+- `overlayOnly?: boolean` on `ServiceConfig` (`types/index.ts`).
+- `getExposability(serviceName)` in `exposure.ts` — one place that returns
+  `{ exposable, reason }` for the three "can't expose" cases in priority
+  order: no published port → `lanOnly` → `overlayOnly`, each with its own
+  message ("no published port" / "LAN-only … cannot be exposed" / "sensitive
+  gateway — reach it over the NetBird/Tailscale overlay"). The write-side
+  guard in `upsertServiceExposureConfig` and the read-side `GET
+  /:name/exposure` route both call it, replacing the two hand-rolled guard
+  blocks the route had drifted a partial copy of.
+- `GET /:name/exposure` now returns `exposableReason` alongside `exposable`;
+  the frontend (`service-card.component.html`) shows it in place of the
+  hardcoded "no published port" line, which was already slightly wrong for
+  Samba and would have been plainly wrong for an `overlayOnly` app.
+- Tagged `overlayOnly: true` on **guacamole** and **pihole** only.
+
+**Roster decision:** asked which apps to tag. Picked Guacamole (named
+directly in §210.3) and Pi-hole (DNS admin for the estate). Deliberately
+**not** tagged this pass: nginx-proxy-manager / netbird-vpn (their admin
+UIs still need a reachable path — separate risk call), and code-server /
+wetty (§210.3 ties them to the open §180 LAN-bypass question; they keep
+their own login today per §93 so they're not unguarded). New README item
+tracks the remaining per-app calls.
+
+Backend typecheck + 596 tests (10 new in `exposure.test.ts`), frontend 50
+tests — all pass.

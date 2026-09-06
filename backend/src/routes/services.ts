@@ -11,10 +11,10 @@ import { requireCapability } from '../middleware/requireCapability';
 import * as executor from '../services/executor';
 import * as status from '../services/status';
 import { createStreamTicket } from '../services/realtime';
-import { getPublishedUpstreamPort, getService, isValidServiceName, resolveComposeFile } from '../config/services';
+import { getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { clearImagePins, pinnedImages } from '../services/composeOverride';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
-import { deprovisionServiceExposure, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
+import { deprovisionServiceExposure, getExposability, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { syncAutheliaAccessControlSafe } from '../services/autheliaAccessControl';
 import { syncGuacamoleUsersSafe } from '../services/guacamoleSync';
 import { syncBeszelUsersSafe } from '../services/beszelSync';
@@ -427,23 +427,19 @@ router.get(
   validateServiceAllowlist,
   async (req: Request, res: Response) => {
     try {
-      // Services with no published port (e.g. tailscale — a VPN client
-      // sidecar, no web UI) have nothing a reverse proxy could ever
-      // forward to. Report that up front, and don't surface a stale
-      // hostname/error from a stored row for a service that was briefly
-      // (mis)configured before this check existed — see
-      // upsertServiceExposureConfig in exposure.ts for the write-side guard.
-      // A `lanOnly` app (Samba) publishes a port but serves a non-HTTP
-      // protocol the tunnel/NPM path can't carry — never exposable, whatever
-      // the compose file publishes.
-      const exposable =
-        !getService(req.params.name)?.lanOnly && getPublishedUpstreamPort(req.params.name) !== null;
+      // Whether this service can be publicly exposed at all, and why not if
+      // it can't (no published port / `lanOnly` / `overlayOnly`) — see
+      // getExposability, shared with the write-side guard so the two can't
+      // drift. Also used to not surface a stale hostname/error from a row
+      // for a service that was briefly (mis)configured before this existed.
+      const { exposable, reason: exposableReason } = getExposability(req.params.name);
 
       const row = await getServiceExposureRow(req.params.name);
       if (!row) {
         return res.json({
           enabled: false,
           exposable,
+          exposableReason,
           hostname: null,
           upstreamScheme: 'http',
           upstreamHost: null,
@@ -457,6 +453,7 @@ router.get(
       return res.json({
         enabled: row.enabled,
         exposable,
+        exposableReason,
         hostname: exposable ? row.hostname : null,
         upstreamScheme: row.upstream_scheme,
         upstreamHost: row.upstream_host,

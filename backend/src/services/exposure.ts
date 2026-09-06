@@ -37,6 +37,41 @@ const UPSTREAM_SCHEME = 'http';
 // decide here.
 const ALLOW_WEBSOCKET_UPGRADE = true;
 
+/**
+ * Whether a service can be publicly exposed through the tunnel, and a
+ * human-readable reason when it can't. Three reasons it can't, in priority
+ * order:
+ *  - no published port in its compose file (tailscale — a VPN sidecar with
+ *    no web UI, nothing a reverse proxy could forward to);
+ *  - `lanOnly`: publishes a port but speaks a non-HTTP LAN protocol the
+ *    tunnel/NPM path can't carry (Samba/SMB on 445) — "can't";
+ *  - `overlayOnly`: a policy call, not a protocol one — a sensitive gateway
+ *    that *can* be tunnelled but shouldn't be; reach it over the overlay
+ *    instead (plan.md §210.3) — "shouldn't".
+ *
+ * Shared by the write-side guard here and the GET /exposure route, so the
+ * two can't drift.
+ */
+export function getExposability(serviceName: string): { exposable: boolean; reason: string | null } {
+  const service = getService(serviceName);
+  if (getPublishedUpstreamPort(serviceName, service?.exposurePortEnvVar) === null) {
+    return {
+      exposable: false,
+      reason: `${serviceName} has no published port in its compose file, so it can't be publicly exposed.`,
+    };
+  }
+  if (service?.lanOnly) {
+    return { exposable: false, reason: `${serviceName} is a LAN-only service and cannot be exposed through the tunnel.` };
+  }
+  if (service?.overlayOnly) {
+    return {
+      exposable: false,
+      reason: `${serviceName} is a sensitive gateway — reach it over the NetBird/Tailscale overlay, not the public tunnel.`,
+    };
+  }
+  return { exposable: true, reason: null };
+}
+
 export async function getServiceExposureRow(serviceName: string): Promise<ServiceExposureRow | null> {
   const result = await query<ServiceExposureRow>('SELECT * FROM service_exposure WHERE service_name = $1', [
     serviceName,
@@ -48,29 +83,17 @@ export async function upsertServiceExposureConfig(
   serviceName: string,
   { enabled }: ServiceExposureInput
 ): Promise<ServiceExposureRow> {
-  // Some services (e.g. tailscale — a VPN client sidecar with no web UI,
-  // no `ports:` in its compose file at all) have nothing a reverse proxy
-  // could ever forward to. Reject enabling exposure for those outright,
-  // rather than letting it silently fail on the next service start with
-  // "unable to determine the published port".
-  if (enabled && getPublishedUpstreamPort(serviceName, getService(serviceName)?.exposurePortEnvVar) === null) {
-    const error: HttpError = {
-      message: `${serviceName} has no published port in its compose file, so it can't be publicly exposed.`,
-      statusCode: 400,
-    };
-    throw error;
-  }
-
-  // A LAN-only app (Samba/SMB) does publish a port, but it isn't HTTP — the
-  // Cloudflare Tunnel + NPM path can't carry it (§0 principle 1). Reject
-  // enabling exposure rather than provisioning an NPM host that forwards
-  // nothing.
-  if (enabled && getService(serviceName)?.lanOnly) {
-    const error: HttpError = {
-      message: `${serviceName} is a LAN-only service and cannot be exposed through the tunnel.`,
-      statusCode: 400,
-    };
-    throw error;
+  // Reject enabling exposure for a service that can't take it — no published
+  // port (tailscale), a non-HTTP LAN protocol (`lanOnly`, Samba), or a
+  // policy block on tunnelling a sensitive gateway (`overlayOnly`, Guacamole/
+  // Pi-hole — plan.md §210.3). Better here than a silent failure on the next
+  // start, or an NPM host that forwards nothing.
+  if (enabled) {
+    const { exposable, reason } = getExposability(serviceName);
+    if (!exposable) {
+      const error: HttpError = { message: reason!, statusCode: 400 };
+      throw error;
+    }
   }
 
   const globalConfig = await getExposureConfig();

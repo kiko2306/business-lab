@@ -255,7 +255,7 @@
         </div>
 
         <div *ngIf="!exposureLoading && exposure && !exposure.exposable" class="small text-body-secondary mb-0">
-          This service has no published port, so it can't be publicly exposed.
+          {{ exposure.exposableReason || "This service has no published port, so it can't be publicly exposed." }}
         </div>
 
         <ng-container *ngIf="!exposureLoading && exposure && exposure.exposable">

@@ -239,6 +239,14 @@ export interface ServiceDefinition {
   // enable public exposure for it. It still gets no Home Page tile (that
   // keys off a provisioned exposure, which can never happen here).
   lanOnly?: boolean;
+  // A policy call, not a protocol one: this app *can* be carried by the
+  // tunnel + NPM path, but it's a keys-to-the-kingdom gateway (Guacamole's
+  // RDP/VNC/SSH to every overlay host behind one login; Pi-hole's DNS admin)
+  // that shouldn't sit on the public Cloudflare Tunnel even behind Authelia.
+  // Reach it over the NetBird/Tailscale overlay instead. Same enforcement
+  // shape as `lanOnly` (dashboard refuses to offer or enable exposure), but a
+  // distinct reason so "shouldn't" doesn't blur into "can't" (plan.md §210.3).
+  overlayOnly?: boolean;
   // Named Authelia groups this app's forward-auth rule requires, on top of
   // the synthetic per-user `app-<name>` group the dashboard manages (plan.md
   // §151/§152). Most apps need none — "is this user allowed this app" is the

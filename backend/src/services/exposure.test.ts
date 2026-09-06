@@ -6,7 +6,7 @@ import { getPublishedUpstreamPort, getService } from '../config/services';
 import { deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
-import { deprovisionServiceExposure, getNpmOriginUrl, provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
+import { deprovisionServiceExposure, getExposability, getNpmOriginUrl, provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
 import { ServiceExposureRow, ExposureGlobalConfig } from '../types';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
@@ -411,6 +411,58 @@ describe('upsertServiceExposureConfig', () => {
     mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ enabled: true })] } as never);
 
     await expect(upsertServiceExposureConfig('paperless', { enabled: true })).resolves.toMatchObject({ enabled: true });
+  });
+
+  it('refuses to enable exposure for a lanOnly service', async () => {
+    mockedGetPublishedUpstreamPort.mockReturnValue(445);
+    mockedGetService.mockReturnValue({ lanOnly: true } as never);
+
+    await expect(upsertServiceExposureConfig('samba', { enabled: true })).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringContaining('LAN-only'),
+    });
+    expect(mockedQuery).not.toHaveBeenCalled();
+  });
+
+  it('refuses to enable exposure for an overlayOnly service (policy, not protocol)', async () => {
+    mockedGetPublishedUpstreamPort.mockReturnValue(8080);
+    mockedGetService.mockReturnValue({ overlayOnly: true } as never);
+
+    await expect(upsertServiceExposureConfig('guacamole', { enabled: true })).rejects.toMatchObject({
+      statusCode: 400,
+      message: expect.stringContaining('overlay'),
+    });
+    expect(mockedQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe('getExposability', () => {
+  it('no published port → not exposable', () => {
+    mockedGetPublishedUpstreamPort.mockReturnValue(null);
+    mockedGetService.mockReturnValue(undefined as never);
+
+    expect(getExposability('tailscale')).toMatchObject({ exposable: false, reason: expect.stringContaining('no published port') });
+  });
+
+  it('lanOnly → not exposable, "cannot" wording', () => {
+    mockedGetPublishedUpstreamPort.mockReturnValue(445);
+    mockedGetService.mockReturnValue({ lanOnly: true } as never);
+
+    expect(getExposability('samba')).toMatchObject({ exposable: false, reason: expect.stringContaining('LAN-only') });
+  });
+
+  it('overlayOnly → not exposable, "sensitive gateway" wording', () => {
+    mockedGetPublishedUpstreamPort.mockReturnValue(8080);
+    mockedGetService.mockReturnValue({ overlayOnly: true } as never);
+
+    expect(getExposability('pihole')).toMatchObject({ exposable: false, reason: expect.stringContaining('sensitive gateway') });
+  });
+
+  it('ordinary HTTP app with a port → exposable, no reason', () => {
+    mockedGetPublishedUpstreamPort.mockReturnValue(8000);
+    mockedGetService.mockReturnValue({} as never);
+
+    expect(getExposability('paperless')).toEqual({ exposable: true, reason: null });
   });
 });
 

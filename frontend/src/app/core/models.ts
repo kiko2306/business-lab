@@ -232,10 +232,14 @@ export interface ExposureSettingsInput {
 
 export interface ServiceExposureConfig {
   enabled: boolean;
-  // False for services with no published port at all (e.g. a VPN client
-  // sidecar with no web UI) — nothing a reverse proxy could ever forward
-  // to. hostname/lastError are always null when this is false.
+  // False for services that can't be publicly exposed — no published port
+  // (a VPN client sidecar with no web UI), a non-HTTP LAN protocol (Samba),
+  // or a policy block on tunnelling a sensitive gateway (Guacamole,
+  // Pi-hole). hostname/lastError are always null when this is false.
   exposable: boolean;
+  // Why exposure isn't offered, when `exposable` is false — shown to the
+  // operator in place of the generic message.
+  exposableReason?: string | null;
   hostname: string | null;
   upstreamScheme: 'http' | 'https';
   upstreamHost: string | null;
