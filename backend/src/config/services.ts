@@ -565,6 +565,23 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // No Host-header validation and no login of its own (like stirling-pdf) —
     // exposure needs no extra env, Authelia is the only gate.
   },
+  'it-tools': {
+    name: 'it-tools',
+    label: 'IT Tools',
+    description: 'Offline box of developer and IT utilities',
+    icon: 'tools',
+    category: 'Development',
+    composePath: 'apps/it-tools/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:80/',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // Fully static SPA — no backend, no Host validation, no login. Authelia
+    // is the only gate; no exposure env needed.
+  },
   'homebox': {
     name: 'homebox',
     label: 'Homebox',

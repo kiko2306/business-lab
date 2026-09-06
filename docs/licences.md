@@ -58,6 +58,7 @@ operate within, listed again at the end.
 | Home Page (gethomepage) | GPL-3.0 | ✅ Clean | internal use |
 | Immich | **AGPL-3.0** | ✅ Clean | unmodified |
 | ITFlow | GPL-3.0 | ✅ Clean | no paid tiers |
+| IT Tools (`corentinth/it-tools`) | **GPL-3.0** | ✅ Clean | stock unmodified, static SPA served by nginx; GPL-3.0 places no restriction on running it internally, not redistributed as software |
 | Jellyfin | GPL-2.0 | ✅ Clean | |
 | Kitchen switcher | *ours* — no LICENSE file | ⚠️ Decide | repo has no licence (below) |
 | Kopia | Apache-2.0 | ✅ Clean | official `kopia/kopia` image, built by the project; internal backup use |

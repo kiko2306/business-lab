@@ -1,0 +1,24 @@
+services:
+  it-tools:
+    # Newest upstream release (Oct 2024 — upstream's `:latest` points at the
+    # same build; only `:nightly` moves). Fully static SPA, no backend/data/
+    # auth, so a stale pin is harmless; bump deliberately.
+    image: corentinth/it-tools:2024.10.22-7ca5933
+    restart: unless-stopped
+    ports:
+      - "${IT_TOOLS_PORT:-10490}:80"
+    labels:
+      - "homepage.group=Development"
+      - "homepage.name=IT Tools"
+      - "homepage.icon=it-tools.png"
+      - "homepage.href=http://localhost:${IT_TOOLS_PORT:-10490}"
+      - "homepage.description=Offline box of developer and IT utilities"
+    healthcheck:
+      # Static nginx — a 200 on the SPA root means it's serving. curl, not
+      # busybox wget: wget resolves localhost to ::1 first and nginx only
+      # listens on IPv4, so wget reports "connection refused".
+      test: ["CMD", "curl", "-fsS", "http://localhost:80/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

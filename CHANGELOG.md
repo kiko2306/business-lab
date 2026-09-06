@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.33.0] — 2026-09-06
+
+### Added
+
+- IT Tools (`corentinth/it-tools`) — static offline box of developer/IT utilities, no backend or config (§22.7)
+
 ## [0.32.0] — 2026-09-06
 
 ### Added

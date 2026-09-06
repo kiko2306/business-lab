@@ -1642,9 +1642,15 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       (Gitea fork) with Actions CI — pairs with `code-server`.
       `exposureEnvKeys.url: ['FORGEJO__server__ROOT_URL']`; SSH on a
       dedicated host port. **Priority: P2** — **Estimate: M**
-- [ ] **IT-Tools** — `corentinth/it-tools`. Offline box of dev/IT utilities
-      (hash, JWT, cron, base64, colour, cert decode…). Static, zero config.
-      **Priority: P3** — **Estimate: S**
+- [x] **IT-Tools** — `corentinth/it-tools:2024.10.22-7ca5933`. Added
+      2026-09-06 (§241): `apps/it-tools/` (`docker-compose.yml` +
+      `.env.example`), host port `${IT_TOOLS_PORT:-10490}` → `:80`,
+      `curl -fsS /` healthcheck (busybox wget fails — resolves localhost to
+      ::1, nginx is IPv4-only). Registry entry (Development, new `tools`
+      icon 🧰), no `exposureEnvKeys` (static SPA, no backend/Host-check/
+      login — Authelia is the only gate). Docs rows in `ports.md`,
+      `app-credentials.md`, `licences.md` (GPL-3.0, internal use). Proven
+      live: healthy, `/` 200.
 
 ### 22.8 Productivity & knowledge
 - [ ] **Karakeep** — `ghcr.io/karakeep-app/karakeep` (ex Hoarder).
@@ -18033,3 +18039,32 @@ Docs: `ports.md` (`10480 scrutiny`), `app-credentials.md` ("no login of
 their own" table), `licences.md` (Scrutiny MIT; bundled InfluxDB 2 OSS MIT,
 smartmontools GPL-2.0+, s6-overlay ISC — all clean for internal use).
 Backend 596 tests + frontend 50 pass. Minor bump 0.31.2 → 0.32.0.
+
+## 241. IT-Tools added — static dev/IT utility box (§22.7, 2026-09-06)
+
+Smallest item on the §22 backlog, pulled as a quick win. `corentinth/it-tools`
+is a fully static Vue SPA (hash/JWT/cron/base64/colour/cert-decode/…) served
+by nginx — no backend, no database, no config, no auth.
+
+- `corentinth/it-tools:2024.10.22-7ca5933` — the newest upstream release.
+  Upstream's `:latest` points at the same Oct-2024 build (only `:nightly`
+  moves), so this is a pin for explicitness, not to dodge an auto-update.
+  Stateless, so a stale pin is harmless; bump deliberately.
+- Port `${IT_TOOLS_PORT:-10490}` → `:80`. No volumes.
+- Healthcheck: `curl -fsS http://localhost:80/`. The obvious
+  `wget --spider` fails inside this image — `/usr/bin/wget` is busybox,
+  which resolves `localhost` to `::1` first and nginx only listens on IPv4,
+  so it reports "connection refused". `curl` (also in the image) falls back
+  to IPv4. Found this live, not by guessing.
+- Registry entry: Development category, new `tools` → 🧰 icon. No
+  `exposureEnvKeys` — no Host-header validation and no login, so exposure is
+  Authelia-only, same as stirling-pdf / scrutiny.
+
+Docs: `ports.md` (`10490 it-tools`), `app-credentials.md` ("no login of
+their own"), `licences.md` (GPL-3.0 — stock, unmodified, internal use, not
+redistributed as software; same standing as Home Page / ITFlow).
+
+Proven live on `tx-home-utils.com`: container healthy, SPA root returns 200
+with the right `<title>`. Torn down after — the dashboard's start path is
+the registry entry. Backend 596 + frontend 50 tests pass. Minor bump
+0.32.0 → 0.33.0.
