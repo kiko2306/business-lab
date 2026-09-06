@@ -329,10 +329,6 @@ Strategy:
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
-- [ ] **n8n workflow overwrite policy** (§118.3) — `n8n-workflows-init`
-      re-imports every boot, so a managed workflow's UI edits are replaced.
-      Fine for now (matches every other generated config here); revisit
-      skip-if-exists if someone needs to customise one in place.
 - [ ] **The LAN can bypass Cloudflare on NPM's :80** (§180, §210) — the
       tunnel origin is the host LAN IP, so NPM's plain-HTTP proxy port
       answers any `Host:` header from anywhere on the LAN, skipping

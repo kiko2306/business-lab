@@ -18374,3 +18374,36 @@ sibling apps and the consuming side is now proven directly, same standard
 as §227.
 
 Compose + docs only — no `backend/src`/`frontend/src`, no version bump.
+
+## 248. n8n workflow overwrite policy — keep re-import-every-boot (§118.3)
+
+Closed the README decision item. `n8n-workflows-init` re-runs
+`import:workflow` → `update:workflow --active` → `publish:workflow` over
+`apps/n8n/workflows/*.json` on every n8n start, so a dashboard-rendered
+workflow is authoritative and a UI edit to it is replaced on the next
+restart.
+
+**Decision: keep it. Not a gap.** It's the same model as every other
+generated config here — CrowdSec's `http.yaml`/`profiles.yaml`, Authelia's
+`configuration.yml`, the Home Page's `services.yaml`, every app `.env`. A
+managed workflow's source of truth is its renderer
+(`services/n8nWorkflows.ts`), the way you'd change CrowdSec's alert template
+by editing `crowdsecConfig.ts`, not the file it emits.
+
+"skip-if-exists" was the alternative — it would let a UI edit to a managed
+workflow survive, but at the cost of the dashboard and n8n's DB silently
+disagreeing, which is exactly the failure mode the overwrite model exists
+to prevent. A user who wants a customised version clones it in the n8n UI:
+the clone gets its own id, is never in `apps/n8n/workflows/`, and the init
+loop never touches it. Already documented in `n8nWorkflows.ts`'s header and
+the compose comment.
+
+Orphan check: when CrowdSec alerts are turned off, `applyN8nWorkflows`
+removes the rendered JSON and `crowdsecConfig.ts` repoints CrowdSec's
+notification-http away from the n8n webhook. The already-imported workflow
+stays in n8n's DB (n8n has no clean CLI delete) and is still published, but
+nothing posts to its webhook any more, so it's inert. Acceptable — a stale,
+unreachable workflow is not worth a delete path that n8n doesn't cleanly
+support.
+
+Docs/plan only — no code, no version bump.
