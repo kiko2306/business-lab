@@ -18426,3 +18426,29 @@ separately at §196). The surviving work is the Housekeeping `@mat` item to
 run the spec once against a real dashboard and report selector drift — kept.
 
 Docs/plan only — no code, no version bump.
+
+## 250. Audited `composePath` vs on-disk compose filenames — documented non-issue
+
+Checked every `SERVICES[*].composePath` against what's actually on disk.
+All 43 entries read `apps/<name>/docker-compose.yml`; two apps
+(`nginx-proxy-manager`, `paperless`) ship the file as `compose.yaml`
+instead. Nothing is broken by that:
+
+- `resolveComposeFile` (`services.ts`) uses only `dirname(composePath)` for
+  the app directory, tries `basename(composePath)` as the first candidate,
+  then falls through `COMPOSE_FILENAMES`
+  (`compose.yaml`, `compose.yml`, `docker-compose.yml`,
+  `docker-compose.yaml`) — so `compose.yaml` resolves fine.
+- `services.test.ts:474` already spells this out: "composePath is nominal —
+  upstream projects name the file inconsistently, so the app directory is
+  probed the same way resolveComposeFile does." The registry-wide compose
+  assertions use a helper that probes the dir, not the literal path.
+
+Rejected: rewriting the two entries to `apps/<name>/compose.yaml`. It would
+make the field look more literal but breaks the "one canonical spelling for
+all apps" convention for a reader — now two of forty-three differ with no
+functional reason — and adds nothing the resolver/tests don't already
+handle. Left as-is.
+
+No code, no README item (self-raised during the working loop), no version
+bump.
