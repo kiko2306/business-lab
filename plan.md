@@ -18407,3 +18407,22 @@ unreachable workflow is not worth a delete path that n8n doesn't cleanly
 support.
 
 Docs/plan only — no code, no version bump.
+
+## 249. Closed the stale §131.5 "E2E coverage for the Docker-touching flows" item
+
+The README's Infrastructure bullet asked for a Playwright live-stack mode
+covering start/stop, exposure and backups. That is exactly what §171 built —
+`e2e/tests/live-stack.spec.ts`, gated on `E2E_LIVE_STACK=1`, local-only,
+skipped in CI:
+
+- **start / stop** an app (`E2E_LIVE_APP`, default `samba`) — the socket flow
+- **Backups page** renders Schedule / "Back up now" / Destination
+- **Exposure page** runs the non-mutating NPM + Cloudflare "Test connection"
+
+The bullet predates §171 and was never reconciled. Deleted it. The one flow
+not exercised is an actual backup *run* — §171 left it out on purpose (a real
+run is ~90 min, unusable in an E2E test; the restore round-trip is proven
+separately at §196). The surviving work is the Housekeeping `@mat` item to
+run the spec once against a real dashboard and report selector drift — kept.
+
+Docs/plan only — no code, no version bump.

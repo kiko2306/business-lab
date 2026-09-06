@@ -249,14 +249,6 @@ Updates:
       throwaway container, then unblocked tonight's Guacamole proof with a
       by-hand `chown` that this recreate makes redundant).
 
-Infrastructure:
-
-- [ ] **E2E coverage for the Docker-touching flows** (§131.5) — the Playwright
-      suite (`e2e/`) covers auth, nav, the Users page and the full 2FA
-      journey against `docker-compose.test.yml`, whose backend has no Docker
-      socket. Start/stop an app, configure exposure and run a backup still
-      need a live stack: add a live-stack mode (`E2E_BASE_URL` at a real
-      dashboard) that exercises them, local-only like the smoke tests.
 Strategy:
 
 
