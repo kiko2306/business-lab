@@ -35,6 +35,16 @@ services:
       PAPERLESS_EMAIL_FROM: ${PAPERLESS_EMAIL_FROM:-}
       PAPERLESS_EMAIL_USE_TLS: ${PAPERLESS_EMAIL_USE_TLS:-true}
       PAPERLESS_EMAIL_USE_SSL: ${PAPERLESS_EMAIL_USE_SSL:-false}
+      # Trust the Remote-User header Authelia sets via NPM's
+      # authelia-authrequest.conf, so an SSO login doesn't land on a second
+      # Paperless login form (plan.md §216/§217, same shape as Guacamole's
+      # HTTP_AUTH_HEADER / Beszel's TRUSTED_AUTH_HEADER). Only consulted when
+      # the header is present — a LAN-direct request to :10310 without it
+      # still gets Paperless's own login. The API keeps its own token auth
+      # (PAPERLESS_ENABLE_HTTP_REMOTE_USER_API left off). A header-authed user
+      # that doesn't exist yet is auto-created as a non-staff account; the
+      # generated PAPERLESS_ADMIN_USER stays the superuser.
+      PAPERLESS_ENABLE_HTTP_REMOTE_USER: "true"
       PAPERLESS_ENABLE_COMPRESSION: "true"
       PAPERLESS_TASK_WORKERS: 2
       PAPERLESS_THREADS_PER_WORKER: 1

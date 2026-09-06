@@ -18334,3 +18334,43 @@ deferred with the trigger to revisit (a real deployment needing a
 non-mount, non-S3 destination), so it stops reading as open work.
 
 Frontend-only text change. Patch bump 0.36.0 → 0.36.1.
+
+## 247. Paperless-ngx skips its own login behind Authelia (§216/§217)
+
+Picked up the header-trust half of the "trust the proxy" item. Paperless-ngx
+supports `PAPERLESS_ENABLE_HTTP_REMOTE_USER` — when set, it trusts a
+`Remote-User` request header as the authenticated username. NPM's
+`authelia-authrequest.conf` already forwards that header for every exposed,
+Authelia-protected app (proven for Guacamole, Beszel, Dozzle), so this is
+one line in `apps/paperless/compose.yaml` and no proxy-side change.
+
+Left `PAPERLESS_ENABLE_HTTP_REMOTE_USER_API` off: the web UI trusts the
+header, the REST API keeps its token auth (integrations use tokens, not an
+SSO session). Header name left at the Paperless default `HTTP_REMOTE_USER`,
+which is what gunicorn exposes `Remote-User` as — matches with nothing set.
+
+### The upstream "misbehaves behind nginx" caveat — did not reproduce
+
+§216 flagged an open upstream report of `HTTP_REMOTE_USER` misbehaving
+behind nginx specifically. Tested against the live container directly
+(gunicorn, no proxy in the way) on `tx-home-utils.com`:
+
+| Request | Before | After |
+|---|---|---|
+| `GET /` no header | 302 → `/accounts/login/` | 302 → `/accounts/login/` (fallback intact) |
+| `GET /` + `Remote-User: admin` | 302 → `/accounts/login/` (ignored) | **200**, authenticated Angular shell (`<pngx-…>`, no password field) |
+| `GET /api/ui_settings/` + `Remote-User: admin` | — | 401 (API still token-only, as intended) |
+
+The header path works; the fallback (LAN-direct, no header) still hits
+Paperless's own login, so §180's LAN-bypass concern doesn't regress —
+direct access is no more open than before. The forged-header test matched
+the existing non-superuser `admin` account rather than auto-creating one;
+the real superuser (`mat`, created interactively) is untouched.
+
+**Not verified**: a full browser round-trip through
+`paperless.tx-home-utils.com` + a real Authelia login — needs an operator
+Authelia session. NPM's `Remote-User` forwarding is already proven for the
+sibling apps and the consuming side is now proven directly, same standard
+as §227.
+
+Compose + docs only — no `backend/src`/`frontend/src`, no version bump.

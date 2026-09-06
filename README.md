@@ -352,14 +352,14 @@ Strategy:
       - **Header/IP trust** (one config change each): File Browser
         (`auth.method=proxy` — blocked on §180: its own login is the only
         gate on the sensitive home-directory mount while the LAN can bypass
-        Authelia), Paperless-ngx (`PAPERLESS_ENABLE_HTTP_REMOTE_USER` —
-        upstream has an open bug report of this misbehaving behind nginx
-        specifically, verify before wiring), Nextcloud (`user_saml`'s
-        "Environment mode"), Home Assistant (`trusted_networks`/
-        `trusted_proxies` — IP-based, weaker, lower priority). Stirling-PDF
-        and Uptime Kuma are done (§227): Stirling-PDF already shipped with
-        `SECURITY_ENABLELOGIN=false` by default; Uptime Kuma's `disableAuth`
-        (a DB setting, no env var) is now set by an idempotent init sidecar.
+        Authelia), Nextcloud (`user_saml`'s "Environment mode"), Home
+        Assistant (`trusted_networks`/`trusted_proxies` — IP-based, weaker,
+        lower priority). Stirling-PDF, Uptime Kuma and Paperless-ngx are
+        done: Stirling-PDF already shipped with `SECURITY_ENABLELOGIN=false`
+        by default; Uptime Kuma's `disableAuth` (a DB setting, no env var)
+        is set by an idempotent init sidecar (§227); Paperless-ngx trusts
+        `Remote-User` via `PAPERLESS_ENABLE_HTTP_REMOTE_USER`, the upstream
+        "misbehaves behind nginx" report did not reproduce (§247).
       - **OIDC against Authelia's own provider, then disable the local
         form** (two config steps: wire OIDC, log in once to auto-create the
         account, then flip the flag below): Immich (Admin Settings, OAuth-only,
