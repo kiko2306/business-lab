@@ -395,7 +395,12 @@
         </label>
         <input id="backupServer" type="text" class="form-control" formControlName="server"
                placeholder="minio.lan:9000" autocomplete="off" />
-        <div class="form-text">Leave blank to connect to AWS S3 itself.</div>
+        <div class="form-text">
+          Leave blank to connect to AWS S3 itself. For Backblaze B2 use its
+          S3-compatible endpoint (<code>s3.&lt;region&gt;.backblazeb2.com</code>),
+          your key ID as the access key ID and the application key as the
+          secret.
+        </div>
       </div>
       <div class="col-md-4">
         <label class="form-label fw-semibold" for="backupShare">Bucket</label>

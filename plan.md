@@ -18300,3 +18300,37 @@ Torn down after; `.env` never created (test values passed via the shell
 environment, guards block writing a real `.env`).
 
 Backend 596 + frontend 50 tests pass. Minor bump 0.35.0 → 0.36.0.
+
+## 246. B2 needs no new backup destination type; SFTP/gdrive parked (§81.5, §194, §221)
+
+Picked up the "B2/SFTP/gdrive as further Kopia-native remotes" README item.
+Outcome: most of it is already done or YAGNI.
+
+**B2 — already covered by the `s3` kind.** Backblaze B2 has had a fully
+S3-compatible API for years; Kopia's `s3` backend talks to it with no
+special handling — bucket name, the B2 *key ID* as the access key ID, the
+*application key* as the secret, and B2's S3 endpoint
+(`s3.<region>.backblazeb2.com`) in the existing Endpoint field. Kopia's
+legacy native `b2` backend buys nothing over that. The §221 form already
+listed "B2" in the S3 option label; all that was missing was telling the
+user the endpoint format and the key-ID/app-key mapping, so that is now a
+line of form-text under the Endpoint field. No backend change, no new
+`BackupTargetKind`, no DB key.
+
+**SFTP and `gdrive` — parked, not scheduled.** The original item hedged
+"if a destination that isn't S3-shaped is ever wanted" — nothing wants one.
+Each also carries real added surface:
+
+- **SFTP**: Kopia's `sftp` backend needs a `known_hosts` entry
+  (`--known-hosts` / `--known-hosts-data`) or it refuses to connect, plus a
+  key-vs-password choice — a genuinely new form shape, not a reuse of the
+  five existing fields.
+- **`gdrive`**: needs a GCP service-account JSON *file* uploaded and
+  mounted, which is a different UX from this project's "paste one token in
+  Settings once" pattern (Cloudflare, Tailscale, …).
+
+README item rewritten to say B2 is covered and SFTP/gdrive are deliberately
+deferred with the trigger to revisit (a real deployment needing a
+non-mount, non-S3 destination), so it stops reading as open work.
+
+Frontend-only text change. Patch bump 0.36.0 → 0.36.1.

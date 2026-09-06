@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.36.1] — 2026-09-06
+
+### Changed
+
+- Backup destination form: note that Backblaze B2 works through the existing S3-compatible kind (its S3 endpoint + key ID + application key) — no separate B2 destination type (§246)
+
 ## [0.36.0] — 2026-09-06
 
 ### Added
