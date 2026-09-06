@@ -1,0 +1,67 @@
+services:
+  metabase:
+    image: metabase/metabase:latest
+    restart: unless-stopped
+    ports:
+      - "${METABASE_PORT:-10510}:3000"
+    environment:
+      # Metabase's own application database (users, questions, dashboards,
+      # and the encrypted connection details for every data source it
+      # queries). Kept in a dedicated Postgres, not the shipped H2 file,
+      # which upstream says not to use for anything real.
+      MB_DB_TYPE: postgres
+      MB_DB_HOST: metabase-db
+      MB_DB_PORT: "5432"
+      MB_DB_DBNAME: ${METABASE_DB_NAME:-metabase}
+      MB_DB_USER: ${METABASE_DB_USER:-metabase}
+      MB_DB_PASS: ${METABASE_DB_PASSWORD}
+      # Encrypts stored data-source credentials at rest. Generated once; keep
+      # it — losing it means re-entering every connected database's password.
+      MB_ENCRYPTION_SECRET_KEY: ${METABASE_ENCRYPTION_KEY}
+      # Feeds email links, public-question URLs and SSO redirects — the
+      # dashboard rewrites it to the public https:// hostname once exposure
+      # is enabled. Restart to apply.
+      MB_SITE_URL: ${METABASE_SITE_URL:-http://localhost:10510}
+      MB_ANON_TRACKING_ENABLED: "false"
+      JAVA_TIMEZONE: ${TZ:-UTC}
+    labels:
+      - "homepage.group=Data"
+      - "homepage.name=Metabase"
+      - "homepage.icon=metabase.png"
+      - "homepage.href=http://localhost:${METABASE_PORT:-10510}"
+      - "homepage.description=BI dashboards and questions over your databases"
+    depends_on:
+      metabase-db:
+        condition: service_healthy
+    networks:
+      - metabase-net
+    healthcheck:
+      # Metabase's own readiness endpoint — {"status":"ok"} once the JVM is
+      # up and app-DB migrations have run (slow on first boot, hence the long
+      # start_period).
+      test: ["CMD", "curl", "-fsS", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 120s
+
+  metabase-db:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${METABASE_DB_NAME:-metabase}
+      POSTGRES_USER: ${METABASE_DB_USER:-metabase}
+      POSTGRES_PASSWORD: ${METABASE_DB_PASSWORD}
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    networks:
+      - metabase-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${METABASE_DB_USER:-metabase}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  metabase-net:
+    driver: bridge

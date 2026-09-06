@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.35.0] — 2026-09-06
+
+### Added
+
+- Metabase (`metabase/metabase`) — BI dashboards and questions over the stack's existing Postgres databases; own companion Postgres for app state (§22.4)
+
 ## [0.34.0] — 2026-09-06
 
 ### Added

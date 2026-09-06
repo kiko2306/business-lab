@@ -724,6 +724,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       disk: '💽',
       tools: '🧰',
       sync: '🔃',
+      chart: '📊',
     };
 
     return icons[icon] ?? '🖥️';

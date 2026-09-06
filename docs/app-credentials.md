@@ -62,6 +62,7 @@ Open these privately and claim them before exposing.
 | **BookStack** | Ships with `admin@admin.com` / `password` — change it on first login. |
 | **Mealie** | Ships with `changeme@example.com` / `MyPassword` — change it on first login. |
 | **NocoDB** | First signup becomes the super admin. |
+| **Metabase** | Setup wizard creates the admin account and (optionally) connects your first database. |
 | **Vikunja** | Register the first account; registration can then be disabled. |
 | **n8n** | Owner account created on first visit. |
 | **File Browser** | Ships with `admin` / `admin`. |

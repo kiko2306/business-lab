@@ -81,7 +81,7 @@ hand edit can leave its copy disagreeing with the app's.
 `10430` guacamole · `10440` homebox · `10450` clamav (clamd, no UI) ·
 `10460` onlyoffice · `10470` kopia (server UI on container `51515`) ·
 `10480` scrutiny · `10490` it-tools · `10500` syncthing (GUI; sync on
-fixed `22000` + discovery `21027/udp`, see below)
+fixed `22000` + discovery `21027/udp`, see below) · `10510` metabase
 
 These are the defaults. The allocator may have moved one on your host if
 something else already held the port — check the app's `.env` for the truth.
