@@ -7,6 +7,7 @@ import { requireCapability } from '../middleware/requireCapability';
 import {
   BACKUP_TARGET_KEYS,
   getBackupTarget,
+  isMountedKind,
   toKopiaRepositoryMount,
   toMountSpec,
   validateTarget,
@@ -590,9 +591,11 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
     return res.json({
       message: applied.detail,
       restarted: applied.restarted,
-      // No Docker mount at all for an s3 target (§221) — toMountSpec throws
-      // for that kind on purpose, so it's simply omitted here.
-      ...(target.kind === 's3' ? {} : { mount: toMountSpec(target), kopiaRepository: toKopiaRepositoryMount(target) }),
+      // No Docker mount at all for s3 (§221) or ftp (§267) — toMountSpec
+      // throws for those on purpose, so the mount details are simply omitted.
+      ...(isMountedKind(target.kind)
+        ? { mount: toMountSpec(target), kopiaRepository: toKopiaRepositoryMount(target) }
+        : {}),
     });
   } catch {
     return res.status(500).json({ error: 'Unable to save the backup destination.' });

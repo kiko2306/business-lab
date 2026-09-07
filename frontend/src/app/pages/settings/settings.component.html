@@ -459,6 +459,8 @@
         <option value="smb">Network drive (SMB / Windows share)</option>
         <option value="nfs">NAS (NFS export)</option>
         <option value="s3">S3-compatible bucket (AWS S3, MinIO, B2, Wasabi…)</option>
+        <option value="ftp">FTP server</option>
+        <option value="ftps">FTP server with TLS (FTPS)</option>
       </select>
     </div>
 
@@ -551,6 +553,46 @@
           Passed straight to Kopia's <code>repository connect s3</code>.
           <code>--disable-tls</code> for a plain-HTTP endpoint (a LAN MinIO,
           say); <code>--region=…</code> if your endpoint needs one.
+        </div>
+      </div>
+    </ng-container>
+
+    <!-- FTP / FTPS -->
+    <ng-container *ngIf="backupTargetForm.controls.kind.value === 'ftp' || backupTargetForm.controls.kind.value === 'ftps'">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="backupServer">Server</label>
+        <input id="backupServer" type="text" class="form-control" formControlName="server"
+               placeholder="192.168.1.50" autocomplete="off" />
+        <div class="form-text">Host, or <code>host:port</code> if it is not on 21.</div>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold" for="backupShare">
+          Remote directory <span class="fw-normal text-body-secondary">(optional)</span>
+        </label>
+        <input id="backupShare" type="text" class="form-control" formControlName="share"
+               placeholder="/" autocomplete="off" />
+        <div class="form-text">Where the repository lives on the server. Blank or <code>/</code> is the FTP root.</div>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="backupUser">Username</label>
+        <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="backupPassword">Password</label>
+        <input id="backupPassword" type="password" class="form-control" formControlName="password"
+               [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+               autocomplete="new-password" />
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold" for="backupOptions">
+          Extra rclone flags <span class="fw-normal text-body-secondary">(optional)</span>
+        </label>
+        <input id="backupOptions" type="text" class="form-control" formControlName="options"
+               placeholder="--ftp-disable-epsv" autocomplete="off" />
+        <div class="form-text">
+          Kopia has no FTP backend of its own — it drives the bundled
+          <code>rclone</code>. These flags are appended to
+          <code>repository create rclone</code>.
         </div>
       </div>
     </ng-container>

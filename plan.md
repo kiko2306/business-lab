@@ -19697,3 +19697,79 @@ the destination called proven.
 Rejected: a `curlftpfs` FUSE mount routed through the `filesystem` kind —
 needs FUSE in the container and would sit in exactly the write path SMB hung
 on (§265). rclone's own streaming + retry is the point of using it.
+
+## 268. `ftp`/`ftps` backup destination — built, unit-tested; live proof blocked by the test NAS (§267)
+
+Implements §267. New `ftp`/`ftps` `BackupTargetKind` driven by the `rclone`
+the `kopia/kopia` image already bundles — Kopia has no FTP backend of its
+own. Mirrors the `s3` kind everywhere a kind is dispatched.
+
+### What landed
+
+- **`backupTarget.ts`** — `BackupTargetKind` += `'ftp' | 'ftps'`; a
+  `BACKUP_TARGET_KINDS` array as the single source of truth for the type
+  guard + Joi; a new `isMountedKind()` (true only for disk/smb/nfs) that
+  replaces the scattered `kind === 's3'` checks in `toMountSpec`,
+  `routes/settings.ts` and `backupTargetTest.ts`; `toRcloneFtpConfig()`
+  splitting `server` into `host`/`port` and mapping the five shared fields
+  onto an rclone ftp remote (`share` → remote dir, default `/`);
+  `validateTarget` rejects a slash/space/`@` in the FTP host.
+- **`kopiaTargetApply.ts` `buildEnvValues`** — restructured to start from a
+  baseline where every mount/s3/rclone var is blank and each kind overrides
+  only its own, so switching kinds never leaves a stale secret in `.env`
+  (previously the s3 and filesystem branches each only cleared the *other's*
+  vars — adding a third group made "clear everything else" the only sane
+  shape). ftp/ftps → `BACKUP_REPO_KIND=rclone` + `BACKUP_RCLONE_HOST/PORT/
+  USER/PASS/REMOTE_PATH/TLS/EXTRA_ARGS`.
+- **`apps/kopia/entrypoint.sh`** — `elif [ "$BACKUP_REPO_KIND" = "rclone" ]`:
+  writes `/app/config/rclone.conf` (`[backup]` type=ftp, password through
+  `rclone obscure`, `concurrency = 4` to cap parallel FTP connections), then
+  `set -- rclone --remote-path="backup:<dir>" --rclone-args=--config=…
+  --rclone-args=--vfs-cache-mode=writes`. The existing connect-or-create and
+  `kopia server start` lines are unchanged.
+- **`apps/kopia/docker-compose.yml`** — `BACKUP_RCLONE_*` passthrough added to
+  `environment:` (direct repo edit — compose files are read-only to backend
+  *code*, not to a maintainer). **`.env.example`** documents the block.
+- **`middleware/validation.ts`** — `kind` enum += `ftp`, `ftps`.
+- **`backupTargetTest.ts`** — `testFtpTarget`: `rclone lsd :ftp:` in a
+  throwaway `kopia/kopia` container with the password obscured *inside* the
+  container (never a flag), terse-error hints for 530 / timeout / TLS / 550.
+- **Frontend** — `BackupTargetKind` widened; Settings form gains the two
+  dropdown options and an FTP fieldset (server incl. optional `:port`,
+  remote directory, username, password, extra rclone flags). The existing
+  save-payload builder already covered the non-`disk` shape.
+- **Docs** — `licences.md` (rclone MIT, bundled, no separate image),
+  `app-credentials.md` (where the FTP fields go).
+- **Tests** — `backupTarget.test.ts` (+`toRcloneFtpConfig`, `isMountedKind`,
+  ftp `validateTarget`), `kopiaTargetApply.test.ts` (+rclone branch blanks
+  the others). Backend 638/638, frontend 50/50, both builds clean.
+
+### Live proof — attempted, blocked by the test NAS (same as SMB §265)
+
+@mat's NAS (`192.168.1.50`, FTP on 21) again stalls `kopia repository
+create`, this time through the rclone path:
+
+- `rclone` alone talks to the NAS FTP fine — `rclone lsd` lists the shares,
+  single PROPFIND/PUT/DELETE sub-second, 8 parallel PUTs all 201 in ~0.2 s.
+- `rclone serve webdav` (what Kopia's rclone backend spawns) starts, and a
+  direct probe gets a fast `401` — it is up and answering.
+- But `kopia repository create rclone` logs `detected webdav address …` and
+  then goes **silent forever** — nothing written to the FTP, no error.
+  `--vfs-cache-mode=writes` + `concurrency=4` did not change it. A throwaway
+  in-network FTP server couldn't isolate it further (a Docker DNS quirk made
+  it unresolvable from the Kopia container, and it fast-failed with a clear
+  error rather than hanging — so the silent hang is specific to reaching the
+  real NAS *past* the rclone-connect stage).
+
+This is now **two protocols (SMB, FTP), two Kopia backends, one symptom, one
+NAS.** The `disk` kind went end to end (§266); `s3` is proven (§221). rclone
+itself flags this backend `[Not maintained]` / "not actively tested, may
+cause data loss". So `ftp` ships as a real, tested capability for a
+well-behaved server, with the live proof recorded as blocked by this
+specific box — the §265 treatment.
+
+### State
+
+Destination settings reverted to @mat's SMB config; Kopia stopped, container
++ volume removed. Minor bump 0.42.1 → 0.43.0 (new user-facing destination
+kind).

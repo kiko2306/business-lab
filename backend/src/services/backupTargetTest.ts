@@ -10,7 +10,16 @@
  */
 
 import { spawn } from 'child_process';
-import { BackupMountSpec, BackupTarget, S3ConnectArgs, toMountSpec, toS3ConnectArgs } from '../utils/backupTarget';
+import {
+  BackupMountSpec,
+  BackupTarget,
+  RcloneFtpConfig,
+  S3ConnectArgs,
+  isMountedKind,
+  toMountSpec,
+  toRcloneFtpConfig,
+  toS3ConnectArgs,
+} from '../utils/backupTarget';
 import { readKopiaRepositoryPassword } from './kopiaTargetApply';
 import logger from '../utils/logger';
 
@@ -52,10 +61,16 @@ export interface BackupTargetTestResult {
   detail: string;
 }
 
-/** Dispatches to the mount-based test or the s3 one — see the file doc comment. */
+/** Dispatches to the mount-based test, the s3 one, or the ftp one — see the file doc comment. */
 export async function testBackupTarget(target: BackupTarget): Promise<BackupTargetTestResult> {
   if (target.kind === 's3') {
     return testS3Target(toS3ConnectArgs(target));
+  }
+  if (target.kind === 'ftp' || target.kind === 'ftps') {
+    return testFtpTarget(toRcloneFtpConfig(target));
+  }
+  if (!isMountedKind(target.kind)) {
+    return { success: false, message: `Cannot test a ${target.kind} destination.`, detail: '' };
   }
   return testMountTarget(toMountSpec(target));
 }
@@ -211,5 +226,72 @@ async function testS3Target(s3: S3ConnectArgs): Promise<BackupTargetTestResult> 
     success: false,
     message: 'Could not connect to the bucket.',
     detail: (raw.slice(0, 400) || 'Kopia gave no output.') + hint,
+  };
+}
+
+/**
+ * Prove an `ftp`/`ftps` destination with `rclone lsd` — list the remote
+ * directory, which needs a successful login and reachable server but writes
+ * nothing (Save is what commits). rclone is the same binary Kopia's `rclone`
+ * backend will drive; it lives in the `kopia/kopia` image, so this runs there
+ * with the entrypoint swapped. The password is obscured inside the container
+ * (`rclone obscure`), never passed as a flag, so it stays out of the process
+ * table and any log.
+ */
+async function testFtpTarget(ftp: RcloneFtpConfig): Promise<BackupTargetTestResult> {
+  if (!ftp.host || !ftp.user) {
+    return { success: false, message: 'Enter the FTP server and username first.', detail: '' };
+  }
+
+  // rclone takes the directory in the remote spec (`:ftp:path`), not a flag;
+  // a bare `:ftp:` is the FTP root.
+  const remote = ftp.remotePath && ftp.remotePath !== '/' ? `:ftp:${ftp.remotePath.replace(/^\/+/, '')}` : ':ftp:';
+  const flags = [
+    'rclone', 'lsd', remote,
+    `--ftp-host=${ftp.host}`,
+    `--ftp-user=${ftp.user}`,
+    '--ftp-pass="$(rclone obscure "$FTP_PASS")"',
+  ];
+  if (ftp.port) flags.push(`--ftp-port=${ftp.port}`);
+  if (ftp.explicitTls) flags.push('--ftp-explicit-tls');
+  if (ftp.extraArgs) flags.push(...ftp.extraArgs.split(/\s+/).filter(Boolean));
+
+  const result = await run(
+    'docker',
+    [
+      'run', '--rm', '--entrypoint', 'sh',
+      '-e', `FTP_PASS=${ftp.pass}`,
+      'kopia/kopia:latest',
+      '-c', flags.join(' '),
+    ],
+    S3_TIMEOUT_MS
+  );
+  const raw = (result.stderr || result.stdout).trim();
+
+  if (result.code === 0) {
+    return {
+      success: true,
+      message: 'FTP server reachable and credentials accepted.',
+      detail: `Listed ${ftp.remotePath} on ${ftp.host}. Kopia will create a repository there on Save.`,
+    };
+  }
+
+  logger.warn('FTP backup destination test failed', { detail: raw.slice(0, 200) });
+
+  let hint = '';
+  if (/530|login|not logged in|authentication/i.test(raw)) {
+    hint = ' Check the username and password.';
+  } else if (/no such host|timed out|connection refused|i\/o timeout|dial tcp/i.test(raw)) {
+    hint = ' The server did not respond — check the host, the port, and that this machine can reach it.';
+  } else if (/tls|certificate|handshake/i.test(raw)) {
+    hint = ' TLS negotiation failed — try the plain "ftp" kind if the server does not do explicit FTPS.';
+  } else if (/550|not found|no such (file|directory)/i.test(raw)) {
+    hint = ' The remote directory does not exist — check the path (use "/" for the FTP root).';
+  }
+
+  return {
+    success: false,
+    message: 'Could not connect to the FTP server.',
+    detail: (raw.slice(0, 400) || 'rclone gave no output.') + hint,
   };
 }

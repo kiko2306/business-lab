@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.43.0] — 2026-09-07
+
+### Added
+
+- Backup destinations: ftp/ftps kind driven by the rclone bundled in the Kopia image (Kopia has no native FTP backend) — new Settings fieldset, rclone.conf generated at start with the password obscured and FTP concurrency capped, test-connection via rclone lsd. Live proof against the test NAS blocked the same way SMB is (§267, §268); disk kind stays the proven external path.
+
 ## [0.42.1] — 2026-09-07
 
 ### Fixed

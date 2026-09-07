@@ -30,7 +30,13 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { BackupTarget, KOPIA_LOCAL_REPOSITORY_DEVICE, toKopiaRepositoryMount, toS3ConnectArgs } from '../utils/backupTarget';
+import {
+  BackupTarget,
+  KOPIA_LOCAL_REPOSITORY_DEVICE,
+  toKopiaRepositoryMount,
+  toRcloneFtpConfig,
+  toS3ConnectArgs,
+} from '../utils/backupTarget';
 import { resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import logger from '../utils/logger';
@@ -111,19 +117,37 @@ export interface ApplyResult {
 
 /**
  * Every env var `applyKopiaTarget` owns in Kopia's `.env`, computed fresh
- * from the target every time — an `s3` target's mount vars fall back to the
- * same harmless local default the app ships with (the compose file always
- * declares the `backup-target` volume, even though Kopia won't use
- * `/repository` when `BACKUP_REPO_KIND=s3`), and a mount-based target's s3
- * vars are blanked out. Nothing is ever left stale from a previous kind.
+ * from the target every time. Starts from a baseline where every var is
+ * empty and the mount falls back to the harmless local default the app ships
+ * with (the compose file always declares the `backup-target` volume, even
+ * when `BACKUP_REPO_KIND` is `s3` or `rclone` and `/repository` goes
+ * unused), then the active kind overrides only its own vars — so nothing is
+ * ever left stale from a previous kind.
  */
 export function buildEnvValues(target: BackupTarget): Record<string, string> {
+  const values: Record<string, string> = {
+    BACKUP_MOUNT_TYPE: 'none',
+    BACKUP_MOUNT_OPTIONS: 'bind',
+    BACKUP_MOUNT_DEVICE: KOPIA_LOCAL_REPOSITORY_DEVICE,
+    BACKUP_REPO_KIND: 'filesystem',
+    BACKUP_S3_BUCKET: '',
+    BACKUP_S3_ENDPOINT: '',
+    BACKUP_S3_ACCESS_KEY_ID: '',
+    BACKUP_S3_SECRET_ACCESS_KEY: '',
+    BACKUP_S3_EXTRA_ARGS: '',
+    BACKUP_RCLONE_HOST: '',
+    BACKUP_RCLONE_PORT: '',
+    BACKUP_RCLONE_USER: '',
+    BACKUP_RCLONE_PASS: '',
+    BACKUP_RCLONE_REMOTE_PATH: '',
+    BACKUP_RCLONE_TLS: '',
+    BACKUP_RCLONE_EXTRA_ARGS: '',
+  };
+
   if (target.kind === 's3') {
     const s3 = toS3ConnectArgs(target);
     return {
-      BACKUP_MOUNT_TYPE: 'none',
-      BACKUP_MOUNT_OPTIONS: 'bind',
-      BACKUP_MOUNT_DEVICE: KOPIA_LOCAL_REPOSITORY_DEVICE,
+      ...values,
       BACKUP_REPO_KIND: 's3',
       BACKUP_S3_BUCKET: s3.bucket,
       BACKUP_S3_ENDPOINT: s3.endpoint,
@@ -133,18 +157,23 @@ export function buildEnvValues(target: BackupTarget): Record<string, string> {
     };
   }
 
+  if (target.kind === 'ftp' || target.kind === 'ftps') {
+    const ftp = toRcloneFtpConfig(target);
+    return {
+      ...values,
+      BACKUP_REPO_KIND: 'rclone',
+      BACKUP_RCLONE_HOST: ftp.host,
+      BACKUP_RCLONE_PORT: ftp.port,
+      BACKUP_RCLONE_USER: ftp.user,
+      BACKUP_RCLONE_PASS: ftp.pass,
+      BACKUP_RCLONE_REMOTE_PATH: ftp.remotePath,
+      BACKUP_RCLONE_TLS: ftp.explicitTls ? 'true' : 'false',
+      BACKUP_RCLONE_EXTRA_ARGS: ftp.extraArgs,
+    };
+  }
+
   const mount = toKopiaRepositoryMount(target);
-  return {
-    BACKUP_MOUNT_TYPE: mount.type,
-    BACKUP_MOUNT_OPTIONS: mount.o,
-    BACKUP_MOUNT_DEVICE: mount.device,
-    BACKUP_REPO_KIND: 'filesystem',
-    BACKUP_S3_BUCKET: '',
-    BACKUP_S3_ENDPOINT: '',
-    BACKUP_S3_ACCESS_KEY_ID: '',
-    BACKUP_S3_SECRET_ACCESS_KEY: '',
-    BACKUP_S3_EXTRA_ARGS: '',
-  };
+  return { ...values, BACKUP_MOUNT_TYPE: mount.type, BACKUP_MOUNT_OPTIONS: mount.o, BACKUP_MOUNT_DEVICE: mount.device };
 }
 
 /**

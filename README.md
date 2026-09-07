@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.42.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.43.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -260,27 +260,19 @@ Strategy:
 
 ### Backups
 
-- [ ] **Add an `ftp`/`ftps` backup destination via Kopia's bundled rclone**
-      (§267) — the `kopia/kopia` image already ships `rclone`, and Kopia's
-      `rclone` backend speaks FTP. New `ftp`/`ftps` `BackupTargetKind` (reusing
-      the five existing fields), a `BACKUP_REPO_KIND=rclone` branch in
-      `entrypoint.sh` that writes `rclone.conf` from env, `buildEnvValues` +
-      `validateTarget` + `testBackupTarget` + the Settings form + docs +
-      tests, then a live proof against `192.168.1.50:21` (snapshot + restore).
-      This is the only remaining destination the test NAS can actually serve
-      (SMB hangs Kopia, NFS is off).
 - [ ] **Prove a real external destination against off-host hardware** (§131.4,
-      §196, §265, §266) — the `disk`-kind code path is now proven end to end
+      §196, §265, §266, §268) — the `disk`-kind code path is proven end to end
       (§266: snapshot + byte-for-byte restore from a real ext4 bind mount,
-      50553 files), and the §265 source-scope bug is fixed. Still unproven:
-      a destination on **separate hardware** — the whole point is surviving
-      the data disk failing. **SMB is out** — `kopia repository create` hangs
-      indefinitely on the test NAS (`//192.168.1.50/backup`) despite a
-      healthy, fast CIFS mount; upstream Kopia doesn't support filesystem
-      repos on SMB/NFS. Try `nfs` against a real NAS (NFS handles
-      `O_EXCL`/rename closer to a local FS, so it may not hang), or `disk`
-      against an actually-separate attached drive. `s3` is already proven
-      (§221) and is the recommended path.
+      50553 files) and the §265 source-scope bug is fixed. Still unproven:
+      any destination on **separate hardware** — the whole point is surviving
+      the data disk failing. The test NAS (`192.168.1.50`) hangs
+      `kopia repository create` on **both** SMB (§265, CIFS mount healthy but
+      Kopia's `O_EXCL`+rename stalls) **and** FTP (§268, rclone talks to it
+      fine but Kopia's rclone→WebDAV bridge goes silent) — two protocols, one
+      uncooperative box. Prove it against something else: `nfs` on a real NAS,
+      `disk` on an actually-separate attached drive, or `s3` (already proven
+      §221, the recommended path). `ftp`/`ftps` and the `disk` path are code-
+      complete; this item is just the off-host live run.
 ### Business Lab (§84)
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { BackupTarget, toKopiaRepositoryMount, toMountSpec, toS3ConnectArgs, validateTarget } from './backupTarget';
+import {
+  BackupTarget,
+  isMountedKind,
+  toKopiaRepositoryMount,
+  toMountSpec,
+  toRcloneFtpConfig,
+  toS3ConnectArgs,
+  validateTarget,
+} from './backupTarget';
 
 const base: BackupTarget = {
   kind: 'disk', path: '', server: '', share: '', username: '', password: '',
@@ -32,8 +40,36 @@ describe('toMountSpec', () => {
     expect(spec.o.match(/vers=/g)).toHaveLength(1);
   });
 
-  it('refuses an s3 target — there is no mount for it, use toS3ConnectArgs', () => {
+  it('refuses the non-mounted kinds — there is no mount for them', () => {
     expect(() => toMountSpec({ ...base, kind: 's3', share: 'bucket', username: 'ak', password: 'sk' })).toThrow();
+    expect(() => toMountSpec({ ...base, kind: 'ftp', server: 'h' })).toThrow(/not a Docker mount/);
+    expect(() => toMountSpec({ ...base, kind: 'ftps', server: 'h' })).toThrow();
+  });
+});
+
+describe('isMountedKind', () => {
+  it('is true only for the kernel-mount kinds', () => {
+    expect(['disk', 'smb', 'nfs'].every(isMountedKind as (k: string) => boolean)).toBe(true);
+    expect(['s3', 'ftp', 'ftps'].some(isMountedKind as (k: string) => boolean)).toBe(false);
+  });
+});
+
+describe('toRcloneFtpConfig', () => {
+  it('maps the shared form fields onto an rclone ftp remote, defaulting path to /', () => {
+    expect(toRcloneFtpConfig({
+      ...base, kind: 'ftp', server: '192.168.1.50', username: 'frias', password: 'pw', share: '',
+    })).toEqual({
+      host: '192.168.1.50', port: '', user: 'frias', pass: 'pw',
+      remotePath: '/', explicitTls: false, extraArgs: '',
+    });
+  });
+
+  it('splits host:port and marks ftps as explicit TLS', () => {
+    const c = toRcloneFtpConfig({
+      ...base, kind: 'ftps', server: 'nas.lan:2121', username: 'u', password: 'p',
+      share: '/backup', options: '--ftp-disable-epsv',
+    });
+    expect(c).toMatchObject({ host: 'nas.lan', port: '2121', remotePath: '/backup', explicitTls: true, extraArgs: '--ftp-disable-epsv' });
   });
 });
 
@@ -92,5 +128,13 @@ describe('validateTarget', () => {
 
   it('does not reject a comma in an s3 secret key — no comma-joined mount options to corrupt', () => {
     expect(validateTarget({ ...base, kind: 's3', share: 'b', username: 'ak', password: 'has,a,comma' })).toBeNull();
+  });
+
+  it('requires a bare host and a username for ftp/ftps, but not a directory', () => {
+    expect(validateTarget({ ...base, kind: 'ftp', server: '' })).toMatch(/FTP server/);
+    expect(validateTarget({ ...base, kind: 'ftp', server: 'ftp://h/x', username: 'u' })).toMatch(/bare host/);
+    expect(validateTarget({ ...base, kind: 'ftp', server: 'h', username: '' })).toMatch(/FTP username/);
+    expect(validateTarget({ ...base, kind: 'ftp', server: 'h', username: 'u' })).toBeNull();
+    expect(validateTarget({ ...base, kind: 'ftps', server: 'h:2121', username: 'u', password: 'has,comma' })).toBeNull();
   });
 });

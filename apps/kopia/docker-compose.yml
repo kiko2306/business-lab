@@ -28,8 +28,9 @@ services:
       KOPIA_SERVER_PASSWORD: ${KOPIA_SERVER_PASSWORD}
       KOPIA_SERVER_CONTROL_PASSWORD: ${KOPIA_SERVER_CONTROL_PASSWORD}
       # Which repository entrypoint.sh connects to — filesystem (the
-      # /repository mount below) or s3 (a Kopia-native remote, no mount at
-      # all, plan.md §221). Written by services/kopiaTargetApply.ts.
+      # /repository mount below), s3 (a Kopia-native remote, no mount at all,
+      # plan.md §221), or rclone (FTP via the bundled rclone, plan.md §267).
+      # Written by services/kopiaTargetApply.ts.
       BACKUP_REPO_KIND: ${BACKUP_REPO_KIND:-filesystem}
       BACKUP_S3_BUCKET: ${BACKUP_S3_BUCKET:-}
       # Blank connects to AWS S3 itself; set for MinIO/B2/Wasabi/any other
@@ -40,6 +41,17 @@ services:
       # Raw extra `kopia repository connect s3` flags, e.g. `--region=us-east-1`
       # or `--disable-tls` for a plain-HTTP endpoint. Appended verbatim.
       BACKUP_S3_EXTRA_ARGS: ${BACKUP_S3_EXTRA_ARGS:-}
+      # FTP / FTPS (BACKUP_REPO_KIND=rclone): entrypoint.sh builds an rclone
+      # "backup" remote of type=ftp from these. PASS is plaintext here (same
+      # trust level as the s3 secret above) and obscured into rclone.conf at
+      # start. TLS=true adds explicit FTPS.
+      BACKUP_RCLONE_HOST: ${BACKUP_RCLONE_HOST:-}
+      BACKUP_RCLONE_PORT: ${BACKUP_RCLONE_PORT:-}
+      BACKUP_RCLONE_USER: ${BACKUP_RCLONE_USER:-}
+      BACKUP_RCLONE_PASS: ${BACKUP_RCLONE_PASS:-}
+      BACKUP_RCLONE_REMOTE_PATH: ${BACKUP_RCLONE_REMOTE_PATH:-}
+      BACKUP_RCLONE_TLS: ${BACKUP_RCLONE_TLS:-}
+      BACKUP_RCLONE_EXTRA_ARGS: ${BACKUP_RCLONE_EXTRA_ARGS:-}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Kopia"

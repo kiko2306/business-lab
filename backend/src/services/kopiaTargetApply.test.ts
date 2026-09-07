@@ -41,6 +41,32 @@ describe('buildEnvValues', () => {
     expect(values.BACKUP_S3_SECRET_ACCESS_KEY).toBe('');
     expect(values.BACKUP_MOUNT_DEVICE).toBe('/mnt/backups');
   });
+
+  it('writes the rclone vars for an ftp target and leaves s3/mount at their empty defaults', () => {
+    const values = buildEnvValues({
+      ...base, kind: 'ftps', server: '192.168.1.50:2121', username: 'frias', password: 'pw',
+      share: '/backup', options: '--ftp-disable-epsv',
+    });
+    expect(values.BACKUP_REPO_KIND).toBe('rclone');
+    expect(values.BACKUP_RCLONE_HOST).toBe('192.168.1.50');
+    expect(values.BACKUP_RCLONE_PORT).toBe('2121');
+    expect(values.BACKUP_RCLONE_USER).toBe('frias');
+    expect(values.BACKUP_RCLONE_PASS).toBe('pw');
+    expect(values.BACKUP_RCLONE_REMOTE_PATH).toBe('/backup');
+    expect(values.BACKUP_RCLONE_TLS).toBe('true');
+    expect(values.BACKUP_RCLONE_EXTRA_ARGS).toBe('--ftp-disable-epsv');
+    // Every other kind's vars stay empty — nothing stale after switching kinds.
+    expect(values.BACKUP_S3_BUCKET).toBe('');
+    expect(values.BACKUP_MOUNT_TYPE).toBe('none');
+    expect(values.BACKUP_MOUNT_DEVICE).toBe('./data/repository');
+  });
+
+  it('blanks every rclone var for a non-ftp target', () => {
+    const values = buildEnvValues({ ...base, kind: 's3', share: 'b', username: 'ak', password: 'sk' });
+    expect(values.BACKUP_RCLONE_HOST).toBe('');
+    expect(values.BACKUP_RCLONE_PASS).toBe('');
+    expect(values.BACKUP_RCLONE_REMOTE_PATH).toBe('');
+  });
 });
 
 // Only ensureKopiaRepoDir takes an explicit appDir and touches nothing else,

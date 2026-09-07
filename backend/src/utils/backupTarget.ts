@@ -45,19 +45,33 @@ export const BACKUP_TARGET_KEYS = {
   options: 'backup_target_options',
 } as const;
 
-export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 's3';
+export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 's3' | 'ftp' | 'ftps';
+
+/** Every accepted kind, one source of truth for the type guard and Joi. */
+export const BACKUP_TARGET_KINDS: readonly BackupTargetKind[] = ['disk', 'smb', 'nfs', 's3', 'ftp', 'ftps'];
+
+/**
+ * `disk`/`smb`/`nfs` are Docker local-driver mounts — the kernel mounts them
+ * and Kopia writes a `filesystem` repository into the mount point. `s3` and
+ * `ftp`/`ftps` are not mounted at all: Kopia talks to them itself (`s3`
+ * natively, `ftp` through the `rclone` it bundles), so they have no
+ * `BackupMountSpec` and `toMountSpec` throws for them.
+ */
+export function isMountedKind(kind: BackupTargetKind): boolean {
+  return kind === 'disk' || kind === 'smb' || kind === 'nfs';
+}
 
 export interface BackupTarget {
   kind: BackupTargetKind;
   /** Local absolute path — `disk` only. */
   path: string;
-  /** Hostname or IP of the NAS — `smb`/`nfs`. */
+  /** Hostname or IP of the NAS — `smb`/`nfs`, or `host`/`host:port` for `ftp`/`ftps`. */
   server: string;
-  /** Share name (smb) or export path (nfs). */
+  /** Share name (smb), export path (nfs), or remote directory (ftp — `/` is the FTP root). */
   share: string;
   username: string;
   password: string;
-  /** Extra mount options, appended verbatim. Escape hatch for odd NAS setups. */
+  /** Extra mount options (smb/nfs) or raw rclone flags (ftp), appended verbatim. Escape hatch. */
   options: string;
 }
 
@@ -74,8 +88,8 @@ export async function getBackupTarget(): Promise<BackupTarget | null> {
   ]);
   const values = Object.fromEntries(result.rows.map((row) => [row.key, row.value]));
 
-  const kind = values[BACKUP_TARGET_KEYS.kind];
-  if (kind !== 'disk' && kind !== 'smb' && kind !== 'nfs' && kind !== 's3') {
+  const kind = values[BACKUP_TARGET_KEYS.kind] as BackupTargetKind;
+  if (!BACKUP_TARGET_KINDS.includes(kind)) {
     return null;
   }
 
@@ -97,11 +111,12 @@ export async function getBackupTarget(): Promise<BackupTarget | null> {
  * read as a separate option — a password with a comma in it would silently
  * mangle the mount rather than fail. Rejected up front instead.
  *
- * `s3` has no mount at all — call `toS3ConnectArgs` for that kind instead.
+ * `s3`/`ftp`/`ftps` have no mount at all — call `toS3ConnectArgs` /
+ * `toRcloneFtpConfig` for those instead.
  */
 export function toMountSpec(target: BackupTarget): BackupMountSpec {
-  if (target.kind === 's3') {
-    throw new Error('toMountSpec does not apply to an s3 target — use toS3ConnectArgs.');
+  if (!isMountedKind(target.kind)) {
+    throw new Error(`toMountSpec does not apply to a ${target.kind} target — it is not a Docker mount.`);
   }
 
   const extra = target.options.trim();
@@ -174,14 +189,61 @@ export function toS3ConnectArgs(target: BackupTarget): S3ConnectArgs {
   };
 }
 
+/**
+ * Translate an `ftp`/`ftps` destination into the values Kopia's entrypoint
+ * writes into an `rclone.conf` (`[backup]` remote of `type = ftp`) before it
+ * runs `kopia repository create rclone --remote=backup:<remotePath>`. Kopia
+ * has no plain-FTP backend of its own; the official image bundles `rclone`
+ * and Kopia's `rclone` backend drives it.
+ */
+export interface RcloneFtpConfig {
+  host: string;
+  /** FTP control port; blank means rclone's default (21). */
+  port: string;
+  user: string;
+  /** Plaintext here — the entrypoint runs it through `rclone obscure`. */
+  pass: string;
+  /** Remote directory Kopia's repository lives in; `/` is the FTP root. */
+  remotePath: string;
+  /** `ftps` → explicit TLS (`AUTH TLS`); `ftp` → none. */
+  explicitTls: boolean;
+  /** Raw extra `kopia repository create rclone` flags, appended verbatim. */
+  extraArgs: string;
+}
+
+export function toRcloneFtpConfig(target: BackupTarget): RcloneFtpConfig {
+  // `server` is `host` or `host:port` — split the last colon only (IPv6 is
+  // not a realistic FTP target here and would need brackets anyway).
+  const [host, port = ''] = target.server.includes(':')
+    ? [target.server.slice(0, target.server.lastIndexOf(':')), target.server.slice(target.server.lastIndexOf(':') + 1)]
+    : [target.server, ''];
+  return {
+    host: host.trim(),
+    port: port.trim(),
+    user: target.username,
+    pass: target.password,
+    remotePath: target.share.trim() || '/',
+    explicitTls: target.kind === 'ftps',
+    extraArgs: target.options.trim(),
+  };
+}
+
 /** Human-readable validation. Returns null when the target is usable. */
 export function validateTarget(target: BackupTarget): string | null {
-  // A comma in a credential corrupts the comma-separated mount options —
-  // moot for s3 (no comma-joined option string) but harmless to keep general.
+  // A comma in a credential corrupts the comma-separated mount options.
+  // Moot for the non-mounted kinds (s3's flags, ftp's rclone.conf INI).
   for (const [name, value] of [['username', target.username], ['password', target.password]] as const) {
-    if (target.kind !== 's3' && value.includes(',')) {
+    if (isMountedKind(target.kind) && value.includes(',')) {
       return `The ${name} cannot contain a comma — mount options are comma-separated, so it would corrupt the mount.`;
     }
+  }
+
+  if (target.kind === 'ftp' || target.kind === 'ftps') {
+    if (!target.server) return 'Enter the FTP server hostname or IP address (optionally host:port).';
+    // The host lands in the rclone.conf authority line.
+    if (/[\s/@]/.test(target.server)) return 'The FTP server must be a bare host or host:port — no slashes, spaces or "user@".';
+    if (!target.username) return 'Enter the FTP username.';
+    return null;
   }
 
   if (target.kind === 'disk') {
