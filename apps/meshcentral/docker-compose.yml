@@ -1,0 +1,65 @@
+services:
+  meshcentral:
+    image: ghcr.io/ylianst/meshcentral:latest
+    restart: unless-stopped
+    # Container listens on 443 (its config.json default). It runs as root, so
+    # the privileged bind is fine; NPM proxies plain HTTP to the published
+    # host port when exposed (see DYNAMIC_CONFIG / *_TLS_OFFLOAD below).
+    ports:
+      - "${MESHCENTRAL_PORT:-10550}:443"
+    environment:
+      # The image only applies the env-driven config.json edits below when
+      # this is on; its own default is "false" (leave config.json untouched).
+      DYNAMIC_CONFIG: "true"
+      # settings.cert and domains."".certUrl host — the public hostname agents
+      # and browsers actually use. Exposure rewrites this to mesh.<base-domain>
+      # at start (exposureEnvKeys.host); "localhost" keeps a LAN-only start
+      # working. REVERSE_PROXY reuses the same value so certUrl resolves to
+      # "<host>:443".
+      HOSTNAME: "${MESHCENTRAL_HOSTNAME:-localhost}"
+      REVERSE_PROXY: "${MESHCENTRAL_HOSTNAME:-}"
+      REVERSE_PROXY_TLS_PORT: "443"
+      # First account (opened as a wizard, privately) owns the server. No open
+      # signup once that account exists.
+      ALLOW_NEW_ACCOUNTS: "false"
+      # The Cloudflare Tunnel carries WebSocket-over-HTTPS cleanly but not
+      # WebRTC's UDP, so keep KVM / file transfer off WebRTC — it would just
+      # fail to negotiate through the tunnel (plan.md §62.2).
+      WEBRTC: "false"
+      # No plain-HTTP redirector: nothing proxies port 80 to this container.
+      REDIR_PORT: "0"
+      # --- reverse-proxy trust, only set while exposure is enabled ---
+      # NPM terminates TLS and forwards plain HTTP to the published port
+      # (exposure UPSTREAM_SCHEME=http), so MeshCentral must not run its own
+      # TLS. settings.tlsOffload takes the proxy's source address — the Docker
+      # bridge gateway — injected by exposureEnvKeys.gatewayOnExposure.
+      # TRUSTED_PROXY=true makes MeshCentral honour the X-Forwarded-* headers
+      # NPM sets. certUrl (from REVERSE_PROXY above) makes MeshCentral publish
+      # the *real* public cert hash to agents instead of its self-signed one,
+      # the documented fix for "Agent bad web cert hash" behind Cloudflare.
+      TLS_OFFLOAD: "${MESHCENTRAL_TLS_OFFLOAD:-}"
+      TRUSTED_PROXY: "${MESHCENTRAL_TRUSTED_PROXY:-}"
+    labels:
+      - "homepage.group=Networking & Security"
+      - "homepage.name=MeshCentral"
+      - "homepage.icon=meshcentral.png"
+      - "homepage.href=http://localhost:${MESHCENTRAL_PORT:-10550}"
+      - "homepage.description=Remote management for endpoints outside the overlay"
+    volumes:
+      # Both under ./data so a fresh clone gitignores them. meshcentral-data
+      # holds config.json + the NeDB database; meshcentral-files holds
+      # per-mesh uploaded files.
+      - ./data/meshcentral-data:/opt/meshcentral/meshcentral-data
+      - ./data/meshcentral-files:/opt/meshcentral/meshcentral-files
+    healthcheck:
+      # The internal scheme depends on exposure state (HTTPS when standalone,
+      # plain HTTP once tlsOffload is set), so try both. curl is in the image.
+      test:
+        [
+          "CMD-SHELL",
+          "curl -fks -o /dev/null https://localhost/ || curl -fs -o /dev/null http://localhost/",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s

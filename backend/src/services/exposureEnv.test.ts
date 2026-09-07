@@ -57,6 +57,16 @@ describe('computeExposureEnvOverrides', () => {
     expect(out).toMatchObject({ N8N_PROTOCOL: 'https', NEXTCLOUD_OVERWRITEPROTOCOL: 'https' });
   });
 
+  it('sets gatewayOnExposure keys to the gateway IP, and leaves them unset without one', () => {
+    expect(
+      computeExposureEnvOverrides({ gatewayOnExposure: ['MESHCENTRAL_TLS_OFFLOAD'] }, HOST, {}, [], '10.201.0.1')
+    ).toEqual({ MESHCENTRAL_TLS_OFFLOAD: '10.201.0.1' });
+    // No gateway (LAN-only start) → the key is not forced on.
+    expect(
+      computeExposureEnvOverrides({ gatewayOnExposure: ['MESHCENTRAL_TLS_OFFLOAD'] }, HOST, {})
+    ).toEqual({});
+  });
+
   it('is empty when nothing is declared', () => {
     expect(computeExposureEnvOverrides({}, HOST, {})).toEqual({});
   });

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.41.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.42.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -402,9 +402,15 @@ and proven on the real stack) are done. Phase tags below.
       `docs/app-credentials.md`.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
-- [ ] **MeshCentral** (§62.2 — §84 phase P6) — still wanted, for client
-      endpoints that will not join the overlay. `TLSOffload` + `certUrl` for
-      the agent cert hash. Independent of the social/product track.
+- [ ] **@mat: prove MeshCentral live with a real agent** (§62.2, §264) — the
+      app is built (`apps/meshcentral/`, port `10550`, `mesh.<domain>`) and
+      env-driven config is wired, but the reverse-proxy path is unproven:
+      expose it, enrol a real agent, and confirm (a) no `Agent bad web cert
+      hash` — i.e. `certUrl` + `tlsOffload` do their job through NPM +
+      Cloudflare, and (b) whether Authelia forward-auth on `mesh.<domain>`
+      blocks agent enrolment. If it does, split the agent endpoint onto its
+      own un-gated hostname (or scope the authrequest snippet to exclude
+      `/agent.ashx` + `/meshrelay.ashx`).
 - [ ] **Home Assistant: identify the three unlabelled Espressif devices**
       (§77.6) — `.18`/`.19`/`.20`, no DHCP hostname. Power-cycle one appliance
       and re-sweep to identify by elimination.

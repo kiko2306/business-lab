@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.42.0] — 2026-09-07
+
+### Added
+
+- MeshCentral (apps/meshcentral): remote endpoint management, published as mesh.<domain>. Config is env-driven at start (image DYNAMIC_CONFIG); exposure injects the public hostname, the Docker bridge gateway into settings.tlsOffload (new exposureEnvKeys.gatewayOnExposure), and certUrl so agents pin the real public cert behind Cloudflare (§62.2).
+
 ## [0.41.1] — 2026-09-07
 
 ### Fixed

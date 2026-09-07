@@ -13,6 +13,7 @@
 import fs from 'fs';
 import path from 'path';
 import { buildExposureHostname, extractComposeEnvVars, getService, resolveComposeFile } from '../config/services';
+import { getHostGatewayIp } from '../utils/network';
 import { parseEnvFile } from '../utils/envFile';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { ServiceExposureEnvKeys } from '../types';
@@ -41,7 +42,10 @@ export function computeExposureEnvOverrides(
   // Extra Host-header values to fold into the allow-list keys beyond the
   // primary hostname — e.g. the Home Page's apex exposure adds the bare base
   // domain, since it is served at both <sub>.<domain> and <domain> (§111).
-  extraHosts: string[] = []
+  extraHosts: string[] = [],
+  // Docker bridge gateway IP, for `gatewayOnExposure` keys. Empty string
+  // leaves those keys unset (a LAN-only start needs no proxy trust).
+  gatewayIp = ''
 ): Record<string, string> {
   const overrides: Record<string, string> = {};
   const separator = keys.allowedHostsSeparator ?? ',';
@@ -70,6 +74,12 @@ export function computeExposureEnvOverrides(
 
   for (const [key, value] of Object.entries(keys.staticOnExposure ?? {})) {
     overrides[key] = value;
+  }
+
+  if (gatewayIp) {
+    for (const key of keys.gatewayOnExposure ?? []) {
+      overrides[key] = gatewayIp;
+    }
   }
 
   return overrides;
@@ -149,5 +159,7 @@ export async function buildExposureEnvOverrides(
     .filter((extra) => extra.apex)
     .map(() => globalConfig.baseDomain);
 
-  return computeExposureEnvOverrides(exposureEnvKeys, hostname, existingValues, extraHosts);
+  const gatewayIp = exposureEnvKeys.gatewayOnExposure?.length ? await getHostGatewayIp() : '';
+
+  return computeExposureEnvOverrides(exposureEnvKeys, hostname, existingValues, extraHosts, gatewayIp);
 }

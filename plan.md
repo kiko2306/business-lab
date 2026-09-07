@@ -19424,3 +19424,67 @@ correct post-acceptance state for a box whose owner accepted the licence. The
 management stack is now on 0.41.x (was 0.26.0); **`.env` still lacks
 `REPO_ROOT`** (passed inline for the rebuild) — the §131.4 self-update infra
 item still stands.
+
+## 264. MeshCentral added (§62.2 — §84 phase P6)
+
+Added `meshcentral` to the registry for remote management of client endpoints
+that will not join the NetBird/Tailscale overlay. Port `10550`, published as
+`mesh.<base-domain>` (`exposureSubdomain: 'mesh'`). Licence: Apache-2.0, clean
+under the resale model — official `ghcr.io/ylianst/meshcentral` image, run
+stock, no paid SSO tier. Alpine+Node base already rowed in `docs/licences.md`.
+
+### The image is env-driven, so no backend config generator
+
+The plan (§62.2) assumed a hand-shaped `data/config.json`. Not needed: the
+official image's `entrypoint.sh` rewrites `config.json` from environment
+variables on every start **when `DYNAMIC_CONFIG=true`** (its own default is
+`false` — the compose file sets it). It also copies the template on first run
+if the file is absent, and runs as root, so there is no init-sidecar chown
+either (unlike mssql/beszel). The mapping used:
+
+| env | config.json key | value |
+|---|---|---|
+| `HOSTNAME` | `settings.cert` + `domains."".certUrl` host | `mesh.<domain>` (exposure) / `localhost` (standalone) |
+| `REVERSE_PROXY` + `REVERSE_PROXY_TLS_PORT` | `domains."".certUrl` | `<host>:443` — the "fetch the real public cert" fix for `Agent bad web cert hash` behind Cloudflare |
+| `TLS_OFFLOAD` | `settings.tlsOffload` | Docker bridge gateway IP (exposure) |
+| `TRUSTED_PROXY` | `settings.trustedProxy` | `true` (exposure) — honour NPM's `X-Forwarded-*` |
+| `ALLOW_NEW_ACCOUNTS` | `domains."".newAccounts` | `false` — first (wizard) account owns it |
+| `WEBRTC` | `settings.webrtc` | `false` — WebRTC's UDP won't cross the tunnel; WebSocket-over-HTTPS does |
+| `REDIR_PORT` | `settings.redirPort` | `0` — nothing proxies :80 to it |
+
+Container listens on 443 internally (image default, root can bind it), mapped
+to `${MESHCENTRAL_PORT:-10550}`. NPM proxies **plain HTTP** to that port
+(`UPSTREAM_SCHEME='http'` in `exposure.ts`), so MeshCentral must drop its own
+TLS once exposed — hence `tlsOffload`. Standalone (not exposed) it keeps
+serving HTTPS for LAN use; the compose healthcheck tries both schemes.
+
+### New `exposureEnvKeys.gatewayOnExposure`
+
+`tlsOffload` needs the reverse proxy's **source IP**, i.e. the Docker bridge
+gateway — which is host-specific and derived at start (`getHostGatewayIp()`),
+so it can't be a `staticOnExposure` literal. Added `gatewayOnExposure: string[]`
+to `ServiceExposureEnvKeys`: on exposure, each listed key is set to the gateway
+IP; empty otherwise. `computeExposureEnvOverrides` gained an optional
+`gatewayIp` arg, `buildExposureEnvOverrides` resolves it only when the key is
+declared. One consumer today (MeshCentral's `MESHCENTRAL_TLS_OFFLOAD`), but it
+is the same shape as the existing hostname injection and several services
+already reach for the gateway independently.
+
+Rejected: `TLS_OFFLOAD=true` / `TRUSTED_PROXY=<ip>`. The image's entrypoint
+coerces `TLS_OFFLOAD` with `jq --arg` (string) — MeshCentral then reads a
+string `tlsoffload` as an **IP list**, so `"true"` would be a broken address.
+`TRUSTED_PROXY` is the mirror case: `jq --argjson` rejects a bare IP as
+invalid JSON, but special-cases the literal `"true"`. So offload takes the IP,
+trusted-proxy takes `true`.
+
+### Left for a live proof (README @mat item)
+
+`isAutheliaProtectionRequired` forces Authelia-on for every exposed app bar
+the Home Page, so `mesh.<domain>` ships behind forward-auth. Whether that
+breaks agent enrolment — agents can't follow a 302 to Authelia — is the open
+question §62.2 flagged, and only a real enrolled agent answers it. If it
+breaks, the fix is a separate un-gated hostname for the agent endpoint (or the
+authrequest snippet scoped to exclude `/agent.ashx` and `/meshrelay.ashx`).
+The `certUrl` / `tlsOffload` path is likewise unproven against the real NPM
+proxy. Not committed as done — the compose + registry + docs are in; the live
+walk is the @mat item.

@@ -71,6 +71,7 @@ Open these privately and claim them before exposing.
 | **File Browser** | Ships with `admin` / `admin`. |
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |
 | **ITFlow** | Setup wizard creates the first admin. See the note below — it needs two things switched on afterwards. |
+| **MeshCentral** | First account created on the login page owns the server (open signup is off, so only the first one). Claim it privately — on the LAN at port `10550` or over the overlay — before exposing. Whether Authelia sits in front of `mesh.<domain>` without breaking agent enrolment is still to be proven live (§62.2); if it does break, the agent endpoint moves to its own hostname. |
 
 ### Nextcloud — register the shared tree once (External Storage)
 

@@ -37,6 +37,12 @@ export interface ServiceExposureEnvKeys {
   // proxy knobs that aren't derived from the hostname, e.g.
   // { N8N_PROTOCOL: 'https' }, { NEXTCLOUD_OVERWRITEPROTOCOL: 'https' }.
   staticOnExposure?: Record<string, string>;
+  // Compose env var(s) that should receive the Docker bridge gateway IP while
+  // exposure is enabled — for apps that need to trust the NPM container as a
+  // reverse proxy by its source address (MeshCentral's tlsOffload, plan.md
+  // §62.2). The gateway is host-specific and derived at start, so it can't be
+  // a staticOnExposure literal.
+  gatewayOnExposure?: string[];
 }
 
 // Marks a service that needs a config *file* touched (not just env) before it

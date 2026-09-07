@@ -63,6 +63,7 @@ operate within, listed again at the end.
 | Kitchen switcher | *ours* — no LICENSE file | ⚠️ Decide | repo has no licence (below) |
 | Kopia | Apache-2.0 | ✅ Clean | official `kopia/kopia` image, built by the project; internal backup use |
 | Mealie | **AGPL-3.0** | ✅ Clean | unmodified |
+| MeshCentral (`ghcr.io/ylianst/meshcentral`) | **Apache-2.0** | ✅ Clean | official image built by the project, run stock. Alpine + Node.js base (`alpine` rowed below; Node.js is MIT-style). No paid tier or SSO paywall. |
 | Metabase (`metabase/metabase`) | **AGPL-3.0** (OSS edition) | ✅ Clean | unmodified; the paid Enterprise/Pro edition is a separate image and licence — we ship only the AGPL OSS one. Bundled `metabase-db` is `postgres:16-alpine` (PostgreSQL License, already rowed below) |
 | Miniflux (`miniflux/miniflux`) | **Apache-2.0** | ✅ Clean | stock unmodified. Bundled `miniflux-db` is `postgres:16-alpine` (PostgreSQL License, already rowed below) |
 | **n8n** | **Sustainable Use License** (fair-code, not OSI) | ⚠️ Condition | client-operated instance for their own workflows = allowed (consulting & support are explicitly permitted). Business Lab hosting n8n *for* clients on infrastructure it operates = needs an n8n Enterprise licence. Keep it one-box-one-client. |
