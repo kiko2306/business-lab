@@ -19117,3 +19117,57 @@ import to confirm the compat endpoint actually parses. @mat — same shape as
 the other "prove SSO live" items. The `#5012` caveat from §238 (Mealie sends
 page HTML to the AI even when the fetch failed) still stands and isn't ours
 to fix.
+
+## 263. §121 SQL Server Express — build plan (batch of §263a–§263e)
+
+§121.5 cleared the licence (setup-and-maintenance model via the §2.b.iv
+hosting exception + a first-start acceptance gate; High Risk Use excluded).
+This section sequences the build; each sub-item lands as its own commit.
+
+Host is `x86_64`, so the live proof (§263f) can run on `tx-home-utils.com`.
+
+- **§263a — `apps/mssql/` skeleton + registry entry.** Compose
+  (`mcr.microsoft.com/mssql/server:2022-latest`, `MSSQL_PID=Express`,
+  `TZ`, LAN-only host port per `docs/ports.md`). **No `ACCEPT_EULA` in the
+  compose or `.env.example`** — the gate (§263d) writes `ACCEPT_EULA=Y` into
+  `.env` on acceptance, and without it the container exits on its own, so
+  landing this first is safe. `services.ts` entry: x86-64 platform guard,
+  mandatory `homepage.*` labels (group "Data", no `homepage.href` — no web
+  UI), `hiddenGeneratedSecrets: ['MSSQL_SA_PASSWORD']`, `lanOnly`,
+  `backup.engine: 'mssql'` (wired in §263c). Health check `sqlcmd -Q "SELECT
+  1"`.
+- **§263b — MSSQL-compliant secret generator.** The generator is plain
+  `crypto.randomBytes(32).toString('hex')` in three places in `appEnv.ts`
+  (lines ~169, ~272, ~347) — lower+digit only, 2 of 4 char classes. MSSQL's
+  SA password policy needs 3 of 4 of upper/lower/digit/symbol (MS docs). And
+  the APP_KEY `base64:` special-case currently only guards one of the three
+  sites (latent bug — a Laravel app whose APP_KEY is filled on config save,
+  not pre-start, gets plain hex). Fix both: extract one
+  `generateSecretFor(key)` helper, fold in APP_KEY, add an `MSSQL_`-prefix
+  branch that appends a fixed `Aa1!`-shape suffix so 4 classes are
+  guaranteed within the 8–128 length bound.
+- **§263c — `mssql` backup engine.** The backup system has
+  `postgres`/`mysql`/`sqlite` engines, no `mssql`. Add one:
+  `sqlcmd -Q "BACKUP DATABASE [<db>] TO DISK='…/<db>.bak' WITH …"` per
+  database into the app's backup dir, restore via `RESTORE DATABASE`. Follow
+  the existing engine shape (dump function + restore function + registry
+  `backup.engine` dispatch). Tests cover the command construction, not
+  sqlcmd.
+- **§263d — EULA acceptance gate.** First app in `apps/` needing one (all
+  others OSS). `settings` row `mssql_eula_accepted` = `{acceptedBy, acceptedAt}`.
+  Start-path guard: `mssql` start refused (dashboard button disabled + API
+  400 with the licence link) until accepted; on acceptance the backend writes
+  `ACCEPT_EULA=Y` to `apps/mssql/.env`. `GET /api/settings/mssql-eula`
+  (`{accepted, acceptedBy, acceptedAt}`), `POST /api/settings/mssql-eula`
+  (records acceptance, audit-logged). Frontend: a modal on the mssql card
+  showing the §121.5 constraints (No High Risk Use, x86-64 only, Express
+  limits, telemetry, AS-IS) + a link to the MS terms + a required tick
+  ("I have a valid and existing SQL Server licence and accept these terms"),
+  then the Start button unlocks.
+- **§263e — docs.** `docs/ports.md` (the allocated port), `docs/app-credentials.md`
+  (SA account, generated password, the acceptance gate), `docs/licences.md`
+  (app row + `mcr.microsoft.com/mssql/server` image row — the §121.5
+  verdict), `docs/raspberry-pi.md` (no arm64 image, registry guard blocks it).
+- **§263f — live proof (@mat / agent).** Accept the EULA in the UI, start
+  `mssql`, create a DB, run a backup/restore round-trip, confirm the SA
+  password satisfies MSSQL's policy on first boot.

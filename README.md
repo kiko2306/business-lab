@@ -400,17 +400,21 @@ and proven on the real stack) are done. Phase tags below.
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
-- [ ] **Add SQL Server Express (LAN-only)** (§121) — licence **cleared**
-      (§121.5): the SQL Server 2022 Express EULA permits it via the §2.b.iv
-      hosting exception **provided the client accepts the Microsoft EULA on
-      first start** — the backend must never set `ACCEPT_EULA=Y` silently. So
-      SQL Server needs its own acceptance gate (unlike every OSS app here):
-      show the terms → operator ticks accept → then start; store who/when.
-      Then `apps/mssql/` (x86-64 only, no arm64; `MSSQL_PID=Express`;
-      complexity-compliant generated `MSSQL_SA_PASSWORD`; ~1 GiB buffer-pool /
-      10 GB DB cap), a new `mssql` backup engine (`sqlcmd BACKUP DATABASE`),
-      docs rows (incl. the No-High-Risk-Use limit: no e-commerce/payments/
-      life-safety), and prove a start + backup/restore round-trip.
+- [ ] **Add SQL Server Express (LAN-only)** (§121, §263 — batch §263a–§263e)
+      — licence cleared (§121.5); building it in sequence:
+  - [ ] **§263a** — `apps/mssql/` skeleton + `services.ts` registry entry
+        (x86-64 guard, LAN-only, `homepage.*` labels, no `ACCEPT_EULA` yet).
+  - [ ] **§263b** — MSSQL-compliant secret generator (`appEnv.ts`: extract
+        `generateSecretFor`, add an `MSSQL_` 3-of-4-classes branch; folds in
+        the APP_KEY special-case that only guards one of three sites today).
+  - [ ] **§263c** — `mssql` backup engine (`sqlcmd BACKUP/RESTORE DATABASE`).
+  - [ ] **§263d** — EULA acceptance gate: `settings` row (who/when), start
+        refused until accepted, backend writes `ACCEPT_EULA=Y` on acceptance,
+        frontend terms modal + tick.
+  - [ ] **§263e** — docs rows (`ports.md`, `app-credentials.md`,
+        `licences.md` app+image, `raspberry-pi.md`).
+  - [ ] **@mat / §263f** — live proof: accept EULA, start, backup/restore
+        round-trip, confirm the generated SA password passes MSSQL's policy.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
 - [ ] **MeshCentral** (§62.2 — §84 phase P6) — still wanted, for client
