@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.41.1] — 2026-09-07
+
+### Fixed
+
+- mssql backup: the _dump dir is created by a root busybox container (the backend can't mkdir inside the uid-10001-owned data dir mssql-init sets up), and the .bak files are made world-readable so the file backup can archive them (§263f live proof).
+
 ## [0.41.0] — 2026-09-07
 
 ### Added

@@ -45,24 +45,22 @@ export interface DumpOutcome {
 const SQLCMD = '/opt/mssql-tools18/bin/sqlcmd';
 
 /**
- * BACKUP DATABASE runs server-side and writes to the server's own
- * filesystem, so the target dir has to exist and be writable by the mssql
- * user (uid 10001) inside the container — which sees it as
- * /var/opt/mssql/_dump. The backend is root-equivalent, so it creates and
- * chowns it here. Stale .bak files from a since-dropped database are cleared
- * so _dump/ mirrors the current database set.
+ * BACKUP DATABASE runs server-side and writes as the mssql user (uid 10001)
+ * into /var/opt/mssql/_dump — but `mssql-init` chowns the whole data dir to
+ * 10001:0, so the backend (non-root in its container) can't `mkdir` there
+ * itself. A throwaway root busybox on the same bind mount creates the dir,
+ * hands it to 10001, and clears stale .bak files (a since-dropped database
+ * must not leave a restorable file behind). Returns the host-side path so the
+ * caller can read the results back.
  */
-export function ensureMssqlDumpDir(appDir: string): string {
+async function ensureMssqlDumpDir(appDir: string): Promise<string> {
   const dir = path.join(appDir, 'data', DUMP_DIR);
-  fs.mkdirSync(dir, { recursive: true });
-  try {
-    fs.chownSync(dir, 10001, 0);
-  } catch {
-    // Best-effort: on a host where the backend isn't uid 0 this may fail, and
-    // the BACKUP below will report the real permission error.
-  }
-  for (const f of fs.readdirSync(dir)) {
-    if (f.endsWith('.bak')) fs.rmSync(path.join(dir, f), { force: true });
+  const result = await run('docker', [
+    'run', '--rm', '-v', `${path.join(appDir, 'data')}:/data`, 'busybox',
+    'sh', '-c', `mkdir -p /data/${DUMP_DIR} && chown 10001:0 /data/${DUMP_DIR} && rm -f /data/${DUMP_DIR}/*.bak`,
+  ]);
+  if (result.code !== 0) {
+    throw new Error((result.stderr || 'could not prepare the _dump directory').trim().slice(0, 300));
   }
   return dir;
 }
@@ -183,7 +181,7 @@ async function dumpServerDatabase(
     if (!network) {
       return { ...base, ok: false, detail: 'the database container is not on a reachable network' };
     }
-    const dumpDir = ensureMssqlDumpDir(appDir);
+    const dumpDir = await ensureMssqlDumpDir(appDir);
     base.target = dumpDir;
     const password = env.MSSQL_SA_PASSWORD || env.SA_PASSWORD || '';
     // sqlcmd runs inside the server container's network namespace via a
@@ -199,6 +197,12 @@ async function dumpServerDatabase(
     if (result.code !== 0) {
       return { ...base, ok: false, detail: (result.stderr || result.stdout.toString() || 'BACKUP failed').trim().slice(0, 300) };
     }
+    // SQL Server writes the .bak files 0640 owned by uid 10001; the file
+    // backup runs as the backend user and has to be able to read them.
+    await run('docker', [
+      'run', '--rm', '-v', `${path.join(appDir, 'data')}:/data`, 'busybox',
+      'chmod', '-R', 'a+rX', `/data/${DUMP_DIR}`,
+    ]);
     const baks = fs.readdirSync(dumpDir).filter((f) => f.endsWith('.bak'));
     const bytes = baks.reduce((sum, f) => sum + fs.statSync(path.join(dumpDir, f)).size, 0);
     return { ...base, ok: true, bytes, detail: `backed up ${baks.length} database(s), ${(bytes / 1024).toFixed(0)} KB` };

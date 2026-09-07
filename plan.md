@@ -19374,3 +19374,53 @@ blocking a start from the dashboard; the acceptance POST writing
 running as the backend's uid; the `x86Only` guard's 409. These are covered by
 unit tests; the live confirmation rides on whenever the management stack is
 next updated.
+
+## 263f (cont.). Full dashboard E2E — one bug found and fixed
+
+Rebuilt `backend`+`frontend` to 0.41.0 on `tx-home-utils.com` (recreated
+individually — no `down` of the management stack) and drove the whole flow
+through the real API as `mat` (webmaster):
+
+| Step | Result |
+|---|---|
+| `mssql` in the registry | ✅ shows as SQL Server / Development / stopped |
+| `GET /settings/mssql-eula` before | ✅ `{accepted:false, acceptance:null}` |
+| `POST /services/mssql/start` before accepting | ✅ **409** with the "accept the terms" message |
+| `POST /settings/mssql-eula {accept:true}` | ✅ recorded `{acceptedByUserId:1, acceptedByName:"mat", acceptedAt}` |
+| `POST /services/mssql/start` after | ✅ 200; container healthy in ~10 s |
+| generated SA password | ✅ `…Aa1_`, 52 chars, 4 character classes — accepted by SQL Server on first boot |
+| `ACCEPT_EULA` in the container env | ✅ `Y` (written to `apps/mssql/.env` by `recordMssqlEulaAcceptance`) |
+| `POST /backups/dump-apps` | ⛔→✅ (see bug) |
+| `POST /services/mssql/backup` | ✅ archive built, manifest `engine: mssql`, 1 dump, 0 failures |
+| delete all rows → `POST /services/mssql/backup/restore` | ✅ `restored 1 database(s) from _dump/`, all 3 rows back |
+
+### Bug: the backend can't create `apps/mssql/data/_dump/`
+
+`dump-apps` first reported `mssql` failed with `EACCES: mkdir
+'.../apps/mssql/data/_dump'`. Cause: `mssql-init` `chown -R 10001:0`s the
+whole data dir so SQL Server (non-root, uid 10001) can write it — which locks
+the **backend** (also non-root in its container) out of creating `_dump`
+there. The Postgres/MySQL engines don't hit this because those apps' data
+dirs stay backend-owned.
+
+Fix (0.41.1, `appDumps.ts`): `ensureMssqlDumpDir` no longer does `fs.mkdirSync`
+— it runs a throwaway **root busybox** on the same bind mount to
+`mkdir -p _dump && chown 10001:0 _dump && rm -f _dump/*.bak`, matching the
+"throwaway container, not `docker exec`" pattern already in the file. And
+after the BACKUP, a second busybox `chmod -R a+rX _dump` makes the `.bak`
+files (SQL Server writes them 0640/uid-10001) readable by the backend so the
+file archive can pick them up. The two fs-based `ensureMssqlDumpDir` unit
+tests were dropped (the helper is now a docker shell-out, like the rest of
+the dump/restore paths, which are live-proof only).
+
+Re-ran the whole table above after the fix — all green.
+
+### State left on the host
+
+`mssql` is stopped, its `data/` removed, the test archive deleted, `shopdemo`
+dropped. The `mssql_eula_accepted` settings row and `apps/mssql/.env`
+(`ACCEPT_EULA=Y` + generated SA password) are left in place — that's the
+correct post-acceptance state for a box whose owner accepted the licence. The
+management stack is now on 0.41.x (was 0.26.0); **`.env` still lacks
+`REPO_ROOT`** (passed inline for the rebuild) — the §131.4 self-update infra
+item still stands.

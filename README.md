@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.41.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.41.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -400,13 +400,6 @@ and proven on the real stack) are done. Phase tags below.
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
-- [ ] **@mat: SQL Server Express — confirm the dashboard glue after a
-      redeploy** (§121, §263f) — the mechanics are proven live (§263f:
-      container healthy, generated SA password accepted, backup/restore
-      round-trip). The deployed stack is on 0.26.0, so the EULA gate blocking
-      a start, the acceptance POST writing `ACCEPT_EULA=Y`, and the `x86Only`
-      409 are still only unit-tested. Confirm them once the management stack
-      is next rebuilt to ≥0.41.0.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
 - [ ] **MeshCentral** (§62.2 — §84 phase P6) — still wanted, for client
