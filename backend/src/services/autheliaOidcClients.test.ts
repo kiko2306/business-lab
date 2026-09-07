@@ -34,6 +34,22 @@ describe('renderOidcClientsBlock', () => {
     expect(block.trimEnd().endsWith('# <<< managed by the dashboard')).toBe(true);
   });
 
+  it('defaults to client_secret_post with no PKCE lines', () => {
+    const block = renderOidcClientsBlock([VIKUNJA]);
+    expect(block).toContain("        token_endpoint_auth_method: 'client_secret_post'");
+    expect(block).not.toContain('require_pkce');
+    expect(block).not.toContain('pkce_challenge_method');
+  });
+
+  it('emits PKCE lines and the chosen auth method for a per-app override (§274)', () => {
+    const block = renderOidcClientsBlock([
+      { ...VIKUNJA, requirePkce: true, tokenEndpointAuthMethod: 'client_secret_basic' },
+    ]);
+    expect(block).toContain('        require_pkce: true');
+    expect(block).toContain("        pkce_challenge_method: 'S256'");
+    expect(block).toContain("        token_endpoint_auth_method: 'client_secret_basic'");
+  });
+
   it('is just the marker pair when there are no managed clients', () => {
     const block = renderOidcClientsBlock([]);
     expect(block.split('\n').filter((l) => l.includes('client_id'))).toHaveLength(0);

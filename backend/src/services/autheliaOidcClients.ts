@@ -55,6 +55,9 @@ export interface ManagedOidcClient {
   secret: string;
   redirectUris: string[];
   scopes: string[];
+  // Per-app overrides (§274). Default: no PKCE requirement, client_secret_post.
+  requirePkce?: boolean;
+  tokenEndpointAuthMethod?: 'client_secret_post' | 'client_secret_basic';
 }
 
 /** Render the marker-delimited managed client entries (6-space list indent). */
@@ -66,11 +69,14 @@ export function renderOidcClientsBlock(clients: ManagedOidcClient[]): string {
       `        client_name: '${client.name}'`,
       `        client_secret: '${client.secret}'`,
       `        authorization_policy: 'one_factor'`,
+      ...(client.requirePkce
+        ? [`        require_pkce: true`, `        pkce_challenge_method: 'S256'`]
+        : []),
       `        redirect_uris:`,
       ...client.redirectUris.map((uri) => `          - '${uri}'`),
       `        scopes:`,
       ...client.scopes.map((scope) => `          - '${scope}'`),
-      `        token_endpoint_auth_method: 'client_secret_post'`
+      `        token_endpoint_auth_method: '${client.tokenEndpointAuthMethod ?? 'client_secret_post'}'`
     );
   }
   lines.push(MARK_END, '');
@@ -126,6 +132,8 @@ function getManagedClients(hostnameByService: Map<string, string>): ManagedOidcC
       secret,
       redirectUris: spec.redirectPaths.map((p) => `https://${hostname}${p}`),
       scopes: spec.scopes ?? ['openid', 'profile', 'email'],
+      requirePkce: spec.requirePkce,
+      tokenEndpointAuthMethod: spec.tokenEndpointAuthMethod,
     });
   }
   return clients;

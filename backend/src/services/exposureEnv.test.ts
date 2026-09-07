@@ -179,6 +179,29 @@ describe('buildExposureEnvOverrides — compose default fallback', () => {
     expect(out.HBOX_OPTIONS_TRUST_PROXY).toBe('true');
   });
 
+  it('substitutes the oidcClient.appEnv tokens for an exposed app (Mealie)', async () => {
+    const appDir = path.join(tmpDir, 'mealie');
+    fs.mkdirSync(appDir);
+    fs.writeFileSync(
+      path.join(appDir, 'docker-compose.yml'),
+      'services:\n  mealie:\n    ports:\n      - "${MEALIE_PORT:-10230}:9000"\n'
+    );
+    fs.writeFileSync(path.join(appDir, '.env'), 'MEALIE_OIDC_CLIENT_SECRET=topsecret\n');
+
+    const { buildExposureEnvOverrides } = await import('./exposureEnv');
+    const out = await buildExposureEnvOverrides('mealie', appDir);
+
+    expect(out.OIDC_AUTH_ENABLED).toBe('true');
+    expect(out.OIDC_CONFIGURATION_URL).toBe(
+      'https://authelia.example.com/.well-known/openid-configuration'
+    );
+    expect(out.OIDC_CLIENT_ID).toBe('mealie');
+    expect(out.OIDC_CLIENT_SECRET).toBe('topsecret');
+    expect(out.OIDC_PROVIDER_NAME).toBe('Authelia');
+    // exposureEnvKeys still applied alongside
+    expect(out.MEALIE_BASE_URL).toBe('https://mealie.example.com');
+  });
+
   it('returns no overrides for an oidcClient app that is not exposed', async () => {
     const appDir = path.join(tmpDir, 'vikunja');
     fs.mkdirSync(appDir);

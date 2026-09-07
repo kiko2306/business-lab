@@ -287,6 +287,13 @@ export interface ServiceDefinition {
     // Defaults to openid/profile/email; override only if the app needs more
     // (e.g. 'groups').
     scopes?: string[];
+    // Some apps' OIDC libraries send a PKCE challenge and/or authenticate at
+    // the token endpoint with HTTP Basic instead of a POST body — Mealie's
+    // authlib client does both (§274). Left unset, the Authelia client is
+    // rendered with no PKCE requirement and `client_secret_post`, which is
+    // what Vikunja and Homebox use.
+    requirePkce?: boolean;
+    tokenEndpointAuthMethod?: 'client_secret_post' | 'client_secret_basic';
     // Runtime env that points the app at Authelia's OIDC provider, injected
     // at start the same way `exposureEnvKeys` are — merged over the shell
     // environment for `docker compose up`, never persisted (see

@@ -7,6 +7,21 @@ services:
     environment:
       TZ: ${TZ:-UTC}
       BASE_URL: ${MEALIE_BASE_URL:-http://localhost:9925}
+      # OIDC against Authelia's provider (plan.md §270/§274). All five are
+      # injected by the dashboard at start when Mealie is exposed — derived
+      # from the public hostname, Authelia's issuer and the client secret in
+      # .env — and left empty otherwise, which keeps OIDC disabled. Not
+      # hand-set. Mealie derives its https:// callback from BASE_URL, which
+      # exposure already rewrites, so there is no proxy-trust var to set.
+      OIDC_AUTH_ENABLED: ${OIDC_AUTH_ENABLED:-false}
+      OIDC_CONFIGURATION_URL: ${OIDC_CONFIGURATION_URL:-}
+      OIDC_CLIENT_ID: ${OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${OIDC_CLIENT_SECRET:-}
+      OIDC_PROVIDER_NAME: ${OIDC_PROVIDER_NAME:-OAuth}
+      # Set to false (by an admin, after one working OIDC sign-in) to hide
+      # Mealie's own username/password form and leave Authelia as the only
+      # gate — §216/§217. Left true so a misconfigured IdP can't lock you out.
+      ALLOW_PASSWORD_LOGIN: ${ALLOW_PASSWORD_LOGIN:-true}
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=Mealie"
