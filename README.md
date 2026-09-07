@@ -270,12 +270,14 @@ Strategy:
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency
 graph.** P1 (§255), P2 (§256), P3a (§257), P3 (§258 — `apps/postiz/` built
-and proven on the real stack) are done; next code action is **P4**. Phase
-tags below.
-- [ ] **P4 — n8n glue** (§84.3) — "generate on a schedule, queue in Postiz":
-      wire the §254 P2 `/content` drafts into Postiz (now a managed app, §258)
-      via n8n, using the managed-workflow import path (§118.3/§260). Also
-      unblocks the CrowdSec-alert workflow (§118.4).
+and proven on the real stack) are done. Phase tags below.
+- [ ] **P4 — glue: `/content` drafts → Postiz** (§84.3, §261) — **parked.**
+      Blocked on Postiz being exposed on the real stack *and* at least one
+      Tier A social provider (Bluesky/Mastodon) connected — until then the
+      queue has nothing that can send. When unblocked, build the
+      human-triggered "Send to Postiz" slice first (Postiz API token in
+      Settings + `postizClient.ts` + a push-draft route — §261), not the n8n
+      scheduler.
 - [ ] **P5 — Verify Meta development-mode publishing empirically** (§84.3a) —
       research, no code deps. Sources agree Instagram publishes from a dev-mode
       app with a Tester role, and a dev-mode Page post is admin-only. Confirm

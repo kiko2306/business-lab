@@ -19014,3 +19014,37 @@ the CrowdSec-alert workflow's own §118.4 smarts. Those add workflows when a
 real need exists, not a speculative pile.
 
 Docs/plan only — no code, no version bump.
+
+## 261. §84 P4 — parked: blocked on Postiz exposure + a connected account (2026-09-07)
+
+Went to build P4 ("generate on a schedule, queue in Postiz" — §254 P4 / §84.3)
+and stopped: it produces dead output today and forces a build §64.2 says to
+avoid.
+
+**Why it's blocked, not just unfinished.**
+
+1. **Postiz can't publish anything yet.** §258 added Postiz but left it *not
+   exposed*, and it has zero connected social accounts — every platform is its
+   own multi-week approval (§84.3a Tier A/B). A schedule that generates copy
+   and queues it into Postiz would fill a queue nothing can send. The value of
+   P4 is entirely downstream of "Postiz has ≥1 working provider."
+2. **It forces the §64.2 credential-provisioning infra.** An n8n workflow that
+   does this needs auth to call the dashboard's `/api/social` generation
+   endpoint *and* a Postiz Public-API key. Neither is credential-free, so
+   P4-via-n8n means building "provision n8n credentials at app-start from
+   dashboard-held values" (§64.2 option 2) — explicitly the thing §64.2 says
+   to reach for only when a genuinely valuable workflow can't avoid a
+   credential. Not worth it for a pipeline whose output is inert.
+
+**The slice that will be worth building** (deferred, noted here so it isn't
+re-derived): a human-triggered "Send to Postiz" on a `/content` draft — a
+Postiz API token in Settings (the §255 Claude-key pattern: one masked field +
+test button), a `postizClient.ts` in the `guacamoleClient.ts`/`beszelSync.ts`
+shape, and a route that pushes a stored draft into Postiz as a queued/draft
+post. No scheduler, no n8n. Then "on a schedule" is a small follow-up copying
+`backupScheduler.ts`'s interval-poll.
+
+**Unblocks on:** Postiz exposed on the real stack + at least one social
+provider connected (Bluesky or Mastodon — the Tier A, no-approval ones).
+
+No code, no version bump.
