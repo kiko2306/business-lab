@@ -6,6 +6,8 @@ import { SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
 import {
   CloudflareSettings,
   CloudflareTestResponse,
+  ClaudeKeySettings,
+  ClaudeKeyTestResponse,
   ExposureSettings,
   ExposureSettingsInput,
   MailSettings,
@@ -68,6 +70,31 @@ export class SettingsService {
 
   testBackupTarget(): Observable<BackupTargetTestResponse> {
     return this.http.post<BackupTargetTestResponse>(`${API_BASE_URL}/settings/backup-target/test`, {});
+  }
+
+  loadClaudeKey(): Observable<ClaudeKeySettings> {
+    return this.http
+      .get<ClaudeKeySettings>(`${API_BASE_URL}/settings/claude-key`, {
+        context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+      })
+      .pipe(retry({ count: 1, delay: 400 }));
+  }
+
+  saveClaudeKey(apiKey: string): Observable<ClaudeKeySettings> {
+    return this.http.put<ClaudeKeySettings>(
+      `${API_BASE_URL}/settings/claude-key`,
+      { apiKey: apiKey.trim() },
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
+  testClaudeKey(apiKey?: string): Observable<ClaudeKeyTestResponse> {
+    const payload = apiKey?.trim() ? { apiKey: apiKey.trim() } : {};
+    return this.http.post<ClaudeKeyTestResponse>(
+      `${API_BASE_URL}/settings/claude-key/test`,
+      payload,
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
   }
 
   getMailSettings(): Observable<MailSettings> {

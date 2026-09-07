@@ -92,6 +92,15 @@ export const schemas = {
   cloudflareTokenTest: Joi.object({
     token: Joi.string().trim().min(20).max(4096).allow('').optional(),
   }),
+  // Anthropic keys are `sk-ant-…`, ~100+ chars. Bound loosely (like the
+  // Cloudflare token) rather than pattern-matched, so a future key format
+  // isn't rejected by the dashboard.
+  claudeKeyUpdate: Joi.object({
+    apiKey: Joi.string().trim().min(20).max(4096).required(),
+  }),
+  claudeKeyTest: Joi.object({
+    apiKey: Joi.string().trim().min(20).max(4096).allow('').optional(),
+  }),
   backupRestore: Joi.object({
     fileName: backupNameSchema.required(),
   }),

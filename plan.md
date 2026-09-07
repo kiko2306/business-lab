@@ -18678,3 +18678,50 @@ next real thing without re-deriving the graph. No code here; this is the map.
 
 P1 (Claude API key in Settings) unless the user redirects — it is the only
 item with no upstream dependency that unblocks more than one downstream.
+
+## 255. §84 P1 — Claude (Anthropic) API key in Settings (2026-09-07)
+
+The keystone of the §254 sequence: one third-party token the system cannot
+derive, entered once in the dashboard, so §0.3's "prompt only for what it
+genuinely cannot obtain" is satisfied and the downstream generation work
+(§254 P2) and Mealie AI parsing (§238) have a key to read.
+
+**Shape — a copy of the Cloudflare-token flow, not a new pattern.**
+
+- `utils/claudeSettings.ts` — `CLAUDE_API_KEY_SETTING = 'claude_api_key'`,
+  `getClaudeApiKey()` (trimmed value or `null`), `maskClaudeKey()` (first 7 +
+  last 4, or `••••••••` for anything ≤ 12 chars so a short/garbage value can't
+  leak).
+- `services/claudeKeyTest.ts` — `testClaudeApiKey(key)` does a raw
+  `https` `GET https://api.anthropic.com/v1/models?limit=1` with
+  `x-api-key` + `anthropic-version: 2023-06-01`. 2xx → valid; 401 → "Key
+  rejected: <api message>"; anything else → the API's own error text. Chosen
+  over `POST /v1/messages` because `/v1/models` spends no tokens — testing the
+  key is free. Raw `https` (not `@anthropic-ai/sdk`) mirrors
+  `verifyCloudflareToken` and the socket-level mail test; the SDK arrives with
+  P2, which actually generates text.
+- `routes/settings.ts` — `GET /claude-key` (`{configured, keyMasked}`),
+  `PUT /claude-key` (`{apiKey}` → upsert + audit log), `POST /claude-key/test`
+  (body `apiKey` or the stored one). All three land in the `settings:manage`
+  capability bucket automatically — the router only routes `/cloudflare-token`
+  and `/exposure` to `exposure:settings`.
+- `middleware/validation.ts` — `claudeKeyUpdate` / `claudeKeyTest`, bounded
+  `min(20).max(4096)` like the Cloudflare token rather than pattern-matched on
+  `sk-ant-`, so a future key format isn't rejected client-side.
+- Frontend — `ClaudeKeySettings` / `ClaudeKeyTestResponse` models, three
+  `SettingsService` methods, and a "Claude API key" `<app-panel>` on the
+  Settings page: one password field (`ngModel` draft, never populated from the
+  server), Save, and a free "Test key" button. The mask is shown as the
+  placeholder once a key is stored.
+
+**Tests.** `claudeSettings.test.ts` covers the masking branches (null, short
+→ fully blanked, real → 7+4) and `getClaudeApiKey` trim/null. The network
+call in `claudeKeyTest.ts` is not unit-tested — same call as
+`verifyCloudflareToken`, which isn't either; a real key on the live box is
+the check. Backend 606 pass, frontend 50 pass + build clean.
+
+**Not done here.** P2 (generation → draft) and the Mealie AI sync (§238,
+which also needs an OpenAI-shaped compat shim for Anthropic's API) — both now
+unblocked. No live proof: entering a real key and clicking "Test key" against
+`api.anthropic.com` is @mat's, but it's an outbound HTTPS check, not
+infrastructure.

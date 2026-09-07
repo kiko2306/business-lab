@@ -37,6 +37,8 @@ import { applyNpmCrowdsecConfig } from '../services/crowdsecConfig';
 import { runAlertTest, AlertSource } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
+import { CLAUDE_API_KEY_SETTING, getClaudeApiKey, maskClaudeKey } from '../utils/claudeSettings';
+import { testClaudeApiKey } from '../services/claudeKeyTest';
 
 const router = Router();
 
@@ -189,6 +191,57 @@ router.post('/cloudflare-token/test', validateBody(schemas.cloudflareTokenTest),
     });
   } catch {
     return res.status(502).json({ error: 'Unable to reach Cloudflare to verify the token.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Claude (Anthropic) API key — one third-party token, entered once, used by
+// content generation (§84.3) and Mealie AI parsing (§238). Same shape as the
+// Cloudflare token above: masked on read, overwrite on write, verify on test.
+// ---------------------------------------------------------------------------
+router.get('/claude-key', async (_req: Request, res: Response) => {
+  try {
+    const key = await getClaudeApiKey();
+    return res.json({ configured: Boolean(key), keyMasked: maskClaudeKey(key) });
+  } catch {
+    return res.status(500).json({ error: 'Unable to load the Claude API key.' });
+  }
+});
+
+router.put('/claude-key', validateBody(schemas.claudeKeyUpdate), async (req: Request, res: Response) => {
+  try {
+    await query(
+      `INSERT INTO settings (key, value, updated_at)
+       VALUES ($1, $2, NOW())
+       ON CONFLICT (key)
+       DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+      [CLAUDE_API_KEY_SETTING, req.body.apiKey.trim()]
+    );
+    await writeAuditLog({
+      userId: req.user?.id ?? null,
+      action: 'settings_change',
+      resource: CLAUDE_API_KEY_SETTING,
+      result: 'success',
+    }).catch(() => {});
+
+    const key = req.body.apiKey.trim();
+    return res.json({ configured: true, keyMasked: maskClaudeKey(key), message: 'Claude API key saved.' });
+  } catch {
+    return res.status(500).json({ error: 'Unable to save the Claude API key.' });
+  }
+});
+
+router.post('/claude-key/test', validateBody(schemas.claudeKeyTest), async (req: Request, res: Response) => {
+  const key = (req.body.apiKey || '').trim() || (await getClaudeApiKey());
+  if (!key) {
+    return res.status(400).json({ error: 'No Claude API key to test — save one first.' });
+  }
+
+  try {
+    const result = await testClaudeApiKey(key);
+    return res.status(result.success ? 200 : 400).json(result);
+  } catch {
+    return res.status(502).json({ error: 'Unable to reach the Anthropic API to verify the key.' });
   }
 });
 

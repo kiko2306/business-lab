@@ -13,6 +13,7 @@ import {
   BackupTargetTestResponse,
   GeneralSettings,
   AlertNotifySettings,
+  ClaudeKeySettings,
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
@@ -90,6 +91,14 @@ export class SettingsComponent implements OnInit {
   protected testingBackupTarget = false;
   protected backupTargetFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected backupTargetTestResult: BackupTargetTestResponse | null = null;
+  protected claudeKey: ClaudeKeySettings | null = null;
+  protected claudeKeyLoading = true;
+  protected savingClaudeKey = false;
+  protected testingClaudeKey = false;
+  // Editable copy of the key; only sent on Save, and never populated from the
+  // server (which only ever returns a mask).
+  protected claudeKeyDraft = '';
+  protected claudeKeyFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected alertSettings: AlertNotifySettings | null = null;
   protected alertsLoading = true;
   protected savingAlerts = false;
@@ -104,6 +113,68 @@ export class SettingsComponent implements OnInit {
     this.loadMailSettings();
     this.loadBackupTarget();
     this.loadAlertSettings();
+    this.loadClaudeKey();
+  }
+
+  private loadClaudeKey(): void {
+    this.claudeKeyLoading = true;
+    this.settingsService
+      .loadClaudeKey()
+      .pipe(finalize(() => (this.claudeKeyLoading = false)))
+      .subscribe({
+        next: (settings) => (this.claudeKey = settings),
+        error: (error) =>
+          (this.claudeKeyFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Unable to load the Claude API key.'),
+          }),
+      });
+  }
+
+  saveClaudeKey(): void {
+    const key = this.claudeKeyDraft.trim();
+    if (!key) {
+      this.claudeKeyFeedback = { type: 'info', message: 'Enter a key to save.' };
+      return;
+    }
+    this.savingClaudeKey = true;
+    this.settingsService
+      .saveClaudeKey(key)
+      .pipe(finalize(() => (this.savingClaudeKey = false)))
+      .subscribe({
+        next: (settings) => {
+          this.claudeKey = settings;
+          this.claudeKeyDraft = '';
+          this.claudeKeyFeedback = { type: 'success', message: settings.message ?? 'Claude API key saved.' };
+          this.toastService.success('Claude API key saved.');
+        },
+        error: (error) =>
+          (this.claudeKeyFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Unable to save the Claude API key.'),
+          }),
+      });
+  }
+
+  testClaudeKey(): void {
+    const key = this.claudeKeyDraft.trim();
+    if (!key && !this.claudeKey?.configured) {
+      this.claudeKeyFeedback = { type: 'info', message: 'Save a key first, or enter one to test.' };
+      return;
+    }
+    this.testingClaudeKey = true;
+    this.settingsService
+      .testClaudeKey(key || undefined)
+      .pipe(finalize(() => (this.testingClaudeKey = false)))
+      .subscribe({
+        next: (result) =>
+          (this.claudeKeyFeedback = { type: result.success ? 'success' : 'danger', message: result.message }),
+        error: (error) =>
+          (this.claudeKeyFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Unable to test the Claude API key.'),
+          }),
+      });
   }
 
   private loadAlertSettings(): void {

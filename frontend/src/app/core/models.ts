@@ -169,6 +169,18 @@ export interface CloudflareTestResponse {
   message: string;
 }
 
+/** GET/PUT /settings/claude-key. The key itself is never sent back. */
+export interface ClaudeKeySettings {
+  configured: boolean;
+  keyMasked: string | null;
+  message?: string;
+}
+
+export interface ClaudeKeyTestResponse {
+  success: boolean;
+  message: string;
+}
+
 export interface ExposureSettings {
   configured: boolean;
   baseDomain: string | null;

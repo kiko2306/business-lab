@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.37.0] — 2026-09-07
+
+### Added
+
+- Settings: a Claude (Anthropic) API key field — stored once, masked on read, with a free "Test key" check against the Anthropic API; consumed by the coming content-generation and Mealie AI features (§84.3 / §254 P1)
+
 ## [0.36.2] — 2026-09-07
 
 ### Changed

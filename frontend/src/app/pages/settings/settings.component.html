@@ -316,6 +316,61 @@
 </app-panel>
 
 <app-panel
+  key="settings:claude-key"
+  title="Claude API key"
+  subtitle="One Anthropic key, used by content generation and AI recipe parsing"
+>
+  <p class="text-body-secondary small mb-3">
+    Get a key from
+    <span class="text-body">console.anthropic.com → API keys</span>. It is stored
+    once here and never shown again — only which key is set. Leave the field
+    blank to keep the current key.
+  </p>
+
+  <div *ngIf="claudeKeyLoading" class="text-body-secondary small">Loading…</div>
+
+  <form *ngIf="!claudeKeyLoading" (ngSubmit)="saveClaudeKey()" class="row g-3">
+    <div class="col-12 col-md-8">
+      <label class="form-label fw-semibold" for="claudeApiKey">API key</label>
+      <input
+        id="claudeApiKey"
+        type="password"
+        class="form-control"
+        autocomplete="off"
+        [(ngModel)]="claudeKeyDraft"
+        [ngModelOptions]="{ standalone: true }"
+        [placeholder]="claudeKey?.configured ? (claudeKey?.keyMasked ?? 'configured — leave blank to keep') : 'sk-ant-…'"
+      />
+    </div>
+
+    <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
+      <button type="submit" class="btn btn-primary" [disabled]="savingClaudeKey || !claudeKeyDraft.trim()">
+        {{ savingClaudeKey ? 'Saving…' : 'Save key' }}
+      </button>
+      <button
+        type="button"
+        class="btn btn-outline-secondary"
+        [disabled]="testingClaudeKey || (!claudeKeyDraft.trim() && !claudeKey?.configured)"
+        (click)="testClaudeKey()"
+      >
+        {{ testingClaudeKey ? 'Testing…' : 'Test key' }}
+      </button>
+      <span
+        *ngIf="claudeKeyFeedback"
+        class="small"
+        [ngClass]="{
+          'text-success': claudeKeyFeedback.type === 'success',
+          'text-danger': claudeKeyFeedback.type === 'danger',
+          'text-body-secondary': claudeKeyFeedback.type === 'info'
+        }"
+      >
+        {{ claudeKeyFeedback.message }}
+      </span>
+    </div>
+  </form>
+</app-panel>
+
+<app-panel
   key="settings:backup-destination"
   title="Backup destination"
   subtitle="Where Kopia writes backups"

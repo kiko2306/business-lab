@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.36.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.37.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -269,15 +269,12 @@ Strategy:
 ### Business Lab (§84)
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency
-graph.** Next code action is **P1** unless redirected. Phase tags below.
+graph.** P1 is done (§255); next code action is **P2**. Phase tags below.
 
-- [ ] **P1 — Claude API key in Settings** (§84.3) — the keystone. Reuse the
-      Cloudflare/Tailscale third-party-token pattern: a `settings` key, Joi
-      schema, masked GET, PUT, one frontend field, a "test" call. Unblocks P2
-      **and** Mealie AI parsing (§238). One session, ships alone.
-- [ ] **P2 — Content generation → draft** (§84.3) — prompt + the P1 key → a
-      stored draft (no publish). n8n is the eventual scheduler (P4), not
-      needed for generate-to-draft.
+- [ ] **P2 — Content generation → draft** (§84.3, §255) — prompt + the stored
+      Claude key → a stored draft (no publish). Add `@anthropic-ai/sdk` here
+      (P1's key test uses raw `https`). n8n is the eventual scheduler (P4),
+      not needed for generate-to-draft.
 - [ ] **P3a — Postiz backend root-cause spike** (§84.3a, §243) — adopt rather
       than build, AGPL-3.0. Trimmed stack is **5 containers**, **5.66 GiB
       image**, ~2.7 GiB RAM. **Blocker:** the backend (`:3000`) never came up
@@ -413,7 +410,8 @@ graph.** Next code action is **P1** unless redirected. Phase tags below.
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
-- [ ] **Wire Mealie's AI recipe parsing** (§123.1, §238 — blocked on §84 P1) —
+- [ ] **Wire Mealie's AI recipe parsing** (§123.1, §238 — §84 P1 done in §255,
+      needs an OpenAI-shaped compat shim for Anthropic's API) —
       investigation done: current Mealie (v3.x) *does* fall back to AI when the
       `recipe-scrapers` URL import can't read a page (automatic, v1.9.0), and
       adds an "Import with AI" page for text/HTML/image/video. But the
