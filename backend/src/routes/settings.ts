@@ -40,6 +40,7 @@ import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
 import { CLAUDE_API_KEY_SETTING, getClaudeApiKey, maskClaudeKey } from '../utils/claudeSettings';
 import { testClaudeApiKey } from '../services/claudeKeyTest';
 import { syncMealieAiProvider } from '../services/mealieAiSync';
+import { getMssqlEulaAcceptance, recordMssqlEulaAcceptance, MSSQL_EULA_SETTING } from '../services/mssqlEula';
 
 const router = Router();
 
@@ -248,6 +249,36 @@ router.post('/claude-key/test', validateBody(schemas.claudeKeyTest), async (req:
     return res.status(result.success ? 200 : 400).json(result);
   } catch {
     return res.status(502).json({ error: 'Unable to reach the Anthropic API to verify the key.' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// SQL Server (mssql) licence acceptance gate — §121.5 / §263d. SQL Server is
+// the only app under a proprietary EULA; the backend must never assert
+// ACCEPT_EULA on its own. Accepting here records who/when and writes
+// ACCEPT_EULA=Y into apps/mssql/.env; until then the app won't start.
+// ---------------------------------------------------------------------------
+router.get('/mssql-eula', async (_req: Request, res: Response) => {
+  try {
+    const acceptance = await getMssqlEulaAcceptance();
+    return res.json({ accepted: Boolean(acceptance), acceptance });
+  } catch {
+    return res.status(500).json({ error: 'Unable to load the SQL Server licence status.' });
+  }
+});
+
+router.post('/mssql-eula', validateBody(schemas.mssqlEulaAccept), async (req: Request, res: Response) => {
+  try {
+    const acceptance = await recordMssqlEulaAcceptance(req.user?.id ?? null, req.user?.username ?? null);
+    await writeAuditLog({
+      userId: req.user?.id ?? null,
+      action: 'settings_change',
+      resource: MSSQL_EULA_SETTING,
+      result: 'success',
+    }).catch(() => {});
+    return res.json({ accepted: true, acceptance, message: 'SQL Server licence accepted — you can now start it.' });
+  } catch {
+    return res.status(500).json({ error: 'Unable to record the SQL Server licence acceptance.' });
   }
 });
 

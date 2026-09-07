@@ -19272,3 +19272,43 @@ aren't unit-tested — same as the Postgres/MySQL engines, which are live-proof
 only; §263f covers the round-trip. Backend 626 pass, typecheck clean.
 
 Next: §263d (EULA acceptance gate).
+
+## 263d. §121 SQL Server Express — EULA acceptance gate
+
+Fourth of the §263 batch, and the reason SQL Server needs more than a normal
+app addition: §121.5's licence clearance depends on an *active human
+acceptance* asserting a valid licence, so `ACCEPT_EULA=Y` must never be set
+by the backend on its own.
+
+- **`services/mssqlEula.ts`** — `getMssqlEulaAcceptance()` reads the
+  `mssql_eula_accepted` settings row (`{acceptedAt, acceptedByUserId,
+  acceptedByName}`, JSON); `recordMssqlEulaAcceptance(userId, name)` writes
+  that row **and** `saveServiceEnv('mssql', { ACCEPT_EULA: 'Y' })`;
+  `assertMssqlEulaAccepted(serviceName)` throws 409 for `mssql` until it's
+  accepted, no-op otherwise.
+- **`executor.ts`** — `await assertMssqlEulaAccepted(serviceName)` in
+  `startService`, right after `assertPlatformSupported`. So the dashboard's
+  Start returns a clear "accept the licence in Settings" message instead of a
+  container that boot-loops.
+- **`routes/settings.ts`** — `GET /settings/mssql-eula`
+  (`{accepted, acceptance}`) and `POST /settings/mssql-eula` (`{accept:
+  true}` → record + audit). Both under the existing `settings:manage`
+  capability. Validation: `mssqlEulaAccept` (`accept` must be literally
+  `true`).
+- **Frontend** — a "SQL Server licence" `<app-panel>` on Settings (the §255
+  Claude-key-panel shape): the §121.5 constraints (No High Risk Use, x86-64
+  only, Express limits, telemetry/AS-IS), a link to the MS terms, a required
+  "I have a valid licence and accept" checkbox, and an Accept button. Once
+  accepted it shows who/when instead. `MssqlEulaStatus` model + two
+  `SettingsService` methods.
+
+Deliberately a Settings panel, not a modal wired into the Start button: it
+reuses an existing pattern, keeps the executor guard a simple yes/no, and the
+start-failure message points here.
+
+Tests: `mssqlEula.test.ts` (7) — parse/round-trip of the stored acceptance,
+`recordMssqlEulaAcceptance` writes the row + `ACCEPT_EULA=Y`,
+`assertMssqlEulaAccepted` 409s only for an unaccepted `mssql`. Backend 633
+pass, frontend 50 pass + build clean.
+
+Next: §263e (docs rows).

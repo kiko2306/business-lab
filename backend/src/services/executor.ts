@@ -25,6 +25,7 @@ import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
 import { reconcileNextcloudClamav } from './nextcloudClamav';
 import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
 import { syncMealieAiProvider } from './mealieAiSync';
+import { assertMssqlEulaAccepted } from './mssqlEula';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
 import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
@@ -346,6 +347,7 @@ export async function startService(serviceName: string, userId: number): Promise
   await ensureGeneratedSecrets(serviceName);
   ensureServiceSecrets(serviceName, appDir, composeFile);
   assertPlatformSupported(serviceName);
+  await assertMssqlEulaAccepted(serviceName);
   await assertDependenciesRunning(serviceName);
 
   try {

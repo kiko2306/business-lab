@@ -371,6 +371,75 @@
 </app-panel>
 
 <app-panel
+  key="settings:mssql-eula"
+  title="SQL Server licence"
+  subtitle="Microsoft's EULA must be accepted before SQL Server can start"
+>
+  <div *ngIf="mssqlEulaLoading" class="text-body-secondary small">Loading…</div>
+
+  <ng-container *ngIf="!mssqlEulaLoading">
+    <div *ngIf="mssqlEula?.accepted" class="alert alert-success py-2 small mb-0">
+      Accepted{{ mssqlEula?.acceptance?.acceptedByName ? ' by ' + mssqlEula?.acceptance?.acceptedByName : '' }}
+      on {{ mssqlEula?.acceptance?.acceptedAt | date: 'medium' }}. SQL Server can be started from its service card.
+    </div>
+
+    <ng-container *ngIf="!mssqlEula?.accepted">
+      <p class="text-body-secondary small mb-2">
+        The <span class="text-body">mssql</span> app runs Microsoft SQL Server 2022 Express, which — unlike every
+        other app here — is proprietary software under the
+        <a
+          href="https://www.microsoft.com/en-us/Useterms/Retail/SQLServer2022DeveloperExpressEvaluation/2022/UseTerms_Retail_SQLServer2022DeveloperExpressEvaluation_English.htm"
+          target="_blank"
+          rel="noopener"
+          >Microsoft Software Licence Terms</a
+        >. Setting <code>ACCEPT_EULA=Y</code> asserts you hold a valid licence, so it is never set automatically —
+        accept below and it is written for you.
+      </p>
+      <ul class="text-body-secondary small mb-3">
+        <li><strong>No High Risk Use</strong> — not for e-commerce, payment, banking or life-safety databases.</li>
+        <li><strong>x86-64 only</strong> — Microsoft ships no arm64 image; the dashboard blocks a start elsewhere.</li>
+        <li>Express limits: 10&nbsp;GB max database, ~1&nbsp;GiB buffer pool, 4 cores.</li>
+        <li>Usage telemetry is sent to Microsoft; provided AS-IS with no support and a nominal liability cap.</li>
+      </ul>
+
+      <div class="form-check mb-3">
+        <input
+          id="mssqlEulaCheck"
+          type="checkbox"
+          class="form-check-input"
+          [(ngModel)]="mssqlEulaChecked"
+          [ngModelOptions]="{ standalone: true }"
+        />
+        <label class="form-check-label small" for="mssqlEulaCheck">
+          I have a valid and existing SQL Server licence and accept these terms.
+        </label>
+      </div>
+
+      <button
+        type="button"
+        class="btn btn-primary"
+        [disabled]="acceptingMssqlEula || !mssqlEulaChecked"
+        (click)="acceptMssqlEula()"
+      >
+        {{ acceptingMssqlEula ? 'Saving…' : 'Accept licence' }}
+      </button>
+    </ng-container>
+
+    <span
+      *ngIf="mssqlEulaFeedback"
+      class="small d-block mt-2"
+      [ngClass]="{
+        'text-success': mssqlEulaFeedback.type === 'success',
+        'text-danger': mssqlEulaFeedback.type === 'danger',
+        'text-body-secondary': mssqlEulaFeedback.type === 'info'
+      }"
+    >
+      {{ mssqlEulaFeedback.message }}
+    </span>
+  </ng-container>
+</app-panel>
+
+<app-panel
   key="settings:backup-destination"
   title="Backup destination"
   subtitle="Where Kopia writes backups"

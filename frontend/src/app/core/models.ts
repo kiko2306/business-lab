@@ -181,6 +181,17 @@ export interface ClaudeKeyTestResponse {
   message: string;
 }
 
+/** GET/POST /settings/mssql-eula — the SQL Server licence acceptance gate. */
+export interface MssqlEulaStatus {
+  accepted: boolean;
+  acceptance: {
+    acceptedAt: string;
+    acceptedByUserId: number | null;
+    acceptedByName: string | null;
+  } | null;
+  message?: string;
+}
+
 /** A generated social-media post draft (plan.md §254 P2). */
 export interface SocialDraft {
   id: number;

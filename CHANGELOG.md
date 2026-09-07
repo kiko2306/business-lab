@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.41.0] — 2026-09-07
+
+### Added
+
+- SQL Server licence acceptance gate: a Settings panel shows the Microsoft EULA terms and a tick-to-accept; until accepted the backend refuses to start mssql and never writes ACCEPT_EULA=Y (§121.5, §263d).
+
 ## [0.40.2] — 2026-09-07
 
 ### Added
