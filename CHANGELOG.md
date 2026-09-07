@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.38.0] — 2026-09-07
+
+### Added
+
+- Content page: generate a social-media post draft from a brief with the stored Claude key, then edit or delete stored drafts (§84.3 / §254 P2)
+
 ## [0.37.0] — 2026-09-07
 
 ### Added

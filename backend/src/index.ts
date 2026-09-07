@@ -14,6 +14,7 @@ import recoveryRouter from './routes/recovery';
 import usersRouter from './routes/users';
 import networkRouter from './routes/network';
 import selfUpdateRouter from './routes/selfUpdate';
+import socialRouter from './routes/social';
 import { APP_VERSION } from './version';
 import {
   ensureUserRolesTable,
@@ -35,6 +36,7 @@ import { reconcileRemovedServices } from './services/exposure';
 import { startExposureReconciler } from './services/exposureReconciler';
 import { regenerateHomepageServices } from './services/homepageConfig';
 import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
+import { ensureSocialDraftsTable } from './services/socialDrafts';
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -160,6 +162,7 @@ for (const prefix of ROUTE_PREFIXES) {
   app.use(`${prefix}/users`, ...protectedGate(), requireCapability('users:manage'), usersRouter);
   app.use(`${prefix}/network`, ...protectedGate(), requireCapability('apps:control'), networkRouter);
   app.use(`${prefix}/self-update`, ...protectedGate(), requireCapability('system:update'), selfUpdateRouter);
+  app.use(`${prefix}/social`, ...protectedGate(), requireCapability('settings:manage'), socialRouter);
   // Mounted after the public liveness probe above, so GET /health stays public
   // while GET /health/system and /health/thresholds remain protected.
   app.use(`${prefix}/health`, ...protectedGate(), healthRouter);
@@ -196,6 +199,9 @@ ensureTotpSchema().catch((err: Error) => {
 });
 dropServiceImageUpdatesTable().catch((err: Error) => {
   console.error('Unable to drop service_image_updates:', err.message);
+});
+ensureSocialDraftsTable().catch((err: Error) => {
+  console.error('Unable to ensure social_drafts table:', err.message);
 });
 ensureSelfUpdateTable()
   .then(() => reconcileDanglingSelfUpdateRun())

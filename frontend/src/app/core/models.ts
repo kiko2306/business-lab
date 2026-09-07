@@ -181,6 +181,15 @@ export interface ClaudeKeyTestResponse {
   message: string;
 }
 
+/** A generated social-media post draft (plan.md §254 P2). */
+export interface SocialDraft {
+  id: number;
+  prompt: string;
+  content: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
 export interface ExposureSettings {
   configured: boolean;
   baseDomain: string | null;

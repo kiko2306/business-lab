@@ -38,6 +38,15 @@
   from that service's card too, under **Configuration** — fill in the
   required fields and save; the backend writes the app's `.env` for you.
 
+## Content
+
+- Enter an Anthropic (Claude) API key once on the **Settings** page ("Claude
+  API key" panel); the free "Test key" button confirms it works.
+- On the **Content** page, write a brief and click **Generate** — Claude
+  returns one social-media post, saved as a draft.
+- Edit a draft's text inline and **Save**, or **Delete** it. Publishing and
+  scheduling are not part of this page yet.
+
 ## Backup and recovery
 
 - Choose where backups are written on the **Settings** page: another disk on

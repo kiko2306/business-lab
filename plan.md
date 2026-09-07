@@ -18725,3 +18725,51 @@ which also needs an OpenAI-shaped compat shim for Anthropic's API) — both now
 unblocked. No live proof: entering a real key and clicking "Test key" against
 `api.anthropic.com` is @mat's, but it's an outbound HTTPS check, not
 infrastructure.
+
+## 256. §84 P2 — content generation → draft (2026-09-07)
+
+The half §84.3 called "worth building here, and it is small": a brief in, a
+stored draft out. No publishing, no scheduling, no platform targeting — those
+are P3/P4.
+
+**Backend.**
+
+- `@anthropic-ai/sdk` added (P1's key test used raw `https`; generation is
+  what the SDK is for).
+- `services/claudeGenerate.ts` — `generateSocialPost(prompt)`: reads the
+  stored key (`getClaudeApiKey`), `new Anthropic({ apiKey })`,
+  `messages.create` on `claude-opus-5` with a system prompt that pins the
+  output to one post and no commentary, `max_tokens: 2000`. Joins the `text`
+  blocks and trims. `ClaudeKeyMissingError` (→ 400) when no key is set;
+  effort/thinking left at model defaults — social copy is a simple task and
+  Opus 5 runs adaptive by default.
+- `services/socialDrafts.ts` — `social_drafts` table (`id`, `prompt`,
+  `content`, `created_at`, `updated_at`), `ensureSocialDraftsTable()` wired
+  into `index.ts` alongside the other `ensure*` calls. CRUD-minus-create-by-
+  hand: `listDrafts`, `createDraft`, `updateDraftContent`, `deleteDraft`.
+- `routes/social.ts` — `GET/POST /api/social/drafts`, `PATCH/DELETE
+  /api/social/drafts/:id`. `POST` is rate-limited (20/min — each call spends
+  tokens). Mounted under `requireCapability('settings:manage')`: a dedicated
+  `content:*` capability would mean touching the capability enum, the Users
+  grant UI, the runbooks and the e2e Users spec for a distinction nobody
+  needs yet — the operator drives generation. Split it out if per-account
+  content access ever becomes real.
+- Validation: `socialDraftCreate` (`prompt` 1–4000), `socialDraftUpdate`
+  (`content` 1–10000), `socialDraftIdParam`.
+
+**Frontend.** New `/content` page (nav entry gated on `settings:manage`):
+a "Generate a draft" panel (brief textarea + Generate) and a "Drafts" panel
+(newest first; each draft shows its brief, an inline-editable `content`
+textarea, Save when dirty, Delete via the in-app confirm modal). `SocialService`
+wraps the four calls; `SocialDraft` model.
+
+**Tests.** `claudeGenerate.test.ts` — mocked SDK + key: no key →
+`ClaudeKeyMissingError` and no API call; text blocks joined and trimmed,
+non-text blocks ignored; empty response throws. The draft-store functions are
+thin pg wrappers, not unit-tested. Backend 609 pass, frontend 50 pass + build
+clean; browser E2E re-run because the nav changed.
+
+**Not done here.** No live generation — that needs a real key on the box and
+is @mat's (the P1 "Test key" item covers proving the key path). P3 (publish)
+and P4 (n8n schedule) are the next phases; the Mealie AI sync (§238) can now
+also proceed, but still needs an OpenAI-shaped compat shim.

@@ -5,6 +5,7 @@ import { AppsComponent } from './pages/apps/apps.component';
 import { BackupsComponent } from './pages/backups/backups.component';
 import { ExposureComponent } from './pages/exposure/exposure.component';
 import { SettingsComponent } from './pages/settings/settings.component';
+import { SocialComponent } from './pages/social/social.component';
 import { UtilsComponent } from './pages/utils/utils.component';
 import { LoginComponent } from './pages/login/login.component';
 import { SetupComponent } from './pages/setup/setup.component';
@@ -73,6 +74,13 @@ export const routes: Routes = [
       {
         path: 'settings',
         component: SettingsComponent,
+        canActivate: [requireCapability('settings:manage')],
+      },
+      {
+        // Content generation (plan.md §254 P2). Same capability as Settings —
+        // it's the operator driving the product, not a separate grant yet.
+        path: 'content',
+        component: SocialComponent,
         canActivate: [requireCapability('settings:manage')],
       },
       {

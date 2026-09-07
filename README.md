@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.37.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.38.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -269,12 +269,8 @@ Strategy:
 ### Business Lab (§84)
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency
-graph.** P1 is done (§255); next code action is **P2**. Phase tags below.
-
-- [ ] **P2 — Content generation → draft** (§84.3, §255) — prompt + the stored
-      Claude key → a stored draft (no publish). Add `@anthropic-ai/sdk` here
-      (P1's key test uses raw `https`). n8n is the eventual scheduler (P4),
-      not needed for generate-to-draft.
+graph.** P1 (§255) and P2 (§256) are done; next code action is **P3a**. Phase
+tags below.
 - [ ] **P3a — Postiz backend root-cause spike** (§84.3a, §243) — adopt rather
       than build, AGPL-3.0. Trimmed stack is **5 containers**, **5.66 GiB
       image**, ~2.7 GiB RAM. **Blocker:** the backend (`:3000`) never came up

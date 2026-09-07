@@ -1,0 +1,70 @@
+<main class="container-fluid py-4">
+  <div class="mb-4">
+    <h1 class="h3 mb-1">Content</h1>
+    <p class="text-body-secondary mb-0">
+      Generate social-media post copy from a brief. Drafts are stored here to
+      edit; publishing comes later.
+    </p>
+  </div>
+
+  <app-panel key="social:generate" title="Generate a draft" subtitle="Describe the post you want">
+    <form (ngSubmit)="generate()">
+      <label class="form-label fw-semibold" for="prompt">Brief</label>
+      <textarea
+        id="prompt"
+        class="form-control"
+        rows="4"
+        [(ngModel)]="prompt"
+        [ngModelOptions]="{ standalone: true }"
+        placeholder="e.g. Announce that our booking system now supports group reservations. Friendly, one line, one emoji."
+      ></textarea>
+      <div class="mt-3">
+        <button type="submit" class="btn btn-primary" [disabled]="generating || !prompt.trim()">
+          {{ generating ? 'Generating…' : 'Generate' }}
+        </button>
+        <span *ngIf="generating" class="small text-body-secondary ms-2">Calling Claude…</span>
+      </div>
+    </form>
+  </app-panel>
+
+  <app-panel key="social:drafts" title="Drafts" subtitle="Generated copy, newest first">
+    <div *ngIf="drafts === null" class="text-body-secondary small">Loading…</div>
+    <div *ngIf="drafts && drafts.length === 0" class="text-body-secondary small">
+      No drafts yet — generate one above.
+    </div>
+
+    <div *ngFor="let draft of drafts" class="border rounded p-3 mb-3">
+      <p class="small text-body-secondary mb-2">
+        <span class="fw-semibold">Brief:</span> {{ draft.prompt }}
+      </p>
+      <textarea
+        class="form-control mb-2"
+        rows="4"
+        [ngModel]="edits[draft.id]"
+        (ngModelChange)="edits[draft.id] = $event"
+        [ngModelOptions]="{ standalone: true }"
+      ></textarea>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <button
+          type="button"
+          class="btn btn-sm btn-primary"
+          [disabled]="savingId === draft.id || !isDirty(draft)"
+          (click)="save(draft)"
+        >
+          {{ savingId === draft.id ? 'Saving…' : 'Save' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-sm btn-outline-danger"
+          [disabled]="deletingId === draft.id"
+          (click)="remove(draft)"
+        >
+          {{ deletingId === draft.id ? 'Deleting…' : 'Delete' }}
+        </button>
+        <span class="small text-body-secondary ms-auto">
+          {{ draft.updatedAt | date: 'medium' }}
+        </span>
+      </div>
+    </div>
+  </app-panel>
+</main>

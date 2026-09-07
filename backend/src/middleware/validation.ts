@@ -101,6 +101,15 @@ export const schemas = {
   claudeKeyTest: Joi.object({
     apiKey: Joi.string().trim().min(20).max(4096).allow('').optional(),
   }),
+  socialDraftCreate: Joi.object({
+    prompt: Joi.string().trim().min(1).max(4000).required(),
+  }),
+  socialDraftUpdate: Joi.object({
+    content: Joi.string().trim().min(1).max(10000).required(),
+  }),
+  socialDraftIdParam: Joi.object({
+    id: Joi.number().integer().positive().required(),
+  }),
   backupRestore: Joi.object({
     fileName: backupNameSchema.required(),
   }),
