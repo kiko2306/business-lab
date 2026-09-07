@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.42.1] — 2026-09-07
+
+### Fixed
+
+- Kopia backup source now ignores /kopia/data (its own local repository and cache) so an app-data snapshot no longer recursively swallows the repository — proven live: a snapshot dropped from a runaway 60+ GB to 3.1 GB / 50553 files, and restored byte-for-byte from a real external mount (§265, §266).
+
 ## [0.42.0] — 2026-09-07
 
 ### Added

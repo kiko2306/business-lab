@@ -28,6 +28,20 @@ import logger from '../utils/logger';
 const SOURCE_PATH = '/source/apps';
 
 /**
+ * Paths under the snapshot root Kopia must never walk — gitignore-style
+ * patterns, anchored to `/source/apps` by the leading slash.
+ *
+ * `/kopia/data` is Kopia's OWN state living inside the source tree
+ * (`apps/kopia/data/` — the local-fallback repository and its cache). Without
+ * this, every app-data snapshot copies the repository into the destination:
+ * already-encrypted, incompressible backup blobs, growing every run, a
+ * backup-of-a-backup that compounds until it fills the disk (plan.md §265 —
+ * it hit 60 GB here and nearly filled `/`). Nothing under it is recoverable
+ * app data anyway: the repository is the backup, and the cache is derived.
+ */
+const SOURCE_IGNORE_RULES = ['/kopia/data'];
+
+/**
  * The basic-auth username. Fixed to `kopia` in the compose file (only the
  * passwords carry security), so the client does not need it passed in.
  */
@@ -280,12 +294,13 @@ export interface ProvisionSourceResult {
 }
 
 /**
- * Register `/source/apps` as a snapshot source if it is not already, with an
- * empty per-source policy so it inherits the global retention ladder. Safe to
- * call repeatedly. Throws on a real failure — this is provisioning, and a
- * caller that asked for it wants to know it did not happen (mirrors
- * provisioning generally: a caller that asked for it wants to know it did
- * not happen.)
+ * Register `/source/apps` as a snapshot source if it is not already, with a
+ * per-source policy that carries only the ignore rules (`SOURCE_IGNORE_RULES`)
+ * — retention still falls through to the global ladder. Safe to call
+ * repeatedly: Kopia's POST /sources rewrites the policy each time, so an
+ * older source registered before the ignore rules existed picks them up on
+ * the next run. Throws on a real failure — this is provisioning, and a
+ * caller that asked for it wants to know it did not happen.
  */
 export async function provisionBackupSource(password: string): Promise<ProvisionSourceResult> {
   const session = await openSession(password);
@@ -300,11 +315,15 @@ export async function provisionBackupSource(password: string): Promise<Provision
     (s) => s.source.path === SOURCE_PATH
   );
 
-  // POST /sources with an inline (empty) policy both registers the source and
-  // gives it the policy it needs to exist — a bare POST fails "missing policy".
+  // POST /sources with an inline policy both registers the source and gives
+  // it the policy it needs to exist — a bare POST fails "missing policy".
   const res = await api(session, '/api/v1/sources', {
     method: 'POST',
-    body: { path: SOURCE_PATH, createSnapshot: false, policy: {} },
+    body: {
+      path: SOURCE_PATH,
+      createSnapshot: false,
+      policy: { files: { ignore: SOURCE_IGNORE_RULES } },
+    },
   });
   if (res.status !== 200) {
     throw new Error(`Kopia refused to register the backup source (HTTP ${res.status}): ${describeError(res.body)}`);

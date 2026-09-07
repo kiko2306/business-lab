@@ -137,11 +137,16 @@ describe('provisionBackupSource', () => {
       source: { userName: 'root', host: 'kopia', path: '/source/apps' },
     });
 
-    // The POST body must carry an inline policy, or Kopia answers "missing policy".
+    // The POST body must carry an inline policy, or Kopia answers "missing
+    // policy" — and that policy must ignore apps/kopia/data/, or the snapshot
+    // recursively swallows Kopia's own repository (plan.md §265).
     const postInit = fetchMock.mock.calls[3][1];
     expect(String(fetchMock.mock.calls[3][0])).toMatch(/\/api\/v1\/sources$/);
     expect(postInit.method).toBe('POST');
-    expect(JSON.parse(postInit.body)).toMatchObject({ path: '/source/apps', policy: {} });
+    expect(JSON.parse(postInit.body)).toMatchObject({
+      path: '/source/apps',
+      policy: { files: { ignore: ['/kopia/data'] } },
+    });
   });
 
   it('reports created:false when the source already exists', async () => {

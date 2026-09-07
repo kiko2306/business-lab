@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.42.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.42.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -260,25 +260,18 @@ Strategy:
 
 ### Backups
 
-- [ ] **Exclude `apps/kopia/data/` from the Kopia snapshot source** (§265) —
-      `provisionBackupSource` registers `/source/apps` with an empty policy,
-      so every app-data snapshot also copies Kopia's own 60 GB local-fallback
-      repository and 4.6 GB cache into the destination — a compounding
-      backup-of-a-backup that nearly filled `/` during the §265 proof. Set a
-      `policy.files.ignore` list (at least `/kopia/data`) on the source or
-      global policy; cover it in `kopiaClient.test.ts`. **Blocks the external-
-      destination proof below** — no destination is safe to prove until the
-      source stops ballooning.
-- [ ] **Prove a real external destination end to end** (§131.4, §196, §265) —
-      `disk`/`SMB`/`NFS` are the only mounted kinds (`s3` is proven, §221).
-      §265: **SMB is a dead end** — `kopia repository create` hangs
+- [ ] **Prove a real external destination against off-host hardware** (§131.4,
+      §196, §265, §266) — the `disk`-kind code path is now proven end to end
+      (§266: snapshot + byte-for-byte restore from a real ext4 bind mount,
+      50553 files), and the §265 source-scope bug is fixed. Still unproven:
+      a destination on **separate hardware** — the whole point is surviving
+      the data disk failing. **SMB is out** — `kopia repository create` hangs
       indefinitely on the test NAS (`//192.168.1.50/backup`) despite a
       healthy, fast CIFS mount; upstream Kopia doesn't support filesystem
-      repos on SMB/NFS. The `disk` kind's write path *was* proven working
-      (repo created on ext4, 30 GB uploaded clean) before the §265 source-
-      scope bug stopped it. After that bug is fixed, prove `disk` (or `nfs`,
-      which may not hang) writes **and restores** against a production-like
-      target.
+      repos on SMB/NFS. Try `nfs` against a real NAS (NFS handles
+      `O_EXCL`/rename closer to a local FS, so it may not hang), or `disk`
+      against an actually-separate attached drive. `s3` is already proven
+      (§221) and is the recommended path.
 ### Business Lab (§84)
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency

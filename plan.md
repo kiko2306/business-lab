@@ -19573,3 +19573,53 @@ the ignore entry.
   records SMB as a dead end and points at `nfs`/`disk`/`s3`; the new ignore-
   policy item is added. Nothing committed as done — no code changed this
   session.
+
+## 266. Backup: the §265 ignore rule landed, and the disk-kind path is proven end to end (2026-09-07)
+
+Fixes finding 2 of §265. `kopiaClient.ts` gained a `SOURCE_IGNORE_RULES`
+constant (`['/kopia/data']` — a gitignore pattern anchored to the
+`/source/apps` snapshot root) and `provisionBackupSource` now POSTs the
+source with `policy: { files: { ignore: SOURCE_IGNORE_RULES } }` instead of
+`policy: {}`. Retention still falls through to the global ladder
+(`retention: {}` on the per-source policy). Kopia's `POST /api/v1/sources`
+rewrites the policy every call, so a source registered before this change
+picks the rule up on its next scheduled run — no migration.
+
+`kopiaClient.test.ts` updated: the provision test now asserts the POST body
+carries `policy.files.ignore === ['/kopia/data']` (the old assertion was
+`toMatchObject({ policy: {} })`, which `{}` satisfies vacuously — it would
+not have caught a regression). 632/632 backend, typecheck clean.
+
+### Live proof (real stack)
+
+Compiled `dist/` locally, `docker cp`'d `kopiaClient.js` into the running
+backend (the running container carries the hot-patched file until the next
+backend image recreate — the code is committed), pointed the destination at
+a `disk`-kind bind mount on a separate ext4 LV, and started Kopia via
+`startService('kopia', 0)`.
+
+- `GET /api/v1/policy?...&path=/source/apps` returned `files.ignore:
+  ["/kopia/data"]` — the rule reached the server.
+- Snapshot: **IDLE, 3,116,127,393 bytes / 50,553 files, 0 errors**, repo
+  2.3 GB on disk. Before the fix the same snapshot was past 30 GB and
+  climbing toward 60+ (§265).
+- Server log: `grep -c "source/apps/kopia/data"` → **0**. Kopia never walked
+  its own repository. Top-level dirs snapshotted were every real app;
+  `apps/kopia/` itself is present with only its four config files
+  (`.env`, `.env.example`, `docker-compose.yml`, `entrypoint.sh`, 24 KB) —
+  `apps/kopia/data/` absent.
+- Restore: `restoreSnapshot` → `getRestoreTaskStatus` polled to **SUCCESS**
+  with `restoredBytes` and `restoredFiles` **exactly** matching the snapshot
+  summary (3,116,127,393 / 50,553). Restored `beszel/data/data.db` opened
+  cold: `PRAGMA integrity_check` → `ok`, 24 tables. `apps/kopia/data/` not in
+  the restored tree.
+
+### State left behind
+
+Destination settings **reverted** again to @mat's SMB config; Kopia
+container + volume removed, Kopia stopped; the `disk` proof mount deleted;
+`/` back to 10 %. The remaining README item is narrowed: the `disk` *code
+path* is proven, what is still open is a destination on genuinely separate
+hardware (real NAS over `nfs`, or a real attached drive) — SMB stays out.
+
+Patch bump 0.42.0 → 0.42.1.
