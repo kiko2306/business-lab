@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.39.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.40.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -400,10 +400,8 @@ and proven on the real stack) are done. Phase tags below.
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
-- [ ] **Add SQL Server Express (LAN-only)** (§121, §263 — batch §263a–§263e)
-      — licence cleared (§121.5); building it in sequence:
-  - [ ] **§263a** — `apps/mssql/` skeleton + `services.ts` registry entry
-        (x86-64 guard, LAN-only, `homepage.*` labels, no `ACCEPT_EULA` yet).
+- [ ] **Add SQL Server Express (LAN-only)** (§121, §263 — batch) — licence
+      cleared (§121.5); §263a (skeleton + registry) done, remaining:
   - [ ] **§263b** — MSSQL-compliant secret generator (`appEnv.ts`: extract
         `generateSecretFor`, add an `MSSQL_` 3-of-4-classes branch; folds in
         the APP_KEY special-case that only guards one of three sites today).

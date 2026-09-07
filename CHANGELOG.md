@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.40.0] — 2026-09-07
+
+### Added
+
+- SQL Server Express (LAN-only) app skeleton and registry entry — x86-64-only guard in the start path, generated SA password, EULA acceptance still pending (§263a).
+
 ## [0.39.2] — 2026-09-07
 
 ### Added

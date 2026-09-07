@@ -19171,3 +19171,40 @@ Host is `x86_64`, so the live proof (§263f) can run on `tx-home-utils.com`.
 - **§263f — live proof (@mat / agent).** Accept the EULA in the UI, start
   `mssql`, create a DB, run a backup/restore round-trip, confirm the SA
   password satisfies MSSQL's policy on first boot.
+
+## 263a. §121 SQL Server Express — app skeleton + registry entry
+
+First of the §263 batch. Lands the app so the later parts have something to
+attach to; it deliberately can't start yet.
+
+- **`apps/mssql/docker-compose.yml`** — `mcr.microsoft.com/mssql/server:2022-latest`,
+  `MSSQL_PID=Express`, host port `${MSSQL_PORT:-10540}:1433` (LAN only —
+  §121.4). `ACCEPT_EULA` is passed through from `.env` (`${ACCEPT_EULA:-}`)
+  and **nothing sets it** — the §263d gate writes `ACCEPT_EULA=Y` on
+  acceptance, and until then the container exits, which is the intended
+  safety. A `mssql-init` busybox chowns `./data` to uid 10001 (the 2022
+  image runs non-root) — same pattern as `n8n-init`. Healthcheck via
+  `sqlcmd18 -C -Q 'SELECT 1'`.
+- **`apps/mssql/.env.example`** — `MSSQL_PORT`, blank `MSSQL_SA_PASSWORD`
+  (generated), blank `ACCEPT_EULA` with the "leave blank" note.
+- **`services.ts`** — `mssql` entry: `category: 'Development'`, `icon:
+  'database'` (new emoji `🗄️` in the frontend map), `lanOnly: true`,
+  `x86Only: true`, `hiddenGeneratedSecrets: ['MSSQL_SA_PASSWORD']`. No
+  `exposureEnvKeys`. `homepage.group=Data` label (§121.2) — a dead label for
+  a `lanOnly` app, but the registry test still requires name/group.
+- **`x86Only` (new `ServiceDefinition` field) + `assertPlatformSupported`** in
+  `executor.ts`, called in `startService` before `assertDependenciesRunning`:
+  refuses an x86-only app on a non-`x64` host with a clear message instead of
+  a cryptic `compose up` manifest error. `arch` param is injectable for the
+  test.
+- `docs/ports.md` — `10540` row.
+- Tests: `services.test.ts` (mssql is lanOnly/x86Only/hidden-SA, and its
+  compose never sets `ACCEPT_EULA=Y`; the `lanOnly` allowlist now expects
+  `['mssql','samba']`), `executor.test.ts` (`assertPlatformSupported` blocks
+  arm64, allows x64, ignores unconstrained apps). Backend 620 pass, frontend
+  50 pass + build clean.
+
+Not done here: the compliant password generator (§263b — right now
+`MSSQL_SA_PASSWORD` would be plain hex, which fails MS's 3-of-4-classes
+policy), the `mssql` backup engine (§263c), the EULA gate (§263d), docs rows
+(§263e), live proof (§263f).

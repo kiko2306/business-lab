@@ -237,8 +237,26 @@ describe('samba is LAN-only', () => {
   it('has no other app flagged lanOnly by accident', () => {
     const lanOnly = Object.entries(SERVICES)
       .filter(([, s]) => s.lanOnly)
-      .map(([name]) => name);
-    expect(lanOnly).toEqual(['samba']);
+      .map(([name]) => name)
+      .sort();
+    // samba (SMB/445) and mssql (SQL Server TDS) — both non-HTTP protocols
+    // the tunnel can't carry (§121.4).
+    expect(lanOnly).toEqual(['mssql', 'samba']);
+  });
+});
+
+describe('mssql (SQL Server Express)', () => {
+  it('is LAN-only, x86-only, and generates a hidden SA password', () => {
+    expect(SERVICES['mssql'].lanOnly).toBe(true);
+    expect(SERVICES['mssql'].x86Only).toBe(true);
+    expect(SERVICES['mssql'].hiddenGeneratedSecrets).toContain('MSSQL_SA_PASSWORD');
+    // No exposure — the TDS protocol can't go through NPM.
+    expect(SERVICES['mssql'].exposureEnvKeys).toBeUndefined();
+  });
+
+  it('never sets ACCEPT_EULA in its compose file (§121.5 acceptance gate)', () => {
+    const text = composeText(SERVICES['mssql'].composePath);
+    expect(text).not.toMatch(/ACCEPT_EULA:\s*['"]?Y/i);
   });
 });
 

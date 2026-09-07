@@ -731,6 +731,34 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // (§238). Same trick as GUACAMOLE_ADMIN_PASSWORD.
     hiddenGeneratedSecrets: ['MEALIE_ADMIN_PASSWORD'],
   },
+  'mssql': {
+    name: 'mssql',
+    label: 'SQL Server',
+    description: 'Microsoft SQL Server 2022 Express (LAN-only)',
+    icon: 'database',
+    category: 'Development',
+    composePath: 'apps/mssql/docker-compose.yml',
+    healthCheck: {
+      enabled: false,
+    },
+    // SQL Server's TDS wire protocol can't traverse the Cloudflare Tunnel +
+    // NPM path (§0 principle 1, §121.4). Reached only on the LAN / compose
+    // network by other apps and dev tools. No exposureEnvKeys, no Home Page
+    // tile.
+    lanOnly: true,
+    // Microsoft ships no arm64 image — the executor blocks a start on a
+    // non-x64 host rather than letting `compose up` fail on the manifest.
+    x86Only: true,
+    // MS enforces a password policy on `sa` (8-128 chars, 3 of 4 character
+    // classes). appEnv.ts's generateSecretFor emits a compliant value for the
+    // MSSQL_ prefix (§263b). Hidden: nothing but this app and its own tooling
+    // ever needs it.
+    hiddenGeneratedSecrets: ['MSSQL_SA_PASSWORD'],
+    // The Microsoft SQL Server licence requires an active human acceptance
+    // before ACCEPT_EULA=Y is set (§121.5). The dashboard gates the start on
+    // it (§263d) and writes ACCEPT_EULA into this app's .env on acceptance —
+    // the compose file never sets it.
+  },
   'vaultwarden': {
     // Email comes from the dashboard's global mail settings rather than being
     // configured per app. SMTP_SECURITY needs the map: Vaultwarden's
