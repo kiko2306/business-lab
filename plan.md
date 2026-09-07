@@ -19773,3 +19773,43 @@ specific box — the §265 treatment.
 Destination settings reverted to @mat's SMB config; Kopia stopped, container
 + volume removed. Minor bump 0.42.1 → 0.43.0 (new user-facing destination
 kind).
+
+## 269. NFS against the test NAS — mounts fine, Kopia's repo-create still hangs (§265, §268)
+
+@mat enabled NFS on `192.168.1.50` (v2/v3/v4/v4.1) and added an export rule.
+No code change — the `nfs` `BackupTargetKind` already exists; this closes the
+"try NFS" thread from the README backup item.
+
+### Findings
+
+- **The export needs an explicit client rule.** With the service merely on,
+  `showmount -e` was empty and every mount got `access denied by server`.
+  After @mat added `/backup 192.168.1.236` (rw, no root-squash) it mounts.
+- **Docker's `local` nfs driver defaults to NFSv3, which fails here.**
+  `mount … addr=192.168.1.50` (no `nfsvers`) → `connection refused`: v3 needs
+  `rpc.mountd`, whose dynamic port is firewalled on this NAS (only 111 + 2049
+  are open). Adding `nfsvers=4.1` to the destination's **options** field
+  mounts cleanly — v4.1 is single-port (2049), no portmapper/mountd. Worth a
+  docs note; not worth changing the kind's default (a genuinely v3-only NAS
+  would break, and v4.1 did not fix the real problem anyway).
+- **`kopia repository create` hangs identically to SMB and FTP.** With a
+  healthy, writable NFSv4.1 mount (`hard`, a plain `touch` in the mount
+  succeeds) and a **clean share** (the leftover `.shards` from §265's SMB
+  attempt removed first), Kopia writes `.shards` (43 bytes) and then stalls
+  forever at "creating directory: /repository" — the same point, the same
+  `Sl`-state process, as SMB (§265) and the rclone/FTP bridge (§268).
+
+### Conclusion
+
+**Three protocols — SMB, FTP, NFSv4.1 — all hang Kopia's repo-create against
+`192.168.1.50`, none against local ext4 (§266).** It is not the code, the
+protocol, the mount options or a stale file: something in how Kopia's Go
+filesystem layer writes its first blobs (temp file → fsync → rename → fsync
+dir) does not complete against this specific NAS's storage over any network
+path, while `dd`/`touch` do. This box cannot host a Kopia repository over the
+network.
+
+Remaining options for a proven off-host destination, unchanged: `s3` (already
+proven §221 — needs an S3/MinIO endpoint, which this NAS does not currently
+offer), or `disk` on a genuinely separate attached drive (code path proven
+§266). Settings left on @mat's SMB config; nothing committed as working.

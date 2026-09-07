@@ -261,18 +261,19 @@ Strategy:
 ### Backups
 
 - [ ] **Prove a real external destination against off-host hardware** (§131.4,
-      §196, §265, §266, §268) — the `disk`-kind code path is proven end to end
-      (§266: snapshot + byte-for-byte restore from a real ext4 bind mount,
-      50553 files) and the §265 source-scope bug is fixed. Still unproven:
-      any destination on **separate hardware** — the whole point is surviving
-      the data disk failing. The test NAS (`192.168.1.50`) hangs
-      `kopia repository create` on **both** SMB (§265, CIFS mount healthy but
-      Kopia's `O_EXCL`+rename stalls) **and** FTP (§268, rclone talks to it
-      fine but Kopia's rclone→WebDAV bridge goes silent) — two protocols, one
-      uncooperative box. Prove it against something else: `nfs` on a real NAS,
-      `disk` on an actually-separate attached drive, or `s3` (already proven
-      §221, the recommended path). `ftp`/`ftps` and the `disk` path are code-
-      complete; this item is just the off-host live run.
+      §196, §265, §266, §268, §269) — the `disk`-kind code path is proven end
+      to end (§266: snapshot + byte-for-byte restore from a real ext4 bind
+      mount, 50553 files) and the §265 source-scope bug is fixed. Still
+      unproven: any destination on **separate hardware**. The test NAS
+      (`192.168.1.50`) hangs `kopia repository create` identically over
+      **SMB (§265), FTP (§268) and NFSv4.1 (§269)** — mount/transport is
+      healthy each time (`dd`/`touch`/`rclone` all fine), but Kopia's first
+      blob writes never complete against this box's storage. Three protocols,
+      one uncooperative NAS — not a code problem. Prove it elsewhere: `s3`
+      (already proven §221, recommended — needs an S3/MinIO endpoint), or
+      `disk` on an actually-separate attached drive. `ftp`/`ftps`, `nfs` and
+      the `disk` path are all code-complete; this item is just the off-host
+      live run on hardware that cooperates.
 ### Business Lab (§84)
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency
