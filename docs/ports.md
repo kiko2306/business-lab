@@ -86,7 +86,8 @@ fixed `22000` + discovery `21027/udp`, see below) · `10510` metabase ·
 Temporal and both Postgres/Valkey sidecars stay on internal networks) ·
 `10540` mssql (SQL Server TDS wire protocol, LAN-only — no web UI, not
 exposed through the tunnel) · `10550` meshcentral (published as
-`mesh.<domain>`)
+`mesh.<domain>`) · `10560` forgejo (HTTP; SSH git on `10561`, LAN/VPN only —
+the tunnel carries HTTP, not SSH)
 
 These are the defaults. The allocator may have moved one on your host if
 something else already held the port — check the app's `.env` for the truth.

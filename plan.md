@@ -1657,10 +1657,18 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       **Priority: P3** — **Estimate: S**
 
 ### 22.7 Dev & self-host infra
-- [ ] **Forgejo** — `codeberg.org/forgejo/forgejo`. Self-hosted Git forge
-      (Gitea fork) with Actions CI — pairs with `code-server`.
-      `exposureEnvKeys.url: ['FORGEJO__server__ROOT_URL']`; SSH on a
-      dedicated host port. **Priority: P2** — **Estimate: M**
+- [x] **Forgejo** — `codeberg.org/forgejo/forgejo:16`. Added 2026-09-07
+      (§277): `apps/forgejo/` (`docker-compose.yml` + `.env.example`), HTTP
+      `${FORGEJO_PORT:-10560}` → `:3000`, SSH git `${FORGEJO_SSH_PORT:-10561}`
+      → `:22` (LAN/VPN only — the tunnel is HTTP). SQLite (`INSTALL_LOCK=true`,
+      single container). Registry entry (Development, new `git` icon 🌿),
+      `exposureEnvKeys` `url: ['FORGEJO_ROOT_URL']` + `host: ['FORGEJO_DOMAIN']`
+      (→ `FORGEJO__server__ROOT_URL`/`DOMAIN`),
+      `booleanEnvKeys: ['FORGEJO_DISABLE_REGISTRATION']`. Docs rows in
+      `ports.md`, `app-credentials.md`, `licences.md` (GPL-3.0-or-later, clean
+      for the client-operated model). Proven live: image pulls, container
+      `healthy` in ~10s, `/api/healthz` → `{"status":"pass"}` (cache + db
+      checks pass), web root 200, listening on 3000 + 22.
 - [x] **IT-Tools** — `corentinth/it-tools:2024.10.22-7ca5933`. Added
       2026-09-06 (§241): `apps/it-tools/` (`docker-compose.yml` +
       `.env.example`), host port `${IT_TOOLS_PORT:-10490}` → `:80`,
@@ -20174,3 +20182,39 @@ Done: Stirling-PDF, Uptime Kuma, Paperless-ngx (§247), **Nextcloud (this
 section)**. Remaining: File Browser (blocked on §180 — its own login is the
 only gate on the home-dir mount while the LAN can bypass Authelia), Home
 Assistant (`trusted_networks` — IP-based, wants the §180 decision first).
+
+## 277. Forgejo added — self-hosted Git forge with CI (§22.7)
+
+`apps/forgejo/` — single container, `codeberg.org/forgejo/forgejo:16`
+(current stable major; Forgejo ships a major ~quarterly and only the pinned
+major tag stays on a release line, so `:latest` is off the table). SQLite via
+`FORGEJO__database__DB_TYPE=sqlite3` + `INSTALL_LOCK=true` keeps it one
+container; a busy instance would move to Postgres.
+
+- **Ports:** HTTP `${FORGEJO_PORT:-10560}` → `:3000`. SSH git
+  `${FORGEJO_SSH_PORT:-10561}` → `:22`, published to the LAN — the Cloudflare
+  Tunnel carries HTTP only (principle 1: no router forwarding), so SSH clone
+  is LAN/VPN. `FORGEJO__server__SSH_PORT` is set to the host port so `ssh://`
+  clone URLs are right.
+- **Config from env:** `app.ini` is generated on first start from
+  `FORGEJO__section__KEY` vars. `ROOT_URL`/`DOMAIN` are left empty and filled
+  by `exposureEnvKeys` (`url: ['FORGEJO_ROOT_URL']`, `host:
+  ['FORGEJO_DOMAIN']`) once exposure is on, so clone URLs / webhooks / OAuth
+  callbacks resolve through the proxy. `FORGEJO_DISABLE_REGISTRATION` is a
+  `booleanEnvKeys` toggle — first account registered is the admin, then close
+  sign-ups from the config panel.
+- **Health:** container `healthcheck` is `wget -qO- /api/healthz` (busybox,
+  Alpine base); the registry `healthCheck` points at the same unauthenticated
+  endpoint on the container port (status.ts swaps in the published port).
+- **Icon:** new `git` → 🌿 in `serviceIcon()` (Forgejo's sprig logo).
+- **Licence:** GPL-3.0-or-later — clean for the client-operated model (run
+  stock, not modified, not resold as software), same call as Home Page /
+  IT-Tools / Paperless. No paid tier. SQLite is in the binary, no sidecar.
+- **Proven live** on this box: `docker compose up` with the compose defaults
+  — image pulled, container reported `healthy` in ~10s, `GET /api/healthz`
+  returned `{"status":"pass"}` with `cache:ping` and `database:ping` both
+  passing, web root returned 200, and the container was listening on 3000
+  (HTTP) and 22 (SSH). Torn down after.
+
+Docs rows added: `docs/ports.md` (incl. the SSH-on-10561 note),
+`docs/app-credentials.md` (register-first-then-close), `docs/licences.md`.

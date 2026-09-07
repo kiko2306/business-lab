@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.48.0] — 2026-09-07
+
+### Apps
+
+- Forgejo added — self-hosted Git forge with CI (apps/forgejo, port 10560, SSH git on 10561); proven live: image pulls, healthy in ~10s, /api/healthz passes
+
 ## [0.47.0] — 2026-09-07
 
 ### Apps

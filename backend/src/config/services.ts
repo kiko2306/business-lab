@@ -482,6 +482,33 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       enabled: false,
     },
   },
+  'forgejo': {
+    name: 'forgejo',
+    label: 'Forgejo',
+    description: 'Self-hosted Git forge with CI',
+    icon: 'git',
+    category: 'Development',
+    composePath: 'apps/forgejo/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      // Container port — status.ts swaps in the published host port and keeps
+      // this as the Host header. /api/healthz is unauthenticated.
+      url: 'http://localhost:3000/api/healthz',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // ROOT_URL/DOMAIN must track the public hostname so clone URLs, webhooks
+    // and OAuth callbacks resolve once proxied. SSH is LAN/VPN only, so no
+    // exposure key for it.
+    exposureEnvKeys: {
+      url: ['FORGEJO_ROOT_URL'],
+      host: ['FORGEJO_DOMAIN'],
+    },
+    // Close sign-ups from the config panel after the first (admin) account —
+    // a plain toggle, not a hand-edited .env.
+    booleanEnvKeys: ['FORGEJO_DISABLE_REGISTRATION'],
+  },
   'guacamole': {
     // Its Postgres holds every saved connection, the user accounts and the
     // session history — the whole app, in other words. Without this its live
