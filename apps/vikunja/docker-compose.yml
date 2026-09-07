@@ -37,16 +37,11 @@ services:
       VIKUNJA_MAILER_PASSWORD: ${VIKUNJA_MAILER_PASSWORD:-}
       VIKUNJA_MAILER_FROMEMAIL: ${VIKUNJA_MAILER_FROMEMAIL:-}
       VIKUNJA_MAILER_FORCESSL: ${VIKUNJA_MAILER_FORCESSL:-false}
-      # OIDC against Authelia's provider (plan.md §270). All six are injected
-      # by the dashboard at start when Vikunja is exposed — derived from the
-      # public hostname, Authelia's issuer and the client secret in .env — and
-      # left empty otherwise, which keeps OpenID disabled. Not hand-set.
-      VIKUNJA_AUTH_OPENID_ENABLED: ${VIKUNJA_AUTH_OPENID_ENABLED:-false}
-      VIKUNJA_AUTH_OPENID_REDIRECTURL: ${VIKUNJA_AUTH_OPENID_REDIRECTURL:-}
-      VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_NAME: ${VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_NAME:-}
-      VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_AUTHURL: ${VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_AUTHURL:-}
-      VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTID: ${VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTID:-}
-      VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTSECRET: ${VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTSECRET:-}
+      # OIDC against Authelia's provider (plan.md §270/§271) is configured by a
+      # managed config.yml (mounted at /etc/vikunja below), not env vars —
+      # Vikunja only surfaces a provider that a config file declares. The
+      # dashboard writes/removes that file as exposure is toggled.
+      #
       # Set to false (by an admin, after one working OIDC sign-in) to hide
       # Vikunja's own username/password form and leave Authelia as the only
       # login — §216/§217. Left true so a misconfigured IdP can't lock you out.
@@ -60,6 +55,10 @@ services:
     volumes:
       - ./data/db:/db
       - ./data/files:/app/vikunja/files
+      # Managed OIDC config.yml (services/vikunjaConfig.ts) — present only while
+      # Vikunja is exposed. /etc/vikunja is on Vikunja's config search path, so
+      # no pointer env var is needed. Read-only to the container.
+      - ./data/config:/etc/vikunja:ro
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3456/api/v1/info || exit 1"]
       interval: 30s

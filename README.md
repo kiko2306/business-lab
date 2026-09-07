@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.48.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.48.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -371,13 +371,15 @@ and proven on the real stack) are done. Phase tags below.
         (§275)** — every one unproven, one @mat live-proof item each below.
         NocoDB (§273) dropped (Enterprise-only SSO). No buildable items left
         in this list.
-- [ ] **@mat: prove Vikunja's Authelia OIDC login live** (§270, §271) — the
-      `vikunja` client is registered in Authelia and `VIKUNJA_AUTH_OPENID_*`
-      is injected at start, but the var names / `_PROVIDERS_<KEY>_` scheme are
-      from Vikunja's docs, not a live run. Expose Vikunja, use the "Authelia"
-      button, confirm it lands with no second form; then flip
-      `VIKUNJA_AUTH_LOCAL_ENABLED` false (Configuration panel) and confirm the
-      local username/password form is gone but OIDC still works.
+- [ ] **@mat: prove Vikunja's Authelia OIDC login live** (§270, §271, §278) —
+      the first live attempt found no "Authelia" button: Vikunja won't surface
+      a provider set only via env vars. §278 moved the provider block into a
+      managed `config.yml` (written by `vikunjaConfig.ts` while exposed),
+      unproven live (CrowdSec cut the run short). Recreate `backend` to pick
+      up `vikunjaConfig.ts`, toggle Vikunja's exposure off/on, reload the
+      login page, confirm the "Authelia" button shows and lands with no second
+      form; then flip `VIKUNJA_AUTH_LOCAL_ENABLED` false (Configuration panel)
+      and confirm the local username/password form is gone but OIDC still works.
 
 - [ ] **@mat: prove Homebox's Authelia OIDC login live** (§270, §272) — the
       `homebox` client is registered in Authelia and `HBOX_OIDC_*` +

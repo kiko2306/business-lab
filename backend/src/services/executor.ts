@@ -32,6 +32,7 @@ import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { applyImmichConfig } from './immichConfig';
+import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
@@ -222,6 +223,12 @@ async function composeUpWithManagedConfig(
   // OIDC env vars, so this file is the only way in; IMMICH_CONFIG_FILE is
   // injected alongside by the exposure system. No-op for every other service.
   await applyImmichConfig(serviceName, appDir);
+  // Vikunja: write data/config/config.yml (Authelia OIDC provider block) while
+  // Vikunja is exposed, remove it otherwise (§271). Vikunja won't surface a
+  // provider that exists only in env vars — it has to be declared in a config
+  // file — so this file is what makes the Authelia button appear. No-op for
+  // every other service.
+  await applyVikunjaConfig(serviceName, appDir);
   // n8n: render the dashboard-managed workflow files before the app comes up,
   // so the n8n-workflows-init container imports the current version (§118.3).
   await applyN8nWorkflows(serviceName, appDir);

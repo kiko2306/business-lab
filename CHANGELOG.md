@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.48.1] — 2026-09-07
+
+### Fixed
+
+- Vikunja OIDC: deliver Authelia's provider block via a managed config.yml — Vikunja won't surface a provider configured only through environment variables, so the login page showed no Authelia button (plan.md §271)
+
 ## [0.48.0] — 2026-09-07
 
 ### Apps

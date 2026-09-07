@@ -20218,3 +20218,54 @@ container; a busy instance would move to Postgres.
 
 Docs rows added: `docs/ports.md` (incl. the SSH-on-10561 note),
 `docs/app-credentials.md` (register-first-then-close), `docs/licences.md`.
+
+## 278. Vikunja OIDC: provider block moves from env vars to a managed config.yml (§270, §271)
+
+The §271 live proof (browser, against `tx-home-utils.com`) found Vikunja's
+login page showing **only** the local username/password form — no "Authelia"
+button — even though Vikunja is exposed and the `vikunja` client is registered
+in Authelia. Root cause is a documented Vikunja constraint: an OpenID
+*provider* is only known to Vikunja if it is declared in a **config file**
+first — "you must add at least one key to a config file if you want to read
+values from an environment variable as the provider won't be known to Vikunja
+otherwise" (vikunja.io/docs/config-options). The
+`VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_*` env vars the §271 `oidcClient.appEnv`
+injected were silently ignored.
+
+### Fix — same shape as Immich's managed `immich.json` (§275)
+
+- **`backend/src/services/vikunjaConfig.ts`** (new) — `applyVikunjaConfig()`
+  writes `apps/vikunja/data/config/config.yml` with the whole `auth.openid`
+  block (provider keyed `authelia`, `redirecturl`, `authurl` = Authelia's
+  issuer, `clientid: vikunja`, `clientsecret` from the app's `.env`) while
+  Vikunja is exposed and the secret exists; removes it otherwise. Hand-rendered
+  YAML — the block is fixed-shape and every value is a controlled string, so no
+  YAML lib. Non-fatal on error.
+- **`executor.ts`** — `applyVikunjaConfig` called in the pre-start block next to
+  `applyImmichConfig`, so the file is in place for the `compose up` that reads
+  it.
+- **`apps/vikunja/docker-compose.yml`** — dropped the six
+  `VIKUNJA_AUTH_OPENID_*` env lines (an empty value from one of them would
+  override the file and re-break it); added `./data/config:/etc/vikunja:ro`
+  (Vikunja auto-discovers `config.yml` on that search path, so no pointer env
+  var like Immich's `IMMICH_CONFIG_FILE` is needed). Kept
+  `VIKUNJA_AUTH_LOCAL_ENABLED` — a scalar env var Vikunja honours fine, and the
+  Configuration-panel toggle; `auth.local` is deliberately left out of the
+  managed file.
+- **`services.ts`** — removed `oidcClient.appEnv` for `vikunja`; the
+  `oidcClient` entry (redirectPaths, secretEnvKey) stays so the Authelia client
+  is still registered on exposure.
+- Tests: `vikunjaConfig.test.ts` (render + write/remove/no-secret), and the
+  Vikunja case in `exposureEnv.test.ts` rewritten to assert **no**
+  `VIKUNJA_AUTH_OPENID*` env is emitted. 672 backend tests pass, typecheck
+  clean.
+
+### Still unproven — @mat
+
+CrowdSec IP-blocked the test run mid-check, so the fixed path is **not** yet
+seen working live. @mat: after a `backend` recreate picks up
+`vikunjaConfig.ts`, toggle Vikunja's exposure off/on (writes `config.yml`),
+reload the login page, confirm the "Authelia" button now shows and lands with
+no second form; then flip `VIKUNJA_AUTH_LOCAL_ENABLED` false and confirm the
+local form is gone but OIDC still works. README §271 item updated to point
+here.

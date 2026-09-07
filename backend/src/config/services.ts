@@ -1111,23 +1111,16 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       url: ['VIKUNJA_PUBLIC_URL'],
     },
     // Log in via Authelia's OIDC provider instead of Vikunja's own form
-    // (plan.md §270). The dashboard registers the `vikunja` client in
-    // Authelia on exposure; these env vars (injected at start, not persisted)
-    // point Vikunja back at it. Vikunja's redirect for a provider keyed
-    // `authelia` is <publicurl>/auth/openid/authelia. Local login stays on
-    // until an admin sets VIKUNJA_AUTH_LOCAL_ENABLED=false after a first
-    // successful OIDC sign-in (§216/§217).
+    // (plan.md §270). The dashboard registers the `vikunja` client in Authelia
+    // on exposure; the client-side config is a managed config.yml written by
+    // services/vikunjaConfig.ts, *not* appEnv — Vikunja won't surface a
+    // provider that exists only in environment variables (§271). Vikunja's
+    // redirect for a provider keyed `authelia` is <publicurl>/auth/openid/authelia.
+    // Local login stays on until an admin sets VIKUNJA_AUTH_LOCAL_ENABLED=false
+    // after a first successful OIDC sign-in (§216/§217).
     oidcClient: {
       redirectPaths: ['/auth/openid/authelia'],
       secretEnvKey: 'VIKUNJA_OIDC_CLIENT_SECRET',
-      appEnv: {
-        VIKUNJA_AUTH_OPENID_ENABLED: 'true',
-        VIKUNJA_AUTH_OPENID_REDIRECTURL: '{PUBLIC_URL}/auth/openid/',
-        VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_NAME: 'Authelia',
-        VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_AUTHURL: '{ISSUER}',
-        VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTID: '{CLIENT_ID}',
-        VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTSECRET: '{CLIENT_SECRET}',
-      },
     },
     // SMTP from the dashboard's global mail settings. Vikunja always attempts
     // STARTTLS; FORCESSL switches it to implicit TLS (465). MAILER_ENABLED

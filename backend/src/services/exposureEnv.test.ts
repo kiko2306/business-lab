@@ -139,7 +139,7 @@ describe('buildExposureEnvOverrides — compose default fallback', () => {
     expect(out.HOMEPAGE_ALLOWED_HOSTS).toBe('192.168.1.23:10190,homepage.example.com,example.com');
   });
 
-  it('substitutes the oidcClient.appEnv tokens for an exposed app (Vikunja)', async () => {
+  it('emits no OIDC env for Vikunja — its provider block is a managed config.yml (§271)', async () => {
     const appDir = path.join(tmpDir, 'vikunja');
     fs.mkdirSync(appDir);
     fs.writeFileSync(
@@ -151,13 +151,11 @@ describe('buildExposureEnvOverrides — compose default fallback', () => {
     const { buildExposureEnvOverrides } = await import('./exposureEnv');
     const out = await buildExposureEnvOverrides('vikunja', appDir);
 
-    expect(out.VIKUNJA_AUTH_OPENID_ENABLED).toBe('true');
-    expect(out.VIKUNJA_AUTH_OPENID_REDIRECTURL).toBe('https://vikunja.example.com/auth/openid/');
-    expect(out.VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_AUTHURL).toBe('https://authelia.example.com');
-    expect(out.VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTID).toBe('vikunja');
-    expect(out.VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTSECRET).toBe('topsecret');
-    // exposureEnvKeys still applied alongside
+    // exposureEnvKeys.url still applied
     expect(out.VIKUNJA_PUBLIC_URL).toBe('https://vikunja.example.com');
+    // ...but nothing OIDC — Vikunja won't read a provider from env vars, so
+    // vikunjaConfig.ts writes it into config.yml instead.
+    expect(Object.keys(out).some((k) => k.startsWith('VIKUNJA_AUTH_OPENID'))).toBe(false);
   });
 
   it('substitutes the oidcClient.appEnv tokens for an exposed app (Homebox)', async () => {
