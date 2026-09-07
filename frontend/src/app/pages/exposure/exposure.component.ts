@@ -40,7 +40,6 @@ export class ExposureComponent implements OnInit {
 
   protected readonly exposureForm = this.formBuilder.nonNullable.group({
     baseDomain: ['', [Validators.required, Validators.maxLength(255)]],
-    npmApiUrl: ['', [Validators.required, Validators.maxLength(500)]],
     npmEmail: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
     npmPassword: ['', [Validators.maxLength(255)]],
     cloudflareAccountId: ['', [Validators.required, Validators.maxLength(32)]],
@@ -181,7 +180,6 @@ export class ExposureComponent implements OnInit {
     this.savingExposure = true;
     const payload: ExposureSettingsInput = {
       baseDomain: value.baseDomain.trim(),
-      npmApiUrl: value.npmApiUrl.trim(),
       npmEmail: value.npmEmail.trim(),
       cloudflareAccountId: value.cloudflareAccountId.trim(),
       cloudflareZoneId: value.cloudflareZoneId.trim(),
@@ -242,7 +240,6 @@ export class ExposureComponent implements OnInit {
           this.exposureSettings = settings;
           this.exposureForm.patchValue({
             baseDomain: settings.baseDomain ?? '',
-            npmApiUrl: settings.npmApiUrl ?? '',
             npmEmail: settings.npmEmail ?? '',
             cloudflareAccountId: settings.cloudflareAccountId ?? '',
             cloudflareZoneId: settings.cloudflareZoneId ?? '',

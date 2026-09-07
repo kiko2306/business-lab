@@ -134,7 +134,8 @@ export const schemas = {
 
   exposureGlobalSettings: Joi.object({
     baseDomain: domainSchema.required(),
-    npmApiUrl: Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(500).required(),
+    // npmApiUrl is derived (docker bridge gateway + NPM_ADMIN_PORT), not
+    // submitted — see getNpmApiUrl / plan.md §253.
     npmEmail: Joi.string().trim().email().max(255).required(),
     // Optional: omit to keep the previously saved password unchanged.
     npmPassword: Joi.string().min(1).max(255).optional(),

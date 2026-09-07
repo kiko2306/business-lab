@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.36.2] — 2026-09-07
+
+### Changed
+
+- Exposure config: NPM admin API URL is now derived from the Docker bridge gateway + NPM_ADMIN_PORT on every read, not stored as hand-editable free text — a stale LAN/DHCP IP can no longer be seeded or typed in and 502 the whole tunnel (§252)
+
 ## [0.36.1] — 2026-09-06
 
 ### Changed

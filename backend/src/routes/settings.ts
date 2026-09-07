@@ -15,7 +15,7 @@ import { testBackupTarget } from '../services/backupTargetTest';
 import { applyKopiaTarget } from '../services/kopiaTargetApply';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
 import { testMailConnection } from '../services/mailTest';
-import { EXPOSURE_SETTINGS_KEYS, getExposureConfig } from '../utils/exposureSettings';
+import { EXPOSURE_SETTINGS_KEYS, getExposureConfig, getNpmApiUrl } from '../utils/exposureSettings';
 import {
   DEFAULT_TIMEZONE,
   getAppTimezone,
@@ -205,7 +205,6 @@ router.get('/exposure', async (_req: Request, res: Response) => {
     return res.json({
       configured: Boolean(
         values[EXPOSURE_SETTINGS_KEYS.baseDomain] &&
-          values[EXPOSURE_SETTINGS_KEYS.npmApiUrl] &&
           values[EXPOSURE_SETTINGS_KEYS.npmEmail] &&
           values[EXPOSURE_SETTINGS_KEYS.npmPassword] &&
           values[EXPOSURE_SETTINGS_KEYS.cloudflareAccountId] &&
@@ -213,7 +212,9 @@ router.get('/exposure', async (_req: Request, res: Response) => {
           values[EXPOSURE_SETTINGS_KEYS.cloudflareTunnelId]
       ),
       baseDomain: values[EXPOSURE_SETTINGS_KEYS.baseDomain] ?? null,
-      npmApiUrl: values[EXPOSURE_SETTINGS_KEYS.npmApiUrl] ?? null,
+      // Derived, read-only — shown so an operator can see where the tunnel
+      // origin points without it being hand-editable (plan.md §253).
+      npmApiUrl: await getNpmApiUrl(),
       npmEmail: values[EXPOSURE_SETTINGS_KEYS.npmEmail] ?? null,
       npmPasswordConfigured: Boolean(values[EXPOSURE_SETTINGS_KEYS.npmPassword]),
       cloudflareAccountId: values[EXPOSURE_SETTINGS_KEYS.cloudflareAccountId] ?? null,
@@ -231,7 +232,6 @@ router.get('/exposure', async (_req: Request, res: Response) => {
 router.put('/exposure', validateBody(schemas.exposureGlobalSettings), async (req: Request, res: Response) => {
   const values: Record<string, string> = {
     [EXPOSURE_SETTINGS_KEYS.baseDomain]: req.body.baseDomain,
-    [EXPOSURE_SETTINGS_KEYS.npmApiUrl]: req.body.npmApiUrl.replace(/\/+$/, ''),
     [EXPOSURE_SETTINGS_KEYS.npmEmail]: req.body.npmEmail,
     [EXPOSURE_SETTINGS_KEYS.cloudflareAccountId]: req.body.cloudflareAccountId,
     [EXPOSURE_SETTINGS_KEYS.cloudflareZoneId]: req.body.cloudflareZoneId,

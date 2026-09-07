@@ -172,6 +172,7 @@ export interface CloudflareTestResponse {
 export interface ExposureSettings {
   configured: boolean;
   baseDomain: string | null;
+  // Derived server-side (docker bridge gateway + NPM_ADMIN_PORT), read-only.
   npmApiUrl: string | null;
   npmEmail: string | null;
   npmPasswordConfigured: boolean;
@@ -222,7 +223,6 @@ export interface AlertNotifySettings {
 
 export interface ExposureSettingsInput {
   baseDomain: string;
-  npmApiUrl: string;
   npmEmail: string;
   npmPassword?: string;
   cloudflareAccountId: string;

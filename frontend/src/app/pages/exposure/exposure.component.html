@@ -119,10 +119,8 @@
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Nginx Proxy Manager URL</label>
-            <input class="form-control" placeholder="http://host.docker.internal:81" formControlName="npmApiUrl" />
-            <div *ngIf="exposureValidationMessage('npmApiUrl', 'Nginx Proxy Manager URL')" class="text-danger small mt-2">
-              {{ exposureValidationMessage('npmApiUrl', 'Nginx Proxy Manager URL') }}
-            </div>
+            <input class="form-control" [value]="exposureSettings?.npmApiUrl ?? ''" readonly disabled />
+            <div class="form-text">Derived from the Docker bridge gateway and NPM's admin port — not editable (plan.md §252).</div>
           </div>
           <div class="col-12 col-md-6">
             <label class="form-label fw-semibold">Nginx Proxy Manager admin email</label>

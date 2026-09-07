@@ -18534,3 +18534,55 @@ this host (README Security TODO, §94) is still worth doing, but is no longer
 what stands between a network move and a working tunnel.
 
 `start.sh` only — no `backend/src` / `frontend/src` change, no version bump.
+
+## 253. Derive `exposure_npm_api_url` instead of storing it (§252 follow-up)
+
+§252 pinned the setting with `force_setting` in `start.sh` so a fresh clone
+would overwrite a stale value. This closes the follow-up: the setting is gone
+entirely — the backend derives the NPM admin API URL on every read, so there
+is no stored string for `start.sh` to seed, for an operator to hand-edit, or
+for a network move to invalidate.
+
+**What changed.**
+
+- `getNpmApiUrl()` (new, in `utils/exposureSettings.ts`) returns
+  `http://<getHostGatewayIp()>:<NPM_ADMIN_PORT>`. `getHostGatewayIp()` already
+  resolved `host.docker.internal` to the docker bridge gateway (reachable from
+  both the backend container and `cloudflared` on the host); the port is read
+  from `apps/nginx-proxy-manager/.env` the same way `getNpmProxyPort()` reads
+  `NPM_HTTP_PORT`, falling back to `10270`.
+- `getExposureConfig()` fills `npmApiUrl` from `getNpmApiUrl()`. The
+  `ExposureGlobalConfig.npmApiUrl` field and every downstream consumer
+  (`getNpmOriginUrl`, `npmClient`, the reconciler) are unchanged — they still
+  get a string, it is just derived now.
+- `exposure_npm_api_url` dropped from `EXPOSURE_SETTINGS_KEYS`, the PUT
+  `/api/settings/exposure` body, `schemas.exposureGlobalSettings`, and the
+  `configured` gate in GET `/api/settings/exposure`. GET still returns
+  `npmApiUrl` (now the derived value) so the Exposure page can show where the
+  tunnel origin points — as a read-only, disabled field, not an input.
+- Frontend: `npmApiUrl` form control / payload field / patch removed; the
+  input is now a read-only display bound to `exposureSettings?.npmApiUrl`.
+- `start.sh`: the `force_setting` helper and the `exposure_npm_api_url` block
+  are removed (the helper had no other user). A short comment records that the
+  value is now backend-derived.
+- `docs/webmaster.md`: the "tunnel origin is the host's LAN address
+  (`exposure_npm_api_url` → …)" note corrected to name the bridge gateway and
+  `getNpmApiUrl`.
+
+**Behaviour change for existing deployments.** An `exposure_npm_api_url` row
+left in `settings` is now simply ignored — nothing reads it. No migration
+deletes it (harmless, and the no-guarantees box tolerates the cruft); a fresh
+clone never creates it.
+
+**Tests.** New `utils/exposureSettings.test.ts`: `getNpmApiUrl` builds the URL
+from gateway + port and falls back to `10270` when the `.env` is absent or the
+port is non-numeric; `getExposureConfig` returns the derived `npmApiUrl` when
+every *stored* field is set and `null` when a stored field is missing. Backend
+601 pass, frontend 50 pass, frontend build clean.
+
+**Not verified here (code + tests only).** A real `./start.sh` run and an
+exposure reconcile pass on the live box — that the derived value resolves to
+`http://10.201.0.1:10270` inside the backend container and repoints every
+ingress origin — is still @mat's to confirm. The derivation reuses
+`getHostGatewayIp`, which the exposure path already depends on in production,
+so the risk is low, but networking gets proven on the box, not in CI.

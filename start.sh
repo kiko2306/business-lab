@@ -604,42 +604,16 @@ if [ "$CF_READY" = "1" ]; then
             ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
             WHERE settings.value IS NULL OR settings.value = '';" >/dev/null 2>&1 || true
     }
-    # Like seed_setting but overwrites a stale value too — for a setting whose
-    # correct value this script derives fresh every run and an operator has no
-    # reason to override (see exposure_npm_api_url below).
-    force_setting() {
-      [ -n "$2" ] || return 0
-      docker exec -i "$DB_CID" psql -v ON_ERROR_STOP=1 -U "$DB_USER" -d "$DB_NAME" \
-        -c "INSERT INTO settings (key, value) VALUES ('$1', '$2')
-            ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()
-            WHERE settings.value IS DISTINCT FROM EXCLUDED.value;" >/dev/null 2>&1 || true
-    }
     log "Seeding the dashboard's exposure settings"
     seed_setting exposure_base_domain "$BASE_DOMAIN"
     seed_setting cloudflare_tunnel_token "$(current_value CLOUDFLARE_API_TOKEN)"
     seed_setting exposure_cloudflare_account_id "$(current_value CLOUDFLARE_ACCOUNT_ID)"
     seed_setting exposure_cloudflare_zone_id "$(current_value CLOUDFLARE_ZONE_ID)"
     seed_setting exposure_cloudflare_tunnel_id "$(current_value CLOUDFLARE_TUNNEL_ID)"
-    # NPM's admin API, where the dashboard creates proxy hosts, and the host
-    # part of every tunnel ingress origin (getNpmOriginUrl / getNpmGrpcOriginUrl
-    # keep the host, swap the port). Derived rather than typed: the admin port
-    # is allocated dynamically (see the port-allocation block above), so a
-    # hardcoded value goes stale the moment it moves — and a stale value fails
-    # every exposure with ECONNREFUSED, which looks like a Cloudflare problem
-    # rather than a wrong port. The docker bridge gateway is reachable both
-    # from the backend container and from cloudflared on the host, which is
-    # what getNpmGrpcOriginUrl needs, and — unlike a LAN IP — it does not move
-    # when this machine changes networks (it is set by the daemon address pool
-    # this script writes, not DHCP).
-    #
-    # force_setting, not seed_setting: this is the one exposure setting an
-    # operator must never hand-edit. A LAN/DHCP IP once typed into the dashboard
-    # otherwise survives every reboot and every network move, silently 502-ing
-    # every public hostname once that IP is reassigned (plan.md §252).
-    NPM_GW="$(docker network inspect bridge -f '{{(index .IPAM.Config 0).Gateway}}' 2>/dev/null || true)"
-    NPM_PORT="$(app_env_value apps/nginx-proxy-manager/.env NPM_ADMIN_PORT)"
-    NPM_PORT="${NPM_PORT:-10270}"
-    [ -n "$NPM_GW" ] && force_setting exposure_npm_api_url "http://${NPM_GW}:${NPM_PORT}"
+    # NPM's admin API URL (the host part of every tunnel ingress origin) is no
+    # longer seeded: the backend derives it fresh from the Docker bridge
+    # gateway + NPM_ADMIN_PORT on every read (getNpmApiUrl), so a stale
+    # LAN/DHCP IP can't be stored or hand-edited into it (plan.md §252).
   else
     warn "database container not found — fill the Cloudflare fields in Settings manually"
   fi
