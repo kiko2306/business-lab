@@ -19335,3 +19335,42 @@ Last of the §263 code batch (docs-only, no version bump).
 
 §263a–e complete — the whole SQL Server build is in. Only §263f (live proof)
 remains, and it needs the host.
+
+## 263f. §121 SQL Server Express — live proof (mechanics proven; dashboard glue pending a redeploy)
+
+Ran the proof against `tx-home-utils.com`. **The deployed management stack is
+on 0.26.0** — none of §255–§263 is running there — so the dashboard
+integration (registry entry, `/settings/mssql-eula` routes, the executor
+`assertMssqlEulaAccepted` / `assertPlatformSupported` guards, the Settings
+panel) can't be exercised until the stack is rebuilt to 0.41.0. That's the
+§131.4 self-update walk / a manual `backend`+`frontend` recreate — its own
+@mat item, not done here.
+
+**What was proven live**, with a throwaway `mcr.microsoft.com/mssql/server:2022-latest`
+stack from `apps/mssql/docker-compose.yml` (scratchpad, torn down after):
+
+- **Container comes up healthy in ~10 s** with `ACCEPT_EULA=Y` + an
+  `MSSQL_SA_PASSWORD` of the exact shape `generateSecretFor` emits
+  (`<48 hex>Aa1_`, 52 chars, 4 character classes). SQL Server accepted the
+  password on first boot — so §263b's generator satisfies the `sa` policy
+  (a non-compliant password makes the container exit, so a healthy container
+  *is* the proof).
+- **Healthcheck works** — `/opt/mssql-tools18/bin/sqlcmd -C … -Q 'SELECT 1'`
+  succeeds, confirming §263a's assumption that the server image bundles
+  `mssql-tools18` at that path and that `-C` is required.
+- **`mssql-init` chown** — busybox `chown -R 10001:0 /data` exits 0; the
+  server (uid 10001) then writes its data files fine.
+- **Backup/restore round-trip** — created `proofdb` with two rows, ran the
+  literal `MSSQL_BACKUP_TSQL` from `appDumps.ts` via a throwaway sqlcmd
+  container **with no volume mount** (BACKUP runs server-side, writing into
+  the server's own `/var/opt/mssql/_dump` bind) → `proofdb.bak` (3.2 MB)
+  appeared on the host. Deleted all rows, ran the restore statement
+  (`RESTORE DATABASE [proofdb] FROM DISK = N'…/_dump/proofdb.bak' WITH
+  REPLACE;`) → both rows back. So §263c's dump and restore SQL are correct.
+
+**Still unproven (needs the 0.41.0 redeploy):** the EULA gate actually
+blocking a start from the dashboard; the acceptance POST writing
+`ACCEPT_EULA=Y` into `apps/mssql/.env`; `ensureMssqlDumpDir`'s `chownSync`
+running as the backend's uid; the `x86Only` guard's 409. These are covered by
+unit tests; the live confirmation rides on whenever the management stack is
+next updated.
