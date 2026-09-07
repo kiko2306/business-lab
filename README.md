@@ -260,12 +260,25 @@ Strategy:
 
 ### Backups
 
-- [ ] **Prove a real external destination end to end** (§131.4, §173, §196) —
-      `disk`/`SMB`/`NFS` are the only destination kinds left now that
-      Duplicati (and its FTP/Google Drive support) is gone. The restore proof
-      (§196) used Kopia's local-fallback repository, not a real external
-      mount. Prove one of the three writes and restores against a
-      production-like server (a NAS, or the live dashboard).
+- [ ] **Exclude `apps/kopia/data/` from the Kopia snapshot source** (§265) —
+      `provisionBackupSource` registers `/source/apps` with an empty policy,
+      so every app-data snapshot also copies Kopia's own 60 GB local-fallback
+      repository and 4.6 GB cache into the destination — a compounding
+      backup-of-a-backup that nearly filled `/` during the §265 proof. Set a
+      `policy.files.ignore` list (at least `/kopia/data`) on the source or
+      global policy; cover it in `kopiaClient.test.ts`. **Blocks the external-
+      destination proof below** — no destination is safe to prove until the
+      source stops ballooning.
+- [ ] **Prove a real external destination end to end** (§131.4, §196, §265) —
+      `disk`/`SMB`/`NFS` are the only mounted kinds (`s3` is proven, §221).
+      §265: **SMB is a dead end** — `kopia repository create` hangs
+      indefinitely on the test NAS (`//192.168.1.50/backup`) despite a
+      healthy, fast CIFS mount; upstream Kopia doesn't support filesystem
+      repos on SMB/NFS. The `disk` kind's write path *was* proven working
+      (repo created on ext4, 30 GB uploaded clean) before the §265 source-
+      scope bug stopped it. After that bug is fixed, prove `disk` (or `nfs`,
+      which may not hang) writes **and restores** against a production-like
+      target.
 ### Business Lab (§84)
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency

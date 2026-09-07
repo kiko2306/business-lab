@@ -19488,3 +19488,88 @@ authrequest snippet scoped to exclude `/agent.ashx` and `/meshrelay.ashx`).
 The `certUrl` / `tlsOffload` path is likewise unproven against the real NPM
 proxy. Not committed as done — the compose + registry + docs are in; the live
 walk is the @mat item.
+
+## 265. Backup: tried to prove a real external destination — SMB hangs, and the snapshot source is scoped wrong (2026-09-07)
+
+@mat set up an SMB share on a NAS (`//192.168.1.50/backup`, user `frias`) as
+the backup destination and asked to close the "prove a real external
+destination end to end" README item. Ran the proof in-process against the
+built `dist/` (the §196 shape — no HTTP session). It did not close. Two
+findings, the second is the one that matters.
+
+### Finding 1 — `kopia repository create` hangs on this SMB share
+
+Fresh start of `apps/kopia` via `startService('kopia', 0)` with the CIFS
+mount applied. `/repository` mounted correctly — `mount` showed
+`//192.168.1.50/backup type cifs`, `df` the 932 GB NAS. Raw I/O from inside
+the container was fine: **20 MB in 0.8 s** (~25 MB/s), 50 small-file creates
+in 2.4 s, unlinks fast. But `kopia repository create filesystem
+--path=/repository` wrote `.shards` (43 bytes) and then **stalled
+indefinitely** — 10+ minutes, no `kopia.repository.f`, a CIFS worker thread
+stuck in `D` / `wait_for_response` (an SMB request the NAS never answered),
+no error logged, health check never went green because the server never
+bound `:51515`.
+
+`dd` never exercises the pattern that hangs: Kopia's atomic blob write is
+`O_CREATE|O_EXCL` → write → fsync → rename, and consumer-NAS SMB stacks
+commonly stall on the `FILE_CREATE`-disposition CREATE or the rename.
+Upstream Kopia explicitly does **not** recommend filesystem repositories on
+SMB/NFS mounts and steers users to S3-compatible object storage — which this
+repo already has (`s3` kind, proven live §221). Conclusion: **SMB-backed
+Kopia repo is a dead end on this NAS**; `nfs` might fare better (NFS handles
+`O_EXCL`/rename closer to a local FS) but was not tried this session.
+
+### Finding 2 — the snapshot source includes Kopia's own repository
+
+Switched the destination to the `disk` kind
+(`/var/backups/kopia-disk-proof`, a bind mount on a separate ext4 LV) to
+prove the mounted-kind path without the SMB hang. Repo created instantly,
+`storageType: filesystem`, source registered, snapshot started and **was
+uploading cleanly** — ~500 MB/min, ~25 MB pack blobs, 40–60 ms `PutBlob`,
+zero errors. Then the destination repo passed **30 GB and kept climbing**,
+on a filesystem with 54 GB free.
+
+Cause: `provisionBackupSource` registers `/source/apps` with an **empty
+policy `{}`** — no ignore rules — so the snapshot walks the *entire* `apps/`
+tree, including:
+
+- `apps/kopia/data/repository/` — Kopia's own local-fallback repository,
+  **60 GB** and growing (it was ~5 GB at §196; every snapshot/test since has
+  piled more in). Snapshotting it copies already-encrypted, incompressible
+  backup blobs into the destination repo — a backup of a backup, compounding
+  every run.
+- `apps/kopia/data/cache/` — 4.6 GB of pure derived cache.
+
+Stopped the container at 41 GB used before it filled `/`. Deleted the
+partial repo; `/` back to 9.3 GB used. No data lost — the box was never at
+risk beyond the root FS filling.
+
+The §196 restore proof did not catch this because it snapshotted into
+Kopia's *own* local repo (source and dest on the same disk, dedup hid the
+size) and measured restore fidelity, not source scope.
+
+### Fix (new README item)
+
+`provisionBackupSource` must set an ignore policy on the `/source/apps`
+source (or the global policy) excluding at least `/kopia/data/` — the
+repository and the cache. Candidates for the same list: other pure-derived
+caches under `apps/*/data/**` (Redis dumps, thumbnail caches, search
+indexes), but `apps/kopia/data/` is the one that breaks things. Kopia takes
+this as a `policy.files.ignore` list (e.g. `["/kopia/data"]`, path relative
+to the snapshot root) via `POST /api/v1/sources` or `PUT /api/v1/policy`.
+Cover it with a `kopiaClient.test.ts` case asserting the policy body carries
+the ignore entry.
+
+### State left behind
+
+- Destination settings **reverted** to @mat's original SMB config
+  (`smb` / `192.168.1.50` / `backup` / `frias`) in the DB and
+  `apps/kopia/.env`. Nothing silently changed.
+- `apps/kopia` container and the `kopia_backup-target` volume removed; Kopia
+  is **stopped**. Tonight's scheduled run will record a clean failure (the
+  scheduler hits Kopia's API, it doesn't start the container) — acceptable
+  on a no-guarantees box.
+- Both README items updated: the "prove a real external destination" item now
+  records SMB as a dead end and points at `nfs`/`disk`/`s3`; the new ignore-
+  policy item is added. Nothing committed as done — no code changed this
+  session.
