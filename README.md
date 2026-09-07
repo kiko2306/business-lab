@@ -269,15 +269,21 @@ Strategy:
 ### Business Lab (§84)
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency
-graph.** P1 (§255) and P2 (§256) are done; next code action is **P3a**. Phase
-tags below.
-- [ ] **P3a — Postiz backend root-cause spike** (§84.3a, §243) — adopt rather
-      than build, AGPL-3.0. Trimmed stack is **5 containers**, **5.66 GiB
-      image**, ~2.7 GiB RAM. **Blocker:** the backend (`:3000`) never came up
-      in the spike — pm2 "online" but not listening, nginx 502 throughout.
-      Root-cause on a throwaway before any registry work. If it stays broken,
-      P3b: a minimal direct Bluesky + Mastodon publisher (both token-only per
-      §84.3a — not the OAuth-maintenance trap; do not hand-roll the rest).
+graph.** P1 (§255), P2 (§256), P3a (§257) are done; next code action is
+**P3 — build `apps/postiz/`**. Phase tags below.
+- [ ] **P3 — Add Postiz** (§84.3a, §243, §257 — blocker cleared) — adopt not
+      build, AGPL-3.0. Trimmed **5-container** stack (postiz + its Postgres +
+      Redis + Temporal + Temporal's Postgres) is viable with
+      `SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true` on the auto-setup service
+      (§257: without it the backend hard-fails on Temporal's 3-Text-attribute
+      SQL cap and 502s forever) plus a health-gated `depends_on: temporal`.
+      Costs are real: **5.66 GiB image**, **~2.5 GiB RAM** — weigh against
+      §84.7's 16 GiB turnkey spec; "only on boxes with headroom" stands. Then:
+      `apps/postiz/` compose + registry entry + `licences.md` rows (Postiz
+      AGPL-3.0, Temporal MIT) + docs. Spike compose in the scratchpad.
+      If P3 stalls, **P3b**: a minimal direct Bluesky + Mastodon publisher
+      (both token-only per §84.3a — not the OAuth-maintenance trap; do not
+      hand-roll the rest).
 - [ ] **P4 — n8n glue** (§84.3) — "generate on a schedule, queue in the
       publish target." Needs P2 + a working P3. Also unblocks the
       CrowdSec-alert workflow (§118.4 / §64).

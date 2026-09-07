@@ -18773,3 +18773,111 @@ clean; browser E2E re-run because the nav changed.
 is @mat's (the P1 "Test key" item covers proving the key path). P3 (publish)
 and P4 (n8n schedule) are the next phases; the Mealie AI sync (§238) can now
 also proceed, but still needs an OpenAI-shaped compat shim.
+
+## 257. §84 P3a — Postiz backend hang root-caused (§243 blocker cleared, 2026-09-07)
+
+§243 stood the trimmed 5-container Postiz stack up and hit a wall: `/api/*`
+502'd for 7+ minutes, the `backend` pm2 process said `online`, port 3000 never
+opened, logs "empty past the npm banner". §243 guessed at Temporal
+readiness / the `--experimental-require-module` flag / a missing env var, and
+flagged it for a root-cause spike before any `apps/postiz/` work. This is that
+spike. Throwaway stack, scratchpad only.
+
+### Root cause — a hard error, not a race
+
+The Postiz backend's `TemporalRegister.onModuleInit`
+(`libraries/nestjs-libraries/src/temporal/temporal.register.js`) registers two
+**Text**-type Temporal search attributes, `organizationId` and `postId`:
+
+```js
+const neededAttribute = ['organizationId', 'postId'];
+// ... addSearchAttributes({ [name]: 1 })   // 1 = INDEXED_VALUE_TYPE_TEXT
+```
+
+Temporal's **SQL visibility store** — which is exactly what you get when you
+drop Elasticsearch — has a fixed schema with **3 Text columns**. `auto-setup`
+pre-seeds two of them (`CustomStringField`, `CustomTextField`) via its
+`add_custom_search_attributes()` step. 2 seeded + 2 from Postiz = 4 > 3, so the
+gRPC call returns `3 INVALID_ARGUMENT: Unable to create search attributes:
+cannot have more than 3 search attribute of type Text`. That throws inside
+`onModuleInit`, NestJS aborts bootstrap before `app.listen()`, port 3000 never
+binds, nginx 502s forever. The error *is* logged — to
+`/root/.pm2/logs/backend-error.log` — but only after `pnpm run prisma-db-push`
+finishes (~3 min of `pnpm dlx prisma`), which is later than §243 looked, and
+`backend-out.log` (the file §243 quoted) only ever shows the NestJS route map.
+
+### §243's "Elasticsearch is genuinely droppable" was wrong — retracted
+
+Dropping ES silently switches Temporal to SQL visibility, and SQL visibility is
+what imposes the 3-Text-attribute cap Postiz trips over. The "~40 platform
+workers RUNNING" §243 saw was the **orchestrator** (a Temporal worker that
+polls task queues) — it comes up regardless because it never calls
+`addSearchAttributes`. A clean backend boot was never actually observed in
+§243.
+
+### Fix (no Postiz patch — AGPL-safe): SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true
+
+Set `SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true` on the `temporalio/auto-setup`
+service. It skips seeding `CustomStringField`/`CustomTextField`, leaving all 3
+Text slots free; Postiz registers its 2 and the backend boots clean:
+
+```
+[Nest] LOG  Nest application successfully started
+Backend started successfully on port 3000
+[Nest] LOG  Configuration check completed without any issues
+[Nest] LOG  🚀 Backend is running on: http://localhost:3000
+```
+
+`GET /api/` → `200 App is running!`, `GET /` → 307 → `/auth` → 200,
+`backend-error.log` empty. `temporal operator search-attribute list` afterwards
+shows `organizationId` + `postId` as Text and no `Custom*Field`.
+
+The alternative — keep `temporal-elasticsearch` (back to 6 containers, +~600 MB
+image, +~300 MB RAM) — also works and is upstream's default, but the env var
+keeps the 5-container trim.
+
+### Secondary hardening that also mattered
+
+The upstream `docker-compose.yaml` gates `postiz` only on its own Postgres +
+Redis, **not** on Temporal — and `auto-setup`'s schema + namespace work takes
+60–90 s. Added a real healthcheck on the `temporal` service and
+`postiz.depends_on.temporal.condition: service_healthy` so ordering is
+deterministic. The healthcheck must target `$(hostname -i):7233`, not
+`127.0.0.1` — Temporal's frontend gRPC binds the container IP:
+
+```yaml
+test: ["CMD-SHELL", "temporal operator namespace describe -n default --address $(hostname -i):7233 >/dev/null 2>&1 || exit 1"]
+interval: 10s ; timeout: 10s ; retries: 18 ; start_period: 90s
+```
+
+Also set `DYNAMIC_CONFIG_FILE_PATH` to the absolute
+`/etc/temporal/config/dynamicconfig/development-sql.yaml` and gave
+`temporal-postgresql` its own `pg_isready` healthcheck.
+
+### Costs (confirm §243)
+
+- **Image: 5.66 GiB** (1.07 GiB compressed) — unchanged, still the estate's
+  largest by far.
+- **RAM settled: ~2.5 GiB for the 5 containers** — `postiz` alone ~2.2 GiB
+  (frontend + backend + orchestrator + nginx + pm2 in one container).
+  `temporal` ~130 MiB (lighter than §243's 230 MiB — no ES), its Postgres
+  ~120 MiB, Postiz's Postgres ~35 MiB, Redis ~4 MiB.
+- Against §84.7's 16 GiB turnkey spec that is a real ~15 % RAM slice + a
+  significant disk slice — "Postiz only on boxes with headroom" still stands.
+
+### Verdict
+
+**P3a done — the blocker is cleared.** The trimmed 5-container stack
+(`postiz`, `postiz-postgres`, `postiz-redis`, `temporal`,
+`temporal-postgresql`) is viable with `SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true`
++ the health-gated `depends_on`. Spike compose kept in the session scratchpad
+(`postiz-spike/docker-compose.spike.yml`), not committed.
+
+Order of operations for the real add is otherwise unchanged from §243's list:
+`apps/postiz/` (5-container compose, this env var, Temporal dynamicconfig,
+`MAIN_URL`/`FRONTEND_URL`/`NEXT_PUBLIC_BACKEND_URL` via `exposureEnvKeys.url`,
+generated `JWT_SECRET`, static DB creds like guacamole-db,
+`DISABLE_REGISTRATION` posture), registry entry, `licences.md` rows (Postiz
+AGPL-3.0; Temporal MIT; `temporalio/auto-setup` bundles PostgreSQL client
+tooling — MIT/PostgreSQL licence), docs. Still weigh the 5.66 GiB / ~2.5 GiB
+cost against §84.7 sizing before shipping it on a turnkey box.
