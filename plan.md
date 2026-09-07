@@ -18586,3 +18586,95 @@ exposure reconcile pass on the live box — that the derived value resolves to
 ingress origin — is still @mat's to confirm. The derivation reuses
 `getHostGatewayIp`, which the exposure path already depends on in production,
 so the risk is low, but networking gets proven on the box, not in CI.
+
+## 254. §84 sequenced into buildable chunks (2026-09-07)
+
+The §84 brief has sat as a flat list of README items — "Add Postiz", "Content
+generation", "Rebrand", "Per-client provisioning" — with the dependencies
+between them only implicit. This section orders them so a session can pick the
+next real thing without re-deriving the graph. No code here; this is the map.
+
+### What is already settled (not open work)
+
+- **§84.1 remote management** — decided (§84.6): Guacamole (built, §199/§200)
+  for overlay machines, MeshCentral still wanted for client endpoints that
+  won't join the overlay. Only MeshCentral is open, and it's a plain app
+  addition (§62.2), not part of the social/product track.
+- **§84.5 licence due diligence** — done (§107); `docs/licences.md` is the
+  living version.
+- **Commercial collateral placement** — decided (§84.6): value-prop deck,
+  pricing, client scenarios are Artifacts shared deliberately, **never
+  committed** to this public repo.
+- **Client social accounts** — decided (§84.7): each client's box runs that
+  client's own developer app under their own business registration. "We create
+  and submit your Meta app" is a billable onboarding step, not a product
+  feature. Business Lab never holds client social tokens.
+
+### The dependency graph
+
+```
+[P1] Claude API key in Settings ──┬─> [P2] Generation → draft ──┐
+                                  └─> Mealie AI parsing (§238)  │
+                                                                ├─> [P4] n8n glue: generate on schedule, queue
+[P3] Publish path for Tier A ───────────────────────────────────┘
+      ├─ [P3a] Postiz backend root-cause spike (§243)  ── if it clears ─> adopt Postiz
+      └─ [P3b] fallback: direct Bluesky + Mastodon (token-only, "trivial" per §84.3a)
+
+[P5] Meta dev-mode empirical check (§84.3a)   — parallel, research, no code deps
+[P6] MeshCentral (§62.2)                      — independent app addition
+[P7] Rebrand tier 1 (strings + favicon)      — independent, zero risk, anytime
+[P8] Rebrand tier 2 (identifiers)            — needs the §83 data-root maintenance window + host
+[P9] Per-client provisioning (§84.5/§84.7/§202/§203) — large; design doc first, then setup-flow work
+[P10] Turnkey build spec (§84.7)             — doc; partly depends on P9
+[P11] Data protection position (§84.5)       — doc/decision; needs a business stance, not code
+[P12] Commercial plan (§84.5)                — Artifact, not repo; needs the SaaS inventory from the user
+```
+
+### Recommended order for the code track
+
+1. **P1 — Claude API key in Settings.** The keystone. One session: reuse the
+   Cloudflare/Tailscale third-party-token pattern (a `settings` key, a Joi
+   schema, a masked GET, a PUT, one frontend field, a "test" call that does a
+   trivial Claude request). Unblocks P2 **and** Mealie AI (§238), which is
+   otherwise blocked on nothing else. Ships and commits alone.
+2. **P2 — Generation → draft.** Prompt + the P1 key → a stored draft (no
+   publish). n8n is the eventual scheduler but the generate-to-draft step
+   doesn't need it. Anthropic's API is not OpenAI-shaped, so if Mealie AI
+   (§238) is done in the same window it needs a compat shim — note it, don't
+   pre-build it.
+3. **P3a — Postiz backend spike (§243).** Separate session, throwaway stack:
+   why does the backend stay "online" in pm2 without listening on :3000? This
+   is the gate on adopting Postiz as the publish/queue layer. If it stays
+   broken, **P3b**: a minimal direct publisher for Bluesky + Mastodon only —
+   both are token-only per §84.3a, so this is not the "maintain OAuth per
+   network" trap, and it delivers the "real first release with zero approvals"
+   §84.3a calls out. Do **not** hand-roll the OAuth networks.
+4. **P4 — n8n glue.** Needs P2 + a working P3. "Generate on a schedule, queue
+   in the publish target." Also blocks the CrowdSec-alert workflow (§118.4)
+   for unrelated reasons — same "pre-built n8n workflows" gap (§64).
+
+### The independent items (any time, any order)
+
+- **P7 rebrand tier 1** — three strings + favicon + doc headings, nothing
+  restarts. Cheapest possible win; take it as a filler.
+- **P5 Meta dev-mode check** — research task: confirm empirically that a
+  dev-mode app with a Tester role publishes to Instagram and that a dev-mode
+  Page post is admin-only. Sources agree; a real app test de-risks every
+  timeline that quotes it.
+- **P6 MeshCentral** — `TLSOffload` + `certUrl` per §62.2.
+
+### The items that need the user, not a session
+
+- **P12 commercial plan / value proposition** — still waiting on the SaaS
+  inventory + monthly costs (§84.7 "still needed from the user"). Nothing to
+  build until that exists, and it lands as an Artifact.
+- **P11 data protection** — controller vs processor stance, DR promise, backup
+  key custody. A business decision to make, then write up.
+- **P8 rebrand tier 2 / P10 turnkey build spec** — both want the §83
+  data-root maintenance window and host access; batch them with that, not
+  before.
+
+### Next action
+
+P1 (Claude API key in Settings) unless the user redirects — it is the only
+item with no upstream dependency that unblocks more than one downstream.

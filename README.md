@@ -268,29 +268,37 @@ Strategy:
       production-like server (a NAS, or the live dashboard).
 ### Business Lab (§84)
 
-- [ ] **Rebrand, tier 2** (§84.2) — package/image/network/project names. Do it
-      in the same maintenance window as the §83 data-root move; both recreate
-      the management stack.
-- [ ] **Add Postiz** (§84.3a, §243 — scoping spike done) — adopt rather than
-      build, AGPL-3.0. Trimmed stack is **5 containers** (Postiz + its
-      Postgres + its Redis + Temporal + Temporal's Postgres — Elasticsearch
-      confirmed droppable). Costs are real: **5.66 GiB image**, ~2.7 GiB RAM
-      for the stack. **Blocker found:** the Postiz backend (`:3000`) never
-      came up in the spike — silent hang, nginx 502 throughout, pm2 process
-      "online" but not listening. Root-cause that on a throwaway before any
-      registry work. Still also gated behind §84.3's unbuilt generation half
-      and §84.7's strategy inversion.
-- [ ] **Content generation** (§84.3) — prompt + a Claude API key entered once
-      in Settings, same third-party-token pattern as Cloudflare/Tailscale;
-      n8n for "generate on a schedule, queue in Postiz".
-- [ ] **Ship against the Tier A networks first** (§84.3a) — Bluesky, Mastodon,
-      own Instagram, own LinkedIn profile all publish today with no approval
-      and no cost. That is a release on its own.
-- [ ] **Verify Meta development-mode publishing empirically** (§84.3a) —
-      sources agree Instagram publishes normally from a dev-mode app with a
-      Tester role, and that a Facebook Page post in dev mode is visible only to
-      admins. Confirm both with a real app before a timeline depends on it.
-- [ ] **Per-client provisioning** (§84.5, §84.7, §202, §203) — one host is
+**§254 sequences these into buildable chunks (P1…P12) with the dependency
+graph.** Next code action is **P1** unless redirected. Phase tags below.
+
+- [ ] **P1 — Claude API key in Settings** (§84.3) — the keystone. Reuse the
+      Cloudflare/Tailscale third-party-token pattern: a `settings` key, Joi
+      schema, masked GET, PUT, one frontend field, a "test" call. Unblocks P2
+      **and** Mealie AI parsing (§238). One session, ships alone.
+- [ ] **P2 — Content generation → draft** (§84.3) — prompt + the P1 key → a
+      stored draft (no publish). n8n is the eventual scheduler (P4), not
+      needed for generate-to-draft.
+- [ ] **P3a — Postiz backend root-cause spike** (§84.3a, §243) — adopt rather
+      than build, AGPL-3.0. Trimmed stack is **5 containers**, **5.66 GiB
+      image**, ~2.7 GiB RAM. **Blocker:** the backend (`:3000`) never came up
+      in the spike — pm2 "online" but not listening, nginx 502 throughout.
+      Root-cause on a throwaway before any registry work. If it stays broken,
+      P3b: a minimal direct Bluesky + Mastodon publisher (both token-only per
+      §84.3a — not the OAuth-maintenance trap; do not hand-roll the rest).
+- [ ] **P4 — n8n glue** (§84.3) — "generate on a schedule, queue in the
+      publish target." Needs P2 + a working P3. Also unblocks the
+      CrowdSec-alert workflow (§118.4 / §64).
+- [ ] **P5 — Verify Meta development-mode publishing empirically** (§84.3a) —
+      research, no code deps. Sources agree Instagram publishes from a dev-mode
+      app with a Tester role, and a dev-mode Page post is admin-only. Confirm
+      with a real app before a timeline depends on it.
+- [ ] **P7 — Rebrand tier 1** (§84.2) — three strings + favicon + doc
+      headings (`index.html` `<title>`, dashboard header, login kicker).
+      Nothing restarts, nothing migrates. Cheapest win; take it as a filler.
+- [ ] **P8 — Rebrand tier 2** (§84.2) — package/image/network/project names.
+      Recreates the management stack — do it in the §83 data-root maintenance
+      window, with host access, not before.
+- [ ] **P9 — Per-client provisioning** (§84.5, §84.7, §202, §203) — one host is
       one deployment today; turnkey boxes need it repeatable per client. The
       list is concrete: their domain, their Cloudflare account and API
       token, their tunnel, their Authelia users, their backup destination.
@@ -299,15 +307,20 @@ Strategy:
       own account) or contracted (a reseller-managed account) — so the
       provisioning flow must support both, with per-zone-scoped API tokens
       required either way. Lands in the setup flow.
-- [ ] **Turnkey build spec** (§84.7) — Dell/16 GiB/500 GB/€400 is proven (this
-      stack runs on 14.84 GiB, 4 CPUs, 53 containers, 8 GB used). The trap is
-      the disk: Ubuntu's installer defaults to a ~100 GiB root LV, which is how
-      §83 happened. Set Docker's data root or the partitioning **at install**,
-      and pick a small-office app profile rather than all of them.
-- [ ] **Data protection position** (§84.5) — controller vs processor, backup
-      key custody, DR.
-- [ ] **Commercial plan** (§84.5) — hardware BOM, support model, onboarding
-      time, and what happens to a client's data when they stop paying.
+- [ ] **P10 — Turnkey build spec** (§84.7) — Dell/16 GiB/500 GB/€400 is proven
+      (this stack runs on 14.84 GiB, 4 CPUs, 53 containers, 8 GB used). The
+      trap is the disk: Ubuntu's installer defaults to a ~100 GiB root LV,
+      which is how §83 happened. Set Docker's data root or the partitioning
+      **at install**, and pick a small-office app profile. Partly depends on
+      P9.
+- [ ] **P11 — Data protection position** (§84.5) — controller vs processor,
+      backup key custody, DR. A business stance to decide, then write up — not
+      a coding session. §84.7 simplifies it (social tokens stay on the client
+      box).
+- [ ] **P12 — Commercial plan** (§84.5) — hardware BOM, support model,
+      onboarding time, and what happens to a client's data when they stop
+      paying. Lands as an **Artifact, not a repo commit** (§84.6). Blocked on
+      the SaaS inventory + monthly costs from @mat (§84.7).
 
 ### Roster changes (§81)
 
@@ -400,7 +413,7 @@ Strategy:
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
-- [ ] **Wire Mealie's AI recipe parsing** (§123.1, §238 — blocked on §84.3) —
+- [ ] **Wire Mealie's AI recipe parsing** (§123.1, §238 — blocked on §84 P1) —
       investigation done: current Mealie (v3.x) *does* fall back to AI when the
       `recipe-scrapers` URL import can't read a page (automatic, v1.9.0), and
       adds an "Import with AI" page for text/HTML/image/video. But the
@@ -424,8 +437,9 @@ Strategy:
       life-safety), and prove a start + backup/restore round-trip.
 - [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
       fresh-install path but never run on a clean VPS.
-- [ ] **MeshCentral** (§62.2) — still wanted, for client endpoints that will
-      not join the overlay. `TLSOffload` + `certUrl` for the agent cert hash.
+- [ ] **MeshCentral** (§62.2 — §84 phase P6) — still wanted, for client
+      endpoints that will not join the overlay. `TLSOffload` + `certUrl` for
+      the agent cert hash. Independent of the social/product track.
 - [ ] **Pre-built n8n workflows** (§64, §118.3) — ship useful workflows rather
       than an empty n8n. No native "import from a directory" for n8n's main
       process; needs a spike (container-`command` import of a backend-rendered
