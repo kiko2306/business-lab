@@ -13,7 +13,7 @@ vi.mock('../config/services', () => ({
   getAppsDir: vi.fn(),
 }));
 
-import { findSqliteFiles } from './appDumps';
+import { ensureMssqlDumpDir, findSqliteFiles } from './appDumps';
 
 const SQLITE_HEADER = Buffer.from('SQLite format 3 ');
 
@@ -75,5 +75,31 @@ describe('findSqliteFiles', () => {
     } finally {
       fs.chmodSync(locked, 0o755);
     }
+  });
+});
+
+describe('ensureMssqlDumpDir', () => {
+  let root: string;
+  beforeEach(() => {
+    root = fs.mkdtempSync(path.join(os.tmpdir(), 'mssql-dump-'));
+  });
+  afterEach(() => fs.rmSync(root, { recursive: true, force: true }));
+
+  it('creates data/_dump and clears stale .bak files but leaves anything else', () => {
+    const dumpDir = path.join(root, 'data', '_dump');
+    fs.mkdirSync(dumpDir, { recursive: true });
+    fs.writeFileSync(path.join(dumpDir, 'old.bak'), 'stale');
+    fs.writeFileSync(path.join(dumpDir, 'notes.txt'), 'keep me');
+
+    const returned = ensureMssqlDumpDir(root);
+
+    expect(returned).toBe(dumpDir);
+    expect(fs.existsSync(path.join(dumpDir, 'old.bak'))).toBe(false);
+    expect(fs.existsSync(path.join(dumpDir, 'notes.txt'))).toBe(true);
+  });
+
+  it('creates the directory when it does not exist yet', () => {
+    const dumpDir = ensureMssqlDumpDir(root);
+    expect(fs.statSync(dumpDir).isDirectory()).toBe(true);
   });
 });

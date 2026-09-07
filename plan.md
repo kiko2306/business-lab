@@ -19236,3 +19236,39 @@ APP_KEY 32-byte decode, MSSQL 3-of-4-classes + length bounds). Backend 623
 pass, typecheck clean.
 
 Next: §263c (`mssql` backup engine).
+
+## 263c. §121 SQL Server Express — mssql backup engine
+
+Third of the §263 batch. SQL Server has no stdout dump tool (no `pg_dump`
+equivalent), so the pattern the other engines use — capture a text dump on
+stdout, `commitDump` it, replay with the client — doesn't apply. Instead:
+
+- **Dump** (`dumpServerDatabase`, `engine === 'mssql'` branch): a throwaway
+  container on the running server's image + network runs
+  `/opt/mssql-tools18/bin/sqlcmd` (bundled in `mssql/server` since 2022 CU14;
+  not on PATH) with one T-SQL batch that cursors over
+  `sys.databases WHERE database_id > 4 AND state = 0` and
+  `BACKUP DATABASE @n TO DISK = N'/var/opt/mssql/_dump/<n>.bak' WITH INIT,
+  FORMAT`. The BACKUP runs **server-side**, writing into the server's own
+  bind-mounted `_dump` dir — so no volume mount on the throwaway container.
+  `ensureMssqlDumpDir` creates `apps/mssql/data/_dump/`, `chown`s it to uid
+  10001 (the non-root mssql user, best-effort — the backend is
+  root-equivalent), and clears stale `.bak`s so the dir mirrors the current
+  database set. The file backup then sweeps `_dump/` like every other app's.
+  No `WITH COMPRESSION` — Express doesn't support it.
+- **Restore** (`restoreServerDatabase`, mssql branch): reads the `.bak`
+  filenames from `_dump/`, derives database names, and issues one
+  `RESTORE DATABASE [db] FROM DISK = N'…/<db>.bak' WITH REPLACE;` per file in
+  a single `sqlcmd -Q`. Same image ⇒ data/log paths match ⇒ no `MOVE`.
+- Types: `backup.engine` and `DumpOutcome.kind` gain `'mssql'`; the registry
+  entry gets `backup: { engine: 'mssql', service: 'mssql' }` (the server
+  backs *itself* up, so `service` is the app's own container). The
+  registry-wide "runs a DB image ⇒ declares a dump" test's image regex now
+  includes `mssql/server`.
+
+Tests: `ensureMssqlDumpDir` (creates the dir, clears stale `.bak`, leaves
+other files) and the registry assertion. The `sqlcmd`/`docker run` paths
+aren't unit-tested — same as the Postgres/MySQL engines, which are live-proof
+only; §263f covers the round-trip. Backend 626 pass, typecheck clean.
+
+Next: §263d (EULA acceptance gate).

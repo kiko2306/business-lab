@@ -254,6 +254,10 @@ describe('mssql (SQL Server Express)', () => {
     expect(SERVICES['mssql'].exposureEnvKeys).toBeUndefined();
   });
 
+  it('declares the mssql backup engine against its own container', () => {
+    expect(SERVICES['mssql'].backup).toEqual({ engine: 'mssql', service: 'mssql' });
+  });
+
   it('never sets ACCEPT_EULA in its compose file (§121.5 acceptance gate)', () => {
     const text = composeText(SERVICES['mssql'].composePath);
     expect(text).not.toMatch(/ACCEPT_EULA:\s*['"]?Y/i);
@@ -538,7 +542,7 @@ describe('database backup coverage', () => {
   // this is a registry-wide rule rather than a review habit. onlyoffice is the
   // case this cannot see: its Postgres lives inside the documentserver image
   // rather than as its own compose service, so there is no image line to match.
-  const DB_IMAGE = /^\s+image:.*(postgres|mariadb|mysql|percona)/im;
+  const DB_IMAGE = /^\s+image:.*(postgres|mariadb|mysql|percona|mssql\/server)/im;
 
   it('declares a dump for every app that runs a database server', () => {
     for (const [name, service] of Object.entries(SERVICES)) {

@@ -197,8 +197,15 @@ export interface ServiceDefinition {
   //
   // SQLite apps need no declaration — they are discovered by file header.
   backup?: {
-    engine: 'postgres' | 'mariadb' | 'mysql';
-    /** Compose service name of the database container, e.g. 'itflow-db'. */
+    // 'mssql' backs up differently from the others: BACKUP DATABASE writes a
+    // binary .bak per user database into the app's own data dir server-side
+    // (no stdout dump tool exists), which the file backup then sweeps. See
+    // services/appDumps.ts.
+    engine: 'postgres' | 'mariadb' | 'mysql' | 'mssql';
+    /**
+     * Compose service name of the database container, e.g. 'itflow-db'. For
+     * 'mssql' this is the app's own service — the server backs itself up.
+     */
     service: string;
   };
   // Which of this service's env vars receive the global mail settings (see

@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.40.2] — 2026-09-07
+
+### Added
+
+- SQL Server (mssql) backup engine: server-side BACKUP DATABASE writes a .bak per user database into apps/mssql/data/_dump/ for the file backup to capture, with a matching RESTORE path (§263c).
+
 ## [0.40.1] — 2026-09-07
 
 ### Changed
