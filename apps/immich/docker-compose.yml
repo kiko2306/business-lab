@@ -11,6 +11,17 @@ services:
       DB_PASSWORD: ${IMMICH_DB_PASSWORD}
       DB_DATABASE_NAME: ${IMMICH_DB_NAME:-immich}
       REDIS_HOSTNAME: immich-redis
+      # Authelia OIDC (plan.md §270/§275). Immich has no OIDC env vars — its
+      # OAuth config is a JSON file; services/immichConfig.ts writes
+      # data/config/immich.json while Immich is exposed and IMMICH_CONFIG_FILE
+      # is injected then. Empty here → a non-exposed start ignores it, so the
+      # admin settings UI stays editable.
+      IMMICH_CONFIG_FILE: ${IMMICH_CONFIG_FILE:-}
+      # Not read by the container — services/immichConfig.ts reads it from .env
+      # and writes it into immich.json as passwordLogin.enabled. Flip false (in
+      # the Configuration panel) after a working OIDC sign-in to hide Immich's
+      # own email/password form. Left true so a bad IdP can't lock you out.
+      IMMICH_PASSWORD_LOGIN_ENABLED: ${IMMICH_PASSWORD_LOGIN_ENABLED:-true}
     labels:
       - "homepage.group=Media & Files"
       - "homepage.name=Immich"
@@ -19,6 +30,9 @@ services:
       - "homepage.description=Photo and video backup with mobile auto-upload"
     volumes:
       - ./data/upload:/data
+      # Managed by the dashboard: immich.json (Authelia OIDC) lands here while
+      # Immich is exposed — see IMMICH_CONFIG_FILE above (§275).
+      - ./data/config:/config
       - /etc/localtime:/etc/localtime:ro
     depends_on:
       immich-db:

@@ -57,7 +57,7 @@ Open these privately and claim them before exposing.
 |---|---|
 | **Authelia** | The SSO account itself. Managed from the dashboard (Authelia is the one app whose users the dashboard edits directly). |
 | **Home Assistant** | Onboarding wizard creates the owner account. HACS is installed automatically; it needs a one-time GitHub authorization — see the note below. |
-| **Immich** | First registered user becomes admin. |
+| **Immich** | First registered user becomes admin. Once exposed, the dashboard writes a managed `data/config/immich.json` wiring Authelia OIDC (§270/§275) and an "Authelia" button appears on the login page. **While that file is present Immich's admin *Settings* UI is read-only and any non-OIDC setting you'd changed there reverts to Immich's default** — turning exposure off removes the file and restores UI control. After one Authelia sign-in, flip **Configuration → `IMMICH_PASSWORD_LOGIN_ENABLED`** to false to drop Immich's own email/password form. |
 | **Jellyfin** | Setup wizard creates the admin user. |
 | **Uptime Kuma** | First visit creates the admin account. |
 | **BookStack** | Ships with `admin@admin.com` / `password` — change it on first login. |

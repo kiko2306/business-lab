@@ -30,6 +30,7 @@ import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperles
 import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
+import { applyImmichConfig } from './immichConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
@@ -215,6 +216,11 @@ async function composeUpWithManagedConfig(
   // stock demo bookmarks before it comes up (§114). services.yaml is filled
   // in by regenerateHomepageServices once the start completes.
   await applyHomepageConfig(serviceName, appDir);
+  // Immich: write data/config/immich.json (Authelia OIDC + password-login
+  // toggle) while Immich is exposed, remove it otherwise (§275). Immich has no
+  // OIDC env vars, so this file is the only way in; IMMICH_CONFIG_FILE is
+  // injected alongside by the exposure system. No-op for every other service.
+  await applyImmichConfig(serviceName, appDir);
   // n8n: render the dashboard-managed workflow files before the app comes up,
   // so the n8n-workflows-init container imports the current version (§118.3).
   await applyN8nWorkflows(serviceName, appDir);

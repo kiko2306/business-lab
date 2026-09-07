@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.45.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.46.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -365,11 +365,12 @@ and proven on the real stack) are done. Phase tags below.
       - **OIDC against Authelia's own provider, then disable the local
         form.** Plumbing is done (§270): a service declaring `oidcClient` in
         the registry gets a confidential Authelia client registered on every
-        exposure change, and its client-side OIDC env injected at start.
-        **Vikunja (§271), Homebox (§272) and Mealie (§274) are wired** — all
-        unproven, see the @mat items below. Remaining: **Immich** — different
-        shape (Admin Settings UI + a CLI recovery path, no env path), its own
-        task.
+        exposure change, and its client-side OIDC config injected at start
+        (env for most; a managed `immich.json` for Immich, §275).
+        **All wired: Vikunja (§271), Homebox (§272), Mealie (§274), Immich
+        (§275)** — every one unproven, one @mat live-proof item each below.
+        NocoDB (§273) dropped (Enterprise-only SSO). No buildable items left
+        in this list.
 - [ ] **@mat: prove Vikunja's Authelia OIDC login live** (§270, §271) — the
       `vikunja` client is registered in Authelia and `VIKUNJA_AUTH_OPENID_*`
       is injected at start, but the var names / `_PROVIDERS_<KEY>_` scheme are
@@ -399,6 +400,21 @@ and proven on the real stack) are done. Phase tags below.
       `ALLOW_PASSWORD_LOGIN` false (Configuration panel) and confirm the local
       form is gone but OIDC still works — one community report exists of that
       flag not taking on some version.
+
+- [ ] **@mat: prove Immich's Authelia OIDC login live** (§270, §275) — the
+      `immich` client is registered in Authelia and the dashboard writes a
+      managed `apps/immich/data/config/immich.json` (Immich has no OIDC env
+      vars) while Immich is exposed, injecting `IMMICH_CONFIG_FILE` then. The
+      `requirePkce`/`client_secret_post` pairing and the mobile
+      `/api/oauth/mobile-redirect` bridge are from Authelia's Immich doc, not
+      a live run. Expose Immich, click "Login with Authelia", confirm it lands
+      with no second form and that Immich's admin *Settings* UI shows the
+      "config file" lock; then flip `IMMICH_PASSWORD_LOGIN_ENABLED` false
+      (Configuration panel) and confirm the email/password form is gone but
+      OIDC still works. If login fails with a PKCE error, drop `requirePkce`
+      from the `immich` `oidcClient`. Also worth a check: whether the
+      Settings-UI lockout matters for a real deployment (it reverts
+      hand-tuned Immich settings to defaults while exposure is on — §275).
 
 - [ ] **@mat: prove Beszel SSO live, then flip `DISABLE_PASSWORD_AUTH`**
       (§229, §236) — `beszelSync.ts` is built and `TRUSTED_AUTH_HEADER:
