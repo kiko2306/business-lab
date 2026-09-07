@@ -64,6 +64,7 @@ Open these privately and claim them before exposing.
 | **Mealie** | Ships with `changeme@example.com` / `MyPassword` — change it on first login. |
 | **NocoDB** | First signup becomes the super admin. |
 | **Metabase** | Setup wizard creates the admin account and (optionally) connects your first database. |
+| **Postiz** | First registered user owns the instance. Registration is open by default — claim it, then set `POSTIZ_DISABLE_REGISTRATION=true` in the dashboard (Configuration) and restart. `POSTIZ_JWT_SECRET` is generated and shown in the panel: back it up, it encrypts the connected social-account tokens. |
 | **Vikunja** | Register the first account; registration can then be disabled. |
 | **n8n** | Owner account created on first visit. |
 | **File Browser** | Ships with `admin` / `admin`. |

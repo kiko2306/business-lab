@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.38.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.39.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -269,24 +269,13 @@ Strategy:
 ### Business Lab (§84)
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency
-graph.** P1 (§255), P2 (§256), P3a (§257) are done; next code action is
-**P3 — build `apps/postiz/`**. Phase tags below.
-- [ ] **P3 — Add Postiz** (§84.3a, §243, §257 — blocker cleared) — adopt not
-      build, AGPL-3.0. Trimmed **5-container** stack (postiz + its Postgres +
-      Redis + Temporal + Temporal's Postgres) is viable with
-      `SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES=true` on the auto-setup service
-      (§257: without it the backend hard-fails on Temporal's 3-Text-attribute
-      SQL cap and 502s forever) plus a health-gated `depends_on: temporal`.
-      Costs are real: **5.66 GiB image**, **~2.5 GiB RAM** — weigh against
-      §84.7's 16 GiB turnkey spec; "only on boxes with headroom" stands. Then:
-      `apps/postiz/` compose + registry entry + `licences.md` rows (Postiz
-      AGPL-3.0, Temporal MIT) + docs. Spike compose in the scratchpad.
-      If P3 stalls, **P3b**: a minimal direct Bluesky + Mastodon publisher
-      (both token-only per §84.3a — not the OAuth-maintenance trap; do not
-      hand-roll the rest).
-- [ ] **P4 — n8n glue** (§84.3) — "generate on a schedule, queue in the
-      publish target." Needs P2 + a working P3. Also unblocks the
-      CrowdSec-alert workflow (§118.4 / §64).
+graph.** P1 (§255), P2 (§256), P3a (§257), P3 (§258 — `apps/postiz/` built
+and proven on the real stack) are done; next code action is **P4**. Phase
+tags below.
+- [ ] **P4 — n8n glue** (§84.3) — "generate on a schedule, queue in Postiz":
+      wire the §254 P2 `/content` drafts into Postiz (now a managed app, §258)
+      via n8n. Needs the "pre-built n8n workflows" import path (§64) too. Also
+      unblocks the CrowdSec-alert workflow (§118.4 / §64).
 - [ ] **P5 — Verify Meta development-mode publishing empirically** (§84.3a) —
       research, no code deps. Sources agree Instagram publishes from a dev-mode
       app with a Tester role, and a dev-mode Page post is admin-only. Confirm

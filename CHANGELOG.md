@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.39.0] — 2026-09-07
+
+### Added
+
+- Postiz (social media scheduling) as a managed app — trimmed 5-container stack (Postiz + Postgres + Valkey + Temporal + Temporal's Postgres), AGPL-3.0 run unmodified; the §257 Temporal search-attribute blocker fixed via SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES + a health-gated depends_on (§254 P3)
+
 ## [0.38.0] — 2026-09-07
 
 ### Added
