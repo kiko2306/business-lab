@@ -19,6 +19,14 @@ services:
       OVERWRITEHOST: ${NEXTCLOUD_OVERWRITEHOST:-}
       OVERWRITEPROTOCOL: ${NEXTCLOUD_OVERWRITEPROTOCOL:-}
       TRUSTED_PROXIES: ${NEXTCLOUD_TRUSTED_PROXIES:-}
+      # Not read by the container — services/nextcloudSaml.ts reads it from
+      # .env. Set true (in the Configuration panel, after the NPM proxy host
+      # has Authelia's authrequest snippet) to switch user_saml into
+      # environment-variable mode so Authelia's Remote-User header logs the
+      # user in and Nextcloud's own form is bypassed (§216/§217). Left false
+      # so a missing/wrong header can't lock everyone out; /login?direct=1
+      # always shows the normal form regardless.
+      NEXTCLOUD_PROXY_HEADER_AUTH: ${NEXTCLOUD_PROXY_HEADER_AUTH:-false}
     labels:
       - "homepage.group=Media & Files"
       - "homepage.name=Nextcloud"

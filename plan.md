@@ -20112,3 +20112,65 @@ Vikunja (§271), Homebox (§272), Mealie (§274), Immich (§275) all wired,
 all unproven — one `@mat` live-proof item each. NocoDB (§273) dropped
 (Enterprise-only SSO). The §216/§217 "trust the proxy" OIDC list is now
 empty of buildable items.
+
+## 276. Slice — Nextcloud trusts Authelia's forward-auth header (user_saml environment mode) (§216, §217)
+
+The Header/IP-trust half of the §216/§217 audit, for Nextcloud. Same "trust
+the proxy" shape as Paperless (§247) and Guacamole (§200), using Nextcloud's
+own mechanism: the bundled `user_saml` app in **environment-variable mode** —
+on each request it reads a `$_SERVER` key for the username and logs that user
+in, auto-provisioning them.
+
+### What landed
+
+- **`services/nextcloudSaml.ts`** — `reconcileNextcloudSaml(service)` runs on
+  every Nextcloud start (after `up`, through the shared `nextcloudOcc`
+  scaffold, like `nextcloudClamav`). When Nextcloud is exposed **and**
+  `NEXTCLOUD_PROXY_HEADER_AUTH` is `true` it installs + enables `user_saml`
+  and sets:
+  - `type = environment-variable`
+  - `general-uid_mapping = HTTP_REMOTE_USER`
+  - `saml-attribute-mapping-email_mapping = HTTP_REMOTE_EMAIL`
+  - `saml-attribute-mapping-displayName_mapping = HTTP_REMOTE_NAME`
+  - `general-require_provisioned_account = 0` (auto-provision)
+
+  Otherwise it runs `occ app:disable user_saml` (idempotent), so turning the
+  toggle off or disabling exposure fully backs the feature out.
+- **`NEXTCLOUD_PROXY_HEADER_AUTH`** — inert compose passthrough +
+  `booleanEnvKeys` entry, so it's a config-panel toggle read by the
+  reconciler from `.env`, default `false`.
+- `.env.example` + `docs/app-credentials.md` Nextcloud row updated. 7 tests.
+
+### Header naming
+
+NPM forwards Authelia's `Remote-User` / `Remote-Email` / `Remote-Name`
+response headers upstream as request headers; PHP exposes those as
+`HTTP_REMOTE_USER` etc. — verified against `user_saml`'s
+`SessionService::prepareEnvironmentBasedSession`, which stores the whole
+`$_SERVER` array and then looks up the configured mapping keys in it.
+
+### Why gated off
+
+Two reasons it ships `false`: the NPM proxy host also needs Authelia's
+`authelia-authrequest.conf` snippet applied before the header is present
+(an @mat step, same as Guacamole), and a wrong mapping would auto-provision
+junk accounts. Lockout recovery is `https://<host>/login?direct=1`, which
+always renders the normal form; the local admin account works there.
+
+### Unproven
+
+Not run against the real Authelia + NPM path. @mat: expose Nextcloud, apply
+the authrequest snippet to its proxy host, flip `NEXTCLOUD_PROXY_HEADER_AUTH`
+true, restart Nextcloud, and confirm an Authelia login lands straight in
+Nextcloud with no second form — then confirm `?direct=1` still works as the
+escape hatch. README item carries this. The §180 LAN-bypass question applies
+here too: until §180 closes, a LAN client can still reach Nextcloud's `:80`
+without Authelia in front — worth deciding whether that matters for Nextcloud
+before relying on header-trust as the only gate.
+
+### Header/IP-trust list status
+
+Done: Stirling-PDF, Uptime Kuma, Paperless-ngx (§247), **Nextcloud (this
+section)**. Remaining: File Browser (blocked on §180 — its own login is the
+only gate on the home-dir mount while the LAN can bypass Authelia), Home
+Assistant (`trusted_networks` — IP-based, wants the §180 decision first).

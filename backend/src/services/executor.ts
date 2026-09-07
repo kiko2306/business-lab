@@ -23,6 +23,7 @@ import { withMaintenanceLock } from './maintenanceLock';
 import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
 import { reconcileNextcloudClamav } from './nextcloudClamav';
+import { reconcileNextcloudSaml } from './nextcloudSaml';
 import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
 import { syncMealieAiProvider } from './mealieAiSync';
 import { assertMssqlEulaAccepted } from './mssqlEula';
@@ -263,6 +264,11 @@ async function composeUpWithManagedConfig(
   // (§81.4/§81.7). Both no-op for every other service.
   await reconcileNextcloudOnlyOffice(serviceName);
   await reconcileNextcloudClamav(serviceName);
+  // Nextcloud: switch user_saml into environment-variable mode so Authelia's
+  // forward-auth headers log the user in (§216/§217). Gated behind
+  // NEXTCLOUD_PROXY_HEADER_AUTH + exposure; disables the app otherwise. Also
+  // after `up` — it's occ against the running database. No-op elsewhere.
+  await reconcileNextcloudSaml(serviceName);
   // Guacamole: rotate the shipped guacadmin/guacadmin default the first time
   // it's reachable (§200 slice 1). Also after `up`, not before — it's a
   // REST call against the running webapp, not a file it needs before boot.

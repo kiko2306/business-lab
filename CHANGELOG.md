@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.47.0] — 2026-09-07
+
+### Apps
+
+- Nextcloud can trust Authelia's forward-auth header (user_saml environment-variable mode), gated behind NEXTCLOUD_PROXY_HEADER_AUTH + exposure
+
 ## [0.46.0] — 2026-09-07
 
 ### Apps

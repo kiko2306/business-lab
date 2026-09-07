@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.46.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.47.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -351,17 +351,17 @@ and proven on the real stack) are done. Phase tags below.
       §217) — twelve apps ship a real, upstream-supported way to stop
       showing their own login on top of Authelia's, the same shape as the
       already-fixed Dozzle/Guacamole:
-      - **Header/IP trust** (one config change each): File Browser
-        (`auth.method=proxy` — blocked on §180: its own login is the only
-        gate on the sensitive home-directory mount while the LAN can bypass
-        Authelia), Nextcloud (`user_saml`'s "Environment mode"), Home
-        Assistant (`trusted_networks`/`trusted_proxies` — IP-based, weaker,
-        lower priority). Stirling-PDF, Uptime Kuma and Paperless-ngx are
-        done: Stirling-PDF already shipped with `SECURITY_ENABLELOGIN=false`
-        by default; Uptime Kuma's `disableAuth` (a DB setting, no env var)
-        is set by an idempotent init sidecar (§227); Paperless-ngx trusts
-        `Remote-User` via `PAPERLESS_ENABLE_HTTP_REMOTE_USER`, the upstream
-        "misbehaves behind nginx" report did not reproduce (§247).
+      - **Header/IP trust**: still open — File Browser (`auth.method=proxy` —
+        blocked on §180: its own login is the only gate on the sensitive
+        home-directory mount while the LAN can bypass Authelia) and Home
+        Assistant (`trusted_networks` — IP-based, weaker, wants the §180
+        decision first). Done: Stirling-PDF (shipped with
+        `SECURITY_ENABLELOGIN=false`), Uptime Kuma (`disableAuth` set by an
+        idempotent init sidecar, §227), Paperless-ngx (`Remote-User` via
+        `PAPERLESS_ENABLE_HTTP_REMOTE_USER`, §247), and **Nextcloud**
+        (`user_saml` environment mode, §276 — wired, gated behind
+        `NEXTCLOUD_PROXY_HEADER_AUTH` + exposure, unproven, see the @mat item
+        below).
       - **OIDC against Authelia's own provider, then disable the local
         form.** Plumbing is done (§270): a service declaring `oidcClient` in
         the registry gets a confidential Authelia client registered on every
@@ -415,6 +415,19 @@ and proven on the real stack) are done. Phase tags below.
       from the `immich` `oidcClient`. Also worth a check: whether the
       Settings-UI lockout matters for a real deployment (it reverts
       hand-tuned Immich settings to defaults while exposure is on — §275).
+
+- [ ] **@mat: prove Nextcloud header-trust live** (§217, §276) — expose
+      Nextcloud, apply Authelia's `authelia-authrequest.conf` snippet to its
+      NPM proxy host, flip `NEXTCLOUD_PROXY_HEADER_AUTH` true (Configuration
+      panel), restart Nextcloud, and confirm an Authelia login lands straight
+      in with no second form (the dashboard puts `user_saml` in
+      environment-variable mode on start). Then confirm
+      `https://<host>/login?direct=1` still shows the normal form as the
+      escape hatch. `general-uid_mapping=HTTP_REMOTE_USER` and the
+      email/displayname mappings are from `user_saml` source, not a live run —
+      if auto-login provisions a wrongly-named account, the `$_SERVER` key is
+      off. §180 applies: decide whether the LAN-direct `:80` bypass matters
+      for Nextcloud before treating header-trust as the only gate.
 
 - [ ] **@mat: prove Beszel SSO live, then flip `DISABLE_PASSWORD_AUTH`**
       (§229, §236) — `beszelSync.ts` is built and `TRUSTED_AUTH_HEADER:
