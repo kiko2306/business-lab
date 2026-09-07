@@ -18481,3 +18481,56 @@ covers B2. §248/§249/§250 were internal decisions with nothing operator-
 facing to update.
 
 Docs only — no code, no version bump.
+
+## 252. Tunnel-wide 502: `exposure_npm_api_url` pinned to a stale LAN IP
+
+**Symptom.** `https://ssh.tx-home-utils.com/` (and every other public
+hostname) returned 502. `cloudflared` logs on the host:
+
+```
+ERR error="Unable to reach the origin service ... dial tcp 192.168.1.23:80:
+    connect: no route to host" ingressRule=8/9/11/12/18/28/30
+    originService=http://192.168.1.23
+```
+
+Wetty, NPM and Authelia were all healthy; `Host: ssh.tx-home-utils.com` on
+NPM's proxy port returned the expected 302 → Authelia. The break was entirely
+in the tunnel's origin address.
+
+**Root cause.** The `settings` row `exposure_npm_api_url` held
+`http://192.168.1.23:10270`. This host's LAN address had moved (DHCP, no
+reservation) from `192.168.1.23` to `192.168.1.236`, so `192.168.1.23` was a
+dead IP. `getNpmOriginUrl` / `getNpmGrpcOriginUrl` keep the host from that
+setting and only swap the port, so every ingress rule the reconciler asserts
+pointed at the dead IP.
+
+Why the setting was wrong in the first place: `start.sh` already derives the
+correct value — `http://<docker-bridge-gateway>:<NPM_ADMIN_PORT>`, here
+`http://10.201.0.1:10270`. The docker bridge gateway is reachable both from
+the backend container and from `cloudflared` on the host, and it is set by the
+daemon address pool `start.sh` writes, **not** DHCP, so it does not move when
+the machine changes networks. But the seeder used `seed_setting`, whose
+`ON CONFLICT ... WHERE settings.value IS NULL OR settings.value = ''` clause
+only fills a blank. A LAN IP that had once been typed into the dashboard (or
+seeded by an older `start.sh`) therefore stuck through every reboot, and went
+silently fatal the moment that IP was reassigned.
+
+**Fix.** `start.sh` gains a `force_setting` helper (upsert with
+`WHERE settings.value IS DISTINCT FROM EXCLUDED.value`) and uses it for
+`exposure_npm_api_url` only. That one setting an operator must never
+hand-edit: its correct value is derived fresh every run and there is no
+legitimate override (`host.docker.internal` works for the backend but not for
+`cloudflared` on the host; `127.0.0.1` is the reverse; only the bridge gateway
+satisfies both). Every other seeded setting keeps `seed_setting` — a
+dashboard-entered value still wins for those.
+
+Once the setting is corrected, `reconcileExposureDrift` repoints every ingress
+rule and DNS origin on its next pass; no manual Cloudflare edit.
+
+**Live box.** Applied the corrected value (`http://10.201.0.1:10270`) to the
+running deployment by hand to restore service — the code path above is what
+makes it stick on the next fresh clone. A DHCP reservation / static IP for
+this host (README Security TODO, §94) is still worth doing, but is no longer
+what stands between a network move and a working tunnel.
+
+`start.sh` only — no `backend/src` / `frontend/src` change, no version bump.

@@ -227,6 +227,16 @@ it is done — not ticked off and left behind. Section references point at
       value in either can cut off the very session applying it. Run
       `sudo ./setup_server.sh` and confirm both prompts behave as documented
       in `docs/first-run.md`.
+- [ ] **Stop storing `exposure_npm_api_url` as hand-editable free text**
+      (§252) — `start.sh` now `force_setting`s it to
+      `http://<docker-bridge-gateway>:<NPM_ADMIN_PORT>` every run, which fixes
+      the "stale LAN IP 502s the whole tunnel" failure on the next fresh
+      clone. Two follow-ups: (a) verify that force path against a real
+      `start.sh` run (the live box was corrected by hand); (b) consider
+      dropping the stored setting entirely and deriving the value inside
+      `getExposureConfig` / the reconciler, so a dashboard edit can't
+      reintroduce a bad host — or split the tunnel origin (always `localhost`
+      from `cloudflared` on the host) from the backend's own NPM URL.
 
 ### Features & architecture (§131)
 
