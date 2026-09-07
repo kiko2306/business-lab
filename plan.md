@@ -20262,10 +20262,24 @@ injected were silently ignored.
 
 ### Still unproven — @mat
 
-CrowdSec IP-blocked the test run mid-check, so the fixed path is **not** yet
-seen working live. @mat: after a `backend` recreate picks up
-`vikunjaConfig.ts`, toggle Vikunja's exposure off/on (writes `config.yml`),
-reload the login page, confirm the "Authelia" button now shows and lands with
-no second form; then flip `VIKUNJA_AUTH_LOCAL_ENABLED` false and confirm the
-local form is gone but OIDC still works. README §271 item updated to point
-here.
+The fixed path is **not** yet seen working live. The real blocker (found while
+trying to prove Homebox the same day) is the **deployed backend version**, not
+CrowdSec: `tx-home-utils.com`'s `homelab-backend` image was built at 11:12,
+~4h before the entire §270–§278 OIDC group was committed (14:50–15:59). The
+running backend has no `autheliaOidcClients.ts`, no `oidcClient` registry
+entries and no OIDC secret auto-generation — Authelia's `configuration.yml`
+`clients:` list still holds only `netbird-dashboard`, and every app's
+`*_OIDC_CLIENT_SECRET` reads "not set". The backend runs a built image, not
+bind-mounted source, so this needs a rebuild + recreate of `backend`, not a
+restart — i.e. the open @mat self-update item (§131.4/§198/§199/§209). Nothing
+in the §270–§278 OIDC group (Vikunja, Homebox, Mealie, Immich) can be proven
+live until that lands.
+
+@mat, once `backend` is rebuilt from current `main`: toggle Vikunja's exposure
+off/on (writes `config.yml`), reload the login page, confirm the "Authelia"
+button now shows and lands with no second form; then flip
+`VIKUNJA_AUTH_LOCAL_ENABLED` false and confirm the local form is gone but OIDC
+still works. README §271 item updated to point here. (CrowdSec did also
+IP-block the first browser run mid-check — a self-inflicted 401-bruteforce
+trip from rapid automated navigation, cleared with `cscli decisions delete`;
+unrelated to the backend-version blocker.)
