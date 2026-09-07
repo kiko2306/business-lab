@@ -19623,3 +19623,77 @@ path* is proven, what is still open is a destination on genuinely separate
 hardware (real NAS over `nfs`, or a real attached drive) — SMB stays out.
 
 Patch bump 0.42.0 → 0.42.1.
+
+## 267. Plan — add an `ftp` backup destination to Kopia via its bundled rclone (§265, §266)
+
+@mat's NAS (`192.168.1.50`) does **plain FTP** (port 21 open) and SMB only —
+SMB hangs `kopia repository create` (§265), NFS is not enabled (2049/111/20048
+filtered), and there's no S3 endpoint on it. FTP is the remaining path for
+that box, and FTP/FTPS was a real destination here once (§173, dropped with
+Duplicati at §196).
+
+### Why this is small now
+
+Kopia has **no native FTP backend**, but the official `kopia/kopia:latest`
+image already ships `rclone` v1.68.2 at `/usr/bin/rclone`, and Kopia has a
+first-class `rclone` repository backend (`kopia repository create rclone
+--remote=<remote>:<path>`). rclone speaks FTP. So: no image change, no new
+dependency, no FUSE mount (rclone streams — it does not present a kernel
+filesystem for Kopia to stall on the way SMB did).
+
+### Design (mirrors the `s3` kind, §221)
+
+- **`backupTarget.ts`** — `BackupTargetKind` gains `'ftp' | 'ftps'`
+  (`ftps` = explicit TLS / `AUTH TLS`). Reuse the existing five fields:
+  `server` = `host` or `host:port`, `share` = remote directory,
+  `username`/`password` = FTP credentials, `options` = raw extra rclone flags
+  (escape hatch, exactly like s3's `extraArgs`). New `toRcloneFtpConfig(target)`
+  → `{ host, port, user, pass, remotePath, explicitTls, extraArgs }`.
+  `validateTarget`: ftp/ftps require `server`, reject a slash/space/`@` in it
+  (lands in the rclone config); the comma-in-credential guard stays scoped to
+  the mounted kinds (rclone.conf is INI `key = value`, a comma is fine).
+  `isMountedKind` / `toMountSpec` treat ftp/ftps as backend-family (throw for
+  `toMountSpec`, like s3).
+- **`kopiaTargetApply.ts` `buildEnvValues`** — ftp/ftps →
+  `BACKUP_REPO_KIND=rclone` plus `BACKUP_RCLONE_HOST/PORT/USER/PASS/
+  REMOTE_PATH/TLS/EXTRA_ARGS`; mount vars fall back to the harmless local
+  default, s3 vars blanked (same "nothing left stale" contract s3 already
+  has).
+- **`apps/kopia/docker-compose.yml`** (direct repo edit — compose files are
+  read-only to *backend code*, not to a plan step) — add the
+  `BACKUP_RCLONE_*` passthrough to `environment:`.
+- **`apps/kopia/entrypoint.sh`** — new `elif [ "$BACKUP_REPO_KIND" = "rclone" ]`
+  branch: write `$HOME/.config/rclone/rclone.conf` from the env
+  (`type = ftp`, `host`, `port`, `user`, `pass = $(rclone obscure "$…")`,
+  `explicit_tls`), then `set -- rclone --remote="backup:$REMOTE_PATH"
+  $EXTRA_ARGS`; `LABEL="ftp://$HOST/$REMOTE_PATH"`. The existing
+  connect-or-create logic (`kopia repository connect "$@" || kopia repository
+  create "$@"`) is unchanged.
+- **`apps/kopia/.env.example`** — document the `BACKUP_RCLONE_*` block.
+- **`validation.ts`** — `kind` valid list gains `ftp`, `ftps`.
+- **`backupTargetTest.ts`** — new `testFtpTarget`: `rclone lsd backup:` (auth
+  + reachability, non-destructive) in a throwaway `kopia/kopia` container with
+  a generated `--config`, mirroring `testS3Target`.
+- **Frontend** — `BackupTargetKind` widened in `models.ts`;
+  `settings.component.ts` + template gain an FTP fieldset (server incl.
+  optional `:port`, remote directory, username, password) and `ftp`/`ftps` in
+  the kind dropdown; `backupTargetIsMounted` false for both.
+- **Docs** — `docs/app-credentials.md` (FTP creds via Settings), `docs/ports.md`
+  (outbound 21, no listener), `docs/licences.md` (rclone note — bundled in the
+  already-rowed `kopia/kopia` image, MIT).
+- **Tests** — `backupTarget.test.ts` (`toRcloneFtpConfig` shape, percent/INI
+  safety, `validateTarget`, `isMountedKind` false), `kopiaTargetApply.test.ts`
+  (`buildEnvValues` rclone branch blanks the others).
+
+### Live proof (the actual open question)
+
+Apply an `ftp` target at `192.168.1.50:21`, `share` = the FTP-visible path to
+`backup`, user `frias`. Start Kopia and watch `kopia repository create rclone`
+**complete** — this is what SMB could not do. Then snapshot (with the §266
+`/kopia/data` ignore rule), restore to scratch, and confirm
+restoredBytes/Files match the summary and a restored DB opens. Only then is
+the destination called proven.
+
+Rejected: a `curlftpfs` FUSE mount routed through the `filesystem` kind —
+needs FUSE in the container and would sit in exactly the write path SMB hung
+on (§265). rclone's own streaming + retry is the point of using it.

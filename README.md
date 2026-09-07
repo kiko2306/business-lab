@@ -260,6 +260,15 @@ Strategy:
 
 ### Backups
 
+- [ ] **Add an `ftp`/`ftps` backup destination via Kopia's bundled rclone**
+      (§267) — the `kopia/kopia` image already ships `rclone`, and Kopia's
+      `rclone` backend speaks FTP. New `ftp`/`ftps` `BackupTargetKind` (reusing
+      the five existing fields), a `BACKUP_REPO_KIND=rclone` branch in
+      `entrypoint.sh` that writes `rclone.conf` from env, `buildEnvValues` +
+      `validateTarget` + `testBackupTarget` + the Settings form + docs +
+      tests, then a live proof against `192.168.1.50:21` (snapshot + restore).
+      This is the only remaining destination the test NAS can actually serve
+      (SMB hangs Kopia, NFS is off).
 - [ ] **Prove a real external destination against off-host hardware** (§131.4,
       §196, §265, §266) — the `disk`-kind code path is now proven end to end
       (§266: snapshot + byte-for-byte restore from a real ext4 bind mount,
