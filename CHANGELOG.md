@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.40.1] — 2026-09-07
+
+### Changed
+
+- Generate SQL-Server-policy-compliant SA passwords: consolidate the three secret-generation sites in appEnv.ts into one generateSecretFor() and add an MSSQL_ branch (3-of-4 char classes); also fixes APP_KEY only being special-cased on one of the three paths (§263b).
+
 ## [0.40.0] — 2026-09-07
 
 ### Added

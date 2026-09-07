@@ -19208,3 +19208,31 @@ Not done here: the compliant password generator (§263b — right now
 `MSSQL_SA_PASSWORD` would be plain hex, which fails MS's 3-of-4-classes
 policy), the `mssql` backup engine (§263c), the EULA gate (§263d), docs rows
 (§263e), live proof (§263f).
+
+## 263b. §121 SQL Server Express — SQL-Server-compliant secret generator
+
+Second of the §263 batch. Before this, `MSSQL_SA_PASSWORD` would have been
+generated as `crypto.randomBytes(32).toString('hex')` — lowercase + digits
+only, two of the four character classes SQL Server's `sa` policy needs (8–128
+chars, 3 of 4 of upper/lower/digit/symbol), so the container would refuse to
+start.
+
+`appEnv.ts` had this generation inline in **three** places (the config-panel
+suggestion, the hidden-secret fill on save, and `ensureGeneratedSecrets`
+before start), and the Laravel `APP_KEY` `base64:` special-case guarded only
+one of the three — a latent bug where an APP_KEY filled on save rather than
+before start would get plain hex and 500 the app.
+
+Consolidated all three into one exported `generateSecretFor(key)`:
+- `*_APP_KEY` → `base64:<32 random bytes>` (moved here, now covers all paths);
+- `MSSQL_*` → `<48 hex chars>Aa1_` — the hex gives lower+digit, the fixed
+  suffix adds upper + symbol, so 4 of 4 classes, 52 chars, within bounds. `_`
+  chosen as the symbol because it's safe in `.env` and every shell we build
+  healthcheck/backup commands with; most other symbols aren't.
+- everything else → 64 hex chars, unchanged.
+
+Tests: `appEnv.test.ts` gains a `generateSecretFor` block (hex shape,
+APP_KEY 32-byte decode, MSSQL 3-of-4-classes + length bounds). Backend 623
+pass, typecheck clean.
+
+Next: §263c (`mssql` backup engine).

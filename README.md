@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.40.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.40.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -401,10 +401,7 @@ and proven on the real stack) are done. Phase tags below.
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
 - [ ] **Add SQL Server Express (LAN-only)** (§121, §263 — batch) — licence
-      cleared (§121.5); §263a (skeleton + registry) done, remaining:
-  - [ ] **§263b** — MSSQL-compliant secret generator (`appEnv.ts`: extract
-        `generateSecretFor`, add an `MSSQL_` 3-of-4-classes branch; folds in
-        the APP_KEY special-case that only guards one of three sites today).
+      cleared (§121.5); §263a–b done, remaining:
   - [ ] **§263c** — `mssql` backup engine (`sqlcmd BACKUP/RESTORE DATABASE`).
   - [ ] **§263d** — EULA acceptance gate: `settings` row (who/when), start
         refused until accepted, backend writes `ACCEPT_EULA=Y` on acceptance,

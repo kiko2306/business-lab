@@ -12,7 +12,7 @@ vi.mock('./exposureEnv', () => ({ buildExposureEnvOverrides: vi.fn().mockResolve
 vi.mock('../utils/generalSettings', () => ({ getAppTimezone: vi.fn().mockResolvedValue('Europe/Lisbon') }));
 
 import { buildExposureEnvOverrides } from './exposureEnv';
-import { ensureGeneratedSecrets, getServiceEnvStatus, saveServiceEnv } from './appEnv';
+import { ensureGeneratedSecrets, generateSecretFor, getServiceEnvStatus, saveServiceEnv } from './appEnv';
 
 const mockedExposureOverrides = vi.mocked(buildExposureEnvOverrides);
 
@@ -321,5 +321,25 @@ describe('appEnv — fixed protocol ports are locked', () => {
 
   it('accepts the unchanged value, so submitting the whole form still works', async () => {
     await expect(saveServiceEnv('pihole', { PIHOLE_WEB_PORT: '10320' })).resolves.toBeTruthy();
+  });
+});
+
+describe('generateSecretFor', () => {
+  it('gives a plain 64-char hex string for an ordinary secret', () => {
+    expect(generateSecretFor('VIKUNJA_JWT_SECRET')).toMatch(/^[0-9a-f]{64}$/);
+  });
+
+  it('gives Laravel a base64:<32 bytes> APP_KEY', () => {
+    const v = generateSecretFor('SPEEDTEST_APP_KEY');
+    expect(v).toMatch(/^base64:/);
+    expect(Buffer.from(v.slice('base64:'.length), 'base64')).toHaveLength(32);
+  });
+
+  it('gives an MSSQL_ key a value that meets SQL Server\'s 3-of-4-classes policy', () => {
+    const v = generateSecretFor('MSSQL_SA_PASSWORD');
+    expect(v.length).toBeGreaterThanOrEqual(8);
+    expect(v.length).toBeLessThanOrEqual(128);
+    const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/].filter((re) => re.test(v));
+    expect(classes.length).toBeGreaterThanOrEqual(3);
   });
 });
