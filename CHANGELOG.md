@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.43.1] — 2026-09-07
+
+### Added
+
+- Authelia OIDC-client plumbing: apps can declare an `oidcClient` in the registry and the dashboard registers a matching confidential client in Authelia's config on every exposure change, so they log in via Authelia instead of showing a second form (plan.md §270). No app wired yet.
+
 ## [0.43.0] — 2026-09-07
 
 ### Added

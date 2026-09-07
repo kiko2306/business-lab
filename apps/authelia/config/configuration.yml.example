@@ -61,11 +61,21 @@ notifier:
   filesystem:
     filename: /data/notification.txt
 
-# OIDC provider — lets other apps (currently: NetBird VPN's management
-# service, see apps/netbird-vpn/) authenticate against Authelia instead of
+# OIDC provider — lets other apps authenticate against Authelia instead of
 # rolling their own login. hmac_secret comes from AUTHELIA_OIDC_HMAC_SECRET
 # in .env; the JWKS signing key is generated to data/oidc-jwks.pem (gitignored
 # — see .env.example for the generation command) rather than checked in here.
+#
+# Two kinds of client live in the list below:
+#   - Hand-maintained static clients (NetBird VPN's dashboard/CLI) — public,
+#     PKCE, bespoke audience + device-code wiring. Edited here by hand.
+#   - Dashboard-managed clients — apps that carry `oidcClient` in the registry
+#     (Immich/Vikunja/Mealie/Homebox/NocoDB) so they log in via Authelia
+#     rather than showing a second login form (plan.md §216/§217/§270). The
+#     backend splices these in between the `# >>> managed by the dashboard`
+#     markers on every exposure change (services/autheliaOidcClients.ts); the
+#     client_secret is auto-generated into the app's own .env. Do not edit
+#     inside the markers — it is regenerated.
 #
 # Both clients below are "public" (no client_secret) since NetBird's
 # dashboard (PKCE) and CLI (device code) are exactly the kind of clients
@@ -110,6 +120,8 @@ identity_providers:
         - 'introspection'
       allowed_origins_from_client_redirect_uris: true
     clients:
+      # >>> managed by the dashboard — plan.md §270; OIDC clients for exposed apps with `oidcClient` in the registry. Manual edits are lost.
+      # <<< managed by the dashboard
       - client_id: 'netbird-dashboard'
         client_name: 'NetBird Dashboard'
         public: true
