@@ -18978,3 +18978,39 @@ Tier 2/3 (identifiers, network, project, Postgres role, hostnames, repo name)
 remain deliberately untouched — the §83 maintenance-window batch.
 
 Frontend build passes; HTML-only, no tests.
+
+## 260. §64 pre-built n8n workflows — spike delivered, candidate table parked (2026-09-07)
+
+Closed the README item. The spike §64 asked for — a way to get a
+backend-rendered workflow JSON into n8n's main process, which has no native
+"import from a directory" — was built in §118.3 and settled in §248:
+`apps/n8n/docker-compose.yml`'s `n8n-workflows-init` runs
+`import:workflow` → `update:workflow --id=<id> --active=true` →
+`publish:workflow` over `apps/n8n/workflows/*.json` on every n8n start;
+`services/n8nWorkflows.ts` renders those files from stored settings. One
+managed workflow ships today (the CrowdSec alert relay).
+
+**Why nothing more gets built now.** §64.1's candidate table doesn't survive
+contact with the current roster:
+
+- *Backup failed → ntfy* — Duplicati is gone (§196 era); dead row.
+- *CrowdSec decision → ntfy* — already shipped.
+- *Certificate expiring → ntfy (NPM API)* — needs an NPM admin credential,
+  which is exactly what §64.2 says a shipped workflow should avoid.
+- *Service down → ntfy (Uptime Kuma)* — Kuma posts to ntfy natively; n8n only
+  adds quiet-hours/severity routing, not enough to justify managed JSON.
+- *Disk health → ntfy (Beszel)* — Beszel has its own alerting.
+- *Document added → Paperless* — Paperless has native post-consume hooks.
+- *New ticket → ntfy (ITFlow)* — ITFlow isn't in the roster (§62.1).
+
+Every row is dead, credential-gated, or duplicates a native feature. §64.3's
+open question — "do these belong to n8n at all, or should the dashboard grow a
+generic notifications feature?" — is left unanswered on purpose: no candidate
+is compelling enough to force the call.
+
+**Still live, unblocked by this:** the import path is ready for whatever
+genuinely needs it next — §84.3 P4 (n8n glue: `/content` drafts → Postiz) and
+the CrowdSec-alert workflow's own §118.4 smarts. Those add workflows when a
+real need exists, not a speculative pile.
+
+Docs/plan only — no code, no version bump.

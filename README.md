@@ -274,8 +274,8 @@ and proven on the real stack) are done; next code action is **P4**. Phase
 tags below.
 - [ ] **P4 — n8n glue** (§84.3) — "generate on a schedule, queue in Postiz":
       wire the §254 P2 `/content` drafts into Postiz (now a managed app, §258)
-      via n8n. Needs the "pre-built n8n workflows" import path (§64) too. Also
-      unblocks the CrowdSec-alert workflow (§118.4 / §64).
+      via n8n, using the managed-workflow import path (§118.3/§260). Also
+      unblocks the CrowdSec-alert workflow (§118.4).
 - [ ] **P5 — Verify Meta development-mode publishing empirically** (§84.3a) —
       research, no code deps. Sources agree Instagram publishes from a dev-mode
       app with a Tester role, and a dev-mode Page post is admin-only. Confirm
@@ -426,11 +426,6 @@ tags below.
 - [ ] **MeshCentral** (§62.2 — §84 phase P6) — still wanted, for client
       endpoints that will not join the overlay. `TLSOffload` + `certUrl` for
       the agent cert hash. Independent of the social/product track.
-- [ ] **Pre-built n8n workflows** (§64, §118.3) — ship useful workflows rather
-      than an empty n8n. No native "import from a directory" for n8n's main
-      process; needs a spike (container-`command` import of a backend-rendered
-      JSON with a stable id + `update:workflow --active`, vs the REST API which
-      needs a UI-created key). Blocks the CrowdSec-alert workflow (§118.4).
 - [ ] **Home Assistant: identify the three unlabelled Espressif devices**
       (§77.6) — `.18`/`.19`/`.20`, no DHCP hostname. Power-cycle one appliance
       and re-sweep to identify by elimination.
