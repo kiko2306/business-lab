@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.43.2] — 2026-09-07
+
+### Added
+
+- Vikunja logs in via Authelia's OIDC provider: the dashboard registers the client and injects Vikunja's VIKUNJA_AUTH_OPENID_* config at start when it's exposed; toggle VIKUNJA_AUTH_LOCAL_ENABLED off after a first sign-in to drop Vikunja's own form (plan.md §271). Unproven against the live proxy.
+
 ## [0.43.1] — 2026-09-07
 
 ### Added

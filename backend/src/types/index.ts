@@ -287,6 +287,15 @@ export interface ServiceDefinition {
     // Defaults to openid/profile/email; override only if the app needs more
     // (e.g. 'groups').
     scopes?: string[];
+    // Runtime env that points the app at Authelia's OIDC provider, injected
+    // at start the same way `exposureEnvKeys` are — merged over the shell
+    // environment for `docker compose up`, never persisted (see
+    // services/exposureEnv.ts). Value tokens substituted at start:
+    //   {ISSUER}        https://<authelia hostname>
+    //   {CLIENT_ID}     the service name
+    //   {CLIENT_SECRET} the app's own secretEnvKey value, from its .env
+    //   {PUBLIC_URL}    https://<this app's exposed hostname>
+    appEnv?: Record<string, string>;
   };
 }
 

@@ -138,4 +138,36 @@ describe('buildExposureEnvOverrides — compose default fallback', () => {
     const out = await buildExposureEnvOverrides('homepage', path.join(tmpDir, 'home-page'));
     expect(out.HOMEPAGE_ALLOWED_HOSTS).toBe('192.168.1.23:10190,homepage.example.com,example.com');
   });
+
+  it('substitutes the oidcClient.appEnv tokens for an exposed app (Vikunja)', async () => {
+    const appDir = path.join(tmpDir, 'vikunja');
+    fs.mkdirSync(appDir);
+    fs.writeFileSync(
+      path.join(appDir, 'docker-compose.yml'),
+      'services:\n  vikunja:\n    ports:\n      - "${VIKUNJA_PORT:-10390}:3456"\n'
+    );
+    fs.writeFileSync(path.join(appDir, '.env'), 'VIKUNJA_OIDC_CLIENT_SECRET=topsecret\n');
+
+    const { buildExposureEnvOverrides } = await import('./exposureEnv');
+    const out = await buildExposureEnvOverrides('vikunja', appDir);
+
+    expect(out.VIKUNJA_AUTH_OPENID_ENABLED).toBe('true');
+    expect(out.VIKUNJA_AUTH_OPENID_REDIRECTURL).toBe('https://vikunja.example.com/auth/openid/');
+    expect(out.VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_AUTHURL).toBe('https://authelia.example.com');
+    expect(out.VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTID).toBe('vikunja');
+    expect(out.VIKUNJA_AUTH_OPENID_PROVIDERS_AUTHELIA_CLIENTSECRET).toBe('topsecret');
+    // exposureEnvKeys still applied alongside
+    expect(out.VIKUNJA_PUBLIC_URL).toBe('https://vikunja.example.com');
+  });
+
+  it('returns no overrides for an oidcClient app that is not exposed', async () => {
+    const appDir = path.join(tmpDir, 'vikunja');
+    fs.mkdirSync(appDir);
+    fs.writeFileSync(path.join(appDir, 'docker-compose.yml'), 'services:\n  vikunja:\n    image: x\n');
+    const { getServiceExposureRow } = await import('./exposure');
+    vi.mocked(getServiceExposureRow).mockResolvedValue({ enabled: false } as never);
+
+    const { buildExposureEnvOverrides } = await import('./exposureEnv');
+    expect(await buildExposureEnvOverrides('vikunja', appDir)).toEqual({});
+  });
 });

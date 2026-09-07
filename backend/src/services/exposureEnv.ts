@@ -94,8 +94,10 @@ export async function buildExposureEnvOverrides(
   serviceName: string,
   appDir: string
 ): Promise<Record<string, string>> {
-  const exposureEnvKeys = getService(serviceName)?.exposureEnvKeys;
-  if (!exposureEnvKeys) {
+  const service = getService(serviceName);
+  const exposureEnvKeys = service?.exposureEnvKeys;
+  const oidcAppEnv = service?.oidcClient?.appEnv;
+  if (!exposureEnvKeys && !oidcAppEnv) {
     return {};
   }
 
@@ -159,7 +161,27 @@ export async function buildExposureEnvOverrides(
     .filter((extra) => extra.apex)
     .map(() => globalConfig.baseDomain);
 
-  const gatewayIp = exposureEnvKeys.gatewayOnExposure?.length ? await getHostGatewayIp() : '';
+  const gatewayIp = exposureEnvKeys?.gatewayOnExposure?.length ? await getHostGatewayIp() : '';
 
-  return computeExposureEnvOverrides(exposureEnvKeys, hostname, existingValues, extraHosts, gatewayIp);
+  const overrides = exposureEnvKeys
+    ? computeExposureEnvOverrides(exposureEnvKeys, hostname, existingValues, extraHosts, gatewayIp)
+    : {};
+
+  // An app that authenticates against Authelia's own OIDC provider (plan.md
+  // §270) gets its client config injected here too — derived from the
+  // exposed hostname + Authelia's issuer + the client secret in its .env, so
+  // nothing OIDC-related is hand-written into the app's .env.
+  if (oidcAppEnv) {
+    const tokens: Record<string, string> = {
+      ISSUER: `https://${buildExposureHostname('authelia', globalConfig.baseDomain)}`,
+      CLIENT_ID: serviceName,
+      CLIENT_SECRET: envValues[service!.oidcClient!.secretEnvKey] ?? '',
+      PUBLIC_URL: `https://${hostname}`,
+    };
+    for (const [key, template] of Object.entries(oidcAppEnv)) {
+      overrides[key] = template.replace(/\{(ISSUER|CLIENT_ID|CLIENT_SECRET|PUBLIC_URL)\}/g, (_m, t) => tokens[t]);
+    }
+  }
+
+  return overrides;
 }

@@ -66,7 +66,7 @@ Open these privately and claim them before exposing.
 | **Metabase** | Setup wizard creates the admin account and (optionally) connects your first database. |
 | **SQL Server** (`mssql`) | LAN-only, no web UI. **Won't start until you accept the Microsoft licence** in Settings → SQL Server licence (§121.5). The `sa` password is generated (`MSSQL_SA_PASSWORD`, hidden — shown only as "configured") and meets SQL Server's policy; read it from `apps/mssql/.env` if a client tool needs it. Connect on the host at port `10540`. Not for e-commerce / payment / life-safety data (licence limit). x86-64 only. |
 | **Postiz** | First registered user owns the instance. Registration is open by default — claim it, then set `POSTIZ_DISABLE_REGISTRATION=true` in the dashboard (Configuration) and restart. `POSTIZ_JWT_SECRET` is generated and shown in the panel: back it up, it encrypts the connected social-account tokens. |
-| **Vikunja** | Register the first account; registration can then be disabled. |
+| **Vikunja** | Register the first account; registration can then be disabled. Once exposed, an "Authelia" OIDC login button appears (the dashboard wires the client automatically — §270). After signing in through it once, flip **Configuration → `VIKUNJA_AUTH_LOCAL_ENABLED`** to false to drop Vikunja's own username/password form and leave Authelia as the only gate. |
 | **n8n** | Owner account created on first visit. |
 | **File Browser** | Ships with `admin` / `admin`. |
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |
