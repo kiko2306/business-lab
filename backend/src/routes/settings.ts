@@ -39,6 +39,7 @@ import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
 import { CLAUDE_API_KEY_SETTING, getClaudeApiKey, maskClaudeKey } from '../utils/claudeSettings';
 import { testClaudeApiKey } from '../services/claudeKeyTest';
+import { syncMealieAiProvider } from '../services/mealieAiSync';
 
 const router = Router();
 
@@ -223,6 +224,11 @@ router.put('/claude-key', validateBody(schemas.claudeKeyUpdate), async (req: Req
       resource: CLAUDE_API_KEY_SETTING,
       result: 'success',
     }).catch(() => {});
+
+    // Push the new key into Mealie's AI recipe parser if it's running (§238).
+    // Detached: the reconcile polls Mealie for up to a minute, and a Mealie
+    // start re-runs it anyway (executor.ts), so the response never waits.
+    void syncMealieAiProvider('mealie').catch(() => {});
 
     const key = req.body.apiKey.trim();
     return res.json({ configured: true, keyMasked: maskClaudeKey(key), message: 'Claude API key saved.' });

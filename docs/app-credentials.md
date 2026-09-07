@@ -61,7 +61,7 @@ Open these privately and claim them before exposing.
 | **Jellyfin** | Setup wizard creates the admin user. |
 | **Uptime Kuma** | First visit creates the admin account. |
 | **BookStack** | Ships with `admin@admin.com` / `password` — change it on first login. |
-| **Mealie** | Ships with `changeme@example.com` / `MyPassword` — change it on first login. |
+| **Mealie** | Ships with `changeme@example.com` / `MyPassword`. The dashboard rotates that password to a generated `MEALIE_ADMIN_PASSWORD` the first time Mealie is reachable (like Guacamole's `guacadmin`) and uses that account to point Mealie's AI recipe parsing at the Settings → Claude API key (§238). Create your own admin user in Mealie; the seeded one is dashboard-owned. AI parsing goes through Anthropic's OpenAI-compat endpoint, which Anthropic documents as test-only — a badly-structured page can still fail to parse. |
 | **NocoDB** | First signup becomes the super admin. |
 | **Metabase** | Setup wizard creates the admin account and (optionally) connects your first database. |
 | **Postiz** | First registered user owns the instance. Registration is open by default — claim it, then set `POSTIZ_DISABLE_REGISTRATION=true` in the dashboard (Configuration) and restart. `POSTIZ_JWT_SECRET` is generated and shown in the panel: back it up, it encrypts the connected social-account tokens. |

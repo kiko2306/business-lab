@@ -725,6 +725,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     exposureEnvKeys: {
       url: ['MEALIE_BASE_URL'],
     },
+    // Not passed to the container — mealieAiSync.ts generates it, then sets it
+    // over Mealie's REST API the first time the shipped changeme@example.com/
+    // MyPassword default logs in, so nothing else can reach that account
+    // (§238). Same trick as GUACAMOLE_ADMIN_PASSWORD.
+    hiddenGeneratedSecrets: ['MEALIE_ADMIN_PASSWORD'],
   },
   'vaultwarden': {
     // Email comes from the dashboard's global mail settings rather than being

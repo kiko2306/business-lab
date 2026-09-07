@@ -19048,3 +19048,72 @@ post. No scheduler, no n8n. Then "on a schedule" is a small follow-up copying
 provider connected (Bluesky or Mastodon — the Tier A, no-approval ones).
 
 No code, no version bump.
+
+## 262. §238 built — Mealie AI recipe parsing wired to the Settings Claude key (2026-09-07)
+
+§238 investigated this and parked it behind two prerequisites: §84.3's
+"Claude API key in Settings" (landed in §255) and "an OpenAI-compat proxy
+for that key, since Anthropic isn't OpenAI-shaped". The second turned out
+not to be needed.
+
+### No proxy container — Anthropic ships an OpenAI-compat endpoint
+
+`https://api.anthropic.com/v1/` speaks the OpenAI `chat/completions` shape:
+Claude API key as the bearer, `model: claude-*`. Mealie's AI-provider config
+takes `base_url` + `api_key` + `model`, so it points straight there — no
+LiteLLM sidecar. Caveat, documented in code and `app-credentials.md`:
+Anthropic calls this layer test-only and **ignores `response_format`**, and
+Mealie calls `chat.completions.parse()` with a schema. Claude usually still
+returns schema-shaped JSON because Mealie's prompts spell the schema out, but
+a messy page can fail to parse. Acceptable on this box; a native-API shim is
+a bigger lift than the feature is worth (`ponytail:` note in
+`mealieAiSync.ts`).
+
+### Mealie has no env-configurable admin — rotate the seed like Guacamole
+
+`_DEFAULT_EMAIL` / `_DEFAULT_PASSWORD` (`changeme@example.com` / `MyPassword`)
+are now private fields in Mealie's settings ("should no longer be set by end
+users"), so a fresh install always seeds exactly that. `mealieAiSync.ts`
+logs in with it, rotates the password to a backend-generated
+`MEALIE_ADMIN_PASSWORD` (`hiddenGeneratedSecrets` in `services.ts`, never
+passed to the container) on first reach, then drives the REST API as that
+account — the `guacamoleAdminRotate.ts` pattern.
+
+### What landed
+
+- `backend/src/services/mealieClient.ts` — thin REST client: `/api/auth/token`
+  (OAuth2 password form), `/api/users/password`, and the group AI-provider
+  endpoints (`GET/PUT .../ai-providers/settings`,
+  `POST/PUT/DELETE .../ai-providers/providers`). Paths + body shapes verified
+  against Mealie source at `mealie-next`, not the docs.
+- `backend/src/services/mealieAiSync.ts` — `syncMealieAiProvider(serviceName)`:
+  resolve base URL (cross-project host-gateway + published port), log in as
+  the managed admin (polling up to 60s, rotating the seed password if
+  needed), then reconcile a provider named `Claude (dashboard-managed)`
+  against `getClaudeApiKey()`. Key set → upsert the provider
+  (`base_url` = the compat endpoint, `model` = `claude-haiku-4-5` — recipe
+  parsing is simple, and §123.1's concern was per-import cost) + make it the
+  group default. Key gone → set the default to null (turns `ai_enabled` off)
+  and delete the provider. Always a full write when the key is set: Mealie
+  never echoes `api_key` back, so there's nothing to diff. Best-effort,
+  never throws.
+- Call sites: `executor.ts` after `reconcileGuacamoleAdminPassword` (every
+  Mealie start), and a detached `void syncMealieAiProvider('mealie')` in
+  `routes/settings.ts`'s `PUT /claude-key` so a key change doesn't need a
+  Mealie restart.
+- `apps/mealie/.env.example` gains the generated `MEALIE_ADMIN_PASSWORD`
+  blank; `services.ts` gains the `hiddenGeneratedSecrets` entry;
+  `docs/app-credentials.md` updated.
+- `mealieAiSync.test.ts` — 6 cases: non-mealie no-op, not-installed no-op,
+  create+set-default, update-existing-skip-settings, key-gone
+  disable+delete, seed-password rotation.
+
+Backend 615 pass, typecheck clean.
+
+### Not proven live
+
+Needs a real Claude key on the box, Mealie running, and a bad-scrape URL
+import to confirm the compat endpoint actually parses. @mat — same shape as
+the other "prove SSO live" items. The `#5012` caveat from §238 (Mealie sends
+page HTML to the AI even when the fetch failed) still stands and isn't ours
+to fix.

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.39.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.39.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -400,18 +400,6 @@ and proven on the real stack) are done. Phase tags below.
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
-- [ ] **Wire Mealie's AI recipe parsing** (§123.1, §238 — §84 P1 done in §255,
-      needs an OpenAI-shaped compat shim for Anthropic's API) —
-      investigation done: current Mealie (v3.x) *does* fall back to AI when the
-      `recipe-scrapers` URL import can't read a page (automatic, v1.9.0), and
-      adds an "Import with AI" page for text/HTML/image/video. But the
-      `OPENAI_*` env vars are gone — provider config is now per-group in the
-      DB, set via `POST /api/groups/ai-providers/providers` +
-      `PUT /api/groups/ai-providers/settings`. So this is a small
-      `mealieAiSync.ts` (drive Mealie's REST API, `guacamoleSync.ts` shape),
-      not `.env` injection — and it needs the §84.3 "Claude API key in
-      Settings" pattern to exist first, plus a compat proxy since Anthropic's
-      API isn't natively OpenAI-shaped. Park until §84.3 lands.
 - [ ] **Add SQL Server Express (LAN-only)** (§121) — licence **cleared**
       (§121.5): the SQL Server 2022 Express EULA permits it via the §2.b.iv
       hosting exception **provided the client accepts the Microsoft EULA on

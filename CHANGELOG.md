@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.39.2] — 2026-09-07
+
+### Added
+
+- Wire Mealie's AI recipe parsing to the Settings Claude API key: the dashboard rotates Mealie's shipped admin default and configures an AI provider pointed at Anthropic's OpenAI-compat endpoint (§238).
+
 ## [0.39.1] — 2026-09-07
 
 ### Changed

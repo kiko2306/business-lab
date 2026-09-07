@@ -24,6 +24,7 @@ import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
 import { reconcileNextcloudClamav } from './nextcloudClamav';
 import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
+import { syncMealieAiProvider } from './mealieAiSync';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
 import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
@@ -244,6 +245,10 @@ async function composeUpWithManagedConfig(
   // it's reachable (§200 slice 1). Also after `up`, not before — it's a
   // REST call against the running webapp, not a file it needs before boot.
   await reconcileGuacamoleAdminPassword(serviceName);
+  // Mealie: rotate its shipped admin default and point its AI recipe parser
+  // at the stored Claude key (§238). Also after `up` — REST against the
+  // running webapp. No-op for every other service.
+  await syncMealieAiProvider(serviceName);
 
   return result;
 }
