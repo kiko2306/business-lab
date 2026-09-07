@@ -19962,3 +19962,23 @@ is the safe default). If the live proof shows Homebox refuses without a
 @mat: expose Homebox, use the Authelia login, land with no second form, then
 flip `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN` false and confirm the local form is gone
 but OIDC still works. README item carries this.
+
+## 273. NocoDB OIDC is Enterprise-only — item dropped, not wired (§270, §272)
+
+Slice D of the §270 OIDC group was going to be NocoDB (`NC_DISABLE_EMAIL_AUTH`
+to drop the local form after an Authelia sign-in). It can't be built: NocoDB's
+OIDC/SSO is a commercial-licence feature, absent from the community
+`nocodb/nocodb:latest` image this stack runs.
+
+- PR nocodb/nocodb#11117 ("Add Support for OpenID Connect logins") was closed
+  unmerged; maintainer: "sso feature was marked as enterprise in the original
+  issue". SAML likewise. The OSS build only does email/password + Google.
+- The `NC_SSO` / `NC_OIDC_*` env vars discussed online come from NocoDB Cloud
+  / the enterprise build and a third-party fork (`brunostjohn/nocodb-oidc`) —
+  not our image.
+
+Same shape as n8n's Enterprise-only SSO: parked with no actionable path, not
+blocked on anything. README moves NocoDB from the "remaining per app" OIDC
+list to the parked list. Remaining buildable in the group: Mealie
+(`ALLOW_PASSWORD_LOGIN=false`, one community breakage report — verify live)
+and Immich (admin-settings + CLI shape, no env path).

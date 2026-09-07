@@ -373,8 +373,7 @@ and proven on the real stack) are done. Phase tags below.
         **@mat** proves it live and flips the disable-local-login flag: Immich
         (Admin Settings, OAuth-only, has a CLI recovery path — no env path,
         different shape), Mealie (`ALLOW_PASSWORD_LOGIN=false` — one community
-        report of this not working on some version, verify live), NocoDB
-        (`NC_DISABLE_EMAIL_AUTH=true`).
+        report of this not working on some version, verify live).
 - [ ] **@mat: prove Vikunja's Authelia OIDC login live** (§270, §271) — the
       `vikunja` client is registered in Authelia and `VIKUNJA_AUTH_OPENID_*`
       is injected at start, but the var names / `_PROVIDERS_<KEY>_` scheme are
@@ -412,10 +411,10 @@ and proven on the real stack) are done. Phase tags below.
       **BookStack** has OIDC/SAML too, but no flag to hide the local form —
       `AUTH_METHOD=oidc` only adds OIDC as an option, and a years-old
       upstream request to disable the standard form is still unimplemented.
-      ITFlow, NPM's own admin UI, Pi-hole, Kopia, WAHA, n8n (Enterprise-only
-      SSO), Jellyfin (core has no header-trust, only a community plugin) and
-      BookStack have no known full fix — parked, not blocked on anything
-      actionable.
+      ITFlow, NPM's own admin UI, Pi-hole, Kopia, WAHA, n8n and NocoDB
+      (Enterprise-only SSO — §273), Jellyfin (core has no header-trust, only a
+      community plugin) and BookStack have no known full fix — parked, not
+      blocked on anything actionable.
 - [ ] **`@mat`: confirm NPM's overlay path, deprovision any live public NPM
       exposure** (§239) — `nginx-proxy-manager` is now `overlayOnly`, so the
       dashboard refuses to *enable* its exposure, but an already-provisioned
