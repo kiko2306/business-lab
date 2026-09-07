@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.39.1] — 2026-09-07
+
+### Changed
+
+- Rebrand tier 1 leftovers: the iOS home-screen title and the Apps page subtitle no longer say "Homelab" (§84.2 / §254 P7)
+
 ## [0.39.0] — 2026-09-07
 
 ### Added

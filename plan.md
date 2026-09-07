@@ -18959,3 +18959,22 @@ DB passwords):
   of this add.
 - Weigh the 5.66 GiB image + ~2.67 GiB RAM before enabling Postiz on a 16 GiB
   turnkey box (§84.7).
+
+## 259. §84 P7 — rebrand tier 1 leftovers (2026-09-07)
+
+§84.2a did the bulk of tier 1 (title, header, kicker, favicon `aria-label`,
+PWA manifest `name`/`short_name`/description) but the README/§254 kept P7 open.
+Two user-visible strings still said "Homelab":
+
+- `frontend/src/index.html` `apple-mobile-web-app-title` — the name an iOS
+  "Add to Home Screen" install shows. Exactly the class §84.2a was fixing;
+  missed because it is a third home-screen-name key alongside the manifest's
+  two.
+- The Apps page subtitle ("services running across your homelab") → "…across
+  your stack", matching the manifest description's earlier same edit.
+
+Doc H1s were already generic or "Business Lab" (README title), so nothing there.
+Tier 2/3 (identifiers, network, project, Postgres role, hostnames, repo name)
+remain deliberately untouched — the §83 maintenance-window batch.
+
+Frontend build passes; HTML-only, no tests.
