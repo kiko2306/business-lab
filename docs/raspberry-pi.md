@@ -144,6 +144,7 @@ Verified against each image's registry manifest on 2026-08-31.
 | pantry, price-compare | yes | yes | built locally from `node:20-alpine`, pure-JS dependencies |
 | kitchen-switcher | yes | yes | static `nginx:alpine` |
 | **waha** | **yes, with `WAHA_IMAGE_TAG=arm`** | no | `latest` is amd64-only |
+| **mssql** | **no** | **no** | Microsoft ships x86-64 only; no emulation support. The registry marks it `x86Only` and the dashboard refuses to start it on a non-x64 host (§263a). |
 
 ## Performance notes
 

@@ -19312,3 +19312,26 @@ Tests: `mssqlEula.test.ts` (7) — parse/round-trip of the stored acceptance,
 pass, frontend 50 pass + build clean.
 
 Next: §263e (docs rows).
+
+## 263e. §121 SQL Server Express — docs rows
+
+Last of the §263 code batch (docs-only, no version bump).
+
+- `docs/ports.md` — `10540` row (added in §263a).
+- `docs/app-credentials.md` — `SQL Server (mssql)` row: LAN-only, no UI,
+  won't start until the licence is accepted in Settings, generated `sa`
+  password in `apps/mssql/.env`, port 10540, the No-High-Risk-Use limit,
+  x86-64 only.
+- `docs/licences.md` — app-table row (**Microsoft Software Licence Terms**,
+  ⚠️ Condition) carrying the §121.5 verdict (cleared via the §2.b.iv hosting
+  exception + first-start acceptance; §6 third-party-transfer bar avoided by
+  the client accepting the EULA themselves; No High Risk Use; x86-64;
+  telemetry; AS-IS), plus an infrastructure-images row for
+  `mcr.microsoft.com/mssql/server:2022-latest` (notes the bundled
+  `mssql-tools18` used by the healthcheck and backup engine). `busybox`
+  already had a row for the init sidecar.
+- `docs/raspberry-pi.md` — `mssql` row in the compatibility table: **no**
+  arm64/armv7, registry `x86Only`, dashboard refuses the start.
+
+§263a–e complete — the whole SQL Server build is in. Only §263f (live proof)
+remains, and it needs the host.
