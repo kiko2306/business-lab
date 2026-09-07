@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.44.0] — 2026-09-07
+
+### Apps
+
+- Homebox logs in via Authelia OIDC — client auto-registered on exposure, HBOX_OPTIONS_ALLOW_LOCAL_LOGIN toggle to drop the local form
+
 ## [0.43.2] — 2026-09-07
 
 ### Added

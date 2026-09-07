@@ -30,7 +30,7 @@ that, each admin can add a TOTP second factor to their own login from
 |---|---|---|
 | **Nginx Proxy Manager** | `admin@example.com` / `changeme` | Forces a change on first login. Do this **before** exposing anything — it controls all reverse proxying and holds the certificates. |
 | **Pi-hole** | password = `PIHOLE_WEB_PASSWORD` in its config | Ships as `change-me`; set a real value in the dashboard before starting. |
-| **Homebox** | first account you register owns it | Registration is open until you turn `HOMEBOX_ALLOW_REGISTRATION` off — claim it before exposing it. |
+| **Homebox** | first account you register owns it | Registration is open until you turn `HOMEBOX_ALLOW_REGISTRATION` off — claim it before exposing it. Once exposed, an Authelia OIDC login appears (the dashboard wires the client automatically — §270). After signing in through it once, flip **Configuration → `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN`** to false to drop Homebox's own username/password form and leave Authelia as the only gate. |
 | **Guacamole** | `guacadmin` / `GUACAMOLE_ADMIN_PASSWORD` (generated, hidden) | Ships as `guacadmin`/`guacadmin`; the dashboard rotates that password to a generated one over Guacamole's own REST API the first time it logs in successfully after a start, so the shipped default stops working — no human step. Its Postgres password is a separate generated secret, unrelated to this. |
 
 ## Generated — read the value in the dashboard

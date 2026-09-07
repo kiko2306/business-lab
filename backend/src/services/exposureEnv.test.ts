@@ -160,6 +160,25 @@ describe('buildExposureEnvOverrides — compose default fallback', () => {
     expect(out.VIKUNJA_PUBLIC_URL).toBe('https://vikunja.example.com');
   });
 
+  it('substitutes the oidcClient.appEnv tokens for an exposed app (Homebox)', async () => {
+    const appDir = path.join(tmpDir, 'homebox');
+    fs.mkdirSync(appDir);
+    fs.writeFileSync(
+      path.join(appDir, 'docker-compose.yml'),
+      'services:\n  homebox:\n    ports:\n      - "${HOMEBOX_PORT:-10440}:7745"\n'
+    );
+    fs.writeFileSync(path.join(appDir, '.env'), 'HOMEBOX_OIDC_CLIENT_SECRET=topsecret\n');
+
+    const { buildExposureEnvOverrides } = await import('./exposureEnv');
+    const out = await buildExposureEnvOverrides('homebox', appDir);
+
+    expect(out.HBOX_OIDC_ENABLED).toBe('true');
+    expect(out.HBOX_OIDC_ISSUER_URL).toBe('https://authelia.example.com');
+    expect(out.HBOX_OIDC_CLIENT_ID).toBe('homebox');
+    expect(out.HBOX_OIDC_CLIENT_SECRET).toBe('topsecret');
+    expect(out.HBOX_OPTIONS_TRUST_PROXY).toBe('true');
+  });
+
   it('returns no overrides for an oidcClient app that is not exposed', async () => {
     const appDir = path.join(tmpDir, 'vikunja');
     fs.mkdirSync(appDir);
