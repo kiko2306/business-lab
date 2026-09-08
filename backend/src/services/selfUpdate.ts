@@ -45,6 +45,19 @@ const composeFilePath = (repoRoot: string) => `${repoRoot}/docker-compose.yml`;
 const BUILD_TIMEOUT_MS = 30 * 60_000;
 const COMMAND_MAX_BUFFER = 16 * 1024 * 1024;
 
+// Compose defaults to the buildx container-based builder, which spins up its
+// own `buildx_buildkit_default` container and `docker exec`s into it to run
+// the build — that needs EXEC on docker-socket-proxy, deliberately left off
+// (its own comment: "narrows things like arbitrary docker exec into any
+// container on the host"). Confirmed live (plan.md §290): every exec/start
+// against the buildkit container came back 403, and the run failed with
+// "unable to upgrade to tcp, received 403" before ever reaching BUILD's own
+// /build endpoint. DOCKER_BUILDKIT=0 forces the classic, pre-buildx builder
+// — a single HTTP POST to /build against the same daemon, exactly what
+// BUILD=1 on the proxy already grants — instead of weakening EXEC just for
+// this.
+const BUILD_ENV: NodeJS.ProcessEnv = { ...process.env, DOCKER_BUILDKIT: '0' };
+
 export type SelfUpdateRunState =
   | 'checking'
   | 'pulling'
@@ -254,7 +267,7 @@ async function runSelfUpdateSequence(
     await runCommand(
       'docker',
       ['compose', '-f', composeFilePath(repoRoot), 'build', 'frontend', 'backend'],
-      { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER }
+      { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
     );
 
     // Every installed app's image, pulled and recreated against whatever the
@@ -276,7 +289,7 @@ async function runSelfUpdateSequence(
     await runCommand(
       'docker',
       ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--build', 'frontend'],
-      { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER }
+      { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
     );
 
     // Mark this as reached (with finished_at) *before* spawning the command
@@ -299,7 +312,7 @@ async function runSelfUpdateSequence(
     const child = spawn(
       'docker',
       ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--build', 'backend'],
-      { detached: true, stdio: 'ignore' }
+      { detached: true, stdio: 'ignore', env: BUILD_ENV }
     );
     child.unref();
   } catch (error) {

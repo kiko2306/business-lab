@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.49.5] — 2026-09-08
+
+### Features & architecture
+
+- Fix the self-update panel's build step: force the classic Docker builder instead of buildx's container-based one, which needs EXEC permission on docker-socket-proxy that's deliberately disabled
+
 ## [0.49.4] — 2026-09-08
 
 ### Exposure
