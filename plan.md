@@ -20518,7 +20518,10 @@ their proxy hosts use NPM's stock config, not this snippet — they still get
 `X-Forwarded-Proto: http`. Both work today (static dashboard; Authelia has
 its own `X-Forwarded-*` handling), so out of scope here.
 
-### Still open
+### Follow-up done in-session: Homebox local login disabled too
 
-- **@mat: `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN=false`** for Homebox — OIDC works,
-  the local form is still shown. Same low-risk flip as the other three.
+`HBOX_OPTIONS_ALLOW_LOCAL_LOGIN=false` set via the Configuration panel +
+restart. Homebox's login page now shows **only** "Sign in with OIDC" — no
+email/password fields, no submit button — and the OIDC button still lands in
+`/home` logged in. All four OIDC apps (Vikunja, Mealie, Immich, Homebox) are
+now OIDC-only with the accept screen suppressed.

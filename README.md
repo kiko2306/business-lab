@@ -361,12 +361,6 @@ and proven on the real stack) are done. Phase tags below.
         login page → Authelia → callback → landed logged in, no second
         password form and (since implicit consent) no accept screen.
         NocoDB (§273) dropped (Enterprise-only SSO).
-- [ ] **@mat: flip `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN` false for Homebox** (§272,
-      §280) — Homebox OIDC works now (the `X-Forwarded-Proto` fix in
-      `proxy.conf` landed, `e94c920`); the local email/password form is still
-      on. Set the flag in the Configuration panel, restart, confirm the form
-      is gone but the OIDC button still logs in. (Not done in-session only
-      because the other three flips were; low-risk.)
 - [ ] **Authelia managed OIDC clients use plaintext `client_secret`** (§270,
       §280) — Authelia logs a deprecation warning for every dashboard-managed
       client ("should be a hashed value ... will be removed in the near
