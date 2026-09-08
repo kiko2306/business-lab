@@ -3,6 +3,7 @@ import express, { NextFunction, Request, Response } from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import rateLimit from 'express-rate-limit';
+import { isSameOrigin } from './utils/corsOrigin';
 
 import authRouter from './routes/auth';
 import servicesRouter from './routes/services';
@@ -70,22 +71,37 @@ app.set(
     : trustProxySetting || 1
 );
 
-const allowedOrigins = (process.env.CORS_ORIGIN || process.env.API_URL || 'http://localhost:4200')
+// Extra origins to allow beyond same-origin — a separately-hosted frontend
+// (e.g. `ng serve` in local dev, talking to a deployed backend). Empty by
+// default: the normal deployment shape is the frontend's own nginx proxying
+// /api same-origin (frontend/nginx.conf), which every request below already
+// covers without needing this list populated at all.
+const allowedOrigins = (process.env.CORS_ORIGIN || '')
   .split(',')
   .map((origin) => origin.trim())
   .filter(Boolean);
 
-const corsOptions: cors.CorsOptions = {
-  origin(origin, callback) {
-    if (!origin || allowedOrigins.includes(origin)) {
-      callback(null, true);
-      return;
-    }
-    callback(new Error('Origin not allowed by CORS policy'));
-  },
-  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Authorization', 'Content-Type'],
-  credentials: false,
+// A static origin allowlist can't be right for this deployment shape: the
+// dashboard is legitimately reachable at several different origins — a LAN
+// IP, the public Cloudflare hostname, `localhost` on the host itself — none
+// of which is knowable in advance. Browsers send `Origin` on same-origin
+// POST/PUT/DELETE requests too (not just cross-origin ones), so comparing it
+// against a fixed value previously rejected the dashboard's own same-origin
+// login from anywhere but whatever one hostname happened to be configured
+// (plan.md §286 — this used to fall back to API_URL, then to a `ng serve`
+// dev default, matching essentially nothing in production). isSameOrigin
+// (utils/corsOrigin.ts) recognizes same-origin by comparing Origin's host
+// against the request's own Host header instead; the static allowlist above
+// is only for a genuinely different origin (a separately-hosted frontend).
+const corsOptionsDelegate: cors.CorsOptionsDelegate<Request> = (req, callback) => {
+  const origin = req.headers.origin;
+  const allow = !origin || allowedOrigins.includes(origin) || isSameOrigin(origin, req.get('host'));
+  callback(null, {
+    origin: allow,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Authorization', 'Content-Type'],
+    credentials: false,
+  });
 };
 
 const mutationLimiter = rateLimit({
@@ -109,7 +125,7 @@ app.use(
     crossOriginResourcePolicy: { policy: 'cross-origin' },
   })
 );
-app.use(cors(corsOptions));
+app.use(cors(corsOptionsDelegate));
 app.use(express.json({ limit: process.env.REQUEST_BODY_LIMIT || '32kb' }));
 app.use(mutationLimiter);
 

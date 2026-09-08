@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.49.3] — 2026-09-08
+
+### Security
+
+- Fix CORS rejecting the dashboard's own same-origin requests: recognize same-origin dynamically instead of a static allowlist that can never cover every valid hostname (LAN IP, public hostname, localhost)
+
 ## [0.49.2] — 2026-09-08
 
 ### Exposure
