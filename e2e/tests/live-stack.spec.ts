@@ -59,7 +59,10 @@ test.describe('live stack — Docker-touching flows', () => {
       // once it is done and fall back to the status badge as the real signal.
       const dialog = page.locator('.startup-logs-dialog');
       if (await dialog.isVisible().catch(() => false)) {
-        await dialog.getByRole('button', { name: 'Close' }).click({ timeout: 120_000 });
+        // exact: true — the dialog also has an icon "X" button whose
+        // aria-label is "Close startup logs", which Playwright's default
+        // substring name-match also treats as matching "Close".
+        await dialog.getByRole('button', { name: 'Close', exact: true }).click({ timeout: 120_000 });
       }
       await settle('running');
     };
