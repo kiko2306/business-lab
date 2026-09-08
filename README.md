@@ -373,15 +373,6 @@ and proven on the real stack) are done. Phase tags below.
       plain-HTTP path); touches `ensureProxyHost`/`exposureConfigFiles.ts` and
       every proxy host, so verify no scheme-sensitive app regresses. Then
       re-run the Homebox login and flip `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN` false.
-- [ ] **@mat: disable the local login form for Vikunja / Mealie / Immich**
-      (§216, §217, §280) — OIDC is proven for all three; the remaining half is
-      the config flip. In each app's Configuration panel set
-      `VIKUNJA_AUTH_LOCAL_ENABLED` / `ALLOW_PASSWORD_LOGIN` /
-      `IMMICH_PASSWORD_LOGIN_ENABLED` to false, restart, and confirm the
-      local username/password form is gone but the Authelia button still
-      logs in. (One community report exists of Mealie's flag not taking on
-      some versions; for Immich also check whether the Settings-UI "config
-      file" lockout matters for a real deployment — §275.)
 - [ ] **Authelia managed OIDC clients use plaintext `client_secret`** (§270,
       §280) — Authelia logs a deprecation warning for every dashboard-managed
       client ("should be a hashed value ... will be removed in the near

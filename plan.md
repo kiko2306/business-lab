@@ -20455,8 +20455,22 @@ Not yet fixed. Options, cheapest first:
   the loopback bind, all 33 exposures reconciled to `127.0.0.1` origins,
   bypass confirmed closed from the LAN, all 34 hostnames + apex still served
   through the tunnel, NetBird gRPC still 200 over HTTP/2. README item removed.
-- The "disable the local login form" half of §216/§217 for Vikunja
-  (`VIKUNJA_AUTH_LOCAL_ENABLED=false`), Mealie (`ALLOW_PASSWORD_LOGIN=false`),
-  Immich (`IMMICH_PASSWORD_LOGIN_ENABLED=false`) — not toggled; the hard part
-  (does OIDC work at all) is now proven, so these are low-risk config flips +
-  a re-login check.
+- The "disable the local login form" half of §216/§217 — **done and proven
+  live**. Set via the Configuration panel (`PUT /api/services/<n>/env`) +
+  restart: `VIKUNJA_AUTH_LOCAL_ENABLED=false`, `ALLOW_PASSWORD_LOGIN=false`
+  (Mealie), `IMMICH_PASSWORD_LOGIN_ENABLED=false` (→ `immich.json`
+  `passwordLogin.enabled:false`). After the restart each login page shows
+  **only** the "…with Authelia" button — no username/password fields, no
+  register link. Mealie's form is gone even with `?direct=1` on the URL (the
+  community report of that flag not taking does not affect this version).
+  Vikunja's OIDC re-login still works with the local form gone.
+
+### Follow-up done in-session: implicit consent (`f3f756d`)
+
+`renderOidcClientsBlock` now emits `consent_mode: 'implicit'` for every
+managed client — the apps are all first-party and already behind Authelia's
+login, so the OAuth "allow <app> to access your profile?" page was pure
+friction. Rebuilt backend, re-synced (all four client blocks carry
+`consent_mode: 'implicit'`, Authelia loads clean), and confirmed live:
+logging out of Vikunja and clicking its Authelia button now lands straight in
+the app with **no accept screen**. Patch 0.48.4.
