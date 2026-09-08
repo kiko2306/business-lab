@@ -21202,3 +21202,51 @@ Verified: re-ran `start.sh` live, confirmed `.git` is now `2775` group
 `docker`, confirmed a freshly-touched test file inside `.git` correctly
 inherited group `docker` despite being created by `mat`, and confirmed
 `POST /api/self-update/check` now succeeds.
+
+## 295. Self-update re-run: §291's original bug confirmed fixed; a second, distinct issue found (2026-09-08)
+
+**Re-ran a real self-update against `tx-home-utils.com`** with both §293's
+Compose-version pin and §294's setgid fix live. Progress this time: `git
+pull` succeeded (setgid fix working), `build` succeeded, **all 46/47 apps
+updated cleanly** (`pihole` failed on its known port-53 conflict, caught
+and logged, not new). Critically — **`database` and `docker-socket-proxy`
+were not touched at all this run.** §291's specific bug (the config-hash
+mismatch recreating unrelated bind-mounted services) did not recur. That
+part of the investigation is closed: the fix works.
+
+**A second, different failure showed up instead.** `homelab-management-
+backend-1` itself — the container the detached final step recreates —
+exited `137` (SIGKILL) mid-swap, leaving a renamed-but-never-started
+replacement (`db15bc556291_homelab-management-backend-1`, `Created`) and
+no running backend at all (dashboard 502) until manually recovered
+(`docker compose up -d backend` from the host; had to `docker rm -f` and
+recreate once more since the first recovery attempt inherited the stale
+renamed-container name instead of the proper one).
+
+This looks unrelated to §291/§292's mechanism — `docker-socket-proxy` was
+never touched, ruling out the same config-hash cascade. `dmesg`/
+`journalctl` showed no explicit OOM-kill message, but the host was
+genuinely memory-constrained at the time of the check (`free -h`: 10Gi/14Gi
+used, 282Mi free, swap 3.7/4.0Gi used) — running the build, all 47 app
+recreates, and self-update's own long-lived node process concurrently is a
+real load spike on this box. The more mundane, plausible explanation:
+the *old* backend process, busy/slow under that load, didn't respond to
+`docker compose`'s stop-timeout SIGTERM in time and got SIGKILLed — a
+routine timeout, not a config bug — though this isn't proven either way.
+
+**A real, smaller gap this surfaced:** `reconcileDanglingSelfUpdateRun()`
+(boot-time cleanup for a stuck run) only handles a row stuck in
+`restarting_backend` with `finished_at` already set — this run's row
+(`id=4`) is stuck at the *earlier* `restarting_frontend` state instead
+(interrupted before backend's own step ever began writing state), which
+that reconciler doesn't recognize. It will sit "in progress" forever in
+the panel unless someone notices and fixes the DB row by hand. Not fixed
+here — noted for whoever picks this up next.
+
+**Net assessment:** §291's originally-diagnosed bug is fixed and verified
+live twice now (isolated diff in §293, a real full run here). The self-
+update panel's "Update now" still isn't unconditionally safe to walk away
+from unattended — this run needed a second manual recovery, just for a
+different reason (backend's own self-replacement, an inherently detached/
+unawaited step by the code's own design) than the first. README item
+updated to reflect exactly this.
