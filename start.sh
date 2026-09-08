@@ -493,11 +493,21 @@ if [ -S /var/run/docker.sock ]; then
   # (§131.4) runs `git pull` and a rebuild as DOCKER_GID inside the backend
   # container, which needs write access to .git and every tracked file a
   # pull might touch, not just apps/.
-  if { chgrp -R "$DOCKER_GID" . && chmod -R g+rwX .; } 2>/dev/null; then
+  #
+  # The setgid bit on every directory (find ... g+s) is what makes this
+  # durable rather than a one-time fix: without it, a *later* `git pull` run
+  # directly on the host (as a human, or this script re-running) creates new
+  # loose objects/refs under .git owned by the invoking user's own primary
+  # group, not DOCKER_GID — silently breaking the backend container's write
+  # access again until someone notices and re-runs this chgrp by hand. Hit
+  # live and had to be fixed by hand on tx-home-utils.com (plan.md §294)
+  # before this line existed. setgid makes every *new* file/dir under here
+  # inherit DOCKER_GID automatically, regardless of who creates it.
+  if { chgrp -R "$DOCKER_GID" . && chmod -R g+rwX . && find . -type d -exec chmod g+s {} +; } 2>/dev/null; then
     log "Set repo checkout group ownership to gid $DOCKER_GID so the dashboard can self-update"
   else
     echo "warning: couldn't chgrp/chmod the repo checkout to gid ${DOCKER_GID} — the self-update panel will fail until you run:" >&2
-    echo "  sudo chgrp -R ${DOCKER_GID} $(pwd) && sudo chmod -R g+rwX $(pwd)" >&2
+    echo "  sudo chgrp -R ${DOCKER_GID} $(pwd) && sudo chmod -R g+rwX $(pwd) && sudo find $(pwd) -type d -exec chmod g+s {} +" >&2
   fi
 else
   echo "warning: /var/run/docker.sock not found — leaving DOCKER_GID as-is." >&2

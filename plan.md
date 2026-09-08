@@ -21172,3 +21172,33 @@ has cleared the same verified-gate a `dev` commit already required.
 Branching further off `dev` for isolation is fine — merges back into
 `dev`, never straight to `main`. `CLAUDE.md` updated to document this
 durably (`78cc084`, merged to `main` the same way).
+
+## 294. Repo checkout's group ownership wasn't durable — setgid fix (2026-09-08)
+
+Retrying the real self-update from §293 hit a new failure before even
+reaching `git fetch`: `POST /api/self-update/check` → `"error: cannot open
+'.git/FETCH_HEAD': Permission denied"`. `start.sh` already `chgrp -R
+$DOCKER_GID` + `chmod -R g+rwX`s the whole repo checkout on every run
+specifically so the backend container's `appuser` (in group `983`, not the
+host's `mat` user) can write to it — but that only fixes ownership *at the
+moment it runs*. Every `git pull`/`git checkout` since (mine, done directly
+on the host to keep the server's checkout in sync with pushes throughout
+this session) created new loose objects/refs under `.git` owned by the
+invoking user's own primary group (`mat`, gid 1000) — not 983 — silently
+reverting the fix. `docker exec homelab-management-backend-1 id` is
+misleading here: it defaults to root and says nothing about the actual
+running process, which really is `appuser` (`uid=100 gid=101`, group `983`
+via the `docker` group membership `start.sh` sets up) — confirmed via `ps`
+inside the container.
+
+Fixed by hand first (`sudo chgrp -R 983 .git && sudo chmod -R g+rwX .git`)
+to unblock immediately, then made it durable in code per this project's own
+rule: added the setgid bit (`find . -type d -exec chmod g+s {} +`) to
+`start.sh`'s existing chgrp step. setgid makes every *new* file or directory
+created under the repo checkout inherit group `983` automatically, from
+then on, regardless of which user creates it — closing the actual gap
+(one-time fix vs. every future write) rather than re-treating the symptom.
+Verified: re-ran `start.sh` live, confirmed `.git` is now `2775` group
+`docker`, confirmed a freshly-touched test file inside `.git` correctly
+inherited group `docker` despite being created by `mat`, and confirmed
+`POST /api/self-update/check` now succeeds.
