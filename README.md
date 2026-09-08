@@ -335,28 +335,16 @@ and proven on the real stack) are done. Phase tags below.
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
-- [ ] **@mat: prove the NPM loopback bind live** (§180, §210, §279) — the
-      code is done: NPM's `:80`/`:443` bind to `127.0.0.1` and the tunnel
-      origin (`getNpmOriginUrl` / `getNpmGrpcOriginUrl`) is `127.0.0.1` to
-      match. Unproven on the real stack, and it's estate-wide: the next
-      exposure reconcile repoints *every* ingress route to
-      `http://127.0.0.1:80` at once. Recreate `nginx-proxy-manager`, run a
-      reconcile, then confirm from a LAN machine that `curl -H 'Host:
-      <app>.<domain>' http://<host-lan-ip>/` now fails while
-      `https://<app>.<domain>` still works through the tunnel — and
-      specifically re-check NetBird's gRPC management API (the fragile
-      origin). **Unblocks §210.2/§210.3** once green: the LAN-direct path
-      is gated, so an app's own login becomes safely droppable in favour of
-      Authelia-only.
 - [ ] **Wire up the "trust the proxy" knobs the §210.2 audit found** (§216,
       §217) — twelve apps ship a real, upstream-supported way to stop
       showing their own login on top of Authelia's, the same shape as the
       already-fixed Dozzle/Guacamole:
-      - **Header/IP trust**: still open — File Browser (`auth.method=proxy` —
-        blocked on §180: its own login is the only gate on the sensitive
-        home-directory mount while the LAN can bypass Authelia) and Home
-        Assistant (`trusted_networks` — IP-based, weaker, wants the §180
-        decision first). Done: Stirling-PDF (shipped with
+      - **Header/IP trust**: still open — File Browser (`auth.method=proxy`)
+        and Home Assistant (`trusted_networks` — IP-based, weaker). The §180
+        LAN-bypass blocker on these is **now cleared** (§279 closed it live:
+        NPM's proxy ports are loopback-only, so there is no un-gated
+        LAN-direct path to drop a login in favour of), so both are buildable.
+        Done: Stirling-PDF (shipped with
         `SECURITY_ENABLELOGIN=false`), Uptime Kuma (`disableAuth` set by an
         idempotent init sidecar, §227), Paperless-ngx (`Remote-User` via
         `PAPERLESS_ENABLE_HTTP_REMOTE_USER`, §247), and **Nextcloud**

@@ -20319,24 +20319,38 @@ gateway). So:
 - Docs: `docs/ports.md` and `docs/webmaster.md` (the OnlyOffice section that
   documented the bypass) updated.
 
-### Not done here / still @mat
+### Proven live on tx-home-utils.com (§280 session)
 
-Not proven live — this is an exposure/networking change, so it does not ship
-until it is. The next exposure reconcile on `tx-home-utils.com` will repoint
-**every** ingress route from `http://10.201.0.1:80` to `http://127.0.0.1:80`;
-if the loopback bind hasn't taken (or cloudflared somehow isn't host-side on a
-given deployment) that 502s every public hostname at once. @mat: recreate
-`nginx-proxy-manager` to pick up the port change, run an exposure reconcile,
-then confirm from a LAN machine `curl -H 'Host: <app>.<domain>'
-http://<host-lan-ip>/` now fails (connection refused / no route) while the
-public `https://<app>.<domain>` still works — and specifically re-check
-NetBird's gRPC (management API through the tunnel), the historically fragile
-origin.
+Applied and verified end to end:
 
-Adjacent, not addressed: NPM's admin API on `0.0.0.0:10270` is itself a LAN
-surface (a past bug briefly served the admin UI on every hostname, §210.2).
-Left as-is — the backend needs it gateway-reachable and it is not an
-app-exposure path; a separate item if a deployment wants it locked down.
+1. Recreated `nginx-proxy-manager` — now binds `127.0.0.1:80` and
+   `127.0.0.1:443` (admin `10270` stays `0.0.0.0`). This opened the expected
+   estate-wide 502 window (origins still `10.201.0.1:80`).
+2. Ran `POST /api/services/<name>/exposure/verify` over all 33 primary
+   exposures (secondaries ride along) — every one `provisioned`, rolling the
+   origins to `http://127.0.0.1:80` (and `https://127.0.0.1:443` for NetBird's
+   gRPC secondary). Full recovery in ~2 min.
+3. Verification:
+   - **Bypass closed**: `curl -H 'Host: vaultwarden.tx-home-utils.com'
+     http://192.168.1.236/` → `000` (connection refused); `:443` likewise.
+   - **cloudflared's path intact**: same `curl` against `http://127.0.0.1/`
+     → 302.
+   - **All 34 public hostnames + the apex** serve through the tunnel —
+     200/302, zero 502s.
+   - **NetBird gRPC**: `POST …/management.ManagementService/GetServerKey`
+     with `content-type: application/grpc` → HTTP/2, **200**. The fragile
+     origin survived the IP move.
+   - NPM + CrowdSec bouncer healthy after the recreate (`[Crowdsec]
+     Initialisation done`).
+
+No code change in this session — `c9e158c` shipped it; this is the live proof
+the commit message said was still owed. README item removed.
+
+Adjacent, still not addressed: NPM's admin API on `0.0.0.0:10270` is itself a
+LAN surface (a past bug briefly served the admin UI on every hostname,
+§210.2). Left as-is — the backend reaches it via the bridge gateway and it is
+not an app-exposure path; a separate item if a deployment wants it locked
+down.
 
 ## 280. Live OIDC proof against tx-home-utils.com — 3 of 4 pass, Homebox blocked, Vikunja fixed (§270–§278)
 
@@ -20436,12 +20450,11 @@ Not yet fixed. Options, cheapest first:
 
 ### Still open after this session
 
-- **§279** (NPM proxy ports → loopback) — code committed (`c9e158c`), **not**
-  applied to the host. Held deliberately: it forces a rolling estate-wide 502
-  during the reconcile that repoints every origin to `127.0.0.1`, and CrowdSec
-  was already IP-blocking the browser mid-session (the `http-generic-401-bf`
-  scenario, from Authelia's redirect 401s — same trip as §278). Wants a calm
-  window.
+- **§279** (NPM proxy ports → loopback) — **applied and proven live later in
+  this same session** (see §279's "Proven live" subsection): NPM recreated on
+  the loopback bind, all 33 exposures reconciled to `127.0.0.1` origins,
+  bypass confirmed closed from the LAN, all 34 hostnames + apex still served
+  through the tunnel, NetBird gRPC still 200 over HTTP/2. README item removed.
 - The "disable the local login form" half of §216/§217 for Vikunja
   (`VIKUNJA_AUTH_LOCAL_ENABLED=false`), Mealie (`ALLOW_PASSWORD_LOGIN=false`),
   Immich (`IMMICH_PASSWORD_LOGIN_ENABLED=false`) — not toggled; the hard part
