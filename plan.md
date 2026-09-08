@@ -21250,3 +21250,26 @@ from unattended — this run needed a second manual recovery, just for a
 different reason (backend's own self-replacement, an inherently detached/
 unawaited step by the code's own design) than the first. README item
 updated to reflect exactly this.
+
+## 296. Fixed reconcileDanglingSelfUpdateRun's coverage gap (§295)
+
+`reconcileDanglingSelfUpdateRun` only recognized a run stuck in
+`restarting_backend` — the exact state §295's live run never reached
+(backend's own detached self-replacement was killed before writing that
+transition), leaving the run's DB row permanently "in progress" with no
+code path that would ever revisit it.
+
+Generalized it: any of the six non-terminal states now counts as
+potentially dangling, and instead of assuming a booting process always
+means "the self-update sequence's own restart worked" (only true for
+`restarting_backend` by construction), it compares the actually-running
+`git rev-parse HEAD` against the run's own `toCommit` — matches → `done`
+(the goal was reached, whatever actually got it there); doesn't match →
+`error` with an honest message, rather than sitting stuck forever either
+way. Two new tests cover both branches, reproducing §295's exact scenario
+(dangling in `restarting_frontend`, commit already matches) plus the
+never-completed case. 689/689 backend tests pass, typecheck clean.
+
+Not yet applied to the actual dangling row (`id=4`) on `tx-home-utils.com`
+— fixed at deploy time when this ships, or can be resolved by hand in the
+meantime.

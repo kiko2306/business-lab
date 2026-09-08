@@ -330,22 +330,78 @@ async function runSelfUpdateSequence(
  * otherwise the panel would have no way to distinguish "still restarting"
  * from "restarted fine" once it can reach the API again.
  */
+// Every state before the two terminal ones — a run stuck in any of these
+// when a new process boots is dangling, not just restarting_backend
+// (originally the only one recognized here; found live, plan.md §295, when
+// backend's own detached self-replacement was killed by something
+// unrelated — real memory pressure under that run's own build+all-apps
+// load spike — leaving the *earlier* restarting_frontend row stuck
+// forever with no code path that would ever touch it again).
+const DANGLING_STATES: readonly SelfUpdateRunState[] = [
+  'checking',
+  'pulling',
+  'building',
+  'updating_apps',
+  'restarting_frontend',
+  'restarting_backend',
+];
+
 export async function reconcileDanglingSelfUpdateRun(): Promise<void> {
   const latest = await getLatestRun();
-  if (!latest || latest.state !== 'restarting_backend') {
+  if (!latest || !DANGLING_STATES.includes(latest.state)) {
     return;
   }
-  await updateRun(latest.id, { state: 'done' });
-  logger.info('Self-update completed — backend restarted into the new build', {
+
+  // This process booting is evidence *something* restarted — but only for
+  // restarting_backend is that guaranteed to be the self-update sequence's
+  // own restart (plan.md §131.4's original design: that state means the
+  // detached final step, recreating this very container, was already
+  // issued). Any earlier stuck state could just as easily be an unrelated
+  // crash, a host reboot mid-run, or the backend swap finished by hand
+  // afterward (as happened live) rather than by self-update's own code —
+  // don't assume either way. Compare what commit is actually running
+  // against what this run was trying to reach instead of guessing.
+  let actualCommit: string | null = null;
+  try {
+    const repoRoot = requireRepoRoot();
+    actualCommit = (await runCommand('git', ['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
+  } catch (error) {
+    logger.warn('Could not read the current commit while reconciling a dangling self-update run', {
+      runId: latest.id,
+      error: (error as Error).message,
+    });
+  }
+
+  if (actualCommit && latest.toCommit && actualCommit === latest.toCommit) {
+    await updateRun(latest.id, { state: 'done', ...(latest.finishedAt ? {} : { finished: true }) });
+    logger.info('Self-update completed — running commit matches this run\'s target', {
+      runId: latest.id,
+      fromCommit: latest.fromCommit,
+      toCommit: latest.toCommit,
+    });
+    await writeAuditLog({
+      userId: null,
+      action: 'self_update_complete',
+      resource: latest.toCommit ?? undefined,
+      metadata: { fromCommit: latest.fromCommit, toCommit: latest.toCommit },
+    }).catch(() => {});
+    return;
+  }
+
+  const message =
+    'The process restarted before this self-update finished, and the commit now running does not match what this run was trying to reach — it did not complete.';
+  await updateRun(latest.id, { state: 'error', errorMessage: message, finished: true });
+  logger.warn('Self-update run left dangling and did not complete', {
     runId: latest.id,
-    fromCommit: latest.fromCommit,
+    state: latest.state,
     toCommit: latest.toCommit,
+    actualCommit,
   });
   await writeAuditLog({
     userId: null,
-    action: 'self_update_complete',
+    action: 'self_update_reconcile_failed',
     resource: latest.toCommit ?? undefined,
-    metadata: { fromCommit: latest.fromCommit, toCommit: latest.toCommit },
+    metadata: { state: latest.state, toCommit: latest.toCommit, actualCommit },
   }).catch(() => {});
 }
 

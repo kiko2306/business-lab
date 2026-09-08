@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.49.6] — 2026-09-08
+
+### Features & architecture
+
+- Fix reconcileDanglingSelfUpdateRun only recognizing a run stuck in restarting_backend: now compares the actually-running commit against any dangling run's target, closing the coverage gap that left an interrupted-earlier run stuck 'in progress' forever
+
 ## [0.49.5] — 2026-09-08
 
 ### Features & architecture

@@ -257,4 +257,47 @@ describe('reconcileDanglingSelfUpdateRun', () => {
     const status = await getSelfUpdateStatus();
     expect(status.latestRun?.state).toBe('done');
   });
+
+  it('completes a row dangling in an earlier state (e.g. restarting_frontend) when the running commit already matches', async () => {
+    // Reproduces plan.md §295 live: backend's own detached self-replacement
+    // was killed by something unrelated before it ever reached
+    // restarting_backend, but the target commit was already running by the
+    // time this process (or a human) got things going again.
+    mockAnUpdateFrom('old111', 'new222', 1);
+    await triggerSelfUpdate(7);
+    await flush();
+    db.rows[db.rows.length - 1].state = 'restarting_frontend';
+
+    await reconcileDanglingSelfUpdateRun();
+
+    expect(audit.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'self_update_complete', metadata: { fromCommit: 'old111', toCommit: 'new222' } })
+    );
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun?.state).toBe('done');
+  });
+
+  it('marks a dangling run as failed rather than leaving it stuck when the running commit never reached the target', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1);
+    await triggerSelfUpdate(7);
+    await flush();
+    const row = db.rows[db.rows.length - 1];
+    row.state = 'restarting_frontend';
+    // Simulate the process that boots afterward never actually landing on
+    // the target commit (crashed and came back on the old one, a host
+    // reboot, etc.) — HEAD stays at the pre-update commit.
+    backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args.includes('rev-parse') && args.includes('HEAD')) return 'old111\n';
+      return '';
+    });
+
+    await reconcileDanglingSelfUpdateRun();
+
+    expect(audit.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ action: 'self_update_reconcile_failed' })
+    );
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun?.state).toBe('error');
+    expect(status.latestRun?.errorMessage).toMatch(/did not complete/);
+  });
 });
