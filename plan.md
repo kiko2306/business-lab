@@ -19126,312 +19126,90 @@ the other "prove SSO live" items. The `#5012` caveat from §238 (Mealie sends
 page HTML to the AI even when the fetch failed) still stands and isn't ours
 to fix.
 
-## 263. §121 SQL Server Express — build plan (batch of §263a–§263e)
+## 263. SQL Server Express — added and proven live (former §263–§263f, compacted 2026-09-08)
 
-§121.5 cleared the licence (setup-and-maintenance model via the §2.b.iv
-hosting exception + a first-start acceptance gate; High Risk Use excluded).
-This section sequences the build; each sub-item lands as its own commit.
+Built over a §263a–§263f batch (2026-09-07) and proven end to end against
+`tx-home-utils.com` on 2026-09-08. §121.5 had cleared the licence
+(setup-and-maintenance model via the §2.b.iv hosting exception + a first-start
+human acceptance gate; No High Risk Use; x86-64 only; AS-IS). Closed — code,
+unit tests and one live E2E run are the record now.
 
-Host is `x86_64`, so the live proof (§263f) can run on `tx-home-utils.com`.
+### What shipped
 
-- **§263a — `apps/mssql/` skeleton + registry entry.** Compose
-  (`mcr.microsoft.com/mssql/server:2022-latest`, `MSSQL_PID=Express`,
-  `TZ`, LAN-only host port per `docs/ports.md`). **No `ACCEPT_EULA` in the
-  compose or `.env.example`** — the gate (§263d) writes `ACCEPT_EULA=Y` into
-  `.env` on acceptance, and without it the container exits on its own, so
-  landing this first is safe. `services.ts` entry: x86-64 platform guard,
-  mandatory `homepage.*` labels (group "Data", no `homepage.href` — no web
-  UI), `hiddenGeneratedSecrets: ['MSSQL_SA_PASSWORD']`, `lanOnly`,
-  `backup.engine: 'mssql'` (wired in §263c). Health check `sqlcmd -Q "SELECT
-  1"`.
-- **§263b — MSSQL-compliant secret generator.** The generator is plain
-  `crypto.randomBytes(32).toString('hex')` in three places in `appEnv.ts`
-  (lines ~169, ~272, ~347) — lower+digit only, 2 of 4 char classes. MSSQL's
-  SA password policy needs 3 of 4 of upper/lower/digit/symbol (MS docs). And
-  the APP_KEY `base64:` special-case currently only guards one of the three
-  sites (latent bug — a Laravel app whose APP_KEY is filled on config save,
-  not pre-start, gets plain hex). Fix both: extract one
-  `generateSecretFor(key)` helper, fold in APP_KEY, add an `MSSQL_`-prefix
-  branch that appends a fixed `Aa1!`-shape suffix so 4 classes are
-  guaranteed within the 8–128 length bound.
-- **§263c — `mssql` backup engine.** The backup system has
-  `postgres`/`mysql`/`sqlite` engines, no `mssql`. Add one:
-  `sqlcmd -Q "BACKUP DATABASE [<db>] TO DISK='…/<db>.bak' WITH …"` per
-  database into the app's backup dir, restore via `RESTORE DATABASE`. Follow
-  the existing engine shape (dump function + restore function + registry
-  `backup.engine` dispatch). Tests cover the command construction, not
-  sqlcmd.
-- **§263d — EULA acceptance gate.** First app in `apps/` needing one (all
-  others OSS). `settings` row `mssql_eula_accepted` = `{acceptedBy, acceptedAt}`.
-  Start-path guard: `mssql` start refused (dashboard button disabled + API
-  400 with the licence link) until accepted; on acceptance the backend writes
-  `ACCEPT_EULA=Y` to `apps/mssql/.env`. `GET /api/settings/mssql-eula`
-  (`{accepted, acceptedBy, acceptedAt}`), `POST /api/settings/mssql-eula`
-  (records acceptance, audit-logged). Frontend: a modal on the mssql card
-  showing the §121.5 constraints (No High Risk Use, x86-64 only, Express
-  limits, telemetry, AS-IS) + a link to the MS terms + a required tick
-  ("I have a valid and existing SQL Server licence and accept these terms"),
-  then the Start button unlocks.
-- **§263e — docs.** `docs/ports.md` (the allocated port), `docs/app-credentials.md`
-  (SA account, generated password, the acceptance gate), `docs/licences.md`
-  (app row + `mcr.microsoft.com/mssql/server` image row — the §121.5
-  verdict), `docs/raspberry-pi.md` (no arm64 image, registry guard blocks it).
-- **§263f — live proof (@mat / agent).** Accept the EULA in the UI, start
-  `mssql`, create a DB, run a backup/restore round-trip, confirm the SA
-  password satisfies MSSQL's policy on first boot.
+- **`apps/mssql/`** — `mcr.microsoft.com/mssql/server:2022-latest`,
+  `MSSQL_PID=Express`, LAN-only host port `10540:1433`, a `mssql-init` busybox
+  that chowns `./data` to uid 10001 (the 2022 image runs non-root).
+  **`ACCEPT_EULA` is not in the compose or `.env.example`** — nothing sets it
+  until the gate does, and the container exits without it, so that is the
+  safe default.
+- **`services.ts`** — `mssql`: `category: 'Development'`, `lanOnly`,
+  `x86Only` (new field), `hiddenGeneratedSecrets: ['MSSQL_SA_PASSWORD']`,
+  `backup: { engine: 'mssql', service: 'mssql' }` (the server backs *itself*
+  up), `homepage.group=Data` labels. New `x86Only` +
+  `assertPlatformSupported` in `executor.ts` (409 on a non-`x64` host,
+  before `assertDependenciesRunning`).
+- **`appEnv.ts` — `generateSecretFor(key)`.** The inline
+  `randomBytes(32).toString('hex')` was duplicated at three sites and the
+  Laravel `APP_KEY` `base64:` special-case guarded only one (a latent bug:
+  an APP_KEY filled on save, not before start, got plain hex). Consolidated
+  into one exported helper: `*_APP_KEY` → `base64:<32 bytes>` (now all
+  paths); `MSSQL_*` → `<48 hex>Aa1_` — 52 chars, 4 character classes, `_` as
+  the symbol because it is safe in `.env` and every shell we build
+  healthcheck/backup commands with; everything else → 64 hex, unchanged.
+  SQL Server's `sa` policy needs 3 of 4 of upper/lower/digit/symbol, so plain
+  hex would have boot-looped the container.
+- **`mssql` backup engine (`appDumps.ts`).** SQL Server has no `pg_dump`-style
+  stdout dump, so the text-dump pattern the other engines use does not apply.
+  Instead: a throwaway `sqlcmd` container (**no volume mount**) issues a
+  server-side `BACKUP DATABASE` over
+  `sys.databases WHERE database_id > 4 AND state = 0` into the server's own
+  bind-mounted `_dump/` dir; restore is one `RESTORE DATABASE [db] FROM DISK
+  … WITH REPLACE;` per `.bak` (same image ⇒ paths match ⇒ no `MOVE`). No
+  `WITH COMPRESSION` (Express lacks it). `backup.engine` / `DumpOutcome.kind`
+  gained `'mssql'`.
+- **`ensureMssqlDumpDir` is a docker shell-out, not `fs.mkdirSync`** (0.41.1
+  fix). The `mssql-init` chown to uid 10001 locks the backend (also non-root
+  in its container) out of creating `_dump/` — Postgres/MySQL don't hit this
+  because their data dirs stay backend-owned. Fix: a root busybox does
+  `mkdir -p _dump && chown 10001:0 _dump && rm -f _dump/*.bak`, and a second
+  busybox `chmod -R a+rX _dump` after the BACKUP makes the 0640/uid-10001
+  `.bak` files readable so the file archive picks them up. The fs-based unit
+  tests were dropped (the helper is now a shell-out like the rest of the
+  dump/restore paths).
+- **EULA gate (`services/mssqlEula.ts`).** `mssql_eula_accepted` settings row
+  (`{acceptedAt, acceptedByUserId, acceptedByName}`);
+  `recordMssqlEulaAcceptance` also writes `ACCEPT_EULA=Y` to
+  `apps/mssql/.env`; `assertMssqlEulaAccepted` throws 409 for `mssql` until
+  accepted, called in `startService` after `assertPlatformSupported`. Routes
+  `GET`/`POST /settings/mssql-eula` under `settings:manage`. Frontend: a
+  "SQL Server licence" panel on Settings (the §255 Claude-key-panel shape) —
+  the §121.5 constraints, a link to the MS terms, a required "I have a valid
+  licence and accept" tick. **A Settings panel, not a modal on the Start
+  button** — reuses an existing pattern and keeps the executor guard a
+  simple yes/no; the start-failure message points there.
+- **Docs** — `docs/ports.md` (`10540`), `docs/app-credentials.md` (SA
+  account, generated password, the gate), `docs/licences.md` (app row —
+  Microsoft Software Licence Terms, ⚠️ Condition, the §121.5 verdict — plus
+  an image row for the server image noting the bundled `mssql-tools18` the
+  healthcheck and backup engine use), `docs/raspberry-pi.md` (no arm64;
+  registry `x86Only` refuses the start).
 
-## 263a. §121 SQL Server Express — app skeleton + registry entry
+### Proven live (tx-home-utils.com, 0.41.x, as `mat`/webmaster)
 
-First of the §263 batch. Lands the app so the later parts have something to
-attach to; it deliberately can't start yet.
+`POST /services/mssql/start` before acceptance → **409** with the licence
+message; `POST /settings/mssql-eula {accept:true}` recorded the acceptance and
+wrote `ACCEPT_EULA=Y`; start after → 200, container healthy in ~10 s; the
+generated SA password (`…Aa1_`, 52 chars) was accepted by SQL Server on first
+boot; `POST /services/mssql/backup` built an archive with manifest
+`engine: mssql`; delete-all-rows → restore from `_dump/` brought every row
+back. All green after the 0.41.1 `ensureMssqlDumpDir` fix (found in this run).
 
-- **`apps/mssql/docker-compose.yml`** — `mcr.microsoft.com/mssql/server:2022-latest`,
-  `MSSQL_PID=Express`, host port `${MSSQL_PORT:-10540}:1433` (LAN only —
-  §121.4). `ACCEPT_EULA` is passed through from `.env` (`${ACCEPT_EULA:-}`)
-  and **nothing sets it** — the §263d gate writes `ACCEPT_EULA=Y` on
-  acceptance, and until then the container exits, which is the intended
-  safety. A `mssql-init` busybox chowns `./data` to uid 10001 (the 2022
-  image runs non-root) — same pattern as `n8n-init`. Healthcheck via
-  `sqlcmd18 -C -Q 'SELECT 1'`.
-- **`apps/mssql/.env.example`** — `MSSQL_PORT`, blank `MSSQL_SA_PASSWORD`
-  (generated), blank `ACCEPT_EULA` with the "leave blank" note.
-- **`services.ts`** — `mssql` entry: `category: 'Development'`, `icon:
-  'database'` (new emoji `🗄️` in the frontend map), `lanOnly: true`,
-  `x86Only: true`, `hiddenGeneratedSecrets: ['MSSQL_SA_PASSWORD']`. No
-  `exposureEnvKeys`. `homepage.group=Data` label (§121.2) — a dead label for
-  a `lanOnly` app, but the registry test still requires name/group.
-- **`x86Only` (new `ServiceDefinition` field) + `assertPlatformSupported`** in
-  `executor.ts`, called in `startService` before `assertDependenciesRunning`:
-  refuses an x86-only app on a non-`x64` host with a clear message instead of
-  a cryptic `compose up` manifest error. `arch` param is injectable for the
-  test.
-- `docs/ports.md` — `10540` row.
-- Tests: `services.test.ts` (mssql is lanOnly/x86Only/hidden-SA, and its
-  compose never sets `ACCEPT_EULA=Y`; the `lanOnly` allowlist now expects
-  `['mssql','samba']`), `executor.test.ts` (`assertPlatformSupported` blocks
-  arm64, allows x64, ignores unconstrained apps). Backend 620 pass, frontend
-  50 pass + build clean.
-
-Not done here: the compliant password generator (§263b — right now
-`MSSQL_SA_PASSWORD` would be plain hex, which fails MS's 3-of-4-classes
-policy), the `mssql` backup engine (§263c), the EULA gate (§263d), docs rows
-(§263e), live proof (§263f).
-
-## 263b. §121 SQL Server Express — SQL-Server-compliant secret generator
-
-Second of the §263 batch. Before this, `MSSQL_SA_PASSWORD` would have been
-generated as `crypto.randomBytes(32).toString('hex')` — lowercase + digits
-only, two of the four character classes SQL Server's `sa` policy needs (8–128
-chars, 3 of 4 of upper/lower/digit/symbol), so the container would refuse to
-start.
-
-`appEnv.ts` had this generation inline in **three** places (the config-panel
-suggestion, the hidden-secret fill on save, and `ensureGeneratedSecrets`
-before start), and the Laravel `APP_KEY` `base64:` special-case guarded only
-one of the three — a latent bug where an APP_KEY filled on save rather than
-before start would get plain hex and 500 the app.
-
-Consolidated all three into one exported `generateSecretFor(key)`:
-- `*_APP_KEY` → `base64:<32 random bytes>` (moved here, now covers all paths);
-- `MSSQL_*` → `<48 hex chars>Aa1_` — the hex gives lower+digit, the fixed
-  suffix adds upper + symbol, so 4 of 4 classes, 52 chars, within bounds. `_`
-  chosen as the symbol because it's safe in `.env` and every shell we build
-  healthcheck/backup commands with; most other symbols aren't.
-- everything else → 64 hex chars, unchanged.
-
-Tests: `appEnv.test.ts` gains a `generateSecretFor` block (hex shape,
-APP_KEY 32-byte decode, MSSQL 3-of-4-classes + length bounds). Backend 623
-pass, typecheck clean.
-
-Next: §263c (`mssql` backup engine).
-
-## 263c. §121 SQL Server Express — mssql backup engine
-
-Third of the §263 batch. SQL Server has no stdout dump tool (no `pg_dump`
-equivalent), so the pattern the other engines use — capture a text dump on
-stdout, `commitDump` it, replay with the client — doesn't apply. Instead:
-
-- **Dump** (`dumpServerDatabase`, `engine === 'mssql'` branch): a throwaway
-  container on the running server's image + network runs
-  `/opt/mssql-tools18/bin/sqlcmd` (bundled in `mssql/server` since 2022 CU14;
-  not on PATH) with one T-SQL batch that cursors over
-  `sys.databases WHERE database_id > 4 AND state = 0` and
-  `BACKUP DATABASE @n TO DISK = N'/var/opt/mssql/_dump/<n>.bak' WITH INIT,
-  FORMAT`. The BACKUP runs **server-side**, writing into the server's own
-  bind-mounted `_dump` dir — so no volume mount on the throwaway container.
-  `ensureMssqlDumpDir` creates `apps/mssql/data/_dump/`, `chown`s it to uid
-  10001 (the non-root mssql user, best-effort — the backend is
-  root-equivalent), and clears stale `.bak`s so the dir mirrors the current
-  database set. The file backup then sweeps `_dump/` like every other app's.
-  No `WITH COMPRESSION` — Express doesn't support it.
-- **Restore** (`restoreServerDatabase`, mssql branch): reads the `.bak`
-  filenames from `_dump/`, derives database names, and issues one
-  `RESTORE DATABASE [db] FROM DISK = N'…/<db>.bak' WITH REPLACE;` per file in
-  a single `sqlcmd -Q`. Same image ⇒ data/log paths match ⇒ no `MOVE`.
-- Types: `backup.engine` and `DumpOutcome.kind` gain `'mssql'`; the registry
-  entry gets `backup: { engine: 'mssql', service: 'mssql' }` (the server
-  backs *itself* up, so `service` is the app's own container). The
-  registry-wide "runs a DB image ⇒ declares a dump" test's image regex now
-  includes `mssql/server`.
-
-Tests: `ensureMssqlDumpDir` (creates the dir, clears stale `.bak`, leaves
-other files) and the registry assertion. The `sqlcmd`/`docker run` paths
-aren't unit-tested — same as the Postgres/MySQL engines, which are live-proof
-only; §263f covers the round-trip. Backend 626 pass, typecheck clean.
-
-Next: §263d (EULA acceptance gate).
-
-## 263d. §121 SQL Server Express — EULA acceptance gate
-
-Fourth of the §263 batch, and the reason SQL Server needs more than a normal
-app addition: §121.5's licence clearance depends on an *active human
-acceptance* asserting a valid licence, so `ACCEPT_EULA=Y` must never be set
-by the backend on its own.
-
-- **`services/mssqlEula.ts`** — `getMssqlEulaAcceptance()` reads the
-  `mssql_eula_accepted` settings row (`{acceptedAt, acceptedByUserId,
-  acceptedByName}`, JSON); `recordMssqlEulaAcceptance(userId, name)` writes
-  that row **and** `saveServiceEnv('mssql', { ACCEPT_EULA: 'Y' })`;
-  `assertMssqlEulaAccepted(serviceName)` throws 409 for `mssql` until it's
-  accepted, no-op otherwise.
-- **`executor.ts`** — `await assertMssqlEulaAccepted(serviceName)` in
-  `startService`, right after `assertPlatformSupported`. So the dashboard's
-  Start returns a clear "accept the licence in Settings" message instead of a
-  container that boot-loops.
-- **`routes/settings.ts`** — `GET /settings/mssql-eula`
-  (`{accepted, acceptance}`) and `POST /settings/mssql-eula` (`{accept:
-  true}` → record + audit). Both under the existing `settings:manage`
-  capability. Validation: `mssqlEulaAccept` (`accept` must be literally
-  `true`).
-- **Frontend** — a "SQL Server licence" `<app-panel>` on Settings (the §255
-  Claude-key-panel shape): the §121.5 constraints (No High Risk Use, x86-64
-  only, Express limits, telemetry/AS-IS), a link to the MS terms, a required
-  "I have a valid licence and accept" checkbox, and an Accept button. Once
-  accepted it shows who/when instead. `MssqlEulaStatus` model + two
-  `SettingsService` methods.
-
-Deliberately a Settings panel, not a modal wired into the Start button: it
-reuses an existing pattern, keeps the executor guard a simple yes/no, and the
-start-failure message points here.
-
-Tests: `mssqlEula.test.ts` (7) — parse/round-trip of the stored acceptance,
-`recordMssqlEulaAcceptance` writes the row + `ACCEPT_EULA=Y`,
-`assertMssqlEulaAccepted` 409s only for an unaccepted `mssql`. Backend 633
-pass, frontend 50 pass + build clean.
-
-Next: §263e (docs rows).
-
-## 263e. §121 SQL Server Express — docs rows
-
-Last of the §263 code batch (docs-only, no version bump).
-
-- `docs/ports.md` — `10540` row (added in §263a).
-- `docs/app-credentials.md` — `SQL Server (mssql)` row: LAN-only, no UI,
-  won't start until the licence is accepted in Settings, generated `sa`
-  password in `apps/mssql/.env`, port 10540, the No-High-Risk-Use limit,
-  x86-64 only.
-- `docs/licences.md` — app-table row (**Microsoft Software Licence Terms**,
-  ⚠️ Condition) carrying the §121.5 verdict (cleared via the §2.b.iv hosting
-  exception + first-start acceptance; §6 third-party-transfer bar avoided by
-  the client accepting the EULA themselves; No High Risk Use; x86-64;
-  telemetry; AS-IS), plus an infrastructure-images row for
-  `mcr.microsoft.com/mssql/server:2022-latest` (notes the bundled
-  `mssql-tools18` used by the healthcheck and backup engine). `busybox`
-  already had a row for the init sidecar.
-- `docs/raspberry-pi.md` — `mssql` row in the compatibility table: **no**
-  arm64/armv7, registry `x86Only`, dashboard refuses the start.
-
-§263a–e complete — the whole SQL Server build is in. Only §263f (live proof)
-remains, and it needs the host.
-
-## 263f. §121 SQL Server Express — live proof (mechanics proven; dashboard glue pending a redeploy)
-
-Ran the proof against `tx-home-utils.com`. **The deployed management stack is
-on 0.26.0** — none of §255–§263 is running there — so the dashboard
-integration (registry entry, `/settings/mssql-eula` routes, the executor
-`assertMssqlEulaAccepted` / `assertPlatformSupported` guards, the Settings
-panel) can't be exercised until the stack is rebuilt to 0.41.0. That's the
-§131.4 self-update walk / a manual `backend`+`frontend` recreate — its own
-@mat item, not done here.
-
-**What was proven live**, with a throwaway `mcr.microsoft.com/mssql/server:2022-latest`
-stack from `apps/mssql/docker-compose.yml` (scratchpad, torn down after):
-
-- **Container comes up healthy in ~10 s** with `ACCEPT_EULA=Y` + an
-  `MSSQL_SA_PASSWORD` of the exact shape `generateSecretFor` emits
-  (`<48 hex>Aa1_`, 52 chars, 4 character classes). SQL Server accepted the
-  password on first boot — so §263b's generator satisfies the `sa` policy
-  (a non-compliant password makes the container exit, so a healthy container
-  *is* the proof).
-- **Healthcheck works** — `/opt/mssql-tools18/bin/sqlcmd -C … -Q 'SELECT 1'`
-  succeeds, confirming §263a's assumption that the server image bundles
-  `mssql-tools18` at that path and that `-C` is required.
-- **`mssql-init` chown** — busybox `chown -R 10001:0 /data` exits 0; the
-  server (uid 10001) then writes its data files fine.
-- **Backup/restore round-trip** — created `proofdb` with two rows, ran the
-  literal `MSSQL_BACKUP_TSQL` from `appDumps.ts` via a throwaway sqlcmd
-  container **with no volume mount** (BACKUP runs server-side, writing into
-  the server's own `/var/opt/mssql/_dump` bind) → `proofdb.bak` (3.2 MB)
-  appeared on the host. Deleted all rows, ran the restore statement
-  (`RESTORE DATABASE [proofdb] FROM DISK = N'…/_dump/proofdb.bak' WITH
-  REPLACE;`) → both rows back. So §263c's dump and restore SQL are correct.
-
-**Still unproven (needs the 0.41.0 redeploy):** the EULA gate actually
-blocking a start from the dashboard; the acceptance POST writing
-`ACCEPT_EULA=Y` into `apps/mssql/.env`; `ensureMssqlDumpDir`'s `chownSync`
-running as the backend's uid; the `x86Only` guard's 409. These are covered by
-unit tests; the live confirmation rides on whenever the management stack is
-next updated.
-
-## 263f (cont.). Full dashboard E2E — one bug found and fixed
-
-Rebuilt `backend`+`frontend` to 0.41.0 on `tx-home-utils.com` (recreated
-individually — no `down` of the management stack) and drove the whole flow
-through the real API as `mat` (webmaster):
-
-| Step | Result |
-|---|---|
-| `mssql` in the registry | ✅ shows as SQL Server / Development / stopped |
-| `GET /settings/mssql-eula` before | ✅ `{accepted:false, acceptance:null}` |
-| `POST /services/mssql/start` before accepting | ✅ **409** with the "accept the terms" message |
-| `POST /settings/mssql-eula {accept:true}` | ✅ recorded `{acceptedByUserId:1, acceptedByName:"mat", acceptedAt}` |
-| `POST /services/mssql/start` after | ✅ 200; container healthy in ~10 s |
-| generated SA password | ✅ `…Aa1_`, 52 chars, 4 character classes — accepted by SQL Server on first boot |
-| `ACCEPT_EULA` in the container env | ✅ `Y` (written to `apps/mssql/.env` by `recordMssqlEulaAcceptance`) |
-| `POST /backups/dump-apps` | ⛔→✅ (see bug) |
-| `POST /services/mssql/backup` | ✅ archive built, manifest `engine: mssql`, 1 dump, 0 failures |
-| delete all rows → `POST /services/mssql/backup/restore` | ✅ `restored 1 database(s) from _dump/`, all 3 rows back |
-
-### Bug: the backend can't create `apps/mssql/data/_dump/`
-
-`dump-apps` first reported `mssql` failed with `EACCES: mkdir
-'.../apps/mssql/data/_dump'`. Cause: `mssql-init` `chown -R 10001:0`s the
-whole data dir so SQL Server (non-root, uid 10001) can write it — which locks
-the **backend** (also non-root in its container) out of creating `_dump`
-there. The Postgres/MySQL engines don't hit this because those apps' data
-dirs stay backend-owned.
-
-Fix (0.41.1, `appDumps.ts`): `ensureMssqlDumpDir` no longer does `fs.mkdirSync`
-— it runs a throwaway **root busybox** on the same bind mount to
-`mkdir -p _dump && chown 10001:0 _dump && rm -f _dump/*.bak`, matching the
-"throwaway container, not `docker exec`" pattern already in the file. And
-after the BACKUP, a second busybox `chmod -R a+rX _dump` makes the `.bak`
-files (SQL Server writes them 0640/uid-10001) readable by the backend so the
-file archive can pick them up. The two fs-based `ensureMssqlDumpDir` unit
-tests were dropped (the helper is now a docker shell-out, like the rest of
-the dump/restore paths, which are live-proof only).
-
-Re-ran the whole table above after the fix — all green.
-
-### State left on the host
-
-`mssql` is stopped, its `data/` removed, the test archive deleted, `shopdemo`
-dropped. The `mssql_eula_accepted` settings row and `apps/mssql/.env`
-(`ACCEPT_EULA=Y` + generated SA password) are left in place — that's the
-correct post-acceptance state for a box whose owner accepted the licence. The
-management stack is now on 0.41.x (was 0.26.0); **`.env` still lacks
-`REPO_ROOT`** (passed inline for the rebuild) — the §131.4 self-update infra
-item still stands.
+State left on the host: `mssql` stopped, its `data/` removed, the test archive
+and `shopdemo` gone; the `mssql_eula_accepted` row and `apps/mssql/.env`
+(`ACCEPT_EULA=Y` + generated SA password) left in place — the correct
+post-acceptance state for a box whose owner accepted the licence. (This run
+also surfaced that the live `.env` lacks `REPO_ROOT`; that is the §131.4
+self-update infra item, not SQL-Server-specific.)
 
 ## 264. MeshCentral added (§62.2 — §84 phase P6)
 
