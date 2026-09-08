@@ -20990,3 +20990,28 @@ exposure enabled and provisioned (`netbird-vpn.tx-home-utils.com` → 302,
 endpoint hit with a plain GET, not an error). Not tested: an actual client
 completing a peer connection — no second device set up as a NetBird peer
 in this session; that's a real end-to-end client test for @mat to try.
+
+## 290. Self-update panel live proof — in progress (2026-09-08)
+
+Picked up the README's "@mat: apply the self-update panel's infra changes
+and prove it live" item (§131.4, §198, §199). The infra half turned out to
+already be live: today's fresh redeploy (§283) used the current repo,
+which already carries §198's changes (`REPO_ROOT` mount, `git` in the
+backend image, `BUILD: 1` on `docker-socket-proxy`) — confirmed directly
+against the running containers rather than assumed:
+
+- `docker inspect homelab-management-backend-1`'s mounts include
+  `/home/mat/www/homelab-management -> /home/mat/www/homelab-management`
+  (`REPO_ROOT`, matching `.env`).
+- `docker exec ... which git` → `/usr/bin/git`.
+- `docker inspect homelab-management-docker-socket-proxy-1`'s env includes
+  `BUILD=1`.
+
+What's left is the actual live proof the README item asks for: trigger a
+real self-update through the dashboard (not a no-op — this session has
+been keeping the server's git checkout manually synced after every push,
+so `commitsBehind` reads 0 right now) and confirm the whole walk end to
+end, plus that a `user`-role account gets 403 and no `/updates` nav entry.
+This commit is deliberately the trigger for that real test: pushed without
+first `git pull`-ing it onto the server by hand, so the self-update panel
+has to do the fetch → pull → build → restart itself.
