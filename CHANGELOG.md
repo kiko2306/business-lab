@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.49.2] — 2026-09-08
+
+### Exposure
+
+- Fix Authelia crash-looping when the first app's exposure is enabled on a fresh deploy: the access_control generator could emit default_policy: deny with zero rules, which Authelia itself refuses to load
+
 ## [0.49.1] — 2026-09-08
 
 ### Exposure

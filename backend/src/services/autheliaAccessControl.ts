@@ -22,7 +22,7 @@ import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
 import { resolveComposeFile } from '../config/services';
-import { getExposureConfig } from '../utils/exposureSettings';
+import { EXPOSURE_SETTINGS_KEYS } from '../utils/exposureSettings';
 import { getAppAccessOptions } from './userAppAccess';
 import { appGroupName } from './autheliaSync';
 import { getUsersDatabasePath } from './autheliaUsers';
@@ -80,8 +80,19 @@ async function getPortalDomain(): Promise<string | null> {
   if (row.rows[0]?.hostname) {
     return row.rows[0].hostname;
   }
-  const config = await getExposureConfig();
-  return config?.baseDomain ? `authelia.${config.baseDomain}` : null;
+  // Deliberately reads just the base domain rather than going through
+  // getExposureConfig(), which also requires NPM/Cloudflare credentials —
+  // Authelia's own portal hostname doesn't need either of those, and on a
+  // fresh deploy this fallback is exactly what runs before NPM's admin
+  // account has been bootstrapped (§283/§284's redeploy hit this: gating on
+  // full config completeness meant this returned null with zero gated apps,
+  // which renderAccessControl below turned into an unloadable
+  // default_policy: deny + empty rules — Authelia refuses to boot on that).
+  const baseDomainRow = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [
+    EXPOSURE_SETTINGS_KEYS.baseDomain,
+  ]);
+  const baseDomain = baseDomainRow.rows[0]?.value;
+  return baseDomain ? `authelia.${baseDomain}` : null;
 }
 
 /**
@@ -138,6 +149,18 @@ export async function syncAutheliaAccessControl(trigger: string): Promise<Access
   }
 
   const [portalDomain, gated] = await Promise.all([getPortalDomain(), getGatedApps()]);
+
+  // A `default_policy: deny` block needs at least one rule — Authelia's own
+  // schema validation refuses to boot otherwise ("must be 'two_factor' or
+  // 'one_factor'" when rules is empty). portalDomain being null here (base
+  // domain not resolvable yet) with no gated apps would render exactly that
+  // unloadable block. Skip the write rather than crash-loop the service
+  // this generator's own restart is about to trigger.
+  if (!portalDomain && gated.length === 0) {
+    logger.warn(`Authelia access_control (${trigger}): base domain not resolvable and no apps gated yet — skipping write to avoid an unloadable default_policy: deny with zero rules`);
+    return { changed: false, restarted: false, ruleCount: 0 };
+  }
+
   const block = renderAccessControl(portalDomain, gated);
 
   const current = fs.readFileSync(configPath, 'utf8');
