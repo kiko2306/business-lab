@@ -90,48 +90,49 @@
       <form [formGroup]="exposureForm" (ngSubmit)="saveExposure()">
         <div class="row g-3">
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Base domain</label>
-            <input class="form-control" placeholder="example.com" formControlName="baseDomain" />
+            <label class="form-label fw-semibold" for="exposureBaseDomain">Base domain</label>
+            <input id="exposureBaseDomain" class="form-control" placeholder="example.com" formControlName="baseDomain" />
             <div *ngIf="exposureValidationMessage('baseDomain', 'Base domain')" class="text-danger small mt-2">
               {{ exposureValidationMessage('baseDomain', 'Base domain') }}
             </div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Cloudflare Tunnel ID</label>
-            <input class="form-control" formControlName="cloudflareTunnelId" />
+            <label class="form-label fw-semibold" for="exposureCloudflareTunnelId">Cloudflare Tunnel ID</label>
+            <input id="exposureCloudflareTunnelId" class="form-control" formControlName="cloudflareTunnelId" />
             <div *ngIf="exposureValidationMessage('cloudflareTunnelId', 'Cloudflare Tunnel ID')" class="text-danger small mt-2">
               {{ exposureValidationMessage('cloudflareTunnelId', 'Cloudflare Tunnel ID') }}
             </div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Cloudflare account ID</label>
-            <input class="form-control" formControlName="cloudflareAccountId" />
+            <label class="form-label fw-semibold" for="exposureCloudflareAccountId">Cloudflare account ID</label>
+            <input id="exposureCloudflareAccountId" class="form-control" formControlName="cloudflareAccountId" />
             <div *ngIf="exposureValidationMessage('cloudflareAccountId', 'Cloudflare account ID')" class="text-danger small mt-2">
               {{ exposureValidationMessage('cloudflareAccountId', 'Cloudflare account ID') }}
             </div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Cloudflare zone ID</label>
-            <input class="form-control" formControlName="cloudflareZoneId" />
+            <label class="form-label fw-semibold" for="exposureCloudflareZoneId">Cloudflare zone ID</label>
+            <input id="exposureCloudflareZoneId" class="form-control" formControlName="cloudflareZoneId" />
             <div *ngIf="exposureValidationMessage('cloudflareZoneId', 'Cloudflare zone ID')" class="text-danger small mt-2">
               {{ exposureValidationMessage('cloudflareZoneId', 'Cloudflare zone ID') }}
             </div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Nginx Proxy Manager URL</label>
-            <input class="form-control" [value]="exposureSettings?.npmApiUrl ?? ''" readonly disabled />
+            <label class="form-label fw-semibold" for="exposureNpmApiUrl">Nginx Proxy Manager URL</label>
+            <input id="exposureNpmApiUrl" class="form-control" [value]="exposureSettings?.npmApiUrl ?? ''" readonly disabled />
             <div class="form-text">Derived from the Docker bridge gateway and NPM's admin port — not editable (plan.md §252).</div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Nginx Proxy Manager admin email</label>
-            <input class="form-control" type="email" formControlName="npmEmail" />
+            <label class="form-label fw-semibold" for="exposureNpmEmail">Nginx Proxy Manager admin email</label>
+            <input id="exposureNpmEmail" class="form-control" type="email" formControlName="npmEmail" />
             <div *ngIf="exposureValidationMessage('npmEmail', 'Nginx Proxy Manager admin email')" class="text-danger small mt-2">
               {{ exposureValidationMessage('npmEmail', 'Nginx Proxy Manager admin email') }}
             </div>
           </div>
           <div class="col-12 col-md-6">
-            <label class="form-label fw-semibold">Nginx Proxy Manager admin password</label>
+            <label class="form-label fw-semibold" for="exposureNpmPassword">Nginx Proxy Manager admin password</label>
             <input
+              id="exposureNpmPassword"
               class="form-control"
               type="password"
               autocomplete="off"

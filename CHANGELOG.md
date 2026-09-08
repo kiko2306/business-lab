@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.49.4] — 2026-09-08
+
+### Exposure
+
+- Fix the Exposure settings form's fields having no label association at all (missing for/id) — a real accessibility gap, found because it also made the fields unfindable by the E2E live-stack spec
+
 ## [0.49.3] — 2026-09-08
 
 ### Security
