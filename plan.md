@@ -21370,3 +21370,51 @@ Net effect: the prune step itself is confirmed mechanically sound
 after this one (the first run any backend on `4742630`-or-later actually
 executes end to end). The backend self-replacement fragility is
 unchanged and remains the open item in the README.
+
+## 298. Dropped redundant --build on self-update's restart steps; backend self-replacement failed a third time anyway (2026-09-08)
+
+Follow-up to §297. `restarting_frontend`/`restarting_backend` both passed
+`--build` to `docker compose up -d` even though the `building` phase
+earlier in the same run had already built and tagged both images —
+rebuilding again was at best a cache-hit no-op, but still invoked the
+builder subsystem and did the work of checking it, real cost landing at
+the two steps most exposed to memory pressure. Removed `--build` from
+both (`selfUpdate.ts`); `up -d` alone reuses the image already on disk.
+Two test assertions updated to match (no `--build` in the recorded args).
+691/691 backend tests pass, typecheck clean.
+
+**Deployed and observed live, with an important caveat.** Self-update
+always executes as the *currently running* backend process — the run
+that lands a fix in `selfUpdate.ts` is, by construction, always driven by
+the *pre-fix* code, since the new code doesn't exist as a running process
+until that same run's own final restart step completes (same limitation
+noted in §297 for the prune step). So run `id=6` (`4742630`→`2c65825`,
+this fix's own landing run) still issued `up -d --build frontend` and
+`up -d --build backend` — confirmed directly via `ps aux` on the host,
+which showed the literal `--build frontend` invocation mid-run.
+
+That run's final backend self-replacement step **failed the same way a
+third time**: `Exited (137)` on the old container, a new one stuck in
+`Created`, never started. Recovered the same way as §295/§297 (`docker rm
+-f` + `docker compose up -d backend`). Because this specific failure
+happened under the *old*, pre-fix code, it neither confirms nor rules out
+whether dropping `--build` reduces the failure rate — the run that would
+actually test that only happens on the *next* self-update after this one
+(the first run any backend on `2c65825`-or-later executes end to end).
+Recorded that limitation plainly rather than claiming the fix was proven.
+
+After recovery: backend confirmed running `0.49.8` (commit `2c65825`,
+this fix's target). Run `id=6`'s row self-healed to `done` via §296's
+reconciler, unprompted, exactly as in §297 — no manual DB fix needed.
+`docker ps -a` showed nothing unexpected besides the pre-existing,
+already-tracked `pihole` port-53 `Created` state.
+
+**Where this leaves the open item**: the `--build` removal is a real,
+verified-safe reduction in work at the risky moment, but is not itself a
+fix for backend's self-replacement having no automatic recovery — that
+gap is structural (the process cannot supervise its own replacement) and
+was discussed as a separate, bigger design question (an external
+watchdog outside the backend's own process) rather than implemented here.
+The README item is updated to reflect three confirmed occurrences now,
+not two, and that the `--build` removal's actual effect is unverified
+pending a future run that gets to exercise it as the active code.
