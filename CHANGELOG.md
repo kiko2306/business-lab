@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.48.4] — 2026-09-08
+
+### Changed
+
+- Authelia OIDC: managed clients now use consent_mode implicit, so first-party apps skip the OAuth accept screen (§280)
+
 ## [0.48.3] — 2026-09-08
 
 ### Fixed

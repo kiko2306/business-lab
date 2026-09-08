@@ -41,6 +41,11 @@ describe('renderOidcClientsBlock', () => {
     expect(block).not.toContain('pkce_challenge_method');
   });
 
+  it('sets implicit consent so first-party apps skip the OAuth accept screen', () => {
+    const block = renderOidcClientsBlock([VIKUNJA]);
+    expect(block).toContain("        consent_mode: 'implicit'");
+  });
+
   it('emits PKCE lines and the chosen auth method for a per-app override (§274)', () => {
     const block = renderOidcClientsBlock([
       { ...VIKUNJA, requirePkce: true, tokenEndpointAuthMethod: 'client_secret_basic' },

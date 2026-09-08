@@ -69,6 +69,11 @@ export function renderOidcClientsBlock(clients: ManagedOidcClient[]): string {
       `        client_name: '${client.name}'`,
       `        client_secret: '${client.secret}'`,
       `        authorization_policy: 'one_factor'`,
+      // Skip the OAuth consent screen. Every managed client is a first-party
+      // app the operator runs, already gated by Authelia's own login — a
+      // "do you allow Vikunja to see your profile?" prompt on your own
+      // deployment is pure friction (proven live, §280).
+      `        consent_mode: 'implicit'`,
       ...(client.requirePkce
         ? [`        require_pkce: true`, `        pkce_challenge_method: 'S256'`]
         : []),
