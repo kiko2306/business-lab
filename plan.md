@@ -21070,3 +21070,84 @@ control plane) as a side effect, mid-sequence, on a real deployment.
 Needs real investigation (reproduce deliberately against a throwaway
 stack, not `tx-home-utils.com` again) before this is trustworthy enough to
 mark "proven live" on the README. Left as an `@mat` item, not closed.
+
+## 292. Throwaway-stack investigation of §291 — one real bug confirmed, the full cascade not fully reproduced (2026-09-08)
+
+**Setup.** A minimal 4→6-service throwaway compose project (never touching
+`tx-home-utils.com`): a `proxy` service running the exact same
+`tecnativa/docker-socket-proxy` image with the exact same permission env
+vars as production, a `sibling` service standing in for `database`, one or
+two buildable services standing in for `frontend`/`backend`, and a `runner`
+service whose Docker access is *only* through `proxy` (`DOCKER_HOST=tcp://
+proxy:2375`) — mirroring the backend container's restricted path exactly.
+
+**Confirmed, real bug: Compose version skew changes the computed
+config-hash for bind-mounted services.** First repro attempt (plain
+`alpine:3.20` runner) didn't reproduce anything — targeting one service
+only ever touched that service. Checked why: the runner's `apk`-installed
+`docker-cli-compose` was v2.27.0, while the *production host's* Compose is
+v5.5.1. Matched the runner's base image to `node:20-alpine` (exactly what
+`backend/Dockerfile` uses) and got Compose v2.40.3 — matching production's
+actual `docker exec homelab-management-backend-1 docker compose version`
+exactly. Still didn't reproduce the cascade with a version-matched but
+otherwise-idle runner.
+
+Went back to the live host for a **read-only, zero-risk** comparison
+instead of guessing further: `docker compose config database
+docker-socket-proxy`, once from the host directly (v5.5.1) and once via
+`docker exec homelab-management-backend-1 ... docker compose config ...`
+(v2.40.3, the exact path self-update uses). Diffed byte-for-byte:
+
+```
+28c28,29
+<         bind: {}
+---
+>         bind:
+>           create_host_path: true
+52c53,54
+<         bind: {}
+---
+>         bind:
+>           create_host_path: true
+```
+
+**Both** `database` (bind-mounts `database/init.sql`) and
+`docker-socket-proxy` (bind-mounts `/var/run/docker.sock`) resolve an extra
+`create_host_path: true` field under the older Compose CLI baked into the
+backend's own image versus the host's newer one. That changes the computed
+`com.docker.compose.config-hash` for exactly the two services that got
+wrongly recreated — a real, verifiable, version-skew bug, independent of
+whether it's the *complete* explanation for §291's incident.
+
+**Not fully reproduced: the broader cascade.** Two things from the live
+error message weren't replicated in the throwaway stack despite direct
+attempts:
+- Genuine config drift on an unrelated (non-dependency) sibling service —
+  tested by actually changing `sibling`'s `command:` between two compose
+  runs — did **not** trigger its recreation when a different service was
+  named, with or without `--no-deps`. So "any drift anywhere reconciles the
+  whole project" is not the mechanism; something more specific to
+  production's exact circumstances is.
+- The live error showed **both** `backend` and `frontend` "Building"/
+  "Built" inside what should have been a `frontend`-only `up --build`
+  step (`docker compose` writes its progress to stderr, which is what
+  `runCommand` captures on failure — so this wasn't a misread, both images
+  genuinely rebuilt). Replicated the same two-step shape (`build a b` then
+  later `up --build a` after changing `a`'s source) with two buildable
+  services in the throwaway stack — only the named service rebuilt. This
+  Bake-grouping side effect didn't reproduce either.
+
+**Recommendation, pending @mat's call:** the confirmed version-skew bug is
+worth fixing regardless — either pin the Compose CLI version installed in
+`backend/Dockerfile` to match (or exceed) whatever's expected on deployment
+hosts, or, more robustly, stop relying on bind-mount-sensitive config-hash
+matching for `database`/`docker-socket-proxy` entirely. `--no-deps` on
+self-update's `up --build` calls is confirmed harmless (tested, doesn't
+prevent the intended per-service rebuild) and is worth adding as
+defense-in-depth even though it wasn't proven suffient alone to explain
+the full incident. Given the cascade's exact trigger is still not fully
+pinned down, this needs either a deliberate reproduction directly against
+a **disposable clone** of the real stack (not `tx-home-utils.com`) with
+the full 47-app registry and the exact same multi-step sequence
+self-update runs, or acceptance of the mitigations above without 100%
+root-cause certainty — a call for @mat, not something to guess further at.

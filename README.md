@@ -233,27 +233,32 @@ it is done — not ticked off and left behind. Section references point at
 
 Updates:
 
-- [ ] **@mat: self-update panel can knock over `docker-socket-proxy` mid-run
-      — needs real investigation before it's trustworthy** (§131.4, §198,
-      §199, §290, §291) — the infra changes are live and the build-403 bug
-      (buildx needing `EXEC` on the socket proxy) is fixed (`449f4e1`), but
-      triggering a real self-update against `tx-home-utils.com` found
-      something worse: `docker compose up -d --build frontend` — scoped to
-      one named service — also recreated `database` and
-      `docker-socket-proxy`. Tearing down the *old* socket-proxy container
-      cut the backend's own Docker control channel before the replacement
-      was up, so the very next step (recreating `database`) failed with
-      "Cannot connect to the Docker daemon", and the socket proxy was left
-      **stopped** — a real outage of every app's status/start/stop until
-      manually recovered (§291; no data lost — the live `database`
-      container itself was never touched, only a stub never-started
-      duplicate was left behind). Root cause not pinned down: neither
-      `docker-compose.yml` nor `.env` changed in the pulled commits, and
-      `docker-socket-proxy`'s block doesn't interpolate `.env` at all, so
-      the usual "config-hash drift" explanation doesn't fit. Reproduce
-      deliberately against a throwaway stack (not the live host again)
-      before trusting "Update now" — this is a live safety property of the
-      panel, not a cosmetic bug.
+- [ ] **@mat: self-update panel can knock over `docker-socket-proxy`
+      mid-run — one real bug confirmed and fixable, the full cascade still
+      not pinned down** (§131.4, §198, §199, §290, §291, §292) — the infra
+      changes are live and the build-403 bug is fixed (`449f4e1`), but a
+      real self-update against `tx-home-utils.com` found `docker compose up
+      -d --build frontend` — scoped to one named service — also recreating
+      `database` and `docker-socket-proxy`, severing the backend's own
+      Docker control channel mid-sequence (§291; fully recovered live, no
+      data lost). Investigated on a throwaway stack (§292): **confirmed** a
+      real Compose version-skew bug — `docker compose config` resolves an
+      extra `bind: {create_host_path: true}` for both bind-mounted services
+      when run via the backend's older bundled Compose (v2.40.3) vs. the
+      host's newer one (v5.5.1), changing their computed config-hash. Real,
+      worth fixing (pin/align the Compose CLI version in
+      `backend/Dockerfile`, and/or add `--no-deps` to self-update's
+      `up --build` calls as defense-in-depth — confirmed harmless,
+      doesn't block the intended rebuild). **Not** confirmed: this fully
+      explains the incident — a throwaway repro with matched Compose
+      versions and deliberate genuine drift on an unrelated sibling did
+      *not* reproduce unwanted recreation, and a from-scratch attempt to
+      reproduce "backend also rebuilds during a frontend-only step"
+      (visible in the original error) didn't reproduce either. Needs either
+      a deliberate reproduction against a full disposable clone of the real
+      stack (all ~47 apps, the exact multi-step self-update sequence) or a
+      decision to ship the mitigations above without full root-cause
+      certainty.
 
 Strategy:
 
