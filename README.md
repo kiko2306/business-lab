@@ -221,13 +221,6 @@ it is done — not ticked off and left behind. Section references point at
       value in either can cut off the very session applying it. Run
       `sudo ./setup_server.sh` and confirm both prompts behave as documented
       in `docs/first-run.md`.
-- [ ] **@mat: prove the derived `exposure_npm_api_url` live** (§253) — the
-      stored setting is gone; the backend now derives
-      `http://<docker-bridge-gateway>:<NPM_ADMIN_PORT>` on every read
-      (`getNpmApiUrl`). Run `./start.sh` on the live box and confirm an
-      exposure reconcile repoints every ingress origin at the derived value
-      (`http://10.201.0.1:10270` there) with no manual Cloudflare edit.
-
 ### Features & architecture (§131)
 
 Updates:

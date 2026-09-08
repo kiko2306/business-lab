@@ -20846,3 +20846,21 @@ exercises the actual browser-facing bundle or a genuinely fresh `.env`.
 This is the first time in the project's history the dashboard has been
 driven end-to-end through a real browser against a real, freshly-deployed
 stack.
+
+## 287. Verified §253's derived `exposure_npm_api_url` live (2026-09-08)
+
+Confirmed on `tx-home-utils.com`, no code change: triggered
+`POST /api/services/authelia/exposure/verify` and checked the whole chain
+directly, no manual Cloudflare/NPM edit anywhere —
+- `getNpmApiUrl()`'s derived admin URL (`http://10.201.0.1:10270`, docker
+  bridge gateway + `NPM_ADMIN_PORT`) successfully authenticated against
+  NPM's real admin API and read back Authelia's proxy host record.
+- That record's own `forward_host`/`forward_port` (`10.201.0.1:10100`)
+  correctly targets Authelia's live container port through the same
+  gateway IP.
+- The Cloudflare Tunnel ingress rule for `authelia.tx-home-utils.com`
+  reads `service: "http://127.0.0.1"` (`:80` omitted — the default HTTP
+  port) — the loopback-only, NPM-env-derived origin `getNpmOriginUrl()`
+  computes per §279's hardening.
+
+Nothing stale or hardcoded anywhere in the path.
