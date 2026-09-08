@@ -368,56 +368,38 @@ and proven on the real stack) are done. Phase tags below.
         the registry gets a confidential Authelia client registered on every
         exposure change, and its client-side OIDC config injected at start
         (env for most; a managed `immich.json` for Immich, §275).
-        **All wired: Vikunja (§271), Homebox (§272), Mealie (§274), Immich
-        (§275)** — every one unproven, one @mat live-proof item each below.
-        NocoDB (§273) dropped (Enterprise-only SSO). No buildable items left
-        in this list.
-- [ ] **@mat: prove Vikunja's Authelia OIDC login live** (§270, §271, §278) —
-      the first live attempt found no "Authelia" button: Vikunja won't surface
-      a provider set only via env vars. §278 moved the provider block into a
-      managed `config.yml` (written by `vikunjaConfig.ts` while exposed),
-      unproven live (CrowdSec cut the run short). Recreate `backend` to pick
-      up `vikunjaConfig.ts`, toggle Vikunja's exposure off/on, reload the
-      login page, confirm the "Authelia" button shows and lands with no second
-      form; then flip `VIKUNJA_AUTH_LOCAL_ENABLED` false (Configuration panel)
-      and confirm the local username/password form is gone but OIDC still works.
-
-- [ ] **@mat: prove Homebox's Authelia OIDC login live** (§270, §272) — the
-      `homebox` client is registered in Authelia and `HBOX_OIDC_*` +
-      `HBOX_OPTIONS_TRUST_PROXY` are injected at start, but the var names, the
-      `/api/v1/users/login/oidc/callback` redirect path and the omission of
-      `require_pkce` (Authelia's Homebox doc sets it) are from docs, not a
-      live run. Expose Homebox, use the Authelia login, confirm it lands with
-      no second form; then flip `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN` false
-      (Configuration panel) and confirm the local form is gone but OIDC still
-      works. If login fails with a PKCE error, set `requirePkce: true` on the
-      `homebox` `oidcClient` (the flag exists as of §274).
-
-- [ ] **@mat: prove Mealie's Authelia OIDC login live** (§270, §274) — the
-      `mealie` client is registered in Authelia (with `require_pkce` +
-      `token_endpoint_auth_method: client_secret_basic`, the first managed
-      client to need either) and `OIDC_*` are injected at start, but the var
-      names, the `/login` callback and the PKCE / basic-auth pairing are from
-      Mealie's OIDC v2 docs, not a live run. Expose Mealie, use the Authelia
-      login, confirm it lands with no second form; then flip
-      `ALLOW_PASSWORD_LOGIN` false (Configuration panel) and confirm the local
-      form is gone but OIDC still works — one community report exists of that
-      flag not taking on some version.
-
-- [ ] **@mat: prove Immich's Authelia OIDC login live** (§270, §275) — the
-      `immich` client is registered in Authelia and the dashboard writes a
-      managed `apps/immich/data/config/immich.json` (Immich has no OIDC env
-      vars) while Immich is exposed, injecting `IMMICH_CONFIG_FILE` then. The
-      `requirePkce`/`client_secret_post` pairing and the mobile
-      `/api/oauth/mobile-redirect` bridge are from Authelia's Immich doc, not
-      a live run. Expose Immich, click "Login with Authelia", confirm it lands
-      with no second form and that Immich's admin *Settings* UI shows the
-      "config file" lock; then flip `IMMICH_PASSWORD_LOGIN_ENABLED` false
-      (Configuration panel) and confirm the email/password form is gone but
-      OIDC still works. If login fails with a PKCE error, drop `requirePkce`
-      from the `immich` `oidcClient`. Also worth a check: whether the
-      Settings-UI lockout matters for a real deployment (it reverts
-      hand-tuned Immich settings to defaults while exposure is on — §275).
+        **Vikunja (§271/§278), Mealie (§274), Immich (§275) — proven live
+        end to end (§280)**: button on the app's own login page → Authelia
+        consent → callback → landed logged in, no second password form.
+        Homebox (§272) is wired but blocked (see below). NocoDB (§273) dropped
+        (Enterprise-only SSO).
+- [ ] **Homebox OIDC: `redirect_uri` scheme is `http`, not `https`** (§272,
+      §280) — Authelia rejects Homebox's authorization request because it
+      sends `http://homebox.<domain>/api/v1/users/login/oidc/callback` while
+      the registered URI is `https://`. Homebox builds it from
+      `X-Forwarded-Proto` (it has `HBOX_OPTIONS_TRUST_PROXY=true`) but NPM
+      hands it `http` — `cloudflared` speaks plain HTTP to NPM, so nginx's
+      `X-Forwarded-Proto $scheme` is `http`. Fix by making NPM send
+      `X-Forwarded-Proto: https` on managed proxy hosts (correct in general —
+      external access is always HTTPS via Cloudflare, and §279 closes the LAN
+      plain-HTTP path); touches `ensureProxyHost`/`exposureConfigFiles.ts` and
+      every proxy host, so verify no scheme-sensitive app regresses. Then
+      re-run the Homebox login and flip `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN` false.
+- [ ] **@mat: disable the local login form for Vikunja / Mealie / Immich**
+      (§216, §217, §280) — OIDC is proven for all three; the remaining half is
+      the config flip. In each app's Configuration panel set
+      `VIKUNJA_AUTH_LOCAL_ENABLED` / `ALLOW_PASSWORD_LOGIN` /
+      `IMMICH_PASSWORD_LOGIN_ENABLED` to false, restart, and confirm the
+      local username/password form is gone but the Authelia button still
+      logs in. (One community report exists of Mealie's flag not taking on
+      some versions; for Immich also check whether the Settings-UI "config
+      file" lockout matters for a real deployment — §275.)
+- [ ] **Authelia managed OIDC clients use plaintext `client_secret`** (§270,
+      §280) — Authelia logs a deprecation warning for every dashboard-managed
+      client ("should be a hashed value ... will be removed in the near
+      future"). Move `renderOidcClientsBlock` to write
+      `$pbkdf2-sha512$…` digests (`authelia crypto hash generate pbkdf2`)
+      instead of the raw secret. Works today; pre-empt the removal.
 
 - [ ] **@mat: prove Nextcloud header-trust live** (§217, §276) — expose
       Nextcloud, apply Authelia's `authelia-authrequest.conf` snippet to its

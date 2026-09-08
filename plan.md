@@ -20337,3 +20337,113 @@ Adjacent, not addressed: NPM's admin API on `0.0.0.0:10270` is itself a LAN
 surface (a past bug briefly served the admin UI on every hostname, §210.2).
 Left as-is — the backend needs it gateway-reachable and it is not an
 app-exposure path; a separate item if a deployment wants it locked down.
+
+## 280. Live OIDC proof against tx-home-utils.com — 3 of 4 pass, Homebox blocked, Vikunja fixed (§270–§278)
+
+The §270–§278 OIDC group was code-complete but unproven because the deployed
+`homelab-backend` image (built 2026-09-07 11:12) predated the whole group.
+This session rebuilt it from `main` on the host and drove every flow in a
+browser.
+
+### Setup done on the host
+
+- `docker compose build backend && up -d backend` — from a stale image to
+  `main`. (`.env` was missing `REPO_ROOT`, which the compose file now requires
+  and `start.sh` writes — passed inline as `REPO_ROOT=$PWD` rather than
+  hand-editing `.env`; running `./start.sh` to persist it is the open §253
+  item.)
+- `PUT /api/services/vikunja/exposure {enabled:true}` re-runs
+  `syncAutheliaOidcClientsSafe`, which had written **0** clients on the stale
+  backend. After restarting vikunja/homebox/mealie/immich once each
+  (`ensureGeneratedSecrets` generates `*_OIDC_CLIENT_SECRET` at pre-start), the
+  re-sync wrote all four clients into `apps/authelia/config/configuration.yml`
+  and restarted Authelia. Managed client-side config confirmed present with the
+  real secrets: `vikunja config.yml`, `immich.json`, `HBOX_OIDC_*` env,
+  `OIDC_*` env.
+
+### Results
+
+| App | Button on its own login page | Full sign-in via Authelia | Notes |
+|---|---|---|---|
+| **Vikunja** (§271/§278) | ✅ "Iniciar sessão com Authelia" | ✅ **after a fix** | see below |
+| **Mealie** (§274) | ✅ | ✅ | `require_pkce` + `client_secret_basic` as shipped; landed logged in, no second form |
+| **Immich** (§275) | ✅ "Login with Authelia" | ✅ | `require_pkce` + `client_secret_post` + managed `immich.json` as shipped; landed in the photos UI |
+| **Homebox** (§272) | ✅ "Sign in with OIDC" | ❌ **blocked** | see below |
+
+Each successful sign-in showed exactly one Authelia OAuth **consent** screen
+(openid/profile/email) on first authorization — expected, one-time, not a
+password prompt. §278's fix (Vikunja provider block in a managed `config.yml`,
+not env) is confirmed: the button that §271 could not make appear is there.
+
+### Vikunja fix — `client_secret_basic` (shipped, patch 0.48.3)
+
+First callback failed:
+
+    oauth2: "invalid_client" "... The request was determined to be using
+    'token_endpoint_auth_method' method 'client_secret_basic', however the
+    OAuth 2.0 client registration does not allow this method."
+
+Vikunja's OAuth2 client authenticates to the token endpoint with HTTP Basic
+and has no config knob to switch to POST. The `vikunja` `oidcClient` registry
+entry now sets `tokenEndpointAuthMethod: 'client_secret_basic'` (the field
+`mealie` already used). Re-synced, Authelia restarted, retried — full flow
+works: button → consent → callback → Vikunja home, logged in as the Authelia
+user, no second password prompt.
+
+### Homebox blocker — `redirect_uri` scheme is `http`, not `https`
+
+Authelia rejects Homebox's authorization request:
+
+    The 'redirect_uris' registered with OAuth 2.0 Client with id 'homebox' did
+    not match 'redirect_uri' value
+    'http://homebox.tx-home-utils.com/api/v1/users/login/oidc/callback'.
+
+Host and path are right; the **scheme is wrong**. Homebox builds the
+redirect_uri from request headers (`HBOX_OPTIONS_TRUST_PROXY=true` is set), but
+it is not seeing `X-Forwarded-Proto: https`. Root cause is the ingress chain:
+Cloudflare terminates TLS and `cloudflared` speaks **plain HTTP** to NPM, so at
+NPM `$scheme` is `http`, and NPM's `proxy_set_header X-Forwarded-Proto $scheme`
+hands Homebox `http`. Any app that derives its own external URL from
+`X-Forwarded-Proto` hits this behind this stack (Nextcloud has
+`OVERWRITEPROTOCOL=https` for the same reason).
+
+Not yet fixed. Options, cheapest first:
+- Make NPM send `X-Forwarded-Proto: https` for these proxy hosts. Correct in
+  general — external access is *always* HTTPS (Cloudflare), and §279 is closing
+  the LAN's plain-HTTP path anyway. Would need `ensureProxyHost` /
+  `exposureConfigFiles.ts` to add an advanced-config / snippet line, and would
+  touch every managed proxy host — verify nothing regresses (apps that already
+  special-case scheme).
+- An explicit external-URL / redirect var on Homebox if a supported one exists
+  in v0.26.2 (none obvious — `HBOX_OIDC_*` has no redirect override).
+- Register both `http://` and `https://` redirect_uris for `homebox` — a
+  downgrade, rejected.
+
+### Also seen, not blocking
+
+- Authelia logs a deprecation **warning** for every managed client: plaintext
+  `client_secret` "should be a hashed value ... will be removed in the near
+  future". The whole §270 managed block writes plaintext secrets. Works today;
+  worth moving to `$pbkdf2-sha512$…` hashes (`authelia crypto hash generate`)
+  before it becomes an error. Own item.
+- `vikunja` container has shown `unhealthy` for 24h+ — its Docker healthcheck
+  runs `/bin/sh`, absent from Vikunja's distroless image
+  (`exec: "/bin/sh": stat /bin/sh: no such file or directory`). App is fine.
+  Pre-existing, unrelated; separate task chip raised.
+- `exposure_npm_api_url` is still a row in `settings` (`http://10.201.0.1:10270`)
+  on this host — §253's derive-don't-store change hasn't been proven live yet
+  (that item is still open).
+
+### Still open after this session
+
+- **§279** (NPM proxy ports → loopback) — code committed (`c9e158c`), **not**
+  applied to the host. Held deliberately: it forces a rolling estate-wide 502
+  during the reconcile that repoints every origin to `127.0.0.1`, and CrowdSec
+  was already IP-blocking the browser mid-session (the `http-generic-401-bf`
+  scenario, from Authelia's redirect 401s — same trip as §278). Wants a calm
+  window.
+- The "disable the local login form" half of §216/§217 for Vikunja
+  (`VIKUNJA_AUTH_LOCAL_ENABLED=false`), Mealie (`ALLOW_PASSWORD_LOGIN=false`),
+  Immich (`IMMICH_PASSWORD_LOGIN_ENABLED=false`) — not toggled; the hard part
+  (does OIDC work at all) is now proven, so these are low-risk config flips +
+  a re-login check.
