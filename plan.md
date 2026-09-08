@@ -20560,3 +20560,16 @@ as too slow for that path.
 Not proven against the live stack: the Authelia restart + a fresh OIDC login
 through each of the four apps with the hashed secret in place. Left as an
 `@mat:` README item.
+
+## 282. Dropped: Home Assistant hardware items and P5 (Meta dev-mode)
+
+TODO cleanup, no code. Removed from the README list:
+
+- **Home Assistant: three unlabelled Espressif devices / washing-machine
+  Bluetooth / Ariston via eBus** (§77.6) — the hardware is no longer
+  available, so these can't be pursued.
+- **P5 — verify Meta development-mode publishing empirically** (§84.3a) — a
+  dev-mode Meta app with Tester roles is too much setup to ask a non-technical
+  client to stand up and maintain. The Meta/Instagram path is dropped as a
+  target; the Business Lab social story stays on the Tier A providers
+  (Bluesky/Mastodon) that need only a token.

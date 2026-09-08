@@ -286,10 +286,6 @@ and proven on the real stack) are done. Phase tags below.
       human-triggered "Send to Postiz" slice first (Postiz API token in
       Settings + `postizClient.ts` + a push-draft route — §261), not the n8n
       scheduler.
-- [ ] **P5 — Verify Meta development-mode publishing empirically** (§84.3a) —
-      research, no code deps. Sources agree Instagram publishes from a dev-mode
-      app with a Tester role, and a dev-mode Page post is admin-only. Confirm
-      with a real app before a timeline depends on it.
 - [ ] **P8 — Rebrand tier 2** (§84.2) — package/image/network/project names.
       Recreates the management stack — do it in the §83 data-root maintenance
       window, with host access, not before.
@@ -431,16 +427,6 @@ and proven on the real stack) are done. Phase tags below.
       blocks agent enrolment. If it does, split the agent endpoint onto its
       own un-gated hostname (or scope the authrequest snippet to exclude
       `/agent.ashx` + `/meshrelay.ashx`).
-- [ ] **Home Assistant: identify the three unlabelled Espressif devices**
-      (§77.6) — `.18`/`.19`/`.20`, no DHCP hostname. Power-cycle one appliance
-      and re-sweep to identify by elimination.
-- [ ] **Home Assistant: Bluetooth for the washing machine** (§77.6) — if it is
-      BLE rather than Wi-Fi, an ESPHome Bluetooth proxy near the machine beats
-      enabling the host stack (the server is nowhere near the laundry, and it
-      avoids mounting the host's D-Bus into the container).
-- [ ] **Home Assistant: Ariston via eBus** (§77.6) — the cloud integration works
-      but the vendor API is flaky and Nuos is not on its tested list. An eBus
-      adapter (~€30–40) plus ebusd is the durable local path.
 - [ ] **App backlog** — §22 lists candidate apps by category (communication,
       business ops, no-code/BI, files/PDF, security/network, dev infra,
       productivity). Pull from there rather than restating it here.
