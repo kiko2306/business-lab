@@ -168,18 +168,21 @@ describe('triggerSelfUpdate', () => {
     );
     // The managed-app update batch ran as part of the same sequence (§209).
     expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7);
-    // Never a `down` — every compose call is `up -d --build` or `build`.
+    // Never a `down` — every compose call is `up -d`, `build`, or a prune.
     const composeCalls = backup.runCommand.mock.calls.filter(([cmd]) => cmd === 'docker');
     expect(composeCalls.length).toBeGreaterThan(0);
     for (const [, args] of composeCalls) {
       expect((args as string[])).not.toContain('down');
     }
     // The final backend recreate is detached, not awaited by runCommand.
+    // No `--build`: the image was already built in the `building` phase
+    // above, so the restart just reuses it.
     expect(spawnMock).toHaveBeenCalledWith(
       'docker',
-      expect.arrayContaining(['up', '-d', '--build', 'backend']),
+      expect.arrayContaining(['up', '-d', 'backend']),
       expect.objectContaining({ detached: true })
     );
+    expect(spawnMock.mock.calls[0][1]).not.toContain('--build');
     expect(spawnMock.mock.calls[0][1]).not.toContain('down');
   });
 
@@ -238,7 +241,7 @@ describe('triggerSelfUpdate', () => {
     // strictly before the frontend/backend restart that follows.
     const buildIdx = kinds.findIndex((k) => k === 'build frontend backend');
     const firstPruneIdx = kinds.findIndex((k) => k === 'image prune -f');
-    const restartFrontendIdx = kinds.findIndex((k) => k.includes('up -d --build frontend'));
+    const restartFrontendIdx = kinds.findIndex((k) => k.includes('up -d frontend'));
     expect(firstPruneIdx).toBeGreaterThan(buildIdx);
     expect(restartFrontendIdx).toBeGreaterThan(firstPruneIdx);
   });

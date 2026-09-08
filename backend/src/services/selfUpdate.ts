@@ -313,10 +313,17 @@ async function runSelfUpdateSequence(
     }
     await pruneDockerCruft('updating_apps');
 
+    // No `--build` here: the `building` phase above already built and
+    // tagged this image in the same run. Rebuilding again would be a
+    // cache-hit no-op in the best case, but still spins up the builder
+    // subsystem and does the work of checking it — real cost landing right
+    // at the two steps most exposed to memory pressure (plan.md §295,
+    // §297: backend's own restart was SIGKILLed under swap exhaustion
+    // here). `up -d` alone reuses the image already on disk.
     await updateRun(runId, { state: 'restarting_frontend' });
     await runCommand(
       'docker',
-      ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--build', 'frontend'],
+      ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', 'frontend'],
       { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
     );
 
@@ -337,9 +344,11 @@ async function runSelfUpdateSequence(
       },
     }).catch(() => {});
 
+    // No `--build` here either — same reasoning as the frontend restart
+    // above, and this is the step that actually got SIGKILLed live.
     const child = spawn(
       'docker',
-      ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--build', 'backend'],
+      ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', 'backend'],
       { detached: true, stdio: 'ignore', env: BUILD_ENV }
     );
     child.unref();

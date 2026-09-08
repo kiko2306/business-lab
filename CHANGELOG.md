@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.49.8] — 2026-09-08
+
+### Fixed
+
+- Self-update panel: drop the redundant --build from the frontend/backend restart steps — the images were already built in the earlier building phase, so this cut real rebuild work at the exact point most exposed to memory pressure
+
 ## [0.49.7] — 2026-09-08
 
 ### Fixed
