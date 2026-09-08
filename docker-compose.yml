@@ -146,6 +146,84 @@ services:
       retries: 5
     # database is NOT exposed on host ports intentionally
 
+  # Recovers backend when its own self-update restart (selfUpdate.ts's
+  # detached, unref'd final `docker compose up -d backend`) gets killed
+  # mid-swap — confirmed live three times under real memory pressure
+  # (plan.md §295, §297, §298), each time leaving a stale `Created`, never-
+  # started container and the dashboard down until someone ran `docker rm
+  # -f` + `docker compose up -d backend` by hand. Backend cannot supervise
+  # its own replacement (the process doing the replacing is the one being
+  # replaced) — this has to live outside it, as its own long-lived
+  # container, so a killed backend can't take its rescuer down with it.
+  # Reuses the backend image (already built, already has docker CLI + the
+  # pinned Compose plugin — reusing it, rather than a second Dockerfile,
+  # guarantees the same pinned version and sidesteps the config-hash-drift
+  # bug a version mismatch caused in §291/§292) with a different command;
+  # the entrypoint's own root-level fixups (chown, git safe.directory) still
+  # run before it drops to appuser, same as backend itself.
+  # See scripts/self-update-watchdog.sh for the recovery logic and its
+  # false-positive-avoidance grace period.
+  self-update-watchdog:
+    image: homelab-backend
+    # command, not entrypoint: keeps the image's own ENTRYPOINT
+    # (docker-entrypoint.sh) so this still gets its root-level fixups
+    # (chown, git safe.directory) before dropping to appuser — only what
+    # runs *after* that changes.
+    command: ["/bin/sh", "${REPO_ROOT}/scripts/self-update-watchdog.sh"]
+    environment:
+      DOCKER_HOST: tcp://watchdog-docker-proxy:2375
+      REPO_ROOT: ${REPO_ROOT:?REPO_ROOT must be set to an absolute path in .env}
+    volumes:
+      - ${REPO_ROOT}:${REPO_ROOT}
+      # Unused by this service — mounted only because docker-entrypoint.sh
+      # unconditionally chowns /app/backups before dropping to appuser, and
+      # errors out under `set -eu` if that path doesn't exist (found live:
+      # the watchdog crash-looped without this). Cheaper than forking the
+      # entrypoint just to skip one line for one service.
+      - backups-data:/app/backups
+    depends_on:
+      backend:
+        condition: service_started
+      watchdog-docker-proxy:
+        condition: service_started
+    networks:
+      - homelab-net
+    restart: unless-stopped
+
+  # A second, separate docker-socket-proxy instance for the watchdog rather
+  # than widening the main one above: DELETE (needed for `docker rm` on a
+  # stuck container) is new capability nothing else here has ever needed,
+  # so it stays scoped to the one service that does, instead of being
+  # granted to backend's own broader access. Still no BUILD (the watchdog
+  # never builds), EXEC, SECRETS, SWARM, or PLUGINS — CONTAINERS+IMAGES+
+  # NETWORKS+VOLUMES read access is what `docker compose up -d backend`
+  # itself needs to check state before creating a container; DELETE only
+  # usefully applies to containers here since nothing in this service's
+  # own script ever targets an image/network/volume for removal, even
+  # though the proxy's category model can't enforce that narrower scope on
+  # its own.
+  watchdog-docker-proxy:
+    image: tecnativa/docker-socket-proxy:latest
+    environment:
+      CONTAINERS: 1
+      IMAGES: 1
+      NETWORKS: 1
+      VOLUMES: 1
+      POST: 1
+      DELETE: 1
+      ALLOW_START: 1
+      ALLOW_STOP: 1
+      INFO: 1
+      VERSION: 1
+      PING: 1
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - homelab-net
+    restart: unless-stopped
+    # Not published to the host — only reachable from other containers on
+    # homelab-net, by service name.
+
 volumes:
   db-data:
     driver: local
