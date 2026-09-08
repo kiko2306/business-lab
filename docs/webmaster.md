@@ -95,13 +95,11 @@ doesn't need to be (§180):
 
 - With a Cloudflare **Tunnel**, `cloudflared` connects **outbound**. No
   Cloudflare edge IP ever connects to NPM, so there is no range to allow.
-- The tunnel origin is the Docker bridge gateway → NPM's HTTP port (derived by
-  the backend, see `getNpmApiUrl` / plan.md §252), so NPM's plain-HTTP `:80` is
-  reachable from the whole LAN by `Host:` header — for **every** exposed app,
-  not just OnlyOffice. NPM's `:443`
-  is not (no cert / no vhost — Cloudflare terminates TLS, the tunnel speaks
-  plain HTTP to the origin). Docker SNAT also flattens the source IP, so a
-  per-host NPM access list can't tell `cloudflared` from a LAN client.
+- NPM's proxy listeners (`:80` / `:443`) are bound to `127.0.0.1` (plan.md
+  §279). `cloudflared` runs on the host so it reaches them; a LAN client
+  cannot, so it can no longer send a spoofed `Host:` header straight to NPM
+  and skip Cloudflare's WAF/Access. The tunnel origin is `http://127.0.0.1`
+  to match (`getNpmOriginUrl`).
 
 So the exposure decision is the real control:
 

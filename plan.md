@@ -20283,3 +20283,57 @@ still works. README §271 item updated to point here. (CrowdSec did also
 IP-block the first browser run mid-check — a self-inflicted 401-bruteforce
 trip from rapid automated navigation, cleared with `cscli decisions delete`;
 unrelated to the backend-version blocker.)
+
+## 279. LAN bypass closed — NPM's proxy ports bound to loopback, tunnel origin → 127.0.0.1 (§180, §210.2)
+
+The long-standing README item: NPM published `${NPM_HTTP_PORT:-80}:80` and
+`:443` on `0.0.0.0`, so any host on the LAN could `curl -H 'Host:
+app.<domain>' http://<host-lan-ip>/…` and reach NPM directly — skipping the
+Cloudflare Tunnel entirely, and with it Cloudflare's WAF / Access layer. §180
+verified it (`curl -H 'Host: onlyoffice.tx-home-utils.com' http://<host>/…` →
+`200`). True for every exposed app, and the reason `code-server` keeps its own
+login (§210.2).
+
+### Fix
+
+`cloudflared` runs on the **host** (systemd, `docs/webmaster.md`), so it can
+reach a loopback listener; nothing in a container needs NPM's *proxy* port
+(the backend only talks to the *admin* API on `10270`, via the bridge
+gateway). So:
+
+- **`apps/nginx-proxy-manager/compose.yaml`** — proxy ports now
+  `127.0.0.1:${NPM_HTTP_PORT:-80}:80` and `127.0.0.1:${NPM_HTTPS_PORT:-443}:443`.
+  Admin `:81`→`${NPM_ADMIN_PORT:-10270}` deliberately left on all interfaces:
+  the backend container reaches it through the docker bridge gateway
+  (`getNpmApiUrl`), which a loopback bind would exclude.
+- **`backend/src/services/exposure.ts`** — `getNpmOriginUrl` and
+  `getNpmGrpcOriginUrl` now force `url.hostname = '127.0.0.1'`. The admin URL
+  they are handed still carries the bridge-gateway host (for the in-container
+  admin API); only the *tunnel origin* string derived from it changes. The
+  gRPC path is unaffected otherwise — `noTLSVerify` still accepts NPM's
+  self-signed cert and `originServerName` still carries the real hostname as
+  SNI, so vhost routing does not depend on the origin host.
+- Tests: `exposure.test.ts` `getNpmOriginUrl` unit cases and the two
+  `ensureIngressRoute` origin assertions updated to `http://127.0.0.1` /
+  `https://127.0.0.1`. 670 backend tests pass, typecheck clean.
+- Docs: `docs/ports.md` and `docs/webmaster.md` (the OnlyOffice section that
+  documented the bypass) updated.
+
+### Not done here / still @mat
+
+Not proven live — this is an exposure/networking change, so it does not ship
+until it is. The next exposure reconcile on `tx-home-utils.com` will repoint
+**every** ingress route from `http://10.201.0.1:80` to `http://127.0.0.1:80`;
+if the loopback bind hasn't taken (or cloudflared somehow isn't host-side on a
+given deployment) that 502s every public hostname at once. @mat: recreate
+`nginx-proxy-manager` to pick up the port change, run an exposure reconcile,
+then confirm from a LAN machine `curl -H 'Host: <app>.<domain>'
+http://<host-lan-ip>/` now fails (connection refused / no route) while the
+public `https://<app>.<domain>` still works — and specifically re-check
+NetBird's gRPC (management API through the tunnel), the historically fragile
+origin.
+
+Adjacent, not addressed: NPM's admin API on `0.0.0.0:10270` is itself a LAN
+surface (a past bug briefly served the admin UI on every hostname, §210.2).
+Left as-is — the backend needs it gateway-reachable and it is not an
+app-exposure path; a separate item if a deployment wants it locked down.

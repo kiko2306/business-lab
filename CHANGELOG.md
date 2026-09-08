@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.48.2] — 2026-09-08
+
+### Security
+
+- Bind Nginx Proxy Manager's :80/:443 to loopback and point the tunnel origin at 127.0.0.1, so a LAN client can no longer send a spoofed Host header straight to NPM and skip Cloudflare (plan.md §279)
+
 ## [0.48.1] — 2026-09-07
 
 ### Fixed

@@ -291,12 +291,12 @@ describe('provisionServiceIfEnabled', () => {
     // while the primary keeps its plain-http origin.
     expect(mockedEnsureIngressRoute).toHaveBeenCalledWith(
       // Default ports are dropped by URL serialization (http:80, https:443).
-      expect.objectContaining({ hostname: 'netbird-vpn.example.com', originUrl: 'http://npm', http2Origin: false, noTLSVerify: false })
+      expect.objectContaining({ hostname: 'netbird-vpn.example.com', originUrl: 'http://127.0.0.1', http2Origin: false, noTLSVerify: false })
     );
     expect(mockedEnsureIngressRoute).toHaveBeenCalledWith(
       expect.objectContaining({
         hostname: 'netbird-vpn-api.example.com',
-        originUrl: 'https://npm',
+        originUrl: 'https://127.0.0.1',
         http2Origin: true,
         noTLSVerify: true,
         originServerName: 'netbird-vpn-api.example.com',
@@ -341,7 +341,7 @@ describe('provisionServiceIfEnabled', () => {
       expect.objectContaining({ hostname: 'example.com', forwardPort: 10190, expectedHostId: null, grpc: false })
     );
     expect(mockedEnsureIngressRoute).toHaveBeenCalledWith(
-      expect.objectContaining({ hostname: 'example.com', originUrl: 'http://npm' })
+      expect.objectContaining({ hostname: 'example.com', originUrl: 'http://127.0.0.1' })
     );
     expect(mockedGetPublishedUpstreamPort).toHaveBeenCalledWith('homepage', 'HOMEPAGE_PORT');
   });
@@ -543,16 +543,17 @@ describe('getNpmOriginUrl', () => {
   // public hostnames served the NPM admin UI instead of their app. An
   // estate-wide outage plus an unintended exposure of the admin panel, from
   // one port that "looked custom".
-  it('always targets the proxy listener, never the admin port it is given', () => {
+  it('always targets the proxy listener on loopback, never the admin host/port it is given', () => {
     // ':80' is absent from the expectations because it is http's default port
-    // and URL.toString() omits it — this is the exact string shape the tunnel
-    // ingress has always carried for non-gRPC hosts (http://<ip>).
-    expect(getNpmOriginUrl('http://10.201.0.1:81')).toBe('http://10.201.0.1');
-    expect(getNpmOriginUrl('http://10.201.0.1:10270')).toBe('http://10.201.0.1');
-    expect(getNpmOriginUrl('http://10.201.0.1:65000')).toBe('http://10.201.0.1');
+    // and URL.toString() omits it. The host is forced to 127.0.0.1: NPM's
+    // proxy listener is bound to loopback (§180, §279), so the admin URL's
+    // host (the bridge gateway) is discarded.
+    expect(getNpmOriginUrl('http://10.201.0.1:81')).toBe('http://127.0.0.1');
+    expect(getNpmOriginUrl('http://10.201.0.1:10270')).toBe('http://127.0.0.1');
+    expect(getNpmOriginUrl('http://10.201.0.1:65000')).toBe('http://127.0.0.1');
   });
 
   it('strips any path, query or fragment', () => {
-    expect(getNpmOriginUrl('http://10.201.0.1:10270/api?x=1#y')).toBe('http://10.201.0.1');
+    expect(getNpmOriginUrl('http://10.201.0.1:10270/api?x=1#y')).toBe('http://127.0.0.1');
   });
 });

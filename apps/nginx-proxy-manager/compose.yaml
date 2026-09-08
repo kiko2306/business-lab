@@ -4,8 +4,16 @@ services:
     image: jc21/nginx-proxy-manager:latest
     restart: unless-stopped
     ports:
-      - "${NPM_HTTP_PORT:-80}:80"
-      - "${NPM_HTTPS_PORT:-443}:443"
+      # Proxy listeners bind to loopback only. cloudflared runs on the host
+      # (systemd, see docs/webmaster.md) so it reaches them at 127.0.0.1, but a
+      # LAN client cannot — without this, NPM answers any spoofed `Host:` header
+      # on the host's LAN IP, skipping Cloudflare's WAF/Access for every exposed
+      # app (plan.md §180, §210, §279). The tunnel origin is 127.0.0.1 to match
+      # (getNpmOriginUrl / getNpmGrpcOriginUrl in backend exposure.ts).
+      - "127.0.0.1:${NPM_HTTP_PORT:-80}:80"
+      - "127.0.0.1:${NPM_HTTPS_PORT:-443}:443"
+      # Admin API stays on all interfaces: the backend container reaches it via
+      # the docker bridge gateway (getNpmApiUrl), which loopback would exclude.
       - "${NPM_ADMIN_PORT:-10270}:81"
     environment:
       DB_MYSQL_HOST: npm-db

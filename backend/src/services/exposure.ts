@@ -157,6 +157,14 @@ export function getNpmOriginUrl(npmApiUrl: string): string {
   //
   // Now the proxy port is read from NPM's own env (NPM_HTTP_PORT), which is
   // the same value its compose file publishes, and only falls back to 80.
+  //
+  // The host is forced to loopback: NPM's proxy listener is bound to
+  // 127.0.0.1 (apps/nginx-proxy-manager/compose.yaml) so the LAN cannot reach
+  // it with a spoofed Host header and skip Cloudflare (plan.md §180, §279).
+  // cloudflared runs on the host, so 127.0.0.1 reaches it; the host portion of
+  // npmApiUrl (the bridge gateway, for the admin API from in-container) is
+  // discarded here.
+  url.hostname = '127.0.0.1';
   url.port = getNpmProxyPort();
   url.pathname = '';
   url.search = '';
@@ -193,6 +201,11 @@ function getNpmProxyPort(): string {
 function getNpmGrpcOriginUrl(npmApiUrl: string): string {
   const url = new URL(npmApiUrl);
   url.protocol = 'https:';
+  // Loopback, same reason as getNpmOriginUrl (§180, §279): NPM's :443 is bound
+  // to 127.0.0.1 now. The self-signed cert is still accepted (noTLSVerify) and
+  // the real hostname still goes as SNI via originServerName, so vhost routing
+  // is unaffected by the origin host.
+  url.hostname = '127.0.0.1';
   url.port = '443';
   url.pathname = '';
   url.search = '';

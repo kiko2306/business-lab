@@ -17,7 +17,7 @@ Almost all of them get there by publishing a port from a Docker bridge; one
 
 | Port | Service | Why it cannot move |
 |---|---|---|
-| `80` / `443` | Nginx Proxy Manager | The Cloudflare Tunnel connector points at these as its origin |
+| `80` / `443` | Nginx Proxy Manager | The Cloudflare Tunnel connector points at these as its origin. Bound to `127.0.0.1` only (plan.md §279) — cloudflared runs on the host and reaches them, the LAN cannot spoof a `Host:` header past Cloudflare. The admin API (`10270`) stays on all interfaces for the backend container. |
 | `53` | Pi-hole | DNS clients expect port 53 |
 | `445` | Samba | Windows SMB clients connect to 445 and cannot be told to use another; LAN-only, never through the tunnel |
 | `8123` | Home Assistant | Runs with `network_mode: host` so its zeroconf/SSDP/DHCP discovery can see the LAN; host networking cannot remap ports |

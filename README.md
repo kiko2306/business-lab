@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.48.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.48.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -335,18 +335,19 @@ and proven on the real stack) are done. Phase tags below.
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
-- [ ] **The LAN can bypass Cloudflare on NPM's :80** (§180, §210) — the
-      tunnel origin is the host LAN IP, so NPM's plain-HTTP proxy port
-      answers any `Host:` header from anywhere on the LAN, skipping
-      Cloudflare's WAF/Access for *every* exposed app. `:443` is already
-      closed (no cert/vhost). Fixing it means moving the tunnel origin to
-      loopback **and** binding NPM's `80`/`443` to `127.0.0.1` —
-      estate-wide and outage-risky (verify every exposed hostname still
-      works through the tunnel), so its own task. Not OnlyOffice-specific;
-      low priority on the no-guarantees box. **Blocks §210.2/§210.3**:
-      until this closes, no app's own login is safely droppable in favor
-      of "Authelia-only" — the LAN-direct path has no gate at all without
-      it (code-server keeps its own login for exactly this reason today).
+- [ ] **@mat: prove the NPM loopback bind live** (§180, §210, §279) — the
+      code is done: NPM's `:80`/`:443` bind to `127.0.0.1` and the tunnel
+      origin (`getNpmOriginUrl` / `getNpmGrpcOriginUrl`) is `127.0.0.1` to
+      match. Unproven on the real stack, and it's estate-wide: the next
+      exposure reconcile repoints *every* ingress route to
+      `http://127.0.0.1:80` at once. Recreate `nginx-proxy-manager`, run a
+      reconcile, then confirm from a LAN machine that `curl -H 'Host:
+      <app>.<domain>' http://<host-lan-ip>/` now fails while
+      `https://<app>.<domain>` still works through the tunnel — and
+      specifically re-check NetBird's gRPC management API (the fragile
+      origin). **Unblocks §210.2/§210.3** once green: the LAN-direct path
+      is gated, so an app's own login becomes safely droppable in favour of
+      Authelia-only.
 - [ ] **Wire up the "trust the proxy" knobs the §210.2 audit found** (§216,
       §217) — twelve apps ship a real, upstream-supported way to stop
       showing their own login on top of Authelia's, the same shape as the
