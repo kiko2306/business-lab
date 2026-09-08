@@ -206,12 +206,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Housekeeping
 
-- [ ] **@mat: run the E2E live-stack specs against a real dashboard once**
-      (§171) — `e2e/tests/live-stack.spec.ts` (start/stop, Backups render,
-      Exposure test-connection) is gated on `E2E_LIVE_STACK=1` and verified
-      only against the socket-less test stack (specs skip there). Run it once
-      with `E2E_LIVE_STACK=1 E2E_BASE_URL=<dashboard> E2E_ADMIN_USER=… ADMIN_PASSWORD=…`
-      and report any selector drift.
 - [ ] **@mat: prove Guacamole SSO live** (§200, §223) — `HTTP_AUTH_HEADER`
       is wired and proven against a scratch stack, but not against the real
       NPM proxy host: apply Guacamole's `authelia-authrequest.conf` snippet

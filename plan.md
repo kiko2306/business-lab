@@ -20760,3 +20760,89 @@ immediately after, with no further action.
 `3feb9a3` (corrected to the real NPM 2.15 setup flow), `98f7919` (Authelia
 access-control zero-rules fix). All three ship together; `0d48751` alone
 would not have worked against this NPM version.
+
+## 286. E2E live-stack specs run against a real dashboard for the first time — a critical bug found and fixed (2026-09-08)
+
+**Context.** Closed the README's oldest-standing item: `e2e/tests/live-stack.spec.ts`
+(start/stop, Backups render, Exposure test-connection) had `E2E_LIVE_STACK=1`
+support since §171 but had never actually run against a real dashboard —
+only ever against the socket-less test stack, where it self-skips. Ran it
+for real from the WSL dev machine against `home-srv-01` over the LAN
+(`E2E_BASE_URL=http://192.168.1.236:10001`).
+
+**It failed immediately, and it was right to.** The `auth.setup.ts` step —
+just loading `/login` and signing in — hung for the full 30s test timeout
+with no visible error. This traced back to a genuinely severe, previously
+invisible bug.
+
+**Bug 1 (root cause) — `.env.example`'s `API_URL=http://localhost:10000`
+default breaks the dashboard for every browser except one running on the
+host itself.** `frontend/Dockerfile` bakes `API_URL` into the built JS
+bundle as `environment.production.ts`'s `apiUrl`, used as an **absolute**
+origin for every API call when non-empty. The frontend's own nginx already
+proxies `/api` same-origin (`api.ts`'s own comment says as much), so this
+should always be blank — but `.env.example` shipped a literal non-blank
+value, and every existing deployment had already drifted away from it
+(manually corrected, or from an older `.env.example`), so this was never
+caught. On a genuinely fresh `.env`, the bundle tries to reach
+`http://localhost:10000/...` from the *visitor's own machine* — works only
+for someone browsing from the host itself, hangs forever (no error
+surfaced) for a LAN client, the public Cloudflare hostname, anywhere else.
+
+Found by tracing Playwright's `request`/`requestfinished` events (the
+failure showed a request to `localhost:10000` that never finished,
+alongside normal requests to the real dashboard origin that did) — a raw
+`fetch()`/`XMLHttpRequest` from the same page context worked instantly,
+which is what pointed at *where* the browser was even trying to send that
+particular request rather than at the network being broken generally.
+Confirmed against a control (the known-working local
+`docker-compose.test.yml` stack, whose own hand-set `.env` was unaffected)
+before touching anything, to rule out a general regression.
+
+**Bug 2 (same chain) — CORS also rejected the dashboard's own same-origin
+requests.** Fixing bug 1 got the login page to render, but submitting it
+now failed with a visible "CORS origin denied" toast. The backend's origin
+allowlist fell back to `CORS_ORIGIN || API_URL || 'http://localhost:4200'`
+— with `API_URL` now correctly blank, it fell all the way to an Angular
+`ng serve` dev default that matches no real deployment. Browsers send
+`Origin` on same-origin POST/PUT/DELETE too, not just cross-origin
+requests, so this rejected the dashboard's own login from every origin
+except whichever one happened to be configured. A static allowlist can't
+be right for this deployment shape regardless: the dashboard is
+legitimately reachable at several different origins (a LAN IP, the public
+Cloudflare hostname, `localhost` on the host) that aren't knowable in
+advance. Fixed with a small, unit-tested `isSameOrigin()`
+(`backend/src/utils/corsOrigin.ts`) that compares the `Origin` header's
+host against the request's own `Host` header — same-origin traffic is
+always allowed regardless of which hostname reached it; the static
+`CORS_ORIGIN` allowlist is now reserved for genuinely cross-origin cases
+(a separately-hosted frontend).
+
+**Bug 3 (independent, surfaced along the way) — the Exposure settings
+form's fields had no label association at all.** With login working, the
+Exposure page's own spec still failed: `getByLabel('Base domain')` timed
+out even though the field was plainly visible in the failure screenshot.
+The `<label>` had no `for`, the `<input>` had no `id` — plain unassociated
+siblings. A real, pre-existing accessibility gap (a screen reader
+announces these seven fields with no name at all), not just a test
+problem — Playwright's `getByLabel()` relies on the same association a
+screen reader does. Fixed by adding `id`/`for` pairs to all seven fields,
+matching the pattern the page's own Cloudflare API token field one section
+up already used correctly.
+
+**Test-only fix.** The "start/stop samba" spec also failed:
+`getByRole('button', { name: 'Close' })` substring-matched *two*
+legitimate buttons in the startup-logs dialog (an icon "×" with
+`aria-label="Close startup logs"`, and a footer "Close" text button — both
+real, pre-existing UI, not a bug). Fixed with `exact: true` on the
+selector.
+
+**Result: all 4 specs pass against the real dashboard.** Each fix was
+deployed and re-verified live before moving to the next (rebuild → rerun
+→ confirm), not applied speculatively. Every one of these bugs — like
+§283–§285's — was invisible to every prior verification this session,
+because every prior check used `curl`/direct API calls, which never
+exercises the actual browser-facing bundle or a genuinely fresh `.env`.
+This is the first time in the project's history the dashboard has been
+driven end-to-end through a real browser against a real, freshly-deployed
+stack.
