@@ -46,6 +46,34 @@ set_env_var() {
   fi
 }
 
+# --- Optional start.config: pre-fill the bootstrap prompts ahead of time ---
+#
+# The values below this point that would otherwise be asked for
+# interactively (Cloudflare/Tailscale credentials — genuinely can't be
+# derived, see §0.3) can instead be set once in start.config, copied from
+# start.config.example. Only fills a value that is still blank in .env,
+# exactly like every prompt below does — never overwrites something already
+# set from a previous run or typed at the prompt. Kept as its own small file
+# rather than folded into .env.example (~40 unrelated per-app keys) so
+# there is one clearly-labeled place to fill in before a fully unattended
+# first run — no TTY, no interactive prompts, nothing skipped for lack of
+# one.
+START_CONFIG_FILE="start.config"
+if [ -f "$START_CONFIG_FILE" ]; then
+  log "Loading $START_CONFIG_FILE"
+  while IFS='=' read -r key value; do
+    case "$key" in ''|'#'*) continue ;; esac
+    value="${value%$'\r'}"
+    [ -n "$value" ] || continue
+    current="$(grep -E "^${key}=" "$ENV_FILE" 2>/dev/null | head -n1 | cut -d= -f2- || true)"
+    case "$current" in
+      "" | change_this* )
+        set_env_var "$key" "$value"
+        ;;
+    esac
+  done < "$START_CONFIG_FILE"
+fi
+
 current_value() {
   # `|| true`: a key genuinely absent from .env (not just blank) makes grep
   # exit 1, and under `set -euo pipefail` that silently kills the whole
@@ -651,6 +679,14 @@ if [ "$CF_READY" = "1" ] && [ -n "$BASE_DOMAIN" ] && [ -n "${CF_TUNNEL_ID:-}" ];
   # dashboard writes app rules into the same config, and a blind PUT here
   # would delete every one of them.
   CF_CFG="$(cf_api GET "/accounts/${CF_ACCOUNT_ID}/cfd_tunnel/${CF_TUNNEL_ID}/configurations")"
+  # set +e around just this assignment: the python helper's exit code is a
+  # meaningful sentinel (2 = "already correct, nothing to write"), read via
+  # $? right after — but under set -e, a `VAR=$(cmd)` whose cmd exits
+  # nonzero kills the whole script before DASH_RC=$? is ever reached, same
+  # failure shape as current_value/app_env_value (plan.md §283). Only found
+  # now because this is the first truly idempotent re-run where the
+  # dashboard's ingress rule was already correct going in.
+  set +e
   DASH_MERGED="$(printf '%s' "$CF_CFG" | DASH_HOST="$DASH_HOST" DASH_PORT="$DASH_PORT" python3 -c '
 import json, os, sys
 host, port = os.environ["DASH_HOST"], os.environ["DASH_PORT"]
@@ -668,6 +704,7 @@ ingress.append({"service": "http_status:404"})   # catch-all must stay last
 print(json.dumps({"config": {**cfg, "ingress": ingress}}))
 ' 2>/dev/null)"
   DASH_RC=$?
+  set -e
 
   if [ "$DASH_RC" = "2" ]; then
     log "Dashboard already published at https://${DASH_HOST}"

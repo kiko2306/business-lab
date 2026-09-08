@@ -103,6 +103,12 @@ Authelia's signing keys, NetBird's store-encryption key and relay secret, the
 web terminal's SSH key, host port allocation, and the Cloudflare account/zone
 /tunnel IDs (looked up from the domain).
 
+For an unattended install with no TTY to prompt on, copy
+`start.config.example` to `start.config` and fill in these same four values
+ahead of time — `start.sh` reads it before asking anything, so nothing gets
+skipped for lack of a terminal. Never commit `start.config`; it holds real
+credentials, same as `.env`.
+
 Non-interactive runs (no TTY) skip the prompts and the setup they gate, then
 tell you to re-run interactively — they never hang waiting for input.
 

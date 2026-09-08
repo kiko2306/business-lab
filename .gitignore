@@ -1,6 +1,7 @@
 # Environment secrets — never commit these (but keep .env.example templates)
 .env
 .env.*
+start.config
 !.env.example
 
 # Per-app persistent data (bind-mounted from each app's own folder)

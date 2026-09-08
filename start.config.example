@@ -1,0 +1,36 @@
+# ============================================================
+# Optional: pre-fill start.sh's bootstrap prompts ahead of time.
+#
+# Copy this file to start.config and fill in what you have. start.sh reads
+# it before asking anything interactively, and only uses a value here to
+# fill in .env if that key is still blank there — it never overwrites a
+# value you already typed at a prompt or that a previous run already saved.
+#
+# This is for a genuinely unattended first run (no TTY to prompt on): every
+# value below is something start.sh cannot derive or generate on its own
+# (plan.md §0.3) — a real account credential only you have. Everything else
+# (JWT secrets, database passwords, per-app secrets) is already generated
+# automatically and needs no entry here.
+#
+# Never commit start.config — it holds real API tokens. .gitignore already
+# excludes it, same as .env.
+# ============================================================
+
+# Base domain for published services (e.g. example.com). Must already be a
+# zone in your Cloudflare account — start.sh looks it up, it does not create it.
+BASE_DOMAIN=
+
+# Cloudflare API token (Account -> Cloudflare Tunnel: Edit, Zone -> DNS: Edit).
+# Create at https://dash.cloudflare.com/profile/api-tokens
+CLOUDFLARE_API_TOKEN=
+
+# Name for this host's Cloudflare Tunnel. Defaults to the machine's hostname
+# if left blank — only set this to override that.
+TUNNEL_NAME=
+
+# Tailscale auth key (tskey-auth-...), needed for NetBird's signal server to
+# get a public address via Tailscale Funnel. Get a reusable key from
+# https://login.tailscale.com/admin/settings/keys — Funnel also needs
+# enabling once for the tailnet; start.sh prints the one-click link if it
+# isn't.
+TAILSCALE_AUTH_KEY=
