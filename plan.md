@@ -21151,3 +21151,24 @@ a **disposable clone** of the real stack (not `tx-home-utils.com`) with
 the full 47-app registry and the exact same multi-step sequence
 self-update runs, or acceptance of the mitigations above without 100%
 root-cause certainty — a call for @mat, not something to guess further at.
+
+## 293. Compose version-skew fix (§292) verified live; adopted a dev-branch workflow
+
+**§292's fix verified.** Pinned `backend/Dockerfile` to install Docker
+Compose v5.5.1 directly from Docker's official release (sha256-verified,
+multi-arch) instead of Alpine's capped `2.40.3` package (`9243271`).
+Rebuilt live on `tx-home-utils.com` and re-ran the exact read-only
+comparison from §292: `docker compose config database docker-socket-proxy`
+from the host vs. via `docker exec homelab-management-backend-1` — now
+byte-for-byte **identical**, `create_host_path` discrepancy gone. Confirms
+the one concretely-identified bug is fixed; the self-update panel's
+broader cascade (§291) still isn't provably explained end to end (§292's
+own caveat stands), so the README item stays open rather than closed.
+
+**Workflow change, user-requested:** all commits now land on a rolling
+`dev` branch first (created from `main` at `9243271`); `main` only ever
+receives a fast-forward merge from `dev`, and only once the merged change
+has cleared the same verified-gate a `dev` commit already required.
+Branching further off `dev` for isolation is fine — merges back into
+`dev`, never straight to `main`. `CLAUDE.md` updated to document this
+durably (`78cc084`, merged to `main` the same way).
