@@ -1121,6 +1121,12 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     oidcClient: {
       redirectPaths: ['/auth/openid/authelia'],
       secretEnvKey: 'VIKUNJA_OIDC_CLIENT_SECRET',
+      // Vikunja's OAuth2 client authenticates to the token endpoint with HTTP
+      // Basic and has no knob to switch to POST, so the Authelia client must
+      // allow client_secret_basic. Proven live (§279): with the default
+      // client_secret_post, the callback fails with `invalid_client` — "the
+      // OAuth 2.0 client registration does not allow this method".
+      tokenEndpointAuthMethod: 'client_secret_basic',
     },
     // SMTP from the dashboard's global mail settings. Vikunja always attempts
     // STARTTLS; FORCESSL switches it to implicit TLS (465). MAILER_ENABLED

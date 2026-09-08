@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.48.3] — 2026-09-08
+
+### Fixed
+
+- Vikunja OIDC: register its Authelia client with token_endpoint_auth_method client_secret_basic — Vikunja authenticates to the token endpoint with HTTP Basic and has no knob to switch to POST, so the default client_secret_post gave invalid_client on the callback (proven live, §280)
+
 ## [0.48.2] — 2026-09-08
 
 ### Security
