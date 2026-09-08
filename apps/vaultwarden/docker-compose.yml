@@ -11,15 +11,17 @@ services:
       # backend/src/config/services.ts — not set by hand. Left unset, Vaultwarden
       # simply runs without email, which disables invitations and 2FA-by-email.
       #
-      # SMTP_SECURITY defaults to "off", not "": compose's ${VAR:-} still
-      # defines the env var, just as an empty string, and Vaultwarden treats
-      # that as an explicitly-invalid enum value (must be starttls/force_tls/
-      # off) rather than "not configured" — it crash-loops on every fresh
-      # deploy where mail was never set up, since SMTP_HOST being empty
-      # doesn't stop this check from running.
+      # Compose's ${VAR:-} still *defines* the container env var, just as an
+      # empty string — and Vaultwarden's config parser treats a present-but-
+      # empty SMTP_HOST/SMTP_FROM as "configured" (Some("")), not "unset"
+      # (None), which is a different code path with its own validation error
+      # ("Both SMTP_HOST and SMTP_FROM need to be set..."). No default value
+      # here fixes that; the var has to be genuinely absent from the
+      # container's environment. Hence the entrypoint override below, instead
+      # of a plain `environment:` default like every other app's mail wiring.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
-      SMTP_SECURITY: ${SMTP_SECURITY:-off}
+      SMTP_SECURITY: ${SMTP_SECURITY:-}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
@@ -27,6 +29,16 @@ services:
       DOMAIN: ${VAULTWARDEN_DOMAIN:-http://localhost:8222}
       SIGNUPS_ALLOWED: ${VAULTWARDEN_SIGNUPS_ALLOWED:-true}
       ADMIN_TOKEN: ${VAULTWARDEN_ADMIN_TOKEN}
+    # Unset the SMTP_* vars before Vaultwarden's own entrypoint runs, when
+    # mail isn't configured (SMTP_HOST empty) — see the comment above. `$$`
+    # escapes compose's own interpolation so the shell sees a literal `$`.
+    entrypoint: >
+      sh -c '
+      if [ -z "$$SMTP_HOST" ]; then
+        unset SMTP_HOST SMTP_PORT SMTP_SECURITY SMTP_USERNAME SMTP_PASSWORD SMTP_FROM SMTP_FROM_NAME;
+      fi;
+      exec /start.sh
+      '
     labels:
       - "homepage.group=Security"
       - "homepage.name=Vaultwarden"
