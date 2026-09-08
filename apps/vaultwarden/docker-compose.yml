@@ -10,9 +10,16 @@ services:
       # (Settings -> Email) via mailEnvKeys on vaultwarden in
       # backend/src/config/services.ts — not set by hand. Left unset, Vaultwarden
       # simply runs without email, which disables invitations and 2FA-by-email.
+      #
+      # SMTP_SECURITY defaults to "off", not "": compose's ${VAR:-} still
+      # defines the env var, just as an empty string, and Vaultwarden treats
+      # that as an explicitly-invalid enum value (must be starttls/force_tls/
+      # off) rather than "not configured" — it crash-loops on every fresh
+      # deploy where mail was never set up, since SMTP_HOST being empty
+      # doesn't stop this check from running.
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-}
-      SMTP_SECURITY: ${SMTP_SECURITY:-}
+      SMTP_SECURITY: ${SMTP_SECURITY:-off}
       SMTP_USERNAME: ${SMTP_USERNAME:-}
       SMTP_PASSWORD: ${SMTP_PASSWORD:-}
       SMTP_FROM: ${SMTP_FROM:-}
