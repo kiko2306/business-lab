@@ -20864,3 +20864,70 @@ directly, no manual Cloudflare/NPM edit anywhere —
   computes per §279's hardening.
 
 Nothing stale or hardcoded anywhere in the path.
+
+## 288. Design — Guacamole SSO live proof needs a routing decision first, not just a snippet (2026-09-08)
+
+**Context.** Picked up the README's "@mat: prove Guacamole SSO live" item
+(§200, §223) — apply `authelia-authrequest.conf` to Guacamole's real NPM
+proxy host, log in through Authelia, confirm no second form. Investigating
+before touching anything found the premise doesn't hold on the real stack:
+there is currently **no NPM proxy host for Guacamole at all**, and creating
+one the obvious way would either not work or weaken a security boundary
+this project has hardened three times over (§180, §210, §279).
+
+**What's actually true today:**
+
+- Guacamole is `overlayOnly: true` — the dashboard's exposure system
+  (`getExposability`) refuses it a Cloudflare-tunneled NPM host outright
+  (§239's policy: a sensitive gateway, reachable over NetBird/Tailscale
+  only, never the public tunnel).
+- NPM's proxy listeners are bound `127.0.0.1:80`/`127.0.0.1:443` only
+  (`apps/nginx-proxy-manager/compose.yaml`) — reachable by nothing except
+  `cloudflared` on the same host (§279's fix for the LAN-spoofed-Host-header
+  bypass). An overlay/VPN peer is blocked by this exactly the same as a LAN
+  client; there is no exception carved out for overlay traffic.
+- The two other `overlayOnly` apps in the registry — NPM's own admin UI and
+  Pi-hole — are **not** routed through NPM/Authelia at all. Both are
+  reached directly on their own published Docker port over the VPN, gated
+  only by their own login (NPM's admin password, Pi-hole's web password).
+  That is the only working "reach an overlay-only app" pattern that exists
+  in this codebase today.
+
+**So "apply the snippet" has no live target to apply it to.** Two real
+options, not decided here:
+
+1. **Build a second, dedicated NPM+Authelia instance for overlay-only apps
+   that want SSO.** Its own compose project, its own listeners bound to the
+   LAN/overlay interface (not loopback) rather than the public one, holding
+   *only* overlay-only apps' proxy hosts. Kept separate from the main NPM
+   deliberately: nginx vhost routing isn't scoped by which port received
+   the connection, so adding an extra LAN-bound port to the *existing* NPM
+   instance would make every currently-tunneled public app *also* reachable
+   directly over the LAN/overlay, defeating §279 for the whole stack, not
+   just adding Guacamole. A second, isolated instance carries no such risk
+   — even direct access only ever reaches apps that were never meant to be
+   Cloudflare-only in the first place. This is a real feature: a new
+   compose service, a new `service_exposure`-adjacent "exposure kind"
+   concept in the backend (today only knows one shape: Cloudflare Tunnel +
+   NPM's public listeners), a new provisioning path, a UI affordance to
+   pick "public" vs "overlay" exposure per app. Multi-session scope, not a
+   same-sitting change — and worth asking whether it's worth building for
+   one app before committing.
+
+2. **Re-examine whether Guacamole should follow the NPM-admin/Pi-hole
+   pattern instead** — reached directly on its own port, gated by its own
+   (dashboard-rotated, §200 slice 1) login, no Authelia SSO at all. §200's
+   whole premise was eliminating a *double* login (Authelia's gate, then
+   Guacamole's own form) — but that double-login only exists if something
+   puts Authelia in front of Guacamole first, which nothing currently does
+   on the real stack. If Guacamole is meant to work like its two overlayOnly
+   siblings, the `guacamole-auth-header` extension (§223, already built and
+   proven on a scratch stack) has no live path that will ever exercise it,
+   and the honest move is to say so rather than build infra to manufacture
+   one.
+
+**Not decided here on purpose** — this is a security-boundary and
+network-topology call, not a bug fix. Left for a real planning pass before
+any compose/backend work starts. The README item is left as-is rather than
+closed, since neither "prove it live" nor "this doesn't apply" has actually
+been decided yet.

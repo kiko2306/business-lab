@@ -206,11 +206,19 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Housekeeping
 
-- [ ] **@mat: prove Guacamole SSO live** (§200, §223) — `HTTP_AUTH_HEADER`
-      is wired and proven against a scratch stack, but not against the real
-      NPM proxy host: apply Guacamole's `authelia-authrequest.conf` snippet
-      there, then log in through Authelia and confirm it lands in Guacamole
-      with no second form.
+- [ ] **@mat: decide how Guacamole is actually meant to be reached, then
+      prove SSO live if it applies** (§200, §223, §288) — turns out there is
+      no NPM proxy host for Guacamole to apply the snippet to, and NPM's
+      proxy listeners are loopback-only (§279), so an overlay/VPN peer can't
+      reach one anyway. The two other `overlayOnly` apps (NPM's own admin
+      UI, Pi-hole) are reached directly on their own port, own login, no
+      Authelia — decide whether Guacamole should follow that same pattern
+      (in which case the `guacamole-auth-header` wiring has no live use and
+      that's fine to say) or whether it's worth building a second,
+      dedicated NPM+Authelia instance just for overlay-only apps that want
+      SSO (real infra, a new "exposure kind" in the backend — see §288 for
+      why a LAN-bound port can't just be added to the existing NPM). A
+      security-boundary/network-topology call, not a coding session.
 
 ### Security
 
