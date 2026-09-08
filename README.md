@@ -416,12 +416,18 @@ and proven on the real stack) are done. Phase tags below.
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
-- [ ] **@mat: enable Pi-hole exposure or free port 53** (§283) — starting
+- [ ] **@mat: decide Pi-hole's port-53 conflict** (§283, §284) — starting
       Pi-hole from a fresh deploy fails: `failed to bind host port
-      0.0.0.0:53/tcp: address already in use`. Something else on the host
-      (likely `systemd-resolved`) already holds port 53 — find and free it,
-      or remap Pi-hole's compose port if this host is never meant to be the
-      LAN's actual resolver.
+      0.0.0.0:53/tcp: address already in use`. Root cause confirmed (no
+      single process to kill): `systemd-resolved` holds `127.0.0.53`/
+      `127.0.0.54:53` and `netbird` holds its own tailnet IP `:53`
+      (MagicDNS) — Linux refuses a wildcard `0.0.0.0:53` bind while any
+      specific-address `:53` socket exists, so Pi-hole can't get the port no
+      matter which one is freed unless *both* are addressed. Real fix needs
+      a host-networking decision (disable `systemd-resolved`'s stub
+      listener via `DNSStubListener=no`, and/or bind Pi-hole to a specific
+      host IP instead of all interfaces) — left unstarted for now rather
+      than done as a host-console change.
 - [ ] **@mat: enable Authelia's public exposure to unblock NetBird** (§283)
       — `netbird-vpn-management` crash-loops (`dial tcp: lookup
       authelia.<domain>: no such host`) until Authelia itself has "Publicly
