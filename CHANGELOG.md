@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.49.7] — 2026-09-08
+
+### Fixed
+
+- Self-update panel: prune dangling images and build cache after the dashboard build and after updating every app, instead of letting reclaimable Docker cruft accumulate silently across runs
+
 ## [0.49.6] — 2026-09-08
 
 ### Features & architecture

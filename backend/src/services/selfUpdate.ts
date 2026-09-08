@@ -58,6 +58,32 @@ const COMMAND_MAX_BUFFER = 16 * 1024 * 1024;
 // this.
 const BUILD_ENV: NodeJS.ProcessEnv = { ...process.env, DOCKER_BUILDKIT: '0' };
 
+/**
+ * Every build and every app recreate leaves behind a dangling image (the old
+ * tag's layers, now unreferenced) and, under the classic builder, stray
+ * intermediate build cache — neither is cleaned up anywhere else (§209: this
+ * is the only place images move at all any more). Across enough self-update
+ * runs that silently piles up — 43GB of reclaimable images and 24GB of build
+ * cache were found live on tx-home-utils.com — and adds to the memory/swap
+ * pressure a run already puts on the host by never coming back down. Run at
+ * the two natural boundaries below (after the dashboard's own build, and
+ * after every app's pull+recreate) rather than only at the end, so the
+ * reclaim lands before the next heavy step instead of piling on top of it.
+ * Best-effort and silent on failure: a prune is cleanup, not part of the
+ * update itself, and must never fail or block the sequence it's tidying up
+ * after.
+ */
+async function pruneDockerCruft(label: string): Promise<void> {
+  try {
+    await runCommand('docker', ['image', 'prune', '-f'], { timeout: 120_000, maxBuffer: COMMAND_MAX_BUFFER });
+    await runCommand('docker', ['builder', 'prune', '-f'], { timeout: 120_000, maxBuffer: COMMAND_MAX_BUFFER });
+  } catch (error) {
+    logger.warn(`Self-update: docker prune after ${label} failed (non-fatal)`, {
+      error: (error as Error).message,
+    });
+  }
+}
+
 export type SelfUpdateRunState =
   | 'checking'
   | 'pulling'
@@ -269,6 +295,7 @@ async function runSelfUpdateSequence(
       ['compose', '-f', composeFilePath(repoRoot), 'build', 'frontend', 'backend'],
       { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
     );
+    await pruneDockerCruft('building');
 
     // Every installed app's image, pulled and recreated against whatever the
     // `git pull` above just landed in its compose file (§209) — the only
@@ -284,6 +311,7 @@ async function runSelfUpdateSequence(
         failed: appsFailed.map((r) => r.serviceName),
       });
     }
+    await pruneDockerCruft('updating_apps');
 
     await updateRun(runId, { state: 'restarting_frontend' });
     await runCommand(

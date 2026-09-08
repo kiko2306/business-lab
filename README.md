@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.49.6** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.49.7** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -233,34 +233,26 @@ it is done — not ticked off and left behind. Section references point at
 
 Updates:
 
-- [ ] **@mat: self-update panel — §291's original bug is fixed and
-      confirmed live; a second, distinct issue still needs a real fix**
-      (§131.4, §198, §199, §290–§295) — §291's finding (`up --build
-      frontend` also recreating `database`/`docker-socket-proxy` via a
-      Compose version-skew config-hash mismatch, §292) is fixed
-      (`9243271`, pinned Compose to match the host) and **confirmed twice
-      live**: once read-only (§293), once with a full real self-update run
-      (§295) — 46/47 apps updated, `database`/`docker-socket-proxy`
-      untouched. That specific bug is closed.
-      A **different** failure showed up in the same run instead:
-      `backend`'s own self-replacement (the final, necessarily detached/
-      unawaited step — the process can't await killing itself) got
-      SIGKILLed mid-swap under real memory/load pressure (all 47 apps
-      recreating plus the build, concurrently — host was at 282Mi free,
-      3.7/4.0Gi swap used at the time), leaving a renamed, never-started
-      container and the dashboard down until manually recovered twice
-      (`docker compose up -d backend`, then a `docker rm -f` + retry
-      since the first attempt inherited the stale renamed-container
-      name). Also surfaced: `reconcileDanglingSelfUpdateRun()` only
-      recognizes a run stuck in `restarting_backend`, not the earlier
-      `restarting_frontend` state this run got stuck in — that run's DB
-      row (`id=4`) will show "in progress" forever unless fixed by hand.
-      Needs: (a) a way to detect/recover a backend swap that never
-      completed (the boot-time reconciler's coverage gap), and (b)
-      deciding whether this host's memory headroom during a full
-      self-update is itself the thing to fix (more RAM, or serializing
-      the app-update phase more gently) before "Update now" is safe to
-      walk away from unattended.
+- [ ] **@mat: self-update panel — backend's own self-replacement can still
+      be killed under memory/load pressure, with no automatic recovery**
+      (§131.4, §198, §199, §290–§297) — §291's Compose version-skew bug is
+      fixed and confirmed live (§293, §295). The boot-time reconciler's
+      coverage gap (only recognized `restarting_backend`, not the earlier
+      `restarting_frontend` a real run got stuck in) is also fixed and
+      verified live against the actual dangling row (§296). §297 found and
+      pruned ~57.5GB of reclaimable Docker cruft (images/build cache) that
+      had silently piled up with no cleanup anywhere in the codebase, and
+      added a prune step to the self-update sequence itself so it doesn't
+      reaccumulate — reduces disk/memory pressure but is not a fix for the
+      original incident, which was live RAM/swap exhaustion from all 47
+      apps recreating plus the build running concurrently. Still open:
+      `backend`'s final, necessarily detached/unawaited self-replacement
+      step (the process can't await killing itself) has no automatic
+      recovery if it gets SIGKILLed mid-swap — needs either a supervisor-
+      level restart-on-failure, or a decision on whether this host's
+      memory headroom during a full self-update is itself the thing to
+      fix (more RAM, or serializing the app-update phase more gently)
+      before "Update now" is safe to walk away from unattended.
 
 Strategy:
 

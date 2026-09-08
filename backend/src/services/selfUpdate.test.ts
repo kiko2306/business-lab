@@ -224,6 +224,43 @@ describe('triggerSelfUpdate', () => {
     expect(restartCalls).toHaveLength(0);
   });
 
+  it('prunes dangling images and build cache after the build and after updating apps', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1);
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const pruneCalls = backup.runCommand.mock.calls.filter(([cmd]) => cmd === 'docker') as [string, string[]][];
+    const kinds = pruneCalls.map(([, args]) => args.join(' '));
+    expect(kinds).toContain('image prune -f');
+    expect(kinds).toContain('builder prune -f');
+    // Runs after `build` and again after the app-update batch, both times
+    // strictly before the frontend/backend restart that follows.
+    const buildIdx = kinds.findIndex((k) => k === 'build frontend backend');
+    const firstPruneIdx = kinds.findIndex((k) => k === 'image prune -f');
+    const restartFrontendIdx = kinds.findIndex((k) => k.includes('up -d --build frontend'));
+    expect(firstPruneIdx).toBeGreaterThan(buildIdx);
+    expect(restartFrontendIdx).toBeGreaterThan(firstPruneIdx);
+  });
+
+  it('does not let a failed prune block the update sequence', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1);
+    backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args.includes('pull')) return '';
+      if (args.includes('rev-parse') && args.includes('HEAD')) return 'old111\n';
+      if (args.includes('rev-parse') && args.includes('origin/main')) return 'new222\n';
+      if (args.includes('rev-list')) return '1\n';
+      if (args.includes('prune')) throw new Error('docker daemon unreachable');
+      return '';
+    });
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun).toMatchObject({ state: 'restarting_backend' });
+  });
+
   it('refuses to start a second run while one is still in progress', async () => {
     backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
       if (args.includes('rev-parse') && args.includes('HEAD')) return 'old111\n';
