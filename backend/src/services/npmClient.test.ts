@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { requestJson } from '../utils/httpJson';
-import { buildProxyHostPayload, ensureProxyHost, NpmProxyHostPartialCreateError, testNpmConnection } from './npmClient';
+import { bootstrapNpmAdminIfDefault, buildProxyHostPayload, ensureProxyHost, NpmProxyHostPartialCreateError, testNpmConnection } from './npmClient';
 
 vi.mock('../utils/httpJson', () => ({
   requestJson: vi.fn(),
@@ -327,5 +327,50 @@ describe('testNpmConnection', () => {
     mockedRequestJson.mockResolvedValueOnce({ statusCode: 401, body: { error: { message: 'bad creds' } }, raw: '' });
 
     await expect(testNpmConnection('http://npm:81', 'admin@example.com', 'wrong')).rejects.toThrow(/login failed/);
+  });
+});
+
+describe('bootstrapNpmAdminIfDefault', () => {
+  it('creates the first admin unauthenticated when GET /api/ reports setup:false', async () => {
+    mockedRequestJson
+      .mockResolvedValueOnce({ statusCode: 200, body: { setup: false }, raw: '' }) // GET /api/
+      .mockResolvedValueOnce({ statusCode: 201, body: { id: 1 }, raw: '' }); // POST /api/users
+
+    const result = await bootstrapNpmAdminIfDefault('http://npm:81');
+
+    expect(result).toEqual({ email: 'admin@example.com', password: expect.any(String) });
+    expect(mockedRequestJson).toHaveBeenCalledTimes(2);
+    const [createUrl, createOptions] = mockedRequestJson.mock.calls[1];
+    expect(createUrl).toBe('http://npm:81/api/users');
+    expect(createOptions).toMatchObject({ method: 'POST' });
+  });
+
+  it('falls back to the legacy default-credential rotation when setup is already done', async () => {
+    mockedRequestJson
+      .mockResolvedValueOnce({ statusCode: 200, body: { setup: true }, raw: '' }) // GET /api/
+      .mockResolvedValueOnce({ statusCode: 200, body: { token: 'jwt' }, raw: '' }) // POST /api/tokens (legacy login)
+      .mockResolvedValueOnce({ statusCode: 200, body: { id: 7 }, raw: '' }) // GET /api/users/me
+      .mockResolvedValueOnce({ statusCode: 200, body: {}, raw: '' }); // PUT /api/users/7/auth
+
+    const result = await bootstrapNpmAdminIfDefault('http://npm:81');
+
+    expect(result).toEqual({ email: 'admin@example.com', password: expect.any(String) });
+    expect(mockedRequestJson).toHaveBeenCalledTimes(4);
+  });
+
+  it('returns null without throwing when neither the setup flow nor the legacy default applies', async () => {
+    mockedRequestJson
+      .mockResolvedValueOnce({ statusCode: 200, body: { setup: true }, raw: '' }) // GET /api/
+      .mockResolvedValueOnce({ statusCode: 401, body: { error: { message: 'bad creds' } }, raw: '' }); // legacy login fails
+
+    await expect(bootstrapNpmAdminIfDefault('http://npm:81')).resolves.toBeNull();
+  });
+
+  it('surfaces an unexpected failure creating the first admin rather than swallowing it', async () => {
+    mockedRequestJson
+      .mockResolvedValueOnce({ statusCode: 200, body: { setup: false }, raw: '' }) // GET /api/
+      .mockResolvedValueOnce({ statusCode: 500, body: { error: { message: 'db down' } }, raw: '' }); // POST /api/users
+
+    await expect(bootstrapNpmAdminIfDefault('http://npm:81')).rejects.toThrow(/Unable to create/);
   });
 });

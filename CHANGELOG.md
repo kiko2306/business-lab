@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.49.1] — 2026-09-08
+
+### Exposure
+
+- Correct NPM's admin bootstrap for current releases: no fixed default account exists any more, it needs POST /api/users while GET /api/ reports setup:false — confirmed live on a throwaway NPM instance
+
 ## [0.49.0] — 2026-09-08
 
 ### Exposure

@@ -295,25 +295,61 @@ export async function testNpmConnection(npmApiUrl: string, npmEmail: string, npm
 // from its own docs, not a secret this app is guessing. That means it's
 // "genuinely obtainable" under plan.md §0.3: no user step should be needed
 // to get past it.
-const NPM_DEFAULT_EMAIL = 'admin@example.com';
-const NPM_DEFAULT_PASSWORD = 'changeme';
+// Current NPM (confirmed on 2.15.1) ships with **no** admin user at all —
+// its own web UI walks a human through `POST /users`, unauthenticated,
+// exactly once, the moment `GET /api/` reports `setup: false`. There is no
+// fixed default account to log into any more; the "admin@example.com /
+// changeme" seed documented in older guides (and in this file, before this
+// comment) was retired upstream. NPM_LEGACY_* below is kept only as a
+// fallback for anyone pinning an older NPM image.
+const NPM_BOOTSTRAP_EMAIL = 'admin@example.com';
+const NPM_BOOTSTRAP_NAME = 'Dashboard Admin';
+const NPM_LEGACY_DEFAULT_EMAIL = 'admin@example.com';
+const NPM_LEGACY_DEFAULT_PASSWORD = 'changeme';
 
 /**
- * If NPM is still sitting on its default admin credentials, rotate the
- * password to a random value this app then owns, and return the (email,
- * new password) pair for the caller to persist as the dashboard's Exposure
- * settings. Returns null — never throws for this specific case — when the
- * default credentials don't work, which just means an admin already
- * changed them (by hand, or by an earlier run of this same bootstrap): that
- * account is left alone either way, since this must never overwrite
+ * If NPM has never had an admin account created (current releases) or is
+ * still sitting on its old fixed default (older releases), create/rotate it
+ * to a random password this app then owns, and return the (email, password)
+ * pair for the caller to persist as the dashboard's Exposure settings.
+ * Returns null — never throws for this specific case — when neither applies,
+ * which just means an admin account already exists and was set up some
+ * other way: it is left alone either way, since this must never overwrite
  * credentials someone else already set.
  */
 export async function bootstrapNpmAdminIfDefault(npmApiUrl: string): Promise<{ email: string; password: string } | null> {
   const base = npmApiUrl.replace(/\/+$/, '');
+  const generatedPassword = randomBytes(24).toString('hex');
+
+  const healthResponse = await requestJson<{ setup?: boolean }>(`${base}/api/`);
+  if (healthResponse.statusCode === 200 && healthResponse.body?.setup === false) {
+    const createResponse = await requestJson<{ id?: number; error?: { message?: string } }>(`${base}/api/users`, {
+      method: 'POST',
+      body: {
+        name: NPM_BOOTSTRAP_NAME,
+        nickname: 'admin',
+        email: NPM_BOOTSTRAP_EMAIL,
+        roles: ['admin'],
+        is_disabled: false,
+        auth: { type: 'password', secret: generatedPassword },
+      },
+    });
+    if (createResponse.statusCode === 200 || createResponse.statusCode === 201) {
+      return { email: NPM_BOOTSTRAP_EMAIL, password: generatedPassword };
+    }
+    // Anything but a plain rejection (e.g. a race where setup finished
+    // between the two calls above) should surface, not be silently treated
+    // as "no bootstrap possible."
+    if (createResponse.statusCode !== 400) {
+      throw new Error(
+        `Unable to create Nginx Proxy Manager's first admin user: ${createResponse.body?.error?.message || createResponse.statusCode}`
+      );
+    }
+  }
 
   let token: string;
   try {
-    token = await login(base, NPM_DEFAULT_EMAIL, NPM_DEFAULT_PASSWORD);
+    token = await login(base, NPM_LEGACY_DEFAULT_EMAIL, NPM_LEGACY_DEFAULT_PASSWORD);
   } catch {
     return null;
   }
@@ -326,17 +362,16 @@ export async function bootstrapNpmAdminIfDefault(npmApiUrl: string): Promise<{ e
     throw new Error(`Unable to read Nginx Proxy Manager's own admin user: ${meResponse.statusCode}`);
   }
 
-  const newPassword = randomBytes(24).toString('hex');
   const authResponse = await requestJson(`${base}/api/users/${userId}/auth`, {
     method: 'PUT',
     headers: { Authorization: `Bearer ${token}` },
-    body: { type: 'password', current: NPM_DEFAULT_PASSWORD, secret: newPassword },
+    body: { type: 'password', current: NPM_LEGACY_DEFAULT_PASSWORD, secret: generatedPassword },
   });
   if (authResponse.statusCode !== 200) {
     throw new Error(`Unable to rotate Nginx Proxy Manager's default admin password: ${authResponse.statusCode}`);
   }
 
-  return { email: NPM_DEFAULT_EMAIL, password: newPassword };
+  return { email: NPM_LEGACY_DEFAULT_EMAIL, password: generatedPassword };
 }
 
 type ProxyHostWriteOptions = Pick<
