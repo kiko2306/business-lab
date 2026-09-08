@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.49.0] — 2026-09-08
+
+### Exposure
+
+- Automate NPM's default-admin bootstrap: rotating off admin@example.com/changeme, and seeding the dashboard's Exposure settings, needs no manual step anymore
+
 ## [0.48.6] — 2026-09-08
 
 ### Security

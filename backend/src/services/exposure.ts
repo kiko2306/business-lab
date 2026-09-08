@@ -20,10 +20,10 @@ import fs from 'fs';
 import path from 'path';
 import { parseEnvFile } from '../utils/envFile';
 import { query } from '../utils/database';
-import { getExposureConfig } from '../utils/exposureSettings';
+import { EXPOSURE_SETTINGS_KEYS, getExposureConfig, getNpmApiUrl } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
 import { SERVICES, buildExposureHostname, getPublishedUpstreamPort, getService, isAutheliaProtectionRequired } from '../config/services';
-import { deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
+import { bootstrapNpmAdminIfDefault, deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
@@ -543,13 +543,49 @@ export async function reconcileRemovedServices(): Promise<void> {
   }
 }
 
+/**
+ * NPM's admin login is the one piece of "global exposure settings" that
+ * previously needed a human to type it in once (§0.2's .env.example: "the
+ * NPM half can't be [seeded]") — its default credentials have to be changed
+ * before the API is usable for anything, and nothing else here knew the new
+ * password. But the default credentials are public, documented, fixed
+ * values, not a secret to guess, so per §0.3 ("prompt only for what it
+ * genuinely cannot obtain") this can run itself: try the default, and if it
+ * still works, rotate the password and store both as the dashboard's own
+ * Exposure settings — exactly what a human would otherwise type into
+ * Settings once. No-op (never throws into the caller) if the defaults don't
+ * work, which just means an admin already changed them.
+ */
+async function ensureNpmAdminBootstrapped(): Promise<void> {
+  const npmApiUrl = await getNpmApiUrl();
+  let bootstrapped: { email: string; password: string } | null;
+  try {
+    bootstrapped = await bootstrapNpmAdminIfDefault(npmApiUrl);
+  } catch (error) {
+    logger.warn('NPM admin bootstrap attempt failed', { error: (error as Error).message });
+    return;
+  }
+  if (!bootstrapped) return;
+
+  await query(
+    `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW()), ($3, $4, NOW())
+     ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+    [EXPOSURE_SETTINGS_KEYS.npmEmail, bootstrapped.email, EXPOSURE_SETTINGS_KEYS.npmPassword, bootstrapped.password]
+  );
+  logger.info('Rotated Nginx Proxy Manager off its default admin credentials');
+}
+
 export async function provisionServiceIfEnabled(serviceName: string, userId: number): Promise<ExposureProvisionResult> {
   const exposureRow = await getServiceExposureRow(serviceName);
   if (!exposureRow || !exposureRow.enabled) {
     return { attempted: false };
   }
 
-  const globalConfig = await getExposureConfig();
+  let globalConfig = await getExposureConfig();
+  if (!globalConfig) {
+    await ensureNpmAdminBootstrapped();
+    globalConfig = await getExposureConfig();
+  }
   if (!globalConfig) {
     const message = 'Exposure is enabled for this service, but global exposure settings are incomplete.';
     await recordProvisioningResult(serviceName, { status: 'failed', lastError: message });

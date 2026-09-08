@@ -1,16 +1,22 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { query } from '../utils/database';
-import { getExposureConfig } from '../utils/exposureSettings';
+import { getExposureConfig, getNpmApiUrl } from '../utils/exposureSettings';
 import { getHostGatewayIp } from '../utils/network';
 import { getPublishedUpstreamPort, getService } from '../config/services';
-import { deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
+import { bootstrapNpmAdminIfDefault, deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
 import { deprovisionServiceExposure, getExposability, getNpmOriginUrl, provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
 import { ServiceExposureRow, ExposureGlobalConfig } from '../types';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
-vi.mock('../utils/exposureSettings', () => ({ getExposureConfig: vi.fn() }));
+vi.mock('../utils/exposureSettings', async (importOriginal) => ({
+  // EXPOSURE_SETTINGS_KEYS is a plain const object — keep the real one so
+  // the query-shape assertions below match production key names.
+  ...(await importOriginal<typeof import('../utils/exposureSettings')>()),
+  getExposureConfig: vi.fn(),
+  getNpmApiUrl: vi.fn(),
+}));
 vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn() }));
 vi.mock('../config/services', () => ({
   getPublishedUpstreamPort: vi.fn(),
@@ -27,6 +33,7 @@ vi.mock('./npmClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./npmClient')>()),
   ensureProxyHost: vi.fn(),
   deleteProxyHost: vi.fn(),
+  bootstrapNpmAdminIfDefault: vi.fn(),
 }));
 vi.mock('./cloudflareTunnelClient', () => ({ ensureIngressRoute: vi.fn(), removeIngressRoute: vi.fn() }));
 vi.mock('../utils/audit', () => ({ writeAuditLog: vi.fn().mockResolvedValue(undefined) }));
@@ -34,6 +41,7 @@ vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), wa
 
 const mockedQuery = vi.mocked(query);
 const mockedGetExposureConfig = vi.mocked(getExposureConfig);
+const mockedGetNpmApiUrl = vi.mocked(getNpmApiUrl);
 const mockedGetHostGatewayIp = vi.mocked(getHostGatewayIp);
 const mockedGetPublishedUpstreamPort = vi.mocked(getPublishedUpstreamPort);
 const mockedGetService = vi.mocked(getService);
@@ -41,6 +49,7 @@ const mockedEnsureProxyHost = vi.mocked(ensureProxyHost);
 const mockedEnsureIngressRoute = vi.mocked(ensureIngressRoute);
 const mockedRemoveIngressRoute = vi.mocked(removeIngressRoute);
 const mockedDeleteProxyHost = vi.mocked(deleteProxyHost);
+const mockedBootstrapNpmAdminIfDefault = vi.mocked(bootstrapNpmAdminIfDefault);
 const mockedWriteAuditLog = vi.mocked(writeAuditLog);
 
 const globalConfig: ExposureGlobalConfig = {
@@ -80,6 +89,10 @@ beforeEach(() => {
   mockedQuery.mockReset();
   mockedQuery.mockResolvedValue({ rows: [] } as never);
   mockedGetExposureConfig.mockReset();
+  mockedGetNpmApiUrl.mockReset();
+  mockedGetNpmApiUrl.mockResolvedValue('http://npm:81');
+  mockedBootstrapNpmAdminIfDefault.mockReset();
+  mockedBootstrapNpmAdminIfDefault.mockResolvedValue(null);
   mockedGetHostGatewayIp.mockReset();
   mockedGetPublishedUpstreamPort.mockReset();
   mockedGetService.mockReset();
@@ -111,9 +124,10 @@ describe('provisionServiceIfEnabled', () => {
     expect(mockedGetExposureConfig).not.toHaveBeenCalled();
   });
 
-  it('fails without touching NPM/Cloudflare when global exposure settings are incomplete', async () => {
+  it('fails without touching NPM/Cloudflare when global exposure settings are incomplete and NPM is not on default credentials', async () => {
     mockedQuery.mockResolvedValueOnce({ rows: [exposureRow()] } as never);
-    mockedGetExposureConfig.mockResolvedValueOnce(null);
+    mockedGetExposureConfig.mockResolvedValue(null);
+    mockedBootstrapNpmAdminIfDefault.mockResolvedValueOnce(null);
 
     const result = await provisionServiceIfEnabled('paperless', 1);
 
@@ -122,7 +136,25 @@ describe('provisionServiceIfEnabled', () => {
       success: false,
       warning: 'Exposure is enabled for this service, but global exposure settings are incomplete.',
     });
+    expect(mockedBootstrapNpmAdminIfDefault).toHaveBeenCalledWith('http://npm:81');
     expect(mockedEnsureProxyHost).not.toHaveBeenCalled();
+  });
+
+  it('self-heals by rotating NPM off its default admin credentials, then proceeds to provision', async () => {
+    mockedQuery.mockResolvedValueOnce({ rows: [exposureRow()] } as never);
+    mockedGetExposureConfig.mockResolvedValueOnce(null).mockResolvedValueOnce(globalConfig);
+    mockedBootstrapNpmAdminIfDefault.mockResolvedValueOnce({ email: 'admin@example.com', password: 'rotated-secret' });
+    mockedGetPublishedUpstreamPort.mockReturnValue(8080);
+    mockedEnsureProxyHost.mockResolvedValue({ id: 1, created: true, updated: false });
+
+    const result = await provisionServiceIfEnabled('paperless', 1);
+
+    expect(mockedQuery).toHaveBeenCalledWith(
+      expect.stringContaining('INSERT INTO settings'),
+      ['exposure_npm_email', 'admin@example.com', 'exposure_npm_password', 'rotated-secret']
+    );
+    expect(result.attempted).toBe(true);
+    expect(mockedEnsureProxyHost).toHaveBeenCalled();
   });
 
   it('fails when the published upstream port cannot be determined', async () => {

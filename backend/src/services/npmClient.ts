@@ -5,6 +5,7 @@
  */
 
 import { execFile } from 'node:child_process';
+import { randomBytes } from 'node:crypto';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
@@ -288,6 +289,54 @@ async function findProxyHostByDomain(npmApiUrl: string, token: string, hostname:
  */
 export async function testNpmConnection(npmApiUrl: string, npmEmail: string, npmPassword: string): Promise<void> {
   await login(npmApiUrl.replace(/\/+$/, ''), npmEmail, npmPassword);
+}
+
+// NPM ships every install with this fixed admin account — public knowledge
+// from its own docs, not a secret this app is guessing. That means it's
+// "genuinely obtainable" under plan.md §0.3: no user step should be needed
+// to get past it.
+const NPM_DEFAULT_EMAIL = 'admin@example.com';
+const NPM_DEFAULT_PASSWORD = 'changeme';
+
+/**
+ * If NPM is still sitting on its default admin credentials, rotate the
+ * password to a random value this app then owns, and return the (email,
+ * new password) pair for the caller to persist as the dashboard's Exposure
+ * settings. Returns null — never throws for this specific case — when the
+ * default credentials don't work, which just means an admin already
+ * changed them (by hand, or by an earlier run of this same bootstrap): that
+ * account is left alone either way, since this must never overwrite
+ * credentials someone else already set.
+ */
+export async function bootstrapNpmAdminIfDefault(npmApiUrl: string): Promise<{ email: string; password: string } | null> {
+  const base = npmApiUrl.replace(/\/+$/, '');
+
+  let token: string;
+  try {
+    token = await login(base, NPM_DEFAULT_EMAIL, NPM_DEFAULT_PASSWORD);
+  } catch {
+    return null;
+  }
+
+  const meResponse = await requestJson<{ id?: number }>(`${base}/api/users/me`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  const userId = meResponse.body?.id;
+  if (meResponse.statusCode !== 200 || !userId) {
+    throw new Error(`Unable to read Nginx Proxy Manager's own admin user: ${meResponse.statusCode}`);
+  }
+
+  const newPassword = randomBytes(24).toString('hex');
+  const authResponse = await requestJson(`${base}/api/users/${userId}/auth`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: { type: 'password', current: NPM_DEFAULT_PASSWORD, secret: newPassword },
+  });
+  if (authResponse.statusCode !== 200) {
+    throw new Error(`Unable to rotate Nginx Proxy Manager's default admin password: ${authResponse.statusCode}`);
+  }
+
+  return { email: NPM_DEFAULT_EMAIL, password: newPassword };
 }
 
 type ProxyHostWriteOptions = Pick<
