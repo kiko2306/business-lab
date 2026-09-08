@@ -20573,3 +20573,70 @@ TODO cleanup, no code. Removed from the README list:
   client to stand up and maintain. The Meta/Instagram path is dropped as a
   target; the Business Lab social story stays on the Tier A providers
   (Bluesky/Mastodon) that need only a token.
+
+## 283. Full fresh-deployment proof against tx-home-utils.com — real bug found and fixed (2026-09-08)
+
+**Context.** The dev workstation moved to WSL; the live test box is now
+reached over LAN SSH (`mat@192.168.1.236`, hostname `home-srv-01`) instead of
+locally. To use the new setup as a real end-to-end proof of "fresh clone
+works," did a full teardown and redeploy against the real host: deleted every
+Cloudflare DNS record in the zone, deleted the Tunnel itself, force-removed
+every app/management container, volume and network, `rm -rf`'d the repo
+clone, fresh-cloned, and re-ran `sudo ./start.sh` unattended (BASE_DOMAIN +
+CLOUDFLARE_API_TOKEN + TUNNEL_NAME pre-seeded from a server-side-only backup
+of the old `.env`, so no secret ever passed through the driving shell's
+command text — see the teardown script's approach if repeating this).
+
+**What went wrong, and what was a real bug vs. tooling noise:**
+
+1. **Container teardown loop skipped two apps** (`nginx-proxy-manager`,
+   `paperless`) for an unexplained reason — never reproduced, worked around by
+   force-removing them by compose-project label afterward. Not chased further
+   since it's a one-off teardown script, not shipped code.
+2. **`rm -rf` on the repo directory failed** on root-owned files under
+   `backend/node_modules` (built inside a container running as root) —
+   needed `sudo rm -rf`, not a plain user-level one.
+3. **Background jobs over a bare `ssh host 'nohup cmd &'` died mid-run**,
+   silently, no matter how the process was detached (`nohup`, `setsid`,
+   `disown` all tried). Root cause: `loginctl show-user` showed `Linger=no`
+   for the user — without lingering, systemd-logind tears down the whole
+   user session scope (and everything in it) once the last login session
+   ends, regardless of POSIX-level session detachment. Fix used: don't
+   background remotely at all — run the command as the foreground process of
+   an SSH call that itself is backgrounded locally, so the SSH TCP session
+   stays open for the whole run. (Enabling linger would also fix it, but that
+   changes host state and wasn't necessary.)
+4. **The real bug**, in `start.sh` itself: `current_value()` and
+   `app_env_value()` read a key with `grep -E "^${key}=" "$ENV_FILE" | head
+   -n1 | cut -d= -f2-`. Under `set -euo pipefail`, a key that is *entirely
+   absent* from `.env` (not just blank) makes `grep` exit 1, `pipefail`
+   propagates that through the pipeline, and an assignment like `DASH_SUB="$(
+   current_value DASHBOARD_SUBDOMAIN)"` at the dashboard-publishing step
+   aborts the *entire script* right there — silently, no error text, because
+   `grep` prints nothing to stderr on no-match. `DASHBOARD_SUBDOMAIN` has no
+   line in `.env.example` (unlike `BASE_DOMAIN`, `POSTGRES_USER` etc., which
+   are always present as a key even when blank, so `grep` still matches the
+   line and exits 0). This is why it was never caught before: every existing
+   deployment already had `DASHBOARD_SUBDOMAIN` sitting in `.env` from a
+   previous run or manual dashboard edit, and only a genuinely fresh `.env`
+   ever hits the absent-key path. Confirmed the exact failure mode locally
+   before touching the fix:
+   `bash -c 'set -euo pipefail; x=$(grep -E "^NOPE=" /etc/hostname); echo after'`
+   prints nothing and exits 1.
+
+**Fix.** Both helpers in `start.sh` now end their pipeline with `|| true`, so
+a genuinely-absent key returns an empty string (the function's actual
+contract) instead of killing the script. Verified: `bash -n start.sh` passes,
+and a second full unattended `sudo ./start.sh` run against the same fresh
+clone completed cleanly — dashboard built, started, published at
+`https://homelab.tx-home-utils.com` (fresh DNS record, fresh Tunnel, fresh
+connector), confirmed reachable both on `localhost:10001` and over the public
+hostname (`HTTP 200` both).
+
+**Left as-is / follow-up:** Tailscale wasn't seeded (no auth key supplied for
+this unattended run), so NetBird's signal server has no public address yet —
+expected, not a bug; `./start.sh` prints the exact warning and re-run
+instructions. The other ~35 apps are intentionally not auto-started by
+`start.sh` — that's the dashboard's job per-app, not the bootstrap script's;
+this run only proves the bootstrap path (dashboard + Cloudflare + Authelia +
+NetBird plumbing), not every app's own bring-up.

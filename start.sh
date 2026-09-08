@@ -47,7 +47,11 @@ set_env_var() {
 }
 
 current_value() {
-  grep -E "^${1}=" "$ENV_FILE" | head -n1 | cut -d= -f2-
+  # `|| true`: a key genuinely absent from .env (not just blank) makes grep
+  # exit 1, and under `set -euo pipefail` that silently kills the whole
+  # script at the call site — every optional key with no .env.example
+  # default (e.g. DASHBOARD_SUBDOMAIN) hit this on a truly fresh clone.
+  grep -E "^${1}=" "$ENV_FILE" | head -n1 | cut -d= -f2- || true
 }
 
 # Generate a secret the first time only — never overwrites a value the user
@@ -103,7 +107,9 @@ set_app_env_var() {
 
 app_env_value() {
   [ -f "$1" ] || return 0
-  grep -E "^${2}=" "$1" | head -n1 | cut -d= -f2-
+  # See current_value's comment: a key absent from the file makes grep exit
+  # 1, which set -euo pipefail turns into a silent full-script abort.
+  grep -E "^${2}=" "$1" | head -n1 | cut -d= -f2- || true
 }
 
 # Fill a placeholder secret in an app's .env, once. Never overwrites a real value.
