@@ -20640,3 +20640,62 @@ instructions. The other ~35 apps are intentionally not auto-started by
 `start.sh` — that's the dashboard's job per-app, not the bootstrap script's;
 this run only proves the bootstrap path (dashboard + Cloudflare + Authelia +
 NetBird plumbing), not every app's own bring-up.
+
+## 284. Started every app from the dashboard for the first time — one more real bug found and fixed (2026-09-08)
+
+**Context.** Continuation of §283's fresh redeploy: completed the dashboard's
+`/setup` (first admin account) and started all 47 registry apps via the same
+API the UI uses (`POST /api/services/:name/start`), in dependency-safe order
+(`authelia` before `netbird-vpn`/`wetty`, which hard-`dependsOn` it —
+`executor.ts` refuses to start a service whose dependency isn't already
+running rather than auto-starting it).
+
+**Result: 45/47 started cleanly.** Two expected non-bugs:
+- **Pi-hole** — `failed to bind host port 0.0.0.0:53/tcp: address already in
+  use`. Something on the host already holds port 53 (likely
+  `systemd-resolved`). Host-level conflict, not investigated further; left as
+  a README item.
+- **SQL Server** — blocked on its Microsoft-licence acceptance gate by
+  design (`Settings → SQL Server licence`).
+
+**A real bug: Vaultwarden crash-looped on every fresh deploy with no mail
+configured.** Two layers, found by peeling one back at a time:
+
+1. `SMTP_SECURITY: ${SMTP_SECURITY:-}` — compose's `${VAR:-}` still *defines*
+   the container env var as an empty string, and Vaultwarden's config parser
+   rejects `""` as an invalid enum value (must be `starttls`/`force_tls`/
+   `off`), crashing with "Error loading config: `SMTP_SECURITY` is invalid."
+   First fix attempt: default it to `off` instead of `""`.
+2. That unmasked the *next* crash underneath: "Both `SMTP_HOST` and
+   `SMTP_FROM` need to be set for email support without `USE_SENDMAIL`".
+   Tested directly against the container (bypassing `.env`, using shell env
+   overrides on `docker compose up`) to isolate the cause: swapping
+   `SMTP_SECURITY`'s value around didn't change anything, but removing the
+   `SMTP_HOST`/`SMTP_FROM` compose lines *entirely* fixed it. Confirms
+   Vaultwarden's config parser treats a present-but-empty env var as
+   `Some("")` — "configured" — not `None` — "unset" — for these two fields
+   specifically. No default *value* can fix that; the var has to be
+   genuinely absent from the container's environment, which plain compose
+   `environment:` mapping can't express (a key with no host-side value still
+   materializes in the container).
+
+   Fixed with an `entrypoint:` override: a small shell wrapper that `unset`s
+   all seven `SMTP_*` vars when `SMTP_HOST` is empty, then `exec /start.sh`
+   (the image's own entrypoint). This was never caught before because every
+   existing deployment had SMTP_SECURITY sitting in `.env` from some earlier
+   session (same root shape as §283's `start.sh` bug: masked by leftover
+   state, not by correctness).
+
+   This is Vaultwarden-specific — the same `mailEnvKeys` pattern (BookStack,
+   n8n, Paperless, etc., `backend/src/services/mailEnv.ts`) works fine
+   elsewhere because those apps' own runtimes tolerate an empty string as
+   "not configured." Not generalized into `mailEnv.ts` for that reason.
+
+**Also expected, not a bug:** `netbird-vpn-netbird-management-1`
+crash-loops — its `management.json` points at Authelia's public OIDC
+endpoint (`https://authelia.<domain>/.well-known/openid-configuration`)
+unconditionally, and no app's public exposure has been turned on yet in this
+fresh deploy (that's a separate, per-app, opt-in dashboard action — §112.3).
+Left as a README item rather than worked around, since enabling exposure is
+a real decision (Cloudflare DNS + NPM host get created), not something to
+do silently as a side effect of "start the apps."

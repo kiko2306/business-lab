@@ -416,8 +416,20 @@ and proven on the real stack) are done. Phase tags below.
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
-- [ ] **VPS fresh-setup test** (§61.5) — `start.sh` has been audited for the
-      fresh-install path but never run on a clean VPS.
+- [ ] **@mat: enable Pi-hole exposure or free port 53** (§283) — starting
+      Pi-hole from a fresh deploy fails: `failed to bind host port
+      0.0.0.0:53/tcp: address already in use`. Something else on the host
+      (likely `systemd-resolved`) already holds port 53 — find and free it,
+      or remap Pi-hole's compose port if this host is never meant to be the
+      LAN's actual resolver.
+- [ ] **@mat: enable Authelia's public exposure to unblock NetBird** (§283)
+      — `netbird-vpn-management` crash-loops (`dial tcp: lookup
+      authelia.<domain>: no such host`) until Authelia itself has "Publicly
+      expose this service" enabled in the dashboard — NetBird's
+      `management.json` points at Authelia's public OIDC endpoint
+      unconditionally, so this is a hard startup-order requirement on any
+      fresh deploy, not a bug. Enable Authelia's exposure, then restart
+      `netbird-vpn`.
 - [ ] **@mat: prove MeshCentral live with a real agent** (§62.2, §264) — the
       app is built (`apps/meshcentral/`, port `10550`, `mesh.<domain>`) and
       env-driven config is wired, but the reverse-proxy path is unproven:
