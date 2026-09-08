@@ -31,4 +31,22 @@ describe('ensurePaperlessDropbox', () => {
     ensurePaperlessDropbox(appDir);
     expect(() => ensurePaperlessDropbox(appDir)).not.toThrow();
   });
+
+  it('tolerates a chmod EPERM when the dir is already world-writable', () => {
+    ensurePaperlessDropbox(appDir);
+    const dropbox = path.join(root, 'file-browser', 'data', 'files', 'to-paperless');
+    // Simulate "owned by another uid": chmod throws EPERM but the mode is fine.
+    const realChmod = fs.chmodSync;
+    (fs as unknown as { chmodSync: unknown }).chmodSync = () => {
+      const e = new Error('EPERM') as NodeJS.ErrnoException;
+      e.code = 'EPERM';
+      throw e;
+    };
+    try {
+      expect(() => ensurePaperlessDropbox(appDir)).not.toThrow();
+    } finally {
+      (fs as unknown as { chmodSync: unknown }).chmodSync = realChmod;
+    }
+    expect(fs.statSync(dropbox).mode & 0o007).toBe(0o007);
+  });
 });

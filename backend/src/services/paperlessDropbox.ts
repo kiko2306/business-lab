@@ -21,5 +21,17 @@ import path from 'path';
 export function ensurePaperlessDropbox(appDir: string): void {
   const dir = path.join(appDir, '..', 'file-browser', 'data', 'files', 'to-paperless');
   fs.mkdirSync(dir, { recursive: true });
-  fs.chmodSync(dir, 0o777);
+  try {
+    fs.chmodSync(dir, 0o777);
+  } catch (err) {
+    // chmod succeeds only as the dir's owner (or root). Once the dir already
+    // exists owned by another uid — e.g. file-browser's container created it —
+    // the backend container is neither, and chmod throws EPERM even when the
+    // mode is already 0777. That is harmless: this call only ever wanted the
+    // dir world-writable so whichever app's uid gets there first can write and
+    // delete. Re-raise only if it is genuinely not writable-by-all.
+    if ((fs.statSync(dir).mode & 0o007) !== 0o007) {
+      throw err;
+    }
+  }
 }

@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.48.5] — 2026-09-08
+
+### Fixed
+
+- ensurePaperlessDropbox: tolerate a chmod EPERM when the shared drop box already exists world-writable but is owned by another container's uid — it was aborting every Paperless start
+
 ## [0.48.4] — 2026-09-08
 
 ### Changed
