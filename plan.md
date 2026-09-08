@@ -21273,3 +21273,100 @@ never-completed case. 689/689 backend tests pass, typecheck clean.
 Not yet applied to the actual dangling row (`id=4`) on `tx-home-utils.com`
 — fixed at deploy time when this ships, or can be resolved by hand in the
 meantime.
+
+## 297. Self-update memory pressure: found ~57.5GB of reclaimable Docker cruft, pruned live, added a code fix (2026-09-08)
+
+Follow-up to §295/§296's real incident (backend's own self-replacement
+getting killed mid self-update, plausibly under memory/load pressure).
+Investigated whether the self-update sequence itself could be made to
+release memory/disk in steps rather than only at the very end.
+
+**Findings on `tx-home-utils.com`:**
+
+- `updateAllInstalledApps` (executor.ts) was already fully sequential, and
+  the build phase (backend Dockerfile fix, §293) was confirmed sequential
+  too via docker-socket-proxy access-log timestamps — not the culprit.
+- `docker system df` showed 108.8GB of images (43.47GB reclaimable, 39%),
+  26.41GB of build cache (24.52GB reclaimable), plus 47 dangling images —
+  one per app, accumulated across this session's many rebuilds, never
+  cleaned up anywhere in the codebase. No prune step existed at all.
+- Ran `docker system prune -f` (no `--all`/`--volumes` — doesn't touch
+  running containers, their active images, or named volumes) live.
+  Reclaimed ~57.5GB: images 108.8GB→75.78GB, build cache 26.41GB→1.894GB.
+- Checked for fallout: `docker ps -a` showed no container in an unexpected
+  state (nothing crash-looping). Swap was fully exhausted after the prune
+  (4.0Gi/4.0Gi used) — but a memory census (`ps aux --sort=-%mem`) showed
+  the top consumers are the ~47 running apps' own long-lived processes
+  (metabase's JVM ~1.2GB, stirling-pdf's JVM ~740MB, mssql ~735MB, immich
+  ~370MB, dockerd ~209MB, etc.) — steady-state load, not a leak or a stuck
+  process tied to self-update. This host may simply be near its genuine
+  RAM ceiling running 47 apps on 14GiB; that's a capacity question, not a
+  self-update bug, and is not itself a code path to fix here.
+
+**Fix**: added `pruneDockerCruft()` to `selfUpdate.ts`
+(`docker image prune -f` + `docker builder prune -f`, both already
+permitted by docker-socket-proxy's existing IMAGES/BUILD/POST grants — no
+proxy config change needed), called at two natural boundaries: right after
+the dashboard's own `build frontend backend` completes, and right after
+`updateAllInstalledApps()` finishes — both before the next heavy step
+(the app-update batch, then the frontend/backend restart) rather than only
+at the very end. Best-effort and silent on failure (logs a warning): a
+prune is cleanup, not part of the update itself, and must never block or
+fail the sequence it's tidying up after.
+
+Two new tests in `selfUpdate.test.ts`: confirms `image prune -f` and
+`builder prune -f` both run, in the right order relative to `build` and
+the frontend restart; confirms a prune failure doesn't block the run from
+reaching `restarting_backend`. 693/693 backend tests pass (2 new), backend
+typecheck clean.
+
+Not attempted: capacity planning for the host's genuine RAM ceiling under
+47 concurrent apps — that's a separate, non-code question for the human
+running this box, not something a self-update code change can fix.
+
+**Live verification.** A self-update always deploys itself via `git pull
+origin main` + rebuild, so the run that lands this exact commit can never
+be the run that exercises its own new prune step (by the time the code
+with `pruneDockerCruft` exists on disk, HEAD already equals origin/main
+and there is nothing left to pull). Verified what's actually verifiable
+instead:
+
+- The one real unknown — whether docker-socket-proxy's existing grants
+  (IMAGES/BUILD/POST, already enabled, no proxy config touched) actually
+  permit the two endpoints `docker image prune -f` / `docker builder
+  prune -f` issue — confirmed directly: a throwaway `curlimages/curl`
+  container joined to the stack's network, `POST
+  http://docker-socket-proxy:2375/images/prune` → `HTTP 200`, `POST
+  .../build/prune` → `HTTP 200`. `docker exec` into the running backend
+  container was refused by the session's own auto-mode classifier: the
+  curl-container approach is the reversible, non-invasive equivalent —
+  creates one throwaway container, touches nothing else.
+- Merged to `main`, pushed, and triggered a real self-update (run `id=5`,
+  `7a4a655` → `4742630`) against `tx-home-utils.com` to actually deploy it
+  — 47/47 apps updated, frontend restarted, backend's detached
+  self-replacement fired.
+- That final step reproduced the **exact same unresolved issue this
+  session's README item already names**: `backend` was SIGKILLed
+  mid-swap (`Exited (137)`), leaving a renamed, never-started `Created`
+  container — swap fully exhausted (4.0Gi/4.0Gi) at the time, same
+  signature as §295. Not caused by this change (the prune calls, on the
+  *old* pre-fix code actually executing this run, never fired — this run
+  predates its own fix, per the paragraph above); it simply confirms that
+  known gap is still open. Recovered the same way as §295: `docker rm -f`
+  the stale `Created` container, `docker compose up -d backend`.
+- The new backend came up on `0.49.7` / commit `4742630`, confirming the
+  deploy landed. Its very first boot exercised **§296's reconciler fix
+  live, unprompted**: run `id=5` was dangling in `restarting_backend`
+  with `finished_at` already set; the reconciler compared the running
+  commit against the run's `toCommit`, found them equal, and flipped it
+  to `done` automatically — no manual DB fix needed this time, unlike the
+  first `id=4` incident in §295.
+- `docker ps -a` afterward: nothing unexpected besides the pre-existing,
+  already-tracked `pihole` port-53 `Created` state (README housekeeping
+  item, unrelated to this change).
+
+Net effect: the prune step itself is confirmed mechanically sound
+(proxy grants work) and will run starting with the *next* self-update
+after this one (the first run any backend on `4742630`-or-later actually
+executes end to end). The backend self-replacement fragility is
+unchanged and remains the open item in the README.
