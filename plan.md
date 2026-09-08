@@ -21418,3 +21418,112 @@ watchdog outside the backend's own process) rather than implemented here.
 The README item is updated to reflect three confirmed occurrences now,
 not two, and that the `--build` removal's actual effect is unverified
 pending a future run that gets to exercise it as the active code.
+
+## 299. A watchdog outside backend's own process, to recover a killed self-update restart automatically (2026-09-08)
+
+Closes the structural gap named in §298: backend cannot supervise its own
+self-update restart (`selfUpdate.ts`'s final, detached, unref'd `docker
+compose up -d backend` recreates the very container running that code) —
+if that gets SIGKILLed mid-swap, as it has three times live under real
+memory pressure (§295, §297, §298), nothing survives to notice or fix it.
+`reconcileDanglingSelfUpdateRun` (§296) closes out the *database row*
+once a new backend process boots — it does nothing if no new process
+ever boots, which is exactly what happened all three times: a stale
+`Created`-but-never-started container, recovered by hand
+(`docker rm -f` + `docker compose up -d backend`) every time.
+
+**Design.** A recovery loop has to live outside backend's own container,
+or it dies with whatever kills backend. Added two new core-stack services
+in the root `docker-compose.yml`:
+
+- `self-update-watchdog` — reuses the already-built `homelab-backend`
+  image (guarantees the same pinned Compose version as backend itself;
+  a second Dockerfile risked reintroducing §291/§292's version-skew
+  config-hash bug) with a different `command:` (not `entrypoint:` — kept
+  the image's own `docker-entrypoint.sh` so the watchdog still gets its
+  root-level fixups before dropping to `appuser`) running
+  `scripts/self-update-watchdog.sh`. Polls `docker compose ps backend
+  --status running --quiet` every 20s; after 6 consecutive down checks
+  (~2 minutes — comfortably past every observed healthy restart, short
+  enough a real failure doesn't sit for long), rechecks once more to
+  avoid racing a fix that landed in between, then `docker rm -f`s any
+  non-running `backend` container and `docker compose up -d backend`
+  (no `--build`, per §298 — reuses whatever image is already tagged).
+  POSIX `/bin/sh` (Alpine/busybox, not bash — it ships in the backend
+  image and runs as that image's CMD).
+- `watchdog-docker-proxy` — a **second**, separate `docker-socket-proxy`
+  instance, rather than widening the existing one backend uses. `DELETE`
+  (needed for `docker rm`) is new capability nothing in this codebase has
+  needed before; keeping it on a dedicated proxy whose only client is
+  this one narrow script, instead of granting it to backend's own
+  broader access, keeps that expansion scoped to exactly what's new.
+  Still no `BUILD`, `EXEC`, `SECRETS`, `SWARM`, or `PLUGINS`. Documented
+  in the compose file that `DELETE`+`IMAGES`/`NETWORKS`/`VOLUMES`
+  together could in principle reach beyond containers (the proxy's
+  category model can't scope `DELETE` narrower than that) even though
+  the script itself never issues such a call.
+
+**Verified on a throwaway stack** (not the live host — a `/tmp` scratch
+compose project, matching the "Investigate on a throwaway stack" pattern
+from §290's docker-socket-proxy investigation), proving each piece the
+design reasoning alone couldn't:
+1. `docker compose config` validates the real compose file cleanly with
+   the two new services; inspected the resolved config for both.
+2. Syntax-checked `self-update-watchdog.sh` with `dash -n` and `sh -n`
+   (POSIX sh, no bashisms).
+3. A minimal throwaway stack (`busybox` standing in for `backend`, a real
+   `tecnativa/docker-socket-proxy` with the exact same env grants as
+   `watchdog-docker-proxy`) — first attempt used an explicit `-p` project
+   name while the watchdog script (deliberately, matching
+   `selfUpdate.ts`'s own convention) passes none, so it resolved a
+   *different* default project name than the stack was brought up under.
+   Not a design bug — it reproduced exactly why the "mount `REPO_ROOT` at
+   the identical absolute path on both sides" convention this repo
+   already follows matters: Compose's default project name comes from
+   the compose file's directory name, so watchdog and backend only agree
+   on it because both containers see `REPO_ROOT` at the same path. Redid
+   the test with that convention actually followed (`REPO_ROOT` set to
+   the throwaway dir's real path, mounted at that same path, no `-p`
+   anywhere) —
+   - `docker kill`ed the stand-in "backend" (`Exited (137)`, matching the
+     real incidents exactly) and ran a fast-interval copy of the script
+     (`POLL_INTERVAL_S=3`, `GRACE_CHECKS=3`, otherwise identical) against
+     the real `watchdog-docker-proxy` config: detected it down, removed
+     the stale exited container (`docker rm -f` through the proxy —
+     the one genuinely new permission, confirmed working), recreated it,
+     new container came up healthy. This is the actual failure mode from
+     §295/§297/§298, automated end to end for the first time.
+   - Re-ran with the container recovering *on its own* partway through
+     the grace window: the down-counter reset and no recovery fired —
+     confirms the false-positive guard doesn't fight a normal restart.
+4. Full teardown of the throwaway stack and its images afterward.
+
+**Deployed and proven against the real, live backend on
+`tx-home-utils.com`.** `docker compose config` validated the file
+against the host's real `.env` first. Brought up both new services —
+`self-update-watchdog` immediately crash-looped: `docker-entrypoint.sh`
+unconditionally `chown`s `/app/backups` before dropping to `appuser`,
+under `set -eu`, and this service doesn't mount that path, so the
+directory doesn't exist and the entrypoint exits before ever reaching the
+watchdog script. Fixed by adding an otherwise-unused `backups-data:
+/app/backups` mount — cheaper than forking the entrypoint to skip one
+line for one service — redeployed, confirmed clean start and correct
+compose-file path resolution in its logs.
+
+Then the real test: `docker kill`ed the live `homelab-management-backend-1`
+directly (safe here — this host's whole reason to exist is proving code
+paths like this one, plan.md's own "no-guarantees dev/test box" section).
+Watched the watchdog's own logs live: 6 consecutive "not running" checks
+over ~2 minutes, then `removing stale backend container <id>` followed by
+`recovery: backend recreated` — unprompted, no manual command run.
+Confirmed after: `homelab-management-backend-1` `Up`, `GET /api/version`
+answering `0.49.8` again. This is the exact failure from §295/§297/§298,
+now closed without a human. `docker ps -a` afterward showed nothing
+unexpected beyond the already-tracked `pihole` port-53 `Created` state.
+
+This closes the "no automatic recovery" half of the README item that's
+been open since §295. The remaining half — whether this host's memory
+headroom during a full self-update is itself worth fixing (more RAM, or
+serializing the app-update phase more gently) — is unchanged and still
+the user's call, now lower-stakes since a SIGKILLed backend restart no
+longer means manual recovery.

@@ -233,37 +233,25 @@ it is done — not ticked off and left behind. Section references point at
 
 Updates:
 
-- [ ] **@mat: self-update panel — backend's own self-replacement can still
-      be killed under memory/load pressure, with no automatic recovery
-      (confirmed three times live now)** (§131.4, §198, §199, §290–§298) —
-      §291's Compose version-skew bug is fixed and confirmed live (§293,
-      §295). The boot-time reconciler's coverage gap (only recognized
-      `restarting_backend`, not the earlier `restarting_frontend` a real
-      run got stuck in) is also fixed and has self-healed a stuck run
-      live, unprompted, twice now (§296, §297, §298) — that part works.
-      §297 found and pruned ~57.5GB of reclaimable Docker cruft
-      (images/build cache) that had silently piled up with no cleanup
-      anywhere in the codebase, and added a prune step to the sequence
-      itself so it doesn't reaccumulate. §298 found the frontend/backend
-      restart steps were redundantly passing `--build` to an image
-      already built earlier in the same run, and removed it. Both are
-      real, verified-safe reductions in work at the risky moment, but
-      **neither is a confirmed fix for the underlying incident** — every
-      attempt to observe a fix's effect is undercut by the fact a
-      self-update run always executes as the *pre-fix* backend process
-      (the new code isn't running until that same run's last step
-      succeeds), so the run that lands a fix can never be the run that
-      tests it. §298's landing run failed the same SIGKILL-mid-swap way a
-      third time, still under the old `--build`-ed code. Still open:
-      `backend`'s final, necessarily detached/unawaited self-replacement
-      step (the process can't await killing itself) has no automatic
-      recovery if it gets SIGKILLed mid-swap — needs either a supervisor
-      *outside* the backend's own process (it structurally cannot watch
-      its own replacement — a host-level watchdog script or sidecar was
-      discussed but not built), or a decision on whether this host's
-      memory headroom during a full self-update is itself the thing to
-      fix (more RAM, or serializing the app-update phase more gently)
-      before "Update now" is safe to walk away from unattended.
+- [ ] **@mat: decide whether this host's memory headroom during a full
+      self-update is worth fixing at the infra level** (§131.4, §198,
+      §199, §290–§299) — everything code-side about the self-update panel
+      is now fixed and verified live: the Compose version-skew bug
+      (§291–§293, §295), the reconciler's `restarting_frontend` coverage
+      gap (§296), ~57.5GB of accumulated Docker cruft plus a prune step so
+      it doesn't reaccumulate (§297), a redundant rebuild at the riskiest
+      moment (§298), and — the last real gap — backend's self-replacement
+      having no automatic recovery if SIGKILLed mid-swap, closed by a
+      `self-update-watchdog` service running outside backend's own process
+      (it structurally can't supervise its own replacement), proven live
+      by `docker kill`ing the real backend and watching it recover
+      unattended (§299). What's left is purely a capacity question, not a
+      code one: this host still runs ~47 apps close to its 14GiB ceiling,
+      and a full self-update's build+all-apps-update phase still pushes
+      swap to its limit — recovery is now automatic, but repeatedly
+      hitting that ceiling isn't free. Worth more RAM, or is the current
+      behavior (occasional automatic recovery, ~1-2 min of downtime) fine
+      to leave as is?
 
 Strategy:
 
