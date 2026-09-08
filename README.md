@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.48.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.48.6** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -361,12 +361,14 @@ and proven on the real stack) are done. Phase tags below.
         login page → Authelia → callback → landed logged in, no second
         password form and (since implicit consent) no accept screen.
         NocoDB (§273) dropped (Enterprise-only SSO).
-- [ ] **Authelia managed OIDC clients use plaintext `client_secret`** (§270,
-      §280) — Authelia logs a deprecation warning for every dashboard-managed
-      client ("should be a hashed value ... will be removed in the near
-      future"). Move `renderOidcClientsBlock` to write
-      `$pbkdf2-sha512$…` digests (`authelia crypto hash generate pbkdf2`)
-      instead of the raw secret. Works today; pre-empt the removal.
+- [ ] **@mat: prove the hashed Authelia OIDC client secrets live** (§270,
+      §280, §281) — `renderOidcClientsBlock` now writes `$pbkdf2-sha512$`
+      digests, not plaintext (verified byte-for-byte against
+      `authelia crypto hash generate/validate pbkdf2`, but not through a real
+      Authelia restart). On the live box: trigger an exposure reconcile so
+      the managed block rewrites, confirm Authelia restarts clean, then do a
+      fresh OIDC login through each of Vikunja/Mealie/Immich/Homebox and
+      confirm each still lands logged in with no `invalid_client`.
 
 - [ ] **@mat: prove Nextcloud header-trust live** (§217, §276) — expose
       Nextcloud, apply Authelia's `authelia-authrequest.conf` snippet to its

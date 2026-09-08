@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { renderOidcClientsBlock, spliceOidcClients, ManagedOidcClient } from './autheliaOidcClients';
+import {
+  renderOidcClientsBlock,
+  spliceOidcClients,
+  pbkdf2ClientSecretDigest,
+  ManagedOidcClient,
+} from './autheliaOidcClients';
 
 const VIKUNJA: ManagedOidcClient = {
   id: 'vikunja',
@@ -24,11 +29,27 @@ access_control:
   default_policy: deny
 `;
 
+describe('pbkdf2ClientSecretDigest', () => {
+  // Byte-for-byte fixtures — the sha256(secret)[:16] salt makes these stable.
+  // Both verify with `authelia crypto hash validate --password <s> -- <digest>`
+  // (plan.md §281).
+  it('produces Authelia-format pbkdf2-sha512 digests, deterministic per secret', () => {
+    expect(pbkdf2ClientSecretDigest('s3cr3t')).toBe(
+      '$pbkdf2-sha512$310000$TnOMpVY8Bs/QAYKZkz1Y2w$kD85nmqd59DGSlVUJ2DP58k/CdFSJCU4sR2/LGSSpUIpoyqgLkUhaCS3tF7XoTuQpo31Jc55mPXC2TZUci.49Q'
+    );
+    expect(pbkdf2ClientSecretDigest('rotated')).toBe(
+      '$pbkdf2-sha512$310000$9CVG1ezdRSUJgIstbQQTtQ$Xiam5YV1FfmAzWODNO6Y4GlqN3KZgbU5qmuLdD8uijF2.asL0/HNJOEl3Fu7txitYuIyfxMoPqeWuIofqsGFIQ'
+    );
+  });
+});
+
 describe('renderOidcClientsBlock', () => {
   it('emits marker-delimited entries at the 6-space list indent', () => {
     const block = renderOidcClientsBlock([VIKUNJA]);
     expect(block).toContain("      - client_id: 'vikunja'");
-    expect(block).toContain("        client_secret: 's3cr3t'");
+    // The plaintext secret is never written; only its pbkdf2 digest.
+    expect(block).not.toContain("'s3cr3t'");
+    expect(block).toContain(`        client_secret: '${pbkdf2ClientSecretDigest('s3cr3t')}'`);
     expect(block).toContain("          - 'https://vikunja.example.com/auth/openid/authelia'");
     expect(block.startsWith('      # >>> managed by the dashboard')).toBe(true);
     expect(block.trimEnd().endsWith('# <<< managed by the dashboard')).toBe(true);
@@ -77,8 +98,8 @@ describe('spliceOidcClients', () => {
     const once = spliceOidcClients(CONFIG, renderOidcClientsBlock([VIKUNJA]));
     const twice = spliceOidcClients(once, renderOidcClientsBlock([{ ...VIKUNJA, secret: 'rotated' }]));
     expect(twice.match(/client_id: 'vikunja'/g)).toHaveLength(1);
-    expect(twice).toContain("client_secret: 'rotated'");
-    expect(twice).not.toContain("client_secret: 's3cr3t'");
+    expect(twice).toContain(`client_secret: '${pbkdf2ClientSecretDigest('rotated')}'`);
+    expect(twice).not.toContain(pbkdf2ClientSecretDigest('s3cr3t'));
   });
 
   it('is idempotent for an unchanged client set', () => {

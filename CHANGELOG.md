@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.48.6] — 2026-09-08
+
+### Security
+
+- Authelia managed OIDC client secrets are written to configuration.yml as $pbkdf2-sha512$ digests, not plaintext (pre-empts Authelia's deprecation removal)
+
 ## [0.48.5] — 2026-09-08
 
 ### Fixed

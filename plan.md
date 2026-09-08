@@ -20525,3 +20525,38 @@ restart. Homebox's login page now shows **only** "Sign in with OIDC" — no
 email/password fields, no submit button — and the OIDC button still lands in
 `/home` logged in. All four OIDC apps (Vikunja, Mealie, Immich, Homebox) are
 now OIDC-only with the accept screen suppressed.
+
+## 281. Authelia managed OIDC client secrets rendered as pbkdf2 digests (§270, §280)
+
+**Patch 0.48.6.** The dashboard-managed `identity_providers.oidc.clients`
+block in `apps/authelia/config/configuration.yml` was writing each app's
+`client_secret` in plaintext. Authelia logs a deprecation warning for that on
+every managed client ("should be a hashed value ... will be removed in the
+near future"). `renderOidcClientsBlock` now renders a `$pbkdf2-sha512$`
+digest instead.
+
+- New `pbkdf2ClientSecretDigest(secret)` in `autheliaOidcClients.ts`: pure
+  Node (`crypto.pbkdf2Sync`, 310000 iterations, 64-byte key), output encoded
+  in go-crypt's passlib "ab64" (`+`→`.`, no padding). Verified byte-for-byte
+  against `authelia crypto hash generate pbkdf2`, and both fixture digests
+  pass `authelia crypto hash validate --password <s> -- <digest>`. No
+  `docker run` / authelia binary at runtime.
+- **Deterministic salt** — `sha256(secret)[:16]`, not random. A random salt
+  would change the rendered block on every exposure reconcile, and the sync
+  restarts Authelia (502s every gated app briefly) whenever the block moves.
+  Each app's secret is a distinct 32+ char auto-generated value, so the
+  "same secret ⇒ same digest" property a deterministic salt gives up never
+  bites across clients. `ponytail:` comment notes the upgrade path (random
+  salt cached in the app's `.env`) if that ever stops holding.
+- Only the **Authelia server side** changes. The app's own OIDC client config
+  still gets the plaintext secret from its `.env` (env-token `{CLIENT_SECRET}`
+  at start; `immich.json` for Immich) — that side needs the real secret to
+  authenticate at the token endpoint.
+
+Pbkdf2 (not the codebase's bcrypt `hashPassword`) because Authelia verifies
+the client secret on *every* token request and its docs call out bcrypt/argon2
+as too slow for that path.
+
+Not proven against the live stack: the Authelia restart + a fresh OIDC login
+through each of the four apps with the hashed secret in place. Left as an
+`@mat:` README item.
