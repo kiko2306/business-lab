@@ -20931,3 +20931,62 @@ network-topology call, not a bug fix. Left for a real planning pass before
 any compose/backend work starts. The README item is left as-is rather than
 closed, since neither "prove it live" nor "this doesn't apply" has actually
 been decided yet.
+
+## 289. VPN restored: Tailscale never authenticated, NetBird never exposed — plus a start.sh bug and a new start.config mechanism (2026-09-08)
+
+**Report: "VPN not connecting."** Root cause was two independent gaps, both
+inherited from §283's unattended fresh redeploy where no TTY meant several
+prompted values were never actually collected:
+
+1. **Tailscale was never authenticated.** `docker exec tailscale-tailscale-1
+   tailscale status` → "Logged out". NetBird's signal server needs a public
+   address via Tailscale Funnel to work at all (its signalling can't run
+   through the Cloudflare Tunnel — plan.md §52/§53), so with Tailscale
+   logged out, no client could ever complete a peer connection.
+2. **`netbird-vpn`'s own exposure was never enabled.** No NPM host, no
+   Cloudflare DNS record, no `netbird-vpn.<domain>`/`netbird-vpn-api.<domain>`
+   at all — a client had nothing to even connect to.
+
+**Getting the Tailscale key in surfaced a real bug.** The user asked for the
+key to be entered through `start.sh`'s actual prompt, not a direct `.env`
+edit — correct per this project's own convention, but that prompt requires
+a genuine TTY (a silent/masked read), and setup_server.sh's fixed-IP and
+passwordless-sudo prompts share the same TTY gate — both risky, human-only
+per an existing README item. Used `expect` to drive a real pty, answering
+only the Tailscale prompt and explicitly *declining* the other two (the
+safe answer regardless — skip, not apply, never approving a value this
+session invented).
+
+First attempt died with no output past "Seeding the dashboard's exposure
+settings" and no useful exit code (`expect` doesn't propagate a spawned
+process's exit status by default — a wrapper measurement that could easily
+mislead in exactly this pattern in future). Re-ran with `bash -x` directly
+(no TTY needed once the key was already stored in `.env`) and found: `DASH_MERGED="$(...
+python3 -c '...')"` — the python helper's exit code is a real sentinel (2 =
+"ingress rule already correct, nothing to write") that the next line reads
+via `DASH_RC=$?`, but `set -euo pipefail` kills the assignment (and the
+whole script) before that line is ever reached whenever the helper exits
+nonzero. Exact same failure shape as `current_value`/`app_env_value`
+(§283) — only ever hit on the **first truly idempotent re-run**, where the
+dashboard's own Cloudflare ingress rule was already correct going in.
+Fixed with a narrowly-scoped `set +e`/`set -e` around just that one
+assignment.
+
+**Also built `start.config`** (`start.config.example` checked in,
+`start.config` gitignored like `.env`) — a small, dedicated file for the
+four genuinely-un-derivable values (`BASE_DOMAIN`, `CLOUDFLARE_API_TOKEN`,
+`TUNNEL_NAME`, `TAILSCALE_AUTH_KEY`) that `start.sh` would otherwise prompt
+for. Loaded automatically before any prompt runs; only fills a value still
+blank in `.env`, never overwrites one already set (same semantics every
+other value here already uses). This is what a fully unattended fresh
+install should use from now on, instead of the `expect`-driven TTY dance
+this investigation needed.
+
+**Verified live, end to end:** Tailscale logged in and Funnel published
+(`791f5c44331b.tail122b53.ts.net`), NetBird signal address set and
+`netbird-management` restarted clean (no crash-loop), `netbird-vpn`'s
+exposure enabled and provisioned (`netbird-vpn.tx-home-utils.com` → 302,
+`netbird-vpn-api.tx-home-utils.com` → 404 — expected for a gRPC-only
+endpoint hit with a plain GET, not an error). Not tested: an actual client
+completing a peer connection — no second device set up as a NetBird peer
+in this session; that's a real end-to-end client test for @mat to try.
