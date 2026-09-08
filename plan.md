@@ -20699,3 +20699,64 @@ fresh deploy (that's a separate, per-app, opt-in dashboard action — §112.3).
 Left as a README item rather than worked around, since enabling exposure is
 a real decision (Cloudflare DNS + NPM host get created), not something to
 do silently as a side effect of "start the apps."
+
+## 285. Enabled Authelia's exposure to unblock NetBird — two more real bugs found and fixed (2026-09-08)
+
+**Context.** Continuation of §283/§284's fresh-deploy proof: closed the
+README follow-up "enable Authelia's public exposure to unblock NetBird."
+Doing that surfaced two more genuine bugs, both specific to the very-first
+exposure enablement on a truly fresh deploy — the same class as §283/§284's
+finds (masked everywhere else by leftover state from a previous run).
+
+**Bug 1 — NPM's admin bootstrap had no automation at all, and the .env.example-documented
+default credentials no longer exist.** Enabling Authelia's exposure failed
+with "global exposure settings are incomplete": `exposure_npm_email`/
+`exposure_npm_password` were never seeded, because nothing seeds them —
+`.env.example` says outright "the NPM half can't be [seeded]." Built
+`bootstrapNpmAdminIfDefault` (`npmClient.ts`) to close that gap per plan.md
+§0.3 ("prompt only for what it genuinely cannot obtain"), wired into
+`provisionServiceIfEnabled` (`exposure.ts`) so it runs itself the moment
+exposure settings come up incomplete. First version assumed the classic
+`admin@example.com`/`changeme` seed (documented in older NPM guides and in
+this repo's own comments) — live-tested against the real host's NPM and it
+was wrong: that login fails even on a container that never had a user
+created. Root cause: current NPM (confirmed 2.15.1) ships with **no** user
+row at all; its web UI's first-run screen calls `POST /api/users`
+unauthenticated instead, gated on `GET /api/` reporting `{"setup": false}`.
+Rewrote the bootstrap to use that mechanism, keeping the legacy
+default-credential path as a fallback for older pinned images. Proved live
+twice: once by hand (curl sequence against the real host's NPM — worked),
+once by spinning up a throwaway, genuinely-fresh `jc21/nginx-proxy-manager`
+container and running the exact sequence the code performs end to end
+(fresh `setup:false` → unauthenticated create → login with the new
+credentials succeeds → a second attempt correctly no-ops rather than
+overwriting anything).
+
+**Bug 2 — enabling the very first app's exposure crash-looped Authelia
+itself.** With NPM's credentials fixed, enabling Authelia's exposure
+regenerated `apps/authelia/config/configuration.yml` with `default_policy:
+deny` and an **empty** `rules:` list — Authelia's own schema validation
+refuses to boot on that ("must be 'two_factor' or 'one_factor' when no
+rules are specified"), taking down the identity provider every other
+Authelia-gated app (NetBird included) depends on. Root cause:
+`getPortalDomain()`'s fallback (`autheliaAccessControl.ts`) went through
+`getExposureConfig()`, which requires the *entire* global exposure config
+(NPM + Cloudflare) to be complete — but building Authelia's own bypass
+hostname only ever needed the base domain. On a fresh deploy, mid-way
+through fixing bug 1, that fallback returned `null` with zero gated apps,
+and `renderAccessControl` had nothing to put in `rules:`. Fixed both ends:
+the fallback now reads just the base-domain setting directly (no NPM/CF
+dependency), and `syncAutheliaAccessControl` now refuses to write (or
+restart Authelia on) a block that would end up with zero rules — logs a
+warning and skips instead, so a future gap in this reasoning degrades to
+"nothing changes" rather than "crash-loop the identity provider." Verified
+live: repaired the already-broken `configuration.yml` by re-triggering the
+sync, confirmed `authelia-authelia-1` goes healthy and
+`https://authelia.tx-home-utils.com` returns 200, and confirmed
+`netbird-management` — blocked on exactly this hostname — recovers
+immediately after, with no further action.
+
+**Commits:** `0d48751` (initial NPM bootstrap, using the wrong mechanism),
+`3feb9a3` (corrected to the real NPM 2.15 setup flow), `98f7919` (Authelia
+access-control zero-rules fix). All three ship together; `0d48751` alone
+would not have worked against this NPM version.

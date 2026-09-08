@@ -428,14 +428,6 @@ and proven on the real stack) are done. Phase tags below.
       listener via `DNSStubListener=no`, and/or bind Pi-hole to a specific
       host IP instead of all interfaces) — left unstarted for now rather
       than done as a host-console change.
-- [ ] **@mat: enable Authelia's public exposure to unblock NetBird** (§283)
-      — `netbird-vpn-management` crash-loops (`dial tcp: lookup
-      authelia.<domain>: no such host`) until Authelia itself has "Publicly
-      expose this service" enabled in the dashboard — NetBird's
-      `management.json` points at Authelia's public OIDC endpoint
-      unconditionally, so this is a hard startup-order requirement on any
-      fresh deploy, not a bug. Enable Authelia's exposure, then restart
-      `netbird-vpn`.
 - [ ] **@mat: prove MeshCentral live with a real agent** (§62.2, §264) — the
       app is built (`apps/meshcentral/`, port `10550`, `mesh.<domain>`) and
       env-driven config is wired, but the reverse-proxy path is unproven:
