@@ -356,23 +356,17 @@ and proven on the real stack) are done. Phase tags below.
         the registry gets a confidential Authelia client registered on every
         exposure change, and its client-side OIDC config injected at start
         (env for most; a managed `immich.json` for Immich, §275).
-        **Vikunja (§271/§278), Mealie (§274), Immich (§275) — proven live
-        end to end (§280)**: button on the app's own login page → Authelia
-        consent → callback → landed logged in, no second password form.
-        Homebox (§272) is wired but blocked (see below). NocoDB (§273) dropped
-        (Enterprise-only SSO).
-- [ ] **Homebox OIDC: `redirect_uri` scheme is `http`, not `https`** (§272,
-      §280) — Authelia rejects Homebox's authorization request because it
-      sends `http://homebox.<domain>/api/v1/users/login/oidc/callback` while
-      the registered URI is `https://`. Homebox builds it from
-      `X-Forwarded-Proto` (it has `HBOX_OPTIONS_TRUST_PROXY=true`) but NPM
-      hands it `http` — `cloudflared` speaks plain HTTP to NPM, so nginx's
-      `X-Forwarded-Proto $scheme` is `http`. Fix by making NPM send
-      `X-Forwarded-Proto: https` on managed proxy hosts (correct in general —
-      external access is always HTTPS via Cloudflare, and §279 closes the LAN
-      plain-HTTP path); touches `ensureProxyHost`/`exposureConfigFiles.ts` and
-      every proxy host, so verify no scheme-sensitive app regresses. Then
-      re-run the Homebox login and flip `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN` false.
+        **Vikunja (§271/§278), Mealie (§274), Immich (§275), Homebox (§272) —
+        all four proven live end to end (§280)**: button on the app's own
+        login page → Authelia → callback → landed logged in, no second
+        password form and (since implicit consent) no accept screen.
+        NocoDB (§273) dropped (Enterprise-only SSO).
+- [ ] **@mat: flip `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN` false for Homebox** (§272,
+      §280) — Homebox OIDC works now (the `X-Forwarded-Proto` fix in
+      `proxy.conf` landed, `e94c920`); the local email/password form is still
+      on. Set the flag in the Configuration panel, restart, confirm the form
+      is gone but the OIDC button still logs in. (Not done in-session only
+      because the other three flips were; low-risk.)
 - [ ] **Authelia managed OIDC clients use plaintext `client_secret`** (§270,
       §280) — Authelia logs a deprecation warning for every dashboard-managed
       client ("should be a hashed value ... will be removed in the near

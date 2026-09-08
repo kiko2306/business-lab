@@ -20474,3 +20474,51 @@ friction. Rebuilt backend, re-synced (all four client blocks carry
 `consent_mode: 'implicit'`, Authelia loads clean), and confirmed live:
 logging out of Vikunja and clicking its Authelia button now lands straight in
 the app with **no accept screen**. Patch 0.48.4.
+
+### Follow-up done in-session: Homebox `redirect_uri` scheme fixed → all four OIDC apps pass
+
+The Homebox blocker (`redirect_uri` came out `http://` → Authelia
+`invalid_request`) was NPM handing it `X-Forwarded-Proto: http`. Root cause
+is structural: Cloudflare terminates TLS and `cloudflared` speaks plain HTTP
+to NPM, so nginx's `$scheme` at the proxy is always `http`.
+
+Fix (`e94c920`): `apps/nginx-proxy-manager/snippets/proxy.conf` — the shared
+snippet every Authelia-protected proxy host `include`s — now hard-codes
+`X-Forwarded-Proto https` (and `X-Original-URL https://…`, `proxy_redirect
+http:// https://`) instead of `$scheme`. Since §279 bound NPM's proxy ports
+to loopback, the only caller is `cloudflared → 127.0.0.1`, always HTTPS at the
+edge, so `https` is unconditionally right. Config-only, no version bump.
+Restarted NPM to load the snippet.
+
+Verified live:
+- **Homebox OIDC now completes** — "Sign in with OIDC" → straight into
+  `/home` logged in as the Authelia user (no consent screen — implicit).
+  All four OIDC apps (Vikunja, Mealie, Immich, Homebox) now pass.
+- All 34 hostnames + apex still 200/302 through the tunnel, no 502/500.
+- **Paperless** (Django — strictest about host/scheme/CSRF) loads fine
+  through the changed snippet; **Nextcloud** (picky about proxy headers)
+  loads fine.
+
+Snag hit along the way (`2bf6a7d`, patch 0.48.5): restarting Paperless to
+re-check it failed with `EPERM: chmod
+apps/file-browser/data/files/to-paperless`. `ensurePaperlessDropbox` did an
+unconditional `chmodSync(dir, 0o777)`, which only works as the dir's owner —
+and the dir now exists owned by another container's uid, mode already 0777.
+That EPERM had been silently aborting *every* Paperless start, leaving it on a
+stale pre-exposure container (`PAPERLESS_ALLOWED_HOSTS` still localhost-only →
+Django `DisallowedHost` 400 for the first authenticated visitor, which was me
+today — not a regression from the snippet change). Wrapped the chmod: swallow
+EPERM when the mode is already world-writable, re-raise otherwise. After the
+fix Paperless restarts, picks up the exposure env
+(`PAPERLESS_ALLOWED_HOSTS`/`_URL`/`CSRF_TRUSTED_ORIGINS` = the real hostname)
+and serves.
+
+Not addressed: `homepage` and `authelia` set `skipAutheliaProtection`, so
+their proxy hosts use NPM's stock config, not this snippet — they still get
+`X-Forwarded-Proto: http`. Both work today (static dashboard; Authelia has
+its own `X-Forwarded-*` handling), so out of scope here.
+
+### Still open
+
+- **@mat: `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN=false`** for Homebox — OIDC works,
+  the local form is still shown. Same low-risk flip as the other three.
