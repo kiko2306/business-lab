@@ -21015,3 +21015,58 @@ end, plus that a `user`-role account gets 403 and no `/updates` nav entry.
 This commit is deliberately the trigger for that real test: pushed without
 first `git pull`-ing it onto the server by hand, so the self-update panel
 has to do the fetch → pull → build → restart itself.
+
+## 291. Self-update panel live proof — a real, unresolved problem found: `up --build <service>` also recreated unrelated services (2026-09-08)
+
+**Continuation of §290.** Fixed the build-403 issue (buildx/EXEC, committed as
+`449f4e1`) and re-triggered. Progress this time: `git pull` succeeded,
+`docker compose build frontend backend` succeeded (classic builder, no
+buildx), all 46/47 apps updated (`pihole` failed on its known port-53
+conflict, caught and logged — not a new issue).
+
+**Then `docker compose -f ... up -d --build frontend` — a command scoped to
+one named service — also recreated `database` and `docker-socket-proxy`.**
+Compose's own log: `Container homelab-management-database-1 Recreate`,
+`Container homelab-management-docker-socket-proxy-1 Recreate`, immediately
+followed by `Cannot connect to the Docker daemon at
+tcp://docker-socket-proxy:2375`. What happened: the backend's `docker` CLI
+talks to Docker *through* `docker-socket-proxy` (`DOCKER_HOST=tcp://
+docker-socket-proxy:2375`) — when compose tore down the *old*
+docker-socket-proxy container to replace it, it severed its own control
+channel before the replacement container was up, so the next step
+(recreating `database`) failed outright. `docker-socket-proxy` was left
+**stopped** — a real, live outage of the backend's entire Docker access
+(every app's status, start/stop) until this was manually recovered.
+
+**Recovered live, verified safe:**
+- The *original* `homelab-management-database-1` was never actually
+  touched — still `Up 7 hours (healthy)` throughout. No data was at risk;
+  only a duplicate, never-started stub container (`994293ea7d96_homelab-
+  management-database-1`, `Created`, never started) was left behind from
+  the interrupted rename-dance. Removed — harmless.
+- `docker compose up -d docker-socket-proxy` restarted it cleanly; compose
+  itself cleaned up the orphaned renamed proxy container as part of that.
+- Confirmed full recovery: `GET /api/services/status` reports all 47
+  services correctly (46 running, `pihole` in its known error state);
+  dashboard reachable; login works.
+
+**Root cause not yet pinned down with confidence.** Neither
+`docker-compose.yml` nor `.env` changed in the commits this run pulled (no
+diff in the relevant range), and `docker-socket-proxy`'s service block
+doesn't use `env_file`/interpolate `.env` at all — so a config-hash drift
+explanation doesn't hold up on inspection. Compose's documented behavior
+for `up <service>` is to scope actions to that service (and its
+dependencies); `frontend` doesn't depend on `database` or
+`docker-socket-proxy`. What actually triggered their recreation is still
+unexplained. Repeating the experiment to isolate it risks repeating the
+same disruption, so stopped here rather than guess at a fix and re-run
+against the live host again.
+
+**Left open, deliberately not declared done:** the self-update panel's
+build-403 fix (`449f4e1`) is real and verified. The panel's own safety
+model — "only touches the named service" — is not: it can knock over
+`docker-socket-proxy` (and by extension, the backend's entire Docker
+control plane) as a side effect, mid-sequence, on a real deployment.
+Needs real investigation (reproduce deliberately against a throwaway
+stack, not `tx-home-utils.com` again) before this is trustworthy enough to
+mark "proven live" on the README. Left as an `@mat` item, not closed.

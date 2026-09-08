@@ -233,22 +233,27 @@ it is done — not ticked off and left behind. Section references point at
 
 Updates:
 
-- [ ] **@mat: apply the self-update panel's infra changes and prove it live**
-      (§131.4, §198, §199) — the panel itself is built and gated to
-      `webmaster`/`admin` (`system:update`), but its `docker-compose.yml`
-      changes (`REPO_ROOT` mount, `BUILD: 1` on `docker-socket-proxy`) and
-      `backend/Dockerfile`'s new `git` dependency have not been applied to
-      `tx-home-utils.com` yet. Recreate `backend`/`docker-socket-proxy`/
-      `frontend` individually once, then click "Update now" on `/updates`
-      for real and confirm the whole walk (fetch → pull → build →
-      **pull/recreate every installed app (§209)** → restart-frontend →
-      restart-backend → reconnect) end to end, plus that a `user`-role
-      account gets 403 and no nav entry. While recreating
-      `backend`, also confirm `docker-entrypoint.sh`'s new chown of
-      `apps/authelia/config/{configuration,users_database}.yml` actually
-      takes on the real container (§199 only proved it in an isolated
-      throwaway container, then unblocked tonight's Guacamole proof with a
-      by-hand `chown` that this recreate makes redundant).
+- [ ] **@mat: self-update panel can knock over `docker-socket-proxy` mid-run
+      — needs real investigation before it's trustworthy** (§131.4, §198,
+      §199, §290, §291) — the infra changes are live and the build-403 bug
+      (buildx needing `EXEC` on the socket proxy) is fixed (`449f4e1`), but
+      triggering a real self-update against `tx-home-utils.com` found
+      something worse: `docker compose up -d --build frontend` — scoped to
+      one named service — also recreated `database` and
+      `docker-socket-proxy`. Tearing down the *old* socket-proxy container
+      cut the backend's own Docker control channel before the replacement
+      was up, so the very next step (recreating `database`) failed with
+      "Cannot connect to the Docker daemon", and the socket proxy was left
+      **stopped** — a real outage of every app's status/start/stop until
+      manually recovered (§291; no data lost — the live `database`
+      container itself was never touched, only a stub never-started
+      duplicate was left behind). Root cause not pinned down: neither
+      `docker-compose.yml` nor `.env` changed in the pulled commits, and
+      `docker-socket-proxy`'s block doesn't interpolate `.env` at all, so
+      the usual "config-hash drift" explanation doesn't fit. Reproduce
+      deliberately against a throwaway stack (not the live host again)
+      before trusting "Update now" — this is a live safety property of the
+      panel, not a cosmetic bug.
 
 Strategy:
 
