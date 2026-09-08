@@ -253,6 +253,35 @@ Updates:
       behavior (occasional automatic recovery, ~1-2 min of downtime) fine
       to leave as is?
 
+Memory baseline (§300 — attack the §290–§299 headroom problem by shrinking
+the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
+
+- [ ] **Phase A — reclaim now (ops, no code)** (§300) — `docker rm -f
+      peaceful_keldysh` (the §268 leftover); `docker buildx prune -af` +
+      `image prune -af` + `network prune`; prune only *inspected* dangling
+      volumes, never blind. Then, once Phase B/C give RAM headroom,
+      `swapoff -a && swapon -a` to flush swap.
+- [ ] **Phase B — lighter config, same apps** (§300) — one commit each:
+      B1 Stirling-PDF → `latest-ultra-lite` (~970→200 MiB, verify no
+      OCR/convert use); B2 WAHA → `NOWEB` engine (~277→50 MiB, verify
+      consumer + document re-pair); B3 Metabase → `JAVA_OPTS=-Xmx768m` +
+      `mem_limit` (~1.34→0.8 GiB); B4 Paperless → 1 web + 1 task worker +
+      `mem_limit` (~450→250 MiB); B5 Immich → cap server, stop
+      machine-learning if smart search unused (−120 MiB); B6 MSSQL →
+      `MSSQL_MEMORY_LIMIT_MB` (only if it stays running — see D3).
+- [ ] **Phase C — `mem_limit` on every service** (§300) — one commit:
+      tiered caps on every `apps/*/docker-compose.yml` + the management
+      stack (generous on `backend` — an OOMKill mid-self-update is the §299
+      failure), maybe a `services.test.ts` guard that each app declares one.
+      Deploy app-by-app, watch `docker events` for `oom`.
+- [ ] **@mat: Phase D decisions** (§300) — D1 Postiz (~1.7 GiB, the §84 P3
+      deliverable): keep capped / trim its Temporal sidecars / replace with
+      n8n social workflows / stop until a client needs it. D2 Metabase
+      (~0.8 GiB capped): keep, or replace with Grafana (~120 MiB, AGPL
+      parity) for SQL dashboards. D3 MSSQL: stop unless a client is using it
+      (−587 MiB; §263f left it stopped, something restarted it). D4 ClamAV
+      (215 MiB, irreducible): on-access vs scheduled scans.
+
 Strategy:
 
 

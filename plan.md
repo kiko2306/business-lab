@@ -21305,3 +21305,143 @@ headroom during a full self-update is itself worth fixing (more RAM, or
 serializing the app-update phase more gently) — is unchanged and still
 the user's call, now lower-stakes since a SIGKILLed backend restart no
 longer means manual recovery.
+
+## 300. Plan — cut the memory baseline: lighter apps, mem_limits, cruft clear (2026-09-09)
+
+`docker stats` on `home-srv-01` (2026-09-08 22:50): ~9.7 GiB of container RSS
+on a 14 GiB host, 266 MiB RAM free, **swap 90 % full (3.6/4.0 GiB)**. No
+container has a memory limit. This is the capacity side of the §290–§299
+self-update-headroom item — attack it by shrinking the baseline rather than
+adding RAM. Nothing here is built yet; this section sequences it.
+
+Two heavy containers dominate: `postiz` (1.40 GiB app, ~1.7 GiB with its
+bundled Temporal cluster) and `metabase` (1.34 GiB, an uncapped JVM). Next
+tier: `stirling-pdf` 970 MiB, `immich-server` 604 MiB, `mssql` 587 MiB,
+`nocodb` 569 MiB, `onlyoffice` 495 MiB, `paperless-ngx` 450 MiB.
+
+### Findings that shape the plan
+
+- **`peaceful_keldysh`** is a leftover `kopia/kopia:latest` throwaway from the
+  §268 FTP-concurrency test (its cmd is the rclone-webdav probe script). Not
+  from any compose project. `docker rm -f` it.
+- **`mssql` is running** (started 2026-09-08 21:43, restarts 0) — §263f left
+  it stopped. Nothing in the plan says a client is using it. Stopping it is
+  587 MiB back for free, pending an @mat "is anyone using this" check.
+- **`stirling-pdf`** runs `stirlingtools/stirling-pdf:latest` (the full image)
+  with only `LANGS=en_GB` set. The `latest-ultra-lite` tag drops the bundled
+  LibreOffice + OCR + security stack (~970 → ~200 MiB) and keeps the core PDF
+  tools. Cost: no OCR, no Office-doc conversion in Stirling — Paperless does
+  its own OCR and Nextcloud edits via OnlyOffice, so those Stirling features
+  are very likely unused here (confirm before switching).
+- **`waha`** runs `WHATSAPP_DEFAULT_ENGINE=WEBJS` (full headless Chromium).
+  The `NOWEB` engine has no browser (~277 → ~50 MiB). Cost: a re-pair of the
+  WhatsApp session and a different (documented) feature set. Confirm what
+  consumes WAHA first (n8n workflows / the §84 content path).
+- **`metabase`** sets no `JAVA_OPTS`, so the JVM will grow its heap toward
+  ¼ of host RAM. `-Xmx768m` + a `mem_limit` caps it to ~0.8 GiB with no
+  feature loss.
+- **`docker system df`**: 11.9 GB reclaimable images, 893 MB reclaimable
+  volumes, 1.9 GB build cache (0 active). Disk, not RAM — but §297 hygiene,
+  and the BuildKit builder holds some RAM.
+
+### Which heavy apps can actually be *replaced* by something lighter
+
+Investigated; the honest answer is "only two, and both are @mat calls":
+
+- **Postiz → n8n workflows.** n8n is already running (306 MiB) and can post to
+  social platforms directly. Drops ~1.7 GiB. Cost: loses the polished
+  scheduling UI that was the §84 P3 product deliverable — a product-scope
+  decision, not a coding session.
+- **Metabase → Grafana.** Grafana (Go, ~120 MiB) does SQL dashboards over the
+  stack's Postgres/MySQL. Licence parity — Metabase OSS and Grafana core are
+  both AGPLv3, and §107's resale model already covers AGPL for
+  self-hosted-per-client. Real option, but "is the Metabase UX worth ~700 MiB
+  over a capped JVM or ~1.2 GiB over Grafana" is an @mat call.
+- **NocoDB, Immich, OnlyOffice, Paperless** — checked. Baserow/Grist (vs
+  NocoDB), PhotoPrism (vs Immich), Collabora (vs OnlyOffice) are all the same
+  weight class or heavier. No lighter drop-in exists; these get capped and
+  usage-checked, not replaced.
+- **ClamAV** (215 MiB) is irreducible — the virus-signature DB is resident by
+  design. The lever is policy (on-access vs scheduled scans), which is an
+  @mat call, not a swap.
+
+Any replacement app must clear the CLAUDE.md licence test (no un-defused
+AGPL-on-network / fair-code / non-software-ToS) and get `docs/licences.md`
+rows before it goes in — same bar as any new app.
+
+### Phase A — reclaim now, zero risk (ops session, no code)
+
+1. `docker rm -f peaceful_keldysh` — the §268 leftover.
+2. `docker buildx prune -af` (1.9 GB cache, 0 active); `docker image prune -af`
+   (11.9 GB); `docker network prune -f`. **Volumes:** list
+   `docker volume ls -f dangling=true`, inspect each against the app roster,
+   prune only the genuinely orphaned ones — never a blind `volume prune`.
+3. Restart `postiz` and `metabase` to reset leaked RSS — buys time, not a
+   fix; note it and move to Phase B/C.
+4. **After** Phase B/C land and RAM has headroom: `swapoff -a && swapon -a`
+   to pull the 3.6 GiB of swap back into RAM. Not before — with 266 MiB free
+   it would fail or thrash.
+
+### Phase B — lighter config, same apps (coding session, one commit per app)
+
+Each edits the app's own `apps/<name>/docker-compose.yml` (human-edited —
+backend never writes compose files) and its `.env.example` where a new key is
+introduced.
+
+- **B1. Stirling-PDF → `latest-ultra-lite`.** ~970 → ~200 MiB. Verify no
+  Stirling OCR/convert use first. `docs/licences.md` image row updated to the
+  new tag.
+- **B2. WAHA → `WHATSAPP_DEFAULT_ENGINE=NOWEB`.** ~277 → ~50 MiB. Verify the
+  consumer, document the re-pair.
+- **B3. Metabase → `JAVA_OPTS=-Xmx768m -Xms256m`** + `mem_limit: 1g`.
+  ~1.34 → ~0.8 GiB.
+- **B4. Paperless-ngx → `PAPERLESS_WEBSERVER_WORKERS=1`,
+  `PAPERLESS_TASK_WORKERS=1`** + `mem_limit`. ~450 → ~250 MiB. Confirm intake
+  throughput is still acceptable for a small office.
+- **B5. Immich** — `mem_limit` on `immich-server`; if smart search / face
+  detection is unused, stop `immich-machine-learning` (−120 MiB) or pin it
+  to the smallest model. @mat confirms whether smart search matters.
+- **B6. MSSQL** (only if it must run — see Phase D) —
+  `MSSQL_MEMORY_LIMIT_MB=1024` + `mem_limit: 1500m` (SQL Server OOMs hard if
+  the cgroup limit sits under its own target; leave headroom).
+
+### Phase C — `mem_limit` on every service (one coding session, one commit)
+
+- Add `mem_limit` (+ a conservative `mem_reservation`) to every
+  `apps/*/docker-compose.yml` and to the management stack, tiered:
+  - **Heavy** (postiz app, metabase, immich-server, mssql, onlyoffice,
+    nocodb, stirling, paperless-ngx, n8n): per-app caps ~1.3–1.5× the
+    post-Phase-B observed RSS.
+  - **Everything else** (all currently < 90 MiB): a blanket `256m`.
+  - **Management stack** (`backend`, `frontend`, `database`, the proxies,
+    the watchdogs): modest caps, deliberately generous on `backend` — a
+    self-update runs there and an OOMKill mid-swap is exactly the §299
+    failure. Do not cap the dashboard into instability.
+- Consider a `services.test.ts` registry-wide guard: every managed app's
+  compose declares `mem_limit` (same shape as the existing homepage-labels /
+  signal-port guards). Decide during the build whether that earns its keep.
+- **Risk:** an under-set limit is an OOMKill loop, not a soft slowdown. Set
+  from measured RSS + headroom, deploy app-by-app, watch `docker events` for
+  `oom` after each. This host is the right place to find a too-tight limit
+  (no-guarantees box).
+- Roll-out is per the §131.4 self-update path or an individual
+  `docker compose up -d <svc>` per app — never a root `docker compose down`.
+
+### Phase D — @mat decisions (not coding sessions)
+
+- **D1. Postiz** (~1.7 GiB): keep with Phase-C caps / trim its Temporal
+  sidecars / replace with n8n social workflows / stop until a client needs
+  it. It is the §84 P3 deliverable.
+- **D2. Metabase** (~0.8 GiB capped): keep, or replace with Grafana
+  (~120 MiB) for SQL dashboards.
+- **D3. MSSQL**: stop it unless a client is actively using it (−587 MiB).
+- **D4. ClamAV** (215 MiB, irreducible): on-access scanning vs scheduled
+  scans on a 14 GiB box.
+
+### Expected result
+
+Phase A + B + C, without touching Postiz/Metabase-replace: **~2–2.5 GiB**
+off the baseline (Stirling −0.77, WAHA −0.23, Metabase cap −0.5, Paperless
+−0.2, Immich ML −0.12, MSSQL stop −0.59) plus 3.6 GiB of swap pulled back
+into RAM. With D1/D2 as replacements: **~4–4.5 GiB**. Container RSS
+9.7 GiB → ~5–7 GiB on 14 GiB — real headroom for a self-update build phase.
