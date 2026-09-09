@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.49.8** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.50.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -23,8 +23,8 @@ What is sold is **service, not software**:
 
 Turnkey hardware — a pre-built box — may be sold alongside that service. The
 apps are never resold or run as a service for third parties; each client
-operates their own instance. Bundled features such as scheduled social
-publishing are part of the free software, not a paid add-on.
+operates their own instance. Bundled features such as document management
+and OCR are part of the free software, not a paid add-on.
 
 This supersedes the "three tiers, only one of which is free" and "which SaaS
 each app replaces" framing in earlier `plan.md` sections (§84.2, §84.4). The
@@ -279,10 +279,6 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
 
 Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
 
-- [ ] **Remove Postiz** (§301a) — `apps/postiz/`, the `services.ts` entry,
-      docs rows, test fixtures; stop+rm the 5 `postiz-*`/`temporal*`
-      containers on the host. Ends the §84 social-publishing angle (P4 was
-      never built). `minor` bump.
 - [ ] **Remove WAHA** (§301b) — `apps/waha/`, registry entry, docs rows
       (incl. the licences.md ⚠️ WhatsApp-ToS row), test fixtures; stop+rm
       `waha-waha-1`. `minor` bump.
@@ -293,10 +289,9 @@ Roster removals (§301 — drop the heaviest apps outright instead of tuning the
       the test cases and docs rows; stop+rm `mssql-mssql-1`+`mssql-init`,
       delete the `mssql_eula_accepted` settings row. Run `scripts/e2e-tests.sh`
       (Settings component changes). `minor` bump.
-- [ ] **@mat: confirm removing Metabase** (§301d) — BI/dashboards over the
-      other apps' databases; speculative, no wired use, 1.34 GiB uncapped
-      JVM, AGPL. If yes: same-shape removal as 301a. If no: it gets a heap
-      cap + `mem_limit` under §300 Phase B/C instead.
+- [ ] **Remove Metabase** (§301d) — BI/dashboards over the other apps'
+      databases; speculative, no wired use, 1.34 GiB uncapped JVM, AGPL.
+      @mat confirmed removal (2026-09-09). Same-shape removal as 301a/301b.
 - [ ] **Redundancy / same-functionality pass** (§301e) — after the removals,
       survey the remaining roster for apps doing substantially the same job
       and write it up for @mat (candidates: Forgejo vs code-server, Immich vs
@@ -326,15 +321,9 @@ Strategy:
 ### Business Lab (§84)
 
 **§254 sequences these into buildable chunks (P1…P12) with the dependency
-graph.** P1 (§255), P2 (§256), P3a (§257), P3 (§258 — `apps/postiz/` built
-and proven on the real stack) are done. Phase tags below.
-- [ ] **P4 — glue: `/content` drafts → Postiz** (§84.3, §261) — **parked.**
-      Blocked on Postiz being exposed on the real stack *and* at least one
-      Tier A social provider (Bluesky/Mastodon) connected — until then the
-      queue has nothing that can send. When unblocked, build the
-      human-triggered "Send to Postiz" slice first (Postiz API token in
-      Settings + `postizClient.ts` + a push-draft route — §261), not the n8n
-      scheduler.
+graph.** P1 (§255) and P2 (§256) are done. P3/P3a/P4 (social publishing via
+Postiz, §257/§258/§261) are dropped — Postiz was removed in §301a. Phase tags
+below.
 - [ ] **P8 — Rebrand tier 2** (§84.2) — package/image/network/project names.
       Recreates the management stack — do it in the §83 data-root maintenance
       window, with host access, not before.

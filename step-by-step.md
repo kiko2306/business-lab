@@ -105,9 +105,9 @@ containers only. Work through them one at a time, using the normal commit and
 	material, diagrams, and setup documentation when a code or decision task
 	makes them stale. Documentation-only commits do not need a version bump.
 
-Do not silently take over tasks marked `@mat` in Queue B. Do not add Postiz,
-SQL Server, MeshCentral, or a new app merely because it appears in the
-backlog; first use the TODO order and licence/architecture gates.
+Do not silently take over tasks marked `@mat` in Queue B. Do not add a new
+app merely because it appears in the backlog; first use the TODO order and
+the licence/architecture gates.
 
 ### Queue B: you must perform these actions
 

@@ -76,7 +76,6 @@ operate within, listed again at the end.
 | Pantry | *ours* — no LICENSE file | ⚠️ Decide | |
 | Paperless-ngx | GPL-3.0 | ✅ Clean | |
 | Pi-hole | EUPL-1.2 | ✅ Clean | weak copyleft, commercial use permitted |
-| **Postiz** (`ghcr.io/gitroomhq/postiz-app`) | **AGPL-3.0** | ⚠️ Condition | run **stock, unmodified** — obligation is only an offer of upstream source, which pointing at the public repo satisfies since we convey no changes. The §257 Temporal search-attribute fix is an **env var (`SKIP_ADD_CUSTOM_SEARCH_ATTRIBUTES`), deliberately not an image patch**, precisely so this stays "unmodified". Do not fork or rebuild the image. Bundled sidecars rowed below. |
 | Price Compare | *ours* — no LICENSE file | ⚠️ Decide | |
 | Samba (`dockurr/samba`) | GPL-3.0 (Samba); MIT (image wrapper) | ✅ Clean | stock unmodified Samba for internal LAN file sharing — GPL-3.0 places no restriction on running it; not modified, not redistributed |
 | Scrutiny (`ghcr.io/analogj/scrutiny`, omnibus) | **MIT** | ✅ Clean | stock unmodified. The omnibus image bundles InfluxDB 2 OSS (MIT), smartmontools (GPL-2.0+) and s6-overlay (ISC) — all clean for internal use, none redistributed as software |
@@ -95,12 +94,11 @@ operate within, listed again at the end.
 
 | Image | Licence | Status | Note |
 |---|---|---|---|
-| postgres:14/15/16/17-alpine, postgres:16 (Postiz stack) | PostgreSQL License (BSD-like) | ✅ Clean | Postiz's own DB is `postgres:17-alpine`; Temporal's is `postgres:16` (non-alpine, matching Temporal's tested matrix) |
-| temporalio/auto-setup:1.28.1 (Postiz) | **MIT** (Temporal) | ✅ Clean | hard dependency of the Postiz backend — no lighter scheduler path (§243). Bundles the `temporal`/`tctl` CLIs and PostgreSQL client tooling, all MIT/Apache-2.0/PostgreSQL-License. Elasticsearch is **not** run (§257). |
+| postgres:14/15/16/17-alpine | PostgreSQL License (BSD-like) | ✅ Clean | the internal database for several apps; the PostgreSQL License places no restriction on internal use |
 | pgautoupgrade/pgautoupgrade:17-alpine (n8n, Paperless) | **MIT** ("Docker PostgreSQL Authors") | ✅ Clean | drop-in for `postgres:17-alpine` that runs `pg_upgrade` in place on a major bump; bundled PostgreSQL keeps the PostgreSQL License. n8n needs PG ≥ 16 (§118.3); Paperless moved off `postgres:15-alpine` for the same deprecation notice (§182). |
 | mariadb:latest (ITFlow), lscr.io/linuxserver/mariadb:latest (BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | not standardisable on MariaDB — its JSON column type breaks NPM's own migrations (§210.1) |
-| valkey:9-alpine (Immich, Paperless, Postiz) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL); Postiz's upstream compose ships `redis:7.2` and we swap it for the same reason. |
+| valkey:9-alpine (Immich, Paperless) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL). |
 | nginx:alpine (Kitchen switcher) | BSD-2-Clause | ✅ Clean | |
 | alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |

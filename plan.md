@@ -21553,3 +21553,32 @@ Syncthing vs Nextcloud (file sync), Dozzle vs Beszel vs Uptime-Kuma vs
 Scrutiny (overlapping monitoring surfaces), Jellyfin vs Immich (media),
 Miniflux as a standalone when Nextcloud has News. Not a code change in
 itself.
+
+## 301a. Postiz removed (2026-09-09)
+
+First of the §301 removals. Postiz was the heaviest stack on the host
+(~1.7 GiB across `postiz`, its Postgres + Valkey, and a full Temporal cluster
+with its own Postgres), AGPL-3.0, and the P4 glue it was added for (§261) was
+never built.
+
+- Deleted `apps/postiz/` and the `services.ts` registry entry. No dedicated
+  backend/frontend code existed (postizClient.ts was never built) and no
+  tests referenced it, so the registry entry was the whole code surface.
+- Docs: dropped the `docs/app-credentials.md` row, the `docs/licences.md` app
+  row + the Temporal `auto-setup` image row, trimmed the shared
+  `postgres`-alpine and `valkey` image rows to drop the Postiz/Temporal
+  mentions, and removed the `10530 postiz` line from `docs/ports.md`.
+  `step-by-step.md`'s stale "do not add Postiz/SQL Server/MeshCentral" caution
+  genericised.
+- README: deleted the P4 item, rewrote the §84 P-sequence intro to record
+  P3/P3a/P4 as dropped, and changed the "bundled features such as scheduled
+  social publishing" example in the sales pitch to document management + OCR.
+- Host: `docker rm -f` the 5 containers by compose-project label and removed
+  the two `postiz_*` networks. RAM on `home-srv-01` went 10.0→8.8 GiB used,
+  0.27→2.6 GiB free. `apps/postiz/` on the host checkout (60 K, still on the
+  pre-§300 `main`) clears on its next `git pull`; the deployed backend there
+  still lists postiz until the stack self-updates — cosmetic on a dev/test
+  box.
+
+Backend `check.sh test` 691/691, `typecheck` clean. `minor` bump 0.49.8 →
+0.50.0.

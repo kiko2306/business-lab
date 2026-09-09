@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.50.0] — 2026-09-09
+
+### Removed
+
+- Postiz (social scheduling) removed from the registry and repo — heaviest stack on the host (~1.7 GiB across 5 containers), AGPL, and the §84 P4 glue it existed for was never built
+
 ## [0.49.8] — 2026-09-08
 
 ### Fixed
