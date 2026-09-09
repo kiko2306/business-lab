@@ -264,16 +264,6 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
       peaceful_keldysh` (the §268 leftover); decide on `docker image prune
       -af` (still ~11 GB of images for currently-stopped apps — a re-pull
       cost if a client later starts one); `network prune`.
-- [ ] **Phase C — finish the n8n/nocodb cap fix on the host** (§305, §307) —
-      Phase C was rolled out by SSH (every app + mgmt stack recreated;
-      `immich-machine-learning` removed incl. from the immich override).
-      **n8n and nocodb crash-looped** on 640m/768m and were raised to 1200m
-      in the repo (on `main`) — but the session lost SSH mutate access before
-      applying it, so **both are still OOM-looping on the host**. @mat: `cd
-      /home/mat/www/homelab-management && git pull && (cd apps/n8n && docker
-      compose up -d) && (cd apps/nocodb && docker compose up -d)` — or the
-      quick stopgap `docker update --memory 1200m --memory-swap -1 n8n-n8n-1
-      nocodb-nocodb-1`. Then re-check `RestartCount` stops climbing.
 - [ ] **@mat: Phase D decisions** (§300) — D4 ClamAV (215 MiB, irreducible):
       on-access vs scheduled scans. (D1 Postiz, D2 Metabase and D3 MSSQL were
       all resolved by the §301 removals.)

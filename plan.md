@@ -21946,3 +21946,17 @@ Also removed on the host during the rollout: `immich-machine-learning` — the
 dashboard's `apps/immich/docker-compose.override.yml` (§209 digest pins) still
 declared it, so `compose up` kept recreating it; deleted that stanza from the
 override and ran `compose up --remove-orphans`.
+
+## 307 (cont.). n8n/nocodb fix applied — Phase C complete (2026-09-09)
+
+@mat pulled and recreated the two apps. Both `health=healthy`,
+`RestartCount=0`, `mem_limit=1200m`. Nothing else in the stack unhealthy or
+churning. Host after: RAM 7.7 GiB used / 7.2 GiB available, swap 1.2 GiB
+stable.
+
+Phase C is done: every running app container (65/68 — the exceptions are the
+BuildKit builder and the `peaceful_keldysh` §268 leftover, plus the
+never-started `pihole`) is memory-capped, `immich-machine-learning` is gone,
+and the `services.test.ts` guard keeps new apps from shipping uncapped.
+§300 now has only Phase A tail (`peaceful_keldysh`/`image prune -af`/
+`network prune`) and Phase D (the ClamAV scan-policy question) open.
