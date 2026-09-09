@@ -22618,3 +22618,25 @@ Authelia `admin`).
 Backend 640 + frontend 50 pass, both typecheck, frontend build clean. Minor
 bump 0.59.5 → 0.60.0. Unblocks §328 (Immich admin bootstrap can now use the
 webmaster's email for account linking).
+
+## 328. Mealie seed admin auto-renamed off `admin` so OIDC can't collide (2026-09-09)
+
+Second of the §326 follow-ups. Mealie ships its seed admin as `username: admin`,
+and Mealie's OIDC auto-provision keys a new account on the incoming username
+with no link to an existing local one — so an Authelia user named `admin` (a
+normal webmaster name) collides on `users.username` and the OIDC callback 500s
+(`sqlite3.IntegrityError` in §326).
+
+`mealieAiSync.ts` already logs in as the managed admin on every Mealie start,
+so a `freeSeedAdminUsername(baseUrl, token)` step there is nearly free: `GET
+/api/users/self`, and if `username === 'admin'`, `PUT /api/users/{id}` with the
+full object and `username: mealie-local-admin`. Idempotent (no-op once it's not
+`admin`), best-effort (a failure only means the collision is still possible).
+The dashboard logs Mealie in by **email** (`changeme@example.com`, unchanged),
+so the rename affects nothing else. Two `mealieClient` helpers added
+(`mealieGetSelf`, `mealieRenameUser`), 2 new tests, 642 pass. Patch 0.60.0 →
+0.60.1.
+
+Note this only bit because tx-home-utils.com's Authelia user is literally
+`admin`; a deployment whose webmaster is `firstname` never hits it. The rename
+closes the edge case regardless.

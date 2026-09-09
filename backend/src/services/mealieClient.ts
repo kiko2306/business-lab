@@ -49,6 +49,39 @@ export async function mealieChangePassword(
   return response.statusCode >= 200 && response.statusCode < 300;
 }
 
+/** GET /api/users/self — the full logged-in account object, or null on non-200. */
+export async function mealieGetSelf(
+  baseUrl: string,
+  token: string
+): Promise<Record<string, unknown> | null> {
+  const response = await requestJson<Record<string, unknown>>(`${baseUrl}/api/users/self`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+  if (response.statusCode !== 200 || !response.body?.id) {
+    return null;
+  }
+  return response.body;
+}
+
+/**
+ * PUT /api/users/{id}. Mealie's update takes the full user object, so this
+ * re-sends `self` verbatim with only `username` changed — a partial body 422s
+ * on the required fields. Returns true on 2xx.
+ */
+export async function mealieRenameUser(
+  baseUrl: string,
+  token: string,
+  self: Record<string, unknown>,
+  newUsername: string
+): Promise<boolean> {
+  const response = await requestJson(`${baseUrl}/api/users/${encodeURIComponent(String(self.id))}`, {
+    method: 'PUT',
+    headers: { Authorization: `Bearer ${token}` },
+    body: { ...self, username: newUsername },
+  });
+  return response.statusCode >= 200 && response.statusCode < 300;
+}
+
 export interface MealieAiProviderInput {
   name: string;
   base_url: string;

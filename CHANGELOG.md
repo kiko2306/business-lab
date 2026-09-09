@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.60.1] — 2026-09-09
+
+### Fixed
+
+- Mealie's seed admin is auto-renamed off username `admin` on start, so an Authelia user named `admin` can sign in via OIDC without a `users.username` collision
+
 ## [0.60.0] — 2026-09-09
 
 ### Added

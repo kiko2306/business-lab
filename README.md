@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.60.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.60.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -299,13 +299,6 @@ below.
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
-- [ ] **@mat: Mealie OIDC login collides with its built-in `admin`** (§326) —
-      the token exchange succeeds, then Mealie's auto-provision fails with
-      `UNIQUE constraint failed: users.username` because it keys the new
-      account on `preferred_username` with no link to the existing local
-      `admin`. Decide the account-linking / `OIDC_USER_CLAIM` config, or
-      rename one side. Hits any deployment where an Authelia username matches a
-      pre-existing local account.
 - [ ] **@mat: Immich needs its first admin created before OIDC works** (§326) —
       OIDC login gets through the token exchange and profile fetch, then
       Immich refuses (`The first registered account must the administrator`).

@@ -21,6 +21,8 @@ vi.mock('../utils/claudeSettings', () => ({ getClaudeApiKey }));
 const client = vi.hoisted(() => ({
   mealieLogin: vi.fn(),
   mealieChangePassword: vi.fn(),
+  mealieGetSelf: vi.fn(),
+  mealieRenameUser: vi.fn(),
   mealieGetAiSettings: vi.fn(),
   mealieCreateAiProvider: vi.fn(),
   mealieUpdateAiProvider: vi.fn(),
@@ -45,6 +47,8 @@ beforeEach(() => {
   vi.mocked(resolveComposeFile).mockReturnValue(installed());
   readAppEnvValue.mockReturnValue('generated-admin-pw');
   client.mealieLogin.mockResolvedValue('tok'); // generated password works
+  client.mealieGetSelf.mockResolvedValue({ id: 'u1', username: 'mealie-local-admin' }); // already renamed
+  client.mealieRenameUser.mockResolvedValue(true);
   client.mealieGetAiSettings.mockResolvedValue({ defaultProviderId: null, providers: [] });
   client.mealieCreateAiProvider.mockResolvedValue('new-id');
 });
@@ -127,5 +131,29 @@ describe('syncMealieAiProvider', () => {
       'generated-admin-pw'
     );
     expect(client.mealieCreateAiProvider).toHaveBeenCalled();
+  });
+
+  it("renames the seed admin off 'admin' so an OIDC user of that name can't collide", async () => {
+    getClaudeApiKey.mockResolvedValue('sk-ant-abc123');
+    const seed = { id: 'u1', username: 'admin', email: 'changeme@example.com', fullName: 'Change Me' };
+    client.mealieGetSelf.mockResolvedValue(seed);
+
+    await syncMealieAiProvider('mealie');
+
+    expect(client.mealieRenameUser).toHaveBeenCalledWith(
+      'http://10.201.0.1:10230',
+      'tok',
+      seed,
+      'mealie-local-admin'
+    );
+  });
+
+  it('leaves the seed admin alone once it has already been renamed', async () => {
+    getClaudeApiKey.mockResolvedValue('sk-ant-abc123');
+    client.mealieGetSelf.mockResolvedValue({ id: 'u1', username: 'mealie-local-admin' });
+
+    await syncMealieAiProvider('mealie');
+
+    expect(client.mealieRenameUser).not.toHaveBeenCalled();
   });
 });

@@ -41,7 +41,9 @@ import {
   mealieCreateAiProvider,
   mealieDeleteAiProvider,
   mealieGetAiSettings,
+  mealieGetSelf,
   mealieLogin,
+  mealieRenameUser,
   mealieSetAiSettings,
   mealieUpdateAiProvider,
   MealieAiProviderInput,
@@ -54,6 +56,15 @@ export const MEALIE_ADMIN_PASSWORD_KEY = 'MEALIE_ADMIN_PASSWORD';
 // as-is — it's only ever a login identifier for this process, never shown.
 const SEED_ADMIN_EMAIL = 'changeme@example.com';
 const SEED_ADMIN_PASSWORD = 'MyPassword';
+
+// Mealie seeds this account with username `admin`. Mealie's OIDC auto-provision
+// keys new accounts on the incoming username with no link to an existing one,
+// so an Authelia user named `admin` (a common webmaster name) collides on
+// `users.username` and the OIDC login 500s (§326/§328). Renaming the seed
+// account off `admin` frees the name; the dashboard logs in by email, so this
+// doesn't affect anything else.
+const SEED_ADMIN_USERNAME = 'admin';
+const RENAMED_SEED_ADMIN_USERNAME = 'mealie-local-admin';
 
 // Name of the provider row this sync owns in Mealie. Matched on to decide
 // create-vs-update; anything else in the group is left alone.
@@ -125,6 +136,29 @@ async function loginAsManagedAdmin(baseUrl: string): Promise<string | null> {
 }
 
 /**
+ * Rename Mealie's seed admin off `username: admin` so an Authelia user of that
+ * name can sign in via OIDC without colliding on `users.username` (§328).
+ * Idempotent: a no-op once the username is anything but `admin`. Best-effort —
+ * a failure just means the collision is still possible, never blocks the sync.
+ */
+async function freeSeedAdminUsername(baseUrl: string, token: string): Promise<void> {
+  try {
+    const self = await mealieGetSelf(baseUrl, token);
+    if (!self || self.username !== SEED_ADMIN_USERNAME) {
+      return;
+    }
+    const ok = await mealieRenameUser(baseUrl, token, self, RENAMED_SEED_ADMIN_USERNAME);
+    logger.info(
+      ok
+        ? `Renamed Mealie's seed admin username ${SEED_ADMIN_USERNAME} -> ${RENAMED_SEED_ADMIN_USERNAME} (frees it for OIDC)`
+        : "Mealie seed-admin rename call failed — an OIDC user named 'admin' may still collide"
+    );
+  } catch (error) {
+    logger.warn('Mealie seed-admin rename skipped', { error: (error as Error).message });
+  }
+}
+
+/**
  * Reconcile the managed AI provider against the stored Claude key. No key →
  * turn AI off and drop the provider. Key set → upsert the provider (always a
  * full write: Mealie never echoes `api_key` back, so there's nothing to
@@ -145,6 +179,8 @@ export async function syncMealieAiProvider(serviceName: string): Promise<void> {
     if (!token) {
       return;
     }
+
+    await freeSeedAdminUsername(baseUrl, token);
 
     const key = await getClaudeApiKey();
     const settings = await mealieGetAiSettings(baseUrl, token);
