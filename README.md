@@ -299,13 +299,17 @@ below.
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
-- [ ] **@mat: fresh OIDC login through each of Vikunja/Mealie/Immich/Homebox**
-      (§270, §280, §281, §324) — the rest of §281 is proven live (§324.3): the
-      four apps are exposed, the §270 managed block rendered `$pbkdf2-sha512$`
-      digests, Authelia restarted clean and each `client_id` resolves. Only
-      the real auth-code exchange — which is what actually verifies the
-      *hashed* secret at the token endpoint — is left. Log into each app via
-      Authelia and confirm it lands logged in with no `invalid_client`.
+- [ ] **@mat: Mealie OIDC login collides with its built-in `admin`** (§326) —
+      the token exchange succeeds, then Mealie's auto-provision fails with
+      `UNIQUE constraint failed: users.username` because it keys the new
+      account on `preferred_username` with no link to the existing local
+      `admin`. Decide the account-linking / `OIDC_USER_CLAIM` config, or
+      rename one side. Hits any deployment where an Authelia username matches a
+      pre-existing local account.
+- [ ] **@mat: Immich needs its first admin created before OIDC works** (§326) —
+      OIDC login gets through the token exchange and profile fetch, then
+      Immich refuses (`The first registered account must the administrator`).
+      One-time manual bootstrap of the admin account on the live box.
 
 - [ ] **@mat: prove Nextcloud header-trust live** (§217, §276) — expose
       Nextcloud, apply Authelia's `authelia-authrequest.conf` snippet to its

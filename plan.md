@@ -22556,3 +22556,41 @@ place both the picker and the validation allowlist (`getAppAccessOptionNames`)
 derive from. Other `service_exposure` consumers already handle the colon
 (explicit `LIKE` for secondaries, or a keyed lookup). Test updated, 640 pass,
 tsc clean. Patch 0.59.4 → 0.59.5.
+
+## 326. §281 proven live — OIDC token exchange with the pbkdf2 client secrets (2026-09-09)
+
+Closes the §270/§280/§281 `@mat` item. With the four apps exposed (§324) and an
+Authelia `admin` login, drove the real OIDC auth-code flow for each against
+`authelia.tx-home-utils.com` (`consent_mode: implicit`, so no consent stop) and
+watched the token endpoint:
+
+| app | token_endpoint_auth_method | PKCE | `POST /api/oidc/token` | end state |
+|---|---|---|---|---|
+| homebox | client_secret_post | no | 200 | logged in (`/api/v1/users/self` 200) |
+| vikunja | client_secret_basic | no | 200 | session JWT issued |
+| mealie | client_secret_basic | S256 | 200 (+ userinfo 200) | see below |
+| immich | client_secret_post | S256 | 200 (profile fetched) | see below |
+
+No `invalid_client` on any of them — the `$pbkdf2-sha512$310000$…` digests
+Authelia loads from the managed block verify correctly at the token endpoint,
+for both `client_secret_post` and `client_secret_basic`, with and without PKCE.
+That is the whole of what §281 needed.
+
+**Two apps didn't complete the login — both for local-account reasons, after a
+successful token exchange, not an SSO fault:**
+
+- **Mealie** — `[OIDC] Exception while creating user: UNIQUE constraint failed:
+  users.username`. Mealie ships a local `admin`, and its OIDC auto-provision
+  keys the new account on `preferred_username` (`admin` from Authelia) with no
+  link to the existing one → collision. Real deployments will hit this whenever
+  an Authelia username matches a pre-existing local account; Mealie's
+  account-linking / `OIDC_USER_CLAIM` settings are the lever. New README item.
+- **Immich** — `The first registered account must the administrator.` This
+  Immich has never had its first (admin) account created, and Immich refuses to
+  make that one via OAuth. One-time manual bootstrap. New README item.
+
+Probe script lived in the session scratchpad (not committed) — Python + a
+scripted firstfactor + manual redirect follow. One bug worth remembering if it
+gets rebuilt: Immich's `oauth4webapi` client rejects the callback unless the
+`iss` parameter Authelia adds to the redirect is passed through (RFC 9207) —
+`OAUTH_INVALID_RESPONSE: response parameter "iss" (issuer) missing`.
