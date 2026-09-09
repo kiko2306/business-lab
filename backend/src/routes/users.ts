@@ -26,7 +26,6 @@ import {
   setUserAppAccess,
 } from '../services/userAppAccess';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
-import { syncBeszelUsersSafe } from '../services/beszelSync';
 import { createInvitation } from '../services/userInvitations';
 import { sendMail, mailIsConfigured } from '../utils/mailSend';
 import { getDashboardBaseUrl } from '../utils/generalSettings';
@@ -258,8 +257,7 @@ router.put(
       // webmaster ↔ not changes Authelia group membership (the `admins` group
       // and every `app-*`).
       const autheliaWarning = await syncAutheliaUsersSafe('user_roles_update', req.user?.id ?? null);
-      const beszelWarning = await syncBeszelUsersSafe('user_roles_update', req.user?.id ?? null);
-      const warning = [autheliaWarning, beszelWarning].filter(Boolean).join(' ') || null;
+      const warning = autheliaWarning || null;
 
       return res.json({ message: 'Roles updated.', roles, ...(warning ? { warning } : {}) });
     } catch (error) {
@@ -349,8 +347,7 @@ router.put(
       }).catch(() => {});
 
       const autheliaWarning = await syncAutheliaUsersSafe('user_access_update', req.user?.id ?? null);
-      const beszelWarning = await syncBeszelUsersSafe('user_access_update', req.user?.id ?? null);
-      const warning = [autheliaWarning, beszelWarning].filter(Boolean).join(' ') || null;
+      const warning = autheliaWarning || null;
 
       return res.json({
         message: 'Access updated.',
@@ -493,8 +490,7 @@ router.delete('/:id', validateParams(schemas.userIdParam), async (req: Request, 
     }).catch(() => {});
 
     const autheliaWarning = await syncAutheliaUsersSafe('user_delete', req.user?.id ?? null);
-    const beszelWarning = await syncBeszelUsersSafe('user_delete', req.user?.id ?? null);
-    const warning = [autheliaWarning, beszelWarning].filter(Boolean).join(' ') || null;
+    const warning = autheliaWarning || null;
 
     return res.json({ message: 'User deleted successfully.', ...(warning ? { warning } : {}) });
   } catch (error) {

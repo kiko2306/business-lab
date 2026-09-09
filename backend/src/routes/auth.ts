@@ -18,7 +18,6 @@ import { effectiveCapabilities } from '../auth/capabilities';
 import { getUserCapabilities, getUserRoles, setUserRoles } from '../services/userRoles';
 import { acceptInvitation, verifyInvitation } from '../services/userInvitations';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
-import { syncBeszelUsersSafe } from '../services/beszelSync';
 import {
   generateRecoveryCodes,
   generateTotpSecret,
@@ -152,10 +151,8 @@ router.post(
         result: 'success',
       }).catch(() => {});
 
-      // The account now has a password hash — write it into Authelia (§157)
-      // and Beszel.
+      // The account now has a password hash — write it into Authelia (§157).
       await syncAutheliaUsersSafe('invitation_accepted', activated.userId);
-      await syncBeszelUsersSafe('invitation_accepted', activated.userId);
 
       const session = await issueSession({ id: activated.userId, username: activated.username });
       return res.json(session);

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.59.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.59.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -219,23 +219,15 @@ Updates:
 
 Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
 
-- [ ] **@mat: resolve the functional-overlap pairs from the §301e survey** —
-      each is a keep-one decision, not urgent:
-      - **Monitoring** — Dozzle (logs) + Scrutiny (SMART) are unique; **Beszel
-        vs Uptime-Kuma** overlap on "is it up". Keep one (Beszel for resource
-        graphs, Uptime-Kuma for a status page + alert rules).
-      - **MeshCentral** — §264 already called it "optional once Guacamole
-        reaches endpoints over NetBird". Drop it unless off-overlay endpoint
-        management is a real requirement.
-      - **Syncthing vs Nextcloud** — Nextcloud already syncs files; keep
-        Syncthing only where serverless P2P sync is the actual need.
-      - **Homebox vs ITFlow** — both track assets/warranties. One per
-        deployment.
-      - **kitchen-switcher** — a one-click Mealie↔Pantry toggle, not really an
-        app. Keep or drop.
-      Minor/no action: wetty vs Guacamole SSH, Miniflux vs Nextcloud News,
-      BookStack vs ITFlow docs (all cheap to keep). (File Browser vs Nextcloud
-      resolved — File Browser removed, §310.)
+- [ ] **@mat: Homebox vs ITFlow — one asset tracker per deployment** (§301e) —
+      both track assets/warranties; not urgent and neither leaves the repo.
+      A per-deployment profile choice: ITFlow for the MSP model (it tracks
+      client assets as part of its wider job), Homebox for a simpler box.
+      The rest of the §301e survey is resolved: Beszel (§323), MeshCentral
+      (§320), Syncthing (§322) and kitchen-switcher (§321) removed; Uptime-Kuma
+      kept over Beszel for its status page + alert rules. Minor/no action:
+      wetty vs Guacamole SSH, Miniflux vs Nextcloud News, BookStack vs ITFlow
+      docs (all cheap to keep).
 
 Strategy:
 
@@ -329,21 +321,6 @@ below.
       off. §180 applies: decide whether the LAN-direct `:80` bypass matters
       for Nextcloud before treating header-trust as the only gate.
 
-- [ ] **@mat: prove Beszel SSO live, then flip `DISABLE_PASSWORD_AUTH`**
-      (§229, §236) — `beszelSync.ts` is built and `TRUSTED_AUTH_HEADER:
-      Remote-Email` is on the `beszel` service, but unproven against the real
-      proxy. Scratch-stack proof (§223 shape): provision a test dashboard
-      user granted `beszel` access, confirm the PocketBase `users` record
-      lands, then forge `Remote-Email` on `/api/collections/users/auth-refresh`
-      (the request the two failing upstream discussions used) and confirm
-      200 + a real token instead of 401. Only then add
-      `DISABLE_PASSWORD_AUTH: "true"` to the compose file — flipping it
-      before the header path is proven risks a lockout with no non-manual
-      way back.
-
-      Each needs its own config change and its own live proof; Nextcloud's
-      fix probably also wants a §180 conversation about whether the LAN-direct
-      bypass matters for that specific app first.
       **BookStack** has OIDC/SAML too, but no flag to hide the local form —
       `AUTH_METHOD=oidc` only adds OIDC as an option, and a years-old
       upstream request to disable the standard form is still unimplemented.

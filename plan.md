@@ -22420,3 +22420,36 @@ Deleted `apps/syncthing/`, the `services.ts` entry, the Syncthing rows in
 `docs/{app-credentials,licences}.md`, and the `ports.md` entry plus its
 `22000`/`21027` fixed-port explainer paragraph. Port `10500` free again.
 656 backend tests + typecheck pass.
+
+## 323. Beszel removed (§229, §236, §301e, 2026-09-09)
+
+@mat call from the §301e overlap survey: Beszel (host + per-container resource
+graphs, basic up/down) and Uptime-Kuma (HTTP/TCP checks + a public status page
++ alert rules) both answer "is my stuff up". Kept Uptime-Kuma — the
+client-facing status page and alert rules are the higher-value half;
+Beszel's resource graphs are mostly covered for an admin by Dozzle +
+`docker stats`. ~19 MiB RSS reclaimed, but the real reason is one fewer thing
+on the roster.
+
+Beszel was the most wired-in of the four §301e removals — it had a full
+user-account sync path (same tier as Authelia's), so this was route surgery,
+not just a registry delete:
+
+- Deleted `apps/beszel/`, `services/beszelClient.ts`, `services/beszelSync.ts`
+  + `beszelSync.test.ts`, and the `services.ts` registry entry.
+- Removed `syncBeszelUsersSafe` — the import and all six call sites across
+  `routes/{users,auth,services}.ts` (user role change, access change, delete,
+  invitation-accept, and the Beszel-specific exposure-change hook). Each sat
+  next to a `syncAutheliaUsersSafe` call and merged a `beszelWarning` into the
+  response; the merges collapse back to the Authelia warning alone. Same shape
+  as the §318 Guacamole-sync removal.
+- Docs: Beszel rows out of `docs/{ports,licences,app-credentials,sales-
+  catalogue,raspberry-pi}.md`, and the `app-credentials.md` note that Beszel's
+  `TRUSTED_AUTH_HEADER` path was "unproven until proven live" is gone with it.
+- Frontend: dropped the now-orphaned `switch` and `sync` fallback emoji from
+  the service-card icon map (kitchen-switcher / Syncthing were their only
+  users); `monitor` was never in the map.
+
+Closes the "prove Beszel SSO live, then flip `DISABLE_PASSWORD_AUTH`" README
+item (§229/§236) — nothing left to prove. Port `10110` free again. Backend
+typecheck + 640 tests, frontend 50 tests, e2e suite all pass.

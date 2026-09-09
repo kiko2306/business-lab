@@ -37,7 +37,7 @@ async function getExposedHostname(serviceName: string): Promise<string | null> {
  *  - some `running`, some still `created` → genuinely mid-boot (`starting`),
  *    e.g. a dependency container hasn't been started yet.
  *  - some `running`, the rest exited → treat as up: one-shot init/migration
- *    containers that ran and exited are normal (e.g. beszel's init step).
+ *    containers that ran and exited are normal (e.g. a DB migration step).
  *  - nothing `running` but something `created` → `compose up` created the
  *    container(s) but they never started — a host-port clash or a bad mount —
  *    which is a failure (`error`), not a transient state.

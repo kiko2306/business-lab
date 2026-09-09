@@ -73,7 +73,6 @@ replaces.
 |---|---|---|
 | Kopia | Fast, encrypted, deduplicated snapshot backups of every app's data | Backblaze/Veeam-style managed backup |
 | Uptime Kuma | Uptime and status monitoring with alerts | UptimeRobot, a hosted status-page product |
-| Beszel | Lightweight server resource monitoring (CPU/RAM/disk) | Datadog or New Relic's infrastructure-monitoring tier |
 | Dozzle | Real-time Docker container log viewer | A log-aggregation SaaS (Papertrail, Loggly) for container logs |
 | Speedtest | Internet speed testing, run from the host itself | speedtest.net (self-hosted, no third party involved) |
 | Home Page | This dashboard's own start page — tiles for every running, exposed app | An internal company intranet/portal page |

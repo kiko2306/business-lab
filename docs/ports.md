@@ -68,7 +68,7 @@ hand edit can leave its copy disagreeing with the app's.
 
 ## Current allocation
 
-`10100` authelia · `10110` beszel · `10120` bookstack · `10130` code-server ·
+`10100` authelia · `10120` bookstack · `10130` code-server ·
 `10140` dozzle ·
 `10190` home-page · `10200` immich · `10210` jellyfin ·
 `10230` mealie · `10240` n8n ·

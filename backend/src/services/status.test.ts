@@ -11,7 +11,7 @@ describe('aggregateContainerState', () => {
   });
 
   it('is running when the only non-running containers are one-shot exits', () => {
-    // e.g. beszel: an init container that exits 0 alongside the running app
+    // e.g. a migration container that exits 0 alongside the running app
     expect(aggregateContainerState(['running', 'running', 'exited'])).toBe('running');
   });
 

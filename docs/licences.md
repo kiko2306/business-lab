@@ -44,7 +44,6 @@ operate within, listed again at the end.
 | App | Upstream licence | Status | Note |
 |---|---|---|---|
 | Authelia | Apache-2.0 | ✅ Clean | |
-| Beszel | MIT | ✅ Clean | |
 | BookStack | MIT (LinuxServer image scripts GPL-3.0) | ✅ Clean | |
 | ClamAV | GPL-2.0 | ✅ Clean | internal use |
 | Code Server | MIT | ✅ Clean | VS Code OSS build |

@@ -40,7 +40,6 @@ once and never displayed again; rotate them there if you need a new one.
 
 | App | Username | Password / token |
 |---|---|---|
-| **Beszel** | `BESZEL_ADMIN_EMAIL` | `BESZEL_ADMIN_PASSWORD` (generated) |
 | **Nextcloud** | `NEXTCLOUD_ADMIN_USER` | `NEXTCLOUD_ADMIN_PASSWORD` (generated). Optional: after exposing Nextcloud and applying Authelia's authrequest snippet to its NPM proxy host, set **Configuration → `NEXTCLOUD_PROXY_HEADER_AUTH`** true — the dashboard switches the bundled `user_saml` app into environment-variable mode so Authelia's `Remote-User` header logs you straight in (§216/§217). If the header path misbehaves, `https://<host>/login?direct=1` always shows the normal form and the local admin still works there; turning the toggle back off removes `user_saml` on the next start. |
 | **Paperless-ngx** | `PAPERLESS_ADMIN_USER` | `PAPERLESS_ADMIN_PASSWORD` (generated). Behind Authelia the Paperless login form is skipped — it trusts the `Remote-User` header (`PAPERLESS_ENABLE_HTTP_REMOTE_USER`). LAN-direct access on the app's port still uses the form. A header-authed user that doesn't exist yet is auto-created non-staff; `PAPERLESS_ADMIN_USER` stays the superuser. The REST API keeps its own token auth. |
 | **Kopia** | `kopia` (fixed) | `KOPIA_SERVER_PASSWORD` (generated) for the web UI / REST API. `KOPIA_PASSWORD` is the repository encryption password — also generated, and the one to keep safe: without it the snapshots can't be read on a rebuild. The backup **destination** (disk / SMB / NFS / S3 / FTP) is set in the dashboard at Settings → Backup destination; for FTP, enter the server (`host` or `host:port`), the remote directory (`/` = FTP root), and the FTP username/password there. |
@@ -133,9 +132,7 @@ A separate set *do* have their own login but skip it behind Authelia, so an
 SSO login lands with no second form: **Paperless-ngx**
 (`PAPERLESS_ENABLE_HTTP_REMOTE_USER`) trusts the `Remote-User` header NPM sets
 from the Authelia forward-auth, and still shows its own login on LAN-direct
-access. This is a fixed per-app property, not a setting. (**Beszel** has the
-same header path wired via `TRUSTED_AUTH_HEADER` but keeps password auth
-enabled until it's proven live.)
+access. This is a fixed per-app property, not a setting.
 
 **Guacamole** is *not* in that set (plan.md §288/§318): it is `overlayOnly` —
 reached directly on port `10430` over NetBird/Tailscale with its own login

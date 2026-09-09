@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.59.4] — 2026-09-09
+
+### Removed
+
+- Beszel dropped — Uptime-Kuma kept for the status-page + alerting overlap; its user-sync path removed from the auth/users/services routes (§301e, §323)
+
 ## [0.59.3] — 2026-09-09
 
 ### Removed
