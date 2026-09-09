@@ -23133,7 +23133,10 @@ Docs-only + shell — no version bump.
 ## 340. DocuSeal added — document signing + fillable PDF forms (§22.3, 2026-09-09)
 
 Picked off the §22 backlog as the next app: highest-priority open candidate
-(P2) and the lightest — one container, no Postgres/Redis.
+(P2) and the lightest — one container, no Postgres/Redis **sidecars** (the
+image turned out to bundle Redis 8.8 + Sidekiq internally for background jobs,
+but that's one self-contained container, SQLite for the actual data — see the
+live-verify note).
 
 `apps/docuseal/`:
 - `docker-compose.yml` — `docuseal/docuseal:latest` (Ruby 4.0.5 / Alpine),
@@ -23168,6 +23171,16 @@ alpha-in-tens is already approximate), `app-credentials.md` (Wizard table),
 
 648 backend tests green (registry-wide `services.test.ts` checks — homepage
 labels, DB-backup coverage — pass with the new entry), frontend 50 green,
-`docker compose config` valid. Minor bump → **0.63.0**. Live-verify after
-the deploy: start it, confirm `healthy` + `/up` 200 + `docuseal.<domain>`
-serves the setup page behind Authelia.
+`docker compose config` valid. Minor bump → **0.63.0**.
+
+**Live-verified (deploy #12, 0.63.0, 2026-09-09).** Started from the dashboard
+API — `exposure: { attempted: true, success: true, hostname:
+docuseal.tx-home-utils.com }`. Container `healthy` in ~1 min at **158 MiB /
+512 MiB** (Puma + a bundled Redis 8.8 + Sidekiq, all in the one container —
+Redis 8 is AGPL-licensed, fine for the model; licences.md row updated). `/up`
+returns the green Rails health page (200). `service_exposure` row
+`enabled + provisioned`, no error. Authelia grew a
+`docuseal.tx-home-utils.com` rule (`one_factor`, `subject:
+group:app-docuseal`) via the §338 auto-sync. `https://docuseal.tx-home-utils.com/`
+→ 302 to the Authelia login (200). Zero manual exposure steps — §331
+auto-exposure end to end for a fresh app.

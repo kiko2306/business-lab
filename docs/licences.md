@@ -48,7 +48,7 @@ operate within, listed again at the end.
 | ClamAV | GPL-2.0 | ✅ Clean | internal use |
 | Code Server | MIT | ✅ Clean | VS Code OSS build |
 | CrowdSec | MIT | ✅ Clean | Cloudflare bouncer MIT; NPM Lua bouncer MIT, see vendored code below |
-| DocuSeal (`docuseal/docuseal`) | **AGPL-3.0** | ✅ Clean | stock unmodified, SQLite single container. Community edition; the paid "DocuSeal Pro" is a separate image we don't run. AGPL obligation falls on the client operating the box, not on Business Lab — same position as Immich / Mealie / NocoDB. `ruby:4.0.5-alpine` base rowed below |
+| DocuSeal (`docuseal/docuseal`) | **AGPL-3.0** | ✅ Clean | stock unmodified, SQLite for data, single all-in-one container. Community edition; the paid "DocuSeal Pro" is a separate image we don't run. The image bundles **Redis 8.8** (dual-licensed **AGPL-3.0** since Redis 8 — the older RSALv2/SSPL that pushed Paperless to Valkey does not apply here) and **Sidekiq** (LGPL-3.0) for background jobs — both internal, not our sidecars, not redistributed. AGPL obligation falls on the client operating the box, same position as Immich / Mealie / NocoDB. `ruby:4.0.5-alpine` base rowed below |
 | Dozzle | MIT | ✅ Clean | |
 | Guacamole | Apache-2.0 | ✅ Clean | incl. bundled `guacamole-auth-header` extension, same licence |
 | Home Assistant | Apache-2.0 | ✅ Clean | |
