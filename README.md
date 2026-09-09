@@ -301,20 +301,19 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **Flip the remaining two-login apps to expose-direct** (§342) — policy
-      (§342): an app either logs in via Authelia *with its own form hidden*, or
-      it's exposed directly with only its own login — never both. Done for
-      **Nextcloud** (header-trust §330), **Immich/Vikunja/Mealie** (OIDC +
-      local login off), **DocuSeal** (`skipAutheliaProtection`, §342). Still
-      two logins today: **BookStack** (`AUTH_METHOD=oidc` only *adds* OIDC, no
-      flag to hide the local form), **ITFlow**, **Kopia**, **n8n**, **NocoDB**
-      (SSO is Enterprise, §273), **Jellyfin** (core has no header-trust, only
-      a community plugin), **Home Assistant** (§311 — no header-trust;
-      `trusted_networks` can't combine with the trusted proxy). Each needs
-      `skipAutheliaProtection: true` + a check its own login is sound as the
-      sole gate — confirm per app before flipping (Kopia sees every backup,
-      n8n runs arbitrary code, HA controls the house). NPM's admin UI and
-      Pi-hole are `overlayOnly` — not on the public tunnel, out of scope here.
+- [ ] **§344 batch 1 — `overlayOnly` for Kopia, n8n, ITFlow** — §342 rule:
+      never two logins. These can't hide their own form, and their own login
+      is too weak to be the sole *internet-facing* gate (Kopia: basic auth,
+      reads/deletes every backup; n8n: runs arbitrary code, no MFA; ITFlow:
+      client passwords + docs). Take them off the public tunnel — one flag
+      each + docs rows + `services.test.ts` — reached over NetBird/Tailscale,
+      one login, no public first-run race.
+- [ ] **§344 batch 2 — expose-direct + admin bootstrap: BookStack, NocoDB,
+      Jellyfin, Home Assistant** — `skipAutheliaProtection: true` each, plus a
+      `reconcile<App>FirstAdmin` (DocuSeal §341 pattern) so exposing them
+      doesn't open a first-visitor-claims-admin race. BookStack also rotates
+      its shipped `admin@admin.com`/`password`; HA also forces `ip_ban_enabled`.
+      One app per commit, after batch 1.
 - [ ] **`@mat`: confirm NPM's admin UI over the overlay** (§239, §324.4) — the
       "deprovision any live public `npm.<domain>`" half is settled: nothing was
       ever provisioned for `nginx-proxy-manager` (no row, no DNS, no proxy
