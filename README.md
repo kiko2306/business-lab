@@ -285,12 +285,22 @@ Roster removals (§301 — drop the heaviest apps outright instead of tuning the
       explicitly (`docker image rm` the specific tags, `docker volume rm` the
       inspected `*_*` volumes) plus a general `docker image prune -af` —
       don't rely on a blind prune. Folds into §300 Phase A.
-- [ ] **Redundancy / same-functionality pass** (§301e) — after the removals,
-      survey the remaining roster for apps doing substantially the same job
-      and write it up for @mat (candidates: Forgejo vs code-server, Immich vs
-      Nextcloud photos, Syncthing vs Nextcloud sync, Dozzle/Beszel/Uptime-Kuma/
-      Scrutiny monitoring overlap, Jellyfin vs Immich media, Miniflux vs
-      Nextcloud News).
+- [ ] **@mat: resolve the functional-overlap pairs from the §301e survey** —
+      each is a keep-one decision, not urgent:
+      - **Monitoring** — Dozzle (logs) + Scrutiny (SMART) are unique; **Beszel
+        vs Uptime-Kuma** overlap on "is it up". Keep one (Beszel for resource
+        graphs, Uptime-Kuma for a status page + alert rules).
+      - **MeshCentral** — §264 already called it "optional once Guacamole
+        reaches endpoints over NetBird". Drop it unless off-overlay endpoint
+        management is a real requirement.
+      - **Syncthing vs Nextcloud** — Nextcloud already syncs files; keep
+        Syncthing only where serverless P2P sync is the actual need.
+      - **Homebox vs ITFlow** — both track assets/warranties. One per
+        deployment.
+      - **kitchen-switcher** — a one-click Mealie↔Pantry toggle, not really an
+        app. Keep or drop.
+      Minor/no action: wetty vs Guacamole SSH, File Browser vs Nextcloud,
+      Miniflux vs Nextcloud News, BookStack vs ITFlow docs (all cheap to keep).
 
 Strategy:
 

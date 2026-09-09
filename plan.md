@@ -21683,3 +21683,66 @@ feature with no users" shape as §91.
 four apps (Postiz ~1.7, Metabase ~1.4, SQL Server ~0.6, WAHA ~0.25). Orphan
 images/volumes on the host clear on its next pull + the §300 Phase A prune
 (README item). §301e (redundancy survey) is the remaining piece.
+
+## 301e. Redundancy / same-functionality survey (2026-09-09)
+
+After the §301a–d removals the roster is 43 registry entries (~39 optional
+apps + core). Surveyed for functional overlap — apps doing substantially the
+same job — so @mat can decide a leaner set. No code here; the actionable
+pairs are README items.
+
+### Real overlap, worth a decision
+
+- **Monitoring cluster — Beszel / Uptime-Kuma / Dozzle / Scrutiny.** Dozzle
+  (container logs) and Scrutiny (disk SMART) are each unique. **Beszel**
+  (host + per-container metrics, basic up/down) and **Uptime-Kuma** (HTTP/TCP
+  uptime + a public status page + alerting) overlap on "is my stuff up".
+  A minimal set is Dozzle + Scrutiny + **one** of {Beszel, Uptime-Kuma}:
+  keep Beszel if the value is resource graphs, keep Uptime-Kuma if it's an
+  external status page + alert rules. Both also duplicate what Home Assistant
+  and `ntfy` already cover for notifications.
+- **MeshCentral vs Guacamole + NetBird.** §264/§62.2 already noted MeshCentral
+  is "optional once Guacamole reaches endpoints over the NetBird overlay".
+  MeshCentral's stated niche is endpoints *outside* the overlay — if every
+  managed endpoint is on NetBird anyway (the intended model), MeshCentral is
+  a ~89 MiB app with no unique job. Decide: is off-overlay remote management
+  a real requirement, or does NetBird+Guacamole cover it.
+- **Syncthing vs Nextcloud.** Nextcloud already does file sync with desktop/
+  mobile clients, plus calendar/contacts. Syncthing is peer-to-peer folder
+  sync with no server model — genuinely different mechanism, but for most
+  clients "keep these folders in sync" is already answered by Nextcloud.
+  Keep Syncthing only where the serverless/P2P property is the point.
+- **Homebox vs ITFlow.** ITFlow tracks client assets, warranties and
+  licences as part of its MSP model; Homebox tracks asset/warranty/inventory
+  standalone. If ITFlow is deployed for a client, Homebox is a second asset
+  database. Pick one per deployment.
+- **kitchen-switcher.** Not an app so much as a UI shim whose whole function
+  is a one-click toggle between Mealie and Pantry. ~5 MiB, but it is registry
+  weight and a Home Page tile for something a bookmark does. Question whether
+  it earns a slot.
+
+### Minor overlap — note only, not worth removing
+
+- **wetty vs Guacamole SSH.** wetty is browser-SSH to *this host* only, ~15
+  MiB, zero-config; Guacamole can do SSH too but is a full remote-desktop
+  gateway. Keep wetty as the lightweight "shell into the dashboard host".
+- **File Browser vs Nextcloud.** Nextcloud has a full web file UI; File
+  Browser is a lightweight web file manager over a directory — useful for the
+  §219 shared file tree where Nextcloud isn't mounted. Keep unless §219's
+  design drops it.
+- **Miniflux vs Nextcloud News.** Direct overlap (RSS), but Miniflux is ~13
+  MiB and much better at it; the cost of keeping it is trivial.
+- **BookStack vs ITFlow docs.** BookStack is a general wiki; ITFlow's docs
+  module is MSP-scoped. Overlap only if a client wants nothing but IT docs.
+- **immich vs Jellyfin.** Different jobs (personal photo library with phone
+  auto-upload vs media streaming). Marginal overlap; keep both.
+
+### Not overlap (layered or protocol-unique) — leave alone
+
+- **Tailscale vs NetBird** — *not* redundant: Tailscale Funnel exists only to
+  carry NetBird's signal past Cloudflare (§46–§55, §69, §289). Removing
+  Tailscale breaks the VPN.
+- **NPM / Authelia / CrowdSec** — complementary ingress/SSO/IPS layers.
+- **Samba** — SMB protocol for native Windows/macOS mounts; nothing else
+  serves it.
+- **Kopia** — backup snapshots, not live storage.
