@@ -23007,3 +23007,13 @@ Fix:
 All idempotent — `syncAutheliaAccessControl` only writes + restarts Authelia
 when the rendered block actually moved. Backend 648 tests (+1 reconciler),
 tsc clean. Patch → 0.62.5.
+
+**Live-verified (deploy #11, 0.62.5, 2026-09-09).** Boot log:
+`Authelia access_control (boot): wrote 29 rule(s); restarting Authelia to apply`.
+`service_exposure` has 34 rows, all `enabled` + `provisioned`; no `clamav` /
+`samba` / `nginx-proxy-manager` row (lanOnly / overlayOnly stay off the tunnel).
+`navidrome.tx-home-utils.com` now redirects to the Authelia login (200) instead
+of 403, and its rule is present (`policy: one_factor`, `subject:
+group:app-navidrome`). All 30 enabled hostnames probed → 200 (Authelia redirect
+where unauthenticated), including `ssh.tx-home-utils.com` (wetty's hostname
+override). §331 auto-exposure closed.
