@@ -301,12 +301,13 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **§344 batch 2 — expose-direct + admin bootstrap: BookStack, ITFlow,
-      NocoDB, Jellyfin, Home Assistant** — `skipAutheliaProtection: true`
-      each, plus a `reconcile<App>FirstAdmin` (DocuSeal §341 pattern) so
-      exposing them doesn't open a first-visitor-claims-admin race. BookStack
-      also rotates its shipped `admin@admin.com`/`password`; ITFlow forces its
-      own 2FA; HA also forces `ip_ban_enabled`. One app per commit.
+- [ ] **§344 batch 2 — one login per app, priority = Authelia-with-form-hidden
+      first** (§342, §344). Per the priority table in §344: **BookStack** →
+      Authelia OIDC (`AUTH_METHOD=oidc` + `AUTH_AUTO_INITIATE`, `admins`→Admin
+      role); **NocoDB** → expose-direct + `NC_ADMIN_EMAIL/PASSWORD` seed;
+      **ITFlow** → expose-direct + `/setup` bootstrap + force its 2FA;
+      **Jellyfin / Home Assistant** → @mat to pick expose-direct vs
+      `overlayOnly` (neither can hide its form). One app per commit.
 - [ ] **`@mat`: confirm NPM's admin UI over the overlay** (§239, §324.4) — the
       "deprovision any live public `npm.<domain>`" half is settled: nothing was
       ever provisioned for `nginx-proxy-manager` (no row, no DNS, no proxy
