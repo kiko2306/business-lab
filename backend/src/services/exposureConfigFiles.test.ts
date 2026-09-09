@@ -45,12 +45,14 @@ describe('buildHomeAssistantFixScript', () => {
     expect(script).toContain('left configuration.yaml alone');
   });
 
-  it('merges the settings straight into an existing .storage/http (no reset — HA stops re-migrating)', () => {
+  it('merges the settings into an existing .storage/http, keeping the pending key', () => {
     expect(script).toContain('/config/.storage/http');
     expect(script).toContain('st.update(want)');
-    expect(script).toContain('data.pop("pending", None)');
+    // clear pending to None — never delete it (HA's loader does raw['pending'])
+    expect(script).toContain('data["pending"] = None');
+    expect(script).not.toContain('data.pop("pending"');
     expect(script).toContain('merged reverse-proxy + ip_ban settings into .storage/http');
-    // it must NOT delete the store (that leaves HA on http defaults — §347)
+    // and never delete/move the store (that leaves HA on http defaults — §347)
     expect(script).not.toMatch(/mv -f \/config\/\.storage\/http/);
     expect(script).not.toMatch(/rm -f \/config\/\.storage\/http\b/);
   });

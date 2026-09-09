@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.67.3] — 2026-09-09
+
+### Fixed
+
+- HA http config: keep the .storage/http pending key (set to null), never delete it — removing it crashed HA's http integration on boot (§347)
+
 ## [0.67.2] — 2026-09-09
 
 ### Fixed

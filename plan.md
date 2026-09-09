@@ -23611,3 +23611,22 @@ the §311 reconcile only reset `.storage/http` when it *lacked*
   `use_x_forwarded_for` and `ip_ban_enabled`.
 Ran the generated script against fixtures in a `python:3.12-slim` container:
 stale block → replaced with the ip_ban version, `.storage/http` → moved aside.
+
+**Follow-up (0.67.3) — the actual fix.** §347's earlier attempts each broke
+live HA in a new way:
+- *reset `.storage/http`* → HA 2026.x records `yaml_migration_done` and does
+  NOT re-migrate a deleted store; it falls back to http defaults → 400 via
+  the proxy.
+- *merge into `stable`, `data.pop("pending")`* → HA's http store loader does
+  `raw["pending"]` and **requires the key** — removing it crashes the `http`
+  integration on boot (`KeyError: 'pending'`), which cascades to auth /
+  frontend / onboarding and HA never listens.
+Correct shape (confirmed live): `data.stable` carries the settings,
+`data.pending` is present with value `null`, `yaml_migration_done` stays.
+The fix script now merges into `stable` and sets `data["pending"] = None`
+(clearing any real pending block) — never deletes/moves the store, never
+drops the `pending` key. Exercised against three store states
+(established-no-pending, with-pending, no-store) in `python:3.12-slim`.
+Live HA recovered by hand to exactly this shape; `home-assistant.<domain>`
+→ 200 direct, `.storage/http` stable has `use_x_forwarded_for` +
+`ip_ban_enabled`, no more "not set-up for reverse proxies".
