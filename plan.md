@@ -22870,3 +22870,26 @@ Wired in:
 per-app route still exist; slice 2 removes them.
 
 Backend 652 tests (+4), tsc clean. Minor bump → 0.62.0.
+
+## 333. §331 slice 2 — remove the per-app exposure write API (2026-09-09)
+
+With exposure automatic (§332) the write endpoints have no caller:
+
+- Deleted `PUT /api/services/:name/exposure` and
+  `POST /api/services/:name/exposure/verify` from `routes/services.ts`, and
+  the now-orphaned imports (`upsertServiceExposureConfig`,
+  `deprovisionServiceExposure`, `provisionServiceIfEnabled`,
+  `syncAutheliaAccessControlSafe`, `syncAutheliaOidcClientsSafe`,
+  `regenerateHomepageServices` — all only used by those two handlers; the
+  Authelia/homepage syncs still run from the exposure reconciler and each
+  service start).
+- Deleted `upsertServiceExposureConfig` from `exposure.ts`, the
+  `serviceExposureUpdate` Joi schema, and the `ServiceExposureInput` type.
+- `GET /api/services/:name/exposure` stays for now — slice 3 removes it with
+  its frontend caller.
+- `apps:expose` capability left defined (backend `capabilities.ts` +
+  `database.ts` seed) but no longer gates anything; the frontend drops it from
+  the grant UI in slice 3. Not worth a `user_capabilities` migration.
+
+`deprovisionServiceExposure` stays exported — `ensureAutoExposure` and
+`reconcileRemovedServices` use it. Backend 647 tests, tsc clean. Patch → 0.62.1.

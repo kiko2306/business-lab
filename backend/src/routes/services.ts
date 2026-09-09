@@ -14,10 +14,7 @@ import { createStreamTicket } from '../services/realtime';
 import { getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { clearImagePins, pinnedImages } from '../services/composeOverride';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
-import { deprovisionServiceExposure, getExposability, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
-import { syncAutheliaAccessControlSafe } from '../services/autheliaAccessControl';
-import { syncAutheliaOidcClientsSafe } from '../services/autheliaOidcClients';
-import { regenerateHomepageServices } from '../services/homepageConfig';
+import { getExposability, getServiceExposureRow } from '../services/exposure';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
 import { writeAuditLog } from '../utils/audit';
@@ -468,105 +465,6 @@ router.get(
   }
 );
 
-/**
- * PUT /api/services/:name/exposure
- * Configure public exposure provisioning for a service. Opt-in per service;
- * provisioning itself happens on the next successful service start.
- */
-router.put(
-  '/:name/exposure',
-  auth,
-  requireCapability('apps:expose'),
-  validateParams(schemas.serviceNameParam),
-  validateServiceAllowlist,
-  validateBody(schemas.serviceExposureUpdate),
-  async (req: Request, res: Response) => {
-    try {
-      const previous = await getServiceExposureRow(req.params.name);
-      const row = await upsertServiceExposureConfig(req.params.name, req.body);
-
-      // Turning exposure off has to actually take the service off the
-      // internet. Before this, the row flipped to disabled while the NPM
-      // host, tunnel ingress rule and DNS record all stayed live and kept
-      // serving traffic — the setting looked applied and wasn't.
-      const turnedOff = Boolean(previous?.enabled) && !row.enabled;
-      if (turnedOff) {
-        await deprovisionServiceExposure(req.params.name, req.user!.id);
-      }
-
-      // A Home Page tile is only written for a running, exposed app — so
-      // disabling exposure has to drop the tile, and (re)enabling it changes
-      // the link. The other side, provisioning, happens on the next start,
-      // which regenerates too.
-      await regenerateHomepageServices();
-
-      // The set of Authelia-gated apps may have changed (enabled/disabled, or
-      // the authelia flag toggled) — regenerate its access-control rules and
-      // restart it if they moved (plan.md §151 slice 2d).
-      const autheliaWarning = await syncAutheliaAccessControlSafe('exposure_change', req.user!.id);
-      // An app that logs in via Authelia's OIDC provider needs its client's
-      // redirect_uris kept in step with its public hostname (plan.md §270).
-      const oidcClientsWarning = await syncAutheliaOidcClientsSafe('exposure_change', req.user!.id);
-      const warning =
-        [autheliaWarning, oidcClientsWarning].filter(Boolean).join(' ') || null;
-
-      return res.json({
-        message: turnedOff
-          ? 'Exposure disabled and public hostnames removed.'
-          : 'Exposure configuration saved. Restart the service to apply it.',
-        enabled: row.enabled,
-        hostname: row.hostname,
-        ...(warning ? { warning } : {}),
-      });
-    } catch (error) {
-      const httpError = error as HttpError;
-      logger.error(`Failed to save exposure config: ${req.params.name}`, { error: httpError.message });
-      return res.status(httpError.statusCode || 500).json({ error: httpError.statusCode ? httpError.message : 'Unable to save exposure configuration.' });
-    }
-  }
-);
-
-/**
- * POST /api/services/:name/exposure/verify
- * Re-verify (and reconcile, since ensureProxyHost/ensureIngressRoute are
- * idempotent) a service's exposure against the live NPM/Cloudflare state —
- * catches drift if either was hand-edited outside this app, without
- * requiring a full service restart.
- */
-router.post(
-  '/:name/exposure/verify',
-  serviceLimiter,
-  auth,
-  requireCapability('apps:expose'),
-  validateParams(schemas.serviceNameParam),
-  validateServiceAllowlist,
-  async (req: Request, res: Response) => {
-    const serviceName = req.params.name;
-
-    try {
-      const row = await getServiceExposureRow(serviceName);
-      if (!row || !row.enabled) {
-        return res.status(400).json({ error: 'Exposure is not enabled for this service.' });
-      }
-
-      const result = await provisionServiceIfEnabled(serviceName, req.user!.id);
-      const updated = await getServiceExposureRow(serviceName);
-
-      // Re-provisioning can move a hostname from failed to provisioned, which
-      // is the point at which the tile becomes linkable.
-      await regenerateHomepageServices();
-
-      return res.json({
-        ...result,
-        status: updated?.status ?? null,
-        lastError: updated?.last_error ?? null,
-      });
-    } catch (error) {
-      logger.error(`Failed to verify exposure: ${serviceName}`, { error: (error as Error).message });
-      return res.status(500).json({ error: 'Unable to verify exposure configuration.' });
-    }
-  }
-);
 
 /**
  * GET /api/services/:name/env

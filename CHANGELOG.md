@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.62.1] — 2026-09-09
+
+### Removed
+
+- The per-app exposure API (PUT/POST `/api/services/:name/exposure`, `upsertServiceExposureConfig`) — exposure is automatic now, there is nothing to toggle (§331 slice 2)
+
 ## [0.62.0] — 2026-09-09
 
 ### Changed

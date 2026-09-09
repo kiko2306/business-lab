@@ -399,10 +399,6 @@ export interface ServiceExposureRow {
   updated_at: Date;
 }
 
-export interface ServiceExposureInput {
-  enabled: boolean;
-}
-
 export interface ExposureProvisionResult {
   attempted: boolean;
   success?: boolean;

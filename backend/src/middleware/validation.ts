@@ -166,9 +166,6 @@ export const schemas = {
     cloudflareZoneId: Joi.string().trim().alphanum().length(32).required(),
     cloudflareTunnelId: Joi.string().trim().min(1).max(255).required(),
   }),
-  serviceExposureUpdate: Joi.object({
-    enabled: Joi.boolean().required(),
-  }),
   serviceEnvUpdate: Joi.object({
     values: Joi.object().pattern(/^[A-Z][A-Z0-9_]*$/, Joi.string().allow('').max(2000)).required(),
   }),

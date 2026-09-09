@@ -27,7 +27,7 @@ import { bootstrapNpmAdminIfDefault, deleteProxyHost, ensureProxyHost, NpmProxyH
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
-import { ExposureGlobalConfig, ExposureProvisionResult, HttpError, ServiceExposureInput, ServiceExposureRow } from '../types';
+import { ExposureGlobalConfig, ExposureProvisionResult, ServiceExposureRow } from '../types';
 
 // Every exposed service is forwarded to over plain HTTP on the host's
 // published port — TLS is terminated by NPM/Cloudflare, not the origin.
@@ -129,43 +129,6 @@ export async function ensureAutoExposure(serviceName: string, userId: number): P
   } catch (error) {
     logger.error(`Auto-exposure reconcile failed for ${serviceName}`, { error: (error as Error).message });
   }
-}
-
-export async function upsertServiceExposureConfig(
-  serviceName: string,
-  { enabled }: ServiceExposureInput
-): Promise<ServiceExposureRow> {
-  // Reject enabling exposure for a service that can't take it — no published
-  // port (tailscale), a non-HTTP LAN protocol (`lanOnly`, Samba), or a
-  // policy block on tunnelling a sensitive gateway (`overlayOnly`, Guacamole/
-  // Pi-hole — plan.md §210.3). Better here than a silent failure on the next
-  // start, or an NPM host that forwards nothing.
-  if (enabled) {
-    const { exposable, reason } = getExposability(serviceName);
-    if (!exposable) {
-      const error: HttpError = { message: reason!, statusCode: 400 };
-      throw error;
-    }
-  }
-
-  const globalConfig = await getExposureConfig();
-  const hostname = globalConfig ? buildExposureHostname(serviceName, globalConfig.baseDomain) : null;
-
-  // Upstream scheme/host/port/websocket are derived automatically (see
-  // provisionServiceIfEnabled) rather than entered by the user; left
-  // unset here and populated on the next successful service start.
-  const result = await query<ServiceExposureRow>(
-    `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, status, updated_at)
-     VALUES ($1, $2, $3, $4, $5, 'not_provisioned', NOW())
-     ON CONFLICT (service_name)
-     DO UPDATE SET
-       enabled = EXCLUDED.enabled,
-       hostname = EXCLUDED.hostname,
-       updated_at = NOW()
-     RETURNING *`,
-    [serviceName, enabled, hostname, UPSTREAM_SCHEME, ALLOW_WEBSOCKET_UPGRADE]
-  );
-  return result.rows[0];
 }
 
 /**
