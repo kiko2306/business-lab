@@ -22060,3 +22060,52 @@ the deployed host the existing `apps/file-browser/data/files/` content must
 be moved to `apps/nextcloud/data/shared/` during a maintenance window, then
 the Samba↔Nextcloud↔Paperless round-trip (§219's live check) re-run. Lands
 on `dev`, not merged to `main`, until that happens.
+
+## 311. Home Assistant proxy-auth: can't be done without a third-party component — parked (§217, 2026-09-09)
+
+Picked up the README §217 "trust the proxy" item for **Home Assistant** — the
+last entry the list still had as "still open ... buildable" now that File
+Browser is gone (§310). The list assumed HA's `trusted_networks` auth
+provider could hide HA's own login behind Authelia, the §180 LAN-bypass
+blocker having been cleared live by §279.
+
+### It can't, and it's a topology conflict, not a missing knob
+
+HA already runs behind NPM via `services/exposureConfigFiles.ts`, which writes
+an `http:` block with `use_x_forwarded_for: true` and a broad `trusted_proxies`
+list (`10/8`, `172.16/12`, `192.168/16`, loopback, `fc00::/7`). That block is
+**mandatory** — without it HA returns `400: Bad Request` to any request
+carrying an `X-Forwarded-For` header, which NPM always adds.
+
+HA's docs are explicit: *"You cannot trust a network that you are using in any
+`trusted_proxies`."* With `use_x_forwarded_for` on, HA evaluates
+`trusted_networks` against the real client IP from XFF, not the proxy hop — so
+to auto-login it would have to trust the actual client source addresses. Behind
+the Cloudflare Tunnel every external user arrives as the same cloudflared→NPM
+hop, so "trust that address" means "trust the whole internet". Putting the NPM
+container's own IP in `trusted_networks` is what the docs forbid, and dropping
+`use_x_forwarded_for` to make HA see the raw connection IP brings back the 400.
+
+Dead end for a config-only fix.
+
+### Rejected alternatives
+
+- **`hass-auth-header` custom component** — delegates auth to a proxy header
+  (`X-Remote-User` etc.). Third-party, unofficial, same class as Jellyfin's
+  community SSO plugin, which §217 already parked. Not worth adding a
+  custom-component install path and its upgrade risk for one app.
+- **OIDC against Authelia's own provider** (the §270 plumbing) — HA core has
+  no OIDC support either; also needs a custom component
+  (`hass-oidc-auth` / similar). Same objection.
+- **`trusted_networks` scoped to a per-deployment allowlist of static admin
+  IPs** — not the "hide the login" mechanism the item wants, and can't be
+  derived by the system (principle 3), so it would be a UI prompt for
+  something most deployments can't answer (dynamic residential IPs).
+
+### Outcome
+
+HA moves to the README's "no known full fix — parked" list, next to Jellyfin,
+ITFlow, NPM's admin UI, Pi-hole, Kopia, n8n, NocoDB and BookStack. No code
+change. The existing `exposureConfigFiles.ts` `http:`-block reconcile stays as
+is — that's what makes HA reachable through the proxy at all, and it's
+unaffected by this.

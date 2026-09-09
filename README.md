@@ -356,16 +356,18 @@ below.
       §217) — twelve apps ship a real, upstream-supported way to stop
       showing their own login on top of Authelia's, the same shape as the
       already-fixed Dozzle/Guacamole:
-      - **Header/IP trust**: still open — Home Assistant (`trusted_networks`
-        — IP-based, weaker). The §180 LAN-bypass blocker on it is **now
-        cleared** (§279 closed it live: NPM's proxy ports are loopback-only,
-        so there is no un-gated LAN-direct path to drop a login in favour
-        of), so it is buildable. File Browser was the other candidate here —
-        **removed entirely** (§310): upstream `filebrowser/filebrowser` was
-        archived 2026-09-01 with no further security fixes, and it held the
-        repo's most dangerous bind mount (`~` read-write). The shared tree it
-        seeded moved under Nextcloud (`apps/nextcloud/data/shared/`), which
-        is now the primary interface to those files.
+      - **Header/IP trust**: nothing actionable left here. Home Assistant —
+        **parked** (§311): HA core ships no trusted-header auth provider, and
+        `trusted_networks` is explicitly incompatible with running behind a
+        trusted proxy (HA docs: "You cannot trust a network that you are
+        using in any `trusted_proxies`"), which HA's exposure config requires.
+        Every remaining route is a third-party custom component. File Browser
+        was the other candidate here — **removed entirely** (§310): upstream
+        `filebrowser/filebrowser` was archived 2026-09-01 with no further
+        security fixes, and it held the repo's most dangerous bind mount
+        (`~` read-write). The shared tree it seeded moved under Nextcloud
+        (`apps/nextcloud/data/shared/`), which is now the primary interface
+        to those files.
         Done: Stirling-PDF (shipped with
         `SECURITY_ENABLELOGIN=false`), Uptime Kuma (`disableAuth` set by an
         idempotent init sidecar, §227), Paperless-ngx (`Remote-User` via
@@ -417,16 +419,18 @@ below.
       before the header path is proven risks a lockout with no non-manual
       way back.
 
-      Each needs its own config change and its own live proof; Nextcloud and
-      Home Assistant's fixes probably also want a §180 conversation about
-      whether the LAN-direct bypass matters for that specific app first.
+      Each needs its own config change and its own live proof; Nextcloud's
+      fix probably also wants a §180 conversation about whether the LAN-direct
+      bypass matters for that specific app first.
       **BookStack** has OIDC/SAML too, but no flag to hide the local form —
       `AUTH_METHOD=oidc` only adds OIDC as an option, and a years-old
       upstream request to disable the standard form is still unimplemented.
       ITFlow, NPM's own admin UI, Pi-hole, Kopia, n8n and NocoDB
       (Enterprise-only SSO — §273), Jellyfin (core has no header-trust, only a
-      community plugin) and BookStack have no known full fix — parked, not
-      blocked on anything actionable.
+      community plugin), **Home Assistant** (§311 — core has none either;
+      `trusted_networks` can't be combined with the trusted proxy it sits
+      behind) and BookStack have no known full fix — parked, not blocked on
+      anything actionable.
 - [ ] **`@mat`: confirm NPM's overlay path, deprovision any live public NPM
       exposure** (§239) — `nginx-proxy-manager` is now `overlayOnly`, so the
       dashboard refuses to *enable* its exposure, but an already-provisioned
