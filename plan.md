@@ -22691,3 +22691,72 @@ poll ~60s for the app to be reachable, and mid-mass-recreate the app often
 isn't back yet. They succeeded on the next explicit start. Same best-effort /
 retry-next-start behaviour the existing guacamole + mealie-AI reconcilers
 already have; idempotent, so it self-heals. Not worth a blocking wait here.
+
+## 330. Nextcloud header-trust proven live — and a user_saml version bug fixed (2026-09-09)
+
+Picked up the `@mat: prove Nextcloud header-trust live` item (§217/§276).
+
+### The authrequest-snippet step was already stale
+
+§276 said the NPM proxy host "also needs Authelia's `authelia-authrequest.conf`
+snippet applied — an @mat step". Not any more: `npmClient.ts` adds that snippet
+to **every** Authelia-protected host automatically (`AUTHELIA_ADVANCED_CONFIG`),
+and `isAutheliaProtectionRequired` is true for every app by default. Verified
+live — Nextcloud's NPM host already includes `authelia-location.conf` +
+`authelia-authrequest.conf`, and Authelia's `/api/authz/auth-request` returns
+`remote-user: admin` / `remote-groups` / `remote-email` / `remote-name` for an
+authenticated session. So the only real step left was: flip
+`NEXTCLOUD_PROXY_HEADER_AUTH`, restart, verify.
+
+### Real bug: `reconcileNextcloudSaml` wrote the mappings to the wrong place
+
+Flipped the toggle + restarted → `user_saml` env-mode login 500'd:
+`NoUserFoundException: IDP parameter for the UID not found` — while
+`HTTP_REMOTE_USER` was right there in the dumped `$_SERVER` keys.
+
+`user_saml` 6.x (8.3.1 here, NC 34) reads the UID/attribute mappings from the
+**provider config** (`user_saml_configurations` table, via
+`SAMLSettings::get(providerId)` → `ConfigurationsMapper`), not from
+`oc_appconfig`. `buildEnableScript()` was setting them with
+`occ config:app:set user_saml general-uid_mapping …` — the old key path, now a
+dead write nothing reads. `getUidMappingAttribute()` returned null →
+`hasUidMappingAttribute()` false → the exception.
+
+Fix: set them with `occ saml:config:set 1 --general-uid_mapping=… --saml-attribute-mapping-*=…`.
+Provider id **1** is fixed (`SessionService::ENVIRONMENT_IDENTITY_PROVIDER_ID`);
+`saml:config:set` upserts (`ConfigurationsMapper::set` → `insertOrUpdate`), so
+no create step. `type` and `general-require_provisioned_account` stay in
+appconfig — confirmed against `SAMLSettings.php:116` and `UserBackend.php:394`.
+Test updated (still 7), 648 pass, tsc clean. Patch 0.61.0 → 0.61.1.
+
+### Verified live (after applying the corrected `saml:config:set 1` by hand)
+
+- `GET https://nextcloud.tx-home-utils.com/` with an Authelia session → **200,
+  lands on `/apps/dashboard/`**, no second form. `/ocs/v2.php/cloud/user` →
+  `"id":"admin"` — header-trust mapped `HTTP_REMOTE_USER=admin` onto Nextcloud's
+  existing local `admin` account (no duplicate).
+- `/login?direct=1` (no Authelia session) → 302 to Authelia (forward-auth
+  gates the whole host). With an Authelia session → 200, `core-login` mount,
+  **no** auto-redirect to `user_saml/saml/login` — the normal form is the
+  lockout fallback, plus the local `admin` password.
+
+### §180 LAN-bypass decision (was deferred to "when we get there")
+
+**Keep header-trust on; do not block on §180.**
+
+- **NPM / tunnel path** (LAN or WAN): `authelia-authrequest.conf` runs for
+  every request and does `auth_request_set $user $upstream_http_remote_user;
+  proxy_set_header Remote-User $user;` — a client-supplied `Remote-User` is
+  *overwritten* with Authelia's authenticated value. Safe.
+- **Direct container port** (`192.168.1.236:10260`, no proxy): no forward-auth,
+  and env-mode `user_saml` with `require_provisioned_account=0` will trust a
+  forged `Remote-User` header → LAN admin with no password. This is the same
+  exposure Paperless (§247), Guacamole (§200) and Stirling-PDF already ship
+  with, and it was accepted for them. Closing it is the existing estate-wide
+  §180 work (tunnel origin → loopback, bind NPM 80/443 to 127.0.0.1), not a
+  Nextcloud-specific task. On a no-guarantees dev/test box with a semi-trusted
+  LAN, acceptable now; §180 stays its own item.
+
+Header/IP-trust list: Stirling-PDF, Uptime Kuma, Paperless-ngx, **Nextcloud**
+done. Remaining tied to §180: File Browser (removed §310), Home Assistant
+(§311 — no upstream mechanism anyway).

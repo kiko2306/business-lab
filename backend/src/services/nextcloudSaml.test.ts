@@ -23,11 +23,16 @@ describe('buildEnableScript', () => {
     expect(script).toContain('config:app:set user_saml type --value "environment-variable"');
   });
 
-  it('maps the uid + email + displayname to the forwarded header $_SERVER keys', () => {
-    expect(script).toContain('general-uid_mapping --value "HTTP_REMOTE_USER"');
-    expect(script).toContain('saml-attribute-mapping-email_mapping --value "HTTP_REMOTE_EMAIL"');
-    expect(script).toContain('saml-attribute-mapping-displayName_mapping --value "HTTP_REMOTE_NAME"');
-    expect(script).toContain('general-require_provisioned_account --value "0"');
+  it('maps the uid + email + displayname on provider 1 to the forwarded header $_SERVER keys', () => {
+    // Provider config (saml:config:set), not appconfig (config:app:set) — user_saml 6.x moved these (§330).
+    expect(script).toContain('php occ saml:config:set 1 ');
+    expect(script).toContain('--general-uid_mapping="HTTP_REMOTE_USER"');
+    expect(script).toContain('--saml-attribute-mapping-email_mapping="HTTP_REMOTE_EMAIL"');
+    expect(script).toContain('--saml-attribute-mapping-displayName_mapping="HTTP_REMOTE_NAME"');
+    expect(script).toContain('--general-idp0_display_name="Authelia"');
+    // These two stay in appconfig.
+    expect(script).toContain('config:app:set user_saml general-require_provisioned_account --value "0"');
+    expect(script).not.toContain('config:app:set user_saml general-uid_mapping');
   });
 });
 

@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.61.1] — 2026-09-09
+
+### Fixed
+
+- Nextcloud header-trust: write the user_saml attribute mappings to the provider config (`occ saml:config:set 1`), not appconfig — user_saml 6.x moved them and the env-mode login failed with "IDP parameter for the UID not found"
+
 ## [0.61.0] — 2026-09-09
 
 ### Added

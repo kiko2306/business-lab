@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.61.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.61.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -300,19 +300,11 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **@mat: prove Nextcloud header-trust live** (§217, §276) — expose
-      Nextcloud, apply Authelia's `authelia-authrequest.conf` snippet to its
-      NPM proxy host, flip `NEXTCLOUD_PROXY_HEADER_AUTH` true (Configuration
-      panel), restart Nextcloud, and confirm an Authelia login lands straight
-      in with no second form (the dashboard puts `user_saml` in
-      environment-variable mode on start). Then confirm
-      `https://<host>/login?direct=1` still shows the normal form as the
-      escape hatch. `general-uid_mapping=HTTP_REMOTE_USER` and the
-      email/displayname mappings are from `user_saml` source, not a live run —
-      if auto-login provisions a wrongly-named account, the `$_SERVER` key is
-      off. §180 applies: decide whether the LAN-direct `:80` bypass matters
-      for Nextcloud before treating header-trust as the only gate.
-
+- [ ] **SSO: apps with no known full fix** (§217, §276, §330) — the
+      header/IP-trust and OIDC-drop-the-local-form work is done for the apps
+      that support it (Nextcloud proven live in §330). These can't hide their
+      local login form or don't do header-trust, and none is blocked on
+      anything actionable:
       **BookStack** has OIDC/SAML too, but no flag to hide the local form —
       `AUTH_METHOD=oidc` only adds OIDC as an option, and a years-old
       upstream request to disable the standard form is still unimplemented.

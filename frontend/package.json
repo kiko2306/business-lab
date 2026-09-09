@@ -1,6 +1,6 @@
 {
   "name": "homelab-frontend",
-  "version": "0.61.0",
+  "version": "0.61.1",
   "description": "Homelab management Angular frontend",
   "license": "GPL-3.0-or-later",
   "scripts": {

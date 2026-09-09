@@ -40,9 +40,20 @@ const TOGGLE_KEY = 'NEXTCLOUD_PROXY_HEADER_AUTH';
 
 /**
  * occ lines that install + switch `user_saml` into environment-variable mode.
- * `config:app:set` overwrites, and the app is only installed when absent, so
- * this converges on every start. A `user_saml` install needs the Nextcloud app
- * store (network); if that fails the script exits 0 and the next start retries.
+ * Idempotent — the app is only installed when absent, every `set` overwrites,
+ * so this converges on every start. A `user_saml` install needs the Nextcloud
+ * app store (network); if that fails the script exits 0 and the next start
+ * retries.
+ *
+ * The attribute mappings live in the **provider config** (the
+ * `user_saml_configurations` table), reached with `occ saml:config:set`, not
+ * `occ config:app:set user_saml ...` (appconfig) — user_saml 6.x moved them
+ * and the old keys are now dead writes nothing reads (found live: §330, the
+ * env-mode login 500'd with "IDP parameter for the UID not found" while
+ * `HTTP_REMOTE_USER` was right there in `$_SERVER`). Provider id **1** is
+ * fixed: `SessionService::ENVIRONMENT_IDENTITY_PROVIDER_ID`. `saml:config:set`
+ * upserts (`ConfigurationsMapper::set` → `insertOrUpdate`), so no create step.
+ * `type` and `general-require_provisioned_account` are still appconfig.
  */
 export function buildEnableScript(): string[] {
   return [
@@ -54,11 +65,13 @@ export function buildEnableScript(): string[] {
     'fi',
     'php occ app:enable user_saml >/dev/null',
     'php occ config:app:set user_saml type --value "environment-variable"',
-    // The $_SERVER keys Authelia's headers land on once NPM forwards them.
-    'php occ config:app:set user_saml general-uid_mapping --value "HTTP_REMOTE_USER"',
-    'php occ config:app:set user_saml saml-attribute-mapping-email_mapping --value "HTTP_REMOTE_EMAIL"',
-    'php occ config:app:set user_saml saml-attribute-mapping-displayName_mapping --value "HTTP_REMOTE_NAME"',
-    'php occ config:app:set user_saml general-idp0_display_name --value "Authelia"',
+    // Provider 1's attribute mappings — the $_SERVER keys Authelia's headers
+    // land on once NPM forwards them.
+    'php occ saml:config:set 1 ' +
+      '--general-idp0_display_name="Authelia" ' +
+      '--general-uid_mapping="HTTP_REMOTE_USER" ' +
+      '--saml-attribute-mapping-email_mapping="HTTP_REMOTE_EMAIL" ' +
+      '--saml-attribute-mapping-displayName_mapping="HTTP_REMOTE_NAME"',
     // 0 = auto-provision a Nextcloud account for any header identity Authelia
     // vouches for. 1 would require the account to pre-exist on another backend.
     'php occ config:app:set user_saml general-require_provisioned_account --value "0"',
