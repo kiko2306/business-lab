@@ -293,6 +293,28 @@ below.
       a destination that is neither a mount nor S3.
 ### Exposure and platform
 
+**Auto-expose every exposable app — drop the per-app toggle (§331).** Run as
+a batch: slices 1–3 together, then 4, then 5.
+
+- [ ] **1. Backend: auto-provision every exposable app** (§331) —
+      `ensureAutoExposure(name)` in `exposure.ts`, called from `startService`
+      and the reconciler/boot sweep. Exposable → row `enabled=true` +
+      provision; not-exposable → teardown + `enabled=false`.
+- [ ] **2. Backend: remove the per-app exposure write API** (§331) — delete
+      `PUT/GET /api/services/:name/exposure`, `POST …/exposure/verify`,
+      `upsertServiceExposureConfig`, the `serviceExposureUpdate` schema, and
+      the `apps:expose` capability. Keep `deprovisionServiceExposure`
+      (internal) and `/status`'s `exposedHostname`.
+- [ ] **3. Frontend: strip the exposure toggle from the service card** (§331)
+      — remove the checkbox + save/verify buttons + their methods; keep the
+      read-only hostname + status. Drop `apps:expose` from `capabilities.ts`.
+- [ ] **4. Frontend: fold CF/tunnel config into Settings, delete `/exposure`**
+      (§331) — move the Cloudflare-token + provisioning forms onto Settings;
+      remove the page, route and nav entry. Backend settings routes unchanged.
+- [ ] **5. Docs** (§331) — `docs/webmaster.md`, `README.md`, `CLAUDE.md`
+      Conventions, `docs/first-run.md`, `docs/app-credentials.md`: every app
+      is exposed automatically; tunnel/token setup lives in Settings.
+
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch

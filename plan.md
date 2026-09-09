@@ -22760,3 +22760,84 @@ Test updated (still 7), 648 pass, tsc clean. Patch 0.61.0 → 0.61.1.
 Header/IP-trust list: Stirling-PDF, Uptime Kuma, Paperless-ngx, **Nextcloud**
 done. Remaining tied to §180: File Browser (removed §310), Home Assistant
 (§311 — no upstream mechanism anyway).
+
+## 331. Plan — auto-expose every exposable app; drop the per-app toggle (2026-09-09)
+
+**Decision (@mat):** the per-app exposure choice goes away. Every app that
+`getExposability()` says *can* be exposed **is** exposed, automatically, behind
+Authelia. No UI toggle. Local/LAN access is not a design concern — every
+exposed app is reached at its `<name>.<domain>` URL.
+
+### What stays the same
+
+- `getExposability()` is still the gate for *whether* an app can be exposed:
+  `lanOnly` (Samba), `overlayOnly` (nginx-proxy-manager) and "no published
+  port" (tailscale, crowdsec) stay **unexposed** (@mat confirmed).
+- `service_exposure` row + its `enabled` column **stay** (@mat confirmed — no
+  schema migration). `enabled` stops being user-controlled: it's set `true`
+  whenever an app is exposable, `false` (with teardown) when it stops being.
+  The row keeps tracking `hostname` / `npm_host_id` / `cf_hostname_id` /
+  `status` / `last_error`.
+- `hideFromHomePage` (OnlyOffice), `skipAutheliaProtection` (Authelia, the
+  apex Home Page), secondary exposures (`<name>:api` etc.) — all unchanged.
+- The global Cloudflare token + tunnel/zone/NPM/domain config still has to be
+  UI-enterable (§0.3 — a third-party API token). It moves to Settings (slice
+  4); it is not a per-app toggle.
+
+### Slices
+
+1. **Backend — auto-provision every exposable app.** New
+   `ensureAutoExposure(name)` in `exposure.ts`: exposable → upsert row
+   `enabled=true` + derived hostname; not-exposable with an `enabled` row →
+   `deprovisionServiceExposure` + `enabled=false` (covers an app gaining
+   `overlayOnly`/`lanOnly`, e.g. §239's NPM). Call it in `startService`
+   before `provisionServiceIfEnabled`, and for every registry service in the
+   `exposureReconciler` sweep + on boot (the sweep now *creates* rows, not
+   just re-verifies). `provisionServiceIfEnabled` itself is unchanged. Tests +
+   version bump.
+
+2. **Backend — remove the per-app exposure write API.** Delete
+   `PUT /api/services/:name/exposure`, `POST …/exposure/verify`, and
+   `GET …/exposure`; delete `upsertServiceExposureConfig`, the
+   `serviceExposureUpdate` schema, the `apps:expose` capability, and the
+   `requireCapability('apps:expose')` guards. `deprovisionServiceExposure`
+   stays (internal — called by slice 1's not-exposable path and
+   `reconcileRemovedServices`). `GET /api/services/:name/status` keeps
+   returning `exposedHostname` for the card.
+
+3. **Frontend — strip the per-app exposure block from the service card.**
+   Remove the "Publicly expose this service" checkbox, "Save exposure
+   settings" / "Verify" buttons and their `loadExposure`/`saveExposure`/
+   `verifyExposure` methods (`service-card.component.*`). Keep the read-only
+   hostname link + status badge (fed from `/status`). Drop `apps:expose` from
+   `capabilities.ts`. Component tests.
+
+4. **Frontend — fold the global CF/tunnel config into Settings; delete the
+   `/exposure` page.** Move the Cloudflare-token form + exposure-provisioning
+   form (base domain, NPM email/password, CF account/zone/tunnel IDs) onto the
+   Settings page. Delete `pages/exposure/`, its route, the nav entry
+   (`home.component.ts`, `shell`). Keep the `/api/settings/exposure` +
+   `/api/settings/cloudflare-token` routes as-is. Route/nav tests + e2e nav
+   spec update.
+
+5. **Docs.** `docs/webmaster.md` ("expose the apps you need" → "every app is
+   exposed automatically; tunnel/token setup lives in Settings"; drop §180's
+   "OnlyOffice: expose it or keep Nextcloud LAN-only" branch — OnlyOffice is
+   always exposed). `README.md` + `CLAUDE.md` Conventions (the exposure
+   paragraph). `docs/first-run.md` "what's reachable" — every app has a public
+   hostname. `docs/app-credentials.md` first-login rows.
+
+### §180, resolved by this change
+
+"No need to worry about local access" settles §180 for good: the LAN-direct
+container port bypasses Authelia and (for the header-trust apps) trusts a
+forged `Remote-User`, but that path is explicitly out of the threat model now.
+§180 becomes **won't-fix (accepted)** unless someone later wants the
+loopback-bind hardening for its own sake. Recorded so it isn't re-litigated.
+
+### Order / batching
+
+Slices 1→2→3 are a chain (API can't go before the auto path; the card can't
+lose the toggle before the API is gone or it 404s on save). Slice 4 depends on
+3 (both touch the frontend build) but is otherwise independent. Slice 5 last.
+Propose running 1–3 as one batch, then 4, then 5.
