@@ -79,7 +79,6 @@ operate within, listed again at the end.
 | Samba (`dockurr/samba`) | GPL-3.0 (Samba); MIT (image wrapper) | ✅ Clean | stock unmodified Samba for internal LAN file sharing — GPL-3.0 places no restriction on running it; not modified, not redistributed |
 | Scrutiny (`ghcr.io/analogj/scrutiny`, omnibus) | **MIT** | ✅ Clean | stock unmodified. The omnibus image bundles InfluxDB 2 OSS (MIT), smartmontools (GPL-2.0+) and s6-overlay (ISC) — all clean for internal use, none redistributed as software |
 | Speedtest (speedtest-tracker) | MIT | ⚠️ Condition | wraps **Ookla Speedtest CLI**, which has its own EULA the operator must accept (free, but not FOSS and not for "commercial" measurement without Ookla's OK). Swap for LibreSpeed if that matters. |
-| **SQL Server 2022 Express** (`mcr.microsoft.com/mssql/server`) | **Microsoft Software Licence Terms** (proprietary, zero-cost) | ⚠️ Condition | **cleared for the setup-and-maintenance model via the §2.b.iv hosting exception + a first-start acceptance gate** (§121.5). The only hard bar is §6 "transfer to a third party" — avoided because the **client accepts the Microsoft EULA themselves** (§263d gate: terms shown → tick → backend writes `ACCEPT_EULA=Y`), making them Microsoft's own licensee under §1.b, not a transferee from us. **No High Risk Use** (§2.b.iv(3)): not for e-commerce / payment / banking / shipping-transaction or life-safety databases. x86-64 only; telemetry to MS; AS-IS, ~$5 liability cap; no published benchmark comparisons without MS approval. The backend must **never** set `ACCEPT_EULA=Y` on its own. |
 | Stirling-PDF | **MIT** (core, since v1.0.0) | ✅ Clean | login / SSO / audit features under `app/proprietary/` are paywalled — don't enable or redistribute those |
 | Syncthing (`syncthing/syncthing`) | **MPL-2.0** | ✅ Clean | stock unmodified; file-level copyleft only, no obligation from running it. Uses the community relay pool by default — no cost, no account |
 | Tailscale | BSD-3-Clause (client) | ✅ Clean | coordination is Tailscale's paid SaaS (a subscription cost, not a licence issue); or self-host headscale (BSD-3) |
@@ -100,7 +99,6 @@ operate within, listed again at the end.
 | nginx:alpine (Kitchen switcher) | BSD-2-Clause | ✅ Clean | |
 | alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |
-| mcr.microsoft.com/mssql/server:2022-latest (SQL Server) | **Microsoft Software Licence Terms** (proprietary) | ⚠️ Condition | the SQL Server engine — see the app row above and §121.5. Bundles `mssql-tools18` (ODBC 18, MS EULA) for `sqlcmd`, used by the healthcheck and the `mssql` backup engine. Not redistributed; the client accepts the terms on first start. |
 | LinuxServer.io images (BookStack, Code Server, MariaDB, Speedtest) | image build scripts GPL-3.0; bundled apps keep their own licence | ✅ Clean | GPL applies to the packaging scripts, adds no restriction on running the app |
 
 ## Vendored source

@@ -334,12 +334,4 @@ describe('generateSecretFor', () => {
     expect(v).toMatch(/^base64:/);
     expect(Buffer.from(v.slice('base64:'.length), 'base64')).toHaveLength(32);
   });
-
-  it('gives an MSSQL_ key a value that meets SQL Server\'s 3-of-4-classes policy', () => {
-    const v = generateSecretFor('MSSQL_SA_PASSWORD');
-    expect(v.length).toBeGreaterThanOrEqual(8);
-    expect(v.length).toBeLessThanOrEqual(128);
-    const classes = [/[a-z]/, /[A-Z]/, /[0-9]/, /[^a-zA-Z0-9]/].filter((re) => re.test(v));
-    expect(classes.length).toBeGreaterThanOrEqual(3);
-  });
 });

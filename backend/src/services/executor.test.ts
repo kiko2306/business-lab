@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { assertPlatformSupported, describeUpdate, parseComposeImages } from './executor';
+import { describeUpdate, parseComposeImages } from './executor';
 
 describe('describeUpdate', () => {
   // The message is the only feedback an update gives when nothing goes wrong,
@@ -44,16 +44,3 @@ describe('parseComposeImages', () => {
   });
 });
 
-describe('assertPlatformSupported', () => {
-  it('blocks an x86-only app on a non-x64 host', () => {
-    expect(() => assertPlatformSupported('mssql', 'arm64')).toThrow(/x86-64 hosts only/);
-  });
-
-  it('allows an x86-only app on x64', () => {
-    expect(() => assertPlatformSupported('mssql', 'x64')).not.toThrow();
-  });
-
-  it('never blocks an app with no platform constraint', () => {
-    expect(() => assertPlatformSupported('mealie', 'arm64')).not.toThrow();
-  });
-});

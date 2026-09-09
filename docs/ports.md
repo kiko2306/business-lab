@@ -83,8 +83,7 @@ hand edit can leave its copy disagreeing with the app's.
 `10480` scrutiny · `10490` it-tools · `10500` syncthing (GUI; sync on
 fixed `22000` + discovery `21027/udp`, see below) · `10510` metabase ·
 `10520` miniflux ·
-`10540` mssql (SQL Server TDS wire protocol, LAN-only — no web UI, not
-exposed through the tunnel) · `10550` meshcentral (published as
+`10550` meshcentral (published as
 `mesh.<domain>`) · `10560` forgejo (HTTP; SSH git on `10561`, LAN/VPN only —
 the tunnel carries HTTP, not SSH)
 

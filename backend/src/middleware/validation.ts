@@ -99,10 +99,6 @@ export const schemas = {
     apiKey: Joi.string().trim().min(20).max(4096).required(),
   }),
 
-  // The SQL Server licence acceptance (§263d) — an explicit true, nothing else.
-  mssqlEulaAccept: Joi.object({
-    accept: Joi.boolean().valid(true).required(),
-  }),
   claudeKeyTest: Joi.object({
     apiKey: Joi.string().trim().min(20).max(4096).allow('').optional(),
   }),

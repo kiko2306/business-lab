@@ -14,7 +14,6 @@ import {
   GeneralSettings,
   AlertNotifySettings,
   ClaudeKeySettings,
-  MssqlEulaStatus,
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
@@ -100,13 +99,6 @@ export class SettingsComponent implements OnInit {
   // server (which only ever returns a mask).
   protected claudeKeyDraft = '';
   protected claudeKeyFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
-  protected mssqlEula: MssqlEulaStatus | null = null;
-  protected mssqlEulaLoading = true;
-  protected acceptingMssqlEula = false;
-  // Bound to the "I have a valid licence" checkbox; the Accept button is
-  // disabled until it's ticked.
-  protected mssqlEulaChecked = false;
-  protected mssqlEulaFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected alertSettings: AlertNotifySettings | null = null;
   protected alertsLoading = true;
   protected savingAlerts = false;
@@ -122,44 +114,6 @@ export class SettingsComponent implements OnInit {
     this.loadBackupTarget();
     this.loadAlertSettings();
     this.loadClaudeKey();
-    this.loadMssqlEula();
-  }
-
-  private loadMssqlEula(): void {
-    this.mssqlEulaLoading = true;
-    this.settingsService
-      .loadMssqlEula()
-      .pipe(finalize(() => (this.mssqlEulaLoading = false)))
-      .subscribe({
-        next: (status) => (this.mssqlEula = status),
-        error: (error) =>
-          (this.mssqlEulaFeedback = {
-            type: 'danger',
-            message: extractErrorMessage(error, 'Unable to load the SQL Server licence status.'),
-          }),
-      });
-  }
-
-  acceptMssqlEula(): void {
-    if (!this.mssqlEulaChecked) {
-      return;
-    }
-    this.acceptingMssqlEula = true;
-    this.settingsService
-      .acceptMssqlEula()
-      .pipe(finalize(() => (this.acceptingMssqlEula = false)))
-      .subscribe({
-        next: (status) => {
-          this.mssqlEula = status;
-          this.mssqlEulaFeedback = { type: 'success', message: status.message ?? 'SQL Server licence accepted.' };
-          this.toastService.success('SQL Server licence accepted.');
-        },
-        error: (error) =>
-          (this.mssqlEulaFeedback = {
-            type: 'danger',
-            message: extractErrorMessage(error, 'Unable to record the SQL Server licence acceptance.'),
-          }),
-      });
   }
 
   private loadClaudeKey(): void {

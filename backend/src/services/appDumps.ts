@@ -33,53 +33,12 @@ const DUMP_TIMEOUT_MS = 10 * 60 * 1000;
 
 export interface DumpOutcome {
   app: string;
-  kind: 'postgres' | 'mariadb' | 'mysql' | 'sqlite' | 'mssql';
+  kind: 'postgres' | 'mariadb' | 'mysql' | 'sqlite';
   target: string;
   ok: boolean;
   detail: string;
   bytes?: number;
 }
-
-// SQL Server 2022 CU14+ images bundle mssql-tools18 here; it is not on PATH.
-// -C trusts the self-signed server cert (ODBC 18 encrypts by default).
-const SQLCMD = '/opt/mssql-tools18/bin/sqlcmd';
-
-/**
- * BACKUP DATABASE runs server-side and writes as the mssql user (uid 10001)
- * into /var/opt/mssql/_dump — but `mssql-init` chowns the whole data dir to
- * 10001:0, so the backend (non-root in its container) can't `mkdir` there
- * itself. A throwaway root busybox on the same bind mount creates the dir,
- * hands it to 10001, and clears stale .bak files (a since-dropped database
- * must not leave a restorable file behind). Returns the host-side path so the
- * caller can read the results back.
- */
-async function ensureMssqlDumpDir(appDir: string): Promise<string> {
-  const dir = path.join(appDir, 'data', DUMP_DIR);
-  const result = await run('docker', [
-    'run', '--rm', '-v', `${path.join(appDir, 'data')}:/data`, 'busybox',
-    'sh', '-c', `mkdir -p /data/${DUMP_DIR} && chown 10001:0 /data/${DUMP_DIR} && rm -f /data/${DUMP_DIR}/*.bak`,
-  ]);
-  if (result.code !== 0) {
-    throw new Error((result.stderr || 'could not prepare the _dump directory').trim().slice(0, 300));
-  }
-  return dir;
-}
-
-/**
- * One sqlcmd batch: back up every user database (database_id > 4, online) to
- * /var/opt/mssql/_dump/<name>.bak. WITH INIT, FORMAT overwrites any previous
- * file. Express has no backup compression, so it isn't requested.
- */
-const MSSQL_BACKUP_TSQL =
-  'SET NOCOUNT ON; ' +
-  'DECLARE @n SYSNAME, @p NVARCHAR(520); ' +
-  'DECLARE c CURSOR FOR SELECT name FROM sys.databases WHERE database_id > 4 AND state = 0; ' +
-  'OPEN c; FETCH NEXT FROM c INTO @n; ' +
-  'WHILE @@FETCH_STATUS = 0 BEGIN ' +
-  "SET @p = N'/var/opt/mssql/_dump/' + @n + N'.bak'; " +
-  'BACKUP DATABASE @n TO DISK = @p WITH INIT, FORMAT; ' +
-  'FETCH NEXT FROM c INTO @n; END ' +
-  'CLOSE c; DEALLOCATE c;';
 
 function run(command: string, args: string[], timeoutMs = DUMP_TIMEOUT_MS): Promise<{ code: number; stdout: Buffer; stderr: string }> {
   return new Promise((resolve) => {
@@ -163,7 +122,7 @@ function commitDump(finalPath: string, data: Buffer): number {
 async function dumpServerDatabase(
   app: string,
   service: string,
-  engine: 'postgres' | 'mariadb' | 'mysql' | 'mssql',
+  engine: 'postgres' | 'mariadb' | 'mysql',
   appDir: string
 ): Promise<DumpOutcome> {
   const base: DumpOutcome = { app, kind: engine, target: '', ok: false, detail: '' };
@@ -176,37 +135,6 @@ async function dumpServerDatabase(
   }
 
   const { env, image, network } = await inspectDb(container);
-
-  if (engine === 'mssql') {
-    if (!network) {
-      return { ...base, ok: false, detail: 'the database container is not on a reachable network' };
-    }
-    const dumpDir = await ensureMssqlDumpDir(appDir);
-    base.target = dumpDir;
-    const password = env.MSSQL_SA_PASSWORD || env.SA_PASSWORD || '';
-    // sqlcmd runs inside the server container's network namespace via a
-    // throwaway container on the same image (docker exec is off the
-    // socket-proxy allowlist — see the Postgres branch). BACKUP itself
-    // executes server-side and writes into the bind-mounted _dump dir.
-    const result = await run('docker', [
-      'run', '--rm', '--network', network,
-      '--entrypoint', SQLCMD, image,
-      '-S', service, '-U', 'sa', '-P', password, '-C', '-b', '-l', '30',
-      '-Q', MSSQL_BACKUP_TSQL,
-    ]);
-    if (result.code !== 0) {
-      return { ...base, ok: false, detail: (result.stderr || result.stdout.toString() || 'BACKUP failed').trim().slice(0, 300) };
-    }
-    // SQL Server writes the .bak files 0640 owned by uid 10001; the file
-    // backup runs as the backend user and has to be able to read them.
-    await run('docker', [
-      'run', '--rm', '-v', `${path.join(appDir, 'data')}:/data`, 'busybox',
-      'chmod', '-R', 'a+rX', `/data/${DUMP_DIR}`,
-    ]);
-    const baks = fs.readdirSync(dumpDir).filter((f) => f.endsWith('.bak'));
-    const bytes = baks.reduce((sum, f) => sum + fs.statSync(path.join(dumpDir, f)).size, 0);
-    return { ...base, ok: true, bytes, detail: `backed up ${baks.length} database(s), ${(bytes / 1024).toFixed(0)} KB` };
-  }
 
   const dumpPath = path.join(ensureDumpDir(appDir), `${app}.sql`);
   base.target = dumpPath;
@@ -490,41 +418,6 @@ export async function restoreServerDatabase(name: string): Promise<DumpOutcome> 
   }
 
   const { service, engine } = definition.backup;
-
-  if (engine === 'mssql') {
-    const dumpDir = path.join(getAppsDir(), name, 'data', DUMP_DIR);
-    base.target = dumpDir;
-    const baks = fs.existsSync(dumpDir) ? fs.readdirSync(dumpDir).filter((f) => f.endsWith('.bak')) : [];
-    if (!baks.length) {
-      return { ...base, ok: false, detail: 'the archive has no _dump/*.bak to replay' };
-    }
-    const container = await findContainer(name, service);
-    if (!container) {
-      return { ...base, ok: false, detail: `${service} is not running; cannot restore` };
-    }
-    const { env, image, network } = await inspectDb(container);
-    if (!network) {
-      return { ...base, ok: false, detail: 'the database container is not on a reachable network' };
-    }
-    const password = env.MSSQL_SA_PASSWORD || env.SA_PASSWORD || '';
-    // One RESTORE per .bak. WITH REPLACE overwrites an existing database and
-    // skips the safety check when it doesn't exist yet; data/log paths match
-    // (same image), so no MOVE is needed.
-    const tsql = baks
-      .map((f) => f.slice(0, -'.bak'.length))
-      .map((db) => `RESTORE DATABASE [${db}] FROM DISK = N'/var/opt/mssql/_dump/${db}.bak' WITH REPLACE;`)
-      .join(' ');
-    const result = await run('docker', [
-      'run', '--rm', '--network', network,
-      '--entrypoint', SQLCMD, image,
-      '-S', service, '-U', 'sa', '-P', password, '-C', '-b', '-l', '30',
-      '-Q', tsql,
-    ]);
-    if (result.code !== 0) {
-      return { ...base, ok: false, detail: (result.stderr || result.stdout.toString() || 'RESTORE failed').trim().slice(0, 300) };
-    }
-    return { ...base, ok: true, detail: `restored ${baks.length} database(s) from _dump/` };
-  }
 
   const dumpPath = path.join(getAppsDir(), name, 'data', DUMP_DIR, `${name}.sql`);
   base.target = dumpPath;

@@ -22,22 +22,13 @@ const SECRET_PLACEHOLDERS = new Set(['', 'change-me', 'changeme', 'change_me', '
 
 /**
  * A fresh value for a generatable secret. Most keys just want 64 hex chars;
- * two need a specific shape and get it here so every generation site agrees:
- *
- *  - **`*_APP_KEY`** — Laravel needs exactly 32 bytes as `base64:<b64>`; a
- *    64-char hex string is 64 bytes and 500s the app on boot ("incorrect key
- *    length").
- *  - **`MSSQL_*`** — SQL Server enforces a password policy on `sa` (8–128
- *    chars, 3 of 4 of upper/lower/digit/symbol). Plain hex is lower+digit
- *    only — two classes — so a fixed `Aa1_` suffix adds the upper and symbol
- *    classes. `_` is shell- and `.env`-safe, unlike most symbols.
+ * `*_APP_KEY` needs a specific shape and gets it here so every generation
+ * site agrees: Laravel needs exactly 32 bytes as `base64:<b64>`; a 64-char
+ * hex string is 64 bytes and 500s the app on boot ("incorrect key length").
  */
 export function generateSecretFor(key: string): string {
   if (/(^|_)APP_KEY$/.test(key)) {
     return `base64:${crypto.randomBytes(32).toString('base64')}`;
-  }
-  if (/^MSSQL_/.test(key)) {
-    return `${crypto.randomBytes(24).toString('hex')}Aa1_`;
   }
   return crypto.randomBytes(32).toString('hex');
 }

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.51.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.52.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -279,16 +279,16 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
 
 Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
 
-- [ ] **Remove SQL Server** (§301c) — the deep one: `apps/mssql/`,
-      `mssqlEula.ts`, the `/settings/mssql-eula` route + validator, the
-      `x86Only`/`assertPlatformSupported` guard, the `mssql` backup engine,
-      the `MSSQL_` secret-generator branch, the frontend licence panel, all
-      the test cases and docs rows; stop+rm `mssql-mssql-1`+`mssql-init`,
-      delete the `mssql_eula_accepted` settings row. Run `scripts/e2e-tests.sh`
-      (Settings component changes). `minor` bump.
 - [ ] **Remove Metabase** (§301d) — BI/dashboards over the other apps'
       databases; speculative, no wired use, 1.34 GiB uncapped JVM, AGPL.
       @mat confirmed removal (2026-09-09). Same-shape removal as 301a/301b.
+- [ ] **Prune the removed apps' images and volumes on the host** (§301) —
+      once `home-srv-01` has pulled the §301 commits and self-updated
+      (frontend + backend rebuilt), the `postiz` / `waha` / `mssql` /
+      `metabase` images and any named volumes are orphaned. Remove them
+      explicitly (`docker image rm` the specific tags, `docker volume rm` the
+      inspected `*_*` volumes) plus a general `docker image prune -af` —
+      don't rely on a blind prune. Folds into §300 Phase A.
 - [ ] **Redundancy / same-functionality pass** (§301e) — after the removals,
       survey the remaining roster for apps doing substantially the same job
       and write it up for @mat (candidates: Forgejo vs code-server, Immich vs

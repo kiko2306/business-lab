@@ -183,11 +183,6 @@ export interface ServiceDefinition {
   // and the dashboard's "Open" link working. Unset for every bridged service,
   // where the compose file remains the source of truth.
   hostNetworkPort?: number;
-  // This service's image has no arm64 build (currently only SQL Server —
-  // Microsoft ships x86-64 only). The executor refuses to start it on a
-  // non-x64 host with a clear message, rather than letting `compose up` fail
-  // with "no matching manifest". See services/executor.ts.
-  x86Only?: boolean;
   // Disambiguates which published port is the primary exposure's upstream,
   // for services whose compose file publishes more than one port where the
   // web UI isn't simply the first one listed — e.g. Pi-hole publishes DNS
@@ -203,14 +198,9 @@ export interface ServiceDefinition {
   //
   // SQLite apps need no declaration — they are discovered by file header.
   backup?: {
-    // 'mssql' backs up differently from the others: BACKUP DATABASE writes a
-    // binary .bak per user database into the app's own data dir server-side
-    // (no stdout dump tool exists), which the file backup then sweeps. See
-    // services/appDumps.ts.
-    engine: 'postgres' | 'mariadb' | 'mysql' | 'mssql';
+    engine: 'postgres' | 'mariadb' | 'mysql';
     /**
-     * Compose service name of the database container, e.g. 'itflow-db'. For
-     * 'mssql' this is the app's own service — the server backs itself up.
+     * Compose service name of the database container, e.g. 'itflow-db'.
      */
     service: string;
   };

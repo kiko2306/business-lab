@@ -21609,3 +21609,50 @@ glue that would have was never built).
 
 Backend `check.sh test` 691/691, `typecheck` clean. `minor` bump 0.50.0 →
 0.51.0.
+
+## 301c. SQL Server removed (2026-09-09)
+
+Third and deepest of the §301 removals. SQL Server (`mssql`, §121/§263) was
+the only proprietary-EULA app in the repo and carried a large special-case
+surface for one LAN-only, no-web-UI database that no client was using
+(~587 MiB when running — and it *was* running, restarted by something after
+§263f left it stopped).
+
+Removed, in one commit:
+
+- **App + services**: `apps/mssql/`, `backend/src/services/mssqlEula.ts` (+ its
+  test), the `services.ts` registry entry.
+- **Executor**: `assertMssqlEulaAccepted` call and `assertPlatformSupported` +
+  the `x86Only` guard (its only consumer was `mssql`; the mechanism can come
+  back if a future app has no arm64 build — noted in the commit).
+- **Backups**: the `mssql` engine in `appDumps.ts` — the dump branch, the
+  restore branch, `ensureMssqlDumpDir`, `MSSQL_BACKUP_TSQL`, `SQLCMD` — and
+  `'mssql'` dropped from the `backup.engine` and `DumpOutcome.kind` unions in
+  `types/index.ts`. Postgres/MySQL/MariaDB/SQLite paths untouched.
+- **Secrets**: the `MSSQL_` branch in `appEnv.ts`'s `generateSecretFor` (the
+  `*_APP_KEY` consolidation it shared the helper with stays — that was a real
+  fix).
+- **API**: the `GET`/`POST /settings/mssql-eula` routes + the `mssqlEulaAccept`
+  Joi schema.
+- **Frontend**: `MssqlEulaStatus` (`models.ts`), the two `SettingsService`
+  methods, the `mssqlEula*` state + load/accept handlers in
+  `settings.component.ts`, and the whole "SQL Server licence" `<app-panel>` in
+  `settings.component.html`.
+- **Tests**: the `mssql` describe and the `x86Only` cases in
+  `services.test.ts` / `executor.test.ts` / `appEnv.test.ts`; the `lanOnly`
+  allowlist assertion is back to `['samba']`; the DB-image regex drops
+  `mssql/server`.
+- **Docs**: rows out of `ports.md`, `app-credentials.md`, `licences.md` (app
+  row + the `mssql/server` image row — `busybox` kept, it's shared) and
+  `raspberry-pi.md` (which now has no special-case compatibility row at all).
+
+Host: `docker rm -f` `mssql-mssql-1` + `mssql-mssql-init-1` and the network;
+`home-srv-01` 8.6→8.2 GiB used. The `mssql_eula_accepted` settings row was
+left in the backend DB — a remote `psql DELETE` was blocked by the session's
+command classifier, and the row is unreachable dead data once the registry no
+longer lists `mssql`. Once the host self-updates to this code, its now-orphan
+`mssql` image + `apps/mssql/` clear on the pull / a targeted prune (README
+item).
+
+Backend `check.sh test` 677/677 (was 691 — 14 mssql cases gone), `typecheck`
+clean. Frontend `test` 50/50, `build` clean. `minor` bump.

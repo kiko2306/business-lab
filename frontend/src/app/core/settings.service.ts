@@ -8,7 +8,6 @@ import {
   CloudflareTestResponse,
   ClaudeKeySettings,
   ClaudeKeyTestResponse,
-  MssqlEulaStatus,
   ExposureSettings,
   ExposureSettingsInput,
   MailSettings,
@@ -94,22 +93,6 @@ export class SettingsService {
     return this.http.post<ClaudeKeyTestResponse>(
       `${API_BASE_URL}/settings/claude-key/test`,
       payload,
-      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
-    );
-  }
-
-  loadMssqlEula(): Observable<MssqlEulaStatus> {
-    return this.http
-      .get<MssqlEulaStatus>(`${API_BASE_URL}/settings/mssql-eula`, {
-        context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
-      })
-      .pipe(retry({ count: 1, delay: 400 }));
-  }
-
-  acceptMssqlEula(): Observable<MssqlEulaStatus> {
-    return this.http.post<MssqlEulaStatus>(
-      `${API_BASE_URL}/settings/mssql-eula`,
-      { accept: true },
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }

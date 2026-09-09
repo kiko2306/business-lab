@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.52.0] — 2026-09-09
+
+### Removed
+
+- SQL Server (mssql) removed — the only proprietary-EULA app, carrying a large special-case surface (licence gate, x86Only guard, bespoke mssql backup engine, MSSQL_ secret branch) for one LAN-only database no client used
+
 ## [0.51.0] — 2026-09-09
 
 ### Removed

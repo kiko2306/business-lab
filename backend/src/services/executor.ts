@@ -26,7 +26,6 @@ import { reconcileNextcloudClamav } from './nextcloudClamav';
 import { reconcileNextcloudSaml } from './nextcloudSaml';
 import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
 import { syncMealieAiProvider } from './mealieAiSync';
-import { assertMssqlEulaAccepted } from './mssqlEula';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
 import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
@@ -57,21 +56,6 @@ async function assertDependenciesRunning(serviceName: string): Promise<void> {
     throw {
       statusCode: 409,
       message: `Cannot start ${getService(serviceName)?.label ?? serviceName}: dependency not running — ${notRunning.join(', ')}.`,
-    } as HttpError;
-  }
-}
-
-/**
- * Refuse to start a service whose image has no build for this host's
- * architecture (currently only SQL Server, x86-64 only). Without this the
- * failure is a cryptic `docker compose up` error about a missing manifest.
- * `arch` is injectable for tests; it defaults to this process's.
- */
-export function assertPlatformSupported(serviceName: string, arch: string = process.arch): void {
-  if (getService(serviceName)?.x86Only && arch !== 'x64') {
-    throw {
-      statusCode: 409,
-      message: `Cannot start ${getService(serviceName)?.label ?? serviceName}: this app has no ${arch} build — it runs on x86-64 hosts only.`,
     } as HttpError;
   }
 }
@@ -365,8 +349,6 @@ export async function startService(serviceName: string, userId: number): Promise
   // no dashboard step (project principle §0.3).
   await ensureGeneratedSecrets(serviceName);
   ensureServiceSecrets(serviceName, appDir, composeFile);
-  assertPlatformSupported(serviceName);
-  await assertMssqlEulaAccepted(serviceName);
   await assertDependenciesRunning(serviceName);
 
   try {
