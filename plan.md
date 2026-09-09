@@ -21773,7 +21773,9 @@ Brought it current:
   (gitignored `.env` + `data/` + a compose override, ~296 MB).
 
 Net: Docker image store 77.3 → 60.8 GB; **~20 GB disk reclaimed** on `/home`.
-RAM 6.8 GiB used / 8.1 GiB available. Swap still 2.9 GB used — the
-`swapoff/swapon` flush is left as a §300 Phase A step. ~11 GB of image store
-is still reclaimable (images for currently-stopped apps) — deliberately left,
-since `image prune -af` there is a re-pull cost, not free.
+Then `swapoff -a && swapon -a` (took ~59 s): swap 2.9 GB → 0, RAM then
+9.6 GiB used / 5.2 GiB available — the paged-out anon pages came back
+resident, onto a fresh unfragmented swap with real RAM headroom, so it
+won't thrash back the way it was before the §301 removals. ~11 GB of image
+store is still reclaimable (images for currently-stopped apps) — deliberately
+left, since `image prune -af` there is a re-pull cost, not free.
