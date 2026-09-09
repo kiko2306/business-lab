@@ -256,11 +256,14 @@ Updates:
 Memory baseline (§300 — attack the §290–§299 headroom problem by shrinking
 the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
 
-- [ ] **Phase A — reclaim now (ops, no code)** (§300) — `docker rm -f
-      peaceful_keldysh` (the §268 leftover); `docker buildx prune -af` +
-      `image prune -af` + `network prune`; prune only *inspected* dangling
-      volumes, never blind. Then, once Phase B/C give RAM headroom,
-      `swapoff -a && swapon -a` to flush swap.
+- [ ] **Phase A — reclaim now (ops, no code)** (§300) — **partly done in
+      §301f**: dangling volumes (−0.9 GB), dangling images (−1.3 GB) and
+      build cache (−2.9 GB) pruned along with the removed apps' images
+      (−15 GB). **Still to do**: `docker rm -f peaceful_keldysh` (the §268
+      leftover); decide on `docker image prune -af` (still ~11 GB of images
+      for currently-stopped apps — a re-pull cost if a client later starts
+      one); `network prune`; and, now that RAM headroom exists (~8 GiB
+      available), `swapoff -a && swapon -a` to flush the 2.9 GB of swap.
 - [ ] **Phase B — lighter config, same apps** (§300) — one commit each:
       B1 Stirling-PDF → `latest-ultra-lite` (~970→200 MiB, verify no
       OCR/convert use); B4 Paperless → 1 web + 1 task worker + `mem_limit`
@@ -278,13 +281,6 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
 
 Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
 
-- [ ] **Prune the removed apps' images and volumes on the host** (§301) —
-      once `home-srv-01` has pulled the §301 commits and self-updated
-      (frontend + backend rebuilt), the `postiz` / `waha` / `mssql` /
-      `metabase` images and any named volumes are orphaned. Remove them
-      explicitly (`docker image rm` the specific tags, `docker volume rm` the
-      inspected `*_*` volumes) plus a general `docker image prune -af` —
-      don't rely on a blind prune. Folds into §300 Phase A.
 - [ ] **@mat: resolve the functional-overlap pairs from the §301e survey** —
       each is a keep-one decision, not urgent:
       - **Monitoring** — Dozzle (logs) + Scrutiny (SMART) are unique; **Beszel

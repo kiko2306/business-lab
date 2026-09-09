@@ -21746,3 +21746,34 @@ pairs are README items.
 - **Samba** — SMB protocol for native Windows/macOS mounts; nothing else
   serves it.
 - **Kopia** — backup snapshots, not live storage.
+
+## 301f. Host updated to the §301 removals + orphan prune (2026-09-09)
+
+`home-srv-01` was on `main` from before §300 — its deployed backend still
+listed the four removed apps (as stopped/unknown, containers already gone).
+Brought it current:
+
+- `git pull --ff-only` on `/home/mat/www/homelab-management` → `4417b71`.
+- `docker compose up -d --build backend frontend` (individual recreate, no
+  `down` — the §293 version-skew fix held: only those two containers were
+  touched). Dashboard back up on **0.53.0**, `/api/services` no longer lists
+  postiz / waha / mssql / metabase.
+- **Images removed** (explicit `docker image rm`): `postiz-app` (5.66 GB),
+  `devlikeapro/waha` (4.45 GB), `mssql/server` (2.34 GB), `metabase` (1.82
+  GB), `temporalio/auto-setup` (0.75 GB) — ~15 GB. `postgres:16` /
+  `:16-alpine` (Temporal / metabase-db) were not present as standalone
+  images.
+- **`docker volume prune -f`** — 34 → 13 volumes, −893 MB (anonymous volumes
+  orphaned by the removed and recreated containers; spot-checked first — a
+  47 MB stray Postgres data dir, OnlyOffice example dirs, a kopia test
+  bucket).
+- **`docker image prune -f`** (dangling only, −1.3 GB) and
+  **`docker builder prune -af`** (−2.9 GB).
+- Removed the leftover `apps/{postiz,waha,mssql,metabase}/` on the host
+  (gitignored `.env` + `data/` + a compose override, ~296 MB).
+
+Net: Docker image store 77.3 → 60.8 GB; **~20 GB disk reclaimed** on `/home`.
+RAM 6.8 GiB used / 8.1 GiB available. Swap still 2.9 GB used — the
+`swapoff/swapon` flush is left as a §300 Phase A step. ~11 GB of image store
+is still reclaimable (images for currently-stopped apps) — deliberately left,
+since `image prune -af` there is a re-pull cost, not free.
