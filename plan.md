@@ -22407,3 +22407,16 @@ Deleted `apps/kitchen-switcher/`, `services/kitchenConfig.ts` +
 `docs/raspberry-pi.md`. Port `10220` free again. Stale "same way as
 applyKitchenConfig" / "best-effort like the Kitchen config" doc-comment
 references in `sambaConfig.ts` repointed. 656 backend tests + typecheck pass.
+
+## 322. Syncthing removed (§301e, 2026-09-09)
+
+@mat call from the §301e survey. Syncthing's unique property is serverless P2P
+folder sync, but for this roster "keep these folders in sync" is already
+answered by Nextcloud's desktop/mobile clients. The recommendation was to keep
+it (18 MiB, distinct mechanism); @mat chose to drop it and re-add per
+deployment if a client actually needs serverless sync.
+
+Deleted `apps/syncthing/`, the `services.ts` entry, the Syncthing rows in
+`docs/{app-credentials,licences}.md`, and the `ports.md` entry plus its
+`22000`/`21027` fixed-port explainer paragraph. Port `10500` free again.
+656 backend tests + typecheck pass.

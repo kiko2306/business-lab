@@ -571,25 +571,6 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // Fully static SPA — no backend, no Host validation, no login. Authelia
     // is the only gate; no exposure env needed.
   },
-  'syncthing': {
-    name: 'syncthing',
-    label: 'Syncthing',
-    description: 'Continuous peer-to-peer folder sync',
-    icon: 'sync',
-    category: 'Backup & Storage',
-    composePath: 'apps/syncthing/docker-compose.yml',
-    healthCheck: {
-      enabled: true,
-      type: 'http',
-      // Unauthenticated health endpoint — returns {"status":"OK"}.
-      url: 'http://localhost:8384/rest/noauth/health',
-      interval: 30000,
-      timeout: 5000,
-    },
-    // GUI binds 0.0.0.0 in the image, which disables Syncthing's localhost
-    // Host-header check, so no exposure env is needed. The GUI has no login
-    // of its own by default — Authelia is the gate.
-  },
   'miniflux': {
     backup: { engine: 'postgres', service: 'miniflux-db' },
     name: 'miniflux',

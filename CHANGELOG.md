@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.59.3] — 2026-09-09
+
+### Removed
+
+- Syncthing dropped — Nextcloud already covers file sync for this roster (§301e, §322)
+
 ## [0.59.2] — 2026-09-09
 
 ### Removed

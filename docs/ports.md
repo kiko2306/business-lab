@@ -80,8 +80,7 @@ hand edit can leave its copy disagreeing with the app's.
 `10390` vikunja · `10410` wetty · `10420` itflow ·
 `10430` guacamole · `10440` homebox · `10450` clamav (clamd, no UI) ·
 `10460` onlyoffice · `10470` kopia (server UI on container `51515`) ·
-`10480` scrutiny · `10490` it-tools · `10500` syncthing (GUI; sync on
-fixed `22000` + discovery `21027/udp`, see below) ·
+`10480` scrutiny · `10490` it-tools ·
 `10520` miniflux · `10570` navidrome
 
 These are the defaults. The allocator may have moved one on your host if
@@ -91,14 +90,6 @@ something else already held the port — check the app's `.env` for the truth.
 
 Samba is not in this list — it publishes SMB on `445` only (see the
 exceptions above), no `10xxx` port.
-
-Syncthing publishes its GUI on the allocated `10500`, but also binds
-`22000/tcp+udp` (sync) and `21027/udp` (local discovery) on fixed numbers —
-every other Syncthing device expects `22000`, so these are hardcoded in the
-compose file and the allocator leaves them alone (it only manages
-`${VAR:-default}:` mappings). There is no router forward for them
-(principle 1); off-LAN peers use Syncthing's public relay pool, LAN peers
-connect directly.
 
 ## The host-networked app
 

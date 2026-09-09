@@ -151,7 +151,6 @@ forged `Remote-User` header would otherwise be an auth bypass.
 | **Dozzle** | Reads container logs, no auth. |
 | **Scrutiny** | Disk SMART health dashboard, no auth of its own. |
 | **IT Tools** | Static utility SPA, no backend and no auth of its own. |
-| **Syncthing** | GUI has no login by default. Set one in Actions → Settings → GUI if you want a second gate under Authelia. |
 | **Stirling PDF** | `SECURITY_ENABLELOGIN=false` by default; can be enabled instead. |
 | **Speedtest**, **Pantry**, **Price Compare** | No auth of their own. |
 | **ntfy** | Open by default; supports its own ACLs if you configure them. |
