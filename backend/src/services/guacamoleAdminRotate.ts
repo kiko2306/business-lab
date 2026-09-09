@@ -45,8 +45,8 @@ const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Guacamole's base URL as reached from any other container on this host —
- * shared with guacamoleSync.ts (§200 slice 3), which needs the exact same
- * cross-project host-gateway + published-port resolution to drive the same
+ * (was also shared with the removed guacamoleSync.ts, §288/§318). Needs the
+ * cross-project host-gateway + published-port resolution to drive Guacamole's
  * REST API as an authenticated admin.
  */
 export async function resolveGuacamoleBaseUrl(): Promise<string> {

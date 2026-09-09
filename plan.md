@@ -22297,3 +22297,54 @@ the keys. New test case covers `home-page` vs `homepage`.
 leftovers by hand (5.5M + 52K). The fix makes it automatic next time. 685
 backend tests + typecheck pass. Version 0.58.0 → 0.58.1. Not re-proven live —
 next app removal on the host is the check.
+
+## 318. Guacamole: reached direct over the overlay with its own login; SSO machinery removed (§200, §223, §288, 2026-09-09)
+
+`@mat` resolved the §288 routing question: **Guacamole follows the
+NPM-admin / Pi-hole pattern** — `overlayOnly`, reached directly on port
+`10430` over NetBird/Tailscale, gated by its own login (the `guacadmin`
+default password is still auto-rotated to a generated one —
+`guacamoleAdminRotate.ts`, §200 slice 1). No reverse proxy, no Authelia in
+front, so the §200 "kill the double login" premise never applied on the real
+stack. Option 2 (a second LAN-bound NPM+Authelia tier for overlay-only apps)
+was not chosen — not worth the infra for one app on one deployment; §288
+keeps the write-up if a future deployment needs overlay SSO across several
+apps.
+
+### Security fix, not just a doc change
+
+`apps/guacamole/docker-compose.yml` set `HTTP_AUTH_HEADER: Remote-User`, which
+auto-enables the bundled `guacamole-auth-header` extension. That is safe
+*only* behind a proxy that strips/sets the header. With the port directly
+reachable over the overlay, a request carrying `Remote-User: guacadmin` would
+authenticate as admin with no password — a straight bypass. Removed the env
+var. The extension jar stays in the image, dormant (it only activates when an
+`HTTP_AUTH_*` var is set); if the §288 option-2 tier is ever built, set it
+then. `REMOTE_IP_VALVE_ENABLED` left on — it only matters behind a proxy and
+Tomcat's RemoteIpValve only trusts XFF from its internal-proxy ranges.
+
+### Dead code removed
+
+`guacamoleSync.ts` existed to pre-provision a Guacamole account per dashboard
+user *for* the header-auth path (its own header said the accounts get a
+throwaway password "nobody is ever told" and "can't usefully log in directly
+until slice 4"). With slice 4 gone it provisioned unusable accounts and did a
+login/REST/logout round-trip on every user create / role change / access
+change / delete / invite-accept, each wrapped so a failure surfaced a UI
+warning. Removed:
+
+- `backend/src/services/guacamoleSync.ts` + `guacamoleSync.test.ts`.
+- `guacamoleListUsers` / `guacamoleCreateUser` / `guacamoleSetUserDisabled` /
+  `guacamoleGetUser` + the `GuacamoleUser` type from `guacamoleClient.ts`
+  (and their tests). `guacamoleLogin` / `guacamoleLogout` /
+  `guacamoleSetPassword` stay — `guacamoleAdminRotate.ts` uses them.
+- The six `syncGuacamoleUsersSafe(...)` call sites in `routes/{users,auth,
+  services}.ts` and the `guacamoleWarning` merged into their responses.
+- Stale "same shape as guacamoleSync" doc-comment refs in `beszelSync.ts`,
+  `beszelClient.ts`, `mealieAiSync.ts` repointed to `autheliaSync.ts`.
+
+Docs: `app-credentials.md` moves Guacamole out of the "skips its own login
+behind Authelia" set and says how it's actually reached. README item deleted
+(the Housekeeping section is now empty). 660 backend tests + typecheck pass.
+Not a live change to prove — no behaviour on the wire changed except the
+removed header trust, which had no live route anyway.

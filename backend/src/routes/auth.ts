@@ -18,7 +18,6 @@ import { effectiveCapabilities } from '../auth/capabilities';
 import { getUserCapabilities, getUserRoles, setUserRoles } from '../services/userRoles';
 import { acceptInvitation, verifyInvitation } from '../services/userInvitations';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
-import { syncGuacamoleUsersSafe } from '../services/guacamoleSync';
 import { syncBeszelUsersSafe } from '../services/beszelSync';
 import {
   generateRecoveryCodes,
@@ -154,9 +153,8 @@ router.post(
       }).catch(() => {});
 
       // The account now has a password hash — write it into Authelia (§157)
-      // and, if it was granted Guacamole access, provision it there too (§200).
+      // and Beszel.
       await syncAutheliaUsersSafe('invitation_accepted', activated.userId);
-      await syncGuacamoleUsersSafe('invitation_accepted', activated.userId);
       await syncBeszelUsersSafe('invitation_accepted', activated.userId);
 
       const session = await issueSession({ id: activated.userId, username: activated.username });

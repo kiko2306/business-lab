@@ -5,7 +5,7 @@
  * points that at Anthropic's OpenAI-compat endpoint with the stored key, so
  * the operator never touches Mealie's own settings (§0.2, §0.3).
  *
- * Shape: guacamoleSync.ts / beszelSync.ts — resolve Mealie's cross-project
+ * Shape: beszelSync.ts / autheliaSync.ts — resolve Mealie's cross-project
  * base URL, log in as an admin whose password this process owns, drive the
  * REST API, best-effort (audited + warned, never thrown, never blocks the
  * caller).

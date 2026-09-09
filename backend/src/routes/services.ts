@@ -17,7 +17,6 @@ import { schemas, validateParams, validateBody } from '../middleware/validation'
 import { deprovisionServiceExposure, getExposability, getServiceExposureRow, upsertServiceExposureConfig, provisionServiceIfEnabled } from '../services/exposure';
 import { syncAutheliaAccessControlSafe } from '../services/autheliaAccessControl';
 import { syncAutheliaOidcClientsSafe } from '../services/autheliaOidcClients';
-import { syncGuacamoleUsersSafe } from '../services/guacamoleSync';
 import { syncBeszelUsersSafe } from '../services/beszelSync';
 import { regenerateHomepageServices } from '../services/homepageConfig';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
@@ -509,17 +508,13 @@ router.put(
       // An app that logs in via Authelia's OIDC provider needs its client's
       // redirect_uris kept in step with its public hostname (plan.md §270).
       const oidcClientsWarning = await syncAutheliaOidcClientsSafe('exposure_change', req.user!.id);
-      // Exposing/hiding Guacamole changes whether `app-guacamole` is even a
-      // grantable option (getAppAccessOptions keys off live exposure), so
-      // its account set can go stale the same way (§200 slice 3).
-      const guacamoleWarning =
-        req.params.name === 'guacamole' ? await syncGuacamoleUsersSafe('exposure_change', req.user!.id) : null;
-      // Same reasoning for Beszel: exposing/hiding it changes whether `beszel`
-      // is a grantable app-access option, so its account set can go stale (§229).
+      // Exposing/hiding Beszel changes whether `beszel` is a grantable
+      // app-access option (getAppAccessOptions keys off live exposure), so its
+      // account set can go stale (§229).
       const beszelWarning =
         req.params.name === 'beszel' ? await syncBeszelUsersSafe('exposure_change', req.user!.id) : null;
       const warning =
-        [autheliaWarning, oidcClientsWarning, guacamoleWarning, beszelWarning].filter(Boolean).join(' ') || null;
+        [autheliaWarning, oidcClientsWarning, beszelWarning].filter(Boolean).join(' ') || null;
 
       return res.json({
         message: turnedOff

@@ -110,7 +110,7 @@ export async function beszelSetUserRole(
 
 /**
  * DELETE /api/collections/users/records/{id}. PocketBase auth records have
- * no "disabled" flag, so revoke means delete here — unlike guacamoleSync,
+ * no "disabled" flag, so revoke means delete here — unlike autheliaSync,
  * which disables. Safe in practice: this sync is the only thing that creates
  * Beszel accounts on this stack, and the first-run seed admin (the
  * universal-token owner) is never in the sync's wanted set nor deleted.

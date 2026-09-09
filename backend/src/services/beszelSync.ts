@@ -1,6 +1,6 @@
 /**
  * Keeps Beszel's own account list in step with the dashboard's users
- * (plan.md §229) — same shape as guacamoleSync.ts, over PocketBase's REST
+ * (plan.md §229) — same shape as autheliaSync.ts, over PocketBase's REST
  * API. Beszel's `TRUSTED_AUTH_HEADER` middleware only ever *looks up* an
  * existing `users` record by the forwarded email (`FindAuthRecordByEmail`,
  * no creation fallback — read straight from `internal/hub/api.go`), so the
@@ -15,11 +15,11 @@
  * (`BESZEL_ADMIN_EMAIL`, the universal-token owner) is never touched: it's
  * not in the wanted set, and it's explicitly excluded from the delete pass.
  *
- * "Active" mirrors guacamoleSync/autheliaSync: `email` + `password_hash`
+ * "Active" mirrors autheliaSync: `email` + `password_hash`
  * both set, so it can't drift from what Authelia considers a real account.
  *
  * Every write is best-effort at the call site, same contract as
- * `syncGuacamoleUsersSafe`: a failure is audited and surfaced as a warning,
+ * `syncAutheliaUsersSafe`: a failure is audited and surfaced as a warning,
  * never rolled back onto the dashboard-side change.
  */
 
@@ -184,7 +184,7 @@ export async function syncBeszelUsers(trigger: string): Promise<BeszelSyncResult
 /**
  * Fire-and-forget wrapper for the user-management routes: never throws,
  * audits a failure, and hands back a short warning string when the sync
- * didn't fully land. Same contract as `syncGuacamoleUsersSafe`.
+ * didn't fully land. Same contract as `syncAutheliaUsersSafe`.
  */
 export async function syncBeszelUsersSafe(trigger: string, userId: number | null): Promise<string | null> {
   try {

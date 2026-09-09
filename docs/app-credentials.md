@@ -131,13 +131,19 @@ longer a per-app setting (Home Page is the sole exception: it's the
 deliberately public front door).
 
 A separate set *do* have their own login but skip it behind Authelia, so an
-SSO login lands with no second form: **Guacamole** (`HTTP_AUTH_HEADER`) and
-**Paperless-ngx** (`PAPERLESS_ENABLE_HTTP_REMOTE_USER`) trust the
-`Remote-User` header NPM sets from the Authelia forward-auth. They still show
-their own login on LAN-direct access (no header). This is a fixed per-app
-property, not a setting. (**Beszel** has the same header path wired via
-`TRUSTED_AUTH_HEADER` but keeps password auth enabled until it's proven
-live.)
+SSO login lands with no second form: **Paperless-ngx**
+(`PAPERLESS_ENABLE_HTTP_REMOTE_USER`) trusts the `Remote-User` header NPM sets
+from the Authelia forward-auth, and still shows its own login on LAN-direct
+access. This is a fixed per-app property, not a setting. (**Beszel** has the
+same header path wired via `TRUSTED_AUTH_HEADER` but keeps password auth
+enabled until it's proven live.)
+
+**Guacamole** is *not* in that set (plan.md §288/§318): it is `overlayOnly` —
+reached directly on port `10430` over NetBird/Tailscale with its own login
+(the auto-rotated `guacadmin` password above), the same as NPM's admin UI and
+Pi-hole. No reverse proxy fronts it, so its bundled `guacamole-auth-header`
+extension is deliberately left off — with the port directly reachable, a
+forged `Remote-User` header would otherwise be an auth bypass.
 
 | App | Why |
 |---|---|
