@@ -264,12 +264,15 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
       peaceful_keldysh` (the §268 leftover); decide on `docker image prune
       -af` (still ~11 GB of images for currently-stopped apps — a re-pull
       cost if a client later starts one); `network prune`.
-- [ ] **Phase B — lighter config, same apps** (§300) — one commit each:
-      B1 Stirling-PDF → `latest-ultra-lite` (~970→200 MiB, verify no
-      OCR/convert use); B4 Paperless → 1 web + 1 task worker + `mem_limit`
-      (~450→250 MiB); B5 Immich → cap server, stop machine-learning if smart
-      search unused (−120 MiB). (B2 WAHA, B3 Metabase, B6 MSSQL dropped — all
-      three apps were removed in §301.)
+- [ ] **Phase B — lighter config, same apps** (§300, §303) — **B1 done**
+      (Stirling-PDF `latest-ultra-lite`: RSS 960→784 MiB, disk 3.4→0.9 GB;
+      needed the host override unpinned). **B4 done** (Paperless 1+1 workers:
+      idle RSS 743→693, real effect is bounding the OCR peak). **B5 not
+      done** — disabling `immich-machine-learning` (248 MiB, unused on this
+      box) needs the service removed from compose *and* the container
+      `docker rm`'d, which the Update page can't do; @mat to run that one
+      SSH step or fold it into Phase C. (B2 WAHA, B3 Metabase, B6 MSSQL
+      dropped — removed in §301.)
 - [ ] **Phase C — `mem_limit` on every service** (§300) — one commit:
       tiered caps on every `apps/*/docker-compose.yml` + the management
       stack (generous on `backend` — an OOMKill mid-self-update is the §299

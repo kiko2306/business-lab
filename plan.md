@@ -21797,3 +21797,62 @@ the healthcheck command couldn't execute in the image:
 Both commands were confirmed exit-0 in the running containers before the
 edit. After `git pull` + `docker compose up -d` for each on `home-srv-01`,
 both flip to `healthy` on the first check. Compose-only; no version bump.
+
+## 303. §300 Phase B — Stirling-PDF ultra-lite + Paperless worker cap (2026-09-09)
+
+Two of the three Phase B levers, each its own commit, verified on
+`home-srv-01` (this was the last work deployed by SSH — see §304 for the
+workflow change that followed).
+
+### B1 — Stirling-PDF → `latest-ultra-lite` (0.54.0)
+
+The full image bundles LibreOffice + Tesseract-OCR + a Python runtime for
+Office-doc conversion and OCR — unused here (Paperless OCRs its own intake,
+Nextcloud edits via OnlyOffice). ultra-lite keeps every core PDF operation.
+`docker-compose.yml` image tag changed; the three "merge, split, OCR, sign,
+convert" description strings (compose label, `services.ts`,
+`sales-catalogue.md`) reworded to "merge, split, rotate, sign, compress".
+
+The host had a dashboard-generated `apps/stirling-pdf/docker-compose.override.yml`
+(§209) pinning the *full* image by digest — it overrode the base tag, so the
+first recreate came back on `:latest` at **1.47 GiB**. Removing the override
+(the file's own "unpin" instruction) let it float to `latest-ultra-lite`:
+**healthy, RSS 960 → 784 MiB, image 3.4 → 0.9 GB on disk.** (The JVM heap is
+most of what's left — a `-Xmx` cap is Phase C.)
+
+### B4 — Paperless 1 web + 1 task worker
+
+`PAPERLESS_WEBSERVER_WORKERS=1` added, `PAPERLESS_TASK_WORKERS` 2 → 1
+(`compose.yaml`, no version bump). Paperless otherwise scales both pools with
+the host CPU count. Verified: env applied, healthy, **RSS 743 → 693 MiB** at
+idle. The larger effect is bounding the *peak* — 1 OCR worker instead of up
+to 4 concurrently — which idle `docker stats` doesn't show.
+
+### B5 — Immich machine-learning: not done
+
+Disabling `immich-machine-learning` (248 MiB, model-cache empty, zero
+activity in 24 h on this box) needs the service commented out of compose
+**and** the container removed — `docker compose up -d` alone won't stop a
+service that's no longer in the file. That makes it an SSH job, which the
+new §304 rule says to flag rather than do. Left for @mat to take with the
+Phase C `mem_limit` pass, or to run the one `docker rm` by hand.
+
+## 304. Test-server updates go through the Update page, not SSH (2026-09-09)
+
+@mat's standing instruction: from now on, code changes reach the test server
+by @mat applying them **from the dashboard Update page** (the §198 self-update
+panel), not by an agent `ssh`ing in to `git pull` + `docker compose up -d`.
+SSH is only for what the self-update genuinely can't do — removing a container
+for a service deleted from a compose file, clearing a dashboard-managed
+`docker-compose.override.yml` pin, host ops (prune, swap, disk). Those get a
+warning first, then @mat's go-ahead.
+
+Practical effect on the workflow: commit + push to `dev`, merge verified work
+to `main`, and report it as **"committed, pending your Update-page deploy"** —
+live verification of Docker-touching changes happens after @mat deploys, from
+their report or a read-only check. Saved to agent memory.
+
+State to be aware of after the §303 SSH deploys (the last ones under the old
+flow): `home-srv-01`'s checkout is on branch **`dev`** at the §303 commit, and
+`apps/stirling-pdf/docker-compose.override.yml` was deleted on the host (the
+B1 unpin). Nothing else diverged.
