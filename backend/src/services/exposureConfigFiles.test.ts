@@ -45,10 +45,14 @@ describe('buildHomeAssistantFixScript', () => {
     expect(script).toContain('left configuration.yaml alone');
   });
 
-  it('resets a stale .storage/http unless it carries BOTH forwarded-for and ip_ban', () => {
+  it('merges the settings straight into an existing .storage/http (no reset — HA stops re-migrating)', () => {
     expect(script).toContain('/config/.storage/http');
-    expect(script).toMatch(/mv -f \/config\/\.storage\/http/);
-    expect(script).toContain('has("use_x_forwarded_for") and has("ip_ban_enabled")');
+    expect(script).toContain('st.update(want)');
+    expect(script).toContain('data.pop("pending", None)');
+    expect(script).toContain('merged reverse-proxy + ip_ban settings into .storage/http');
+    // it must NOT delete the store (that leaves HA on http defaults — §347)
+    expect(script).not.toMatch(/mv -f \/config\/\.storage\/http/);
+    expect(script).not.toMatch(/rm -f \/config\/\.storage\/http\b/);
   });
 
   it('carries the trusted_proxies + brute-force lockout block in its embedded payload', () => {

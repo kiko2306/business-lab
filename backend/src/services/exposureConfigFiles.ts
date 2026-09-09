@@ -77,24 +77,41 @@ function run(command: string, timeoutMs = 120_000): Promise<string> {
   });
 }
 
+// The reverse-proxy + brute-force-lockout settings HA needs when it's exposed
+// directly (§311, §344/§347). Kept as data so the fix script can both write
+// the yaml block (fresh install) and merge them straight into .storage/http
+// (an established HA that has stopped migrating http: from the yaml).
+const HA_HTTP_SETTINGS = {
+  use_x_forwarded_for: true,
+  trusted_proxies: HA_TRUSTED_PROXIES,
+  ip_ban_enabled: true,
+  login_attempts_threshold: 5,
+} as const;
+
 /**
- * The /bin/sh script that runs inside the throwaway HA container. Makes
- * /config/configuration.yaml carry the *current* marker-fenced http: block
- * (appended if absent, replaced if a stale version is present — e.g. one
- * without the §344 ip_ban keys), then moves aside a stale .storage/http so HA
- * re-migrates the block on the start that follows. The .storage/http reset
- * fires unless the live config already carries BOTH use_x_forwarded_for and
- * ip_ban_enabled, so tightening the block reaches a HA that already migrated
- * an earlier version.
+ * The /bin/sh script that runs inside the throwaway HA container. Two things:
+ *
+ *  1. `/config/configuration.yaml` carries the current marker-fenced `http:`
+ *     block (appended if absent, replaced if stale, left alone if the user
+ *     manages their own `http:`) — this is what a *fresh* HA migrates on first
+ *     boot.
+ *  2. If `/config/.storage/http` already exists, merge the settings straight
+ *     into its `data.stable` (and clear a stale `pending`/`error`). An
+ *     established HA 2026.x records that it has migrated and then ignores the
+ *     yaml `http:` — deleting `.storage/http` does NOT make it re-migrate, it
+ *     just falls back to defaults (learned the hard way, §347). Patching the
+ *     store in place is the only thing that reaches it.
  */
 function buildHomeAssistantFixScript(): string {
   const blockB64 = Buffer.from(HA_HTTP_BLOCK).toString('base64');
   const begin = JSON.stringify(HA_MARKER_BEGIN);
   const end = JSON.stringify(HA_MARKER_END);
+  const settingsJson = JSON.stringify(HA_HTTP_SETTINGS);
   return [
     'set -e',
     'CFG=/config/configuration.yaml',
     `export HLM_BLOCK=$(printf '%s' ${JSON.stringify(blockB64)} | base64 -d)`,
+    `export HLM_SETTINGS=${JSON.stringify(settingsJson)}`,
     // Reconcile the marker block in configuration.yaml. python3 is in the
     // image; the block comes in via the env so nothing needs escaping.
     "python3 <<'PYEOF'",
@@ -121,26 +138,30 @@ function buildHomeAssistantFixScript(): string {
     '    print("hlm: user manages http: — left configuration.yaml alone")',
     'PYEOF',
     'if [ -f /config/.storage/http ]; then',
-    "  RESET=$(python3 <<'PYEOF'",
-    'import json',
+    "  python3 <<'PYEOF'",
+    'import json, os',
+    'p = "/config/.storage/http"',
+    'want = json.loads(os.environ["HLM_SETTINGS"])',
     'try:',
-    '    d = json.load(open("/config/.storage/http"))["data"]',
-    '    st = d.get("stable") or {}',
-    '    pe = d.get("pending") or {}',
-    '    def has(k):',
-    '        return st.get(k) is True or (pe.get(k) is True and not pe.get("error"))',
-    '    ok = has("use_x_forwarded_for") and has("ip_ban_enabled")',
-    '    print("ok" if ok else "reset")',
+    '    doc = json.load(open(p))',
     'except Exception:',
-    '    print("reset")',
+    '    doc = {"version": 2, "minor_version": 2, "key": "http", "data": {}}',
+    'data = doc.setdefault("data", {})',
+    'st = data.setdefault("stable", {})',
+    'changed = any(st.get(k) != v for k, v in want.items())',
+    'st.update(want)',
+    '# A leftover pending/error block would keep HA from applying stable.',
+    '# Pop both unconditionally — `or` would short-circuit the second pop.',
+    'had_pending = data.pop("pending", None) is not None',
+    'had_error = data.pop("error", None) is not None',
+    'if had_pending or had_error:',
+    '    changed = True',
+    'if changed:',
+    '    json.dump(doc, open(p, "w"), indent=2)',
+    '    print("hlm: merged reverse-proxy + ip_ban settings into .storage/http")',
+    'else:',
+    '    print("hlm: .storage/http already carries the reverse-proxy config")',
     'PYEOF',
-    '  )',
-    '  if [ "$RESET" = "reset" ]; then',
-    '    mv -f /config/.storage/http /config/.storage/http.hlm-superseded 2>/dev/null || rm -f /config/.storage/http',
-    '    echo "hlm: reset migrated .storage/http so the yaml http: block re-applies"',
-    '  else',
-    '    echo "hlm: .storage/http already carries the reverse-proxy config"',
-    '  fi',
     'else',
     '  echo "hlm: .storage/http absent; yaml http: block will migrate on boot"',
     'fi',

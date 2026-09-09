@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.67.2] — 2026-09-09
+
+### Fixed
+
+- Home Assistant reverse-proxy + ip_ban config now merges directly into .storage/http (§347) — an established HA no longer re-migrates the yaml http: block, so deleting the store left it on defaults (400 via the proxy)
+
 ## [0.67.1] — 2026-09-09
 
 ### Fixed
