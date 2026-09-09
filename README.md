@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.65.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.66.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -301,15 +301,12 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **§344 batch 2 leftovers — ITFlow bootstrap + Home Assistant** —
-      **BookStack** (Authelia OIDC), **NocoDB** (expose-direct + env seed) and
-      **Jellyfin** (`lanOnly`) are done. Still open:
-      **ITFlow** — needs `itflowClient.ts` + `reconcileItflowFirstAdmin`
-      against the running `/setup.php` (no env admin; rolling `master` image),
-      then `skipAutheliaProtection` + switch on its 2FA. Stays behind Authelia
-      until that exists.
-      **Home Assistant** — @mat to pick: expose-direct (force `ip_ban_enabled`
-      in its managed config) vs `overlayOnly` / `lanOnly`.
+- [ ] **§344 batch 2 leftover — Home Assistant** — BookStack (Authelia OIDC),
+      NocoDB (expose-direct + env seed), Jellyfin (`lanOnly`) and ITFlow
+      (expose-direct + setup-wizard bootstrap, §346) are done. Still open:
+      **Home Assistant** — @mat to pick expose-direct (force `ip_ban_enabled`
+      in its managed config) vs `overlayOnly` / `lanOnly`. Core HA has no
+      OIDC / header-trust (§311).
 - [ ] **`@mat`: confirm NPM's admin UI over the overlay** (§239, §324.4) — the
       "deprovision any live public `npm.<domain>`" half is settled: nothing was
       ever provisioned for `nginx-proxy-manager` (no row, no DNS, no proxy

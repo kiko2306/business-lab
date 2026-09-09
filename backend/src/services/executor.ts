@@ -35,6 +35,7 @@ import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import { applyImmichConfig } from './immichConfig';
 import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { reconcileDocusealFirstAdmin } from './docusealAdminBootstrap';
+import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
@@ -283,6 +284,10 @@ async function composeUpWithManagedConfig(
   // the outer gate and this just creates the admin account. After `up`; no-op
   // otherwise.
   await reconcileDocusealFirstAdmin(serviceName);
+  // ITFlow: run its first-run setup wizard so there's no manual step / first-
+  // visitor race once it's exposed directly (§344). No OIDC, no env admin —
+  // four form POSTs against setup/index.php. After `up`; no-op otherwise.
+  await reconcileItflowFirstAdmin(serviceName);
 
   return result;
 }
