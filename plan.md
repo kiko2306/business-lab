@@ -21445,3 +21445,111 @@ off the baseline (Stirling −0.77, WAHA −0.23, Metabase cap −0.5, Paperless
 −0.2, Immich ML −0.12, MSSQL stop −0.59) plus 3.6 GiB of swap pulled back
 into RAM. With D1/D2 as replacements: **~4–4.5 GiB**. Container RSS
 9.7 GiB → ~5–7 GiB on 14 GiB — real headroom for a self-update build phase.
+
+## 301. Plan — remove SQL Server, Postiz, WAHA (and question Metabase); then a redundancy pass (2026-09-09)
+
+Follows §300. Rather than *tune* the heaviest removable apps, the call is to
+**delete them outright**. §300's Phase B2 (WAHA→NOWEB), B6 (MSSQL memory cap),
+D1 (Postiz keep/trim/replace) and D3 (stop MSSQL) are all overtaken by this —
+their README items are replaced by the removal items below.
+
+### What each app does, and why it goes
+
+- **SQL Server (`mssql`, §121/§263).** Microsoft SQL Server 2022 Express,
+  LAN-only, no web UI — added so a client who *needs* SQL Server specifically
+  (not Postgres) has it. It is the **only proprietary-EULA app in the repo**
+  and carries a disproportionate code surface for it: a licence-acceptance
+  gate (`mssqlEula.ts`, a settings route, a frontend panel), an `x86Only`
+  platform guard, a bespoke `mssql` backup engine (server-side `BACKUP
+  DATABASE` + a root-busybox dump-dir dance), and an `MSSQL_` branch in the
+  secret generator. 587 MiB resident when running (and it was found running
+  on 2026-09-08 despite §263f leaving it stopped). No client is using it.
+  Removing it reclaims the RAM and lets all of that special-case code go.
+- **Postiz (`postiz`, §257/§258).** Social-media scheduling app — the §84
+  phase-P3 "product" piece. Heaviest single stack on the host: ~1.7 GiB
+  across 5 containers (app + a full Temporal cluster with its own Postgres +
+  Valkey). AGPL-3.0. P4 (the `/content` → Postiz glue) was never built and is
+  parked. Dropping Postiz ends the social-publishing product angle until/unless
+  it is deliberately picked back up.
+- **WAHA (`waha`, §84 P3a/§243).** WhatsApp HTTP API gateway (headless
+  Chromium driving WhatsApp Web) for automations to send/receive WhatsApp
+  messages. 277 MiB. `docs/licences.md` already flags it ⚠️ — automating
+  WhatsApp Web **breaches Meta's ToS** regardless of WAHA's own Apache-2.0
+  licence, exactly the "non-software ToS" bar in the CLAUDE.md conventions.
+  Removing it is licence hygiene as much as memory.
+- **Metabase (`metabase`, §244) — questioned, not yet confirmed.** BI /
+  dashboarding: connects to the *other* apps' Postgres/MySQL databases and
+  lets someone build charts, dashboards and ad-hoc SQL "questions" across
+  them. In this project it is a speculative value-add — nobody has asked for
+  cross-app BI, there is no wired use of it, and it is 1.34 GiB of uncapped
+  JVM (AGPL-3.0). Same "a feature with no users" shape as §91. Strong removal
+  candidate; @mat to confirm before 301d runs.
+
+### Removal commits
+
+Each is `minor` (a registry change is user-facing) via `scripts/bump-version.sh`,
+and each finishes with the containers actually stopped + removed on
+`home-srv-01`, `apps/<name>/data/` deleted, and the dashboard proven still
+healthy (Settings page especially, for 301c).
+
+- **301a — Postiz.** Delete `apps/postiz/`; the `services.ts` entry
+  (~684–716); `docs/app-credentials.md`, `docs/licences.md` (the Postiz app
+  row + its Temporal/`auto-setup`/`postgres:16` sidecar rows; keep
+  `valkey`/`postgres-alpine`/`busybox` — shared), `docs/sales-catalogue.md`,
+  `docs/ports.md` rows; `services.test.ts` + `homepageConfig.test.ts`
+  fixtures. Delete README P3/P4 items. Live: stop+rm the 5 `postiz-*` /
+  `temporal*` containers, drop the two networks, rm data.
+- **301b — WAHA.** Delete `apps/waha/`; the `services.ts` entry (~1227–1253);
+  `docs/*` rows (incl. the licences.md ⚠️ WhatsApp-ToS row + the item-6
+  client-agreement note); `homepageConfig.test.ts` fixtures (`waha` is the
+  running+exposed example in several cases — reassign to another app, e.g.
+  `stirling-pdf`). Live: stop+rm `waha-waha-1`, rm data.
+- **301c — SQL Server.** The deep one:
+  - Delete `apps/mssql/`, `backend/src/services/mssqlEula.ts`,
+    `backend/src/services/mssqlEula.test.ts`.
+  - `services.ts` — drop the `mssql` entry.
+  - `executor.ts` — drop the `assertMssqlEulaAccepted` import + call; drop
+    `assertPlatformSupported` + the `x86Only` check + its call. No consumer
+    remains; note in the commit that the platform-guard mechanism can be
+    re-added if a future arm64-incompatible app needs it.
+  - `appDumps.ts` — drop the `mssql` dump branch, restore branch,
+    `ensureMssqlDumpDir`, `MSSQL_BACKUP_TSQL`, `SQLCMD`; drop `'mssql'` from
+    the engine + `DumpOutcome.kind` unions; drop `mssql/server` from
+    `DB_IMAGE`/`DB_IMAGE` regexes in tests.
+  - `appEnv.ts` — drop the `MSSQL_` branch in `generateSecretFor` + its doc
+    comment (keep the `*_APP_KEY` branch — that consolidation was a real fix).
+  - `routes/settings.ts` — drop the `/mssql-eula` GET+POST + import.
+  - `middleware/validation.ts` — drop `mssqlEulaAccept`.
+  - `types/index.ts` — drop `x86Only?`, `'mssql'` from `backup.engine` +
+    `DumpOutcome.kind`.
+  - Frontend — drop `MssqlEulaStatus` (`models.ts`),
+    `loadMssqlEula`/`acceptMssqlEula` (`settings.service.ts`), the
+    `mssqlEula*` state + load call (`settings.component.ts`), the whole
+    `settings:mssql-eula` `<app-panel>` (`settings.component.html` ~374–438).
+  - Tests — `services.test.ts` (drop the `mssql` describe; `lanOnly`
+    allowlist back to `['samba']`), `appEnv.test.ts`, `executor.test.ts`,
+    `homepageConfig.test.ts`.
+  - Docs — `ports.md`, `app-credentials.md`, `licences.md` (drop the app row
+    + the `mssql/server` image row; keep `busybox`), `raspberry-pi.md`,
+    `sales-catalogue.md`.
+  - Live — stop+rm `mssql-mssql-1` + `mssql-init`, rm `apps/mssql/data/`,
+    `DELETE FROM settings WHERE key='mssql_eula_accepted'` (disposable box,
+    but leave it clean).
+  - Verify — `check.sh backend test` + `frontend test` + both `build`; run
+    `scripts/e2e-tests.sh` (the Settings component changed); on the real
+    stack confirm the Apps list has no SQL Server, Settings renders with no
+    licence panel and no console error.
+- **301d — Metabase** (only if @mat confirms). Same shape as 301a: registry
+  entry, `apps/metabase/`, docs rows, test fixtures. Live: stop+rm
+  `metabase-*`, rm data.
+
+### 301e — redundancy / same-functionality pass
+
+After the removals, survey the remaining roster for functional overlap —
+apps that do substantially the same job — and write it up as its own plan
+section + README items for @mat to decide. First-look candidates to test:
+Forgejo vs code-server (Git hosting overlap), Immich vs Nextcloud (photos),
+Syncthing vs Nextcloud (file sync), Dozzle vs Beszel vs Uptime-Kuma vs
+Scrutiny (overlapping monitoring surfaces), Jellyfin vs Immich (media),
+Miniflux as a standalone when Nextcloud has News. Not a code change in
+itself.

@@ -263,24 +263,46 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
       `swapoff -a && swapon -a` to flush swap.
 - [ ] **Phase B — lighter config, same apps** (§300) — one commit each:
       B1 Stirling-PDF → `latest-ultra-lite` (~970→200 MiB, verify no
-      OCR/convert use); B2 WAHA → `NOWEB` engine (~277→50 MiB, verify
-      consumer + document re-pair); B3 Metabase → `JAVA_OPTS=-Xmx768m` +
-      `mem_limit` (~1.34→0.8 GiB); B4 Paperless → 1 web + 1 task worker +
-      `mem_limit` (~450→250 MiB); B5 Immich → cap server, stop
-      machine-learning if smart search unused (−120 MiB); B6 MSSQL →
-      `MSSQL_MEMORY_LIMIT_MB` (only if it stays running — see D3).
+      OCR/convert use); B3 Metabase heap cap — *see §301, Metabase is now a
+      removal candidate*; B4 Paperless → 1 web + 1 task worker + `mem_limit`
+      (~450→250 MiB); B5 Immich → cap server, stop machine-learning if smart
+      search unused (−120 MiB). (B2 WAHA and B6 MSSQL dropped — both apps are
+      being removed, §301.)
 - [ ] **Phase C — `mem_limit` on every service** (§300) — one commit:
       tiered caps on every `apps/*/docker-compose.yml` + the management
       stack (generous on `backend` — an OOMKill mid-self-update is the §299
       failure), maybe a `services.test.ts` guard that each app declares one.
       Deploy app-by-app, watch `docker events` for `oom`.
-- [ ] **@mat: Phase D decisions** (§300) — D1 Postiz (~1.7 GiB, the §84 P3
-      deliverable): keep capped / trim its Temporal sidecars / replace with
-      n8n social workflows / stop until a client needs it. D2 Metabase
-      (~0.8 GiB capped): keep, or replace with Grafana (~120 MiB, AGPL
-      parity) for SQL dashboards. D3 MSSQL: stop unless a client is using it
-      (−587 MiB; §263f left it stopped, something restarted it). D4 ClamAV
-      (215 MiB, irreducible): on-access vs scheduled scans.
+- [ ] **@mat: Phase D decisions** (§300) — D4 ClamAV (215 MiB, irreducible):
+      on-access vs scheduled scans. (D1 Postiz, D3 MSSQL folded into the §301
+      removals; D2 Metabase → see the §301 Metabase question.)
+
+Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
+
+- [ ] **Remove Postiz** (§301a) — `apps/postiz/`, the `services.ts` entry,
+      docs rows, test fixtures; stop+rm the 5 `postiz-*`/`temporal*`
+      containers on the host. Ends the §84 social-publishing angle (P4 was
+      never built). `minor` bump.
+- [ ] **Remove WAHA** (§301b) — `apps/waha/`, registry entry, docs rows
+      (incl. the licences.md ⚠️ WhatsApp-ToS row), test fixtures; stop+rm
+      `waha-waha-1`. `minor` bump.
+- [ ] **Remove SQL Server** (§301c) — the deep one: `apps/mssql/`,
+      `mssqlEula.ts`, the `/settings/mssql-eula` route + validator, the
+      `x86Only`/`assertPlatformSupported` guard, the `mssql` backup engine,
+      the `MSSQL_` secret-generator branch, the frontend licence panel, all
+      the test cases and docs rows; stop+rm `mssql-mssql-1`+`mssql-init`,
+      delete the `mssql_eula_accepted` settings row. Run `scripts/e2e-tests.sh`
+      (Settings component changes). `minor` bump.
+- [ ] **@mat: confirm removing Metabase** (§301d) — BI/dashboards over the
+      other apps' databases; speculative, no wired use, 1.34 GiB uncapped
+      JVM, AGPL. If yes: same-shape removal as 301a. If no: it gets a heap
+      cap + `mem_limit` under §300 Phase B/C instead.
+- [ ] **Redundancy / same-functionality pass** (§301e) — after the removals,
+      survey the remaining roster for apps doing substantially the same job
+      and write it up for @mat (candidates: Forgejo vs code-server, Immich vs
+      Nextcloud photos, Syncthing vs Nextcloud sync, Dozzle/Beszel/Uptime-Kuma/
+      Scrutiny monitoring overlap, Jellyfin vs Immich media, Miniflux vs
+      Nextcloud News).
 
 Strategy:
 
