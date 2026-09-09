@@ -11,8 +11,8 @@ import { SelfUpdateRunState, SelfUpdateStatus } from '../../core/models';
 const PROGRESS_LABELS: Record<SelfUpdateRunState, string> = {
   checking: 'Checking for updates…',
   pulling: 'Pulling the latest code…',
-  building: 'Building the frontend and backend images…',
-  updating_apps: 'Pulling and recreating managed apps on their pinned images…',
+  building: 'Building the images that changed…',
+  updating_apps: 'Pulling and recreating the apps that changed…',
   restarting_frontend: 'Restarting the frontend…',
   restarting_backend: 'Restarting the backend — the dashboard will reconnect on its own…',
   done: 'Up to date.',

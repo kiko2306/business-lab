@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.63.4] — 2026-09-09
+
+### Changed
+
+- Self-update only rebuilds and recreates what the git diff touched (§343 C) — a version/docs-only deploy is now a bare git pull; backend restarts only if backend code changed, apps recreate only if their own files did
+
 ## [0.63.3] — 2026-09-09
 
 ### Changed

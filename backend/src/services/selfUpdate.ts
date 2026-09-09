@@ -273,6 +273,67 @@ export async function triggerSelfUpdate(userId: number | null): Promise<SelfUpda
   return run;
 }
 
+interface DeployScope {
+  /** The frontend image needs `docker compose build` + a restart. */
+  frontend: boolean;
+  /** The backend image needs `docker compose build` + its self-restart. */
+  backend: boolean;
+  /**
+   * Installed apps whose `apps/<name>/**` changed and so need a pull+recreate.
+   * `null` means "could not read the diff — recreate every installed app", the
+   * safe fallback.
+   */
+  apps: Set<string> | null;
+}
+
+// A changed path under one of these needs the corresponding image rebuilt.
+// tsconfig / angular.json / the root compose file all change what a build
+// produces; the lockfiles change what `npm ci` installs.
+const BACKEND_BUILD_RE = /^backend\/(src\/|Dockerfile|package\.json|package-lock\.json|tsconfig)/;
+const FRONTEND_BUILD_RE = /^frontend\/(src\/|Dockerfile|package\.json|package-lock\.json|angular\.json|tsconfig)/;
+const APP_PATH_RE = /^apps\/([^/]+)\//;
+
+/**
+ * `git diff --name-only <from>..<to>` → which images to rebuild and which
+ * apps to recreate. Any failure (no `from`, git error, empty output that
+ * shouldn't be empty) returns the everything-changed fallback so a deploy is
+ * never silently under-applied.
+ */
+async function classifyDeploy(repoRoot: string, fromCommit: string | null, toCommit: string): Promise<DeployScope> {
+  const fallback: DeployScope = { frontend: true, backend: true, apps: null };
+  if (!fromCommit || fromCommit === toCommit) {
+    return fallback;
+  }
+  let names: string[];
+  try {
+    const out = await runCommand(
+      'git',
+      ['-C', repoRoot, 'diff', '--name-only', `${fromCommit}..${toCommit}`],
+      { timeout: 15_000 }
+    );
+    names = out.split('\n').map((l) => l.trim()).filter(Boolean);
+  } catch (error) {
+    logger.warn('Self-update: could not diff the pull — recreating every app', {
+      error: (error as Error).message,
+    });
+    return fallback;
+  }
+  if (!names.length) {
+    return fallback;
+  }
+
+  const apps = new Set<string>();
+  let frontend = names.includes('docker-compose.yml');
+  let backend = false;
+  for (const name of names) {
+    if (BACKEND_BUILD_RE.test(name)) backend = true;
+    if (FRONTEND_BUILD_RE.test(name)) frontend = true;
+    const app = APP_PATH_RE.exec(name)?.[1];
+    if (app) apps.add(app);
+  }
+  return { frontend, backend, apps };
+}
+
 async function runSelfUpdateSequence(
   runId: number,
   repoRoot: string,
@@ -288,50 +349,74 @@ async function runSelfUpdateSequence(
     await updateRun(runId, { state: 'pulling' });
     await runCommand('git', ['-C', repoRoot, 'pull', '--ff-only', 'origin', 'main'], { timeout: 60_000 });
     const toCommit = (await runCommand('git', ['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
+    await updateRun(runId, { toCommit });
 
-    await updateRun(runId, { state: 'building', toCommit });
-    await runCommand(
-      'docker',
-      ['compose', '-f', composeFilePath(repoRoot), 'build', 'frontend', 'backend'],
-      { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
-    );
-    await pruneDockerCruft('building');
+    const scope = await classifyDeploy(repoRoot, check.currentCommit, toCommit);
+    const buildTargets = [
+      ...(scope.frontend ? ['frontend'] : []),
+      ...(scope.backend ? ['backend'] : []),
+    ];
+    const willTouchApps = scope.apps === null || scope.apps.size > 0;
+    logger.info('Self-update scope', {
+      runId,
+      build: buildTargets,
+      apps: scope.apps === null ? 'all' : [...scope.apps],
+    });
 
-    // Every installed app's image, pulled and recreated against whatever the
-    // `git pull` above just landed in its compose file (§209) — the only
-    // place this happens now, replacing the old per-app "Update" button.
-    // Best-effort: updateAllInstalledApps never throws, it logs a per-app
-    // failure and moves on, so one app's broken pull can't block the
-    // dashboard's own rebuild/restart from completing below.
-    await updateRun(runId, { state: 'updating_apps' });
-    const appResults = await updateAllInstalledApps(userId);
-    const appsFailed = appResults.filter((r) => !r.ok);
-    if (appsFailed.length) {
-      logger.warn(`Self-update: ${appsFailed.length}/${appResults.length} app(s) failed to update`, {
-        failed: appsFailed.map((r) => r.serviceName),
-      });
+    // Nothing the deploy changed needs a build, an app recreate or a restart —
+    // a version bump, docs, plan.md. The `git pull` above is the whole update;
+    // the backend reads VERSION live so `/version` is already current (§343).
+    if (!buildTargets.length && !willTouchApps) {
+      await writeAuditLog({
+        userId,
+        action: 'self_update_trigger',
+        resource: toCommit,
+        metadata: { fromCommit: check.currentCommit, toCommit, scope: 'pull-only' },
+      }).catch(() => {});
+      await updateRun(runId, { state: 'done', finished: true });
+      logger.info('Self-update: pull-only, nothing to rebuild or restart', { runId });
+      return;
     }
-    await pruneDockerCruft('updating_apps');
 
-    // No `--build` here: the `building` phase above already built and
-    // tagged this image in the same run. Rebuilding again would be a
-    // cache-hit no-op in the best case, but still spins up the builder
-    // subsystem and does the work of checking it — real cost landing right
-    // at the two steps most exposed to memory pressure (plan.md §295,
-    // §297: backend's own restart was SIGKILLed under swap exhaustion
-    // here). `up -d` alone reuses the image already on disk.
-    await updateRun(runId, { state: 'restarting_frontend' });
-    await runCommand(
-      'docker',
-      ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', 'frontend'],
-      { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
-    );
+    if (buildTargets.length) {
+      await updateRun(runId, { state: 'building' });
+      await runCommand(
+        'docker',
+        ['compose', '-f', composeFilePath(repoRoot), 'build', ...buildTargets],
+        { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
+      );
+      await pruneDockerCruft('building');
+    }
 
-    // Mark this as reached (with finished_at) *before* spawning the command
-    // that replaces this process — a row stuck here after a boot is still
-    // legible as "got this far", and reconcileDanglingSelfUpdateRun closes
-    // it out for good once the new process starts.
-    await updateRun(runId, { state: 'restarting_backend', finished: true });
+    // Only the apps whose own files changed in the pull (or all, on the
+    // fallback). Best-effort: updateAllInstalledApps never throws, it logs a
+    // per-app failure and moves on.
+    let appResults: Awaited<ReturnType<typeof updateAllInstalledApps>> = [];
+    if (willTouchApps) {
+      await updateRun(runId, { state: 'updating_apps' });
+      appResults = await updateAllInstalledApps(userId, scope.apps);
+      const appsFailed = appResults.filter((r) => !r.ok);
+      if (appsFailed.length) {
+        logger.warn(`Self-update: ${appsFailed.length}/${appResults.length} app(s) failed to update`, {
+          failed: appsFailed.map((r) => r.serviceName),
+        });
+      }
+      await pruneDockerCruft('updating_apps');
+    }
+    const appsFailed = appResults.filter((r) => !r.ok);
+
+    // No `--build` on the restarts: the `building` phase already tagged the
+    // image (plan.md §295/§297 — this is the step that got SIGKILLed under
+    // swap pressure). `up -d` reuses the image on disk.
+    if (scope.frontend) {
+      await updateRun(runId, { state: 'restarting_frontend' });
+      await runCommand(
+        'docker',
+        ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', 'frontend'],
+        { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
+      );
+    }
+
     await writeAuditLog({
       userId,
       action: 'self_update_trigger',
@@ -339,13 +424,24 @@ async function runSelfUpdateSequence(
       metadata: {
         fromCommit: check.currentCommit,
         toCommit,
+        scope: { build: buildTargets, apps: scope.apps === null ? 'all' : [...scope.apps] },
         appsUpdated: appResults.length - appsFailed.length,
         appsFailed: appsFailed.map((r) => r.serviceName),
       },
     }).catch(() => {});
 
-    // No `--build` here either — same reasoning as the frontend restart
-    // above, and this is the step that actually got SIGKILLed live.
+    if (!scope.backend) {
+      // Backend image unchanged — no self-restart, so the run finishes here.
+      await updateRun(runId, { state: 'done', finished: true });
+      logger.info('Self-update: applied without a backend restart', { runId });
+      return;
+    }
+
+    // Mark restarting_backend (with finished_at) *before* spawning the command
+    // that replaces this process — a row stuck here after a boot is still
+    // legible as "got this far", and reconcileDanglingSelfUpdateRun closes it
+    // out once the new process starts.
+    await updateRun(runId, { state: 'restarting_backend', finished: true });
     const child = spawn(
       'docker',
       ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', 'backend'],

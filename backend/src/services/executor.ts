@@ -599,11 +599,23 @@ export interface AppUpdateResult {
  * one broken pull doesn't leave the other apps un-updated. Not installed
  * (`resolveComposeFile` finds no compose file) just means "skip it", not an
  * error.
+ *
+ * `only` scopes the sweep to a set of service names — the self-update passes
+ * the apps whose `apps/<name>/**` actually changed in the `git pull`, so a
+ * deploy that touched no app (a version bump, backend-only code) does zero
+ * pulls and zero recreates (§343 C). Omitted / `null` = every installed app,
+ * the fallback when the diff can't be computed.
  */
-export async function updateAllInstalledApps(userId: number | null): Promise<AppUpdateResult[]> {
+export async function updateAllInstalledApps(
+  userId: number | null,
+  only?: ReadonlySet<string> | null
+): Promise<AppUpdateResult[]> {
   const results: AppUpdateResult[] = [];
 
   for (const service of getAllServices()) {
+    if (only && !only.has(service.name)) {
+      continue;
+    }
     if (!resolveComposeFile(service.name)?.composeFile) {
       continue;
     }

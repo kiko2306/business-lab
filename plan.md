@@ -23361,5 +23361,25 @@ only `VERSION` + `CHANGELOG.md` + the README line; the version-bump hook
 checks `VERSION` is in the commit; CLAUDE.md updated. 665 backend tests
 (version.test rewritten, selfUpdate.test mock updated). Live check on the box:
 `echo 0.64.111 > VERSION` → `GET /api/version` returned `0.64.111` with **no
-restart**; reverting reflected back immediately. C is the remaining README
-item.
+restart**; reverting reflected back immediately.
+
+**C landed (0.63.4).** `selfUpdate.ts` gains `classifyDeploy()` —
+`git diff --name-only <from>..<to>` → `{ frontend, backend, apps }`.
+`runSelfUpdateSequence` then:
+- builds only the image(s) whose paths changed (`build ...buildTargets`, or
+  skips `docker compose build` entirely);
+- calls `updateAllInstalledApps(userId, scope.apps)` — a new second arg that
+  scopes the sweep to the changed app dirs (or every app when `apps` is
+  `null`); skipped entirely when no app changed;
+- `up -d frontend` only if the frontend changed;
+- self-restarts the backend only if the backend changed — otherwise the run
+  marks `done` from inside the still-running process.
+- **Nothing in any bucket** (VERSION / CHANGELOG / README / plan / docs) →
+  straight to `done` after the pull, audit `scope: 'pull-only'`.
+Fallback to the full everything-changed path when the diff can't be read
+(no `fromCommit`, `git diff` error, empty output). Trade-off: an upstream
+`:latest` image now only refreshes when that app's own files change in the
+pull, not on every code deploy — accepted (a dedicated "pull latest images"
+action can come later; the full sweep is still one `git diff` failure away).
+Frontend `PROGRESS_LABELS` for `building` / `updating_apps` reworded ("…that
+changed"). 669 backend + 50 frontend tests.

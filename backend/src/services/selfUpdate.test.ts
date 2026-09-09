@@ -95,7 +95,15 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 // A stateful runCommand fixture: HEAD only moves to `remoteCommit` once
 // `git pull` actually "runs", the same as the real repo would behave.
-function mockAnUpdateFrom(localCommit: string, remoteCommit: string, commitsBehind: number) {
+// `changedFiles` is what `git diff --name-only` returns for the pull — []
+// (the default) means "diff unavailable", which classifyDeploy treats as
+// everything-changed, so the existing full-path tests stay full-path.
+function mockAnUpdateFrom(
+  localCommit: string,
+  remoteCommit: string,
+  commitsBehind: number,
+  changedFiles: string[] = []
+) {
   let head = localCommit;
   backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
     if (args.includes('pull')) {
@@ -105,6 +113,7 @@ function mockAnUpdateFrom(localCommit: string, remoteCommit: string, commitsBehi
     if (args.includes('rev-parse') && args.includes('HEAD')) return `${head}\n`;
     if (args.includes('rev-parse') && args.includes('origin/main')) return `${remoteCommit}\n`;
     if (args.includes('rev-list')) return `${commitsBehind}\n`;
+    if (args.includes('diff') && args.includes('--name-only')) return changedFiles.join('\n') + '\n';
     return '';
   });
 }
@@ -167,7 +176,8 @@ describe('triggerSelfUpdate', () => {
       })
     );
     // The managed-app update batch ran as part of the same sequence (§209).
-    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7);
+    // `null` scope = "diff unavailable, recreate everything" (§343 C).
+    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7, null);
     // Never a `down` — every compose call is `up -d`, `build`, or a prune.
     const composeCalls = backup.runCommand.mock.calls.filter(([cmd]) => cmd === 'docker');
     expect(composeCalls.length).toBeGreaterThan(0);
@@ -184,6 +194,73 @@ describe('triggerSelfUpdate', () => {
     );
     expect(spawnMock.mock.calls[0][1]).not.toContain('--build');
     expect(spawnMock.mock.calls[0][1]).not.toContain('down');
+  });
+
+  it('a version/docs-only diff is pull-only — no build, no app sweep, no restart', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1, ['VERSION', 'CHANGELOG.md', 'README.md', 'plan.md']);
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun).toMatchObject({ state: 'done', toCommit: 'new222' });
+    expect(executor.updateAllInstalledApps).not.toHaveBeenCalled();
+    expect(spawnMock).not.toHaveBeenCalled();
+    const docker = backup.runCommand.mock.calls.filter(([cmd]) => cmd === 'docker').map(([, a]) => (a as string[]).join(' '));
+    expect(docker.some((k) => k.startsWith('compose -f') && k.includes('build'))).toBe(false);
+    expect(docker.some((k) => k.includes('up -d'))).toBe(false);
+    expect(audit.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({ metadata: expect.objectContaining({ scope: 'pull-only' }) })
+    );
+  });
+
+  it('a backend-only diff rebuilds + restarts backend, leaves frontend and apps alone', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1, ['backend/src/routes/services.ts']);
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun).toMatchObject({ state: 'restarting_backend' });
+    expect(executor.updateAllInstalledApps).not.toHaveBeenCalled();
+    const built = backup.runCommand.mock.calls.find(([cmd, a]) => cmd === 'docker' && (a as string[]).includes('build'));
+    expect(built?.[1]).toEqual(expect.arrayContaining(['build', 'backend']));
+    expect(built?.[1]).not.toContain('frontend');
+    // frontend was not restarted
+    const frontendUp = backup.runCommand.mock.calls.some(
+      ([cmd, a]) => cmd === 'docker' && (a as string[]).includes('up') && (a as string[]).includes('frontend')
+    );
+    expect(frontendUp).toBe(false);
+    expect(spawnMock).toHaveBeenCalledWith('docker', expect.arrayContaining(['up', '-d', 'backend']), expect.anything());
+  });
+
+  it('an app-only diff recreates just that app and finishes without a restart', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1, ['apps/mealie/docker-compose.yml', 'apps/mealie/.env.example']);
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun).toMatchObject({ state: 'done', toCommit: 'new222' });
+    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7, new Set(['mealie']));
+    expect(spawnMock).not.toHaveBeenCalled();
+    const built = backup.runCommand.mock.calls.some(([cmd, a]) => cmd === 'docker' && (a as string[]).includes('build'));
+    expect(built).toBe(false);
+  });
+
+  it('a frontend-only diff rebuilds + restarts frontend and finishes without a backend restart', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1, ['frontend/src/app/shell.component.ts']);
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun).toMatchObject({ state: 'done' });
+    expect(spawnMock).not.toHaveBeenCalled();
+    const frontendUp = backup.runCommand.mock.calls.some(
+      ([cmd, a]) => cmd === 'docker' && (a as string[]).includes('up') && (a as string[]).includes('frontend')
+    );
+    expect(frontendUp).toBe(true);
   });
 
   it('continues past a failed app update and records the summary in the audit metadata', async () => {
