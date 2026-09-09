@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.63.6** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.63.7** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -301,12 +301,12 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **§344 batch 2 — expose-direct + admin bootstrap: BookStack, NocoDB,
-      Jellyfin, Home Assistant** — `skipAutheliaProtection: true` each, plus a
-      `reconcile<App>FirstAdmin` (DocuSeal §341 pattern) so exposing them
-      doesn't open a first-visitor-claims-admin race. BookStack also rotates
-      its shipped `admin@admin.com`/`password`; HA also forces `ip_ban_enabled`.
-      One app per commit, after batch 1.
+- [ ] **§344 batch 2 — expose-direct + admin bootstrap: BookStack, ITFlow,
+      NocoDB, Jellyfin, Home Assistant** — `skipAutheliaProtection: true`
+      each, plus a `reconcile<App>FirstAdmin` (DocuSeal §341 pattern) so
+      exposing them doesn't open a first-visitor-claims-admin race. BookStack
+      also rotates its shipped `admin@admin.com`/`password`; ITFlow forces its
+      own 2FA; HA also forces `ip_ban_enabled`. One app per commit.
 - [ ] **`@mat`: confirm NPM's admin UI over the overlay** (§239, §324.4) — the
       "deprovision any live public `npm.<domain>`" half is settled: nothing was
       ever provisioned for `nginx-proxy-manager` (no row, no DNS, no proxy

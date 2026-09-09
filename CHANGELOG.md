@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.63.7] — 2026-09-09
+
+### Changed
+
+- ITFlow stays publicly exposed after all (§344) — its client portal needs public access; only Kopia and n8n go overlayOnly
+
 ## [0.63.6] — 2026-09-09
 
 ### Changed

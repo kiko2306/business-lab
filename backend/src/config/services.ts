@@ -163,11 +163,6 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       url: ['ITFLOW_URL'],
     },
     managedEnvKeys: ['ITFLOW_URL'],
-    // Off the public tunnel (§344): ITFlow stores client passwords and
-    // documentation behind a plain PHP session login — too sensitive to gate
-    // only with its own form on the internet, and Authelia in front would be
-    // two logins (§342). Reach it over the overlay.
-    overlayOnly: true,
     // Internal MariaDB credentials — nothing outside this compose project
     // uses them, so there is nothing for the user to choose.
     hiddenGeneratedSecrets: ['ITFLOW_DB_PASSWORD'],

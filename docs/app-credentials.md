@@ -135,17 +135,18 @@ SSO login lands with no second form: **Paperless-ngx**
 from the Authelia forward-auth, and still shows its own login on LAN-direct
 access. This is a fixed per-app property, not a setting.
 
-**Guacamole**, **Kopia**, **n8n** and **ITFlow** are `overlayOnly` (plan.md
-§288/§318/§344): never on the public tunnel, reached directly on their host
-port over NetBird/Tailscale with their own login only. Guacamole opens
-RDP/VNC/SSH to every overlay host; Kopia can read and delete every backup;
-n8n runs arbitrary code; ITFlow holds client passwords and documentation —
-each is one weak login away from the whole estate, so it stays off the
-internet and Authelia is *not* stacked in front (that would be a second
-login — §342). NPM's own admin UI and Pi-hole are `overlayOnly` for the same
-reason. Guacamole's bundled `guacamole-auth-header` extension is left off
-since no reverse proxy fronts it — a forged `Remote-User` header on a
-directly reachable port would be an auth bypass.
+**Guacamole**, **Kopia** and **n8n** are `overlayOnly` (plan.md §288/§318/§344):
+never on the public tunnel, reached directly on their host port over
+NetBird/Tailscale with their own login only. Guacamole opens RDP/VNC/SSH to
+every overlay host; Kopia can read and delete every backup; n8n runs
+arbitrary code — each is one weak login away from the whole estate and has no
+client-facing use, so it stays off the internet and Authelia is *not* stacked
+in front (that would be a second login — §342). NPM's own admin UI and
+Pi-hole are `overlayOnly` for the same reason. Guacamole's bundled
+`guacamole-auth-header` extension is left off since no reverse proxy fronts it
+— a forged `Remote-User` header on a directly reachable port would be an auth
+bypass. (ITFlow's client portal has to be public, so it stays exposed — with
+its own login as the gate; 2FA is switched on in its own settings, see below.)
 
 | App | Why |
 |---|---|

@@ -253,11 +253,12 @@ describe('samba is LAN-only', () => {
       .sort();
     // nginx-proxy-manager: the proxy's own admin. pihole: DNS admin.
     // guacamole: RDP/VNC/SSH to every overlay host. kopia: reads + deletes
-    // every backup. n8n: runs arbitrary code. itflow: client passwords + docs
-    // (§344). Each is one weak login away from the whole estate — reached
-    // over the overlay, never the public tunnel, and never with Authelia
-    // stacked in front (that would be two logins — §342).
-    expect(overlayOnly).toEqual(['guacamole', 'itflow', 'kopia', 'n8n', 'nginx-proxy-manager', 'pihole']);
+    // every backup. n8n: runs arbitrary code (§344). Each is one weak login
+    // away from the whole estate and has no client-facing use — reached over
+    // the overlay, never the public tunnel, and never with Authelia stacked
+    // in front (two logins — §342). ITFlow is NOT here: its client portal has
+    // to be public, so it's batch 2 (expose-direct + own login).
+    expect(overlayOnly).toEqual(['guacamole', 'kopia', 'n8n', 'nginx-proxy-manager', 'pihole']);
   });
 });
 
