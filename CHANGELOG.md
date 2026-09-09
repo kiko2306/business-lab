@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.63.0] — 2026-09-09
+
+### Apps
+
+- Add DocuSeal — document signing and fillable PDF forms (§22.3), single container on SQLite, auto-exposed behind Authelia
+
 ## [0.62.5] — 2026-09-09
 
 ### Fixed

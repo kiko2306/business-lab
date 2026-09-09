@@ -1,0 +1,39 @@
+
+services:
+  docuseal:
+    mem_limit: 512m
+    mem_reservation: 128m
+    image: docuseal/docuseal:latest
+    restart: unless-stopped
+    ports:
+      - "${DOCUSEAL_PORT:-10150}:3000"
+    environment:
+      # Public hostname + HTTPS enforcement. Both blank until the exposure
+      # system fills them from the published hostname (services.ts
+      # exposureEnvKeys.host) — DocuSeal then builds absolute signing URLs /
+      # email links and issues secure cookies, trusting NPM's
+      # X-Forwarded-Proto. Blank = plain HTTP on the LAN port, no redirect.
+      HOST: ${DOCUSEAL_HOST:-}
+      FORCE_SSL: ${DOCUSEAL_FORCE_SSL:-}
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=DocuSeal"
+      - "homepage.icon=docuseal.png"
+      - "homepage.href=http://localhost:${DOCUSEAL_PORT:-10150}"
+      - "homepage.description=Document signing and fillable PDF forms"
+    volumes:
+      # SQLite DB (docuseal.sqlite), the generated SECRET_KEY_BASE and all
+      # uploaded documents live under /data. No Postgres sidecar: DocuSeal
+      # defaults to SQLite when DATABASE_URL is unset, which is plenty for a
+      # single-box deployment and keeps this a one-container app.
+      - ./data:/data
+    healthcheck:
+      # Rails' built-in health endpoint (Rails::HealthController at /up): 200
+      # once booted, 5xx if it can't reach its DB. BusyBox wget (Alpine base);
+      # 127.0.0.1 not localhost so it can't resolve to ::1. If a future image
+      # drops the /up route, switch to "/" (200, or 302 to /setup on first run).
+      test: ["CMD-SHELL", "wget -q -O- http://127.0.0.1:3000/up >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s

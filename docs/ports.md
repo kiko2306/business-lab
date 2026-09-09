@@ -69,7 +69,7 @@ hand edit can leave its copy disagreeing with the app's.
 ## Current allocation
 
 `10100` authelia · `10120` bookstack · `10130` code-server ·
-`10140` dozzle ·
+`10140` dozzle · `10150` docuseal ·
 `10190` home-page · `10200` immich · `10210` jellyfin ·
 `10230` mealie · `10240` n8n ·
 `10250`–`10253` netbird (management, dashboard, signal, relay) ·

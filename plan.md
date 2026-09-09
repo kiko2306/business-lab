@@ -1538,9 +1538,17 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       static IP or a smarthost relay. **Priority: P3** — **Estimate: L**
 
 ### 22.3 Business operations
-- [ ] **Docuseal** — `docuseal/docuseal`. Self-hosted e-signatures and
-      fillable PDF forms (DocuSign alt) — contracts, NDAs, onboarding.
-      `exposureEnvKeys.host: ['HOST']`. **Priority: P2** — **Estimate: M**
+- [x] **DocuSeal** — `docuseal/docuseal:latest`. Added 2026-09-09 (§340):
+      `apps/docuseal/` (`docker-compose.yml` + `.env.example`), single
+      container on **SQLite** (`./data:/data` — DB, the auto-generated
+      `SECRET_KEY_BASE` and uploads), host port `${DOCUSEAL_PORT:-10150}` →
+      `:3000`, BusyBox-wget `/up` (Rails health) healthcheck. Registry entry
+      (Productivity, new `signature` icon ✍️), `exposureEnvKeys.host:
+      ['DOCUSEAL_HOST', 'DOCUSEAL_FORCE_SSL']` — both bare-hostname, blank
+      until exposed. No OIDC / no way to hide its own form, so Authelia is the
+      outer gate and DocuSeal keeps its first-run admin account
+      (`app-credentials.md` Wizard row). Licence **AGPL-3.0** (community
+      edition, run stock — client-operated, same as Immich/Mealie/NocoDB).
 - [ ] **Twenty** — `twentycrm/twenty`. Modern open-source CRM (people,
       companies, opportunities, pipelines). Needs Postgres + Redis;
       `exposureEnvKeys.url: ['SERVER_URL']`. **Priority: P2** —
@@ -23121,3 +23129,45 @@ built, and `nslookup github.com 127.0.0.1` resolves through it. Host DNS
 (`resolvectl query`) unaffected throughout. The leftover `daemon.json` `dns`
 key from the run-2 attempt was left in place — same values, harmless.
 Docs-only + shell — no version bump.
+
+## 340. DocuSeal added — document signing + fillable PDF forms (§22.3, 2026-09-09)
+
+Picked off the §22 backlog as the next app: highest-priority open candidate
+(P2) and the lightest — one container, no Postgres/Redis.
+
+`apps/docuseal/`:
+- `docker-compose.yml` — `docuseal/docuseal:latest` (Ruby 4.0.5 / Alpine),
+  `${DOCUSEAL_PORT:-10150}:3000`, `./data:/data` (SQLite `docuseal.sqlite`,
+  the auto-generated `SECRET_KEY_BASE`, and uploaded documents all live
+  there — DocuSeal defaults to SQLite when `DATABASE_URL` is unset, so no DB
+  sidecar and nothing for the `backup:` rule to cover). `mem_limit: 512m`.
+  Healthcheck: BusyBox `wget` on `http://127.0.0.1:3000/up` (Rails'
+  `Rails::HealthController`) — `127.0.0.1` not `localhost` to dodge the ::1
+  resolution trap it-tools hit; fallback noted in the file if a later image
+  drops the route.
+- `.env.example` — just `DOCUSEAL_PORT`; `DOCUSEAL_HOST` / `DOCUSEAL_FORCE_SSL`
+  are exposure-managed and stay blank.
+
+`services.ts` entry (after `it-tools`): Productivity, `icon: 'signature'`,
+`healthCheck` http `:10150/up`, `exposureEnvKeys.host: ['DOCUSEAL_HOST',
+'DOCUSEAL_FORCE_SSL']`. Both take the bare hostname — `HOST` builds DocuSeal's
+absolute signing URLs / email links, `FORCE_SSL` (non-empty ⇒ force TLS +
+canonical host) makes it issue `https://` links and secure cookies while
+trusting NPM's `X-Forwarded-Proto`. Blank off-exposure ⇒ plain HTTP on the LAN
+port. No `oidcClient`: DocuSeal has no OIDC and no switch to hide its own login
+form, so Authelia is the outer gate only and its first-run admin account
+stays (docs/app-credentials.md "Wizard" table). Auto-exposure (§331) picks it
+up with no extra wiring.
+
+Frontend: `signature` → ✍️ in `serviceIcon()`.
+
+Docs: rows in `ports.md` (`10150`, slotted after dozzle — the scheme's
+alpha-in-tens is already approximate), `app-credentials.md` (Wizard table),
+`licences.md` (DocuSeal **AGPL-3.0**, clean run-stock/client-operated; plus a
+`ruby:4.0.5-alpine` base-image row).
+
+648 backend tests green (registry-wide `services.test.ts` checks — homepage
+labels, DB-backup coverage — pass with the new entry), frontend 50 green,
+`docker compose config` valid. Minor bump → **0.63.0**. Live-verify after
+the deploy: start it, confirm `healthy` + `/up` 200 + `docuseal.<domain>`
+serves the setup page behind Authelia.

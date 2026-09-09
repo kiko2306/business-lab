@@ -48,6 +48,7 @@ operate within, listed again at the end.
 | ClamAV | GPL-2.0 | ✅ Clean | internal use |
 | Code Server | MIT | ✅ Clean | VS Code OSS build |
 | CrowdSec | MIT | ✅ Clean | Cloudflare bouncer MIT; NPM Lua bouncer MIT, see vendored code below |
+| DocuSeal (`docuseal/docuseal`) | **AGPL-3.0** | ✅ Clean | stock unmodified, SQLite single container. Community edition; the paid "DocuSeal Pro" is a separate image we don't run. AGPL obligation falls on the client operating the box, not on Business Lab — same position as Immich / Mealie / NocoDB. `ruby:4.0.5-alpine` base rowed below |
 | Dozzle | MIT | ✅ Clean | |
 | Guacamole | Apache-2.0 | ✅ Clean | incl. bundled `guacamole-auth-header` extension, same licence |
 | Home Assistant | Apache-2.0 | ✅ Clean | |
@@ -90,6 +91,7 @@ operate within, listed again at the end.
 | mariadb:latest (ITFlow), lscr.io/linuxserver/mariadb:latest (BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | not standardisable on MariaDB — its JSON column type breaks NPM's own migrations (§210.1) |
 | valkey:9-alpine (Immich, Paperless) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL). |
+| ruby:4.0.5-alpine (DocuSeal) | Ruby License / BSD-2-Clause (dual); OpenSSL-linked | ✅ Clean | language runtime base; permissive, no restriction on internal use. Alpine base rowed below |
 | alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |
 | LinuxServer.io images (BookStack, Code Server, MariaDB, Speedtest) | image build scripts GPL-3.0; bundled apps keep their own licence | ✅ Clean | GPL applies to the packaging scripts, adds no restriction on running the app |

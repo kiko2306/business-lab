@@ -555,6 +555,29 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // Fully static SPA — no backend, no Host validation, no login. Authelia
     // is the only gate; no exposure env needed.
   },
+  'docuseal': {
+    name: 'docuseal',
+    label: 'DocuSeal',
+    description: 'Document signing and fillable PDF forms',
+    icon: 'signature',
+    category: 'Productivity',
+    composePath: 'apps/docuseal/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:10150/up',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // DocuSeal has no OIDC and no way to hide its own login form, so Authelia
+    // is the outer gate and DocuSeal keeps its own first-run admin account
+    // (docs/app-credentials.md). HOST + FORCE_SSL must follow the public
+    // hostname once exposed — DocuSeal builds absolute signing URLs and
+    // secure cookies from them; both are bare-hostname values, so `host`.
+    exposureEnvKeys: {
+      host: ['DOCUSEAL_HOST', 'DOCUSEAL_FORCE_SSL'],
+    },
+  },
   'miniflux': {
     backup: { engine: 'postgres', service: 'miniflux-db' },
     name: 'miniflux',
