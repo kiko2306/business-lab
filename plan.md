@@ -21975,3 +21975,16 @@ Phase A is done bar one @mat call: `docker image prune -af` would reclaim
 ~11 GB more, but that's images for currently-stopped apps and a re-pull cost
 if one is later started — left as a deliberate decision, not run blind.
 Host after: RAM 7.5 GiB used / 7.3 GiB available, swap 1.2 GiB.
+
+## 309. §300 Phase A closed — `docker image prune -af` (2026-09-09)
+
+@mat's call to reclaim it. `docker image prune -af` on `home-srv-01`:
+**18.2 GB freed**, Docker image store 61.6 → 43.4 GB, now 0 reclaimable
+(every image maps to a running container). Untagged casualties are images for
+stopped/never-run apps and old sidecar tags (`redis:7-alpine`,
+`postgres:15-alpine`, `alpine:latest`, `mikefarah/yq`, …) — they re-pull if
+one of those apps is started. Stack re-checked: 67 running, none unhealthy,
+RAM unchanged (disk-only op). `/home` now 48 GB used / 304 GB free.
+
+Phase A is done. §300 has only Phase D open (the ClamAV on-access-vs-scheduled
+question). Session disk total: ~40 GB reclaimed across §301f + §308 + §309.
