@@ -214,14 +214,22 @@ passing, unless it is genuinely part of the change at hand.
   source-available (n8n's Sustainable Use License, RSAL/SSPL), or carries a
   non-software ToS (WhatsApp). If a candidate app's licence fails that test, it
   does not go in.
+- **Exposure is automatic (`plan.md` §331).** Every app `getExposability()`
+  allows (has an HTTP port, not `lanOnly`/`overlayOnly`) is exposed behind
+  Authelia — there is no per-app toggle and no `PUT …/exposure` route.
+  `ensureAutoExposure()` keeps each `service_exposure` row in step on every
+  start and in the ~6 h reconciler sweep; the `enabled` column is set from
+  exposability, never by a user. `lanOnly` (Samba) and `overlayOnly`
+  (nginx-proxy-manager) stay off the tunnel. The Cloudflare token + tunnel
+  provisioning config lives on the **Settings** page (`<app-network-settings>`).
 - **A running, publicly exposed app shows up on the Home Page.** The Home Page
   is itself public at the bare domain (`plan.md` §111), so the dashboard owns
   its service list: `backend/src/services/homepageConfig.ts` generates
   `apps/home-page/data/services.yaml` from the registry, each app's live
   `service_exposure` row, and the `homepage.*` compose labels — a tile per app
   that is **both running and exposed**, linking to `https://<hostname>`, not
-  `localhost`. Label auto-discovery is disabled. An app with no exposure has
-  no tile (`plan.md` §112.3). The `homepage.*` labels stay **mandatory** as
+  `localhost`. Label auto-discovery is disabled. A non-exposable app (no HTTP
+  port, `lanOnly`, `overlayOnly`) has no tile (`plan.md` §112.3). The `homepage.*` labels stay **mandatory** as
   the source of name/group/icon/description: a compose file carries
   `homepage.group`, `homepage.name`, `homepage.icon`, `homepage.description`
   (and `homepage.href` for a human reading the file — the generator ignores

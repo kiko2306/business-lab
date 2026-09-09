@@ -173,12 +173,12 @@ look like unrelated bugs:
 - Start it from the dashboard.
 - Set any config it needs (the dashboard pre-fills generated secrets — just
   save).
-- Turn on **Publicly expose this service**. Authelia protection is applied
-  automatically — there's nothing to toggle, except for Home Page, which
-  stays public by design.
 
-Exposure provisioning creates the NPM proxy host, the tunnel ingress rule and
-the DNS record automatically. Turning exposure off removes all three.
+That's it — every app that can be exposed (has an HTTP port, isn't LAN-only
+like Samba or overlay-only like the NPM admin UI) gets a public
+`<name>.<domain>` hostname behind Authelia on that start. There is no toggle.
+Provisioning creates the NPM proxy host, the tunnel ingress rule and the DNS
+record automatically; Home Page stays public by design.
 
 ## If something is not reachable
 

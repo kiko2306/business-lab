@@ -76,9 +76,10 @@ secret that's already set, and never reinstalls Docker if it's already
 there.
 
 Open the printed dashboard URL and complete `/setup` to create the first
-admin account. From there, every other configuration step — per-app secrets,
-enabling public exposure — is done from the dashboard itself; no more manual
-`.env` editing is required for the core app.
+admin account. From there, per-app secrets are entered in the dashboard; no
+more manual `.env` editing is required for the core app. Every app that can be
+exposed is published behind Authelia automatically on its next start — there
+is no per-app exposure step.
 
 <details>
 <summary>Manual setup (if you'd rather not run the script)</summary>
@@ -292,28 +293,6 @@ below.
       Settings" pattern) only get built if a real deployment actually wants
       a destination that is neither a mount nor S3.
 ### Exposure and platform
-
-**Auto-expose every exposable app — drop the per-app toggle (§331).** Run as
-a batch: slices 1–3 together, then 4, then 5.
-
-- [ ] **1. Backend: auto-provision every exposable app** (§331) —
-      `ensureAutoExposure(name)` in `exposure.ts`, called from `startService`
-      and the reconciler/boot sweep. Exposable → row `enabled=true` +
-      provision; not-exposable → teardown + `enabled=false`.
-- [ ] **2. Backend: remove the per-app exposure write API** (§331) — delete
-      `PUT/GET /api/services/:name/exposure`, `POST …/exposure/verify`,
-      `upsertServiceExposureConfig`, the `serviceExposureUpdate` schema, and
-      the `apps:expose` capability. Keep `deprovisionServiceExposure`
-      (internal) and `/status`'s `exposedHostname`.
-- [ ] **3. Frontend: strip the exposure toggle from the service card** (§331)
-      — remove the checkbox + save/verify buttons + their methods; keep the
-      read-only hostname + status. Drop `apps:expose` from `capabilities.ts`.
-- [ ] **4. Frontend: fold CF/tunnel config into Settings, delete `/exposure`**
-      (§331) — move the Cloudflare-token + provisioning forms onto Settings;
-      remove the page, route and nav entry. Backend settings routes unchanged.
-- [ ] **5. Docs** (§331) — `docs/webmaster.md`, `README.md`, `CLAUDE.md`
-      Conventions, `docs/first-run.md`, `docs/app-credentials.md`: every app
-      is exposed automatically; tunnel/token setup lives in Settings.
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't

@@ -22943,3 +22943,27 @@ two infra panels isn't worth it.
 
 `/api/settings/*` routes and `settings.service.ts` methods untouched. Frontend
 50 tests + build clean. Patch → 0.62.3.
+
+## 336. §331 slice 5 — docs for auto-exposure (2026-09-09)
+
+Docs-only, closing §331.
+
+- `CLAUDE.md` Conventions — new bullet: exposure is automatic, no toggle, no
+  `PUT …/exposure`; `ensureAutoExposure` keeps `service_exposure.enabled` in
+  step from `getExposability`; `lanOnly`/`overlayOnly` stay off the tunnel;
+  CF token + tunnel config on the Settings page. Home Page bullet reworded
+  ("a non-exposable app has no tile").
+- `docs/it-admin.md`, `docs/first-run.md` — the "turn on Publicly expose this
+  service" step is gone; every exposable app is published on its next start.
+- `docs/webmaster.md` — the DNS/ingress paragraph reworded to "created
+  automatically for every exposable app"; the "OnlyOffice: expose it, or keep
+  Nextcloud LAN-only" decision table dropped (OnlyOffice is always exposed
+  now), keeping only the "why IP-restriction isn't needed" rationale.
+- `README.md` — quick-start note; the §331 TODO block removed (all five slices
+  landed).
+- `docs/app-credentials.md` — "claim it before exposing it" → "before
+  inviting other Authelia users" (an app is exposed the moment it starts, but
+  behind Authelia); dropped the stale "turning exposure off removes
+  immich.json" clause.
+
+No code, no version bump. §331 complete: exposure is automatic end to end.

@@ -8,7 +8,7 @@ Three kinds of app, and the difference matters:
 | | Meaning |
 |---|---|
 | **Generated** | The dashboard generated a random secret. Read it in the app's config panel. Nothing to choose. |
-| **Wizard** | The app asks you to create an account on first visit. **Whoever opens it first owns it** — do that before exposing it publicly. |
+| **Wizard** | The app asks you to create an account on first visit. **Whoever opens it first owns it** — every app is exposed automatically behind Authelia, so open it yourself before you invite other Authelia users. |
 | **Fixed default** | Ships with a published, well-known credential. **Change it immediately.** |
 
 > **Open a Wizard app privately first.** On the LAN or over NetBird, not after
@@ -30,7 +30,7 @@ that, each admin can add a TOTP second factor to their own login from
 |---|---|---|
 | **Nginx Proxy Manager** | `admin@example.com` / `changeme` | Forces a change on first login. Do this **before** exposing anything — it controls all reverse proxying and holds the certificates. |
 | **Pi-hole** | password = `PIHOLE_WEB_PASSWORD` in its config | Ships as `change-me`; set a real value in the dashboard before starting. |
-| **Homebox** | first account you register owns it | Registration is open until you turn `HOMEBOX_ALLOW_REGISTRATION` off — claim it before exposing it. Once exposed, an Authelia OIDC login appears (the dashboard wires the client automatically — §270). After signing in through it once, flip **Configuration → `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN`** to false to drop Homebox's own username/password form and leave Authelia as the only gate. |
+| **Homebox** | first account you register owns it | Registration is open until you turn `HOMEBOX_ALLOW_REGISTRATION` off — claim it before inviting other Authelia users. Once exposed, an Authelia OIDC login appears (the dashboard wires the client automatically — §270). After signing in through it once, flip **Configuration → `HBOX_OPTIONS_ALLOW_LOCAL_LOGIN`** to false to drop Homebox's own username/password form and leave Authelia as the only gate. |
 | **Guacamole** | `guacadmin` / `GUACAMOLE_ADMIN_PASSWORD` (generated, hidden) | Ships as `guacadmin`/`guacadmin`; the dashboard rotates that password to a generated one over Guacamole's own REST API the first time it logs in successfully after a start, so the shipped default stops working — no human step. Its Postgres password is a separate generated secret, unrelated to this. |
 
 ## Generated — read the value in the dashboard
@@ -49,13 +49,13 @@ once and never displayed again; rotate them there if you need a new one.
 
 ## Wizard — you create the account
 
-Open these privately and claim them before exposing.
+Every app is exposed behind Authelia automatically — claim these yourself before inviting other Authelia users.
 
 | App | First-run |
 |---|---|
 | **Authelia** | The SSO account itself. Managed from the dashboard (Authelia is the one app whose users the dashboard edits directly). |
 | **Home Assistant** | Onboarding wizard creates the owner account. HACS is installed automatically; it needs a one-time GitHub authorization — see the note below. |
-| **Immich** | First registered user becomes admin. Once exposed, the dashboard writes a managed `data/config/immich.json` wiring Authelia OIDC (§270/§275) and an "Authelia" button appears on the login page. **While that file is present Immich's admin *Settings* UI is read-only and any non-OIDC setting you'd changed there reverts to Immich's default** — turning exposure off removes the file and restores UI control. After one Authelia sign-in, flip **Configuration → `IMMICH_PASSWORD_LOGIN_ENABLED`** to false to drop Immich's own email/password form. |
+| **Immich** | First registered user becomes admin. Once exposed, the dashboard writes a managed `data/config/immich.json` wiring Authelia OIDC (§270/§275) and an "Authelia" button appears on the login page. **While that file is present Immich's admin *Settings* UI is read-only and any non-OIDC setting you'd changed there reverts to Immich's default** (the file is present whenever Immich is running — every app is exposed automatically). After one Authelia sign-in, flip **Configuration → `IMMICH_PASSWORD_LOGIN_ENABLED`** to false to drop Immich's own email/password form. |
 | **Jellyfin** | Setup wizard creates the admin user. |
 | **Navidrome** | First visit creates the admin account. |
 | **Uptime Kuma** | First visit creates the admin account. |
