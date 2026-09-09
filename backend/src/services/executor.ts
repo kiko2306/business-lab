@@ -30,6 +30,7 @@ import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { applyImmichConfig } from './immichConfig';
+import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
@@ -264,6 +265,11 @@ async function composeUpWithManagedConfig(
   // at the stored Claude key (§238). Also after `up` — REST against the
   // running webapp. No-op for every other service.
   await syncMealieAiProvider(serviceName);
+  // Immich: create the first (admin) account on an exposed start so Authelia
+  // OIDC has an admin to link to — Immich won't provision the first account
+  // via OAuth (§329). REST against the running API, so after `up`. No-op
+  // otherwise.
+  await reconcileImmichFirstAdmin(serviceName);
 
   return result;
 }

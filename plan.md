@@ -22640,3 +22640,30 @@ so the rename affects nothing else. Two `mealieClient` helpers added
 Note this only bit because tx-home-utils.com's Authelia user is literally
 `admin`; a deployment whose webmaster is `firstname` never hits it. The rename
 closes the edge case regardless.
+
+## 329. Immich's first admin is created automatically on an exposed start (2026-09-09)
+
+Last of the §326 follow-ups. Immich completes the Authelia OAuth token exchange
+fine, then refuses to provision the account — "The first registered account
+must the administrator" — because Immich won't make the very first account via
+OAuth. So the dashboard makes it.
+
+- `services.ts` — `IMMICH_ADMIN_PASSWORD` added to immich `hiddenGeneratedSecrets`
+  (generated on first start like `MEALIE_ADMIN_PASSWORD` / `GUACAMOLE_ADMIN_PASSWORD`;
+  not read by the container). `.env.example` documents it.
+- `immichClient.ts` — `immichPing` + `immichAdminSignUp` (`POST /api/auth/admin-sign-up`,
+  unauthenticated, only works while Immich has no admin; a later 400 "already
+  has an admin" is the idempotent success case).
+- `immichAdminBootstrap.ts` — `reconcileImmichFirstAdmin`, run after `docker
+  compose up` on every Immich start (executor, next to `syncMealieAiProvider`).
+  No-op unless Immich is installed **and exposed**. Polls `ping` for up to 60s,
+  then signs up an admin with **`getAutheliaAdminUser().email`** and the
+  generated password — so the webmaster's own OIDC login links to this account
+  by email instead of creating a second one. Skips with a warning if there's no
+  Authelia admin email yet (i.e. `/setup` predates §327).
+- 6 tests, 648 pass, tsc clean. Minor bump 0.60.1 → 0.61.0.
+
+Verified by hand against the live box earlier in the session (§326): creating
+the Immich admin as `admin@example.com` then re-running the OIDC flow returned
+`201` with an access token and `isAdmin: true`. This change just automates that
+one-time step.

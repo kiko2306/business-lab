@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.61.0] — 2026-09-09
+
+### Added
+
+- Immich's first (admin) account is created automatically on an exposed start, using the Authelia admin's email, so single sign-on links to it instead of failing with "the first registered account must be the administrator"
+
 ## [0.60.1] — 2026-09-09
 
 ### Fixed
