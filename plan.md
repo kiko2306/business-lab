@@ -22977,3 +22977,33 @@ host proxying HTTP at a non-HTTP port (§324.2 flagged the same thing when it
 was skipped by hand). Added `lanOnly: true` to its registry entry — the
 `getExposability` gate now returns false for it. Test updated (`lanOnly` set is
 now `['clamav', 'samba']`). Patch → 0.62.4.
+
+## 338. §331 follow-up — auto-exposure must regenerate Authelia's rules (2026-09-09)
+
+Verifying §331 on the live box: started `navidrome` (an exposable app with no
+`service_exposure` row), `ensureAutoExposure` created the row and
+`provisionServiceIfEnabled` published `navidrome.tx-home-utils.com` — but the
+hostname 403'd for everyone. Authelia had no `access_control` rule for it, so
+`default_policy: deny` won.
+
+Cause: slice 2 deleted the `PUT …/exposure` route, and that route was the
+**only** caller of `syncAutheliaAccessControlSafe` / `syncAutheliaOidcClientsSafe`.
+Nothing regenerated Authelia's rules on an exposure change any more.
+
+Fix:
+
+- `ensureAutoExposure` returns `boolean` — `true` when it created, enabled or
+  tore down a row.
+- `executor.ts` — after `provisionServiceIfEnabled` at both start/update sites,
+  if `ensureAutoExposure` returned `true`, run both `syncAuthelia*Safe`
+  (`trigger: 'auto_exposure'`). This is the fast path for a just-exposed app.
+- `exposureReconciler.ts` — runs both syncs **every** pass now (not gated), as
+  the drift backstop: an app auto-exposed on a start that didn't sync, or a
+  hand-edited `configuration.yml`, is healed within one 6 h cycle.
+- `index.ts` — runs both once on boot (`trigger: 'boot'`), so a fresh deploy
+  has correct rules before the first request rather than 10 min later when the
+  reconciler's initial pass fires.
+
+All idempotent — `syncAutheliaAccessControl` only writes + restarts Authelia
+when the rendered block actually moved. Backend 648 tests (+1 reconciler),
+tsc clean. Patch → 0.62.5.

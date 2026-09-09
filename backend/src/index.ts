@@ -34,6 +34,8 @@ import { initWebSocket, sseHandler } from './services/realtime';
 import { startupLogsHandler } from './services/serviceLogs';
 import { startBackupScheduler } from './services/backupScheduler';
 import { reconcileRemovedServices } from './services/exposure';
+import { syncAutheliaAccessControlSafe } from './services/autheliaAccessControl';
+import { syncAutheliaOidcClientsSafe } from './services/autheliaOidcClients';
 import { reconcileRemovedAppProjects } from './services/removedAppCleanup';
 import { startExposureReconciler } from './services/exposureReconciler';
 import { regenerateHomepageServices } from './services/homepageConfig';
@@ -231,6 +233,13 @@ startBackupScheduler();
 reconcileRemovedServices().catch((err: Error) => {
   console.error('Unable to reconcile exposure for removed services:', err.message);
 });
+// Auto-exposure (§331) can create a service_exposure row on a start that
+// didn't itself regenerate Authelia's rules (or the rules were hand-edited).
+// Re-assert them once on boot so every enabled hostname has its access_control
+// rule + OIDC client before the first request — idempotent, restarts Authelia
+// only if the block moved.
+syncAutheliaAccessControlSafe('boot', null).catch(() => {});
+syncAutheliaOidcClientsSafe('boot', null).catch(() => {});
 // Exposure is only half of it: a removed app's containers keep running as an
 // unmanaged Compose project and its gitignored apps/<name>/data + .env stay on
 // disk. Tear both down once on boot.

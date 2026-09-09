@@ -26,6 +26,8 @@ import { SERVICES } from '../config/services';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { ensureAutoExposure, getServiceExposureRow, provisionServiceIfEnabled } from './exposure';
 import { regenerateHomepageServices } from './homepageConfig';
+import { syncAutheliaAccessControlSafe } from './autheliaAccessControl';
+import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import logger from '../utils/logger';
 
 // Exposure drifts only when NPM/Cloudflare is hand-edited or a token rotates,
@@ -101,6 +103,14 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
     }
     await new Promise((resolve) => setTimeout(resolve, BETWEEN_SERVICES_MS));
   }
+
+  // Re-assert the Authelia access-control rules + OIDC clients against the
+  // current enabled-exposure set every pass — this is the backstop that heals
+  // drift (a hand-edited configuration.yml, or an app auto-exposed on a start
+  // that didn't itself run the sync). Idempotent; restarts Authelia only if
+  // the rendered block actually moved.
+  await syncAutheliaAccessControlSafe('exposure_reconcile', SYSTEM_USER_ID);
+  await syncAutheliaOidcClientsSafe('exposure_reconcile', SYSTEM_USER_ID);
 
   // Re-provisioning can flip a hostname from failed to provisioned, which is
   // the point its Home Page tile becomes linkable.

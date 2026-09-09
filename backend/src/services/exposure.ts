@@ -92,11 +92,13 @@ export async function getServiceExposureRow(serviceName: string): Promise<Servic
  *
  * Secondary keys (`<name>:<suffix>`) ride along inside provisionServiceIfEnabled
  * from the parent's `additionalExposures`, so they're skipped here. Idempotent;
- * called on every start and by the reconciler sweep. Never throws.
+ * called on every start and by the reconciler sweep. Never throws. Returns
+ * `true` when it created, enabled or tore down a row — the caller then
+ * regenerates the Authelia access-control rules + OIDC clients.
  */
-export async function ensureAutoExposure(serviceName: string, userId: number): Promise<void> {
+export async function ensureAutoExposure(serviceName: string, userId: number): Promise<boolean> {
   if (serviceName.includes(':')) {
-    return;
+    return false;
   }
   try {
     const { exposable } = getExposability(serviceName);
@@ -113,8 +115,9 @@ export async function ensureAutoExposure(serviceName: string, userId: number): P
            DO UPDATE SET enabled = true, hostname = EXCLUDED.hostname, updated_at = NOW()`,
           [serviceName, hostname, UPSTREAM_SCHEME, ALLOW_WEBSOCKET_UPGRADE]
         );
+        return true;
       }
-      return;
+      return false;
     }
 
     if (row?.enabled) {
@@ -125,9 +128,12 @@ export async function ensureAutoExposure(serviceName: string, userId: number): P
         [serviceName]
       );
       logger.info(`Auto-exposure: ${serviceName} is no longer exposable — exposure torn down`);
+      return true;
     }
+    return false;
   } catch (error) {
     logger.error(`Auto-exposure reconcile failed for ${serviceName}`, { error: (error as Error).message });
+    return false;
   }
 }
 

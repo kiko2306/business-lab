@@ -29,6 +29,8 @@ import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperles
 import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
+import { syncAutheliaAccessControlSafe } from './autheliaAccessControl';
+import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import { applyImmichConfig } from './immichConfig';
 import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { applyVikunjaConfig } from './vikunjaConfig';
@@ -375,11 +377,20 @@ export async function startService(serviceName: string, userId: number): Promise
 
     // Auto-exposure (§331): every exposable app is exposed, no opt-in — keep
     // the row in step with getExposability() before provisioning it.
-    await ensureAutoExposure(serviceName, userId);
+    const exposureChanged = await ensureAutoExposure(serviceName, userId);
     const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error: Error) => {
       logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
       return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };
     });
+    // A row that was just created, enabled or torn down changes the set of
+    // Authelia-gated hostnames and OIDC clients — regenerate both (idempotent,
+    // restarts Authelia only if the rules actually moved). Without this an
+    // auto-exposed app gets an NPM host + DNS but no access_control rule, so
+    // Authelia's default-deny 403s everyone (§331 follow-up).
+    if (exposureChanged) {
+      await syncAutheliaAccessControlSafe('auto_exposure', userId);
+      await syncAutheliaOidcClientsSafe('auto_exposure', userId);
+    }
 
     // A newly-started (and exposed) app gets a Home Page tile; a newly-exposed
     // one changes its link. Regenerate after provisioning so the tile reflects
@@ -514,11 +525,20 @@ export async function pullAndRecreateService(serviceName: string, userId: number
 
     // Auto-exposure (§331): every exposable app is exposed, no opt-in — keep
     // the row in step with getExposability() before provisioning it.
-    await ensureAutoExposure(serviceName, userId);
+    const exposureChanged = await ensureAutoExposure(serviceName, userId);
     const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error: Error) => {
       logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
       return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };
     });
+    // A row that was just created, enabled or torn down changes the set of
+    // Authelia-gated hostnames and OIDC clients — regenerate both (idempotent,
+    // restarts Authelia only if the rules actually moved). Without this an
+    // auto-exposed app gets an NPM host + DNS but no access_control rule, so
+    // Authelia's default-deny 403s everyone (§331 follow-up).
+    if (exposureChanged) {
+      await syncAutheliaAccessControlSafe('auto_exposure', userId);
+      await syncAutheliaOidcClientsSafe('auto_exposure', userId);
+    }
 
     return {
       success: true,

@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.62.5] — 2026-09-09
+
+### Fixed
+
+- Auto-exposure now regenerates Authelia's access-control rules + OIDC clients — a newly auto-exposed app was getting an NPM host + DNS but no Authelia rule, so default-deny 403'd everyone (§331 follow-up)
+
 ## [0.62.4] — 2026-09-09
 
 ### Fixed

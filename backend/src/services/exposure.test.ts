@@ -421,7 +421,7 @@ describe('ensureAutoExposure (§331)', () => {
     mockedGetExposureConfig.mockResolvedValue(globalConfig);
     mockedQuery.mockResolvedValueOnce({ rows: [] } as never); // getServiceExposureRow → no row
 
-    await ensureAutoExposure('paperless', 0);
+    expect(await ensureAutoExposure('paperless', 0)).toBe(true);
 
     const upsert = mockedQuery.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO service_exposure'));
     expect(upsert).toBeDefined();
@@ -435,7 +435,7 @@ describe('ensureAutoExposure (§331)', () => {
       rows: [exposureRow({ enabled: true, hostname: 'paperless.example.com' })],
     } as never);
 
-    await ensureAutoExposure('paperless', 0);
+    expect(await ensureAutoExposure('paperless', 0)).toBe(false);
 
     expect(mockedQuery.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO service_exposure'))).toBe(false);
   });
@@ -447,7 +447,7 @@ describe('ensureAutoExposure (§331)', () => {
     mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ service_name: 'nginx-proxy-manager', enabled: true })] } as never);
     mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ service_name: 'nginx-proxy-manager', enabled: true })] } as never);
 
-    await ensureAutoExposure('nginx-proxy-manager', 0);
+    expect(await ensureAutoExposure('nginx-proxy-manager', 0)).toBe(true);
 
     const disable = mockedQuery.mock.calls.find(([sql]) => String(sql).includes('SET enabled = false'));
     expect(disable).toBeDefined();
@@ -455,7 +455,7 @@ describe('ensureAutoExposure (§331)', () => {
   });
 
   it('ignores secondary exposure keys', async () => {
-    await ensureAutoExposure('netbird-vpn:api', 0);
+    expect(await ensureAutoExposure('netbird-vpn:api', 0)).toBe(false);
     expect(mockedQuery).not.toHaveBeenCalled();
   });
 });

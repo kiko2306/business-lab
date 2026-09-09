@@ -9,6 +9,10 @@ const exposure = vi.hoisted(() => ({
   getServiceExposureRow: vi.fn(),
 }));
 const homepage = vi.hoisted(() => ({ regenerateHomepageServices: vi.fn(async () => {}) }));
+const authelia = vi.hoisted(() => ({
+  syncAutheliaAccessControlSafe: vi.fn(async () => null),
+  syncAutheliaOidcClientsSafe: vi.fn(async () => null),
+}));
 const registry = vi.hoisted(() => ({ SERVICES: {} as Record<string, unknown> }));
 
 vi.mock('../utils/database', () => db);
@@ -16,6 +20,8 @@ vi.mock('../utils/audit', () => audit);
 vi.mock('../utils/exposureSettings', () => exposureSettings);
 vi.mock('./exposure', () => exposure);
 vi.mock('./homepageConfig', () => homepage);
+vi.mock('./autheliaAccessControl', () => ({ syncAutheliaAccessControlSafe: authelia.syncAutheliaAccessControlSafe }));
+vi.mock('./autheliaOidcClients', () => ({ syncAutheliaOidcClientsSafe: authelia.syncAutheliaOidcClientsSafe }));
 vi.mock('../config/services', () => registry);
 vi.mock('../utils/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
@@ -96,6 +102,12 @@ describe('reconcileExposureDrift', () => {
     await reconcileExposureDrift();
     expect(exposure.ensureAutoExposure.mock.calls.map((c) => c[0])).not.toContain('nextcloud:api');
     expect(exposure.provisionServiceIfEnabled.mock.calls.map((c) => c[0])).not.toContain('nextcloud:api');
+  });
+
+  it('re-asserts the Authelia rules + OIDC clients every pass (drift backstop)', async () => {
+    await reconcileExposureDrift();
+    expect(authelia.syncAutheliaAccessControlSafe).toHaveBeenCalledOnce();
+    expect(authelia.syncAutheliaOidcClientsSafe).toHaveBeenCalledOnce();
   });
 
   it('flags a service whose exposure will not come back, with an audit row', async () => {
