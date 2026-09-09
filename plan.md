@@ -22893,3 +22893,27 @@ With exposure automatic (§332) the write endpoints have no caller:
 
 `deprovisionServiceExposure` stays exported — `ensureAutoExposure` and
 `reconcileRemovedServices` use it. Backend 647 tests, tsc clean. Patch → 0.62.1.
+
+## 334. §331 slice 3 — strip the per-app exposure toggle from the UI (2026-09-09)
+
+- **service-card modal** — the whole "Exposure settings" section gone (the
+  "Publicly expose this service" switch, Save / Re-verify buttons, and the
+  `exposure*` fields + `loadExposure`/`saveExposure`/`verifyExposure` methods).
+  The card face already links the public hostname (`service.exposedHostname`
+  from `/status`), so there was nothing read-only left worth keeping in the
+  modal.
+- **`GET /api/services/:name/exposure`** removed (its only caller was that
+  section), with the now-orphaned `getExposability`/`getServiceExposureRow`
+  imports from `routes/services.ts`.
+- **`operations.service.ts` / `models.ts`** — `getServiceExposure`,
+  `updateServiceExposure`, `verifyServiceExposure` and the
+  `ServiceExposureConfig` / `Update` / `VerifyResult` interfaces deleted.
+- **`apps:expose` capability** removed from `auth/capabilities.ts` (backend),
+  the `it_admin` seed in `database.ts`, and the frontend `capabilities.ts`
+  (type union, `ALL_CAPABILITIES`, the `it_admin` default, and the
+  "App exposure toggle" label). Existing `user_capabilities` rows for it are
+  inert — `effectiveCapabilities` filters to the known set — so no migration.
+
+Frontend 50 tests + build, backend 647 + tsc, all clean. Patch → 0.62.2.
+Batch §331 slices 1–3 complete; slice 4 (fold CF/tunnel config into Settings,
+delete the `/exposure` page) and slice 5 (docs) next.

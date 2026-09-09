@@ -127,7 +127,7 @@ export async function ensureRoleModelReshape(): Promise<void> {
     SELECT r.user_id, c.capability
     FROM user_roles r
     CROSS JOIN (VALUES
-      ('apps:control'), ('apps:config'), ('apps:expose'),
+      ('apps:control'), ('apps:config'),
       ('backups:manage'), ('settings:manage'), ('audit:view')
     ) AS c(capability)
     WHERE r.role = 'it_admin'

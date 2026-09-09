@@ -16,7 +16,6 @@ import { Role } from './models';
 export type Capability =
   | 'apps:control'
   | 'apps:config'
-  | 'apps:expose'
   | 'exposure:settings'
   | 'backups:manage'
   | 'settings:manage'
@@ -27,7 +26,6 @@ export type Capability =
 export const ALL_CAPABILITIES: Capability[] = [
   'apps:control',
   'apps:config',
-  'apps:expose',
   'exposure:settings',
   'backups:manage',
   'settings:manage',
@@ -43,7 +41,7 @@ const ROLE_CAPABILITIES: Record<string, Capability[]> = {
   // Legacy names — a session persisted before §152 still carries these until
   // its access token next refreshes. Remove a release after §152 ships.
   owner: ALL_CAPABILITIES,
-  it_admin: ['apps:control', 'apps:config', 'apps:expose', 'backups:manage', 'settings:manage', 'audit:view'],
+  it_admin: ['apps:control', 'apps:config', 'backups:manage', 'settings:manage', 'audit:view'],
 };
 
 export const ROLE_LABELS: Record<Role, string> = {
@@ -55,7 +53,6 @@ export const ROLE_LABELS: Record<Role, string> = {
 export const CAPABILITY_LABELS: Record<Capability, string> = {
   'apps:control': 'Start / stop apps',
   'apps:config': 'App configuration',
-  'apps:expose': 'App exposure toggle',
   'exposure:settings': 'Exposure settings',
   'backups:manage': 'Backups',
   'settings:manage': 'Settings',

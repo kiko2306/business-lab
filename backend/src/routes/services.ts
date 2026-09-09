@@ -14,7 +14,6 @@ import { createStreamTicket } from '../services/realtime';
 import { getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { clearImagePins, pinnedImages } from '../services/composeOverride';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
-import { getExposability, getServiceExposureRow } from '../services/exposure';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
 import { writeAuditLog } from '../utils/audit';
@@ -412,58 +411,6 @@ router.delete(
   }
 );
 
-/**
- * GET /api/services/:name/exposure
- * Read public exposure provisioning config and status for a service
- */
-router.get(
-  '/:name/exposure',
-  auth,
-  validateParams(schemas.serviceNameParam),
-  validateServiceAllowlist,
-  async (req: Request, res: Response) => {
-    try {
-      // Whether this service can be publicly exposed at all, and why not if
-      // it can't (no published port / `lanOnly` / `overlayOnly`) — see
-      // getExposability, shared with the write-side guard so the two can't
-      // drift. Also used to not surface a stale hostname/error from a row
-      // for a service that was briefly (mis)configured before this existed.
-      const { exposable, reason: exposableReason } = getExposability(req.params.name);
-
-      const row = await getServiceExposureRow(req.params.name);
-      if (!row) {
-        return res.json({
-          enabled: false,
-          exposable,
-          exposableReason,
-          hostname: null,
-          upstreamScheme: 'http',
-          upstreamHost: null,
-          upstreamPort: null,
-          websocket: false,
-          status: 'not_provisioned',
-          lastError: null,
-        });
-      }
-
-      return res.json({
-        enabled: row.enabled,
-        exposable,
-        exposableReason,
-        hostname: exposable ? row.hostname : null,
-        upstreamScheme: row.upstream_scheme,
-        upstreamHost: row.upstream_host,
-        upstreamPort: row.upstream_port,
-        websocket: row.websocket,
-        status: row.status,
-        lastError: exposable ? row.last_error : null,
-      });
-    } catch (error) {
-      logger.error(`Failed to load exposure config: ${req.params.name}`, { error: (error as Error).message });
-      return res.status(500).json({ error: 'Unable to load exposure configuration.' });
-    }
-  }
-);
 
 
 /**

@@ -20,7 +20,6 @@ import {
   ServiceEnvField,
   ServiceEnvStatus,
   ServiceAction,
-  ServiceExposureConfig,
   ServiceOperation,
   ServiceStatus,
   StartupActionEvent,
@@ -61,16 +60,9 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   @Output() actionRequested = new EventEmitter<ServiceAction>();
 
-  // All per-service setup (configuration, exposure, admin account) lives in a
-  // single modal opened from the row, instead of inline expanding panels.
+  // All per-service setup (configuration, admin account) lives in a single
+  // modal opened from the row, instead of inline expanding panels.
   protected settingsModalOpen = false;
-
-  protected exposureLoading = false;
-  protected exposureSaving = false;
-  protected exposureVerifying = false;
-  protected exposure: ServiceExposureConfig | null = null;
-
-  protected exposureEnabled = false;
 
   protected envLoading = false;
   protected envSaving = false;
@@ -146,9 +138,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     this.settingsModalOpen = true;
     if (!this.env) {
       this.loadEnv();
-    }
-    if (!this.exposure) {
-      this.loadExposure();
     }
     if (this.service.adminUserManagementSupported && !this.adminUser) {
       this.loadAdminUser();
@@ -400,53 +389,6 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       : `${dep.label} — ${state}. Needed for this app to work, not to start.`;
   }
 
-  loadExposure(): void {
-    this.exposureLoading = true;
-    this.operations
-      .getServiceExposure(this.service.name)
-      .pipe(finalize(() => (this.exposureLoading = false)))
-      .subscribe({
-        next: (config) => {
-          this.exposure = config;
-          this.exposureEnabled = config.enabled;
-        },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load exposure configuration.')),
-      });
-  }
-
-  saveExposure(): void {
-    this.exposureSaving = true;
-    this.operations
-      .updateServiceExposure(this.service.name, {
-        enabled: this.exposureEnabled,
-      })
-      .pipe(finalize(() => (this.exposureSaving = false)))
-      .subscribe({
-        next: (response) => {
-          this.toast.success(response.message);
-          this.loadExposure();
-        },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save exposure configuration.')),
-      });
-  }
-
-  verifyExposure(): void {
-    this.exposureVerifying = true;
-    this.operations
-      .verifyServiceExposure(this.service.name)
-      .pipe(finalize(() => (this.exposureVerifying = false)))
-      .subscribe({
-        next: (result) => {
-          if (result.success) {
-            this.toast.success(`Exposure verified — reconciled with the live NPM/Cloudflare state.`);
-          } else if (result.warning) {
-            this.toast.error(result.warning);
-          }
-          this.loadExposure();
-        },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to verify exposure configuration.')),
-      });
-  }
 
   loadEnv(): void {
     this.envLoading = true;

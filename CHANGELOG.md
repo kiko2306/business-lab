@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.62.2] — 2026-09-09
+
+### Removed
+
+- The per-app 'Publicly expose this service' toggle from the service-card modal, the `GET /api/services/:name/exposure` endpoint, and the `apps:expose` capability — exposure is automatic (§331 slice 3)
+
 ## [0.62.1] — 2026-09-09
 
 ### Removed

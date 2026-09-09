@@ -20,9 +20,6 @@ import {
   DiscoveredHost,
   HealthStatus,
   ServiceEnvStatus,
-  ServiceExposureConfig,
-  ServiceExposureUpdate,
-  ServiceExposureVerifyResult,
   SelfUpdateCheck,
   SelfUpdateRun,
   SelfUpdateStatus,
@@ -125,21 +122,6 @@ export class OperationsService {
     return this.http.get(`${API_BASE_URL}/services/${serviceName}/backups/${encodeURIComponent(file)}`, {
       responseType: 'blob',
     });
-  }
-
-  getServiceExposure(serviceName: string): Observable<ServiceExposureConfig> {
-    return this.http.get<ServiceExposureConfig>(`${API_BASE_URL}/services/${serviceName}/exposure`);
-  }
-
-  updateServiceExposure(serviceName: string, update: ServiceExposureUpdate): Observable<{ message: string; hostname: string | null }> {
-    return this.http.put<{ message: string; hostname: string | null }>(
-      `${API_BASE_URL}/services/${serviceName}/exposure`,
-      update
-    );
-  }
-
-  verifyServiceExposure(serviceName: string): Observable<ServiceExposureVerifyResult> {
-    return this.http.post<ServiceExposureVerifyResult>(`${API_BASE_URL}/services/${serviceName}/exposure/verify`, {});
   }
 
   getServiceEnv(serviceName: string): Observable<ServiceEnvStatus> {

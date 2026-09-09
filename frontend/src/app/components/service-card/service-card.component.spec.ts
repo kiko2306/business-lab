@@ -5,7 +5,7 @@ import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ToastService } from '../../core/toast.service';
-import { AppBackupEntry, ServiceEnvStatus, ServiceExposureConfig, ServiceStatus } from '../../core/models';
+import { AppBackupEntry, ServiceEnvStatus, ServiceStatus } from '../../core/models';
 
 const service = (name: string, state: ServiceStatus['state'], extra: Partial<ServiceStatus> = {}): ServiceStatus => ({
   name,
@@ -26,7 +26,7 @@ describe('ServiceCardComponent dependencies', () => {
     await TestBed.configureTestingModule({
       imports: [ServiceCardComponent],
       providers: [
-        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceExposure']) },
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
         { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
       ],
@@ -128,7 +128,6 @@ describe('ServiceCardComponent per-app backups', () => {
 
   beforeEach(async () => {
     operations = jasmine.createSpyObj('OperationsService', [
-      'getServiceExposure',
       'getServiceEnv',
       'listAppBackups',
       'createAppBackup',
@@ -137,9 +136,6 @@ describe('ServiceCardComponent per-app backups', () => {
       'downloadAppBackup',
     ]);
     operations.listAppBackups.and.returnValue(of({ items: [] }));
-    operations.getServiceExposure.and.returnValue(
-      of({ enabled: false, exposable: false } as unknown as ServiceExposureConfig)
-    );
     operations.getServiceEnv.and.returnValue(of({ fields: [] } as unknown as ServiceEnvStatus));
     confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
 

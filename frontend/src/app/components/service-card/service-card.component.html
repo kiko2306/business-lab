@@ -245,61 +245,6 @@
         </ng-container>
       </section>
 
-      <!-- Exposure -->
-      <section class="settings-section">
-        <h3 class="settings-section-title">Exposure settings</h3>
-
-        <div *ngIf="exposureLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
-          <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-          Loading…
-        </div>
-
-        <div *ngIf="!exposureLoading && exposure && !exposure.exposable" class="small text-body-secondary mb-0">
-          {{ exposure.exposableReason || "This service has no published port, so it can't be publicly exposed." }}
-        </div>
-
-        <ng-container *ngIf="!exposureLoading && exposure && exposure.exposable">
-          <div class="form-check form-switch mb-2">
-            <input class="form-check-input" type="checkbox" id="exposureEnabled-{{ service.name }}" [(ngModel)]="exposureEnabled" />
-            <label class="form-check-label small" for="exposureEnabled-{{ service.name }}">
-              Publicly expose this service
-            </label>
-          </div>
-
-          <div *ngIf="exposure.hostname" class="small text-body-secondary mb-2">
-            Public hostname:
-            <a [href]="'https://' + exposure.hostname" target="_blank" rel="noopener noreferrer"><code>{{ exposure.hostname }}</code></a>
-            <span class="badge ms-1" [class.text-bg-success]="exposure.status === 'provisioned'" [class.text-bg-secondary]="exposure.status === 'not_provisioned'" [class.text-bg-danger]="exposure.status === 'failed'">
-              {{ exposure.status }}
-            </span>
-          </div>
-          <div *ngIf="exposure.lastError" class="alert alert-danger py-1 px-2 small mb-2">{{ exposure.lastError }}</div>
-
-          <div *ngIf="exposure.upstreamHost && exposure.upstreamPort" class="small text-body-secondary mb-2">
-            Forwarding to <code>{{ exposure.upstreamScheme }}://{{ exposure.upstreamHost }}:{{ exposure.upstreamPort }}</code>
-            <span class="ms-1">(detected automatically)</span>
-          </div>
-
-          <div class="d-flex flex-wrap gap-2 mt-2">
-            <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="exposureSaving" (click)="saveExposure()">
-              <span *ngIf="exposureSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-              Save exposure settings
-            </button>
-            <button
-              *ngIf="exposure.enabled && exposure.hostname"
-              type="button"
-              class="btn btn-outline-secondary btn-sm"
-              [disabled]="exposureVerifying"
-              title="Re-check the live Nginx Proxy Manager and Cloudflare state against what's configured here, and fix it if it has drifted."
-              (click)="verifyExposure()"
-            >
-              <span *ngIf="exposureVerifying" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-              Re-verify
-            </button>
-          </div>
-        </ng-container>
-      </section>
-
       <!-- Backups -->
       <section class="settings-section">
         <h3 class="settings-section-title">Backups</h3>

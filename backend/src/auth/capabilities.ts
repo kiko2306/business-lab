@@ -24,7 +24,6 @@ export type Role = (typeof ROLES)[number];
 export const CAPABILITIES = [
   'apps:control', // start / stop / restart a managed app
   'apps:config', // write a managed app's .env
-  'apps:expose', // toggle a managed app's public exposure
   'exposure:settings', // Cloudflare token, tunnel/zone IDs, NPM credentials
   'backups:manage', // run / restore / schedule backups
   'settings:manage', // timezone, ntfy alerts, mailbox, backup destination
