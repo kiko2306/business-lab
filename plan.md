@@ -21904,3 +21904,17 @@ Machine Learning back off in Immich's admin settings (moot here — no photos).
 **SSH step @mat still needs (flagged per §304):** after the Update-page
 deploy, `docker rm -f immich-immich-machine-learning-1` — `docker compose
 up -d` won't stop a service that's no longer in the file.
+
+## 306. Branch workflow refined: dev by default, main only for deploys (2026-09-09)
+
+Extends §304. The rule is now: **every push that doesn't require a server
+update stays on `dev`**; `dev` → `main` happens **only when a server deploy is
+wanted**, not routinely after each verified commit. `main` is "what the server
+should run", and the test server's checkout **tracks `main`** — it was found on
+`dev` (left there by the §303 B1 SSH deploy) and switched back to `main` (now
+at `b43ac72`, the Phase C commits, staged for @mat's Update-page run).
+
+Practical effect: plan/docs/test-only commits and any not-yet-to-deploy code
+sit on `dev`; the session reports Docker-touching work as "on `dev`, ready to
+merge to `main` when you want to deploy". Saved to agent memory alongside the
+Update-page rule.
