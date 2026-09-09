@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.65.0] — 2026-09-09
+
+### Changed
+
+- NocoDB is exposed directly with its own login (§344) — community NocoDB has no OIDC; the dashboard seeds its super admin from NC_ADMIN_EMAIL (Authelia admin) + a generated complex NC_ADMIN_PASSWORD on boot
+
 ## [0.64.0] — 2026-09-09
 
 ### Changed

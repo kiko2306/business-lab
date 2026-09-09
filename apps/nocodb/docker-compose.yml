@@ -21,6 +21,13 @@ services:
       # rewrites it to the public https:// hostname once exposure is enabled.
       NC_PUBLIC_URL: ${NOCODB_PUBLIC_URL:-http://localhost:8011}
       NC_DISABLE_TELE: ${NOCODB_DISABLE_TELEMETRY:-true}
+      # Super admin, (re-)provisioned from these on every boot (§344). The
+      # dashboard injects NC_ADMIN_EMAIL (the Authelia admin's) at start and
+      # generates NC_ADMIN_PASSWORD into .env — NocoDB has no OIDC in the
+      # community edition, so it's exposed directly with its own login as the
+      # only gate. NocoDB requires both to be set together.
+      NC_ADMIN_EMAIL: ${NOCODB_ADMIN_EMAIL:-}
+      NC_ADMIN_PASSWORD: ${NOCODB_ADMIN_PASSWORD:-}
       TZ: ${TZ:-UTC}
     labels:
       - "homepage.group=Data"

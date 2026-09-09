@@ -12,6 +12,7 @@ import { writeAuditLog } from '../utils/audit';
 import { ensureAutoExposure, provisionServiceIfEnabled } from './exposure';
 import { buildExposureEnvOverrides } from './exposureEnv';
 import { buildMailEnvOverrides } from './mailEnv';
+import { buildAdminSeedEnvOverrides } from './adminSeedEnv';
 import { ensureGeneratedSecrets } from './appEnv';
 import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
@@ -182,6 +183,9 @@ async function composeUpWithManagedConfig(
   // Mail settings are global and injected the same way — one mailbox
   // configured once, inherited by every app that declares mailEnvKeys.
   const mailOverrides = await buildMailEnvOverrides(serviceName);
+  // NocoDB seeds its super admin from NC_ADMIN_EMAIL/PASSWORD on boot (§344) —
+  // supply the email (the Authelia admin's). No-op for every other service.
+  const adminSeedOverrides = await buildAdminSeedEnvOverrides(serviceName);
   await applyExposureConfigFiles(serviceName, appDir);
   await applyCrowdsecConfigFiles(serviceName, appDir);
   // Samba: render the share's smb.conf before the app comes up — load-bearing:
@@ -245,6 +249,7 @@ async function composeUpWithManagedConfig(
   const result = await executeCommand(command, COMPOSE_UP_TIMEOUT_MS, {
     ...(await resolveTimezoneOverride(appDir)),
     ...mailOverrides,
+    ...adminSeedOverrides,
     // Exposure last: if a service somehow named the same var in both, the
     // hostname-derived value is the more specific one.
     ...envOverrides,

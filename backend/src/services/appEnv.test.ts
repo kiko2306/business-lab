@@ -334,4 +334,17 @@ describe('generateSecretFor', () => {
     expect(v).toMatch(/^base64:/);
     expect(Buffer.from(v.slice('base64:'.length), 'base64')).toHaveLength(32);
   });
+
+  it('gives an ADMIN_PASSWORD a complexity-policy-safe password (NocoDB needs upper+digit+special)', () => {
+    for (let i = 0; i < 50; i += 1) {
+      const v = generateSecretFor('NOCODB_ADMIN_PASSWORD');
+      expect(v).toHaveLength(24);
+      expect(v).toMatch(/[a-z]/);
+      expect(v).toMatch(/[A-Z]/);
+      expect(v).toMatch(/[0-9]/);
+      expect(v).toMatch(/[!@#%^*\-_=+]/);
+      // no chars that would need escaping in .env / a URL
+      expect(v).not.toMatch(/["'`$\\ ]/);
+    }
+  });
 });

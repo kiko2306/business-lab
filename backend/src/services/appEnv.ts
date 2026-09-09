@@ -30,7 +30,37 @@ export function generateSecretFor(key: string): string {
   if (/(^|_)APP_KEY$/.test(key)) {
     return `base64:${crypto.randomBytes(32).toString('base64')}`;
   }
+  // Some apps enforce a complexity policy on the admin password (NocoDB wants
+  // an uppercase letter, a digit and a special char) — a 64-char hex string
+  // fails it. Build one that satisfies the common rules; every other app that
+  // uses a generated *_ADMIN_PASSWORD accepts an arbitrary string, so this is
+  // safe to apply to all of them, and a complex break-glass password is
+  // better anyway.
+  if (/ADMIN_PASSWORD$/i.test(key)) {
+    return generateComplexPassword();
+  }
   return crypto.randomBytes(32).toString('hex');
+}
+
+/**
+ * A 24-char password with at least one lower, upper, digit and special, from
+ * a character set that needs no escaping in a `.env` file or a URL (no
+ * `$`, quotes, backslash, backtick). Exported for the test.
+ */
+export function generateComplexPassword(): string {
+  const lower = 'abcdefghijkmnpqrstuvwxyz';
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digit = '23456789';
+  const special = '!@#%^*-_=+';
+  const all = lower + upper + digit + special;
+  const pick = (set: string): string => set[crypto.randomInt(set.length)];
+  const chars = [pick(lower), pick(upper), pick(digit), pick(special)];
+  while (chars.length < 24) chars.push(pick(all));
+  for (let i = chars.length - 1; i > 0; i -= 1) {
+    const j = crypto.randomInt(i + 1);
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
 }
 
 // Values for keys matching this are never echoed back to the client, only
