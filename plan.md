@@ -22667,3 +22667,27 @@ Verified by hand against the live box earlier in the session (§326): creating
 the Immich admin as `admin@example.com` then re-running the OIDC flow returned
 `201` with an access token and `isAdmin: true`. This change just automates that
 one-time step.
+
+### 329.1 Live verification (2026-09-09, deploy of 0.61.0)
+
+Deployed `ed8fbde` to tx-home-utils.com via the dashboard Update page (13
+commits, 0.58.0 → 0.61.0, `removedAppCleanup` tore down the §320–§323 apps,
+every exposed hostname + the apex still 200 afterwards).
+
+- **§328 Mealie**: backend logged `Renamed Mealie's seed admin username admin
+  -> mealie-local-admin (frees it for OIDC)`; the Mealie OIDC login then
+  returned `200` + an `access_token` (was `401`, `UNIQUE constraint failed:
+  users.username`).
+- **§329 Immich**: backend logged `Generated 1 secret(s) for immich
+  [IMMICH_ADMIN_PASSWORD]` then `Immich already has an admin account; nothing
+  to bootstrap` (the idempotent path — the admin was hand-made earlier in the
+  session); Immich OIDC login returns `201` + access token, `isAdmin: true`.
+- **§327 setup email**: shipped; not re-testable live (DB already initialised),
+  covered by the e2e `auth.setup.ts` run.
+
+Caveat: during the deploy's `updating_apps` phase the two new reconcilers did
+**not** land on the first pass — `syncMealieAiProvider`/`reconcileImmichFirstAdmin`
+poll ~60s for the app to be reachable, and mid-mass-recreate the app often
+isn't back yet. They succeeded on the next explicit start. Same best-effort /
+retry-next-start behaviour the existing guacamole + mealie-AI reconcilers
+already have; idempotent, so it self-heals. Not worth a blocking wait here.
