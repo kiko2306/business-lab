@@ -46,7 +46,14 @@ services:
       # generated PAPERLESS_ADMIN_USER stays the superuser.
       PAPERLESS_ENABLE_HTTP_REMOTE_USER: "true"
       PAPERLESS_ENABLE_COMPRESSION: "true"
-      PAPERLESS_TASK_WORKERS: 2
+      # Worker counts pinned low (plan.md §300 B4). Paperless otherwise scales
+      # both pools with the host CPU count: on a 4-core box that's ~2 gunicorn
+      # web workers + 2 Celery task workers, each loading Django + the
+      # scikit-learn classifier (~740 MiB RSS total). A small office files a
+      # handful of documents a day — 1 + 1 handles that and roughly halves the
+      # footprint. Raise these if OCR of a large backlog is queued.
+      PAPERLESS_WEBSERVER_WORKERS: 1
+      PAPERLESS_TASK_WORKERS: 1
       PAPERLESS_THREADS_PER_WORKER: 1
     labels:
       - "homepage.group=Productivity"
