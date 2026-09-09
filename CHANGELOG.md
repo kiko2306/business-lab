@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.64.0] — 2026-09-09
+
+### Changed
+
+- BookStack now logs in through Authelia OIDC with its own form hidden (§344) — AUTH_METHOD=oidc + auto-initiate, admins group maps to BookStack Admin; break-glass at /login?prevent_auto_init=true
+
 ## [0.63.7] — 2026-09-09
 
 ### Changed

@@ -15,6 +15,27 @@ services:
       # LSIO's BookStack image halts on boot without a valid Laravel key
       # ("The application key is missing"); the dashboard generates one.
       APP_KEY: ${BOOKSTACK_APP_KEY}
+      # Trust the reverse proxy's X-Forwarded-* so BookStack builds https URLs
+      # (and OIDC redirect_uri) correctly. Set to '*' by the exposure system
+      # only while exposed — nothing but NPM reaches this port.
+      APP_PROXIES: ${BOOKSTACK_APP_PROXIES:-}
+      # Authelia OIDC (§344). All blank/`standard` until the exposure system
+      # injects them from the registered client (services.ts `oidcClient`);
+      # then AUTH_METHOD=oidc + AUTH_AUTO_INITIATE hides the local form and
+      # sends every login straight to Authelia, and the Authelia `admins`
+      # group maps to BookStack's "Admin" role on first sign-in. Break-glass:
+      # /login?prevent_auto_init=true still reaches the standard page.
+      AUTH_METHOD: ${BOOKSTACK_AUTH_METHOD:-standard}
+      AUTH_AUTO_INITIATE: ${BOOKSTACK_AUTH_AUTO_INITIATE:-false}
+      OIDC_NAME: ${BOOKSTACK_OIDC_NAME:-Authelia}
+      OIDC_ISSUER: ${BOOKSTACK_OIDC_ISSUER:-}
+      OIDC_ISSUER_DISCOVER: ${BOOKSTACK_OIDC_ISSUER_DISCOVER:-true}
+      OIDC_CLIENT_ID: ${BOOKSTACK_OIDC_CLIENT_ID:-}
+      OIDC_CLIENT_SECRET: ${BOOKSTACK_OIDC_CLIENT_SECRET:-}
+      OIDC_USER_TO_GROUPS: ${BOOKSTACK_OIDC_USER_TO_GROUPS:-false}
+      OIDC_GROUPS_CLAIM: ${BOOKSTACK_OIDC_GROUPS_CLAIM:-groups}
+      OIDC_ADDITIONAL_SCOPES: ${BOOKSTACK_OIDC_ADDITIONAL_SCOPES:-}
+      OIDC_REMOVE_FROM_GROUPS: ${BOOKSTACK_OIDC_REMOVE_FROM_GROUPS:-false}
       DB_HOST: bookstack-db
       DB_PORT: 3306
       # Current LSIO image uses DB_USERNAME/DB_PASSWORD (the old DB_USER/DB_PASS
