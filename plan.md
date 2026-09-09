@@ -22109,3 +22109,16 @@ ITFlow, NPM's admin UI, Pi-hole, Kopia, n8n, NocoDB and BookStack. No code
 change. The existing `exposureConfigFiles.ts` `http:`-block reconcile stays as
 is — that's what makes HA reachable through the proxy at all, and it's
 unaffected by this.
+
+## 312. README: closed the "trust the proxy knobs" parent item (§216/§217, 2026-09-09)
+
+Deleted the `- [ ]` **Wire up the "trust the proxy" knobs** bullet from the
+README TODO. Every sub-item under it is resolved: header/IP-trust done for
+Stirling-PDF, Uptime Kuma, Paperless-ngx and Nextcloud (§227/§247/§276),
+Home Assistant parked (§311), File Browser removed (§310); OIDC-against-
+Authelia done and proven live for Vikunja/Mealie/Immich/Homebox (§280),
+NocoDB dropped (§273). The only work left — live proofs of the hashed OIDC
+secrets, Nextcloud header-trust and Beszel SSO — is already tracked as its
+own three `@mat` bullets, which stay. The "no known full fix — parked" list
+(ITFlow, NPM admin, Pi-hole, Kopia, n8n, NocoDB, Jellyfin, Home Assistant,
+BookStack) stays as context under those bullets. No code change.

@@ -352,39 +352,6 @@ below.
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
-- [ ] **Wire up the "trust the proxy" knobs the §210.2 audit found** (§216,
-      §217) — twelve apps ship a real, upstream-supported way to stop
-      showing their own login on top of Authelia's, the same shape as the
-      already-fixed Dozzle/Guacamole:
-      - **Header/IP trust**: nothing actionable left here. Home Assistant —
-        **parked** (§311): HA core ships no trusted-header auth provider, and
-        `trusted_networks` is explicitly incompatible with running behind a
-        trusted proxy (HA docs: "You cannot trust a network that you are
-        using in any `trusted_proxies`"), which HA's exposure config requires.
-        Every remaining route is a third-party custom component. File Browser
-        was the other candidate here — **removed entirely** (§310): upstream
-        `filebrowser/filebrowser` was archived 2026-09-01 with no further
-        security fixes, and it held the repo's most dangerous bind mount
-        (`~` read-write). The shared tree it seeded moved under Nextcloud
-        (`apps/nextcloud/data/shared/`), which is now the primary interface
-        to those files.
-        Done: Stirling-PDF (shipped with
-        `SECURITY_ENABLELOGIN=false`), Uptime Kuma (`disableAuth` set by an
-        idempotent init sidecar, §227), Paperless-ngx (`Remote-User` via
-        `PAPERLESS_ENABLE_HTTP_REMOTE_USER`, §247), and **Nextcloud**
-        (`user_saml` environment mode, §276 — wired, gated behind
-        `NEXTCLOUD_PROXY_HEADER_AUTH` + exposure, unproven, see the @mat item
-        below).
-      - **OIDC against Authelia's own provider, then disable the local
-        form.** Plumbing is done (§270): a service declaring `oidcClient` in
-        the registry gets a confidential Authelia client registered on every
-        exposure change, and its client-side OIDC config injected at start
-        (env for most; a managed `immich.json` for Immich, §275).
-        **Vikunja (§271/§278), Mealie (§274), Immich (§275), Homebox (§272) —
-        all four proven live end to end (§280)**: button on the app's own
-        login page → Authelia → callback → landed logged in, no second
-        password form and (since implicit consent) no accept screen.
-        NocoDB (§273) dropped (Enterprise-only SSO).
 - [ ] **@mat: prove the hashed Authelia OIDC client secrets live** (§270,
       §280, §281) — `renderOidcClientsBlock` now writes `$pbkdf2-sha512$`
       digests, not plaintext (verified byte-for-byte against
