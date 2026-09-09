@@ -116,13 +116,14 @@ tell you to re-run interactively — they never hang waiting for input.
 
 `start.sh` sources `setup_server.sh` for the host-only half of bootstrap
 (packages, Docker, the daemon address-pool, cloudflared's transport) before
-any of the above. That file also offers two one-time, opt-in y/N prompts of
-its own, both skipped automatically without a TTY:
+any of the above. That file also offers three one-time, opt-in y/N prompts of
+its own, all skipped automatically without a TTY:
 
 | Prompt | What it does | Why it asks instead of just doing it |
 |---|---|---|
 | **Set a fixed IP** | Writes a netplan config for a static address, applied with `netplan try` (auto-reverts unless you press ENTER within 45s) | A wrong gateway/DNS value can cut off the very session used to fix it |
 | **Remove the sudo password prompt** | A `NOPASSWD:ALL` sudoers entry for the invoking user | Full passwordless sudo is a real privilege grant — safe now that code-server's LAN port requires its own login (plan.md §93), but still asked every time, not assumed |
+| **Free port 53 for Pi-hole** | Drop-in setting `DNSStubListener=no`, repoints `/etc/resolv.conf` at systemd-resolved's uplink file, restarts resolved — frees `127.0.0.53:53` so Pi-hole's container can bind the DNS port (plan.md §284) | It's a host-DNS change and only matters if this host will run Pi-hole; only shown when the stub listener is actually up |
 
 Say no (or just press Enter) to skip either one; re-run `./start.sh` later to
 be asked again.

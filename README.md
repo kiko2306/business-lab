@@ -340,18 +340,15 @@ below.
       path, then re-run §219's live check (write over SMB → visible in
       Nextcloud `/shared` and in Paperless's `to-paperless/` drop box → and
       back). Until then §310 stays on `dev`, unmerged.
-- [ ] **@mat: decide Pi-hole's port-53 conflict** (§283, §284) — starting
-      Pi-hole from a fresh deploy fails: `failed to bind host port
-      0.0.0.0:53/tcp: address already in use`. Root cause confirmed (no
-      single process to kill): `systemd-resolved` holds `127.0.0.53`/
-      `127.0.0.54:53` and `netbird` holds its own tailnet IP `:53`
-      (MagicDNS) — Linux refuses a wildcard `0.0.0.0:53` bind while any
-      specific-address `:53` socket exists, so Pi-hole can't get the port no
-      matter which one is freed unless *both* are addressed. Real fix needs
-      a host-networking decision (disable `systemd-resolved`'s stub
-      listener via `DNSStubListener=no`, and/or bind Pi-hole to a specific
-      host IP instead of all interfaces) — left unstarted for now rather
-      than done as a host-console change.
+- [ ] **@mat: run `setup_server.sh`'s stub-listener prompt, then start Pi-hole**
+      (§283, §284, §339) — `setup_server.sh` now offers a one-time y/N prompt
+      ("Free port 53 for Pi-hole?") that writes a `DNSStubListener=no` drop-in,
+      repoints `/etc/resolv.conf` at systemd-resolved's uplink file, and
+      restarts resolved — freeing `127.0.0.53:53` so Pi-hole's default
+      `0.0.0.0:53` bind succeeds. Syntax + shellcheck clean, not yet run on the
+      host. Run `sudo ./setup_server.sh`, answer `y`, confirm host DNS still
+      resolves (`resolvectl query github.com`), then start Pi-hole from the
+      dashboard and confirm it binds :53.
 - [ ] **App backlog** — §22 lists candidate apps by category (communication,
       business ops, no-code/BI, files/PDF, security/network, dev infra,
       productivity). Pull from there rather than restating it here.

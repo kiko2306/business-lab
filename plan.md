@@ -23017,3 +23017,55 @@ of 403, and its rule is present (`policy: one_factor`, `subject:
 group:app-navidrome`). All 30 enabled hostnames probed → 200 (Authelia redirect
 where unauthenticated), including `ssh.tx-home-utils.com` (wetty's hostname
 override). §331 auto-exposure closed.
+
+## 339. Pi-hole's port-53 conflict — freed in setup_server.sh (2026-09-09)
+
+§284 left Pi-hole unstartable on the live box: `docker compose up` fails with
+`failed to bind host port 0.0.0.0:53/tcp: address already in use`. Re-checked
+the host state to settle what actually holds the port:
+
+- `ss -lun 'sport = :53'` → only `systemd-resolve` on `127.0.0.53:53` and
+  `127.0.0.54:53` (both loopback, TCP + UDP).
+- **netbird is not a factor** — `netbird status` is `NeedsLogin`, so its
+  MagicDNS `:53` socket (the README's other named blocker) doesn't exist yet
+  and won't until someone runs `netbird up`.
+
+So the live conflict is just resolved's stub listener. Docker's default
+wildcard `0.0.0.0:53` bind is refused while `127.0.0.53:53` is held (a new
+wildcard bind with no matching `SO_REUSEADDR` overlaps the existing specific
+bind), so freeing "a" port isn't the model — the stub listener has to go.
+
+**Options weighed:**
+
+- *Bind Pi-hole to the host LAN IP* (`192.168.1.236:53:53`). Works, no host
+  change — but needs the LAN IP plumbed from `start.sh` → root `.env` →
+  `appEnv.ts` → Pi-hole's `.env` → a `${VAR:+…}` conditional port mapping: a
+  new cross-cutting "host LAN IP" concept across ~4 files, and fragile to a
+  DHCP address change (only mitigated by §94's fixed-IP prompt, itself
+  `@mat`-gated). Rejected as too much machinery for the payoff.
+- *Disable resolved's stub listener in `setup_server.sh`.* One host file, no
+  stack plumbing, robust against a later netbird MagicDNS (that binds a
+  different specific address — `100.x`), and `setup_server.sh` is exactly
+  where the fixed-IP / daemon.json host-networking changes already live. Chosen.
+
+**Change.** A new prompted (single y/N, TTY-only, like the fixed-IP prompt)
+block in `setup_server.sh`, after the fixed-IP block:
+
+- Only shown when `systemd-resolved` is active **and** `ss` still shows the
+  stub on `127.0.0.53` (skip if a drop-in already did this, or the resolver
+  setup is non-standard).
+- Writes `/etc/systemd/resolved.conf.d/10-disable-stub-listener.conf` with
+  `[Resolve]\nDNSStubListener=no`.
+- `ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf` — the stub file
+  `/etc/resolv.conf` normally points at still lists `127.0.0.53`, so host name
+  resolution would break the instant the stub stops; the uplink file
+  resolved also maintains has the real upstream servers.
+- `systemctl restart systemd-resolved`.
+
+Non-interactive runs (a sourced `start.sh` with no TTY) skip it, same as the
+other two prompts — Pi-hole isn't in `start.sh`'s auto-start set anyway.
+
+`bash -n` + shellcheck clean (no new findings). **Not yet run on the host** —
+README carries the `@mat` verify item (run it, confirm `resolvectl query`
+still resolves, start Pi-hole, confirm it binds :53). Docs-only + shell —
+no version bump.

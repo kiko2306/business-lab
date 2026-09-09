@@ -633,6 +633,58 @@ elif [ -t 0 ]; then
   warn "netplan not found — this host isn't using Ubuntu's default network stack, so setting a fixed IP isn't automated here. Configure it by hand for your networking setup."
 fi
 
+# --- Optional: free port 53 for Pi-hole -------------------------------------
+#
+# systemd-resolved's stub listener holds 127.0.0.53:53 (and .54:53). That is
+# enough to make Docker's default 0.0.0.0:53 bind for Pi-hole fail outright
+# with "address already in use" — a wildcard bind is refused while any
+# specific-address :53 socket exists, so freeing one port isn't enough, the
+# listener has to go (plan.md §284). Nothing inside the stack can do this;
+# like the fixed-IP prompt it's a host-networking change, so it lives here.
+#
+# What it does: a drop-in setting DNSStubListener=no, repoints
+# /etc/resolv.conf at the uplink resolver file systemd-resolved also
+# maintains (so host name resolution keeps working — only the local :53
+# socket goes away), and restarts systemd-resolved. Prompted, not automatic:
+# a host that never runs Pi-hole doesn't need it.
+RESOLVED_STUB_DROPIN="/etc/systemd/resolved.conf.d/10-disable-stub-listener.conf"
+if [ -t 0 ] && command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved; then
+  STUB_ACTIVE=yes
+  if command -v ss >/dev/null 2>&1 && ! ss -H -lun 'sport = :53' 2>/dev/null | grep -q '127.0.0.53'; then
+    STUB_ACTIVE=no
+  fi
+  if [ -f "$RESOLVED_STUB_DROPIN" ]; then
+    log "systemd-resolved's stub listener is already disabled ($RESOLVED_STUB_DROPIN) — port 53 is free for Pi-hole"
+  elif [ "$STUB_ACTIVE" = yes ]; then
+    echo
+    echo "Free port 53 for Pi-hole?"
+    echo "systemd-resolved holds 127.0.0.53:53, which blocks Pi-hole's container"
+    echo "from binding the DNS port. This disables resolved's local stub listener"
+    echo "(host DNS keeps working via its uplink resolver) and restarts it."
+    echo "Only needed if this host will run Pi-hole."
+    printf 'Disable the stub listener? [y/N]: '
+    read -r STUB_CONFIRM
+    if [ "$STUB_CONFIRM" = "y" ] || [ "$STUB_CONFIRM" = "Y" ]; then
+      mkdir -p "$(dirname "$RESOLVED_STUB_DROPIN")"
+      printf '[Resolve]\nDNSStubListener=no\n' > "$RESOLVED_STUB_DROPIN"
+      chmod 644 "$RESOLVED_STUB_DROPIN"
+      # /etc/resolv.conf normally symlinks resolved's stub file, which still
+      # lists 127.0.0.53 — repoint it at the uplink file resolved also keeps,
+      # or host name resolution breaks the moment the stub stops.
+      if [ -e /run/systemd/resolve/resolv.conf ]; then
+        ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
+      fi
+      if systemctl restart systemd-resolved >/dev/null 2>&1; then
+        log "Disabled systemd-resolved's stub listener — port 53 is free for Pi-hole"
+      else
+        warn "wrote $RESOLVED_STUB_DROPIN but couldn't restart systemd-resolved — run 'systemctl restart systemd-resolved' by hand"
+      fi
+    else
+      log "Skipped — port 53 stays with systemd-resolved; Pi-hole won't start until it's freed"
+    fi
+  fi
+fi
+
 # --- Optional: remove the sudo password prompt for the invoking user ---------
 #
 # Prompted, never automatic — full NOPASSWD sudo for TARGET_USER means any
