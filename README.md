@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.52.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.53.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -263,25 +263,21 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
       `swapoff -a && swapon -a` to flush swap.
 - [ ] **Phase B — lighter config, same apps** (§300) — one commit each:
       B1 Stirling-PDF → `latest-ultra-lite` (~970→200 MiB, verify no
-      OCR/convert use); B3 Metabase heap cap — *see §301, Metabase is now a
-      removal candidate*; B4 Paperless → 1 web + 1 task worker + `mem_limit`
+      OCR/convert use); B4 Paperless → 1 web + 1 task worker + `mem_limit`
       (~450→250 MiB); B5 Immich → cap server, stop machine-learning if smart
-      search unused (−120 MiB). (B2 WAHA and B6 MSSQL dropped — both apps are
-      being removed, §301.)
+      search unused (−120 MiB). (B2 WAHA, B3 Metabase, B6 MSSQL dropped — all
+      three apps were removed in §301.)
 - [ ] **Phase C — `mem_limit` on every service** (§300) — one commit:
       tiered caps on every `apps/*/docker-compose.yml` + the management
       stack (generous on `backend` — an OOMKill mid-self-update is the §299
       failure), maybe a `services.test.ts` guard that each app declares one.
       Deploy app-by-app, watch `docker events` for `oom`.
 - [ ] **@mat: Phase D decisions** (§300) — D4 ClamAV (215 MiB, irreducible):
-      on-access vs scheduled scans. (D1 Postiz, D3 MSSQL folded into the §301
-      removals; D2 Metabase → see the §301 Metabase question.)
+      on-access vs scheduled scans. (D1 Postiz, D2 Metabase and D3 MSSQL were
+      all resolved by the §301 removals.)
 
 Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
 
-- [ ] **Remove Metabase** (§301d) — BI/dashboards over the other apps'
-      databases; speculative, no wired use, 1.34 GiB uncapped JVM, AGPL.
-      @mat confirmed removal (2026-09-09). Same-shape removal as 301a/301b.
 - [ ] **Prune the removed apps' images and volumes on the host** (§301) —
       once `home-srv-01` has pulled the §301 commits and self-updated
       (frontend + backend rebuilt), the `postiz` / `waha` / `mssql` /

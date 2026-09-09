@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.53.0] — 2026-09-09
+
+### Removed
+
+- Metabase (BI dashboards over the apps' databases) removed — a speculative value-add with no wired consumer, ~1.34 GiB uncapped JVM, AGPL
+
 ## [0.52.0] — 2026-09-09
 
 ### Removed

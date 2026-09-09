@@ -81,7 +81,7 @@ hand edit can leave its copy disagreeing with the app's.
 `10430` guacamole · `10440` homebox · `10450` clamav (clamd, no UI) ·
 `10460` onlyoffice · `10470` kopia (server UI on container `51515`) ·
 `10480` scrutiny · `10490` it-tools · `10500` syncthing (GUI; sync on
-fixed `22000` + discovery `21027/udp`, see below) · `10510` metabase ·
+fixed `22000` + discovery `21027/udp`, see below) ·
 `10520` miniflux ·
 `10550` meshcentral (published as
 `mesh.<domain>`) · `10560` forgejo (HTTP; SSH git on `10561`, LAN/VPN only —

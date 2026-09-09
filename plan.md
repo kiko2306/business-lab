@@ -21656,3 +21656,30 @@ item).
 
 Backend `check.sh test` 677/677 (was 691 — 14 mssql cases gone), `typecheck`
 clean. Frontend `test` 50/50, `build` clean. `minor` bump.
+
+## 301d. Metabase removed (2026-09-09)
+
+Fourth §301 removal (@mat confirmed after asking what Metabase was for).
+Metabase is a BI/dashboard tool that connects to the other apps' Postgres/
+MySQL databases for charts and ad-hoc SQL — a speculative value-add with no
+wired consumer in the stack, 1.34 GiB of uncapped JVM, AGPL-3.0. Same "a
+feature with no users" shape as §91.
+
+- Deleted `apps/metabase/` and the `services.ts` entry (registry-only, like
+  §301a/§301b — no backend/frontend code, no tests).
+- Docs: rows out of `app-credentials.md`, `licences.md`, `ports.md` (the
+  `10510 metabase` slot).
+- README: the §300 Phase B3 heap-cap item and the Phase D2 "keep or replace
+  with Grafana" question are both gone — Metabase is simply out.
+- Host: `docker rm -f` `metabase-metabase-1` + `metabase-metabase-db-1` and
+  the network.
+
+`check.sh backend test` 677/677, `typecheck` clean. `minor` bump.
+
+### §301 removals — net effect on the host
+
+`home-srv-01` RAM used went **10.0 → 6.8 GiB** across §301a–d (free 0.27 →
+4.5 GiB, swap 3.6 → 2.9 GiB) — ~3.2 GiB of baseline reclaimed by dropping
+four apps (Postiz ~1.7, Metabase ~1.4, SQL Server ~0.6, WAHA ~0.25). Orphan
+images/volumes on the host clear on its next pull + the §300 Phase A prune
+(README item). §301e (redundancy survey) is the remaining piece.
