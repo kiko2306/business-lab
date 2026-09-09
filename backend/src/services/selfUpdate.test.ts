@@ -69,7 +69,7 @@ vi.mock('../utils/database', () => ({ query: db.query }));
 vi.mock('../utils/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
-vi.mock('../version', () => ({ APP_VERSION: '0.24.0' }));
+vi.mock('../version', () => ({ APP_VERSION: '0.24.0', getAppVersion: () => '0.24.0' }));
 
 // executor.ts pulls in the whole compose-execution/registry dependency graph
 // (npmClient, exposure, etc.) — irrelevant here and heavy to load for real,

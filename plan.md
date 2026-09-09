@@ -23293,3 +23293,70 @@ own login only). Not done in this change: several are sensitive when the only
 gate is their own login (Kopia reads every backup; n8n runs arbitrary code;
 Home Assistant controls the house), so the flip list wants an explicit
 per-app confirmation before it ships. Tracked in the README.
+
+## 343. Plan — make a deploy only do the work the diff needs (2026-09-09)
+
+`server update takes way too long` — every `POST /self-update/trigger` runs
+the same ~15 min regardless of what changed: `docker compose build frontend
+backend` (~6 min, always both), then `updateAllInstalledApps` recreates **all
+~35 apps** (`pull` + `--force-recreate` + post-`up` reconcilers that poll ~60s
+each, ~7 min), then restarts frontend + backend. A version-only or docs-only
+bump pays the whole bill.
+
+Three pieces, landed **A+B together, then C**:
+
+### A — runtime `VERSION` file
+
+- New `VERSION` at repo root (plain `X.Y.Z`). `backend/src/version.ts` gains
+  `getAppVersion()` which reads `${REPO_ROOT}/VERSION` **per call** (the repo
+  is bind-mounted rw into the backend, so a `git pull` is visible with no
+  restart), falling back to `<repoRoot>/VERSION` via `__dirname`, then the
+  image's `package.json`, then `0.0.0`. `index.ts` `/version` + `/health` and
+  `getSelfUpdateStatus` call it instead of the boot-time `APP_VERSION` const.
+- Frontend already fetches `/version` from the API (`shell.component.ts`), so
+  it picks up a new value on its next poll with no rebuild.
+
+### B — stop bumping `package.json` for a release
+
+- `scripts/bump-version.sh` reads/writes `VERSION` (+ `CHANGELOG.md` + the
+  README `**Version**` line); it no longer edits the two `package.json` or two
+  `package-lock.json` version fields. Those freeze at 0.63.2 — nothing
+  publishes them and nothing reads them at runtime once A lands.
+- `.claude/hooks/require-version-bump.sh` checks `VERSION` is in the commit
+  instead of grepping a `package.json` version diff.
+- Without B, every release commit still touches `package-lock.json` → busts
+  the Docker build cache → C's "skip the build" never triggers.
+- `version.test.ts` updated: `APP_VERSION` tracks `VERSION`, not package.json.
+
+### C — deploy scoped to the diff
+
+- After `git pull`, `git diff --name-only <from>..<to>` → classify:
+  - `backend/{src,Dockerfile,package*,tsconfig*}` → rebuild + restart backend
+  - `frontend/{src,Dockerfile,package*,angular.json,tsconfig*}` or root
+    `docker-compose.yml` → rebuild + restart frontend
+  - `apps/<name>/**` → that app needs recreation
+- Nothing in any bucket (version / docs / plan only) → skip build, skip the
+  app sweep, skip both restarts; mark `done` in ~10 s.
+- `docker compose build` runs with only the service(s) that need it (or is
+  skipped). Restart only the rebuilt service(s).
+- App image freshness kept: `docker compose pull` still runs for every
+  installed app (cheap when nothing moved), but `--force-recreate` + the
+  reconciler poll only run for an app whose image id moved **or** whose
+  `apps/<name>/**` changed. `pullAndRecreateService` splits into a `pull`
+  step and a `recreate` step so the sequence can do one without the other.
+- Fallback to today's full sweep when the diff can't be computed (null
+  `fromCommit`, `git diff` error).
+
+Risk: a backend change that alters managed-config generation for an app it
+doesn't force-recreate won't re-render that app's config until its next
+natural start. Accepted — those reconcilers are idempotent and mostly
+post-`up` REST calls; forcing 35 recreates for it is exactly the cost being
+removed. Documented in the self-update walk.
+
+**A+B landed (0.63.3).** `VERSION` file at repo root; `version.ts` gains
+`getAppVersion()` reading it per call (REPO_ROOT, then `__dirname/../../VERSION`,
+then package.json, then `0.0.0`); `/version`, `/health`, `getSelfUpdateStatus`
+call it. `bump-version.sh` rewritten to touch only `VERSION` + `CHANGELOG.md` +
+the README line; the version-bump hook checks `VERSION` is in the commit;
+CLAUDE.md updated. 665 backend tests (version.test rewritten, selfUpdate.test
+mock updated). C is the remaining README item.

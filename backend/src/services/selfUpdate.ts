@@ -34,7 +34,7 @@ import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { runCommand } from './backup';
 import { updateAllInstalledApps } from './executor';
-import { APP_VERSION } from '../version';
+import { getAppVersion } from '../version';
 import { HttpError } from '../types';
 
 const composeFilePath = (repoRoot: string) => `${repoRoot}/docker-compose.yml`;
@@ -243,7 +243,7 @@ export interface SelfUpdateStatus {
 
 export async function getSelfUpdateStatus(): Promise<SelfUpdateStatus> {
   const latestRun = await getLatestRun();
-  return { appVersion: APP_VERSION, check: cachedCheck, latestRun };
+  return { appVersion: getAppVersion(), check: cachedCheck, latestRun };
 }
 
 function isRunInProgress(run: SelfUpdateRunRow | null): boolean {

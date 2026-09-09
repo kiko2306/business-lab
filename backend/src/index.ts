@@ -16,7 +16,7 @@ import usersRouter from './routes/users';
 import networkRouter from './routes/network';
 import selfUpdateRouter from './routes/selfUpdate';
 import socialRouter from './routes/social';
-import { APP_VERSION } from './version';
+import { getAppVersion } from './version';
 import {
   ensureUserRolesTable,
   ensureRoleModelReshape,
@@ -134,7 +134,7 @@ app.use(mutationLimiter);
 
 // Health check — always available
 app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok', version: APP_VERSION, timestamp: new Date().toISOString() });
+  res.json({ status: 'ok', version: getAppVersion(), timestamp: new Date().toISOString() });
 });
 
 // Ping check — always available, unauthenticated
@@ -143,10 +143,11 @@ app.get('/ping', (_req: Request, res: Response) => {
 });
 
 // App version — public, unauthenticated. Powers the "Business Lab vX.Y.Z"
-// line in the dashboard footer; served from the backend (not baked into the
-// frontend bundle) so it reflects what is actually running (plan.md §131.4).
+// line in the dashboard footer; read live from the repo-root VERSION file on
+// each request (plan.md §343) so a version-only deploy is a bare `git pull`
+// with no rebuild or restart.
 app.get(['/version', '/api/version'], (_req: Request, res: Response) => {
-  res.json({ version: APP_VERSION });
+  res.json({ version: getAppVersion() });
 });
 
 // Every router is served both at the root (e.g. /auth/login) and under the

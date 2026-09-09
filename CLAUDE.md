@@ -281,13 +281,16 @@ rule working — find another way rather than routing around it.
 
 The version-bump rule is enforced the same way: `.claude/hooks/require-version-bump.sh`
 blocks a `git commit` that changes a non-test file under `backend/src` or
-`frontend/src` unless the same commit bumps `version` in both `package.json`
-files and adds a `CHANGELOG.md` entry (also update the `**Version X.Y.Z**` line
-under the README title). Docs/plan/test-only commits are untouched.
+`frontend/src` unless the same commit bumps the repo-root `VERSION` file and
+adds a `CHANGELOG.md` entry (also update the `**Version X.Y.Z**` line under the
+README title). Docs/plan/test-only commits are untouched.
 
-Do that bump with `scripts/bump-version.sh <patch|minor> <Category> "<bullet>"`
-rather than editing the five files by hand — it bumps both `package.json`s,
-both `package-lock.json`s (including the nested `packages[""].version`, which
-has drifted out of sync with the root before with nothing catching it), the
-README line, and inserts the `CHANGELOG.md` entry, all from one source of
-truth. Review its diff before committing.
+`VERSION` is the single source of truth: the backend reads it live from the
+bind-mounted checkout and serves it at `GET /version` (plan.md §343), so a
+version-only bump deploys as a bare `git pull` with no rebuild. The
+`package.json` version fields are frozen and unused — do **not** bump them.
+
+Do the bump with `scripts/bump-version.sh <patch|minor> <Category> "<bullet>"`
+rather than editing the three files by hand — it writes `VERSION`, the README
+line, and the `CHANGELOG.md` entry from one source of truth. Review its diff
+before committing.

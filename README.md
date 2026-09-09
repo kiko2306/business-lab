@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.63.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.63.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -293,6 +293,15 @@ below.
       Settings" pattern) only get built if a real deployment actually wants
       a destination that is neither a mount nor S3.
 ### Exposure and platform
+
+- [ ] **Deploy scoped to the diff — piece C** (§343) — A+B (runtime `VERSION`
+      file; `bump-version.sh` + the version-bump hook stop touching
+      `package.json`) have landed. C: after `git pull`, classify
+      `git diff --name-only` and only `docker compose build` / restart the
+      service(s) that changed, and only `--force-recreate` an app whose image
+      moved or whose `apps/<name>/**` changed — version/docs-only deploys
+      become a ~10 s `git pull`. Split `pullAndRecreateService` into pull +
+      recreate; fall back to the full sweep when the diff can't be computed.
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't

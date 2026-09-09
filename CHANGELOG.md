@@ -7,9 +7,17 @@ user-facing feature or a breaking change and a **patch** bump marks a fix or a
 small internal change. `MAJOR` stays `0` until a `1.0.0` is declared
 deliberately.
 
-The version here is the single source of truth for the string shown in the
-dashboard footer; `backend/package.json` and `frontend/package.json` carry the
-same value and the backend serves it at `GET /version`.
+The version string shown in the dashboard footer lives in the repo-root
+`VERSION` file, which the backend reads live (bind-mounted) and serves at
+`GET /version` (plan.md §343). `scripts/bump-version.sh` writes `VERSION`,
+this file, and the README line together; the `package.json` version fields
+are frozen and unused.
+
+## [0.63.3] — 2026-09-09
+
+### Changed
+
+- Version now lives in a repo-root VERSION file read live by the API (§343) — a version-only deploy needs no rebuild; bump-version.sh and the version-bump hook stop touching package.json
 
 ## [0.63.2] — 2026-09-09
 

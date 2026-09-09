@@ -11,8 +11,9 @@
 #   - Only trips when a non-test file under backend/src or frontend/src is in
 #     the change. Plan/README/docs-only commits (plan: prefix) never touch
 #     those paths, so they pass untouched.
-#   - Passes as soon as BOTH package.json versions move and CHANGELOG.md is in
-#     the same commit.
+#   - Passes as soon as the repo-root VERSION file moves and CHANGELOG.md is
+#     in the same commit (plan.md §343 — VERSION is the source of truth now;
+#     package.json versions are frozen).
 #
 # No `pipefail`: `git diff | grep -q` would SIGPIPE the diff and mark the
 # pipeline failed the moment grep matches, inverting the check.
@@ -39,10 +40,8 @@ changed=$( { git diff --cached --name-only; git diff --name-only HEAD; } 2>/dev/
 ships_code=$(grep -E '^(backend|frontend)/src/' <<<"$changed" | grep -vE '\.(test|spec)\.ts$' || true)
 [ -n "$ships_code" ] || exit 0
 
-version_diff=$( { git diff --cached HEAD -- backend/package.json frontend/package.json
-                  git diff HEAD -- backend/package.json frontend/package.json; } 2>/dev/null || true )
 version_bumped=no
-grep -qE '^\+[[:space:]]*"version":' <<<"$version_diff" && version_bumped=yes || true
+grep -qxF 'VERSION' <<<"$changed" && version_bumped=yes || true
 
 changelog_touched=no
 grep -qxF 'CHANGELOG.md' <<<"$changed" && changelog_touched=yes || true
@@ -52,12 +51,13 @@ if [ "$version_bumped" = yes ] && [ "$changelog_touched" = yes ]; then
 fi
 
 missing=""
-[ "$version_bumped" = no ] && missing+=$'\n  - bump "version" in backend/package.json AND frontend/package.json (and the two lines near the top of each package-lock.json)'
+[ "$version_bumped" = no ] && missing+=$'\n  - bump the repo-root VERSION file'
 [ "$changelog_touched" = no ] && missing+=$'\n  - add a matching entry to CHANGELOG.md'
 
 jq -cn --arg r "Refused by .claude/hooks: this commit changes code under backend/src or frontend/src, so it must also:$missing
   - update the **Version X.Y.Z** line under the # Business Lab title in README.md
 
-Pre-1.0 semver: PATCH = fix / small internal change, MINOR = user-facing feature or breaking change. See the standing versioning rule. If this really ships no behaviour change, it should not be touching those source paths." \
+Use scripts/bump-version.sh <patch|minor> <Category> \"<bullet>\" — it does all three.
+Pre-1.0 semver: PATCH = fix / small internal change, MINOR = user-facing feature or breaking change. If this really ships no behaviour change, it should not be touching those source paths." \
   '{hookSpecificOutput:{hookEventName:"PreToolUse",permissionDecision:"deny",permissionDecisionReason:$r}}'
 exit 0
