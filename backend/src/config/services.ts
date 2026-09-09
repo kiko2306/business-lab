@@ -956,6 +956,13 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       interval: 30000,
       timeout: 5000,
     },
+    // LAN only (§344): media is streamed on-premises. Jellyfin core has no
+    // OIDC/header-trust, so it can't sit behind Authelia with its form
+    // hidden, and its own login (blank passwords allowed, large pre-auth
+    // surface) isn't something to put on the public tunnel. Reached on the
+    // LAN at its host port with its own login. No Home Page tile (keys off a
+    // provisioned exposure).
+    lanOnly: true,
   },
   'navidrome': {
     name: 'navidrome',

@@ -235,7 +235,7 @@ describe('samba is LAN-only', () => {
     expect(SERVICES['samba'].exposurePortEnvVar).toBeUndefined();
   });
 
-  it('only samba and clamav are flagged lanOnly', () => {
+  it('samba, clamav and jellyfin are flagged lanOnly', () => {
     const lanOnly = Object.entries(SERVICES)
       .filter(([, s]) => s.lanOnly)
       .map(([name]) => name)
@@ -243,7 +243,9 @@ describe('samba is LAN-only', () => {
     // samba (SMB/445) — a non-HTTP protocol the tunnel can't carry.
     // clamav (clamd/3310) — its own protocol, no web UI; lanOnly keeps
     // auto-exposure (§331) from publishing a broken hostname for it.
-    expect(lanOnly).toEqual(['clamav', 'samba']);
+    // jellyfin — media streamed on-premises only (§344); no SSO, weak own
+    // login, not for the public tunnel.
+    expect(lanOnly).toEqual(['clamav', 'jellyfin', 'samba']);
   });
 
   it('flags the keys-to-the-kingdom apps overlayOnly, keeping them off the public tunnel', () => {

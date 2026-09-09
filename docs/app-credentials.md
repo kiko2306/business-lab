@@ -58,7 +58,7 @@ Every app is exposed behind Authelia automatically — claim these yourself befo
 | **Authelia** | The SSO account itself. Managed from the dashboard (Authelia is the one app whose users the dashboard edits directly). |
 | **Home Assistant** | Onboarding wizard creates the owner account. HACS is installed automatically; it needs a one-time GitHub authorization — see the note below. |
 | **Immich** | First registered user becomes admin. Once exposed, the dashboard writes a managed `data/config/immich.json` wiring Authelia OIDC (§270/§275) and an "Authelia" button appears on the login page. **While that file is present Immich's admin *Settings* UI is read-only and any non-OIDC setting you'd changed there reverts to Immich's default** (the file is present whenever Immich is running — every app is exposed automatically). After one Authelia sign-in, flip **Configuration → `IMMICH_PASSWORD_LOGIN_ENABLED`** to false to drop Immich's own email/password form. |
-| **Jellyfin** | Setup wizard creates the admin user. |
+| **Jellyfin** | LAN only (§344) — not on the tunnel or the overlay. Reach it on the LAN at the host's `JELLYFIN_PORT` and run its setup wizard there to create the admin. |
 | **Navidrome** | First visit creates the admin account. |
 | **Uptime Kuma** | First visit creates the admin account. |
 | **BookStack** | Once exposed, `AUTH_METHOD=oidc` + auto-initiate sends every login straight to Authelia (§344) — no BookStack form. An Authelia user in the `admins` group is auto-provisioned as a BookStack admin on first sign-in. The shipped `admin@admin.com` / `password` standard account still exists as break-glass at `<host>/login?prevent_auto_init=true` — change its password (or disable it) once an OIDC admin is in. |

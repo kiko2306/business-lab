@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.65.1] — 2026-09-09
+
+### Changed
+
+- Jellyfin is now lanOnly (§344) — media stays on-premises; off the tunnel and the overlay, its own login on the LAN
+
 ## [0.65.0] — 2026-09-09
 
 ### Changed

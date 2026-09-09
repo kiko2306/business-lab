@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.65.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.65.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -301,13 +301,15 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **§344 batch 2 — one login per app, priority = Authelia-with-form-hidden
-      first** (§342, §344). Per the priority table in §344: **BookStack** →
-      Authelia OIDC (`AUTH_METHOD=oidc` + `AUTH_AUTO_INITIATE`, `admins`→Admin
-      role); **NocoDB** → expose-direct + `NC_ADMIN_EMAIL/PASSWORD` seed;
-      **ITFlow** → expose-direct + `/setup` bootstrap + force its 2FA;
-      **Jellyfin / Home Assistant** → @mat to pick expose-direct vs
-      `overlayOnly` (neither can hide its form). One app per commit.
+- [ ] **§344 batch 2 leftovers — ITFlow bootstrap + Home Assistant** —
+      **BookStack** (Authelia OIDC), **NocoDB** (expose-direct + env seed) and
+      **Jellyfin** (`lanOnly`) are done. Still open:
+      **ITFlow** — needs `itflowClient.ts` + `reconcileItflowFirstAdmin`
+      against the running `/setup.php` (no env admin; rolling `master` image),
+      then `skipAutheliaProtection` + switch on its 2FA. Stays behind Authelia
+      until that exists.
+      **Home Assistant** — @mat to pick: expose-direct (force `ip_ban_enabled`
+      in its managed config) vs `overlayOnly` / `lanOnly`.
 - [ ] **`@mat`: confirm NPM's admin UI over the overlay** (§239, §324.4) — the
       "deprovision any live public `npm.<domain>`" half is settled: nothing was
       ever provisioned for `nginx-proxy-manager` (no row, no DNS, no proxy
