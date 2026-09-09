@@ -2140,9 +2140,18 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
         page and confirmed light persisted with no dark flash, toggled back.
 
 ### 22.9 Optional / niche
-- [ ] **Navidrome** (`deluan/navidrome`) — Subsonic-compatible music
-      streaming, if Jellyfin's music side isn't enough.
-      `exposureEnvKeys.url: ['ND_BASEURL']` (subpath) — usually fine at root.
+- [x] **Navidrome** (`deluan/navidrome`) — added 2026-09-09 (§313):
+      `apps/navidrome/` (compose + `.env.example`), image pinned
+      `deluan/navidrome:0.63.2`, host port `${NAVIDROME_PORT:-10570}` →
+      `:4533`, `./data:/data` + read-only `${NAVIDROME_MUSIC_DIR:-./data/music}
+      :/music`, `wget /ping` container healthcheck. **Category:** Media.
+      **Icon:** new `music` → 🎵. **No exposure env keys** — Navidrome builds
+      its public base URL from NPM's `X-Forwarded-*` headers and does no Host
+      allowlisting, same as Jellyfin (the §22.9 note's `ND_BASEURL` is
+      sub-path only, which the dashboard never uses). First-run: admin
+      created via the web setup screen (no admin env), rowed in
+      `app-credentials.md`. Licence **GPL-3.0** (not AGPL) — clean for the
+      resale model, rowed in `licences.md`.
 - [ ] **Changedetection.io** (`dgtlmoon/changedetection.io`) — watch web
       pages for changes (price/stock/policy), notify via ntfy.
 - [ ] ***arr stack** (Prowlarr/Sonarr/Radarr + a download client) — media
@@ -22122,3 +22131,48 @@ secrets, Nextcloud header-trust and Beszel SSO — is already tracked as its
 own three `@mat` bullets, which stay. The "no known full fix — parked" list
 (ITFlow, NPM admin, Pi-hole, Kopia, n8n, NocoDB, Jellyfin, Home Assistant,
 BookStack) stays as context under those bullets. No code change.
+
+## 313. Navidrome added — Subsonic-compatible music streaming (§22.9, 2026-09-09)
+
+Picked from the §22 backlog (agent has nothing else actionable — see §311/§312
+context; the rest of the TODO list is `@mat` decisions or live-host proofs).
+Navidrome cleared the licence gate: **GPL-3.0**, not AGPL and no fair-code /
+paid-SSO wrinkle, so it fits the "software not sold, client operates the box"
+model unchanged.
+
+### What landed
+
+- `apps/navidrome/docker-compose.yml` + `.env.example`. Image pinned
+  `deluan/navidrome:0.63.2` (latest stable). Port `${NAVIDROME_PORT:-10570}`
+  → container `:4533` — appended at the end of the allocation like miniflux
+  (§245) / forgejo (§277); strict alphabetical-in-tens broke down long ago.
+- Volumes: `./data:/data` (Navidrome's SQLite DB + cache), and the music
+  library `${NAVIDROME_MUSIC_DIR:-./data/music}:/music:ro` — read-only, same
+  shape as Jellyfin's `JELLYFIN_MEDIA_DIR`. Navidrome only ever writes `/data`.
+- `mem_limit: 256m` / `mem_reservation: 64m` — a Go binary serving audio, a
+  fraction of Jellyfin's 768m; the ceiling covers an ffmpeg transcode during
+  a library scan.
+- Healthcheck: `wget /ping` (unauthenticated, small JSON body). Registry
+  `healthCheck` points at `http://localhost:4533/ping`.
+- `services.ts`: entry after `jellyfin`, `category: 'Media'`, `icon: 'music'`.
+  New `music: '🎵'` in `serviceIcon()` (frontend service-card).
+
+### Exposure: no env keys, deliberately
+
+The §22.9 backlog note suggested `exposureEnvKeys.url: ['ND_BASEURL']`. Left
+off: `ND_BASEURL` is a URL *path* prefix for serving under a sub-path, which
+the dashboard never does (every app gets its own hostname). Navidrome derives
+its absolute base URL (share links, PWA manifest, Subsonic API base) from the
+`X-Forwarded-Proto`/`-Host` headers NPM sends, and does no Host-header
+allowlisting — so nothing needs rewriting when exposure flips on. Same
+situation as Jellyfin, which also declares no `exposureEnvKeys`. `ND_BASEURL`
+is set to `""` explicitly in the compose env with a comment.
+
+### Docs + verification
+
+Rows added to `ports.md` (`10570`), `app-credentials.md` (wizard table) and
+`licences.md` (GPL-3.0, Alpine base already rowed). Version 0.55.0 → 0.56.0.
+Backend 678 tests + typecheck pass; frontend 50 tests + build pass. **Not
+started against the real host** — no agent host access; a live run needs the
+deploy host to pull the image and point `NAVIDROME_MUSIC_DIR` at a real
+library. Lands on `dev`.

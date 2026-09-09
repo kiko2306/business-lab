@@ -85,7 +85,7 @@ fixed `22000` + discovery `21027/udp`, see below) ·
 `10520` miniflux ·
 `10550` meshcentral (published as
 `mesh.<domain>`) · `10560` forgejo (HTTP; SSH git on `10561`, LAN/VPN only —
-the tunnel carries HTTP, not SSH)
+the tunnel carries HTTP, not SSH) · `10570` navidrome
 
 These are the defaults. The allocator may have moved one on your host if
 something else already held the port — check the app's `.env` for the truth.

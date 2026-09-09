@@ -1,0 +1,40 @@
+
+services:
+  navidrome:
+    # Go binary + a small Alpine userland for ffmpeg; audio-only, no transcoding
+    # of video, so it sits happily in a fraction of Jellyfin's footprint. The
+    # ceiling mostly covers an ffmpeg transcode or two during a library scan.
+    mem_limit: 256m
+    mem_reservation: 64m
+    image: deluan/navidrome:0.63.2
+    restart: unless-stopped
+    ports:
+      - "${NAVIDROME_PORT:-10570}:4533"
+    environment:
+      TZ: ${TZ:-UTC}
+      ND_DATAFOLDER: /data
+      ND_MUSICFOLDER: /music
+      # Navidrome builds absolute URLs (share links, the PWA manifest, Subsonic
+      # API base) from the X-Forwarded-* headers NPM sends, so exposing it at
+      # the root of a hostname needs no host/URL setting. ND_BASEURL is only for
+      # serving under a sub-path, which the dashboard never does.
+      ND_BASEURL: ""
+    labels:
+      - "homepage.group=Media & Files"
+      - "homepage.name=Navidrome"
+      - "homepage.icon=navidrome.png"
+      - "homepage.href=http://localhost:${NAVIDROME_PORT:-10570}"
+      - "homepage.description=Music streaming server (Subsonic-compatible)"
+    volumes:
+      - ./data:/data
+      # Point this at your actual music library on the host — defaults to a
+      # folder inside this app's own data dir if left unset. Read-only: Navidrome
+      # never writes to the library, only its own /data.
+      - ${NAVIDROME_MUSIC_DIR:-./data/music}:/music:ro
+    healthcheck:
+      # /ping is unauthenticated and returns a small JSON body.
+      test: ["CMD-SHELL", "wget -q -O - http://localhost:4533/ping || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s

@@ -985,6 +985,25 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       timeout: 5000,
     },
   },
+  'navidrome': {
+    name: 'navidrome',
+    label: 'Navidrome',
+    description: 'Music streaming server (Subsonic-compatible)',
+    icon: 'music',
+    category: 'Media',
+    composePath: 'apps/navidrome/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      // /ping is unauthenticated; status.ts swaps in the published host port.
+      url: 'http://localhost:4533/ping',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // No exposure env keys: Navidrome derives its public base URL from the
+    // X-Forwarded-* headers NPM sends and does no Host allowlisting, so it
+    // needs nothing rewritten when exposure flips on (same as Jellyfin).
+  },
   'vikunja': {
     name: 'vikunja',
     label: 'Vikunja',

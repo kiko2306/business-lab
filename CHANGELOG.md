@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.56.0] — 2026-09-09
+
+### Added
+
+- Navidrome — Subsonic-compatible music streaming server (apps/navidrome, port 10570)
+
 ## [0.55.0] — 2026-09-09
 
 ### Removed
