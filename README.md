@@ -264,20 +264,16 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
       peaceful_keldysh` (the §268 leftover); decide on `docker image prune
       -af` (still ~11 GB of images for currently-stopped apps — a re-pull
       cost if a client later starts one); `network prune`.
-- [ ] **Phase B — lighter config, same apps** (§300, §303) — **B1 done**
-      (Stirling-PDF `latest-ultra-lite`: RSS 960→784 MiB, disk 3.4→0.9 GB;
-      needed the host override unpinned). **B4 done** (Paperless 1+1 workers:
-      idle RSS 743→693, real effect is bounding the OCR peak). **B5 not
-      done** — disabling `immich-machine-learning` (248 MiB, unused on this
-      box) needs the service removed from compose *and* the container
-      `docker rm`'d, which the Update page can't do; @mat to run that one
-      SSH step or fold it into Phase C. (B2 WAHA, B3 Metabase, B6 MSSQL
-      dropped — removed in §301.)
-- [ ] **Phase C — `mem_limit` on every service** (§300) — one commit:
-      tiered caps on every `apps/*/docker-compose.yml` + the management
-      stack (generous on `backend` — an OOMKill mid-self-update is the §299
-      failure), maybe a `services.test.ts` guard that each app declares one.
-      Deploy app-by-app, watch `docker events` for `oom`.
+- [ ] **Phase C — `mem_limit` on every service, + disable Immich ML** (§300,
+      §303 B5) — one commit: tiered `mem_limit` (+ `mem_reservation`) on
+      every `apps/*/docker-compose.yml` and the management stack (generous on
+      `backend` — an OOMKill mid-self-update is the §299 failure), plus a
+      `-Xmx` cap on the two JVMs (Stirling, plus any other). Same pass drops
+      `immich-machine-learning` from the Immich compose (248 MiB, empty model
+      cache / zero activity on this box) — needs the container `docker rm`'d
+      as well as removed from the file, so it's an SSH step to flag, not an
+      Update-page one. Maybe a `services.test.ts` guard that each app
+      declares a limit. Deploy app-by-app, watch `docker events` for `oom`.
 - [ ] **@mat: Phase D decisions** (§300) — D4 ClamAV (215 MiB, irreducible):
       on-access vs scheduled scans. (D1 Postiz, D2 Metabase and D3 MSSQL were
       all resolved by the §301 removals.)

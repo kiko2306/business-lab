@@ -21834,8 +21834,9 @@ Disabling `immich-machine-learning` (248 MiB, model-cache empty, zero
 activity in 24 h on this box) needs the service commented out of compose
 **and** the container removed — `docker compose up -d` alone won't stop a
 service that's no longer in the file. That makes it an SSH job, which the
-new §304 rule says to flag rather than do. Left for @mat to take with the
-Phase C `mem_limit` pass, or to run the one `docker rm` by hand.
+new §304 rule says to flag rather than do. **Decision (@mat, 2026-09-09):
+folded into the Phase C `mem_limit` pass** — the compose edit rides with the
+per-app caps, and the one `docker rm` is the SSH step that pass will flag.
 
 ## 304. Test-server updates go through the Update page, not SSH (2026-09-09)
 
