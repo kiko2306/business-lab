@@ -245,6 +245,20 @@ describe('samba is LAN-only', () => {
     // auto-exposure (§331) from publishing a broken hostname for it.
     expect(lanOnly).toEqual(['clamav', 'samba']);
   });
+
+  it('flags the keys-to-the-kingdom apps overlayOnly, keeping them off the public tunnel', () => {
+    const overlayOnly = Object.entries(SERVICES)
+      .filter(([, s]) => s.overlayOnly)
+      .map(([name]) => name)
+      .sort();
+    // nginx-proxy-manager: the proxy's own admin. pihole: DNS admin.
+    // guacamole: RDP/VNC/SSH to every overlay host. kopia: reads + deletes
+    // every backup. n8n: runs arbitrary code. itflow: client passwords + docs
+    // (§344). Each is one weak login away from the whole estate — reached
+    // over the overlay, never the public tunnel, and never with Authelia
+    // stacked in front (that would be two logins — §342).
+    expect(overlayOnly).toEqual(['guacamole', 'itflow', 'kopia', 'n8n', 'nginx-proxy-manager', 'pihole']);
+  });
 });
 
 describe('netbird-vpn exposures', () => {

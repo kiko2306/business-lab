@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.63.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.63.6** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -301,13 +301,6 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **§344 batch 1 — `overlayOnly` for Kopia, n8n, ITFlow** — §342 rule:
-      never two logins. These can't hide their own form, and their own login
-      is too weak to be the sole *internet-facing* gate (Kopia: basic auth,
-      reads/deletes every backup; n8n: runs arbitrary code, no MFA; ITFlow:
-      client passwords + docs). Take them off the public tunnel — one flag
-      each + docs rows + `services.test.ts` — reached over NetBird/Tailscale,
-      one login, no public first-run race.
 - [ ] **§344 batch 2 — expose-direct + admin bootstrap: BookStack, NocoDB,
       Jellyfin, Home Assistant** — `skipAutheliaProtection: true` each, plus a
       `reconcile<App>FirstAdmin` (DocuSeal §341 pattern) so exposing them

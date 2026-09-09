@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.63.6] — 2026-09-09
+
+### Changed
+
+- Kopia, n8n and ITFlow are now overlayOnly (§344 batch 1) — off the public tunnel, reached over the overlay with their own login, no Authelia stacked in front (§342)
+
 ## [0.63.5] — 2026-09-09
 
 ### Changed

@@ -23429,6 +23429,15 @@ pattern) for BookStack / NocoDB / Jellyfin / Home Assistant.
   `getExposability` already treats `overlayOnly` as not-exposable, and
   `reconcileRemovedServices`-style teardown is `ensureAutoExposure`'s
   `exposable === false` branch (§331).
+
+  **Batch 1 landed (0.63.6).** `overlayOnly: true` on `kopia`, `n8n`,
+  `itflow`; `overlayOnly` set test added (`guacamole, itflow, kopia, n8n,
+  nginx-proxy-manager, pihole`); `app-credentials.md` overlay paragraph
+  extended. 670 backend tests. Teardown of the live public exposure for the
+  three is self-healing: the §331 reconciler sweep (10 min after the deploy's
+  boot) runs `ensureAutoExposure` → `exposable:false` → deprovisions NPM host
+  + DNS + row, then `syncAutheliaAccessControlSafe` drops the rules — or a
+  `start` of each does it immediately.
 - **Batch 2 — expose-direct + admin bootstrap for BookStack, NocoDB,
   Jellyfin, Home Assistant.** Per app: `skipAutheliaProtection: true`, a
   `<app>Client.ts` + `reconcile<App>FirstAdmin` wired into
