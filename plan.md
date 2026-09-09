@@ -1662,6 +1662,9 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       for the client-operated model). Proven live: image pulls, container
       `healthy` in ~10s, `/api/healthz` → `{"status":"pass"}` (cache + db
       checks pass), web root 200, listening on 3000 + 22.
+      **Removed 2026-09-09 (§315)** — `@mat` call; `apps/forgejo/`, the
+      registry entry, the `git` icon and all docs rows deleted. Ports
+      `10560`/`10561` are free again.
 - [x] **IT-Tools** — `corentinth/it-tools:2024.10.22-7ca5933`. Added
       2026-09-06 (§241): `apps/it-tools/` (`docker-compose.yml` +
       `.env.example`), host port `${IT_TOOLS_PORT:-10490}` → `:80`,
@@ -22176,3 +22179,25 @@ real deployment ever wants one, it goes back on the list then. The passing
 mention of "Changedetection.io-style tools" in the §22.9c Price Compare entry
 stays — it's context for why Price Compare was custom-built, not a backlog
 item.
+
+## 315. Forgejo removed from the project (§277, 2026-09-09)
+
+`@mat` decided Forgejo (added §277, 2026-09-07) is not wanted. Straight
+removal — nothing depended on it (no `dependsOn`/`requires`/`oidcClient`
+edges, no other app mounted its data):
+
+- `apps/forgejo/` deleted (`docker-compose.yml` + `.env.example`; `data/`
+  was gitignored).
+- `forgejo` registry entry removed from `services.ts`. Its `git` → 🌿 icon
+  in `serviceIcon()` (frontend service-card) went with it — nothing else
+  used it.
+- Docs rows dropped: `ports.md` (allocation line — `10560`/`10561` free
+  again), `licences.md` (the GPL-3.0-or-later row), `app-credentials.md`
+  (the wizard-table row).
+- `plan.md` §22.7 backlog entry annotated "Removed §315" rather than
+  deleted — it's history now, same as the File Browser §310 pattern.
+
+Version 0.56.0 → 0.57.0. Backend 678 tests + typecheck pass, frontend 50
+tests pass. No host access — the deployed box, if it ever ran Forgejo, keeps
+`apps/forgejo/data/` on disk until someone clears it (gitignored, so a fresh
+clone is already clean); the compose project just stops being managed.

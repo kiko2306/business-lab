@@ -65,7 +65,6 @@ Open these privately and claim them before exposing.
 | **NocoDB** | First signup becomes the super admin. |
 | **Vikunja** | Register the first account; registration can then be disabled. Once exposed, an "Authelia" OIDC login button appears (the dashboard wires the client automatically — §270). After signing in through it once, flip **Configuration → `VIKUNJA_AUTH_LOCAL_ENABLED`** to false to drop Vikunja's own username/password form and leave Authelia as the only gate. |
 | **n8n** | Owner account created on first visit. |
-| **Forgejo** | First account you register becomes the admin (the web installer is pre-locked). Claim it privately, then set **Configuration → `FORGEJO_DISABLE_REGISTRATION`** true and restart to close sign-ups. SSH git access is on host port `10561` (`ssh://git@<host>:10561/owner/repo`), LAN/VPN only — the tunnel carries HTTP, not SSH. |
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |
 | **ITFlow** | Setup wizard creates the first admin. See the note below — it needs two things switched on afterwards. |
 | **MeshCentral** | First account created on the login page owns the server (open signup is off, so only the first one). Claim it privately — on the LAN at port `10550` or over the overlay — before exposing. Whether Authelia sits in front of `mesh.<domain>` without breaking agent enrolment is still to be proven live (§62.2); if it does break, the agent endpoint moves to its own hostname. |

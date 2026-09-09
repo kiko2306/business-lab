@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.57.0] — 2026-09-09
+
+### Removed
+
+- Forgejo removed from the project (apps/forgejo, registry entry, docs rows; ports 10560/10561 freed)
+
 ## [0.56.0] — 2026-09-09
 
 ### Added
