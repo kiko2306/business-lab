@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.66.1] — 2026-09-09
+
+### Changed
+
+- Park ITFlow's auto-run setup wizard (§346) — it fired before the itfloworg image finished its first-boot DB migration and locked setup with no schema; ITFlow stays behind Authelia
+
 ## [0.66.0] — 2026-09-09
 
 ### Changed
