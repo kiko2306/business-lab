@@ -23429,12 +23429,15 @@ pattern) for BookStack / ITFlow / NocoDB / Jellyfin / Home Assistant.
   `exposable === false` branch (§331) deprovisions the NPM host + DNS +
   Authelia rule on the next sweep (or a `start`).
 
-  **Batch 1 landed (0.63.6, then corrected 0.63.7).** First cut also flagged
-  ITFlow `overlayOnly` — wrong: ITFlow's **client portal must be public**
-  (clients file tickets / view invoices; you can't put a VPN in front of
-  that). Reverted; ITFlow moved to batch 2. Final `overlayOnly` set:
-  `guacamole, kopia, n8n, nginx-proxy-manager, pihole`. Kopia + n8n teardown
-  is self-healing via the §331 reconciler sweep (or a `start` of each).
+  **Batch 1 landed + live-verified (0.63.6, corrected 0.63.7).** First cut
+  also flagged ITFlow `overlayOnly` — wrong: ITFlow's **client portal must be
+  public** (clients file tickets / view invoices; you can't put a VPN in
+  front of that). Reverted; ITFlow moved to batch 2. Final `overlayOnly` set:
+  `guacamole, kopia, n8n, nginx-proxy-manager, pihole`. Live: a `start` of
+  each of `kopia` / `n8n` ran `ensureAutoExposure` → `exposable:false` →
+  deprovisioned; `kopia.<domain>` / `n8n.<domain>` no longer resolve.
+  `itflow` re-provisioned after the revert — back to `itflow.<domain>` →
+  Authelia login (two logins, its interim state until batch 2).
 - **Batch 2 — expose-direct + admin bootstrap for BookStack, ITFlow, NocoDB,
   Jellyfin, Home Assistant.** Per app: `skipAutheliaProtection: true`, a
   `<app>Client.ts` + `reconcile<App>FirstAdmin` wired into
