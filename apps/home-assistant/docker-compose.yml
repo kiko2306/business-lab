@@ -21,6 +21,10 @@ services:
     network_mode: host
     environment:
       TZ: ${TZ:-UTC}
+      # NOT read by HA — a carrier so the config panel shows the field and the
+      # dashboard generates a value. The backend uses it to create HA's owner
+      # account via onboarding (services/homeAssistantAdminBootstrap.ts, §344).
+      HOMEASSISTANT_ADMIN_PASSWORD: ${HOMEASSISTANT_ADMIN_PASSWORD:-}
     labels:
       - "homepage.group=Home Automation"
       - "homepage.name=Home Assistant"

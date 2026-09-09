@@ -48,11 +48,14 @@ describe('buildHomeAssistantFixScript', () => {
     expect(script).toMatch(/mv -f \/config\/\.storage\/http/);
   });
 
-  it('carries the trusted_proxies block in its embedded payload', () => {
+  it('carries the trusted_proxies + brute-force lockout block in its embedded payload', () => {
     const b64 = script.match(/"([A-Za-z0-9+/=]{40,})"/)?.[1] ?? '';
     const decoded = Buffer.from(b64, 'base64').toString('utf8');
     expect(decoded).toContain('use_x_forwarded_for: true');
     expect(decoded).toContain('172.16.0.0/12');
+    // HA is exposed direct with only its own login (§344) — lockout must be on.
+    expect(decoded).toContain('ip_ban_enabled: true');
+    expect(decoded).toContain('login_attempts_threshold: 5');
   });
 });
 

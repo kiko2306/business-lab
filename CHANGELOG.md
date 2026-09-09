@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.67.0] — 2026-09-09
+
+### Changed
+
+- Home Assistant is exposed directly with its own login (§344/§347) — the dashboard runs HA's onboarding on start (Authelia admin username + generated HOMEASSISTANT_ADMIN_PASSWORD) and forces ip_ban_enabled in its managed http: block
+
 ## [0.66.1] — 2026-09-09
 
 ### Changed

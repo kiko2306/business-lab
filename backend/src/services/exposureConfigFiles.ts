@@ -43,6 +43,11 @@ const HA_HTTP_BLOCK = [
   '  use_x_forwarded_for: true',
   '  trusted_proxies:',
   ...HA_TRUSTED_PROXIES.map((cidr) => `    - ${cidr}`),
+  // HA is exposed directly with only its own login (§344), so its brute-force
+  // lockout has to be on — ip_ban_enabled defaults false and
+  // login_attempts_threshold defaults -1 (never bans).
+  '  ip_ban_enabled: true',
+  '  login_attempts_threshold: 5',
   HA_MARKER_END,
   '',
 ].join('\n');
