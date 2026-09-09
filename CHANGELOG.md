@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.68.0] — 2026-09-09
+
+### Changed
+
+- ITFlow is exposed directly with its own login (§346/§348) — the dashboard runs its setup wizard once the schema is up, verifying each step so a half-done setup is never locked
+
 ## [0.67.3] — 2026-09-09
 
 ### Fixed

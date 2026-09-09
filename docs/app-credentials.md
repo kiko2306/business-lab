@@ -48,6 +48,7 @@ once and never displayed again; rotate them there if you need a new one.
 | **Miniflux** | `MINIFLUX_ADMIN_USERNAME` (default `admin`) | `MINIFLUX_ADMIN_PASSWORD` (generated) — created from env on first boot, no wizard |
 | **DocuSeal** | the Authelia admin's email | `DOCUSEAL_ADMIN_PASSWORD` (generated). DocuSeal community has no SSO and can't hide its login form, so it is **exposed directly, not behind Authelia** (§342) — this account is the only login. The dashboard runs DocuSeal's first-run `/setup` wizard on first start (§341); read the password from `apps/docuseal/.env`, or set your own in the config panel **before** the first start. After setup, change it in DocuSeal → profile settings. |
 | **NocoDB** | the Authelia admin's email | `NOCODB_ADMIN_PASSWORD` (generated, complex). Community NocoDB has no OIDC, so it is **exposed directly, not behind Authelia** (§344) — this account is the only login. NocoDB (re-)provisions its super admin from `NC_ADMIN_EMAIL` / `NC_ADMIN_PASSWORD` on **every** boot, so these env values are the source of truth — change the password in `apps/nocodb/.env` (via the config panel) and restart, not inside NocoDB. Read it from `apps/nocodb/.env`. |
+| **ITFlow** | the Authelia admin's email | `ITFLOW_ADMIN_PASSWORD` (generated). ITFlow has no OIDC and its client portal must be public, so it is **exposed directly, not behind Authelia** (§344/§346) — this account is the only login. The dashboard runs ITFlow's four-step setup wizard on first start once the schema is up (it verifies each step and won't lock a half-done setup). Read the password from `apps/itflow/.env`, or set your own there **before** the first start. Turn on **2FA** in ITFlow → My Profile. Also do the two ITFlow things below (email + cron). |
 
 ## Wizard — you create the account
 
@@ -66,7 +67,6 @@ Every app is exposed behind Authelia automatically — claim these yourself befo
 | **Vikunja** | Register the first account; registration can then be disabled. Once exposed, an "Authelia" OIDC login button appears (the dashboard wires the client automatically — §270). After signing in through it once, flip **Configuration → `VIKUNJA_AUTH_LOCAL_ENABLED`** to false to drop Vikunja's own username/password form and leave Authelia as the only gate. |
 | **n8n** | Owner account created on first visit. |
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |
-| **ITFlow** | Setup wizard creates the first admin (behind Authelia for now — §346's auto-run bootstrap is parked pending a readiness gate). See the note below — email + cron. |
 
 ### Nextcloud — register the shared tree once (External Storage)
 
@@ -145,9 +145,9 @@ in front (that would be a second login — §342). NPM's own admin UI and
 Pi-hole are `overlayOnly` for the same reason. Guacamole's bundled
 `guacamole-auth-header` extension is left off since no reverse proxy fronts it
 — a forged `Remote-User` header on a directly reachable port would be an auth
-bypass. (ITFlow's client portal has to be public, so it stays exposed —
-behind Authelia for now, two logins, until §346's own-login bootstrap is
-unparked; enable 2FA in ITFlow's own settings meanwhile.)
+bypass. (ITFlow's client portal has to be public, so it's exposed directly
+with only its own login — §346, its setup wizard is run for you; enable 2FA
+in ITFlow's own settings.)
 
 | App | Why |
 |---|---|

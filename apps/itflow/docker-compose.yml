@@ -20,6 +20,10 @@ services:
       ITFLOW_LOG_LEVEL: ${ITFLOW_LOG_LEVEL:-info}
       ITFLOW_DB_HOST: itflow-db
       ITFLOW_DB_PASS: ${ITFLOW_DB_PASSWORD}
+      # NOT read by ITFlow — a carrier so the config panel shows the field and
+      # the dashboard generates a value. The backend uses it to run ITFlow's
+      # first-run setup wizard (services/itflowAdminBootstrap.ts, §344/§346).
+      ITFLOW_ADMIN_PASSWORD: ${ITFLOW_ADMIN_PASSWORD:-}
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=ITFlow"
