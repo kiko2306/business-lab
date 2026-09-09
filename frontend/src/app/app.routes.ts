@@ -3,7 +3,6 @@ import { ShellComponent } from './layout/shell/shell.component';
 import { HomeComponent } from './pages/home/home.component';
 import { AppsComponent } from './pages/apps/apps.component';
 import { BackupsComponent } from './pages/backups/backups.component';
-import { ExposureComponent } from './pages/exposure/exposure.component';
 import { SettingsComponent } from './pages/settings/settings.component';
 import { SocialComponent } from './pages/social/social.component';
 import { UtilsComponent } from './pages/utils/utils.component';
@@ -17,7 +16,7 @@ import { SelfUpdateComponent } from './pages/self-update/self-update.component';
 import { RecoveryComponent } from './pages/recovery/recovery.component';
 import { authGuard } from './guards/auth.guard';
 import { guestGuard } from './guards/guest.guard';
-import { requireCapability } from './guards/capability.guard';
+import { requireCapability, requireAnyCapability } from './guards/capability.guard';
 
 export const routes: Routes = [
   {
@@ -67,14 +66,9 @@ export const routes: Routes = [
         canActivate: [requireCapability('backups:manage')],
       },
       {
-        path: 'exposure',
-        component: ExposureComponent,
-        canActivate: [requireCapability('exposure:settings')],
-      },
-      {
         path: 'settings',
         component: SettingsComponent,
-        canActivate: [requireCapability('settings:manage')],
+        canActivate: [requireAnyCapability('settings:manage', 'exposure:settings')],
       },
       {
         // Content generation (plan.md §254 P2). Same capability as Settings —

@@ -17,18 +17,20 @@ import {
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
+import { AuthService } from '../../core/auth.service';
 import { PanelComponent } from '../../components/panel/panel.component';
+import { NetworkSettingsComponent } from './network-settings.component';
 
 /**
- * Stack-wide settings on its own route (§131.1): the timezone, ntfy alert
- * pushes, the shared mailbox and the backup destination. The Cloudflare token
- * and exposure provisioning left for `/exposure` in §143; what remains here is
- * everything that isn't networking.
+ * Stack-wide settings on its own route (§131.1): networking (the Cloudflare
+ * token + first-start provisioning, `<app-network-settings>`, folded back in
+ * from the old `/exposure` route — §331 slice 4), the timezone, ntfy alert
+ * pushes, the shared mailbox and the backup destination.
  */
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent, NetworkSettingsComponent],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.css'
 })
@@ -36,6 +38,11 @@ export class SettingsComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly settingsService = inject(SettingsService);
   private readonly toastService = inject(ToastService);
+
+  // Networking (Cloudflare token + tunnel provisioning) is the webmaster's
+  // remit — `exposure:settings`, distinct from the `settings:manage` that
+  // gates the rest of this page (§149).
+  protected readonly canManageNetworking = inject(AuthService).hasCapability('exposure:settings');
 
   // Sending is required as a set; receiving is entirely optional, so only
   // the SMTP half carries validators. Clearing imapHost turns receiving off.

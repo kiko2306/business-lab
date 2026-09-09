@@ -15,21 +15,21 @@ import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
 
 /**
- * Exposure & networking on its own route (§131.1): the Cloudflare Tunnel token
- * and the first-start exposure-provisioning settings (base domain, tunnel/zone
- * IDs, Nginx Proxy Manager credentials). Lifted out of the Settings panel
- * (§136.4) — the two panels were always the networking half of that stack, and
- * they share the same token. Per-service exposure stays on each service card
- * on the Apps page.
+ * Networking settings — the Cloudflare Tunnel token and the first-start
+ * exposure-provisioning values (base domain, tunnel/zone IDs, Nginx Proxy
+ * Manager credentials). Embedded in the Settings page (§331 slice 4, folded
+ * back after living on its own `/exposure` route since §143). There is no
+ * per-app exposure toggle any more — every exposable app is exposed
+ * automatically (§331).
  */
 @Component({
-  selector: 'app-exposure',
+  selector: 'app-network-settings',
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent],
-  templateUrl: './exposure.component.html',
-  styleUrl: './exposure.component.css',
+  templateUrl: './network-settings.component.html',
+  styleUrl: './network-settings.component.css',
 })
-export class ExposureComponent implements OnInit {
+export class NetworkSettingsComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly settingsService = inject(SettingsService);
   private readonly toastService = inject(ToastService);

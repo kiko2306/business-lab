@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.62.3] — 2026-09-09
+
+### Changed
+
+- The Cloudflare token + tunnel-provisioning forms moved from the standalone /exposure page onto the Settings page (`<app-network-settings>`); the /exposure route and nav link are gone (§331 slice 4)
+
 ## [0.62.2] — 2026-09-09
 
 ### Removed

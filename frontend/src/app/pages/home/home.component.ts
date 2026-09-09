@@ -50,9 +50,9 @@ export class HomeComponent {
       wide: true,
     },
     {
-      title: 'Exposure & networking',
-      description: 'The Cloudflare Tunnel token and first-start provisioning for Nginx Proxy Manager.',
-      link: '/exposure',
+      title: 'Networking',
+      description: 'The Cloudflare Tunnel token and first-start provisioning — now on the Settings page.',
+      link: '/settings',
       capability: 'exposure:settings',
     },
     {

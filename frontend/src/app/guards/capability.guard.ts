@@ -16,3 +16,14 @@ export function requireCapability(capability: Capability): CanActivateFn {
     return auth.hasCapability(capability) ? true : router.parseUrl('/home');
   };
 }
+
+/** Like `requireCapability`, but any one of `capabilities` is enough — e.g.
+ *  Settings holds both `settings:manage` panels and the `exposure:settings`
+ *  networking panel (§331 slice 4). */
+export function requireAnyCapability(...capabilities: Capability[]): CanActivateFn {
+  return () => {
+    const auth = inject(AuthService);
+    const router = inject(Router);
+    return capabilities.some((c) => auth.hasCapability(c)) ? true : router.parseUrl('/home');
+  };
+}

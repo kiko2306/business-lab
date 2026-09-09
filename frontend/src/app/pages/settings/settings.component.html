@@ -2,10 +2,12 @@
   <div class="mb-4">
     <h1 class="h3 mb-1">Settings</h1>
     <p class="text-body-secondary mb-0">
-      Stack-wide settings: the timezone, ntfy alert pushes, the shared mailbox,
-      and where backups are sent.
+      Stack-wide settings: networking, the timezone, ntfy alert pushes, the
+      shared mailbox, and where backups are sent.
     </p>
   </div>
+
+<app-network-settings *ngIf="canManageNetworking" />
 
 <app-panel
   key="settings:general"

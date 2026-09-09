@@ -22917,3 +22917,29 @@ With exposure automatic (§332) the write endpoints have no caller:
 Frontend 50 tests + build, backend 647 + tsc, all clean. Patch → 0.62.2.
 Batch §331 slices 1–3 complete; slice 4 (fold CF/tunnel config into Settings,
 delete the `/exposure` page) and slice 5 (docs) next.
+
+## 335. §331 slice 4 — fold the networking config into Settings, delete /exposure (2026-09-09)
+
+The `/exposure` page never held per-app toggles — only the Cloudflare Tunnel
+token and the first-start provisioning values (base domain, NPM creds, CF
+account/zone/tunnel IDs). With the per-app toggle gone (§334) a whole route for
+two infra panels isn't worth it.
+
+- `pages/exposure/exposure.component.*` → `pages/settings/network-settings.component.*`,
+  `ExposureComponent` → `NetworkSettingsComponent`, selector `app-network-settings`.
+  Stripped its `<main>`/`<h1>` wrapper — it's now just the two `<app-panel>`s.
+- `settings.component` embeds `<app-network-settings *ngIf="canManageNetworking" />`
+  at the top. `canManageNetworking = AuthService.hasCapability('exposure:settings')`
+  — the backend still gates `/api/settings/{cloudflare-token,exposure}` on that
+  capability (§149), so the panel only renders for who can use it.
+- Route `exposure` deleted from `app.routes.ts`; the `/settings` guard widened
+  to `requireAnyCapability('settings:manage', 'exposure:settings')` (new helper)
+  so an exposure-only webmaster still reaches the page. Shell nav "Exposure"
+  link removed, "Settings" link shown for either capability. Home menu tile
+  retitled "Networking", points at `/settings`.
+- e2e: `nav.spec` drops the Exposure row; `live-stack.spec`'s provisioning-test
+  navigates to `/settings` (the panel + its "Test connection" button are
+  unchanged, just relocated).
+
+`/api/settings/*` routes and `settings.service.ts` methods untouched. Frontend
+50 tests + build clean. Patch → 0.62.3.

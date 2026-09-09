@@ -19,10 +19,8 @@
              *ngIf="caps.has('apps:control')">Apps</a>
           <a class="app-nav__link" routerLink="/backups" routerLinkActive="active"
              *ngIf="caps.has('backups:manage')">Backups</a>
-          <a class="app-nav__link" routerLink="/exposure" routerLinkActive="active"
-             *ngIf="caps.has('exposure:settings')">Exposure</a>
           <a class="app-nav__link" routerLink="/settings" routerLinkActive="active"
-             *ngIf="caps.has('settings:manage')">Settings</a>
+             *ngIf="caps.has('settings:manage') || caps.has('exposure:settings')">Settings</a>
           <a class="app-nav__link" routerLink="/content" routerLinkActive="active"
              *ngIf="caps.has('settings:manage')">Content</a>
           <a class="app-nav__link" routerLink="/utils" routerLinkActive="active"

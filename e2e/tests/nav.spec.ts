@@ -6,7 +6,6 @@ import { test, expect } from '@playwright/test';
 const PAGES: { link: string; url: string; heading: string }[] = [
   { link: 'Apps', url: '**/apps', heading: 'Apps' },
   { link: 'Backups', url: '**/backups', heading: 'Backups & restore' },
-  { link: 'Exposure', url: '**/exposure', heading: 'Exposure & networking' },
   { link: 'Settings', url: '**/settings', heading: 'Settings' },
   { link: 'Utils', url: '**/utils', heading: 'Utils' },
   { link: 'Users & roles', url: '**/users', heading: 'Users & roles' },

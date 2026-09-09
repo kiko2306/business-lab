@@ -95,9 +95,9 @@ test.describe('live stack — Docker-touching flows', () => {
     await expect(page.getByText('Destination:')).toBeVisible();
   });
 
-  test('the Exposure page can test the provisioning connection', async ({ page }) => {
-    await page.goto('/exposure');
-    await expect(page.getByRole('heading', { name: 'Exposure & networking', level: 1 })).toBeVisible();
+  test('the Settings page can test the exposure provisioning connection', async ({ page }) => {
+    await page.goto('/settings');
+    await expect(page.getByRole('heading', { name: 'Settings', level: 1 })).toBeVisible();
 
     const panel = page.locator('.panel', { has: page.locator('.panel__toggle', { hasText: 'First-start exposure provisioning' }) });
     await expandPanel(page, 'First-start exposure provisioning');
