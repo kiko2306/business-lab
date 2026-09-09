@@ -22391,3 +22391,19 @@ neutral `APP_TLS_OFFLOAD` string — MeshCentral was the only registry user of
 MeshCentral…" rationale comment on the Guacamole entry is kept as the record
 of that decision. Closes the "prove MeshCentral live with a real agent"
 README item (§62.2). 660 backend tests + typecheck pass.
+
+## 321. kitchen-switcher removed (§301e, 2026-09-09)
+
+@mat call from the §301e survey. kitchen-switcher was a static nginx page whose
+entire function was a one-click toggle between Mealie and Pantry — ~5 MiB, but
+registry weight, a Home Page tile, and a backend config-writer
+(`kitchenConfig.ts`, run from `executor.ts` on every start) for something a
+bookmark does.
+
+Deleted `apps/kitchen-switcher/`, `services/kitchenConfig.ts` +
+`kitchenConfig.test.ts`, the `applyKitchenConfig` import and call site in
+`executor.ts`, the `services.ts` entry, and the rows in
+`docs/{ports,licences,app-credentials,sales-catalogue}.md` and
+`docs/raspberry-pi.md`. Port `10220` free again. Stale "same way as
+applyKitchenConfig" / "best-effort like the Kitchen config" doc-comment
+references in `sambaConfig.ts` repointed. 656 backend tests + typecheck pass.

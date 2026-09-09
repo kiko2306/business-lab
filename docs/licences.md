@@ -58,7 +58,6 @@ operate within, listed again at the end.
 | ITFlow | GPL-3.0 | ✅ Clean | no paid tiers |
 | IT Tools (`corentinth/it-tools`) | **GPL-3.0** | ✅ Clean | stock unmodified, static SPA served by nginx; GPL-3.0 places no restriction on running it internally, not redistributed as software |
 | Jellyfin | GPL-2.0 | ✅ Clean | |
-| Kitchen switcher | *ours* — no LICENSE file | ⚠️ Decide | repo has no licence (below) |
 | Kopia | Apache-2.0 | ✅ Clean | official `kopia/kopia` image, built by the project; internal backup use. The image bundles `rclone` (**MIT**, ✅ clean) — used only to reach an FTP destination via Kopia's `rclone` backend (§267); no separate image |
 | Mealie | **AGPL-3.0** | ✅ Clean | unmodified |
 | Miniflux (`miniflux/miniflux`) | **Apache-2.0** | ✅ Clean | stock unmodified. Bundled `miniflux-db` is `postgres:16-alpine` (PostgreSQL License, already rowed below) |
@@ -93,7 +92,6 @@ operate within, listed again at the end.
 | mariadb:latest (ITFlow), lscr.io/linuxserver/mariadb:latest (BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | not standardisable on MariaDB — its JSON column type breaks NPM's own migrations (§210.1) |
 | valkey:9-alpine (Immich, Paperless) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL). |
-| nginx:alpine (Kitchen switcher) | BSD-2-Clause | ✅ Clean | |
 | alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |
 | LinuxServer.io images (BookStack, Code Server, MariaDB, Speedtest) | image build scripts GPL-3.0; bundled apps keep their own licence | ✅ Clean | GPL applies to the packaging scripts, adds no restriction on running the app |

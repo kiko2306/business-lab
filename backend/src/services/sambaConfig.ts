@@ -2,8 +2,8 @@
  * Samba's `smb.conf` is a managed config file: the dashboard owns the share
  * definition, not a hand-edited file on the host (§0.2). This renders it from
  * the app's .env (share name + the account the entrypoint creates) just
- * before `docker compose up`, the same way applyKitchenConfig and
- * applyExposureConfigFiles run — so the share is correct from the first
+ * before `docker compose up`, the same way applyExposureConfigFiles
+ * runs — so the share is correct from the first
  * start with no field for anyone to fill in.
  *
  * dockur/samba's entrypoint uses a bind-mounted /etc/samba/smb.conf verbatim
@@ -81,7 +81,8 @@ export function buildSmbConf({ shareName, user }: SambaSettings): string {
 }
 
 /**
- * Write apps/samba/data/smb.conf. Not best-effort like the Kitchen config: if
+ * Write apps/samba/data/smb.conf. Unlike most rendered config this is not
+ * best-effort: if
  * this file is missing when `compose up` runs, Docker creates the bind source
  * as a directory and dockur/samba's entrypoint aborts. So a failure here
  * should fail the start rather than leave a broken bind.

@@ -1090,26 +1090,6 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     },
     // No Host-header / allowed-origin validation — nothing to sync on exposure.
   },
-  'kitchen-switcher': {
-    name: 'kitchen-switcher',
-    label: 'Kitchen',
-    description: 'One-click switcher between Mealie and Pantry',
-    icon: 'switch',
-    category: 'Productivity',
-    composePath: 'apps/kitchen-switcher/docker-compose.yml',
-    healthCheck: {
-      enabled: true,
-      type: 'http',
-      url: 'http://localhost:8013/',
-      interval: 30000,
-      timeout: 5000,
-    },
-    // Static nginx page — no framework, nothing to sync on exposure. The
-    // URLs of the apps it embeds are written into html/config.json on every
-    // start (services/kitchenConfig.ts) from live exposure state and the
-    // allocated ports, so there is nothing to type in; the gear icon still
-    // offers a per-browser override in localStorage.
-  },
   'onlyoffice': {
     name: 'onlyoffice',
     label: 'OnlyOffice',

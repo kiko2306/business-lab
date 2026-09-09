@@ -132,7 +132,6 @@ Verified against each image's registry manifest on 2026-08-31.
 | immich | yes | **no** | `immich-machine-learning` is not run by default (§300 B5); if re-enabled it is heavy — expect slow face/object indexing |
 | nextcloud | yes | yes | usable but sluggish on a Pi under load |
 | pantry, price-compare | yes | yes | built locally from `node:20-alpine`, pure-JS dependencies |
-| kitchen-switcher | yes | yes | static `nginx:alpine` |
 
 ## Performance notes
 

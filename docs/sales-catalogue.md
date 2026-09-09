@@ -49,7 +49,6 @@ replaces.
 |---|---|---|
 | Home Assistant | Home automation hub — devices, sensors, automations | SmartThings, Google Home/Nest's automation tier |
 | Mealie | Recipe manager and meal planner, imports recipes from URLs | Paprika, Whisk |
-| Kitchen Switcher | One-click toggle between the Mealie and Pantry apps on a shared kiosk device | (internal utility — no SaaS equivalent) |
 | Pantry | Custom-built pantry stock tracker — expiration dates, use-item flow, shopping list | Custom-built to replace a spreadsheet or a paid pantry-tracking app |
 | Price Compare | Compares grocery prices across several Portuguese supermarket chains | A grocery price-comparison app/browser extension |
 

@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.59.2] — 2026-09-09
+
+### Removed
+
+- kitchen-switcher dropped — a UI shim for a bookmark, not an app (§301e, §321)
+
 ## [0.59.1] — 2026-09-09
 
 ### Removed

@@ -15,7 +15,6 @@ import { buildMailEnvOverrides } from './mailEnv';
 import { ensureGeneratedSecrets } from './appEnv';
 import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
-import { applyKitchenConfig } from './kitchenConfig';
 import { applySambaConfig } from './sambaConfig';
 import { ensureKopiaRepoDir } from './kopiaTargetApply';
 import { clearImagePins, writeImagePins, pickLocalDigest, parseImageRef } from './composeOverride';
@@ -181,12 +180,9 @@ async function composeUpWithManagedConfig(
   const mailOverrides = await buildMailEnvOverrides(serviceName);
   await applyExposureConfigFiles(serviceName, appDir);
   await applyCrowdsecConfigFiles(serviceName, appDir);
-  // The Kitchen switcher embeds its siblings, so it needs their URLs — which
-  // only the dashboard knows (exposure state + allocated ports).
-  await applyKitchenConfig(serviceName, appDir);
-  // Samba: render the share's smb.conf before the app comes up. Unlike the
-  // Kitchen config this is load-bearing — a missing data/smb.conf makes
-  // Docker create the bind source as a directory and the entrypoint aborts.
+  // Samba: render the share's smb.conf before the app comes up — load-bearing:
+  // a missing data/smb.conf makes Docker create the bind source as a directory
+  // and the entrypoint aborts.
   await applySambaConfig(serviceName, appDir);
   // Kopia: a local (type=none) repository bind fails to mount if its directory
   // does not exist yet, and apps/*/data/ is gitignored — so create it before
