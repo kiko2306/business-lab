@@ -21918,3 +21918,31 @@ Practical effect: plan/docs/test-only commits and any not-yet-to-deploy code
 sit on `dev`; the session reports Docker-touching work as "on `dev`, ready to
 merge to `main` when you want to deploy". Saved to agent memory alongside the
 Update-page rule.
+
+## 307. §305 rollout — n8n and nocodb OOM-looped, caps raised (2026-09-09)
+
+Applied Phase C on `home-srv-01` by SSH (recreating every app + the
+management stack so the new `mem_limit`s took — a plain self-update pull
+wouldn't, no image change). 65/68 running containers ended up capped
+(the exceptions: `buildx_buildkit_default` and `peaceful_keldysh`, neither an
+app; `pihole` isn't running).
+
+**Two caps were too tight — n8n (640m) and nocodb (768m) crash-looped**,
+n8n with `FATAL ERROR: ... JavaScript heap out of memory`. Both are Node/V8
+apps that size the heap off the cgroup limit, so a cap set from idle RSS
+starved them. Every other app — including the other Node one, immich-server
+at 900m — took its cap cleanly with `RestartCount` 0. Both raised to
+**1200m** (committed, on `main`).
+
+Mid-fix the session's SSH access to host-mutating commands (`sed -i`,
+`docker update`, `docker compose up` loops) was locked down by the command
+classifier, so the cap bump could not be applied from here — handed to @mat
+with the exact commands. Net memory after the rollout (before the n8n/nocodb
+fix): RAM 6.8 GiB used / 8.0 GiB available (was 9.0 / 5.8 at the start of the
+rollout, 10.0 / 4.3 at the very start of the session), swap 1.2 GiB and
+settling.
+
+Also removed on the host during the rollout: `immich-machine-learning` — the
+dashboard's `apps/immich/docker-compose.override.yml` (§209 digest pins) still
+declared it, so `compose up` kept recreating it; deleted that stanza from the
+override and ran `compose up --remove-orphans`.
