@@ -59,8 +59,11 @@ services:
       # Vikunja is exposed. /etc/vikunja is on Vikunja's config search path, so
       # no pointer env var is needed. Read-only to the container.
       - ./data/config:/etc/vikunja:ro
+    # Vikunja's image is distroless — no /bin/sh (so CMD-SHELL can't run) and
+    # no wget. Use the binary's own `healthcheck` subcommand (the upstream
+    # docker-compose does the same); it hits the API and exits 0 when healthy.
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3456/api/v1/info || exit 1"]
+      test: ["CMD", "/app/vikunja/vikunja", "healthcheck"]
       interval: 30s
       timeout: 10s
       retries: 3

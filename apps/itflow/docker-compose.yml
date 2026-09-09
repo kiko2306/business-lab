@@ -39,8 +39,12 @@ services:
     # so if cron dies this healthcheck still reports healthy while every
     # scheduled job (email-to-ticket, mail queue, recurring invoices) silently
     # stops. See plan.md §62.1.
+    # wget, not curl — the itfloworg/itflow image (Alpine) ships busybox wget
+    # but no curl, so the old `curl -f` check could never run and the
+    # container read `unhealthy` while httpd was fine. busybox wget exits
+    # non-zero on a 4xx/5xx, which is the "is httpd answering" signal wanted.
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8080"]
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost:8080/"]
       interval: 30s
       timeout: 10s
       retries: 3
