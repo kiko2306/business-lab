@@ -42,7 +42,6 @@ replaces.
 | App | What it does | Stands in for |
 |---|---|---|
 | Ntfy | Push notifications to phone and desktop, triggered from other apps or scripts | Pushover, Pushbullet |
-| WAHA | WhatsApp HTTP API gateway for automations (e.g. n8n) to send/receive messages | A paid WhatsApp Business API provider (Twilio, 360dialog) |
 | Vaultwarden | Self-hosted password manager, Bitwarden-client compatible | 1Password, LastPass, Bitwarden's own hosted tiers |
 
 ## Home and lifestyle

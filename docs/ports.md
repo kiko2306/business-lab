@@ -77,7 +77,7 @@ hand edit can leave its copy disagreeing with the app's.
 `10300` pantry · `10310` paperless · `10320` pihole-web ·
 `10340` price-compare · `10350` speedtest ·
 `10360` stirling-pdf · `10370` uptime-kuma · `10380` vaultwarden ·
-`10390` vikunja · `10400` waha · `10410` wetty · `10420` itflow ·
+`10390` vikunja · `10410` wetty · `10420` itflow ·
 `10430` guacamole · `10440` homebox · `10450` clamav (clamd, no UI) ·
 `10460` onlyoffice · `10470` kopia (server UI on container `51515`) ·
 `10480` scrutiny · `10490` it-tools · `10500` syncthing (GUI; sync on

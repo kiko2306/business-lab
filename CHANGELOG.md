@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.51.0] — 2026-09-09
+
+### Removed
+
+- WAHA (WhatsApp HTTP API) removed — automating WhatsApp Web breaches Meta's ToS (a non-software-terms flag in docs/licences.md), a headless-Chromium container at ~277 MiB, and nothing in the stack consumed it
+
 ## [0.50.0] — 2026-09-09
 
 ### Removed

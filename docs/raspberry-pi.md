@@ -6,13 +6,9 @@ published multi-arch, the backend has no natively compiled dependencies, and
 which supports arm64, and its cloudflared download already branches on
 `aarch64|arm64`).
 
-Two things do need attention, and both are handled in this repo:
+One thing does need attention, and it is handled in this repo:
 
 - **A 64-bit OS is mandatory.** See [Why 64-bit](#why-64-bit) below.
-- **`apps/waha` needs a different image tag on ARM.** Set
-  `WAHA_IMAGE_TAG=arm` in `apps/waha/.env` — upstream publishes the ARM64
-  build under its own tag instead of in a multi-arch manifest. Everything
-  else works with no changes.
 
 ## Hardware requirements
 
@@ -114,12 +110,6 @@ sudo ./start.sh
 `start.sh` uses `apt-get`, which Raspberry Pi OS provides, and installs Docker
 and the Compose plugin the same way it does on any Debian host.
 
-One ARM-only step, and only if you use WAHA:
-
-```bash
-echo "WAHA_IMAGE_TAG=arm" >> apps/waha/.env
-```
-
 ## Why 64-bit
 
 The core stack itself would run on 32-bit (`node`, `nginx`, `postgres` and
@@ -143,7 +133,6 @@ Verified against each image's registry manifest on 2026-08-31.
 | nextcloud | yes | yes | usable but sluggish on a Pi under load |
 | pantry, price-compare | yes | yes | built locally from `node:20-alpine`, pure-JS dependencies |
 | kitchen-switcher | yes | yes | static `nginx:alpine` |
-| **waha** | **yes, with `WAHA_IMAGE_TAG=arm`** | no | `latest` is amd64-only |
 | **mssql** | **no** | **no** | Microsoft ships x86-64 only; no emulation support. The registry marks it `x86Only` and the dashboard refuses to start it on a non-x64 host (§263a). |
 
 ## Performance notes

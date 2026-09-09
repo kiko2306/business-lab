@@ -33,9 +33,8 @@ can still bite, and the rows to read carefully, are:
    line is **who operates the instance**: the client, on their own box, for
    their own use → fine; Business Lab hosting it centrally for several clients →
    not, without a commercial licence.
-3. **Non-software terms** — WAHA automates WhatsApp Web, which breaches Meta's
-   ToS regardless of WAHA's own (permissive) licence. Ookla's Speedtest CLI has
-   its own EULA. These are business risks, not licence blockers.
+3. **Non-software terms** — Ookla's Speedtest CLI has its own EULA. A business
+   risk to accept or avoid, not a licence blocker.
 
 Under this model, **nothing here blocks pricing.** The ⚠️ rows are conditions to
 operate within, listed again at the end.
@@ -87,7 +86,6 @@ operate within, listed again at the end.
 | Uptime Kuma | MIT | ✅ Clean | |
 | Vaultwarden | **AGPL-3.0** | ✅ Clean | unmodified |
 | Vikunja | **AGPL-3.0** | ✅ Clean | unmodified |
-| **WAHA** (core image) | Apache-2.0 | ⚠️ Watch | licence is clean. But automating WhatsApp Web **breaches Meta/WhatsApp ToS** — the client's number can be banned. Treat as a documented risk the client accepts, not a feature sold with a guarantee. |
 | Web Terminal (wetty) | MIT | ✅ Clean | |
 
 ## Infrastructure & dependency images
@@ -140,11 +138,9 @@ commercial side.
 4. **Keep off `redis:7-alpine`** (RSALv2/SSPL). Paperless is on Valkey; if any
    future app needs a Redis, use Valkey or pin `redis:7.2-alpine` (still BSD-3).
 5. **Speedtest**: accept the Ookla CLI EULA, or replace with LibreSpeed.
-6. **WAHA**: document the WhatsApp-ToS ban risk in the client agreement; don't
-   warrant deliverability.
-7. **Never ship a modified build** of any AGPL/GPL app without making the source
+6. **Never ship a modified build** of any AGPL/GPL app without making the source
    available. Stock images only.
-8. **Pick a licence for this repo.**
+7. **Pick a licence for this repo.**
 
 Do those and the "not sold, setup & maintenance only" model is clear of every
 licence here.

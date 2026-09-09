@@ -21582,3 +21582,30 @@ never built.
 
 Backend `check.sh test` 691/691, `typecheck` clean. `minor` bump 0.49.8 →
 0.50.0.
+
+## 301b. WAHA removed (2026-09-09)
+
+Second of the §301 removals. WAHA (WhatsApp HTTP API — headless Chromium
+driving WhatsApp Web, ~277 MiB) automates WhatsApp Web, which breaches Meta's
+ToS regardless of WAHA's Apache-2.0 licence — a standing ⚠️ non-software-terms
+flag in `docs/licences.md`. Nothing in the stack consumed it (the P4 n8n
+glue that would have was never built).
+
+- Deleted `apps/waha/` and the `services.ts` registry entry (the whole code
+  surface — no backend/frontend code, no non-fixture tests).
+- `homepageConfig.test.ts` used `waha` as the generic "running + exposed"
+  tile fixture in two cases — swapped to `pihole` / `/admin` (a real registry
+  app that genuinely has a non-root `webPath`), assertions updated.
+- Docs: dropped the app rows in `app-credentials.md`, `licences.md` (app row
+  + the item-6 client-agreement note, renumbered 7→6/8→7) and
+  `sales-catalogue.md`; removed the `10400 waha` line from `ports.md`; removed
+  the WAHA `WAHA_IMAGE_TAG=arm` steps and compat-table row from
+  `raspberry-pi.md` (which leaves `mssql` as the only special-case there —
+  itself going in §301c); trimmed licences.md's "non-software terms" bullet
+  to Speedtest-only. README's Authelia-audit "no known full fix" list lost
+  its WAHA mention.
+- Host: `docker rm -f waha-waha-1` + its network. `home-srv-01` 8.8→8.6 GiB
+  used.
+
+Backend `check.sh test` 691/691, `typecheck` clean. `minor` bump 0.50.0 →
+0.51.0.

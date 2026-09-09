@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.50.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.51.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -279,9 +279,6 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
 
 Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
 
-- [ ] **Remove WAHA** (§301b) — `apps/waha/`, registry entry, docs rows
-      (incl. the licences.md ⚠️ WhatsApp-ToS row), test fixtures; stop+rm
-      `waha-waha-1`. `minor` bump.
 - [ ] **Remove SQL Server** (§301c) — the deep one: `apps/mssql/`,
       `mssqlEula.ts`, the `/settings/mssql-eula` route + validator, the
       `x86Only`/`assertPlatformSupported` guard, the `mssql` backup engine,
@@ -435,7 +432,7 @@ below.
       **BookStack** has OIDC/SAML too, but no flag to hide the local form —
       `AUTH_METHOD=oidc` only adds OIDC as an option, and a years-old
       upstream request to disable the standard form is still unimplemented.
-      ITFlow, NPM's own admin UI, Pi-hole, Kopia, WAHA, n8n and NocoDB
+      ITFlow, NPM's own admin UI, Pi-hole, Kopia, n8n and NocoDB
       (Enterprise-only SSO — §273), Jellyfin (core has no header-trust, only a
       community plugin) and BookStack have no known full fix — parked, not
       blocked on anything actionable.
