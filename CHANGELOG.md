@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.67.1] — 2026-09-09
+
+### Fixed
+
+- Home Assistant ip_ban_enabled now actually applies (§347) — the managed http: block is reconciled (stale versions replaced) and .storage/http reset unless it carries both use_x_forwarded_for and ip_ban_enabled
+
 ## [0.67.0] — 2026-09-09
 
 ### Changed

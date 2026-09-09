@@ -78,35 +78,58 @@ function run(command: string, timeoutMs = 120_000): Promise<string> {
 }
 
 /**
- * The /bin/sh script that runs inside the throwaway HA container. Appends the
- * http: block to /config/configuration.yaml if it's missing (and the user
- * hasn't got their own http:), then moves aside a stale .storage/http so HA
- * re-migrates the block on the start that follows.
+ * The /bin/sh script that runs inside the throwaway HA container. Makes
+ * /config/configuration.yaml carry the *current* marker-fenced http: block
+ * (appended if absent, replaced if a stale version is present — e.g. one
+ * without the §344 ip_ban keys), then moves aside a stale .storage/http so HA
+ * re-migrates the block on the start that follows. The .storage/http reset
+ * fires unless the live config already carries BOTH use_x_forwarded_for and
+ * ip_ban_enabled, so tightening the block reaches a HA that already migrated
+ * an earlier version.
  */
 function buildHomeAssistantFixScript(): string {
   const blockB64 = Buffer.from(HA_HTTP_BLOCK).toString('base64');
+  const begin = JSON.stringify(HA_MARKER_BEGIN);
+  const end = JSON.stringify(HA_MARKER_END);
   return [
     'set -e',
     'CFG=/config/configuration.yaml',
-    `MARK=${JSON.stringify(HA_MARKER_BEGIN)}`,
-    'if [ -f "$CFG" ]; then',
-    '  if ! grep -qF "$MARK" "$CFG" && ! grep -qE "^http:([[:space:]]|$)" "$CFG"; then',
-    '    printf "\\n" >> "$CFG"',
-    `    printf '%s' ${JSON.stringify(blockB64)} | base64 -d >> "$CFG"`,
-    '    echo "hlm: appended http: block to configuration.yaml"',
-    '  fi',
-    'fi',
+    `export HLM_BLOCK=$(printf '%s' ${JSON.stringify(blockB64)} | base64 -d)`,
+    // Reconcile the marker block in configuration.yaml. python3 is in the
+    // image; the block comes in via the env so nothing needs escaping.
+    "python3 <<'PYEOF'",
+    'import io, os, re',
+    'cfg = "/config/configuration.yaml"',
+    `begin, end = ${begin}, ${end}`,
+    'block = os.environ.get("HLM_BLOCK", "")',
+    'text = ""',
+    'if os.path.exists(cfg):',
+    '    text = io.open(cfg, encoding="utf-8").read()',
+    'has_own_http = re.search(r"(?m)^http:\\s*($|[#\\s])", re.sub(re.escape(begin) + r"[\\s\\S]*?" + re.escape(end) + r"\\n?", "", text)) is not None',
+    'pat = re.compile(re.escape(begin) + r"[\\s\\S]*?" + re.escape(end) + r"\\n?")',
+    'if pat.search(text):',
+    '    new = pat.sub(block.rstrip("\\n") + "\\n", text, count=1)',
+    '    if new != text:',
+    '        io.open(cfg, "w", encoding="utf-8").write(new)',
+    '        print("hlm: replaced stale http: block in configuration.yaml")',
+    '    else:',
+    '        print("hlm: configuration.yaml http: block already current")',
+    'elif not has_own_http:',
+    '    io.open(cfg, "a", encoding="utf-8").write("\\n" + block)',
+    '    print("hlm: appended http: block to configuration.yaml")',
+    'else:',
+    '    print("hlm: user manages http: — left configuration.yaml alone")',
+    'PYEOF',
     'if [ -f /config/.storage/http ]; then',
-    // Reset .storage/http only when neither `stable` nor a healthy `pending`
-    // already carries use_x_forwarded_for — HA's image has python3, and a
-    // heredoc survives the base64 round-trip fine.
     "  RESET=$(python3 <<'PYEOF'",
     'import json',
     'try:',
     '    d = json.load(open("/config/.storage/http"))["data"]',
     '    st = d.get("stable") or {}',
     '    pe = d.get("pending") or {}',
-    '    ok = st.get("use_x_forwarded_for") is True or (pe.get("use_x_forwarded_for") is True and not pe.get("error"))',
+    '    def has(k):',
+    '        return st.get(k) is True or (pe.get(k) is True and not pe.get("error"))',
+    '    ok = has("use_x_forwarded_for") and has("ip_ban_enabled")',
     '    print("ok" if ok else "reset")',
     'except Exception:',
     '    print("reset")',

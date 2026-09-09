@@ -23595,3 +23595,19 @@ Minor → 0.67.0.
 §344 status: BookStack (OIDC), NocoDB, Jellyfin (lanOnly), Kopia/n8n
 (overlayOnly), Home Assistant — done. **ITFlow** is the only one left,
 parked (§346) pending a `getSetupState` readiness gate.
+
+**Follow-up (0.67.1).** Live-verified §347: HA went expose-direct (200 to
+`/onboarding.html`, no Authelia redirect, zero Authelia rule) and the
+bootstrap created its owner (`admin` + generated pw) — HA had never actually
+been onboarded behind Authelia. **But `ip_ban_enabled` didn't take effect**:
+HA had already migrated the pre-§344 `http:` block into `.storage/http`, and
+the §311 reconcile only reset `.storage/http` when it *lacked*
+`use_x_forwarded_for`, not when the block content changed. Fixed
+`buildHomeAssistantFixScript`:
+- the `configuration.yaml` marker block is now *reconciled* (append if
+  absent, **replace** a stale version, leave a user-owned `http:` alone) via
+  python rather than a one-shot shell append;
+- the `.storage/http` reset fires unless the live config carries **both**
+  `use_x_forwarded_for` and `ip_ban_enabled`.
+Ran the generated script against fixtures in a `python:3.12-slim` container:
+stale block → replaced with the ip_ban version, `.storage/http` → moved aside.

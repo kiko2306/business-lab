@@ -37,15 +37,18 @@ describe('exposureConfigFiles.hasOwnHttpSection', () => {
 describe('buildHomeAssistantFixScript', () => {
   const script = __test.buildHomeAssistantFixScript();
 
-  it('appends the http: block only when neither our marker nor a user http: is present', () => {
-    expect(script).toContain('grep -qF "$MARK"');
-    expect(script).toContain('grep -qE "^http:([[:space:]]|$)"');
-    expect(script).toContain('base64 -d >> "$CFG"');
+  it('reconciles the marker block in configuration.yaml (append, replace, or leave a user http: alone)', () => {
+    expect(script).toContain('/config/configuration.yaml');
+    // append when absent, replace a stale version, respect a user-owned http:
+    expect(script).toContain('appended http: block to configuration.yaml');
+    expect(script).toContain('replaced stale http: block in configuration.yaml');
+    expect(script).toContain('left configuration.yaml alone');
   });
 
-  it('resets a stale .storage/http', () => {
+  it('resets a stale .storage/http unless it carries BOTH forwarded-for and ip_ban', () => {
     expect(script).toContain('/config/.storage/http');
     expect(script).toMatch(/mv -f \/config\/\.storage\/http/);
+    expect(script).toContain('has("use_x_forwarded_for") and has("ip_ban_enabled")');
   });
 
   it('carries the trusted_proxies + brute-force lockout block in its embedded payload', () => {
