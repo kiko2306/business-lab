@@ -50,7 +50,6 @@ operate within, listed again at the end.
 | Code Server | MIT | ✅ Clean | VS Code OSS build |
 | CrowdSec | MIT | ✅ Clean | Cloudflare bouncer MIT; NPM Lua bouncer MIT, see vendored code below |
 | Dozzle | MIT | ✅ Clean | |
-| File Browser | Apache-2.0 | ✅ Clean | |
 | Forgejo (`codeberg.org/forgejo/forgejo`) | **GPL-3.0-or-later** | ✅ Clean | official image, run stock. GPL-3.0 places no restriction on running it internally; not modified, not redistributed as software. Bundled SQLite (public domain) is in the binary — no separate image. Alpine base rowed below. No paid tier |
 | Guacamole | Apache-2.0 | ✅ Clean | incl. bundled `guacamole-auth-header` extension, same licence |
 | Home Assistant | Apache-2.0 | ✅ Clean | |

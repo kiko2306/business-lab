@@ -274,17 +274,6 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       fromName: ['BOOKSTACK_MAIL_FROM_NAME'],
     },
   },
-  'filebrowser': {
-    name: 'filebrowser',
-    label: 'File Browser',
-    description: 'Web-based file manager',
-    icon: 'folder',
-    category: 'Backup & Storage',
-    composePath: 'apps/file-browser/docker-compose.yml',
-    healthCheck: {
-      enabled: false,
-    },
-  },
   'homepage': {
     name: 'homepage',
     label: 'Home Page',

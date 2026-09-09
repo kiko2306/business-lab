@@ -40,8 +40,8 @@ describe('findSqliteFiles', () => {
   });
 
   it('rejects a .db file that is NOT SQLite', () => {
-    // portainer and file-browser use BoltDB, stirling-pdf uses H2 — all with a
-    // .db extension. Snapshotting those with sqlite3 would produce garbage
+    // portainer uses BoltDB, stirling-pdf uses H2 — both with a .db
+    // extension. Snapshotting those with sqlite3 would produce garbage
     // that still looks like a successful backup.
     write('alpha/data/portainer.db', Buffer.from('    bolt-ish content'));
     write('beta/data/stirling.mv.db', Buffer.from('H:2,block:4,blockSize:10'));

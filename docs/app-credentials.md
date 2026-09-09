@@ -64,7 +64,6 @@ Open these privately and claim them before exposing.
 | **NocoDB** | First signup becomes the super admin. |
 | **Vikunja** | Register the first account; registration can then be disabled. Once exposed, an "Authelia" OIDC login button appears (the dashboard wires the client automatically — §270). After signing in through it once, flip **Configuration → `VIKUNJA_AUTH_LOCAL_ENABLED`** to false to drop Vikunja's own username/password form and leave Authelia as the only gate. |
 | **n8n** | Owner account created on first visit. |
-| **File Browser** | Ships with `admin` / `admin`. |
 | **Forgejo** | First account you register becomes the admin (the web installer is pre-locked). Claim it privately, then set **Configuration → `FORGEJO_DISABLE_REGISTRATION`** true and restart to close sign-ups. SSH git access is on host port `10561` (`ssh://git@<host>:10561/owner/repo`), LAN/VPN only — the tunnel carries HTTP, not SSH. |
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |
 | **ITFlow** | Setup wizard creates the first admin. See the note below — it needs two things switched on afterwards. |
@@ -72,9 +71,11 @@ Open these privately and claim them before exposing.
 
 ### Nextcloud — register the shared tree once (External Storage)
 
-The tree File Browser and Samba already share (§202/§219) is bind-mounted
-into the Nextcloud container at `/shared`, but Nextcloud won't show it until
-you register it as external storage — and that one step can't be scripted:
+The shared tree lives at `apps/nextcloud/data/shared/` (§202/§219/§310) — a
+sibling of Nextcloud's webroot, also served over SMB by Samba — and is
+bind-mounted into the Nextcloud container at `/shared`, but Nextcloud won't
+show it until you register it as external storage — and that one step can't
+be scripted:
 Nextcloud's own create API for it requires a fresh interactive password
 confirmation (`#[PasswordConfirmationRequired(strict: true)]`), which no
 API/Basic-Auth call can satisfy, and the `occ files_external:create` command

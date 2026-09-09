@@ -37,14 +37,16 @@ services:
       - "homepage.description=File sync, calendar, and contacts"
     volumes:
       - ./data/app:/var/www/html
-      # The tree File Browser and Samba already share (plan.md §202/§219),
-      # mounted at a path outside the webroot — writing into ./data/app
-      # directly would desync Nextcloud's own file cache. Register it once
+      # The shared tree (plan.md §202/§219/§310). Nextcloud is its primary
+      # interface, so it lives under this app — but as a SIBLING of the
+      # webroot, not inside ./data/app: writing into the webroot from
+      # outside would desync Nextcloud's own file cache. Samba serves this
+      # same dir over SMB, Paperless watches a subfolder. Register it once
       # via Admin settings -> External Storage (local, /shared): the create
       # API is #[PasswordConfirmationRequired(strict: true)] upstream, which
       # only a real interactive session can satisfy, so this one step can't
       # be scripted (see docs/app-credentials.md).
-      - ../file-browser/data/files:/shared
+      - ./data/shared:/shared
     depends_on:
       nextcloud-db:
         condition: service_healthy

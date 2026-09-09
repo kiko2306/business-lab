@@ -33,7 +33,7 @@ Upstream defaults collided. Before this scheme:
 | Port | Claimed by |
 |---|---|
 | `80` | bookstack, nginx-proxy-manager, speedtest |
-| `8080` | file-browser, netbird-management, pihole-web |
+| `8080` | netbird-management, pihole-web |
 | `8081` | dozzle, netbird-dashboard |
 | `3000` | home-page **and the backend itself** |
 
@@ -69,7 +69,7 @@ hand edit can leave its copy disagreeing with the app's.
 ## Current allocation
 
 `10100` authelia · `10110` beszel · `10120` bookstack · `10130` code-server ·
-`10140` dozzle · `10160` file-browser ·
+`10140` dozzle ·
 `10190` home-page · `10200` immich · `10210` jellyfin ·
 `10220` kitchen-switcher · `10230` mealie · `10240` n8n ·
 `10250`–`10253` netbird (management, dashboard, signal, relay) ·

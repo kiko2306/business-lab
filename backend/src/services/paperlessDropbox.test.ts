@@ -18,10 +18,10 @@ afterEach(() => {
 });
 
 describe('ensurePaperlessDropbox', () => {
-  it('creates the shared-tree drop box under the sibling file-browser app, world-writable', () => {
+  it('creates the drop box under nextcloud/data/shared, world-writable', () => {
     ensurePaperlessDropbox(appDir);
 
-    const dropbox = path.join(root, 'file-browser', 'data', 'files', 'to-paperless');
+    const dropbox = path.join(root, 'nextcloud', 'data', 'shared', 'to-paperless');
     const stat = fs.statSync(dropbox);
     expect(stat.isDirectory()).toBe(true);
     expect(stat.mode & 0o777).toBe(0o777);
@@ -34,7 +34,7 @@ describe('ensurePaperlessDropbox', () => {
 
   it('tolerates a chmod EPERM when the dir is already world-writable', () => {
     ensurePaperlessDropbox(appDir);
-    const dropbox = path.join(root, 'file-browser', 'data', 'files', 'to-paperless');
+    const dropbox = path.join(root, 'nextcloud', 'data', 'shared', 'to-paperless');
     // Simulate "owned by another uid": chmod throws EPERM but the mode is fine.
     const realChmod = fs.chmodSync;
     (fs as unknown as { chmodSync: unknown }).chmodSync = () => {

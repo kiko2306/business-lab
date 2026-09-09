@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.54.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.55.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -278,8 +278,9 @@ Roster removals (§301 — drop the heaviest apps outright instead of tuning the
         deployment.
       - **kitchen-switcher** — a one-click Mealie↔Pantry toggle, not really an
         app. Keep or drop.
-      Minor/no action: wetty vs Guacamole SSH, File Browser vs Nextcloud,
-      Miniflux vs Nextcloud News, BookStack vs ITFlow docs (all cheap to keep).
+      Minor/no action: wetty vs Guacamole SSH, Miniflux vs Nextcloud News,
+      BookStack vs ITFlow docs (all cheap to keep). (File Browser vs Nextcloud
+      resolved — File Browser removed, §310.)
 
 Strategy:
 
@@ -355,11 +356,16 @@ below.
       §217) — twelve apps ship a real, upstream-supported way to stop
       showing their own login on top of Authelia's, the same shape as the
       already-fixed Dozzle/Guacamole:
-      - **Header/IP trust**: still open — File Browser (`auth.method=proxy`)
-        and Home Assistant (`trusted_networks` — IP-based, weaker). The §180
-        LAN-bypass blocker on these is **now cleared** (§279 closed it live:
-        NPM's proxy ports are loopback-only, so there is no un-gated
-        LAN-direct path to drop a login in favour of), so both are buildable.
+      - **Header/IP trust**: still open — Home Assistant (`trusted_networks`
+        — IP-based, weaker). The §180 LAN-bypass blocker on it is **now
+        cleared** (§279 closed it live: NPM's proxy ports are loopback-only,
+        so there is no un-gated LAN-direct path to drop a login in favour
+        of), so it is buildable. File Browser was the other candidate here —
+        **removed entirely** (§310): upstream `filebrowser/filebrowser` was
+        archived 2026-09-01 with no further security fixes, and it held the
+        repo's most dangerous bind mount (`~` read-write). The shared tree it
+        seeded moved under Nextcloud (`apps/nextcloud/data/shared/`), which
+        is now the primary interface to those files.
         Done: Stirling-PDF (shipped with
         `SECURITY_ENABLELOGIN=false`), Uptime Kuma (`disableAuth` set by an
         idempotent init sidecar, §227), Paperless-ngx (`Remote-User` via
@@ -436,6 +442,14 @@ below.
       a real interactive login — Nextcloud's create API requires a fresh
       password confirmation no API call can satisfy. Steps in
       `docs/app-credentials.md`.
+- [ ] **@mat: relocate the live shared tree + re-prove the round-trip**
+      (§310) — File Browser was removed and the shared tree moved from
+      `apps/file-browser/data/files/` to `apps/nextcloud/data/shared/`. A
+      fresh clone is fine (dir is gitignored), but the deployed host has
+      real data at the old path: in a maintenance window `mv` it to the new
+      path, then re-run §219's live check (write over SMB → visible in
+      Nextcloud `/shared` and in Paperless's `to-paperless/` drop box → and
+      back). Until then §310 stays on `dev`, unmerged.
 - [ ] **@mat: decide Pi-hole's port-53 conflict** (§283, §284) — starting
       Pi-hole from a fresh deploy fails: `failed to bind host port
       0.0.0.0:53/tcp: address already in use`. Root cause confirmed (no

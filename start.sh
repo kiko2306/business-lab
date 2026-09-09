@@ -517,7 +517,7 @@ fi
 #
 # Every managed app publishes a host port. Left to upstream defaults these
 # collide: before this scheme, port 80 was claimed by bookstack, NPM *and*
-# speedtest, 8080 by file-browser, netbird-management and pihole-web, and
+# speedtest, 8080 by netbird-management and pihole-web, and
 # home-page defaulted to 3000 — the backend's own port. Colliding apps simply
 # fail to start, one at a time, as they are enabled.
 #

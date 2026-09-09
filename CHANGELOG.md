@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.55.0] — 2026-09-09
+
+### Removed
+
+- File Browser removed — upstream `filebrowser/filebrowser` was archived 2026-09-01 with no further security fixes, while holding the repo's most dangerous bind mount (host `~` read-write); the shared tree it seeded moved to `apps/nextcloud/data/shared/`, still served over SMB by Samba and watched by Paperless
+
 ## [0.54.0] — 2026-09-09
 
 ### Changed

@@ -33,7 +33,6 @@ replaces.
 |---|---|---|
 | Nextcloud | File sync, calendar and contacts | Google Drive/Calendar, Dropbox, Microsoft 365 |
 | Immich | Photo and video backup with mobile auto-upload | Google Photos, iCloud Photos |
-| File Browser | Web-based file manager over a shared folder | A lightweight Dropbox/WeTransfer-style file portal |
 | Samba | Windows (SMB) network file share on the LAN | A NAS's file-share tier |
 | Jellyfin | Home media server for the client's own video/music library | Plex Pass, a personal Netflix-style front end |
 

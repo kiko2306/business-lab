@@ -21988,3 +21988,75 @@ RAM unchanged (disk-only op). `/home` now 48 GB used / 304 GB free.
 
 Phase A is done. §300 has only Phase D open (the ClamAV on-access-vs-scheduled
 question). Session disk total: ~40 GB reclaimed across §301f + §308 + §309.
+
+## 310. File Browser removed — upstream archived; shared tree moved under Nextcloud (§216/§217, §219, 2026-09-09)
+
+Picked up the README §217 "trust the proxy" item for **File Browser**
+(`auth.method=proxy` header-trust, the §180 LAN-bypass blocker cleared by
+§279). Probing the image to confirm the config mechanism turned up a
+show-stopper printed on every start:
+
+```
+NOTICE: File Browser is being wound down.
+NOTICE: The project is archived on 2026-09-01, after which there will be no
+NOTICE: further releases and no security fixes.
+```
+
+Confirmed via the GitHub API: `filebrowser/filebrowser` has
+`"archived": true`, last push 2026-07-31, known-unfixed issues sitting in
+security advisories. The `:latest` image we pin (built 2026-07-27) is the
+final release.
+
+### Decision: remove the app entirely, don't wire SSO into it
+
+Wiring proxy-auth into File Browser would be investing in a security-frozen
+codebase that holds the single most dangerous bind mount in the repo —
+`${FILEBROWSER_HOME:-/home/mat}` read-write, reaching `~/.ssh`, `~/.gnupg`,
+`~/.docker` and every `apps/*/.env`. Its own login was the only gate on
+that. Rejected alternatives:
+
+- **Migrate to the maintained fork `gtsteffaniak/filebrowser`** (active,
+  8.2k stars) then wire SSO against it — a real roster addition (new image,
+  re-vet licence, re-verify the DB-backup caveat), not worth it when
+  Nextcloud already covers browser-based file management. The §301e overlap
+  survey already flagged "File Browser vs Nextcloud".
+- **Keep it unwired, just delete the §217 bullet line** — leaves an
+  archived, unpatched app exposed for no reason.
+
+`@mat` confirmed: drop it, and — since Nextcloud is the access path to
+shared files now — the apps that were mounting File Browser's tree move to
+Nextcloud's.
+
+### What moved
+
+`apps/file-browser/data/files/` had quietly become the canonical shared
+tree (§219): Samba (`/storage`), Nextcloud External Storage (`/shared`) and
+Paperless's one-way drop box (`…/to-paperless` → `consume/`) all bind-mount
+it by relative path. New home: **`apps/nextcloud/data/shared/`** — a
+*sibling* of Nextcloud's webroot, never inside `./data/app` (§219's reason
+stands: an outside write into the webroot desyncs Nextcloud's file cache).
+
+- `apps/file-browser/` deleted (compose + `.env.example`; `data/` was
+  gitignored).
+- `filebrowser` registry entry removed from `services.ts`.
+- Nextcloud compose: `/shared` bind → `./data/shared`.
+- Samba compose: `/storage` bind → `../nextcloud/data/shared`; the old
+  `filebrowser-init` permission bootstrap (`chown -R 1000:1000` +
+  `chmod -R o+rwX`, needed because Samba writes as uid 1000 and Nextcloud's
+  mount as www-data uid 33) moved here as `samba-init` — nothing in
+  Nextcloud's own entrypoint sets up that sibling dir.
+- Paperless compose + `paperlessDropbox.ts` (+ its test): drop-box path
+  repointed to `../nextcloud/data/shared/to-paperless`.
+- Docs: File Browser rows dropped from `ports.md` (×2), `licences.md`,
+  `app-credentials.md`, `sales-catalogue.md`, `recovery-troubleshooting.md`,
+  and mentions trimmed from `it-admin.md`, `user-guide.md`, `raspberry-pi.md`,
+  `start.sh`. Port `10160` is now free.
+
+### Not verified live
+
+Backend typecheck + 678 tests pass. The mount move touches Docker binds
+across three apps and can't be proven from here (no agent host access). On
+the deployed host the existing `apps/file-browser/data/files/` content must
+be moved to `apps/nextcloud/data/shared/` during a maintenance window, then
+the Samba↔Nextcloud↔Paperless round-trip (§219's live check) re-run. Lands
+on `dev`, not merged to `main`, until that happens.

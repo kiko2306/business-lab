@@ -88,8 +88,8 @@ other app is started from the dashboard.
   Restore stops it, rolls its data and database back to the snapshot, and
   starts it again. Separate from the off-site backup — see the comparison in
   [recovery-troubleshooting.md](recovery-troubleshooting.md#backuprestore).
-- **File Browser** and **Stirling-PDF** embed a database that is copied live,
-  not snapshotted, and can restore corrupt — an accepted risk documented in
+- **Stirling-PDF** embeds a database that is copied live, not snapshotted,
+  and can restore corrupt — an accepted risk documented in
   [recovery-troubleshooting.md](recovery-troubleshooting.md#apps-without-a-consistent-database-snapshot).
 - Full restore detail is in
   [recovery-troubleshooting.md](recovery-troubleshooting.md#backuprestore).

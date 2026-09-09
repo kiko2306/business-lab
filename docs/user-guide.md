@@ -65,10 +65,9 @@
   anything changed since the snapshot is lost). This is separate from, and
   does not replace, the scheduled off-site backup.
 - Restore when needed.
-- File Browser and Stirling-PDF embed a database (BoltDB / H2) that is copied
-  live, not snapshotted, so it can restore corrupt — an accepted risk because
-  both hold little that isn't quickly rebuilt. See
-  `docs/recovery-troubleshooting.md`.
+- Stirling-PDF embeds a database (H2) that is copied live, not snapshotted,
+  so it can restore corrupt — an accepted risk because it holds little that
+  isn't quickly rebuilt. See `docs/recovery-troubleshooting.md`.
 - Locked out of the dashboard? Run `./start.sh recover reset-password` on the
   host — it prompts for the username and a new password and resets it inside
   the backend container. `./start.sh recover list` shows the usernames; add
