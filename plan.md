@@ -22594,3 +22594,27 @@ scripted firstfactor + manual redirect follow. One bug worth remembering if it
 gets rebuilt: Immich's `oauth4webapi` client rejects the callback unless the
 `iss` parameter Authelia adds to the redirect is passed through (RFC 9207) —
 `OAUTH_INVALID_RESPONSE: response parameter "iss" (issuer) missing`.
+
+## 327. First-run setup collects the webmaster's email → auto-synced to Authelia (2026-09-09)
+
+First of three automation follow-ups from §326. `/setup` took only
+username+password, so the initial webmaster had no email — and
+`syncAutheliaUsers` skips any account without one (`autheliaSync.ts:84`). Net
+effect: the only real dashboard account never landed in Authelia, so every
+per-app OIDC login had nobody to map to (that is why §326 needed a hand-made
+Authelia `admin`).
+
+- `schemas.authSetup` — `email` now required (`emailSchema`).
+- `routes/auth.ts` `/setup` — inserts `email`, then calls
+  `syncAutheliaUsersSafe('setup', id)` right after the webmaster role is set,
+  so `users_database.yml` gets the account (in `admins` + every `app-*` group,
+  per the sync's webmaster branch) before the response returns. Best-effort:
+  a sync failure never blocks setup.
+- Frontend `/setup` — email field (type=email, required, `Validators.email`),
+  `auth.service.setup(username, email, password)`.
+- e2e `auth.setup.ts` + `helpers.ts` — fills the new field, `ADMIN.email`
+  (`admin@example.com`, `E2E_ADMIN_EMAIL` override).
+
+Backend 640 + frontend 50 pass, both typecheck, frontend build clean. Minor
+bump 0.59.5 → 0.60.0. Unblocks §328 (Immich admin bootstrap can now use the
+webmaster's email for account linking).

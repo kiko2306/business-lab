@@ -31,6 +31,22 @@
             </div>
 
             <div class="mb-3">
+              <label class="form-label fw-semibold" for="setupEmail">Email</label>
+              <input
+                id="setupEmail"
+                type="email"
+                class="form-control form-control-lg"
+                formControlName="email"
+                autocomplete="email"
+                maxlength="255"
+                (paste)="sanitizePaste($event, 'email', 255)"
+              />
+              <div *ngIf="form.controls.email.touched && form.controls.email.invalid" class="text-danger small mt-1">
+                Enter a valid email address — it becomes your single sign-on identity for the managed apps.
+              </div>
+            </div>
+
+            <div class="mb-3">
               <label class="form-label fw-semibold" for="setupPassword">Password</label>
               <input
                 id="setupPassword"

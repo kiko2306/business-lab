@@ -107,11 +107,11 @@ export class AuthService {
       .pipe(tap((response) => this.persistSession(response)));
   }
 
-  setup(username: string, password: string): Observable<AuthResponse> {
+  setup(username: string, email: string, password: string): Observable<AuthResponse> {
     return this.http
       .post<AuthResponse>(
         `${API_BASE_URL}/auth/setup`,
-        { username: username.trim(), password },
+        { username: username.trim(), email: email.trim(), password },
         {
           context: new HttpContext()
             .set(SKIP_AUTH, true)

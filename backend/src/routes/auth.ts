@@ -167,15 +167,15 @@ router.post(
 // POST /api/auth/setup — create the first admin user
 // ---------------------------------------------------------------------------
 router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schemas.authSetup), async (req: Request, res: Response) => {
-  const { username, password } = req.body;
+  const { username, email, password } = req.body;
 
   try {
     const passwordHash = await hashPassword(password);
     const result = await query<UserRow>(
-      `INSERT INTO users (username, password_hash, is_setup_complete)
-       VALUES ($1, $2, TRUE)
+      `INSERT INTO users (username, email, password_hash, is_setup_complete)
+       VALUES ($1, $2, $3, TRUE)
        RETURNING id, username`,
-      [username.trim(), passwordHash]
+      [username.trim(), email.trim().toLowerCase(), passwordHash]
     );
     const user = result.rows[0];
 
@@ -183,6 +183,11 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
     await setUserRoles(user.id, ['webmaster']);
     const roles = ['webmaster'];
     const capabilities = effectiveCapabilities(roles);
+
+    // The webmaster now has an email + password hash, so it's a valid Authelia
+    // user — push it into users_database.yml so SSO works without a second
+    // "invite yourself" step. Best-effort: never block setup on it.
+    await syncAutheliaUsersSafe('setup', user.id);
 
     const accessToken = signAccessToken({ id: user.id, username: user.username, roles });
     const refreshToken = signRefreshToken({ id: user.id });

@@ -46,6 +46,10 @@ const domainSchema = Joi.string()
 export const schemas = {
   authSetup: Joi.object({
     username: usernameSchema.required(),
+    // Required so the first webmaster is a usable SSO identity from the start:
+    // autheliaSync only writes users that carry an email, so without this the
+    // initial admin never lands in Authelia and per-app OIDC has nobody to map.
+    email: emailSchema.required(),
     password: passwordSchema.required(),
   }),
   authLogin: Joi.object({

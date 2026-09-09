@@ -23,6 +23,7 @@ export class SetupComponent {
 
   protected readonly form = this.formBuilder.nonNullable.group({
     username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
+    email: ['', [Validators.required, Validators.email, Validators.maxLength(255)]],
     password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(128)]],
     confirmPassword: ['', [Validators.required, Validators.maxLength(128)]],
   });
@@ -30,7 +31,11 @@ export class SetupComponent {
   protected submitting = false;
   protected errorMessage = '';
 
-  sanitizePaste(event: ClipboardEvent, controlName: 'username' | 'password' | 'confirmPassword', maxLength: number): void {
+  sanitizePaste(
+    event: ClipboardEvent,
+    controlName: 'username' | 'email' | 'password' | 'confirmPassword',
+    maxLength: number
+  ): void {
     const pasted = event.clipboardData?.getData('text') ?? '';
     const sanitized = sanitizePastedText(pasted, maxLength, controlName === 'username');
     event.preventDefault();
@@ -44,7 +49,7 @@ export class SetupComponent {
       return;
     }
 
-    const { username, password, confirmPassword } = this.form.getRawValue();
+    const { username, email, password, confirmPassword } = this.form.getRawValue();
     if (password !== confirmPassword) {
       this.errorMessage = 'Passwords do not match.';
       return;
@@ -54,7 +59,7 @@ export class SetupComponent {
     this.submitting = true;
 
     this.authService
-      .setup(username, password)
+      .setup(username, email, password)
       .pipe(finalize(() => (this.submitting = false)))
       .subscribe({
         next: () => {

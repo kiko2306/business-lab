@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.60.0] — 2026-09-09
+
+### Added
+
+- First-run setup collects the webmaster's email and syncs it straight into Authelia, so the initial admin is a usable single-sign-on identity for the managed apps with no separate invite step
+
 ## [0.59.5] — 2026-09-09
 
 ### Fixed

@@ -6,6 +6,7 @@ import { expect, type Page } from '@playwright/test';
 // is passed in.
 export const ADMIN = {
   username: process.env.E2E_ADMIN_USER ?? 'admin',
+  email: process.env.E2E_ADMIN_EMAIL ?? 'admin@example.com',
   password: process.env.E2E_ADMIN_PASSWORD ?? 'AdminPassword-123',
 };
 
