@@ -340,19 +340,6 @@ below.
       path, then re-run §219's live check (write over SMB → visible in
       Nextcloud `/shared` and in Paperless's `to-paperless/` drop box → and
       back). Until then §310 stays on `dev`, unmerged.
-- [ ] **@mat: finish Pi-hole's port-53 fix — pull, re-run `setup_server.sh`,
-      reboot, start Pi-hole** (§283, §284, §339) — `setup_server.sh`'s "Free
-      port 53 for Pi-hole?" prompt disables systemd-resolved's stub listener
-      (frees `127.0.0.53:53`) and replaces `/etc/resolv.conf` with a static
-      `1.1.1.1 / 8.8.8.8` so host *and* containers keep a working resolver
-      (this host's resolved had the dead stub address as its own upstream).
-      An earlier attempt that used `daemon.json` `"dns"` + `systemctl restart
-      docker` cut egress on every existing compose network — the live host
-      needs a **reboot** to rebuild those. Steps: `git pull` on the host,
-      `sudo ./setup_server.sh` (prompt is skipped, resolv.conf gets rewritten),
-      `sudo reboot`, then start Pi-hole from the dashboard and confirm FTL
-      binds :53 and gravity builds. Also confirm host DNS still resolves
-      (`resolvectl query github.com`) and other apps' egress is back.
 - [ ] **App backlog** — §22 lists candidate apps by category (communication,
       business ops, no-code/BI, files/PDF, security/network, dev infra,
       productivity). Pull from there rather than restating it here.

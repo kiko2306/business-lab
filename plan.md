@@ -23109,8 +23109,15 @@ start reinstalls every network's rules cleanly); the `daemon.json` `dns` key
 left behind is harmless (same values) and can go at any later restart.
 
 `bash -n` + shellcheck clean (only the 3 pre-existing SC2015/SC2001 findings).
-**Final verification pending on the host** — `git pull`, re-run
-`sudo ./setup_server.sh` (prompt skipped; `ensure_static_resolv_conf` rewrites
-`/etc/resolv.conf`), **reboot** to rebuild the docker networks broken by the
-run-2 restart, then start Pi-hole and confirm FTL binds `:53` and gravity
-builds. Docs-only + shell — no version bump.
+
+**Live-verified (2026-09-09).** `git pull` + `sudo ./setup_server.sh` rewrote
+`/etc/resolv.conf` to the static `1.1.1.1 / 8.8.8.8`; `sudo reboot` rebuilt the
+compose networks. The pre-existing Pi-hole container came back orphaned from
+its network (`docker network inspect pihole_default` → no containers, only
+`lo` inside) — a stop+start from the dashboard recreated it clean. It then
+came up **healthy**: `docker-proxy` on `0.0.0.0:53` tcp+udp and `:10320`,
+FTL serving, egress works (resolved `raw.githubusercontent.com`), gravity
+built, and `nslookup github.com 127.0.0.1` resolves through it. Host DNS
+(`resolvectl query`) unaffected throughout. The leftover `daemon.json` `dns`
+key from the run-2 attempt was left in place — same values, harmless.
+Docs-only + shell — no version bump.
