@@ -217,35 +217,6 @@ it is done — not ticked off and left behind. Section references point at
 
 Updates:
 
-- [ ] **@mat: decide whether this host's memory headroom during a full
-      self-update is worth fixing at the infra level** (§131.4, §198,
-      §199, §290–§299) — everything code-side about the self-update panel
-      is now fixed and verified live: the Compose version-skew bug
-      (§291–§293, §295), the reconciler's `restarting_frontend` coverage
-      gap (§296), ~57.5GB of accumulated Docker cruft plus a prune step so
-      it doesn't reaccumulate (§297), a redundant rebuild at the riskiest
-      moment (§298), and — the last real gap — backend's self-replacement
-      having no automatic recovery if SIGKILLed mid-swap, closed by a
-      `self-update-watchdog` service running outside backend's own process
-      (it structurally can't supervise its own replacement), proven live
-      by `docker kill`ing the real backend and watching it recover
-      unattended (§299). What's left is purely a capacity question, not a
-      code one: this host still runs ~47 apps close to its 14GiB ceiling,
-      and a full self-update's build+all-apps-update phase still pushes
-      swap to its limit — recovery is now automatic, but repeatedly
-      hitting that ceiling isn't free. Worth more RAM, or is the current
-      behavior (occasional automatic recovery, ~1-2 min of downtime) fine
-      to leave as is?
-
-Memory baseline (§300 — attacked the §290–§299 headroom problem by shrinking
-the baseline; started ~9.7 GiB container RSS on 14 GiB with swap 90% full,
-ended ~7.5 GiB used / 7.3 GiB available / swap 1.2 GiB). Phases A–C done
-(§301–§309). Remaining:
-
-- [ ] **@mat: Phase D decision** (§300) — D4 ClamAV (215 MiB, irreducible):
-      on-access vs scheduled scans. (D1 Postiz, D2 Metabase and D3 MSSQL were
-      resolved by the §301 removals.)
-
 Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
 
 - [ ] **@mat: resolve the functional-overlap pairs from the §301e survey** —

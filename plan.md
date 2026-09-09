@@ -22348,3 +22348,27 @@ behind Authelia" set and says how it's actually reached. README item deleted
 (the Housekeeping section is now empty). 660 backend tests + typecheck pass.
 Not a live change to prove — no behaviour on the wire changed except the
 removed header trust, which had no live route anyway.
+
+## 319. §300 closed — RAM headroom left as-is, ClamAV stays on-demand (2026-09-09)
+
+Two @mat decisions from the §300 memory-baseline work, both resolved. No code.
+
+**Self-update RAM headroom (§131.4, §198, §199, §290–§299): leave as-is.** The
+§300–§309 baseline shrink plus the §301 removals did the job — `home-srv-01` on
+2026-09-09 reads 8 GiB used / 6 GiB available / **swap 0 of 3 used**, container
+RSS ~6.9 GiB (down from the 9.7 GiB / 90 %-full-swap starting point in §300).
+Recovery from a SIGKILL mid-swap is automatic since the §299 watchdog. This is
+the no-guarantees dev/test box; the only remaining symptom is a rare ~1–2 min
+auto-recovered blip during a *full* self-update. Buying RAM for a disposable
+box to remove that is not worth it. Real sizing headroom is P10's problem — a
+separate per-client deployment on its own hardware (16 GiB spec, §84.7).
+
+**Phase D — D4 ClamAV: keep on-demand scanning.** The 870 MiB live RSS is the
+resident signature database — irreducible under any policy. `apps/clamav/
+docker-compose.yml` runs only `clamd` + `freshclam`; Nextcloud's antivirus app
+and Paperless call clamd's TCP socket (`10450`) for **targeted, on-demand
+scans**. There is no `clamonacc`, no watched mount, no cron — it is already the
+lean "scan on request" model. "On-access" would mean *new* wiring (clamonacc +
+a mounted path to watch) for more constant CPU churn and no real gain on a
+14 GiB box. D1/D2/D3 (Postiz, Metabase, MSSQL) were already resolved by the
+§301a–d removals.
