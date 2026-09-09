@@ -1,7 +1,9 @@
 
 services:
   nocodb:
-    mem_limit: 768m
+    # 768m OOM-looped this Node/Nest app on the §305 rollout (V8 GC thrash
+    # under a cgroup cap set from idle RSS ~570 MiB). 1200m holds.
+    mem_limit: 1200m
     mem_reservation: 256m
     image: nocodb/nocodb:latest
     restart: unless-stopped

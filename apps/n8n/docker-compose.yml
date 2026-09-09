@@ -59,7 +59,10 @@ services:
       - n8n-net
 
   n8n:
-    mem_limit: 640m
+    # 640m OOM-looped on the §305 rollout — "JavaScript heap out of memory".
+    # Node sizes its old-space off the cgroup limit; 640m left too little for
+    # workflow execution + the editor. 1200m holds.
+    mem_limit: 1200m
     mem_reservation: 192m
     image: docker.n8n.io/n8nio/n8n:latest
     restart: unless-stopped
