@@ -264,16 +264,13 @@ the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
       peaceful_keldysh` (the §268 leftover); decide on `docker image prune
       -af` (still ~11 GB of images for currently-stopped apps — a re-pull
       cost if a client later starts one); `network prune`.
-- [ ] **Phase C — `mem_limit` on every service, + disable Immich ML** (§300,
-      §303 B5) — one commit: tiered `mem_limit` (+ `mem_reservation`) on
-      every `apps/*/docker-compose.yml` and the management stack (generous on
-      `backend` — an OOMKill mid-self-update is the §299 failure), plus a
-      `-Xmx` cap on the two JVMs (Stirling, plus any other). Same pass drops
-      `immich-machine-learning` from the Immich compose (248 MiB, empty model
-      cache / zero activity on this box) — needs the container `docker rm`'d
-      as well as removed from the file, so it's an SSH step to flag, not an
-      Update-page one. Maybe a `services.test.ts` guard that each app
-      declares a limit. Deploy app-by-app, watch `docker events` for `oom`.
+- [ ] **Phase C — deploy + verify** (§300, §305) — the code is committed
+      (`mem_limit` + `mem_reservation` on every compose service and the
+      management stack; Stirling `-Xmx640m`; `immich-machine-learning`
+      removed; a `services.test.ts` guard). **@mat**: apply from the Update
+      page, then `docker rm -f immich-immich-machine-learning-1` (the one SSH
+      step — `compose up` won't stop a removed service), then watch
+      `docker events` / `docker stats` and loosen any cap that OOM-loops.
 - [ ] **@mat: Phase D decisions** (§300) — D4 ClamAV (215 MiB, irreducible):
       on-access vs scheduled scans. (D1 Postiz, D2 Metabase and D3 MSSQL were
       all resolved by the §301 removals.)

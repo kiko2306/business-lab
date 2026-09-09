@@ -21857,3 +21857,50 @@ State to be aware of after the §303 SSH deploys (the last ones under the old
 flow): `home-srv-01`'s checkout is on branch **`dev`** at the §303 commit, and
 `apps/stirling-pdf/docker-compose.override.yml` was deleted on the host (the
 B1 unpin). Nothing else diverged.
+
+## 305. §300 Phase C — mem_limit everywhere + Immich ML dropped (2026-09-09)
+
+Two commits. Not yet deployed — under the §304 rule this waits for @mat's
+Update-page run, then a `docker events`/`docker stats` check.
+
+### mem_limit on every compose service
+
+No container had a memory limit — one runaway could swap-thrash the whole
+14 GiB host (the §290–§299 self-update failure). A script inserted
+`mem_limit` (+ advisory `mem_reservation`) into every service of all 43 app
+composes and the management `docker-compose.yml`, tiered off the 2026-09-09
+RSS listing at ~1.4x with spike headroom:
+
+- **Heavy** — clamav 1200m (signature DB, can't go lower), stirling-pdf 1g,
+  immich-server 900m, paperless-ngx 900m, nocodb 768m, n8n 640m,
+  home-assistant 640m, onlyoffice 640m, npm-db 512m, guacamole/forgejo/
+  code-server/nextcloud/jellyfin 512–768m.
+- **Mid** — 256–384m (mealie, meshcentral, home-page, uptime-kuma, the
+  Postgres/MariaDB sidecars, scrutiny, itflow…).
+- **Light** — 96–192m for everything idling under ~90 MiB.
+- **Management stack** — backend 768m (deliberately roomy: an OOMKill
+  mid-self-update *is* §299), database 512m, proxies/frontend/watchdogs
+  96–128m.
+- **Stirling** also gets `JAVA_TOOL_OPTIONS=-Xmx640m` — its JDK-25 image sets
+  no `-Xmx` and would size the heap off the cgroup limit, leaving too little
+  for non-heap under the 1g cap (and it runs `-XX:+ExitOnOutOfMemoryError`).
+
+`mem_limit` alone (no `memswap_limit`) lets a container spill to swap before
+an OOM-kill, so a slightly-tight cap degrades rather than crash-loops — the
+values are set to only bite on a genuine runaway. A registry-wide
+`services.test.ts` guard now fails if any app ships a service with no
+`mem_limit` (`KNOWN_UNLIMITED` is the empty escape hatch).
+
+### immich-machine-learning removed (§300 B5)
+
+The service is deleted from `apps/immich/docker-compose.yml` — ~250 MiB
+resident for face recognition + smart search, and on this box the model
+cache was empty with zero activity in 24 h. The compose keeps a comment
+block with the exact snippet to restore it. `immich-server` has no
+`depends_on` it, so it starts clean; ML jobs just error until someone turns
+Machine Learning back off in Immich's admin settings (moot here — no photos).
+`docs/raspberry-pi.md` note softened.
+
+**SSH step @mat still needs (flagged per §304):** after the Update-page
+deploy, `docker rm -f immich-immich-machine-learning-1` — `docker compose
+up -d` won't stop a service that's no longer in the file.

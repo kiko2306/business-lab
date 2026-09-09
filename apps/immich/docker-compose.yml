@@ -50,18 +50,13 @@ services:
       retries: 3
       start_period: 60s
 
-  # CPU/RAM-hungry (face recognition, smart search). On modest hardware this
-  # is the first thing to disable if the stack is too heavy — the server
-  # still runs without it, those two features just stop working.
-  immich-machine-learning:
-    mem_limit: 512m
-    mem_reservation: 128m
-    image: ghcr.io/immich-app/immich-machine-learning:release
-    restart: unless-stopped
-    volumes:
-      - ./data/model-cache:/cache
-    networks:
-      - immich-net
+  # immich-machine-learning (face recognition + smart search) is deliberately
+  # not run on this deployment — CPU/RAM-hungry (~250 MiB resident, more under
+  # indexing) for two features nobody here uses. The server runs fine without
+  # it; those two features just report errors. To re-enable: add the service
+  # back (image ghcr.io/immich-app/immich-machine-learning:release, a
+  # ./data/model-cache:/cache volume, immich-net, mem_limit: 512m) and flip
+  # Machine Learning back on in Immich's admin settings. See plan.md §300 B5.
 
   # Major pinned to 9, matching Immich's own upstream docker-compose.yml,
   # which pins the same `valkey:9` — not an arbitrary version.

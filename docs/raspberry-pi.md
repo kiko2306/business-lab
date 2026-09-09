@@ -129,7 +129,7 @@ Verified against each image's registry manifest on 2026-08-31.
 | bookstack, code-server, grocy, speedtest (`linuxserver/*`) | yes | **no** | arm64-only images |
 | paperless, mealie, home-page, home-assistant, n8n, stirling-pdf, nginx-proxy-manager | yes | **no** | arm64-only images |
 | jellyfin | yes | **no** | no hardware transcoding configured (no `/dev/dri` in the compose) — transcoding is CPU-only and will struggle |
-| immich | yes | **no** | `immich-machine-learning` is heavy; expect slow face/object indexing |
+| immich | yes | **no** | `immich-machine-learning` is not run by default (§300 B5); if re-enabled it is heavy — expect slow face/object indexing |
 | nextcloud | yes | yes | usable but sluggish on a Pi under load |
 | pantry, price-compare | yes | yes | built locally from `node:20-alpine`, pure-JS dependencies |
 | kitchen-switcher | yes | yes | static `nginx:alpine` |
