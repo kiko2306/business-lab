@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.63.2] — 2026-09-09
+
+### Apps
+
+- DocuSeal: expose directly with only its own login instead of stacking Authelia in front (§342) — no app should present two login screens
+
 ## [0.63.1] — 2026-09-09
 
 ### Apps

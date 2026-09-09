@@ -2,12 +2,12 @@
  * Create DocuSeal's first (admin) account on start, so there is no manual
  * "run the /setup wizard" step (§341, principle 3).
  *
- * DocuSeal's community edition has no OIDC/SAML (SSO is Pro-only), so unlike
- * Immich/Vikunja/Mealie there is no OIDC client to wire and no way to hide
- * DocuSeal's own login form — Authelia is the outer forward-auth gate and the
- * user still signs in to DocuSeal with a password. What this removes is the
- * onboarding form: the account is created with the Authelia admin's email and
- * a generated `DOCUSEAL_ADMIN_PASSWORD`, so exposing DocuSeal lands the
+ * DocuSeal's community edition has no OIDC/SAML (SSO is Pro-only) and no way
+ * to hide its own login form, so — rather than stack Authelia in front for a
+ * second login (§342) — DocuSeal is exposed directly and its own login is the
+ * only gate. This bootstrap makes that gate usable with no manual step: the
+ * account is created with the Authelia admin's email (a familiar identity)
+ * and a generated `DOCUSEAL_ADMIN_PASSWORD`, so exposing DocuSeal lands the
  * webmaster straight on a login page instead of a setup wizard.
  *
  * Shape mirrors immichAdminBootstrap.ts: resolve the cross-project base URL,
@@ -62,7 +62,7 @@ export async function reconcileDocusealFirstAdmin(serviceName: string): Promise<
   }
 
   // Only meaningful while exposed — that's when the webmaster reaches DocuSeal
-  // through Authelia. A non-exposed DocuSeal keeps its normal UI onboarding.
+  // over the public hostname. A non-exposed DocuSeal keeps its UI onboarding.
   const exposureRow = await getServiceExposureRow(DOCUSEAL_SERVICE);
   if (!exposureRow?.enabled) {
     return;

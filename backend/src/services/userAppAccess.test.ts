@@ -7,8 +7,11 @@ vi.mock('../utils/database', () => ({
   withTransaction: vi.fn(),
 }));
 
-const { getService } = vi.hoisted(() => ({ getService: vi.fn() }));
-vi.mock('../config/services', () => ({ getService }));
+const { getService, isAutheliaProtectionRequired } = vi.hoisted(() => ({
+  getService: vi.fn(),
+  isAutheliaProtectionRequired: vi.fn(),
+}));
+vi.mock('../config/services', () => ({ getService, isAutheliaProtectionRequired }));
 
 import {
   getAppAccessForUsers,
@@ -25,6 +28,9 @@ beforeEach(() => {
   query.mockReset();
   getService.mockReset();
   getService.mockImplementation((name: string) => REGISTRY[name]);
+  isAutheliaProtectionRequired.mockReset();
+  // Default: every app is Authelia-gated unless a test says otherwise.
+  isAutheliaProtectionRequired.mockReturnValue(true);
 });
 
 describe('getAppAccessOptions', () => {
@@ -44,16 +50,30 @@ describe('getAppAccessOptions', () => {
     ]);
   });
 
-  it('only asks for exposed apps, excluding Home Page, Authelia, and secondary exposure legs', async () => {
+  it('only asks the DB for exposed primary apps; the Authelia filter is applied in JS', async () => {
     query.mockResolvedValue({ rows: [] });
     await getAppAccessOptions();
     const sql = query.mock.calls[0][0] as string;
     expect(sql).toMatch(/enabled = TRUE/);
-    expect(sql).toMatch(/service_name NOT IN \('authelia', 'homepage'\)/);
     // Secondary exposure keys (netbird-vpn:api, homepage:apex, …) are not
     // grantable apps — their `:suffix` name breaks the appAccess pattern and
     // `app-<name>` group naming (regression: user create 400'd on them).
     expect(sql).toMatch(/service_name NOT LIKE '%:%'/);
+  });
+
+  it('drops apps that are not Authelia-protected (Home Page, Authelia, skipAutheliaProtection)', async () => {
+    query.mockResolvedValue({
+      rows: [
+        { service_name: 'vaultwarden', hostname: 'v' },
+        { service_name: 'homepage', hostname: 'h' },
+        { service_name: 'docuseal', hostname: 'd' },
+      ],
+    });
+    isAutheliaProtectionRequired.mockImplementation((name: string) => name === 'vaultwarden');
+
+    const options = await getAppAccessOptions();
+
+    expect(options.map((o) => o.serviceName)).toEqual(['vaultwarden']);
   });
 
   it('falls back to the service name when the registry has no entry', async () => {

@@ -46,7 +46,7 @@ once and never displayed again; rotate them there if you need a new one.
 | **Samba** | `SAMBA_USER` (default `labshare`) | `SAMBA_PASSWORD` — generated on first start. Set your own in the config panel if you need to know it to map the drive from Windows (`\\<host>\<SAMBA_SHARE_NAME>`). |
 | **Vaultwarden** | — | `VAULTWARDEN_ADMIN_TOKEN` (generated, hidden) — for `/admin` only; normal accounts are self-registered |
 | **Miniflux** | `MINIFLUX_ADMIN_USERNAME` (default `admin`) | `MINIFLUX_ADMIN_PASSWORD` (generated) — created from env on first boot, no wizard |
-| **DocuSeal** | the Authelia admin's email | `DOCUSEAL_ADMIN_PASSWORD` (generated). The dashboard runs DocuSeal's first-run `/setup` wizard on first start (§341) — DocuSeal community has no SSO, so Authelia gates the hostname and you still sign in to DocuSeal with this password. Read it from `apps/docuseal/.env`, or set your own in the config panel **before** the first start; after setup, change it in DocuSeal → profile settings. |
+| **DocuSeal** | the Authelia admin's email | `DOCUSEAL_ADMIN_PASSWORD` (generated). DocuSeal community has no SSO and can't hide its login form, so it is **exposed directly, not behind Authelia** (§342) — this account is the only login. The dashboard runs DocuSeal's first-run `/setup` wizard on first start (§341); read the password from `apps/docuseal/.env`, or set your own in the config panel **before** the first start. After setup, change it in DocuSeal → profile settings. |
 
 ## Wizard — you create the account
 

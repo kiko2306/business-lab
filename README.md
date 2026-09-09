@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.63.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.63.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -301,20 +301,20 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **SSO: apps with no known full fix** (§217, §276, §330) — the
-      header/IP-trust and OIDC-drop-the-local-form work is done for the apps
-      that support it (Nextcloud proven live in §330). These can't hide their
-      local login form or don't do header-trust, and none is blocked on
-      anything actionable:
-      **BookStack** has OIDC/SAML too, but no flag to hide the local form —
-      `AUTH_METHOD=oidc` only adds OIDC as an option, and a years-old
-      upstream request to disable the standard form is still unimplemented.
-      ITFlow, NPM's own admin UI, Pi-hole, Kopia, n8n and NocoDB
-      (Enterprise-only SSO — §273), Jellyfin (core has no header-trust, only a
-      community plugin), **Home Assistant** (§311 — core has none either;
-      `trusted_networks` can't be combined with the trusted proxy it sits
-      behind) and BookStack have no known full fix — parked, not blocked on
-      anything actionable.
+- [ ] **Flip the remaining two-login apps to expose-direct** (§342) — policy
+      (§342): an app either logs in via Authelia *with its own form hidden*, or
+      it's exposed directly with only its own login — never both. Done for
+      **Nextcloud** (header-trust §330), **Immich/Vikunja/Mealie** (OIDC +
+      local login off), **DocuSeal** (`skipAutheliaProtection`, §342). Still
+      two logins today: **BookStack** (`AUTH_METHOD=oidc` only *adds* OIDC, no
+      flag to hide the local form), **ITFlow**, **Kopia**, **n8n**, **NocoDB**
+      (SSO is Enterprise, §273), **Jellyfin** (core has no header-trust, only
+      a community plugin), **Home Assistant** (§311 — no header-trust;
+      `trusted_networks` can't combine with the trusted proxy). Each needs
+      `skipAutheliaProtection: true` + a check its own login is sound as the
+      sole gate — confirm per app before flipping (Kopia sees every backup,
+      n8n runs arbitrary code, HA controls the house). NPM's admin UI and
+      Pi-hole are `overlayOnly` — not on the public tunnel, out of scope here.
 - [ ] **`@mat`: confirm NPM's admin UI over the overlay** (§239, §324.4) — the
       "deprovision any live public `npm.<domain>`" half is settled: nothing was
       ever provisioned for `nginx-proxy-manager` (no row, no DNS, no proxy

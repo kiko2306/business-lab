@@ -317,9 +317,12 @@ describe('homepage apex exposure', () => {
 });
 
 describe('Authelia login is mandatory by default', () => {
-  it('exempts only Home Page and Authelia itself', () => {
+  it('exempts Home Page, Authelia itself, and apps that cannot hide their own login', () => {
     expect(isAutheliaProtectionRequired('homepage')).toBe(false);
     expect(isAutheliaProtectionRequired('authelia')).toBe(false);
+    // DocuSeal community has no SSO and no way to hide its login form, so it's
+    // exposed directly with only its own login rather than two logins (§342).
+    expect(isAutheliaProtectionRequired('docuseal')).toBe(false);
   });
 
   it('requires it for every other exposed app, regardless of any stored state', () => {

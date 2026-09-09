@@ -23231,3 +23231,43 @@ typecheck + `compose config` clean. Patch → **0.63.1**. Live-verify after the
 deploy: on a DocuSeal start the log shows the admin created, and
 `docuseal.<domain>` shows a login form (not /setup) that accepts the Authelia
 email + generated password.
+
+## 342. No app gets two logins — expose-direct or hide-the-form, never both (2026-09-09)
+
+Policy call from the user, mid-§341: an app must not present two login
+screens. Either it authenticates through Authelia **and** hides its own form
+(header-trust or OIDC-with-local-login-off — Nextcloud §330, Immich/Vikunja/
+Mealie), **or** it is exposed directly with only its own login and Authelia
+is not in front of it. An app with no login of its own keeps Authelia as its
+single gate (Stirling-PDF, IT-Tools, Scrutiny, …) — that's still one login.
+
+The mechanism already existed: `skipAutheliaProtection` in `services.ts` →
+`isAutheliaProtectionRequired()` false → `provisionServiceIfEnabled` passes
+`autheliaProtected: false` to `npmClient`, so the proxy host gets no
+`authelia-*` snippet. Previously only Home Page (§111) and Authelia itself
+used it.
+
+**DocuSeal is the first "expose-direct" app.** Community edition: no OIDC/SAML
+(Pro only), no flag to hide the Devise login form. So `skipAutheliaProtection:
+true` — DocuSeal is published at `docuseal.<domain>` with no forward-auth, and
+the account the §341 bootstrap creates (Authelia admin's email + generated
+`DOCUSEAL_ADMIN_PASSWORD`) is the only gate.
+
+Also: `getAppAccessOptions` (`userAppAccess.ts`) now filters on
+`isAutheliaProtectionRequired` instead of a hardcoded `NOT IN ('authelia',
+'homepage')`. An app that isn't Authelia-protected has no per-user Authelia
+access to grant, so it drops out of the Users & roles app-access picker and
+out of the generated `access_control` rules — one source of truth for "is
+this app gated", the registry flag.
+
+663 backend tests (userAppAccess + services.test updated), typecheck clean.
+Patch → **0.63.2**.
+
+**Still open — the rest of the two-login apps.** The README "SSO: apps with no
+known full fix" set (BookStack, ITFlow, Kopia, n8n, NocoDB, Jellyfin, Home
+Assistant) currently sits behind Authelia *and* shows its own login. Under
+this policy each must flip to `skipAutheliaProtection: true` (expose direct,
+own login only). Not done in this change: several are sensitive when the only
+gate is their own login (Kopia reads every backup; n8n runs arbitrary code;
+Home Assistant controls the house), so the flip list wants an explicit
+per-app confirmation before it ships. Tracked in the README.

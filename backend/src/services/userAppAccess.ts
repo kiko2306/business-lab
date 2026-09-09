@@ -3,18 +3,20 @@
  * `user_app_access` says "this account may reach this managed app through
  * Authelia". No rows means no SSO app access.
  *
- * The set of apps that can be granted is derived, not configured: every
- * exposed app is Authelia-protected by default (see
- * isAutheliaProtectionRequired in config/services.ts), so an app appears
- * here whenever it is publicly exposed — except Home Page (deliberately
- * public) and Authelia itself (it cannot forward-auth-gate its own login).
- * Slices 2c/2d turn these rows into Authelia group membership and
- * access-control rules; this module just reads and writes them.
+ * The set of apps that can be granted is derived, not configured: an app
+ * appears here whenever it is publicly exposed *and* Authelia-protected (see
+ * isAutheliaProtectionRequired in config/services.ts). That excludes Home
+ * Page and Authelia itself (deliberately public / can't gate its own login),
+ * and any app flagged `skipAutheliaProtection` because it can't hide its own
+ * login form — those are exposed directly with only the app's own login, so
+ * there is no per-user Authelia access to grant (§342). Slices 2c/2d turn
+ * these rows into Authelia group membership and access-control rules; this
+ * module just reads and writes them.
  */
 
 import { PoolClient } from 'pg';
 import { query, withTransaction } from '../utils/database';
-import { getService } from '../config/services';
+import { getService, isAutheliaProtectionRequired } from '../config/services';
 
 export interface AppAccessOption {
   serviceName: string;
@@ -36,10 +38,10 @@ export async function getAppAccessOptions(): Promise<AppAccessOption[]> {
   const result = await query<{ service_name: string; hostname: string | null }>(
     `SELECT service_name, hostname
      FROM service_exposure
-     WHERE enabled = TRUE AND service_name NOT IN ('authelia', 'homepage')
-       AND service_name NOT LIKE '%:%'`
+     WHERE enabled = TRUE AND service_name NOT LIKE '%:%'`
   );
   return result.rows
+    .filter((row) => isAutheliaProtectionRequired(row.service_name))
     .map((row) => {
       const service = getService(row.service_name);
       return {
