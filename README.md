@@ -299,14 +299,13 @@ below.
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
-- [ ] **@mat: prove the hashed Authelia OIDC client secrets live** (§270,
-      §280, §281) — `renderOidcClientsBlock` now writes `$pbkdf2-sha512$`
-      digests, not plaintext (verified byte-for-byte against
-      `authelia crypto hash generate/validate pbkdf2`, but not through a real
-      Authelia restart). On the live box: trigger an exposure reconcile so
-      the managed block rewrites, confirm Authelia restarts clean, then do a
-      fresh OIDC login through each of Vikunja/Mealie/Immich/Homebox and
-      confirm each still lands logged in with no `invalid_client`.
+- [ ] **@mat: fresh OIDC login through each of Vikunja/Mealie/Immich/Homebox**
+      (§270, §280, §281, §324) — the rest of §281 is proven live (§324.3): the
+      four apps are exposed, the §270 managed block rendered `$pbkdf2-sha512$`
+      digests, Authelia restarted clean and each `client_id` resolves. Only
+      the real auth-code exchange — which is what actually verifies the
+      *hashed* secret at the token endpoint — is left. Log into each app via
+      Authelia and confirm it lands logged in with no `invalid_client`.
 
 - [ ] **@mat: prove Nextcloud header-trust live** (§217, §276) — expose
       Nextcloud, apply Authelia's `authelia-authrequest.conf` snippet to its
@@ -330,12 +329,14 @@ below.
       `trusted_networks` can't be combined with the trusted proxy it sits
       behind) and BookStack have no known full fix — parked, not blocked on
       anything actionable.
-- [ ] **`@mat`: confirm NPM's overlay path, deprovision any live public NPM
-      exposure** (§239) — `nginx-proxy-manager` is now `overlayOnly`, so the
-      dashboard refuses to *enable* its exposure, but an already-provisioned
-      `npm.<domain>` route isn't torn down automatically (same as `lanOnly`).
-      Check whether the live host has one and toggle it off if so, and
-      confirm the admin UI is reachable over NetBird/Tailscale.
+- [ ] **`@mat`: confirm NPM's admin UI over the overlay** (§239, §324.4) — the
+      "deprovision any live public `npm.<domain>`" half is settled: nothing was
+      ever provisioned for `nginx-proxy-manager` (no row, no DNS, no proxy
+      host), so `overlayOnly` has nothing to tear down. Still open: the host
+      isn't on either overlay right now (NetBird client `NeedsLogin`, Tailscale
+      userspace-only), so NPM admin is LAN-only (`192.168.1.236:10270`). Run
+      `netbird up` (interactive SSO) and confirm the admin UI is reachable over
+      the overlay.
 
 ### Apps and integrations
 

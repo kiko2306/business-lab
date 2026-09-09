@@ -22453,3 +22453,86 @@ not just a registry delete:
 Closes the "prove Beszel SSO live, then flip `DISABLE_PASSWORD_AUTH`" README
 item (§229/§236) — nothing left to prove. Port `10110` free again. Backend
 typecheck + 640 tests, frontend 50 tests, e2e suite all pass.
+
+## 324. Exposed the full app roster on the live box; proved §281's hashed OIDC secrets (2026-09-09)
+
+Session was handed browser + SSH access to `tx-home-utils.com` and asked to
+make progress on the "prove X live" backlog. The box came back from the §300/
+§301 removal work with only `authelia` and `netbird-vpn` exposed, so almost
+every open live-proof item (§270/§280/§281, §217/§276) had nothing to run
+against. @mat's call: expose **everything runnable**.
+
+### 324.1 What was done
+
+Drove the dashboard's own exposure API (logged in as the disposable `mat`
+test admin — no code path bypassed):
+
+- `PUT /api/services/:name/exposure {"enabled":true}` then
+  `POST /api/services/:name/exposure/verify` for **28 apps** — every running
+  service `getExposability` allows, minus the four already removed from the
+  registry on `dev` (`beszel`, `syncthing`, `meshcentral`, `kitchen-switcher`
+  — exposing those would strand hostnames the next deploy tears down).
+- Then `POST /api/services/:name/start` on all 28 so
+  `buildExposureEnvOverrides` rewrote each `.env` and recreated the container.
+
+Result: **33 `service_exposure` rows, all `provisioned`**; 28 Home Page tiles
+generated; every hostname + the zone apex returns 200 over the public tunnel
+(`ssh`, `itflow`, `home-assistant`, `code-server`, `bookstack`, `homepage`,
+`n8n`, `paperless`, `speedtest`, `dozzle`, `scrutiny`, `it-tools`, `miniflux`,
+`homebox`, `mealie`, `vaultwarden`, `uptime-kuma`, `kopia`, `nextcloud`,
+`immich`, `jellyfin`, `vikunja`, `ntfy`, `nocodb`, `stirling-pdf`,
+`onlyoffice`, `pantry`, `price-compare`, plus `authelia` / `netbird-vpn`).
+
+### 324.2 Two things the run surfaced
+
+- **`verify` provisions the edge, not the app.** After the verify pass
+  `homepage.<domain>` and the apex 400'd with gethomepage's
+  `{"error":"Host validation failed"}` — `HOMEPAGE_ALLOWED_HOSTS` is an
+  `exposureEnvKeys` override that only lands on the next **start**, which
+  `verify` doesn't do. The `/start` pass fixed it (apex now serves the Home
+  Page). Any app with `exposureEnvKeys` (Nextcloud trusted domains, n8n
+  webhook URL, OIDC redirect URIs) is in the same boat: expose → **restart**,
+  not expose → verify. The PUT response already says "Restart the service to
+  apply it"; worth heeding literally.
+- **`clamav` reports `exposable: true` but has no HTTP UI** — its published
+  port is the clamd TCP socket (3310) and its own compose comment says "no web
+  UI at all". Exposing it through an HTTP proxy is nonsense. Skipped it.
+  Candidate `getExposability` fix (require an HTTP-ish port / a
+  `homepage.href`) — noted, not filed.
+
+### 324.3 §281 proven live (hashed Authelia OIDC client secrets)
+
+Exposing `homebox`/`mealie`/`immich`/`vikunja` made the dashboard splice the
+§270 managed OIDC-clients block into `apps/authelia/config/configuration.yml`
+for the first time on this host. Confirmed:
+
+- all four `client_secret`s render as `$pbkdf2-sha512$310000$…` digests, not
+  plaintext;
+- Authelia restarted **clean** — `Up (healthy)`, no `invalid_client` /
+  secret-parse errors in the log;
+- `/.well-known/openid-configuration` serves; a bare authorization request
+  against each `client_id` gets past client lookup (fails only on the
+  deliberately-wrong `redirect_uri` in the probe — i.e. the client resolves).
+
+The token-endpoint check of the *hashed* secret only happens on a real
+auth-code exchange, so the final interactive OIDC login through each app
+stays an `@mat` item — but the "does Authelia load and serve the pbkdf2
+block" half of §281 is done.
+
+### 324.4 §239 — no live public NPM exposure to tear down
+
+Checked while here: no `nginx-proxy-manager` `service_exposure` row, no
+`npm.<domain>` DNS, no NPM proxy host for it. Nothing was ever provisioned,
+so nothing to deprovision — the `overlayOnly` flag is doing its job. The
+"confirm the admin UI over the overlay" half is still open for a different
+reason: the host isn't currently on either overlay (NetBird client shows
+`NeedsLogin`, Tailscale runs userspace-only with no host interface), so NPM
+admin is LAN-only (`192.168.1.236:10270`) right now. Rejoining needs an
+interactive `netbird up` SSO login.
+
+### 324.5 Not done
+
+No repo change — this was live state only, on the no-guarantees box, and it
+does not survive a fresh clone. `@mat` follow-ups: the interactive OIDC
+logins (§270/§280/§281), Nextcloud header-trust (§217/§276 — Nextcloud is now
+exposed, which was step one), and the overlay rejoin.
