@@ -21960,3 +21960,18 @@ never-started `pihole`) is memory-capped, `immich-machine-learning` is gone,
 and the `services.test.ts` guard keeps new apps from shipping uncapped.
 §300 now has only Phase A tail (`peaceful_keldysh`/`image prune -af`/
 `network prune`) and Phase D (the ClamAV scan-policy question) open.
+
+## 308. §300 Phase A tail — peaceful_keldysh removed, network prune (2026-09-09)
+
+- `docker rm -f peaceful_keldysh` — the leftover `kopia/kopia:latest`
+  throwaway from the §268 FTP-concurrency test (running since 2026-09-07).
+  Running containers 68 → 67.
+- `docker network prune -f` — removed three empty orphan default networks
+  (`n8n_default`, `pihole_default`, `immich_default`), auto-created but unused
+  since those apps run on their named `*-net` networks. immich/n8n/nocodb
+  re-checked after: healthy, on their proper `<proj>_<proj>-net`.
+
+Phase A is done bar one @mat call: `docker image prune -af` would reclaim
+~11 GB more, but that's images for currently-stopped apps and a re-pull cost
+if one is later started — left as a deliberate decision, not run blind.
+Host after: RAM 7.5 GiB used / 7.3 GiB available, swap 1.2 GiB.
