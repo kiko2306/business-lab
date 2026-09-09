@@ -34,6 +34,7 @@ import { initWebSocket, sseHandler } from './services/realtime';
 import { startupLogsHandler } from './services/serviceLogs';
 import { startBackupScheduler } from './services/backupScheduler';
 import { reconcileRemovedServices } from './services/exposure';
+import { reconcileRemovedAppProjects } from './services/removedAppCleanup';
 import { startExposureReconciler } from './services/exposureReconciler';
 import { regenerateHomepageServices } from './services/homepageConfig';
 import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
@@ -229,6 +230,12 @@ startBackupScheduler();
 // hostname otherwise, with no page left in the dashboard to switch them off.
 reconcileRemovedServices().catch((err: Error) => {
   console.error('Unable to reconcile exposure for removed services:', err.message);
+});
+// Exposure is only half of it: a removed app's containers keep running as an
+// unmanaged Compose project and its gitignored apps/<name>/data + .env stay on
+// disk. Tear both down once on boot.
+reconcileRemovedAppProjects().catch((err: Error) => {
+  console.error('Unable to clean up removed app projects:', err.message);
 });
 // Then, on a slow cadence, re-assert every still-exposed service against the
 // live NPM/Cloudflare state so hand-edits or a rotated token that broke

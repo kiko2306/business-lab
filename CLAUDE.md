@@ -249,8 +249,11 @@ passing, unless it is genuinely part of the change at hand.
 
 - Commit any `.env`, secret, token or password. The repo is **public**
   (`kiko2306/business-lab`). `.env.example` templates only.
-- `docker compose down` the management stack — it tears down the running
-  dashboard. Restart individual services instead.
+- `docker compose down` **at the repo root** — it tears down the running
+  dashboard (frontend, backend, database, socket proxy). Restart individual
+  services instead. `docker compose down` on a *managed app's* own project is
+  fine — it's how apps get stopped, and how a removed app's leftovers get
+  cleaned up (`removedAppCleanup.ts`).
 - Edit an app's compose file from backend code. Backend generates `.env` files
   (`appEnv.ts`) and managed config files; compose files are read-only to it.
 - Claim something works because it type-checks. This project's history is full
@@ -262,7 +265,8 @@ passing, unless it is genuinely part of the change at hand.
 
 The first two of those are enforced, not just asked for. `.claude/settings.json`
 denies the Read/Edit/Write tools on `.env` files, and `.claude/hooks/bash-guards.sh`
-covers what per-tool rules cannot: it refuses a root `docker compose down`, and
+covers what per-tool rules cannot: it refuses a `docker compose down` aimed at
+the repo root (a down targeting a file under `apps/` is allowed), and
 refuses a shell command that reads or writes a real `.env` (`.env.example`
 templates, `ls`, `find` and `git` are left alone). A refusal from either is the
 rule working — find another way rather than routing around it.

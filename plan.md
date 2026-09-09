@@ -22201,3 +22201,56 @@ Version 0.56.0 → 0.57.0. Backend 678 tests + typecheck pass, frontend 50
 tests pass. No host access — the deployed box, if it ever ran Forgejo, keeps
 `apps/forgejo/data/` on disk until someone clears it (gitignored, so a fresh
 clone is already clean); the compose project just stops being managed.
+
+## 316. Removed apps get torn down on boot; `docker compose down` un-blanket-banned (§315, 2026-09-09)
+
+§315 removed Forgejo from the registry but couldn't stop it on the deployed
+host: the update pulls the code, restarts the backend, and
+`reconcileRemovedServices` drops the NPM/Cloudflare exposure — but the
+containers keep running as an unmanaged Compose project and
+`apps/forgejo/{data,.env}` (gitignored, so untouched by `git pull`) stay on
+disk. `@mat`: fix it, and stop treating `docker compose down` as forbidden.
+
+### The rule was never actually blanket
+
+CLAUDE.md's "Never" bullet and `bash-guards.sh` Guard 1 only ever protected a
+`docker compose down` **at the repo root** (which kills the dashboard's own
+frontend/backend/db/socket-proxy). `stopService` in `executor.ts` has always
+run `docker compose -p <project> down` for a managed app — that's the Stop
+button. Reworded CLAUDE.md to say so plainly; the hook already allowed an
+`apps/`-targeted down and is unchanged. The repo-root guard stays — an
+accidental root `down` is exactly the 3am outage it exists to prevent.
+
+### `removedAppCleanup.ts`
+
+New boot step, right after `reconcileRemovedServices` in `index.ts`, same
+"first moment the code knows an entry is gone" idiom:
+
+- Scans `apps/`. An **orphan** = a directory whose name is not in `SERVICES`,
+  is compose-project-shaped (`^[a-z0-9][a-z0-9-]*$`), and has **no compose
+  file**. The no-compose-file check is the safety discriminator: a dir that
+  still has `docker-compose.yml` but no registry entry is a half-scaffolded
+  new app or a mid-edit — logged as a warning, never deleted.
+- Empty registry ⇒ do nothing (a failed registry load would otherwise look
+  like "every app removed").
+- Per orphan: `docker compose -p <name> down --remove-orphans` (fileless —
+  Compose v2 resolves the project from container labels, which is all that's
+  left), then `fs.rm(apps/<name>, { recursive, force })`, then an
+  `app_project_removed` audit row. A failed `down` still proceeds to the
+  directory removal.
+- Pure selection split into `selectOrphanAppDirs()` +
+  `removedAppCleanup.test.ts` (6 cases: orphan picked, registered app kept,
+  compose-file dir skipped, plain file ignored, bad names rejected, empty
+  registry refused).
+
+Not passing `--volumes`: every managed app uses bind mounts under `./data`
+(removed with the dir), so nothing is stranded today.
+`ponytail: no --volumes; add if a future app uses a named volume.`
+
+### Docs
+
+`docs/it-admin.md` gets a "Removing an app" section. Version 0.57.0 → 0.58.0.
+Backend 684 tests + typecheck pass. **Not run against the real host** — the
+live proof is: remove an app on a real deployment, update, confirm the
+containers are gone and `apps/<name>/` is deleted, and confirm a still-present
+compose-file-but-no-entry dir is left alone.

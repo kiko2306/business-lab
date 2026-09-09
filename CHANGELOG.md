@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.58.0] — 2026-09-09
+
+### Added
+
+- Removed apps are now cleaned up on boot — containers torn down (docker compose down) and the orphaned apps/<name>/ dir deleted (removedAppCleanup.ts)
+
 ## [0.57.0] — 2026-09-09
 
 ### Removed

@@ -123,3 +123,20 @@ usually the app is not started, or NPM is down. Backend logs:
 That is a code change (a compose project, a `services.ts` entry, doc rows
 including a [licences.md](licences.md) row), not an operations task — see the
 Conventions section of `CLAUDE.md`.
+
+## Removing an app
+
+Also a code change: delete `apps/<name>/`, drop the `services.ts` entry and
+the doc rows. Once that lands and the deployment updates, the backend cleans
+up after it **on the next restart** — the self-update already restarts the
+backend, so no extra step:
+
+- the app's NPM proxy host and Cloudflare hostname are deprovisioned
+  (`reconcileRemovedServices`);
+- its containers are torn down with `docker compose down` and its
+  `apps/<name>/` directory — the gitignored `data/` and `.env` a `git pull`
+  leaves behind — is deleted (`removedAppCleanup.ts`).
+
+If the compose file is somehow still on disk under `apps/<name>/` with no
+registry entry (a half-finished new app, or a partial edit), the cleanup
+skips that directory and logs a warning instead of deleting it.
