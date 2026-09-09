@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.63.5] — 2026-09-09
+
+### Changed
+
+- Verify §343 C: this bump touches only VERSION / CHANGELOG / README, so its deploy must be a bare git pull with no build, app sweep or restart
+
 ## [0.63.4] — 2026-09-09
 
 ### Changed
