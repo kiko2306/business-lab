@@ -4,6 +4,7 @@ const db = vi.hoisted(() => ({ query: vi.fn() }));
 const audit = vi.hoisted(() => ({ writeAuditLog: vi.fn(async () => {}) }));
 const exposureSettings = vi.hoisted(() => ({ getExposureConfig: vi.fn() }));
 const exposure = vi.hoisted(() => ({
+  ensureAutoExposure: vi.fn(),
   provisionServiceIfEnabled: vi.fn(),
   getServiceExposureRow: vi.fn(),
 }));
@@ -22,9 +23,6 @@ vi.mock('../utils/logger', () => ({
 
 import { reconcileExposureDrift as reconcile, EXPOSURE_RECONCILE_LAST_RUN_KEY } from './exposureReconciler';
 
-/** Rows the `SELECT ... FROM service_exposure` returns. */
-const exposedRows = (...names: string[]) => ({ rows: names.map((service_name) => ({ service_name })) });
-
 /**
  * Run a reconcile pass, pumping fake timers so the 2s between-services pause
  * doesn't make the test wait for real.
@@ -38,14 +36,17 @@ async function reconcileExposureDrift(): ReturnType<typeof reconcile> {
 beforeEach(() => {
   vi.clearAllMocks();
   vi.useFakeTimers();
-  registry.SERVICES = { npm: {}, nextcloud: {}, vaultwarden: {}, jellyfin: {} };
+  // Two exposable (nextcloud, vaultwarden), one not (samba), plus a secondary key.
+  registry.SERVICES = { nextcloud: {}, vaultwarden: {}, samba: {}, 'nextcloud:api': {} };
   exposureSettings.getExposureConfig.mockResolvedValue({ baseDomain: 'example.com' });
-  exposure.provisionServiceIfEnabled.mockResolvedValue({ attempted: true, success: true });
+  exposure.ensureAutoExposure.mockResolvedValue(undefined);
+  // Not-exposable services report attempted:false from provisionServiceIfEnabled
+  // (their row never gets enabled) — the reconciler skips them in its tally.
+  exposure.provisionServiceIfEnabled.mockImplementation(async (name: string) =>
+    name === 'samba' ? { attempted: false } : { attempted: true, success: true }
+  );
   exposure.getServiceExposureRow.mockResolvedValue({ status: 'provisioned', last_error: null });
-  db.query.mockImplementation(async (sql: string) => {
-    if (sql.includes('FROM service_exposure')) return exposedRows('nextcloud', 'vaultwarden');
-    return { rows: [] };
-  });
+  db.query.mockResolvedValue({ rows: [] });
 });
 
 afterEach(() => {
@@ -62,15 +63,23 @@ describe('reconcileExposureDrift', () => {
   it('bails when global exposure config is not set', async () => {
     exposureSettings.getExposureConfig.mockResolvedValue(null);
     expect(await reconcileExposureDrift()).toBeNull();
-    expect(db.query).not.toHaveBeenCalled();
+    expect(exposure.provisionServiceIfEnabled).not.toHaveBeenCalled();
   });
 
-  it('re-asserts every enabled primary exposure and reports a clean pass', async () => {
+  it('sweeps every primary registry service and reports a clean pass', async () => {
     const summary = await reconcileExposureDrift();
 
-    expect(exposure.provisionServiceIfEnabled.mock.calls.map((c) => c[0])).toEqual(['nextcloud', 'vaultwarden']);
+    // Every primary (secondary `nextcloud:api` filtered out); ensureAutoExposure
+    // first so an exposable app that has no row yet gets one.
+    expect(exposure.ensureAutoExposure.mock.calls.map((c) => c[0])).toEqual(['nextcloud', 'vaultwarden', 'samba']);
+    expect(exposure.provisionServiceIfEnabled.mock.calls.map((c) => c[0])).toEqual([
+      'nextcloud',
+      'vaultwarden',
+      'samba',
+    ]);
     // userId 0 — the "system" sentinel.
     expect(exposure.provisionServiceIfEnabled).toHaveBeenCalledWith('nextcloud', 0);
+    // samba is not exposable (attempted:false) — not counted.
     expect(summary).toEqual({ checked: 2, reconciled: 2, failed: [] });
     expect(audit.writeAuditLog).not.toHaveBeenCalled();
     expect(homepage.regenerateHomepageServices).toHaveBeenCalledOnce();
@@ -83,18 +92,10 @@ describe('reconcileExposureDrift', () => {
     expect(write![1][0]).toBe(EXPOSURE_RECONCILE_LAST_RUN_KEY);
   });
 
-  it('skips secondary rows and names the registry does not know', async () => {
-    db.query.mockImplementation(async (sql: string) => {
-      if (sql.includes('FROM service_exposure')) {
-        return exposedRows('nextcloud', 'ghost-app');
-      }
-      return { rows: [] };
-    });
-    // The SQL already filters `service_name NOT LIKE '%:%'`, so secondary keys
-    // never reach here; `ghost-app` is filtered in code because SERVICES lacks it.
-    const summary = await reconcileExposureDrift();
-    expect(exposure.provisionServiceIfEnabled.mock.calls.map((c) => c[0])).toEqual(['nextcloud']);
-    expect(summary?.checked).toBe(1);
+  it('never touches secondary keys directly', async () => {
+    await reconcileExposureDrift();
+    expect(exposure.ensureAutoExposure.mock.calls.map((c) => c[0])).not.toContain('nextcloud:api');
+    expect(exposure.provisionServiceIfEnabled.mock.calls.map((c) => c[0])).not.toContain('nextcloud:api');
   });
 
   it('flags a service whose exposure will not come back, with an audit row', async () => {
@@ -119,12 +120,15 @@ describe('reconcileExposureDrift', () => {
   it('treats a thrown provisioning error as a failure, not a crash', async () => {
     exposure.provisionServiceIfEnabled.mockImplementation(async (name: string) => {
       if (name === 'nextcloud') throw new Error('cloudflare 403');
+      if (name === 'samba') return { attempted: false };
       return { attempted: true, success: true };
     });
 
     const summary = await reconcileExposureDrift();
 
     expect(summary?.failed).toEqual([{ service: 'nextcloud', error: 'cloudflare 403' }]);
+    // nextcloud threw (counted), vaultwarden ok, samba skipped → checked 2.
+    expect(summary?.checked).toBe(2);
     expect(summary?.reconciled).toBe(1);
   });
 });

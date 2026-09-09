@@ -9,7 +9,7 @@ import fs from 'fs';
 import path from 'path';
 import logger from '../utils/logger';
 import { writeAuditLog } from '../utils/audit';
-import { provisionServiceIfEnabled } from './exposure';
+import { ensureAutoExposure, provisionServiceIfEnabled } from './exposure';
 import { buildExposureEnvOverrides } from './exposureEnv';
 import { buildMailEnvOverrides } from './mailEnv';
 import { ensureGeneratedSecrets } from './appEnv';
@@ -373,6 +373,9 @@ export async function startService(serviceName: string, userId: number): Promise
 
     logger.info(`Service started successfully: ${serviceName}`, { userId });
 
+    // Auto-exposure (§331): every exposable app is exposed, no opt-in — keep
+    // the row in step with getExposability() before provisioning it.
+    await ensureAutoExposure(serviceName, userId);
     const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error: Error) => {
       logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
       return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };
@@ -509,6 +512,9 @@ export async function pullAndRecreateService(serviceName: string, userId: number
     });
     logger.info(`Service updated: ${serviceName}`, { userId, updated });
 
+    // Auto-exposure (§331): every exposable app is exposed, no opt-in — keep
+    // the row in step with getExposability() before provisioning it.
+    await ensureAutoExposure(serviceName, userId);
     const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error: Error) => {
       logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
       return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };

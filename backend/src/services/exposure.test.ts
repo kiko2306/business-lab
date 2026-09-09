@@ -6,7 +6,7 @@ import { getPublishedUpstreamPort, getService } from '../config/services';
 import { bootstrapNpmAdminIfDefault, deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
 import { ensureIngressRoute, removeIngressRoute } from './cloudflareTunnelClient';
 import { writeAuditLog } from '../utils/audit';
-import { deprovisionServiceExposure, getExposability, getNpmOriginUrl, provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
+import { deprovisionServiceExposure, ensureAutoExposure, getExposability, getNpmOriginUrl, provisionServiceIfEnabled, upsertServiceExposureConfig } from './exposure';
 import { ServiceExposureRow, ExposureGlobalConfig } from '../types';
 
 vi.mock('../utils/database', () => ({ query: vi.fn() }));
@@ -464,6 +464,51 @@ describe('upsertServiceExposureConfig', () => {
       statusCode: 400,
       message: expect.stringContaining('overlay'),
     });
+    expect(mockedQuery).not.toHaveBeenCalled();
+  });
+});
+
+describe('ensureAutoExposure (§331)', () => {
+  it('creates an enabled row for an exposable app that has none', async () => {
+    mockedGetPublishedUpstreamPort.mockReturnValue(8000);
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedQuery.mockResolvedValueOnce({ rows: [] } as never); // getServiceExposureRow → no row
+
+    await ensureAutoExposure('paperless', 0);
+
+    const upsert = mockedQuery.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO service_exposure'));
+    expect(upsert).toBeDefined();
+    expect(upsert![1]).toEqual(['paperless', 'paperless.example.com', 'http', true]);
+  });
+
+  it('is a no-op when an exposable app already has an enabled row with the right hostname', async () => {
+    mockedGetPublishedUpstreamPort.mockReturnValue(8000);
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedQuery.mockResolvedValueOnce({
+      rows: [exposureRow({ enabled: true, hostname: 'paperless.example.com' })],
+    } as never);
+
+    await ensureAutoExposure('paperless', 0);
+
+    expect(mockedQuery.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO service_exposure'))).toBe(false);
+  });
+
+  it('tears down and disables an app that stopped being exposable', async () => {
+    mockedGetService.mockReturnValue({ overlayOnly: true } as never);
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    // getServiceExposureRow (enabled), then deprovisionServiceExposure's own SELECT.
+    mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ service_name: 'nginx-proxy-manager', enabled: true })] } as never);
+    mockedQuery.mockResolvedValueOnce({ rows: [exposureRow({ service_name: 'nginx-proxy-manager', enabled: true })] } as never);
+
+    await ensureAutoExposure('nginx-proxy-manager', 0);
+
+    const disable = mockedQuery.mock.calls.find(([sql]) => String(sql).includes('SET enabled = false'));
+    expect(disable).toBeDefined();
+    expect(disable![1]).toEqual(['nginx-proxy-manager']);
+  });
+
+  it('ignores secondary exposure keys', async () => {
+    await ensureAutoExposure('netbird-vpn:api', 0);
     expect(mockedQuery).not.toHaveBeenCalled();
   });
 });

@@ -79,6 +79,58 @@ export async function getServiceExposureRow(serviceName: string): Promise<Servic
   return result.rows[0] ?? null;
 }
 
+/**
+ * Auto-exposure (plan.md §331): there is no per-app opt-in — every app
+ * `getExposability()` allows *is* exposed, behind Authelia. This keeps the
+ * `service_exposure` row in step with that rule; the actual NPM/Cloudflare
+ * provisioning is still `provisionServiceIfEnabled`'s job, run straight after.
+ *
+ *  - exposable → ensure an `enabled` row with the derived hostname exists.
+ *  - not exposable, but an `enabled` row exists → tear the live exposure down
+ *    and flip the row off (an app that gained `lanOnly`/`overlayOnly`, or lost
+ *    its published port — e.g. §239's nginx-proxy-manager).
+ *
+ * Secondary keys (`<name>:<suffix>`) ride along inside provisionServiceIfEnabled
+ * from the parent's `additionalExposures`, so they're skipped here. Idempotent;
+ * called on every start and by the reconciler sweep. Never throws.
+ */
+export async function ensureAutoExposure(serviceName: string, userId: number): Promise<void> {
+  if (serviceName.includes(':')) {
+    return;
+  }
+  try {
+    const { exposable } = getExposability(serviceName);
+    const row = await getServiceExposureRow(serviceName);
+
+    if (exposable) {
+      const globalConfig = await getExposureConfig();
+      const hostname = globalConfig ? buildExposureHostname(serviceName, globalConfig.baseDomain) : null;
+      if (!row || !row.enabled || row.hostname !== hostname) {
+        await query(
+          `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, status, updated_at)
+           VALUES ($1, true, $2, $3, $4, 'not_provisioned', NOW())
+           ON CONFLICT (service_name)
+           DO UPDATE SET enabled = true, hostname = EXCLUDED.hostname, updated_at = NOW()`,
+          [serviceName, hostname, UPSTREAM_SCHEME, ALLOW_WEBSOCKET_UPGRADE]
+        );
+      }
+      return;
+    }
+
+    if (row?.enabled) {
+      await deprovisionServiceExposure(serviceName, userId);
+      await query(
+        `UPDATE service_exposure SET enabled = false, status = 'not_provisioned', last_error = NULL, updated_at = NOW()
+         WHERE service_name = $1`,
+        [serviceName]
+      );
+      logger.info(`Auto-exposure: ${serviceName} is no longer exposable — exposure torn down`);
+    }
+  } catch (error) {
+    logger.error(`Auto-exposure reconcile failed for ${serviceName}`, { error: (error as Error).message });
+  }
+}
+
 export async function upsertServiceExposureConfig(
   serviceName: string,
   { enabled }: ServiceExposureInput

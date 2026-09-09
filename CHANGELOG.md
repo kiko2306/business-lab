@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.62.0] — 2026-09-09
+
+### Changed
+
+- Exposure is now automatic: every app that can be exposed is exposed behind Authelia on each start and by the reconciler sweep, with no per-app opt-in (§331 slice 1)
+
 ## [0.61.1] — 2026-09-09
 
 ### Fixed

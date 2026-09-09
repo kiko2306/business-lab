@@ -24,7 +24,7 @@ import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import { SERVICES } from '../config/services';
 import { getExposureConfig } from '../utils/exposureSettings';
-import { getServiceExposureRow, provisionServiceIfEnabled } from './exposure';
+import { ensureAutoExposure, getServiceExposureRow, provisionServiceIfEnabled } from './exposure';
 import { regenerateHomepageServices } from './homepageConfig';
 import logger from '../utils/logger';
 
@@ -69,19 +69,26 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
     return null;
   }
 
-  const rows = await query<{ service_name: string }>(
-    `SELECT service_name FROM service_exposure
-     WHERE enabled = true AND service_name NOT LIKE '%:%'`
-  );
-  // Secondary rows (`<service>:<suffix>`) ride along with their primary inside
+  // Auto-exposure (§331): the source of truth is the registry + getExposability,
+  // not a per-app toggle. Sweep every primary service — ensureAutoExposure
+  // creates/enables the row for anything exposable (and tears down anything that
+  // stopped being), then provisionServiceIfEnabled asserts it against NPM +
+  // Cloudflare. Secondary keys (`<service>:<suffix>`) ride along inside
   // provisionServiceIfEnabled; orphaned names are reconcileRemovedServices' job.
-  const services = rows.rows.map((r) => r.service_name).filter((name) => SERVICES[name]);
+  const services = Object.keys(SERVICES).filter((name) => !name.includes(':'));
 
-  const summary: ExposureReconcileSummary = { checked: services.length, reconciled: 0, failed: [] };
+  const summary: ExposureReconcileSummary = { checked: 0, reconciled: 0, failed: [] };
 
   for (const name of services) {
     try {
+      await ensureAutoExposure(name, SYSTEM_USER_ID);
       const result = await provisionServiceIfEnabled(name, SYSTEM_USER_ID);
+      // Not exposable (samba, tailscale, nginx-proxy-manager, …) — nothing to
+      // check, don't count it or the summary reads "40 checked, 6 failed".
+      if (!result.attempted) {
+        continue;
+      }
+      summary.checked += 1;
       const row = await getServiceExposureRow(name);
       if (result.success && row?.status !== 'failed') {
         summary.reconciled += 1;
@@ -89,6 +96,7 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
         summary.failed.push({ service: name, error: row?.last_error ?? result.warning ?? 'unknown error' });
       }
     } catch (error) {
+      summary.checked += 1;
       summary.failed.push({ service: name, error: (error as Error).message });
     }
     await new Promise((resolve) => setTimeout(resolve, BETWEEN_SERVICES_MS));

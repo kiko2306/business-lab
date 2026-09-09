@@ -22841,3 +22841,32 @@ Slices 1→2→3 are a chain (API can't go before the auto path; the card can't
 lose the toggle before the API is gone or it 404s on save). Slice 4 depends on
 3 (both touch the frontend build) but is otherwise independent. Slice 5 last.
 Propose running 1–3 as one batch, then 4, then 5.
+
+## 332. §331 slice 1 — auto-provision every exposable app (2026-09-09)
+
+`ensureAutoExposure(name, userId)` in `exposure.ts`:
+
+- exposable (`getExposability`) → upsert an `enabled=true` `service_exposure`
+  row with the derived hostname (idempotent — skips the write when the row is
+  already enabled with the right hostname).
+- not exposable, but an `enabled` row exists → `deprovisionServiceExposure`
+  then `UPDATE … SET enabled=false` (an app that gained `lanOnly`/`overlayOnly`
+  or lost its published port — §239's nginx-proxy-manager is the live case).
+- secondary keys (`<name>:<suffix>`) skipped — provisioned from the parent's
+  `additionalExposures` inside `provisionServiceIfEnabled`.
+
+Wired in:
+
+- `executor.ts` — called right before `provisionServiceIfEnabled` at both
+  post-start and post-update sites.
+- `exposureReconciler.ts` — the sweep now iterates **every primary registry
+  service** (`Object.keys(SERVICES)`), not just rows already `enabled`, calling
+  `ensureAutoExposure` then `provisionServiceIfEnabled`. `provisionServiceIfEnabled`
+  returning `attempted:false` (a not-exposable app) is skipped in the tally, so
+  the summary stays "N exposable checked", not "40 checked, 6 failed".
+
+`provisionServiceIfEnabled` itself is unchanged — the row is just always
+`enabled` for exposable apps now. `upsertServiceExposureConfig` and the
+per-app route still exist; slice 2 removes them.
+
+Backend 652 tests (+4), tsc clean. Minor bump → 0.62.0.
