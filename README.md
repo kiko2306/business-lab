@@ -340,15 +340,19 @@ below.
       path, then re-run §219's live check (write over SMB → visible in
       Nextcloud `/shared` and in Paperless's `to-paperless/` drop box → and
       back). Until then §310 stays on `dev`, unmerged.
-- [ ] **@mat: run `setup_server.sh`'s stub-listener prompt, then start Pi-hole**
-      (§283, §284, §339) — `setup_server.sh` now offers a one-time y/N prompt
-      ("Free port 53 for Pi-hole?") that writes a `DNSStubListener=no` drop-in,
-      repoints `/etc/resolv.conf` at systemd-resolved's uplink file, and
-      restarts resolved — freeing `127.0.0.53:53` so Pi-hole's default
-      `0.0.0.0:53` bind succeeds. Syntax + shellcheck clean, not yet run on the
-      host. Run `sudo ./setup_server.sh`, answer `y`, confirm host DNS still
-      resolves (`resolvectl query github.com`), then start Pi-hole from the
-      dashboard and confirm it binds :53.
+- [ ] **@mat: finish Pi-hole's port-53 fix — re-run `setup_server.sh`, then
+      recreate Pi-hole** (§283, §284, §339) — `setup_server.sh`'s "Free port 53
+      for Pi-hole?" prompt now does two things: disables systemd-resolved's stub
+      listener (frees `127.0.0.53:53`) **and** pins `"dns": ["1.1.1.1",
+      "8.8.8.8"]` in `daemon.json` + restarts docker, because removing the stub
+      leaves containers with a dead `127.0.0.53` (this host's resolved has the
+      stub address as its own IPv4 upstream; only IPv6 works, and Docker's
+      bridge has no IPv6). Run 1 on the host freed :53 but Pi-hole then hung on
+      gravity with no DNS. The daemon.json half is idempotent and runs on a
+      re-run even though the drop-in already exists: `sudo ./setup_server.sh`,
+      then recreate Pi-hole from the dashboard and confirm FTL binds :53 and
+      gravity builds. Also confirm host DNS still resolves
+      (`resolvectl query github.com`).
 - [ ] **App backlog** — §22 lists candidate apps by category (communication,
       business ops, no-code/BI, files/PDF, security/network, dev infra,
       productivity). Pull from there rather than restating it here.

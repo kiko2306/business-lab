@@ -23065,7 +23065,35 @@ block in `setup_server.sh`, after the fixed-IP block:
 Non-interactive runs (a sourced `start.sh` with no TTY) skip it, same as the
 other two prompts — Pi-hole isn't in `start.sh`'s auto-start set anyway.
 
-`bash -n` + shellcheck clean (no new findings). **Not yet run on the host** —
-README carries the `@mat` verify item (run it, confirm `resolvectl query`
-still resolves, start Pi-hole, confirm it binds :53). Docs-only + shell —
-no version bump.
+**Run 1 on the host (2026-09-09) — half-worked, exposed a second problem.**
+The stub-listener half worked: `:53` freed, `resolvectl query` still resolves.
+But Pi-hole then hung building gravity — `[✗] DNS resolution is currently
+unavailable`, FTL never bound `:53`, container went unhealthy. Cause: this
+host's `systemd-resolved` has **`127.0.0.53` configured as its own upstream
+DNS** on `enp2s0` (almost certainly written by an earlier fixed-IP run whose
+`DEFAULT_DNS` capture read the stub address out of `/etc/resolv.conf`), with a
+real IPv6 resolver as the only working entry. With the stub up, queries to
+`127.0.0.53` were absorbed and forwarded out over IPv6, so it looked fine.
+With the stub off:
+
+- Host still resolves — it reaches the IPv6 upstream directly.
+- **Containers don't** — Docker's bridge has no IPv6, so every container that
+  copied the host's `127.0.0.53` is left with a dead resolver. Not Pi-hole
+  specific; any container needing egress DNS breaks.
+
+**Second change.** The `setup_server.sh` block now also gives *Docker* an
+explicit upstream: an `ensure_container_dns_upstream()` helper merges
+`"dns": ["1.1.1.1", "8.8.8.8"]` into `daemon.json` (preserving the
+address-pool block) and restarts docker. Public resolvers deliberately — a
+gateway/LAN value would loop through Pi-hole while Pi-hole itself is
+restarting. Idempotent (no-op + no docker restart if `dns` is already set),
+and called from **both** paths — the fresh "just disabled the stub" path and
+the "drop-in already exists" path — so a host left in run 1's half-state is
+repaired by re-running the script.
+
+`bash -n` + shellcheck clean (only the 3 pre-existing SC2015/SC2001 findings);
+the JSON-merge helper unit-checked in isolation (merge / idempotent / missing
+file). **Run 2 pending on the host** — re-run `sudo ./setup_server.sh`
+(the prompt is skipped, the daemon.json repair runs), then recreate Pi-hole
+and confirm FTL binds `:53` and gravity builds. Docs-only + shell — no
+version bump.

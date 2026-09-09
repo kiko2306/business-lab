@@ -123,7 +123,7 @@ its own, all skipped automatically without a TTY:
 |---|---|---|
 | **Set a fixed IP** | Writes a netplan config for a static address, applied with `netplan try` (auto-reverts unless you press ENTER within 45s) | A wrong gateway/DNS value can cut off the very session used to fix it |
 | **Remove the sudo password prompt** | A `NOPASSWD:ALL` sudoers entry for the invoking user | Full passwordless sudo is a real privilege grant — safe now that code-server's LAN port requires its own login (plan.md §93), but still asked every time, not assumed |
-| **Free port 53 for Pi-hole** | Drop-in setting `DNSStubListener=no`, repoints `/etc/resolv.conf` at systemd-resolved's uplink file, restarts resolved — frees `127.0.0.53:53` so Pi-hole's container can bind the DNS port (plan.md §284) | It's a host-DNS change and only matters if this host will run Pi-hole; only shown when the stub listener is actually up |
+| **Free port 53 for Pi-hole** | Disables systemd-resolved's stub listener (`DNSStubListener=no` drop-in, `/etc/resolv.conf` repointed, resolved restarted) to free `127.0.0.53:53`, and pins `"dns"` in `daemon.json` + restarts docker so containers still resolve (plan.md §284, §339) | It's a host-DNS change and restarts docker; only matters if this host will run Pi-hole, and only shown when the stub listener is up |
 
 Say no (or just press Enter) to skip either one; re-run `./start.sh` later to
 be asked again.
