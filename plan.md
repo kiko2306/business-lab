@@ -23353,10 +23353,13 @@ natural start. Accepted — those reconcilers are idempotent and mostly
 post-`up` REST calls; forcing 35 recreates for it is exactly the cost being
 removed. Documented in the self-update walk.
 
-**A+B landed (0.63.3).** `VERSION` file at repo root; `version.ts` gains
-`getAppVersion()` reading it per call (REPO_ROOT, then `__dirname/../../VERSION`,
-then package.json, then `0.0.0`); `/version`, `/health`, `getSelfUpdateStatus`
-call it. `bump-version.sh` rewritten to touch only `VERSION` + `CHANGELOG.md` +
-the README line; the version-bump hook checks `VERSION` is in the commit;
-CLAUDE.md updated. 665 backend tests (version.test rewritten, selfUpdate.test
-mock updated). C is the remaining README item.
+**A+B landed + live-verified (0.63.3, deploy #15).** `VERSION` file at repo
+root; `version.ts` gains `getAppVersion()` reading it per call (REPO_ROOT,
+then `__dirname/../../VERSION`, then package.json, then `0.0.0`); `/version`,
+`/health`, `getSelfUpdateStatus` call it. `bump-version.sh` rewritten to touch
+only `VERSION` + `CHANGELOG.md` + the README line; the version-bump hook
+checks `VERSION` is in the commit; CLAUDE.md updated. 665 backend tests
+(version.test rewritten, selfUpdate.test mock updated). Live check on the box:
+`echo 0.64.111 > VERSION` → `GET /api/version` returned `0.64.111` with **no
+restart**; reverting reflected back immediately. C is the remaining README
+item.
