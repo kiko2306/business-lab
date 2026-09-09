@@ -29,10 +29,7 @@ export const ITFLOW_ADMIN_PASSWORD_KEY = 'ITFLOW_ADMIN_PASSWORD';
 const FALLBACK_PORT = 10420;
 const COMPANY_NAME = 'Company';
 
-// The itfloworg image downloads ITFlow's source and runs its DB migration on
-// first boot with no ready signal — give it up to ~3 min to reach the user
-// step before giving up.
-const MAX_ATTEMPTS = 60;
+const MAX_ATTEMPTS = 30;
 const RETRY_DELAY_MS = 3000;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -76,14 +73,9 @@ export async function reconcileItflowFirstAdmin(serviceName: string): Promise<vo
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
       const state = await getSetupState(baseUrl);
 
-      // 'not-ready' = reachable but still migrating; 'unreachable' = no useful
-      // response yet. Both mean keep polling — never run the wizard against a
-      // half-initialised ITFlow (§346).
-      if (state === 'unreachable' || state === 'not-ready') {
+      if (state === 'unreachable') {
         if (attempt === MAX_ATTEMPTS) {
-          logger.warn(
-            `ITFlow admin bootstrap gave up: the setup wizard never reached the user step (last state: ${state})`
-          );
+          logger.warn('ITFlow admin bootstrap gave up: the app never became reachable (it downloads its source on first boot)');
           return;
         }
         await sleep(RETRY_DELAY_MS);

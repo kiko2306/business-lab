@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.68.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.68.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -294,6 +294,16 @@ below.
       a destination that is neither a mount nor S3.
 ### Exposure and platform
 
+- [ ] **ITFlow: still two logins — the image won't init its own schema** (§344,
+      §346, §348, §349) — every other §344 app is done; ITFlow stays behind
+      Authelia because the `itfloworg/itflow` container doesn't migrate its DB
+      schema on first boot on this host (`itflow.users` never exists), so no
+      first-run bootstrap can work. `itflowClient.ts` / `itflowAdminBootstrap.ts`
+      + tests are in the tree, unwired. First figure out the image-init
+      problem (entrypoint logs, migration script, MariaDB readiness ordering,
+      or pin a known-good tag); *then* re-add `skipAutheliaProtection` + the
+      `reconcileItflowFirstAdmin` wiring.
+
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch
@@ -301,6 +311,16 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
+- [ ] **§344 — unpark ITFlow's setup-wizard bootstrap** — everything else in
+      §344 is done (BookStack OIDC, NocoDB/HA/DocuSeal expose-direct + seed,
+      Jellyfin `lanOnly`, Kopia/n8n `overlayOnly`). ITFlow's §346 flip is
+      parked: the wizard fired before the `itfloworg` image finished its
+      first-boot DB migration and locked setup with no schema. To unpark:
+      `getSetupState` must check the served HTML shows the `add_user` step
+      (schema up), not just a 200, and `runSetupWizard` should confirm the
+      `users` row exists before calling it done; then re-add
+      `skipAutheliaProtection` + the `reconcileItflowFirstAdmin` wiring.
+      `itflowClient.ts` / `itflowAdminBootstrap.ts` + tests are already in.
 - [ ] **`@mat`: confirm NPM's admin UI over the overlay** (§239, §324.4) — the
       "deprovision any live public `npm.<domain>`" half is settled: nothing was
       ever provisioned for `nginx-proxy-manager` (no row, no DNS, no proxy

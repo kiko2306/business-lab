@@ -97,27 +97,14 @@ describe('reconcileItflowFirstAdmin', () => {
     expect(mockedWizard).not.toHaveBeenCalled();
   });
 
-  it('keeps polling while not-ready (schema still migrating) and never runs the wizard', async () => {
-    vi.useFakeTimers();
-    mockedState.mockResolvedValue('not-ready');
-    try {
-      const pending = reconcileItflowFirstAdmin('itflow');
-      await vi.runAllTimersAsync();
-      await expect(pending).resolves.toBeUndefined();
-      expect(mockedState).toHaveBeenCalledTimes(60);
-      expect(mockedWizard).not.toHaveBeenCalled();
-    } finally {
-      vi.useRealTimers();
-    }
-  });
-
-  it('also gives up cleanly when it stays unreachable', async () => {
+  it('retries while unreachable then gives up without throwing', async () => {
     vi.useFakeTimers();
     mockedState.mockResolvedValue('unreachable');
     try {
       const pending = reconcileItflowFirstAdmin('itflow');
       await vi.runAllTimersAsync();
       await expect(pending).resolves.toBeUndefined();
+      expect(mockedState).toHaveBeenCalledTimes(30);
       expect(mockedWizard).not.toHaveBeenCalled();
     } finally {
       vi.useRealTimers();

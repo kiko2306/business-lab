@@ -17,7 +17,7 @@ are frozen and unused.
 
 ### Changed
 
-- ITFlow is exposed directly with its own login (§346/§348) — the dashboard runs its setup wizard once the schema is up, verifying each step so a half-done setup is never locked
+- ITFlow setup-wizard bootstrap (§348) — reverted in 0.68.1; see below
 
 ## [0.67.3] — 2026-09-09
 
