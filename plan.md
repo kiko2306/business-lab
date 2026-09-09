@@ -23383,3 +23383,12 @@ pull, not on every code deploy — accepted (a dedicated "pull latest images"
 action can come later; the full sweep is still one `git diff` failure away).
 Frontend `PROGRESS_LABELS` for `building` / `updating_apps` reworded ("…that
 changed"). 669 backend + 50 frontend tests.
+
+**C live-verified (deploy #17, 0.63.4 → 0.63.5).** A bump touching only
+`VERSION` / `CHANGELOG.md` / `README.md` / `plan-index.md`: backend log
+`Self-update scope runId:17 build:[] apps:[]` then `pull-only, nothing to
+rebuild or restart`, run `done` in **~1 s** (deploy #16, a full backend+frontend
+change, took ~15 min for comparison). Audit metadata `{"scope":"pull-only"}`.
+`/version` moved to 0.63.5 with no container restart (frontend/db untouched,
+9 h uptime; the backend's "1 min" age was deploy #16's own restart 20 s
+earlier, not #17).
