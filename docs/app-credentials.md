@@ -46,6 +46,7 @@ once and never displayed again; rotate them there if you need a new one.
 | **Samba** | `SAMBA_USER` (default `labshare`) | `SAMBA_PASSWORD` — generated on first start. Set your own in the config panel if you need to know it to map the drive from Windows (`\\<host>\<SAMBA_SHARE_NAME>`). |
 | **Vaultwarden** | — | `VAULTWARDEN_ADMIN_TOKEN` (generated, hidden) — for `/admin` only; normal accounts are self-registered |
 | **Miniflux** | `MINIFLUX_ADMIN_USERNAME` (default `admin`) | `MINIFLUX_ADMIN_PASSWORD` (generated) — created from env on first boot, no wizard |
+| **DocuSeal** | the Authelia admin's email | `DOCUSEAL_ADMIN_PASSWORD` (generated). The dashboard runs DocuSeal's first-run `/setup` wizard on first start (§341) — DocuSeal community has no SSO, so Authelia gates the hostname and you still sign in to DocuSeal with this password. Read it from `apps/docuseal/.env`, or set your own in the config panel **before** the first start; after setup, change it in DocuSeal → profile settings. |
 
 ## Wizard — you create the account
 
@@ -62,7 +63,6 @@ Every app is exposed behind Authelia automatically — claim these yourself befo
 | **BookStack** | Ships with `admin@admin.com` / `password` — change it on first login. |
 | **Mealie** | Ships with `changeme@example.com` / `MyPassword`. The dashboard rotates that password to a generated `MEALIE_ADMIN_PASSWORD` the first time Mealie is reachable (like Guacamole's `guacadmin`) and uses that account to point Mealie's AI recipe parsing at the Settings → Claude API key (§238). Create your own admin user in Mealie; the seeded one is dashboard-owned. AI parsing goes through Anthropic's OpenAI-compat endpoint, which Anthropic documents as test-only — a badly-structured page can still fail to parse. Once exposed, an Authelia OIDC login appears (the dashboard wires the client automatically — §270/§274). After signing in through it once, flip **Configuration → `ALLOW_PASSWORD_LOGIN`** to false to drop Mealie's own username/password form and leave Authelia as the only gate. |
 | **NocoDB** | First signup becomes the super admin. |
-| **DocuSeal** | First visit opens a setup page — create the admin account (email + password). No OIDC and no way to hide the form, so Authelia stays the outer gate and this account is DocuSeal's own. |
 | **Vikunja** | Register the first account; registration can then be disabled. Once exposed, an "Authelia" OIDC login button appears (the dashboard wires the client automatically — §270). After signing in through it once, flip **Configuration → `VIKUNJA_AUTH_LOCAL_ENABLED`** to false to drop Vikunja's own username/password form and leave Authelia as the only gate. |
 | **n8n** | Owner account created on first visit. |
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |

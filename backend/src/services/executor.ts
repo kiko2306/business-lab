@@ -33,6 +33,7 @@ import { syncAutheliaAccessControlSafe } from './autheliaAccessControl';
 import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import { applyImmichConfig } from './immichConfig';
 import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
+import { reconcileDocusealFirstAdmin } from './docusealAdminBootstrap';
 import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
@@ -272,6 +273,11 @@ async function composeUpWithManagedConfig(
   // via OAuth (§329). REST against the running API, so after `up`. No-op
   // otherwise.
   await reconcileImmichFirstAdmin(serviceName);
+  // DocuSeal: run its first-run /setup wizard so there's no manual onboarding
+  // step (§341). No OIDC — DocuSeal community has no SSO — so Authelia stays
+  // the outer gate and this just creates the admin account. After `up`; no-op
+  // otherwise.
+  await reconcileDocusealFirstAdmin(serviceName);
 
   return result;
 }

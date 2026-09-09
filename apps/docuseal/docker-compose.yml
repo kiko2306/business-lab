@@ -15,6 +15,11 @@ services:
       # X-Forwarded-Proto. Blank = plain HTTP on the LAN port, no redirect.
       HOST: ${DOCUSEAL_HOST:-}
       FORCE_SSL: ${DOCUSEAL_FORCE_SSL:-}
+      # NOT read by DocuSeal — a carrier so the dashboard's config panel shows
+      # the field and auto-generates a value. The backend uses it to run
+      # DocuSeal's first-run /setup wizard (services/docusealAdminBootstrap.ts):
+      # DocuSeal community has no SSO, so the admin still logs in with this.
+      DOCUSEAL_ADMIN_PASSWORD: ${DOCUSEAL_ADMIN_PASSWORD:-}
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=DocuSeal"

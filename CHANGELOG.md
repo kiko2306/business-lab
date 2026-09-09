@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.63.1] — 2026-09-09
+
+### Apps
+
+- DocuSeal: run its first-run /setup wizard automatically on start (§341) — community edition has no SSO, so Authelia gates the hostname and the generated DOCUSEAL_ADMIN_PASSWORD account is created for you
+
 ## [0.63.0] — 2026-09-09
 
 ### Apps
