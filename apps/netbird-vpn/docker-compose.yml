@@ -1,6 +1,8 @@
 
 services:
   netbird-vpn:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: netbirdio/signal:latest
     restart: unless-stopped
     ports:
@@ -25,6 +27,8 @@ services:
   # enforcement) since login goes through its OIDC clients — see
   # apps/authelia/config/configuration.yml.
   netbird-dashboard:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: netbirdio/dashboard:latest
     restart: unless-stopped
     ports:
@@ -77,6 +81,8 @@ services:
       - netbird-net
 
   netbird-management:
+    mem_limit: 192m
+    mem_reservation: 48m
     image: netbirdio/management:latest
     restart: unless-stopped
     ports:
@@ -122,6 +128,8 @@ services:
   # the Relay.Secret in data/management.json exactly — management mints
   # time-based tokens with it that the relay verifies.
   netbird-relay:
+    mem_limit: 96m
+    mem_reservation: 24m
     image: netbirdio/relay:latest
     restart: unless-stopped
     ports:

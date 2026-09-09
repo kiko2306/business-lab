@@ -1,6 +1,8 @@
 
 services:
   authelia:
+    mem_limit: 192m
+    mem_reservation: 64m
     image: authelia/authelia:latest
     restart: unless-stopped
     # Two config files merged: the tracked configuration.yml plus the

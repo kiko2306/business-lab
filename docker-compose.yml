@@ -1,6 +1,8 @@
 
 services:
   frontend:
+    mem_limit: 128m
+    mem_reservation: 32m
     build:
       context: ./frontend
       dockerfile: Dockerfile
@@ -16,6 +18,8 @@ services:
     restart: unless-stopped
 
   backend:
+    mem_limit: 768m
+    mem_reservation: 256m
     build:
       context: ./backend
       dockerfile: Dockerfile
@@ -105,6 +109,8 @@ services:
   # dashboard's own frontend/backend images from the freshly `git pull`ed
   # source, which the Build API gates separately from plain POST.
   docker-socket-proxy:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: tecnativa/docker-socket-proxy:latest
     environment:
       CONTAINERS: 1
@@ -128,6 +134,8 @@ services:
     # homelab-net, by service name.
 
   database:
+    mem_limit: 512m
+    mem_reservation: 128m
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-homelab}
@@ -164,6 +172,7 @@ services:
   # See scripts/self-update-watchdog.sh for the recovery logic and its
   # false-positive-avoidance grace period.
   self-update-watchdog:
+    mem_limit: 96m
     image: homelab-backend
     # command, not entrypoint: keeps the image's own ENTRYPOINT
     # (docker-entrypoint.sh) so this still gets its root-level fixups
@@ -203,6 +212,8 @@ services:
   # though the proxy's category model can't enforce that narrower scope on
   # its own.
   watchdog-docker-proxy:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: tecnativa/docker-socket-proxy:latest
     environment:
       CONTAINERS: 1

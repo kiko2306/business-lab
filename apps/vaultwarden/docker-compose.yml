@@ -1,6 +1,8 @@
 
 services:
   vaultwarden:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: vaultwarden/server:latest
     restart: unless-stopped
     ports:

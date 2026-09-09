@@ -1,6 +1,8 @@
 
 services:
   nocodb:
+    mem_limit: 768m
+    mem_reservation: 256m
     image: nocodb/nocodb:latest
     restart: unless-stopped
     ports:
@@ -41,6 +43,8 @@ services:
   # NocoDB officially supports Postgres up to 16; newer majors aren't
   # validated by upstream yet, so this isn't a stale pin.
   nocodb-db:
+    mem_limit: 256m
+    mem_reservation: 64m
     image: postgres:16-alpine
     restart: unless-stopped
     environment:

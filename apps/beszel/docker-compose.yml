@@ -1,5 +1,7 @@
 services:
   beszel:
+    mem_limit: 192m
+    mem_reservation: 64m
     image: henrygd/beszel:latest
     restart: unless-stopped
     ports:
@@ -44,6 +46,7 @@ services:
   # hasn't cut a major since 2015); pinned only to stay off `:edge`, not
   # because this one-shot script needs a specific version.
   beszel-init:
+    mem_limit: 96m
     image: alpine:3
     restart: "no"
     depends_on:
@@ -77,6 +80,8 @@ services:
         echo "beszel-init: universal token registered"
 
   beszel-agent:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: henrygd/beszel-agent:latest
     restart: unless-stopped
     network_mode: host

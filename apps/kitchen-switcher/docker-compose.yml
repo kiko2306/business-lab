@@ -1,5 +1,7 @@
 services:
   kitchen-switcher:
+    mem_limit: 96m
+    mem_reservation: 16m
     image: nginx:alpine
     restart: unless-stopped
     ports:

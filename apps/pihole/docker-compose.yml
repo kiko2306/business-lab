@@ -1,6 +1,8 @@
 
 services:
   pihole:
+    mem_limit: 192m
+    mem_reservation: 64m
     image: pihole/pihole:latest
     restart: unless-stopped
     ports:

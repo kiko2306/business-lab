@@ -1,6 +1,8 @@
 
 services:
   crowdsec:
+    mem_limit: 192m
+    mem_reservation: 64m
     image: crowdsecurity/crowdsec:latest
     restart: unless-stopped
     environment:
@@ -75,6 +77,8 @@ services:
   # once a classic token is usable or the bouncer is fixed:
   #   docker compose --profile edge-bouncer up -d
   cloudflare-worker-bouncer:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: crowdsecurity/cloudflare-worker-bouncer:latest
     profiles: ["edge-bouncer"]
     restart: unless-stopped

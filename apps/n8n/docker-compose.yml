@@ -14,6 +14,7 @@ services:
   # n8n runs as uid/gid 1000 (node) but Docker creates ./data/n8n root-owned,
   # so it can't write /home/node/.n8n/config. One-off chown; exits 0.
   n8n-init:
+    mem_limit: 96m
     image: busybox:stable
     user: "0:0"
     command: ["chown", "-R", "1000:1000", "/data"]
@@ -29,6 +30,7 @@ services:
   # so a rendered workflow is authoritative — UI edits to it are replaced
   # (plan.md §118.3). No-op when the directory is empty.
   n8n-workflows-init:
+    mem_limit: 96m
     image: docker.n8n.io/n8nio/n8n:latest
     restart: "no"
     depends_on:
@@ -57,6 +59,8 @@ services:
       - n8n-net
 
   n8n:
+    mem_limit: 640m
+    mem_reservation: 192m
     image: docker.n8n.io/n8nio/n8n:latest
     restart: unless-stopped
     depends_on:
@@ -113,6 +117,8 @@ services:
       start_period: 30s
 
   n8n-db:
+    mem_limit: 256m
+    mem_reservation: 64m
     # pgautoupgrade is a drop-in for postgres:17-alpine: same entrypoint, env
     # and config, but on start it runs `pg_upgrade --link` in place if it finds
     # an older cluster in PGDATA. n8n 2.36 logs "Postgres 15 is not supported"

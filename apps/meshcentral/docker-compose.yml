@@ -1,5 +1,7 @@
 services:
   meshcentral:
+    mem_limit: 256m
+    mem_reservation: 96m
     image: ghcr.io/ylianst/meshcentral:latest
     restart: unless-stopped
     # Container listens on 443 (its config.json default). It runs as root, so

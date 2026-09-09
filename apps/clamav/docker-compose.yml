@@ -1,5 +1,7 @@
 services:
   clamav:
+    mem_limit: 1200m
+    mem_reservation: 768m
     image: clamav/clamav:latest
     restart: unless-stopped
     ports:

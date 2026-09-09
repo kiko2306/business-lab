@@ -1,6 +1,8 @@
 
 services:
   itflow:
+    mem_limit: 256m
+    mem_reservation: 96m
     image: itfloworg/itflow:latest
     restart: unless-stopped
     ports:
@@ -56,6 +58,8 @@ services:
   # matching bookstack-db (lscr.io/linuxserver/mariadb:latest) elsewhere in
   # this repo.
   itflow-db:
+    mem_limit: 256m
+    mem_reservation: 96m
     image: mariadb:latest
     restart: unless-stopped
     environment:

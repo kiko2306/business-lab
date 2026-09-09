@@ -1,5 +1,7 @@
 services:
   scrutiny:
+    mem_limit: 256m
+    mem_reservation: 96m
     # Omnibus image: web UI + InfluxDB + collector in one container. Pinned
     # to a tagged release, not `latest-omnibus`/`nightly-omnibus` — upstream's
     # own docs warn those update the image with no notice, which is exactly

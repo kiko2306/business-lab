@@ -1,6 +1,8 @@
 
 services:
   code-server:
+    mem_limit: 512m
+    mem_reservation: 128m
     image: lscr.io/linuxserver/code-server:latest
     restart: unless-stopped
     ports:

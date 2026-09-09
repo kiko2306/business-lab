@@ -1,6 +1,8 @@
 
 services:
   samba:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: dockurr/samba:latest
     restart: unless-stopped
     # SMB is a LAN protocol, not HTTP: it is never routed through the

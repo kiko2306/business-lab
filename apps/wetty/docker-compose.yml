@@ -19,6 +19,8 @@ services:
   # That key is also what makes disabling host password auth safe: browser
   # access keeps working regardless of whether any laptop has a key.
   wetty:
+    mem_limit: 96m
+    mem_reservation: 24m
     image: wettyoss/wetty:latest
     restart: unless-stopped
     ports:

@@ -1,5 +1,7 @@
 services:
   syncthing:
+    mem_limit: 192m
+    mem_reservation: 48m
     image: syncthing/syncthing:1
     restart: unless-stopped
     environment:

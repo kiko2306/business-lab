@@ -1,6 +1,8 @@
 
 services:
   nextcloud:
+    mem_limit: 512m
+    mem_reservation: 128m
     image: nextcloud:latest
     restart: unless-stopped
     ports:
@@ -62,6 +64,8 @@ services:
   # image, entrypoint swapped to its bundled /cron.sh, sharing the app volume
   # so it sees the same config/data as the web container.
   nextcloud-cron:
+    mem_limit: 256m
+    mem_reservation: 64m
     image: nextcloud:latest
     restart: unless-stopped
     entrypoint: /cron.sh
@@ -81,6 +85,8 @@ services:
   # Nextcloud's own admin docs put 16 at the top of the officially-supported
   # range; 17+ isn't validated by upstream yet, so this isn't a stale pin.
   nextcloud-db:
+    mem_limit: 256m
+    mem_reservation: 96m
     image: postgres:16-alpine
     restart: unless-stopped
     environment:

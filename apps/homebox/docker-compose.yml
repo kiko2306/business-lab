@@ -1,5 +1,7 @@
 services:
   homebox:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: ghcr.io/sysadminsmedia/homebox:latest
     restart: unless-stopped
     ports:

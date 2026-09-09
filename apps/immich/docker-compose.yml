@@ -1,6 +1,8 @@
 
 services:
   immich-server:
+    mem_limit: 900m
+    mem_reservation: 384m
     image: ghcr.io/immich-app/immich-server:release
     restart: unless-stopped
     ports:
@@ -52,6 +54,8 @@ services:
   # is the first thing to disable if the stack is too heavy — the server
   # still runs without it, those two features just stop working.
   immich-machine-learning:
+    mem_limit: 512m
+    mem_reservation: 128m
     image: ghcr.io/immich-app/immich-machine-learning:release
     restart: unless-stopped
     volumes:
@@ -62,6 +66,8 @@ services:
   # Major pinned to 9, matching Immich's own upstream docker-compose.yml,
   # which pins the same `valkey:9` — not an arbitrary version.
   immich-redis:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: docker.io/valkey/valkey:9-alpine
     restart: unless-stopped
     networks:
@@ -70,6 +76,8 @@ services:
   # Immich-maintained Postgres image with the vector-search extensions it
   # requires baked in — a generic postgres image will not work here.
   immich-db:
+    mem_limit: 256m
+    mem_reservation: 96m
     image: ghcr.io/immich-app/postgres:14-vectorchord0.4.3-pgvectors0.2.0
     restart: unless-stopped
     environment:

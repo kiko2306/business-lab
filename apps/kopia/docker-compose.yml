@@ -1,5 +1,7 @@
 services:
   kopia:
+    mem_limit: 192m
+    mem_reservation: 48m
     image: kopia/kopia:latest
     restart: unless-stopped
     # Kopia identifies every snapshot source by (user, host, path). The host

@@ -1,6 +1,8 @@
 
 services:
   ntfy:
+    mem_limit: 96m
+    mem_reservation: 24m
     image: binwiederhier/ntfy:latest
     restart: unless-stopped
     command: serve

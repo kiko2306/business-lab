@@ -1,6 +1,8 @@
 
 services:
   home-assistant:
+    mem_limit: 640m
+    mem_reservation: 256m
     image: ghcr.io/home-assistant/home-assistant:stable
     restart: unless-stopped
     # Host networking is what makes Home Assistant's automatic discovery work.

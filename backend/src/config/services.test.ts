@@ -1,6 +1,7 @@
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
+import yaml from 'js-yaml';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   SERVICES,
@@ -547,6 +548,32 @@ describe('database backup coverage', () => {
         composeText(service.composePath),
         `${name} declares backup.service '${service.backup.service}', which is not a service in its compose file`
       ).toMatch(new RegExp(`^\\s+${service.backup.service}:\\s*$`, 'm'));
+    }
+  });
+});
+
+describe('memory limits', () => {
+  // Every service in every managed app's compose file carries a `mem_limit`
+  // (plan.md §300 Phase C). Without one, a single runaway container can push
+  // the whole 14 GiB host into swap-thrash — the exact problem §290–§299 hit
+  // during a self-update. Checked registry-wide here so a new app can't ship
+  // without a cap. `mem_reservation` is advisory and not required.
+  const KNOWN_UNLIMITED = new Set<string>([]);
+
+  it('are declared on every service of every registry app', () => {
+    for (const [name, service] of Object.entries(SERVICES)) {
+      const doc = yaml.load(composeText(service.composePath)) as {
+        services?: Record<string, Record<string, unknown>>;
+      };
+      for (const [svc, body] of Object.entries(doc.services ?? {})) {
+        if (KNOWN_UNLIMITED.has(svc) || body === null || typeof body !== 'object') {
+          continue;
+        }
+        expect(
+          body.mem_limit,
+          `${name}: compose service '${svc}' has no mem_limit`
+        ).toBeDefined();
+      }
     }
   });
 });

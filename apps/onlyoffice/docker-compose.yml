@@ -1,5 +1,7 @@
 services:
   onlyoffice:
+    mem_limit: 640m
+    mem_reservation: 256m
     image: onlyoffice/documentserver:latest
     restart: unless-stopped
     ports:

@@ -6,6 +6,7 @@ services:
   # One-off chown before the app starts; exits 0. (Vikunja's own image is
   # `FROM scratch` with no shell, hence busybox.)
   vikunja-init:
+    mem_limit: 96m
     image: busybox:stable
     user: "0:0"
     command: ["chown", "-R", "1000:1000", "/db", "/files"]
@@ -15,6 +16,8 @@ services:
       - ./data/files:/files
 
   vikunja:
+    mem_limit: 192m
+    mem_reservation: 48m
     image: vikunja/vikunja:latest
     restart: unless-stopped
     depends_on:

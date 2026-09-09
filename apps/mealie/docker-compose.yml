@@ -1,5 +1,7 @@
 services:
   mealie:
+    mem_limit: 384m
+    mem_reservation: 128m
     image: ghcr.io/mealie-recipes/mealie:latest
     restart: unless-stopped
     ports:

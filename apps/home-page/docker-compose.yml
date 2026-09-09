@@ -1,6 +1,8 @@
 
 services:
   homepage:
+    mem_limit: 256m
+    mem_reservation: 96m
     image: ghcr.io/gethomepage/homepage:latest
     restart: unless-stopped
     ports:

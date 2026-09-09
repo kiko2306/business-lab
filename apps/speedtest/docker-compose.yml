@@ -1,6 +1,8 @@
 
 services:
   speedtest:
+    mem_limit: 192m
+    mem_reservation: 48m
     image: lscr.io/linuxserver/speedtest-tracker:latest
     restart: unless-stopped
     ports:

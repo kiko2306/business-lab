@@ -1,5 +1,7 @@
 services:
   miniflux:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: miniflux/miniflux:latest
     restart: unless-stopped
     ports:
@@ -41,6 +43,8 @@ services:
       start_period: 30s
 
   miniflux-db:
+    mem_limit: 192m
+    mem_reservation: 64m
     image: postgres:16-alpine
     restart: unless-stopped
     environment:

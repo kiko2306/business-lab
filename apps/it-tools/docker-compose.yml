@@ -1,5 +1,7 @@
 services:
   it-tools:
+    mem_limit: 128m
+    mem_reservation: 16m
     # Newest upstream release (Oct 2024 — upstream's `:latest` points at the
     # same build; only `:nightly` moves). Fully static SPA, no backend/data/
     # auth, so a stale pin is harmless; bump deliberately.

@@ -1,6 +1,8 @@
 
 services:
   stirling-pdf:
+    mem_limit: 1g
+    mem_reservation: 320m
     # ultra-lite, not the full image: the full tag bundles a LibreOffice +
     # Tesseract-OCR + Python runtime that sit resident (~960 MiB RSS, 3.4 GB
     # on disk) for the Office-doc conversion and OCR tools. This deployment
@@ -14,6 +16,14 @@ services:
       - "${STIRLING_PDF_PORT:-10360}:8080"
     environment:
       TZ: ${TZ:-UTC}
+      # Cap the JVM heap so the container stays under mem_limit above. The
+      # image (JDK 25, Spring Boot) sets no -Xmx and would size the heap to a
+      # percentage of the *cgroup* limit — with the 1g mem_limit that leaves
+      # too little for metaspace/threads/direct buffers under PDF load, and
+      # the image runs -XX:+ExitOnOutOfMemoryError. -Xmx640m + ~360m non-heap
+      # fits 1g. JAVA_TOOL_OPTIONS is read by the JVM unconditionally (the
+      # launcher is a bare `java -jar`, so JAVA_CUSTOM_OPTS may not apply).
+      JAVA_TOOL_OPTIONS: "-Xmx640m"
       # All processing is local; no login by default. Flip to true (and add
       # users via the UI) to gate access — but exposure should go through
       # Authelia rather than relying on this.

@@ -1,6 +1,8 @@
 
 services:
   nginx-proxy-manager:
+    mem_limit: 256m
+    mem_reservation: 96m
     image: jc21/nginx-proxy-manager:latest
     restart: unless-stopped
     ports:
@@ -67,6 +69,8 @@ services:
   # of upstream issue). This is the one DB pin in this file that isn't
   # MariaDB, and that's deliberate, not an oversight.
   npm-db:
+    mem_limit: 512m
+    mem_reservation: 128m
     image: mysql:8.0
     restart: unless-stopped
     environment:

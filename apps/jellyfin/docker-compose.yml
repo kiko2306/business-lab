@@ -1,6 +1,8 @@
 
 services:
   jellyfin:
+    mem_limit: 768m
+    mem_reservation: 192m
     image: jellyfin/jellyfin:latest
     restart: unless-stopped
     ports:

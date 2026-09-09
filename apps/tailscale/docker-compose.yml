@@ -1,6 +1,8 @@
 
 services:
   tailscale:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: tailscale/tailscale:latest
     restart: unless-stopped
     environment:

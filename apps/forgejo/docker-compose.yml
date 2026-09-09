@@ -1,5 +1,7 @@
 services:
   forgejo:
+    mem_limit: 512m
+    mem_reservation: 128m
     # Pinned to the current stable major (16.x, Sept 2026). Forgejo ships a
     # major roughly quarterly and only the pinned major tag stays on a
     # release line — `:latest` would jump majors with no notice, which a

@@ -1,5 +1,7 @@
 services:
   dozzle:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: amir20/dozzle:latest
     restart: unless-stopped
     ports:

@@ -1,5 +1,7 @@
 services:
   price-compare:
+    mem_limit: 128m
+    mem_reservation: 32m
     build: ./app
     restart: unless-stopped
     ports:

@@ -6,6 +6,7 @@ services:
   # service the database waits on, rather than an afterwards step. It writes
   # once and then no-ops, so a restart does not churn the file.
   guacamole-initdb:
+    mem_limit: 96m
     image: guacamole/guacamole:1.6.0
     user: "0:0"
     command:
@@ -21,6 +22,8 @@ services:
   # The proxy daemon that actually speaks RDP, VNC and SSH. No published port:
   # only the web app talks to it, over the compose network.
   guacd:
+    mem_limit: 192m
+    mem_reservation: 48m
     image: guacamole/guacd:1.6.0
     restart: unless-stopped
     volumes:
@@ -40,6 +43,8 @@ services:
   # mismatched pair refuses to load, and :latest can drift out from under it
   # silently on a routine restart.
   guacamole:
+    mem_limit: 512m
+    mem_reservation: 192m
     image: guacamole/guacamole:1.6.0
     restart: unless-stopped
     depends_on:
@@ -96,6 +101,8 @@ services:
   # stack, which do have a real ceiling (§210.1) — no reason to run a third
   # major for this one alone.
   guacamole-db:
+    mem_limit: 256m
+    mem_reservation: 96m
     image: postgres:16-alpine
     restart: unless-stopped
     depends_on:

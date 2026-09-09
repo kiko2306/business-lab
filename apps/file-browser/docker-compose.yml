@@ -7,6 +7,7 @@ services:
   # same tree as www-data (uid 33 in its own container), a uid this chown
   # can't predict or match, so group ownership alone isn't enough.
   filebrowser-init:
+    mem_limit: 96m
     image: busybox:stable
     user: "0:0"
     command: ["sh", "-c", "chown -R 1000:1000 /database /srv && chmod -R o+rwX /srv"]
@@ -16,6 +17,8 @@ services:
       - ./data/files:/srv
 
   filebrowser:
+    mem_limit: 128m
+    mem_reservation: 32m
     image: filebrowser/filebrowser:latest
     restart: unless-stopped
     depends_on:

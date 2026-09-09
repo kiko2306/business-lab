@@ -6,6 +6,8 @@ services:
   # floats within v1 until the v2 move is done on purpose, migration path
   # read first.
   uptime-kuma:
+    mem_limit: 256m
+    mem_reservation: 96m
     image: louislam/uptime-kuma:1
     restart: unless-stopped
     ports:
@@ -37,6 +39,7 @@ services:
   # `user` table: an empty one still forces the first-run setup wizard
   # (`docs/app-credentials.md`), same as before this change.
   uptime-kuma-init:
+    mem_limit: 96m
     image: louislam/uptime-kuma:1
     restart: "no"
     depends_on:

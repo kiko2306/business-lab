@@ -1,6 +1,8 @@
 
 services:
   paperless-ngx:
+    mem_limit: 900m
+    mem_reservation: 384m
     image: ghcr.io/paperless-ngx/paperless-ngx:latest
     restart: unless-stopped
     ports:
@@ -86,6 +88,8 @@ services:
       start_period: 40s
 
   paperless-db:
+    mem_limit: 256m
+    mem_reservation: 96m
     # pgautoupgrade is a drop-in for postgres:17-alpine: same entrypoint, env
     # and config, but on start it runs `pg_upgrade --link` in place if it finds
     # an older cluster in PGDATA. Paperless-ngx logs "PostgreSQL 15 ... will no
@@ -117,6 +121,8 @@ services:
       start_period: 90s
 
   paperless-redis:
+    mem_limit: 96m
+    mem_reservation: 24m
     # Valkey, not Redis: redis:7-alpine is now RSALv2/SSPL (source-available,
     # not FOSS — docs/licences.md). Valkey is the BSD-3 community fork of
     # Redis 7.2, wire-compatible, and the Immich stack already runs it. The
