@@ -23081,19 +23081,36 @@ With the stub off:
   copied the host's `127.0.0.53` is left with a dead resolver. Not Pi-hole
   specific; any container needing egress DNS breaks.
 
-**Second change.** The `setup_server.sh` block now also gives *Docker* an
-explicit upstream: an `ensure_container_dns_upstream()` helper merges
-`"dns": ["1.1.1.1", "8.8.8.8"]` into `daemon.json` (preserving the
-address-pool block) and restarts docker. Public resolvers deliberately — a
-gateway/LAN value would loop through Pi-hole while Pi-hole itself is
-restarting. Idempotent (no-op + no docker restart if `dns` is already set),
-and called from **both** paths — the fresh "just disabled the stub" path and
-the "drop-in already exists" path — so a host left in run 1's half-state is
-repaired by re-running the script.
+**Run 2 attempt — `daemon.json` "dns" + `systemctl restart docker` — made it
+worse.** Adding `"dns": ["1.1.1.1","8.8.8.8"]` to `daemon.json` and
+restarting dockerd did fix the container resolver (a fresh container gets
+the right `/etc/resolv.conf`), but the **dockerd restart tore the
+iptables/NAT rules of every existing user-defined network** — `pihole_default`,
+`mealie_default`, all ~26 of them — so their containers could no longer route
+out (`ping 1.1.1.1` → "network unreachable"). Default-bridge containers were
+fine; only pre-existing compose networks broke, and only a recreate per
+project (or a host reboot) reinstalls their rules. Pi-hole then restart-looped:
+FTL needs `gravity.db`, gravity needs DNS, gravity's DNS check went out the
+broken network. Ingress (tunnel → NPM → app) kept working throughout.
 
-`bash -n` + shellcheck clean (only the 3 pre-existing SC2015/SC2001 findings);
-the JSON-merge helper unit-checked in isolation (merge / idempotent / missing
-file). **Run 2 pending on the host** — re-run `sudo ./setup_server.sh`
-(the prompt is skipped, the daemon.json repair runs), then recreate Pi-hole
-and confirm FTL binds `:53` and gravity builds. Docs-only + shell — no
-version bump.
+**Final change.** Drop the `daemon.json`/docker-restart idea entirely. The
+block now replaces `/etc/resolv.conf` (normally a symlink to resolved's dead
+`127.0.0.53` stub file) with a static `nameserver 1.1.1.1 / 8.8.8.8`. Docker's
+embedded DNS copies those non-loopback lines into each container on a
+user-defined network **at container start** — no dockerd restart, Docker
+untouched, existing networks intact. `ensure_static_resolv_conf()` is
+idempotent (rewrites only while resolv.conf is still a symlink or still lists
+`127.0.0.53`) and runs from both the fresh and the already-disabled paths.
+Existing containers pick up the new resolver on their next per-project
+recreate.
+
+Recovering the live host from the run-2 damage needs a **reboot** (cold dockerd
+start reinstalls every network's rules cleanly); the `daemon.json` `dns` key
+left behind is harmless (same values) and can go at any later restart.
+
+`bash -n` + shellcheck clean (only the 3 pre-existing SC2015/SC2001 findings).
+**Final verification pending on the host** — `git pull`, re-run
+`sudo ./setup_server.sh` (prompt skipped; `ensure_static_resolv_conf` rewrites
+`/etc/resolv.conf`), **reboot** to rebuild the docker networks broken by the
+run-2 restart, then start Pi-hole and confirm FTL binds `:53` and gravity
+builds. Docs-only + shell — no version bump.

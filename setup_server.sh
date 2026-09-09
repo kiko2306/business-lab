@@ -642,50 +642,36 @@ fi
 # listener has to go (plan.md §284). Nothing inside the stack can do this;
 # like the fixed-IP prompt it's a host-networking change, so it lives here.
 #
-# Two coupled changes, because removing the stub takes the resolver every
-# container inherits (127.0.0.53) with it:
-#   1. A drop-in setting DNSStubListener=no, /etc/resolv.conf repointed at
-#      resolved's uplink file, resolved restarted. Host name resolution keeps
-#      working via resolved's real upstream; only the local :53 socket goes.
-#   2. An explicit "dns" in daemon.json (1.1.1.1 / 8.8.8.8) + a docker
-#      restart. Docker's bridge has no IPv6 and containers otherwise copy the
-#      host's now-dead 127.0.0.53 — this gives every container a working
-#      upstream. Public resolvers on purpose: a LAN/gateway value would loop
-#      through Pi-hole while Pi-hole itself is restarting (plan.md §339).
+# Two changes, because removing the stub takes the resolver every container
+# inherits (127.0.0.53) with it:
+#   1. A drop-in setting DNSStubListener=no, resolved restarted.
+#   2. /etc/resolv.conf replaced (it is normally a symlink to resolved's stub
+#      file, i.e. the now-dead 127.0.0.53) with a static file naming public
+#      resolvers. Both the host and — via Docker's embedded DNS, which copies
+#      the non-loopback nameserver lines into every container on a user-defined
+#      network at container-start — the containers then have a working
+#      upstream. Deliberately NOT done by putting "dns" in daemon.json: that
+#      needs a dockerd restart, which reinstalls the iptables/NAT rules of
+#      every *existing* user-defined network and cuts their egress until each
+#      compose project is recreated (learned the hard way, §339). Touching
+#      only resolv.conf leaves Docker alone; existing containers pick up the
+#      new resolver on their next recreate.
 #
 # Prompted, not automatic: a host that never runs Pi-hole needs neither.
 RESOLVED_STUB_DROPIN="/etc/systemd/resolved.conf.d/10-disable-stub-listener.conf"
 
-# Merge an explicit "dns" upstream into daemon.json (step 2 above) and restart
-# docker. Idempotent — a no-op if "dns" is already set — so it also repairs a
-# host where step 1 ran on an earlier pass but step 2 didn't.
-ensure_container_dns_upstream() {
-  if ! command -v python3 >/dev/null 2>&1; then
-    warn "python3 not found — add '\"dns\": [\"1.1.1.1\", \"8.8.8.8\"]' to $DOCKER_DAEMON_JSON and restart docker, or containers won't resolve DNS with the stub listener off"
+# Point /etc/resolv.conf at real public resolvers (see step 2 above).
+# Idempotent: rewrites only if it is still a symlink or still lists 127.0.0.53,
+# so it also repairs a host where the drop-in was written on an earlier pass
+# but resolv.conf was left pointing at the dead stub.
+ensure_static_resolv_conf() {
+  if [ ! -L /etc/resolv.conf ] && ! grep -q '127.0.0.53' /etc/resolv.conf 2>/dev/null; then
     return
   fi
-  if python3 - "$DOCKER_DAEMON_JSON" <<'PY'
-import json, sys
-p = sys.argv[1]
-try:
-    with open(p) as f:
-        cfg = json.load(f)
-except (FileNotFoundError, ValueError):
-    cfg = {}
-if cfg.get("dns"):
-    sys.exit(1)  # already set — nothing to do, don't restart docker
-cfg["dns"] = ["1.1.1.1", "8.8.8.8"]
-with open(p, "w") as f:
-    json.dump(cfg, f, indent=2)
-    f.write("\n")
-PY
-  then
-    if systemctl restart docker >/dev/null 2>&1; then
-      log "Set container DNS upstream (1.1.1.1, 8.8.8.8) in $DOCKER_DAEMON_JSON and restarted docker"
-    else
-      warn "wrote dns into $DOCKER_DAEMON_JSON but couldn't restart docker — run 'systemctl restart docker' by hand"
-    fi
-  fi
+  rm -f /etc/resolv.conf
+  printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf
+  chmod 644 /etc/resolv.conf
+  log "Set /etc/resolv.conf to 1.1.1.1 / 8.8.8.8 — recreate running containers (per compose project) to pick up the new resolver"
 }
 
 if [ -t 0 ] && command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved; then
@@ -695,33 +681,26 @@ if [ -t 0 ] && command -v systemctl >/dev/null 2>&1 && systemctl is-active --qui
   fi
   if [ -f "$RESOLVED_STUB_DROPIN" ]; then
     log "systemd-resolved's stub listener is already disabled ($RESOLVED_STUB_DROPIN) — port 53 is free for Pi-hole"
-    # Step 1 done on an earlier run — make sure step 2 (container DNS) is too.
-    ensure_container_dns_upstream
+    ensure_static_resolv_conf
   elif [ "$STUB_ACTIVE" = yes ]; then
     echo
     echo "Free port 53 for Pi-hole?"
     echo "systemd-resolved holds 127.0.0.53:53, which blocks Pi-hole's container"
     echo "from binding the DNS port. This disables resolved's local stub listener,"
-    echo "sets an explicit container DNS upstream in daemon.json, and restarts"
-    echo "both systemd-resolved and docker. Only needed if this host runs Pi-hole."
+    echo "points /etc/resolv.conf at public resolvers (1.1.1.1 / 8.8.8.8), and"
+    echo "restarts systemd-resolved. Only needed if this host runs Pi-hole."
     printf 'Disable the stub listener? [y/N]: '
     read -r STUB_CONFIRM
     if [ "$STUB_CONFIRM" = "y" ] || [ "$STUB_CONFIRM" = "Y" ]; then
       mkdir -p "$(dirname "$RESOLVED_STUB_DROPIN")"
       printf '[Resolve]\nDNSStubListener=no\n' > "$RESOLVED_STUB_DROPIN"
       chmod 644 "$RESOLVED_STUB_DROPIN"
-      # /etc/resolv.conf normally symlinks resolved's stub file, which still
-      # lists 127.0.0.53 — repoint it at the uplink file resolved also keeps,
-      # or host name resolution breaks the moment the stub stops.
-      if [ -e /run/systemd/resolve/resolv.conf ]; then
-        ln -sf /run/systemd/resolve/resolv.conf /etc/resolv.conf
-      fi
+      ensure_static_resolv_conf
       if systemctl restart systemd-resolved >/dev/null 2>&1; then
         log "Disabled systemd-resolved's stub listener — port 53 is free for Pi-hole"
       else
         warn "wrote $RESOLVED_STUB_DROPIN but couldn't restart systemd-resolved — run 'systemctl restart systemd-resolved' by hand"
       fi
-      ensure_container_dns_upstream
     else
       log "Skipped — port 53 stays with systemd-resolved; Pi-hole won't start until it's freed"
     fi

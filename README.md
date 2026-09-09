@@ -340,19 +340,19 @@ below.
       path, then re-run §219's live check (write over SMB → visible in
       Nextcloud `/shared` and in Paperless's `to-paperless/` drop box → and
       back). Until then §310 stays on `dev`, unmerged.
-- [ ] **@mat: finish Pi-hole's port-53 fix — re-run `setup_server.sh`, then
-      recreate Pi-hole** (§283, §284, §339) — `setup_server.sh`'s "Free port 53
-      for Pi-hole?" prompt now does two things: disables systemd-resolved's stub
-      listener (frees `127.0.0.53:53`) **and** pins `"dns": ["1.1.1.1",
-      "8.8.8.8"]` in `daemon.json` + restarts docker, because removing the stub
-      leaves containers with a dead `127.0.0.53` (this host's resolved has the
-      stub address as its own IPv4 upstream; only IPv6 works, and Docker's
-      bridge has no IPv6). Run 1 on the host freed :53 but Pi-hole then hung on
-      gravity with no DNS. The daemon.json half is idempotent and runs on a
-      re-run even though the drop-in already exists: `sudo ./setup_server.sh`,
-      then recreate Pi-hole from the dashboard and confirm FTL binds :53 and
-      gravity builds. Also confirm host DNS still resolves
-      (`resolvectl query github.com`).
+- [ ] **@mat: finish Pi-hole's port-53 fix — pull, re-run `setup_server.sh`,
+      reboot, start Pi-hole** (§283, §284, §339) — `setup_server.sh`'s "Free
+      port 53 for Pi-hole?" prompt disables systemd-resolved's stub listener
+      (frees `127.0.0.53:53`) and replaces `/etc/resolv.conf` with a static
+      `1.1.1.1 / 8.8.8.8` so host *and* containers keep a working resolver
+      (this host's resolved had the dead stub address as its own upstream).
+      An earlier attempt that used `daemon.json` `"dns"` + `systemctl restart
+      docker` cut egress on every existing compose network — the live host
+      needs a **reboot** to rebuild those. Steps: `git pull` on the host,
+      `sudo ./setup_server.sh` (prompt is skipped, resolv.conf gets rewritten),
+      `sudo reboot`, then start Pi-hole from the dashboard and confirm FTL
+      binds :53 and gravity builds. Also confirm host DNS still resolves
+      (`resolvectl query github.com`) and other apps' egress is back.
 - [ ] **App backlog** — §22 lists candidate apps by category (communication,
       business ops, no-code/BI, files/PDF, security/network, dev infra,
       productivity). Pull from there rather than restating it here.
