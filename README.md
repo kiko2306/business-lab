@@ -253,18 +253,14 @@ Updates:
       behavior (occasional automatic recovery, ~1-2 min of downtime) fine
       to leave as is?
 
-Memory baseline (§300 — attack the §290–§299 headroom problem by shrinking
-the baseline, ~9.7 GiB container RSS on 14 GiB, swap 90% full):
+Memory baseline (§300 — attacked the §290–§299 headroom problem by shrinking
+the baseline; started ~9.7 GiB container RSS on 14 GiB with swap 90% full,
+ended ~7.5 GiB used / 7.3 GiB available / swap 1.2 GiB). Phases A–C done
+(§301–§309). Remaining:
 
-- [ ] **@mat: decide on `docker image prune -af` on the host** (§300 Phase A,
-      §308) — the rest of Phase A is done (§301f prune + swap flush, §308
-      removed `peaceful_keldysh` and ran `network prune`). What's left is a
-      judgement call: ~11 GB of the image store is images for currently-
-      *stopped* apps — a blind `image prune -af` reclaims it but costs a
-      re-pull if a client later starts one of those apps.
-- [ ] **@mat: Phase D decisions** (§300) — D4 ClamAV (215 MiB, irreducible):
+- [ ] **@mat: Phase D decision** (§300) — D4 ClamAV (215 MiB, irreducible):
       on-access vs scheduled scans. (D1 Postiz, D2 Metabase and D3 MSSQL were
-      all resolved by the §301 removals.)
+      resolved by the §301 removals.)
 
 Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
 
