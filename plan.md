@@ -21779,3 +21779,21 @@ resident, onto a fresh unfragmented swap with real RAM headroom, so it
 won't thrash back the way it was before the §301 removals. ~11 GB of image
 store is still reclaimable (images for currently-stopped apps) — deliberately
 left, since `image prune -af` there is a re-pull cost, not free.
+
+## 302. itflow / vikunja healthchecks fixed (2026-09-09)
+
+Both read `unhealthy` (found in the §301f verification) while serving fine —
+the healthcheck command couldn't execute in the image:
+
+- **itflow** (`itfloworg/itflow`, Alpine): the check ran `curl`, which the
+  image doesn't have. → `["CMD", "wget", "-q", "-O", "/dev/null",
+  "http://localhost:8080/"]` (busybox `wget` is present and exits non-zero on
+  4xx/5xx).
+- **vikunja** (`vikunja/vikunja`, distroless): the check used `CMD-SHELL`,
+  but there's no `/bin/sh` (nor `wget`). → `["CMD", "/app/vikunja/vikunja",
+  "healthcheck"]`, the binary's own subcommand — what upstream's compose
+  uses.
+
+Both commands were confirmed exit-0 in the running containers before the
+edit. After `git pull` + `docker compose up -d` for each on `home-srv-01`,
+both flip to `healthy` on the first check. Compose-only; no version bump.

@@ -206,15 +206,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Housekeeping
 
-- [ ] **Fix the itflow and vikunja container healthchecks** (found during
-      the §301f verification) — both apps run fine but read `unhealthy`
-      because the healthcheck command can't execute in the current image:
-      `apps/itflow/docker-compose.yml:43` calls `curl` (not in the itflow
-      image's `$PATH`), and `apps/vikunja/docker-compose.yml:63` uses
-      `CMD-SHELL` (the distroless Vikunja image has no `/bin/sh`). Pre-dates
-      §301. Switch itflow to `wget`/a PHP one-liner and vikunja to a plain
-      `CMD` `wget`, or drop the checks. Pure compose edit; prove the
-      `(healthy)` flip on the host.
 - [ ] **@mat: decide how Guacamole is actually meant to be reached, then
       prove SSO live if it applies** (§200, §223, §288) — turns out there is
       no NPM proxy host for Guacamole to apply the snippet to, and NPM's
