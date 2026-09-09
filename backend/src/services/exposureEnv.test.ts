@@ -59,11 +59,11 @@ describe('computeExposureEnvOverrides', () => {
 
   it('sets gatewayOnExposure keys to the gateway IP, and leaves them unset without one', () => {
     expect(
-      computeExposureEnvOverrides({ gatewayOnExposure: ['MESHCENTRAL_TLS_OFFLOAD'] }, HOST, {}, [], '10.201.0.1')
-    ).toEqual({ MESHCENTRAL_TLS_OFFLOAD: '10.201.0.1' });
+      computeExposureEnvOverrides({ gatewayOnExposure: ['APP_TLS_OFFLOAD'] }, HOST, {}, [], '10.201.0.1')
+    ).toEqual({ APP_TLS_OFFLOAD: '10.201.0.1' });
     // No gateway (LAN-only start) → the key is not forced on.
     expect(
-      computeExposureEnvOverrides({ gatewayOnExposure: ['MESHCENTRAL_TLS_OFFLOAD'] }, HOST, {})
+      computeExposureEnvOverrides({ gatewayOnExposure: ['APP_TLS_OFFLOAD'] }, HOST, {})
     ).toEqual({});
   });
 

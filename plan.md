@@ -22372,3 +22372,22 @@ lean "scan on request" model. "On-access" would mean *new* wiring (clamonacc +
 a mounted path to watch) for more constant CPU churn and no real gain on a
 14 GiB box. D1/D2/D3 (Postiz, Metabase, MSSQL) were already resolved by the
 §301a–d removals.
+
+## 320. MeshCentral removed (§264, §301e, 2026-09-09)
+
+@mat call from the §301e overlap survey. MeshCentral's only unique job is
+managing endpoints *outside* the NetBird overlay; the intended model puts every
+managed endpoint on the overlay, where Guacamole reaches it with no agent and
+no pinned cert hash (§264 already flagged MeshCentral as "optional once
+Guacamole reaches endpoints over NetBird"). ~93 MiB RSS for no distinct
+function.
+
+Deleted `apps/meshcentral/`, the `services.ts` registry entry, and the
+MeshCentral rows from `docs/{ports,licences,app-credentials}.md`. Ports
+`10550` free again. The one test that used `MESHCENTRAL_TLS_OFFLOAD` as a
+synthetic `gatewayOnExposure` fixture (`exposureEnv.test.ts`) now uses a
+neutral `APP_TLS_OFFLOAD` string — MeshCentral was the only registry user of
+`gatewayOnExposure`, but the mechanism and its test stay. The "Chosen over
+MeshCentral…" rationale comment on the Guacamole entry is kept as the record
+of that decision. Closes the "prove MeshCentral live with a real agent"
+README item (§62.2). 660 backend tests + typecheck pass.

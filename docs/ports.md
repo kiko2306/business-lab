@@ -82,9 +82,7 @@ hand edit can leave its copy disagreeing with the app's.
 `10460` onlyoffice · `10470` kopia (server UI on container `51515`) ·
 `10480` scrutiny · `10490` it-tools · `10500` syncthing (GUI; sync on
 fixed `22000` + discovery `21027/udp`, see below) ·
-`10520` miniflux ·
-`10550` meshcentral (published as
-`mesh.<domain>`) · `10570` navidrome
+`10520` miniflux · `10570` navidrome
 
 These are the defaults. The allocator may have moved one on your host if
 something else already held the port — check the app's `.env` for the truth.

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.59.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.59.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -388,15 +388,6 @@ below.
       listener via `DNSStubListener=no`, and/or bind Pi-hole to a specific
       host IP instead of all interfaces) — left unstarted for now rather
       than done as a host-console change.
-- [ ] **@mat: prove MeshCentral live with a real agent** (§62.2, §264) — the
-      app is built (`apps/meshcentral/`, port `10550`, `mesh.<domain>`) and
-      env-driven config is wired, but the reverse-proxy path is unproven:
-      expose it, enrol a real agent, and confirm (a) no `Agent bad web cert
-      hash` — i.e. `certUrl` + `tlsOffload` do their job through NPM +
-      Cloudflare, and (b) whether Authelia forward-auth on `mesh.<domain>`
-      blocks agent enrolment. If it does, split the agent endpoint onto its
-      own un-gated hostname (or scope the authrequest snippet to exclude
-      `/agent.ashx` + `/meshrelay.ashx`).
 - [ ] **App backlog** — §22 lists candidate apps by category (communication,
       business ops, no-code/BI, files/PDF, security/network, dev infra,
       productivity). Pull from there rather than restating it here.

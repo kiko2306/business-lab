@@ -61,7 +61,6 @@ operate within, listed again at the end.
 | Kitchen switcher | *ours* — no LICENSE file | ⚠️ Decide | repo has no licence (below) |
 | Kopia | Apache-2.0 | ✅ Clean | official `kopia/kopia` image, built by the project; internal backup use. The image bundles `rclone` (**MIT**, ✅ clean) — used only to reach an FTP destination via Kopia's `rclone` backend (§267); no separate image |
 | Mealie | **AGPL-3.0** | ✅ Clean | unmodified |
-| MeshCentral (`ghcr.io/ylianst/meshcentral`) | **Apache-2.0** | ✅ Clean | official image built by the project, run stock. Alpine + Node.js base (`alpine` rowed below; Node.js is MIT-style). No paid tier or SSO paywall. |
 | Miniflux (`miniflux/miniflux`) | **Apache-2.0** | ✅ Clean | stock unmodified. Bundled `miniflux-db` is `postgres:16-alpine` (PostgreSQL License, already rowed below) |
 | **n8n** | **Sustainable Use License** (fair-code, not OSI) | ⚠️ Condition | client-operated instance for their own workflows = allowed (consulting & support are explicitly permitted). Business Lab hosting n8n *for* clients on infrastructure it operates = needs an n8n Enterprise licence. Keep it one-box-one-client. |
 | Navidrome (`deluan/navidrome`) | **GPL-3.0** | ✅ Clean | official image, run stock. GPL-3.0 (not AGPL) places no restriction on running it internally; not modified, not redistributed as software. Bundled SQLite (public domain) and a static ffmpeg build (LGPL/GPL, mere aggregation) are in the image; Alpine base rowed below. No paid tier |

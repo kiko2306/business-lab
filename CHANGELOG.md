@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.59.1] — 2026-09-09
+
+### Removed
+
+- MeshCentral dropped — redundant once Guacamole reaches endpoints over the NetBird overlay (§301e, §320)
+
 ## [0.59.0] — 2026-09-09
 
 ### Changed

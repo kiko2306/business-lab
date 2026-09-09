@@ -710,44 +710,6 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       },
     },
   },
-  'meshcentral': {
-    name: 'meshcentral',
-    label: 'MeshCentral',
-    description: 'Remote management for endpoints outside the overlay',
-    icon: 'remote',
-    category: 'Networking & Security',
-    composePath: 'apps/meshcentral/docker-compose.yml',
-    healthCheck: {
-      // The container's internal scheme flips with exposure state (HTTPS
-      // standalone, plain HTTP once tlsOffload is set), so a fixed-URL probe
-      // here can't win. The compose healthcheck tries both; the dashboard
-      // reads container status.
-      enabled: false,
-    },
-    // Published as mesh.<base-domain>, not meshcentral.<base-domain> — "mesh"
-    // is what the agent config and the operator reach for, and it keeps the
-    // address stable if the implementation is ever swapped.
-    exposureSubdomain: 'mesh',
-    // MeshCentral is config-file driven; the image rewrites config.json from
-    // these env vars at start (DYNAMIC_CONFIG=true in the compose file).
-    //   HOSTNAME  -> settings.cert + domains."".certUrl host: the public name
-    //               agents pin. Without the right value agents fail with
-    //               "Agent bad web cert hash" behind Cloudflare (§62.2).
-    //   TLS_OFFLOAD -> settings.tlsOffload = the NPM container's source IP, so
-    //                  MeshCentral serves plain HTTP for NPM to wrap (exposure
-    //                  proxies http, never https).
-    //   TRUSTED_PROXY=true -> honour NPM's X-Forwarded-* headers.
-    exposureEnvKeys: {
-      host: ['MESHCENTRAL_HOSTNAME'],
-      gatewayOnExposure: ['MESHCENTRAL_TLS_OFFLOAD'],
-      staticOnExposure: { MESHCENTRAL_TRUSTED_PROXY: 'true' },
-    },
-    managedEnvKeys: ['MESHCENTRAL_HOSTNAME', 'MESHCENTRAL_TLS_OFFLOAD', 'MESHCENTRAL_TRUSTED_PROXY'],
-    // NOTE: whether Authelia forward-auth in front of mesh.<domain> breaks
-    // agent enrolment (agents can't complete a 302 redirect) is unproven —
-    // it ships Authelia-on like every other app and the live-agent proof
-    // (README / §62.2) decides if the agent endpoint needs its own hostname.
-  },
   'vaultwarden': {
     // Email comes from the dashboard's global mail settings rather than being
     // configured per app. SMTP_SECURITY needs the map: Vaultwarden's
