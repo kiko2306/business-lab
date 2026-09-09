@@ -1531,10 +1531,6 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       `staticOnExposure: { NTFY_BEHIND_PROXY: 'true' }` (only trust
       X-Forwarded-For when actually proxied). `dead-simple` pub/sub push;
       `uptime-kuma`, `n8n`, `watchtower` and backup scripts can all post to it.
-- [ ] **FreeScout** — `tiredofit/freescout`. Shared-inbox help desk for a
-      `support@` address (Zendesk-lite). Laravel →
-      `exposureEnvKeys.url: ['APP_URL']`, needs MySQL. **Priority: P2** —
-      **Estimate: M**
 - [ ] **Stalwart Mail** — `stalwartlabs/mail-server`. Modern all-in-one mail
       server (SMTP/IMAP/JMAP + web admin), far less fiddly than Mailcow.
       Advanced: needs real MX/SPF/DKIM/DMARC/PTR and inbound port 25, which a
@@ -1652,9 +1648,6 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       `/api/summary` 200. Docs rows in `ports.md`, `app-credentials.md`
       ("no login of their own"), `licences.md` (MIT; bundled InfluxDB 2 /
       smartmontools / s6-overlay all clean).
-- [ ] **NetAlertX** — `jokobsk/netalertx` (ex Pi.Alert). LAN scan with
-      new-device / device-down / presence alerts. `network_mode: host`.
-      **Priority: P3** — **Estimate: S**
 
 ### 22.7 Dev & self-host infra
 - [x] **Forgejo** — `codeberg.org/forgejo/forgejo:16`. Added 2026-09-07
@@ -2152,8 +2145,6 @@ that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
       created via the web setup screen (no admin env), rowed in
       `app-credentials.md`. Licence **GPL-3.0** (not AGPL) — clean for the
       resale model, rowed in `licences.md`.
-- [ ] **Changedetection.io** (`dgtlmoon/changedetection.io`) — watch web
-      pages for changes (price/stock/policy), notify via ntfy.
 - [ ] ***arr stack** (Prowlarr/Sonarr/Radarr + a download client) — media
       automation for Jellyfin. Big surface; only if that's a real use.
 - [ ] **Grafana + Prometheus** — proper metrics/alerting if Beszel +
@@ -22176,3 +22167,12 @@ Backend 678 tests + typecheck pass; frontend 50 tests + build pass. **Not
 started against the real host** — no agent host access; a live run needs the
 deploy host to pull the image and point `NAVIDROME_MUSIC_DIR` at a real
 library. Lands on `dev`.
+
+## 314. Dropped three backlog apps: FreeScout, NetAlertX, Changedetection.io (§22, 2026-09-09)
+
+`@mat` decided these three §22 backlog candidates will not be implemented —
+removed their bullets from §22.2 / §22.6 / §22.9. No further tracking; if a
+real deployment ever wants one, it goes back on the list then. The passing
+mention of "Changedetection.io-style tools" in the §22.9c Price Compare entry
+stays — it's context for why Price Compare was custom-built, not a backlog
+item.
