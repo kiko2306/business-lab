@@ -22254,3 +22254,46 @@ Backend 684 tests + typecheck pass. **Not run against the real host** — the
 live proof is: remove an app on a real deployment, update, confirm the
 containers are gone and `apps/<name>/` is deleted, and confirm a still-present
 compose-file-but-no-entry dir is left alone.
+
+## 317. removedAppCleanup: two bugs found by the live §316 deploy (2026-09-09)
+
+Deployed §316 to the host and removed Forgejo + File Browser for real. The
+self-update ran clean (~16 min; the build phase is still the slow part — §300
+territory), the new backend booted with `reconcileRemovedAppProjects`, and it
+**half-worked**:
+
+- ✅ both projects' containers and networks torn down (fileless
+  `docker compose -p <name> down` does work — its progress prints to stderr,
+  so an empty stdout is not "nothing happened", which the §316 log line
+  misread);
+- ✅ `.env` and the managed `docker-compose.override.yml` removed;
+- ❌ `apps/forgejo/data/` and `apps/file-browser/data/` left on disk —
+  `EACCES: permission denied` unlinking `filebrowser.db` / `rmdir .../git/.ssh`.
+
+### Bug 1 — the backend is non-root, the leftover data is root
+
+Container `data/` trees are written by the app's own (root) container;
+`fs.rm` from the backend's non-root `appuser` can't touch them. Fix:
+`removeAppDir()` tries `fs.rm` first (fine for a purely-gitignored dir nothing
+ever ran), and on failure escalates to `docker run --rm --network none -v
+$APPS_DIR:$APPS_DIR busybox rm -rf <dir>` — the same throwaway-root-container
+pattern `exposureConfigFiles.ts` uses for HA's root-owned config. Verifies the
+dir is gone afterward.
+
+### Bug 2 — matched dir names against registry *keys*
+
+`selectOrphanAppDirs` compared `apps/<dir>` names to `Object.keys(SERVICES)`.
+A few services live in a differently-named dir — `homepage` →
+`apps/home-page/` — so `home-page` looked orphaned. It was spared only by
+still having a compose file (logged the spurious "compose file but no registry
+entry" warning). A dir with that kind of name mismatch and *no* compose file
+would have been wrongly deleted. Fix: build the safe set from
+`getProjectName(key)` for every service (the `composePath` dir basename), not
+the keys. New test case covers `home-page` vs `homepage`.
+
+### Host state
+
+`sudo rm -rf apps/forgejo apps/file-browser` on the host cleared the two
+leftovers by hand (5.5M + 52K). The fix makes it automatic next time. 685
+backend tests + typecheck pass. Version 0.58.0 → 0.58.1. Not re-proven live —
+next app removal on the host is the check.

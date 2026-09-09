@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.58.1] — 2026-09-09
+
+### Fixed
+
+- removedAppCleanup: delete root-owned app data via a root helper container (backend runs non-root), and match dirs by project-dir name not registry key (home-page vs homepage)
+
 ## [0.58.0] — 2026-09-09
 
 ### Added
