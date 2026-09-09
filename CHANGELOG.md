@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.54.0] — 2026-09-09
+
+### Changed
+
+- Stirling-PDF runs the ultra-lite image — every core PDF operation, but no bundled LibreOffice/OCR/Python runtime (~960 MiB RSS and 3.4 GB on disk down to ~200 MiB / 0.9 GB); switch back to :latest if Office-doc conversion or OCR is needed
+
 ## [0.53.0] — 2026-09-09
 
 ### Removed

@@ -25,7 +25,7 @@ replaces.
 | Paperless-ngx | Document management — OCR, tagging and search over scanned/ingested files | DocuWare, Adobe Document Cloud's storage tier |
 | OnlyOffice | In-browser document editor (opens from Nextcloud) | Microsoft 365 web apps, Google Docs/Sheets/Slides |
 | Homebox | Asset, warranty and inventory tracking | Sortly, EZOfficeInventory |
-| Stirling-PDF | Local PDF toolkit — merge, split, OCR, sign, convert | Adobe Acrobat, SmallPDF/iLovePDF subscriptions |
+| Stirling-PDF | Local PDF toolkit — merge, split, rotate, sign, compress | Adobe Acrobat, SmallPDF/iLovePDF subscriptions |
 
 ## Files, photos and media
 

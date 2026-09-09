@@ -1,7 +1,14 @@
 
 services:
   stirling-pdf:
-    image: stirlingtools/stirling-pdf:latest
+    # ultra-lite, not the full image: the full tag bundles a LibreOffice +
+    # Tesseract-OCR + Python runtime that sit resident (~960 MiB RSS, 3.4 GB
+    # on disk) for the Office-doc conversion and OCR tools. This deployment
+    # doesn't use those (Paperless does its own OCR, Nextcloud edits via
+    # OnlyOffice), and ultra-lite keeps every core PDF operation — merge,
+    # split, rotate, watermark, sign, compress, metadata — at ~200 MiB / 0.9
+    # GB (plan.md §300 B1). Switch back to `:latest` if Office/OCR is wanted.
+    image: stirlingtools/stirling-pdf:latest-ultra-lite
     restart: unless-stopped
     ports:
       - "${STIRLING_PDF_PORT:-10360}:8080"
@@ -19,7 +26,7 @@ services:
       - "homepage.name=Stirling-PDF"
       - "homepage.icon=stirling-pdf.png"
       - "homepage.href=http://localhost:${STIRLING_PDF_PORT:-10360}"
-      - "homepage.description=Local PDF toolkit (merge, split, OCR, sign, convert)"
+      - "homepage.description=Local PDF toolkit (merge, split, rotate, sign, compress)"
     volumes:
       # OCR language packs, custom app config, uploaded custom files, pipelines.
       - ./data/tessdata:/usr/share/tessdata

@@ -1134,7 +1134,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
   'stirling-pdf': {
     name: 'stirling-pdf',
     label: 'Stirling-PDF',
-    description: 'Local PDF toolkit (merge, split, OCR, sign, convert)',
+    description: 'Local PDF toolkit (merge, split, rotate, sign, compress)',
     icon: 'pdf',
     category: 'Backup & Storage',
     composePath: 'apps/stirling-pdf/docker-compose.yml',
