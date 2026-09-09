@@ -22536,3 +22536,23 @@ No repo change — this was live state only, on the no-guarantees box, and it
 does not survive a fresh clone. `@mat` follow-ups: the interactive OIDC
 logins (§270/§280/§281), Nextcloud header-trust (§217/§276 — Nextcloud is now
 exposed, which was step one), and the overlay rejoin.
+
+## 325. Fix: user create/edit 400'd on secondary exposure legs in the app-access list (2026-09-09)
+
+Found right after §324 exposed the full roster: creating a user failed Joi
+validation with `"appAccess[5]" with value "homepage:apex" fails to match
+/^[a-z0-9-]+$/` (and `netbird-vpn:api`, `netbird-vpn:relay`).
+
+`getAppAccessOptions()` in `services/userAppAccess.ts` fed the SSO app-access
+picker straight from `SELECT ... FROM service_exposure WHERE enabled = TRUE`,
+which includes secondary exposure rows whose `service_name` is `<app>:<suffix>`.
+Those are exposure legs, not apps you grant SSO access to, and the `:` breaks
+both the `appAccess` pattern and `app-<name>` Authelia group naming. Latent
+since NetBird was set up (`netbird-vpn:api`/`:relay` were always `enabled`);
+`homepage:apex` from §324 made it hit.
+
+One-line fix: `AND service_name NOT LIKE '%:%'` on that query — the single
+place both the picker and the validation allowlist (`getAppAccessOptionNames`)
+derive from. Other `service_exposure` consumers already handle the colon
+(explicit `LIKE` for secondaries, or a keyed lookup). Test updated, 640 pass,
+tsc clean. Patch 0.59.4 → 0.59.5.

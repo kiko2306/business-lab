@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.59.5] — 2026-09-09
+
+### Fixed
+
+- SSO app-access list no longer offers secondary exposure legs (`netbird-vpn:api`, `homepage:apex`); creating or editing a user with those exposed no longer 400s on the `appAccess` pattern check
+
 ## [0.59.4] — 2026-09-09
 
 ### Removed

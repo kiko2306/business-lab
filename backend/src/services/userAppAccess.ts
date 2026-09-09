@@ -27,13 +27,17 @@ export interface AppAccessOption {
 /**
  * The apps that can currently be granted — exposed, excluding Home Page and
  * Authelia (see the module doc comment). Ordered by label for a stable
- * picker.
+ * picker. Secondary exposure rows (`<app>:api`, `<app>:relay`, `homepage:apex`
+ * — anything with a colon) are exposure legs of an app, not apps you grant SSO
+ * access to, and their `<name>` breaks both the `appAccess` pattern check and
+ * `app-<name>` group naming — so they're filtered out here.
  */
 export async function getAppAccessOptions(): Promise<AppAccessOption[]> {
   const result = await query<{ service_name: string; hostname: string | null }>(
     `SELECT service_name, hostname
      FROM service_exposure
-     WHERE enabled = TRUE AND service_name NOT IN ('authelia', 'homepage')`
+     WHERE enabled = TRUE AND service_name NOT IN ('authelia', 'homepage')
+       AND service_name NOT LIKE '%:%'`
   );
   return result.rows
     .map((row) => {

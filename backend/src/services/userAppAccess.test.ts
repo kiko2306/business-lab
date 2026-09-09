@@ -44,12 +44,16 @@ describe('getAppAccessOptions', () => {
     ]);
   });
 
-  it('only asks for exposed apps, excluding Home Page and Authelia itself', async () => {
+  it('only asks for exposed apps, excluding Home Page, Authelia, and secondary exposure legs', async () => {
     query.mockResolvedValue({ rows: [] });
     await getAppAccessOptions();
     const sql = query.mock.calls[0][0] as string;
     expect(sql).toMatch(/enabled = TRUE/);
     expect(sql).toMatch(/service_name NOT IN \('authelia', 'homepage'\)/);
+    // Secondary exposure keys (netbird-vpn:api, homepage:apex, …) are not
+    // grantable apps — their `:suffix` name breaks the appAccess pattern and
+    // `app-<name>` group naming (regression: user create 400'd on them).
+    expect(sql).toMatch(/service_name NOT LIKE '%:%'/);
   });
 
   it('falls back to the service name when the registry has no entry', async () => {
