@@ -22967,3 +22967,13 @@ Docs-only, closing §331.
   immich.json" clause.
 
 No code, no version bump. §331 complete: exposure is automatic end to end.
+
+## 337. §331 follow-up — ClamAV flagged lanOnly (2026-09-09)
+
+Auto-exposure (§332) exposes every app `getExposability()` allows, and
+`getExposability` only checks "has a published port" — ClamAV's `:3310` is the
+clamd protocol socket, not HTTP, so it would have got a `clamav.<domain>` NPM
+host proxying HTTP at a non-HTTP port (§324.2 flagged the same thing when it
+was skipped by hand). Added `lanOnly: true` to its registry entry — the
+`getExposability` gate now returns false for it. Test updated (`lanOnly` set is
+now `['clamav', 'samba']`). Patch → 0.62.4.

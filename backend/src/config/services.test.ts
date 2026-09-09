@@ -235,13 +235,15 @@ describe('samba is LAN-only', () => {
     expect(SERVICES['samba'].exposurePortEnvVar).toBeUndefined();
   });
 
-  it('has no other app flagged lanOnly by accident', () => {
+  it('only samba and clamav are flagged lanOnly', () => {
     const lanOnly = Object.entries(SERVICES)
       .filter(([, s]) => s.lanOnly)
       .map(([name]) => name)
       .sort();
     // samba (SMB/445) — a non-HTTP protocol the tunnel can't carry.
-    expect(lanOnly).toEqual(['samba']);
+    // clamav (clamd/3310) — its own protocol, no web UI; lanOnly keeps
+    // auto-exposure (§331) from publishing a broken hostname for it.
+    expect(lanOnly).toEqual(['clamav', 'samba']);
   });
 });
 

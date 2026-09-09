@@ -211,7 +211,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       enabled: false,
     },
     // No web UI and nothing to expose publicly: its only callers are other
-    // apps on this host, over the docker gateway.
+    // apps on this host, over the docker gateway. `lanOnly` keeps auto-exposure
+    // (§331) from publishing a `clamav.<domain>` that would just proxy HTTP at
+    // the clamd protocol socket.
+    lanOnly: true,
   },
   'code-server': {
     name: 'code-server',

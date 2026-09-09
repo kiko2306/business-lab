@@ -11,6 +11,12 @@ The version here is the single source of truth for the string shown in the
 dashboard footer; `backend/package.json` and `frontend/package.json` carry the
 same value and the backend serves it at `GET /version`.
 
+## [0.62.4] — 2026-09-09
+
+### Fixed
+
+- Flag ClamAV `lanOnly` so auto-exposure (§331) doesn't publish a `clamav.<domain>` hostname that would proxy HTTP at the clamd protocol socket
+
 ## [0.62.3] — 2026-09-09
 
 ### Changed
