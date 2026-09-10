@@ -150,6 +150,13 @@ describe('checkForUpdate', () => {
     const check = await checkForUpdate();
     expect(check).toMatchObject({ currentCommit: 'old111', remoteCommit: 'new222', commitsBehind: 3 });
   });
+
+  it('runs git under `umask 002` so a deploy cannot leave .git non-group-writable (§351)', async () => {
+    await checkForUpdate();
+    const fetchCall = backup.runCommand.mock.calls.find(([, args]) => (args as string[]).includes('fetch'));
+    expect(fetchCall?.[0]).toBe('sh');
+    expect(fetchCall?.[1]).toEqual(['-c', 'umask 002 && exec git "$@"', 'git', '-C', '/repo', 'fetch', 'origin', 'main', '--quiet']);
+  });
 });
 
 describe('triggerSelfUpdate', () => {

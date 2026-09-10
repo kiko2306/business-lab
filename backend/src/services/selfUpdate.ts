@@ -28,7 +28,7 @@
  * `executor.ts`'s per-app compose calls.
  */
 
-import { spawn } from 'child_process';
+import { spawn, type ExecFileOptions } from 'child_process';
 import logger from '../utils/logger';
 import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
@@ -38,6 +38,21 @@ import { getAppVersion } from '../version';
 import { HttpError } from '../types';
 
 const composeFilePath = (repoRoot: string) => `${repoRoot}/docker-compose.yml`;
+
+/**
+ * Run git with umask 002, so every loose object / ref / index it writes into
+ * `.git` stays group-writable. The backend container runs as uid 100 with the
+ * default umask 022; without this, a deploy's `git fetch`/`pull` leaves
+ * `.git/objects/**` owned by uid 100 and not writable by the host `mat`
+ * account, and the next check's `git fetch` (whichever user it runs as) then
+ * dies with "insufficient permission for adding an object" — `origin/main`
+ * silently freezes and the panel shows "up to date" forever (§351).
+ * `sh -c` because execFile has no umask option; args pass through argv, so no
+ * shell-quoting concerns.
+ */
+function runGit(args: string[], options: ExecFileOptions = {}): Promise<string> {
+  return runCommand('sh', ['-c', 'umask 002 && exec git "$@"', 'git', ...args], options);
+}
 
 // A `docker compose build` of both images (npm ci + ng build included) is
 // slow — much slower than the 15-minute allowance `executor.ts` gives a
@@ -207,11 +222,10 @@ async function updateRun(
  */
 export async function checkForUpdate(): Promise<SelfUpdateCheck> {
   const repoRoot = requireRepoRoot();
-  await runCommand('git', ['-C', repoRoot, 'fetch', 'origin', 'main', '--quiet'], { timeout: 30_000 });
-  const currentCommit = (await runCommand('git', ['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
-  const remoteCommit = (await runCommand('git', ['-C', repoRoot, 'rev-parse', 'origin/main'], { timeout: 10_000 })).trim();
-  const countOutput = await runCommand(
-    'git',
+  await runGit(['-C', repoRoot, 'fetch', 'origin', 'main', '--quiet'], { timeout: 30_000 });
+  const currentCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
+  const remoteCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'origin/main'], { timeout: 10_000 })).trim();
+  const countOutput = await runGit(
     ['-C', repoRoot, 'rev-list', '--count', `${currentCommit}..${remoteCommit}`],
     { timeout: 10_000 }
   );
@@ -306,8 +320,7 @@ async function classifyDeploy(repoRoot: string, fromCommit: string | null, toCom
   }
   let names: string[];
   try {
-    const out = await runCommand(
-      'git',
+    const out = await runGit(
       ['-C', repoRoot, 'diff', '--name-only', `${fromCommit}..${toCommit}`],
       { timeout: 15_000 }
     );
@@ -347,8 +360,8 @@ async function runSelfUpdateSequence(
 
   try {
     await updateRun(runId, { state: 'pulling' });
-    await runCommand('git', ['-C', repoRoot, 'pull', '--ff-only', 'origin', 'main'], { timeout: 60_000 });
-    const toCommit = (await runCommand('git', ['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
+    await runGit(['-C', repoRoot, 'pull', '--ff-only', 'origin', 'main'], { timeout: 60_000 });
+    const toCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
     await updateRun(runId, { toCommit });
 
     const scope = await classifyDeploy(repoRoot, check.currentCommit, toCommit);
@@ -497,7 +510,7 @@ export async function reconcileDanglingSelfUpdateRun(): Promise<void> {
   let actualCommit: string | null = null;
   try {
     const repoRoot = requireRepoRoot();
-    actualCommit = (await runCommand('git', ['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
+    actualCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
   } catch (error) {
     logger.warn('Could not read the current commit while reconciling a dangling self-update run', {
       runId: latest.id,

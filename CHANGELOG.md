@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.69.2] — 2026-09-10
+
+### Fixed
+
+- Self-update now runs git with umask 002 so a deploy can't leave .git non-group-writable and freeze the update check
+
 ## [0.69.1] — 2026-09-10
 
 ### Changed

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.69.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.69.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -293,14 +293,6 @@ below.
       Settings" pattern) only get built if a real deployment actually wants
       a destination that is neither a mount nor S3.
 ### Exposure and platform
-
-- [ ] **Self-update git: consistent user + umask** (§351) — a deploy runs
-      `git` inside the backend container as uid 100 with umask 022, leaving
-      `.git` objects/refs owned by that uid and not group-writable, so a later
-      `git fetch` as any other user hard-fails and `origin/main` silently
-      freezes. Recovered by hand once (`chgrp -R docker` / `chmod g+rwX` /
-      `g+s`, what `start.sh` prints). Make the deploy's git run with `umask 002`
-      (or a fixed user) so it can't re-pollute.
 
 - [ ] **Surface a failed/stale self-update check** (§351) — `checkForUpdate()`
       errors are swallowed into a `logger.warn`; the panel keeps showing the

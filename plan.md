@@ -23760,3 +23760,24 @@ force-check. 51 frontend tests pass (self-update spec updated + 1 new).
 
 Not touched: the 6h interval, and surfacing a failed/stale check in the UI —
 both still worth doing (see README). Patch → 0.69.1.
+
+## 352. Self-update runs git under umask 002 (2026-09-10)
+
+First of the two §351 follow-ups. The deploy's `git fetch`/`pull` runs inside
+the backend container as uid 100 at the default umask 022, so every loose
+object / ref / index it writes into `.git` comes out non-group-writable and
+owned by uid 100. A later `git fetch` from any other user (a host `git`, a
+cron) then dies with `insufficient permission for adding an object to
+.git/objects`, `refs/remotes/origin/main` freezes, and the Updates panel shows
+"up to date" indefinitely — exactly the live incident that opened §351.
+
+`selfUpdate.ts` gains `runGit(args, opts)` — `runCommand('sh', ['-c', 'umask
+002 && exec git "$@"', 'git', ...args], opts)` (execFile has no umask option;
+args go through argv so nothing is shell-quoted) — and every `runCommand('git',
+…)` in the file routes through it. New objects/dirs are now group-writable, so
+`mat` and `appuser` (both in the `docker` group) can each write and the
+ownership rot can't recur. Existing corruption still needs the one-time
+`chgrp`/`chmod` recovery `start.sh` prints; this only stops it coming back.
+
+713 backend tests (+1: asserts `fetch` runs as `sh -c 'umask 002 && exec git
+"$@"'`). Patch → 0.69.2.
