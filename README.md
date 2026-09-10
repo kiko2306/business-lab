@@ -290,6 +290,13 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
+- [ ] **The start/restart log panel freezes the UI on a chatty first boot**
+      (§371) — starting Twenty locked the dashboard while it streamed
+      `docker compose logs --follow --tail 200`: Twenty's first boot emits
+      thousands of NestJS lines (per-migration, per-cron-job) and the
+      frontend log view renders them all with no cap/virtualisation. The
+      backend op completes fine; a refresh recovers the UI. Cap the streamed
+      lines (ring buffer), virtualise the list, or throttle the SSE.
 - [ ] **`setup_server.sh` reinstalls gnupg/ca-certificates every run** (§366) —
       the missing-package check is `command -v gnupg` / `command -v ca-certificates`,
       but neither package provides a binary of that name (`gnupg` → `gpg`,

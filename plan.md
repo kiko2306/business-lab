@@ -24429,3 +24429,35 @@ first-boot migration completes, the owner signup works, and exposure injects
 `SERVER_URL`. `ENCRYPTION_KEY` is generated as 64 hex chars (the backend's
 default); if Twenty rejects that format it wants `openssl rand -base64 32` —
 regenerate in the config panel.
+
+## 371. Twenty verified live on 0.74.0 (§370 follow-up, 2026-09-10)
+
+Deployed and started on the host (self-update run 40, clean rebuild).
+
+- First boot: `twentycrm/twenty` runs `instance:commands` (TypeORM migrations
+  for every version 2.11→2.39), then `cron:register:all` (30 jobs), then
+  `node dist/main`. ~3 min total; RestartCount stayed 0 (the "Message queue
+  shutdown complete" between phases is each one-shot command closing its own
+  BullMQ connection, not a crash). The 180 s healthcheck `start_period` was
+  about right — it flipped healthy at ~3 min.
+- `ENCRYPTION_KEY` / `APP_SECRET` generated as 64 hex chars (the backend's
+  default `generateSecretFor`) — **accepted**, no key-format error. The
+  earlier worry that Twenty needs `openssl rand -base64 32` was unfounded.
+- Auto-exposed on start (§331): `https://twenty.<domain>` → 200 straight
+  away. `SERVER_URL` is **not** persisted to `apps/twenty/.env` — the backend
+  merges `exposureEnvKeys.url` into the `compose up` environment at start
+  (same mechanism as mail/adminSeed env), and `docker exec … env` confirmed
+  `SERVER_URL=https://twenty.<domain>` inside the running server container. A
+  restart after the first start is what applies it.
+- All four containers (server, worker, db, redis) healthy.
+
+Owner signup (`IS_SIGN_UP_ENABLED=true`, first visitor) and locking it down
+afterwards is the operator's step, per `docs/app-credentials.md`.
+
+### Side-finding — the log panel freezes the UI on a chatty boot
+
+Starting Twenty locked the dashboard for the duration: the start flow streams
+`docker compose logs --follow --tail 200`, Twenty's first boot emits thousands
+of lines, and the frontend log view renders them all unbounded. The backend
+op completed fine; a browser refresh recovered the UI. New README item to cap
+/ virtualise / throttle the streamed log view.
