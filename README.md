@@ -304,19 +304,13 @@ below.
       it's not (TLS validity windows, TOTP, backup schedules, log
       correlation). Check `timedatectl` — `System clock synchronized: yes` and
       the intended zone.
-- [ ] **@mat: prune the stale Tailscale nodes** (§364) — the tailnet still
-      holds the old container-ID nodes (`26ef4eae9a8a`, `791f5c44331b`,
-      `c45d6f5a3c43`, all this same box) and their dead Funnel hostnames.
-      Delete them at login.tailscale.com → Machines. Needs the Tailscale admin
-      login — there is no API token on the box and the node CLI can't remove
-      sibling devices.
-- [ ] **Revert `/etc/resolv.conf` order on the host** (§364) — reordered to
-      `8.8.8.8` first during the §363 migration (backup at
-      `/etc/resolv.conf.pre363`) because `1.1.1.1` was still NXDOMAIN on the
-      new Funnel record. Restore `1.1.1.1` first once
-      `dig +short businesslab-signal.tail122b53.ts.net @1.1.1.1` returns an
-      IP; harmless to leave until then (the next `start.sh` rewrites it per
-      §339 anyway).
+- [ ] **@mat: refresh the Tailscale auth key before it expires** (§367) — the
+      `TAILSCALE_AUTH_KEY` in `apps/tailscale/.env` had **expired**; a
+      deauthed node then can't re-register at all (crash loop) until a new
+      key is set via the dashboard Tailscale card → Configuration. A fresh
+      reusable key was set 2026-09-10. Reusable keys still expire (90 d
+      default) — set a calendar reminder, or switch to a tagged/ephemeral
+      setup that doesn't.
 
 ### Apps and integrations
 

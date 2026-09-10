@@ -24269,3 +24269,42 @@ missing.
 a deliberate UTC server clock, or NTP drift. README item to check
 `timedatectl` (sync state + intended zone) — wrong time breaks TLS validity
 windows, TOTP, backup schedules and log correlation.
+
+## 367. B2 done the hard way — node delete → expired auth key → polluted serve-config (2026-09-10)
+
+Pruning the three stale tailnet nodes (§364 B2) turned into a full overlay
+outage and two real findings.
+
+**What happened.** All four Tailscale devices were deleted from the admin
+console — the three stale container-ID nodes *and* the live `businesslab-signal`.
+Deleting the live one deauthed the running tailscaled, and it could not
+re-register: the `TAILSCALE_AUTH_KEY` in `apps/tailscale/.env` had **expired**
+(`invalid key: API key … not valid`), so the container crash-looped. A fresh
+reusable key set via the dashboard (Tailscale card → Configuration) let it
+re-register — as `businesslab-signal`, because `TS_HOSTNAME` is pinned (§363),
+so `management.json` `Signal.URI` never needed touching.
+
+**But the funnel stayed dead for ~20 min** — every `*.tail122b53.ts.net`
+funnel hostname on the node returned a TLS-handshake EOF. Node was Online,
+funnel capability present, DNS resolved (A + AAAA on both 1.1.1.1 and
+8.8.8.8), cert issued. Cause: the **serve-config still held all four funnel
+entries**, three of them for now-deleted MagicDNS names. `tailscale serve
+reset` + re-adding only `businesslab-signal` fixed it *immediately* — the
+next `curl` got HTTP 405 (healthy signal server). One `systemctl restart
+netbird` and `Signal: Connected` came back and held.
+
+**Findings, both now README items:**
+
+1. **`start.sh` now runs `tailscale serve reset` before re-asserting funnel**
+   (done this section). Stale serve entries are not cosmetic — enough of them
+   and the edge refuses funnel for the live name entirely. The tailscale app
+   is single-purpose here so a blanket reset is safe.
+2. **The auth key expires.** A deauthed node with a dead key can't self-heal
+   at all. Reusable keys still have a 90-day default. `@mat` item: rotate
+   before expiry, or move to a tagged/ephemeral key.
+
+**End state:** overlay healthy, funnel serve-config holds only
+`businesslab-signal`, `Signal.URI` unchanged, NPM admin over the overlay 200.
+B2's actual goal (no stale nodes / hostnames) is achieved. `1.1.1.1` has also
+caught up on the funnel record now, so the §364 `/etc/resolv.conf` revert is
+unblocked.

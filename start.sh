@@ -885,6 +885,15 @@ if [ -f apps/netbird-vpn/.env ]; then
       # The node NAME is pinned in apps/tailscale/docker-compose.yml
       # (TS_HOSTNAME) so SIGNAL_HOST below is stable across recreates and this
       # patch converges once instead of chasing a new ID every restart (§363).
+      #
+      # Reset the serve-config first. It persists in the state dir, so a node
+      # that was ever renamed or re-registered carries dead funnel entries for
+      # its old MagicDNS names — and those are not cosmetic: with several
+      # present the Tailscale edge refused to serve funnel for the live name at
+      # all (TLS handshake EOF for 20+ min) until `serve reset` cleared them
+      # (plan.md §367). The tailscale app is single-purpose here (NetBird
+      # signal), so nothing else on it is lost.
+      docker exec "$TS_CID" tailscale serve reset >/dev/null 2>&1 || true
       FUNNEL_OUT="$(docker exec "$TS_CID" tailscale funnel --bg --https=443 "http://${TS_GW}:${SIGNAL_PORT}" 2>&1 || true)"
 
       if printf '%s' "$FUNNEL_OUT" | grep -qi 'not enabled'; then
