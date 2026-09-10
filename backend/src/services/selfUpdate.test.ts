@@ -214,22 +214,25 @@ describe('triggerSelfUpdate', () => {
       expect((args as string[])).not.toContain('down');
     }
     // The final backend recreate is detached, not awaited by runCommand.
-    // --force-recreate + --no-build: the image was built in the `building`
-    // phase, and plain `up -d` was seen leaving the container on its old
-    // image (§355).
+    // --no-deps (never bounce the DB), --force-recreate + --no-build (adopt the
+    // image already built in the `building` phase) — §356.
     expect(spawnMock).toHaveBeenCalledWith(
       'docker',
-      expect.arrayContaining(['up', '-d', '--force-recreate', '--no-build', 'backend']),
+      expect.arrayContaining(['up', '-d', '--no-deps', '--force-recreate', '--no-build', 'backend']),
       expect.objectContaining({ detached: true })
     );
     expect(spawnMock.mock.calls[0][1]).not.toContain('--build');
     expect(spawnMock.mock.calls[0][1]).not.toContain('down');
 
-    // Same flags on the frontend restart.
+    // Same on the frontend restart — --no-deps is load-bearing there: frontend
+    // depends_on backend, so without it `up -d frontend` recreates backend
+    // first and kills this process mid-sequence (§356).
     const frontendUp = backup.runCommand.mock.calls.find(
       ([cmd, a]) => cmd === 'docker' && (a as string[]).includes('up') && (a as string[]).includes('frontend')
     );
-    expect(frontendUp?.[1]).toEqual(expect.arrayContaining(['up', '-d', '--force-recreate', '--no-build', 'frontend']));
+    expect(frontendUp?.[1]).toEqual(
+      expect.arrayContaining(['up', '-d', '--no-deps', '--force-recreate', '--no-build', 'frontend'])
+    );
   });
 
   it('writes a durable "classified" breadcrumb with the resolved scope before building (§354)', async () => {

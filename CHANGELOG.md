@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.71.1] — 2026-09-10
+
+### Fixed
+
+- Self-update: --no-deps on the restart steps so 'up -d frontend' can't recreate the backend mid-deploy (the frontend image now actually gets adopted)
+
 ## [0.71.0] — 2026-09-10
 
 ### Added

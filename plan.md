@@ -23964,3 +23964,28 @@ same mechanism with a `type` switch, not a new transport.
 720 backend tests (+4), 53 frontend, builds clean. **Not proven against a real
 SFTP server** — needs a deploy + a Settings → Backup destination round trip
 (Test then Save) against an actual SSH host. Minor → 0.71.0.
+
+**Verified live (0.71.0, deploy #35) + a deploy-mechanism fix → 0.71.1.**
+
+SFTP proven end to end against a throwaway `atmoz/sftp` container: `PUT
+/settings/backup-target` (kind `sftp`) recreated Kopia, whose entrypoint wrote
+`rclone.conf` with `type = sftp` + obscured pass + `disable_hashcheck` and ran
+`kopia repository create rclone` — log showed `Connected to repository`, and
+`ls` on the SFTP server showed a real repo (`kopia.repository.f`,
+`kopia.blobcfg.f`, blob dirs). `POST /settings/backup-target/test` →
+`{"success":true,"message":"SFTP server reachable and credentials accepted."}`.
+(`rclone` writes back `shell_type = unix` into the conf on first connect —
+its own behaviour, harmless.) Cleaned up: test container + image removed,
+`backup_target_*` rows cleared, Kopia back on the `filesystem` default (its
+`KOPIA_PASSWORD` regenerated in the process, so the old local repo was wiped —
+fine on the dev box).
+
+**Root cause of the "frontend rebuilt but not adopted" bug (runs 31, 33, 35),
+finally.** The root compose's `frontend` `depends_on: [backend]`, so
+`docker compose up -d frontend` recreates `backend` *first* — killing the
+process running `runSelfUpdateSequence` and its child `docker compose` before
+the frontend is ever touched. `reconcileDanglingSelfUpdateRun` then closes the
+run as `done`. The §355 `--force-recreate` made it worse (forced the backend
+recreate). Fix: **`--no-deps`** on both restart `up -d` calls — the frontend
+one so it can't drag in `backend`, the backend one so it can't bounce
+Postgres. This is the actual close of the §354 thread.

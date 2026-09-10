@@ -475,19 +475,19 @@ async function runSelfUpdateSequence(
     }
     const appsFailed = appResults.filter((r) => !r.ok);
 
-    // No `--build` on the restarts: the `building` phase already tagged the
-    // image (plan.md §295/§297 — this is the step that got SIGKILLed under
-    // swap pressure). `--force-recreate` because plain `up -d frontend` was
-    // observed (runs 31, 33) leaving the container on its old image even
-    // though `build` had just retagged `homelab-frontend:latest` — the
-    // build/deploy would report success while the browser kept serving the
-    // previous bundle. Forcing the recreate makes the container adopt the
-    // freshly-built image unconditionally.
+    // `--no-deps` is load-bearing: the root compose's `frontend` service
+    // `depends_on: [backend]`, so a plain `up -d frontend` recreates `backend`
+    // *first* — killing this very process (and its child `docker compose`)
+    // mid-sequence, before the frontend is ever touched. That's why runs
+    // 31/33/35 rebuilt the image but left the container on the old one and
+    // never wrote the end-of-run audit. `--force-recreate --no-build`: the
+    // image was already tagged in the `building` phase, so this just has to
+    // make the container adopt it.
     if (scope.frontend) {
       await updateRun(runId, { state: 'restarting_frontend' });
       await runCommand(
         'docker',
-        ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--force-recreate', '--no-build', 'frontend'],
+        ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--no-deps', '--force-recreate', '--no-build', 'frontend'],
         { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
       );
     }
@@ -517,9 +517,12 @@ async function runSelfUpdateSequence(
     // legible as "got this far", and reconcileDanglingSelfUpdateRun closes it
     // out once the new process starts.
     await updateRun(runId, { state: 'restarting_backend', finished: true });
+    // `--no-deps` here too: `backend` depends_on the socket proxy and the
+    // database, and a deploy must never bounce Postgres as a side effect of
+    // recreating the API container.
     const child = spawn(
       'docker',
-      ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--force-recreate', '--no-build', 'backend'],
+      ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--no-deps', '--force-recreate', '--no-build', 'backend'],
       { detached: true, stdio: 'ignore', env: BUILD_ENV }
     );
     child.unref();
