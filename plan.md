@@ -24152,3 +24152,49 @@ means another node holds the name and the drift would be back.
 container and confirm the name and `Signal: Connected` both hold with no
 `start.sh` re-run (README @mat item). Also prune the three stale funnel
 hostnames left from the old container IDs.
+
+## 364. §363 verified live — pin holds, but a tailscale recreate still needs a netbird bounce (2026-09-10)
+
+Deployed `331ae10` to the host and force-recreated the tailscale container
+twice.
+
+**What the pin fixes (proven):**
+
+- **Node name is stable.** Both recreates came back as
+  `businesslab-signal.tail122b53.ts.net`, not the new container ID. Before
+  §363 each recreate produced `<container-id>.tail122b53.ts.net`.
+- **Funnel serve-config and the Funnel cert persist** across a recreate
+  (they live in `/var/lib/tailscale`, the `./data` bind mount) — no
+  `tailscale funnel` re-assert needed on the second recreate.
+- **`management.json` `Signal.URI` stays valid** — set once to
+  `businesslab-signal…:443`, untouched by either recreate. No `start.sh`, no
+  JSON patch.
+
+**The one-time transition cost (as predicted, but slower than hoped):** the
+first recreate onto the pinned name meant Tailscale had to provision Funnel
+for a brand-new hostname — `tailscale cert businesslab-signal…` to force the
+LE cert, then wait on public DNS. `businesslab-signal.tail122b53.ts.net`
+resolved on `8.8.8.8` within a few minutes but `1.1.1.1` was still NXDOMAIN
+40+ min later; since the host's `/etc/resolv.conf` (§339) lists `1.1.1.1`
+first and glibc doesn't fall through on NXDOMAIN, the box couldn't resolve it
+until `resolv.conf` was reordered to `8.8.8.8` first (backup at
+`/etc/resolv.conf.pre363` — revert once `1.1.1.1` catches up). This is a
+one-off for *this* box's migration; a fresh clone names the node
+`businesslab-signal` from the first boot and never renames.
+
+**The residual gap:** after a tailscale container recreate, NetBird's signal
+stream sits in `rpc error … EOF` and does **not** self-heal — tailscaled's
+Funnel data path drops briefly on restart and the client never retries hard
+enough. `sudo systemctl restart netbird` brings `Signal: Connected` straight
+back (~8 s). So a tailscale recreate needs a lightweight netbird-client
+bounce afterward — not a `start.sh` run, not a `management.json` patch. That
+bounce is what the follow-up item should automate (the dashboard already
+knows `netbird-vpn` `requires: ['tailscale']`; restarting tailscale from the
+app card, or a self-update that recreates it, should chain a
+`netbird-vpn` restart).
+
+**Final state:** overlay healthy — Management + Signal Connected, `wt0`
+`100.94.134.207`, NPM admin over the overlay returns 200 (§239 still good).
+Node `businesslab-signal`. Stale funnel hostnames from the old container IDs
+(`26ef4eae9a8a`, `791f5c44331b`, `c45d6f5a3c43`) still listed and their nodes
+still in the tailnet — cleanup needs the Tailscale admin console (@mat).

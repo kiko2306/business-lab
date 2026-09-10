@@ -290,17 +290,22 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **@mat: verify the pinned Tailscale signal hostname survives a recreate**
-      (§363) — root cause of the §362 overlay drop was that the tailscale
-      node name defaulted to the container ID, so every recreate moved the
-      MagicDNS name and stranded `management.json`'s `Signal.URI`. Fixed by
-      pinning `TS_HOSTNAME` (`businesslab-signal`) in
-      `apps/tailscale/docker-compose.yml`. After this deploys: on the host,
-      `docker compose -p tailscale up -d --force-recreate tailscale`, then
-      confirm `tailscale status` still shows `businesslab-signal.<tailnet>`
-      and `netbird status` stays `Signal: Connected` with no `start.sh` re-run.
-      The stale Funnel entries from the old IDs (`791f5c…`, `c45d6f5a…`) can
-      be dropped with `tailscale funnel --https=443 off` per hostname.
+- [ ] **Restart `netbird-vpn` whenever `tailscale` is recreated** (§364) —
+      §363's `TS_HOSTNAME` pin is verified: the node name, Funnel config and
+      cert all survive a tailscale recreate now, and `management.json` needs
+      no re-patch. But NetBird's signal stream sits in `rpc error … EOF` after
+      a tailscale restart and doesn't self-heal — `systemctl restart netbird`
+      fixes it in ~8 s. The dashboard already models `netbird-vpn`
+      `requires: ['tailscale']`; a restart of tailscale from the app card (and
+      a self-update that recreates it) should chain a `netbird-vpn` restart.
+- [ ] **@mat: prune the stale Tailscale nodes + revert `/etc/resolv.conf`**
+      (§364) — the tailnet still holds the old container-ID nodes
+      (`26ef4eae9a8a`, `791f5c44331b`, `c45d6f5a3c43`, all this box); delete
+      them at login.tailscale.com → Machines so their dead Funnel hostnames
+      stop showing. Also: `/etc/resolv.conf` was reordered to `8.8.8.8` first
+      during the §363 migration (backup at `/etc/resolv.conf.pre363`) because
+      `1.1.1.1` lagged on the new Funnel record — restore `1.1.1.1` first once
+      `dig +short businesslab-signal.tail122b53.ts.net @1.1.1.1` returns an IP.
 
 ### Apps and integrations
 
