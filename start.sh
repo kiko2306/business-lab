@@ -882,6 +882,9 @@ if [ -f apps/netbird-vpn/.env ]; then
       # resolves, still serves TLS, and returns 502 — while NetBird reports
       # "signal receive stream stalled" and no peer can pair. Exactly that
       # happened when app ports were renumbered to 10100+ (plan.md §69).
+      # The node NAME is pinned in apps/tailscale/docker-compose.yml
+      # (TS_HOSTNAME) so SIGNAL_HOST below is stable across recreates and this
+      # patch converges once instead of chasing a new ID every restart (§363).
       FUNNEL_OUT="$(docker exec "$TS_CID" tailscale funnel --bg --https=443 "http://${TS_GW}:${SIGNAL_PORT}" 2>&1 || true)"
 
       if printf '%s' "$FUNNEL_OUT" | grep -qi 'not enabled'; then
@@ -897,6 +900,18 @@ if [ -f apps/netbird-vpn/.env ]; then
           warn "tailscale is running but reported no DNS name yet — re-run ./start.sh once it has finished coming up"
         else
           log "NetBird signal is published via Tailscale Funnel at ${SIGNAL_HOST}"
+          # The pinned name is businesslab-signal unless a deployment set its
+          # own TS_HOSTNAME. If Tailscale had to de-dupe it (a second node with
+          # the same name on this tailnet), the label comes back as
+          # `<name>-2` and will change again if that other node goes away —
+          # i.e. the drift is back. Surface it rather than silently pinning to
+          # a moving target.
+          WANT_TS_NAME="$(app_env_value apps/tailscale/.env TS_HOSTNAME)"
+          WANT_TS_NAME="${WANT_TS_NAME:-businesslab-signal}"
+          case "${SIGNAL_HOST%%.*}" in
+            "$WANT_TS_NAME") : ;;
+            *) warn "Tailscale node name is '${SIGNAL_HOST%%.*}', not '${WANT_TS_NAME}' — another node on this tailnet holds that name. Set a unique TS_HOSTNAME in apps/tailscale/.env, or remove the stale node, so the signal hostname stops moving." ;;
+          esac
           set_app_env_var apps/netbird-vpn/.env NETBIRD_SIGNAL_HOSTNAME "$SIGNAL_HOST"
 
           # Patch Signal.URI in place. data/management.json is never

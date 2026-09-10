@@ -24109,3 +24109,46 @@ prune them in the same pass.
 `tx-home-utils.com` resolves and serves again (Authelia, NetBird management +
 relay all live on it) — contradicting an earlier note that it was dead after
 §283. Not investigated further; just recorded.
+
+## 363. NetBird signal drift: root cause was an unpinned Tailscale node name (§362 follow-up, 2026-09-10)
+
+§362 proposed a backend reconciler to keep chasing the drifting signal
+hostname. Looking at *why* it drifts killed that idea.
+
+**Root cause.** `apps/tailscale/docker-compose.yml` never set `TS_HOSTNAME`,
+so `tailscaled` reports the container's hostname — which Docker sets to the
+container ID — as the node name. State persists (`./data:/var/lib/tailscale`,
+verified: `profile-data/` + node key survive recreates), so the node *key*
+is stable, but its **name** follows the container ID on every start, and
+MagicDNS `<name>.<tailnet>.ts.net` follows the name. NetBird's signal server
+is published at exactly that hostname (`management.json` `Signal.URI`), so
+every `docker compose up` recreate of the tailscale container (a self-update
+digest re-pin, an app restart from the dashboard, an image pull) renamed the
+node and stranded signal at a dead `*.ts.net` address. Confirmed on the host:
+container `26ef4eae9a8a` ⇒ Tailscale `HostName: 26ef4eae9a8a` ⇒ `DNSName:
+26ef4eae9a8a.tail122b53.ts.net`, three such names accumulated in
+`tailscale funnel status`.
+
+**Fix — pin the name, don't chase it.** `TS_HOSTNAME: ${TS_HOSTNAME:-businesslab-signal}`
+in the tailscale compose file. With a persistent state dir + a fixed name the
+DNSName is now constant across recreates, so `Signal.URI` is set once (by
+`start.sh`) and stays valid — no reconciler, no sidecar, nothing to run on a
+cadence. One deployment is one tailnet (§84.7); `.env` `TS_HOSTNAME` overrides
+the default for the rare shared-tailnet case, where Tailscale would otherwise
+append `-2` and reintroduce the drift.
+
+**Why not the reconciler.** The backend can't `tailscale status` / `tailscale
+funnel` anyway — the socket-proxy blocks `docker exec` (nextcloudOcc.ts has
+the same note) — so it would have needed a sidecar to publish the DNSName to
+a file, plus a 6-hourly sweep, to keep a value that should simply be
+constant. Pinning removes the problem instead of servicing it.
+
+**start.sh** keeps its funnel re-assert + `Signal.URI` patch (still needed
+for a first run and for the signal *port* changing), and now warns if the
+live node name isn't the pinned one — i.e. Tailscale had to de-dupe it, which
+means another node holds the name and the drift would be back.
+
+**Open:** verify on the host after this deploys — force-recreate the tailscale
+container and confirm the name and `Signal: Connected` both hold with no
+`start.sh` re-run (README @mat item). Also prune the three stale funnel
+hostnames left from the old container IDs.

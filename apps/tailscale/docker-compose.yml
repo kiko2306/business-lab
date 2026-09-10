@@ -9,6 +9,16 @@ services:
       TS_AUTHKEY: ${TAILSCALE_AUTH_KEY}
       TS_STATE_DIR: /var/lib/tailscale
       TS_USERSPACE: "true"
+      # Pin the node name. Unset, tailscaled reports the container's hostname
+      # — which is the container ID — so every recreate registers the node
+      # under a new name and its MagicDNS `<name>.<tailnet>.ts.net` changes.
+      # NetBird's signal server is published at exactly that hostname
+      # (management.json `Signal.URI`), so an unpinned name means every
+      # tailscale restart silently points signal at a dead address and the
+      # whole overlay drops until start.sh re-patches it (plan.md §362/§363).
+      # One deployment is one tailnet (§84.7); override in .env only if two
+      # share one, to avoid Tailscale's `-2` de-dupe suffix.
+      TS_HOSTNAME: ${TS_HOSTNAME:-businesslab-signal}
     labels:
       - "homepage.group=Infrastructure"
       - "homepage.name=Tailscale"

@@ -290,18 +290,17 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **Self-update doesn't reconcile the NetBird signal hostname** (§362) —
-      `start.sh` re-asserts the Tailscale Funnel binding and patches
-      `Signal.URI` in `management.json` on every run, but the Update-page /
-      self-update path never runs it. So any deploy or Tailscale
-      node re-register (e.g. an `override.yml` edit) silently points signal at
-      a dead `*.ts.net` hostname and the whole overlay drops — Management,
-      Signal, `wt0`, all of it — until someone SSHes in and runs `start.sh`.
-      On a dashboard-managed box that's a hole (principle 2). Fix: a backend
-      reconciler sweep (like the ~6 h exposure one) that re-derives the live
-      node DNSName and re-patches `management.json`, or fold it into the
-      self-update sequence. Also prune the stale Funnel entries `start.sh`
-      leaves behind.
+- [ ] **@mat: verify the pinned Tailscale signal hostname survives a recreate**
+      (§363) — root cause of the §362 overlay drop was that the tailscale
+      node name defaulted to the container ID, so every recreate moved the
+      MagicDNS name and stranded `management.json`'s `Signal.URI`. Fixed by
+      pinning `TS_HOSTNAME` (`businesslab-signal`) in
+      `apps/tailscale/docker-compose.yml`. After this deploys: on the host,
+      `docker compose -p tailscale up -d --force-recreate tailscale`, then
+      confirm `tailscale status` still shows `businesslab-signal.<tailnet>`
+      and `netbird status` stays `Signal: Connected` with no `start.sh` re-run.
+      The stale Funnel entries from the old IDs (`791f5c…`, `c45d6f5a…`) can
+      be dropped with `tailscale funnel --https=443 off` per hostname.
 
 ### Apps and integrations
 
