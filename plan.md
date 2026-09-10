@@ -24075,3 +24075,37 @@ So P9 is **not** a large setup-flow build. What's actually missing is small:
 P9a (the Deployment status card). It's the only item that is a real feature,
 it's what "repeatable per client" literally asks for, and P10 references it.
 P9b/P9c/P9d are small and can batch after it.
+
+## 358. P9a — the deployment checklist (§357, 2026-09-10)
+
+Built the read-only provisioning status view §357 named as the one real
+feature in P9. New service `deploymentStatus.ts` derives a seven-item
+checklist from the same settings/config the individual Settings sections
+read — base domain, Cloudflare API token, tunnel (id + account + zone),
+proxy admin credentials, shared mailbox (`getMailConfig`), backup
+destination (`getBackupTarget`), administrator account (`getAutheliaAdminUser`,
+with the total Authelia user count folded into its detail line). Each item
+is `{ id, label, done, detail, fixIn }`; `detail` is the current value with
+no secrets (the token check says "Stored (use Test to verify)" rather than
+echoing it). `GET /api/settings/deployment` under the existing
+`settings:manage` gate; no writes, no third-party calls — the per-section
+Test buttons stay the way to prove a value live.
+
+Frontend: a "Deployment checklist" `<app-panel>` at the top of Settings,
+above `<app-network-settings>`, listing each item with a Set/To do badge and,
+for outstanding items, which section to set it in. The load is non-fatal —
+the rest of the page renders if the checklist request fails.
+
+`listAutheliaUsernames()` added to `autheliaUsers.ts` (existence-guarded like
+`getAutheliaAdminUser`) for the user count. Tests: `deploymentStatus.test.ts`
+covers the all-blank fresh box, per-item done/detail derivation, the
+tunnel's three-key AND, and the mail/backup/user-count folding. Backend +
+frontend checks green; read-only aggregation so no real-stack proof needed.
+
+Not done here: jump-links from a checklist row to its Settings section
+(panels are collapsed by default, so a scroll-and-expand is more plumbing
+than the row's "set it in <section>" text is worth) — add if operators ask.
+`docs/openapi.yaml` left alone: it covers only cloudflare-token + exposure,
+not general/mail/backup/claude-key either, so it is a curated partial spec,
+not one this endpoint belongs in. `docs/first-run.md` gets a pointer to the
+checklist; the full per-client runbook rewrite is P9c.

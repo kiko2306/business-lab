@@ -41,6 +41,7 @@ import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
 import { CLAUDE_API_KEY_SETTING, getClaudeApiKey, maskClaudeKey } from '../utils/claudeSettings';
 import { testClaudeApiKey } from '../services/claudeKeyTest';
 import { syncMealieAiProvider } from '../services/mealieAiSync';
+import { getDeploymentStatus } from '../services/deploymentStatus';
 
 const router = Router();
 
@@ -587,6 +588,19 @@ router.post('/backup-target/test', async (_req: Request, res: Response) => {
 
   const result = await testBackupTarget(target);
   return res.status(result.success ? 200 : 400).json(result);
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/settings/deployment — the per-client provisioning checklist
+// (plan.md §357 P9a). Read-only; derived from the same settings the sections
+// above read, so an operator provisioning a new box sees what is still blank.
+// ---------------------------------------------------------------------------
+router.get('/deployment', async (_req: Request, res: Response) => {
+  try {
+    return res.json(await getDeploymentStatus());
+  } catch {
+    return res.status(500).json({ error: 'Unable to load the deployment checklist.' });
+  }
 });
 
 // ---------------------------------------------------------------------------

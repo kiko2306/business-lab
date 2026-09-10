@@ -156,6 +156,11 @@ adding capability.
 Your first login sets the dashboard's own admin account (it is in setup mode
 until you do).
 
+**Settings → Deployment checklist** then shows what a new box still needs set —
+base domain, Cloudflare token, tunnel, proxy credentials, email, backup
+destination, admin account — each marked *Set* or *To do* with where to set it.
+Use it to confirm a per-client box is fully provisioned before handover.
+
 ### The order that works
 
 Some apps depend on others, and starting them out of order fails in ways that

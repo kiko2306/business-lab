@@ -77,6 +77,15 @@ function pickAdminEntry(data: UsersDatabaseFile): [string, RawAutheliaUser] | nu
   return entries.find(([, user]) => (user.groups ?? []).includes('admins')) ?? entries[0];
 }
 
+/** Every username in Authelia's user database, [] if the file is absent. */
+export function listAutheliaUsernames(): string[] {
+  const filePath = getUsersDatabasePath();
+  if (!filePath || !fs.existsSync(filePath)) {
+    return [];
+  }
+  return Object.keys(readUsersDatabase(filePath).data.users ?? {});
+}
+
 export function getAutheliaAdminUser(): AutheliaAdminUser | null {
   const filePath = getUsersDatabasePath();
   if (!filePath || !fs.existsSync(filePath)) {

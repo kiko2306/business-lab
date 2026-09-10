@@ -7,6 +7,33 @@
     </p>
   </div>
 
+<!-- P9a (§357): read-only provisioning checklist — what a new client box still needs set. -->
+<app-panel
+  key="settings:deployment"
+  title="Deployment checklist"
+  [subtitle]="deployment
+    ? (deployment.outstanding === 0 ? 'This box is fully provisioned' : deployment.outstanding + ' item(s) still need setting')
+    : 'Per-client provisioning status'"
+>
+  <p *ngIf="deploymentLoading" class="text-body-secondary mb-0">Loading…</p>
+  <p *ngIf="!deploymentLoading && !deployment" class="text-body-secondary mb-0">
+    Unable to load the checklist.
+  </p>
+  <ul *ngIf="deployment" class="list-group list-group-flush">
+    <li *ngFor="let c of deployment.checks" class="list-group-item d-flex gap-3 px-0">
+      <span class="badge align-self-start" [class.text-bg-success]="c.done" [class.text-bg-warning]="!c.done">
+        {{ c.done ? 'Set' : 'To do' }}
+      </span>
+      <span class="flex-grow-1">
+        <span class="fw-medium">{{ c.label }}</span>
+        <br />
+        <span class="text-body-secondary small">{{ c.detail }}</span>
+        <span *ngIf="!c.done" class="text-body-secondary small"> · set it in <em>{{ c.fixIn }}</em></span>
+      </span>
+    </li>
+  </ul>
+</app-panel>
+
 <app-network-settings *ngIf="canManageNetworking" />
 
 <app-panel

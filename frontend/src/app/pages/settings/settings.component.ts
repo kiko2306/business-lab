@@ -14,6 +14,7 @@ import {
   GeneralSettings,
   AlertNotifySettings,
   ClaudeKeySettings,
+  DeploymentStatus,
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
@@ -82,6 +83,8 @@ export class SettingsComponent implements OnInit {
     dashboardUrl: ['', [Validators.maxLength(255), Validators.pattern(/^$|^https?:\/\/[^\s/]+\/?$/)]],
   });
 
+  protected deployment: DeploymentStatus | null = null;
+  protected deploymentLoading = true;
   protected generalSettings: GeneralSettings | null = null;
   protected generalLoading = true;
   protected savingGeneral = false;
@@ -116,11 +119,24 @@ export class SettingsComponent implements OnInit {
   protected testingAlertSource: string | null = null;
 
   ngOnInit(): void {
+    this.loadDeployment();
     this.loadGeneralSettings();
     this.loadMailSettings();
     this.loadBackupTarget();
     this.loadAlertSettings();
     this.loadClaudeKey();
+  }
+
+  private loadDeployment(): void {
+    this.deploymentLoading = true;
+    this.settingsService
+      .loadDeploymentStatus()
+      .pipe(finalize(() => (this.deploymentLoading = false)))
+      .subscribe({
+        next: (status) => (this.deployment = status),
+        // Non-fatal: the rest of the page is still usable without the checklist.
+        error: () => (this.deployment = null),
+      });
   }
 
   private loadClaudeKey(): void {

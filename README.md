@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.71.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.72.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -258,13 +258,6 @@ below.
 - [ ] **P8 — Rebrand tier 2** (§84.2) — package/image/network/project names.
       Recreates the management stack — do it in the §83 data-root maintenance
       window, with host access, not before.
-- [ ] **P9a — Deployment status card** (§357) — the §84.7 provisioning list
-      (domain, Cloudflare token, tunnel, Authelia users, backup destination,
-      mail) is already repeatable per box via `start.sh` + Settings + `/setup`;
-      what's missing is one read-only screen telling an operator *what is
-      left* for a given box. Extend the Settings page — no new page, no
-      wizard — with a checklist that aggregates existing endpoint reads and
-      links each red item to the section that fixes it. P10 references this.
 - [ ] **P9b — Cloudflare account model** (§203, §357) — store which model
       applies (self-controlled vs contracted reseller) as a `settings`
       string, and on token save warn when the token can see more than one

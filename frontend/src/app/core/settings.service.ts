@@ -19,6 +19,7 @@ import {
   ExposureTestResponse,
   GeneralSettings,
   AlertNotifySettings,
+  DeploymentStatus,
 } from './models';
 
 @Injectable({
@@ -121,6 +122,14 @@ export class SettingsService {
       {},
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
+  }
+
+  loadDeploymentStatus(): Observable<DeploymentStatus> {
+    return this.http
+      .get<DeploymentStatus>(`${API_BASE_URL}/settings/deployment`, {
+        context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+      })
+      .pipe(retry({ count: 1, delay: 400 }));
   }
 
   loadGeneralSettings(): Observable<GeneralSettings> {

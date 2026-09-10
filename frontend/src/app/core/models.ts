@@ -224,6 +224,20 @@ export interface GeneralSettings {
   dashboardUrlEffective?: string | null;
 }
 
+/** GET /api/settings/deployment — the per-client provisioning checklist (§357). */
+export interface DeploymentCheck {
+  id: string;
+  label: string;
+  done: boolean;
+  detail: string;
+  fixIn: string;
+}
+
+export interface DeploymentStatus {
+  checks: DeploymentCheck[];
+  outstanding: number;
+}
+
 /** GET /api/auth/invitation/:token — what the set-password screen shows. */
 export interface InvitationInfo {
   username: string;

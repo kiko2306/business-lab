@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.72.0] — 2026-09-10
+
+### Added
+
+- Settings → Deployment checklist: a read-only per-client provisioning status view (base domain, Cloudflare token, tunnel, proxy credentials, email, backup destination, admin account)
+
 ## [0.71.1] — 2026-09-10
 
 ### Fixed
