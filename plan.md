@@ -23802,3 +23802,29 @@ Not done: shortening the 6h sweep interval — left as-is; the stale badge plus
 the force-check on "Update now" (§351) already close the "silently wrong" gap.
 
 714 backend tests (+1), 53 frontend tests (+2). Patch → 0.69.3.
+
+## 354. Deploy 0.69.3 verified; self-update under-scoped run 31 (2026-09-10)
+
+**0.69.3 (§352 + §353) is live and verified.** Backend: `/self-update/status`
+→ `appVersion: 0.69.3`, the new `lastCheckError` field present and `null`, a
+forced `/check` returns cleanly (`git fetch` no longer hits the permission
+wall). `runGit`'s `umask 002` wrapper is in the deployed source; it only bites
+on the *next* deploy's pull (run 31's pull ran on the old backend), and run
+31's `.git/objects` did come out uid-100 `0444` as expected. Frontend: the
+served bundle carries the §353 panel strings (`Last update check failed`, `may
+be out of date`, `lastCheckError`) after a manual rebuild — see below.
+
+**Bug found: run 31 rebuilt the backend but not the frontend.** The run was
+`a2cdf98 → a93c1f4` (reflog: one clean ff, `ORIG_HEAD = a2cdf98`). That range
+changes four `frontend/src/**` files, and `FRONTEND_BUILD_RE` matches every
+one — verified by hand on the box. Yet the frontend image stayed at run 30's
+(08:01) while the backend image rebuilt (08:18) and the backend restarted
+(08:22). So `classifyDeploy` returned `frontend: false` for an input that
+provably yields `frontend: true`, or the build step dropped it. Couldn't
+root-cause: the backend logs only go to stdout (lost on the self-restart) and
+no audit row is written when a run finishes on a path that skips the audit,
+so there's no record of the computed `DeployScope`. Recovered by a manual
+`docker compose build frontend && up -d frontend` on the host (the auto-mode
+classifier blocks that over agent SSH; the dashboard Update page was a no-op
+with `HEAD == origin/main`). README carries the follow-up: log the resolved
+SHAs + diff list + scope before building, and a per-phase breadcrumb.

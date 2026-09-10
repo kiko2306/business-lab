@@ -294,6 +294,17 @@ below.
       a destination that is neither a mount nor S3.
 ### Exposure and platform
 
+- [ ] **Self-update under-scoped a deploy — build the missing logging** (§354)
+      — deploy run 31 (`a2cdf98..a93c1f4`) rebuilt+restarted the backend but
+      **not** the frontend, though the diff plainly changed four
+      `frontend/src/**` files and `classifyDeploy`'s regex matches them. Couldn't
+      root-cause after the fact: backend logs are stdout-only (gone on the
+      self-restart) and there's no audit row when the run ends before the
+      audit write. Add to `runSelfUpdateSequence`: log the resolved
+      `fromCommit`/`toCommit` and the full `git diff --name-only` list + the
+      computed `DeployScope` *before* building, and write the audit row (or a
+      breadcrumb) at each phase, not just at the end. Then re-provoke.
+
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch
