@@ -956,6 +956,16 @@ NBSIGPY
       fi
     fi
   fi
+
+  # Whatever the signal address ended up being, bounce the host NetBird client
+  # so it reconnects against it. NetBird's signal stream does not self-heal
+  # after the tailscale container (its Funnel) moves — it sits in "rpc error
+  # ... EOF" until restarted (plan.md §364). `try-restart` is a no-op if the
+  # client isn't installed or isn't running.
+  if command -v systemctl >/dev/null 2>&1; then
+    systemctl try-restart netbird >/dev/null 2>&1 \
+      && log "bounced the NetBird client to reconnect to signal" || true
+  fi
 fi
 
 cat <<EOF

@@ -24198,3 +24198,37 @@ app card, or a self-update that recreates it, should chain a
 Node `businesslab-signal`. Stale funnel hostnames from the old container IDs
 (`26ef4eae9a8a`, `791f5c44331b`, `c45d6f5a3c43`) still listed and their nodes
 still in the tailnet — cleanup needs the Tailscale admin console (@mat).
+
+## 365. §364 — a host unit bounces NetBird when the tailscale container restarts (2026-09-10)
+
+§364 found that after a tailscale recreate the NetBird client sits in
+`rpc error … EOF` and needs `systemctl restart netbird`. The first sketch was
+a backend "restart the `requires`-dependents" change — but the thing that
+needs bouncing is **`netbird.service`, a host systemd unit** (`/usr/bin/netbird`
+client), not the `netbird-vpn` *app* containers. The backend can't reach host
+systemd (and the socket-proxy blocks the exec it would take), so this is a
+host-side fix, same class as the cloudflared drop-in setup_server.sh already
+installs.
+
+**`scripts/netbird-follows-tailscale.sh`** — blocks on
+`docker events --filter label=com.docker.compose.project=tailscale
+--filter …service=tailscale --filter event=start` (label filter, not name:
+`--force-recreate` gives a new container id), and on each start waits
+`SETTLE_SECONDS` (15, for tailscaled to bring Funnel back) then
+`systemctl restart netbird`. Covers every recreate path — dashboard "restart",
+self-update image re-pin, crash, plain `compose up` — because it watches the
+event, not the caller. No-ops where `netbird.service` isn't installed.
+
+**`setup_server.sh`** installs it as `netbird-follows-tailscale.service`
+(`Restart=always`), idempotently — rewrites only when the unit is missing or
+its `ExecStart` path moved. Enabled `--now`.
+
+**`start.sh`** also does `systemctl try-restart netbird` right after its
+signal-hostname block, so a manual `start.sh` run leaves the client
+reconnected without waiting for the next tailscale event.
+
+Not verified yet — host-only. Deploy is: `git pull` (Update page) puts the
+files on disk, then **`sudo ./setup_server.sh`** (or the next
+`sudo ./start.sh`) installs + enables the unit. Then: force-recreate the
+tailscale container and confirm `netbird status` returns to `Signal:
+Connected` within ~30 s with no manual step. README item carries the check.

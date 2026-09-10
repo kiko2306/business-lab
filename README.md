@@ -290,14 +290,17 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **Restart `netbird-vpn` whenever `tailscale` is recreated** (§364) —
-      §363's `TS_HOSTNAME` pin is verified: the node name, Funnel config and
-      cert all survive a tailscale recreate now, and `management.json` needs
-      no re-patch. But NetBird's signal stream sits in `rpc error … EOF` after
-      a tailscale restart and doesn't self-heal — `systemctl restart netbird`
-      fixes it in ~8 s. The dashboard already models `netbird-vpn`
-      `requires: ['tailscale']`; a restart of tailscale from the app card (and
-      a self-update that recreates it) should chain a `netbird-vpn` restart.
+- [ ] **@mat: install + verify `netbird-follows-tailscale.service`** (§365) —
+      built: a host unit (`scripts/netbird-follows-tailscale.sh`, installed by
+      `setup_server.sh`) that watches `docker events` for the tailscale
+      container and restarts `netbird.service` after it, since NetBird's
+      signal stream sits in `rpc error … EOF` and doesn't self-heal otherwise
+      (§364). `start.sh` also `try-restart`s netbird after its signal block.
+      Deploy: after the `git pull`, run `sudo ./setup_server.sh` once (or the
+      next `sudo ./start.sh`) to install the unit. Then verify:
+      `docker compose -p tailscale up -d --force-recreate` and confirm
+      `netbird status` returns to `Signal: Connected` within ~30 s with no
+      manual step. Watch it with `journalctl -u netbird-follows-tailscale -f`.
 - [ ] **@mat: prune the stale Tailscale nodes** (§364) — the tailnet still
       holds the old container-ID nodes (`26ef4eae9a8a`, `791f5c44331b`,
       `c45d6f5a3c43`, all this same box) and their dead Funnel hostnames.

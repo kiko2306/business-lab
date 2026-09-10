@@ -529,6 +529,41 @@ if command -v systemctl >/dev/null 2>&1 && systemctl list-unit-files cloudflared
   fi
 fi
 
+# --- NetBird client follows the Tailscale container (plan.md §364) ----------
+# NetBird's signal stream runs through the Tailscale container's Funnel and
+# does not recover on its own when that container is recreated — the client
+# sits in "rpc error ... EOF" until it is restarted. The backend can't do it
+# (netbird is host systemd, not a managed container), so a tiny host unit
+# watches `docker events` for the tailscale container and bounces
+# netbird.service. Idempotent: only writes the unit when missing or when its
+# ExecStart path has moved.
+NBFT_SCRIPT="$(pwd)/scripts/netbird-follows-tailscale.sh"
+NBFT_UNIT="/etc/systemd/system/netbird-follows-tailscale.service"
+if command -v systemctl >/dev/null 2>&1 && [ -f "$NBFT_SCRIPT" ]; then
+  if [ ! -f "$NBFT_UNIT" ] || ! grep -qF "ExecStart=$NBFT_SCRIPT" "$NBFT_UNIT" 2>/dev/null; then
+    log "Installing netbird-follows-tailscale.service (plan.md §364)"
+    cat > "$NBFT_UNIT" <<UNIT
+# Managed by setup_server.sh — see plan.md §364.
+[Unit]
+Description=Restart the NetBird client when the Tailscale container restarts
+After=docker.service netbird.service
+Wants=docker.service
+
+[Service]
+Type=simple
+ExecStart=$NBFT_SCRIPT
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+    systemctl daemon-reload >/dev/null 2>&1 || true
+  fi
+  systemctl enable --now netbird-follows-tailscale.service >/dev/null 2>&1 \
+    || warn "couldn't enable netbird-follows-tailscale.service — enable it by hand"
+fi
+
 if ! docker compose version >/dev/null 2>&1; then
   if command -v apt-get >/dev/null 2>&1; then
     log "Docker Compose plugin not found — installing docker-compose-plugin"
