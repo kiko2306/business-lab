@@ -258,15 +258,24 @@ below.
 - [ ] **P8 — Rebrand tier 2** (§84.2) — package/image/network/project names.
       Recreates the management stack — do it in the §83 data-root maintenance
       window, with host access, not before.
-- [ ] **P9 — Per-client provisioning** (§84.5, §84.7, §202, §203) — one host is
-      one deployment today; turnkey boxes need it repeatable per client. The
-      list is concrete: their domain, their Cloudflare account and API
-      token, their tunnel, their Authelia users, their backup destination.
-      Decided (§203): whose Cloudflare account holds the domain is the
-      client's own call, not ours to standardise — self-controlled (their
-      own account) or contracted (a reseller-managed account) — so the
-      provisioning flow must support both, with per-zone-scoped API tokens
-      required either way. Lands in the setup flow.
+- [ ] **P9a — Deployment status card** (§357) — the §84.7 provisioning list
+      (domain, Cloudflare token, tunnel, Authelia users, backup destination,
+      mail) is already repeatable per box via `start.sh` + Settings + `/setup`;
+      what's missing is one read-only screen telling an operator *what is
+      left* for a given box. Extend the Settings page — no new page, no
+      wizard — with a checklist that aggregates existing endpoint reads and
+      links each red item to the section that fixes it. P10 references this.
+- [ ] **P9b — Cloudflare account model** (§203, §357) — store which model
+      applies (self-controlled vs contracted reseller) as a `settings`
+      string, and on token save warn when the token can see more than one
+      zone (an account-global contracted token is the §202 blast-radius
+      risk). One extra API call in the existing token-test path. Fold in
+      **P9d**: `apps/price-compare/.env.example`'s `GOOGLE_REDIRECT_URI` is
+      the one templated value with a hardcoded domain — drop the example host
+      or mark it per-deployment.
+- [ ] **P9c — Per-client provisioning runbook** (§357) — one doc pass making
+      `docs/first-run.md` + `docs/deployment-guide.md` the ordered
+      "provision a box for a new client" procedure, post-§331/§341. Doc only.
 - [ ] **P10 — Turnkey build spec** (§84.7) — Dell/16 GiB/500 GB/€400 is proven
       (this stack runs on 14.84 GiB, 4 CPUs, 53 containers, 8 GB used). The
       trap is the disk: Ubuntu's installer defaults to a ~100 GiB root LV,

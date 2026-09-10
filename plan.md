@@ -23989,3 +23989,89 @@ run as `done`. The §355 `--force-recreate` made it worse (forced the backend
 recreate). Fix: **`--no-deps`** on both restart `up -d` calls — the frontend
 one so it can't drag in `backend`, the backend one so it can't bounce
 Postgres. This is the actual close of the §354 thread.
+
+## 357. P9 planning pass — per-client provisioning is mostly already built (2026-09-10)
+
+The README carried P9 ("Per-client provisioning", §84.5/§84.7/§202/§203) as a
+large open feature: "one host is one deployment today; turnkey boxes need it
+repeatable per client." This is the planning pass §254 asked for ("large;
+design doc first, then setup-flow work"). No code here.
+
+### The finding: the repeatable path already exists
+
+The §84.7 gap list — "their domain, their Cloudflare account and API token,
+their tunnel, their Authelia users, their backup destination" — was written
+before §331/§335 (auto-exposure, networking folded into Settings), §341/§346/§347
+(apps self-bootstrap their admin on start) and §356 (SFTP backups). Walking it
+item by item against the code as it stands now:
+
+| §84.7 item | State on a fresh clone today | Where |
+|---|---|---|
+| Their domain | Prompted once by `start.sh` (`BASE_DOMAIN`), or pre-filled in `start.config`; every hostname templates from it (Authelia, NetBird, wetty). Also editable in Settings (`exposure_base_domain`). | `start.sh:249`, `resolve_shared_value` |
+| Their Cloudflare account + API token | Prompted once (`CLOUDFLARE_API_TOKEN`); zone id and **account id are looked up from the token**, never hardcoded — so "self-controlled" vs "contracted" (§203) already works with no code path difference. Re-enterable in Settings. | `start.sh:250`, `start.sh:282` |
+| Their tunnel | Looked up by name, **created if absent** (`config_src: cloudflare`), id seeded into `settings`. Remotely-managed, so the dashboard's `PUT /cfd_tunnel/{id}/configurations` drives ingress. | `start.sh` CF block, `cloudflareTunnelClient.ts` |
+| Their Authelia users | First admin via the dashboard `/setup` page; the rest via the Users page (`POST /api/users`, invitations, 2FA). Writes `users_database.yml` + access-control rules (§338). | `pages/setup`, `routes/users.ts`, `autheliaUsers.ts` |
+| Their backup destination | Settings → backup target: `disk`/`s3`/`sftp`/`ftp`/`nfs`, with a test button. Passphrase custody is the open §84.5/§74 item, not a provisioning gap. | `routes/settings.ts:507`, `kopiaTargetApply.ts` |
+| Mail (not in the §84.7 list but per-client) | Settings → mail, with a test send. | `routes/settings.ts:412` |
+| Per-app admin accounts | Self-seeded on first start from the Authelia admin's email (§341/§346/§347, `adminSeedEnv.ts`). No per-client step. | `adminSeedEnv.ts` |
+
+Nothing in the repo bakes in `tx-home-utils.com` as runtime behaviour —
+`git grep` finds it only in code comments, a self-update log string, and one
+`apps/price-compare/.env.example` placeholder (`GOOGLE_REDIRECT_URI`). A fresh
+clone inherits no prior client's identity or secrets (`apps/*/.env` +
+`apps/*/data/` are gitignored; `start.sh` generates `JWT_SECRET`,
+`POSTGRES_PASSWORD` etc. per box).
+
+So P9 is **not** a large setup-flow build. What's actually missing is small:
+
+### The residual gaps (the real P9)
+
+1. **P9a — a provisioning status surface.** There is no single screen that
+   tells an operator provisioning client #5 *what is left*. The state is all
+   query-able (domain set? token valid? tunnel up? mail tested? backup target
+   tested? how many Authelia users?) but scattered across Settings sections
+   and `start.sh` stdout. Build: a read-only "Deployment" card (extend the
+   Settings page — no new page) that reads existing endpoints and shows a
+   checklist with a link to the section that fixes each red item. This is the
+   "repeatable per client" ask made concrete. Small — mostly aggregating
+   reads that already exist.
+
+2. **P9b — record the Cloudflare account model + enforce zone scope.** §203
+   says the flow supports both "self-controlled" and "contracted", with
+   per-zone-scoped tokens "non-optional" in the contracted case. The code
+   already works with a zone-scoped token (the `/zones?name=` lookup only
+   returns zones the token can see). Missing: (a) store which model applies
+   as a `settings` string for the record, (b) on token save, warn if the
+   token can see more than one zone (a contracted reseller token that is
+   account-global is the blast-radius risk §202 flagged). Tiny — one extra
+   Cloudflare API call in the existing token-test path.
+
+3. **P9c — the provisioning runbook.** `docs/first-run.md` +
+   `docs/deployment-guide.md` predate the §331/§341 changes. One pass to make
+   them the ordered "provision a box for a new client" procedure: clone →
+   `start.config` (or `start.sh` prompts) → `/setup` admin → Settings (mail,
+   backup, verify Cloudflare) → add the client's users → hand over. Doc only.
+   Decision taken here: **do not build a multi-step wizard.** The `/setup`
+   page stays single-purpose (first admin); Settings + the P9a checklist are
+   the config surface. A wizard would be a second copy of every Settings
+   field.
+
+4. **P9d — `apps/price-compare/.env.example` redirect URI.** The one
+   templated value carrying a domain. Either drop the example host or note in
+   the file that it's per-deployment. Trivial; fold into P9b or its own
+   one-liner.
+
+### Not in P9
+
+- **P8 (rebrand tier 2 — package/image/network/project names)** stays
+  separate and stays gated on the §83 maintenance window. Turnkey is
+  one-box-one-client, so shared `homelab-*` identifiers don't actually
+  collide in the field; P8 is polish, not a provisioning blocker.
+- **P10/P11/P12** unchanged — P10 (build spec) partly depends on P9a landing;
+  P11/P12 are business-stance docs.
+
+### Next action
+
+P9a (the Deployment status card). It's the only item that is a real feature,
+it's what "repeatable per client" literally asks for, and P10 references it.
+P9b/P9c/P9d are small and can batch after it.
