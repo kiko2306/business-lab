@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.73.0] — 2026-09-10
+
+### Added
+
+- Cloudflare account model (self-controlled vs contracted) recorded in Networking settings; the token Test connection now warns when the token can see more than one zone (P9b)
+
 ## [0.72.0] — 2026-09-10
 
 ### Added

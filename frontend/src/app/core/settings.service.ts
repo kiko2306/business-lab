@@ -4,6 +4,7 @@ import { Observable, retry } from 'rxjs';
 import { API_BASE_URL } from './api';
 import { SKIP_GLOBAL_ERROR_HANDLING } from './http-context';
 import {
+  CloudflareAccountModel,
   CloudflareSettings,
   CloudflareTestResponse,
   ClaudeKeySettings,
@@ -40,6 +41,14 @@ export class SettingsService {
     return this.http.put<CloudflareSettings>(
       `${API_BASE_URL}/settings/cloudflare-token`,
       { token: token.trim() },
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
+  saveCloudflareAccountModel(model: CloudflareAccountModel): Observable<{ accountModel: CloudflareAccountModel; message: string }> {
+    return this.http.put<{ accountModel: CloudflareAccountModel; message: string }>(
+      `${API_BASE_URL}/settings/cloudflare-account-model`,
+      { model },
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }

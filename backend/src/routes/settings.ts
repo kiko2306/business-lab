@@ -37,7 +37,7 @@ import {
 import { applyNpmCrowdsecConfig } from '../services/crowdsecConfig';
 import { runAlertTest, AlertSource } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
-import { testCloudflareTunnelAccess } from '../services/cloudflareTunnelClient';
+import { testCloudflareTunnelAccess, countTokenZones } from '../services/cloudflareTunnelClient';
 import { CLAUDE_API_KEY_SETTING, getClaudeApiKey, maskClaudeKey } from '../utils/claudeSettings';
 import { testClaudeApiKey } from '../services/claudeKeyTest';
 import { syncMealieAiProvider } from '../services/mealieAiSync';
@@ -54,11 +54,16 @@ const router = Router();
  */
 router.use((req: Request, res: Response, next) => {
   const isExposure =
-    req.path.startsWith('/cloudflare-token') || req.path.startsWith('/exposure');
+    req.path.startsWith('/cloudflare-') || req.path.startsWith('/exposure');
   return requireCapability(isExposure ? 'exposure:settings' : 'settings:manage')(req, res, next);
 });
 
 const CLOUDFLARE_TOKEN_KEY = 'cloudflare_tunnel_token';
+// Per-deployment contract term: 'self-controlled' (client runs their own
+// Cloudflare account) or 'contracted' (a reseller-managed account). Recorded
+// only — nothing branches on it; the provisioning flow supports both
+// (plan.md §203/§357 P9b).
+const CLOUDFLARE_ACCOUNT_MODEL_KEY = 'cloudflare_account_model';
 const PERMISSION_EXPLANATION =
   'Required permissions: Account → Cloudflare Tunnel → Edit, Zone → DNS → Edit. ' +
   'To also run CrowdSec, add Account → Workers Scripts → Edit, Account → Workers KV Storage → Edit ' +
@@ -135,15 +140,48 @@ function verifyCloudflareToken(token: string): Promise<CloudflareVerifyResult> {
 router.get('/cloudflare-token', async (_req: Request, res: Response) => {
   try {
     const token = await getStoredToken();
+    const modelRow = await query<{ value: string }>('SELECT value FROM settings WHERE key = $1', [
+      CLOUDFLARE_ACCOUNT_MODEL_KEY,
+    ]);
     return res.json({
       configured: Boolean(token),
       tokenMasked: maskToken(token),
       permissionExplanation: PERMISSION_EXPLANATION,
+      accountModel: modelRow.rows[0]?.value ?? null,
     });
   } catch {
     return res.status(500).json({ error: 'Unable to load Cloudflare settings.' });
   }
 });
+
+// ---------------------------------------------------------------------------
+// PUT /api/settings/cloudflare-account-model — record self-controlled vs
+// contracted (plan.md §203/§357 P9b). For the record; nothing branches on it.
+// ---------------------------------------------------------------------------
+router.put(
+  '/cloudflare-account-model',
+  validateBody(schemas.cloudflareAccountModel),
+  async (req: Request, res: Response) => {
+    try {
+      await query(
+        `INSERT INTO settings (key, value, updated_at)
+         VALUES ($1, $2, NOW())
+         ON CONFLICT (key)
+         DO UPDATE SET value = EXCLUDED.value, updated_at = NOW()`,
+        [CLOUDFLARE_ACCOUNT_MODEL_KEY, req.body.model]
+      );
+      await writeAuditLog({
+        userId: req.user?.id ?? null,
+        action: 'settings_change',
+        resource: CLOUDFLARE_ACCOUNT_MODEL_KEY,
+        result: 'success',
+      }).catch(() => {});
+      return res.json({ accountModel: req.body.model, message: 'Cloudflare account model saved.' });
+    } catch {
+      return res.status(500).json({ error: 'Unable to save the Cloudflare account model.' });
+    }
+  }
+);
 
 router.put('/cloudflare-token', validateBody(schemas.cloudflareTokenUpdate), async (req: Request, res: Response) => {
   const token = req.body.token;
@@ -188,9 +226,29 @@ router.post('/cloudflare-token/test', validateBody(schemas.cloudflareTokenTest),
       return res.status(400).json({ error: result.message });
     }
 
+    // A token that can see more than one zone is account-wide, not
+    // zone-scoped — for a reseller-managed account that means a leak reaches
+    // every client's DNS (plan.md §202/§357 P9b). Not a failure; just flagged.
+    // Needs Zone:Read, so a token without it silently skips the check.
+    let zoneCount: number | undefined;
+    let warning: string | undefined;
+    try {
+      zoneCount = await countTokenZones(token);
+      if (zoneCount > 1) {
+        warning =
+          `This token can see ${zoneCount} Cloudflare zones. Scope it to a single zone ` +
+          `(Zone Resources → Include → Specific zone) so a leaked token can't reach another ` +
+          `deployment's DNS — required for a reseller-managed (contracted) account.`;
+      }
+    } catch {
+      // Zone listing is best-effort; its absence doesn't invalidate the token.
+    }
+
     return res.json({
       success: true,
       message: result.message,
+      ...(zoneCount !== undefined ? { zoneCount } : {}),
+      ...(warning ? { warning } : {}),
     });
   } catch {
     return res.status(502).json({ error: 'Unable to reach Cloudflare to verify the token.' });

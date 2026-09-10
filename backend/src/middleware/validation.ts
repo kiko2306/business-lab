@@ -96,6 +96,11 @@ export const schemas = {
   cloudflareTokenTest: Joi.object({
     token: Joi.string().trim().min(20).max(4096).allow('').optional(),
   }),
+  // Which Cloudflare account holds the client's zone — a per-deployment
+  // contract term, recorded for the record only (plan.md §203/§357 P9b).
+  cloudflareAccountModel: Joi.object({
+    model: Joi.string().valid('self-controlled', 'contracted').required(),
+  }),
   // Anthropic keys are `sk-ant-…`, ~100+ chars. Bound loosely (like the
   // Cloudflare token) rather than pattern-matched, so a future key format
   // isn't rejected by the dashboard.

@@ -24109,3 +24109,40 @@ than the row's "set it in <section>" text is worth) — add if operators ask.
 not general/mail/backup/claude-key either, so it is a curated partial spec,
 not one this endpoint belongs in. `docs/first-run.md` gets a pointer to the
 checklist; the full per-client runbook rewrite is P9c.
+
+## 359. P9b — Cloudflare account model + multi-zone token warning (§357, 2026-09-10)
+
+Two small provisioning gaps §357 named, plus P9d folded in.
+
+**Account model.** New `settings` key `cloudflare_account_model` ∈
+`{self-controlled, contracted}` — a per-deployment contract term (§203),
+recorded only; nothing branches on it. `GET /api/settings/cloudflare-token`
+returns it; `PUT /api/settings/cloudflare-account-model` (Joi enum, audit
+logged) sets it. The router capability gate widened from
+`/cloudflare-token` to `/cloudflare-` so the new route stays
+`exposure:settings` (webmaster remit) like the token. Frontend: a select in
+the Networking panel under the token, auto-saving on change.
+
+**Multi-zone token warning.** `countTokenZones(apiToken)` in
+`cloudflareTunnelClient.ts` — `GET /zones?per_page=2`, reads
+`result_info.total_count`. Wired into `POST /cloudflare-token/test` after the
+existing verify: `> 1` zone means the token is account-wide, not zone-scoped,
+so a leak reaches every client's DNS — the §202 blast-radius risk. Returned
+as `{ zoneCount, warning }` alongside `success`; the frontend shows it as an
+info (not error) message — a multi-zone token still verifies fine. Needs
+Zone:Read, so the call is wrapped in try/catch: a token without it skips the
+check silently rather than failing the test.
+
+**P9d.** `apps/price-compare/.env.example`'s
+`GOOGLE_REDIRECT_URI=https://price-compare.tx-home-utils.com/...` was the one
+templated value carrying a real domain — swapped for `<your-domain>` with the
+setup comment updated to say replace it.
+
+Tests: `countTokenZones` (total_count, array-length fallback, 403 throw) in
+`cloudflareTunnelClient.test.ts`. Backend + frontend checks green. The live
+Cloudflare token test wasn't exercised (no token in the session) — README
+`@mat` item to run it against a scoped and an account-wide token.
+
+Not surfaced on the §358 deployment checklist: the account model has a
+sensible default and isn't a handover blocker, so a checklist row for it
+would be permanent noise.

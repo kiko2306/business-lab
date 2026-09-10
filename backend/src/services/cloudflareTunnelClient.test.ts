@@ -1,6 +1,6 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
 import { requestJson } from '../utils/httpJson';
-import { ensureIngressRoute, testCloudflareTunnelAccess } from './cloudflareTunnelClient';
+import { countTokenZones, ensureIngressRoute, testCloudflareTunnelAccess } from './cloudflareTunnelClient';
 
 vi.mock('../utils/httpJson', () => ({
   requestJson: vi.fn(),
@@ -224,5 +224,34 @@ describe('testCloudflareTunnelAccess', () => {
     });
 
     await expect(testCloudflareTunnelAccess(testOptions)).rejects.toThrow(/Unable to access Cloudflare zone: zone forbidden/);
+  });
+});
+
+describe('countTokenZones', () => {
+  it('returns result_info.total_count for an account-wide token', async () => {
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: { success: true, result: [{}, {}], result_info: { total_count: 7 } },
+      raw: '',
+    });
+    await expect(countTokenZones('token')).resolves.toBe(7);
+  });
+
+  it('falls back to the result array length when result_info is absent', async () => {
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: { success: true, result: [{}] },
+      raw: '',
+    });
+    await expect(countTokenZones('token')).resolves.toBe(1);
+  });
+
+  it('throws when the zone list is not accessible (no Zone:Read)', async () => {
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 403,
+      body: { success: false, errors: [{ message: 'not allowed' }] },
+      raw: '',
+    });
+    await expect(countTokenZones('token')).rejects.toThrow(/Unable to list Cloudflare zones: not allowed/);
   });
 });

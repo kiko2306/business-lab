@@ -5,6 +5,7 @@ import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { sanitizePastedText } from '../../core/input-sanitize';
 import {
+  CloudflareAccountModel,
   CloudflareSettings,
   ExposureSettings,
   ExposureSettingsInput,
@@ -49,6 +50,7 @@ export class NetworkSettingsComponent implements OnInit {
 
   protected configuredSettings: CloudflareSettings | null = null;
   protected exposureSettings: ExposureSettings | null = null;
+  protected savingAccountModel = false;
   protected showToken = false;
   protected loading = true;
   protected exposureLoading = true;
@@ -133,11 +135,36 @@ export class NetworkSettingsComponent implements OnInit {
       .pipe(finalize(() => (this.testing = false)))
       .subscribe({
         next: (response) => {
-          this.feedback = { type: 'success', message: response.message };
+          // A multi-zone token still verifies fine — surface the scope
+          // warning without calling the test a failure (§357 P9b).
+          this.feedback = response.warning
+            ? { type: 'info', message: `${response.message} ${response.warning}` }
+            : { type: 'success', message: response.message };
           this.toastService.success(response.message);
         },
         error: (error) => {
           this.feedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to test token.') };
+        },
+      });
+  }
+
+  saveAccountModel(model: CloudflareAccountModel): void {
+    if (!model || model === this.configuredSettings?.accountModel) {
+      return;
+    }
+    this.savingAccountModel = true;
+    this.settingsService
+      .saveCloudflareAccountModel(model)
+      .pipe(finalize(() => (this.savingAccountModel = false)))
+      .subscribe({
+        next: (response) => {
+          if (this.configuredSettings) {
+            this.configuredSettings.accountModel = response.accountModel;
+          }
+          this.toastService.success(response.message);
+        },
+        error: (error) => {
+          this.feedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save the account model.') };
         },
       });
   }

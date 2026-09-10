@@ -157,16 +157,24 @@ export interface ServiceStatusResponse {
   summary: ServiceSummary;
 }
 
+/** Which Cloudflare account holds the client's zone (plan.md §203/§357). */
+export type CloudflareAccountModel = 'self-controlled' | 'contracted';
+
 export interface CloudflareSettings {
   configured: boolean;
   tokenMasked: string | null;
   permissionExplanation: string;
+  accountModel: CloudflareAccountModel | null;
   message?: string;
 }
 
 export interface CloudflareTestResponse {
   success: boolean;
   message: string;
+  // Present when Zone:Read let us count; `warning` is set when > 1 (an
+  // account-wide token — see §357 P9b).
+  zoneCount?: number;
+  warning?: string;
 }
 
 /** GET/PUT /settings/claude-key. The key itself is never sent back. */

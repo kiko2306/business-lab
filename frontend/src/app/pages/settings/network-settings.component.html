@@ -56,6 +56,27 @@
         Test connection
       </button>
     </div>
+
+    <hr class="my-4" />
+
+    <label class="form-label fw-semibold" for="cfAccountModel">Account model</label>
+    <select
+      id="cfAccountModel"
+      class="form-select"
+      style="max-width: 26rem"
+      [disabled]="savingAccountModel"
+      [ngModel]="configuredSettings?.accountModel"
+      (ngModelChange)="saveAccountModel($event)"
+    >
+      <option [ngValue]="null" disabled>Choose…</option>
+      <option value="self-controlled">Self-controlled — the client owns this Cloudflare account</option>
+      <option value="contracted">Contracted — a reseller-managed account holds the zone</option>
+    </select>
+    <div class="form-text">
+      A per-deployment contract term, recorded for the record. Either way the token must be
+      scoped to this deployment's zone (Zone Resources → Specific zone) — Test connection
+      warns if it is not.
+    </div>
   </ng-container>
 </app-panel>
 

@@ -109,6 +109,30 @@ export async function testCloudflareTunnelAccess({
   }
 }
 
+/**
+ * How many zones the API token can see. A per-zone-scoped token
+ * (Zone Resources → Specific zone) returns 1 (or 0 before the zone exists);
+ * an account-level token returns every zone in the account — that wider set
+ * is the blast radius if the token leaks, which matters for a reseller-
+ * managed ("contracted") account holding several clients (plan.md §202/§357).
+ * Needs Zone → Zone → Read; callers treat a throw as "couldn't determine".
+ */
+export async function countTokenZones(apiToken: string): Promise<number> {
+  const response = await requestJson<
+    CloudflareApiEnvelope<unknown[]> & { result_info?: { total_count?: number } }
+  >(`${API_BASE}/zones?per_page=2`, {
+    headers: { Authorization: `Bearer ${apiToken}` },
+  });
+
+  if (response.statusCode !== 200 || !response.body?.success) {
+    throw new Error(
+      `Unable to list Cloudflare zones: ${response.body?.errors?.[0]?.message || response.statusCode}`
+    );
+  }
+
+  return response.body.result_info?.total_count ?? response.body.result?.length ?? 0;
+}
+
 interface EnsureIngressRouteOptions {
   apiToken: string;
   accountId: string;
