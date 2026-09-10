@@ -23930,3 +23930,37 @@ carries no Authelia snippet — own login only. Left as-is: a benign DBAL-4
 `serverVersion` deprecation notice (INFO, one per request; DBAL 3 works fine),
 and the live frontend one patch behind — its 0.70.0 image is built and tagged,
 `up -d --force-recreate frontend` or the next `frontend/src` deploy adopts it.
+
+## 356. SFTP as a Kopia backup destination (§81.5, §194, 2026-09-10)
+
+Closes the SFTP half of the "non-S3 Kopia remote" backlog. Kopia has no SFTP
+backend of its own, but the official image already bundles `rclone` and the
+`ftp`/`ftps` path (§267) drives it — rclone speaks `sftp` too, so this is the
+same mechanism with a `type` switch, not a new transport.
+
+- `backupTarget.ts` — `'sftp'` added to `BackupTargetKind` /
+  `BACKUP_TARGET_KINDS`; new `isRcloneKind()` (ftp|ftps|sftp);
+  `RcloneFtpConfig`/`toRcloneFtpConfig` renamed to
+  `RcloneRemoteConfig`/`toRcloneRemoteConfig` and given a `type: 'ftp'|'sftp'`
+  field; `validateTarget` folds sftp into the rclone branch and additionally
+  requires a password (no key-file input in the 5-field model).
+- `kopiaTargetApply.ts` — the rclone branch now emits `BACKUP_RCLONE_TYPE`
+  (`ftp`|`sftp`) alongside the existing `BACKUP_RCLONE_*`.
+- `apps/kopia/entrypoint.sh` — writes `type = $BACKUP_RCLONE_TYPE` into
+  `rclone.conf`; the FTP-only `concurrency = 4` / `explicit_tls` lines move
+  under an `if type = ftp`, and sftp gets `disable_hashcheck = true`. SFTP does
+  no host-key verification (no `known_hosts` in the container; the SSH
+  transport is still encrypted) — override with `--sftp-known-hosts-file` via
+  the extra-flags field.
+- `backupTargetTest.ts` — `testFtpTarget` → `testRcloneTarget`, builds
+  `--ftp-*` or `--sftp-*` flags off `r.type`; `RCLONE_PASS` env replaces
+  `FTP_PASS`.
+- Compose `BACKUP_RCLONE_TYPE` passthrough; `.env.example` documents it.
+  Frontend: `sftp` option in the destination `<select>`, and the FTP field
+  block widened to cover it (port hint 22, host-key note).
+- Joi `backupTarget.kind` gains `sftp`. Docs: `app-credentials.md` Kopia row;
+  README item narrowed to `gdrive`-only.
+
+720 backend tests (+4), 53 frontend, builds clean. **Not proven against a real
+SFTP server** — needs a deploy + a Settings → Backup destination round trip
+(Test then Save) against an actual SSH host. Minor → 0.71.0.

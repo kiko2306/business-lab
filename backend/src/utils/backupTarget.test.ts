@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
   BackupTarget,
   isMountedKind,
+  isRcloneKind,
   toKopiaRepositoryMount,
   toMountSpec,
-  toRcloneFtpConfig,
+  toRcloneRemoteConfig,
   toS3ConnectArgs,
   validateTarget,
 } from './backupTarget';
@@ -50,26 +51,40 @@ describe('toMountSpec', () => {
 describe('isMountedKind', () => {
   it('is true only for the kernel-mount kinds', () => {
     expect(['disk', 'smb', 'nfs'].every(isMountedKind as (k: string) => boolean)).toBe(true);
-    expect(['s3', 'ftp', 'ftps'].some(isMountedKind as (k: string) => boolean)).toBe(false);
+    expect(['s3', 'ftp', 'ftps', 'sftp'].some(isMountedKind as (k: string) => boolean)).toBe(false);
   });
 });
 
-describe('toRcloneFtpConfig', () => {
+describe('isRcloneKind', () => {
+  it('is true only for ftp, ftps and sftp', () => {
+    expect(['ftp', 'ftps', 'sftp'].every(isRcloneKind as (k: string) => boolean)).toBe(true);
+    expect(['disk', 'smb', 'nfs', 's3'].some(isRcloneKind as (k: string) => boolean)).toBe(false);
+  });
+});
+
+describe('toRcloneRemoteConfig', () => {
   it('maps the shared form fields onto an rclone ftp remote, defaulting path to /', () => {
-    expect(toRcloneFtpConfig({
+    expect(toRcloneRemoteConfig({
       ...base, kind: 'ftp', server: '192.168.1.50', username: 'frias', password: 'pw', share: '',
     })).toEqual({
-      host: '192.168.1.50', port: '', user: 'frias', pass: 'pw',
+      type: 'ftp', host: '192.168.1.50', port: '', user: 'frias', pass: 'pw',
       remotePath: '/', explicitTls: false, extraArgs: '',
     });
   });
 
   it('splits host:port and marks ftps as explicit TLS', () => {
-    const c = toRcloneFtpConfig({
+    const c = toRcloneRemoteConfig({
       ...base, kind: 'ftps', server: 'nas.lan:2121', username: 'u', password: 'p',
       share: '/backup', options: '--ftp-disable-epsv',
     });
-    expect(c).toMatchObject({ host: 'nas.lan', port: '2121', remotePath: '/backup', explicitTls: true, extraArgs: '--ftp-disable-epsv' });
+    expect(c).toMatchObject({ type: 'ftp', host: 'nas.lan', port: '2121', remotePath: '/backup', explicitTls: true, extraArgs: '--ftp-disable-epsv' });
+  });
+
+  it('maps sftp to type=sftp, never explicit TLS', () => {
+    const c = toRcloneRemoteConfig({
+      ...base, kind: 'sftp', server: 'vps.example.com', username: 'backup', password: 'p', share: '/srv/kopia',
+    });
+    expect(c).toMatchObject({ type: 'sftp', host: 'vps.example.com', port: '', remotePath: '/srv/kopia', explicitTls: false });
   });
 });
 
@@ -136,5 +151,13 @@ describe('validateTarget', () => {
     expect(validateTarget({ ...base, kind: 'ftp', server: 'h', username: '' })).toMatch(/FTP username/);
     expect(validateTarget({ ...base, kind: 'ftp', server: 'h', username: 'u' })).toBeNull();
     expect(validateTarget({ ...base, kind: 'ftps', server: 'h:2121', username: 'u', password: 'has,comma' })).toBeNull();
+  });
+
+  it('requires host, username and (unlike ftp) a password for sftp — no key-file field here', () => {
+    expect(validateTarget({ ...base, kind: 'sftp', server: '' })).toMatch(/SFTP server/);
+    expect(validateTarget({ ...base, kind: 'sftp', server: 'user@h', username: 'u', password: 'p' })).toMatch(/bare host/);
+    expect(validateTarget({ ...base, kind: 'sftp', server: 'h', username: '', password: 'p' })).toMatch(/SFTP username/);
+    expect(validateTarget({ ...base, kind: 'sftp', server: 'h', username: 'u', password: '' })).toMatch(/SFTP password/);
+    expect(validateTarget({ ...base, kind: 'sftp', server: 'h:2222', username: 'u', password: 'p' })).toBeNull();
   });
 });

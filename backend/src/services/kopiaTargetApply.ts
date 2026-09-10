@@ -32,9 +32,10 @@ import fs from 'fs';
 import path from 'path';
 import {
   BackupTarget,
+  isRcloneKind,
   KOPIA_LOCAL_REPOSITORY_DEVICE,
   toKopiaRepositoryMount,
-  toRcloneFtpConfig,
+  toRcloneRemoteConfig,
   toS3ConnectArgs,
 } from '../utils/backupTarget';
 import { resolveComposeFile } from '../config/services';
@@ -135,6 +136,7 @@ export function buildEnvValues(target: BackupTarget): Record<string, string> {
     BACKUP_S3_ACCESS_KEY_ID: '',
     BACKUP_S3_SECRET_ACCESS_KEY: '',
     BACKUP_S3_EXTRA_ARGS: '',
+    BACKUP_RCLONE_TYPE: '',
     BACKUP_RCLONE_HOST: '',
     BACKUP_RCLONE_PORT: '',
     BACKUP_RCLONE_USER: '',
@@ -157,18 +159,19 @@ export function buildEnvValues(target: BackupTarget): Record<string, string> {
     };
   }
 
-  if (target.kind === 'ftp' || target.kind === 'ftps') {
-    const ftp = toRcloneFtpConfig(target);
+  if (isRcloneKind(target.kind)) {
+    const r = toRcloneRemoteConfig(target);
     return {
       ...values,
       BACKUP_REPO_KIND: 'rclone',
-      BACKUP_RCLONE_HOST: ftp.host,
-      BACKUP_RCLONE_PORT: ftp.port,
-      BACKUP_RCLONE_USER: ftp.user,
-      BACKUP_RCLONE_PASS: ftp.pass,
-      BACKUP_RCLONE_REMOTE_PATH: ftp.remotePath,
-      BACKUP_RCLONE_TLS: ftp.explicitTls ? 'true' : 'false',
-      BACKUP_RCLONE_EXTRA_ARGS: ftp.extraArgs,
+      BACKUP_RCLONE_TYPE: r.type,
+      BACKUP_RCLONE_HOST: r.host,
+      BACKUP_RCLONE_PORT: r.port,
+      BACKUP_RCLONE_USER: r.user,
+      BACKUP_RCLONE_PASS: r.pass,
+      BACKUP_RCLONE_REMOTE_PATH: r.remotePath,
+      BACKUP_RCLONE_TLS: r.explicitTls ? 'true' : 'false',
+      BACKUP_RCLONE_EXTRA_ARGS: r.extraArgs,
     };
   }
 

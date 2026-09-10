@@ -48,6 +48,7 @@ describe('buildEnvValues', () => {
       share: '/backup', options: '--ftp-disable-epsv',
     });
     expect(values.BACKUP_REPO_KIND).toBe('rclone');
+    expect(values.BACKUP_RCLONE_TYPE).toBe('ftp');
     expect(values.BACKUP_RCLONE_HOST).toBe('192.168.1.50');
     expect(values.BACKUP_RCLONE_PORT).toBe('2121');
     expect(values.BACKUP_RCLONE_USER).toBe('frias');
@@ -61,8 +62,21 @@ describe('buildEnvValues', () => {
     expect(values.BACKUP_MOUNT_DEVICE).toBe('./data/repository');
   });
 
-  it('blanks every rclone var for a non-ftp target', () => {
+  it('writes type=sftp and never sets TLS for an sftp target', () => {
+    const values = buildEnvValues({
+      ...base, kind: 'sftp', server: 'vps.example.com:2222', username: 'backup', password: 'pw', share: '/srv/kopia',
+    });
+    expect(values.BACKUP_REPO_KIND).toBe('rclone');
+    expect(values.BACKUP_RCLONE_TYPE).toBe('sftp');
+    expect(values.BACKUP_RCLONE_HOST).toBe('vps.example.com');
+    expect(values.BACKUP_RCLONE_PORT).toBe('2222');
+    expect(values.BACKUP_RCLONE_REMOTE_PATH).toBe('/srv/kopia');
+    expect(values.BACKUP_RCLONE_TLS).toBe('false');
+  });
+
+  it('blanks every rclone var (type included) for a non-rclone target', () => {
     const values = buildEnvValues({ ...base, kind: 's3', share: 'b', username: 'ak', password: 'sk' });
+    expect(values.BACKUP_RCLONE_TYPE).toBe('');
     expect(values.BACKUP_RCLONE_HOST).toBe('');
     expect(values.BACKUP_RCLONE_PASS).toBe('');
     expect(values.BACKUP_RCLONE_REMOTE_PATH).toBe('');

@@ -43,10 +43,12 @@ services:
       # Raw extra `kopia repository connect s3` flags, e.g. `--region=us-east-1`
       # or `--disable-tls` for a plain-HTTP endpoint. Appended verbatim.
       BACKUP_S3_EXTRA_ARGS: ${BACKUP_S3_EXTRA_ARGS:-}
-      # FTP / FTPS (BACKUP_REPO_KIND=rclone): entrypoint.sh builds an rclone
-      # "backup" remote of type=ftp from these. PASS is plaintext here (same
-      # trust level as the s3 secret above) and obscured into rclone.conf at
-      # start. TLS=true adds explicit FTPS.
+      # FTP / FTPS / SFTP (BACKUP_REPO_KIND=rclone): entrypoint.sh builds an
+      # rclone "backup" remote of type=$BACKUP_RCLONE_TYPE (ftp or sftp) from
+      # these. PASS is plaintext here (same trust level as the s3 secret above)
+      # and obscured into rclone.conf at start. TLS=true adds explicit FTPS
+      # (ftp only).
+      BACKUP_RCLONE_TYPE: ${BACKUP_RCLONE_TYPE:-}
       BACKUP_RCLONE_HOST: ${BACKUP_RCLONE_HOST:-}
       BACKUP_RCLONE_PORT: ${BACKUP_RCLONE_PORT:-}
       BACKUP_RCLONE_USER: ${BACKUP_RCLONE_USER:-}

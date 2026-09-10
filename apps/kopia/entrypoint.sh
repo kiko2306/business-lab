@@ -29,38 +29,49 @@ if [ "${BACKUP_REPO_KIND:-filesystem}" = "s3" ]; then
     $BACKUP_S3_EXTRA_ARGS
   LABEL="s3://$BACKUP_S3_BUCKET"
 elif [ "${BACKUP_REPO_KIND:-filesystem}" = "rclone" ]; then
-  # Kopia has no plain-FTP backend; it drives the rclone bundled in this image
-  # instead. Build an rclone "backup" remote of type=ftp from the env the
-  # dashboard writes (services/kopiaTargetApply.ts), password obscured as
-  # rclone.conf requires. --config is passed explicitly so nothing depends on
-  # $HOME. BACKUP_RCLONE_EXTRA_ARGS is unquoted — same word-split escape-hatch
+  # Kopia has no FTP or SFTP backend; it drives the rclone bundled in this
+  # image instead. Build an rclone "backup" remote from the env the dashboard
+  # writes (services/kopiaTargetApply.ts), password obscured as rclone.conf
+  # requires. --config is passed explicitly so nothing depends on $HOME.
+  # BACKUP_RCLONE_EXTRA_ARGS is unquoted — same word-split escape-hatch
   # contract as the s3/mount options fields.
+  RCLONE_TYPE="${BACKUP_RCLONE_TYPE:-ftp}"
   RCLONE_CONF=/app/config/rclone.conf
   {
     echo "[backup]"
-    echo "type = ftp"
+    echo "type = $RCLONE_TYPE"
     echo "host = $BACKUP_RCLONE_HOST"
     echo "user = $BACKUP_RCLONE_USER"
     echo "pass = $(rclone obscure "$BACKUP_RCLONE_PASS")"
     [ -n "$BACKUP_RCLONE_PORT" ] && echo "port = $BACKUP_RCLONE_PORT"
-    [ "$BACKUP_RCLONE_TLS" = "true" ] && echo "explicit_tls = true"
-    # Cap simultaneous FTP control connections. Kopia's repository layer opens
-    # several blob writes in parallel and each becomes an FTP connection
-    # through the rclone bridge; most FTP servers (and every consumer NAS)
-    # cap connections per user and just stall the rest, which reads as a hung
-    # `repository create`. 4 is well under any real limit and still parallel.
-    echo "concurrency = 4"
+    if [ "$RCLONE_TYPE" = "ftp" ]; then
+      [ "$BACKUP_RCLONE_TLS" = "true" ] && echo "explicit_tls = true"
+      # Cap simultaneous FTP control connections. Kopia's repository layer
+      # opens several blob writes in parallel and each becomes an FTP
+      # connection through the rclone bridge; most FTP servers (and every
+      # consumer NAS) cap connections per user and just stall the rest, which
+      # reads as a hung `repository create`. 4 is well under any real limit
+      # and still parallel.
+      echo "concurrency = 4"
+    else
+      # SFTP over one SSH connection multiplexes channels, so it does not need
+      # the FTP connection cap. No host-key file ships in the container, so
+      # rclone would refuse an unknown host; the SSH transport is still
+      # encrypted end to end. Add --sftp-known-hosts-file via
+      # BACKUP_RCLONE_EXTRA_ARGS if strict host-key checking is wanted.
+      echo "disable_hashcheck = true"
+    fi
   } > "$RCLONE_CONF"
-  # Kopia's rclone backend takes one `remote:path` string; "/" is the FTP root.
+  # Kopia's rclone backend takes one `remote:path` string; "/" is the root.
   REMOTE_DIR=$(printf '%s' "${BACKUP_RCLONE_REMOTE_PATH:-/}" | sed 's#^/*##')
   # --vfs-cache-mode=writes: Kopia's rclone backend runs `rclone serve webdav`
   # and speaks WebDAV to it; without a write cache every WebDAV PUT is a
-  # synchronous FTP round trip and large blob writes crawl or time out.
+  # synchronous round trip to the remote and large blob writes crawl or time out.
   set -- rclone --remote-path="backup:$REMOTE_DIR" \
     --rclone-args="--config=$RCLONE_CONF" \
     --rclone-args=--vfs-cache-mode=writes \
     $BACKUP_RCLONE_EXTRA_ARGS
-  LABEL="ftp://$BACKUP_RCLONE_HOST/$REMOTE_DIR"
+  LABEL="$RCLONE_TYPE://$BACKUP_RCLONE_HOST/$REMOTE_DIR"
 else
   set -- filesystem --path="$REPO_PATH"
   LABEL="$REPO_PATH"

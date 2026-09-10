@@ -45,16 +45,21 @@ export const BACKUP_TARGET_KEYS = {
   options: 'backup_target_options',
 } as const;
 
-export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 's3' | 'ftp' | 'ftps';
+export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 's3' | 'ftp' | 'ftps' | 'sftp';
 
 /** Every accepted kind, one source of truth for the type guard and Joi. */
-export const BACKUP_TARGET_KINDS: readonly BackupTargetKind[] = ['disk', 'smb', 'nfs', 's3', 'ftp', 'ftps'];
+export const BACKUP_TARGET_KINDS: readonly BackupTargetKind[] = ['disk', 'smb', 'nfs', 's3', 'ftp', 'ftps', 'sftp'];
+
+/** Kinds Kopia reaches through the bundled `rclone` rather than natively. */
+export function isRcloneKind(kind: BackupTargetKind): boolean {
+  return kind === 'ftp' || kind === 'ftps' || kind === 'sftp';
+}
 
 /**
  * `disk`/`smb`/`nfs` are Docker local-driver mounts — the kernel mounts them
  * and Kopia writes a `filesystem` repository into the mount point. `s3` and
- * `ftp`/`ftps` are not mounted at all: Kopia talks to them itself (`s3`
- * natively, `ftp` through the `rclone` it bundles), so they have no
+ * `ftp`/`ftps`/`sftp` are not mounted at all: Kopia talks to them itself
+ * (`s3` natively, the rest through the `rclone` it bundles), so they have no
  * `BackupMountSpec` and `toMountSpec` throws for them.
  */
 export function isMountedKind(kind: BackupTargetKind): boolean {
@@ -65,13 +70,13 @@ export interface BackupTarget {
   kind: BackupTargetKind;
   /** Local absolute path — `disk` only. */
   path: string;
-  /** Hostname or IP of the NAS — `smb`/`nfs`, or `host`/`host:port` for `ftp`/`ftps`. */
+  /** Hostname or IP of the NAS — `smb`/`nfs`, or `host`/`host:port` for `ftp`/`ftps`/`sftp`. */
   server: string;
-  /** Share name (smb), export path (nfs), or remote directory (ftp — `/` is the FTP root). */
+  /** Share name (smb), export path (nfs), or remote directory (ftp/sftp — `/` is the root). */
   share: string;
   username: string;
   password: string;
-  /** Extra mount options (smb/nfs) or raw rclone flags (ftp), appended verbatim. Escape hatch. */
+  /** Extra mount options (smb/nfs) or raw rclone flags (ftp/sftp), appended verbatim. Escape hatch. */
   options: string;
 }
 
@@ -190,34 +195,37 @@ export function toS3ConnectArgs(target: BackupTarget): S3ConnectArgs {
 }
 
 /**
- * Translate an `ftp`/`ftps` destination into the values Kopia's entrypoint
- * writes into an `rclone.conf` (`[backup]` remote of `type = ftp`) before it
- * runs `kopia repository create rclone --remote=backup:<remotePath>`. Kopia
- * has no plain-FTP backend of its own; the official image bundles `rclone`
- * and Kopia's `rclone` backend drives it.
+ * Translate an `ftp`/`ftps`/`sftp` destination into the values Kopia's
+ * entrypoint writes into an `rclone.conf` (`[backup]` remote of the given
+ * `type`) before it runs `kopia repository create rclone
+ * --remote=backup:<remotePath>`. Kopia has no FTP or SFTP backend of its own;
+ * the official image bundles `rclone` and Kopia's `rclone` backend drives it.
  */
-export interface RcloneFtpConfig {
+export interface RcloneRemoteConfig {
+  /** rclone remote `type` — `ftp` (covers ftp + ftps) or `sftp`. */
+  type: 'ftp' | 'sftp';
   host: string;
-  /** FTP control port; blank means rclone's default (21). */
+  /** Control/SSH port; blank means rclone's default (21 for ftp, 22 for sftp). */
   port: string;
   user: string;
   /** Plaintext here — the entrypoint runs it through `rclone obscure`. */
   pass: string;
-  /** Remote directory Kopia's repository lives in; `/` is the FTP root. */
+  /** Remote directory Kopia's repository lives in; `/` is the root. */
   remotePath: string;
-  /** `ftps` → explicit TLS (`AUTH TLS`); `ftp` → none. */
+  /** `ftps` → explicit TLS (`AUTH TLS`). Always false for `ftp` and `sftp`. */
   explicitTls: boolean;
   /** Raw extra `kopia repository create rclone` flags, appended verbatim. */
   extraArgs: string;
 }
 
-export function toRcloneFtpConfig(target: BackupTarget): RcloneFtpConfig {
+export function toRcloneRemoteConfig(target: BackupTarget): RcloneRemoteConfig {
   // `server` is `host` or `host:port` — split the last colon only (IPv6 is
-  // not a realistic FTP target here and would need brackets anyway).
+  // not a realistic target here and would need brackets anyway).
   const [host, port = ''] = target.server.includes(':')
     ? [target.server.slice(0, target.server.lastIndexOf(':')), target.server.slice(target.server.lastIndexOf(':') + 1)]
     : [target.server, ''];
   return {
+    type: target.kind === 'sftp' ? 'sftp' : 'ftp',
     host: host.trim(),
     port: port.trim(),
     user: target.username,
@@ -238,11 +246,14 @@ export function validateTarget(target: BackupTarget): string | null {
     }
   }
 
-  if (target.kind === 'ftp' || target.kind === 'ftps') {
-    if (!target.server) return 'Enter the FTP server hostname or IP address (optionally host:port).';
+  if (isRcloneKind(target.kind)) {
+    const label = target.kind === 'sftp' ? 'SFTP' : 'FTP';
+    if (!target.server) return `Enter the ${label} server hostname or IP address (optionally host:port).`;
     // The host lands in the rclone.conf authority line.
-    if (/[\s/@]/.test(target.server)) return 'The FTP server must be a bare host or host:port — no slashes, spaces or "user@".';
-    if (!target.username) return 'Enter the FTP username.';
+    if (/[\s/@]/.test(target.server)) return `The ${label} server must be a bare host or host:port — no slashes, spaces or "user@".`;
+    if (!target.username) return `Enter the ${label} username.`;
+    // No key-file field in the 5-input model, so SFTP is password-auth only.
+    if (target.kind === 'sftp' && !target.password) return 'Enter the SFTP password (key-file auth is not supported here).';
     return null;
   }
 

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.70.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.71.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -285,13 +285,11 @@ below.
 ### Roster changes (§81)
 
 
-- [ ] **SFTP / gdrive as non-S3 Kopia remotes** (§81.5, §194, §221, §246) —
-      **parked, not scheduled.** B2 needs no new destination type: it has an
-      S3-compatible API and goes through the existing `s3` kind (§246).
-      SFTP (needs `known_hosts` handling) and `gdrive` (needs a GCP
-      service-account JSON upload, a different UX from the "one token in
-      Settings" pattern) only get built if a real deployment actually wants
-      a destination that is neither a mount nor S3.
+- [ ] **`gdrive` as a non-S3 Kopia remote** (§194, §246) — **parked, not
+      scheduled.** B2 needs no new destination type: S3-compatible API via the
+      existing `s3` kind (§246). SFTP is done (§356). `gdrive` needs a GCP
+      service-account JSON upload — a different UX from the "one token in
+      Settings" pattern — so it only gets built if a real deployment wants it.
 ### Exposure and platform
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node

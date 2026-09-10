@@ -394,6 +394,7 @@
         <option value="s3">S3-compatible bucket (AWS S3, MinIO, B2, Wasabi…)</option>
         <option value="ftp">FTP server</option>
         <option value="ftps">FTP server with TLS (FTPS)</option>
+        <option value="sftp">SFTP server (over SSH)</option>
       </select>
     </div>
 
@@ -490,13 +491,16 @@
       </div>
     </ng-container>
 
-    <!-- FTP / FTPS -->
-    <ng-container *ngIf="backupTargetForm.controls.kind.value === 'ftp' || backupTargetForm.controls.kind.value === 'ftps'">
+    <!-- FTP / FTPS / SFTP -->
+    <ng-container *ngIf="backupTargetForm.controls.kind.value === 'ftp' || backupTargetForm.controls.kind.value === 'ftps' || backupTargetForm.controls.kind.value === 'sftp'">
       <div class="col-md-4">
         <label class="form-label fw-semibold" for="backupServer">Server</label>
         <input id="backupServer" type="text" class="form-control" formControlName="server"
                placeholder="192.168.1.50" autocomplete="off" />
-        <div class="form-text">Host, or <code>host:port</code> if it is not on 21.</div>
+        <div class="form-text">
+          Host, or <code>host:port</code> if it is not on
+          {{ backupTargetForm.controls.kind.value === 'sftp' ? '22' : '21' }}.
+        </div>
       </div>
       <div class="col-md-4">
         <label class="form-label fw-semibold" for="backupShare">
@@ -504,7 +508,7 @@
         </label>
         <input id="backupShare" type="text" class="form-control" formControlName="share"
                placeholder="/" autocomplete="off" />
-        <div class="form-text">Where the repository lives on the server. Blank or <code>/</code> is the FTP root.</div>
+        <div class="form-text">Where the repository lives on the server. Blank or <code>/</code> is the root.</div>
       </div>
       <div class="col-md-6">
         <label class="form-label fw-semibold" for="backupUser">Username</label>
@@ -515,15 +519,20 @@
         <input id="backupPassword" type="password" class="form-control" formControlName="password"
                [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
                autocomplete="new-password" />
+        <div class="form-text" *ngIf="backupTargetForm.controls.kind.value === 'sftp'">
+          Password auth only. The host key is not verified unless you pass
+          <code>--sftp-known-hosts-file</code> below.
+        </div>
       </div>
       <div class="col-12">
         <label class="form-label fw-semibold" for="backupOptions">
           Extra rclone flags <span class="fw-normal text-body-secondary">(optional)</span>
         </label>
         <input id="backupOptions" type="text" class="form-control" formControlName="options"
-               placeholder="--ftp-disable-epsv" autocomplete="off" />
+               [placeholder]="backupTargetForm.controls.kind.value === 'sftp' ? '--sftp-known-hosts-file=/path/known_hosts' : '--ftp-disable-epsv'"
+               autocomplete="off" />
         <div class="form-text">
-          Kopia has no FTP backend of its own — it drives the bundled
+          Kopia has no FTP or SFTP backend of its own — it drives the bundled
           <code>rclone</code>. These flags are appended to
           <code>repository create rclone</code>.
         </div>

@@ -553,7 +553,7 @@ export interface MailTestResponse {
   imap: { ok: boolean; detail: string } | null;
 }
 
-export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 's3' | 'ftp' | 'ftps';
+export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 's3' | 'ftp' | 'ftps' | 'sftp';
 
 /** GET /settings/backup-target. Secrets report only whether they are set. */
 export interface BackupTargetSettings {
