@@ -78,6 +78,7 @@ operate within, listed again at the end.
 | Speedtest (speedtest-tracker) | MIT | ⚠️ Condition | wraps **Ookla Speedtest CLI**, which has its own EULA the operator must accept (free, but not FOSS and not for "commercial" measurement without Ookla's OK). Swap for LibreSpeed if that matters. |
 | Stirling-PDF | **MIT** (core, since v1.0.0) | ✅ Clean | login / SSO / audit features under `app/proprietary/` are paywalled — don't enable or redistribute those |
 | Tailscale | BSD-3-Clause (client) | ✅ Clean | coordination is Tailscale's paid SaaS (a subscription cost, not a licence issue); or self-host headscale (BSD-3) |
+| Twenty (`twentycrm/twenty`) | **AGPL-3.0** (community) | ⚠️ Condition | run the community edition stock — files marked `/* @license Enterprise */` (SSO/OIDC, row-level permissions) are under Twenty's separate commercial licence and need a paid EE subscription for production use; **don't enable them**. AGPL obligation otherwise falls on the client operating the box, same position as Immich / Mealie / NocoDB. Bundled `twenty-db` (`pgautoupgrade:16-alpine`, MIT) and `twenty-redis` (`valkey:9-alpine`, BSD-3) rowed below. |
 | Uptime Kuma | MIT | ✅ Clean | |
 | Vaultwarden | **AGPL-3.0** | ✅ Clean | unmodified |
 | Vikunja | **AGPL-3.0** | ✅ Clean | unmodified |
@@ -88,10 +89,10 @@ operate within, listed again at the end.
 | Image | Licence | Status | Note |
 |---|---|---|---|
 | postgres:14/15/16/17-alpine | PostgreSQL License (BSD-like) | ✅ Clean | the internal database for several apps; the PostgreSQL License places no restriction on internal use |
-| pgautoupgrade/pgautoupgrade:17-alpine (n8n, Paperless) | **MIT** ("Docker PostgreSQL Authors") | ✅ Clean | drop-in for `postgres:17-alpine` that runs `pg_upgrade` in place on a major bump; bundled PostgreSQL keeps the PostgreSQL License. n8n needs PG ≥ 16 (§118.3); Paperless moved off `postgres:15-alpine` for the same deprecation notice (§182). |
+| pgautoupgrade/pgautoupgrade:16/17-alpine (n8n, Paperless, Twenty) | **MIT** ("Docker PostgreSQL Authors") | ✅ Clean | drop-in for `postgres:NN-alpine` that runs `pg_upgrade` in place on a major bump; bundled PostgreSQL keeps the PostgreSQL License. n8n needs PG ≥ 16 (§118.3); Paperless moved off `postgres:15-alpine` for the same deprecation notice (§182); Twenty pins 16 to match upstream. |
 | mariadb:latest (ITFlow), mariadb:11.4 (Kimai), lscr.io/linuxserver/mariadb:latest (BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | not standardisable on MariaDB — its JSON column type breaks NPM's own migrations (§210.1) |
-| valkey:9-alpine (Immich, Paperless) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL). |
+| valkey:9-alpine (Immich, Paperless, Twenty) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL). |
 | ruby:4.0.5-alpine (DocuSeal) | Ruby License / BSD-2-Clause (dual); OpenSSL-linked | ✅ Clean | language runtime base; permissive, no restriction on internal use. Alpine base rowed below |
 | alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |
@@ -129,6 +130,9 @@ commercial side.
 2. **Don't white-label OnlyOffice.** Keep its name and the About notice.
 3. **Don't enable Stirling-PDF's `proprietary/` features** (SSO, audit log) —
    those are paid.
+3a. **Don't enable Twenty's `@license Enterprise` features** (SSO/OIDC,
+   row-level permissions) — production use of those needs a paid Twenty EE
+   subscription. The community edition run stock is fine.
 4. **Keep off `redis:7-alpine`** (RSALv2/SSPL). Paperless is on Valkey; if any
    future app needs a Redis, use Valkey or pin `redis:7.2-alpine` (still BSD-3).
 5. **Speedtest**: accept the Ookla CLI EULA, or replace with LibreSpeed.
