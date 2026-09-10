@@ -298,14 +298,19 @@ below.
       fixes it in ~8 s. The dashboard already models `netbird-vpn`
       `requires: ['tailscale']`; a restart of tailscale from the app card (and
       a self-update that recreates it) should chain a `netbird-vpn` restart.
-- [ ] **@mat: prune the stale Tailscale nodes + revert `/etc/resolv.conf`**
-      (§364) — the tailnet still holds the old container-ID nodes
-      (`26ef4eae9a8a`, `791f5c44331b`, `c45d6f5a3c43`, all this box); delete
-      them at login.tailscale.com → Machines so their dead Funnel hostnames
-      stop showing. Also: `/etc/resolv.conf` was reordered to `8.8.8.8` first
-      during the §363 migration (backup at `/etc/resolv.conf.pre363`) because
-      `1.1.1.1` lagged on the new Funnel record — restore `1.1.1.1` first once
-      `dig +short businesslab-signal.tail122b53.ts.net @1.1.1.1` returns an IP.
+- [ ] **@mat: prune the stale Tailscale nodes** (§364) — the tailnet still
+      holds the old container-ID nodes (`26ef4eae9a8a`, `791f5c44331b`,
+      `c45d6f5a3c43`, all this same box) and their dead Funnel hostnames.
+      Delete them at login.tailscale.com → Machines. Needs the Tailscale admin
+      login — there is no API token on the box and the node CLI can't remove
+      sibling devices.
+- [ ] **Revert `/etc/resolv.conf` order on the host** (§364) — reordered to
+      `8.8.8.8` first during the §363 migration (backup at
+      `/etc/resolv.conf.pre363`) because `1.1.1.1` was still NXDOMAIN on the
+      new Funnel record. Restore `1.1.1.1` first once
+      `dig +short businesslab-signal.tail122b53.ts.net @1.1.1.1` returns an
+      IP; harmless to leave until then (the next `start.sh` rewrites it per
+      §339 anyway).
 
 ### Apps and integrations
 
