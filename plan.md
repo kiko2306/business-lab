@@ -23917,3 +23917,16 @@ snippet. Minor → 0.70.0.
 Live recovery: `docker compose up -d --force-recreate frontend` (the 0.70.0
 image is already built and tagged); `sudo rm -rf apps/kimai` + redeploy +
 start so `.env` regenerates from the fixed example.
+
+**Verified live (0.70.1, run #34 + a config fix).** `KIMAI_TRUSTED_HOSTS`
+pushed to `localhost|127.0.0.1` via `PUT /services/kimai/env` (the old comma
+value was already in `.env`); exposure folded the hostname to
+`localhost|127.0.0.1|kimai.tx-home-utils.com` and set `TRUSTED_PROXIES=
+0.0.0.0/0`. Kimai `healthy`, no more "Untrusted Host". `kimai2_users` has
+`admin`/`admin@example.com` (from the injected `ADMINMAIL`/`ADMINPASS`); an
+HTTP login 302s to home and an authed page holds the session (redirects the
+fresh admin into Kimai's own first-run wizard). NPM proxy host `37.conf`
+carries no Authelia snippet — own login only. Left as-is: a benign DBAL-4
+`serverVersion` deprecation notice (INFO, one per request; DBAL 3 works fine),
+and the live frontend one patch behind — its 0.70.0 image is built and tagged,
+`up -d --force-recreate frontend` or the next `frontend/src` deploy adopts it.
