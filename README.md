@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.69.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.69.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -294,16 +294,14 @@ below.
       a destination that is neither a mount nor S3.
 ### Exposure and platform
 
-- [ ] **Self-update under-scoped a deploy — build the missing logging** (§354)
-      — deploy run 31 (`a2cdf98..a93c1f4`) rebuilt+restarted the backend but
-      **not** the frontend, though the diff plainly changed four
-      `frontend/src/**` files and `classifyDeploy`'s regex matches them. Couldn't
-      root-cause after the fact: backend logs are stdout-only (gone on the
-      self-restart) and there's no audit row when the run ends before the
-      audit write. Add to `runSelfUpdateSequence`: log the resolved
-      `fromCommit`/`toCommit` and the full `git diff --name-only` list + the
-      computed `DeployScope` *before* building, and write the audit row (or a
-      breadcrumb) at each phase, not just at the end. Then re-provoke.
+- [ ] **Self-update under-scoped a deploy — confirm the fix caught it** (§354)
+      — deploy run 31 (`a2cdf98..a93c1f4`) rebuilt the backend but **not** the
+      frontend though four `frontend/src/**` files changed. The logging is now
+      in place (classify log with the full diff + a `phase: 'classified'` audit
+      breadcrumb). Still open: on the next real multi-target deploy, check the
+      `Self-update: classified deploy` log line + the breadcrumb row to see
+      whether `classifyDeploy` returned the wrong scope or the build step
+      dropped a target — then fix the actual cause.
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't

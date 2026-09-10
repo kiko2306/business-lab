@@ -23828,3 +23828,13 @@ so there's no record of the computed `DeployScope`. Recovered by a manual
 classifier blocks that over agent SSH; the dashboard Update page was a no-op
 with `HEAD == origin/main`). README carries the follow-up: log the resolved
 SHAs + diff list + scope before building, and a per-phase breadcrumb.
+
+**Follow-up landed (same day).** `classifyDeploy` now `logger.info`s
+`{ fromCommit, toCommit, changedFiles, frontend, backend, apps }` on the
+normal path and a reason string on each everything-changed fallback, so the
+exact diff and the derived scope are always in the log. `runSelfUpdateSequence`
+writes a durable `self_update_trigger` audit row with `phase: 'classified'`
+(from/to + build targets + apps) *before* the build — the one record that
+survives the self-restart and that `reconcileDanglingSelfUpdateRun` can't
+paper over. 715 backend tests (+1). Patch → 0.69.4. Re-provoke on the next
+real deploy to see whether run 31's miss was the classifier or the build step.

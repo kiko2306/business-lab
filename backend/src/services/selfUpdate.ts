@@ -333,6 +333,11 @@ const APP_PATH_RE = /^apps\/([^/]+)\//;
 async function classifyDeploy(repoRoot: string, fromCommit: string | null, toCommit: string): Promise<DeployScope> {
   const fallback: DeployScope = { frontend: true, backend: true, apps: null };
   if (!fromCommit || fromCommit === toCommit) {
+    logger.info('Self-update: classifyDeploy → everything-changed fallback', {
+      reason: !fromCommit ? 'no fromCommit' : 'fromCommit === toCommit',
+      fromCommit,
+      toCommit,
+    });
     return fallback;
   }
   let names: string[];
@@ -345,10 +350,16 @@ async function classifyDeploy(repoRoot: string, fromCommit: string | null, toCom
   } catch (error) {
     logger.warn('Self-update: could not diff the pull — recreating every app', {
       error: (error as Error).message,
+      fromCommit,
+      toCommit,
     });
     return fallback;
   }
   if (!names.length) {
+    logger.warn('Self-update: git diff returned no files — everything-changed fallback', {
+      fromCommit,
+      toCommit,
+    });
     return fallback;
   }
 
@@ -361,6 +372,18 @@ async function classifyDeploy(repoRoot: string, fromCommit: string | null, toCom
     const app = APP_PATH_RE.exec(name)?.[1];
     if (app) apps.add(app);
   }
+  // The full changed-file list, not just the derived scope: §354 — a deploy
+  // (run 31) rebuilt the backend but not the frontend though frontend/src had
+  // changed, and with only stdout logs (lost on the self-restart) there was no
+  // way afterwards to see what classifyDeploy actually decided or from what.
+  logger.info('Self-update: classified deploy', {
+    fromCommit,
+    toCommit,
+    changedFiles: names,
+    frontend,
+    backend,
+    apps: [...apps],
+  });
   return { frontend, backend, apps };
 }
 
@@ -392,6 +415,23 @@ async function runSelfUpdateSequence(
       build: buildTargets,
       apps: scope.apps === null ? 'all' : [...scope.apps],
     });
+    // Durable breadcrumb of what this run decided to do, written *before* the
+    // build — the run row and end-of-run audit only capture the outcome, and
+    // reconcileDanglingSelfUpdateRun happily closes a restart-interrupted run
+    // as `done`. §354: without this, a run that skipped a rebuild it shouldn't
+    // have leaves no trace of why.
+    await writeAuditLog({
+      userId,
+      action: 'self_update_trigger',
+      resource: toCommit,
+      metadata: {
+        phase: 'classified',
+        fromCommit: check.currentCommit,
+        toCommit,
+        build: buildTargets,
+        apps: scope.apps === null ? 'all' : [...scope.apps],
+      },
+    }).catch(() => {});
 
     // Nothing the deploy changed needs a build, an app recreate or a restart —
     // a version bump, docs, plan.md. The `git pull` above is the whole update;

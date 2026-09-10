@@ -225,6 +225,25 @@ describe('triggerSelfUpdate', () => {
     expect(spawnMock.mock.calls[0][1]).not.toContain('down');
   });
 
+  it('writes a durable "classified" breadcrumb with the resolved scope before building (§354)', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1, ['backend/src/routes/services.ts']);
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    expect(audit.writeAuditLog).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'self_update_trigger',
+        metadata: expect.objectContaining({
+          phase: 'classified',
+          fromCommit: 'old111',
+          toCommit: 'new222',
+          build: ['backend'],
+        }),
+      })
+    );
+  });
+
   it('a version/docs-only diff is pull-only — no build, no app sweep, no restart', async () => {
     mockAnUpdateFrom('old111', 'new222', 1, ['VERSION', 'CHANGELOG.md', 'README.md', 'plan.md']);
 
