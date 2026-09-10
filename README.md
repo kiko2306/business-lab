@@ -298,12 +298,6 @@ below.
       slow mirror. Fix the probe: check `command -v gpg` and
       `[ -e /etc/ssl/certs/ca-certificates.crt ]` (or `dpkg -s`), and don't
       `apt-get update` when nothing is actually missing.
-- [ ] **@mat: confirm the host clock / timezone** (§366) — during the §365
-      test `date` on `home-srv-01` read ~1 h behind local wall time. If the
-      box is deliberately on UTC that's fine for a server; if NTP has drifted
-      it's not (TLS validity windows, TOTP, backup schedules, log
-      correlation). Check `timedatectl` — `System clock synchronized: yes` and
-      the intended zone.
 - [ ] **@mat: refresh the Tailscale auth key before it expires** (§367) — the
       `TAILSCALE_AUTH_KEY` in `apps/tailscale/.env` had **expired**; a
       deauthed node then can't re-register at all (crash loop) until a new
@@ -325,12 +319,16 @@ below.
 
 ### Apps and integrations
 
-- [ ] **@mat: register Nextcloud's shared-tree mount** (§219, §224) — the
-      `/shared` bind mount and `www-data` write permission are in place, but
-      registering it with Nextcloud (Admin settings -> External Storage) needs
-      a real interactive login — Nextcloud's create API requires a fresh
-      password confirmation no API call can satisfy. Steps in
-      `docs/app-credentials.md`.
+- [ ] **Auto-register Nextcloud's `/shared` external mount + make the
+      webmaster a Nextcloud admin** (§369) — done by hand on the test box
+      (`occ app:enable files_external` + `occ files_external:create`, then
+      `occ group:adduser admin mat`), but it should be automatic. `occ` has
+      no password-confirmation constraint (that only affects the web API, the
+      old §219 blocker), so `nextcloudSaml.ts` / an `occ` bootstrap can:
+      (a) enable `files_external` and create the `/shared` Local mount for
+      all users, and (b) add the Authelia admin (webmaster) to Nextcloud's
+      `admin` group — SAML has no group mapping, so a fresh SSO account lands
+      as a plain user and can't reach Admin settings at all.
 - [ ] **@mat: relocate the live shared tree + re-prove the round-trip**
       (§310) — File Browser was removed and the shared tree moved from
       `apps/file-browser/data/files/` to `apps/nextcloud/data/shared/`. A

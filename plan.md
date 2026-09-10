@@ -24347,3 +24347,43 @@ README item added. B2 itself (the three stale tailnet nodes + their funnel
 entries) is done; the §364 `/etc/resolv.conf` revert is moot now — NetBird
 owns/leaves that file per its DNS setting, and `1.1.1.1` has the funnel
 record anyway.
+
+## 369. §219 Nextcloud shared mount — done by occ, and it was never an interactive-only job (2026-09-10)
+
+Working B5 (register `/shared` in Nextcloud). Two things wrong with the
+standing item:
+
+1. **`files_external` was disabled.** No "External storage" in the admin
+   menu, and `occ files_external:*` reported "no commands defined in the
+   namespace" — the app was installed (1.26.0) but not enabled. So the
+   feature wasn't reachable at all.
+2. **The SAML account had no admin.** Nextcloud has a local `admin` user;
+   the SSO user (`mat`) is a plain user. `user_saml` maps uid/email/name but
+   has **no group mapping**, so an Authelia admin never becomes a Nextcloud
+   admin — "Administration settings" simply isn't shown.
+
+Fixed by hand:
+
+```
+occ app:enable files_external
+occ files_external:create Shared local null::null -c datadir=/shared
+occ group:adduser admin mat
+```
+
+`occ files_external:verify 1` → `status: ok`. Mount `/Shared` → `/shared`,
+all users.
+
+**The §219 premise was wrong.** It said this needed an interactive login
+because "the create API requires a fresh password confirmation no API call
+can satisfy" — true of the OCS/web API, but `occ files_external:create` has
+no such constraint. This was always automatable once `files_external` was
+enabled.
+
+New item (§369) replaces §219/§224: `nextcloudSaml.ts` or an `occ` bootstrap
+should (a) enable `files_external` + create the `/shared` mount, and (b) add
+the Authelia admin to Nextcloud's `admin` group on provision. The user's
+note: **webmaster accounts should be injected as Nextcloud admin.**
+
+Also closed: the §366 host-clock item — `home-srv-01` is on `Etc/UTC`,
+`timedatectl` says synchronized; the "1 h behind" was UTC vs the operator's
+local WEST (UTC+1), not drift.
