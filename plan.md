@@ -23889,3 +23889,31 @@ invoicing.
 proven on the real stack** — needs a deploy to confirm `kimai:install`
 migrates, the admin logs in, and exposure provisions without an Authelia
 snippet. Minor → 0.70.0.
+
+**Live (deploy #33, 0.70.0) — two fixes, → 0.70.1:**
+
+1. **Kimai `TRUSTED_HOSTS` must be pipe-separated, not comma.** Symfony's
+   `trusted_hosts` is `%env(string:TRUSTED_HOSTS)%` — one regex, not a list. The
+   comma value read as a single literal pattern, so every request (the
+   healthcheck's `127.0.0.1` included) came back `BadRequestHttpException:
+   Untrusted Host` and the container never went healthy. `kimai:install` itself
+   was fine — **79 migrations, "Successfully installed Kimai 2.66.0"**, and
+   `kimai:user:create admin` seeded the super-admin from the injected
+   `ADMINMAIL`/`ADMINPASS`. Fix: `|` separator in the compose default,
+   `.env.example`, and `allowedHostsSeparator: '|'` on the exposure key.
+
+2. **Self-update `up -d frontend` left the container on its old image.** Runs
+   31 and 33 both: `classifyDeploy` correctly returned `frontend: true` (the
+   §354 breadcrumb confirms `build: ["frontend","backend"]`), the `building`
+   phase *did* rebuild and retag `homelab-frontend:latest`, but the plain
+   `docker compose up -d frontend` restart step did not recreate the container
+   — it kept serving the previous bundle while the run reported success.
+   (Compose v5.5.1 / Engine 29.8 on the box, classic builder via
+   `DOCKER_BUILDKIT=0`.) Backend never hit this because its restart replaces
+   the running process outright. Fix: `--force-recreate --no-build` on both
+   restart calls. Closes the §354 thread — the miss was the restart step, not
+   the classifier.
+
+Live recovery: `docker compose up -d --force-recreate frontend` (the 0.70.0
+image is already built and tagged); `sudo rm -rf apps/kimai` + redeploy +
+start so `.env` regenerates from the fixed example.

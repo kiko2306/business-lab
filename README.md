@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.70.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.70.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -293,17 +293,6 @@ below.
       Settings" pattern) only get built if a real deployment actually wants
       a destination that is neither a mount nor S3.
 ### Exposure and platform
-
-- [ ] **Self-update under-scoped a deploy — confirm the fix caught it** (§354)
-      — deploy run 31 (`a2cdf98..a93c1f4`) rebuilt the backend but **not** the
-      frontend though four `frontend/src/**` files changed. The logging is now
-      in place (classify log with the full diff + a `phase: 'classified'` audit
-      breadcrumb), live from 0.69.4. Run 32 (backend-only diff) scoped
-      correctly — rebuilt backend, left the frontend image untouched — so the
-      miss isn't "always skips frontend". Still open: on the next deploy that
-      touches `frontend/src`, check the `Self-update: classified deploy` log
-      line + the breadcrumb row to see whether `classifyDeploy` returned the
-      wrong scope or the build step dropped a target — then fix the cause.
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't

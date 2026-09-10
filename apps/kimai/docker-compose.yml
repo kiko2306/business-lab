@@ -31,7 +31,11 @@ services:
       # value is a hard 400. TRUSTED_PROXIES trusts the reverse proxy's
       # forwarded headers — only set once exposed, since NPM is then the sole
       # ingress.
-      TRUSTED_HOSTS: ${KIMAI_TRUSTED_HOSTS:-localhost,127.0.0.1}
+      # Symfony trusted_hosts is a single regex (config/packages/framework.yaml:
+      # `%env(string:TRUSTED_HOSTS)%`), so entries are PIPE-separated, not
+      # comma. A comma value is read as one literal pattern and every host —
+      # including the healthcheck's 127.0.0.1 — comes back "Untrusted Host".
+      TRUSTED_HOSTS: ${KIMAI_TRUSTED_HOSTS:-localhost|127.0.0.1}
       TRUSTED_PROXIES: ${KIMAI_TRUSTED_PROXIES:-}
       # APP_SECRET is intentionally not set: the image auto-generates one on
       # first boot and persists it to var/data/.appsecret (below), which is

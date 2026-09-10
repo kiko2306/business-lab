@@ -214,15 +214,22 @@ describe('triggerSelfUpdate', () => {
       expect((args as string[])).not.toContain('down');
     }
     // The final backend recreate is detached, not awaited by runCommand.
-    // No `--build`: the image was already built in the `building` phase
-    // above, so the restart just reuses it.
+    // --force-recreate + --no-build: the image was built in the `building`
+    // phase, and plain `up -d` was seen leaving the container on its old
+    // image (§355).
     expect(spawnMock).toHaveBeenCalledWith(
       'docker',
-      expect.arrayContaining(['up', '-d', 'backend']),
+      expect.arrayContaining(['up', '-d', '--force-recreate', '--no-build', 'backend']),
       expect.objectContaining({ detached: true })
     );
     expect(spawnMock.mock.calls[0][1]).not.toContain('--build');
     expect(spawnMock.mock.calls[0][1]).not.toContain('down');
+
+    // Same flags on the frontend restart.
+    const frontendUp = backup.runCommand.mock.calls.find(
+      ([cmd, a]) => cmd === 'docker' && (a as string[]).includes('up') && (a as string[]).includes('frontend')
+    );
+    expect(frontendUp?.[1]).toEqual(expect.arrayContaining(['up', '-d', '--force-recreate', '--no-build', 'frontend']));
   });
 
   it('writes a durable "classified" breadcrumb with the resolved scope before building (§354)', async () => {
@@ -366,7 +373,7 @@ describe('triggerSelfUpdate', () => {
     // strictly before the frontend/backend restart that follows.
     const buildIdx = kinds.findIndex((k) => k === 'build frontend backend');
     const firstPruneIdx = kinds.findIndex((k) => k === 'image prune -f');
-    const restartFrontendIdx = kinds.findIndex((k) => k.includes('up -d frontend'));
+    const restartFrontendIdx = kinds.findIndex((k) => k.includes('up -d') && k.includes('frontend'));
     expect(firstPruneIdx).toBeGreaterThan(buildIdx);
     expect(restartFrontendIdx).toBeGreaterThan(firstPruneIdx);
   });

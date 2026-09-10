@@ -477,12 +477,17 @@ async function runSelfUpdateSequence(
 
     // No `--build` on the restarts: the `building` phase already tagged the
     // image (plan.md §295/§297 — this is the step that got SIGKILLed under
-    // swap pressure). `up -d` reuses the image on disk.
+    // swap pressure). `--force-recreate` because plain `up -d frontend` was
+    // observed (runs 31, 33) leaving the container on its old image even
+    // though `build` had just retagged `homelab-frontend:latest` — the
+    // build/deploy would report success while the browser kept serving the
+    // previous bundle. Forcing the recreate makes the container adopt the
+    // freshly-built image unconditionally.
     if (scope.frontend) {
       await updateRun(runId, { state: 'restarting_frontend' });
       await runCommand(
         'docker',
-        ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', 'frontend'],
+        ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--force-recreate', '--no-build', 'frontend'],
         { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
       );
     }
@@ -514,7 +519,7 @@ async function runSelfUpdateSequence(
     await updateRun(runId, { state: 'restarting_backend', finished: true });
     const child = spawn(
       'docker',
-      ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', 'backend'],
+      ['compose', '-f', composeFilePath(repoRoot), 'up', '-d', '--force-recreate', '--no-build', 'backend'],
       { detached: true, stdio: 'ignore', env: BUILD_ENV }
     );
     child.unref();

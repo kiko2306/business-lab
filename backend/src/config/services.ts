@@ -667,8 +667,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // Authelia admin's) at start.
     skipAutheliaProtection: true,
     exposureEnvKeys: {
-      // Symfony TRUSTED_HOSTS — gains the public hostname on exposure.
+      // Symfony TRUSTED_HOSTS — gains the public hostname on exposure. It's a
+      // single regex, so the entries are pipe-separated (see the compose file).
       allowedHosts: ['KIMAI_TRUSTED_HOSTS'],
+      allowedHostsSeparator: '|',
       // Trust NPM's forwarded headers only once NPM is the ingress. The
       // container isn't otherwise internet-reachable; 0.0.0.0/0 is what
       // Kimai's own docs use behind a reverse proxy.
