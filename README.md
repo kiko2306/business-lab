@@ -294,14 +294,6 @@ below.
       a destination that is neither a mount nor S3.
 ### Exposure and platform
 
-- [ ] **@mat: prove ITFlow's expose-direct bootstrap on the live stack** (§350)
-      — code landed: the wizard now runs its `add_database` step first (the
-      itfloworg image never creates the schema), so ITFlow is `skipAutheliaProtection`
-      with its own login only. Needs a deploy + a wiped `apps/itflow/data/`
-      first start to confirm `db.sql` imports and the generated
-      `ITFLOW_ADMIN_PASSWORD` / Authelia-admin-email account logs in. Until
-      verified this stays on `dev`, not `main`.
-
 - [ ] **Self-update git: consistent user + umask** (§351) — a deploy runs
       `git` inside the backend container as uid 100 with umask 022, leaving
       `.git` objects/refs owned by that uid and not group-writable, so a later

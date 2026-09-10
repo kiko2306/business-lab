@@ -23718,9 +23718,18 @@ wizard is the sanctioned path and the bootstrap already speaks it.
 712 backend tests pass (itflowClient rewritten for the add_database step +
 its confirm GET; itflowAdminBootstrap +1 for the missing-DB-password skip).
 Minor → 0.69.0.
-§344 is now done for **every** app. **Not yet proven on the live stack** — needs
-a deploy + a wiped `apps/itflow/data/` first start to confirm the schema
-imports and the admin logs in.
+
+**Proven on the live stack (2026-09-10, deploy of 0.69.1).** ITFlow's DB was
+empty (no schema, no `config.php`); one API `stop`+`start` on the new backend
+and the log showed `Ran ITFlow's setup wizard and created its admin
+(admin@example.com)` in ~23s. After: 141 tables imported by `add_database`,
+`users` row (`admin@example.com`, active), `config.php` written with
+`$config_enable_setup = 0`, `GET /setup/` and `GET /` both 302 → `/login.php`.
+NPM proxy host `36.conf` carries no Authelia snippet — own login only, no two
+logins. (Browser login itself not checked from the host: `$config_https_only =
+TRUE` makes the session cookie Secure, so a plain-HTTP curl can't hold a
+session — correct behaviour behind the tunnel.) §344 is now done for **every**
+app.
 
 ## 351. Updates page — "Update now" force-checks first (2026-09-10)
 
