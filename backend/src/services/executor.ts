@@ -28,6 +28,7 @@ import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
 import { syncMealieAiProvider } from './mealieAiSync';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
 import { ensurePaperlessDropbox } from './paperlessDropbox';
+import { ensureTwentyStorage } from './twentyStorage';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { syncAutheliaAccessControlSafe } from './autheliaAccessControl';
@@ -230,6 +231,12 @@ async function composeUpWithManagedConfig(
   // writable before `compose up`, same reason applySambaConfig runs here.
   if (serviceName === 'paperless') {
     ensurePaperlessDropbox(appDir);
+  }
+  // Twenty: its `.local-storage` bind source must exist and be writable by
+  // uid 1000 before `compose up`, or the first workspace signup 500s with
+  // EACCES on mkdir (§371).
+  if (serviceName === 'twenty') {
+    ensureTwentyStorage(appDir);
   }
 
   // The reconciler above may have created OR removed docker-compose.managed.yml

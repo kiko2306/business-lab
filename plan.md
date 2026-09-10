@@ -24461,3 +24461,22 @@ Starting Twenty locked the dashboard for the duration: the start flow streams
 of lines, and the frontend log view renders them all unbounded. The backend
 op completed fine; a browser refresh recovered the UI. New README item to cap
 / virtualise / throttle the streamed log view.
+
+## 372. Twenty workspace signup 500'd on EACCES — pre-start storage dir fix (§371 follow-up, 2026-09-10)
+
+First workspace signup failed: `EACCES: permission denied, mkdir
+'/app/packages/twenty-server/.local-storage/<workspace-id>'`. Twenty's
+server/worker run as uid 1000 (`node`) and `mkdir` per-workspace data there
+on signup, but Docker had created the `./data/storage` bind source as
+**root** on first `up` (`apps/*, /data/` is gitignored, and the Update-page
+deploy doesn't run `start.sh`'s permissions pass).
+
+Fixed the same way Paperless's drop box is (§219): new
+`backend/src/services/twentyStorage.ts` — `mkdirSync(recursive)` +
+`chmodSync(0o777)` on `apps/twenty/data/storage`, tolerating the EPERM once
+Twenty's own uid owns it. Called from `executor.ts` for `serviceName ===
+'twenty'` right before `compose up`, next to `ensurePaperlessDropbox`. Test
+mirrors `paperlessDropbox.test.ts` (creates world-writable, idempotent,
+EPERM-tolerant). Host was unblocked immediately with `chown -R 1000:1000
+apps/twenty/data/storage`; this makes it automatic on every start and on a
+fresh clone.

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.74.1] — 2026-09-10
+
+### Fixed
+
+- Twenty: create its .local-storage bind dir writable before start, so the first workspace signup no longer 500s on EACCES
+
 ## [0.74.0] — 2026-09-10
 
 ### Added
