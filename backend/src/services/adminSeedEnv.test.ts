@@ -11,7 +11,7 @@ beforeEach(() => {
 });
 
 describe('buildAdminSeedEnvOverrides', () => {
-  it('is empty for any service other than nocodb', async () => {
+  it('is empty for a service with no env-seeded admin', async () => {
     expect(await buildAdminSeedEnvOverrides('bookstack')).toEqual({});
   });
 
@@ -19,8 +19,13 @@ describe('buildAdminSeedEnvOverrides', () => {
     expect(await buildAdminSeedEnvOverrides('nocodb')).toEqual({ NOCODB_ADMIN_EMAIL: 'mig@example.com' });
   });
 
-  it('is empty for nocodb when there is no Authelia admin email yet', async () => {
+  it('supplies Kimai the Authelia admin email', async () => {
+    expect(await buildAdminSeedEnvOverrides('kimai')).toEqual({ KIMAI_ADMIN_EMAIL: 'mig@example.com' });
+  });
+
+  it('is empty when there is no Authelia admin email yet', async () => {
     mockedAdmin.mockReturnValue(null);
     expect(await buildAdminSeedEnvOverrides('nocodb')).toEqual({});
+    expect(await buildAdminSeedEnvOverrides('kimai')).toEqual({});
   });
 });

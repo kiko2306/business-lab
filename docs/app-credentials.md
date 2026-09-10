@@ -49,6 +49,7 @@ once and never displayed again; rotate them there if you need a new one.
 | **DocuSeal** | the Authelia admin's email | `DOCUSEAL_ADMIN_PASSWORD` (generated). DocuSeal community has no SSO and can't hide its login form, so it is **exposed directly, not behind Authelia** (§342) — this account is the only login. The dashboard runs DocuSeal's first-run `/setup` wizard on first start (§341); read the password from `apps/docuseal/.env`, or set your own in the config panel **before** the first start. After setup, change it in DocuSeal → profile settings. |
 | **NocoDB** | the Authelia admin's email | `NOCODB_ADMIN_PASSWORD` (generated, complex). Community NocoDB has no OIDC, so it is **exposed directly, not behind Authelia** (§344) — this account is the only login. NocoDB (re-)provisions its super admin from `NC_ADMIN_EMAIL` / `NC_ADMIN_PASSWORD` on **every** boot, so these env values are the source of truth — change the password in `apps/nocodb/.env` (via the config panel) and restart, not inside NocoDB. Read it from `apps/nocodb/.env`. |
 | **ITFlow** | the Authelia admin's email | `ITFLOW_ADMIN_PASSWORD` (generated). ITFlow has no OIDC (SAML only), can't hide its own login form, and its client portal must be public — so it is **exposed directly, not behind Authelia** (§342/§350) and this account is the only login. The dashboard runs ITFlow's first-run wizard on first start — its *first* step creates the schema (the itfloworg image doesn't), then the admin. Read the password from `apps/itflow/.env`, or set your own in the config panel **before** the first start. Turn on 2FA in ITFlow → **My Profile** afterwards. See the note below — email + cron still need doing by hand. |
+| **Kimai** | the Authelia admin's email (user `admin`) | `KIMAI_ADMIN_PASSWORD` (generated, complex). Kimai federates via SAML only and Authelia is OIDC-only, so it is **exposed directly, not behind Authelia** (§342) — this account is the only login. Kimai's entrypoint runs `kimai:user:create admin` from `ADMINMAIL`/`ADMINPASS` on **every** boot (no-ops once the user exists); the dashboard injects the email and generates the password into `apps/kimai/.env`. Recovery = change `KIMAI_ADMIN_PASSWORD` in the config panel and restart (not email — set `KIMAI_MAILER_URL` by hand if you want reset mails). Turn on Kimai's built-in 2FA in **My Profile** afterwards. |
 
 ## Wizard — you create the account
 
@@ -111,13 +112,16 @@ the app to apply, same as exposure):
 **Vaultwarden**, **BookStack**, **n8n** (user-management emails), **Paperless**
 (sending only), **Vikunja**.
 
-Two apps keep mail config in their own database and cannot inherit it — the
-global settings are values to **copy into the app's own UI** by hand, and
-nothing warns you if you don't:
+Three apps can't inherit the global mail config — the settings are values to
+apply by hand, and nothing warns you if you don't:
 
-- **ITFlow** — see the note above.
+- **ITFlow** — see the note above; copied into ITFlow's own UI.
 - **Uptime Kuma** — an email alert is an SMTP *notification* created under
   **Settings → Notifications**. There is no environment variable for it.
+- **Kimai** — reads SMTP from a single `MAILER_URL` DSN
+  (`smtp://user:pass@host:port`), which the per-field injection can't build.
+  Set `KIMAI_MAILER_URL` in `apps/kimai/.env` (config panel). Kimai runs fine
+  without it.
 
 Paperless' *document intake* over IMAP is also its own per-account setting
 (**Settings → Mail**), separate from the global config.

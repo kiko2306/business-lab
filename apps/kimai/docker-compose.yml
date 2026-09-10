@@ -1,0 +1,103 @@
+
+services:
+  kimai:
+    mem_limit: 512m
+    mem_reservation: 128m
+    # apache tag = self-contained Apache+PHP, listens on 8001 (see upstream
+    # Dockerfile). The FPM tags need a separate web server container.
+    image: kimai/kimai2:apache
+    restart: unless-stopped
+    ports:
+      - "${KIMAI_PORT:-10500}:8001"
+    environment:
+      TZ: ${TZ:-UTC}
+      # Doctrine connection string. The entrypoint parses it with awk on
+      # / : @ so the password must stay free of those — KIMAI_DB_PASSWORD is
+      # generated as hex. serverVersion pins the dialect so Doctrine skips a
+      # probe on every boot; keep it in step with the kimai-db image tag.
+      DATABASE_URL: "mysql://${KIMAI_DB_USER:-kimai}:${KIMAI_DB_PASSWORD}@kimai-db:3306/${KIMAI_DB_NAME:-kimai}?charset=utf8mb4&serverVersion=mariadb-11.4.0"
+      # First super-admin. The entrypoint runs `kimai:user:create admin` on
+      # every start when ADMINPASS is set (no-ops once the user exists), so
+      # this is the whole account-bootstrap — Kimai has no OIDC that fits here
+      # (SAML only, and Authelia is an OIDC-only IdP), so it's exposed with its
+      # own login as the single gate (§342). The dashboard injects
+      # KIMAI_ADMIN_EMAIL (the Authelia admin's) at start via adminSeedEnv.ts
+      # and generates KIMAI_ADMIN_PASSWORD into .env. Turn on Kimai's built-in
+      # 2FA (My Profile) afterwards.
+      ADMINMAIL: ${KIMAI_ADMIN_EMAIL:-}
+      ADMINPASS: ${KIMAI_ADMIN_PASSWORD:-}
+      # Symfony host/proxy trust. TRUSTED_HOSTS gains the public hostname when
+      # exposure is enabled (services.ts exposureEnvKeys.allowedHosts); a wrong
+      # value is a hard 400. TRUSTED_PROXIES trusts the reverse proxy's
+      # forwarded headers — only set once exposed, since NPM is then the sole
+      # ingress.
+      TRUSTED_HOSTS: ${KIMAI_TRUSTED_HOSTS:-localhost,127.0.0.1}
+      TRUSTED_PROXIES: ${KIMAI_TRUSTED_PROXIES:-}
+      # APP_SECRET is intentionally not set: the image auto-generates one on
+      # first boot and persists it to var/data/.appsecret (below), which is
+      # the stable source of truth across restarts.
+      # Kimai reads SMTP from a single MAILER_URL DSN, which the dashboard's
+      # per-field mail injection can't build — set it here by hand if wanted
+      # (smtp://user:pass@host:port). Kimai runs fine without it; admin
+      # recovery is "change KIMAI_ADMIN_PASSWORD and restart", not email.
+      MAILER_URL: ${KIMAI_MAILER_URL:-null://null}
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=Kimai"
+      - "homepage.icon=kimai.png"
+      - "homepage.href=http://localhost:${KIMAI_PORT:-10500}"
+      - "homepage.description=Time tracking with rates and exports"
+    volumes:
+      # Uploads, the auto-generated APP_SECRET and other runtime data. cache/
+      # and log/ under var/ are left ephemeral (rebuilt on boot).
+      - ./data/kimai:/opt/kimai/var/data
+    depends_on:
+      kimai-db:
+        condition: service_healthy
+    networks:
+      - kimai-net
+    healthcheck:
+      # curl is present in the image (it's what the image's own HEALTHCHECK
+      # uses). A 200 on the login page once Apache + PHP are up.
+      test: ["CMD", "curl", "-fsS", "-o", "/dev/null", "http://127.0.0.1:8001/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 90s
+
+  # Kimai 2.x needs MariaDB 10.11+ / MySQL 8.0+. Pinned to the current LTS
+  # rather than :latest so serverVersion in DATABASE_URL above stays accurate.
+  kimai-db:
+    mem_limit: 512m
+    mem_reservation: 128m
+    image: mariadb:11.4
+    restart: unless-stopped
+    environment:
+      TZ: ${TZ:-UTC}
+      # No external root access is needed; a random root password is one less
+      # generated secret to store.
+      MARIADB_RANDOM_ROOT_PASSWORD: "true"
+      MARIADB_DATABASE: ${KIMAI_DB_NAME:-kimai}
+      MARIADB_USER: ${KIMAI_DB_USER:-kimai}
+      MARIADB_PASSWORD: ${KIMAI_DB_PASSWORD}
+    command:
+      # Kimai's migrations assume DYNAMIC row format and a utf8mb4 default
+      # (both are 11.4 defaults; pinned so a future image change can't break
+      # `kimai:install`). innodb-large-prefix was removed in 10.6 — always on.
+      - "--innodb-default-row-format=dynamic"
+      - "--character-set-server=utf8mb4"
+      - "--collation-server=utf8mb4_unicode_ci"
+    volumes:
+      - ./data/db:/var/lib/mysql
+    networks:
+      - kimai-net
+    healthcheck:
+      test: ["CMD", "healthcheck.sh", "--connect", "--innodb_initialized"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+networks:
+  kimai-net:
+    driver: bridge

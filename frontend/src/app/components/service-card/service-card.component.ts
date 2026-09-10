@@ -670,6 +670,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       megaphone: '📣',
       database: '🗄️',
       signature: '✍️',
+      clock: '⏱️',
     };
 
     return icons[icon] ?? '🖥️';

@@ -58,6 +58,7 @@ operate within, listed again at the end.
 | ITFlow | GPL-3.0 | ✅ Clean | no paid tiers |
 | IT Tools (`corentinth/it-tools`) | **GPL-3.0** | ✅ Clean | stock unmodified, static SPA served by nginx; GPL-3.0 places no restriction on running it internally, not redistributed as software |
 | Jellyfin | GPL-2.0 | ✅ Clean | |
+| Kimai (`kimai/kimai2:apache`) | **AGPL-3.0** | ✅ Clean | stock unmodified, self-contained Apache+PHP container. AGPL obligation falls on the client operating the box — same position as Immich / Mealie / NocoDB / DocuSeal / Homebox. Bundled `kimai-db` is `mariadb:11.4` (rowed below). No paid tiers gate the features we use; the marketplace plugins are separate and not installed |
 | Kopia | Apache-2.0 | ✅ Clean | official `kopia/kopia` image, built by the project; internal backup use. The image bundles `rclone` (**MIT**, ✅ clean) — used only to reach an FTP destination via Kopia's `rclone` backend (§267); no separate image |
 | Mealie | **AGPL-3.0** | ✅ Clean | unmodified |
 | Miniflux (`miniflux/miniflux`) | **Apache-2.0** | ✅ Clean | stock unmodified. Bundled `miniflux-db` is `postgres:16-alpine` (PostgreSQL License, already rowed below) |
@@ -88,7 +89,7 @@ operate within, listed again at the end.
 |---|---|---|---|
 | postgres:14/15/16/17-alpine | PostgreSQL License (BSD-like) | ✅ Clean | the internal database for several apps; the PostgreSQL License places no restriction on internal use |
 | pgautoupgrade/pgautoupgrade:17-alpine (n8n, Paperless) | **MIT** ("Docker PostgreSQL Authors") | ✅ Clean | drop-in for `postgres:17-alpine` that runs `pg_upgrade` in place on a major bump; bundled PostgreSQL keeps the PostgreSQL License. n8n needs PG ≥ 16 (§118.3); Paperless moved off `postgres:15-alpine` for the same deprecation notice (§182). |
-| mariadb:latest (ITFlow), lscr.io/linuxserver/mariadb:latest (BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
+| mariadb:latest (ITFlow), mariadb:11.4 (Kimai), lscr.io/linuxserver/mariadb:latest (BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | not standardisable on MariaDB — its JSON column type breaks NPM's own migrations (§210.1) |
 | valkey:9-alpine (Immich, Paperless) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL). |
 | ruby:4.0.5-alpine (DocuSeal) | Ruby License / BSD-2-Clause (dual); OpenSSL-linked | ✅ Clean | language runtime base; permissive, no restriction on internal use. Alpine base rowed below |
