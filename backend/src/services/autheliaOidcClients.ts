@@ -4,7 +4,7 @@
  * that declare an `oidcClient` and are currently exposed (plan.md §270).
  *
  * This is the plumbing the §216/§217 "trust the proxy" work needs for the
- * OIDC group (Immich, Vikunja, Mealie, Homebox, NocoDB): each of those apps
+ * OIDC group (Immich, Vikunja, Mealie, NocoDB): each of those apps
  * logs in against Authelia's own OIDC provider instead of showing a second
  * login form. NetBird's client (also in that list) stays hand-maintained —
  * it is a public/PKCE client with bespoke audience/device-code wiring — so

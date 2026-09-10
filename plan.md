@@ -24480,3 +24480,28 @@ mirrors `paperlessDropbox.test.ts` (creates world-writable, idempotent,
 EPERM-tolerant). Host was unblocked immediately with `chown -R 1000:1000
 apps/twenty/data/storage`; this makes it automatic on every start and on a
 fresh clone.
+
+## 373. Homebox removed — ITFlow is the one asset tracker (§301e closed, 2026-09-10)
+
+§301e's last open thread. Decided: keep ITFlow, drop Homebox. Homebox's whole
+feature set — assets, locations, warranty expiry, purchase records,
+maintenance logs, QR labels — is a subset of ITFlow's asset module, and
+ITFlow additionally ties assets to clients and users and carries the rest of
+the MSP job (helpdesk, invoicing, docs vault, domain/SSL expiry, contracts).
+Running both means a second, thinner asset database. No per-deployment profile
+switch — just one app.
+
+Removed: `apps/homebox/`, the `homebox` registry entry (OIDC client config
+included), the redundant Homebox case in `exposureEnv.test.ts` (the Mealie
+case right after it covers the same `oidcClient.appEnv` path), and rows in
+`docs/ports.md` (`10440` freed), `docs/app-credentials.md`,
+`docs/sales-catalogue.md`, `docs/licences.md`, `step-by-step.md`. Comments in
+`autheliaOidcClients.ts` / `immichConfig.ts` / `types/index.ts` /
+`nginx-proxy-manager/snippets/proxy.conf` that used Homebox as an OIDC-app
+example repointed to Mealie / generalised.
+
+Deployed-host teardown is automatic: `git pull` drops the tracked compose
+file, leaving `apps/homebox/` with gitignored `.env` + `data/` and no compose
+→ `removedAppCleanup.ts` tears down the project and dir, and
+`reconcileRemovedServices` drops its NPM host / DNS / tunnel ingress.
+Backend + frontend checks green.

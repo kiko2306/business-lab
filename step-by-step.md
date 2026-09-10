@@ -161,7 +161,7 @@ proven:
   resolution and keep a recovery path.
 - **Estimated: 15-30 minutes after prerequisite.** Treat Nextcloud external storage registration as complete; code alone only
   supplies the mount and permissions.
-- **Estimated: 30-90 minutes per app after prerequisite.** Claim Guacamole, Mealie, Paperless, Immich, Vikunja, Homebox, NocoDB,
+- **Estimated: 30-90 minutes per app after prerequisite.** Claim Guacamole, Mealie, Paperless, Immich, Vikunja, NocoDB,
   Nextcloud, or Home Assistant proxy/OIDC login changes as working; each needs
   its own live proof and may expose version-specific behavior.
 - **Estimated: 30-90 minutes after observation.** Schedule CrowdSec alert deduplication; first observe whether real pushes are

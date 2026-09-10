@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.74.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.75.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -219,16 +219,6 @@ it is done — not ticked off and left behind. Section references point at
 Updates:
 
 Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
-
-- [ ] **@mat: Homebox vs ITFlow — one asset tracker per deployment** (§301e) —
-      both track assets/warranties; not urgent and neither leaves the repo.
-      A per-deployment profile choice: ITFlow for the MSP model (it tracks
-      client assets as part of its wider job), Homebox for a simpler box.
-      The rest of the §301e survey is resolved: Beszel (§323), MeshCentral
-      (§320), Syncthing (§322) and kitchen-switcher (§321) removed; Uptime-Kuma
-      kept over Beszel for its status page + alert rules. Minor/no action:
-      wetty vs Guacamole SSH, Miniflux vs Nextcloud News, BookStack vs ITFlow
-      docs (all cheap to keep).
 
 Strategy:
 

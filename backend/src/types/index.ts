@@ -281,7 +281,7 @@ export interface ServiceDefinition {
     // the token endpoint with HTTP Basic instead of a POST body — Mealie's
     // authlib client does both (§274). Left unset, the Authelia client is
     // rendered with no PKCE requirement and `client_secret_post`, which is
-    // what Vikunja and Homebox use.
+    // what Vikunja and Mealie use.
     requirePkce?: boolean;
     tokenEndpointAuthMethod?: 'client_secret_post' | 'client_secret_basic';
     // Runtime env that points the app at Authelia's OIDC provider, injected

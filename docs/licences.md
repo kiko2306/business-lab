@@ -52,13 +52,12 @@ operate within, listed again at the end.
 | Dozzle | MIT | ✅ Clean | |
 | Guacamole | Apache-2.0 | ✅ Clean | incl. bundled `guacamole-auth-header` extension, same licence |
 | Home Assistant | Apache-2.0 | ✅ Clean | |
-| Homebox | **AGPL-3.0** | ✅ Clean | unmodified; see AGPL note |
 | Home Page (gethomepage) | GPL-3.0 | ✅ Clean | internal use |
 | Immich | **AGPL-3.0** | ✅ Clean | unmodified |
 | ITFlow | GPL-3.0 | ✅ Clean | no paid tiers |
 | IT Tools (`corentinth/it-tools`) | **GPL-3.0** | ✅ Clean | stock unmodified, static SPA served by nginx; GPL-3.0 places no restriction on running it internally, not redistributed as software |
 | Jellyfin | GPL-2.0 | ✅ Clean | |
-| Kimai (`kimai/kimai2:apache`) | **AGPL-3.0** | ✅ Clean | stock unmodified, self-contained Apache+PHP container. AGPL obligation falls on the client operating the box — same position as Immich / Mealie / NocoDB / DocuSeal / Homebox. Bundled `kimai-db` is `mariadb:11.4` (rowed below). No paid tiers gate the features we use; the marketplace plugins are separate and not installed |
+| Kimai (`kimai/kimai2:apache`) | **AGPL-3.0** | ✅ Clean | stock unmodified, self-contained Apache+PHP container. AGPL obligation falls on the client operating the box — same position as Immich / Mealie / NocoDB / DocuSeal. Bundled `kimai-db` is `mariadb:11.4` (rowed below). No paid tiers gate the features we use; the marketplace plugins are separate and not installed |
 | Kopia | Apache-2.0 | ✅ Clean | official `kopia/kopia` image, built by the project; internal backup use. The image bundles `rclone` (**MIT**, ✅ clean) — used only to reach an FTP destination via Kopia's `rclone` backend (§267); no separate image |
 | Mealie | **AGPL-3.0** | ✅ Clean | unmodified |
 | Miniflux (`miniflux/miniflux`) | **Apache-2.0** | ✅ Clean | stock unmodified. Bundled `miniflux-db` is `postgres:16-alpine` (PostgreSQL License, already rowed below) |

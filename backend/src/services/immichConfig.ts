@@ -1,6 +1,6 @@
 /**
  * Immich logs in against Authelia's OIDC provider (plan.md §270/§275), but
- * unlike Vikunja/Homebox/Mealie it has **no OIDC environment variables** — its
+ * unlike Vikunja/Mealie it has **no OIDC environment variables** — its
  * OAuth settings live either in the admin UI (the database) or in a JSON
  * config file pointed at by `IMMICH_CONFIG_FILE`. The UI path can't be
  * automated without driving the browser, so this writes the file.
