@@ -24308,3 +24308,42 @@ netbird` and `Signal: Connected` came back and held.
 B2's actual goal (no stale nodes / hostnames) is achieved. `1.1.1.1` has also
 caught up on the funnel record now, so the §364 `/etc/resolv.conf` revert is
 unblocked.
+
+## 368. NetBird DNS management vs Pi-hole's :53 — a fresh enrollment breaks host DNS (2026-09-10)
+
+Tail end of the §367 recovery. Re-registering the NetBird client with the
+fresh auth key turned **DNS management on** (the pre-existing enrollment had
+`dns=false`). NetBird then:
+
+- rewrote `/etc/resolv.conf` to `search netbird.selfhosted` +
+  `nameserver 100.94.134.207` (its own IP), saving the previous file to
+  `/etc/resolv.conf.original.netbird`, and
+- tried to start its embedded resolver on `:53`.
+
+But **Pi-hole's container publishes `0.0.0.0:53`** (docker-proxy holds it), so
+NetBird's resolver couldn't bind — `dig @100.94.134.207` timed out, and every
+system-resolver lookup (`getent`, `curl`, git, apt) hung. `dig @8.8.8.8`
+directly still worked, which is the tell. Host DNS was fully down for ~10 min.
+
+**Fix:** `sudo netbird down` (restores resolv.conf from the saved original),
+then `sudo netbird up --disable-dns`. Overlay came back Connected (Relays
+3/3), `/etc/resolv.conf` stayed `8.8.8.8`/`1.1.1.1`, DNS worked.
+`--disable-dns` persists as `"DisableDNS": true` in
+`/var/lib/netbird/default.json`, so daemon restarts and reboots keep it.
+
+**Why it matters beyond this box.** Pi-hole is a shipped app. Any per-client
+box that runs it has this collision the moment NetBird is (re-)enrolled
+without `--disable-dns` — and the failure is a total host DNS outage that
+also stops self-update and backups. `start.sh` can't set it (it never runs
+`netbird up` — that's the interactive `@mat` step), so:
+
+- `docs/first-run.md` / `deployment-guide.md` must document `netbird up
+  --disable-dns` as the enrollment command, not bare `netbird up`.
+- Worth considering whether the netbird client install/enroll can be made to
+  default it, or a start.sh check that warns when `DisableDNS` is false and
+  `:53` is taken.
+
+README item added. B2 itself (the three stale tailnet nodes + their funnel
+entries) is done; the §364 `/etc/resolv.conf` revert is moot now — NetBird
+owns/leaves that file per its DNS setting, and `1.1.1.1` has the funnel
+record anyway.
