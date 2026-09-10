@@ -94,11 +94,36 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
   }
 
   updateNow(): void {
+    // Force a fresh git fetch before asking — the status panel only shows a
+    // cached check (refreshed every 6h or by "Check now"), and a stale
+    // "up to date" would otherwise silently skip a real update.
+    this.checking = true;
+    this.operations.checkForSelfUpdate().subscribe({
+      next: (check) => {
+        this.checking = false;
+        if (this.status) {
+          this.status = { ...this.status, check };
+        }
+        if (check.commitsBehind === 0) {
+          this.toast.success('Already up to date — nothing to pull.');
+          return;
+        }
+        this.confirmAndTrigger(check.commitsBehind);
+      },
+      error: (error) => {
+        this.checking = false;
+        this.toast.error(extractErrorMessage(error, 'Unable to check for updates.'));
+      },
+    });
+  }
+
+  private confirmAndTrigger(commitsBehind: number): void {
     void this.confirm
       .ask({
         title: 'Update Business Lab',
         message:
-          'Pull the latest code and rebuild + restart the dashboard now?\nIt will be briefly unavailable while the backend restarts.',
+          `Pull ${commitsBehind} commit${commitsBehind === 1 ? '' : 's'} and rebuild + restart the dashboard now?` +
+          '\nIt will be briefly unavailable while the backend restarts.',
         confirmText: 'Update',
         danger: true,
       })

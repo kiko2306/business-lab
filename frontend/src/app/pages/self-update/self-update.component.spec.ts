@@ -75,21 +75,34 @@ describe('SelfUpdateComponent', () => {
     expect(operations.getSelfUpdateStatus).toHaveBeenCalled();
     const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
     expect(text).toContain('Up to date');
-    const updateButton = (fixture.nativeElement as HTMLElement).querySelector('button.btn-primary') as HTMLButtonElement;
-    expect(updateButton.disabled).toBe(true);
-  });
-
-  it('enables "Update now" when commits are behind, and requires confirmation before triggering', () => {
-    operations.getSelfUpdateStatus.and.returnValue(of(behindStatus));
-    fixture.detectChanges();
-    openPanel();
-
+    // "Update now" stays clickable even on a cached "up to date" — clicking it
+    // forces a fresh git fetch first, so a stale cache can't hide an update.
     const updateButton = (fixture.nativeElement as HTMLElement).querySelector('button.btn-primary') as HTMLButtonElement;
     expect(updateButton.disabled).toBe(false);
+  });
+
+  it('force-checks before updating and bails out when the fresh check says up to date', () => {
+    operations.getSelfUpdateStatus.and.returnValue(of(upToDateStatus));
+    fixture.detectChanges();
+    operations.checkForSelfUpdate.and.returnValue(of(upToDateStatus.check!));
+
+    component.updateNow();
+
+    expect(operations.checkForSelfUpdate).toHaveBeenCalled();
+    expect(confirm.ask).not.toHaveBeenCalled();
+    expect(operations.triggerSelfUpdate).not.toHaveBeenCalled();
+    expect(toast.success).toHaveBeenCalled();
+  });
+
+  it('force-checks before updating, then requires confirmation before triggering', () => {
+    operations.getSelfUpdateStatus.and.returnValue(of(upToDateStatus));
+    fixture.detectChanges();
+    operations.checkForSelfUpdate.and.returnValue(of(behindStatus.check!));
 
     confirm.ask.and.returnValue(Promise.resolve(false));
     component.updateNow();
 
+    expect(operations.checkForSelfUpdate).toHaveBeenCalled();
     expect(confirm.ask).toHaveBeenCalledWith(jasmine.objectContaining({ danger: true }));
     expect(operations.triggerSelfUpdate).not.toHaveBeenCalled();
   });
@@ -98,6 +111,7 @@ describe('SelfUpdateComponent', () => {
     operations.getSelfUpdateStatus.and.returnValue(of(upToDateStatus));
     fixture.detectChanges();
 
+    operations.checkForSelfUpdate.and.returnValue(of(behindStatus.check!));
     confirm.ask.and.returnValue(Promise.resolve(true));
     operations.triggerSelfUpdate.and.returnValue(of(runningRun));
     operations.getSelfUpdateStatus.and.returnValue(

@@ -62,10 +62,10 @@
           <button
             type="button"
             class="btn btn-sm btn-primary"
-            [disabled]="triggering || runInProgress || !s.check || s.check.commitsBehind === 0"
+            [disabled]="checking || triggering || runInProgress"
             (click)="updateNow()"
           >
-            {{ triggering || runInProgress ? 'Updating…' : 'Update now' }}
+            {{ triggering || runInProgress ? 'Updating…' : checking ? 'Checking…' : 'Update now' }}
           </button>
         </div>
       </div>

@@ -23721,3 +23721,33 @@ Minor → 0.69.0.
 §344 is now done for **every** app. **Not yet proven on the live stack** — needs
 a deploy + a wiped `apps/itflow/data/` first start to confirm the schema
 imports and the admin logs in.
+
+## 351. Updates page — "Update now" force-checks first (2026-09-10)
+
+Fallout from a live incident: the Updates panel showed "up to date" for ~a day
+while `main` was 32 commits ahead. Two causes stacked —
+
+1. The server's `.git` was polluted with ~418 objects/refs owned by uid 100
+   (the backend container's `appuser`, umask 022, non-group-writable) from a
+   past deploy that ran `git` inside the container. Any `git fetch` not running
+   as exactly uid 100 died with `insufficient permission for adding an object
+   to .git/objects`, so `refs/remotes/origin/main` froze. Fixed on the host with
+   the `chgrp -R docker` / `chmod -R g+rwX` / `chmod g+s` that `start.sh`
+   already prints, plus `git checkout main` (the checkout had been left on
+   `dev`). Durable fix (making the deploy's git run with a consistent
+   user/umask) is a separate TODO.
+2. `checkForUpdate()` result is cached and only refreshed on backend start, the
+   6h sweeper, or the "Check now" button — never by the status poll. A failed
+   sweep is swallowed into a `logger.warn`. So the panel kept serving the last
+   good cache (`0 behind`) with no sign anything was wrong, and "Update now" is
+   `[disabled]` while `commitsBehind === 0`, so you can't even click through.
+
+Change (frontend only): `updateNow()` now calls `checkForSelfUpdate()` first
+(a real `git fetch` + recompare), refreshes the panel, and either bails with
+"Already up to date" or shows the confirm dialog with the true commit count.
+The button's `[disabled]` drops the cached-count condition — it's live unless a
+check/update is already running. "Check now" stays as the standalone
+force-check. 51 frontend tests pass (self-update spec updated + 1 new).
+
+Not touched: the 6h interval, and surfacing a failed/stale check in the UI —
+both still worth doing (see README). Patch → 0.69.1.

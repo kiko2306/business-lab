@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.69.1] — 2026-09-10
+
+### Changed
+
+- "Update now" on the Updates page now forces a fresh git fetch before it asks, so a stale cached check can't hide an available update
+
 ## [0.69.0] — 2026-09-10
 
 ### ITFlow
