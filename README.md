@@ -298,10 +298,12 @@ below.
       — deploy run 31 (`a2cdf98..a93c1f4`) rebuilt the backend but **not** the
       frontend though four `frontend/src/**` files changed. The logging is now
       in place (classify log with the full diff + a `phase: 'classified'` audit
-      breadcrumb). Still open: on the next real multi-target deploy, check the
-      `Self-update: classified deploy` log line + the breadcrumb row to see
-      whether `classifyDeploy` returned the wrong scope or the build step
-      dropped a target — then fix the actual cause.
+      breadcrumb), live from 0.69.4. Run 32 (backend-only diff) scoped
+      correctly — rebuilt backend, left the frontend image untouched — so the
+      miss isn't "always skips frontend". Still open: on the next deploy that
+      touches `frontend/src`, check the `Self-update: classified deploy` log
+      line + the breadcrumb row to see whether `classifyDeploy` returned the
+      wrong scope or the build step dropped a target — then fix the cause.
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
