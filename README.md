@@ -287,14 +287,6 @@ below.
       frontend log view renders them all with no cap/virtualisation. The
       backend op completes fine; a refresh recovers the UI. Cap the streamed
       lines (ring buffer), virtualise the list, or throttle the SSE.
-- [ ] **`setup_server.sh` reinstalls gnupg/ca-certificates every run** (§366) —
-      the missing-package check is `command -v gnupg` / `command -v ca-certificates`,
-      but neither package provides a binary of that name (`gnupg` → `gpg`,
-      `ca-certificates` → no binary), so both always "miss" and every run does
-      an `apt-get update` + install — which hung the §365 deploy twice on a
-      slow mirror. Fix the probe: check `command -v gpg` and
-      `[ -e /etc/ssl/certs/ca-certificates.crt ]` (or `dpkg -s`), and don't
-      `apt-get update` when nothing is actually missing.
 - [ ] **@mat: move `TAILSCALE_AUTH_KEY` to a non-expiring OAuth client** (§367) —
       the reusable auth key in `apps/tailscale/.env` **expired** and a deauthed
       node then couldn't re-register at all (crash loop) until a fresh key was

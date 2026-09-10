@@ -75,14 +75,23 @@ if [ "$HAS_SYSTEMD" -eq 0 ]; then
   echo >&2
 fi
 
+# Is a package's payload already present? The naive `command -v <pkg>` was
+# wrong for two of these — `gnupg` ships `gpg` (no `gnupg` binary),
+# `ca-certificates` ships no binary at all — so both always looked "missing"
+# and every run did an `apt-get update` (slow, and it hung two deploys). Probe
+# what the package actually provides instead.
+have_pkg() {
+  case "$1" in
+    gnupg)           command -v gpg >/dev/null 2>&1 ;;
+    ca-certificates) [ -e /etc/ssl/certs/ca-certificates.crt ] ;;
+    *)               command -v "$1" >/dev/null 2>&1 ;;
+  esac
+}
+
 if command -v apt-get >/dev/null 2>&1; then
   APT_MISSING=()
-  for bin_pkg in "curl:curl" "openssl:openssl" "gnupg:gnupg" "ca-certificates:ca-certificates" "python3:python3"; do
-    bin="${bin_pkg%%:*}"
-    pkg="${bin_pkg##*:}"
-    if ! command -v "$bin" >/dev/null 2>&1; then
-      APT_MISSING+=("$pkg")
-    fi
+  for pkg in curl openssl gnupg ca-certificates python3; do
+    have_pkg "$pkg" || APT_MISSING+=("$pkg")
   done
   if [ "${#APT_MISSING[@]}" -gt 0 ]; then
     log "Installing missing packages: ${APT_MISSING[*]}"

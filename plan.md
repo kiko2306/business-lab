@@ -24505,3 +24505,18 @@ file, leaving `apps/homebox/` with gitignored `.env` + `data/` and no compose
 → `removedAppCleanup.ts` tears down the project and dir, and
 `reconcileRemovedServices` drops its NPM host / DNS / tunnel ingress.
 Backend + frontend checks green.
+
+## 374. setup_server.sh package probe fixed — no more apt-get update every run (§366, 2026-09-10)
+
+`setup_server.sh`'s missing-package loop checked `command -v <pkg>` for each
+of `curl openssl gnupg ca-certificates python3`. That's wrong for two:
+`gnupg` ships `gpg`/`gpgv` (no `gnupg` binary), `ca-certificates` ships no
+binary at all — so both always reported missing, `APT_MISSING` was never
+empty, and every run ran `apt-get update -qq` before the install. On a slow
+mirror that `apt-get update` hangs — it stalled the §365 deploy twice.
+
+Fix: a `have_pkg()` helper that probes what each package actually provides —
+`gpg` for `gnupg`, `/etc/ssl/certs/ca-certificates.crt` for `ca-certificates`,
+`command -v` for the rest. The existing `[ ${#APT_MISSING[@]} -gt 0 ]` guard
+then genuinely skips the `apt-get update` + install when nothing is missing,
+which is the normal case on a re-run. `bash -n` clean.
