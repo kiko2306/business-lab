@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.69.0] — 2026-09-10
+
+### ITFlow
+
+- Run ITFlow's setup-wizard database step on first start so it can be exposed with only its own login
+
 ## [0.68.0] — 2026-09-09
 
 ### Changed

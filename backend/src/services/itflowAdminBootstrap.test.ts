@@ -43,7 +43,20 @@ beforeEach(() => {
   mockedGateway.mockResolvedValue('10.201.0.1');
   mockedTz.mockResolvedValue('Europe/Lisbon');
   mockedExposure.mockResolvedValue({ enabled: true } as Awaited<ReturnType<typeof getServiceExposureRow>>);
-  mockedReadEnv.mockReturnValue('generated-itflow-pw');
+  mockedReadEnv.mockImplementation((_service, key) => {
+    switch (key) {
+      case 'ITFLOW_ADMIN_PASSWORD':
+        return 'generated-itflow-pw';
+      case 'ITFLOW_DB_PASSWORD':
+        return 'generated-db-pw';
+      case 'ITFLOW_DB_NAME':
+        return 'itflow';
+      case 'ITFLOW_DB_USER':
+        return 'itflow';
+      default:
+        return null;
+    }
+  });
   mockedAdmin.mockReturnValue({ username: 'mig', email: 'mig@example.com', displayName: 'Mig T', groups: [] });
   mockedState.mockResolvedValue('needs-setup');
   mockedWizard.mockResolvedValue('completed');
@@ -73,6 +86,12 @@ describe('reconcileItflowFirstAdmin', () => {
     expect(mockedWizard).not.toHaveBeenCalled();
   });
 
+  it('skips when the DB password is not set (cannot run the wizard database step)', async () => {
+    mockedReadEnv.mockImplementation((_s, key) => (key === 'ITFLOW_ADMIN_PASSWORD' ? 'pw' : null));
+    await reconcileItflowFirstAdmin('itflow');
+    expect(mockedWizard).not.toHaveBeenCalled();
+  });
+
   it('skips when there is no Authelia admin email', async () => {
     mockedAdmin.mockReturnValue(null);
     await reconcileItflowFirstAdmin('itflow');
@@ -88,6 +107,10 @@ describe('reconcileItflowFirstAdmin', () => {
       password: 'generated-itflow-pw',
       companyName: 'Company',
       timezone: 'Europe/Lisbon',
+      dbHost: 'itflow-db',
+      dbName: 'itflow',
+      dbUser: 'itflow',
+      dbPassword: 'generated-db-pw',
     });
   });
 

@@ -20,6 +20,12 @@ services:
       ITFLOW_LOG_LEVEL: ${ITFLOW_LOG_LEVEL:-info}
       ITFLOW_DB_HOST: itflow-db
       ITFLOW_DB_PASS: ${ITFLOW_DB_PASSWORD}
+      # NOT read by ITFlow — a carrier so the dashboard's config panel shows the
+      # field and auto-generates a value. The backend uses it to create the
+      # admin account through ITFlow's first-run wizard
+      # (backend/src/services/itflowAdminBootstrap.ts): ITFlow has no SSO that
+      # fits here, so the admin still logs in with this. See plan.md §350.
+      ITFLOW_ADMIN_PASSWORD: ${ITFLOW_ADMIN_PASSWORD:-}
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=ITFlow"

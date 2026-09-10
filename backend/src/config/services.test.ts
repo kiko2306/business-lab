@@ -377,6 +377,9 @@ describe('Authelia login is mandatory by default', () => {
     // DocuSeal community has no SSO and no way to hide its login form, so it's
     // exposed directly with only its own login rather than two logins (§342).
     expect(isAutheliaProtectionRequired('docuseal')).toBe(false);
+    // ITFlow: SAML-only (no OIDC), can't hide its form, client portal must be
+    // public — own login only, wizard-bootstrapped (§350).
+    expect(isAutheliaProtectionRequired('itflow')).toBe(false);
   });
 
   it('requires it for every other exposed app, regardless of any stored state', () => {

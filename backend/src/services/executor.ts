@@ -36,6 +36,7 @@ import { applyImmichConfig } from './immichConfig';
 import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { reconcileDocusealFirstAdmin } from './docusealAdminBootstrap';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
+import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
@@ -288,8 +289,11 @@ async function composeUpWithManagedConfig(
   // first-visitor-claims-owner race. Clean JSON API with a real `done` flag.
   // After `up`; no-op otherwise.
   await reconcileHomeAssistantFirstAdmin(serviceName);
-  // ITFlow's setup-wizard bootstrap is intentionally NOT called here yet —
-  // getSetupState needs a real readiness gate first (§346 reverted).
+  // ITFlow: run its first-run setup wizard (schema import + admin) so exposing
+  // it direct (§344/§350) has no manual step and no claim race. The wizard's
+  // first POST creates the schema — the itfloworg image doesn't. After `up`;
+  // no-op otherwise.
+  await reconcileItflowFirstAdmin(serviceName);
 
   return result;
 }

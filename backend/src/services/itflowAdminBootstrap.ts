@@ -13,6 +13,11 @@
  * account this creates (Authelia admin's email + generated
  * `ITFLOW_ADMIN_PASSWORD`) is it. Enable 2FA in ITFlow's own profile settings
  * afterwards.
+ *
+ * The image never creates the schema — the wizard's first step does, from the
+ * DB credentials posted to it (§350). Those come from apps/itflow/.env
+ * (`ITFLOW_DB_*`, same values the itflow-db container was created with); the
+ * host is always the compose service name.
  */
 
 import logger from '../utils/logger';
@@ -28,6 +33,12 @@ export const ITFLOW_SERVICE = 'itflow';
 export const ITFLOW_ADMIN_PASSWORD_KEY = 'ITFLOW_ADMIN_PASSWORD';
 const FALLBACK_PORT = 10420;
 const COMPANY_NAME = 'Company';
+// itflow-db is the compose service name; the app always reaches MariaDB there.
+const DB_HOST = 'itflow-db';
+// Match apps/itflow/.env.example defaults — the itflow-db container is created
+// with these unless the operator changed them before the first start.
+const DB_NAME_DEFAULT = 'itflow';
+const DB_USER_DEFAULT = 'itflow';
 
 const MAX_ATTEMPTS = 30;
 const RETRY_DELAY_MS = 3000;
@@ -58,6 +69,14 @@ export async function reconcileItflowFirstAdmin(serviceName: string): Promise<vo
     return;
   }
 
+  const dbPassword = readAppEnvValue(ITFLOW_SERVICE, 'ITFLOW_DB_PASSWORD');
+  if (!dbPassword) {
+    logger.error('ITFlow admin bootstrap skipped: ITFLOW_DB_PASSWORD is not set — cannot run the wizard database step');
+    return;
+  }
+  const dbName = readAppEnvValue(ITFLOW_SERVICE, 'ITFLOW_DB_NAME') || DB_NAME_DEFAULT;
+  const dbUser = readAppEnvValue(ITFLOW_SERVICE, 'ITFLOW_DB_USER') || DB_USER_DEFAULT;
+
   const admin = getAutheliaAdminUser();
   const email = admin?.email?.trim();
   if (!email) {
@@ -87,7 +106,17 @@ export async function reconcileItflowFirstAdmin(serviceName: string): Promise<vo
         return;
       }
 
-      const result = await runSetupWizard(baseUrl, { name, email, password, companyName: COMPANY_NAME, timezone });
+      const result = await runSetupWizard(baseUrl, {
+        name,
+        email,
+        password,
+        companyName: COMPANY_NAME,
+        timezone,
+        dbHost: DB_HOST,
+        dbName,
+        dbUser,
+        dbPassword,
+      });
       if (result === 'completed') {
         logger.info(`Ran ITFlow's setup wizard and created its admin (${email})`);
       } else if (result === 'already-setup') {
