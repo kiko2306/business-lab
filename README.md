@@ -290,14 +290,18 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **`@mat`: confirm NPM's admin UI over the overlay** (§239, §324.4) — the
-      "deprovision any live public `npm.<domain>`" half is settled: nothing was
-      ever provisioned for `nginx-proxy-manager` (no row, no DNS, no proxy
-      host), so `overlayOnly` has nothing to tear down. Still open: the host
-      isn't on either overlay right now (NetBird client `NeedsLogin`, Tailscale
-      userspace-only), so NPM admin is LAN-only (`192.168.1.236:10270`). Run
-      `netbird up` (interactive SSO) and confirm the admin UI is reachable over
-      the overlay.
+- [ ] **Self-update doesn't reconcile the NetBird signal hostname** (§362) —
+      `start.sh` re-asserts the Tailscale Funnel binding and patches
+      `Signal.URI` in `management.json` on every run, but the Update-page /
+      self-update path never runs it. So any deploy or Tailscale
+      node re-register (e.g. an `override.yml` edit) silently points signal at
+      a dead `*.ts.net` hostname and the whole overlay drops — Management,
+      Signal, `wt0`, all of it — until someone SSHes in and runs `start.sh`.
+      On a dashboard-managed box that's a hole (principle 2). Fix: a backend
+      reconciler sweep (like the ~6 h exposure one) that re-derives the live
+      node DNSName and re-patches `management.json`, or fold it into the
+      self-update sequence. Also prune the stale Funnel entries `start.sh`
+      leaves behind.
 
 ### Apps and integrations
 

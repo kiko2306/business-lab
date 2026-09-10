@@ -24049,3 +24049,63 @@ Decisions taken and not revisited:
 No open threads from P9 itself. P10 (turnkey build spec) partly depends on
 P9a and stays its own README item; backup-passphrase custody is the separate
 §84.5/§74 thread.
+
+## 362. §239 NPM-admin-over-overlay verified — and a signal-drift gap in self-update (2026-09-10)
+
+Went to close the README `@mat` item "confirm NPM's admin UI over the
+overlay" (§239, §324.4). `netbird up` on the host completed the Authelia SSO
+but then failed: `failed connecting to Signal Service: context deadline
+exceeded` — Management and Signal both Disconnected, NetBird IP N/A, no `wt0`.
+
+### Root cause — signal hostname drift (the §52/§53/§69/§294 class, again)
+
+`apps/netbird-vpn/data/management.json` had
+`Signal.URI = c45d6f5a3c43.tail122b53.ts.net:443`, but the live Tailscale
+node's `Self.DNSName` was `26ef4eae9a8a.tail122b53.ts.net` — a different
+node. `tailscale funnel status` listed two entries (`791f5c…`,
+`c45d6f5a3c43…`), both non-resolving, and none for the current node. The
+Tailscale container had re-registered as a new node on 2026-09-09 ~17:38
+(when `docker-compose.override.yml` was last edited and the container
+recreated), and nothing patched `management.json` afterwards, so signal was
+being advertised at a dead hostname for ~17 h.
+
+The signal server itself was healthy throughout (`HTTP 405` on local
+`:10252`).
+
+### The fix already exists — but only in `start.sh`
+
+`start.sh` (~line 890, the Funnel block) re-asserts
+`tailscale funnel --https=443 http://<gw>:<signal_port>` **on every run**,
+reads the live `Self.DNSName`, writes `NETBIRD_SIGNAL_HOSTNAME`, and
+read-compare-writes `Signal.URI` in `management.json`, restarting management
+only on a change. `sudo ./start.sh` on the host restored everything:
+Management + Signal Connected, `wt0` up at `100.94.134.207/16`, Wireguard
+port 51820, `Signal.URI` now `26ef4eae9a8a.tail122b53.ts.net:443` matching
+the node, and a Funnel entry for the current node.
+
+### §239 result — verified (with one caveat)
+
+With the overlay back: `curl http://100.94.134.207:10270/` and `/login` both
+return **HTTP 200** from the host — NPM admin is served on the NetBird
+interface (it binds `0.0.0.0`, so every interface including `wt0`). Not
+exercised from a *second* peer (host is `Peers 0/0`), but the path is
+identical — NetBird routes `100.94.0.0/16` peer-to-peer. The other half of
+the item (deprovision any public `npm.<domain>`) was already settled: nothing
+was ever provisioned for `nginx-proxy-manager`. Item removed from the README.
+
+### The gap (new README item)
+
+The self-update / Update-page path does **not** run the signal reconcile, so
+every deploy or Tailscale re-register silently drops the whole overlay until
+someone runs `start.sh` by hand — on a box meant to be dashboard-managed
+(principle 2). Proposed fix: a backend reconciler sweep (mirror the ~6 h
+exposure reconciler) that re-derives the live node DNSName and re-patches
+`management.json`, or fold it into the self-update sequence. `start.sh` also
+leaves stale Funnel entries behind (`791f5c…`, `c45d6f5a3c43…` still listed);
+prune them in the same pass.
+
+### Aside
+
+`tx-home-utils.com` resolves and serves again (Authelia, NetBird management +
+relay all live on it) — contradicting an earlier note that it was dead after
+§283. Not investigated further; just recorded.
