@@ -38,7 +38,7 @@ against this model.
 - First login per app: [/docs/app-credentials.md](/docs/app-credentials.md)
 - Host ports: [/docs/ports.md](/docs/ports.md)
 - Raspberry Pi / arm64 guide: [/docs/raspberry-pi.md](/docs/raspberry-pi.md)
-- Deployment guide: [/docs/deployment-guide.md](/docs/deployment-guide.md)
+- Deployment guide — provisioning a box for a client, first run to hand-over: [/docs/deployment-guide.md](/docs/deployment-guide.md)
 - API reference (OpenAPI): [/docs/openapi.yaml](/docs/openapi.yaml)
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
 - Two-factor authentication (TOTP) for the dashboard login: [/docs/two-factor.md](/docs/two-factor.md)
@@ -265,9 +265,6 @@ below.
       connection with a per-zone-scoped token (expect no warning) and with an
       account-wide one (expect the "can see N zones" warning), and confirm a
       token without Zone:Read still passes without the warning.
-- [ ] **P9c — Per-client provisioning runbook** (§357) — one doc pass making
-      `docs/first-run.md` + `docs/deployment-guide.md` the ordered
-      "provision a box for a new client" procedure, post-§331/§341. Doc only.
 - [ ] **P10 — Turnkey build spec** (§84.7) — Dell/16 GiB/500 GB/€400 is proven
       (this stack runs on 14.84 GiB, 4 CPUs, 53 containers, 8 GB used). The
       trap is the disk: Ubuntu's installer defaults to a ~100 GiB root LV,

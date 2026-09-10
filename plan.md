@@ -24146,3 +24146,22 @@ Cloudflare token test wasn't exercised (no token in the session) — README
 Not surfaced on the §358 deployment checklist: the account model has a
 sensible default and isn't a handover blocker, so a checklist row for it
 would be permanent noise.
+
+## 360. P9c — the per-client provisioning runbook (§357, 2026-09-10)
+
+Doc-only. `docs/deployment-guide.md` was a stale generic stub —
+`docker compose up -d --build` at the repo root, "rotate JWT secrets",
+"external backups for the DB volume" — none of which matches how this stack
+is actually deployed. Rewrote it as the ordered "provision one box for one
+client" runbook: prerequisites → `sudo ./start.sh` (or `start.config` for
+unattended) → `/setup` admin → the Settings → Deployment checklist items
+(networking/account model/mail/backup) → add the client's users → start apps
+in the NPM-then-Authelia-then-rest order → hand-over checklist. Each step
+links to the existing reference (first-run.md, app-credentials.md,
+recovery-troubleshooting.md) rather than restating it. Kept the
+`docker-e2e-test.sh` section, retitled so it reads as a pre-release check,
+not a provisioning step.
+
+`first-run.md` gets a pointer at the top to the new runbook (it stays the
+reference for the `start.sh` mechanics). README doc list entry sharpened to
+say what the guide is now.

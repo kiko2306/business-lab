@@ -3,7 +3,10 @@
 Answers three questions in order: what to have ready, what the script asks
 for, and what is actually reachable once it finishes.
 
-Per-app login credentials are in [app-credentials.md](app-credentials.md).
+Per-app login credentials are in [app-credentials.md](app-credentials.md). For
+the ordered end-to-end procedure of provisioning a box for a client — first run
+through hand-over — see [deployment-guide.md](deployment-guide.md); this page is
+the reference it links into for the `start.sh` half.
 
 ## Before you run it
 
