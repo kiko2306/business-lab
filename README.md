@@ -295,13 +295,18 @@ below.
       slow mirror. Fix the probe: check `command -v gpg` and
       `[ -e /etc/ssl/certs/ca-certificates.crt ]` (or `dpkg -s`), and don't
       `apt-get update` when nothing is actually missing.
-- [ ] **@mat: refresh the Tailscale auth key before it expires** (§367) — the
-      `TAILSCALE_AUTH_KEY` in `apps/tailscale/.env` had **expired**; a
-      deauthed node then can't re-register at all (crash loop) until a new
-      key is set via the dashboard Tailscale card → Configuration. A fresh
-      reusable key was set 2026-09-10. Reusable keys still expire (90 d
-      default) — set a calendar reminder, or switch to a tagged/ephemeral
-      setup that doesn't.
+- [ ] **@mat: move `TAILSCALE_AUTH_KEY` to a non-expiring OAuth client** (§367) —
+      the reusable auth key in `apps/tailscale/.env` **expired** and a deauthed
+      node then couldn't re-register at all (crash loop) until a fresh key was
+      set (done 2026-09-10). Reusable keys hard-cap at 90 days, so this recurs.
+      Fix it once: Tailscale admin → Settings → OAuth clients → new client
+      scoped `auth_keys` (write); add a tag (`tag:businesslab`) to the ACL
+      `tagOwners` and make sure the Funnel `nodeAttrs` grant covers that tag;
+      set `TAILSCALE_AUTH_KEY` (dashboard → Tailscale → Configuration) to
+      `tskey-client-…?preauthorized=true&ephemeral=false` with the tag applied
+      via the client. OAuth client secrets don't expire, so the node
+      re-registers itself indefinitely — no rotation. Needs the Tailscale
+      admin login; the agent can't do the OAuth-client/ACL steps.
 - [ ] **NetBird client must run with `--disable-dns` on any box with Pi-hole**
       (§368) — a fresh NetBird enrollment turns DNS management **on**: it
       rewrites `/etc/resolv.conf` to `nameserver <netbird-ip>` and starts an
