@@ -258,13 +258,6 @@ below.
 - [ ] **P8 — Rebrand tier 2** (§84.2) — package/image/network/project names.
       Recreates the management stack — do it in the §83 data-root maintenance
       window, with host access, not before.
-- [ ] **@mat: verify the multi-zone token warning live** (§359) — the
-      Networking → Test connection zone-scope check (`countTokenZones` via
-      `GET /zones?per_page=2`) is unit-tested against the Cloudflare list
-      shape only; no real token was available in the build session. Run Test
-      connection with a per-zone-scoped token (expect no warning) and with an
-      account-wide one (expect the "can see N zones" warning), and confirm a
-      token without Zone:Read still passes without the warning.
 - [ ] **P10 — Turnkey build spec** (§84.7) — Dell/16 GiB/500 GB/€400 is proven
       (this stack runs on 14.84 GiB, 4 CPUs, 53 containers, 8 GB used). The
       trap is the disk: Ubuntu's installer defaults to a ~100 GiB root LV,

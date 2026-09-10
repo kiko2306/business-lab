@@ -24165,3 +24165,11 @@ not a provisioning step.
 `first-run.md` gets a pointer at the top to the new runbook (it stays the
 reference for the `start.sh` mechanics). README doc list entry sharpened to
 say what the guide is now.
+
+## 361. §359 P9b verified live (2026-09-10)
+
+0.73.0 deployed to the test server via the Update page (rebuild path — self-update
+run 37, `9858855` → `6fc3eec`, clean). The §359 multi-zone token warning was then
+exercised on the live dashboard: Settings → Networking → Test connection against a
+real Cloudflare token, and the zone-scope check behaves as designed. README `@mat`
+item removed.
