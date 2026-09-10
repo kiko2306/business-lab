@@ -24232,3 +24232,40 @@ files on disk, then **`sudo ./setup_server.sh`** (or the next
 `sudo ./start.sh`) installs + enables the unit. Then: force-recreate the
 tailscale container and confirm `netbird status` returns to `Signal:
 Connected` within ~30 s with no manual step. README item carries the check.
+
+## 366. §365 verified live; two setup_server.sh side-findings (2026-09-10)
+
+Installed `netbird-follows-tailscale.service` on the host and force-recreated
+the tailscale container. Journal (unattended):
+
+```
+13:44:36  tailscale container 'tailscale-tailscale-1' started — settling 15s
+13:44:53  restarted netbird.service
+13:45:00  Signal: Connected   (held through a 2-min poll)
+```
+
+Recreate → `docker events` catch → 15 s settle → `systemctl restart netbird`
+→ signal recovered, no manual step. This is the same recreate that sat in
+`rpc error … EOF` for 3+ min unattended during §364. §364/§365 gap closed.
+
+Note: `sudo ./setup_server.sh` couldn't be used to install the unit — it
+hangs on `apt-get update` (see below) — so the unit block was applied by hand
+from the committed script. The `grep -qF "ExecStart=…"` guard makes the next
+real `setup_server.sh`/`start.sh` run a no-op on it.
+
+### Side-finding 1 — setup_server.sh reinstalls gnupg/ca-certificates every run
+
+The probe is `command -v gnupg` / `command -v ca-certificates`. Neither
+package ships a binary of that name (`gnupg` → `gpg`/`gpgv`,
+`ca-certificates` → data only), so both always report missing and every run
+does `apt-get update -qq && apt-get install -y -qq gnupg ca-certificates`.
+On a slow mirror that `apt-get update` hangs — it blocked this deploy twice.
+README item to fix the probe and skip `apt-get update` when nothing is
+missing.
+
+### Side-finding 2 — host clock ~1 h behind local
+
+`date` on `home-srv-01` read ~1 h behind wall-clock during the test. Could be
+a deliberate UTC server clock, or NTP drift. README item to check
+`timedatectl` (sync state + intended zone) — wrong time breaks TLS validity
+windows, TOTP, backup schedules and log correlation.

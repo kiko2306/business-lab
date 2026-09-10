@@ -290,17 +290,20 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **@mat: install + verify `netbird-follows-tailscale.service`** (§365) —
-      built: a host unit (`scripts/netbird-follows-tailscale.sh`, installed by
-      `setup_server.sh`) that watches `docker events` for the tailscale
-      container and restarts `netbird.service` after it, since NetBird's
-      signal stream sits in `rpc error … EOF` and doesn't self-heal otherwise
-      (§364). `start.sh` also `try-restart`s netbird after its signal block.
-      Deploy: after the `git pull`, run `sudo ./setup_server.sh` once (or the
-      next `sudo ./start.sh`) to install the unit. Then verify:
-      `docker compose -p tailscale up -d --force-recreate` and confirm
-      `netbird status` returns to `Signal: Connected` within ~30 s with no
-      manual step. Watch it with `journalctl -u netbird-follows-tailscale -f`.
+- [ ] **`setup_server.sh` reinstalls gnupg/ca-certificates every run** (§366) —
+      the missing-package check is `command -v gnupg` / `command -v ca-certificates`,
+      but neither package provides a binary of that name (`gnupg` → `gpg`,
+      `ca-certificates` → no binary), so both always "miss" and every run does
+      an `apt-get update` + install — which hung the §365 deploy twice on a
+      slow mirror. Fix the probe: check `command -v gpg` and
+      `[ -e /etc/ssl/certs/ca-certificates.crt ]` (or `dpkg -s`), and don't
+      `apt-get update` when nothing is actually missing.
+- [ ] **@mat: confirm the host clock / timezone** (§366) — during the §365
+      test `date` on `home-srv-01` read ~1 h behind local wall time. If the
+      box is deliberately on UTC that's fine for a server; if NTP has drifted
+      it's not (TLS validity windows, TOTP, backup schedules, log
+      correlation). Check `timedatectl` — `System clock synchronized: yes` and
+      the intended zone.
 - [ ] **@mat: prune the stale Tailscale nodes** (§364) — the tailnet still
       holds the old container-ID nodes (`26ef4eae9a8a`, `791f5c44331b`,
       `c45d6f5a3c43`, all this same box) and their dead Funnel hostnames.
