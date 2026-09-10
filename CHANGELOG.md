@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.69.3] — 2026-09-10
+
+### Added
+
+- Updates page now flags a failed or stale update check instead of silently showing the last cached result
+
 ## [0.69.2] — 2026-09-10
 
 ### Fixed

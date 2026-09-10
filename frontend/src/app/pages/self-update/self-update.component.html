@@ -35,7 +35,10 @@
             </dd>
 
             <dt class="col-sm-4 text-body-secondary">Last checked</dt>
-            <dd class="col-sm-8">{{ check.checkedAt | date: 'medium' }}</dd>
+            <dd class="col-sm-8">
+              {{ check.checkedAt | date: 'medium' }}
+              <span *ngIf="checkIsStale" class="badge text-bg-warning ms-1">stale</span>
+            </dd>
           </ng-container>
           <ng-container *ngIf="!s.check">
             <dt class="col-sm-4 text-body-secondary">Status</dt>
@@ -43,6 +46,10 @@
           </ng-container>
         </dl>
 
+        <div class="alert alert-warning small mt-3 mb-0" *ngIf="s.lastCheckError as err">
+          Last update check failed ({{ err.at | date: 'medium' }}) — the status above may be out of date.
+          <span class="font-monospace d-block mt-1">{{ err.message }}</span>
+        </div>
         <div class="alert alert-info small mt-3 mb-0" *ngIf="runInProgress && s.latestRun as run">
           {{ progressLabels[run.state] }}
         </div>

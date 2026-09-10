@@ -19,6 +19,11 @@ const PROGRESS_LABELS: Record<SelfUpdateRunState, string> = {
   error: 'The last update failed.',
 };
 
+// The sweeper re-checks every 6h; flag the cached result as stale once it's
+// meaningfully older than that, so a silently-failing sweep can't keep reading
+// as a current "up to date" (§351).
+const CHECK_STALE_AFTER_MS = 8 * 60 * 60 * 1000;
+
 const IN_PROGRESS_STATES: SelfUpdateRunState[] = [
   'checking',
   'pulling',
@@ -63,6 +68,15 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
   protected get runInProgress(): boolean {
     const state = this.status?.latestRun?.state;
     return !!state && IN_PROGRESS_STATES.includes(state);
+  }
+
+  /** The last successful check is old enough that it may no longer be true. */
+  protected get checkIsStale(): boolean {
+    const checkedAt = this.status?.check?.checkedAt;
+    if (!checkedAt) {
+      return false;
+    }
+    return Date.now() - Date.parse(checkedAt) > CHECK_STALE_AFTER_MS;
   }
 
   loadStatus(): void {

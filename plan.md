@@ -23781,3 +23781,24 @@ ownership rot can't recur. Existing corruption still needs the one-time
 
 713 backend tests (+1: asserts `fetch` runs as `sh -c 'umask 002 && exec git
 "$@"'`). Patch → 0.69.2.
+
+## 353. Updates page surfaces a failed/stale check (2026-09-10)
+
+Second §351 follow-up. `checkForUpdate()` failures were swallowed into a
+`logger.warn` by the sweeper's `.catch`, so a check that had been failing for
+hours was invisible — the panel kept serving the last good `cachedCheck` and
+read as "up to date" (exactly what hid the frozen `origin/main`).
+
+- `selfUpdate.ts` — module-level `lastCheckError: { message, at } | null`, set
+  in a try/catch around `checkForUpdate`'s git calls (and cleared on the next
+  success); the error is still rethrown so `POST /check` and `triggerSelfUpdate`
+  see it. `SelfUpdateStatus` / `getSelfUpdateStatus` carry it.
+- Panel — an `alert-warning` ("Last update check failed (<when>) — the status
+  above may be out of date" + the git message) whenever `lastCheckError` is
+  set, and a `stale` badge on "Last checked" once the cached result is older
+  than 8h (the sweep runs every 6h). Frontend-only staleness, no new poll.
+
+Not done: shortening the 6h sweep interval — left as-is; the stale badge plus
+the force-check on "Update now" (§351) already close the "silently wrong" gap.
+
+714 backend tests (+1), 53 frontend tests (+2). Patch → 0.69.3.

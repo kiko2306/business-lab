@@ -157,6 +157,28 @@ describe('checkForUpdate', () => {
     expect(fetchCall?.[0]).toBe('sh');
     expect(fetchCall?.[1]).toEqual(['-c', 'umask 002 && exec git "$@"', 'git', '-C', '/repo', 'fetch', 'origin', 'main', '--quiet']);
   });
+
+  it('records lastCheckError when the fetch fails, and clears it on the next success (§351)', async () => {
+    backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args.includes('fetch')) throw new Error('insufficient permission for adding an object to .git/objects');
+      if (args.includes('rev-parse')) return 'abc123\n';
+      if (args.includes('rev-list')) return '0\n';
+      return '';
+    });
+    await expect(checkForUpdate()).rejects.toThrow(/insufficient permission/);
+    expect((await getSelfUpdateStatus()).lastCheckError).toMatchObject({
+      message: expect.stringContaining('insufficient permission'),
+    });
+
+    backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args.includes('rev-parse') && args.includes('HEAD')) return 'abc123\n';
+      if (args.includes('rev-parse') && args.includes('origin/main')) return 'abc123\n';
+      if (args.includes('rev-list')) return '0\n';
+      return '';
+    });
+    await checkForUpdate();
+    expect((await getSelfUpdateStatus()).lastCheckError).toBeNull();
+  });
 });
 
 describe('triggerSelfUpdate', () => {

@@ -610,8 +610,14 @@ export interface SelfUpdateCheck {
   checkedAt: string;
 }
 
+export interface SelfUpdateCheckError {
+  message: string;
+  at: string;
+}
+
 export interface SelfUpdateStatus {
   appVersion: string;
   check: SelfUpdateCheck | null;
+  lastCheckError: SelfUpdateCheckError | null;
   latestRun: SelfUpdateRun | null;
 }

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.69.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.69.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -293,12 +293,6 @@ below.
       Settings" pattern) only get built if a real deployment actually wants
       a destination that is neither a mount nor S3.
 ### Exposure and platform
-
-- [ ] **Surface a failed/stale self-update check** (§351) — `checkForUpdate()`
-      errors are swallowed into a `logger.warn`; the panel keeps showing the
-      last good cache. Show `checkedAt` age + a "last check failed / stale"
-      badge when the sweep errored or the timestamp is old, and consider a
-      shorter sweep interval than 6h.
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't

@@ -15,12 +15,14 @@ describe('SelfUpdateComponent', () => {
 
   const upToDateStatus: SelfUpdateStatus = {
     appVersion: '0.24.0',
-    check: { currentCommit: 'abc123def456', remoteCommit: 'abc123def456', commitsBehind: 0, checkedAt: '2026-09-04T10:00:00.000Z' },
+    check: { currentCommit: 'abc123def456', remoteCommit: 'abc123def456', commitsBehind: 0, checkedAt: new Date().toISOString() },
+    lastCheckError: null,
     latestRun: null,
   };
   const behindStatus: SelfUpdateStatus = {
     appVersion: '0.24.0',
-    check: { currentCommit: 'old111old111', remoteCommit: 'new222new222', commitsBehind: 2, checkedAt: '2026-09-04T10:00:00.000Z' },
+    check: { currentCommit: 'old111old111', remoteCommit: 'new222new222', commitsBehind: 2, checkedAt: new Date().toISOString() },
+    lastCheckError: null,
     latestRun: null,
   };
   const runningRun: SelfUpdateRun = {
@@ -79,6 +81,30 @@ describe('SelfUpdateComponent', () => {
     // forces a fresh git fetch first, so a stale cache can't hide an update.
     const updateButton = (fixture.nativeElement as HTMLElement).querySelector('button.btn-primary') as HTMLButtonElement;
     expect(updateButton.disabled).toBe(false);
+  });
+
+  it('shows a warning when the last check failed', () => {
+    operations.getSelfUpdateStatus.and.returnValue(
+      of({ ...upToDateStatus, lastCheckError: { message: 'insufficient permission', at: new Date().toISOString() } }),
+    );
+    fixture.detectChanges();
+    openPanel();
+
+    const text = (fixture.nativeElement as HTMLElement).textContent ?? '';
+    expect(text).toContain('Last update check failed');
+    expect(text).toContain('insufficient permission');
+  });
+
+  it('flags a stale check', () => {
+    const old = new Date(Date.now() - 12 * 60 * 60 * 1000).toISOString();
+    operations.getSelfUpdateStatus.and.returnValue(
+      of({ ...upToDateStatus, check: { ...upToDateStatus.check!, checkedAt: old } }),
+    );
+    fixture.detectChanges();
+    openPanel();
+
+    expect(component['checkIsStale']).toBe(true);
+    expect((fixture.nativeElement as HTMLElement).textContent).toContain('stale');
   });
 
   it('force-checks before updating and bails out when the fresh check says up to date', () => {

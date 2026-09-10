@@ -126,7 +126,17 @@ export interface SelfUpdateCheck {
   checkedAt: string;
 }
 
+export interface SelfUpdateCheckError {
+  message: string;
+  at: string;
+}
+
 let cachedCheck: SelfUpdateCheck | null = null;
+// Set whenever checkForUpdate() throws (git fetch failed, remote unreachable,
+// a corrupted .git). Without surfacing this, a check that has been failing for
+// hours is invisible — the panel just keeps serving the last good `cachedCheck`
+// and reads as "up to date" (§351).
+let lastCheckError: SelfUpdateCheckError | null = null;
 
 export async function ensureSelfUpdateTable(): Promise<void> {
   await query(`
@@ -222,20 +232,26 @@ async function updateRun(
  */
 export async function checkForUpdate(): Promise<SelfUpdateCheck> {
   const repoRoot = requireRepoRoot();
-  await runGit(['-C', repoRoot, 'fetch', 'origin', 'main', '--quiet'], { timeout: 30_000 });
-  const currentCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
-  const remoteCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'origin/main'], { timeout: 10_000 })).trim();
-  const countOutput = await runGit(
-    ['-C', repoRoot, 'rev-list', '--count', `${currentCommit}..${remoteCommit}`],
-    { timeout: 10_000 }
-  );
-  cachedCheck = {
-    currentCommit,
-    remoteCommit,
-    commitsBehind: parseInt(countOutput.trim(), 10) || 0,
-    checkedAt: new Date().toISOString(),
-  };
-  return cachedCheck;
+  try {
+    await runGit(['-C', repoRoot, 'fetch', 'origin', 'main', '--quiet'], { timeout: 30_000 });
+    const currentCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
+    const remoteCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'origin/main'], { timeout: 10_000 })).trim();
+    const countOutput = await runGit(
+      ['-C', repoRoot, 'rev-list', '--count', `${currentCommit}..${remoteCommit}`],
+      { timeout: 10_000 }
+    );
+    cachedCheck = {
+      currentCommit,
+      remoteCommit,
+      commitsBehind: parseInt(countOutput.trim(), 10) || 0,
+      checkedAt: new Date().toISOString(),
+    };
+    lastCheckError = null;
+    return cachedCheck;
+  } catch (error) {
+    lastCheckError = { message: (error as Error).message, at: new Date().toISOString() };
+    throw error;
+  }
 }
 
 export function startSelfUpdateCheckSweeper(): void {
@@ -252,12 +268,13 @@ export function startSelfUpdateCheckSweeper(): void {
 export interface SelfUpdateStatus {
   appVersion: string;
   check: SelfUpdateCheck | null;
+  lastCheckError: SelfUpdateCheckError | null;
   latestRun: SelfUpdateRunRow | null;
 }
 
 export async function getSelfUpdateStatus(): Promise<SelfUpdateStatus> {
   const latestRun = await getLatestRun();
-  return { appVersion: getAppVersion(), check: cachedCheck, latestRun };
+  return { appVersion: getAppVersion(), check: cachedCheck, lastCheckError, latestRun };
 }
 
 function isRunInProgress(run: SelfUpdateRunRow | null): boolean {
