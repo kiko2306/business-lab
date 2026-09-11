@@ -26051,3 +26051,36 @@ own remaining check (a remote peer actually reaching something on
 `192.168.1.0/24` through it) is still open — everything up to and
 including the routing peer joining the overlay is now confirmed; end-to-
 end reachability from an enrolled remote device is the last piece.
+
+**§404's own check, partially done.** Enrolled this WSL machine (`PRT-DEV-01`,
+NetBird client installed natively in Linux — the install script's
+"already installed" check false-positives on a pre-existing *Windows*
+NetBird install WSL exposes via its PATH interop; worked around by
+running the installer's actual `apt`/keyring steps directly rather than
+through that check) as an ordinary peer with a Setup-Keys-issued key.
+`netbird status --detail` shows the `netbird-router` peer correctly
+advertising `Networks: 192.168.1.0/24` — proof the auto-provisioned
+network/resource/router/policy is real and reaches a client with zero
+manual NetBird-dashboard steps beyond the one PAT.
+
+**Not fully provable from this machine, on purpose left open rather than
+overclaimed**: WSL sits on the same physical LAN as `home-srv-01`
+(`192.168.1.138`), so `ip route get 192.168.1.236` resolves via `eth1`
+directly — the SSH that succeeded through it went over the plain LAN, not
+the tunnel (that peer stays `Idle`, no WireGuard session ever
+established). A client that's actually on this LAN can't demonstrate
+tunneled routing at all; it needs a genuinely off-LAN device (phone on
+mobile data, or a laptop from an actual remote network) to prove packet
+delivery through the tunnel rather than just that the route was offered.
+User chose to hold off marking §404 fully verified until that off-LAN test
+happens, rather than accept the network-map evidence alone.
+
+Also cleaned up incidental damage: the NetBird install command was run on
+`home-srv-01` by accident before being run correctly on WSL — landed a
+host-level `apt` package + enabled systemd service there, exactly the
+console-configuration CLAUDE.md's principle 2 exists to prevent (this
+wasn't code doing it, a human typed it directly on the box by mistake).
+Purged (`apt-get purge netbird`, service already stopped/disabled by that),
+removed the leftover apt repo file and keyring, confirmed clean — the
+Docker `netbird-client` container already covers this host, so nothing
+else needed to replace it.
