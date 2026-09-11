@@ -25169,3 +25169,25 @@ licence due diligence as the two things it deliberately doesn't cover.
 Linked from README's doc list. README item deleted.
 
 Docs-only, no code — no version bump, no host verification needed.
+
+## 394. P12 unblocked — no generic SaaS-cost inventory (§84.5/§84.7 decision, 2026-09-11)
+
+§84.7 had P12 blocked on "the SaaS inventory + monthly costs from @mat" — a
+pre-built table of what each app replaces and the generic monthly saving.
+@mat's call: **skip it.** The real savings math is client-by-client — it
+depends on what *that specific client* already pays for (which tools, how
+many seats), so a generic inventory would be either too vague to use in a
+sales conversation or wrong for any given client. Calculated live, per
+client, at the sales conversation instead — not something to pre-build into
+the plan.
+
+This drops the one hard blocker P12 had. What's left of it (hardware BOM —
+already provable from the turnkey build spec, §390; support model;
+onboarding time per client; what happens to a client's data when they stop
+paying, which §393's controller/processor stance already answers most of —
+it's their box, nothing happens to it) is still open, and — like P11 —
+needs talking through rather than drafting solo, since it's business
+decisions, not something derivable from the code.
+
+README item's blocked-on clause removed; item re-scoped to reflect what's
+actually left.

@@ -237,10 +237,14 @@ Strategy:
 graph.** P1 (§255) and P2 (§256) are done. P3/P3a/P4 (social publishing via
 Postiz, §257/§258/§261) are dropped — Postiz was removed in §301a. Phase tags
 below.
-- [ ] **P12 — Commercial plan** (§84.5) — hardware BOM, support model,
-      onboarding time, and what happens to a client's data when they stop
-      paying. Lands as an **Artifact, not a repo commit** (§84.6). Blocked on
-      the SaaS inventory + monthly costs from @mat (§84.7).
+- [ ] **P12 — Commercial plan** (§84.5) — hardware BOM (provable now from
+      the turnkey build spec, §390), support model, onboarding time, and
+      what happens to a client's data when they stop paying (§393's
+      controller/processor stance already answers most of this — it's their
+      box). No generic SaaS-cost inventory needed — savings are calculated
+      client-by-client at the sales conversation, not pre-built (§394).
+      Lands as an **Artifact, not a repo commit** (§84.6). A business stance
+      to talk through, like P11 — not a coding session.
 
 ### Roster changes (§81)
 
