@@ -25025,3 +25025,73 @@ disagreement on the picks is a new, smaller item, not a reason to leave P10
 open indefinitely.
 
 Docs-only — no version bump, no host verification needed.
+
+## 391. P8 — rebrand tier 2 implemented (§84.2)
+
+Mapped the full scope before touching anything, since "all safe, all
+cosmetic" (the original §84.2 framing) turned out to have two real
+exceptions the tiering didn't anticipate:
+
+- **The exposure/CrowdSec config markers** (`HA_MARKER_BEGIN/END` in
+  `exposureConfigFiles.ts`, `NPM_REALIP_MARKER_*`/`NPM_BOUNCER_MARKER_*` in
+  `crowdsecConfig.ts`) are `# >>> homelab-management: ... >>>` comment
+  fences the backend searches NPM's on-disk generated config for, to
+  replace its own managed block. Read `replaceMarkedBlock()`: when the
+  fence isn't found, it **appends** a new block rather than replacing —
+  renaming the marker text would mean every live host's *existing* config
+  (carrying the old marker) gets a duplicate block on the next reconcile,
+  not a clean swap. Left these alone — same call as Tier 3's own test ("real
+  cost, no user-visible benefit"), just found inside what looked like Tier 2.
+- **`n8nWorkflows.ts`'s `ALERT_TEST_SCENARIO`** matching key — same class of
+  internal-only identifier, left alone for the same reason.
+- **The compose project name** (`homelab-management`, directory-derived —
+  confirmed live: `docker volume ls`/`docker network ls` on the host all
+  carry that prefix) backs 4 **named volumes** (`db-data`, `scripts-data`,
+  `logs-data`, `backups-data`). A naive project rename would make Compose
+  create new, empty volumes under the new prefix and orphan the real
+  Postgres data/logs/backups. Fixed by pinning each volume's `name:` to its
+  *current* literal Docker volume name (`homelab-management_*`) — the
+  project identity changes, the actual data volumes don't move at all.
+  Confirmed the one place that reads a volume name at runtime
+  (`appBackup.ts`'s `backupsVolumeName()`) does it via live `docker inspect`
+  of its own container's mounts, not a hardcoded string — so pinning is
+  sufficient, no code change needed there.
+
+**What actually changed**, `homelab-*` → `business-lab-*`: both
+`package.json` `name`s (+ matching `package-lock.json` `name` fields, both
+occurrences each — root and the `packages[""]` entry), the Angular project
+name + build output path (`angular.json`, `frontend/Dockerfile`'s `COPY`,
+`docker-compose.test.yml`'s bind mount, `frontend/karma.conf.js`'s coverage
+dir), the two Docker image tags (`business-lab-backend`/`-frontend`, both
+`docker-compose.yml` and `docker-compose.test.yml`), the network
+(`business-lab-net`), the compose project (`name: business-lab`, new
+top-level key — see the volume-pinning above), `scripts/check.sh` +
+`CLAUDE.md`'s matching `business-lab-frontend-test` local dev image name,
+`start.sh`'s `db_container()` filter
+(`com.docker.compose.project=business-lab` — **must** match the compose
+file's `name:` exactly or the live-DB-credential lookup silently finds
+nothing), and `setup_test/README.md`'s image-tag mentions. Test fixtures in
+`composeOverride.test.ts`/`backupScheduler.test.ts` updated for consistency
+(arbitrary strings, not load-bearing).
+
+**Deliberately untouched**, matching Tier 3 (real cost, no visible benefit,
+or genuinely risky for a string nobody sees): `POSTGRES_DB`/`POSTGRES_USER`
+defaults (`homelab`, both the real compose file and the ephemeral
+`docker-compose.test.yml`), the `DASHBOARD_SUBDOMAIN` default (`homelab.
+<domain>` — a public-hostname change, its own migration task), the GitHub
+repo name, and the two config markers above.
+
+Backend typecheck clean, 757/757 tests pass; frontend `build` (confirms the
+Angular rename: output lands at `dist/business-lab-frontend` as expected)
+and `test:ci` (55/55, rebuilding `business-lab-frontend-test` fresh under
+the new name) both clean. `docker compose config` validated on both compose
+files (project name, volume pins, and syntax all confirmed correct).
+
+**Not yet live** — this is the real maintenance window the README item
+named, and the cutover itself needs @mat's hands: bringing the *old*
+`homelab-management`-named stack down to free the fixed host ports
+(`10000`/`10001`) is a repo-root `docker compose down`, which
+`.claude/hooks/bash-guards.sh` refuses for the agent by design — correctly,
+here it's exactly the kind of action that needs a human's own call, not a
+routed-around block. Staying on `dev` until @mat runs the cutover and it's
+proven live.

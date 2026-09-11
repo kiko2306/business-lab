@@ -5,7 +5,7 @@
 #   ./scripts/check.sh backend test
 #   ./scripts/check.sh backend typecheck
 #   ./scripts/check.sh frontend build
-#   ./scripts/check.sh frontend test        # builds homelab-frontend-test if missing
+#   ./scripts/check.sh frontend test        # builds business-lab-frontend-test if missing
 #
 # Resolves the repo root via BASH_SOURCE rather than $PWD: mounting "$PWD" as
 # /repo silently breaks once the shell's cwd has drifted into backend/ or
@@ -22,9 +22,9 @@ case "$workspace/$task" in
   backend/typecheck)  docker run --rm -v "$ROOT":/repo -w /repo/backend node:20 npm run typecheck ;;
   frontend/build)     docker run --rm -v "$ROOT":/repo -w /repo/frontend node:20 npm run build ;;
   frontend/test)
-    docker image inspect homelab-frontend-test >/dev/null 2>&1 \
-      || docker build -t homelab-frontend-test -f "$ROOT/frontend/Dockerfile.test" "$ROOT/frontend"
-    docker run --rm -v "$ROOT":/repo -w /repo/frontend homelab-frontend-test npm run test:ci
+    docker image inspect business-lab-frontend-test >/dev/null 2>&1 \
+      || docker build -t business-lab-frontend-test -f "$ROOT/frontend/Dockerfile.test" "$ROOT/frontend"
+    docker run --rm -v "$ROOT":/repo -w /repo/frontend business-lab-frontend-test npm run test:ci
     ;;
   *)
     echo "Usage: $0 {backend test|backend typecheck|frontend build|frontend test}" >&2

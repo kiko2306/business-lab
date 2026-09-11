@@ -221,7 +221,7 @@ machine means a separate Docker daemon:
 | Same-host hazard | On a laptop |
 |---|---|
 | App controls in the test dashboard driving **production's** containers (identical Compose project names — see Appendix A) | **gone** — different daemon, no shared containers |
-| `homelab-backend`/`homelab-frontend` image tags being overwritten | **gone** |
+| `business-lab-backend`/`business-lab-frontend` image tags being overwritten | **gone** |
 | Port collisions on `80`/`3000` | **gone** — use the defaults |
 | Tunnel-name default matching production's tunnel | **mostly gone** — different hostname |
 
@@ -322,7 +322,7 @@ Only if a second machine isn't available. Four extra hazards apply:
    it at — so pressing Stop in a test dashboard stops **production's**
    containers. Expect the test dashboard to show apps as already *running*;
    that is the symptom. Use only `/setup` and read-only Settings.
-2. **Image tags.** `homelab-backend`/`homelab-frontend` are declared with no
+2. **Image tags.** `business-lab-backend`/`business-lab-frontend` are declared with no
    tag and no variable, so a test build overwrites the tags production uses.
    Run at the same commit, and rebuild live afterwards.
 3. **Ports.** Set `FRONTEND_PORT=8091`, `BACKEND_PORT=3100` and

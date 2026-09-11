@@ -183,7 +183,7 @@ prompt_env_var() {
 # back so the dashboard shows what is actually in use.
 db_container() {
   docker ps -q \
-    --filter label=com.docker.compose.project=homelab-management \
+    --filter label=com.docker.compose.project=business-lab \
     --filter label=com.docker.compose.service=database 2>/dev/null | head -n1
 }
 

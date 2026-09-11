@@ -3,7 +3,7 @@
   "version": 1,
   "newProjectRoot": "projects",
   "projects": {
-    "homelab-frontend": {
+    "business-lab-frontend": {
       "projectType": "application",
       "schematics": {},
       "root": "",
@@ -13,7 +13,7 @@
         "build": {
           "builder": "@angular-devkit/build-angular:application",
           "options": {
-            "outputPath": "dist/homelab-frontend",
+            "outputPath": "dist/business-lab-frontend",
             "index": "src/index.html",
             "browser": "src/main.ts",
             "polyfills": ["zone.js"],
@@ -61,10 +61,10 @@
           "builder": "@angular-devkit/build-angular:dev-server",
           "configurations": {
             "production": {
-              "buildTarget": "homelab-frontend:build:production"
+              "buildTarget": "business-lab-frontend:build:production"
             },
             "development": {
-              "buildTarget": "homelab-frontend:build:development"
+              "buildTarget": "business-lab-frontend:build:development"
             }
           },
           "defaultConfiguration": "development"

@@ -74,13 +74,13 @@ source of truth. Nothing loads the file automatically anyway.
 resolves the repo root itself, so it works even if the shell's cwd has
 drifted into `backend/` or `frontend/` — mounting `$PWD` directly breaks
 there, since some backend tests resolve paths up to the repo root, not just
-their own workspace. `frontend test` builds the `homelab-frontend-test`
+their own workspace. `frontend test` builds the `business-lab-frontend-test`
 image on first use if it's missing (Karma/Jasmine + headless Chrome doesn't
 run on plain `node:20` — no Chrome, and `node:20`'s Debian base is missing
 the shared libraries headless Chrome needs). `./scripts/smoke-tests.sh` runs
 on the host against an already-running backend.
 
-Rebuild `homelab-frontend-test` (`docker build -t homelab-frontend-test -f
+Rebuild `business-lab-frontend-test` (`docker build -t business-lab-frontend-test -f
 frontend/Dockerfile.test frontend`) if `frontend/package-lock.json`'s
 `puppeteer` version changes (`Dockerfile.test` pins a matching Chrome
 download).

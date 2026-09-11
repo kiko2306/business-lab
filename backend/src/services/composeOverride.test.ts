@@ -138,6 +138,6 @@ describe('pickLocalDigest', () => {
   });
 
   it('returns null for a locally built image, which has no digests at all', () => {
-    expect(pickLocalDigest([], 'homelab-backend')).toBeNull();
+    expect(pickLocalDigest([], 'business-lab-backend')).toBeNull();
   });
 });

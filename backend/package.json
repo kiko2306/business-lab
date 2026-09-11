@@ -1,7 +1,7 @@
 {
-  "name": "homelab-backend",
+  "name": "business-lab-backend",
   "version": "0.63.2",
-  "description": "Homelab management API server",
+  "description": "Business Lab management API server",
   "license": "GPL-3.0-or-later",
   "main": "dist/index.js",
   "scripts": {

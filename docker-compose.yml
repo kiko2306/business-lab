@@ -1,4 +1,11 @@
 
+# Pins the compose project name regardless of the checkout directory's own
+# name (Compose otherwise derives it from the directory, which is how this
+# stack ended up running as "homelab-management" — the original clone dir).
+# start.sh's own container-discovery filter (com.docker.compose.project)
+# has to match this exactly. Rebrand tier 2 (plan.md §84.2/§390).
+name: business-lab
+
 services:
   frontend:
     mem_limit: 128m
@@ -8,13 +15,13 @@ services:
       dockerfile: Dockerfile
       args:
         API_URL: ${API_URL:-}
-    image: homelab-frontend
+    image: business-lab-frontend
     ports:
       - "${FRONTEND_PORT:-10001}:80"
     depends_on:
       - backend
     networks:
-      - homelab-net
+      - business-lab-net
     restart: unless-stopped
 
   backend:
@@ -25,7 +32,7 @@ services:
       dockerfile: Dockerfile
       args:
         DOCKER_GID: ${DOCKER_GID:-999}
-    image: homelab-backend
+    image: business-lab-backend
     ports:
       # Bound to loopback only. The dashboard never uses this publish — the
       # frontend proxies /api/ to backend:3000 over the compose network
@@ -91,7 +98,7 @@ services:
       docker-socket-proxy:
         condition: service_started
     networks:
-      - homelab-net
+      - business-lab-net
     restart: unless-stopped
 
   # Scopes the backend's Docker access instead of mounting the raw host
@@ -128,10 +135,10 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
-      - homelab-net
+      - business-lab-net
     restart: unless-stopped
     # Not published to the host — only reachable from other containers on
-    # homelab-net, by service name.
+    # business-lab-net, by service name.
 
   database:
     mem_limit: 512m
@@ -145,7 +152,7 @@ services:
       - db-data:/var/lib/postgresql/data
       - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     networks:
-      - homelab-net
+      - business-lab-net
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-homelab} -d ${POSTGRES_DB:-homelab}"]
@@ -173,7 +180,7 @@ services:
   # false-positive-avoidance grace period.
   self-update-watchdog:
     mem_limit: 96m
-    image: homelab-backend
+    image: business-lab-backend
     # command, not entrypoint: keeps the image's own ENTRYPOINT
     # (docker-entrypoint.sh) so this still gets its root-level fixups
     # (chown, git safe.directory) before dropping to appuser — only what
@@ -196,7 +203,7 @@ services:
       watchdog-docker-proxy:
         condition: service_started
     networks:
-      - homelab-net
+      - business-lab-net
     restart: unless-stopped
 
   # A second, separate docker-socket-proxy instance for the watchdog rather
@@ -230,21 +237,32 @@ services:
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
     networks:
-      - homelab-net
+      - business-lab-net
     restart: unless-stopped
     # Not published to the host — only reachable from other containers on
-    # homelab-net, by service name.
+    # business-lab-net, by service name.
 
 volumes:
+  # Pinned to their existing literal Docker volume names (the project-name
+  # prefix these got under the old "homelab-management" project) rather than
+  # letting them re-prefix under the new project name above — the whole
+  # point of the rebrand is cosmetic identifiers, not moving the one real
+  # stateful thing in the stack (Postgres data, logs, backups). Anything
+  # relying on `docker volume inspect` (backupScheduler.ts's postgres-backup
+  # path) needs this to keep resolving to the same volume it always has.
   db-data:
     driver: local
+    name: homelab-management_db-data
   scripts-data:
     driver: local
+    name: homelab-management_scripts-data
   logs-data:
     driver: local
+    name: homelab-management_logs-data
   backups-data:
     driver: local
+    name: homelab-management_backups-data
 
 networks:
-  homelab-net:
+  business-lab-net:
     driver: bridge

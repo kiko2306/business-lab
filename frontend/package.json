@@ -1,7 +1,7 @@
 {
-  "name": "homelab-frontend",
+  "name": "business-lab-frontend",
   "version": "0.63.2",
-  "description": "Homelab management Angular frontend",
+  "description": "Business Lab management Angular frontend",
   "license": "GPL-3.0-or-later",
   "scripts": {
     "ng": "ng",

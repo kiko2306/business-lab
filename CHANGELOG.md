@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.77.4] — 2026-09-11
+
+### Changed
+
+- Internal identifiers rebranded homelab-* -> business-lab-* (npm package names, Docker image tags, the compose network, and the compose project name itself — the last pinned via a new top-level 'name:' key, with each stateful volume pinned to its existing literal name so the rename touches zero data) — P8/rebrand tier 2, §84.2/§390
+
 ## [0.77.3] — 2026-09-11
 
 ### Fixed

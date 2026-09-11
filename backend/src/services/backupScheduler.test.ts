@@ -177,7 +177,7 @@ describe('runAppDataBackup failure reporting', () => {
       outcomes: [
         { app: 'vaultwarden', kind: 'sqlite', ok: true, detail: 'snapshot 272 KB' },
         { app: 'nextcloud', kind: 'postgres', ok: false, detail: 'could not resolve host nextcloud-db' },
-        { app: 'immich', kind: 'postgres', ok: false, detail: 'network homelab-net not found' },
+        { app: 'immich', kind: 'postgres', ok: false, detail: 'network business-lab-net not found' },
       ],
     });
 
@@ -191,7 +191,7 @@ describe('runAppDataBackup failure reporting', () => {
       failed: 2,
       failures: [
         { app: 'nextcloud', kind: 'postgres', detail: 'could not resolve host nextcloud-db' },
-        { app: 'immich', kind: 'postgres', detail: 'network homelab-net not found' },
+        { app: 'immich', kind: 'postgres', detail: 'network business-lab-net not found' },
       ],
     });
   });

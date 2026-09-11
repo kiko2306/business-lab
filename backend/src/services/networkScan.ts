@@ -1,7 +1,7 @@
 /**
  * LAN device discovery for the dashboard's Utils section.
  *
- * The backend container itself sits on the internal `homelab-net` Docker
+ * The backend container itself sits on the internal `business-lab-net` Docker
  * bridge, not the physical LAN, so it cannot see LAN hosts directly. Instead
  * it launches a short-lived `--network host` container through the same
  * `docker` CLI (routed at `DOCKER_HOST` to docker-socket-proxy) that

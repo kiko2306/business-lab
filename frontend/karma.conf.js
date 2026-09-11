@@ -19,7 +19,7 @@ module.exports = function (config) {
       suppressAll: true,
     },
     coverageReporter: {
-      dir: require('path').join(__dirname, './coverage/homelab-frontend'),
+      dir: require('path').join(__dirname, './coverage/business-lab-frontend'),
       subdir: '.',
       reporters: [{ type: 'html' }, { type: 'text-summary' }],
     },
