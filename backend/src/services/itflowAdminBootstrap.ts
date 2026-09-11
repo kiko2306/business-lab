@@ -18,6 +18,19 @@
  * DB credentials posted to it (§350). Those come from apps/itflow/.env
  * (`ITFLOW_DB_*`, same values the itflow-db container was created with); the
  * host is always the compose service name.
+ *
+ * The wizard's own admin-creation (`add_user`) only ever runs once —
+ * `already-setup` short-circuits before it every start after. Found live
+ * (2026-09-11): the very first bootstrap ran while the Authelia admin's
+ * email was still the placeholder `admin@example.com` (§350's own proof),
+ * and nothing ever re-synced it once the real email was set — a stale
+ * identity forever, the same class of gap the Nextcloud admin-group
+ * promotion (§377) fixed on the other side. So the `already-setup` branch
+ * now also re-syncs `users.user_email`/`user_name` to the *current* Authelia
+ * admin on every start via `itflowDb.ts` (PHP + mysqli through ITFlow's own
+ * container, prepared statement) — `user_id = 1` is always that
+ * wizard-created row, since `add_database` leaves `users` completely empty
+ * and `add_user` is the very first insert into it, ever.
  */
 
 import logger from '../utils/logger';
@@ -28,6 +41,7 @@ import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
 import { getSetupState, runSetupWizard } from './itflowClient';
+import { runItflowDbScript } from './itflowDb';
 
 export const ITFLOW_SERVICE = 'itflow';
 export const ITFLOW_ADMIN_PASSWORD_KEY = 'ITFLOW_ADMIN_PASSWORD';
@@ -102,7 +116,8 @@ export async function reconcileItflowFirstAdmin(serviceName: string): Promise<vo
       }
 
       if (state === 'already-setup') {
-        logger.info('ITFlow setup is already complete; nothing to bootstrap');
+        logger.info('ITFlow setup is already complete; syncing the admin identity');
+        await reconcileAdminIdentity(email, name);
         return;
       }
 
@@ -130,3 +145,31 @@ export async function reconcileItflowFirstAdmin(serviceName: string): Promise<vo
     logger.error('Failed to bootstrap the ITFlow first admin', { error: (error as Error).message });
   }
 }
+
+/**
+ * Re-point the wizard-created admin (`user_id = 1`, see file header) at the
+ * *current* Authelia admin's email/name. Idempotent — a no-op once they
+ * already match. Never throws; a failure here leaves the previous identity
+ * in place, which is a stale-but-working login, not a broken one.
+ */
+async function reconcileAdminIdentity(email: string, name: string): Promise<void> {
+  const script = [
+    "$email = getenv('ITFLOW_ADMIN_EMAIL');",
+    "$name = getenv('ITFLOW_ADMIN_NAME');",
+    '$stmt = $mysqli->prepare("UPDATE users SET user_email = ?, user_name = ? WHERE user_id = 1");',
+    '$stmt->bind_param("ss", $email, $name);',
+    'if ($stmt->execute()) {',
+    '    echo "hlm: admin identity synced to $email\\n";',
+    '} else {',
+    '    echo "hlm: could not sync admin identity: " . $mysqli->error . "\\n";',
+    '}',
+  ];
+
+  const result = await runItflowDbScript(script, {
+    env: { ...process.env, ITFLOW_ADMIN_EMAIL: email, ITFLOW_ADMIN_NAME: name },
+    passEnv: ['ITFLOW_ADMIN_EMAIL', 'ITFLOW_ADMIN_NAME'],
+  });
+  logger.info('ITFlow admin identity reconciled', { ok: result.ok, output: result.output || '(no output)' });
+}
+
+export const __test = { reconcileAdminIdentity };

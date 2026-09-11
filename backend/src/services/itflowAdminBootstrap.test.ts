@@ -6,6 +6,7 @@ import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
 import { getSetupState, runSetupWizard } from './itflowClient';
+import { runItflowDbScript } from './itflowDb';
 import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 
 vi.mock('../config/services', async (importOriginal) => ({
@@ -19,6 +20,7 @@ vi.mock('./autheliaUsers', () => ({ getAutheliaAdminUser: vi.fn() }));
 vi.mock('./exposure', () => ({ getServiceExposureRow: vi.fn() }));
 vi.mock('./appEnv', () => ({ readAppEnvValue: vi.fn() }));
 vi.mock('./itflowClient', () => ({ getSetupState: vi.fn(), runSetupWizard: vi.fn() }));
+vi.mock('./itflowDb', () => ({ runItflowDbScript: vi.fn() }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 const mockedResolve = vi.mocked(resolveComposeFile);
@@ -30,6 +32,7 @@ const mockedExposure = vi.mocked(getServiceExposureRow);
 const mockedReadEnv = vi.mocked(readAppEnvValue);
 const mockedState = vi.mocked(getSetupState);
 const mockedWizard = vi.mocked(runSetupWizard);
+const mockedDbScript = vi.mocked(runItflowDbScript);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -60,6 +63,7 @@ beforeEach(() => {
   mockedAdmin.mockReturnValue({ username: 'mig', email: 'mig@example.com', displayName: 'Mig T', groups: [] });
   mockedState.mockResolvedValue('needs-setup');
   mockedWizard.mockResolvedValue('completed');
+  mockedDbScript.mockResolvedValue({ ok: true, output: 'hlm: admin identity synced to mig@example.com' });
 });
 
 describe('reconcileItflowFirstAdmin', () => {
@@ -114,10 +118,21 @@ describe('reconcileItflowFirstAdmin', () => {
     });
   });
 
-  it('treats an already-complete setup as success without POSTing', async () => {
+  it('treats an already-complete setup as success without POSTing, and re-syncs the admin identity', async () => {
     mockedState.mockResolvedValue('already-setup');
     await expect(reconcileItflowFirstAdmin('itflow')).resolves.toBeUndefined();
     expect(mockedWizard).not.toHaveBeenCalled();
+
+    // §350's own proof: the wizard's one-shot admin creation can leave a stale
+    // email (it ran against a placeholder once) with no later way to fix it —
+    // this re-sync is what keeps it converging on the *current* Authelia admin.
+    expect(mockedDbScript).toHaveBeenCalledTimes(1);
+    const [script, opts] = mockedDbScript.mock.calls[0];
+    expect(script.join('\n')).toContain('UPDATE users SET user_email = ?, user_name = ? WHERE user_id = 1');
+    expect(opts?.env?.ITFLOW_ADMIN_EMAIL).toBe('mig@example.com');
+    expect(opts?.env?.ITFLOW_ADMIN_NAME).toBe('Mig T');
+    // The email/name never appear literally in the script — only via getenv().
+    expect(script.join('\n')).not.toContain('mig@example.com');
   });
 
   it('retries while unreachable then gives up without throwing', async () => {

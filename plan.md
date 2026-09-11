@@ -24686,3 +24686,47 @@ real stack** — needs a host deploy + ITFlow restart to confirm the prepared
 statements actually land (right column types, `standard_smtp`/`standard_imap`
 accepted, cron flips on) the same way §377/§378 proved the Nextcloud
 reconcilers. Staying on `dev` until that's done.
+
+## 381. §380 verified live — and a real bug found + fixed: ITFlow's admin was stuck on a stale email (2026-09-11)
+
+Deployed 0.77.0 and restarted ITFlow. Backend log confirmed §380 works exactly
+as designed:
+
+```
+ITFlow mail/cron settings reconciled — mailConfigured: true, ok: true
+output: hlm: cron enabled / hlm: SMTP settings copied from the dashboard /
+        hlm: IMAP settings copied from the dashboard
+```
+
+@mat then reported their webmaster account didn't exist in ITFlow. Root
+cause, found by reading the log trail rather than guessing: §350's own proof
+line reads `Ran ITFlow's setup wizard and created its admin
+(admin@example.com)` — the wizard's one-time `add_user` step ran while the
+Authelia admin's email was still the placeholder `admin@example.com`.
+`reconcileItflowFirstAdmin` never runs the wizard a second time
+(`already-setup` short-circuits it), so ITFlow's admin has been stuck on that
+placeholder ever since, unaffected by the Authelia admin's email later
+becoming real (confirmed live: `apps/authelia/config/users_database.yml`
+today has `mat` / `miguelamtx@gmail.com`). Same class of gap as the Nextcloud
+admin-group promotion (§377) — a one-shot bootstrap with no later
+convergence.
+
+**Fixed the same session, same pattern**: `itflowAdminBootstrap.ts`'s
+`already-setup` branch now calls a new `reconcileAdminIdentity()` — an
+`UPDATE users SET user_email = ?, user_name = ? WHERE user_id = 1` through
+the `itflowDb.ts` scaffold (§380), run on *every* start once setup is
+already done. `user_id = 1` is always the wizard-created row (`add_database`
+leaves `users` empty; `add_user` is the first-ever insert), so this can't
+clobber a later human-added ITFlow user. Idempotent, no-op once the email
+already matches. Test file gained a `./itflowDb` mock (the real one would
+have shelled out to `docker compose` in the existing "already-setup" test)
+and an assertion on the sync call; 753/753 still pass (one test extended,
+not a new count). Patch 0.77.0 → 0.77.1.
+
+**Immediate unblock given to @mat**: log in to ITFlow with
+`admin@example.com` + the `ITFLOW_ADMIN_PASSWORD` value from the dashboard's
+ITFlow Configuration panel, until the fix deploys and the next ITFlow
+restart re-syncs the email to the real one.
+
+Not yet re-verified live (needs another deploy + ITFlow restart) — staying
+on `dev` until that's done, same gate as §380.

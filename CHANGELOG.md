@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.77.1] — 2026-09-11
+
+### Fixed
+
+- ITFlow's wizard-created admin account no longer gets stuck on a stale email — its identity now re-syncs to the current Authelia admin on every start, not just the first (§350 follow-up)
+
 ## [0.77.0] — 2026-09-11
 
 ### Added
