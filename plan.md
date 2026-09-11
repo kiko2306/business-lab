@@ -25610,3 +25610,40 @@ Nextcloud's four warnings: verified fixed. Merging §402 to `main` stands —
 Nextcloud (the actual ask) is proven live; the HSTS-for-all-hosts gap is a
 separate, scoped, not-yet-started piece of work, tracked as its own README
 item rather than blocking what already works.
+
+## 402.2. Nextcloud's own admin panel down to 2 items — both already resolved
+
+@mat pasted the admin panel again after §402.1's fix. Down from 4 warnings
+to 2 ("Erros no log", "Cabeçalhos HTTP" — HSTS again).
+
+**Log errors: both stale, pre-fix.** `occ log:file` (filtered to level>=3)
+shows the same single OnlyOffice self-check blip from Sep 8, plus one mail
+*send* failure dated **2026-09-10 15:45** — before §402's mail fix deployed
+(~2026-09-11 13:32). No errors since the fix landed; this ages out of
+Nextcloud's own rolling "errors since" window on its own.
+
+**HSTS: real fix confirmed working, but Nextcloud's own self-check can't
+see it — traced why, not a regression.** Read the actual check
+(`apps/settings/lib/SetupChecks/SecurityHeaders.php` +
+`CheckServerResponseTrait::getTestUrls`): it doesn't inspect what a real
+client receives. It makes its own HTTP request to itself — `overwrite.cli.url`
+first (here: `http://localhost`, an internal loopback address that never
+touches NPM), then `getBaseUrl()`, then each `trusted_domains` entry over
+both schemes — and evaluates headers on the *first* response that comes
+back `200`. Authelia protects every path on the public hostname, including
+`/heartbeat` (confirmed: 302 to the Authelia login, same as every other
+path) — so the only candidate that ever returns 200 is the internal
+loopback one, which by definition never passes through NPM and never
+carries the header. Verified the real fix is unaffected: `curl -I` against
+the public hostname from three independent vantage points (this machine,
+the host, and *from inside the Nextcloud container itself* hitting its own
+public URL) all show `strict-transport-security: max-age=15552000;
+includeSubDomains`.
+
+Real fix exists for the self-check too — set `overwrite.cli.url` to the
+public HTTPS URL (tried first) plus a narrow Authelia access-control bypass
+for `/heartbeat` (no sensitive data, a keep-alive ping) so that first
+candidate actually reaches NPM instead of 302ing — but @mat chose to leave
+it: the security outcome (real visitors get the header) is already
+achieved, and this would be trading a truly cosmetic panel warning for a
+change to Authelia's access rules. Not pursued.
