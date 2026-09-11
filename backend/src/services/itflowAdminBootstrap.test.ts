@@ -7,7 +7,7 @@ import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
 import { getSetupState, runSetupWizard } from './itflowClient';
 import { runItflowDbScript } from './itflowDb';
-import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
+import { __test, reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 
 vi.mock('../config/services', async (importOriginal) => ({
   ...(await importOriginal<typeof import('../config/services')>()),
@@ -118,7 +118,7 @@ describe('reconcileItflowFirstAdmin', () => {
     });
   });
 
-  it('treats an already-complete setup as success without POSTing, and re-syncs the admin identity', async () => {
+  it('treats an already-complete setup as success without POSTing, and re-syncs the admin identity + password', async () => {
     mockedState.mockResolvedValue('already-setup');
     await expect(reconcileItflowFirstAdmin('itflow')).resolves.toBeUndefined();
     expect(mockedWizard).not.toHaveBeenCalled();
@@ -126,13 +126,17 @@ describe('reconcileItflowFirstAdmin', () => {
     // §350's own proof: the wizard's one-shot admin creation can leave a stale
     // email (it ran against a placeholder once) with no later way to fix it —
     // this re-sync is what keeps it converging on the *current* Authelia admin.
-    expect(mockedDbScript).toHaveBeenCalledTimes(1);
-    const [script, opts] = mockedDbScript.mock.calls[0];
-    expect(script.join('\n')).toContain('UPDATE users SET user_email = ?, user_name = ? WHERE user_id = 1');
-    expect(opts?.env?.ITFLOW_ADMIN_EMAIL).toBe('mig@example.com');
-    expect(opts?.env?.ITFLOW_ADMIN_NAME).toBe('Mig T');
+    expect(mockedDbScript).toHaveBeenCalledTimes(2);
+    const [identityScript, identityOpts] = mockedDbScript.mock.calls[0];
+    expect(identityScript.join('\n')).toContain('UPDATE users SET user_email = ?, user_name = ? WHERE user_id = 1');
+    expect(identityOpts?.env?.ITFLOW_ADMIN_EMAIL).toBe('mig@example.com');
+    expect(identityOpts?.env?.ITFLOW_ADMIN_NAME).toBe('Mig T');
     // The email/name never appear literally in the script — only via getenv().
-    expect(script.join('\n')).not.toContain('mig@example.com');
+    expect(identityScript.join('\n')).not.toContain('mig@example.com');
+
+    const [passwordScript, passwordOpts] = mockedDbScript.mock.calls[1];
+    expect(passwordOpts?.env?.ITFLOW_ADMIN_PASSWORD_SYNC).toBe('generated-itflow-pw');
+    expect(passwordScript.join('\n')).not.toContain('generated-itflow-pw');
   });
 
   it('retries while unreachable then gives up without throwing', async () => {
@@ -157,5 +161,40 @@ describe('reconcileItflowFirstAdmin', () => {
       expect.any(String),
       expect.objectContaining({ name: 'Admin', timezone: 'UTC' })
     );
+  });
+});
+
+// §382: the login password also wraps ITFlow's internal credential-encryption
+// master key, so the reconciler has to re-derive that, not just re-hash —
+// and only when password_verify() actually disagrees, so an ordinary restart
+// with nothing changed touches the row at all.
+describe('reconcileAdminPassword', () => {
+  it('checks password_verify() first, and re-derives the encryption key only on a real mismatch', async () => {
+    mockedDbScript.mockResolvedValue({ ok: true, output: 'hlm: admin password (and its encryption key) synced to the config panel value' });
+
+    await __test.reconcileAdminPassword('new-pw');
+
+    expect(mockedDbScript).toHaveBeenCalledTimes(1);
+    const [script, opts] = mockedDbScript.mock.calls[0];
+    const joined = script.join('\n');
+    expect(joined).toContain('password_verify($password, $current_hash)');
+    expect(joined).toContain('setupFirstUserSpecificKey($password, $site_encryption_master_key)');
+    expect(joined).toContain("UPDATE users SET user_password = ?, user_specific_encryption_ciphertext = ?");
+    // The plaintext password travels through getenv() only, never inline.
+    expect(joined).not.toContain('new-pw');
+    expect(opts?.env?.ITFLOW_ADMIN_PASSWORD_SYNC).toBe('new-pw');
+  });
+
+  it('never lets the password leak into the logged output', async () => {
+    const loggerModule = await import('../utils/logger');
+    mockedDbScript.mockResolvedValue({ ok: false, output: 'mysqli error near new-pw at line 3' });
+
+    await __test.reconcileAdminPassword('new-pw');
+
+    const infoCall = (loggerModule.default.info as ReturnType<typeof vi.fn>).mock.calls.find(
+      (call) => call[0] === 'ITFlow admin password reconciled'
+    );
+    expect(infoCall?.[1].output).not.toContain('new-pw');
+    expect(infoCall?.[1].output).toContain('***');
   });
 });

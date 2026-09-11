@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.77.3] — 2026-09-11
+
+### Fixed
+
+- A changed ITFlow admin password in the config panel now actually takes effect on restart — the login password also wraps ITFlow's own internal credential-encryption key, so the reconciler re-derives that too, not just the hash, only when password_verify() finds a real mismatch (§382)
+
 ## [0.77.2] — 2026-09-11
 
 ### Fixed

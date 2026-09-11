@@ -24785,3 +24785,59 @@ password still fully masked, same fixture). 755/755 pass, typecheck clean.
 Patch 0.77.1 → 0.77.2. Not yet re-verified live — needs a deploy + a look at
 the ITFlow config panel to confirm the password field actually shows text
 now. Staying on `dev` until that's done.
+
+## 383. ITFlow admin password changes never took effect — the real reason, and the fix (§382 follow-up, 2026-09-11)
+
+@mat read the now-visible password, tried it, still "Incorrect username or
+password." Different bug from §381's — same *shape* (wizard runs once,
+nothing re-syncs after), worse consequence.
+
+**Root cause**, found by reading ITFlow's own `functions/security.php`
+rather than guessing: the login password isn't just `user_password`
+(bcrypt) — it also unlocks `user_specific_encryption_ciphertext`, a per-user
+AES-wrapped copy of a **site-wide credential-encryption master key** that
+protects every credential ITFlow itself stores (client server passwords,
+API keys). `setup/index.php`'s `add_user` step sets both together, once,
+during the one-shot wizard run — and, same as the email, nothing has ever
+re-synced either one since. So the password @mat set in the config panel
+was written to `.env` correctly; it just never reached ITFlow's `users`
+row, exactly like the email had been stuck.
+
+**Why this couldn't be fixed the same simple way as the email**: ITFlow's
+own "change password" handlers (`admin/post/users.php`) call
+`encryptUserSpecificKey()`, which reads `$_SESSION['user_encryption_
+session_ciphertext']` + a `$_COOKIE` — it decrypts the *current* master key
+using the session's already-established key, then re-wraps it under the new
+password. That only works from an authenticated browser session; a cold
+`docker compose run` script has neither. And there's no way around that
+without the user's **old**, currently-valid password (needed to decrypt the
+existing wrapped key) — which was never captured anywhere and is gone the
+moment `.env` gets overwritten.
+
+**Fix, `reconcileAdminPassword()` in `itflowAdminBootstrap.ts`**: rather
+than a lossless rewrap, mirror the wizard's own *from-scratch* path instead
+— `setupFirstUserSpecificKey()`, the function ITFlow uses for a brand-new
+account, needs no session, just takes the new plaintext password and
+generates a **fresh** site master key. Gated with `password_verify()`
+against the currently-stored hash first, so this only writes anything when
+there's a genuine mismatch — an ordinary restart with nothing changed is a
+complete no-op, unlike a blind overwrite every start (which would have
+silently destroyed a real deployment's credential vault on every restart,
+not just when actually rotating the password). Wired into the same
+`already-setup` branch as §381's identity sync, right after it.
+
+**The honest trade-off, stated plainly** (also now in `app-credentials.md`):
+this is **not** lossless. Replacing the master key means anything
+previously encrypted under the old one becomes permanently unreadable —
+there is no cold-script way to avoid that without the old password. Checked
+with @mat first: nothing was stored in ITFlow yet, so on `tx-home-utils.com`
+this is exactly the kind of loss CLAUDE.md's "no-guarantees dev/test box"
+section explicitly permits. A real client deployment rotating this password
+needs to know the trade-off going in — now documented.
+
+2 new tests (`password_verify()` gate, `setupFirstUserSpecificKey()` call,
+password redacted from logs even on a failure path); the existing
+already-setup test updated for the second `runItflowDbScript` call.
+757/757 pass, typecheck clean. Patch 0.77.2 → 0.77.3. Not yet re-verified
+live — needs a deploy + ITFlow restart, then an actual login attempt.
+Staying on `dev` until that's done.

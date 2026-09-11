@@ -31,6 +31,31 @@
  * container, prepared statement) — `user_id = 1` is always that
  * wizard-created row, since `add_database` leaves `users` completely empty
  * and `add_user` is the very first insert into it, ever.
+ *
+ * Same gap, worse shape, for the password (§382 follow-up): ITFlow's login
+ * password also unlocks a per-user AES key that wraps a site-wide
+ * credential-encryption master key (`user_specific_encryption_ciphertext` —
+ * see ITFlow's `functions/security.php`), so changing it correctly means
+ * re-wrapping that master key, not just re-hashing. ITFlow's own "change
+ * password" code can only do that from an active logged-in session (it
+ * reads `$_SESSION`/`$_COOKIE`), which a cold reconciler doesn't have. Found
+ * live: @mat changed `ITFLOW_ADMIN_PASSWORD` in the config panel, restarted,
+ * and still couldn't log in — the new value sat in `.env` with nothing ever
+ * pushing it into ITFlow's own `users` row. `reconcileAdminPassword` closes
+ * that gap the only way that's actually correct without a session: detect
+ * an out-of-sync password with `password_verify()` first (so a normal
+ * restart, nothing changed, is a complete no-op) and, only then, reset both
+ * the hash and the master key together — using ITFlow's own
+ * `setupFirstUserSpecificKey()` (also required in), the same function its
+ * wizard uses for a from-scratch account, since it needs no live session.
+ * **This intentionally mirrors the wizard's own from-scratch path — it is
+ * not a lossless "rewrap under a new password" (that needs the *old*
+ * plaintext password, which a cold script never has either). A password
+ * change here also **discards any credential ITFlow itself has encrypted**
+ * (client passwords/API keys stored *inside* ITFlow, not the dashboard) —
+ * acceptable on `tx-home-utils.com` (CLAUDE.md: data loss there is fine,
+ * confirmed with @mat nothing was stored yet), but a real deployment
+ * changing this password needs to know that trade-off going in.
  */
 
 import logger from '../utils/logger';
@@ -56,6 +81,10 @@ const DB_USER_DEFAULT = 'itflow';
 
 const MAX_ATTEMPTS = 30;
 const RETRY_DELAY_MS = 3000;
+// randomString() / setupFirstUserSpecificKey() — needed for reconcileAdminPassword,
+// self-contained (no other requires, no session/cookie reads), safe to pull in
+// on top of config.php's own $mysqli connection.
+const SECURITY_FUNCTIONS_PATH = '/var/www/localhost/htdocs/functions/security.php';
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function resolveItflowBaseUrl(): Promise<string> {
@@ -118,6 +147,7 @@ export async function reconcileItflowFirstAdmin(serviceName: string): Promise<vo
       if (state === 'already-setup') {
         logger.info('ITFlow setup is already complete; syncing the admin identity');
         await reconcileAdminIdentity(email, name);
+        await reconcileAdminPassword(password);
         return;
       }
 
@@ -172,4 +202,51 @@ async function reconcileAdminIdentity(email: string, name: string): Promise<void
   logger.info('ITFlow admin identity reconciled', { ok: result.ok, output: result.output || '(no output)' });
 }
 
-export const __test = { reconcileAdminIdentity };
+/**
+ * Sync the wizard-created admin's password (and the credential-encryption
+ * master key it wraps — see the file header) to whatever `.env` currently
+ * declares. Detects a mismatch with `password_verify()` first, so a normal
+ * restart where nothing changed touches nothing. Never throws.
+ */
+async function reconcileAdminPassword(password: string): Promise<void> {
+  const script = [
+    `require '${SECURITY_FUNCTIONS_PATH}';`,
+    "$password = getenv('ITFLOW_ADMIN_PASSWORD_SYNC');",
+    '$stmt = $mysqli->prepare("SELECT user_password FROM users WHERE user_id = 1");',
+    '$stmt->execute();',
+    '$stmt->bind_result($current_hash);',
+    '$found = $stmt->fetch();',
+    '$stmt->close();',
+    'if (!$found) {',
+    '    echo "hlm: no wizard-created admin (user_id=1) to sync a password for\\n";',
+    '} elseif (password_verify($password, $current_hash)) {',
+    '    echo "hlm: admin password already matches\\n";',
+    '} else {',
+    // Mirrors the wizard's own from-scratch path (setupFirstUserSpecificKey
+    // needs no live session, unlike ITFlow's own change-password code) —
+    // deliberately not a rewrap under the new password, which would need
+    // the *old* plaintext one. See the file header for the trade-off.
+    '    $password_hash = password_hash($password, PASSWORD_DEFAULT);',
+    '    $site_encryption_master_key = randomString();',
+    '    $user_specific_encryption_ciphertext = setupFirstUserSpecificKey($password, $site_encryption_master_key);',
+    '    $update = $mysqli->prepare("UPDATE users SET user_password = ?, user_specific_encryption_ciphertext = ? WHERE user_id = 1");',
+    '    $update->bind_param("ss", $password_hash, $user_specific_encryption_ciphertext);',
+    '    if ($update->execute()) {',
+    '        echo "hlm: admin password (and its encryption key) synced to the config panel value\\n";',
+    '    } else {',
+    '        echo "hlm: could not sync admin password: " . $mysqli->error . "\\n";',
+    '    }',
+    '}',
+  ];
+
+  const result = await runItflowDbScript(script, {
+    env: { ...process.env, ITFLOW_ADMIN_PASSWORD_SYNC: password },
+    passEnv: ['ITFLOW_ADMIN_PASSWORD_SYNC'],
+  });
+  // Belt-and-braces: the script never echoes the password, but keep it out
+  // of the log even if a future mysqli error message happened to include it.
+  const safeOutput = result.output.split(password).join('***');
+  logger.info('ITFlow admin password reconciled', { ok: result.ok, output: safeOutput || '(no output)' });
+}
+
+export const __test = { reconcileAdminIdentity, reconcileAdminPassword };
