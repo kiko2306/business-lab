@@ -113,9 +113,11 @@ Step 1 already bootstrapped Tailscale with a hand-generated auth key and
 (if it was needed) a manual Funnel click. This closes the loop so neither
 is ever needed again on this box:
 
-1. In Tailscale's admin console: **Settings → OAuth clients → Generate
-   OAuth client**, scopes **`auth_keys`** and **`policy_file`**, tag
-   **`tag:businesslab`** (must match — see
+1. In Tailscale's admin console (<https://login.tailscale.com/admin/>):
+   **Settings → Trust credentials** — Tailscale's current nav has moved
+   OAuth clients under this label, not a literal "OAuth clients" entry —
+   then generate one with scopes **`auth_keys`** and **`policy_file`**,
+   tag **`tag:businesslab`** (must match — see
    [app-credentials.md](app-credentials.md) for why). Copy the client ID
    and secret — the secret is shown once.
 2. Paste both into `TAILSCALE_OAUTH_CLIENT_ID` /
