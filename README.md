@@ -207,23 +207,14 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
-### Features & architecture (§131)
-
-Updates:
-
-Roster removals (§301 — drop the heaviest apps outright instead of tuning them):
-
-Strategy:
-
-
 ### Roster changes (§81)
-
 
 - [ ] **`gdrive` as a non-S3 Kopia remote** (§194, §246) — **parked, not
       scheduled.** B2 needs no new destination type: S3-compatible API via the
       existing `s3` kind (§246). SFTP is done (§356). `gdrive` needs a GCP
       service-account JSON upload — a different UX from the "one token in
       Settings" pattern — so it only gets built if a real deployment wants it.
+
 ### Exposure and platform
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node

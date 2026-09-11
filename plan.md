@@ -25385,3 +25385,12 @@ hardware — not just code-complete. `ftps`/`sftp` share the same rclone code
 path `ftp` just proved (§267's own design), so this closes the whole
 off-host-hardware thread the item existed for, not just the one protocol
 tested.
+
+## 400. README TODO: removed stray empty section headers
+
+"### Features & architecture (§131)" and its three label lines ("Updates:",
+"Roster removals (§301...):", "Strategy:") carried no items at all — dead
+scaffolding left over from whatever they were tracking before those threads
+closed out. Removed the whole block; the two genuinely open items
+(`gdrive`, CrowdSec dedupe, both explicitly parked pending real demand) are
+unaffected, just no longer separated by empty headers.
