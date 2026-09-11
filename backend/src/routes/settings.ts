@@ -19,13 +19,17 @@ import { testMailConnection } from '../services/mailTest';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig, getNpmApiUrl } from '../utils/exposureSettings';
 import {
   DEFAULT_TIMEZONE,
+  DEFAULT_UPDATE_BRANCH,
   getAppTimezone,
   getDashboardBaseUrl,
   getStoredDashboardUrl,
+  getUpdateBranch,
+  isValidBranchName,
   isValidDashboardUrl,
   isValidTimezone,
   setAppTimezone,
   setDashboardUrl,
+  setUpdateBranch,
 } from '../utils/generalSettings';
 import {
   getAlertNotifyConfig,
@@ -676,6 +680,11 @@ router.get('/general', async (_req: Request, res: Response) => {
       // or a `dashboard.<domain>` guess, or null if neither is available.
       dashboardUrl: await getStoredDashboardUrl(),
       dashboardUrlEffective: await getDashboardBaseUrl(),
+      // Which branch the self-update panel (Update page) fetches/pulls —
+      // plan.md §406. `main` unless this deployment tracks something else
+      // (e.g. `beta` on a test box that stages ahead of production).
+      updateBranch: await getUpdateBranch(),
+      defaultUpdateBranch: DEFAULT_UPDATE_BRANCH,
     });
   } catch {
     return res.status(500).json({ error: 'Unable to load general settings.' });
@@ -701,21 +710,39 @@ router.put('/general', async (req: Request, res: Response) => {
     return res.status(400).json({ error: 'Dashboard URL must be a full https:// address with no path.' });
   }
 
+  // Optional; '' (or omitted) resets to the default (main). Anything else
+  // must look like a real branch name — it's interpolated into a git argv.
+  const updateBranch = req.body?.updateBranch;
+  const hasUpdateBranch = updateBranch !== undefined && updateBranch !== null;
+  if (hasUpdateBranch && updateBranch !== '' && !isValidBranchName(updateBranch)) {
+    return res.status(400).json({ error: 'Update branch must be a plain git branch name.' });
+  }
+
   try {
     await setAppTimezone(timezone);
     if (hasDashboardUrl) {
       await setDashboardUrl(dashboardUrl);
     }
+    if (hasUpdateBranch) {
+      await setUpdateBranch(updateBranch || DEFAULT_UPDATE_BRANCH);
+    }
     await writeAuditLog({
       userId: req.user?.id ?? null,
       action: 'settings_change',
-      resource: hasDashboardUrl ? 'app_timezone, dashboard_url' : 'app_timezone',
+      resource: [
+        'app_timezone',
+        hasDashboardUrl && 'dashboard_url',
+        hasUpdateBranch && 'update_branch',
+      ]
+        .filter(Boolean)
+        .join(', '),
       result: 'success',
     }).catch(() => {});
 
     return res.json({
       timezone,
       ...(hasDashboardUrl ? { dashboardUrl: await getStoredDashboardUrl() } : {}),
+      ...(hasUpdateBranch ? { updateBranch: await getUpdateBranch() } : {}),
       message: 'Settings saved. Restart apps to apply the timezone.',
     });
   } catch {

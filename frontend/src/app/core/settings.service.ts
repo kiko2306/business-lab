@@ -151,11 +151,16 @@ export class SettingsService {
 
   saveGeneralSettings(
     timezone: string,
-    dashboardUrl?: string
-  ): Observable<{ timezone: string; dashboardUrl?: string; message: string }> {
-    return this.http.put<{ timezone: string; dashboardUrl?: string; message: string }>(
+    dashboardUrl?: string,
+    updateBranch?: string
+  ): Observable<{ timezone: string; dashboardUrl?: string; updateBranch?: string; message: string }> {
+    return this.http.put<{ timezone: string; dashboardUrl?: string; updateBranch?: string; message: string }>(
       `${API_BASE_URL}/settings/general`,
-      { timezone, ...(dashboardUrl === undefined ? {} : { dashboardUrl }) },
+      {
+        timezone,
+        ...(dashboardUrl === undefined ? {} : { dashboardUrl }),
+        ...(updateBranch === undefined ? {} : { updateBranch }),
+      },
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }

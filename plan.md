@@ -25871,3 +25871,70 @@ that the network/resource/router/policy/setup key now exist without having
 touched the wizard, confirm `netbird-client`'s logs show it authenticating
 with the auto-generated key, then finish §404's own live check (a remote
 peer reaching something on `192.168.1.0/24` through it).
+
+## 406. Three-tier branch model: dev → beta → main, and a configurable Update branch
+
+User request, unrelated to NetBird specifically: `dev` for active
+development, a new `beta` branch that `home-srv-01` stays on permanently as
+the test/staging ring, `main` reserved for what's actually verified —
+merged to only once something on `beta` has been proven live. Previously
+this repo's convention (session memory, not plan.md) was a flatter
+`dev` → `main` model with the test host tracking `main` directly.
+
+**`beta` created** from `dev`'s tip (04ef3ac — the two NetBird commits,
+§404/§405) and pushed. `home-srv-01`'s checkout switched from `main` to
+`beta` and pulled, over SSH per the user's explicit instruction (this is a
+git/branch operation, not app configuration — CLAUDE.md principle 2 is
+about not hand-editing app config/YAML on the host, not about never running
+git there).
+
+**Gap this surfaced**: the dashboard's own Update page — the *intended*
+way to deploy (session memory: "server tracks main and deploys via the
+dashboard Update page, not agent SSH") — had `origin/main` hardcoded in two
+places in `selfUpdate.ts` (`checkForUpdate`'s fetch/compare, and the pull in
+`runSelfUpdateSequence`). With `home-srv-01` now living on `beta`, that
+button would have kept silently checking/pulling `main`, which is behind —
+exactly the kind of hand-editing-required drift principle 2 exists to
+prevent. Fixed properly rather than left as a manual-SSH-only workaround:
+
+- `backend/src/utils/generalSettings.ts` gained `getUpdateBranch()` /
+  `setUpdateBranch()`, same `settings` key/value table + get-or-default
+  pattern as `getAppTimezone()`/`getStoredDashboardUrl()` right above them.
+  Default `main` (safe for a fresh/production deployment); a deployment
+  that wants something else sets it once, through the dashboard, same as
+  every other core setting — never a hand-edited root `.env`.
+- `selfUpdate.ts`'s two hardcoded `'main'`s now resolve `getUpdateBranch()`
+  each run. `SelfUpdateCheck` gained a `branch` field so the frontend shows
+  what's actually being tracked instead of a hardcoded "main" in the
+  Update page's subtitle and "Latest on main" label.
+- New **Update branch** field on the Settings page's General panel,
+  alongside Timezone and Dashboard URL — same form, same save flow.
+  `isValidBranchName()` guards it (plain branch-name charset, no `..`)
+  since it's interpolated straight into a `git` argv.
+
+Set to `beta` for `home-srv-01` via that new Settings field once the
+rebuilt backend (below) is up — the Update button there now does exactly
+what the manual SSH pull just did, for every deploy after this one.
+
+11 new/updated tests: `generalSettings.test.ts` (new — `isValidBranchName`:
+accepts plain names and `feature/x` style, rejects empty/non-string/`..`
+and shell metacharacters, since a branch name reaching this function
+untrusted is exactly what a malicious Settings PUT would try), the two
+`self-update.component.spec.ts` fixtures updated for the new required
+`branch` field. `selfUpdate.test.ts`'s existing exact-argv assertion
+(`fetch origin main --quiet`) needed no change — its mocked `query()`
+returns `{rows: []}` for the new `SELECT ... settings` lookup, so
+`getUpdateBranch()` falls through to the same `main` default the test
+already asserted. Backend typecheck clean, 801/801 pass. Frontend build
+clean (pre-existing bundle-size budget warning, unrelated), 58/58 tests
+pass. Minor bump.
+
+**Not yet verified against the live host** — staying on `dev` (and `beta`,
+which already has the commit once pushed). Verification: rebuild+restart
+`backend` on `home-srv-01` (a plain `git pull` doesn't apply backend code —
+`docker-compose.yml`'s `backend.build.context` is a built image, not a
+live-mounted source tree; only `VERSION` is read live per §343), then set
+Update branch to `beta` on that host via Settings, hit "Check now" on the
+Update page and confirm the panel now reads "Pull the latest code from
+beta" / "Latest on beta" instead of main, and confirms up-to-date against
+`origin/beta` rather than `origin/main`.

@@ -11,7 +11,7 @@
     anchor="self-update"
     key="self-update"
     title="Business Lab"
-    subtitle="Pull the latest code from main, rebuild the dashboard, pull and recreate every managed app on its pinned images, then restart"
+    [subtitle]="'Pull the latest code from ' + (status?.check?.branch ?? 'main') + ', rebuild the dashboard, pull and recreate every managed app on its pinned images, then restart'"
   >
     <div class="card mb-3" *ngIf="status as s">
       <div class="card-body p-4">
@@ -23,7 +23,7 @@
             <dt class="col-sm-4 text-body-secondary">Current commit</dt>
             <dd class="col-sm-8 font-monospace">{{ check.currentCommit.slice(0, 12) }}</dd>
 
-            <dt class="col-sm-4 text-body-secondary">Latest on main</dt>
+            <dt class="col-sm-4 text-body-secondary">Latest on {{ check.branch }}</dt>
             <dd class="col-sm-8 font-monospace">{{ check.remoteCommit.slice(0, 12) }}</dd>
 
             <dt class="col-sm-4 text-body-secondary">Status</dt>

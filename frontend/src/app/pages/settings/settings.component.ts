@@ -81,6 +81,8 @@ export class SettingsComponent implements OnInit {
     // Base URL for links the dashboard emails (invites, §158). Blank = use the
     // derived guess.
     dashboardUrl: ['', [Validators.maxLength(255), Validators.pattern(/^$|^https?:\/\/[^\s/]+\/?$/)]],
+    // Branch the Update page's self-update panel tracks. Blank = 'main'.
+    updateBranch: ['', [Validators.maxLength(120), Validators.pattern(/^$|^[A-Za-z0-9._/-]+$/)]],
   });
 
   protected deployment: DeploymentStatus | null = null;
@@ -296,6 +298,7 @@ export class SettingsComponent implements OnInit {
           this.generalSettings = settings;
           this.generalForm.controls.timezone.setValue(settings.timezone);
           this.generalForm.controls.dashboardUrl.setValue(settings.dashboardUrl ?? '');
+          this.generalForm.controls.updateBranch.setValue(settings.updateBranch ?? '');
         },
         error: (error) => {
           this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to load general settings.') };
@@ -312,7 +315,8 @@ export class SettingsComponent implements OnInit {
     this.settingsService
       .saveGeneralSettings(
         this.generalForm.controls.timezone.value,
-        this.generalForm.controls.dashboardUrl.value.trim()
+        this.generalForm.controls.dashboardUrl.value.trim(),
+        this.generalForm.controls.updateBranch.value.trim()
       )
       .pipe(finalize(() => (this.savingGeneral = false)))
       .subscribe({

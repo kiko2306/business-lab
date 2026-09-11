@@ -75,6 +75,23 @@
         Enter a full http(s):// address with no path.
       </div>
     </div>
+    <div class="col-12 col-md-8">
+      <label class="form-label fw-semibold" for="updateBranch">Update branch</label>
+      <input
+        id="updateBranch"
+        type="text"
+        class="form-control font-monospace"
+        formControlName="updateBranch"
+        placeholder="main"
+      />
+      <p class="form-text mb-0">
+        Branch the Update page checks and pulls from. Leave blank for
+        <code>{{ generalSettings.defaultUpdateBranch }}</code>.
+      </p>
+      <div class="form-text text-danger" *ngIf="generalForm.controls.updateBranch.touched && generalForm.controls.updateBranch.invalid">
+        Enter a plain branch name (letters, digits, <code>. _ / -</code>).
+      </div>
+    </div>
     <div class="col-12 d-flex align-items-center gap-2">
       <button type="submit" class="btn btn-primary" [disabled]="savingGeneral || generalForm.invalid">
         {{ savingGeneral ? 'Saving…' : 'Save' }}

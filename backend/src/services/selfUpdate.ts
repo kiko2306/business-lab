@@ -35,6 +35,7 @@ import { writeAuditLog } from '../utils/audit';
 import { runCommand } from './backup';
 import { updateAllInstalledApps } from './executor';
 import { getAppVersion } from '../version';
+import { getUpdateBranch } from '../utils/generalSettings';
 import { HttpError } from '../types';
 
 const composeFilePath = (repoRoot: string) => `${repoRoot}/docker-compose.yml`;
@@ -124,6 +125,7 @@ export interface SelfUpdateCheck {
   remoteCommit: string;
   commitsBehind: number;
   checkedAt: string;
+  branch: string;
 }
 
 export interface SelfUpdateCheckError {
@@ -225,17 +227,23 @@ async function updateRun(
 }
 
 /**
- * `git fetch` + compare against `origin/main`. Deliberately not called from
- * a live status poll — a fetch against a slow/unreachable remote shouldn't
- * hang the panel — so it's cached here and refreshed by the sweeper (and by
- * the "Check now" button) rather than on every poll.
+ * `git fetch` + compare against `origin/<branch>` (`getUpdateBranch()` —
+ * `main` unless a deployment has set something else in Settings, e.g.
+ * `beta` for a host that tracks pre-release commits; plan.md §406).
+ * Deliberately not called from a live status poll — a fetch against a
+ * slow/unreachable remote shouldn't hang the panel — so it's cached here and
+ * refreshed by the sweeper (and by the "Check now" button) rather than on
+ * every poll.
  */
 export async function checkForUpdate(): Promise<SelfUpdateCheck> {
   const repoRoot = requireRepoRoot();
+  const branch = await getUpdateBranch();
   try {
-    await runGit(['-C', repoRoot, 'fetch', 'origin', 'main', '--quiet'], { timeout: 30_000 });
+    await runGit(['-C', repoRoot, 'fetch', 'origin', branch, '--quiet'], { timeout: 30_000 });
     const currentCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
-    const remoteCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'origin/main'], { timeout: 10_000 })).trim();
+    const remoteCommit = (
+      await runGit(['-C', repoRoot, 'rev-parse', `origin/${branch}`], { timeout: 10_000 })
+    ).trim();
     const countOutput = await runGit(
       ['-C', repoRoot, 'rev-list', '--count', `${currentCommit}..${remoteCommit}`],
       { timeout: 10_000 }
@@ -245,6 +253,7 @@ export async function checkForUpdate(): Promise<SelfUpdateCheck> {
       remoteCommit,
       commitsBehind: parseInt(countOutput.trim(), 10) || 0,
       checkedAt: new Date().toISOString(),
+      branch,
     };
     lastCheckError = null;
     return cachedCheck;
@@ -400,7 +409,8 @@ async function runSelfUpdateSequence(
 
   try {
     await updateRun(runId, { state: 'pulling' });
-    await runGit(['-C', repoRoot, 'pull', '--ff-only', 'origin', 'main'], { timeout: 60_000 });
+    const branch = await getUpdateBranch();
+    await runGit(['-C', repoRoot, 'pull', '--ff-only', 'origin', branch], { timeout: 60_000 });
     const toCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
     await updateRun(runId, { toCommit });
 

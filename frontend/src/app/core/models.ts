@@ -230,6 +230,10 @@ export interface GeneralSettings {
   // stored value or a derived `dashboard.<domain>` guess, or null.
   dashboardUrl?: string;
   dashboardUrlEffective?: string | null;
+  // Branch the Update page's self-update panel fetches/pulls — 'main' unless
+  // this deployment tracks something else (plan.md §406).
+  updateBranch?: string;
+  defaultUpdateBranch?: string;
 }
 
 /** GET /api/settings/deployment — the per-client provisioning checklist (§357). */
@@ -630,6 +634,7 @@ export interface SelfUpdateCheck {
   remoteCommit: string;
   commitsBehind: number;
   checkedAt: string;
+  branch: string;
 }
 
 export interface SelfUpdateCheckError {

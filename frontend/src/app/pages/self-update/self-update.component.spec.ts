@@ -15,13 +15,13 @@ describe('SelfUpdateComponent', () => {
 
   const upToDateStatus: SelfUpdateStatus = {
     appVersion: '0.24.0',
-    check: { currentCommit: 'abc123def456', remoteCommit: 'abc123def456', commitsBehind: 0, checkedAt: new Date().toISOString() },
+    check: { currentCommit: 'abc123def456', remoteCommit: 'abc123def456', commitsBehind: 0, checkedAt: new Date().toISOString(), branch: 'main' },
     lastCheckError: null,
     latestRun: null,
   };
   const behindStatus: SelfUpdateStatus = {
     appVersion: '0.24.0',
-    check: { currentCommit: 'old111old111', remoteCommit: 'new222new222', commitsBehind: 2, checkedAt: new Date().toISOString() },
+    check: { currentCommit: 'old111old111', remoteCommit: 'new222new222', commitsBehind: 2, checkedAt: new Date().toISOString(), branch: 'main' },
     lastCheckError: null,
     latestRun: null,
   };
