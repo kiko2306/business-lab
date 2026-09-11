@@ -26288,3 +26288,17 @@ future edit here fails in CI rather than live. Backend typecheck clean,
 
 **Not yet verified against the live host** — pushing to `dev`/`beta`,
 rebuilding, restarting Tailscale once more.
+
+**Verified live.** Restart after the fix: `"Tailscale: minted an auth
+key"`, no warnings — the fresh key authenticated
+(`active login: businesslab-signal.tail122b53.ts.net` in the container's
+own logs) and it's already proxying gRPC traffic for NetBird's signal
+server. No Funnel log line, exactly as expected — `ensureFunnelEnabled`
+only logs on the add path, and §387's hand-edit already granted
+`tag:businesslab`, so this run correctly found it and no-op'd. A second
+restart moments later logged nothing at all from either check — the
+just-minted key still valid, Funnel still granted, fully silent and
+idempotent. §408 done: both §404's NetBird routing peer and this both now
+self-provision from one scoped credential each, the same shape as
+Cloudflare's own token has always worked, closing the gap the user's
+original question named directly. `dev`/`beta` → `main` next.
