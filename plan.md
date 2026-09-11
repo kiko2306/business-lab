@@ -24901,3 +24901,29 @@ removed again. This time lowercase `yes` for **both** prompts:
 Both prompts now behave as `docs/first-run.md` documents, with the case
 bug §385 found and fixed no longer reproducible. §94 closed — first genuine
 live exercise of both prompts, not just their syntax/shellcheck check.
+
+## 387. §367 OAuth client crash-looped — `--advertise-tags` was missing (2026-09-11)
+
+ACL fixed (§367's own follow-up: `nodeAttrs`'s Funnel grant now covers
+`tag:businesslab` alongside `autogroup:member` — the tag itself already
+existed in `tagOwners`). OAuth client generated (`auth_keys` write scope,
+tagged `tag:businesslab`). Set `TAILSCALE_AUTH_KEY` to the
+`tskey-client-…?preauthorized=true&ephemeral=false` form, restarted —
+container crash-looped.
+
+`docker logs`: `oauth authkeys require --advertise-tags` →
+`failed to auth tailscale: tailscale up failed: exit status 1`. An
+OAuth-issued key is tag-bound at issuance, but Tailscale still requires the
+node to explicitly advertise the tag on `tailscale up` — the compose file
+had never needed this (a personal reusable key carries no such requirement).
+
+Fix: `apps/tailscale/docker-compose.yml` gains
+`TS_EXTRA_ARGS: --advertise-tags=tag:businesslab` (containerboot's
+generic extra-flags passthrough). Hardcoded, not a new `.env` knob — unlike
+`TS_HOSTNAME`, there's no real scenario here needing a per-deployment
+override. Safe for a personal reusable key too, since `tagOwners` already
+grants `tag:businesslab` to `autogroup:owner`.
+
+Not `backend/src`/`frontend/src` — no version bump. Not yet re-verified
+live — needs a deploy + Tailscale restart to confirm the container comes up
+clean and the node registers tagged.

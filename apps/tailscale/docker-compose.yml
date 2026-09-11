@@ -19,6 +19,14 @@ services:
       # One deployment is one tailnet (§84.7); override in .env only if two
       # share one, to avoid Tailscale's `-2` de-dupe suffix.
       TS_HOSTNAME: ${TS_HOSTNAME:-businesslab-signal}
+      # An OAuth-client-issued auth key always carries a tag, and Tailscale
+      # refuses to authenticate unless the node explicitly advertises it —
+      # containerboot's `tailscale up` otherwise dies with "oauth authkeys
+      # require --advertise-tags" (found live, §367, crash-loop on a fresh
+      # OAuth key). Safe for a personal reusable key too: the ACL's
+      # `tagOwners` grants `tag:businesslab` to `autogroup:owner`, so the
+      # tailnet owner's own key can advertise it as well.
+      TS_EXTRA_ARGS: --advertise-tags=tag:businesslab
     labels:
       - "homepage.group=Infrastructure"
       - "homepage.name=Tailscale"
