@@ -25949,3 +25949,33 @@ work, which is still unverified — merging now would land unverified
 NetBird changes on `main` alongside this verified one. Holding until
 §404/§405 are verified too, so the merge is one clean batch; a cherry-pick
 of just this commit to `main` early is possible if wanted sooner.
+
+## 405.1. Fixed: NETBIRD_API_TOKEN was invisible in the config panel
+
+Found live, mid §405 verification: the NetBird VPN config panel in the
+dashboard (opened to set `NETBIRD_API_TOKEN`) listed every other
+`apps/netbird-vpn` field but not that one, nor `NETBIRD_SIGNAL_HOSTNAME`.
+Root cause — the per-app config panel doesn't read `.env.example` at all;
+`appEnv.ts`'s `loadStatus()` builds the field list from
+`extractComposeEnvVars(composeContent)`, i.e. whatever `${VAR}` the
+compose file itself substitutes. `NETBIRD_API_TOKEN` was added straight to
+`.env.example` with nothing in `docker-compose.yml` ever referencing it
+(it's consumed only by `netbirdRoutingPeer.ts`, reading the file directly)
+— exactly the assumption that broke.
+
+Fixed by referencing `${NETBIRD_API_TOKEN:-change-me}` as an (unused by
+the container) environment entry on `netbird-client` in
+`apps/netbird-vpn/docker-compose.yml`, commented as being there solely to
+surface the field — same mechanism as every other editable field in this
+app. Gave `NB_SETUP_KEY` the same `:-change-me` default while touching
+this block: it had none before, which made the frontend's
+"required value(s) not set" banner claim the whole app "won't start"
+without one — untrue (`docker compose up` just substitutes empty string;
+nothing in `executor.ts` blocks a start on a missing required field, only
+`netbird-client` itself fails to authenticate and crash-loops, exactly as
+designed) but worth not leaving misleading in the UI.
+
+No backend/frontend code changed — compose-file-only, no version bump
+required. Backend test suite unaffected (801/801, confirmed after the
+edit). Committing directly; this is a correction to an already-open,
+unverified §405, not a new independent change.
