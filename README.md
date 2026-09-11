@@ -224,13 +224,26 @@ it is done — not ticked off and left behind. Section references point at
       alertNotify/ntfy system so this isn't a silent failure.
 
 - [ ] **NetBird restart can re-register netbird-client under a fresh
-      WireGuard identity** (§410) — found live: restarting NetBird VPN
+      WireGuard identity** (§410/§410.1) — found live, recurred across
+      three separate restarts in one session: restarting NetBird VPN
       caused the routing-peer container to come up as a brand-new peer
       (different keypair) instead of reusing the one persisted in
       `./data/client`, leaving the old identity stuck forever and orphaned
       in NetBird's peer list. Root cause not pinned down — needs
       investigating with real SSH access to the host (containerboot's own
       logs around a restart) before it silently recurs unattended.
+
+- [ ] **NetBird routing-peer auto-provisioning's pre-up hook races
+      netbird-management on every restart, not just a first-ever cold
+      start** (§410.1) — `ensureNetbirdRoutingPeer` runs before `docker
+      compose up`, so it always finds `netbird-management` down on a
+      dashboard "Restart" (confirmed a genuine stop-then-start of the
+      whole project every time, not just the first start ever). Two
+      consecutive restarts both hit the same "fetch failed" race back to
+      back in one live session — move it to a post-up, poll-until-ready
+      pattern (`docusealAdminBootstrap.ts`'s `MAX_ATTEMPTS`/
+      `RETRY_DELAY_MS` shape) instead of relying on "try again next
+      restart."
 
 - [ ] **Secondary-IP workaround is a hand-edited netplan file, not a
       `start.sh` option** (§410) — `NETBIRD_SECONDARY_LAN_ADDRESS` lets the

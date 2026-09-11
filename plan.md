@@ -26460,3 +26460,94 @@ wall the primary resource did.
   same `netplan try` safety net) would remove the "hand-edit netplan"
   step for every future deployment that wants it. Not done here since it
   needed to be proven useful first; added to the README TODO list.
+
+## 410.1. Continued live verification — deployed, one client-side gotcha found and fixed, resource still unconfirmed; session paused here
+
+Direct continuation of §410's own live-verification step, same session,
+`dev`/`beta` already had the secondary-address code at this point.
+`172.20.5.10` was applied to `home-srv-01` in §410; this section is
+everything tried after that to actually prove the feature end to end.
+Session paused mid-verification — picking this up needs no re-diagnosis
+of what's below, only the next concrete step at the very end.
+
+**Backend deployed and configured.** `git pull` + rebuild + restart on
+`home-srv-01` (relayed through the user, since this session had no direct
+SSH access the whole time — see the access-method note at the end).
+`NETBIRD_SECONDARY_LAN_ADDRESS=172.20.5.10` set in NetBird VPN's config
+panel.
+
+**Client-side gotcha, found and fixed, unrelated to the feature itself:**
+the WSL machine used for testing hit two separate dead ends before
+reconnecting cleanly —
+
+1. NetBird peer session expiry (`"peer login has expired, please log in
+   once more"`, in `/var/log/netbird/client.log`) — this tailnet has
+   NetBird's own periodic re-auth policy on (Settings → Authentication →
+   Peer Session Expiration, seen earlier in this same session's screenshots).
+   Fixed with `sudo netbird service restart` + a fresh `netbird up
+   --setup-key=...`.
+2. **Stale negative-cached DNS for the Signal hostname.** After the
+   service restart, `netbird up` hung indefinitely and `netbird status`
+   showed `failed connecting to Signal Service: ... dial context: context
+   deadline exceeded`. Diagnosed by hand-crafting a raw UDP DNS query
+   (no `dig`/`nslookup`/`host` installed) direct to `8.8.8.8` for
+   `businesslab-signal.tail122b53.ts.net` — resolved fine there (3 A
+   records, `176.58.90.145`/`.63`/`.46`), while the WSL machine's own
+   resolver (`1.1.1.1`, from `/etc/resolv.conf`) returned NXDOMAIN for the
+   exact same name. Confirmed the actual Signal path was never the
+   problem: `curl --resolve …:443:176.58.90.145` against it returned the
+   expected `405` (its gRPC server answering a plain GET — the same
+   signature already documented as healthy in §53.2). Worked around with
+   a `/etc/hosts` override on the WSL machine (not a Business Lab fix —
+   this is one client's own stale resolver cache, not anything server-side
+   to change). Once added, `netbird up` connected immediately
+   (`Management: Connected`, `Signal: Connected`, `Relays: 3/3`).
+   **Worth remembering for future sessions**: a `.ts.net` Funnel hostname
+   failing to resolve is not necessarily a server problem — check the
+   client's own resolver against a different one (raw UDP query to
+   `8.8.8.8`, as above, or `--resolve` in curl) before assuming the
+   Tailscale/NetBird side is broken.
+
+**The zombie-peer re-registration bug (§410) recurred twice more** during
+this same verification pass — a fourth distinct WireGuard identity
+(`netbird-router-93-231`) showed up alongside the three from before, all
+still `Idle`/dead except whichever one most recently redeemed the setup
+key. Not re-investigated further this session (no SSH access to
+containerboot's own reasoning); still the README TODO item from §410.
+
+**The actual resource-propagation test is still unconfirmed.** Two
+restart attempts both hit the pre-up cold-start race
+(`"NetBird routing peer: auto-provisioning failed ... fetch failed"`,
+`docker logs business-lab-backend-1`) — and unlike earlier in this same
+session (§405's original verification), where a second/third restart did
+eventually get past it, **both attempts here failed identically**, back to
+back. That's worth treating as a real observation, not dismissed as the
+same known flakiness: `ensureNetbirdRoutingPeer` runs as a pre-up hook,
+and NetBird VPN's "Restart" action is a genuine stop-then-start of the
+whole compose project (confirmed in the backend's own log sequence —
+"Service stopped successfully" before "Starting service" every time), so
+the hook racing a not-yet-started `netbird-management` on *every* restart,
+not just a first-ever cold start, is the more likely explanation for why
+it's been inconsistent — worth moving this hook to a post-up,
+poll-until-ready pattern (matching `docusealAdminBootstrap.ts`'s own
+`MAX_ATTEMPTS`/`RETRY_DELAY_MS` shape) instead of continuing to rely on
+"try again on the next restart." Added to the README TODO list — this
+current pre-up placement is a design choice worth revisiting, not just a
+timing fluke to shrug off.
+
+**Access-method note, for whoever resumes this**: this session never had
+direct SSH to `home-srv-01` (the whole thread started because of exactly
+that — a client on a colliding home network). Everything server-side was
+relayed through the user via the Wetty web terminal
+(`https://ssh.tx-home-utils.com`) — copy a command, paste the output back.
+Slow, but the only working channel the whole session. A future session
+resuming this should check whether it has genuine SSH access before
+assuming it needs the same relay dance.
+
+**Concrete next step to resume with**: restart NetBird VPN from the
+dashboard (once, or a couple of times if the first hits the same race),
+then check `docker logs business-lab-backend-1 --since 10m | grep -i
+netbird` for either the auto-provisioning warning (retry again) or a
+clean run with no warning (in which case test `ssh 172.20.5.10` from a
+client on a colliding network — that's the actual proof this section
+never got to).
