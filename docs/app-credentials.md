@@ -103,6 +103,17 @@ Worth knowing: the container's healthcheck only probes the web server, not
 cron. If cron dies the container still reports healthy while every scheduled
 job stops.
 
+### Nextcloud — mail is automatic
+
+Nextcloud has no `mail_smtp*` environment variables either — like ITFlow,
+its SMTP config lives only in its own database, normally set by hand in
+**Administration settings → Basic settings**. The dashboard copies the
+global mail settings (Settings → Email) into it on every Nextcloud start
+(`nextcloudMail.ts`, §402), splitting the dashboard's single from-address
+field into Nextcloud's separate local-part/domain config keys. No-op with
+nothing configured yet — outgoing mail (share notifications, activity
+digests) just doesn't send until **Settings → Email** is filled in.
+
 ## Global mail settings — who inherits them
 
 One SMTP account is entered once in **Settings → Email**. Apps that read mail
@@ -112,10 +123,13 @@ the app to apply, same as exposure):
 **Vaultwarden**, **BookStack**, **n8n** (user-management emails), **Paperless**
 (sending only), **Vikunja**.
 
-Three apps can't inherit the global mail config — the settings are values to
-apply by hand, and nothing warns you if you don't:
+None of the following read mail config from their environment — for two of
+them that just means applying the settings by hand, and nothing warns you if
+you don't:
 
-- **ITFlow** — see the note above; copied into ITFlow's own UI.
+- **ITFlow** and **Nextcloud** — see the notes above; both copied
+  automatically into the app's own database, no environment variable
+  involved.
 - **Uptime Kuma** — an email alert is an SMTP *notification* created under
   **Settings → Notifications**. There is no environment variable for it.
 - **Kimai** — reads SMTP from a single `MAILER_URL` DSN
