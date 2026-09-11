@@ -99,6 +99,16 @@ async function nbRequest<T>(baseUrl: string, token: string, method: string, path
     body: body === undefined ? undefined : JSON.stringify(body),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   });
+  // Found live (§405.2): GET /api/groups?name=X (and, going by that,
+  // presumably any other filtered/scoped lookup here) answers 404 when
+  // nothing matches rather than 200 with an empty list — despite every GET
+  // in this file otherwise expecting an array. Every ensure* below only
+  // ever reads the result to check "does X already exist", so treating a
+  // 404 on a GET as "nothing here yet" is correct everywhere it's used and
+  // avoids a second wrong guess about which specific endpoints do this.
+  if (method === 'GET' && response.status === 404) {
+    return [] as unknown as T;
+  }
   if (!response.ok) {
     const text = await response.text().catch(() => '');
     throw new Error(`NetBird API ${method} ${path} -> ${response.status}: ${text.slice(0, 300)}`);

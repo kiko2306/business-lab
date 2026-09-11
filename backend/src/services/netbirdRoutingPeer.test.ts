@@ -140,4 +140,18 @@ describe('ensureNetbirdRoutingPeer', () => {
     await expect(ensureNetbirdRoutingPeer('netbird-vpn')).resolves.toBeUndefined();
     expect(mockedSave).not.toHaveBeenCalled();
   });
+
+  // Found live (§405.2): NetBird's GET /api/groups?name=X answers 404, not
+  // 200 [], when nothing matches — a real API response shape, not a timing
+  // fluke, so it gets its own regression test rather than folding into the
+  // "everything missing" fixture above (which never simulated a non-2xx).
+  it('treats a 404 GET as "nothing here yet" rather than a hard failure', async () => {
+    vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string; body?: string }) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') return Promise.resolve(jsonResponse({ message: 'not found', code: 404 }, 404));
+      return fetchEverythingMissing(url, init);
+    }) as typeof fetch);
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+    expect(mockedSave).toHaveBeenCalledWith('netbird-vpn', { NETBIRD_ROUTING_PEER_SETUP_KEY: 'NEW-SETUP-KEY' });
+  });
 });

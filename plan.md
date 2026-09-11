@@ -25979,3 +25979,41 @@ No backend/frontend code changed — compose-file-only, no version bump
 required. Backend test suite unaffected (801/801, confirmed after the
 edit). Committing directly; this is a correction to an already-open,
 unverified §405, not a new independent change.
+
+## 405.2. Fixed: NetBird's group lookup 404s instead of returning []
+
+Found live on the first real restart with a PAT set — two failures back to
+back, both expected/self-healing/real in turn:
+
+1. First restart: `auto-provisioning failed ... error: "fetch failed"`.
+   The dashboard's Restart did a full stop, then start — at the moment the
+   pre-up hook ran, `netbird-management` itself was still down (this same
+   `docker compose up` hadn't brought it back yet). Exactly the cold-start
+   case the code's own comment already calls out as expected; no fix
+   needed, just a second restart once management was actually up.
+2. Second restart, management reachable this time:
+   `NetBird API GET /api/groups?name=business-lab-netbird-router -> 404`.
+   A genuine bug: `GET /api/groups?name=X` answers **404** when nothing
+   matches that name, not `200 []` — contrary to what NetBird's own API
+   docs implied when checked before writing this (§405's own writeup: "the
+   Networks API... confirmed against NetBird's own API docs"). `ensureGroup`
+   is a plain get-or-create; the 404 threw instead of falling through to
+   the create branch, so nothing after it in the chain ever ran.
+
+Fixed in `nbRequest` itself rather than in `ensureGroup` alone: a 404 on
+any `GET` in this file now returns `[]` instead of throwing. Every GET
+here is read only to check "does X already exist" before creating it, so
+that's correct for all of them, and it means a second wrong guess about
+which of the *other* four list endpoints also 404-on-empty (never
+independently confirmed — only the groups one has actually been exercised
+live) fails safe instead of failing loud. `POST`s are untouched — a failed
+*create* should still throw.
+
+New regression test in `netbirdRoutingPeer.test.ts`: a 404 on every GET
+still reaches the same from-scratch happy path the "everything missing"
+test already covers. Backend typecheck clean, 802/802 pass. Compose-only
+change from §405.1 aside, this is backend/src — patch bump.
+
+**Not yet verified against the live host** — pushing to `dev`/`beta`,
+rebuilding `home-srv-01`'s backend, then restarting NetBird VPN once more
+is the next step.

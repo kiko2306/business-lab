@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.82.1] — 2026-09-11
+
+### Fixed
+
+- NetBird's GET /api/groups?name=X 404s instead of 200 [] when nothing matches — the routing-peer auto-provisioner's group lookup now treats a 404 on any GET as empty rather than throwing
+
 ## [0.82.0] — 2026-09-11
 
 ### Added
