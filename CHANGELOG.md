@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.80.0] — 2026-09-11
+
+### Exposure
+
+- Give every plain (non-Authelia, non-gRPC) proxy host its own advanced_config so HSTS reaches it too, instead of relying on NPM's own stock template which was silently shadowing the header (§402.1)
+
 ## [0.79.0] — 2026-09-11
 
 ### Nextcloud

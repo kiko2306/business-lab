@@ -47,16 +47,56 @@ describe('buildProxyHostPayload', () => {
       forward_scheme: 'http',
       forward_host: '172.17.0.1',
       forward_port: 8000,
-      allow_websocket_upgrade: true,
+      // Always off now — the plain advanced_config below sets Upgrade/
+      // Connection itself when websocket is wanted.
+      allow_websocket_upgrade: false,
       block_exploits: true,
       caching_enabled: false,
       ssl_forced: false,
       http2_support: false,
-      advanced_config: '',
     });
   });
 
-  it('coerces a falsy websocket value to false', () => {
+  // §402.1: a plain (no Authelia, no gRPC) host used to get an empty
+  // advanced_config and rely on NPM's own stock location /, which declares
+  // `add_header X-Served-By` and silently shadows the inherited HSTS block
+  // in server_proxy.conf. It now gets its own location, through the
+  // dashboard's own header-safe /snippets/proxy.conf, same as the other two
+  // paths.
+  it('gives a plain (no Authelia, no gRPC) host its own advanced_config, via the header-safe snippet', () => {
+    const payload = buildProxyHostPayload({
+      hostname: 'nocodb.example.com',
+      forwardScheme: 'http',
+      forwardHost: '172.17.0.1',
+      forwardPort: 8000,
+      websocket: false,
+      autheliaProtected: false,
+      grpc: false,
+      certificateId: 0,
+    });
+
+    expect(payload.advanced_config).toContain('include /snippets/proxy.conf;');
+    expect(payload.advanced_config).toContain('proxy_pass $forward_scheme://$server:$port;');
+    expect(payload.advanced_config).not.toContain('Upgrade');
+  });
+
+  it('adds Upgrade/Connection to the plain advanced_config only when the app wants websockets', () => {
+    const payload = buildProxyHostPayload({
+      hostname: 'code-server.example.com',
+      forwardScheme: 'http',
+      forwardHost: '172.17.0.1',
+      forwardPort: 8000,
+      websocket: true,
+      autheliaProtected: false,
+      grpc: false,
+      certificateId: 0,
+    });
+
+    expect(payload.advanced_config).toContain('proxy_set_header Upgrade $http_upgrade;');
+    expect(payload.advanced_config).toContain('proxy_set_header Connection "upgrade";');
+  });
+
+  it('coerces a falsy websocket value to false in the plain advanced_config too', () => {
     const payload = buildProxyHostPayload({
       hostname: 'x.example.com',
       forwardScheme: 'http',
@@ -68,6 +108,7 @@ describe('buildProxyHostPayload', () => {
       certificateId: 0,
     });
     expect(payload.allow_websocket_upgrade).toBe(false);
+    expect(payload.advanced_config).not.toContain('Upgrade');
   });
 
   it('includes the Authelia forward-auth snippet includes when protected', () => {
@@ -296,7 +337,11 @@ describe('ensureProxyHost', () => {
           forward_scheme: 'http',
           forward_host: '172.17.0.1',
           forward_port: 8000,
-          allow_websocket_upgrade: true,
+          // A host already migrated to its own plain advanced_config
+          // (§402.1) — allow_websocket_upgrade off, matching
+          // buildProxyHostPayload's own output for the same options.
+          allow_websocket_upgrade: false,
+          advanced_config: buildProxyHostPayload({ ...baseOptions, certificateId: 0 }).advanced_config,
         },
       ],
       raw: '',
@@ -306,6 +351,33 @@ describe('ensureProxyHost', () => {
 
     expect(result).toEqual({ id: 9, created: false, updated: false });
     expect(mockedRequestJson).toHaveBeenCalledTimes(2); // login + list only, no write
+  });
+
+  it('migrates a pre-§402.1 plain host (empty advanced_config, NPM auto-injected websockets) to its own', async () => {
+    mockLogin();
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: [
+        {
+          id: 9,
+          domain_names: ['paperless.example.com'],
+          forward_scheme: 'http',
+          forward_host: '172.17.0.1',
+          forward_port: 8000,
+          // Exactly what every skipAutheliaProtection app's host looked
+          // like before §402.1 — the shape that was silently shadowing
+          // HSTS via NPM's own stock location /.
+          allow_websocket_upgrade: true,
+          advanced_config: '',
+        },
+      ],
+      raw: '',
+    });
+    mockedRequestJson.mockResolvedValueOnce({ statusCode: 200, body: { id: 9 }, raw: '' }); // update
+
+    const result = await ensureProxyHost({ ...baseOptions, expectedHostId: 9 });
+
+    expect(result).toEqual({ id: 9, created: false, updated: true });
   });
 
   it('throws when login fails', async () => {

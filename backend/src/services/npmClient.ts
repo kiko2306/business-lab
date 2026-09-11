@@ -103,6 +103,52 @@ function buildGrpcAdvancedConfig(forwardHost: string, forwardPort: number): stri
   ].join('\n');
 }
 
+// The plain case: no Authelia, no gRPC — an app with its own native login
+// (NocoDB, Stirling-PDF, ...) or a raw-protocol need (`skipAutheliaProtection`
+// in services.ts). Used to matter less which include this location used,
+// since NPM's own auto-generated one (conf.d/include/proxy.conf) worked fine
+// — until HSTS (§402, plan.md §402.1): that stock file declares its own
+// `add_header X-Served-By`, and nginx drops every *inherited* add_header for
+// a location that declares any of its own — silently shadowing the
+// server-scope Strict-Transport-Security block in server_proxy.conf for
+// every one of these ~9 apps. Routing through the dashboard's own
+// /snippets/proxy.conf instead — already proven live by the Authelia and
+// gRPC blocks below, and itself declaring no add_header — fixes that, the
+// same way those two paths already were unaffected by it.
+function buildPlainAdvancedConfig(websocket: boolean): string {
+  return [
+    'location / {',
+    // proxy.conf already sets proxy_http_version 1.1 — do not redeclare it
+    // (see the Authelia block below for why that's fatal, not just redundant).
+    '    include /snippets/proxy.conf;',
+    ...(websocket
+      ? ['    proxy_set_header Upgrade $http_upgrade;', '    proxy_set_header Connection "upgrade";']
+      : []),
+    '    proxy_pass $forward_scheme://$server:$port;',
+    '}',
+  ].join('\n');
+}
+
+// One place to compute the advanced_config every write and every drift-check
+// agree on — buildProxyHostPayload and ensureProxyHost's needsUpdate used to
+// each carry their own copy of this ternary, and it's exactly the kind of
+// place a fix landing in only one of them would quietly stop taking effect.
+function computeAdvancedConfig(opts: {
+  autheliaProtected: boolean;
+  grpc: boolean;
+  forwardHost: string;
+  forwardPort: number;
+  websocket: boolean;
+}): string {
+  if (opts.grpc) {
+    return buildGrpcAdvancedConfig(opts.forwardHost, opts.forwardPort);
+  }
+  if (opts.autheliaProtected) {
+    return AUTHELIA_ADVANCED_CONFIG;
+  }
+  return buildPlainAdvancedConfig(opts.websocket);
+}
+
 interface EnsureProxyHostResult {
   id: number;
   created: boolean;
@@ -401,23 +447,19 @@ export function buildProxyHostPayload({
     forward_port: forwardPort,
     block_exploits: true,
     caching_enabled: false,
-    // NPM auto-injects proxy_http_version/Upgrade/Connection itself when
-    // this is on, regardless of a custom advanced_config — the Authelia and
-    // gRPC blocks below set their own directives (since both fully replace
-    // NPM's own location /), so leaving this also on means both add the
-    // same directive and nginx fails to reload at all.
-    allow_websocket_upgrade: autheliaProtected || grpc ? false : Boolean(websocket),
+    // Every host gets its own advanced_config location / now (Authelia,
+    // gRPC, or the plain one above) — always off, or NPM's own
+    // auto-injected proxy_http_version/Upgrade/Connection (added regardless
+    // of a custom advanced_config) duplicates what's already in it and
+    // nginx refuses to reload at all.
+    allow_websocket_upgrade: false,
     access_list_id: '0',
     certificate_id: grpc ? certificateId : 0,
     ssl_forced: grpc,
     http2_support: grpc ? true : false,
     hsts_enabled: false,
     hsts_subdomains: false,
-    advanced_config: grpc
-      ? buildGrpcAdvancedConfig(forwardHost, forwardPort)
-      : autheliaProtected
-        ? AUTHELIA_ADVANCED_CONFIG
-        : '',
+    advanced_config: computeAdvancedConfig({ autheliaProtected, grpc, forwardHost, forwardPort, websocket }),
   };
 }
 
@@ -536,17 +578,15 @@ export async function ensureProxyHost({
     throw new Error(`Nginx Proxy Manager host for ${hostname} already exists and is not managed by this service.`);
   }
 
-  const expectedAdvancedConfig = grpc
-    ? buildGrpcAdvancedConfig(forwardHost, forwardPort)
-    : autheliaProtected
-      ? AUTHELIA_ADVANCED_CONFIG
-      : '';
-  const expectedWebsocketUpgrade = autheliaProtected || grpc ? false : Boolean(websocket);
+  const expectedAdvancedConfig = computeAdvancedConfig({ autheliaProtected, grpc, forwardHost, forwardPort, websocket });
   const needsUpdate =
     existing.forward_scheme !== forwardScheme ||
     existing.forward_host !== forwardHost ||
     existing.forward_port !== forwardPort ||
-    Boolean(existing.allow_websocket_upgrade) !== expectedWebsocketUpgrade ||
+    // Always false now (see buildProxyHostPayload) — a host still carrying
+    // `true` predates every one of these hosts getting its own
+    // advanced_config (§402.1) and needs the same migration write.
+    Boolean(existing.allow_websocket_upgrade) ||
     Boolean(existing.http2_support) !== grpc ||
     Boolean(existing.ssl_forced) !== grpc ||
     (grpc && existing.certificate_id !== certificateId) ||

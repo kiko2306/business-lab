@@ -25647,3 +25647,66 @@ candidate actually reaches NPM instead of 302ing — but @mat chose to leave
 it: the security outcome (real visitors get the header) is already
 achieved, and this would be trading a truly cosmetic panel warning for a
 change to Authelia's access rules. Not pursued.
+
+## 403. HSTS closed the last gap: every plain proxy host gets its own
+     advanced_config (§402.1's README follow-up)
+
+§402.1 found HSTS only reached Authelia-protected and gRPC hosts — the ~9
+apps with `skipAutheliaProtection: true` (NocoDB, Stirling-PDF, ...) got no
+`advanced_config` at all, so NPM rendered its own stock `location /`
+(`conf.d/include/proxy.conf`), whose own `add_header X-Served-By` silently
+shadows the inherited HSTS block for every one of them.
+
+**Fix**: `npmClient.ts` gains a third `advanced_config` shape,
+`buildPlainAdvancedConfig(websocket)` — a `location /` through
+`/snippets/proxy.conf` (the same file the Authelia and gRPC blocks already
+use, already proven live, already declaring no `add_header` of its own),
+with `Upgrade`/`Connection` added only when that specific app wants
+websockets (mirroring what NPM's own `allow_websocket_upgrade` flag used to
+do for these hosts). `allow_websocket_upgrade` on the host payload is now
+unconditionally `false` for every host, not just Authelia/gRPC ones — with
+every host carrying its own advanced_config now, leaving it on would
+duplicate whatever that config already sets and fail nginx's reload (§99).
+
+Also de-duplicated: `buildProxyHostPayload`'s and `ensureProxyHost`'s
+`needsUpdate` check each carried their own copy of the
+grpc/Authelia/plain `advanced_config` ternary — pulled into one
+`computeAdvancedConfig()` both call, so a future change to one path can't
+land in only one of the two places.
+
+**Compared `/snippets/proxy.conf` against NPM's stock
+`conf.d/include/proxy.conf`** before trusting it for these hosts: the
+dashboard's own snippet is a superset for every header that matters
+(`Host`, `X-Forwarded-Proto` — hardcoded `https`, correct for this
+architecture, unlike stock's `$x_forwarded_scheme` — `X-Forwarded-For`,
+`X-Real-IP`) plus `proxy_http_version 1.1`, timeouts and buffering stock
+doesn't set at all. The only thing dropped is `X-Forwarded-Scheme`, which
+nothing here reads. `proxy_pass $forward_scheme://$server:$port;` (no
+`$request_uri` suffix, unlike stock) is exactly what `AUTHELIA_ADVANCED_CONFIG`
+already uses for the entire Authelia-protected fleet — nginx passes the
+original URI through unchanged when `proxy_pass`'s target has no URI part,
+so this is a proven-equivalent form, not a new behavior.
+
+**Blast radius, called out plainly**: this changes the generated NPM config
+for every currently-`skipAutheliaProtection` host, not just future ones —
+the exposure reconciler (on next start or the ~6h sweep) will `PUT` a new
+`advanced_config` + `allow_websocket_upgrade: false` for each. Each one
+individually reuses the exact snippet already proven live for every
+Authelia/gRPC host, so the risk is bounded, but this is still "every plain
+app's proxy host gets rewritten" — flagging it here rather than only in the
+commit message, per plan.md's own "what was tried and rejected" discipline
+even when nothing was rejected, just risk carried forward into live
+verification.
+
+9 new/updated tests in `npmClient.test.ts` (the new plain-advanced_config
+shape, the websocket-conditional Upgrade/Connection lines, the falsy-
+websocket coercion carried into the new path, and a dedicated "migrates a
+pre-§402.1 host" case exercising the exact `allow_websocket_upgrade: true,
+advanced_config: ''` shape every one of the ~9 affected hosts is in right
+now). Backend typecheck clean, 784/784 pass. Minor bump.
+
+**Not yet verified against the live host** — staying on `dev` until a
+service with `skipAutheliaProtection: true` (NocoDB is the obvious one,
+already used as the §402.1 repro) is restarted and `curl -I` against its
+public hostname shows the header, with no regression to its own login flow
+or (for one that needs it) its websocket connection.
