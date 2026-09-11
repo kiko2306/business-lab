@@ -24987,3 +24987,41 @@ rather than reaching into their document store via API unasked.
 §310 closed. README item deleted — nothing left to do; the round-trip this
 item existed to re-prove now has fresh, live confirmation instead of resting
 on the original 2026-09-09 proof.
+
+## 390. P10 — turnkey build spec drafted (§84.7)
+
+New `docs/turnkey-build-spec.md`. Nothing here needed new investigation —
+every fact in it was already proven elsewhere (§83's disk trap, §84.7's
+measured hardware numbers, §357/P9a's deployment checklist) — the work was
+assembling it into one operator-facing doc and making the one real decision
+the README item still needed: **picking the small-office app profile**.
+
+Pulled the current registry (39 apps, `backend/src/config/services.ts` /
+`apps/`) rather than trusting stale mentions of dropped apps (Metabase,
+Grocy, Syncthing, Forgejo, WAHA, Kitchen Switcher are gone — §301's
+roster-removal pass), and sorted it into four tiers:
+
+- **Core** (10 apps) — NPM/Authelia/NetBird/Tailscale/Web Terminal/ClamAV/
+  CrowdSec/Kopia/Samba/Home Page: plumbing, not a client-facing choice.
+- **Recommended default bundle** (14 apps) — what a 2–15-person office
+  actually needs day one, each mapped to the SaaS it replaces (Nextcloud+
+  OnlyOffice, Vaultwarden, Vikunja, Paperless, DocuSeal, Twenty, Kimai,
+  BookStack, NocoDB, n8n, Guacamole, Stirling-PDF, Uptime Kuma, Pi-hole).
+- **Available, not default** — ITFlow (that's MSP tooling, only relevant if
+  the client *is* one), Immich, Miniflux, Scrutiny, Dozzle, Speedtest.
+- **Not recommended for this profile** — Jellyfin/Navidrome/Mealie/Pantry/
+  Price Compare/Home Assistant (personal/household-built, not office
+  tools), Code Server/IT Tools (dev tooling).
+
+Cross-linked from `README.md`'s doc list and fixed `deployment-guide.md`'s
+stale self-link (`../README.md#todo` → the new doc directly, since the
+README anchor it pointed at no longer exists once this item is deleted).
+
+**Explicitly a draft, not a decision** — the hardware spec and disk rule are
+proven, but the app-profile tiering is this session's proposal for @mat to
+adjust, not a business sign-off. README item deleted regardless, matching
+what it actually asked for ("pick a small-office app profile") — a
+disagreement on the picks is a new, smaller item, not a reason to leave P10
+open indefinitely.
+
+Docs-only — no version bump, no host verification needed.

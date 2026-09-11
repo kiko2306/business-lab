@@ -39,6 +39,7 @@ against this model.
 - Host ports: [/docs/ports.md](/docs/ports.md)
 - Raspberry Pi / arm64 guide: [/docs/raspberry-pi.md](/docs/raspberry-pi.md)
 - Deployment guide — provisioning a box for a client, first run to hand-over: [/docs/deployment-guide.md](/docs/deployment-guide.md)
+- Turnkey build spec — hardware, disk partitioning, the default small-office app profile: [/docs/turnkey-build-spec.md](/docs/turnkey-build-spec.md)
 - API reference (OpenAPI): [/docs/openapi.yaml](/docs/openapi.yaml)
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
 - Two-factor authentication (TOTP) for the dashboard login: [/docs/two-factor.md](/docs/two-factor.md)
@@ -239,12 +240,6 @@ below.
 - [ ] **P8 — Rebrand tier 2** (§84.2) — package/image/network/project names.
       Recreates the management stack — do it in the §83 data-root maintenance
       window, with host access, not before.
-- [ ] **P10 — Turnkey build spec** (§84.7) — Dell/16 GiB/500 GB/€400 is proven
-      (this stack runs on 14.84 GiB, 4 CPUs, 53 containers, 8 GB used). The
-      trap is the disk: Ubuntu's installer defaults to a ~100 GiB root LV,
-      which is how §83 happened. Set Docker's data root or the partitioning
-      **at install**, and pick a small-office app profile. Partly depends on
-      P9.
 - [ ] **P11 — Data protection position** (§84.5) — controller vs processor,
       backup key custody, DR. A business stance to decide, then write up — not
       a coding session. §84.7 simplifies it (social tokens stay on the client

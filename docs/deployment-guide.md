@@ -22,7 +22,7 @@ Have these in hand — `start.sh` cannot derive them (see
   Pi-hole, enroll with `sudo netbird up --disable-dns` — see
   [first-run.md § Enrolling this host as a NetBird peer](first-run.md#enrolling-this-host-as-a-netbird-peer).
   A bare `netbird up` breaks host DNS (`plan.md` §368).
-- Hardware per [the turnkey build spec](../README.md#todo) — decide Docker's
+- Hardware per [the turnkey build spec](turnkey-build-spec.md) — decide Docker's
   data root at install time, not after (first-run.md § Where Docker keeps its
   data).
 
