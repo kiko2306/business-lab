@@ -79,6 +79,19 @@ describe('ensureTailscaleAutomation', () => {
     });
   });
 
+  // Found live (§408.1): Tailscale's key description field 400s on
+  // anything outside alphanumeric/space/hyphen — "Business Lab (auto)"'s
+  // parentheses broke it. Regression, not just a fixed string.
+  it("sends a key description Tailscale's API actually accepts", async () => {
+    vi.mocked(fetch).mockImplementation(freshSetupFetch as typeof fetch);
+    await ensureTailscaleAutomation('tailscale');
+    const keysPost = vi
+      .mocked(fetch)
+      .mock.calls.find(([url, init]) => (url as string).endsWith('/tailnet/-/keys') && (init as { method?: string })?.method === 'POST');
+    const body = JSON.parse((keysPost?.[1] as { body: string }).body);
+    expect(body.description).toMatch(/^[A-Za-z0-9 -]{1,50}$/);
+  });
+
   it('sends If-Match with the GET ACL response ETag when enabling Funnel', async () => {
     vi.mocked(fetch).mockImplementation(freshSetupFetch as typeof fetch);
     await ensureTailscaleAutomation('tailscale');

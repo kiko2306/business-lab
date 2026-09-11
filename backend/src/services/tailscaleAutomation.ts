@@ -112,7 +112,10 @@ async function ensureAuthKey(token: string): Promise<void> {
   }
 
   const { data: created } = await tsRequest<TsKey>(token, 'POST', '/tailnet/-/keys', {
-    description: 'Business Lab (auto)',
+    // Found live (§408.1): Tailscale's key description only allows
+    // alphanumeric, spaces and hyphens — "Business Lab (auto)" 400'd on the
+    // parentheses.
+    description: 'Business Lab auto-mint',
     expirySeconds: AUTH_KEY_EXPIRY_SECONDS,
     capabilities: {
       devices: {

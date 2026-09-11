@@ -26273,3 +26273,18 @@ restarted, and the backend log confirms it either minted/confirmed the
 auth key and found Funnel already granted (the expected outcome, given
 §387's hand-edit already covers `tag:businesslab`) without touching the
 container's actual connection.
+
+## 408.1. Fixed: Tailscale's key description rejects parentheses
+
+Found live, first restart with an OAuth client set: `POST /tailnet/-/keys
+-> 400: "keys: description had invalid characters"`. The OpenAPI spec
+(read before building §408) does say the description field is
+alphanumeric/hyphens/spaces only — missed that `'Business Lab (auto)'`
+itself violates its own documented constraint. Changed to `'Business Lab
+auto-mint'`. New regression test asserts the description sent actually
+matches Tailscale's allowed charset, not just the literal string, so a
+future edit here fails in CI rather than live. Backend typecheck clean,
+812/812 pass. Patch bump.
+
+**Not yet verified against the live host** — pushing to `dev`/`beta`,
+rebuilding, restarting Tailscale once more.

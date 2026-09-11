@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.83.1] — 2026-09-11
+
+### Fixed
+
+- Tailscale auto-mint key description rejected parentheses (its API only allows alphanumeric/hyphen/space)
+
 ## [0.83.0] — 2026-09-11
 
 ### Added
