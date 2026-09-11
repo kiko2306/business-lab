@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.84.0] — 2026-09-11
+
+### Added
+
+- Hide fields from app config panels that a human never needs to see or touch: two admin-email fields silently overridden every start, and DB username/database-name pairs across 12 apps that could break the DB connection if edited
+
 ## [0.83.1] — 2026-09-11
 
 ### Fixed
