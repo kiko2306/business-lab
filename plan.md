@@ -24550,3 +24550,44 @@ both pointing at `sudo netbird up --disable-dns` and why a bare `netbird up`
 takes down host DNS. Satisfies the README item's "at minimum" bar; the further
 idea there (a `start.sh` check that warns when `DisableDNS` is false and `:53`
 is taken) stays unscheduled — no demand for it yet.
+
+## 377. Nextcloud `/shared` mount + admin-group promotion automated (§369, 2026-09-11)
+
+Turned §369's by-hand fix into code, through the shared `nextcloudOcc.ts`
+scaffold (same `docker compose run --rm --user www-data` pattern as the
+OnlyOffice/ClamAV wiring):
+
+- **New `nextcloudSharedMount.ts`.** Enables `files_external` (installing it
+  first if absent — it's bundled but was found *disabled*, not missing) and
+  registers `/shared` with `occ files_external:create Shared local null::null
+  -c datadir=/shared`, guarded by an `occ files_external:list | grep -q
+  "/shared"` idempotency check — `files_external:create` has no upsert form
+  and would otherwise duplicate the mount every start.
+- **`nextcloudSaml.ts` extended.** `buildEnableScript()` now takes an optional
+  `adminUsername`; when given, it appends `occ group:adduser admin
+  "$SSO_ADMIN_USER"` guarded by `occ user:info` first. The Nextcloud account
+  for a header-authed admin is auto-provisioned lazily, on their first request
+  through the header (`general-require_provisioned_account=0`) — not at
+  Nextcloud-start time, when this reconciler actually runs. So the promotion
+  is a no-op on a fresh deployment and converges on the *next* Nextcloud start
+  after the admin's first sign-in, the same "retries until it lands" shape as
+  the OnlyOffice/ClamAV app-store-unreachable paths. The username travels
+  through `$SSO_ADMIN_USER` (`passEnv`), never interpolated into the script,
+  matching how the OnlyOffice wiring keeps its JWT secret off the command
+  line.
+- Both wired into `executor.ts` after `reconcileNextcloudSaml`, same slot as
+  the other Nextcloud `occ` reconcilers (after `compose up`, since occ needs
+  the running database).
+- Fixed the stale premise the old code carried: §219 said the create API
+  needs a fresh interactive password confirmation that "no API call can
+  satisfy" — true of the OCS/web API only. `occ files_external:create` has no
+  such constraint (confirmed live in §369). Updated the comment in
+  `apps/nextcloud/docker-compose.yml` and rewrote `docs/app-credentials.md`'s
+  Nextcloud section accordingly.
+
+Backend typecheck clean; `backend test` 740/740 (12 new: 6 in
+`nextcloudSharedMount.test.ts`, 6 added to `nextcloudSaml.test.ts` for the
+promotion step). Not yet re-proven live on the host — the by-hand fix from
+§369 is already applied there, so this is unblocking a *fresh clone*, not
+fixing anything currently broken on `tx-home-utils.com`; next Nextcloud
+restart there will exercise the new code path for real.

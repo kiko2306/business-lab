@@ -4,11 +4,13 @@ const occ = vi.hoisted(() => ({ runNextcloudOccScript: vi.fn() }));
 const exposure = vi.hoisted(() => ({ getServiceExposureRow: vi.fn() }));
 const appEnv = vi.hoisted(() => ({ readAppEnvValue: vi.fn() }));
 const registry = vi.hoisted(() => ({ resolveComposeFile: vi.fn() }));
+const autheliaUsers = vi.hoisted(() => ({ getAutheliaAdminUser: vi.fn() }));
 
 vi.mock('./nextcloudOcc', () => occ);
 vi.mock('./exposure', () => exposure);
 vi.mock('./appEnv', () => appEnv);
 vi.mock('../config/services', () => registry);
+vi.mock('./autheliaUsers', () => autheliaUsers);
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 import { reconcileNextcloudSaml, buildEnableScript, buildDisableScript } from './nextcloudSaml';
@@ -44,11 +46,27 @@ describe('buildDisableScript', () => {
   });
 });
 
+describe('buildEnableScript admin promotion', () => {
+  it('adds no promotion step when no admin username is given', () => {
+    expect(buildEnableScript().join('\n')).not.toContain('group:adduser admin');
+  });
+
+  it('promotes the account only if it already exists, and retries later if not', () => {
+    const script = buildEnableScript('mat').join('\n');
+    expect(script).toContain('if php occ user:info "$SSO_ADMIN_USER"');
+    expect(script).toContain('php occ group:adduser admin "$SSO_ADMIN_USER"');
+    expect(script).toContain('retries next start');
+    // The username never appears literally — only through the env var.
+    expect(script).not.toContain('group:adduser admin mat');
+  });
+});
+
 describe('reconcileNextcloudSaml', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     registry.resolveComposeFile.mockReturnValue({ composeFile: '/apps/nextcloud/docker-compose.yml' });
     occ.runNextcloudOccScript.mockResolvedValue({ ok: true, output: '' });
+    autheliaUsers.getAutheliaAdminUser.mockReturnValue(null);
   });
 
   const scriptOf = () => occ.runNextcloudOccScript.mock.calls[0][0].join('\n') as string;
@@ -80,5 +98,26 @@ describe('reconcileNextcloudSaml', () => {
 
     await reconcileNextcloudSaml('nextcloud');
     expect(scriptOf()).toContain('php occ app:disable user_saml');
+  });
+
+  it('passes the Authelia admin username through the environment, not the script, when enabling', async () => {
+    exposure.getServiceExposureRow.mockResolvedValue({ enabled: true });
+    appEnv.readAppEnvValue.mockReturnValue('true');
+    autheliaUsers.getAutheliaAdminUser.mockReturnValue({ username: 'mat', displayName: '', email: '', groups: [] });
+
+    await reconcileNextcloudSaml('nextcloud');
+    expect(scriptOf()).toContain('group:adduser admin "$SSO_ADMIN_USER"');
+    const opts = occ.runNextcloudOccScript.mock.calls[0][1];
+    expect(opts.env.SSO_ADMIN_USER).toBe('mat');
+    expect(opts.passEnv).toEqual(['SSO_ADMIN_USER']);
+  });
+
+  it('does not attempt the promotion when there is no Authelia admin yet', async () => {
+    exposure.getServiceExposureRow.mockResolvedValue({ enabled: true });
+    appEnv.readAppEnvValue.mockReturnValue('true');
+    autheliaUsers.getAutheliaAdminUser.mockReturnValue(null);
+
+    await reconcileNextcloudSaml('nextcloud');
+    expect(scriptOf()).not.toContain('group:adduser');
   });
 });

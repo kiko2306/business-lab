@@ -41,11 +41,11 @@ services:
       # interface, so it lives under this app — but as a SIBLING of the
       # webroot, not inside ./data/app: writing into the webroot from
       # outside would desync Nextcloud's own file cache. Samba serves this
-      # same dir over SMB, Paperless watches a subfolder. Register it once
-      # via Admin settings -> External Storage (local, /shared): the create
-      # API is #[PasswordConfirmationRequired(strict: true)] upstream, which
-      # only a real interactive session can satisfy, so this one step can't
-      # be scripted (see docs/app-credentials.md).
+      # same dir over SMB, Paperless watches a subfolder. Registered as
+      # external storage automatically (services/nextcloudSharedMount.ts,
+      # §369) — the earlier "needs an interactive password confirmation"
+      # premise was wrong; that only applies to the OCS/web create API, and
+      # `occ files_external:create` has no such constraint.
       - ./data/shared:/shared
     depends_on:
       nextcloud-db:

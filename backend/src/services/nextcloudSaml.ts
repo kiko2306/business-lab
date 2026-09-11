@@ -24,6 +24,17 @@
  * account still works there. Turning the toggle back off (or disabling
  * exposure) removes `user_saml` entirely on the next start.
  *
+ * Also promotes the Authelia admin to Nextcloud's `admin` group (§369): the
+ * user's note was "webmaster accounts should be injected as Nextcloud
+ * admin", and `user_saml` has no group mapping of its own — a fresh SSO
+ * account always lands as a plain user, which never sees Administration
+ * settings at all. This only means anything once env-mode is on, so it's
+ * folded into the same enable script rather than a separate reconciler.
+ * `general-require_provisioned_account=0` auto-creates the Nextcloud account
+ * lazily, on that admin's first authenticated request through the header —
+ * not before — so the promotion is a no-op until then and simply retries on
+ * every subsequent Nextcloud start until it lands.
+ *
  * Runs after `docker compose up` on every Nextcloud start (occ needs the
  * database), through the shared nextcloudOcc scaffold. No-op for every other
  * service. Never fatal.
@@ -32,6 +43,7 @@
 import logger from '../utils/logger';
 import { resolveComposeFile } from '../config/services';
 import { readAppEnvValue } from './appEnv';
+import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { runNextcloudOccScript } from './nextcloudOcc';
 
@@ -54,8 +66,16 @@ const TOGGLE_KEY = 'NEXTCLOUD_PROXY_HEADER_AUTH';
  * fixed: `SessionService::ENVIRONMENT_IDENTITY_PROVIDER_ID`. `saml:config:set`
  * upserts (`ConfigurationsMapper::set` → `insertOrUpdate`), so no create step.
  * `type` and `general-require_provisioned_account` are still appconfig.
+ *
+ * `adminUsername`, when given, appends a group-promotion step: the account
+ * only exists once that admin has actually signed in through the header at
+ * least once (see the file header), so this checks `occ user:info` first and
+ * quietly skips — retrying on the next Nextcloud start — rather than failing
+ * the whole script. Passed through `$SSO_ADMIN_USER` (never interpolated
+ * into the script) the same way the OnlyOffice wiring keeps its JWT secret
+ * off the command line.
  */
-export function buildEnableScript(): string[] {
+export function buildEnableScript(adminUsername?: string): string[] {
   return [
     'if ! php occ app:getpath user_saml >/dev/null 2>&1; then',
     '  if ! php occ app:install user_saml; then',
@@ -76,6 +96,16 @@ export function buildEnableScript(): string[] {
     // vouches for. 1 would require the account to pre-exist on another backend.
     'php occ config:app:set user_saml general-require_provisioned_account --value "0"',
     'echo "hlm: user_saml environment mode configured"',
+    ...(adminUsername
+      ? [
+          'if php occ user:info "$SSO_ADMIN_USER" >/dev/null 2>&1; then',
+          '  php occ group:adduser admin "$SSO_ADMIN_USER"',
+          '  echo "hlm: $SSO_ADMIN_USER promoted to the Nextcloud admin group"',
+          'else',
+          '  echo "hlm: $SSO_ADMIN_USER has not signed in to Nextcloud yet; admin-group promotion retries next start"',
+          'fi',
+        ]
+      : []),
   ];
 }
 
@@ -109,8 +139,12 @@ export async function reconcileNextcloudSaml(serviceName: string): Promise<void>
     const exposureRow = await getServiceExposureRow(NEXTCLOUD_SERVICE);
     const toggle = (readAppEnvValue(NEXTCLOUD_SERVICE, TOGGLE_KEY) ?? '').trim().toLowerCase();
     const wanted = Boolean(exposureRow?.enabled) && toggle === 'true';
+    const adminUsername = wanted ? getAutheliaAdminUser()?.username : undefined;
 
-    const result = await runNextcloudOccScript(wanted ? buildEnableScript() : buildDisableScript());
+    const result = await runNextcloudOccScript(
+      wanted ? buildEnableScript(adminUsername) : buildDisableScript(),
+      adminUsername ? { env: { ...process.env, SSO_ADMIN_USER: adminUsername }, passEnv: ['SSO_ADMIN_USER'] } : undefined
+    );
     logger.info(`Nextcloud user_saml reconciled (${wanted ? 'enabled' : 'disabled'})`, {
       ok: result.ok,
       output: result.output || '(no output)',

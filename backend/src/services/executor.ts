@@ -24,6 +24,7 @@ import { ensureHomeAssistantHacs } from './homeAssistantHacs';
 import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
 import { reconcileNextcloudClamav } from './nextcloudClamav';
 import { reconcileNextcloudSaml } from './nextcloudSaml';
+import { reconcileNextcloudSharedMount } from './nextcloudSharedMount';
 import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
 import { syncMealieAiProvider } from './mealieAiSync';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
@@ -272,8 +273,15 @@ async function composeUpWithManagedConfig(
   // Nextcloud: switch user_saml into environment-variable mode so Authelia's
   // forward-auth headers log the user in (§216/§217). Gated behind
   // NEXTCLOUD_PROXY_HEADER_AUTH + exposure; disables the app otherwise. Also
-  // after `up` — it's occ against the running database. No-op elsewhere.
+  // promotes the Authelia admin into Nextcloud's admin group once their
+  // header-auth'd account exists (§369). After `up` — it's occ against the
+  // running database. No-op elsewhere.
   await reconcileNextcloudSaml(serviceName);
+  // Nextcloud: register the `/shared` bind mount as external storage (§219/
+  // §369) — the "needs an interactive password confirmation" premise that
+  // used to make this a by-hand step was wrong; `occ files_external:create`
+  // has no such constraint. After `up`; no-op elsewhere.
+  await reconcileNextcloudSharedMount(serviceName);
   // Guacamole: rotate the shipped guacadmin/guacadmin default the first time
   // it's reachable (§200 slice 1). Also after `up`, not before — it's a
   // REST call against the running webapp, not a file it needs before boot.

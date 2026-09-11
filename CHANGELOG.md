@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.76.0] — 2026-09-11
+
+### Added
+
+- Nextcloud's /shared external mount and the Authelia admin's Nextcloud admin-group membership are now provisioned automatically via occ (§369) — no more by-hand External Storage click-through
+
 ## [0.75.1] — 2026-09-11
 
 ### Fixed

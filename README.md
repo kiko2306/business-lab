@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.75.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.76.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -294,16 +294,6 @@ below.
       admin login; the agent can't do the OAuth-client/ACL steps.
 ### Apps and integrations
 
-- [ ] **Auto-register Nextcloud's `/shared` external mount + make the
-      webmaster a Nextcloud admin** (§369) — done by hand on the test box
-      (`occ app:enable files_external` + `occ files_external:create`, then
-      `occ group:adduser admin mat`), but it should be automatic. `occ` has
-      no password-confirmation constraint (that only affects the web API, the
-      old §219 blocker), so `nextcloudSaml.ts` / an `occ` bootstrap can:
-      (a) enable `files_external` and create the `/shared` Local mount for
-      all users, and (b) add the Authelia admin (webmaster) to Nextcloud's
-      `admin` group — SAML has no group mapping, so a fresh SSO account lands
-      as a plain user and can't reach Admin settings at all.
 - [ ] **@mat: relocate the live shared tree + re-prove the round-trip**
       (§310) — File Browser was removed and the shared tree moved from
       `apps/file-browser/data/files/` to `apps/nextcloud/data/shared/`. A

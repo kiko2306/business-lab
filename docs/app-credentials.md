@@ -69,21 +69,23 @@ Every app is exposed behind Authelia automatically — claim these yourself befo
 | **n8n** | Owner account created on first visit. |
 | **NetBird** | Log in through Authelia; the first user becomes account owner. |
 
-### Nextcloud — register the shared tree once (External Storage)
+### Nextcloud — the shared tree and admin access are automatic
 
 The shared tree lives at `apps/nextcloud/data/shared/` (§202/§219/§310) — a
 sibling of Nextcloud's webroot, also served over SMB by Samba — and is
-bind-mounted into the Nextcloud container at `/shared`, but Nextcloud won't
-show it until you register it as external storage — and that one step can't
-be scripted:
-Nextcloud's own create API for it requires a fresh interactive password
-confirmation (`#[PasswordConfirmationRequired(strict: true)]`), which no
-API/Basic-Auth call can satisfy, and the `occ files_external:create` command
-older docs describe no longer exists in current Nextcloud.
+bind-mounted into the Nextcloud container at `/shared`. The dashboard
+registers it as external storage (name `Shared`, all users) on every
+Nextcloud start, so there is nothing to click through: **Admin settings ->
+External Storage** just shows it already there. (The earlier premise that
+this needed a real interactive session — `#[PasswordConfirmationRequired]` —
+only applies to the OCS/web create API; `occ files_external:create` has no
+such constraint, §369.)
 
-**Admin settings -> External Storage -> Add storage**: name it (e.g.
-`Shared`), type **Local**, path `/shared`, Auth `None`, leave it applicable
-to all users, then **Save**. Takes effect immediately, no restart needed.
+If **`NEXTCLOUD_PROXY_HEADER_AUTH`** is on (above), the dashboard also adds
+the Authelia admin to Nextcloud's `admin` group the first time their
+header-authed account exists — `user_saml` has no group mapping of its own,
+so without this a fresh SSO login would otherwise land as a plain user with
+no Administration settings.
 
 ### ITFlow — two things to do after the wizard
 
