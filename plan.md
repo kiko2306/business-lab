@@ -25315,3 +25315,35 @@ live — needs a deploy + Kopia restart (compose resource limits only apply
 to a freshly created container, so a plain re-trigger isn't enough this
 time) and one more "Back up now" to confirm a snapshot actually lands.
 Staying on `dev`.
+
+## 398. §397 verified live — a real off-host FTP snapshot landed (§131.4)
+
+Deployed, restarted Kopia (fresh container, `Memory=805306368` = 768 MiB
+confirmed, `RestartCount=0`), clicked "Back up now" once more. This time:
+no OOM in `dmesg`, no restart, `kopia server start`'s process stayed alive
+through the whole upload (confirmed mid-flight: RSS ~461 MB, real CPU,
+disk/network I/O wait state — genuinely working, not stalled). A few
+minutes later:
+
+```
+root@kopia:/source/apps
+  2026-09-11 13:02:19 WEST k2fcfdc65125b9a1fc1c928730f2805b4
+  3.4 GB dgrwxrwxr-x files:52107 dirs:4648
+  (latest-1,hourly-1,daily-1,weekly-1,monthly-1,annual-1)
+```
+
+A real 3.4 GB, 52,107-file snapshot, genuinely sitting on
+`portoinf.dyndns-server.com` — off-host hardware that actually cooperates,
+unlike the test NAS across three protocols (§265/§268/§269).
+
+**This is the proof the long-parked README item was waiting on.** Two real
+bugs found and fixed to get here (§396's stale-volume issue, §397's OOM),
+neither a code-complete-but-unproven gap — both were genuine defects only a
+real upload against real off-host hardware could surface, exactly why this
+item stayed open instead of being called done from the `disk`-kind proof
+alone.
+
+**Not yet closing the README item outright** — §266's `disk`-kind proof
+went one step further (byte-for-byet restore, not just a snapshot). Whether
+to also prove a restore from this FTP destination before deleting the item
+is @mat's call, not a coding decision.
