@@ -25276,3 +25276,42 @@ Not yet re-verified live — needs a deploy + re-save to confirm the stale
 volume actually gets cleared and Kopia starts clean against the real FTP
 destination this time. Staying on `dev` until that's proven — this is
 exactly the "touches Docker/backups" case the verification gate exists for.
+
+## 397. Kopia OOM-killed on every real upload to the FTP destination — `mem_limit` too low (§131.4)
+
+§396's fix let the FTP destination genuinely connect and create a repository
+(confirmed live — real progress, unlike the old NAS). Actually triggering
+"Back up now" told a different story: `started: true, dumped: 30` from the
+backend every time, but `kopia snapshot list --all` stayed empty across
+three consecutive attempts, and `docker inspect` showed Kopia's container
+quietly restarting (`RestartCount` 1 → 2 → 3) a few seconds after each
+trigger — clean `ExitCode=0`, nothing in `docker logs`, `OOMKilled: false`.
+Looked like a mystery at first: no backend code path restarts Kopia as part
+of a backup run (checked `runAppDataBackup`/`snapshotAppData` directly), no
+autoheal/watchtower container exists, no healthcheck-triggered restart
+mechanism is even possible in plain Compose.
+
+**Root cause, found in the host's own kernel log** (`dmesg`), not guessed:
+`Memory cgroup out of memory: Killed process ... (kopia) ...` — a genuine
+OOM kill, timed to the second with each restart. `apps/kopia/docker-
+compose.yml` had `mem_limit: 192m`, which was only ever proven against
+connecting to/creating an *empty* repository (§221's s3 proof, §265-269's
+NAS attempts that never got past `repository create` either) — nobody had
+proven a real upload before. Actually walking and content-hashing 30 apps'
+worth of data, through rclone's `--vfs-cache-mode=writes` buffering over the
+FTP bridge, needs real headroom. Docker's own `OOMKilled` flag missed it
+because the killed PID wasn't the container's PID 1 in Docker's accounting,
+even though the kernel took the whole container down regardless — which is
+exactly why `docker logs` showed a clean, silent restart with zero error
+text: nothing in the kopia process itself ever got the chance to log
+anything, it was killed from outside.
+
+Fixed: `mem_limit: 192m` → `768m`, `mem_reservation: 48m` → `192m`. Not a
+precisely-measured minimum — a real, evidence-based bump with actual
+headroom rather than a bare-minimum retune, since app data will only grow.
+
+Not `backend/src`/`frontend/src` — no version bump. Not yet re-verified
+live — needs a deploy + Kopia restart (compose resource limits only apply
+to a freshly created container, so a plain re-trigger isn't enough this
+time) and one more "Back up now" to confirm a snapshot actually lands.
+Staying on `dev`.

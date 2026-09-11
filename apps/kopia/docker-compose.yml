@@ -1,7 +1,18 @@
 services:
   kopia:
-    mem_limit: 192m
-    mem_reservation: 48m
+    # 192m was enough to connect/create an (empty) repository, which is all
+    # this had ever been proven against — a real snapshot upload needs far
+    # more: walking + content-hashing the source tree, plus rclone's own
+    # `--vfs-cache-mode=writes` buffering over the FTP bridge. Found live
+    # (plan.md §396 follow-up): every "Back up now" against a real off-host
+    # FTP destination got the container OOM-killed by the kernel a few
+    # seconds after the upload started (`dmesg`: "Memory cgroup out of
+    # memory: Killed process ... (kopia)") — Docker's own `OOMKilled` flag
+    # didn't reflect it since the killed PID wasn't the container's PID 1,
+    # but it still took the whole container down and silently discarded the
+    # in-flight upload, restarting clean with no error in `docker logs`.
+    mem_limit: 768m
+    mem_reservation: 192m
     image: kopia/kopia:latest
     restart: unless-stopped
     # Kopia identifies every snapshot source by (user, host, path). The host
