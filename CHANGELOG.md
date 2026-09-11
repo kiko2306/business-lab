@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.77.2] — 2026-09-11
+
+### Fixed
+
+- A generated *_ADMIN_PASSWORD (ITFlow, DocuSeal, NocoDB, Kimai, Home Assistant) is now actually readable in the config panel, not silently masked like every other secret — app-credentials.md documented this but the code never did it
+
 ## [0.77.1] — 2026-09-11
 
 ### Fixed
