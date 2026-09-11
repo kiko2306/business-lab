@@ -25233,3 +25233,46 @@ list. README item deleted, and with it the now-empty "Business Lab (§84)"
 heading — P1 through P12 are all done.
 
 Docs-only, no code — no version bump, no host verification needed.
+
+## 396. A real off-host FTP destination surfaced a stale-volume bug in `applyKopiaTarget` (§131.4)
+
+@mat got a genuinely new, separate FTP server (`portoinf.dyndns-server.com`)
+— unlike the uncooperative test NAS, this one actually answers: "FTP server
+reachable and credentials accepted" from the destination test. First real
+chance to close the long-parked off-host-backup item.
+
+Saved the new `ftp` destination (previous kind was `smb`, pointed at a dead
+`192.168.1.38`). Dashboard reported success. Starting Kopia then failed:
+`docker compose could not start this service`.
+
+**Root cause, found by reading `applyKopiaTarget()`, not guessing.**
+Kopia was stopped at save time (container state `Created`, never actually
+started). The function's volume-recreation step —
+`docker compose down` + `docker volume rm -f kopia_backup-target` + `up` —
+only ran inside the "Kopia is currently running" branch. Not running →
+early return with just "Saved. Start Kopia to use it," **skipping the
+volume cleanup entirely**. Docker named volumes are immutable once created
+(CIFS `driver_opts` baked in at creation time), so the old SMB-configured
+`kopia_backup-target` volume survived untouched. The next manual Start
+reused it as-is — confirmed directly: `docker compose up` printed "Volume
+exists but doesn't match configuration in compose file. Recreate (data will
+be lost)?" and, with no TTY to answer, silently kept the stale one, still
+trying to mount `//192.168.1.38/share` — dead host, immediate failure.
+
+**Fix**: the "is Kopia running" check now only decides whether to bring it
+back *up* afterward — the `down` + `volume rm` cleanup runs unconditionally
+every time a destination is saved, whether Kopia is running, stopped, or
+merely `Created`. `docker compose down` is a safe no-op-ish call either way
+(and correctly cleans up a `Created`-but-never-started container, which
+still held a reference blocking the volume removal).
+
+No new test — `kopiaTargetApply.test.ts`'s own header already states why:
+`applyKopiaTarget` is a thin shell over `docker`, proven live rather than
+mocked, same as the rest of this file's Docker-orchestration half. Backend
+typecheck clean, 757/757 tests pass (unaffected — `buildEnvValues`/
+`ensureKopiaRepoDir` are what's actually unit-tested here, neither touched).
+
+Not yet re-verified live — needs a deploy + re-save to confirm the stale
+volume actually gets cleared and Kopia starts clean against the real FTP
+destination this time. Staying on `dev` until that's proven — this is
+exactly the "touches Docker/backups" case the verification gate exists for.

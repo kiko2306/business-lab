@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.77.5] — 2026-09-11
+
+### Fixed
+
+- Saving a new Kopia backup destination while Kopia was stopped left the old destination's Docker volume in place, silently reused on the next Start — the volume cleanup now runs regardless of whether Kopia happens to be running at save time
+
 ## [0.77.4] — 2026-09-11
 
 ### Changed
