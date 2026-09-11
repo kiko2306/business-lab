@@ -182,13 +182,18 @@ Authelia for two logins.)
 
 ## Services with no web UI
 
-**CrowdSec**, **Tailscale** — no login, nothing to expose.
-CrowdSec's bouncer keys and Tailscale's auth key are handled by the dashboard
-and `start.sh`. CrowdSec generates two: `CROWDSEC_BOUNCER_KEY` for the
-Cloudflare worker bouncer and `CROWDSEC_NGINX_BOUNCER_KEY` for the Lua bouncer
-inside Nginx Proxy Manager, kept separate so either can be revoked on its own
-(`cscli bouncers delete nginx`). Both are generated on first start and baked
-into the right config file; neither is ever typed.
+**CrowdSec**, **Tailscale**, **NetBird's routing peer** — no login, nothing
+to expose. CrowdSec's bouncer keys and Tailscale's auth key are handled by
+the dashboard and `start.sh`. CrowdSec generates two: `CROWDSEC_BOUNCER_KEY`
+for the Cloudflare worker bouncer and `CROWDSEC_NGINX_BOUNCER_KEY` for the
+Lua bouncer inside Nginx Proxy Manager, kept separate so either can be
+revoked on its own (`cscli bouncers delete nginx`). Both are generated on
+first start and baked into the right config file; neither is ever typed.
+The routing peer's setup key (`NETBIRD_ROUTING_PEER_SETUP_KEY`) is the one
+exception typed by hand — it's minted by NetBird's own Remote Network Access
+wizard, not derivable, and is entered once through this app's config in the
+Business Lab dashboard (same pattern as `TAILSCALE_AUTH_KEY`). See
+`apps/netbird-vpn/.env.example`.
 
 ## Rotating a credential
 

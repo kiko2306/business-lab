@@ -142,6 +142,39 @@ services:
     networks:
       - netbird-net
 
+  # Routing peer: joins the overlay as an ordinary peer on THIS host and
+  # advertises its LAN (the "My Subnet" network resource created in the
+  # NetBird dashboard's Remote Network Access wizard) so a remote peer
+  # reaches every device on the LAN without installing NetBird on each one.
+  #
+  # network_mode: host (not netbird-net) — a routing peer has to see and
+  # route packets on the host's real LAN interface; an isolated Docker
+  # bridge network can't provide that. NET_ADMIN + /dev/net/tun are what
+  # let it create the WireGuard interface and adjust routes itself.
+  netbird-client:
+    mem_limit: 64m
+    mem_reservation: 16m
+    image: netbirdio/netbird:latest
+    restart: unless-stopped
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun
+    environment:
+      NB_HOSTNAME: netbird-router
+      # Same self-hosted endpoint every native client already uses — see
+      # additionalExposures on netbird-vpn in backend/src/config/services.ts.
+      NB_MANAGEMENT_URL: "https://netbird-vpn-api.${BASE_DOMAIN}"
+      # Generated once from the dashboard's Remote Network Access wizard
+      # ("Generate Setup Key" on the routing-peer step) and pasted in via
+      # this app's config in the Business Lab dashboard — see
+      # apps/netbird-vpn/.env.example. NetBird setup keys expire (30 days by
+      # default); a fresh one only needs pasting in, not a rebuild.
+      NB_SETUP_KEY: "${NETBIRD_ROUTING_PEER_SETUP_KEY}"
+    volumes:
+      - ./data/client:/etc/netbird
+
 networks:
   netbird-net:
     driver: bridge

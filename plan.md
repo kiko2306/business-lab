@@ -25726,3 +25726,67 @@ kimai, twenty) takes the exact same `buildPlainAdvancedConfig(true)` path
 NocoDB just proved live; nothing app-specific left to verify separately.
 Merged to `main` already (deployed ahead of verification, same pattern
 §402.1 used); no further action needed.
+
+## 404. NetBird routing peer, so a remote client reaches the whole LAN
+
+Prompted by wanting to work on this repo from home against `home-srv-01`
+over VPN. `apps/netbird-vpn/` already runs the self-hosted signal/
+management/dashboard/relay stack (§52 etc.), but nothing in it ever joined
+the overlay *as a peer* — every existing container there only serves other
+peers, none of them route traffic anywhere. NetBird's own dashboard wizard
+(Settings → Networks → Remote Network Access) offers exactly the fix: a
+"routing peer" that advertises a whole LAN subnet as a network resource, so
+a remote client reaches everything on it without installing NetBird on each
+individual homelab device.
+
+**Rejected: running the wizard's own install command by hand on the host.**
+That's console configuration — CLAUDE.md principle 2 reserves the only
+host-run command for `./start.sh`. It would also evaporate on a fresh
+clone, same as any other hand-applied host fix.
+
+**What shipped instead**: a `netbird-client` service added to the existing
+`apps/netbird-vpn/docker-compose.yml` (not a new app — it's the same
+NetBird deployment gaining a peer role, same as `netbird-relay` is a role
+alongside `netbird-dashboard`). `network_mode: host` + `NET_ADMIN` +
+`/dev/net/tun`, since a routing peer has to see and route packets on the
+host's actual LAN interface — the isolated `netbird-net` bridge the other
+four containers sit on can't provide that (mirrors why `home-assistant`
+needs the same `network_mode: host` for its own discovery traffic,
+services.ts:186). Points `NB_MANAGEMENT_URL` at
+`https://netbird-vpn-api.${BASE_DOMAIN}` — the same public endpoint every
+native NetBird client (phone, desktop) already uses via the
+`additionalExposures` on `netbird-vpn` in `services.ts`, so no new exposure
+plumbing was needed.
+
+The one genuinely third-party value — `NETBIRD_ROUTING_PEER_SETUP_KEY`,
+minted by NetBird's own Remote Network Access wizard, not derivable — goes
+into `apps/netbird-vpn/.env.example` as a `change-me` placeholder, which
+appEnv.ts's existing generic per-app config UI already picks up and prompts
+for (identical pattern to `TAILSCALE_AUTH_KEY`; no backend/frontend code
+changes needed for that part). Documented in `docs/app-credentials.md`'s
+"no web UI" section alongside Tailscale's key.
+
+No `services.ts` changes: `netbird-client` carries no exposure, no health
+check, and isn't the app's `exposurePortEnvVar` target — it's an unexposed
+extra container inside an app definition that already exists, same as
+`netbird-relay`/`netbird-management` needing no registry entries of their
+own. No `docs/ports.md` row (no `ports:` block — host networking can't
+remap one, same as Home Assistant). No new `docs/licences.md` row —
+`netbirdio/netbird` is the same BSD-3-Clause NetBird already has a clean
+row for.
+
+Backend typecheck clean, 787/787 pass (no new tests — nothing here is
+parsing/derivation logic the existing `netbird-vpn exposures` /
+`NetBird signal port coupling` suites don't already cover, and those still
+pass unchanged since no existing service in the compose file moved).
+
+**Not yet verified against the live host** — staying on `dev`. Verification
+needs, in order: generate the routing-peer setup key from
+`https://netbird-vpn.tx-home-utils.com`'s Remote Network Access wizard
+(network resource `192.168.1.0/24`, matching `home-srv-01`'s actual LAN),
+paste it into `NETBIRD_ROUTING_PEER_SETUP_KEY` via the dashboard's NetBird
+VPN config panel, restart the `netbird-vpn` app so `netbird-client` picks it
+up, confirm the peer shows connected (not "Waiting for your routing peer to
+connect") in that same wizard, then from an actual remote NetBird peer
+(this WSL, enrolled separately) confirm a LAN address behind `home-srv-01`
+(e.g. `192.168.1.236:22`) is reachable that wasn't reachable before.
