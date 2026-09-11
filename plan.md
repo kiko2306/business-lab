@@ -26084,3 +26084,15 @@ Purged (`apt-get purge netbird`, service already stopped/disabled by that),
 removed the leftover apt repo file and keyring, confirmed clean — the
 Docker `netbird-client` container already covers this host, so nothing
 else needed to replace it.
+
+**§404 fully verified.** WSL's own LAN interface (`eth1`) taken down and
+its uplink switched to a phone tether — genuinely off this LAN now, no
+more same-subnet ambiguity. `ip route get 192.168.1.236` now resolves via
+`wt0` (the NetBird WireGuard interface) in the `netbird` routing table,
+not a physical NIC. `netbird status --detail` shows the `netbird-router`
+peer at `Status: Connected`, `Connection type: P2P` — a live tunnel, not
+just an offered route. `ssh 192.168.1.236` through it reached `home-srv-01`
+and printed a marker confirming the path. End to end, with zero manual
+NetBird-dashboard steps beyond the one Personal Access Token: §404's
+`netbird-client` container + §405's API-driven auto-provisioning +
+§405.1–§405.3's fixes all proven live together. `dev`/`beta` → `main` next.
