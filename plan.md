@@ -25095,3 +25095,35 @@ named, and the cutover itself needs @mat's hands: bringing the *old*
 here it's exactly the kind of action that needs a human's own call, not a
 routed-around block. Staying on `dev` until @mat runs the cutover and it's
 proven live.
+
+## 392. §391 verified live — and `external: true` was missing from the volume pin (2026-09-11)
+
+@mat ran the cutover (`docker compose down` under the old project, `git
+pull`, `docker compose up -d --build`). Confirmed live:
+
+- All 6 containers up clean under the new project:
+  `business-lab-{frontend,backend,database,docker-socket-proxy,
+  self-update-watchdog,watchdog-docker-proxy}-1`.
+- Volumes correctly **not** recreated — `docker volume ls` still shows the
+  original `homelab-management_{db,scripts,logs,backups}-data`, no new
+  empty ones, no orphaned old containers left behind.
+- Network came up as `business-lab_business-lab-net`.
+- Backend log clean: `Homelab backend listening on port 3000`, Home Page
+  services.yaml regenerated (28 tiles) — talking to Postgres and the app
+  registry fine.
+
+**But `docker compose up` printed a warning** §391 didn't anticipate:
+`volume "homelab-management_backups-data" already exists but was created
+for project "homelab-management" (expected "business-lab"). Use `external:
+true` to use an existing volume`. Harmless this time (the stack came up and
+the data's there — confirmed above), but `name:` alone isn't the fully
+correct way to reference a volume you don't want this project to think it
+owns; `external: true` is what actually says that. Added it to all four
+volume definitions. Bonus effect, not just quieting the warning: an
+`external` volume is something `docker compose down -v` **refuses to
+remove**, even if `-v` is ever passed by accident later — strictly safer
+than the `name:`-only pin.
+
+`docker compose config` validated clean. Not `backend/src`/`frontend/src` —
+no version bump, matching this session's own precedent for compose-only
+fixes. §391/§392 close P8 — README item to be deleted next.

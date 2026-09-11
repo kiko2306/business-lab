@@ -2,8 +2,7 @@
 
 **Version 0.77.4** — full history in the [changelog](/CHANGELOG.md).
 
-Business Lab (repository `business-lab`; npm packages, Docker images and the
-compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
+Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
 ## What it is, and how it's sold
 
@@ -237,9 +236,6 @@ Strategy:
 graph.** P1 (§255) and P2 (§256) are done. P3/P3a/P4 (social publishing via
 Postiz, §257/§258/§261) are dropped — Postiz was removed in §301a. Phase tags
 below.
-- [ ] **P8 — Rebrand tier 2** (§84.2) — package/image/network/project names.
-      Recreates the management stack — do it in the §83 data-root maintenance
-      window, with host access, not before.
 - [ ] **P11 — Data protection position** (§84.5) — controller vs processor,
       backup key custody, DR. A business stance to decide, then write up — not
       a coding session. §84.7 simplifies it (social tokens stay on the client

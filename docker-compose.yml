@@ -247,20 +247,26 @@ volumes:
   # prefix these got under the old "homelab-management" project) rather than
   # letting them re-prefix under the new project name above — the whole
   # point of the rebrand is cosmetic identifiers, not moving the one real
-  # stateful thing in the stack (Postgres data, logs, backups). Anything
-  # relying on `docker volume inspect` (backupScheduler.ts's postgres-backup
-  # path) needs this to keep resolving to the same volume it always has.
+  # stateful thing in the stack (Postgres data, logs, backups). `external:
+  # true` (not just `name:`) is required, not decorative: without it Compose
+  # still treats the volume as one it should own under *this* project and
+  # warns on every `up` that it "was created for project homelab-management,
+  # expected business-lab" (found live) — external tells it this volume's
+  # lifecycle is not this project's to manage, which also means `docker
+  # compose down -v` can never remove it, even by accident. Anything relying
+  # on `docker volume inspect` (backupScheduler.ts's postgres-backup path)
+  # needs this to keep resolving to the same volume it always has.
   db-data:
-    driver: local
+    external: true
     name: homelab-management_db-data
   scripts-data:
-    driver: local
+    external: true
     name: homelab-management_scripts-data
   logs-data:
-    driver: local
+    external: true
     name: homelab-management_logs-data
   backups-data:
-    driver: local
+    external: true
     name: homelab-management_backups-data
 
 networks:
