@@ -25191,3 +25191,45 @@ decisions, not something derivable from the code.
 
 README item's blocked-on clause removed; item re-scoped to reflect what's
 actually left.
+
+## 395. P12 — commercial plan talked through and written up (§84.5)
+
+Talked through the remaining open pieces with @mat (hardware BOM and the
+what-happens-on-nonpayment question were already resolved — the turnkey
+build spec, §390, and §393's controller/processor stance respectively):
+
+- **Pricing structure: flat monthly retainer**, not tiered or hourly —
+  simplest to sell and administer for a small/solo operation, one price
+  covers domain management + configuration + maintenance (the three pillars
+  the README's "What it is, and how it's sold" already named).
+- **Onboarding: a separate one-time setup fee**, distinct from the ongoing
+  monthly retainer that starts after handover.
+- **Support response time: best-effort, no contracted SLA** — same shape as
+  P11's DR stance, an honest internal target rather than a penalty-backed
+  promise. Consistent story across the whole offering rather than a stricter
+  commitment on support than on disaster recovery.
+- **Onboarding time estimate**, derived from `deployment-guide.md`'s actual
+  steps and confirmed as-is: **~1 business day hands-on** (`start.sh` +
+  prompts, Cloudflare/domain wiring, the deployment checklist, starting and
+  configuring the turnkey spec's ~14-app default bundle, client accounts,
+  handoff walkthrough), **~3–5 business days calendar time** — the gap is
+  client-side coordination (DNS/domain readiness, scheduling), not server
+  time.
+
+**No actual € figures** — the retainer amount and setup fee are real
+pricing decisions only @mat can set, and inventing plausible-sounding
+numbers for a real commercial document would be presumptuous. Left as
+clearly marked blanks instead.
+
+**§84.6's "lands as an Artifact, not a repo commit" call was superseded
+mid-build** — @mat: with no real € figures in it, this is a structure/
+template document, not competitive-sensitive pricing data, and can be
+public the same way `data-protection-position.md` is. New
+`docs/commercial-plan.md` — hardware BOM (cross-referencing the turnkey
+build spec rather than repeating it), the pricing structure with blank
+figures, the onboarding table, the support stance, and the
+nothing-happens-to-their-box nonpayment answer. Linked from README's doc
+list. README item deleted, and with it the now-empty "Business Lab (§84)"
+heading — P1 through P12 are all done.
+
+Docs-only, no code — no version bump, no host verification needed.

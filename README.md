@@ -40,6 +40,7 @@ against this model.
 - Deployment guide — provisioning a box for a client, first run to hand-over: [/docs/deployment-guide.md](/docs/deployment-guide.md)
 - Turnkey build spec — hardware, disk partitioning, the default small-office app profile: [/docs/turnkey-build-spec.md](/docs/turnkey-build-spec.md)
 - Data protection position — controller vs processor, backup key custody, the DR promise: [/docs/data-protection-position.md](/docs/data-protection-position.md)
+- Commercial plan — pricing structure, onboarding timeline, support model: [/docs/commercial-plan.md](/docs/commercial-plan.md)
 - API reference (OpenAPI): [/docs/openapi.yaml](/docs/openapi.yaml)
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
 - Two-factor authentication (TOTP) for the dashboard login: [/docs/two-factor.md](/docs/two-factor.md)
@@ -231,21 +232,6 @@ Strategy:
       `disk` on an actually-separate attached drive. `ftp`/`ftps`, `nfs` and
       the `disk` path are all code-complete; this item is just the off-host
       live run on hardware that cooperates.
-### Business Lab (§84)
-
-**§254 sequences these into buildable chunks (P1…P12) with the dependency
-graph.** P1 (§255) and P2 (§256) are done. P3/P3a/P4 (social publishing via
-Postiz, §257/§258/§261) are dropped — Postiz was removed in §301a. Phase tags
-below.
-- [ ] **P12 — Commercial plan** (§84.5) — hardware BOM (provable now from
-      the turnkey build spec, §390), support model, onboarding time, and
-      what happens to a client's data when they stop paying (§393's
-      controller/processor stance already answers most of this — it's their
-      box). No generic SaaS-cost inventory needed — savings are calculated
-      client-by-client at the sales conversation, not pre-built (§394).
-      Lands as an **Artifact, not a repo commit** (§84.6). A business stance
-      to talk through, like P11 — not a coding session.
-
 ### Roster changes (§81)
 
 
