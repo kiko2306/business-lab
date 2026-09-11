@@ -23,8 +23,8 @@ What it does **not** do, and you need in advance:
 | Prerequisite | Why | Notes |
 |---|---|---|
 | **A domain on Cloudflare** | Every public hostname is `<app>.<your-domain>`, published through a Cloudflare Tunnel | The domain must already be a zone in your Cloudflare account |
-| **A Cloudflare API token** | Creates the tunnel, its ingress rules and DNS records | Needs **Account → Cloudflare Tunnel: Edit** and **Zone → DNS: Edit** |
-| **A Tailscale account + auth key** | NetBird's signal server is published over Tailscale Funnel; it cannot work through the Cloudflare Tunnel (see plan.md §52) | A reusable auth key from <https://login.tailscale.com/admin/settings/keys> |
+| **A Cloudflare API token** | Creates the tunnel, its ingress rules and DNS records | Needs **Account → Cloudflare Tunnel: Edit** and **Zone → DNS: Edit**. Leave its **TTL** on Cloudflare's default (*No expire date*) — nothing here rotates this token, so an expiring one silently breaks tunnel/DNS provisioning later with no warning |
+| **A Tailscale account + auth key** | NetBird's signal server is published over Tailscale Funnel; it cannot work through the Cloudflare Tunnel (see plan.md §52) | A **reusable** auth key from <https://login.tailscale.com/admin/settings/keys>, with the longest expiration Tailscale's UI offers — same reasoning as the Cloudflare token above |
 | **Tailscale Funnel enabled** | Same reason | One-time per tailnet. If it isn't, `start.sh` prints the exact one-click URL to enable it — you can also do this after the fact and re-run |
 | **`cloudflared` installed** | `start.sh` configures the tunnel but does not install the connector | It *does* pin the connector's transport, which NetBird depends on |
 | **systemd running as PID 1** | The tunnel connector is a systemd unit | WSL needs `systemd=true` in `/etc/wsl.conf`; `start.sh` warns loudly if it is missing |
@@ -190,8 +190,9 @@ Some apps depend on others, and starting them out of order fails in ways that
 look like unrelated bugs:
 
 1. **Nginx Proxy Manager** — every public hostname is served through it, so
-   nothing can be exposed until it runs. Log in and change its default
-   credentials immediately (see [app-credentials.md](app-credentials.md)).
+   nothing can be exposed until it runs. No manual credential step: the
+   dashboard claims/rotates its admin account itself the first time it needs
+   the API (see [app-credentials.md](app-credentials.md)).
 2. **Authelia** — the login gate in front of every exposed app but Home
    Page. Anything you expose returns errors until Authelia is up, and
    NetBird refuses to start at all without it.

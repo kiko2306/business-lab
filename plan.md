@@ -26096,3 +26096,84 @@ and printed a marker confirming the path. End to end, with zero manual
 NetBird-dashboard steps beyond the one Personal Access Token: §404's
 `netbird-client` container + §405's API-driven auto-provisioning +
 §405.1–§405.3's fixes all proven live together. `dev`/`beta` → `main` next.
+
+## 407. Audited first-setup automation for NPM/Authelia/Tailscale/NetBird — mostly already done, docs were the real gap
+
+User request: automate first-setup for these four as much as possible, plus
+a detailed step-by-step. Read every relevant piece of code (not just docs)
+before concluding anything, since §404/§405 had already found this
+project's own docs lagging shipped code once this session.
+
+**NPM — already 100% automated, code has been live since §285
+(2026-09-08).** `bootstrapNpmAdminIfDefault` (`npmClient.ts`), wired into
+`provisionServiceIfEnabled` (`exposure.ts`): the moment the dashboard first
+needs NPM's API (provisioning any app's exposure) and finds the exposure
+settings incomplete, it detects current NPM's no-user-yet state (or an
+older image's `admin@example.com`/`changeme`) and claims/rotates it to a
+generated, write-only password — zero human steps. **Three places in the
+docs still told an operator to log in and change NPM's default by hand**
+(`docs/app-credentials.md`, `docs/deployment-guide.md`,
+`docs/first-run.md`) — actively wrong, not just stale: following that
+advice today would mean logging into NPM with credentials that don't work
+any more, or being told to do a step the system already did before you
+could reach the login page. Fixed all three.
+
+**Authelia — already 100% automated, and always has been by design.**
+`autheliaSync.ts` mirrors every dashboard account with an email into
+Authelia's `users_database.yml` on save (bcrypt hash copied across
+verbatim, verified compatible with Authelia's file backend). The
+dashboard's own `/setup` — the one action that's unavoidably the literal
+first thing anyone does with a fresh deployment — calls
+`syncAutheliaUsersSafe` immediately after creating the first admin, and
+`email` is `.required()` in that form's validation specifically so this
+always has something to sync (comment in `middleware/validation.ts` states
+this in so many words). There is no separate "log into Authelia" step;
+there never was one to remove. Docs already described this correctly
+(`deployment-guide.md` §2) — nothing to fix.
+
+**Tailscale — already about as automated as this project's own principle 3
+allows.** One secret (`TAILSCALE_AUTH_KEY`, prompted once by `start.sh`,
+genuinely third-party) and one external one-time action (enable Funnel for
+the tailnet — `start.sh` prints the exact one-click URL when it's needed).
+Nothing left to automate without Business Lab holding a Tailscale API/OAuth
+credential of its own, which would be new scope, not closing a gap.
+
+**NetBird — extensively automated this session already (§404/§405).** What
+remains — one Authelia-SSO click to claim account ownership, one PAT paste
+— is inherent to NetBird's own OIDC-only dashboard and API design, same
+category as every other "Wizard" app in `app-credentials.md` ("first visit
+creates the owner"). Not worth building server-side OIDC-flow impersonation
+to remove a single click already this cheap.
+
+**New, on explicit user instruction ("I don't want expiration dates on
+tokens or API keys for those"):** checked every manually-minted credential
+in this flow against its own API for a non-expiring option.
+Cloudflare's token defaults to "No expire date" already (just don't
+override it — added a warning in `first-run.md` not to). Tailscale's UI
+offers a long-lived option — instructed to pick it. **NetBird has no
+non-expiring option for either its Personal Access Tokens or setup keys —
+hard 365-day cap on both, confirmed against NetBird's own API docs.**
+Documented picking 365 everywhere NetBird asks, and the asymmetry this
+creates: the routing-peer *setup key* self-heals past its own expiry
+(§405.2/§405.3's `valid`-flag check, no human involved), but the **PAT**
+itself cannot — NetBird's API has no way to mint one without a human
+already holding a session in its UI, so hitting that cap silently stops
+auto-provisioning (a logged warning only) until someone notices and pastes
+a fresh one in. No dashboard alert exists for that today — added to the
+README TODO list rather than built now, since alerting wasn't part of what
+was asked and deserves its own proposal.
+
+**Also added, not previously documented anywhere in the ordered guides**:
+a "NetBird routing peer, for remote LAN access" step in
+`deployment-guide.md`'s § 5, covering the claim-ownership click, the PAT
+mint-and-paste with the 365-day guidance above, and a note that everything
+after that is automatic (§405) — this genuinely didn't exist in the
+deployment walkthrough before today, only scattered across
+`app-credentials.md` and `plan.md`.
+
+Docs-only change (`docs/app-credentials.md`, `docs/deployment-guide.md`,
+`docs/first-run.md`) — no backend/src or frontend/src touched, no version
+bump. Nothing here needed fresh live verification: every automated behavior
+being documented was already proven live in §285 (NPM), the dashboard's own
+`/setup` flow (Authelia, exercised on every fresh deployment including this
+one), and §404–§405.3 (NetBird) earlier this session.

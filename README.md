@@ -216,3 +216,10 @@ it is done — not ticked off and left behind. Section references point at
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
+- [ ] **No alert when the NetBird PAT expires** (§407) — NetBird's API caps
+      Personal Access Tokens at 365 days with no "never expires" option.
+      When it hits that cap, `netbirdRoutingPeer.ts`'s auto-provisioning
+      just logs a warning and silently stops until someone notices and
+      pastes a fresh token in. Wire an alert into the existing
+      alertNotify/ntfy system so this isn't a silent failure.
+

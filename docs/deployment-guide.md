@@ -73,14 +73,39 @@ invite link.
 
 Order matters for the first three (first-run.md § The order that works):
 
-1. **Nginx Proxy Manager** — change its default login immediately
-   ([app-credentials.md](app-credentials.md)).
+1. **Nginx Proxy Manager** — every public hostname is served through it, so
+   nothing can be exposed until it runs. No manual credential step: the
+   dashboard claims/rotates its admin account itself the moment it first
+   needs the API ([app-credentials.md](app-credentials.md)).
 2. **Authelia** — the login gate; exposed apps error until it is up.
 3. Everything else, any order.
 
 Each exposable app gets a public `<name>.<domain>` behind Authelia on that
 start — no toggle, no per-app exposure step (plan.md §331). Set any config an
 app asks for (generated secrets are pre-filled — just save).
+
+### Optional: NetBird's routing peer, for remote LAN access
+
+Only if this client wants to reach the box's LAN from off-site (working from
+home, a second office, …) — skip this if not. Once NetBird VPN is started and
+exposed:
+
+1. Open `https://netbird-vpn.<domain>` and log in through Authelia — first
+   visit claims account ownership (this one browser click can't be automated
+   away; NetBird's own OIDC flow needs a real session).
+2. In NetBird's own UI: **your username (Team) → Access Tokens → Create
+   Token**, expiration **365 days** (NetBird's hard cap — see
+   [app-credentials.md](app-credentials.md) for why nothing shorter or
+   longer is possible). Copy the value — shown once.
+3. Paste it into `NETBIRD_API_TOKEN` in NetBird VPN's config panel here in
+   the dashboard, save, restart NetBird VPN.
+
+Everything past that point — the network resource, its router, the access
+policy, and the peer setup key — is created and kept in sync automatically
+(plan.md §405); no further NetBird-dashboard steps. Re-paste a fresh token
+here once a year when the old one expires (§405 — this half genuinely can't
+self-renew, NetBird has no way to mint a token without a human holding a
+session in its own UI first).
 
 ## 6. Hand over
 
