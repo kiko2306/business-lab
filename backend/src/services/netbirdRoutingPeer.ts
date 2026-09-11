@@ -114,7 +114,11 @@ async function nbRequest<T>(baseUrl: string, token: string, method: string, path
     throw new Error(`NetBird API ${method} ${path} -> ${response.status}: ${text.slice(0, 300)}`);
   }
   if (response.status === 204) return undefined as T;
-  return (await response.json()) as T;
+  const parsed = await response.json();
+  // Found live (§405.3): a 200 with a JSON `null` body shows up too (not
+  // just the 404-for-empty case §405.2 already handles) — every GET here
+  // expects an array, so normalize either empty shape the same way.
+  return (method === 'GET' && parsed === null ? [] : parsed) as T;
 }
 
 async function ensureGroup(baseUrl: string, token: string, name: string): Promise<string> {

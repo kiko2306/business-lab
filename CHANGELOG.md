@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.82.2] — 2026-09-11
+
+### Fixed
+
+- NetBird's list GETs can also 200 with a null body for an empty collection, not just 404 — normalized alongside the earlier 404 fix
+
 ## [0.82.1] — 2026-09-11
 
 ### Fixed

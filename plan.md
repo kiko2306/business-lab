@@ -26017,3 +26017,26 @@ change from §405.1 aside, this is backend/src — patch bump.
 **Not yet verified against the live host** — pushing to `dev`/`beta`,
 rebuilding `home-srv-01`'s backend, then restarting NetBird VPN once more
 is the next step.
+
+## 405.3. Fixed: a GET can also 200 with a null body, not just 404
+
+§405.2 shipped, deployed, restarted — new error, past the group-lookup
+call this time: `Cannot read properties of null (reading 'some')`. One of
+`ensureResource`/`ensureRouter`/`ensurePolicy`'s list GETs came back `200`
+with a JSON body of literal `null` rather than `[]` for an empty
+collection — a second, different shape of "nothing here yet" from the
+same API, not the 404 §405.2 already handles.
+
+`nbRequest` now normalizes both: a `GET` returning `null` (in addition to
+the existing 404-as-`[]` handling) is treated as `[]`. New regression test
+mirroring the 404 one. Backend typecheck clean, 803/803 pass. Patch bump.
+
+Two live-only failures in two consecutive restarts, both from the same
+root cause — this API answers "empty" in more than one shape and the code
+initially only handled the one seen first. Not chasing a third
+speculative shape pre-emptively (untested guesses are exactly how §405
+picked up its first wrong assumption); the next restart either works or
+surfaces whatever's actually still wrong.
+
+**Not yet verified against the live host** — pushing to `dev`/`beta`,
+rebuilding `home-srv-01`'s backend, then restarting NetBird VPN once more.

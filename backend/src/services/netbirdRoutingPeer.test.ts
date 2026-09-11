@@ -154,4 +154,17 @@ describe('ensureNetbirdRoutingPeer', () => {
     await ensureNetbirdRoutingPeer('netbird-vpn');
     expect(mockedSave).toHaveBeenCalledWith('netbird-vpn', { NETBIRD_ROUTING_PEER_SETUP_KEY: 'NEW-SETUP-KEY' });
   });
+
+  // Found live (§405.3): a 200 with a JSON `null` body, not just a 404,
+  // also shows up for an empty collection — crashed the first real .some()
+  // downstream of it ("Cannot read properties of null").
+  it('treats a 200 GET with a null body as "nothing here yet" rather than a hard failure', async () => {
+    vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string; body?: string }) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'GET') return Promise.resolve(jsonResponse(null, 200));
+      return fetchEverythingMissing(url, init);
+    }) as typeof fetch);
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+    expect(mockedSave).toHaveBeenCalledWith('netbird-vpn', { NETBIRD_ROUTING_PEER_SETUP_KEY: 'NEW-SETUP-KEY' });
+  });
 });
