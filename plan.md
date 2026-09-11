@@ -25938,3 +25938,14 @@ Update branch to `beta` on that host via Settings, hit "Check now" on the
 Update page and confirm the panel now reads "Pull the latest code from
 beta" / "Latest on beta" instead of main, and confirms up-to-date against
 `origin/beta` rather than `origin/main`.
+
+**Verified live.** Update branch set to `beta` via Settings on
+`home-srv-01`. The Update page now reads "Pull the latest code from beta"
+and "Latest on beta" (`67312ee74c8f`, matching the running commit),
+status "Up to date" — confirms `checkForUpdate()` is genuinely comparing
+against `origin/beta`, not a cached/stale label. Not merged to `main` yet:
+`dev`/`beta` are ahead of `main` by this commit *and* §404/§405's NetBird
+work, which is still unverified — merging now would land unverified
+NetBird changes on `main` alongside this verified one. Holding until
+§404/§405 are verified too, so the merge is one clean batch; a cherry-pick
+of just this commit to `main` early is possible if wanted sooner.
