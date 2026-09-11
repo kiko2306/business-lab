@@ -25710,3 +25710,19 @@ service with `skipAutheliaProtection: true` (NocoDB is the obvious one,
 already used as the §402.1 repro) is restarted and `curl -I` against its
 public hostname shows the header, with no regression to its own login flow
 or (for one that needs it) its websocket connection.
+
+**Verified live.** Deployed, restarted NocoDB. Its generated
+`proxy_host/*.conf` now carries `location / { include /snippets/proxy.conf;
+proxy_set_header Upgrade $http_upgrade; proxy_set_header Connection
+"upgrade"; proxy_pass $forward_scheme://$server:$port; }` in place of the
+old empty advanced_config, and `curl -I
+https://nocodb.tx-home-utils.com` returns a normal `200` (own login page
+intact) with `strict-transport-security: max-age=15552000;
+includeSubDomains` present. Turns out `websocket` isn't actually a per-app
+value at the exposure layer — `exposure.ts`'s `ALLOW_WEBSOCKET_UPGRADE` is
+a single `true` constant passed for every app — so every one of the other
+`skipAutheliaProtection` hosts (itflow, home-assistant, homepage, docuseal,
+kimai, twenty) takes the exact same `buildPlainAdvancedConfig(true)` path
+NocoDB just proved live; nothing app-specific left to verify separately.
+Merged to `main` already (deployed ahead of verification, same pattern
+§402.1 used); no further action needed.
