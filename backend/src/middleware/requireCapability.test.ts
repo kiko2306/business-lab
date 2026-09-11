@@ -9,7 +9,7 @@ const { getUserRoles, getUserCapabilities } = vi.hoisted(() => ({
 }));
 vi.mock('../services/userRoles', () => ({ getUserRoles, getUserCapabilities }));
 
-import { requireCapability } from './requireCapability';
+import { requireCapability, requireWebmaster } from './requireCapability';
 
 function mockRes() {
   const res = {} as Response & { statusCode?: number; body?: unknown };
@@ -91,6 +91,63 @@ describe('requireCapability', () => {
 
     await requireCapability('settings:manage')(req, res, next);
 
+    expect(next).toHaveBeenCalledOnce();
+  });
+});
+
+describe('requireWebmaster', () => {
+  beforeEach(() => {
+    getUserRoles.mockReset();
+    getUserCapabilities.mockReset();
+  });
+
+  it('calls next() for a webmaster', async () => {
+    getUserRoles.mockResolvedValue(['webmaster']);
+    const req = { user: { id: 1 } } as unknown as Request;
+    const res = mockRes();
+    const next = vi.fn();
+
+    await requireWebmaster()(req, res, next);
+
+    expect(next).toHaveBeenCalledOnce();
+    expect(res.status).not.toHaveBeenCalled();
+  });
+
+  // The real gap this guard closes: an admin holds apps:control (every
+  // capability, by default) but must NOT get this action just from that.
+  it('403s an admin, even one with every capability granted', async () => {
+    getUserRoles.mockResolvedValue(['admin']);
+    const req = { user: { id: 2 } } as unknown as Request;
+    const res = mockRes();
+    const next = vi.fn();
+
+    await requireWebmaster()(req, res, next);
+
+    expect(next).not.toHaveBeenCalled();
+    expect(res.statusCode).toBe(403);
+    expect(getUserCapabilities).not.toHaveBeenCalled();
+  });
+
+  it('401s when the request is unauthenticated', async () => {
+    const req = {} as Request;
+    const res = mockRes();
+    const next = vi.fn();
+
+    await requireWebmaster()(req, res, next);
+
+    expect(res.statusCode).toBe(401);
+    expect(getUserRoles).not.toHaveBeenCalled();
+  });
+
+  it('reads roles fresh on every call, not from the token', async () => {
+    getUserRoles.mockResolvedValue(['webmaster']);
+    const req = { user: { id: 5, roles: ['user'] } } as unknown as Request;
+    const res = mockRes();
+    const next = vi.fn();
+
+    await requireWebmaster()(req, res, next);
+
+    expect(getUserRoles).toHaveBeenCalledWith(5);
     expect(next).toHaveBeenCalledOnce();
   });
 });

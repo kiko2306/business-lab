@@ -38,3 +38,35 @@ export function requireCapability(capability: Capability) {
     }
   };
 }
+
+/**
+ * Route guard: 403 unless the signed-in user holds the `webmaster` role
+ * itself — narrower than any capability, and not something a webmaster can
+ * delegate to an admin via feature grants (an admin gets `apps:control` by
+ * default, which is otherwise all Unpin needed). Reserved for an action
+ * whose risk a capability grant doesn't capture: clearing an image pin can
+ * silently trigger an unvetted `docker pull` outside the self-update batch
+ * on the next restart, since the base compose tag is rarely already cached
+ * locally (found live — plan.md §401). Same fresh-DB-read shape as
+ * `requireCapability`, for the same reason.
+ */
+export function requireWebmaster() {
+  return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
+    const userId = req.user?.id;
+    if (!userId) {
+      res.status(401).json({ error: 'Not authenticated.' });
+      return;
+    }
+    try {
+      const roles = await getUserRoles(userId);
+      if (!roles.includes('webmaster')) {
+        res.status(403).json({ error: 'Only a webmaster can do this.' });
+        return;
+      }
+      next();
+    } catch (error) {
+      console.error('Webmaster check failed:', (error as Error).message);
+      res.status(500).json({ error: 'Unable to verify permissions.' });
+    }
+  };
+}

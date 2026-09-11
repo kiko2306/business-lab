@@ -25394,3 +25394,53 @@ scaffolding left over from whatever they were tracking before those threads
 closed out. Removed the whole block; the two genuinely open items
 (`gdrive`, CrowdSec dedupe, both explicitly parked pending real demand) are
 unaffected, just no longer separated by empty headers.
+
+## 401. Unpin restricted to webmaster + confirmed before it runs
+
+@mat's proposal: remove the Unpin button outright — "users will always have
+the version released by the update." Pushed back rather than just
+implementing it: Unpin is a real, already-used recovery path (§303 —
+Stirling-PDF stuck pinned to the full 1.47 GiB image when the compose file's
+intended tag was the 0.9 GB `ultra-lite` variant; Unpin was the fix), and
+removing it entirely would leave clearing a bad pin as a host file edit —
+exactly the "no console configuration" thing this project avoids.
+
+**The real problem, once named precisely**: `apps:control` — the same
+capability that gates start/stop/restart, held by every admin by default —
+is all Unpin has ever needed, and the button fires with **zero
+confirmation**, unlike every other destructive action in the same component
+(backup restore/delete both go through `ConfirmService`).
+
+**And it's a bigger risk than it looks.** Traced `restartService`
+(`executor.ts`) → `composeUpWithManagedConfig(..., forceRecreate: true)` →
+plain `docker compose up -d --force-recreate`, no `--pull` flag. Compose
+only auto-pulls an image that's missing locally. Since a self-update always
+pins by exact digest reference (`repo:tag@sha256:…`), the bare compose-file
+tag (`repo:tag`) is very likely **never** separately cached — so Unpin's own
+recreate step, immediately after clearing the pin, silently triggers a fresh
+`docker pull` of whatever that tag resolves to on the registry *right now*.
+No self-update batch, no controlled review, no rollback — the exact
+opposite of `pullAndRecreateService`'s own pull→recreate→re-pin sequence.
+
+**Fix, in two parts**:
+
+- **Webmaster-only.** New `requireWebmaster()` in `requireCapability.ts` —
+  same fresh-DB-read shape as `requireCapability`, but checks the
+  `webmaster` role directly rather than a capability, since "every
+  capability by default" (what admin already gets) is exactly the thing
+  that needed narrowing. Wired onto `POST /:name/update/unpin` in place of
+  `requireCapability('apps:control')`. Frontend: `AuthService.isWebmaster()`
+  (mirrors the existing `hasCapability()`/`currentRoles()` shape), read once
+  into `ServiceCardComponent`'s `protected readonly isWebmaster`, gating the
+  button's `*ngIf` alongside the existing `pinned()` check.
+- **Confirmed before it runs.** `unpin()` now goes through `ConfirmService`
+  first, same pattern as `restoreAppBackup`/`deleteAppBackup` in the same
+  component — the prompt names the service and states the actual risk
+  (floats to whatever the tag currently resolves to, not what the last
+  update verified) rather than a generic "are you sure?".
+
+7 new tests (`requireWebmaster`'s 4 cases including the "admin with every
+capability still gets 403" case that's the whole point of the guard; 3 in
+`service-card.component.spec.ts` covering the confirm gate and the prompt
+content). Backend typecheck clean, 761/761 pass; frontend build clean,
+58/58 pass. Minor bump — a real behavior/access change, not cosmetic.

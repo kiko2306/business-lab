@@ -7,7 +7,7 @@ import { Router, Request, Response, NextFunction } from 'express';
 import fs from 'fs/promises';
 import rateLimit from 'express-rate-limit';
 import auth from '../middleware/auth';
-import { requireCapability } from '../middleware/requireCapability';
+import { requireCapability, requireWebmaster } from '../middleware/requireCapability';
 import * as executor from '../services/executor';
 import * as status from '../services/status';
 import { createStreamTicket } from '../services/realtime';
@@ -152,12 +152,18 @@ router.post(
  * (§209) wrote, so the app floats back to the tags in its base compose file
  * until the next self-update pulls and re-pins it. Recreates the container
  * when it is running so the change takes effect now.
+ *
+ * `requireWebmaster`, not `requireCapability('apps:control')` — an admin
+ * gets that capability by default too, but unpinning can silently trigger
+ * an unvetted image pull the moment the container recreates (found live,
+ * §401), outside the self-update batch's own review. That risk belongs to
+ * the webmaster, not every account that can start/stop/restart an app.
  */
 router.post(
   '/:name/update/unpin',
   serviceLimiter,
   auth,
-  requireCapability('apps:control'),
+  requireWebmaster(),
   validateParams(schemas.serviceNameParam),
   validateServiceAllowlist,
   async (req: Request, res: Response) => {

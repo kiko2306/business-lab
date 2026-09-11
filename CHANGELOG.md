@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.78.0] — 2026-09-11
+
+### Changed
+
+- Unpin is now webmaster-only and asks for confirmation before clearing an image pin — it can silently trigger an unvetted docker pull on the app's next restart, outside the self-update batch's own review, which every account with ordinary apps:control could previously trigger with one unconfirmed click
+
 ## [0.77.5] — 2026-09-11
 
 ### Fixed

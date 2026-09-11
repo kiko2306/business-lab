@@ -59,7 +59,7 @@
       <span *ngIf="loadingAction !== 'start'">Start</span>
     </button>
     <button
-      *ngIf="pinned()"
+      *ngIf="pinned() && isWebmaster"
       type="button"
       class="btn btn-outline-secondary btn-sm"
       [disabled]="loadingAction !== null"

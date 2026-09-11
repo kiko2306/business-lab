@@ -51,6 +51,16 @@ export class AuthService {
     return this.userSubject.value?.roles ?? [];
   }
 
+  /**
+   * Synchronous webmaster check — narrower than any capability, for an
+   * action even a fully-capable admin shouldn't reach (e.g. Unpin, backend
+   * `requireWebmaster`). An admin holds every capability by default, so
+   * `hasCapability` alone can't express this distinction.
+   */
+  isWebmaster(): boolean {
+    return this.currentRoles().includes('webmaster');
+  }
+
   login(username: string, password: string): Observable<LoginResult> {
     return this.http
       .post<LoginResult>(

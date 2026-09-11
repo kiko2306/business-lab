@@ -25,6 +25,7 @@ import {
   ServiceStatus,
   StartupActionEvent,
 } from '../../core/models';
+import { AuthService } from '../../core/auth.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
@@ -55,6 +56,13 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
   private readonly zone = inject(NgZone);
+
+  // Unpin is webmaster-only (backend requireWebmaster mirrors this) — it can
+  // silently trigger an unvetted image pull on the next recreate, outside
+  // the self-update batch's own review, so it's not just apps:control like
+  // start/stop/restart. Computed once; a role change takes a fresh login to
+  // show up here, same as every other capability-gated element.
+  protected readonly isWebmaster = inject(AuthService).isWebmaster();
 
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
@@ -113,7 +121,20 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     return `Pinned to ${(this.service.pinnedImages ?? []).join(', ')} — Unpin to follow the compose-file tags again`;
   }
 
-  protected unpin(): void {
+  async unpin(): Promise<void> {
+    const confirmed = await this.confirm.ask({
+      title: `Unpin ${this.service.label}`,
+      message:
+        `Unpin ${this.service.label}? On its next restart it'll float to whatever ` +
+        `image its compose tag currently resolves to — not the version the last ` +
+        `update verified. Only use this to recover from a bad or stale pin; wait ` +
+        `for the next scheduled update otherwise.`,
+      confirmText: 'Unpin',
+      danger: true,
+    });
+    if (!confirmed) {
+      return;
+    }
     this.serviceState.unpinService(this.service.name);
   }
 
