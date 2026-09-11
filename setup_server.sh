@@ -634,6 +634,13 @@ if [ -t 0 ] && command -v netplan >/dev/null 2>&1; then
         echo "  dns:       $FIXED_DNS"
         printf 'Type YES to apply, anything else to skip: '
         read -r FIXED_IP_CONFIRM
+        # Case-insensitive: typing the full word "yes" is already the
+        # deliberate-confirmation gate this prompt wants (vs. a bare y/N) —
+        # rejecting it over capitalization alone is a trap, not more safety.
+        # Found live (§94, 2026-09-11): a typed "yes" silently skipped here.
+        case "$FIXED_IP_CONFIRM" in
+          [Yy][Ee][Ss]) FIXED_IP_CONFIRM=YES ;;
+        esac
         if [ "$FIXED_IP_CONFIRM" = "YES" ]; then
           cat > "$FIXED_IP_FILE" <<YAML
 network:
@@ -770,6 +777,10 @@ if [ "$TARGET_USER" != "root" ] && [ -t 0 ]; then
     echo "running as '${TARGET_USER}' becomes root with no password asked."
     printf 'Type YES to proceed, anything else to skip: '
     read -r NOPASSWD_CONFIRM
+    # Case-insensitive — see the matching fixed-IP prompt above (§94).
+    case "$NOPASSWD_CONFIRM" in
+      [Yy][Ee][Ss]) NOPASSWD_CONFIRM=YES ;;
+    esac
     if [ "$NOPASSWD_CONFIRM" = "YES" ]; then
       TMP_SUDOERS="$(mktemp)"
       printf '%s ALL=(ALL) NOPASSWD:ALL\n' "$TARGET_USER" > "$TMP_SUDOERS"

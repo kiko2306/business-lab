@@ -24856,3 +24856,34 @@ wizard-created ITFlow admin (email + password + its internal encryption
 key) now stays converged with the dashboard's declared config on every
 start, instead of being frozen at whatever the one-shot wizard produced.
 §380–§383 all confirmed working on the real stack.
+
+## 385. §94 exercised live — real bug found: the fixed-IP confirm was case-sensitive (2026-09-11)
+
+First `sudo ./setup_server.sh` run only proved the idempotent skip path (both
+settings were already applied from an earlier session) — not what §94 asked
+for. @mat removed `/etc/netplan/90-homelab-fixed-ip.yaml` and
+`/etc/sudoers.d/90-mat-nopasswd` and re-ran to force the real prompts.
+
+**Passwordless-sudo prompt: correct.** Typed `YES`, got
+`Passwordless sudo enabled for 'mat'`.
+
+**Fixed-IP prompt: real bug.** Typed `yes` (lowercase, the natural answer),
+and `[ "$FIXED_IP_CONFIRM" = "YES" ]` silently took the skip branch —
+`Skipped — this host keeps its current network configuration`. Fails safe
+(no wrong value got applied), but it's exactly the class of thing §94 exists
+to catch: a prompt that doesn't do what a reasonable typed answer implies,
+with zero feedback telling the operator their input wasn't recognized.
+
+Fixed in `setup_server.sh`: both confirmations (`FIXED_IP_CONFIRM`,
+`NOPASSWD_CONFIRM`) now `case`-normalize `[Yy][Ee][Ss]` to `YES` before the
+comparison — still requires the full word typed (the deliberate
+"not a single y/N" friction the sudo prompt's own comment calls for stays),
+just not the capitalization. `bash -n` clean, `shellcheck` clean (same 3
+pre-existing SC2015/SC2001 infos, unrelated to this change, nothing new).
+
+Not `backend/src`/`frontend/src` — no version bump. Committed to `dev`.
+**Not yet re-proven live** — the fix is shellcheck/syntax-verified only, same
+bar the original code shipped at; a third `netplan try` pass to prove the
+fixed comparison itself would need @mat again. Their call whether that's
+worth one more live pass or whether code review + shellcheck is enough for
+a one-line case-normalization change.
