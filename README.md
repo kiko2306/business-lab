@@ -205,15 +205,6 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
-### Security
-
-- [ ] **@mat: verify `setup_server.sh`'s new prompts against the real
-      host** (§94) — the fixed-IP (`netplan try`) and passwordless-sudo
-      (`NOPASSWD:ALL` sudoers entry) prompts are syntax/shellcheck-verified
-      only; deliberately not exercised by an agent session, since a wrong
-      value in either can cut off the very session applying it. Run
-      `sudo ./setup_server.sh` and confirm both prompts behave as documented
-      in `docs/first-run.md`.
 ### Features & architecture (§131)
 
 Updates:

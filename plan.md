@@ -24887,3 +24887,17 @@ bar the original code shipped at; a third `netplan try` pass to prove the
 fixed comparison itself would need @mat again. Their call whether that's
 worth one more live pass or whether code review + shellcheck is enough for
 a one-line case-normalization change.
+
+## 386. §385 fix verified live — §94 closed (2026-09-11)
+
+Deployed, then a third `sudo ./setup_server.sh` pass with the two files
+removed again. This time lowercase `yes` for **both** prompts:
+
+- Fixed-IP: `Type YES to apply, anything else to skip: yes` → applied via
+  `netplan try`, accepted within the 45s window, `Fixed IP applied and
+  confirmed: 192.168.1.236/24`.
+- Passwordless sudo: `yes` → `Passwordless sudo enabled for 'mat'`.
+
+Both prompts now behave as `docs/first-run.md` documents, with the case
+bug §385 found and fixed no longer reproducible. §94 closed — first genuine
+live exercise of both prompts, not just their syntax/shellcheck check.
