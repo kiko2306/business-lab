@@ -292,18 +292,6 @@ below.
       via the client. OAuth client secrets don't expire, so the node
       re-registers itself indefinitely — no rotation. Needs the Tailscale
       admin login; the agent can't do the OAuth-client/ACL steps.
-- [ ] **NetBird client must run with `--disable-dns` on any box with Pi-hole**
-      (§368) — a fresh NetBird enrollment turns DNS management **on**: it
-      rewrites `/etc/resolv.conf` to `nameserver <netbird-ip>` and starts an
-      embedded resolver on `:53`. Pi-hole's container already publishes `:53`,
-      so the resolver can't bind and **all host DNS breaks** (self-update,
-      backups, apt, everything) until `sudo netbird up --disable-dns`
-      (persists as `DisableDNS:true` in `/var/lib/netbird/*.json`). Set on the
-      test box 2026-09-10. Needs automating — `start.sh` doesn't run
-      `netbird up` (interactive), so at minimum `docs/first-run.md` /
-      `deployment-guide.md` must say to pass `--disable-dns`, and a re-enroll
-      that forgets it silently kills DNS.
-
 ### Apps and integrations
 
 - [ ] **Auto-register Nextcloud's `/shared` external mount + make the

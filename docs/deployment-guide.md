@@ -18,6 +18,10 @@ Have these in hand — `start.sh` cannot derive them (see
   Zone → DNS: Edit.
 - A **Tailscale account + reusable auth key**, and Funnel enabled once for the
   tailnet.
+- If the host itself will be enrolled as a **NetBird peer** and it runs
+  Pi-hole, enroll with `sudo netbird up --disable-dns` — see
+  [first-run.md § Enrolling this host as a NetBird peer](first-run.md#enrolling-this-host-as-a-netbird-peer).
+  A bare `netbird up` breaks host DNS (`plan.md` §368).
 - Hardware per [the turnkey build spec](../README.md#todo) — decide Docker's
   data root at install time, not after (first-run.md § Where Docker keeps its
   data).

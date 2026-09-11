@@ -24540,3 +24540,13 @@ pending timer/buffer alongside the existing cleanup. Two new tests in
 `service-card.component.spec.ts` (`fakeAsync`/`tick`) cover the buffering and
 teardown. Frontend build + `test:ci` (55/55) green; not a Docker/exposure
 change, so no host verification needed.
+
+## 376. Documented `netbird up --disable-dns` for a Pi-hole host (§368, 2026-09-11)
+
+Doc-only follow-up. Added a "§ Enrolling this host as a NetBird peer" note in
+`docs/first-run.md` (right after the Pi-hole `:53` prompt it collides with) and
+a cross-reference bullet in `docs/deployment-guide.md`'s prerequisites list,
+both pointing at `sudo netbird up --disable-dns` and why a bare `netbird up`
+takes down host DNS. Satisfies the README item's "at minimum" bar; the further
+idea there (a `start.sh` check that warns when `DisableDNS` is false and `:53`
+is taken) stays unscheduled — no demand for it yet.

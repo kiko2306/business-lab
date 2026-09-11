@@ -131,6 +131,26 @@ its own, all skipped automatically without a TTY:
 Say no (or just press Enter) to skip either one; re-run `./start.sh` later to
 be asked again.
 
+### Enrolling this host as a NetBird peer
+
+Not part of `start.sh` — it's a manual, interactive step (`netbird up` needs a
+browser SSO login) whenever the host itself joins the overlay, e.g. for
+[SSH over NetBird](ssh-keys.md). **If this host runs Pi-hole**, always pass
+`--disable-dns`:
+
+```bash
+sudo netbird up --disable-dns
+```
+
+A fresh (or re-)enrollment turns NetBird's DNS management on by default: it
+rewrites `/etc/resolv.conf` to point at its own embedded resolver and tries to
+bind `:53` — which Pi-hole's container already holds, so the resolver can't
+start and **all host DNS breaks** (updates, backups, apt, everything) until
+`--disable-dns` is (re-)applied. It persists across restarts and reboots
+(`DisableDNS: true` in `/var/lib/netbird/default.json`), so this only needs
+doing once per enrollment — but a re-enrollment that forgets the flag breaks
+DNS again (`plan.md` §368).
+
 ## What is reachable when it finishes
 
 **The dashboard, and only the dashboard** — on the host, and publicly:
