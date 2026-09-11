@@ -19,11 +19,11 @@ const SCAN_MAX_BUFFER = 4 * 1024 * 1024;
 // Resolved inside the scan container (it shares the host's network
 // namespace) rather than the backend's own, since the backend only ever
 // sees the Docker bridge's route table.
-const SCAN_SCRIPT = `
+const RESOLVE_LAN_CIDR = `
 iface=$(ip -o -4 route show to default | awk '{print $5}')
-cidr=$(ip -o -4 addr show dev "$iface" | awk '{print $4}' | head -1)
-nmap -sn "$cidr"
+ip -o -4 addr show dev "$iface" | awk '{print $4}' | head -1
 `;
+const SCAN_SCRIPT = `cidr=$(${RESOLVE_LAN_CIDR}); nmap -sn "$cidr"`;
 
 export interface DiscoveredHost {
   ip: string;
@@ -85,4 +85,17 @@ export async function scanLan(): Promise<DiscoveredHost[]> {
     'run', '--rm', '--network', 'host', '--entrypoint', 'sh', SCAN_IMAGE, '-c', SCAN_SCRIPT,
   ]);
   return parseNmapOutput(stdout);
+}
+
+/**
+ * The host's own LAN subnet, as "a.b.c.d/nn" (a host address, not yet masked
+ * to a network address — see netbirdRoutingPeer.ts's normalizeCidr). Reuses
+ * the nmap image for the throwaway `--network host` container purely because
+ * it already has `ip` and this avoids pulling a second image just for that.
+ */
+export async function getLanCidr(): Promise<string> {
+  const stdout = await run('docker', [
+    'run', '--rm', '--network', 'host', '--entrypoint', 'sh', SCAN_IMAGE, '-c', RESOLVE_LAN_CIDR,
+  ]);
+  return stdout.trim();
 }

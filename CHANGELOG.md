@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.81.0] — 2026-09-11
+
+### Added
+
+- Auto-provision NetBird's routing peer (network/resource/router/policy/setup key) via its management API once a Personal Access Token is set, closing the wizard click-through §404 left manual
+
 ## [0.80.0] — 2026-09-11
 
 ### Exposure

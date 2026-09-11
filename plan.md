@@ -25790,3 +25790,84 @@ up, confirm the peer shows connected (not "Waiting for your routing peer to
 connect") in that same wizard, then from an actual remote NetBird peer
 (this WSL, enrolled separately) confirm a LAN address behind `home-srv-01`
 (e.g. `192.168.1.236:22`) is reachable that wasn't reachable before.
+
+## 405. Auto-provisioning the NetBird routing peer, so §404 needs no wizard
+
+Follow-up to §404, prompted directly: "auto everything you can, I just want
+the user to push start as much as possible." §404 shipped the
+`netbird-client` container but still needed a human to click through
+NetBird's own Remote Network Access wizard (create the network resource,
+generate the setup key) on every fresh deployment — exactly the kind of
+repeated manual step principle 3 says to automate away.
+
+**What's genuinely not automatable**: a NetBird Personal Access Token.
+NetBird's management API needs one to do anything, and only NetBird's own
+UI (Settings → Personal Access Tokens, after logging in) can mint it — not
+derivable, not obtainable any other way. Everything downstream of having
+one, though, NetBird exposes as a plain REST API (confirmed against
+NetBird's own API docs: `/api/groups`, `/api/networks`,
+`/api/networks/{id}/resources`, `/api/networks/{id}/routers`,
+`/api/policies`, `/api/setup-keys`), so that part can run in code.
+
+**What shipped**: `backend/src/services/netbirdRoutingPeer.ts`,
+`ensureNetbirdRoutingPeer(serviceName)`, hooked into
+`composeUpWithManagedConfig` in `executor.ts` right after
+`applyN8nWorkflows` — runs on every start/restart of `netbird-vpn`, no-ops
+for every other service. No-ops immediately if `NETBIRD_API_TOKEN` (new
+`.env.example` var) is still `change-me` — the manual §404 path stays the
+fallback. With a token set, it idempotently:
+
+1. Derives the host's LAN CIDR by reusing `networkScan.ts`'s existing
+   `--network host` throwaway-container trick (`getLanCidr()`, factored out
+   of the code `scanLan()` already ran for LAN device discovery — same
+   `ip -o -4 route show to default` / `ip -o -4 addr show` script, one
+   function instead of two copies) — normalized from a host address to a
+   true network address (`normalizeCidr()`, the one pure function worth
+   testing here).
+2. Reaches NetBird's management API over
+   `http://<host-gateway-ip>:<published-mgmt-port>` — the same
+   `getHostGatewayIp()` + `getPublishedUpstreamPort()` pattern
+   `docusealAdminBootstrap.ts`/`immichAdminBootstrap.ts` already use to
+   reach a sibling app's own API, not the public
+   `netbird-vpn-api.<domain>` hostname. No dependency on Cloudflare/NPM
+   being healthy, and it works even before NetBird is exposed.
+3. Ensures (get-or-create, matched by name) two dedicated groups — one for
+   the routing peer itself, one tagging the LAN resource — a network named
+   "Business Lab LAN", the LAN resource in it, a router pointed at the
+   routing-peer group, and a policy granting NetBird's built-in "All" group
+   access to the resource group. Only *creates* the resource if missing —
+   deliberately does not PATCH an existing one's address if the host's LAN
+   subnet later changes; that's a rare host reconfig, one click to fix by
+   hand in NetBird's UI, not worth guessing an untested PATCH payload for.
+4. Ensures the setup key: checks the key's own `valid` flag from NetBird's
+   API (setup keys are shown in plaintext only once, on creation — a
+   masked value comes back from every later GET, so there is nothing
+   locally to compare against). Missing, expired or revoked → mints a
+   fresh reusable one (365-day expiry, NetBird's own max) and overwrites
+   `NETBIRD_ROUTING_PEER_SETUP_KEY`, which `docker compose up -d` then
+   picks up on this same start/restart — still valid → touches nothing,
+   including whatever's currently in `.env` (so a key pasted in by hand
+   under the §404 fallback survives until a token is actually set).
+
+Every step is wrapped in one outer try/catch that logs a warning and
+returns rather than throwing — the management API is genuinely
+unreachable on a cold first start (`netbird-client` is part of the same
+`docker compose up` that hasn't run yet), and this must never block that
+start. Self-heals on the next start/restart once NetBird is up.
+
+10 new tests in `netbirdRoutingPeer.test.ts`: `normalizeCidr`'s masking
+(including `/0` and `/32`) and rejection of malformed input, the three
+no-op guards (wrong service, no token, placeholder token), the "can't
+determine the LAN subnet" guard, a from-scratch happy path asserting the
+final `saveServiceEnv` call, a fully-idempotent path (everything already
+valid — asserts zero writes), and the unreachable-API path resolving
+without throwing. Backend typecheck clean, 798/798 pass. Patch bump.
+
+**Not yet verified against the live host** — staying on `dev` alongside
+§404. Verification: mint a NetBird PAT from
+`https://netbird-vpn.tx-home-utils.com`, paste it into `NETBIRD_API_TOKEN`
+via the dashboard, restart NetBird VPN, confirm in NetBird's own dashboard
+that the network/resource/router/policy/setup key now exist without having
+touched the wizard, confirm `netbird-client`'s logs show it authenticating
+with the auto-generated key, then finish §404's own live check (a remote
+peer reaching something on `192.168.1.0/24` through it).

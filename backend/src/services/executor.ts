@@ -45,6 +45,7 @@ import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 import { reconcileItflowMailCron } from './itflowMailCron';
 import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
+import { ensureNetbirdRoutingPeer } from './netbirdRoutingPeer';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getServiceStatus } from './status';
@@ -233,6 +234,12 @@ async function composeUpWithManagedConfig(
   // n8n: render the dashboard-managed workflow files before the app comes up,
   // so the n8n-workflows-init container imports the current version (§118.3).
   await applyN8nWorkflows(serviceName, appDir);
+  // NetBird: ensure the routing-peer's network/resource/router/policy/setup
+  // key exist via NetBird's own management API, so `netbird-client` (part of
+  // this same compose file) comes up already able to route the LAN — no
+  // wizard click-through on a fresh deployment (§404/§405). No-op until a
+  // Personal Access Token is entered, and for every other service.
+  await ensureNetbirdRoutingPeer(serviceName);
   // Paperless: render the pre-consume ClamAV scanner script + the managed
   // compose fragment that carries PAPERLESS_PRE_CONSUME_SCRIPT (§81.7). Both
   // must exist before the container starts.
