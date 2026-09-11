@@ -24927,3 +24927,30 @@ grants `tag:businesslab` to `autogroup:owner`.
 Not `backend/src`/`frontend/src` — no version bump. Not yet re-verified
 live — needs a deploy + Tailscale restart to confirm the container comes up
 clean and the node registers tagged.
+
+## 388. §367 verified live end to end — OAuth client closes the recurring-expiry item (2026-09-11)
+
+Deployed §387's fix, restarted Tailscale. Clean this time — no crash-loop:
+
+```
+tags=tag:businesslab, host="businesslab-signal"
+active login: businesslab-signal.tail122b53.ts.net
+machineAuthorized=true, Hostinfo.IngressEnabled changed to true
+```
+
+`tailscale funnel status` inside the container: `Funnel on` at
+`https://businesslab-signal.tail122b53.ts.net`, proxying to the signal
+server (`10.201.19.1:10252`) — unchanged target, `TS_HOSTNAME` pin held
+through the re-enrollment as designed. `curl` against the public Funnel
+hostname: `405` — the same known-healthy signature for the signal gRPC
+server established in §53/§330. NetBird traffic already flowing
+("received a proxy request for plaintext gRPC" in the tailscale log before
+the check even started).
+
+§367 closed: `TAILSCALE_AUTH_KEY` is now an OAuth-client-issued key
+(`tag:businesslab`, `auth_keys` write scope) that does not expire, ending
+the 90-day reusable-key rotation this item existed to fix. Two real bugs
+found and fixed getting here — the ACL's Funnel grant only covering
+`autogroup:member` (not the tagged node, §367 ACL edit) and containerboot's
+`--advertise-tags` requirement for an OAuth key (§387) — both now permanent
+fixes, not one-off workarounds.

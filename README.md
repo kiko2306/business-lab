@@ -271,18 +271,6 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **@mat: move `TAILSCALE_AUTH_KEY` to a non-expiring OAuth client** (§367) —
-      the reusable auth key in `apps/tailscale/.env` **expired** and a deauthed
-      node then couldn't re-register at all (crash loop) until a fresh key was
-      set (done 2026-09-10). Reusable keys hard-cap at 90 days, so this recurs.
-      Fix it once: Tailscale admin → Settings → OAuth clients → new client
-      scoped `auth_keys` (write); add a tag (`tag:businesslab`) to the ACL
-      `tagOwners` and make sure the Funnel `nodeAttrs` grant covers that tag;
-      set `TAILSCALE_AUTH_KEY` (dashboard → Tailscale → Configuration) to
-      `tskey-client-…?preauthorized=true&ephemeral=false` with the tag applied
-      via the client. OAuth client secrets don't expire, so the node
-      re-registers itself indefinitely — no rotation. Needs the Tailscale
-      admin login; the agent can't do the OAuth-client/ACL steps.
 ### Apps and integrations
 
 - [ ] **@mat: relocate the live shared tree + re-prove the round-trip**
