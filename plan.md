@@ -25543,3 +25543,70 @@ backend logs for the four new reconciler log lines, and (c) Nextcloud's own
 admin panel to confirm all four warnings are actually gone. Staying on
 `dev` until that's done — per the Docker/exposure-change gate, this doesn't
 merge to `main` on typecheck+unit-tests alone.
+
+## 402.1. Live verification: mail/maintenance/mimetype clean; HSTS needed a
+     permission fix, then landed for Authelia-protected hosts only
+
+Deployed §402 and restarted Nextcloud + NPM to verify.
+
+**Mail, maintenance window, mimetype — all clean on the first try.**
+`occ config:system:set` output in the backend log shows `mail_smtpmode`
+through `mail_domain` all set from the dashboard's stored account,
+`maintenance_window_start` set to `2`, and the mimetype repair pass ran to
+completion (sentinel written so it won't re-run). The `Connection refused`
+error's root cause — no `mail_smtp*` keys at all — is fixed.
+
+**HSTS: hit a real permission bug first, root-caused and fixed without
+touching code.** First write attempt failed: `EACCES` on `mkdir` for
+`apps/nginx-proxy-manager/data/app/nginx/custom`. Traced it — not a bug in
+the new reconciler: the backend's own process runs as a non-root `appuser`
+(uid 100, supplementary group 101+983, where 983 is the host's `docker`
+group), and every other app's `data/` tree the backend already writes into
+successfully (`crowdsec/config`, `home-page/data`, ...) is group-owned by
+that same `docker` gid — but NPM's own container runs as root and had never
+had its tree brought into that group, unlike every other app. `start.sh`
+already does exactly this, recursively, on every run (`chgrp -R
+"$DOCKER_GID" "$app_dir" && chmod -R g+rwX "$app_dir"`, with its own
+comment naming precisely this failure mode) — it just hadn't been re-run
+since NPM's `nginx/` tree was created. `sudo ./start.sh` (the one command
+CLAUDE.md allows on the host) fixed it in one pass; no code change needed.
+Confirmed live: `curl -I https://nextcloud.tx-home-utils.com` now returns
+`strict-transport-security: max-age=15552000; includeSubDomains`.
+
+**Found live: the "every proxied host" claim in §402 was wrong.** Same
+`curl -I` against `https://nocodb.tx-home-utils.com` — no HSTS header.
+Traced NPM's generated `proxy_host/*.conf`: a host that is
+Authelia-protected (the majority — `isAutheliaProtectionRequired`, default
+true) or gRPC (`buildGrpcAdvancedConfig`) gets a dashboard-authored
+`advanced_config` that replaces `location /` entirely and includes
+`/snippets/proxy.conf` — which declares no `add_header` of its own, so it
+correctly inherits the server-scope HSTS block from `server_proxy.conf`.
+But `skipAutheliaProtection: true` apps (NocoDB, Stirling-PDF and 7 others —
+own native login/OIDC, or a raw-protocol need) get **no** `advanced_config`
+(`''`), so NPM renders its own stock `location /`, which
+`include`s NPM's baked-in `conf.d/include/proxy.conf` — and that file
+declares `add_header X-Served-By $host;`. nginx's inheritance rule (any
+`add_header` in a location suppresses every inherited one, regardless of
+scope) means those ~9 apps silently never see the server-scope header at
+all — exactly the shadowing risk §402's own design note called out, just in
+a place I hadn't checked: NPM's *own* stock template, not only the
+dashboard's Authelia/gRPC overrides.
+
+**Not fixed here.** Closing the gap means giving those ~9 hosts their own
+`advanced_config` too (a `location /` built from `/snippets/proxy.conf` —
+already proven safe by the other two paths — plus the HSTS `add_header`
+directly in it, so it stops depending on `server_proxy.conf` inheritance at
+all), which also means flipping `allow_websocket_upgrade` off for them the
+same way `autheliaProtected || grpc` already does (NPM fatals on a
+duplicate directive if both are on) and re-adding Upgrade/Connection
+headers by hand for the ones among the nine that need websockets. That's a
+real change to `npmClient.ts`'s `buildProxyHostPayload` touching every
+plain proxy host's generated config — correctly scoped as its own
+follow-up, not a rider on the fix that was actually asked for (Nextcloud's
+own warning, which is fixed and verified). Left as an open item rather than
+rushed.
+
+Nextcloud's four warnings: verified fixed. Merging §402 to `main` stands —
+Nextcloud (the actual ask) is proven live; the HSTS-for-all-hosts gap is a
+separate, scoped, not-yet-started piece of work, tracked as its own README
+item rather than blocking what already works.

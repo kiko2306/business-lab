@@ -217,6 +217,21 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **HSTS missing for `skipAutheliaProtection` apps** (§402.1) — the
+      server-scope header in NPM's `server_proxy.conf` only reaches hosts
+      whose `location /` has no `add_header` of its own. Authelia-protected
+      and gRPC hosts are fine (their dashboard-authored `advanced_config`
+      uses `/snippets/proxy.conf`, which declares none) — but the ~9 apps
+      with `skipAutheliaProtection: true` (NocoDB, Stirling-PDF, ...) get no
+      `advanced_config` at all, so NPM renders its own stock `location /`,
+      which includes `conf.d/include/proxy.conf` — and that declares
+      `add_header X-Served-By`, which silently blocks ours. Fix is to give
+      those hosts an `advanced_config` too (same `/snippets/proxy.conf` +
+      the HSTS header, in `npmClient.ts`), which also means flipping
+      `allow_websocket_upgrade` off for them the way `autheliaProtected ||
+      grpc` already does and re-adding Upgrade/Connection by hand for the
+      ones that need it — a real change to every plain host's generated
+      config, correctly scoped as its own piece of work.
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch
