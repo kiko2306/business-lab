@@ -6,7 +6,11 @@ services:
     image: tailscale/tailscale:latest
     restart: unless-stopped
     environment:
-      TS_AUTHKEY: ${TAILSCALE_AUTH_KEY}
+      # :-change-me default: an unauthenticated container just crash-loops
+      # (restart: unless-stopped) rather than blocking the rest of this
+      # compose file — same reasoning as netbird-client's NB_SETUP_KEY
+      # (apps/netbird-vpn/docker-compose.yml, §405.1).
+      TS_AUTHKEY: ${TAILSCALE_AUTH_KEY:-change-me}
       TS_STATE_DIR: /var/lib/tailscale
       TS_USERSPACE: "true"
       # Pin the node name. Unset, tailscaled reports the container's hostname
@@ -27,6 +31,14 @@ services:
       # `tagOwners` grants `tag:businesslab` to `autogroup:owner`, so the
       # tailnet owner's own key can advertise it as well.
       TS_EXTRA_ARGS: --advertise-tags=tag:businesslab
+      # Neither read by this container — referenced here only so the
+      # dashboard's generic per-app config panel surfaces them (it lists
+      # whatever a compose file substitutes; see extractComposeEnvVars in
+      # backend/src/config/services.ts). tailscaleAutomation.ts (backend)
+      # reads them straight from .env to drive Tailscale's own API and
+      # keep TAILSCALE_AUTH_KEY minted/fresh — plan.md §408.
+      TAILSCALE_OAUTH_CLIENT_ID: "${TAILSCALE_OAUTH_CLIENT_ID:-change-me}"
+      TAILSCALE_OAUTH_CLIENT_SECRET: "${TAILSCALE_OAUTH_CLIENT_SECRET:-change-me}"
     labels:
       - "homepage.group=Infrastructure"
       - "homepage.name=Tailscale"

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.83.0] — 2026-09-11
+
+### Added
+
+- Automate Tailscale's own setup via an OAuth client: mint/refresh the auth key and enable Funnel through Tailscale's own API instead of manual UI steps, same pattern as NetBird's PAT (§408)
+
 ## [0.82.2] — 2026-09-11
 
 ### Fixed

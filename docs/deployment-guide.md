@@ -107,6 +107,29 @@ here once a year when the old one expires (§405 — this half genuinely can't
 self-renew, NetBird has no way to mint a token without a human holding a
 session in its own UI first).
 
+### Optional: automate Tailscale's own setup
+
+Step 1 already bootstrapped Tailscale with a hand-generated auth key and
+(if it was needed) a manual Funnel click. This closes the loop so neither
+is ever needed again on this box:
+
+1. In Tailscale's admin console: **Settings → OAuth clients → Generate
+   OAuth client**, scopes **`auth_keys`** and **`policy_file`**, tag
+   **`tag:businesslab`** (must match — see
+   [app-credentials.md](app-credentials.md) for why). Copy the client ID
+   and secret — the secret is shown once.
+2. Paste both into `TAILSCALE_OAUTH_CLIENT_ID` /
+   `TAILSCALE_OAUTH_CLIENT_SECRET` in Tailscale's config panel here in the
+   dashboard, save, restart Tailscale.
+
+From then on, every Tailscale start mints/refreshes `TAILSCALE_AUTH_KEY`
+itself (90 days, Tailscale's own max — re-checked and re-minted
+automatically before it expires, no human step) and confirms Funnel stays
+enabled for `tag:businesslab` in the tailnet's ACL (plan.md §408). This
+closes the exact gap that caused a real outage once already (§367 — an
+expired auth key deauthed the node and took NetBird's signal server down
+with it, because nothing was watching).
+
 ## 6. Hand over
 
 - Deployment checklist all green.

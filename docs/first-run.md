@@ -26,6 +26,13 @@ What it does **not** do, and you need in advance:
 | **A Cloudflare API token** | Creates the tunnel, its ingress rules and DNS records | Needs **Account → Cloudflare Tunnel: Edit** and **Zone → DNS: Edit**. Leave its **TTL** on Cloudflare's default (*No expire date*) — nothing here rotates this token, so an expiring one silently breaks tunnel/DNS provisioning later with no warning |
 | **A Tailscale account + auth key** | NetBird's signal server is published over Tailscale Funnel; it cannot work through the Cloudflare Tunnel (see plan.md §52) | A **reusable** auth key from <https://login.tailscale.com/admin/settings/keys>, with the longest expiration Tailscale's UI offers — same reasoning as the Cloudflare token above |
 | **Tailscale Funnel enabled** | Same reason | One-time per tailnet. If it isn't, `start.sh` prints the exact one-click URL to enable it — you can also do this after the fact and re-run |
+
+Both Tailscale steps above are only needed to bootstrap the very first
+start — once the dashboard is up, pasting a Tailscale OAuth client into the
+Tailscale app's config panel hands both to the backend from then on
+(mint/refresh the auth key, keep Funnel enabled), no more manual key
+generation or Funnel clicks on any future re-enrollment. See
+[deployment-guide.md § Optional: automate Tailscale's own setup](deployment-guide.md#optional-automate-tailscales-own-setup).
 | **`cloudflared` installed** | `start.sh` configures the tunnel but does not install the connector | It *does* pin the connector's transport, which NetBird depends on |
 | **systemd running as PID 1** | The tunnel connector is a systemd unit | WSL needs `systemd=true` in `/etc/wsl.conf`; `start.sh` warns loudly if it is missing |
 

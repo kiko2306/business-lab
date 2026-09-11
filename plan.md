@@ -26177,3 +26177,99 @@ bump. Nothing here needed fresh live verification: every automated behavior
 being documented was already proven live in §285 (NPM), the dashboard's own
 `/setup` flow (Authelia, exercised on every fresh deployment including this
 one), and §404–§405.3 (NetBird) earlier this session.
+
+## 408. Tailscale gets the same treatment as NetBird — an OAuth client automates the auth key and Funnel
+
+Direct follow-up to §407: asked "can you [automate Tailscale/NetBird] the
+way you do Cloudflare, so you can manage the tokens?" — answer was that
+NetBird already does (§405, a scoped one-time PAT the backend then drives
+via API), Tailscale didn't (only a narrow enrollment key, no API-driven
+management), then "automate as much as possible" once that gap was named.
+
+**This isn't hypothetical scope** — plan.md §367 (2026-09-10) is a real
+outage from exactly this gap: a reusable `TAILSCALE_AUTH_KEY` hit its
+90-day default expiry, the node deauthed, and NetBird's signal server
+(published through Tailscale Funnel — Cloudflare can't carry it, §52) went
+down with it, undetected until someone noticed. §367 left "rotate before
+expiry, or move to a tagged/ephemeral key" as a `@mat` item; this closes it
+properly instead.
+
+**Researched Tailscale's actual OpenAPI spec first** (`curl -s
+"https://api.tailscale.com/api/v2?openapi=1"`) rather than its docs pages —
+WebFetch kept returning the JS-rendered SPA shell for the docs site, not
+content, so the raw spec was the only reliable source. Confirmed directly
+from it, not guessed:
+
+- OAuth client credentials (`client_id`/`client_secret`) exchange for a
+  1-hour access token at `POST /oauth/token` — "Trust credentials don't
+  expire," unlike the tokens/keys they mint.
+- `POST /tailnet/-/keys` (`-` = "the token's own tailnet", confirmed in the
+  spec's own path-param docs) creates a reusable/preauthorized/tagged auth
+  key with `auth_keys` scope; `expirySeconds` "Defaults to 90 days" with no
+  stated way past that.
+- `GET /tailnet/-/keys/{id}` returns `invalid: true` for a revoked or
+  expired key — checked before re-minting, not assumed.
+- `GET`/`POST /tailnet/-/acl` (`policy_file`/`policy_file:read` scopes)
+  read/write the whole policy as JSON, with `ETag`/`If-Match` for safe
+  concurrent-edit handling — confirmed against the OpenAPI spec's own
+  request/response schema, and the exact `nodeAttrs` Funnel syntax
+  (`{"target": ["tag:businesslab"], "attr": ["funnel"]}`) against
+  Tailscale's Funnel KB page, matching what §367's own follow-up (§387)
+  already found written into this tailnet's live ACL by hand.
+- OAuth-issued auth keys are tag-bound and the node must explicitly
+  advertise that tag on `tailscale up` — already true here
+  (`TS_EXTRA_ARGS: --advertise-tags=tag:businesslab`, added for exactly
+  this reason in §387 the hard way, a crash-loop). `tag:businesslab` is
+  the OAuth client's own tag the whole way through, so nothing new to
+  configure there.
+
+**What shipped**: `backend/src/services/tailscaleAutomation.ts`,
+`ensureTailscaleAutomation(serviceName)`, wired into
+`composeUpWithManagedConfig` right after `ensureNetbirdRoutingPeer` —
+identical shape to §405: no-op unless `TAILSCALE_OAUTH_CLIENT_ID`/
+`_SECRET` are set (two new `.env.example` vars, surfaced in the config
+panel via the same "referenced-but-unused" compose trick §405.1 needed for
+`NETBIRD_API_TOKEN`), best-effort try/catch around the whole thing so an
+unreachable Tailscale API never blocks a start. With a client set, every
+`tailscale` start:
+
+1. Checks the stored `TAILSCALE_AUTH_KEY_ID` (new bookkeeping var — the
+   key's plaintext is shown only once, same reasoning as NetBird's setup
+   key, so validity has to be checked by ID, not by re-reading the value)
+   via `GET .../keys/{id}`; mints a fresh key only if it's missing or
+   actually `invalid`, never on a bare lookup failure — a transient
+   network blip against Tailscale's API must not spuriously churn out a
+   new key every start.
+2. Read-merge-writes the ACL: fetches the real policy, checks whether
+   `tag:businesslab` already has `funnel` in `nodeAttrs` (it already does
+   on `home-srv-01`, from §387's hand-edit — this is expected to find that
+   and no-op there, not fight it), adds the one entry only if missing, and
+   writes the *whole* policy back with `If-Match` so a concurrent edit in
+   Tailscale's own admin console is refused rather than silently
+   overwritten. JSON round-trip, not HuJSON — any hand-written ACL
+   comments wouldn't survive a write this makes, an acceptable trade for
+   this deployment's single-purpose tailnet, called out in docs and to the
+   user before building.
+
+Also gave `TAILSCALE_AUTH_KEY` a `:-change-me` compose default (same
+§405.1 reasoning: an unauthenticated container should crash-loop on its
+own, restart: unless-stopped, not read as "blocks the whole app").
+
+8 new tests in `tailscaleAutomation.test.ts`: the three no-op guards
+(wrong service, no client, placeholder client), a from-scratch happy path
+(mints a key, confirms the ACL POST carries `If-Match` with the GET's
+`ETag`), full idempotency (valid key + Funnel already granted → zero
+writes), re-mint on an `invalid: true` key, and API-unreachable resolving
+without throwing. Backend typecheck clean, 811/811 pass. Docs updated:
+`first-run.md` (points at the OAuth-client option instead of duplicating
+it), `deployment-guide.md` (new "Optional: automate Tailscale's own setup"
+step, mirroring NetBird's), `app-credentials.md` (both apps' two-tier
+pattern documented together, replacing the now-stale single-tier
+description). Minor bump.
+
+**Not yet verified against the live host** — staying on `dev` until an
+OAuth client is created and pasted in on `home-srv-01`, Tailscale is
+restarted, and the backend log confirms it either minted/confirmed the
+auth key and found Funnel already granted (the expected outcome, given
+§387's hand-edit already covers `tag:businesslab`) without touching the
+container's actual connection.

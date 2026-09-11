@@ -46,6 +46,7 @@ import { reconcileItflowMailCron } from './itflowMailCron';
 import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { ensureNetbirdRoutingPeer } from './netbirdRoutingPeer';
+import { ensureTailscaleAutomation } from './tailscaleAutomation';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
 import { getServiceStatus } from './status';
@@ -240,6 +241,11 @@ async function composeUpWithManagedConfig(
   // wizard click-through on a fresh deployment (§404/§405). No-op until a
   // Personal Access Token is entered, and for every other service.
   await ensureNetbirdRoutingPeer(serviceName);
+  // Tailscale: mint/refresh TAILSCALE_AUTH_KEY and enable Funnel on the
+  // tailnet's ACL via Tailscale's own API, so there's no manual key
+  // generation or one-click Funnel step (§408). No-op until an OAuth client
+  // is entered, and for every other service.
+  await ensureTailscaleAutomation(serviceName);
   // Paperless: render the pre-consume ClamAV scanner script + the managed
   // compose fragment that carries PAPERLESS_PRE_CONSUME_SCRIPT (§81.7). Both
   // must exist before the container starts.
