@@ -302,6 +302,3 @@ below.
       path, then re-run §219's live check (write over SMB → visible in
       Nextcloud `/shared` and in Paperless's `to-paperless/` drop box → and
       back). Until then §310 stays on `dev`, unmerged.
-- [ ] **App backlog** — §22 lists candidate apps by category (communication,
-      business ops, no-code/BI, files/PDF, security/network, dev infra,
-      productivity). Pull from there rather than restating it here.

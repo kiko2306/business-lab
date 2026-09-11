@@ -24607,3 +24607,14 @@ all of §377's checks passed:
 
 §377/§369 closed — the by-hand fix is now the automated, reconciled behaviour
 on every Nextcloud start, proven on the real stack per CLAUDE.md's gate.
+
+## 379. §22 app backlog closed out — README item deleted (2026-09-11)
+
+Checked every entry in §22 (the app backlog plan.md's README pointed at):
+every single candidate is now `[x]` (added) or `[~]` (explicitly dropped) —
+confirmed by §370, which dropped every other still-open candidate (Stalwart
+Mail, Cal.com, Karakeep, the *arr stack, Grafana+Prometheus) in the same pass
+that added Twenty. Nothing left to pull. Deleted the stale "App backlog"
+README item rather than force a pick from an empty list; a new app now needs
+either a fresh ask or a proposal outside §22 entirely, not a "pull from the
+backlog."
