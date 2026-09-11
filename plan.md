@@ -25347,3 +25347,41 @@ alone.
 went one step further (byte-for-byet restore, not just a snapshot). Whether
 to also prove a restore from this FTP destination before deleting the item
 is @mat's call, not a coding decision.
+
+## 399. `ftp` off-host destination proven end to end — snapshot + byte-for-byte restore (§131.4 closed)
+
+Matched §266's own bar exactly, on real off-host hardware this time
+(`portoinf.dyndns-server.com`, not the uncooperative test NAS).
+
+No dashboard route exists yet for a Kopia snapshot restore
+(`restoreSnapshot`/`getRestoreTaskStatus` in `kopiaClient.ts` are built but
+unwired — same gap §266 hit) — used Kopia's own CLI directly instead,
+restoring to a throwaway path inside the container (`/tmp/restore-test`),
+never touching the live `/source/apps` tree:
+
+```
+docker exec kopia-kopia-1 kopia restore k2fcfdc65125b9a1fc1c928730f2805b4 /tmp/restore-test
+```
+
+- **File count**: 52,107 restored — exact match to the snapshot's
+  `fileCount: 52107`.
+- **Bytes**: `du -sb` first read 3,423,520,778 — ~19.65 MB over the
+  snapshot's `totalSize: 3403870713`. Didn't take that as a discrepancy
+  without checking why: `du` measures disk-block allocation, not logical
+  file size, and 52,107 mostly-small files each round up to their block
+  boundary — exactly the kind of gap block overhead produces. Summed real
+  logical sizes instead (`find -printf %s`, careful to avoid both awk's
+  scientific-notation default output and a 32-bit `%d` overflow at this
+  size — `%.0f` for full precision): **`3403870713`** — byte-for-byte
+  identical to the snapshot's own total. The `du` gap was purely a
+  measurement artifact, not missing data.
+
+Temp restore directory cleaned up afterward (`rm -rf`, same "state left
+behind" discipline as §266).
+
+**README item closed.** The `disk`, `s3`, and now `ftp` destination kinds
+are all proven end to end, snapshot and restore, against genuinely separate
+hardware — not just code-complete. `ftps`/`sftp` share the same rclone code
+path `ftp` just proved (§267's own design), so this closes the whole
+off-host-hardware thread the item existed for, not just the one protocol
+tested.

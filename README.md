@@ -216,22 +216,6 @@ Roster removals (§301 — drop the heaviest apps outright instead of tuning the
 Strategy:
 
 
-### Backups
-
-- [ ] **Prove a real external destination against off-host hardware** (§131.4,
-      §196, §265, §266, §268, §269) — the `disk`-kind code path is proven end
-      to end (§266: snapshot + byte-for-byte restore from a real ext4 bind
-      mount, 50553 files) and the §265 source-scope bug is fixed. Still
-      unproven: any destination on **separate hardware**. The test NAS
-      (`192.168.1.50`) hangs `kopia repository create` identically over
-      **SMB (§265), FTP (§268) and NFSv4.1 (§269)** — mount/transport is
-      healthy each time (`dd`/`touch`/`rclone` all fine), but Kopia's first
-      blob writes never complete against this box's storage. Three protocols,
-      one uncooperative NAS — not a code problem. Prove it elsewhere: `s3`
-      (already proven §221, recommended — needs an S3/MinIO endpoint), or
-      `disk` on an actually-separate attached drive. `ftp`/`ftps`, `nfs` and
-      the `disk` path are all code-complete; this item is just the off-host
-      live run on hardware that cooperates.
 ### Roster changes (§81)
 
 
