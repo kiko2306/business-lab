@@ -26040,3 +26040,14 @@ surfaces whatever's actually still wrong.
 
 **Not yet verified against the live host** — pushing to `dev`/`beta`,
 rebuilding `home-srv-01`'s backend, then restarting NetBird VPN once more.
+
+**Verified live.** Third restart, no warning: `"NetBird: generated the
+routing-peer setup key"` — the full chain (groups, network, resource,
+router, policy, setup key) succeeded against the real management API.
+`netbird-client` came up and stayed up (no crash loop), synced ACL rules
+and created its nftables ipsets, i.e. genuinely authenticated and
+connected as a peer, all without touching NetBird's own wizard. §404's
+own remaining check (a remote peer actually reaching something on
+`192.168.1.0/24` through it) is still open — everything up to and
+including the routing peer joining the overlay is now confirmed; end-to-
+end reachability from an enrolled remote device is the last piece.
