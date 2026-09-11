@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.77.0] — 2026-09-11
+
+### Added
+
+- ITFlow's mail settings + cron master switch are now provisioned automatically from the dashboard's global mail config, via a prepared-statement PHP script run through ITFlow's own container (§62.1) — no more by-hand copy into its Settings UI
+
 ## [0.76.0] — 2026-09-11
 
 ### Added

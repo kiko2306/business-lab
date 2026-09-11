@@ -24618,3 +24618,71 @@ that added Twenty. Nothing left to pull. Deleted the stale "App backlog"
 README item rather than force a pick from an empty list; a new app now needs
 either a fresh ask or a proposal outside §22 entirely, not a "pull from the
 backlog."
+
+## 380. ITFlow's post-wizard mail + cron settings automated (§62.1)
+
+Implemented the README item added last session. Confirmed against ITFlow's
+actual current source (`itflow-org/itflow` on GitHub, not assumed) before
+writing anything:
+
+- **`settings` table, one row (`company_id = 1`)** holds both — no
+  environment-variable path, confirmed by reading
+  `admin/post/settings_mail.php` and `admin/post/cron.php` directly. SMTP:
+  `config_smtp_provider` (`'standard_smtp'` for a plain username/password
+  account — `'google_oauth'`/`'microsoft_oauth'` are the other two, not
+  used here), `config_smtp_host/port/encryption/username/password`,
+  `config_mail_from_email/name`. IMAP mirrors it under `config_imap_*`.
+  Encryption is `'tls'`/`'ssl'`/`''` (no `'none'` string — blank means none).
+- **Cron is one flag, not five.** `cron_jobs.cron_job_enabled` already
+  defaults `1` in ITFlow's own schema for every job — only the master switch
+  `settings.config_enable_cron` (default `0`) needs setting. Also found:
+  upstream moved that switch's UI out of **Settings → Notifications** into
+  **Maintenance → Cron** as of ITFlow 26.08 — the old doc location
+  (app-credentials.md, .env.example) was already stale before this session
+  touched it, moot now that it's automatic either way.
+- **Mechanism chosen: PHP + mysqli inside ITFlow's own container, not raw SQL
+  and not an HTTP client.** Compared three options:
+  1. Authenticated HTTP client mirroring `itflowClient.ts`'s wizard driver —
+     rejected: needs a login flow, session cookie, and CSRF token scraped out
+     of HTML for two separate forms. Real work for no benefit over below.
+  2. `docker compose run` a throwaway `mariadb` client against `itflow-db`
+     (same shape as `nextcloudOcc.ts`, swapping `occ` for `mysql -e`) —
+     rejected: raw SQL string-building means hand-rolling the same escaping
+     ITFlow's own `escapeSql()` does, in bash, for no reason.
+  3. **Chosen**: `docker compose run` a throwaway `itflow` container
+     (confirmed via its Dockerfile: Alpine, `php84-mysqli` installed,
+     `/usr/bin/php` symlinked in) running a PHP script that `require`s the
+     install's own `config.php` — which already defines a connected
+     `$mysqli` (`setup/index.php` writes exactly that) — then runs real
+     prepared statements. No connection details to re-derive, no SQL
+     escaping to hand-roll, and it fails the same obvious way
+     (`require(): Failed opening required`) if the wizard hasn't run yet, so
+     no separate "is it set up" check is needed either.
+- **New `itflowDb.ts`** — the scaffold (base64 the script onto the command
+  line, `docker compose run --rm --no-deps -T --entrypoint /bin/sh itflow`,
+  decode, pipe into `php`), mirroring `nextcloudOcc.ts` almost exactly.
+- **New `itflowMailCron.ts`** — `buildMailCronScript()` returns the PHP
+  lines; SMTP/IMAP values (including both passwords) travel through
+  `getenv()` inside the script and `-e NAME` on the command line, never
+  interpolated into the script text or SQL, same discipline as
+  `nextcloudOnlyOffice.ts`'s JWT secret. `reconcileItflowMailCron()` pulls
+  the dashboard's config via the existing `getMailConfig()`
+  (`utils/mailSettings.ts` — already the shared source every app's mail
+  wiring reads from), skips IMAP entirely when no IMAP host is configured
+  (doesn't clobber a blank over nothing), and redacts both passwords from
+  the logged output as a belt-and-braces measure.
+- Wired into `executor.ts` right after `reconcileItflowFirstAdmin` (§350) —
+  the `settings` row only exists once that wizard has completed, so ordering
+  matters; no explicit gate needed beyond that since a failed `require` is
+  self-describing and retries on the next start.
+- Rewrote the by-hand instructions this replaces: `app-credentials.md`
+  ("ITFlow — two things to do after the wizard" → "mail + cron are
+  automatic") and `apps/itflow/.env.example`'s comment block. README item
+  deleted.
+
+Backend typecheck clean; `backend test` 753/753 (13 new: 4 in
+`itflowDb.test.ts`, 9 in `itflowMailCron.test.ts`). **Not yet run against the
+real stack** — needs a host deploy + ITFlow restart to confirm the prepared
+statements actually land (right column types, `standard_smtp`/`standard_imap`
+accepted, cron flips on) the same way §377/§378 proved the Nextcloud
+reconcilers. Staying on `dev` until that's done.

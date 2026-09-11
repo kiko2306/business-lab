@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.76.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.77.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -302,17 +302,3 @@ below.
       path, then re-run §219's live check (write over SMB → visible in
       Nextcloud `/shared` and in Paperless's `to-paperless/` drop box → and
       back). Until then §310 stays on `dev`, unmerged.
-- [ ] **Automate ITFlow's post-wizard email + cron settings** (§62.1) —
-      unlike the first-run wizard (auto-run, §350), these two are still a
-      by-hand step because ITFlow has **no environment-variable support for
-      SMTP/IMAP or cron**: both live in its own database, edited only from
-      its own UI (`app-credentials.md` "ITFlow — two things to do after the
-      wizard"), and fail *silently* if skipped. Needs an authenticated
-      client the same shape as `itflowClient.ts`'s wizard driver — log in,
-      carry the session cookie, extract each form's CSRF token, POST
-      Settings → Email (mail settings, presumably the same values as the
-      dashboard's global Settings → Email) and Settings → Notifications →
-      enable Cron. Check first whether writing straight to `itflow-db`
-      (already-known credentials, same DB the wizard's `add_database` step
-      seeds) is simpler than driving the HTML forms — same tradeoff the
-      `occ`-exec pattern (Nextcloud) took versus a REST client.

@@ -39,6 +39,7 @@ import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { reconcileDocusealFirstAdmin } from './docusealAdminBootstrap';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
 import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
+import { reconcileItflowMailCron } from './itflowMailCron';
 import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
@@ -309,6 +310,11 @@ async function composeUpWithManagedConfig(
   // first POST creates the schema — the itfloworg image doesn't. After `up`;
   // no-op otherwise.
   await reconcileItflowFirstAdmin(serviceName);
+  // ITFlow: copy the dashboard's global mail settings into ITFlow's own DB
+  // and flip its master cron switch on (§62.1) — the two by-hand steps in
+  // app-credentials.md. After reconcileItflowFirstAdmin: the `settings` row
+  // this writes to only exists once that wizard has run.
+  await reconcileItflowMailCron(serviceName);
 
   return result;
 }

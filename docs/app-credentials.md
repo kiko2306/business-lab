@@ -87,19 +87,17 @@ header-authed account exists — `user_saml` has no group mapping of its own,
 so without this a fresh SSO login would otherwise land as a plain user with
 no Administration settings.
 
-### ITFlow — two things to do after the wizard
+### ITFlow — mail + cron are automatic
 
-Neither is obvious, and both fail *silently* if missed.
-
-1. **Email.** ITFlow does not read mail settings from the environment; it keeps
-   them in its own database. So the dashboard's global mail settings
-   (Settings → Email) are values to **copy into ITFlow's own UI**, not values
-   it inherits. Nothing warns you — outgoing mail simply never sends.
-2. **Cron.** Email-to-ticket, the mail queue and recurring invoices all run
-   from cron. The container already runs it, so there is nothing to schedule on
-   the host, but it must be enabled inside ITFlow:
-   **Settings → Notifications → enable Cron**, with the individual jobs under
-   **Maintenance → Cron**.
+ITFlow does not read mail settings or a cron toggle from the environment —
+both live in its own database, normally set by hand in its own UI. The
+dashboard now does this for you on every ITFlow start
+(`itflowMailCron.ts`, §62.1): it copies the dashboard's global mail settings
+(Settings → Email) into ITFlow's SMTP/IMAP config, and flips ITFlow's master
+cron switch on (**Maintenance → Cron**, individual jobs default enabled) so
+email-to-ticket, the mail queue and recurring invoices actually run. Nothing
+to click through — if outgoing mail isn't sending, check **Settings → Email**
+on the dashboard first, since that's what ITFlow's copy is sourced from.
 
 Worth knowing: the container's healthcheck only probes the web server, not
 cron. If cron dies the container still reports healthy while every scheduled
