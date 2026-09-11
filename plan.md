@@ -24520,3 +24520,23 @@ Fix: a `have_pkg()` helper that probes what each package actually provides —
 `command -v` for the rest. The existing `[ ${#APT_MISSING[@]} -gt 0 ]` guard
 then genuinely skips the `apt-get update` + install when nothing is missing,
 which is the normal case on a re-run. `bash -n` clean.
+
+## 375. Startup log popup no longer freezes on a chatty first boot (§371 side-finding, 2026-09-11)
+
+Root cause wasn't unbounded log storage — `pushStartupLine` already ring-buffers
+to 600 lines and the popup renders a single `<pre>{{ startupLogText() }}`, not
+a per-line `*ngFor`. It was event *frequency*: each `EventSource` `'log'`
+message ran inside Angular's zone, so a burst of hundreds of lines (Twenty's
+migrations) queued a full change-detection pass **and** an `AfterViewChecked`
+`scrollTop = scrollHeight` reflow per line, all synchronous on the main
+thread.
+
+Fix in `service-card.component.ts`: the `'log'` listener is now registered via
+`NgZone.runOutsideAngular`, pushing into a plain buffer (`queueStartupLine`)
+instead of touching component state directly. A single `setTimeout` (120 ms)
+flushes the buffer through `NgZone.run()` in one batch, so the DOM updates a
+few times a second regardless of burst size. `teardownStartupLogs` clears the
+pending timer/buffer alongside the existing cleanup. Two new tests in
+`service-card.component.spec.ts` (`fakeAsync`/`tick`) cover the buffering and
+teardown. Frontend build + `test:ci` (55/55) green; not a Docker/exposure
+change, so no host verification needed.

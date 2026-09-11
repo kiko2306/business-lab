@@ -1,4 +1,4 @@
-import { ComponentFixture, TestBed } from '@angular/core/testing';
+import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { ServiceCardComponent } from './service-card.component';
 import { ConfirmService } from '../../core/confirm.service';
@@ -184,4 +184,47 @@ describe('ServiceCardComponent per-app backups', () => {
     component.openSettings();
     expect(operations.listAppBackups).toHaveBeenCalledWith('paperless');
   });
+});
+
+describe('ServiceCardComponent startup log batching (§371)', () => {
+  let component: ServiceCardComponent;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+      ],
+    }).compileComponents();
+
+    component = TestBed.createComponent(ServiceCardComponent).componentInstance;
+    component.service = service('twenty', 'stopped');
+  });
+
+  // A chatty first boot fires the SSE 'log' event hundreds of times in a
+  // burst; each one used to apply straight to the view and freeze the tab.
+  // Lines must sit buffered until the throttled flush, then land in one go.
+  it('buffers rapid log lines and applies them in one flush', fakeAsync(() => {
+    for (let i = 0; i < 500; i++) {
+      component['queueStartupLine'](`line ${i}`);
+    }
+    expect(component['startupLogLines']).toEqual([]);
+
+    tick(120);
+
+    expect(component['startupLogLines'].length).toBe(500);
+    expect(component['startupLogLines'][0]).toBe('line 0');
+    expect(component['startupLogLines'][499]).toBe('line 499');
+  }));
+
+  it('stops flushing once the popup is torn down', fakeAsync(() => {
+    component['queueStartupLine']('leftover');
+    component['teardownStartupLogs']();
+
+    tick(120);
+
+    expect(component['startupLogLines']).toEqual([]);
+  }));
 });

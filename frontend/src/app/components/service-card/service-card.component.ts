@@ -6,6 +6,7 @@ import {
   EventEmitter,
   HostListener,
   Input,
+  NgZone,
   OnDestroy,
   Output,
   ViewChild,
@@ -53,6 +54,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly serviceState = inject(ServiceStateService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
+  private readonly zone = inject(NgZone);
 
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
@@ -90,6 +92,15 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private startupActionSub?: Subscription;
   private startupAutoCloseTimer?: ReturnType<typeof setTimeout>;
   private scrollLogsPending = false;
+  // A chatty first boot (Twenty: thousands of migration/cron lines, §371) can
+  // fire the 'log' SSE event faster than the UI can usefully redraw. Each one
+  // used to run inside Angular's zone and trigger a full change-detection
+  // pass plus a scrollTop/scrollHeight reflow, freezing the tab for the
+  // burst's duration. Buffer lines outside the zone and flush them in
+  // batches instead — the DOM updates a few times a second no matter how
+  // fast the backend is emitting.
+  private pendingStartupLines: string[] = [];
+  private startupFlushTimer?: ReturnType<typeof setTimeout>;
 
   @ViewChild('startupLogBody') private startupLogBody?: ElementRef<HTMLElement>;
 
@@ -175,13 +186,18 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     const source = new EventSource(url);
     this.startupLogSource = source;
 
-    source.addEventListener('log', (event) => {
-      try {
-        const { line } = JSON.parse((event as MessageEvent<string>).data) as { line: string };
-        this.pushStartupLine(line);
-      } catch {
-        // ignore malformed frames
-      }
+    // Registered outside the Angular zone so a burst of events doesn't queue
+    // a change-detection pass per line — only the throttled flush re-enters
+    // the zone.
+    this.zone.runOutsideAngular(() => {
+      source.addEventListener('log', (event) => {
+        try {
+          const { line } = JSON.parse((event as MessageEvent<string>).data) as { line: string };
+          this.queueStartupLine(line);
+        } catch {
+          // ignore malformed frames
+        }
+      });
     });
 
     source.addEventListener('done', (event) => {
@@ -236,6 +252,27 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     this.startupActionSub = undefined;
   }
 
+  private queueStartupLine(line: string): void {
+    this.pendingStartupLines.push(line);
+    if (!this.startupFlushTimer) {
+      this.startupFlushTimer = setTimeout(() => this.flushStartupLines(), 120);
+    }
+  }
+
+  private flushStartupLines(): void {
+    this.startupFlushTimer = undefined;
+    const lines = this.pendingStartupLines;
+    if (!lines.length) {
+      return;
+    }
+    this.pendingStartupLines = [];
+    this.zone.run(() => {
+      for (const line of lines) {
+        this.pushStartupLine(line);
+      }
+    });
+  }
+
   private pushStartupLine(line: string): void {
     this.startupLogLines.push(line);
     if (this.startupLogLines.length > 600) {
@@ -258,6 +295,11 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       clearTimeout(this.startupAutoCloseTimer);
       this.startupAutoCloseTimer = undefined;
     }
+    if (this.startupFlushTimer) {
+      clearTimeout(this.startupFlushTimer);
+      this.startupFlushTimer = undefined;
+    }
+    this.pendingStartupLines = [];
   }
 
   protected startupPhaseLabel(): string {

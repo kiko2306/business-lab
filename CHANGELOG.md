@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.75.1] — 2026-09-11
+
+### Fixed
+
+- Startup log popup no longer freezes the UI on a chatty first boot — SSE log lines are batched outside Angular's zone and flushed a few times a second instead of triggering a change-detection pass per line (§371)
+
 ## [0.75.0] — 2026-09-10
 
 ### Removed

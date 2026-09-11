@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.75.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.75.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`; npm packages, Docker images and the
 compose project are still `homelab-*`, see §84.2) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
@@ -280,13 +280,6 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **The start/restart log panel freezes the UI on a chatty first boot**
-      (§371) — starting Twenty locked the dashboard while it streamed
-      `docker compose logs --follow --tail 200`: Twenty's first boot emits
-      thousands of NestJS lines (per-migration, per-cron-job) and the
-      frontend log view renders them all with no cap/virtualisation. The
-      backend op completes fine; a refresh recovers the UI. Cap the streamed
-      lines (ring buffer), virtualise the list, or throttle the SSE.
 - [ ] **@mat: move `TAILSCALE_AUTH_KEY` to a non-expiring OAuth client** (§367) —
       the reusable auth key in `apps/tailscale/.env` **expired** and a deauthed
       node then couldn't re-register at all (crash loop) until a fresh key was
