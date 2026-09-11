@@ -26363,3 +26363,100 @@ a naming mistake here is "still shows in the UI," not a broken app;
 treated as verified by the test suite rather than requiring a fresh live
 host check, unlike the Docker/exposure/networking changes earlier this
 session. Minor bump.
+
+## 410. A real remote-work session surfaced two live bugs and a genuine gap — a second, collision-proof address
+
+User worked from home for the first time since §404-§408 shipped, wanting
+to actually use the VPN, not just prove it once from a phone tether. Three
+distinct things came out of that session, in the order found.
+
+**1. Subnet collision (client-side, not a Business Lab bug).** The user's
+home network and `home-srv-01`'s own office LAN both happen to use
+`192.168.1.0/24` — extremely common default addressing. Whenever the
+client machine is on a network sharing that range, its OS deterministically
+prefers the local (non-working) route over the correct NetBird tunnel route
+for anything in `192.168.1.x` — not intermittent, not fixable by retrying,
+inherent to how IP routing picks the most specific/local match. Confirmed
+by testing: direct LAN IP and even the deployment's own SSH alias (same
+address) both failed identically from the colliding network, worked
+instantly from a phone tether (genuinely different range). Declined the
+"change home-srv-01's LAN range" idea at first (a router change to the
+*office* network — CLAUDE.md principle 1, and the actual fix for THIS half
+of the problem is router-side, which the project won't touch); also
+declined changing the *user's home* router (their call, even though outside
+this project's own "no router changes" rule since it's not the protected
+host).
+
+**2. A zombie peer, found live.** Restarting NetBird VPN from the dashboard
+mid-session caused `netbird-client` to re-register under a **completely
+new WireGuard keypair** (`netbird-router-108-245`, distinct public key)
+rather than reusing its persisted identity in the bind-mounted
+`./data/client` volume — the old `netbird-router` peer stayed listed
+(dashboard showed it "just now" active, actually a stale entry never
+receiving live traffic again) and permanently stuck at `Connecting` with
+zero ICE candidates gathered, forever. Root cause not fully pinned down
+(no SSH access to inspect containerboot's own reasoning live — the whole
+session was fighting exactly the connectivity this would have needed), but
+the group-based router config (`business-lab-netbird-router`, `auto_groups`
+on the setup key) correctly picked up the *new* identity automatically —
+confirmed in NetBird's own UI: "2 Routing Peers," "High Availability:
+Active." Removed the dead old peer by hand in NetBird's UI once identified
+by its stuck-forever status; genuine root cause of the re-registration
+itself is still open — flagged as a real gap below, not closed here.
+
+**Even after removing the zombie**, the live peer's own `Networks: -`
+never populated during this session, despite `Status: Connected,
+Connection type: Relayed` — meaning the resource-route itself wasn't
+propagating to this client for reasons that were never conclusively
+diagnosed (possibly downstream of the same identity churn, possibly a
+separate NetBird-side propagation delay under HA with a recently-removed
+router). **This was not resolved as a mechanism** — the session pivoted to
+a different, independently-useful fix instead of continuing to chase it.
+
+**3. The actual fix shipped: a second, collision-proof resource.** Since
+the user confirmed working from a colliding home network is going to be
+the *normal* case, not a one-off, a permanent client-side workaround for
+finding #1 was worth building regardless of whether #2's mechanism gets
+fully root-caused: give `home-srv-01` a **second static IP**, in a range
+essentially no consumer router defaults to, and have the routing peer
+advertise it as an additional resource alongside the real LAN CIDR.
+
+- **Host**: `172.20.5.10/24` added to `enp2s0` in
+  `/etc/netplan/90-homelab-fixed-ip.yaml` — purely additive to the
+  `addresses:` list (`start.sh`'s own fixed-IP file format), gateway/DNS/
+  routes untouched. Applied live via `netplan try` (same auto-revert
+  safety net `start.sh` itself uses), confirmed kept, confirmed present on
+  the interface (`ip -4 addr show enp2s0` — both addresses live). This is
+  a **manual, one-time host change for this specific deployment** — not
+  yet a reusable `start.sh` feature; see the open item below.
+- **Code**: `netbirdRoutingPeer.ts` gained an optional second `ensureResource`
+  call, gated on a new `NETBIRD_SECONDARY_LAN_ADDRESS` env var
+  (`apps/netbird-vpn/.env.example`, surfaced in the config panel via the
+  same "referenced-but-unused" compose trick §405.1 established). Reuses
+  the *same* resource group as the primary LAN resource — since the
+  router is peer-groups-based (not resource-specific) and the access
+  policy already grants "All" → that group, no separate router or policy
+  needed for the second resource, it's covered automatically by what
+  already exists. 2 new tests: the secondary resource gets created when
+  the env var is set, and skipped (no extra POST) when it isn't. Backend
+  typecheck clean, 817/817 pass. Minor bump.
+
+**Not yet verified against the live host** — pushing to `dev`/`beta`,
+rebuilding, then `NETBIRD_SECONDARY_LAN_ADDRESS=172.20.5.10` needs setting
+in the dashboard and NetBird VPN restarted, then an actual reachability
+test from the user's (colliding) home network to `172.20.5.10` — the real
+proof, since #2's unresolved mechanism means this could still hit the same
+wall the primary resource did.
+
+**Open items, not done in this section:**
+- §2's actual root cause (why a restart re-registers a fresh WireGuard
+  identity instead of reusing the persisted one) is unexplained, not just
+  undocumented — worth a dedicated investigation with real SSH access
+  before it happens again on a restart the user isn't there to babysit.
+  Added to the README TODO list.
+- The secondary-IP host change was applied by hand this session, not
+  built into `start.sh`'s fixed-IP prompt — if this pattern proves out
+  live, making it a proper `start.sh` option (a second optional address,
+  same `netplan try` safety net) would remove the "hand-edit netplan"
+  step for every future deployment that wants it. Not done here since it
+  needed to be proven useful first; added to the README TODO list.

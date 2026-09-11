@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.84.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.85.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -222,4 +222,23 @@ it is done — not ticked off and left behind. Section references point at
       just logs a warning and silently stops until someone notices and
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
+
+- [ ] **NetBird restart can re-register netbird-client under a fresh
+      WireGuard identity** (§410) — found live: restarting NetBird VPN
+      caused the routing-peer container to come up as a brand-new peer
+      (different keypair) instead of reusing the one persisted in
+      `./data/client`, leaving the old identity stuck forever and orphaned
+      in NetBird's peer list. Root cause not pinned down — needs
+      investigating with real SSH access to the host (containerboot's own
+      logs around a restart) before it silently recurs unattended.
+
+- [ ] **Secondary-IP workaround is a hand-edited netplan file, not a
+      `start.sh` option** (§410) — `NETBIRD_SECONDARY_LAN_ADDRESS` lets the
+      routing peer advertise a second, collision-proof address for clients
+      whose own network shares the LAN's real subnet (very common:
+      `192.168.1.0/24`), but adding that address to the host itself was a
+      manual `netplan` edit this session, not a reusable setup step. If it
+      proves out live, add it as a second optional prompt in `start.sh`'s
+      existing fixed-IP flow (same `netplan try` safety net) so future
+      deployments don't need an AI agent hand-editing netplan.
 

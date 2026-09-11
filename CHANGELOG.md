@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.85.0] — 2026-09-11
+
+### Added
+
+- NetBird routing peer can advertise a second, fixed address (NETBIRD_SECONDARY_LAN_ADDRESS) alongside the real LAN subnet, for a remote client whose own network collides with it
+
 ## [0.84.0] — 2026-09-11
 
 ### Added

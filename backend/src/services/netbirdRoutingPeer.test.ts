@@ -72,7 +72,10 @@ beforeEach(() => {
   mockedPort.mockReturnValue(10250);
   mockedGateway.mockResolvedValue('10.201.0.1');
   mockedLanCidr.mockResolvedValue('192.168.1.236/24');
-  mockedReadEnv.mockReturnValue('a-real-token');
+  // Default: a real API token, no secondary address configured. Individual
+  // tests override with mockImplementation when they need the secondary
+  // address set.
+  mockedReadEnv.mockImplementation((_service, key) => (key === 'NETBIRD_API_TOKEN' ? 'a-real-token' : null));
   mockedSave.mockResolvedValue({} as Awaited<ReturnType<typeof saveServiceEnv>>);
   vi.stubGlobal('fetch', vi.fn());
 });
@@ -133,6 +136,47 @@ describe('ensureNetbirdRoutingPeer', () => {
     vi.mocked(fetch).mockImplementation(fetchEverythingPresent as typeof fetch);
     await ensureNetbirdRoutingPeer('netbird-vpn');
     expect(mockedSave).not.toHaveBeenCalled();
+  });
+
+  // plan.md §410: an optional second, fixed resource for a client whose own
+  // network collides with the real LAN subnet.
+  it('advertises the secondary address as a second resource in the same group when set', async () => {
+    mockedReadEnv.mockImplementation((_service, key) => {
+      if (key === 'NETBIRD_API_TOKEN') return 'a-real-token';
+      if (key === 'NETBIRD_SECONDARY_LAN_ADDRESS') return '172.20.5.10';
+      return null;
+    });
+    const resourcePosts: unknown[] = [];
+    vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string; body?: string }) => {
+      const method = init?.method ?? 'GET';
+      const path = new URL(url).pathname;
+      if (method === 'POST' && path.endsWith('/resources')) {
+        resourcePosts.push(JSON.parse(init!.body!));
+      }
+      return fetchEverythingMissing(url, init);
+    }) as typeof fetch);
+
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+
+    expect(resourcePosts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ name: 'LAN', address: '192.168.1.0/24' }),
+        expect.objectContaining({ name: 'Secondary address', address: '172.20.5.10' }),
+      ])
+    );
+  });
+
+  it('skips the secondary resource when unset — no extra POST beyond the primary LAN one', async () => {
+    let resourcePostCount = 0;
+    vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string; body?: string }) => {
+      const method = init?.method ?? 'GET';
+      if (method === 'POST' && new URL(url).pathname.endsWith('/resources')) resourcePostCount += 1;
+      return fetchEverythingMissing(url, init);
+    }) as typeof fetch);
+
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+
+    expect(resourcePostCount).toBe(1);
   });
 
   it('never throws when the management API is unreachable (cold first start)', async () => {
