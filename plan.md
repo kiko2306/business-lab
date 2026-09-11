@@ -25127,3 +25127,45 @@ than the `name:`-only pin.
 `docker compose config` validated clean. Not `backend/src`/`frontend/src` —
 no version bump, matching this session's own precedent for compose-only
 fixes. §391/§392 close P8 — README item to be deleted next.
+
+## 393. P11 — data protection position decided and written up (§84.5)
+
+Talked it through with @mat rather than drafting it solo — this is a
+business stance, the README item's own framing ("decide, then write up —
+not a coding session"). Narrowed first: §84.7 already resolved the social-
+token half (client's own app, client's own box, no processor relationship
+at all) — nothing left to decide there, just worth stating explicitly since
+an earlier draft (§84.3a) assumed the opposite.
+
+Two live decisions, both @mat's call:
+
+- **Backup key custody: the client holds their own Kopia repository
+  passphrase, Business Lab never sees or stores a copy.** The purest
+  liability position — never a custodian of the means to decrypt a client's
+  data — traded against "if they lose it, backups are unrecoverable and
+  that's fully on them," stated plainly as a real support-conversation cost,
+  not glossed over.
+- **DR promise: best-effort, no formal SLA.** Backups protect against data
+  loss; hardware replacement/rebuild happens on an informal ~1–3 business
+  day window, not a contracted uptime guarantee. Matches what a small/solo
+  MSP operation can actually deliver without spare hardware or a warm
+  cloud-failover path on permanent standby — the honest trade for offices
+  choosing this over enterprise SaaS specifically for cost.
+
+**Controller vs processor** wasn't really an open question — the
+architecture only supports one answer (no central Business Lab server holds
+any client's data; each box is a fully separate install the client owns) —
+so it's presented in the write-up as the derived default (client = controller
+of their own business data, Business Lab = processor for setup/support/
+maintenance, formalized as a DPA clause) rather than something negotiated.
+
+New `docs/data-protection-position.md` — the stance and its reasoning, not
+the actual DPA contract language (that needs real legal drafting against a
+real jurisdiction/template; explicitly out of scope, flagged as such in the
+doc). Public repo, unlike P12: this is policy, not pricing/sales collateral,
+so §84.4's public-repo caveat doesn't apply — being visible is a trust
+signal, not a leak. Cross-links the turnkey build spec and flags P12 and
+licence due diligence as the two things it deliberately doesn't cover.
+Linked from README's doc list. README item deleted.
+
+Docs-only, no code — no version bump, no host verification needed.

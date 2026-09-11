@@ -39,6 +39,7 @@ against this model.
 - Raspberry Pi / arm64 guide: [/docs/raspberry-pi.md](/docs/raspberry-pi.md)
 - Deployment guide — provisioning a box for a client, first run to hand-over: [/docs/deployment-guide.md](/docs/deployment-guide.md)
 - Turnkey build spec — hardware, disk partitioning, the default small-office app profile: [/docs/turnkey-build-spec.md](/docs/turnkey-build-spec.md)
+- Data protection position — controller vs processor, backup key custody, the DR promise: [/docs/data-protection-position.md](/docs/data-protection-position.md)
 - API reference (OpenAPI): [/docs/openapi.yaml](/docs/openapi.yaml)
 - Recovery & troubleshooting: [/docs/recovery-troubleshooting.md](/docs/recovery-troubleshooting.md)
 - Two-factor authentication (TOTP) for the dashboard login: [/docs/two-factor.md](/docs/two-factor.md)
@@ -236,10 +237,6 @@ Strategy:
 graph.** P1 (§255) and P2 (§256) are done. P3/P3a/P4 (social publishing via
 Postiz, §257/§258/§261) are dropped — Postiz was removed in §301a. Phase tags
 below.
-- [ ] **P11 — Data protection position** (§84.5) — controller vs processor,
-      backup key custody, DR. A business stance to decide, then write up — not
-      a coding session. §84.7 simplifies it (social tokens stay on the client
-      box).
 - [ ] **P12 — Commercial plan** (§84.5) — hardware BOM, support model,
       onboarding time, and what happens to a client's data when they stop
       paying. Lands as an **Artifact, not a repo commit** (§84.6). Blocked on
