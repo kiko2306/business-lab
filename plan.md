@@ -24841,3 +24841,18 @@ already-setup test updated for the second `runItflowDbScript` call.
 757/757 pass, typecheck clean. Patch 0.77.2 → 0.77.3. Not yet re-verified
 live — needs a deploy + ITFlow restart, then an actual login attempt.
 Staying on `dev` until that's done.
+
+## 384. §381–§383 verified live end to end (2026-09-11)
+
+Deployed 0.77.3, restarted ITFlow. Backend log showed all three reconcilers
+firing clean in sequence — identity, password, mail/cron, all `ok: true` —
+and the password one actually rewrote the row this time (not the no-op
+"already matches" path), confirming the `password_verify()` mismatch
+detection works as designed. @mat logged in with `miguelamtx@gmail.com` and
+the config-panel password: **works**.
+
+Closes the whole thread that started with §377's verification prompt: the
+wizard-created ITFlow admin (email + password + its internal encryption
+key) now stays converged with the dashboard's declared config on every
+start, instead of being frozen at whatever the one-shot wizard produced.
+§380–§383 all confirmed working on the real stack.
