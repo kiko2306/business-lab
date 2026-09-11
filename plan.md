@@ -24954,3 +24954,36 @@ found and fixed getting here — the ACL's Funnel grant only covering
 `autogroup:member` (not the tagged node, §367 ACL edit) and containerboot's
 `--advertise-tags` requirement for an OAuth key (§387) — both now permanent
 fixes, not one-off workarounds.
+
+## 389. §310 closed — no data left to move, round-trip re-proven live (2026-09-11)
+
+Checked the host before touching anything: `apps/file-browser/data/files/`
+**does not exist any more** — `ls`/`du` both `No such file or directory`.
+§310's premise ("the deployed host has real data at the old path") no
+longer holds; either it was already migrated by hand at some point, or the
+directory was cleaned up separately. Either way, there was nothing to `mv`.
+
+`apps/nextcloud/data/shared/` — the current, correct location — exists,
+owned `mat:docker`, `drwxrwsrwx`, with `to-paperless/` already present
+(created by `paperlessDropbox.ts` as designed). Samba's compose confirmed
+bound to `../nextcloud/data/shared:/storage`, matching §310's intent.
+
+Re-ran §219's actual live check against the current path instead of just
+trusting the compose files:
+
+- Wrote a file straight into `apps/nextcloud/data/shared/` — visible
+  simultaneously inside the `nextcloud` container (`/shared/…`, uid 1000)
+  and the `samba` container (`/storage/…`, user `labshare`) — same
+  underlying bind, both apps agree.
+- Wrote a file into `to-paperless/` — Paperless's consumer picked it up in
+  seconds, ran the ClamAV pre-consume script (exit 0), and fully consumed
+  it (`document_id: 1`), removing it from the drop box. Confirms the
+  Paperless leg *and* the §219 ClamAV pre-consume wiring together, live.
+
+Test artifacts cleaned up except the resulting Paperless document itself
+(`roundtrip-test`, id 1) — left for @mat to delete from Paperless's own UI
+rather than reaching into their document store via API unasked.
+
+§310 closed. README item deleted — nothing left to do; the round-trip this
+item existed to re-prove now has fresh, live confirmation instead of resting
+on the original 2026-09-09 proof.

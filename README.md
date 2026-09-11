@@ -271,13 +271,3 @@ below.
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-### Apps and integrations
-
-- [ ] **@mat: relocate the live shared tree + re-prove the round-trip**
-      (§310) — File Browser was removed and the shared tree moved from
-      `apps/file-browser/data/files/` to `apps/nextcloud/data/shared/`. A
-      fresh clone is fine (dir is gitignored), but the deployed host has
-      real data at the old path: in a maintenance window `mv` it to the new
-      path, then re-run §219's live check (write over SMB → visible in
-      Nextcloud `/shared` and in Paperless's `to-paperless/` drop box → and
-      back). Until then §310 stays on `dev`, unmerged.
