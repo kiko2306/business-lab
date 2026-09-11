@@ -52,7 +52,6 @@
  *     exactly the failures this feature can cause.
  */
 
-import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
@@ -62,8 +61,8 @@ import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services
 import { parseEnvFile } from '../utils/envFile';
 import { getAlertNotifyConfig } from '../utils/alertNotify';
 import { CROWDSEC_ALERT_WEBHOOK_PATH } from './n8nWorkflows';
+import { NPM_SERVICE, replaceMarkedBlock, readNpmComposeRuntime, testNpmConfig } from './npmConfigWriter';
 
-const NPM_SERVICE = 'nginx-proxy-manager';
 const BOUNCER_CONFIG_RELATIVE = path.join('config', 'cloudflare-worker-bouncer.yaml');
 const BOUNCER_KEY_ENV = 'CROWDSEC_BOUNCER_KEY';
 
@@ -136,22 +135,6 @@ const CLOUDFLARE_IP_RANGES = [
   '2a06:98c0::/29',
   '2c0f:f248::/32',
 ];
-
-function run(command: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(command, { maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.toString() || error.message));
-        return;
-      }
-      resolve(stdout.toString());
-    });
-  });
-}
-
-function escapeRegExp(value: string): string {
-  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-}
 
 // Config for crowdsecurity/cloudflare-worker-bouncer — it deploys a Cloudflare
 // Worker + KV namespace + zone routes that block IPs CrowdSec has flagged
@@ -385,140 +368,6 @@ SECRET_KEY=
 SITE_KEY=
 APPSEC_URL=
 `;
-}
-
-/**
- * One canonical form for a config file we edit in two places: no leading blank
- * lines, exactly one blank line between blocks, exactly one trailing newline.
- *
- * Without this the two edits below disagree about spacing — appending a block
- * separates it with a blank line, replacing one in place doesn't — so the file
- * keeps "changing" on every render, and each phantom change costs a rewrite
- * and a config test. Normalising both to the same shape is what makes the
- * whole render idempotent.
- */
-function normaliseConf(text: string): string {
-  const body = text
-    .replace(/\n{3,}/g, '\n\n')
-    .replace(/^\n+/, '')
-    .replace(/\s+$/, '');
-  return body ? `${body}\n` : '';
-}
-
-/**
- * Insert, replace or (with `block: null`) remove one marker-fenced block in a
- * config file, leaving everything around it — including the other block, and
- * anything an operator added by hand — in place.
- */
-function replaceMarkedBlock(existing: string, begin: string, end: string, block: string | null): string {
-  const fence = new RegExp(`${escapeRegExp(begin)}[\\s\\S]*?${escapeRegExp(end)}`);
-
-  if (fence.test(existing)) {
-    return normaliseConf(existing.replace(fence, block ? block.trimEnd() : ''));
-  }
-  if (!block) {
-    return existing;
-  }
-  const before = existing.trimEnd();
-  return normaliseConf(before ? `${before}\n\n${block.trimEnd()}` : block.trimEnd());
-}
-
-/**
- * NPM's compose file, as the source of the image and bind mounts a config test
- * has to reproduce. Reading them rather than hardcoding means the test keeps
- * matching the real container when a mount is added to that file — which is
- * exactly how the bouncer's own /crowdsec mount arrived.
- */
-function readNpmComposeRuntime(appDir: string, composeFile: string): { image: string; mounts: string[] } | null {
-  try {
-    const doc = yaml.load(fs.readFileSync(composeFile, 'utf8')) as {
-      services?: Record<string, { image?: string; volumes?: string[] }>;
-    };
-    const service = doc?.services?.[NPM_SERVICE];
-    if (!service?.image) {
-      return null;
-    }
-    const mounts = (service.volumes ?? [])
-      .filter((volume) => typeof volume === 'string' && volume.startsWith('./'))
-      .map((volume) => `${appDir}/${volume.slice(2)}`);
-    return { image: service.image, mounts };
-  } catch (error) {
-    logger.warn(`CrowdSec: could not read ${composeFile} for the nginx config test`, {
-      error: (error as Error).message,
-    });
-    return null;
-  }
-}
-
-const NGINX_CHECK_OK = 'HOMELAB_NGINX_OK';
-const NGINX_CHECK_FAIL = 'HOMELAB_NGINX_FAIL';
-/** Long enough for init_by_lua to run and nginx to settle; it is killed after. */
-const NGINX_CHECK_SECONDS = 6;
-
-/**
- * Does nginx actually come up with the config we just wrote? Answered in a
- * throwaway container from NPM's own image and bind mounts, never against the
- * running NPM (the socket proxy the backend talks to has EXEC off by design,
- * so `docker exec` isn't available — and testing a change by applying it to
- * the live proxy is the outage this whole function exists to avoid).
- *
- * `nginx -t` alone is not enough, and finding that out is the reason this is
- * shaped the way it is: **`-t` never executes `init_by_lua_block`**. Deleting
- * the vendored crowdsec.lua outright and running `-t` reports "test is
- * successful" — and then a real start dies with a Lua traceback. Since the
- * whole enforcement feature hangs off `init_by_lua_block`, a syntax-only check
- * would wave through precisely the failure it is supposed to catch. So the
- * config is tested and then nginx is *started*, and surviving a few seconds is
- * what counts as passing. NPM's nginx.conf already says `daemon off`, so the
- * process stays in the foreground and being killed by the timeout (exit 124)
- * is the success signal.
- *
- * The `npm` user and nginx's temp/cache directories normally come from the
- * image's entrypoint, which `--entrypoint sh` skips; the preamble recreates
- * just enough of them for nginx to read its config, and nothing else.
- *
- * Returns null when nginx is happy, or its own complaint when it isn't. A null
- * return when the *check itself* can't run (no docker, no image) is
- * deliberate: an unavailable check must not become a reason to reject a config
- * that may well be fine.
- */
-async function testNpmConfig(appDir: string, composeFile: string): Promise<string | null> {
-  const runtime = readNpmComposeRuntime(appDir, composeFile);
-  if (!runtime) {
-    return null;
-  }
-
-  const mounts = runtime.mounts.map((mount) => `-v ${JSON.stringify(mount)}`).join(' ');
-  const script = [
-    'id -u npm >/dev/null 2>&1 || useradd --system --no-create-home --shell /usr/sbin/nologin npm',
-    'mkdir -p /var/log/nginx /run/nginx /tmp/nginx /var/lib/nginx/cache/public /var/lib/nginx/cache/private /var/cache/nginx/proxy_temp',
-    `nginx -t 2>&1 || { echo ${NGINX_CHECK_FAIL}; exit 0; }`,
-    `timeout -s QUIT ${NGINX_CHECK_SECONDS} nginx 2>&1`,
-    // 124 = still running when the timeout fired, i.e. it started cleanly.
-    `[ "$?" = "124" ] || { echo ${NGINX_CHECK_FAIL}; exit 0; }`,
-    `echo ${NGINX_CHECK_OK}`,
-  ].join('\n');
-
-  // Base64 rather than an inline string: this command is assembled for a host
-  // shell, which would happily expand the script's own `$?` before docker ever
-  // sees it — and a `$?` that always reads as empty turns the check into one
-  // that silently never fails. Encoded, there is nothing left for either shell
-  // to interpret.
-  const encoded = Buffer.from(script, 'utf8').toString('base64');
-
-  try {
-    const output = await run(
-      `docker run --rm --entrypoint sh ${mounts} ${runtime.image} -c 'echo ${encoded} | base64 -d | sh'`
-    );
-    if (output.includes(NGINX_CHECK_OK)) {
-      return null;
-    }
-    return output.includes(NGINX_CHECK_FAIL) ? output.trim() : null;
-  } catch (error) {
-    // The `docker run` itself failed — not evidence about the config.
-    logger.warn('CrowdSec: could not run the nginx config check', { error: (error as Error).message });
-    return null;
-  }
 }
 
 /**

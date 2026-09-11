@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.79.0] — 2026-09-11
+
+### Nextcloud
+
+- Fix Nextcloud's four admin-panel warnings: HSTS at NPM (all proxied hosts), dashboard mail settings wired into occ, a maintenance-window hour, and a one-time mimetype repair pass (§402)
+
 ## [0.78.0] — 2026-09-11
 
 ### Changed

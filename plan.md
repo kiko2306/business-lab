@@ -25444,3 +25444,102 @@ capability still gets 403" case that's the whole point of the guard; 3 in
 `service-card.component.spec.ts` covering the confirm gate and the prompt
 content). Backend typecheck clean, 761/761 pass; frontend build clean,
 58/58 pass. Minor bump — a real behavior/access change, not cosmetic.
+
+## 402. Fixed all four of Nextcloud's own admin-panel warnings
+
+@mat pasted Nextcloud's "Avisos de configuração e segurança" panel verbatim
+and asked to fix it, not just report on it. Four warnings, four different
+root causes:
+
+**1. Two log errors.** `occ log:file` + a level>=3 filter turned up:
+- `onlyoffice`, one occurrence (2026-09-08): `getConvertedUri on check
+  error` from OnlyOffice's own periodic self-test cron. Hasn't recurred
+  since; left alone rather than chased — a single historical occurrence from
+  the app's own health-check job isn't something to build a fix around
+  without a repro.
+- `core`, 2026-09-10: SMTP `Connection refused` to `127.0.0.1:25`.
+  `occ config:list system` showed **zero** `mail_smtp*` keys at all — not
+  misconfigured, never configured — so every send attempt fell through to a
+  local sendmail that doesn't exist in this stack.
+
+**2. No maintenance window.** `occ config:system:get
+maintenance_window_start` — empty. Background jobs run at any hour,
+including peak use.
+
+**3. Mimetype migrations pending.** `occ maintenance:repair
+--include-expensive` (confirmed there's no `--dry-run` flag; the real
+invocation is just that) is the fix Nextcloud names in its own warning text
+and deliberately doesn't run on update, because it's slow on a large
+instance.
+
+**4. No HSTS header.** Architecturally the hardest of the four: this stack's
+ingress is Cloudflare Tunnel → NPM → app. TLS terminates at Cloudflare's
+edge: every hop after that, including Nextcloud itself, only ever sees plain
+HTTP. Nextcloud's own `.htaccess`-based HSTS logic keys off the request
+scheme it sees — always `http` — so it can never fire here regardless of
+`OVERWRITEPROTOCOL=https`. The header has to come from NPM, the only hop
+that can plausibly add it, and since every request that reaches NPM in this
+architecture *did* arrive via Cloudflare's HTTPS-only edge, it can be
+unconditional rather than gated on a forwarded-proto check.
+
+**Fixes, four new reconcilers + one refactor:**
+
+- **`npmConfigWriter.ts`** (new) — pulled the marker-replace / nginx-boot-
+  test / rollback machinery out of `crowdsecConfig.ts` (`run`,
+  `escapeRegExp`, `normaliseConf`, `replaceMarkedBlock`,
+  `readNpmComposeRuntime`, `testNpmConfig`, plus a new `applyNpmMarkedBlock`
+  wrapper for a single-block caller) so HSTS could reuse the exact same
+  config-test-and-rollback path instead of a second copy of it.
+  `crowdsecConfig.ts` now imports these; its own `applyNpmHttpTopConfig`
+  keeps its bespoke two-block (real-IP + bouncer) logic, since that needs
+  one shared read-modify-write-then-test across both blocks, which the
+  generic single-block helper doesn't fit. All 36 existing crowdsecConfig
+  tests, unchanged, still pass against the extracted functions.
+- **`npmSecurityHeaders.ts`** (new) — writes a marker-fenced
+  `Strict-Transport-Security: max-age=15552000; includeSubDomains` into
+  NPM's `server_proxy.conf` (not `http_top.conf`, which is http-scope and
+  already CrowdSec's; not per-host `advanced_config`, which carries the
+  Authelia/gRPC location overrides in `npmClient.ts` and would silently
+  lose an http-scope `add_header` to nginx's inheritance rule — a location
+  block that declares its own `add_header` drops every inherited one).
+  `server_proxy.conf` is included inside every generated per-host block, so
+  it sits at the same scope as those overrides rather than above them.
+  Hooked into `executor.ts` on NPM's *own* start (not CrowdSec's, the way
+  `http_top.conf` is) — so it's live the moment that same start finishes,
+  no separate restart needed.
+- **`nextcloudMail.ts`** (new) — copies the dashboard's global mail
+  settings (`utils/mailSettings.ts`) into Nextcloud's `mail_smtp*` occ keys.
+  Same shape as `itflowMailCron.ts`: values travel through shell env vars
+  referenced as `$VAR` inside the script, never interpolated into the
+  script text. One Nextcloud-specific wrinkle: `mail_from_address` is the
+  *local part only* — Nextcloud stores it separately from `mail_domain` and
+  joins them at send time, unlike every other app here that takes one full
+  address. No-op with no dashboard mail account configured (a missing
+  feature, not a broken Nextcloud).
+- **`nextcloudMaintenance.ts`** (new) — one occ script covering both
+  remaining warnings: sets `maintenance_window_start` to `2` (any hour
+  clears the warning; 2am is just reasonable for a single-timezone home
+  stack), then runs `maintenance:repair --include-expensive` gated behind
+  its own sentinel (`occ config:app:set core hlm_mimetype_migrated`) so the
+  expensive pass runs once, not on every Nextcloud start — the whole reason
+  Nextcloud doesn't run it automatically on update. 600s timeout (vs the
+  scaffold's 180s default) to give the repair pass room.
+
+Both Nextcloud reconcilers wired into `executor.ts`'s existing post-`up`
+Nextcloud chain, next to `reconcileNextcloudSharedMount`.
+
+24 new tests across `npmConfigWriter.test.ts`,
+`npmSecurityHeaders.test.ts`, `nextcloudMail.test.ts` and
+`nextcloudMaintenance.test.ts` (script content, the password/secret never
+landing in the built script or command line, the no-op-for-every-other-
+service and never-throws cases). Backend typecheck clean, 781/781 pass.
+Minor bump — real config/behavior changes, not cosmetic, but nothing
+touching request routing or auth.
+
+**Not yet verified against the live host** — needs a deploy (Update page),
+a restart of Nextcloud and Nginx Proxy Manager, and then checking (a)
+`curl -I` on a proxied host for the `Strict-Transport-Security` header, (b)
+backend logs for the four new reconciler log lines, and (c) Nextcloud's own
+admin panel to confirm all four warnings are actually gone. Staying on
+`dev` until that's done — per the Docker/exposure-change gate, this doesn't
+merge to `main` on typecheck+unit-tests alone.

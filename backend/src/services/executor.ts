@@ -25,12 +25,15 @@ import { reconcileNextcloudOnlyOffice } from './nextcloudOnlyOffice';
 import { reconcileNextcloudClamav } from './nextcloudClamav';
 import { reconcileNextcloudSaml } from './nextcloudSaml';
 import { reconcileNextcloudSharedMount } from './nextcloudSharedMount';
+import { reconcileNextcloudMail } from './nextcloudMail';
+import { reconcileNextcloudMaintenance } from './nextcloudMaintenance';
 import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
 import { syncMealieAiProvider } from './mealieAiSync';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
 import { ensurePaperlessDropbox } from './paperlessDropbox';
 import { ensureTwentyStorage } from './twentyStorage';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
+import { applyNpmSecurityHeaders } from './npmSecurityHeaders';
 import { applyHomepageConfig, regenerateHomepageServices } from './homepageConfig';
 import { syncAutheliaAccessControlSafe } from './autheliaAccessControl';
 import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
@@ -193,6 +196,11 @@ async function composeUpWithManagedConfig(
   const adminSeedOverrides = await buildAdminSeedEnvOverrides(serviceName);
   await applyExposureConfigFiles(serviceName, appDir);
   await applyCrowdsecConfigFiles(serviceName, appDir);
+  // HSTS for every proxied host (§402) — written into NPM's own
+  // server_proxy.conf on NPM's own start, so (unlike CrowdSec's config,
+  // which is written on CrowdSec's start and needs an NPM restart to apply)
+  // it's live the moment this same start finishes. No-op elsewhere.
+  await applyNpmSecurityHeaders(serviceName);
   // Samba: render the share's smb.conf before the app comes up — load-bearing:
   // a missing data/smb.conf makes Docker create the bind source as a directory
   // and the entrypoint aborts.
@@ -283,6 +291,15 @@ async function composeUpWithManagedConfig(
   // used to make this a by-hand step was wrong; `occ files_external:create`
   // has no such constraint. After `up`; no-op elsewhere.
   await reconcileNextcloudSharedMount(serviceName);
+  // Nextcloud: copy the dashboard's global mail settings into its own SMTP
+  // config (§402 — root cause of one of its two log-error warnings, a
+  // Connection-refused to 127.0.0.1:25 with no mail_smtp* set at all). After
+  // `up`; no-op elsewhere and when no dashboard mail account is configured.
+  await reconcileNextcloudMail(serviceName);
+  // Nextcloud: set a maintenance-window hour and run the mimetype repair
+  // pass once (§402 — its other two admin-panel warnings). After `up`;
+  // no-op elsewhere.
+  await reconcileNextcloudMaintenance(serviceName);
   // Guacamole: rotate the shipped guacadmin/guacadmin default the first time
   // it's reachable (§200 slice 1). Also after `up`, not before — it's a
   // REST call against the running webapp, not a file it needs before boot.
