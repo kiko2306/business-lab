@@ -24591,3 +24591,19 @@ promotion step). Not yet re-proven live on the host — the by-hand fix from
 §369 is already applied there, so this is unblocking a *fresh clone*, not
 fixing anything currently broken on `tx-home-utils.com`; next Nextcloud
 restart there will exercise the new code path for real.
+
+## 378. §377 verified live on `tx-home-utils.com` (2026-09-11)
+
+Deployed via the dashboard Update page (`main` → 0.76.0) and Nextcloud
+restarted from the dashboard to exercise the new reconcilers. @mat confirmed
+all of §377's checks passed:
+
+- Both new log lines appeared with `ok: true` after the restart.
+- The `/shared` external-storage idempotency guard held — still exactly one
+  `Shared` mount, no duplicate from re-running `files_external:create`
+  against the mount §369 had already registered by hand.
+- `mat` remains in Nextcloud's `admin` group and reaches Administration
+  settings signed in through Authelia SSO.
+
+§377/§369 closed — the by-hand fix is now the automated, reconciled behaviour
+on every Nextcloud start, proven on the real stack per CLAUDE.md's gate.
