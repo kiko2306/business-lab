@@ -140,8 +140,10 @@ describe('ensureNetbirdRoutingPeer', () => {
 
   it('skips without throwing when the LAN subnet cannot be determined', async () => {
     mockedLanCidr.mockResolvedValue('not-a-cidr');
-    await expect(ensureNetbirdRoutingPeer('netbird-vpn')).resolves.toBeUndefined();
-    expect(fetch).not.toHaveBeenCalled();
+    await expect(ensureNetbirdRoutingPeer('netbird-vpn')).resolves.toBe(false);
+    // The readiness probe is a GET; what matters is that nothing was created.
+    const posts = vi.mocked(fetch).mock.calls.filter(([, init]) => (init as { method?: string })?.method === 'POST');
+    expect(posts).toEqual([]);
   });
 
   it('creates the network/resource/router/policy/setup-key from scratch and stores the new key', async () => {
@@ -207,10 +209,34 @@ describe('ensureNetbirdRoutingPeer', () => {
     expect(resourcePosts[1]).toEqual(expect.objectContaining({ name: 'LAN alias', address: '10.50.7.0/24' }));
   });
 
-  it('never throws when the management API is unreachable (cold first start)', async () => {
-    vi.mocked(fetch).mockRejectedValue(new Error('ECONNREFUSED'));
-    await expect(ensureNetbirdRoutingPeer('netbird-vpn')).resolves.toBeUndefined();
-    expect(mockedSave).not.toHaveBeenCalled();
+  // Fake timers because the readiness probe now burns its whole 60s budget
+  // (20 x 3s) before giving up, rather than failing on the first request.
+  it('gives up quietly when management never becomes reachable', async () => {
+    vi.useFakeTimers();
+    try {
+      vi.mocked(fetch).mockRejectedValue(new Error('ECONNREFUSED'));
+      const pending = ensureNetbirdRoutingPeer('netbird-vpn');
+      await vi.runAllTimersAsync();
+      await expect(pending).resolves.toBe(false);
+      expect(mockedSave).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  // The executor recreates netbird-client and the alias sidecar on a true
+  // return — their environment is baked in at create time, so without it
+  // netbird-client keeps crash-looping on the `change-me` setup key it
+  // started with (§414). False when there was nothing new to write, or the
+  // recreate (and the peer drop it causes) would happen on every start.
+  it('reports an .env change so the executor knows to recreate its consumers', async () => {
+    vi.mocked(fetch).mockImplementation(fetchEverythingMissing as typeof fetch);
+    await expect(ensureNetbirdRoutingPeer('netbird-vpn')).resolves.toBe(true);
+  });
+
+  it('reports no .env change when everything is already provisioned', async () => {
+    vi.mocked(fetch).mockImplementation(fetchEverythingPresent as typeof fetch);
+    await expect(ensureNetbirdRoutingPeer('netbird-vpn')).resolves.toBe(false);
   });
 
   // Found live (§405.2): NetBird's GET /api/groups?name=X answers 404, not

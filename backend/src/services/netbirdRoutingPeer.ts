@@ -6,7 +6,17 @@
  * hand means clicking through NetBird's own dashboard wizard (create a
  * network, a resource, a router, a policy, a setup key) on every fresh
  * deployment — this runs the same steps against NetBird's own management
- * API instead, idempotently, before every start/restart of the app.
+ * API instead, idempotently, on every start/restart of the app.
+ *
+ * Runs AFTER `docker compose up`, not before (§414). Before was unworkable:
+ * a dashboard "Restart" is a genuine stop-then-start of the whole project,
+ * so netbird-management was always down when this ran and every restart hit
+ * the same "fetch failed", leaving provisioning to "try again next restart"
+ * — which never came, because the next restart raced identically. Running
+ * after `up` means polling until management answers, and then recreating the
+ * two containers that consume what this writes to .env: their environment is
+ * baked in at create time, so netbird-client would otherwise keep
+ * crash-looping on the `change-me` setup key it was started with.
  *
  * The one thing that can't be derived is a NetBird Personal Access Token
  * (Settings → Personal Access Tokens in the NetBird dashboard) — minted by
@@ -51,6 +61,12 @@ const SETUP_KEY_NAME = 'Business Lab routing peer';
 const SETUP_KEY_EXPIRES_IN = 31536000; // 365 days — NetBird's own max
 
 const REQUEST_TIMEOUT_MS = 10_000;
+// Up to 60s (20 x 3s) for management to start serving, same budget as
+// docusealAdminBootstrap/immichAdminBootstrap — `up` returns well before
+// management has fetched Authelia's OIDC discovery document and bound :80.
+const MAX_ATTEMPTS = 20;
+const RETRY_DELAY_MS = 3000;
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface NbGroup {
   id: string;
@@ -140,6 +156,25 @@ async function nbRequest<T>(baseUrl: string, token: string, method: string, path
   return (method === 'GET' && parsed === null ? [] : parsed) as T;
 }
 
+/**
+ * Resolves once management is serving HTTP, false if it never does. Any
+ * response counts, including 401/403 — this is a liveness probe, not an auth
+ * check, and treating a status code as "not ready" would burn the whole
+ * budget retrying a genuinely bad token.
+ */
+async function waitForManagement(baseUrl: string): Promise<boolean> {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
+    try {
+      await fetch(`${baseUrl}/api/networks`, { signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS) });
+      return true;
+    } catch {
+      if (attempt === MAX_ATTEMPTS) return false;
+      await sleep(RETRY_DELAY_MS);
+    }
+  }
+  return false;
+}
+
 async function ensureGroup(baseUrl: string, token: string, name: string): Promise<string> {
   const existing = await nbRequest<NbGroup[]>(baseUrl, token, 'GET', `/api/groups?name=${encodeURIComponent(name)}`);
   const match = existing.find((g) => g.name === name);
@@ -218,10 +253,10 @@ async function ensurePolicy(baseUrl: string, token: string, sourceGroupId: strin
 // expired/revoked key is regenerated and overwrites whatever's in .env
 // (including a key pasted in by hand before a PAT existed); a still-valid
 // one is left alone, whatever .env currently holds for it.
-async function ensureSetupKey(baseUrl: string, token: string, routerGroupId: string): Promise<void> {
+async function ensureSetupKey(baseUrl: string, token: string, routerGroupId: string): Promise<boolean> {
   const keys = await nbRequest<NbSetupKey[]>(baseUrl, token, 'GET', '/api/setup-keys');
   const existing = keys.find((k) => k.name === SETUP_KEY_NAME);
-  if (existing?.valid) return;
+  if (existing?.valid) return false;
 
   const created = await nbRequest<NbSetupKey>(baseUrl, token, 'POST', '/api/setup-keys', {
     name: SETUP_KEY_NAME,
@@ -236,24 +271,36 @@ async function ensureSetupKey(baseUrl: string, token: string, routerGroupId: str
       ? 'NetBird: routing-peer setup key had expired or was revoked — generated a fresh one'
       : 'NetBird: generated the routing-peer setup key'
   );
+  return true;
 }
 
-export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<void> {
-  if (serviceName !== SERVICE) return;
+/**
+ * Returns true when it wrote new values to .env, i.e. when the containers
+ * that read them have to be recreated to see them — see the note at the top
+ * of this file.
+ */
+export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<boolean> {
+  if (serviceName !== SERVICE) return false;
 
   const token = (readAppEnvValue(SERVICE, API_TOKEN_ENV) ?? '').trim();
   if (!token || token.toLowerCase() === 'change-me') {
-    return; // nothing to automate until a Personal Access Token is entered
+    return false; // nothing to automate until a Personal Access Token is entered
   }
 
+  let envChanged = false;
   try {
     const port = getPublishedUpstreamPort(SERVICE, MGMT_PORT_ENV) ?? DEFAULT_MGMT_PORT;
     const baseUrl = `http://${await getHostGatewayIp()}:${port}`;
 
+    if (!(await waitForManagement(baseUrl))) {
+      logger.warn('NetBird routing peer: management never became reachable — skipping auto-provisioning');
+      return false;
+    }
+
     const cidr = normalizeCidr(await getLanCidr());
     if (!cidr) {
       logger.warn('NetBird routing peer: could not determine the host LAN subnet — skipping');
-      return;
+      return false;
     }
 
     // Advertised in addition to the real LAN, never instead of it: NetBird
@@ -280,27 +327,31 @@ export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<voi
       await ensureResource(baseUrl, token, networkId, ALIAS_RESOURCE_NAME, aliasCidr, [resourceGroupId]);
       // Read back by the netbird-lan-alias sidecar, which owns the NETMAP
       // rule. Written here rather than derived in the sidecar so one place
-      // decides the mapping and the two halves can never disagree; this runs
-      // as a pre-up hook, so the values are on disk before compose reads them.
-      // Only on an actual change — this runs on every start, and rewriting
-      // .env each time would churn the file for nothing.
+      // decides the mapping and the two halves can never disagree.
+      // Only on an actual change — this runs on every start, and both
+      // rewriting .env and the container recreate it triggers would otherwise
+      // happen for nothing.
       if (
         readAppEnvValue(SERVICE, LAN_CIDR_ENV) !== cidr ||
         readAppEnvValue(SERVICE, ALIAS_CIDR_ENV) !== aliasCidr
       ) {
         await saveServiceEnv(SERVICE, { [LAN_CIDR_ENV]: cidr, [ALIAS_CIDR_ENV]: aliasCidr });
+        envChanged = true;
       }
     }
     await ensureRouter(baseUrl, token, networkId, routerGroupId);
     await ensurePolicy(baseUrl, token, allGroupId, resourceGroupId);
-    await ensureSetupKey(baseUrl, token, routerGroupId);
+    if (await ensureSetupKey(baseUrl, token, routerGroupId)) envChanged = true;
+
+    return envChanged;
   } catch (error) {
-    // Best-effort: the management API isn't reachable yet on a cold first
-    // start (netbird-client itself is part of this same `docker compose up`
-    // and hasn't run yet either), and NetBird's API can be flaky mid-restart.
-    // Self-heals on the next start/restart — never blocks this one.
+    // Best-effort: NetBird's API can still be flaky right after it starts
+    // serving, and a revoked PAT throws here too. Self-heals on the next
+    // start/restart — never blocks this one. Any .env write that already
+    // happened is still reported, so its consumers get recreated.
     logger.warn('NetBird routing peer: auto-provisioning failed, leaving existing config untouched', {
       error: (error as Error).message,
     });
+    return envChanged;
   }
 }

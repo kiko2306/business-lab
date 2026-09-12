@@ -47,6 +47,11 @@ import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { ensureNetbirdRoutingPeer } from './netbirdRoutingPeer';
 import { ensureNetbirdDeviceCodeFlow } from './netbirdAuthFlow';
+
+// The netbird-vpn compose services whose environment comes from values
+// ensureNetbirdRoutingPeer generates (NB_SETUP_KEY, NETBIRD_LAN_*) — see the
+// recreate in composeUpWithManagedConfig.
+const NETBIRD_ENV_CONSUMERS = ['netbird-client', 'netbird-lan-alias'];
 import { ensureTailscaleAutomation } from './tailscaleAutomation';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
@@ -236,13 +241,6 @@ async function composeUpWithManagedConfig(
   // n8n: render the dashboard-managed workflow files before the app comes up,
   // so the n8n-workflows-init container imports the current version (§118.3).
   await applyN8nWorkflows(serviceName, appDir);
-  // NetBird: ensure the routing-peer's network/resource/router/policy/setup
-  // key exist via NetBird's own management API, so `netbird-client` (part of
-  // this same compose file) comes up already able to route the LAN — no
-  // wizard click-through on a fresh deployment (§404/§405). No-op until a
-  // Personal Access Token is entered, and for every other service.
-  await ensureNetbirdRoutingPeer(serviceName);
-
   // NetBird: management reads management.json only at startup, so the auth
   // flow has to be settled before the app comes up (§413).
   await ensureNetbirdDeviceCodeFlow(serviceName);
@@ -350,6 +348,27 @@ async function composeUpWithManagedConfig(
   // app-credentials.md. After reconcileItflowFirstAdmin: the `settings` row
   // this writes to only exists once that wizard has run.
   await reconcileItflowMailCron(serviceName);
+
+  // NetBird: create the routing peer's network/resource/router/policy/setup
+  // key via NetBird's own management API, so there's no wizard
+  // click-through on a fresh deployment (§404/§405). After `up`, polling
+  // until management serves: a dashboard "Restart" stops the whole project,
+  // so running this before `up` always found management down and deferred to
+  // a "next restart" that raced identically (§414). No-op until a Personal
+  // Access Token is entered, and for every other service.
+  if (await ensureNetbirdRoutingPeer(serviceName)) {
+    // It wrote a setup key and/or the LAN alias pair to .env, and a
+    // container's environment is fixed when it is created — netbird-client
+    // would keep crash-looping on the `change-me` key it started with, and
+    // the alias sidecar would sit idle. Recreate just those two so one start
+    // is enough.
+    await executeCommand(
+      `docker compose -p ${projectName} ${effectiveArgs} up -d --force-recreate ${NETBIRD_ENV_CONSUMERS.join(' ')}`,
+      COMPOSE_UP_TIMEOUT_MS,
+      { ...(await resolveTimezoneOverride(appDir)), ...mailOverrides, ...adminSeedOverrides, ...envOverrides }
+    );
+    logger.info('NetBird: recreated the routing peer and LAN-alias sidecar to pick up the generated config (§414)');
+  }
 
   return result;
 }

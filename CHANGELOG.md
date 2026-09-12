@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.87.2] — 2026-09-12
+
+### Fixed
+
+- NetBird routing-peer provisioning now runs after `docker compose up` and polls until management is serving, so one restart is enough instead of racing and deferring to the next one
+
 ## [0.87.1] — 2026-09-12
 
 ### Fixed
