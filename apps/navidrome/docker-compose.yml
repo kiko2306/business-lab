@@ -12,6 +12,11 @@ services:
       - "${NAVIDROME_PORT:-10570}:4533"
     environment:
       TZ: ${TZ:-UTC}
+      # NOT read by Navidrome — a carrier so the dashboard's config panel
+      # shows the field and auto-generates a value. The backend uses it to
+      # create the first admin (services/navidromeAdminBootstrap.ts):
+      # Navidrome has no OIDC, so its own login is the only gate.
+      NAVIDROME_ADMIN_PASSWORD: ${NAVIDROME_ADMIN_PASSWORD:-}
       ND_DATAFOLDER: /data
       ND_MUSICFOLDER: /music
       # Navidrome builds absolute URLs (share links, the PWA manifest, Subsonic

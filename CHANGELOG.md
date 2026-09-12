@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.90.0] — 2026-09-12
+
+### Added
+
+- Navidrome's admin account is now created automatically on first start, so its create-admin form can't be claimed by a visitor
+
 ## [0.89.0] — 2026-09-12
 
 ### Added

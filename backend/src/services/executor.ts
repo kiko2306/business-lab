@@ -42,6 +42,7 @@ import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { reconcileDocusealFirstAdmin } from './docusealAdminBootstrap';
 import { reconcileN8nFirstAdmin } from './n8nAdminBootstrap';
 import { reconcileJellyfinFirstAdmin } from './jellyfinAdminBootstrap';
+import { reconcileNavidromeFirstAdmin } from './navidromeAdminBootstrap';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
 import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 import { reconcileItflowMailCron } from './itflowMailCron';
@@ -349,6 +350,10 @@ async function composeUpWithManagedConfig(
   // of claiming the server (§420). REST against the running server, so after
   // `up`; no-op otherwise.
   await reconcileJellyfinFirstAdmin(serviceName);
+  // Navidrome: create the admin so its first-run form can't be claimed by a
+  // visitor (§420). REST against the running app, so after `up`; no-op
+  // otherwise.
+  await reconcileNavidromeFirstAdmin(serviceName);
   // ITFlow: run its first-run setup wizard (schema import + admin) so exposing
   // it direct (§344/§350) has no manual step and no claim race. The wizard's
   // first POST creates the schema — the itfloworg image doesn't. After `up`;
