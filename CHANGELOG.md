@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.86.0] — 2026-09-12
+
+### Removed
+
+- NetBird's NETBIRD_SECONDARY_LAN_ADDRESS workaround — the routing peer's own overlay IP reaches every host service and cannot collide with a client's home network
+
 ## [0.85.0] — 2026-09-11
 
 ### Added

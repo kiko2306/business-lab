@@ -33,20 +33,12 @@ const API_TOKEN_ENV = 'NETBIRD_API_TOKEN';
 const SETUP_KEY_ENV = 'NETBIRD_ROUTING_PEER_SETUP_KEY';
 const MGMT_PORT_ENV = 'NETBIRD_MGMT_PORT';
 const DEFAULT_MGMT_PORT = 10250;
-// Optional — see apps/netbird-vpn/.env.example. A second, fixed address to
-// advertise alongside the auto-detected LAN CIDR, for a remote client whose
-// own network collides with the LAN's real subnet (plan.md §410): a static
-// secondary IP added to the host itself, outside the common private ranges,
-// that a colliding client can still reach even though the real LAN subnet
-// route is unusable to it.
-const SECONDARY_ADDRESS_ENV = 'NETBIRD_SECONDARY_LAN_ADDRESS';
 
 const ROUTER_GROUP_NAME = 'business-lab-netbird-router';
 const RESOURCE_GROUP_NAME = 'business-lab-lan';
 const ALL_PEERS_GROUP_NAME = 'All'; // NetBird's own built-in group
 const NETWORK_NAME = 'Business Lab LAN';
 const RESOURCE_NAME = 'LAN';
-const SECONDARY_RESOURCE_NAME = 'Secondary address';
 const POLICY_NAME = 'Business Lab: LAN resource access';
 const SETUP_KEY_NAME = 'Business Lab routing peer';
 const SETUP_KEY_EXPIRES_IN = 31536000; // 365 days — NetBird's own max
@@ -250,16 +242,6 @@ export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<voi
     const resourceGroupId = await ensureGroup(baseUrl, token, RESOURCE_GROUP_NAME);
     const networkId = await ensureNetwork(baseUrl, token, NETWORK_NAME);
     await ensureResource(baseUrl, token, networkId, RESOURCE_NAME, cidr, [resourceGroupId]);
-
-    // Same resource group as the LAN resource above, so the router (which is
-    // peer_groups-based, not tied to one resource) and the access policy
-    // (which grants "All" -> this group) already cover it — nothing else to
-    // wire up for it to work once it's added.
-    const secondaryAddress = (readAppEnvValue(SERVICE, SECONDARY_ADDRESS_ENV) ?? '').trim();
-    if (secondaryAddress && secondaryAddress.toLowerCase() !== 'change-me') {
-      await ensureResource(baseUrl, token, networkId, SECONDARY_RESOURCE_NAME, secondaryAddress, [resourceGroupId]);
-    }
-
     await ensureRouter(baseUrl, token, networkId, routerGroupId);
     await ensurePolicy(baseUrl, token, allGroupId, resourceGroupId);
     await ensureSetupKey(baseUrl, token, routerGroupId);

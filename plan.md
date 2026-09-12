@@ -26738,3 +26738,29 @@ The secondary address was conceived while the routing peer was churning
 identities and nothing connected at all; for reaching *the host* it is
 redundant, and for reaching *other LAN devices* from a colliding network
 it never helped anyway, being a second address for the host alone.
+
+## 411.3. Removed the secondary-address workaround — the overlay IP already does its job
+
+Deleted `NETBIRD_SECONDARY_LAN_ADDRESS` and everything hanging off it: the
+`ensureResource` call and two constants in `netbirdRoutingPeer.ts`, the
+compose env var, the `.env.example` block, its two unit tests (replaced by
+one asserting the LAN resource is the *only* resource posted), and the
+README item proposing a `start.sh` netplan prompt. Net −53 lines.
+
+Rationale is §411.2's finding: the routing peer's own NetBird overlay IP
+reaches every service on the host, because `netbird-client` runs
+`network_mode: host`, and `100.64.0.0/10` cannot collide with a client's
+home network. The secondary address was conceived in §410 while the peer
+was churning identities and nothing connected at all — it solved the
+host-access half of the collision problem that the overlay IP already
+solved, and never addressed the other-LAN-devices half at all.
+
+`docs/deployment-guide.md` gains the replacement in the routing-peer
+section: on a colliding client, use the overlay IP; other devices on the
+box's LAN need one side renumbered.
+
+Nothing to unwind server-side — `netbird networks list` confirmed only the
+`LAN` resource ever existed, so the secondary resource was never created
+live. The `172.20.5.10/24` address stays on `home-srv-01`'s `enp2s0` in
+`/etc/netplan/90-homelab-fixed-ip.yaml`; harmless, and editing netplan over
+the link it serves is not worth the risk for cosmetics.

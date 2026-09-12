@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.85.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.86.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -243,14 +243,4 @@ it is done — not ticked off and left behind. Section references point at
       pattern (`docusealAdminBootstrap.ts`'s `MAX_ATTEMPTS`/
       `RETRY_DELAY_MS` shape) instead of relying on "try again next
       restart."
-
-- [ ] **Secondary-IP workaround is a hand-edited netplan file, not a
-      `start.sh` option** (§410) — `NETBIRD_SECONDARY_LAN_ADDRESS` lets the
-      routing peer advertise a second, collision-proof address for clients
-      whose own network shares the LAN's real subnet (very common:
-      `192.168.1.0/24`), but adding that address to the host itself was a
-      manual `netplan` edit this session, not a reusable setup step. If it
-      proves out live, add it as a second optional prompt in `start.sh`'s
-      existing fixed-IP flow (same `netplan try` safety net) so future
-      deployments don't need an AI agent hand-editing netplan.
 

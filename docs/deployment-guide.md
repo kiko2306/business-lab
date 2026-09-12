@@ -107,6 +107,19 @@ here once a year when the old one expires (§405 — this half genuinely can't
 self-renew, NetBird has no way to mint a token without a human holding a
 session in its own UI first).
 
+**If a client's own network uses the same range as this box's LAN** (very
+common — most routers default to `192.168.1.0/24`), their machine already
+has a directly-connected route for it, which beats the NetBird one, so the
+LAN resource is unusable to them. Reach the box on the routing peer's
+**NetBird overlay IP** instead — `netbird status` on any enrolled peer
+lists it, e.g. `ssh mat@100.94.52.176`, `http://100.94.52.176:10001`. It
+works because `netbird-client` runs `network_mode: host`, so that address
+is the host's and every service on the box answers on it; and it can never
+collide, being inside `100.64.0.0/10`, which no consumer router hands out.
+Other devices on the box's LAN stay unreachable for that client — the only
+real fixes there are renumbering one side's LAN, or reaching them through
+the box (plan.md §411.2).
+
 ### Optional: automate Tailscale's own setup
 
 Step 1 already bootstrapped Tailscale with a hand-generated auth key and

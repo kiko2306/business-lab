@@ -193,10 +193,6 @@ services:
       # drive NetBird's management API. Same `:-change-me` reasoning as
       # NB_SETUP_KEY above — optional, never blocks a start.
       NETBIRD_API_TOKEN: "${NETBIRD_API_TOKEN:-change-me}"
-      # Also not read by this container — same reasoning as
-      # NETBIRD_API_TOKEN above, just for this field. Optional; blank is
-      # fine (nothing extra gets advertised). See plan.md §410.
-      NETBIRD_SECONDARY_LAN_ADDRESS: "${NETBIRD_SECONDARY_LAN_ADDRESS:-}"
     volumes:
       # /var/lib/netbird, not /etc/netbird: NetBird 0.78's profile system
       # keeps the client's identity here (default.json holds the WireGuard
