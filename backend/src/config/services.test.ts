@@ -639,3 +639,58 @@ describe('memory limits', () => {
     }
   });
 });
+
+// §425: two ways a bypass pattern silently fails, both of which took Authelia
+// down on the live host. A TypeScript string literal eats the backslash in
+// '\?' (so the config got `(?.*)?$`, which Go's regexp rejects outright and
+// Authelia refuses to boot on), and Authelia matches `resources` against the
+// path *plus query string*, so a bare `$` never matches a real request.
+describe('autheliaBypassPaths', () => {
+  const withBypass = Object.values(SERVICES).filter((s) => s.autheliaBypassPaths?.length);
+
+  it('is declared by at least the two services that need it', () => {
+    expect(withBypass.map((s) => s.name).sort()).toEqual(['ntfy', 'vaultwarden']);
+  });
+
+  it('compiles as a regex — a lost backslash makes Authelia refuse to start', () => {
+    for (const service of withBypass) {
+      for (const pattern of service.autheliaBypassPaths ?? []) {
+        expect(() => new RegExp(pattern), `${service.name}: ${pattern}`).not.toThrow();
+        // `(?` is the tell for the eaten backslash: valid in JS as a group
+        // modifier, rejected by Go's regexp, so it passes a naive compile
+        // check and still breaks Authelia.
+        expect(pattern, `${service.name}: ${pattern} looks like '\\?' lost its backslash`).not.toContain('(?.');
+      }
+    }
+  });
+
+  const matchesAny = (patterns: string[], path: string) => patterns.some((p) => new RegExp(p).test(path));
+
+  it("admits the requests native clients actually send, query strings included", () => {
+    const ntfy = SERVICES.ntfy.autheliaBypassPaths ?? [];
+    expect(matchesAny(ntfy, '/homelab-alerts/json')).toBe(true);
+    expect(matchesAny(ntfy, '/homelab-alerts/json?poll=1&since=cFdmck')).toBe(true);
+    expect(matchesAny(ntfy, '/homelab-alerts/ws')).toBe(true);
+    expect(matchesAny(ntfy, '/v1/health')).toBe(true);
+
+    const vw = SERVICES.vaultwarden.autheliaBypassPaths ?? [];
+    expect(matchesAny(vw, '/identity/connect/token')).toBe(true);
+    expect(matchesAny(vw, '/api/sync?excludeDomains=true')).toBe(true);
+    expect(matchesAny(vw, '/notifications/hub/negotiate')).toBe(true);
+  });
+
+  it('does not admit what must stay behind Authelia', () => {
+    const ntfy = SERVICES.ntfy.autheliaBypassPaths ?? [];
+    // Publishing from outside, and the web UI.
+    expect(matchesAny(ntfy, '/homelab-alerts')).toBe(false);
+    expect(matchesAny(ntfy, '/')).toBe(false);
+
+    const vw = SERVICES.vaultwarden.autheliaBypassPaths ?? [];
+    // Registration must stay gated or open signups become public; the admin
+    // panel and the web vault likewise.
+    expect(matchesAny(vw, '/identity/accounts/register')).toBe(false);
+    expect(matchesAny(vw, '/admin')).toBe(false);
+    expect(matchesAny(vw, '/admin/diagnostics')).toBe(false);
+    expect(matchesAny(vw, '/')).toBe(false);
+  });
+});

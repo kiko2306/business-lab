@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.95.2] — 2026-09-12
+
+### Fixed
+
+- a lost backslash in the Authelia bypass patterns made Authelia refuse to start; the patterns are now checked for validity and behaviour in tests
+
 ## [0.95.1] — 2026-09-12
 
 ### Fixed

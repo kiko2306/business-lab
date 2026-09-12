@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.95.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.95.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 

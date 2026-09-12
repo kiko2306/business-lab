@@ -865,7 +865,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // The trailing `(\?.*)?$` on the anchored entry is not decoration:
     // Authelia matches these against the path *and query string* (§425).
     autheliaBypassPaths: [
-      '^/identity/connect/token(\?.*)?$',
+      '^/identity/connect/token(\\?.*)?$',
       '^/api($|/)',
       '^/notifications/hub($|/)',
       '^/events($|/)',
@@ -1182,7 +1182,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // path **and the query string**, and the ntfy app subscribes with
     // `/json?poll=1&since=…`. Verified the hard way — a bare `$` here let
     // /v1/health through and kept 302-ing the actual subscription (§425).
-    autheliaBypassPaths: ['^/[A-Za-z0-9_-]{1,64}/(json|sse|ws|raw)(\?.*)?$', '^/v1/health(\?.*)?$'],
+    autheliaBypassPaths: ['^/[A-Za-z0-9_-]{1,64}/(json|sse|ws|raw)(\\?.*)?$', '^/v1/health(\\?.*)?$'],
     healthCheck: {
       enabled: true,
       type: 'http',
