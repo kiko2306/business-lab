@@ -27926,3 +27926,47 @@ literally, and the patterns are asserted for validity *and* behaviour. The
 remaining untested surface is the rendered file itself — nothing yet checks
 that Authelia will accept a generated config before it is written, which
 would have caught both. Noted as a README item.
+
+## 426. Validate the generated Authelia config before it replaces the live one
+
+The general defence the §423 and §425 outages both wanted. Each was caught
+afterwards by a targeted guard — literal splicing, and a regex test — but the
+class of bug is "the generator wrote something Authelia cannot load", and
+that is answerable directly: ask Authelia.
+
+`authelia validate-config` is its own subcommand, in the image already
+running, invoked through the same throwaway `docker compose run` pattern the
+rest of this codebase uses for container-side work. Crucially with the *same
+flags the service itself uses* — both config files and
+`--config.experimental.filters template` — without which a perfectly good
+config is rejected for unresolved `{{ env "BASE_DOMAIN" }}`.
+
+Wired into both generators (`autheliaAccessControl.ts` and
+`autheliaOidcClients.ts`) between rendering and writing.
+
+### The asymmetry is the design
+
+`rejectsAutheliaConfig()` blocks the write when Authelia **reports** the
+config unloadable, and does **not** block it when validation could not run at
+all. Refusing to write whenever Docker hiccups would trade a rare,
+recoverable outage for a permanent, invisible one — exposure changes silently
+never applying. `ranButRejected()` draws that line off `exec`'s error shape
+(a numeric exit code means it ran; a spawn failure or timeout kill does not),
+and that is the unit test.
+
+### Verified live, both directions, through the deployed module
+
+```
+broken patterns injected: 3
+valid  -> ok=true  ran=true
+broken -> ok=false ran=true | Configuration parsed and loaded with errors: …
+```
+
+The "broken" input is the actual §425 breakage — the three
+`(\?.*)?$` patterns with their backslashes removed. Before wiring, the same
+check was run directly against the container: exit 0 on the real config, exit
+1 with `invalid or unsupported Perl syntax` on the broken one. So the guard
+demonstrably stops the exact config that took the login gate down twice.
+
+A real `syncAutheliaAccessControl` run afterwards validated and reported no
+change, confirming the guard does not interfere with the normal path.

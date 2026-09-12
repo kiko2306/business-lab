@@ -243,16 +243,6 @@ it is done — not ticked off and left behind. Section references point at
       cannot be verified against this host without risking the link it is
       managed over (cf. §411.3).
 
-- [ ] **Nothing validates a generated Authelia config before writing it**
-      (§423/§425) — two outages in one session came from a rule the
-      generator happily wrote and Authelia then refused to load (a `$'`
-      splice pattern, then a `\?` whose backslash TypeScript ate). Both are
-      now guarded at their own layer, but the general defence is missing:
-      run `authelia validate-config` (its own subcommand, available in the
-      same image) against the candidate file in a throwaway container before
-      replacing the live one, and skip the write if it fails. Cheap, and it
-      would have caught both.
-
 - [ ] **Delete the obsolete `netbird-router-*` peers in the NetBird
       dashboard** (§410/§411.1) — the cause is fixed (the routing peer was
       mounting the pre-0.78 `/etc/netbird` state path, so it never
