@@ -27674,3 +27674,100 @@ Six apps listed. **Four automated** — n8n (§419), Jellyfin and Navidrome
 (§420). **One declined** — Twenty, above. Every one of the four was verified
 against the live host, and in all four the generated password was proven to
 actually authenticate, not merely that the account appeared.
+
+## 423. Per-path Authelia bypasses — and the `$` that took Authelia down
+
+§415's Vaultwarden half, plus an outage I caused doing it and the latent bug
+behind it.
+
+### The mechanism
+
+New `autheliaBypassPaths` registry field. `renderAccessControl` emits it as a
+`bypass` rule with `resources:` **ahead** of that app's `one_factor` rule —
+load-bearing, because Authelia takes the first matching rule, so a bypass
+emitted second would silently never bypass. That ordering is what the test
+pins, not the rendering.
+
+### §415 said this half was blocked on closing signups. It wasn't.
+
+The recorded blocker was that bypassing Vaultwarden's client API would expose
+`/identity/accounts/register` while `SIGNUPS_ALLOWED=true`, so the bypass had
+to land together with closing signups — which in turn would break first-run
+claiming, since Vaultwarden has no way to create the first user with
+registration off.
+
+Precision dissolves it. Bypass **`^/identity/connect/token$`**, not
+`^/identity`:
+
+```
+autheliaBypassPaths: [
+  '^/identity/connect/token$',
+  '^/api($|/)',
+  '^/notifications/hub($|/)',
+  '^/events($|/)',
+]
+```
+
+Login and token refresh are admitted; `/identity/accounts/register` is not
+matched and stays gated, so account creation still needs an Authelia session
+and first-run claiming still works. No `/admin` (the admin panel keeps both
+Authelia *and* its ADMIN_TOKEN), no `/` (the web vault still needs a
+session). `SIGNUPS_ALLOWED` needs no change, and the README item that wanted
+it defaulted to false is weaker than it looked: with registration behind
+Authelia, "anyone who can register" is already "an Authelia user".
+
+### The outage
+
+`^/identity/connect/token$'` — note the trailing `$'`. Both
+`spliceAccessControl` and `spliceOidcClients` passed the generated block to
+`String.replace` as the replacement **string**, where `$&`, `$'`, "$`" and
+`$1` are substitution patterns. `$'` means "everything after the match", so
+the splice pasted the entire tail of `configuration.yml` into the middle of
+the access_control block:
+
+```
+- '^/identity/connect/token      - client_id: 'netbird-dashboard'
+```
+
+Authelia refused to load it (`yaml: line 135: did not find expected '-'
+indicator`) and crash-looped, which took **every gated app** with it — 500s
+across the board, including the paths that were supposed to still gate. That
+is how it was noticed: the "still gated" half of the verification returned
+500 instead of 302.
+
+Recovery: fix the splices to replace with `() => block` (literal on all three
+branches), redeploy, copy `configuration.yml.example` over the corrupted
+file, and let the backend's boot reconciler re-derive both managed blocks —
+which it did, 25 rules and 5 OIDC clients, Authelia healthy in ~45 s. The
+file is regenerable by design (§151), which is the only reason this was a
+short outage rather than a rebuild.
+
+`spliceOidcClients` had the identical bug and was safe purely by luck:
+`generateComplexPassword` excludes `$` from its charset for .env-quoting
+reasons, so no generated secret had ever contained one.
+
+### Lesson recorded, because it generalises
+
+Every generator in this codebase that splices rendered text into a config
+file with `String.replace` is one `$` away from this. The regression test
+drives `$&`, `` $` ``, `$'` and `$1` through both branches and asserts the
+file's tail still appears exactly once.
+
+### Verified live, after recovery
+
+| Path | Result | Meaning |
+|---|---|---|
+| `POST /identity/connect/token` | **415** | Vaultwarden's own reply — bypass works |
+| `GET /api/config` | **200** | Vaultwarden's own reply — bypass works |
+| `/identity/accounts/register` | **302** | still gated, as designed |
+| `/admin` | **302** | admin panel still double-gated |
+| `/` | **302** | web vault still needs a session |
+| `bookstack.<domain>/` | **302** | unrelated apps unaffected |
+
+### Still open
+
+The **ntfy** half of §415. Unchanged and still needs ntfy's own auth built
+first (`auth-file` + ACL + a dashboard-generated subscriber token) — a bare
+bypass there would publish the CrowdSec alert stream, attacker IPs included,
+to anyone who guesses the topic. The mechanism this section adds is what it
+will use once that exists.
