@@ -28209,3 +28209,13 @@ information no amount of server-side curl can infer.
 Worth checking the same way if Vaultwarden's clients ever misbehave: its
 bypass list was written from the same kind of reasoning about which
 endpoints a client "should" need.
+
+## 430.1. Confirmed on the phone
+
+The ntfy app subscribes and receives on `homelab-alerts` with the
+`subscriber` username/password. §415 is closed end to end: the alert stream
+is unreadable anonymously, readable with a credential the dashboard issues
+itself, and publishing from the internal senders never needed one.
+
+Took four rounds (§425, §428, §429, §430). The diagnostic order that would
+have found it in one is now in `docs/app-credentials.md`.
