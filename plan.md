@@ -26709,3 +26709,32 @@ directory looks exactly like a working one from the outside. When
 something "loses its identity across restarts", check that the path being
 persisted is the path the current version of the software actually writes
 to, before reading anything into how it failed.
+
+## 411.2. LAN resource propagation confirmed end-to-end (closes §410.1's open thread)
+
+§410.1 ended with "the actual resource-propagation test is still
+unconfirmed" — whether a remote client reaches the whole LAN through the
+routing peer, not just the host. Confirmed now, with the §411/§411.1 fixes
+deployed:
+
+- `ssh mat@192.168.1.236` and `ping 192.168.1.236` from a remote client — OK.
+- `ping 192.168.1.254` (the LAN's gateway, a device that is *not* the
+  server) from the same client — OK. This is the part that was never
+  proven: traffic is being routed past the routing peer onto the LAN.
+
+An earlier attempt in this session pinged `192.168.1.1` and read the
+failure as a routing problem. There is no `.1` on that network — the
+gateway is `.254`, both in the live route table and pinned in
+`/etc/netplan/90-homelab-fixed-ip.yaml`. Worth remembering before drawing
+conclusions from an unreachable address: confirm the address exists first.
+
+Also relevant to the `NETBIRD_SECONDARY_LAN_ADDRESS` question (§410): the
+routing peer's own overlay IP reaches every service on the host, because
+`netbird-client` runs `network_mode: host` — verified with
+`ssh mat@100.94.52.176` and `curl http://100.94.52.176:10001/api/version`
+(200). That address sits in `100.64.0.0/10` (CGNAT), which a consumer
+router never assigns, so it cannot collide with a client's home network.
+The secondary address was conceived while the routing peer was churning
+identities and nothing connected at all; for reaching *the host* it is
+redundant, and for reaching *other LAN devices* from a colliding network
+it never helped anyway, being a second address for the host alone.
