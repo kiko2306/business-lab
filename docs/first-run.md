@@ -99,14 +99,14 @@ refusals, the grow, and a repeat run — without touching a real one.
 
 ## What it asks you for
 
-Four values, all remembered in `.env` so a re-run never asks twice:
+Four things, all remembered in `.env` so a re-run never asks twice:
 
 | Prompt | Example | Used for |
 |---|---|---|
 | `BASE_DOMAIN` | `example.com` | Every public hostname, plus Authelia's and NetBird's URLs |
 | `CLOUDFLARE_API_TOKEN` | *(hidden input)* | Tunnel + DNS provisioning |
 | `TUNNEL_NAME` | defaults to the hostname | Names the Cloudflare Tunnel for this host |
-| `TAILSCALE_AUTH_KEY` | `tskey-auth-…` *(hidden input)* | Joins the tailnet so NetBird signalling can be published |
+| `TAILSCALE_OAUTH_CLIENT_ID` + `_SECRET` | *(hidden input)* | Joins the tailnet so NetBird signalling can be published — **and never expires**: the dashboard mints and re-mints the auth key itself from it (§408). Press Enter to skip and be asked for a plain `TAILSCALE_AUTH_KEY` instead, which lasts 90 days (Tailscale's own maximum) and must then be replaced by hand. |
 
 Everything else is derived or generated: per-app secrets, database passwords,
 Authelia's signing keys, NetBird's store-encryption key and relay secret, the
@@ -114,7 +114,7 @@ web terminal's SSH key, host port allocation, and the Cloudflare account/zone
 /tunnel IDs (looked up from the domain).
 
 For an unattended install with no TTY to prompt on, copy
-`start.config.example` to `start.config` and fill in these same four values
+`start.config.example` to `start.config` and fill in these same values
 ahead of time — `start.sh` reads it before asking anything, so nothing gets
 skipped for lack of a terminal. Never commit `start.config`; it holds real
 credentials, same as `.env`.

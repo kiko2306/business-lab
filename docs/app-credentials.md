@@ -195,7 +195,8 @@ pasting in one extra genuinely-third-party credential hands the whole
 thing to the dashboard from then on (§408/§405).
 
 - `TAILSCALE_AUTH_KEY` — by hand, a reusable key from Tailscale's own
-  **Settings → Keys**. With a **Tailscale OAuth client** (`auth_keys` +
+  **Settings → Keys**; `start.sh` asks for this only if you skip the OAuth
+  client it offers first. With a **Tailscale OAuth client** (`auth_keys` +
   `policy_file` scopes, tagged `tag:businesslab`) pasted into
   `TAILSCALE_OAUTH_CLIENT_ID`/`TAILSCALE_OAUTH_CLIENT_SECRET` instead, the
   dashboard mints and re-mints this key itself (90 days, Tailscale's own

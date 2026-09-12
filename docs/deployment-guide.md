@@ -16,8 +16,12 @@ Have these in hand — `start.sh` cannot derive them (see
 - A **Cloudflare API token** scoped to **that one zone** (Zone Resources →
   Include → Specific zone), with Account → Cloudflare Tunnel: Edit and
   Zone → DNS: Edit.
-- A **Tailscale account + reusable auth key**, and Funnel enabled once for the
-  tailnet.
+- A **Tailscale account**, and Funnel enabled once for the tailnet. Prefer an
+  **OAuth client** (Settings → OAuth clients, scopes `auth_keys` +
+  `policy_file`, tagged `tag:businesslab`) over a reusable auth key: it does
+  not expire, and the dashboard then mints and re-mints the auth key itself
+  and keeps Funnel enabled on the ACL (§408). A plain auth key works too, but
+  lasts 90 days and has to be replaced by hand.
 - Nothing for NetBird. The host needs no enrollment step of its own — the
   routing peer's container runs `network_mode: host`, so the box is already
   on the overlay (see

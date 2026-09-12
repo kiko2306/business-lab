@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.87.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.87.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -222,14 +222,6 @@ it is done — not ticked off and left behind. Section references point at
       just logs a warning and silently stops until someone notices and
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
-
-- [ ] **`start.config` should take Tailscale's OAuth client, not its auth
-      key** (§416.2) — it accepts `TAILSCALE_AUTH_KEY` (90-day, must be
-      re-typed) but not `TAILSCALE_OAUTH_CLIENT_ID`/`_SECRET`, which is
-      non-expiring and makes the dashboard mint and re-mint that key itself
-      (§408). An unattended client install currently bakes in a credential
-      that dies in 90 days. Keep accepting the auth key for anyone who only
-      has one.
 
 - [ ] **Six apps still need a human to claim the admin account** (§416.3) —
       Navidrome, Uptime Kuma, n8n, Twenty, Vikunja, Jellyfin. Four

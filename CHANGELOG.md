@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.87.3] — 2026-09-12
+
+### Fixed
+
+- start.sh now offers Tailscale's non-expiring OAuth client before the 90-day auth key, and no longer skips seeding a key whose value is still the `change-me` placeholder on a fresh clone
+
 ## [0.87.2] — 2026-09-12
 
 ### Fixed

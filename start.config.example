@@ -34,3 +34,13 @@ TUNNEL_NAME=
 # enabling once for the tailnet; start.sh prints the one-click link if it
 # isn't.
 TAILSCALE_AUTH_KEY=
+
+# Tailscale: an OAuth client is preferred over a plain auth key because it
+# does not expire — given one, the dashboard mints and re-mints the auth key
+# itself and keeps Funnel enabled on the tailnet ACL (plan.md §408). An auth
+# key typed here lasts 90 days (Tailscale's own maximum) and must then be
+# replaced by hand. Set either; the OAuth client wins if both are present.
+#   https://login.tailscale.com/admin/settings/oauth
+#   scopes: auth_keys + policy_file, tagged tag:businesslab
+TAILSCALE_OAUTH_CLIENT_ID=
+TAILSCALE_OAUTH_CLIENT_SECRET=

@@ -140,6 +140,18 @@ app_env_value() {
   grep -E "^${2}=" "$1" | head -n1 | cut -d= -f2- || true
 }
 
+# True when an app .env value is absent OR still a placeholder. Pass 1 of the
+# port allocator seeds every app .env from its .env.example, so on a fresh
+# clone a key is `change-me`, not missing — a plain `-z` check reads that as
+# "already set" and silently skips seeding it (which is exactly what happened
+# to TAILSCALE_AUTH_KEY, §418).
+app_env_unset() {
+  case "$(app_env_value "$1" "$2")" in
+    "" | change-me* | change_this* ) return 0 ;;
+    * ) return 1 ;;
+  esac
+}
+
 # Fill a placeholder secret in an app's .env, once. Never overwrites a real value.
 ensure_app_secret() {
   local file="$1" key="$2" value
@@ -169,6 +181,25 @@ prompt_env_var() {
       printf '%s: ' "$prompt" >&2; read -r value
     fi
   done
+  set_env_var "$key" "$value"
+}
+
+# Like prompt_env_var, but an empty answer is accepted and reported as
+# non-zero, for a credential that has a usable fallback (Tailscale's OAuth
+# client below falls back to a plain auth key). prompt_env_var itself loops
+# until it gets something, which is right for a value with no alternative.
+prompt_env_var_optional() {
+  local key="$1" prompt="$2" silent="${3:-}" value
+  value="$(current_value "$key")"
+  case "$value" in "" | change-me* | change_this* ) value="" ;; esac
+  if [ -n "$value" ]; then return 0; fi
+  if [ ! -t 0 ]; then return 1; fi
+  if [ -n "$silent" ]; then
+    printf '%s: ' "$prompt" >&2; read -r -s value; printf '\n' >&2
+  else
+    printf '%s: ' "$prompt" >&2; read -r value
+  fi
+  [ -n "$value" ] || return 1
   set_env_var "$key" "$value"
 }
 
@@ -261,15 +292,32 @@ fi
 # all (plan.md §52/§53), so without this NetBird has no working signalling and
 # no peer ever connects.
 #
-# Get a key from https://login.tailscale.com/admin/settings/keys (a reusable
-# auth key is easiest). Funnel additionally needs enabling once for the
-# tailnet; the Funnel phase near the end of this script prints the one-click
-# link if it is not.
+# An OAuth client is asked for FIRST and preferred, because it is the only
+# form of this credential that does not expire: with one, the dashboard mints
+# and re-mints the auth key itself (§408). A plain auth key typed here is good
+# for 90 days — Tailscale's own maximum — and then has to be retyped by hand,
+# which is precisely the silent-expiry trap auto-provisioning exists to avoid.
+# Both are accepted, since someone may only have a key.
+#
+#   OAuth client: https://login.tailscale.com/admin/settings/oauth
+#                 scopes auth_keys + policy_file, tag:businesslab
+#   Auth key:     https://login.tailscale.com/admin/settings/keys (reusable)
+#
+# Funnel additionally needs enabling once for the tailnet; the Funnel phase
+# near the end of this script prints the one-click link if it is not (and the
+# dashboard keeps it enabled on the ACL by itself, given an OAuth client).
 TS_READY=0
-if prompt_env_var TAILSCALE_AUTH_KEY "Tailscale auth key (tskey-auth-...; needed for NetBird signalling)" "" silent; then
+if prompt_env_var_optional TAILSCALE_OAUTH_CLIENT_ID \
+     "Tailscale OAuth client ID (recommended — never expires; blank to use a plain auth key)" \
+   && prompt_env_var TAILSCALE_OAUTH_CLIENT_SECRET "Tailscale OAuth client secret" "" silent; then
   TS_READY=1
-else
-  warn "TAILSCALE_AUTH_KEY not set and no terminal to prompt on — NetBird signalling will not be configured."
+fi
+if [ "$TS_READY" != "1" ] \
+   && prompt_env_var TAILSCALE_AUTH_KEY "Tailscale auth key (tskey-auth-...; needed for NetBird signalling)" "" silent; then
+  TS_READY=1
+fi
+if [ "$TS_READY" != "1" ]; then
+  warn "No Tailscale OAuth client or auth key set, and no terminal to prompt on — NetBird signalling will not be configured."
 fi
 
 BASE_DOMAIN="$(current_value BASE_DOMAIN)"
@@ -848,8 +896,31 @@ if [ -f apps/netbird-vpn/.env ]; then
     # panel, and copying this file's over it would silently revert a key the
     # user had updated there — which is exactly what happened on 2026-09-02,
     # and only on runs where this container happened to be stopped (§85.1a).
-    if [ -z "$(app_env_value apps/tailscale/.env TAILSCALE_AUTH_KEY)" ]; then
+    # app_env_unset, not `-z`: a fresh clone has `change-me` here, not an
+    # empty value, and the plain check silently skipped the seed (§418).
+    if app_env_unset apps/tailscale/.env TAILSCALE_OAUTH_CLIENT_ID \
+       && [ -n "$(current_value TAILSCALE_OAUTH_CLIENT_ID)" ]; then
+      set_app_env_var apps/tailscale/.env TAILSCALE_OAUTH_CLIENT_ID "$(current_value TAILSCALE_OAUTH_CLIENT_ID)"
+      set_app_env_var apps/tailscale/.env TAILSCALE_OAUTH_CLIENT_SECRET "$(current_value TAILSCALE_OAUTH_CLIENT_SECRET)"
+    fi
+    if app_env_unset apps/tailscale/.env TAILSCALE_AUTH_KEY \
+       && [ -n "$(current_value TAILSCALE_AUTH_KEY)" ]; then
       set_app_env_var apps/tailscale/.env TAILSCALE_AUTH_KEY "$(current_value TAILSCALE_AUTH_KEY)"
+    fi
+    # With an OAuth client but no key yet, mint the first one through the
+    # backend's own implementation — the core stack is already up by this
+    # point (line ~622), so this reuses tailscaleAutomation.ts rather than
+    # keeping a second copy of Tailscale's API dance in shell. Without this
+    # the container would start on `change-me` and never authenticate.
+    if app_env_unset apps/tailscale/.env TAILSCALE_AUTH_KEY \
+       && ! app_env_unset apps/tailscale/.env TAILSCALE_OAUTH_CLIENT_ID; then
+      if docker compose exec -T backend \
+           node -e 'require("./dist/services/tailscaleAutomation").ensureTailscaleAutomation("tailscale")' \
+           >/dev/null 2>&1 && ! app_env_unset apps/tailscale/.env TAILSCALE_AUTH_KEY; then
+        log "Minted a Tailscale auth key from the OAuth client"
+      else
+        warn "couldn't mint a Tailscale auth key from the OAuth client — check it in the dashboard's Tailscale config panel"
+      fi
     fi
     log "Starting the Tailscale app (NetBird signalling depends on it)"
     docker compose -f apps/tailscale/docker-compose.yml --env-file apps/tailscale/.env \

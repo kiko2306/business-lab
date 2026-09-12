@@ -27380,3 +27380,78 @@ Net effect on the original question (§416): with this gone, a client
 deployment's only console command is `./start.sh`, as principle 2 requires.
 No code was written, which is the right outcome — the feature was already
 there under a different name.
+
+## 418. start.sh asks for Tailscale's OAuth client first — and a latent seeding bug it exposed
+
+§416.2: `start.config`/`start.sh` accepted `TAILSCALE_AUTH_KEY` (90 days,
+Tailscale's own maximum, then retyped by hand) but had no way to accept the
+**OAuth client**, which does not expire and lets the dashboard mint and
+re-mint that key itself (§408). So every unattended client deployment baked
+in a credential guaranteed to die in 90 days — the exact silent-expiry trap
+the auto-provisioning exists to avoid.
+
+### What landed
+
+- `start.sh` asks for `TAILSCALE_OAUTH_CLIENT_ID` **first**, labelled as
+  recommended and never-expiring; pressing Enter falls through to the old
+  auth-key prompt, so someone who only has a key is unaffected. New
+  `prompt_env_var_optional` helper for that — `prompt_env_var` loops until it
+  gets a value, which is correct for something with no alternative and wrong
+  for something with a fallback.
+- `start.config.example` gains both OAuth keys, so an unattended install can
+  be pre-seeded with the non-expiring credential. The loader has no key
+  allowlist, so nothing else needed changing there.
+- With an OAuth client and no key yet, `start.sh` mints the first key by
+  calling **the backend's own implementation**:
+  `docker compose exec -T backend node -e 'require("./dist/services/tailscaleAutomation")…'`.
+  The core stack is already up by that point (line ~622), so this reuses
+  `tailscaleAutomation.ts` instead of keeping a second copy of Tailscale's
+  API dance in shell. Without it the container would start on `change-me`
+  and never authenticate, since `start.sh` starts the Tailscale app directly
+  rather than through the dashboard (which is where the hook normally runs).
+- Docs: `first-run.md`'s prompt table, `deployment-guide.md`'s prerequisites,
+  `app-credentials.md`, and the root `.env.example` note.
+
+### The bug found while tracing it
+
+The existing seed guard was
+
+```sh
+if [ -z "$(app_env_value apps/tailscale/.env TAILSCALE_AUTH_KEY)" ]; then
+```
+
+but pass 1 of the port allocator (`start.sh` ~line 568) copies every app's
+`.env.example` to `.env` on a fresh clone, and `apps/tailscale/.env.example`
+ships `TAILSCALE_AUTH_KEY=change-me`. So on a fresh deployment the value is
+a *placeholder*, not empty, `-z` reads it as "already set", the seed is
+skipped, and the Tailscale container starts with `change-me` and never
+authenticates — taking NetBird signalling with it (§52/§53: no signal, no
+peer ever connects). It works on this host only because the value was filled
+in later, by hand and then by the automation.
+
+Fixed with an `app_env_unset` helper applying the same "`change-me` counts as
+unset" rule `ensure_app_secret` already used, and used for all three
+Tailscale keys. This is the same class of bug as §85.1a, from the opposite
+direction: that one overwrote a good value, this one refused to write a
+missing one.
+
+### Verified
+
+- The mint command `start.sh` now issues, run against the live host: returned
+  cleanly and left a valid key and key-id in place — that exercises the
+  idempotent "key still valid, do nothing" branch. Minting *from scratch* was
+  not forced, because it would mean revoking the live key and taking NetBird
+  signalling down with it; the minting itself is §408 code that is unchanged
+  here, and what is new is the call site, which is what got tested.
+- `app_env_unset` against fixtures (`change-me`, a real value, empty, absent
+  key, absent file) — all five as expected. Run by hand: `start.sh` has no
+  test harness, and adding one for two helpers would be more machinery than
+  the thing it tests.
+- `bash -n start.sh` clean.
+
+### Not verified
+
+A full `./start.sh` run on a fresh clone — it is a root host bootstrap, and
+this host is already bootstrapped. The changed paths are the two prompt
+branches and the seeding block; the seeding logic is what the fixture check
+covers.
