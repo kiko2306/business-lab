@@ -159,3 +159,36 @@ describe('spliceAccessControl', () => {
     expect(second).toBe(first);
   });
 });
+
+describe('renderAccessControl bypass paths', () => {
+  it('emits the bypass rule BEFORE the app\'s own one_factor rule', () => {
+    const block = renderAccessControl('authelia.example.com', [
+      { hostname: 'vault.example.com', group: 'app-vaultwarden', bypassPaths: ['^/api($|/)'] },
+    ]);
+
+    const bypassAt = block.indexOf("- domain: 'vault.example.com'\n      policy: bypass");
+    const gateAt = block.indexOf("- domain: 'vault.example.com'\n      policy: one_factor");
+    expect(bypassAt).toBeGreaterThan(-1);
+    expect(gateAt).toBeGreaterThan(-1);
+    // Authelia is first-match-wins: the other order silently never bypasses.
+    expect(bypassAt).toBeLessThan(gateAt);
+    expect(block).toContain("      resources:\n        - '^/api($|/)'");
+  });
+
+  it('lists every path, in the declared order', () => {
+    const block = renderAccessControl(null, [
+      { hostname: 'vault.example.com', group: 'app-vaultwarden', bypassPaths: ['^/a$', '^/b$'] },
+    ]);
+    expect(block).toContain("      resources:\n        - '^/a$'\n        - '^/b$'");
+  });
+
+  it('emits no bypass rule at all for an app that declares none', () => {
+    for (const paths of [undefined, []]) {
+      const block = renderAccessControl(null, [
+        { hostname: 'wiki.example.com', group: 'app-bookstack', bypassPaths: paths },
+      ]);
+      expect(block).not.toContain('policy: bypass');
+      expect(block).not.toContain('resources:');
+    }
+  });
+});

@@ -21,7 +21,7 @@ import fs from 'fs';
 import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
-import { resolveComposeFile } from '../config/services';
+import { getService, resolveComposeFile } from '../config/services';
 import { EXPOSURE_SETTINGS_KEYS } from '../utils/exposureSettings';
 import { getAppAccessOptions } from './userAppAccess';
 import { appGroupName } from './autheliaSync';
@@ -43,6 +43,8 @@ function getConfigPath(): string | null {
 interface GatedApp {
   hostname: string;
   group: string;
+  /** Path regexes to admit unauthenticated — see `autheliaBypassPaths`. */
+  bypassPaths?: string[];
 }
 
 /** Render the full `access_control:` block (marker comments included). */
@@ -53,6 +55,16 @@ export function renderAccessControl(portalDomain: string | null, gated: GatedApp
     lines.push(`    - domain: '${portalDomain}'`, `      policy: bypass`);
   }
   for (const app of gated) {
+    // Bypass first, deliberately: Authelia takes the first rule that matches,
+    // so a bypass emitted after the app's one_factor rule would never be
+    // reached. These admit specific API paths that native clients call with
+    // their own credentials (§423).
+    if (app.bypassPaths?.length) {
+      lines.push(`    - domain: '${app.hostname}'`, `      policy: bypass`, `      resources:`);
+      for (const resource of app.bypassPaths) {
+        lines.push(`        - '${resource}'`);
+      }
+    }
     lines.push(
       `    - domain: '${app.hostname}'`,
       `      policy: one_factor`,
@@ -70,7 +82,11 @@ async function getGatedApps(): Promise<GatedApp[]> {
   const options = await getAppAccessOptions();
   return options
     .filter((o) => o.hostname)
-    .map((o) => ({ hostname: o.hostname as string, group: appGroupName(o.serviceName) }));
+    .map((o) => ({
+      hostname: o.hostname as string,
+      group: appGroupName(o.serviceName),
+      bypassPaths: getService(o.serviceName)?.autheliaBypassPaths,
+    }));
 }
 
 async function getPortalDomain(): Promise<string | null> {

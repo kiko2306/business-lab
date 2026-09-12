@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.93.0] — 2026-09-12
+
+### Added
+
+- Authelia can now bypass specific API paths per app, so Bitwarden's own clients can reach Vaultwarden's token and sync endpoints instead of retrying a login redirect forever
+
 ## [0.92.1] — 2026-09-12
 
 ### Added

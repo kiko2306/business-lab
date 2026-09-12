@@ -848,6 +848,26 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     icon: 'lock',
     category: 'Networking & Security',
     composePath: 'apps/vaultwarden/docker-compose.yml',
+    // Bitwarden's own apps (mobile, desktop, browser extension) authenticate
+    // with a master password against Vaultwarden itself and cannot follow
+    // Authelia's 401-redirect-to-login-portal, so they retried forever
+    // against /identity/connect/token (plan.md §415). These admit exactly the
+    // endpoints those clients need — the vault data is end-to-end encrypted
+    // and each request still carries Vaultwarden's own bearer token.
+    //
+    // What is deliberately NOT here matters more than what is:
+    //   * `^/identity/connect/token$` only — NOT `^/identity`, which would
+    //     also expose /identity/accounts/register and make account creation
+    //     public while SIGNUPS_ALLOWED is true (§423).
+    //   * no `/admin` — Vaultwarden's admin panel stays behind Authelia as
+    //     well as its own ADMIN_TOKEN.
+    //   * no `/` — the web vault still requires an Authelia session.
+    autheliaBypassPaths: [
+      '^/identity/connect/token$',
+      '^/api($|/)',
+      '^/notifications/hub($|/)',
+      '^/events($|/)',
+    ],
     healthCheck: {
       enabled: true,
       type: 'http',
