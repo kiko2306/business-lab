@@ -25,6 +25,7 @@
  */
 
 import { execFile } from 'child_process';
+import { rejectsAutheliaConfig } from './autheliaValidate';
 import { promisify } from 'util';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -211,6 +212,12 @@ export async function syncAutheliaOidcClients(trigger: string): Promise<OidcClie
   const current = fs.readFileSync(configPath, 'utf8');
   const next = spliceOidcClients(current, block);
   if (next === current) {
+    return { changed: false, restarted: false, clientCount: clients.length };
+  }
+
+  // Same guard as the access_control generator (§426): never replace the
+  // config Authelia is running on with one it cannot load.
+  if (await rejectsAutheliaConfig(next, `oidc-clients/${trigger}`)) {
     return { changed: false, restarted: false, clientCount: clients.length };
   }
 

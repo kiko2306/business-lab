@@ -10,7 +10,11 @@ vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), err
 vi.mock('./userAppAccess', () => ({ getAppAccessOptions: vi.fn() }));
 vi.mock('./autheliaSync', () => ({ appGroupName: (n: string) => `app-${n}` }));
 vi.mock('./autheliaUsers', () => ({ getUsersDatabasePath: vi.fn() }));
-vi.mock('../config/services', () => ({ resolveComposeFile: vi.fn() }));
+vi.mock('../config/services', () => ({ resolveComposeFile: vi.fn(), getService: vi.fn() }));
+// The real one shells out to `docker compose run authelia validate-config`;
+// its own behaviour is covered in autheliaValidate.test.ts. `false` = "does
+// not reject", i.e. the write proceeds.
+vi.mock('./autheliaValidate', () => ({ rejectsAutheliaConfig: vi.fn().mockResolvedValue(false) }));
 vi.mock('fs', () => ({
   default: { existsSync: vi.fn(), readFileSync: vi.fn(), writeFileSync: vi.fn() },
   existsSync: vi.fn(),

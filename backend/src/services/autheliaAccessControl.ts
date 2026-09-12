@@ -26,6 +26,7 @@ import { EXPOSURE_SETTINGS_KEYS } from '../utils/exposureSettings';
 import { getAppAccessOptions } from './userAppAccess';
 import { appGroupName } from './autheliaSync';
 import { getUsersDatabasePath } from './autheliaUsers';
+import { rejectsAutheliaConfig } from './autheliaValidate';
 import path from 'path';
 
 const execFileAsync = promisify(execFile);
@@ -187,6 +188,13 @@ export async function syncAutheliaAccessControl(trigger: string): Promise<Access
   const current = fs.readFileSync(configPath, 'utf8');
   const next = spliceAccessControl(current, block);
   if (next === current) {
+    return { changed: false, restarted: false, ruleCount: gated.length };
+  }
+
+  // Ask Authelia whether it can load this before replacing the file it is
+  // running on. Two generated strings have produced unloadable configs and
+  // crash-looped the service (§423/§425); this is the general guard (§426).
+  if (await rejectsAutheliaConfig(next, `access_control/${trigger}`)) {
     return { changed: false, restarted: false, ruleCount: gated.length };
   }
 

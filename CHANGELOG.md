@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.96.0] — 2026-09-12
+
+### Added
+
+- the generated Authelia config is now validated with Authelia's own validate-config before it replaces the live one, so an unloadable rule can no longer take the login gate down
+
 ## [0.95.2] — 2026-09-12
 
 ### Fixed
