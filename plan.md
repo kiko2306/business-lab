@@ -28013,3 +28013,73 @@ Email (dashboard mail settings) [smtp, to=<the Authelia admin's address>]
 So repeated starts converge rather than accumulate. The notification was not
 fired — that would send a real email — but its transport, recipient and
 type are what the read-back confirms.
+
+## 428. The ntfy app's 403: a token where the app wanted a password
+
+Reported from the phone: subscribing to `https://ntfy.tx-home-utils.com`
+returned
+
+```
+io.heckel.ntfy.service.NotAuthorizedException: User not authorized, HTTP 403
+```
+
+§425's protection working as designed — ntfy refusing an unauthenticated
+read — with the app holding no credential it could use. Two separate
+mistakes, both mine, both in §425.
+
+### 1. The credential the app asks for was never stored
+
+§425 minted an access token and generated the `subscriber` account's
+password *inline*, discarding it, on a code comment asserting "the password
+is never used — the app authenticates with the token". Wrong. ntfy's own
+docs describe the Android app in terms of a **"user configured for a
+server"** and its troubleshooting reads "Username/password may be
+incorrect" — the form wants a username and a password, and there was none to
+give it.
+
+Both are now generated and stored: username/password for the phone and
+desktop apps, `Authorization: Bearer tk_…` for the CLI and raw HTTP. An
+existing deployment converges — a token with no stored password *is* the
+pre-fix state, so the user is recreated (taking its old tokens with it) and a
+fresh token minted alongside the new password. A deployment already holding
+both is left alone, since `ntfy token add` mints a new token on every call.
+
+Verified against the public hostname, all three paths at once:
+
+```
+no credential       -> 403 denied
+username+password   -> 200 OK, topic readable
+bearer token        -> 200 OK, topic readable
+```
+
+### 2. The config panel masked the very values it told you to read
+
+`.env.example` and §425 both said to read the token in ntfy's config panel.
+It wasn't there: `getServiceEnvStatus('ntfy')` returned
+`value=NULL (masked)` for both keys, because `SECRET_KEY_PATTERN` masks
+anything token- or password-shaped.
+
+The panel already reveals one class of secret — a generated
+`*_ADMIN_PASSWORD`, so an app with no SSO can have its login read back — and
+the comment governing it asserted that convention was "precise enough that
+no separate per-service opt-in list is needed". ntfy is the counter-example:
+credentials generated *for the human to copy somewhere else*, neither of
+which ends in `ADMIN_PASSWORD`. So there is now an explicit `readableSecrets`
+registry field alongside the convention, and the comment says so instead of
+claiming otherwise.
+
+Registry tests enforce that nothing is declared readable *and* hidden
+(hidden always wins, so such a key would be silently unreadable), and that
+the list stays limited to ntfy — every entry converts a write-only secret
+into a readable one.
+
+Confirmed live: both keys now come back `visible in the panel`.
+
+### What this cost, and the lesson
+
+§425 was called verified on the strength of `curl -H "Authorization: Bearer
+…"` returning 200. That proved the *server* was right and said nothing about
+the *client*, which is the half that had to work. Verifying a feature against
+the transport I happened to choose, rather than the one the real client uses,
+is how both of these got through — and the masking bug means the documented
+recovery path had never been walked either.
