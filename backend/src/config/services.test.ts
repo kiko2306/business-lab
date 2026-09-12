@@ -669,6 +669,9 @@ describe('autheliaBypassPaths', () => {
   it("admits the requests native clients actually send, query strings included", () => {
     const ntfy = SERVICES.ntfy.autheliaBypassPaths ?? [];
     expect(matchesAny(ntfy, '/homelab-alerts/json')).toBe(true);
+    // The credential check the Android app makes before subscribing — the
+    // one whose absence made the app say "no connection" (§430).
+    expect(matchesAny(ntfy, '/homelab-alerts/auth')).toBe(true);
     expect(matchesAny(ntfy, '/homelab-alerts/json?poll=1&since=cFdmck')).toBe(true);
     expect(matchesAny(ntfy, '/homelab-alerts/ws')).toBe(true);
     expect(matchesAny(ntfy, '/v1/health')).toBe(true);

@@ -1181,11 +1181,18 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // `POST /<topic>` — publishing — is deliberately absent, so publishing
     // from outside still needs an Authelia session. /v1/health is admitted so
     // the app's "test connection" works without one.
+    //
+    // `auth` is in the list because the phone app calls
+    // `GET /<topic>/auth` to check its credentials *before* subscribing, and
+    // without it Authelia 302'd that check to the login portal and the app
+    // reported "no connection" with nothing else in the log (§430). It
+    // exposes nothing: it is ntfy's own authorisation check, which answers
+    // 403 to an anonymous caller and 200 only to a credential ntfy accepts.
     // `(\?.*)?$`, not a bare `$`: Authelia matches `resources` against the
     // path **and the query string**, and the ntfy app subscribes with
     // `/json?poll=1&since=…`. Verified the hard way — a bare `$` here let
     // /v1/health through and kept 302-ing the actual subscription (§425).
-    autheliaBypassPaths: ['^/[A-Za-z0-9_-]{1,64}/(json|sse|ws|raw)(\\?.*)?$', '^/v1/health(\\?.*)?$'],
+    autheliaBypassPaths: ['^/[A-Za-z0-9_-]{1,64}/(json|sse|ws|raw|auth)(\\?.*)?$', '^/v1/health(\\?.*)?$'],
     healthCheck: {
       enabled: true,
       type: 'http',

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.97.4] — 2026-09-12
+
+### Fixed
+
+- the ntfy phone app could not authenticate because Authelia was redirecting its `/<topic>/auth` credential check to the login portal
+
 ## [0.97.3] — 2026-09-12
 
 ### Fixed
