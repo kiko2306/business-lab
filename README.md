@@ -228,12 +228,6 @@ it is done — not ticked off and left behind. Section references point at
       an authenticated user. Revisit by reading the pinned version's
       upstream source for the exact mutation — not by probing.
 
-- [ ] **Uptime Kuma's SMTP notification isn't covered by global mail**
-      (§416.5) — no environment variable exists; it is a row in its own
-      `setting` table / a Socket.IO call. Now unblocked: §421 created the
-      admin, and `uptimeKumaAdminBootstrap.ts` already speaks the Socket.IO
-      frames needed, so this can reuse both.
-
 - [ ] **The fixed-IP prompt still isn't pre-answerable** (§422 did the other
       two) — `SETUP_FREE_PORT_53` and `SETUP_NOPASSWD_SUDO` now work from
       `start.config`, but a static IP needs the interface, address, gateway
@@ -241,7 +235,13 @@ it is done — not ticked off and left behind. Section references point at
       instead of `netplan try`, which auto-reverts with no terminal to
       confirm on. Left out because a wrong value cuts the host off and it
       cannot be verified against this host without risking the link it is
-      managed over (cf. §411.3).
+      managed over (cf. §411.3). `netplan try`'s auto-revert is the only
+      safety net for a typo'd gateway, and an unattended `netplan apply`
+      removes it. **Suggested design if picked up:** require all four values
+      explicitly (no guessed defaults), validate with `netplan generate`,
+      and *write the file without applying it* so it takes effect on the
+      next boot — an unattended install reboots anyway, and nothing can cut
+      the live link.
 
 - [ ] **Delete the obsolete `netbird-router-*` peers in the NetBird
       dashboard** (§410/§411.1) — the cause is fixed (the routing peer was

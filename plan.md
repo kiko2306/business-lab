@@ -27970,3 +27970,46 @@ demonstrably stops the exact config that took the login gate down twice.
 
 A real `syncAutheliaAccessControl` run afterwards validated and reported no
 change, confirming the guard does not interfere with the normal path.
+
+## 427. Uptime Kuma's SMTP notification, from the global mail settings
+
+§416.5, and the last app whose mail had to be set up by hand. Uptime Kuma
+has no environment variable for this at all — an email alert is a
+*notification object* in its own database — so `mailEnvKeys` could never
+reach it and the docs simply said to configure it in its UI.
+
+Two things from earlier in this run made it small: §421 gave the app an
+admin account, and the Socket.IO client written for that bootstrap is reused
+rather than adding a second transport. Authentication is free, because this
+app runs with `disableAuth` (§227/§216) so Authelia is the only gate and the
+server sends `autoLogin` and treats the socket as signed in.
+
+### Idempotent through Uptime Kuma's own API
+
+No local marker: the server sends `notificationList` on login, and passing an
+existing entry's id back to `addNotification` updates it instead of adding a
+second one. A duplicate notification per start is the obvious failure mode,
+so `findExistingId` is unit-tested against the real frame shape (including
+the case where a row has the right name but no numeric id).
+
+### Two details that would have failed silently
+
+- **`smtpSecure` is implicit TLS only.** For STARTTLS it must stay false;
+  setting it makes nodemailer speak TLS at a plaintext port and the send just
+  fails. Same distinction as §422's `smtps://` vs `smtp://`.
+- **`isDefault` + `applyExisting`.** Without them the notification covers
+  only monitors created *after* it, which looks like "alerts work" until an
+  existing monitor goes down.
+
+### Verified live
+
+First run reported `created`/`updated` and two further runs both `updated`,
+with the list read back out of Uptime Kuma showing **count=1**:
+
+```
+Email (dashboard mail settings) [smtp, to=<the Authelia admin's address>]
+```
+
+So repeated starts converge rather than accumulate. The notification was not
+fired — that would send a real email — but its transport, recipient and
+type are what the read-back confirms.
