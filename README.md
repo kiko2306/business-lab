@@ -223,17 +223,6 @@ it is done — not ticked off and left behind. Section references point at
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
 
-- [ ] **Test the VPN from a client whose LAN is also `192.168.1.0/24`**
-      (§411.4) — everything in §411–§411.3 was verified with no subnet
-      collision, so the behaviour that motivated the (now deleted)
-      secondary-address workaround is still unproven. Run the three
-      predictions in §411.4: the overlay IP `100.94.52.176` should still
-      reach the host, while `192.168.1.236` and `192.168.1.254` should
-      resolve to the *client's own* network — check **which** host answers,
-      since a silent wrong-host connection is the real hazard. Also try
-      `netbird networks select`/`deselect`, which may be a per-client
-      answer to collisions needing no server-side change.
-
 - [ ] **Delete the obsolete `netbird-router-*` peers in the NetBird
       dashboard** (§410/§411.1) — the cause is fixed (the routing peer was
       mounting the pre-0.78 `/etc/netbird` state path, so it never

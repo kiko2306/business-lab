@@ -120,6 +120,21 @@ Other devices on the box's LAN stay unreachable for that client — the only
 real fixes there are renumbering one side's LAN, or reaching them through
 the box (plan.md §411.2).
 
+Two things about that collision are worth knowing before someone burns an
+afternoon on it (verified from a colliding client, plan.md §411.5):
+
+- **`netbird networks deselect` / `select` does not help.** NetBird puts its
+  routes in a separate `netbird` routing table, consulted by `ip rule`
+  priority 110 — *below* priority 105's `lookup main suppress_prefixlength
+  0`, which serves the client's own directly-connected LAN. Deselecting only
+  empties the netbird table; selecting cannot make it win. The overlay IP is
+  unaffected either way, since it rides the plain `100.94.0.0/16` route on
+  `wt0`.
+- **A colliding address can answer from the wrong machine, silently.**
+  `192.168.1.1` from such a client reaches *their own router*, not the box's
+  LAN. So don't "test the VPN" against a LAN IP — a reply proves nothing
+  about which side answered. Test the overlay IP.
+
 ### Optional: automate Tailscale's own setup
 
 Step 1 already bootstrapped Tailscale with a hand-generated auth key and

@@ -26814,3 +26814,99 @@ paragraph. Untested; the commands exist, the behaviour is not known.
 The obsolete peers (`netbird-router`, `-93-231`, `-108-245`, `-201-197`,
 `-103-170`) still need deleting in the NetBird dashboard, keeping only
 `-52-176` — README item, needs a dashboard login.
+
+## 411.5. The colliding-LAN test, run: all three predictions resolved
+
+Run from `prt-dev-01` (WSL) on a **different physical network** whose LAN is
+`192.168.1.0/23` — `192.168.1.8`, gateway `192.168.1.1` — i.e. overlapping
+the box's `192.168.1.0/24`, and genuinely remote (routing peer connected
+P2P, remote ICE endpoint `2.82.103.227:51820`, not a LAN candidate). Repo
+`0.86.0` on both sides; routing peer `netbird-router-52-176`,
+`100.94.52.176`, identity still stable.
+
+### The three predictions from §411.4
+
+1. **Overlay IP keeps working — confirmed.**
+   `curl http://100.94.52.176:10001/api/version` → `200 {"version":"0.86.0"}`;
+   `ssh mat@100.94.52.176 hostname` → `home-srv-01`. The §411.3 deletion of
+   the secondary-address workaround stands.
+2. **`192.168.1.236` over the VPN fails — confirmed**, via the client's own
+   interface (`ip route get 192.168.1.236` → `dev eth1 src 192.168.1.8`),
+   with `No route to host`: this client's LAN happens to have nothing at
+   `.236`, so it failed loudly rather than answering from the wrong box.
+3. **`192.168.1.254` reaches the client's own network — confirmed.** Same
+   local route; no reply, because the client's LAN has no `.254` (its
+   gateway is `.1`). The box's LAN *does* answer there — verified from the
+   box over the overlay.
+
+### The wrong-host hazard, demonstrated
+
+Prediction 2's real worry — a silent connection to the wrong machine — was
+provable with `192.168.1.1`, which exists on the client's LAN but not on the
+box's:
+
+- `curl http://192.168.1.1/` → `301 → /2.0/gui/`, `Server: HTTP Server` — the
+  client's **own router**.
+- `curl --interface wt0 http://192.168.1.1/` → nothing, and from the box
+  `ping 192.168.1.1` gets no reply: no such host on the box's LAN.
+
+So an identical address resolves to two different networks depending on route,
+and unbound traffic always lands on the client's side. **Never "test the VPN"
+against a LAN IP from a colliding client** — a reply says nothing about which
+side answered.
+
+### Why, mechanically — and why `select`/`deselect` can't fix it
+
+NetBird does not touch the `main` table; it installs
+`192.168.1.0/24 dev wt0` in a dedicated `netbird` table and reaches it by
+policy rule:
+
+```
+105:   from all lookup main suppress_prefixlength 0
+110:   not from all fwmark 0x1bd00 lookup netbird
+```
+
+Priority 105 consults `main` for everything except the default route, so the
+client's directly-connected `192.168.0.0/23 dev eth1` matches first and rule
+110 is never reached for that range. Tested both directions:
+
+- `netbird networks deselect LAN` → table `netbird` empties; overlay IP
+  unaffected (it rides the plain `100.94.0.0/16` kernel route on `wt0`).
+- `netbird networks select LAN` → route returns, `ip route get 192.168.1.236`
+  still says `dev eth1`.
+
+So the §411.4 hope that `select`/`deselect` might be a per-client answer to
+collisions is **dead**: it controls whether the route exists, not whether it
+wins. `netbird status`'s `Networks: -` line while `netbird networks list` says
+`Status: Selected` is consistent with that — the route is selected but not
+installed anywhere the main lookup can see.
+
+### One escape hatch, not worth documenting as a workflow
+
+Device-binding does defeat the collision: `ping -I wt0 192.168.1.236` (4–5 ms)
+and `curl --interface wt0 http://192.168.1.236:10001/api/version` →
+`200 {"version":"0.86.0"}`, `local=100.94.10.157`. `ip route get 192.168.1.236
+oif wt0` confirms why — with an output interface pinned, `main`'s eth1 route is
+skipped and the `netbird` table applies.
+
+*Address*-binding does not: `ssh -b 100.94.10.157` and `ssh -o
+BindInterface=wt0` both give `No route to host`, matching
+`ip route get 192.168.1.236 from 100.94.10.157` → `dev eth1`. OpenSSH has no
+usable `SO_BINDTODEVICE` path here, so the tool most people would reach for
+can't use the hatch at all. Left out of the deployment guide deliberately:
+per-command interface pinning that works for `curl` and not `ssh` is a worse
+instruction than "use the overlay IP".
+
+### Landed
+
+`docs/deployment-guide.md`'s collision paragraph gains the two findings a
+reader actually needs: `select`/`deselect` doesn't help and why, and the
+wrong-host hazard with the instruction not to test against a LAN IP. No code
+change — the code was already right; §411.4's open question was whether it
+was right *for the right reason*, and it is.
+
+### Still open
+
+The obsolete `netbird-router*` peers (`-236-33` seen Idle in this session's
+peer list, plus `-93-231`, `-108-245`, `-201-197`, `-103-170`) still need
+deleting in the NetBird dashboard — unchanged README item, needs a login.
