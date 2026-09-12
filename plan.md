@@ -27206,3 +27206,59 @@ management reads `management.json` only at startup.
 The full dashboard "Restart" button path, which needs a UI login the agent
 does not have. What was tested is the hook and the recreate command the
 executor issues, on the real stack, with management genuinely down.
+
+## 415. The Authelia 401 loop is two native mobile clients, not a broken integration
+
+Investigated the §413 observation; no code changed, because the fix turns out
+to be an exposure decision rather than a bug fix.
+
+### What it actually is
+
+Not an internal integration failing. Both 401 sources are **external native
+clients that cannot do a browser login**, coming from one external IP
+(`87.196.86.21`, i.e. a phone, not the box — the box's WAN is IPv6):
+
+- the ntfy app subscribing to `ntfy.<domain>/homelab-alerts/json?since=…`
+  every ~5 s, and
+- a Bitwarden client POSTing `vaultwarden.<domain>/identity/connect/token`.
+
+Authelia answers each with `401 → redirect to the login portal`, which a
+native client can do nothing with, so it retries forever.
+
+### The README item's guess was wrong
+
+It said the ntfy 401s were "probably the alert integration failing silently".
+They are not: alerts **publish** fine. `ntfyPublishUrl()` in
+`n8nWorkflows.ts` posts to `http://host.docker.internal:<published port>/`,
+the host's own published port, which never passes through Authelia. Nothing
+is being lost — the alerts just can't be *read* on the phone.
+
+### Why it isn't a one-line fix
+
+1. **There is no path-level bypass mechanism.** `autheliaAccessControl.ts`
+   generates exactly one whole-domain `one_factor` rule per gated app (plus
+   `bypass` for Authelia's own portal). Per-path bypass means a new registry
+   field, a generator change to emit a `resources:`-scoped rule *ahead* of the
+   domain rule (Authelia is first-match-wins), and its tests.
+2. **ntfy has no authentication of its own.** Nothing in
+   `apps/ntfy/docker-compose.yml` sets `auth-file`/`auth-default-access`; it
+   relies entirely on Authelia. Bypassing `/homelab-alerts/json` would make
+   the alert stream — which carries attacker IPs from CrowdSec — readable by
+   anyone who guesses the topic. `alertNotify.ts`'s own header comment already
+   flags this ("ntfy topics are publish-by-name and this instance is
+   internet-facing"). Doing it safely means generating ntfy's auth file + ACL
+   and a subscriber token from the dashboard first — which is the right shape
+   under principle 3, but it is a feature, not a rule.
+3. **Vaultwarden has `SIGNUPS_ALLOWED: true`.** Bypassing its client API
+   while signups are open would let anyone register an account on the public
+   instance. Today Authelia is the only thing preventing that. The bypass and
+   `SIGNUPS_ALLOWED=false` have to land together.
+
+### Conclusion
+
+Left as a README item, rewritten with the accurate diagnosis and the two
+independent halves, because both change what is publicly reachable and that
+is not the agent's call to make unprompted. Vaultwarden's half is the
+well-trodden one (its own auth is strong, the clients are E2E-encrypted, and
+gating only the web vault is the documented pattern); ntfy's half needs its
+own auth enabling first.

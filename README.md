@@ -223,12 +223,25 @@ it is done — not ticked off and left behind. Section references point at
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
 
-- [ ] **Authelia 401s two API endpoints on a loop** (§413, noticed in its
-      logs) — something polls `ntfy.<domain>/homelab-alerts/json` every ~5 s
-      and gets a 401 redirect to the login page, and Vaultwarden's
-      `/identity/connect/token` gets the same. Both look like API paths
-      caught by forward-auth that need a bypass rule. The ntfy one is
-      probably the alert integration failing silently.
+- [ ] **Native mobile clients can't get past Authelia** (§415) — the ntfy
+      app and a Bitwarden client retry forever against
+      `ntfy.<domain>/homelab-alerts/json` and
+      `vaultwarden.<domain>/identity/connect/token`, because Authelia answers
+      a native client with a 401-to-login-portal it can't use. Alerts
+      themselves are fine (they publish via the host port, not through
+      Authelia) — it's only reading them on the phone that's blocked.
+      Needs a per-path bypass mechanism, which does not exist:
+      `autheliaAccessControl.ts` emits one whole-domain rule per app, so this
+      means a registry field plus a `resources:`-scoped rule ahead of the
+      domain rule. Two independent halves, each an exposure decision:
+
+      - **Vaultwarden** — bypass `/api`, `/identity`, `/notifications`; the
+        documented pattern, its own auth is strong. Must land together with
+        `SIGNUPS_ALLOWED=false`, or the open signup endpoint becomes public.
+      - **ntfy** — needs ntfy's own auth first (`auth-file` + ACL +
+        a generated subscriber token, dashboard-managed). It has none today,
+        so a bare bypass would publish the CrowdSec alert stream, attacker
+        IPs included, to anyone who guesses the topic.
 
 - [ ] **Delete the obsolete `netbird-router-*` peers in the NetBird
       dashboard** (§410/§411.1) — the cause is fixed (the routing peer was
