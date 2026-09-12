@@ -26764,3 +26764,53 @@ Nothing to unwind server-side — `netbird networks list` confirmed only the
 live. The `172.20.5.10/24` address stays on `home-srv-01`'s `enp2s0` in
 `/etc/netplan/90-homelab-fixed-ip.yaml`; harmless, and editing netplan over
 the link it serves is not worth the risk for cosmetics.
+
+## 411.4. Handoff: the colliding-LAN test, to be run from a client on 192.168.1.0/24
+
+Everything in §411–§411.3 was verified from a client on `10.174.69.1/24` —
+i.e. with **no** subnet collision. The one claim still unproven is the one
+that motivated the whole secondary-address detour: what actually happens
+when a remote client's own network uses the same range as the box's LAN.
+Next session runs from such a client. Recording the predictions here
+*before* the test, so they can be falsified rather than rationalised after
+the fact.
+
+### State at handoff
+
+- Repo `0.86.0`, `dev`/`beta`/`main` all at `5a205c9`; host pulled, backend
+  rebuilt, `netbird-client` recreated.
+- Routing peer: `netbird-router-52-176`, `100.94.52.176`, identity stable
+  across three recreates. `Relays: 3/3`, `Networks: 192.168.1.0/24`.
+- Box's LAN: `192.168.1.0/24`, host `192.168.1.236`, gateway `192.168.1.254`.
+
+### Predictions to test
+
+1. **Overlay IP keeps working.** `ssh mat@100.94.52.176` and
+   `curl http://100.94.52.176:10001/api/version` → expected to succeed
+   unchanged. This is the whole basis for deleting the secondary address
+   (§411.3); if it fails, that deletion was wrong and should be revisited.
+2. **`192.168.1.236` over the VPN fails, or worse, silently succeeds
+   against the wrong machine.** The client has a directly-connected route
+   for `192.168.1.0/24` on its own interface, which should beat the NetBird
+   route. **Check *which* host answers, don't just check that something
+   does** — `ssh mat@192.168.1.236 hostname` returning something other than
+   `home-srv-01`, or an SSH host-key mismatch warning, is the interesting
+   result. A silent wrong-host connection is the real hazard here.
+3. **`192.168.1.254` reaches the client's own gateway, not the box's.**
+   Same reasoning. Confirm by whether its web UI / MAC differs.
+
+### Also worth trying while there
+
+NetBird 0.78 has `netbird networks select` / `deselect` (the `Status:
+Selected` line in `netbird networks list`). If a colliding client can
+`deselect` the LAN network to stop NetBird fighting its local route — or
+conversely `select` it and have NetBird win — that is a per-client CLI
+answer to collisions that needs no server-side change at all, and would be
+worth documenting in `docs/deployment-guide.md` next to the overlay-IP
+paragraph. Untested; the commands exist, the behaviour is not known.
+
+### Still open regardless
+
+The obsolete peers (`netbird-router`, `-93-231`, `-108-245`, `-201-197`,
+`-103-170`) still need deleting in the NetBird dashboard, keeping only
+`-52-176` — README item, needs a dashboard login.
