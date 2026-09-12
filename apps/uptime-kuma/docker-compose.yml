@@ -12,6 +12,16 @@ services:
     restart: unless-stopped
     ports:
       - "${UPTIME_KUMA_PORT:-10370}:3001"
+    environment:
+      # NOT read by Uptime Kuma — a carrier so the dashboard's config panel
+      # shows the field and auto-generates a value. The backend uses it to
+      # create the admin via Uptime Kuma's Socket.IO `setup` event
+      # (services/uptimeKumaAdminBootstrap.ts), which is what clears the
+      # first-run wizard the uptime-kuma-init comment below mentions.
+      # With `disableAuth` on, this password is never used to log in —
+      # Authelia is the gate — so it is a break-glass credential for anyone
+      # who turns Uptime Kuma's own auth back on.
+      UPTIME_KUMA_ADMIN_PASSWORD: ${UPTIME_KUMA_ADMIN_PASSWORD:-}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Uptime Kuma"

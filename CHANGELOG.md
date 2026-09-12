@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.91.0] — 2026-09-12
+
+### Added
+
+- Uptime Kuma's admin account is now created automatically, clearing its first-run setup wizard
+
 ## [0.90.0] — 2026-09-12
 
 ### Added
