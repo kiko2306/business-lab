@@ -27144,3 +27144,65 @@ mobile data is a carrier CGNAT range with nothing competing with the NetBird
 route, while the same phone on a `192.168.1.0/24` WiFi has a
 directly-connected route that wins. `10.177.1.30` works on both. That
 "mobile data yes, WiFi no" tell is now in `docs/deployment-guide.md`.
+
+## 414. NetBird routing-peer provisioning: after `up`, and recreate what it configures
+
+`ensureNetbirdRoutingPeer` ran as a pre-up hook, so on a dashboard "Restart"
+— a genuine stop-then-start of the whole project — netbird-management was
+always down when it ran. Every restart logged the same `fetch failed` and
+left provisioning to "try again next restart", which raced identically
+(§410.1: two consecutive restarts both hit it in one live session).
+
+### Moved after `up`, polling until management serves
+
+20 × 3 s, the same budget `docusealAdminBootstrap`/`immichAdminBootstrap`
+use. `waitForManagement` counts **any HTTP response as ready, 401 included**:
+it is a liveness probe, and treating a status code as "not ready" would burn
+the whole 60 s retrying a genuinely revoked PAT before reporting it.
+
+### The half that mattered more: a container's env is fixed at create time
+
+Moving the hook after `up` surfaced the real reason a second restart was
+needed. `netbird-client` is created with `NB_SETUP_KEY` read from `.env` at
+`up` time. On a first start that value is `change-me`, so the container
+crash-loops (`restart: unless-stopped`) — and a setup key written to `.env`
+*after* `up` is never seen by the already-created container, however many
+times it restarts. Same for the §412 sidecar's `NETBIRD_LAN_*`, which would
+sit idle logging "no LAN/alias range yet".
+
+So the hook now returns whether it wrote anything, and the executor
+force-recreates exactly the two consumers when it did:
+
+```
+docker compose -p netbird-vpn … up -d --force-recreate netbird-client netbird-lan-alias
+```
+
+Returning **false** in steady state is load-bearing, not an optimisation: a
+recreate drops peer connections, so doing it on every start would be worse
+than the bug it fixes. Both branches are unit-tested for that reason.
+
+### Verified live
+
+- **The race itself**: stopped netbird-management, called the hook
+  immediately with it down, and scheduled a `docker start` 20 s later. The
+  hook returned after **22 s** with `envChanged=false` and no warning — it
+  waited, then provisioned. Before this change it failed instantly.
+- **The recreate**: ran the exact command the executor now issues. Both
+  containers came back, the sidecar reinstalled its two nat rules, and the
+  routing peer kept its identity — `netbird-router-52-176`,
+  `100.94.52.176`, public key `K9nTXiLUUp19F9UQJF1eHCQGXkhb3GNH4jRxBDjhwkE=`,
+  unchanged, `Connected` over P2P. That last check is the one that matters
+  here: a `--force-recreate` of `netbird-client` is precisely what used to
+  leak a zombie peer per recreate, and §411.1's `/var/lib/netbird` mount
+  holds up under a recreate the code now performs deliberately.
+- The §412 alias still answers afterwards (`10.177.1.30:8080` → 200,
+  `10.177.1.236:10001` → 0.87.2).
+
+`ensureNetbirdDeviceCodeFlow` (§413) deliberately stays **pre**-up:
+management reads `management.json` only at startup.
+
+### Not verified
+
+The full dashboard "Restart" button path, which needs a UI login the agent
+does not have. What was tested is the hook and the recreate command the
+executor issues, on the real stack, with management genuinely down.

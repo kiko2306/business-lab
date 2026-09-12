@@ -238,16 +238,3 @@ it is done — not ticked off and left behind. Section references point at
       every `netbird-router*` peer except the one currently connected, so
       the router group has exactly one live member. Needs a NetBird
       dashboard login, which the agent does not have.
-
-- [ ] **NetBird routing-peer auto-provisioning's pre-up hook races
-      netbird-management on every restart, not just a first-ever cold
-      start** (§410.1) — `ensureNetbirdRoutingPeer` runs before `docker
-      compose up`, so it always finds `netbird-management` down on a
-      dashboard "Restart" (confirmed a genuine stop-then-start of the
-      whole project every time, not just the first start ever). Two
-      consecutive restarts both hit the same "fetch failed" race back to
-      back in one live session — move it to a post-up, poll-until-ready
-      pattern (`docusealAdminBootstrap.ts`'s `MAX_ATTEMPTS`/
-      `RETRY_DELAY_MS` shape) instead of relying on "try again next
-      restart."
-
