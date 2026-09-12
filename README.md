@@ -223,15 +223,18 @@ it is done — not ticked off and left behind. Section references point at
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
 
-- [ ] **NetBird restart can re-register netbird-client under a fresh
-      WireGuard identity** (§410/§410.1) — found live, recurred across
-      three separate restarts in one session: restarting NetBird VPN
-      caused the routing-peer container to come up as a brand-new peer
-      (different keypair) instead of reusing the one persisted in
-      `./data/client`, leaving the old identity stuck forever and orphaned
-      in NetBird's peer list. Root cause not pinned down — needs
-      investigating with real SSH access to the host (containerboot's own
-      logs around a restart) before it silently recurs unattended.
+- [ ] **Verify the routing peer's DNS fix, then clear the zombie peers**
+      (§411) — root cause of both the dead VPN and §410's re-registrations
+      is found and fixed on `dev`: NetBird rewrote the `netbird-client`
+      container's own `/etc/resolv.conf` to its embedded resolver, which
+      never answers because Pi-hole owns `:53`, so the router could not
+      resolve the relay, either public STUN server, or management.
+      `NB_DISABLE_DNS: "true"` is in `apps/netbird-vpn/docker-compose.yml`
+      but **is not yet proven on the host** — deploy, recreate the
+      container, and confirm `Relays: 3/3` and a non-zero peer count.
+      Then delete the dead `netbird-router`, `netbird-router-93-231`,
+      `-108-245` and `-201-197` peers in the NetBird dashboard so the
+      router group has exactly one live member.
 
 - [ ] **NetBird routing-peer auto-provisioning's pre-up hook races
       netbird-management on every restart, not just a first-ever cold
