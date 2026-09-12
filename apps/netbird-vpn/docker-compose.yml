@@ -170,12 +170,9 @@ services:
       # which never answers on a box where Pi-hole owns :53 — so the router
       # then cannot resolve netbird-vpn-api/-relay.${BASE_DOMAIN} and dies
       # with "relay connection is not established", taking every peer
-      # connection with it. Losing management that way is also what makes
-      # it re-register under a fresh WireGuard identity on restart, which
-      # is where the netbird-router-NNN-NNN zombie peers came from
-      # (plan.md §410/§411). Same `--disable-dns` §368 already standardised
-      # for the host's own daemon; a router forwards packets and never
-      # needs to resolve *.netbird.selfhosted itself.
+      # connection with it (plan.md §411). Same `--disable-dns` §368
+      # already standardised for the host's own daemon; a router forwards
+      # packets and never needs to resolve *.netbird.selfhosted itself.
       NB_DISABLE_DNS: "true"
       # Same self-hosted endpoint every native client already uses — see
       # additionalExposures on netbird-vpn in backend/src/config/services.ts.
@@ -201,7 +198,15 @@ services:
       # fine (nothing extra gets advertised). See plan.md §410.
       NETBIRD_SECONDARY_LAN_ADDRESS: "${NETBIRD_SECONDARY_LAN_ADDRESS:-}"
     volumes:
-      - ./data/client:/etc/netbird
+      # /var/lib/netbird, not /etc/netbird: NetBird 0.78's profile system
+      # keeps the client's identity here (default.json holds the WireGuard
+      # private key, alongside state.json/active_profile.json), and
+      # /etc/netbird — the pre-profiles location this used to mount — is
+      # left empty. Mounting the wrong path persisted nothing, so every
+      # container recreate registered a brand-new peer and NetBird gave it
+      # a suffixed name; that is where the netbird-router-NNN-NNN zombies
+      # came from (plan.md §410/§411.1), not from any network fault.
+      - ./data/client:/var/lib/netbird
 
 networks:
   netbird-net:

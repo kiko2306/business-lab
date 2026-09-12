@@ -26654,3 +26654,58 @@ cleaned up from here (deleting peers is not something
 `netbirdRoutingPeer.ts` does, and inventing that is not worth it for a
 one-off left by a bug now fixed). The §410.1 pre-up race is untouched and
 stays on the README list.
+
+## 411.1. Correction: the zombie peers were a stale bind-mount path, not the DNS fault
+
+§411's DNS diagnosis is correct and verified, but its claim that losing
+management is *also* what produced the `netbird-router-NNN-NNN` zombies
+was **wrong**. Recorded here rather than edited above, per the append-only
+rule.
+
+What disproved it: after deploying `NB_DISABLE_DNS` to `beta` and
+recreating `netbird-client`, the container came up healthy in every
+respect — `/etc/resolv.conf` left as Docker wrote it, `Management:
+Connected`, `Relays: 3/3 Available`, `Networks: 192.168.1.0/24` — and
+*still* registered a fifth identity, `netbird-router-103-170`, taking the
+peer count from 6 to 7. A clean recreate with working DNS re-registering
+anyway rules DNS out as the cause.
+
+The actual cause, found by looking at where the client keeps its state:
+
+```
+./data/client:/etc/netbird   -> empty, both on the host and in the container
+/var/lib/netbird/            -> default.json, state.json, active_profile.json
+```
+
+NetBird 0.78's profile system (`Profile: default` in `netbird status`,
+`netbird profile` subcommand) moved client state to `/var/lib/netbird`;
+`default.json` is what holds the WireGuard private key. `/etc/netbird` is
+the pre-profiles location. This compose file has been mounting the old
+path, so **nothing was ever persisted** — every recreate started from an
+empty state dir, redeemed the setup key afresh, and got a new keypair.
+NetBird then de-duplicated the colliding `NB_HOSTNAME: netbird-router` by
+appending a suffix, one generation per recreate.
+
+That also explains the detail §410 found most baffling: the identity was
+lost on *ordinary* restarts with no error in the logs, because from the
+client's point of view nothing failed — it was a first-ever start every
+single time.
+
+Corroboration that `/var/lib/netbird` is the intended path rather than a
+guess: NetBird's own `client/Dockerfile-rootless` sets
+`NB_STATE_DIR="/var/lib/netbird"` and `NB_CONFIG="/var/lib/netbird/config.json"`.
+
+Fix is the one-line mount change to `./data/client:/var/lib/netbird`.
+Changing it costs one final re-registration (the empty `data/client` is
+populated on the next start), after which the identity survives; the
+proof is that a second recreate leaves `FQDN` unchanged.
+
+### Lesson worth carrying
+
+Both §410 and §411 spent their effort on the network because the
+*symptom* was a network one. The state that was supposed to make the peer
+stable was never written at all, and a bind mount pointing at an empty
+directory looks exactly like a working one from the outside. When
+something "loses its identity across restarts", check that the path being
+persisted is the path the current version of the software actually writes
+to, before reading anything into how it failed.

@@ -223,18 +223,14 @@ it is done — not ticked off and left behind. Section references point at
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
 
-- [ ] **Verify the routing peer's DNS fix, then clear the zombie peers**
-      (§411) — root cause of both the dead VPN and §410's re-registrations
-      is found and fixed on `dev`: NetBird rewrote the `netbird-client`
-      container's own `/etc/resolv.conf` to its embedded resolver, which
-      never answers because Pi-hole owns `:53`, so the router could not
-      resolve the relay, either public STUN server, or management.
-      `NB_DISABLE_DNS: "true"` is in `apps/netbird-vpn/docker-compose.yml`
-      but **is not yet proven on the host** — deploy, recreate the
-      container, and confirm `Relays: 3/3` and a non-zero peer count.
-      Then delete the dead `netbird-router`, `netbird-router-93-231`,
-      `-108-245` and `-201-197` peers in the NetBird dashboard so the
-      router group has exactly one live member.
+- [ ] **Delete the obsolete `netbird-router-*` peers in the NetBird
+      dashboard** (§410/§411.1) — the cause is fixed (the routing peer was
+      mounting the pre-0.78 `/etc/netbird` state path, so it never
+      persisted its identity and registered afresh on every recreate), but
+      the identities it already leaked have to be removed by hand: delete
+      every `netbird-router*` peer except the one currently connected, so
+      the router group has exactly one live member. Needs a NetBird
+      dashboard login, which the agent does not have.
 
 - [ ] **NetBird routing-peer auto-provisioning's pre-up hook races
       netbird-management on every restart, not just a first-ever cold
