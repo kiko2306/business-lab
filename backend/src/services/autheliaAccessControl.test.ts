@@ -192,3 +192,34 @@ describe('renderAccessControl bypass paths', () => {
     }
   });
 });
+
+// §423: a bypass path ending in `$'` was read as String.replace's
+// "everything after the match" pattern, splicing the rest of the file into
+// the block and leaving a config Authelia refused to load — which took every
+// gated app down with it. Both splice branches must treat the block as
+// literal text.
+describe('spliceAccessControl treats the block as literal', () => {
+  const dangerous = [
+    "    - domain: 'v.example.com'\n      policy: bypass\n      resources:\n        - '^/identity/connect/token$'\n",
+    "        - '^/api($|/)'\n",
+    '        - \'$& $` $\' $1\'\n',
+  ];
+
+  it('keeps $-sequences intact when replacing an existing marked block', () => {
+    for (const body of dangerous) {
+      const block = `# >>> managed by the dashboard — plan.md §151; regenerated on every exposure change, manual edits are lost\naccess_control:\n${body}# <<< managed by the dashboard\n`;
+      const before = `head: true\n# >>> managed by the dashboard — plan.md §151; regenerated on every exposure change, manual edits are lost\naccess_control:\n  old: yes\n# <<< managed by the dashboard\ntail_marker_unique: true\n`;
+      const out = spliceAccessControl(before, block);
+      expect(out).toContain(body.trimEnd());
+      // The tail must appear exactly once — twice means it was spliced in.
+      expect(out.split('tail_marker_unique').length - 1).toBe(1);
+    }
+  });
+
+  it('keeps $-sequences intact on the structural (no markers yet) branch', () => {
+    const block = "access_control:\n  rules:\n    - domain: 'v'\n      resources:\n        - '^/x$'\n";
+    const out = spliceAccessControl('access_control:\n  default_policy: deny\n\ntail_marker_unique: true\n', block);
+    expect(out).toContain("- '^/x$'");
+    expect(out.split('tail_marker_unique').length - 1).toBe(1);
+  });
+});

@@ -123,12 +123,17 @@ export function spliceAccessControl(configText: string, block: string): string {
       '\\$&'
     )}\\n?`
   );
+  // `() => block`, never `block` itself: as a replacement *string*, `$&`,
+  // `$'`, "$`" and `$1` are substitution patterns, so any `$` in the
+  // generated block would splice part of the file into itself. A bypass path
+  // ending `token$'` did exactly that and left an unloadable config that took
+  // Authelia — and with it every gated app — down (plan.md §423).
   if (marked.test(configText)) {
-    return configText.replace(marked, block);
+    return configText.replace(marked, () => block);
   }
   const structural = /^access_control:\n(?:[ \t].*\n|#.*\n|\n)*/m;
   if (structural.test(configText)) {
-    return configText.replace(structural, block);
+    return configText.replace(structural, () => block);
   }
   // No access_control at all — prepend it after the first line.
   return `${block}\n${configText}`;

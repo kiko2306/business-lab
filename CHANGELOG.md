@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.93.1] — 2026-09-12
+
+### Fixed
+
+- a generated Authelia config block containing a `$` could splice part of the file into itself, producing a config Authelia refused to load
+
 ## [0.93.0] — 2026-09-12
 
 ### Added

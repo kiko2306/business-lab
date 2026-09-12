@@ -128,8 +128,11 @@ const MARKED = new RegExp(
  * file has no `oidc.clients` list at all (no OIDC provider configured).
  */
 export function spliceOidcClients(configText: string, block: string): string {
+  // `() => block` for the same reason as spliceAccessControl (§423): a `$` in
+  // the block would otherwise be read as a replacement pattern. Safe here so
+  // far only because generateComplexPassword deliberately excludes `$`.
   if (MARKED.test(configText)) {
-    return configText.replace(MARKED, block);
+    return configText.replace(MARKED, () => block);
   }
   const clientsKey = /^ {4}clients:\n/m;
   if (clientsKey.test(configText)) {
