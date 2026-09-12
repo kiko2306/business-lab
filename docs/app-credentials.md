@@ -222,6 +222,25 @@ The setup key's self-heal checks NetBird's own `valid` flag on every
 365-day cap has no dashboard alert today, only the logged warning
 mentioned above; see the README TODO list.
 
+## Diagnosing "the app can't connect" for an exposed service
+
+Read NPM's access log for that proxy host **first** — it gives the exact
+path, status and user-agent, which no amount of curl from the server can
+infer:
+
+```bash
+docker exec nginx-proxy-manager-nginx-proxy-manager-1 \
+  sh -c 'grep -l <hostname> /data/nginx/proxy_host/*.conf'   # find the host id
+docker exec nginx-proxy-manager-nginx-proxy-manager-1 \
+  tail -20 /data/logs/proxy-host-<id>_access.log
+```
+
+A `302` there means Authelia gated a path the client needs, and the app's own
+error will usually be a misleading "no connection" rather than an
+authorisation failure — see `plan.md` §430, where the ntfy phone app's
+`GET /<topic>/auth` credential check was the missing path and four rounds of
+server-side testing never showed it.
+
 ## Rotating a credential
 
 Generated values live in each app's `.env`, written by the dashboard. Change

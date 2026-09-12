@@ -28153,3 +28153,59 @@ server held (§429). Every step was "verified" against the thing I had just
 built rather than against the whole path the user actually walks — which for
 this feature is *phone → Cloudflare → Authelia → ntfy → auth db*. The lesson
 already recorded in §428 stands, one layer deeper.
+
+## 430. "No connection": the app's credential check was never in the bypass
+
+Fourth attempt at this one feature, and the first one diagnosed from the
+client's own request rather than from a theory about it.
+
+### What the evidence was, once I went looking for it
+
+Everything I could test from the server said yes: ntfy, Authelia and the
+home page all up; the domain served over **both** IPv4 (`172.67.145.117`)
+and IPv6; Pi-hole answering with Cloudflare addresses and no local override;
+the held-open `json` stream returning `200 application/x-ndjson` with data;
+the WebSocket `OPEN` in 2.4 s; and the stored credential still valid. The
+user's browser reached `/v1/health` fine. The app still said "no connection".
+
+ntfy's own log said only `subscribers=0` and logged no authentication
+failure — which was the clue, not the dead end it looked like: the request
+was never reaching ntfy at all. NPM's per-host access log had it in one
+line:
+
+```
+GET /homelab-alerts/auth -> 302   "ntfy/1.25.2 (play; Android 16; SDK 36)"
+```
+
+The Android app calls **`GET /<topic>/auth`** to validate its credentials
+*before* subscribing. The §425 bypass admitted `json|sse|ws|raw` and not
+`auth`, so Authelia redirected that check to the login portal, the app never
+got as far as subscribing, and the failure surfaced as a connection error
+rather than an authorisation one.
+
+Adding `auth` exposes nothing — it is ntfy's own authorisation check, 403 to
+an anonymous caller and 200 only to a credential ntfy accepts. Verified after
+the fix, and the distinction that matters is *who answers*:
+
+```
+/auth  anonymous        -> 403 from ntfy
+/auth  with credential  -> 200 from ntfy
+```
+
+### The actual lesson, four sections late
+
+§425 → §428 → §429 → here, each failure in a layer the previous check did not
+cover. The common thread is not carelessness about any one layer; it is that
+**every diagnosis started from the server's point of view**, and the one
+artefact that describes the client's — NPM's access log, which was there the
+whole time and answered it in a single line — was only consulted at the
+fourth attempt.
+
+For any "the app can't reach it" report against an exposed service, read
+`/data/logs/proxy-host-<n>_access.log` in the NPM container **first**. It
+gives the exact path, status and user-agent, which is precisely the
+information no amount of server-side curl can infer.
+
+Worth checking the same way if Vaultwarden's clients ever misbehave: its
+bypass list was written from the same kind of reasoning about which
+endpoints a client "should" need.
