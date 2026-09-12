@@ -26910,3 +26910,125 @@ was right *for the right reason*, and it is.
 The obsolete `netbird-router*` peers (`-236-33` seen Idle in this session's
 peer list, plus `-93-231`, `-108-245`, `-201-197`, `-103-170`) still need
 deleting in the NetBird dashboard — unchanged README item, needs a login.
+
+## 412. The colliding-LAN fix: a NETMAPed alias range for the box's LAN
+
+§411.5 closed the question of *what* happens when a remote client's own
+network is also `192.168.1.0/24`, and left the requirement unmet: from such a
+client, no device on the box's LAN is reachable at all. This section makes the
+whole range reachable, with nothing to configure client-side.
+
+### Why the client side can't be the answer
+
+The obvious fix is to make the VPN win on the client — one `ip rule` below
+priority 105:
+
+```
+ip rule add to 192.168.1.0/24 lookup netbird priority 100
+```
+
+It works, and it is still the wrong answer, for a reason that has nothing to
+do with taste: **the client's own default gateway is inside the range**. Hand
+`192.168.1.0/24` to the VPN and `192.168.1.1` — the next hop of the client's
+default route, and therefore the path WireGuard's own packets take — goes over
+the tunnel it is carrying. The client loses the internet and the VPN together.
+Pinning the gateway back to `main` at a higher priority rescues the internet
+but gives up the box's gateway, so the requirement ("`.1`–`.254`") is
+unsatisfiable that way. It is also per-machine, root-only, manual console
+configuration — principle 2 — and lost on reinstall.
+
+So the fix has to be server-side, and it has to use addresses that cannot
+collide.
+
+### What landed
+
+A second range, `10.177.1.0/24`, advertised as its own NetBird resource and
+NETMAPed 1:1 onto the real LAN on the routing peer. Last octet preserved:
+
+| On the box's LAN | Over the VPN |
+|---|---|
+| `192.168.1.1` (its gateway) | `10.177.1.1` |
+| `192.168.1.30` | `10.177.1.30` |
+| `192.168.1.236` (the host) | `10.177.1.236` |
+
+- `netbirdRoutingPeer.ts` advertises the alias **in addition** to the real LAN
+  and writes the pair to `apps/netbird-vpn/.env`
+  (`NETBIRD_LAN_CIDR`/`NETBIRD_LAN_ALIAS_CIDR`) as its pre-up hook.
+- A `netbird-lan-alias` sidecar in `apps/netbird-vpn/docker-compose.yml`
+  (`network_mode: host`, `NET_ADMIN`) reads those two values and installs two
+  rules, re-asserting them every 60 s.
+- `aliasCidrFor()` keeps the alias at the LAN's **own** prefix length: NETMAP
+  rewrites only the host part, so a `/24` alias over a `/23` LAN would map half
+  of it and black-hole the rest. Base address from `.env`, mask from the host.
+
+`10.177.1.0/24` is deliberately obscure, and specifically clear of the
+`10.201.x` pool Docker uses on this host (`start.sh`).
+
+### The one non-obvious constraint: keep advertising the real LAN
+
+The first design replaced the `LAN` resource with the alias. That would have
+been broken, and reading NetBird's live nft table before writing any code is
+what caught it — NetBird generates its firewall rules **from the advertised
+CIDR**:
+
+```
+chain netbird-rt-fwd {
+        ip saddr @nb-43babe13 ip daddr 192.168.1.0/24 accept
+}
+chain netbird-acl-forward-filter {
+        iifname "wt0" jump netbird-rt-fwd
+        iifname "wt0" drop          ← everything the jump didn't accept
+}
+```
+
+A NETMAP in `nat`/`PREROUTING` (priority `dstnat`, −100) runs *before* the
+forward hook, so by the time the packet is filtered its destination is already
+`192.168.1.x`. Advertise only the alias and the accept rule reads
+`ip daddr 10.177.1.0/24`, matches nothing, and netbird's own trailing `drop`
+eats every aliased packet. A `drop` in one nftables chain cannot be overridden
+by an `accept` in another table, so there is no way to patch around it from
+outside. Advertising **both** makes netbird write both accept rules, and the
+real-LAN one is what passes the translated packet. It also keeps the existing
+behaviour for non-colliding clients exactly as it was — the change is purely
+additive.
+
+Rejected on the same evidence: putting the DNAT in a custom nft chain at
+priority −175 (after conntrack at −200, before netbird's mangle-prerouting at
+−150) so netbird's mark-based masquerade would see the translated destination
+and cover the source NAT for us. It works on paper and needs one rule instead
+of two, but it couples us to netbird's internal chain priorities and mark
+values, and `nft` isn't in the netbird image (only `iptables-nft`). Our own
+one-line masquerade is independent of netbird's internals and needs no second
+image.
+
+### Verified live, from a genuinely colliding client
+
+Client `192.168.1.8/23`, remote (P2P, remote endpoint `2.82.103.227`), host at
+`0.87.0`:
+
+- The client picked the alias up on its own — `netbird networks list` shows
+  both resources `Selected`, and `ip route get 10.177.1.30` resolves to `wt0`
+  with no local route to fight.
+- `curl http://10.177.1.30:8080` → `200`, `Server: Webs` — the device on the
+  box's LAN. `10.177.1.236:10001` → `{"version":"0.87.0"}`.
+- **Full-range sweep**: pinging `10.177.1.1`–`.254` from the client and
+  `192.168.1.1`–`.254` from the box returns the *identical* host set
+  (`.30 .50 .111 .206 .236 .254`). The whole range maps, not just the address
+  that was being tested.
+- Wrong-host discrimination: `10.177.1.254` answers `Server: micro_httpd` (the
+  box's gateway) while the client's own `192.168.1.1` still answers
+  `Server: HTTP Server` — two different machines, both reachable, neither
+  shadowing the other.
+- Re-assert loop: deleting the NETMAP rule by hand had it back within 60 s,
+  logged, with no duplicate — the `-C` check keeps it from stacking. This is
+  not theoretical; a docker daemon restart rebuilds the `nat` table and drops
+  anything it did not put there.
+- The provisioning hook run twice in a row produced no second resource, no
+  `.env` rewrite (it compares before saving) and no warnings.
+
+### Not done
+
+No new image and so no new `docs/licences.md` row: the sidecar reuses
+`netbirdio/netbird`, already pulled for the routing peer, whose Alpine base
+ships `iptables-nft` (`nft` itself is absent — hence iptables, not nftables,
+for the rules).
