@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.88.1] — 2026-09-12
+
+### Fixed
+
+- n8n's owner bootstrap no longer gates on exposure — n8n is deliberately overlay-only, so the gate meant it never ran
+
 ## [0.88.0] — 2026-09-12
 
 ### Added

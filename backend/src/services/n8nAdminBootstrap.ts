@@ -1,14 +1,21 @@
 /**
- * Claim n8n's owner account on start, so an exposed n8n lands on a login
- * page instead of a "set up owner" wizard (§419, principle 3).
+ * Claim n8n's owner account on start, so reaching n8n lands on a login page
+ * instead of a "set up owner" wizard (§419, principle 3).
  *
- * n8n community has no SSO (SAML is enterprise-only), so it sits behind
- * Authelia *and* keeps its own login. Leaving the owner unclaimed on a
- * publicly reachable instance means the first visitor to get through
- * Authelia decides who owns it — the same first-visit claim race
- * immichAdminBootstrap/docusealAdminBootstrap exist to close. The account is
- * created with the Authelia admin's email and a generated
- * `N8N_ADMIN_PASSWORD`, readable in the app's config panel.
+ * n8n community has no SSO (SAML is enterprise-only), so it always keeps its
+ * own login. The account is created with the Authelia admin's email and a
+ * generated `N8N_ADMIN_PASSWORD`, readable in the app's config panel; an
+ * operator who wants to choose it sets that field before the first start,
+ * same as every sibling bootstrap.
+ *
+ * Deliberately **not** gated on exposure, unlike docusealAdminBootstrap.
+ * n8n's `getExposability()` refuses outright — "a sensitive gateway, reach it
+ * over the NetBird/Tailscale overlay, not the public tunnel" — so its
+ * `service_exposure` row is permanently `enabled: false` and an exposure gate
+ * would mean this never runs at all. Found by running it against the live
+ * host, which is the only reason it was caught. DocuSeal's gate is right for
+ * DocuSeal (public, directly exposed, and un-exposed it keeps its own
+ * onboarding); the wizard here is a step for the admin either way.
  *
  * Idempotent by construction: `showSetupOnFirstLoad` in n8n's own
  * `/rest/settings` is n8n's answer to "does an owner exist yet", so once one
@@ -20,7 +27,6 @@ import logger from '../utils/logger';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getHostGatewayIp } from '../utils/network';
 import { getAutheliaAdminUser } from './autheliaUsers';
-import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
 
 export const N8N_SERVICE = 'n8n';
@@ -71,12 +77,6 @@ async function getSetupState(baseUrl: string): Promise<SetupState> {
 export async function reconcileN8nFirstAdmin(serviceName: string): Promise<void> {
   if (serviceName !== N8N_SERVICE) return;
   if (!resolveComposeFile(N8N_SERVICE)?.composeFile) return;
-
-  // Only meaningful while exposed: that's when an unclaimed owner is a race
-  // with whoever reaches the public hostname first. A LAN-only n8n keeps its
-  // own onboarding, where a human can choose their own password.
-  const exposureRow = await getServiceExposureRow(N8N_SERVICE);
-  if (!exposureRow?.enabled) return;
 
   const password = readAppEnvValue(N8N_SERVICE, N8N_ADMIN_PASSWORD_KEY);
   if (!password) {
