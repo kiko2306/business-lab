@@ -223,6 +223,50 @@ it is done — not ticked off and left behind. Section references point at
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
 
+- [ ] **Enrol this host as a NetBird peer without a console step** (§416.1)
+      — `docs/first-run.md` still tells an operator to run
+      `sudo netbird up --disable-dns` with a browser SSO login, which
+      principle 2 forbids. The dashboard already mints setup keys via the
+      PAT, and `netbird up --setup-key … --management-url … --disable-dns`
+      needs no browser. Mint a **second** key for this (the routing peer's
+      auto-joins `business-lab-netbird-router`, so reusing it would register
+      the host as a second router). Also permanently closes the §368 footgun
+      where a re-enrollment that forgets `--disable-dns` breaks all host DNS.
+
+- [ ] **`start.config` should take Tailscale's OAuth client, not its auth
+      key** (§416.2) — it accepts `TAILSCALE_AUTH_KEY` (90-day, must be
+      re-typed) but not `TAILSCALE_OAUTH_CLIENT_ID`/`_SECRET`, which is
+      non-expiring and makes the dashboard mint and re-mint that key itself
+      (§408). An unattended client install currently bakes in a credential
+      that dies in 90 days. Keep accepting the auth key for anyone who only
+      has one.
+
+- [ ] **Six apps still need a human to claim the admin account** (§416.3) —
+      Navidrome, Uptime Kuma, n8n, Twenty, Vikunja, Jellyfin. Four
+      bootstraps of this exact shape already exist to copy
+      (`reconcileImmichFirstAdmin`, `…Docuseal…`, `…HomeAssistant…`,
+      `…Itflow…`). Closes the first-visit claim race properly instead of
+      relying on Authelia sitting in front.
+
+- [ ] **Build Kimai's `MAILER_URL` from the global mail settings** (§416.4)
+      — documented as by-hand only because the per-field injection can't
+      compose a DSN, but it is just `smtp://user:pass@host:port` from fields
+      the dashboard already holds.
+
+- [ ] **Uptime Kuma's SMTP notification isn't covered by global mail**
+      (§416.5) — no environment variable exists; it needs Uptime Kuma's own
+      API after an admin exists, so it depends on the admin bootstrap above.
+
+- [ ] **`setup_server.sh`'s three y/N prompts aren't pre-answerable**
+      (§416.6) — fixed IP, NOPASSWD sudo, and freeing port 53 for Pi-hole
+      are all skipped silently on a no-TTY install because `start.config`
+      has no keys for them.
+
+- [ ] **Vaultwarden ships `SIGNUPS_ALLOWED=true`** (§416.7) — anyone who
+      reaches it could register if it were ever un-gated, and it blocks
+      §415's client-API bypass. Default it to false with a
+      dashboard-managed invite instead.
+
 - [ ] **Native mobile clients can't get past Authelia** (§415) — the ntfy
       app and a Bitwarden client retry forever against
       `ntfy.<domain>/homelab-alerts/json` and
