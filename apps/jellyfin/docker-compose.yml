@@ -9,6 +9,12 @@ services:
       - "${JELLYFIN_PORT:-10210}:8096"
     environment:
       TZ: ${TZ:-UTC}
+      # NOT read by Jellyfin — a carrier so the dashboard's config panel shows
+      # the field and auto-generates a value. The backend uses it to run
+      # Jellyfin's first-run startup wizard
+      # (services/jellyfinAdminBootstrap.ts): Jellyfin has no OIDC and is
+      # lanOnly, so its own login is the only gate.
+      JELLYFIN_ADMIN_PASSWORD: ${JELLYFIN_ADMIN_PASSWORD:-}
     labels:
       - "homepage.group=Media & Files"
       - "homepage.name=Jellyfin"
