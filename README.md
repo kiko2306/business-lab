@@ -223,18 +223,17 @@ it is done — not ticked off and left behind. Section references point at
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
 
-- [ ] **Two apps still need a human to claim the admin account** (§416.3;
-      n8n §419, Jellyfin + Navidrome §420, Vikunja dissolved — its OIDC
-      login creates the user by itself) — **Uptime Kuma** and **Twenty**.
-      Copy `navidromeAdminBootstrap.ts`; no exposure gate (§419).
-      - **Uptime Kuma** drives setup over socket.io, not REST. Needs a raw
-        engine.io handshake or a new dependency — a decision to take before
-        starting, not an implementation detail.
-      - **Twenty** is a GraphQL `signUp` mutation on a fast-moving API;
-        confirm it against the running instance first.
-      When probing either, confirm a route with a **GET that returns 405**,
-      never a POST — probing Jellyfin's `/Startup/Complete` completed its
-      wizard as a side effect (§420).
+- [ ] **Twenty's workspace owner is still claimed by hand** (§421) — the
+      only one of §416.3's six not automated, and deliberately: at
+      `v2.39.5` GraphQL introspection is disabled, `clientConfig` and
+      `checkUserExists` no longer exist on `Query` (so there is no
+      read-only way to ask whether a workspace exists), and the auth
+      surface is login-token/OTP based. Guessing mutations against a live
+      CRM risks a half-created workspace that cannot be re-claimed.
+      Low urgency: Twenty is behind Authelia and upstream disables new
+      signups once the first workspace exists, so the race is one click by
+      an authenticated user. Revisit by reading the pinned version's
+      upstream source for the exact mutation — not by probing.
 
 - [ ] **Build Kimai's `MAILER_URL` from the global mail settings** (§416.4)
       — documented as by-hand only because the per-field injection can't

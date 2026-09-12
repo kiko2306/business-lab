@@ -27602,3 +27602,75 @@ cannot be signed into looks identical from the outside.
 engine.io handshake or a new dependency, and that is a decision, not an
 implementation. **Twenty** — GraphQL `signUp` on a fast-moving API, not yet
 confirmed against the running instance.
+
+## 421. Uptime Kuma's admin over Socket.IO; Twenty declined, with reasons (§416.3 closed)
+
+### Uptime Kuma
+
+The one app in §416.3 with no REST API for this: setup is a Socket.IO event.
+Built on the `ws` client the backend **already depends on** rather than
+adding `socket.io-client` for a single call — the v4 frames involved are few,
+and every one in the test was captured from the running app before any code
+was written:
+
+```
+← 0{"sid":…}                 engine.io OPEN
+→ 40                         socket.io CONNECT
+← 40{"sid":…}
+← 42["setup"]                only sent when no user exists yet
+← 42["info",{…}] / 42["autoLogin"]
+→ 421["setup","<user>","<pw>"]
+← 431[{"ok":true}]
+```
+
+`42["setup"]` is the state signal, and its **absence** means already set up —
+the safe direction, since a missed signal skips rather than firing setup at a
+live instance. Engine.io pings are ponged, or the server drops the connection
+mid-exchange.
+
+Context that makes this the right shape: this app already sets `disableAuth`
+via `uptime-kuma-init` (§227/§216) so Authelia is the only gate, and that
+container's own comment notes the empty `user` table still forces the wizard.
+Creating the user clears the wizard **without introducing a second login**.
+The generated password is therefore break-glass only — it matters if someone
+turns Uptime Kuma's own auth back on.
+
+Verified live: admin created as `mat`; the server then stopped announcing
+`setup` and instead sent the full logged-in payload (`monitorList`,
+`notificationList`, `apiKeyList`, …); second run logged "already has an admin
+account".
+
+### Twenty: declined, not deferred for lack of effort
+
+Pinned at `twentycrm/twenty:v2.39.5`. Four findings, in the order they came:
+
+1. **GraphQL introspection is disabled** — `__schema` returns "GraphQL
+   introspection has been disabled", so the schema cannot be discovered.
+2. **The public query surface has moved.** Both `clientConfig` and
+   `checkUserExists` — the usual pre-auth queries, and the only read-only way
+   to ask "does a workspace exist yet" — answer `Cannot query field … on type
+   "Query"` in this version.
+3. **The auth surface is login-token/OTP based.** The frontend bundle
+   (`/assets/index-*.js`, the authoritative source for this exact build)
+   contains `getAuthTokensFromLoginToken` and `getAuthTokensFromOTP`, with no
+   password sign-up mutation in the main chunk — it is lazily loaded.
+4. **The race is self-closing and already bounded.** Upstream confirms the
+   first registered account becomes workspace owner and *new signups are
+   disabled after the first workspace is created* in single-workspace mode.
+   Twenty is also behind Authelia (its own SSO is Enterprise-only), so only
+   an authenticated Authelia user can reach the form at all.
+
+Guessing mutation names and payloads against a live CRM — with no state query
+to check first, and no introspection to confirm against — risks leaving a
+half-created workspace that cannot be re-claimed, which is strictly worse
+than the documented manual step. Given (4), the exposure is one click by an
+Authelia user on first deployment. Revisit only by reading the pinned
+version's upstream source for the exact mutation, not by probing.
+
+### §416.3 outcome
+
+Six apps listed. **Four automated** — n8n (§419), Jellyfin and Navidrome
+(§420), Uptime Kuma (here). **One dissolved** — Vikunja needed nothing
+(§420). **One declined** — Twenty, above. Every one of the four was verified
+against the live host, and in all four the generated password was proven to
+actually authenticate, not merely that the account appeared.
