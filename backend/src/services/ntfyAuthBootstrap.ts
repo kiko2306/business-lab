@@ -16,6 +16,14 @@
  * nextcloudOnlyOffice.ts and homeAssistantHacs.ts. ntfy's CLI writes the auth
  * database directly, so the server does not need to be up for this.
  *
+ * Stores **both** a password and a token, because the two clients want
+ * different things: ntfy's own docs describe the Android app in terms of a
+ * "user configured for a server" and its troubleshooting says "username/
+ * password may be incorrect", while the CLI and raw HTTP take
+ * `Authorization: Bearer tk_…`. The first cut stored only the token and
+ * generated the password inline — so the phone app, which asks for a
+ * username and password, had nothing to enter and ntfy answered 403 (§428).
+ *
  * Runs once: a token already in `.env` is left alone, because `ntfy token
  * add` mints a *new* token every time it is called and the old one keeps
  * working — re-running blindly would litter the auth database with tokens
@@ -29,7 +37,9 @@ import { generateComplexPassword, readAppEnvValue, saveServiceEnv } from './appE
 
 export const NTFY_SERVICE = 'ntfy';
 export const NTFY_TOKEN_KEY = 'NTFY_SUBSCRIBE_TOKEN';
-const SUBSCRIBER_USER = 'subscriber';
+export const NTFY_PASSWORD_KEY = 'NTFY_SUBSCRIBE_PASSWORD';
+/** Also the username to type into the ntfy app. */
+export const SUBSCRIBER_USER = 'subscriber';
 
 function run(command: string, timeoutMs = 120_000): Promise<string> {
   return new Promise((resolve, reject) => {
@@ -59,9 +69,13 @@ export function parseToken(cliOutput: string): string | null {
  * renames the topic is a worse failure than a read-only token that follows
  * it. Still read-only, and still the only way to read anything.
  */
-function buildScript(password: string): string {
+function buildScript(password: string, recreate: boolean): string {
   return [
     'set -e',
+    // Recreating is how an existing subscriber whose password was never
+    // stored (the §428 state) converges on one that is. Deleting takes its
+    // tokens with it, which is why a fresh token is minted right after.
+    recreate ? `ntfy user del ${SUBSCRIBER_USER} >/dev/null 2>&1 || true` : ':',
     `NTFY_PASSWORD='${password}' ntfy user add --ignore-exists --role=user ${SUBSCRIBER_USER} >/dev/null 2>&1 || true`,
     `ntfy access ${SUBSCRIBER_USER} '*' ro >/dev/null`,
     `ntfy token add --label='Business Lab dashboard (subscriber)' ${SUBSCRIBER_USER}`,
@@ -71,17 +85,19 @@ function buildScript(password: string): string {
 export async function ensureNtfySubscriberToken(serviceName: string): Promise<void> {
   if (serviceName !== NTFY_SERVICE) return;
 
-  const existing = (readAppEnvValue(NTFY_SERVICE, NTFY_TOKEN_KEY) ?? '').trim();
-  if (existing) return;
+  const existingToken = (readAppEnvValue(NTFY_SERVICE, NTFY_TOKEN_KEY) ?? '').trim();
+  const existingPassword = (readAppEnvValue(NTFY_SERVICE, NTFY_PASSWORD_KEY) ?? '').trim();
+  if (existingToken && existingPassword) return;
+  // A token but no password means this ran before §428 and the phone app has
+  // no credential it can use. Recreate the user so both exist.
+  const recreate = Boolean(existingToken) && !existingPassword;
 
   const resolved = resolveComposeFile(NTFY_SERVICE);
   if (!resolved?.composeFile) return;
 
   try {
-    // The password is never used — the app authenticates with the token — but
-    // ntfy will not create a user without one, and a blank password would
-    // make `subscriber` loggable-into from the web UI.
-    const script = buildScript(generateComplexPassword());
+    const password = generateComplexPassword();
+    const script = buildScript(password, recreate);
     const scriptB64 = Buffer.from(script).toString('base64');
     const command =
       `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
@@ -92,8 +108,11 @@ export async function ensureNtfySubscriberToken(serviceName: string): Promise<vo
       logger.warn('ntfy: minted no subscriber token — `ntfy token add` printed nothing recognisable');
       return;
     }
-    await saveServiceEnv(NTFY_SERVICE, { [NTFY_TOKEN_KEY]: token });
-    logger.info('ntfy: created the read-only subscriber token (read it in ntfy\'s config panel)');
+    await saveServiceEnv(NTFY_SERVICE, { [NTFY_TOKEN_KEY]: token, [NTFY_PASSWORD_KEY]: password });
+    logger.info(
+      `ntfy: ${recreate ? 're-created' : 'created'} the read-only '${SUBSCRIBER_USER}' account — ` +
+        'username/password for the phone app, token for the CLI, both in ntfy\'s config panel'
+    );
   } catch (error) {
     // Never blocks the start; retried on the next one.
     logger.warn('ntfy: could not create the subscriber token', { error: (error as Error).message });

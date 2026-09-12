@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.97.1] — 2026-09-12
+
+### Fixed
+
+- ntfy's subscriber password is now stored as well as its token — the phone app asks for a username and password, so a token alone left it with nothing to enter and ntfy returned 403
+
 ## [0.97.0] — 2026-09-12
 
 ### Added

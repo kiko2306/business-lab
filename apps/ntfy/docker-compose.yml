@@ -40,6 +40,11 @@ services:
       # desktop app (Settings -> add the topic -> "Login/token") to subscribe
       # now that anonymous reads are denied.
       NTFY_SUBSCRIBE_TOKEN: ${NTFY_SUBSCRIBE_TOKEN:-}
+      # The same read-only account's password. The Android/iOS apps ask for a
+      # username and password ("Manage users" per ntfy's own docs), not a
+      # token — storing only the token left the phone with nothing to enter
+      # and ntfy answering 403 (§428). Username is `subscriber`.
+      NTFY_SUBSCRIBE_PASSWORD: ${NTFY_SUBSCRIBE_PASSWORD:-}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=ntfy"
