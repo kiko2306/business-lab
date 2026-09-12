@@ -46,6 +46,7 @@ import { reconcileItflowMailCron } from './itflowMailCron';
 import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { ensureNetbirdRoutingPeer } from './netbirdRoutingPeer';
+import { ensureNetbirdDeviceCodeFlow } from './netbirdAuthFlow';
 import { ensureTailscaleAutomation } from './tailscaleAutomation';
 import { extractComposeEnvVars, getAllServices, getService, isValidServiceName, resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
@@ -241,6 +242,10 @@ async function composeUpWithManagedConfig(
   // wizard click-through on a fresh deployment (§404/§405). No-op until a
   // Personal Access Token is entered, and for every other service.
   await ensureNetbirdRoutingPeer(serviceName);
+
+  // NetBird: management reads management.json only at startup, so the auth
+  // flow has to be settled before the app comes up (§413).
+  await ensureNetbirdDeviceCodeFlow(serviceName);
   // Tailscale: mint/refresh TAILSCALE_AUTH_KEY and enable Funnel on the
   // tailnet's ACL via Tailscale's own API, so there's no manual key
   // generation or one-click Funnel step (§408). No-op until an OAuth client

@@ -26,7 +26,9 @@
     "Password": null
   },
   "Relay": {
-    "Addresses": ["rels://netbird-vpn-relay.${BASE_DOMAIN}:443"],
+    "Addresses": [
+      "rels://netbird-vpn-relay.${BASE_DOMAIN}:443"
+    ],
     "CredentialsTTL": "24h",
     "Secret": "${NETBIRD_RELAY_AUTH_SECRET}"
   },
@@ -57,20 +59,6 @@
       "TokenEndpoint": "https://authelia.${BASE_DOMAIN}/api/oidc/token",
       "DeviceAuthEndpoint": "https://authelia.${BASE_DOMAIN}/api/oidc/device-authorization",
       "Scope": "openid profile email offline_access",
-      "UseIDToken": true
-    }
-  },
-  "PKCEAuthorizationFlow": {
-    "ProviderConfig": {
-      "Audience": "netbird-dashboard",
-      "ClientID": "netbird-dashboard",
-      "Domain": "",
-      "AuthorizationEndpoint": "https://authelia.${BASE_DOMAIN}/api/oidc/authorization",
-      "TokenEndpoint": "https://authelia.${BASE_DOMAIN}/api/oidc/token",
-      "Scope": "openid profile email offline_access",
-      "RedirectURLs": [
-        "http://localhost:53000/"
-      ],
       "UseIDToken": true
     }
   }

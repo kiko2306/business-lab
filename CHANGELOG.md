@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.87.1] — 2026-09-12
+
+### Fixed
+
+- NetBird: mobile login no longer dead-ends on `localhost:53000` — native clients use the OIDC device-code flow, which needs no loopback listener
+
 ## [0.87.0] — 2026-09-12
 
 ### Added

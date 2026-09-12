@@ -148,16 +148,18 @@ identity_providers:
         redirect_uris:
           - 'https://netbird-vpn.{{ env "BASE_DOMAIN" }}/nb-auth'
           - 'https://netbird-vpn.{{ env "BASE_DOMAIN" }}/nb-silent-auth'
-          # Native clients (Android/desktop/CLI) reuse this same public PKCE
-          # client — they can't use the two web URLs above, because the app
-          # runs a throwaway loopback listener and expects the authorization
-          # code delivered back to it there (RFC 8252). Reusing this client
-          # rather than netbird-cli is deliberate: management validates the
-          # bearer's audience against HttpConfig.AuthAudience, which is
-          # 'netbird-dashboard', so a token minted for a different client_id
-          # would be rejected. Both slash variants are registered because
-          # Authelia matches redirect_uri by exact string.
-          # See PKCEAuthorizationFlow in apps/netbird-vpn/data/management.json.
+          # RFC 8252 loopback, for a native client doing the PKCE flow: the
+          # app listens on 127.0.0.1:53000 and expects the authorization code
+          # delivered back to it there. Kept registered, but **no longer
+          # reached** — management stopped advertising PKCEAuthorizationFlow
+          # (plan.md §413), because nothing listens on that port on a phone,
+          # so Android/iOS landed on a "connection refused" page after a
+          # successful login; and on Windows 53000 is inside the Hyper-V/WSL
+          # excluded range, so the client picks an unregistered port instead.
+          # Native clients all use the device-code grant below now. These two
+          # entries stay so that a deployment whose management.json still has
+          # the PKCE flow keeps working. Both slash variants, because Authelia
+          # matches redirect_uri by exact string.
           - 'http://localhost:53000/'
           - 'http://localhost:53000'
         scopes:
