@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.88.0] — 2026-09-12
+
+### Added
+
+- n8n's owner account is now claimed automatically on start, so an exposed n8n shows a login instead of a setup wizard
+
 ## [0.87.3] — 2026-09-12
 
 ### Fixed

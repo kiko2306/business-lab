@@ -82,6 +82,11 @@ services:
       - "host.docker.internal:host-gateway"
     environment:
       <<: *n8n-db-env
+      # NOT read by n8n — a carrier so the dashboard's config panel shows the
+      # field and auto-generates a value. The backend uses it to claim n8n's
+      # owner account (services/n8nAdminBootstrap.ts): n8n community has no
+      # SSO, so the admin still logs in with this behind Authelia.
+      N8N_ADMIN_PASSWORD: ${N8N_ADMIN_PASSWORD:-}
       N8N_HOST: ${N8N_HOST:-localhost}
       N8N_PORT: 5678
       N8N_PROTOCOL: ${N8N_PROTOCOL:-http}

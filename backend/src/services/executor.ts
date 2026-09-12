@@ -40,6 +40,7 @@ import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import { applyImmichConfig } from './immichConfig';
 import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { reconcileDocusealFirstAdmin } from './docusealAdminBootstrap';
+import { reconcileN8nFirstAdmin } from './n8nAdminBootstrap';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
 import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 import { reconcileItflowMailCron } from './itflowMailCron';
@@ -338,6 +339,11 @@ async function composeUpWithManagedConfig(
   // first-visitor-claims-owner race. Clean JSON API with a real `done` flag.
   // After `up`; no-op otherwise.
   await reconcileHomeAssistantFirstAdmin(serviceName);
+  // n8n: claim the owner account so an exposed n8n shows a login instead of
+  // a setup wizard, and the first visitor through Authelia can't claim it
+  // (§419). REST against the running editor backend, so after `up`; no-op
+  // otherwise.
+  await reconcileN8nFirstAdmin(serviceName);
   // ITFlow: run its first-run setup wizard (schema import + admin) so exposing
   // it direct (§344/§350) has no manual step and no claim race. The wizard's
   // first POST creates the schema — the itfloworg image doesn't. After `up`;
