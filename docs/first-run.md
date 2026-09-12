@@ -138,25 +138,37 @@ its own, all skipped automatically without a TTY:
 Say no (or just press Enter) to skip either one; re-run `./start.sh` later to
 be asked again.
 
-### Enrolling this host as a NetBird peer
+### This host is already on the NetBird overlay — nothing to enroll
 
-Not part of `start.sh` — it's a manual, interactive step (`netbird up` needs a
-browser SSO login) whenever the host itself joins the overlay, e.g. for
-[SSH over NetBird](ssh-keys.md). **If this host runs Pi-hole**, always pass
-`--disable-dns`:
+There is no host-level enrollment step, and the `netbird` CLI is not
+installed on the host at all. NetBird VPN's own `netbird-client` container
+(the routing peer, provisioned automatically — plan.md §404/§405) runs
+`network_mode: host`, so the `wt0` interface and its `100.64.0.0/10` address
+live in the **host's** network namespace. The host is a full overlay
+participant either way: it answers on that address, and it initiates
+connections out over it.
+
+Read the address off any enrolled peer with `netbird status`, or on the box
+with `ip -4 addr show wt0`. It is what [SSH over NetBird](ssh-keys.md) uses,
+and being inside `100.64.0.0/10` it can never collide with a client's home
+network (plan.md §411.5/§412).
+
+A *separate* machine enrolling natively (a laptop, a phone) is a different
+matter, and **if that machine runs Pi-hole or any local resolver on `:53`,
+enroll it with `--disable-dns`**:
 
 ```bash
 sudo netbird up --disable-dns
 ```
 
 A fresh (or re-)enrollment turns NetBird's DNS management on by default: it
-rewrites `/etc/resolv.conf` to point at its own embedded resolver and tries to
-bind `:53` — which Pi-hole's container already holds, so the resolver can't
-start and **all host DNS breaks** (updates, backups, apt, everything) until
-`--disable-dns` is (re-)applied. It persists across restarts and reboots
-(`DisableDNS: true` in `/var/lib/netbird/default.json`), so this only needs
-doing once per enrollment — but a re-enrollment that forgets the flag breaks
-DNS again (`plan.md` §368).
+rewrites `/etc/resolv.conf` to point at its own embedded resolver and tries
+to bind `:53`, so the resolver cannot start and **all DNS on that machine
+breaks** until `--disable-dns` is (re-)applied. It persists across restarts
+and reboots (`DisableDNS: true` in `/var/lib/netbird/default.json`), so it
+only needs doing once per enrollment — but a re-enrollment that forgets the
+flag breaks DNS again (`plan.md` §368, and §411 for the same bug inside the
+routing-peer container, fixed there with `NB_DISABLE_DNS`).
 
 ## What is reachable when it finishes
 

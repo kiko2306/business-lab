@@ -223,16 +223,6 @@ it is done — not ticked off and left behind. Section references point at
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
 
-- [ ] **Enrol this host as a NetBird peer without a console step** (§416.1)
-      — `docs/first-run.md` still tells an operator to run
-      `sudo netbird up --disable-dns` with a browser SSO login, which
-      principle 2 forbids. The dashboard already mints setup keys via the
-      PAT, and `netbird up --setup-key … --management-url … --disable-dns`
-      needs no browser. Mint a **second** key for this (the routing peer's
-      auto-joins `business-lab-netbird-router`, so reusing it would register
-      the host as a second router). Also permanently closes the §368 footgun
-      where a re-enrollment that forgets `--disable-dns` breaks all host DNS.
-
 - [ ] **`start.config` should take Tailscale's OAuth client, not its auth
       key** (§416.2) — it accepts `TAILSCALE_AUTH_KEY` (90-day, must be
       re-typed) but not `TAILSCALE_OAUTH_CLIENT_ID`/`_SECRET`, which is

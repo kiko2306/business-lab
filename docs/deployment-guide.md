@@ -18,10 +18,13 @@ Have these in hand — `start.sh` cannot derive them (see
   Zone → DNS: Edit.
 - A **Tailscale account + reusable auth key**, and Funnel enabled once for the
   tailnet.
-- If the host itself will be enrolled as a **NetBird peer** and it runs
-  Pi-hole, enroll with `sudo netbird up --disable-dns` — see
-  [first-run.md § Enrolling this host as a NetBird peer](first-run.md#enrolling-this-host-as-a-netbird-peer).
-  A bare `netbird up` breaks host DNS (`plan.md` §368).
+- Nothing for NetBird. The host needs no enrollment step of its own — the
+  routing peer's container runs `network_mode: host`, so the box is already
+  on the overlay (see
+  [first-run.md](first-run.md#this-host-is-already-on-the-netbird-overlay--nothing-to-enroll)).
+  A *separate* machine enrolling natively that runs a local resolver on
+  `:53` needs `sudo netbird up --disable-dns`, or its DNS breaks
+  (`plan.md` §368).
 - Hardware per [the turnkey build spec](turnkey-build-spec.md) — decide Docker's
   data root at install time, not after (first-run.md § Where Docker keeps its
   data).

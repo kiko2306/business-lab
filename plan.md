@@ -27340,3 +27340,43 @@ else's UI.
 a console or a re-typed credential, so they rank above the per-app wizard
 work in (3). (4) is a one-liner. (5) depends on (3). (6) only matters for
 genuinely unattended installs. (7) is an exposure decision, like §415.
+
+## 417. §416.1 dissolved: the host needs no NetBird enrollment at all
+
+The README item proposed automating `sudo netbird up --disable-dns` with a
+dashboard-minted setup key, to remove the last console step. Checked the host
+before building it, and the step turns out to be **obsolete rather than
+un-automated**:
+
+- `systemctl is-active netbird` → `inactive`; `is-enabled` → `not-found`; and
+  `command -v netbird` finds nothing. **The netbird CLI is not installed on
+  the host**, so the documented command could not be run there as written.
+- `wt0` / `100.94.52.176` belongs to NetBird VPN's own `netbird-client`
+  container, which runs `network_mode: host` — the interface and its address
+  live in the host's network namespace.
+- The host is a full overlay participant, not merely reachable: from
+  `home-srv-01`, `ping 100.94.10.157` (a remote peer) → 2/2, ~15 ms.
+
+So the routing peer the dashboard already provisions (§404/§405) *is* the
+host's overlay membership. A second, host-level enrollment would be
+redundant, and worse: two NetBird daemons in one namespace both want `wt0`.
+The `home-srv-01` / `100.94.134.207` peer sitting `Idle` in the peer list is
+a leftover identity from before the routing peer existed — one more for the
+dashboard-cleanup item, not something to recreate.
+
+### What landed
+
+Docs only. `docs/first-run.md`'s "Enrolling this host as a NetBird peer"
+section is replaced by "This host is already on the NetBird overlay —
+nothing to enroll", and `docs/deployment-guide.md`'s prerequisite bullet now
+says there is nothing to do for NetBird.
+
+The §368 `--disable-dns` knowledge is **kept, not deleted** — it still
+applies to a *separate* machine enrolling natively with a local resolver on
+`:53` (this session's own WSL client is one). It just does not apply to this
+box, which is the part the old wording got wrong.
+
+Net effect on the original question (§416): with this gone, a client
+deployment's only console command is `./start.sh`, as principle 2 requires.
+No code was written, which is the right outcome — the feature was already
+there under a different name.
