@@ -27771,3 +27771,54 @@ first (`auth-file` + ACL + a dashboard-generated subscriber token) — a bare
 bypass there would publish the CrowdSec alert stream, attacker IPs included,
 to anyone who guesses the topic. The mechanism this section adds is what it
 will use once that exists.
+
+## 424. publishAlert(), and the NetBird PAT no longer expiring silently
+
+§407: NetBird caps Personal Access Tokens at 365 days with no never-expires
+option, and its API cannot mint a replacement without a human already
+holding a session in NetBird's own UI. So when a token hit that cap,
+`netbirdRoutingPeer.ts` logged a warning and auto-provisioning stayed dead
+until somebody noticed.
+
+### The primitive that was missing
+
+Everything that alerted before this went CrowdSec → n8n → ntfy. That is
+right for a stream of alerts and far too much machinery for "this one
+credential stopped working", so `alertNotify.ts` gains `publishAlert()`: one
+POST to ntfy's own published port, the same `host.docker.internal` route
+`ntfyPublishUrl()` uses.
+
+Deliberately **not** through n8n, Cloudflare, NPM or Authelia. The things
+worth alerting about are often the things that just broke, so the alert path
+depends on as little of the stack as possible — ntfy and the host port,
+nothing else. Never throws; returns whether it published, so the caller can
+log the difference rather than assume delivery.
+
+### Only a rejected credential alerts
+
+`isRejectedCredential()` matches the `-> 401:`/`-> 403:` that `nbRequest`
+puts in its error message, and nothing else. A transport failure ("fetch
+failed", a timeout, a 500) retries on the next start by itself, and alerting
+on those would fire on every flaky start — which on this host, before §414,
+was *every* restart. The test pins both sides of that line.
+
+### Verified live
+
+`publishAlert()` run against the host returned `true`, and the message reads
+back out of the topic intact:
+
+```json
+{"topic":"homelab-alerts","title":"Business Lab: alert plumbing test",
+ "message":"§424 verification — publishAlert() reached ntfy directly…",
+ "priority":4,"tags":["white_check_mark"]}
+```
+
+The PAT-rejection branch itself was not fired live — that would mean
+revoking the working token and losing VPN auto-provisioning to prove a log
+line. What was verified is the delivery path it uses, plus the predicate
+deciding when it fires.
+
+Note the irony worth recording: this alert lands in the topic a phone
+currently **cannot read**, because Authelia blocks native ntfy clients
+(§415/§423's remaining half). The alert is stored and readable on the host;
+making it reach a phone is that item, not this one.
