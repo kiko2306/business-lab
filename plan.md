@@ -27822,3 +27822,107 @@ Note the irony worth recording: this alert lands in the topic a phone
 currently **cannot read**, because Authelia blocks native ntfy clients
 (§415/§423's remaining half). The alert is stored and readable on the host;
 making it reach a phone is that item, not this one.
+
+## 425. ntfy: deny anonymous reads, then let the phone app in — and two bypass regex traps
+
+§415's remaining half, and the second and third times a generated Authelia
+rule took the service down. Both are now covered by tests rather than care.
+
+### The shape that made it safe
+
+The blocker recorded in §415 was that ntfy has no authentication of its own,
+so bypassing its read endpoints would publish the CrowdSec alert stream —
+attacker IPs included — to anyone who guessed the topic.
+`NTFY_AUTH_DEFAULT_ACCESS=write-only` inverts that, and is exactly the right
+way round for this stack:
+
+- **publishing stays anonymous**, which is all the internal senders need —
+  CrowdSec → n8n → ntfy and `publishAlert()` (§424), both over the host port,
+  never through the tunnel. `POST /<topic>` is deliberately *not* in the
+  bypass, so publishing from outside still needs an Authelia session.
+- **reading now needs a token**, which is what needed protecting.
+
+So the Authelia bypass admits read shapes only, for any topic (the topic name
+is a user setting), and cannot expose anything — ntfy itself demands the
+token.
+
+`ntfyAuthBootstrap.ts` mints what makes that usable: a read-only
+`subscriber` user plus `ntfy token add`, through a throwaway
+`docker compose run` against ntfy's own image and volume, because the
+socket-proxy blocks `exec` (same constraint and workaround as
+`nextcloudOnlyOffice.ts`). It runs once and leaves an existing token alone —
+`ntfy token add` mints a *new* token on every call and the old one keeps
+working, so re-running would litter the auth db with tokens nobody can
+identify. Access is `ro` on `'*'` rather than one topic: a token that stops
+working when someone renames the topic is a worse failure than one that
+follows it.
+
+The token surfaces in ntfy's own config panel with no frontend work, via the
+usual compose-carrier env var.
+
+### Trap 1: Authelia matches `resources` against the path **and query string**
+
+`^/[A-Za-z0-9_-]{1,64}/(json|sse|ws|raw)$` looked right and was useless: the
+ntfy app subscribes with `/homelab-alerts/json?poll=1&since=…`, so the `$`
+never matched and Authelia kept 302-ing exactly the request the bypass
+existed to allow. `/v1/health` appeared to work only because the probe sent
+no query.
+
+The unanchored prefix entries (`^/api($|/)` and friends) were unaffected —
+Authelia *searches* rather than full-matches, which is also why they already
+tolerated a query.
+
+### Trap 2: a TypeScript string literal eats the backslash in `\?`
+
+The fix for trap 1 was written `'(\?.*)?$'` in `services.ts`. `\?` is not a
+recognised JS escape, so the backslash is dropped at parse time and the
+generated config carried `(?.*)?$` — which Go's regexp rejects:
+
+```
+could not decode '^/v1/health(?.*)?$' to a regexp.Regexp:
+  error parsing regexp: invalid or unsupported Perl syntax: `(?.`
+```
+
+Authelia refused to start and crash-looped, taking every gated app with it
+again. Source now uses `\\?`. Note the nastiness: `(?.` is *valid* to
+JavaScript's `RegExp` constructor, so a naive "does it compile" check in the
+backend's own runtime would have passed it.
+
+### The guard that replaces care
+
+A registry-wide test in `services.test.ts` now asserts, for every
+`autheliaBypassPaths` entry:
+
+- it compiles, **and** does not contain `(?.` — the tell for the eaten
+  backslash, precisely because JS accepts it and Go does not;
+- it matches the requests native clients actually send, query strings
+  included (`/homelab-alerts/json?poll=1&since=…`, `/api/sync?excludeDomains=true`);
+- it does **not** match `/identity/accounts/register`, `/admin`,
+  `/admin/diagnostics`, either web root, or ntfy's publish path.
+
+That last group is the security assertion: without it, a future widening of
+one of these prefixes silently makes registration or an admin panel public.
+
+### Verified live, end to end
+
+| Request | Result | Meaning |
+|---|---|---|
+| `ntfy /homelab-alerts/json?poll=1`, anonymous | **403** | reached ntfy through the bypass; ntfy refused |
+| same, `Authorization: Bearer tk_…`, over the tunnel | **200**, messages readable | the phone app works |
+| `ntfy POST /homelab-alerts` from outside | **302** | publishing still needs Authelia |
+| `ntfy /` | **302** | web UI still gated |
+| anonymous publish over the host port | **200** | CrowdSec/n8n/publishAlert unaffected |
+| `vaultwarden POST /identity/connect/token` | **415** | still bypassed (Vaultwarden's own reply) |
+| `vaultwarden /identity/accounts/register` | **302** | still gated |
+| `bookstack /` | **302** | unrelated apps unaffected |
+
+### Cost, recorded honestly
+
+Two Authelia outages on the live host in this run — one from the `$'` splice
+bug (§423), one from this escaping bug. Both were minutes long and both were
+recoverable only because `configuration.yml` is regenerable by design
+(§151). The generator is now defended on both axes: the splices replace
+literally, and the patterns are asserted for validity *and* behaviour. The
+remaining untested surface is the rendered file itself — nothing yet checks
+that Authelia will accept a generated config before it is written, which
+would have caught both. Noted as a README item.
