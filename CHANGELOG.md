@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.95.0] — 2026-09-12
+
+### Added
+
+- ntfy now denies anonymous reads and mints a read-only subscriber token for the phone app, so the alert stream can be subscribed to without exposing it
+
 ## [0.94.0] — 2026-09-12
 
 ### Added

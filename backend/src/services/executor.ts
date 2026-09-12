@@ -44,6 +44,7 @@ import { reconcileN8nFirstAdmin } from './n8nAdminBootstrap';
 import { reconcileJellyfinFirstAdmin } from './jellyfinAdminBootstrap';
 import { reconcileNavidromeFirstAdmin } from './navidromeAdminBootstrap';
 import { reconcileUptimeKumaFirstAdmin } from './uptimeKumaAdminBootstrap';
+import { ensureNtfySubscriberToken } from './ntfyAuthBootstrap';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
 import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 import { reconcileItflowMailCron } from './itflowMailCron';
@@ -359,6 +360,10 @@ async function composeUpWithManagedConfig(
   // visitor (§421). Socket.IO against the running app, so after `up`; no-op
   // otherwise.
   await reconcileUptimeKumaFirstAdmin(serviceName);
+  // ntfy: mint the read-only subscriber token the phone app needs, now that
+  // anonymous reads are denied (§425). Writes ntfy's auth db via a throwaway
+  // run container, so after `up`; no-op otherwise and once a token exists.
+  await ensureNtfySubscriberToken(serviceName);
   // ITFlow: run its first-run setup wizard (schema import + admin) so exposing
   // it direct (§344/§350) has no manual step and no claim race. The wizard's
   // first POST creates the schema — the itfloworg image doesn't. After `up`;

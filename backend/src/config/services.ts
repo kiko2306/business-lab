@@ -1166,6 +1166,17 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     icon: 'bell',
     category: 'Monitoring & Management',
     composePath: 'apps/ntfy/docker-compose.yml',
+    // The ntfy phone/desktop apps subscribe with an ntfy access token and
+    // cannot follow Authelia's 401-redirect-to-login-portal, so they retried
+    // forever (plan.md §415). Safe to admit *only* because ntfy now runs with
+    // NTFY_AUTH_DEFAULT_ACCESS=write-only, which denies anonymous reads — so
+    // these endpoints are protected by ntfy's own token, not by nothing.
+    //
+    // Read endpoints only, and any topic (the topic name is a user setting):
+    // `POST /<topic>` — publishing — is deliberately absent, so publishing
+    // from outside still needs an Authelia session. /v1/health is admitted so
+    // the app's "test connection" works without one.
+    autheliaBypassPaths: ['^/[A-Za-z0-9_-]{1,64}/(json|sse|ws|raw)$', '^/v1/health$'],
     healthCheck: {
       enabled: true,
       type: 'http',

@@ -20,6 +20,26 @@ services:
       NTFY_BEHIND_PROXY: ${NTFY_BEHIND_PROXY:-false}
       # Persist messages / subscriptions across restarts (default is in-memory).
       NTFY_CACHE_FILE: /var/cache/ntfy/cache.db
+      # ntfy's own access control (plan.md §425). `write-only` is the whole
+      # trick: anyone may PUBLISH anonymously, nobody may READ without a
+      # token. That is the right way round here —
+      #   * publishing is internal only (CrowdSec -> n8n -> ntfy and the
+      #     backend's publishAlert(), both over the host port, never through
+      #     the tunnel), and POST /<topic> is NOT in ntfy's Authelia bypass,
+      #     so it stays gated from outside;
+      #   * reading is what needed protecting: the alert stream carries
+      #     attacker IPs from CrowdSec, and ntfy topics are publish-by-name.
+      # It also means the bypass that lets the ntfy phone app subscribe
+      # (autheliaBypassPaths on ntfy in backend/src/config/services.ts)
+      # cannot expose anything — ntfy itself demands a token to read.
+      NTFY_AUTH_FILE: /var/cache/ntfy/auth.db
+      NTFY_AUTH_DEFAULT_ACCESS: write-only
+      # NOT read by ntfy — a carrier so the dashboard's config panel shows the
+      # token. Minted by services/ntfyAuthBootstrap.ts with `ntfy token add`
+      # against a read-only `subscriber` user; paste it into the ntfy phone or
+      # desktop app (Settings -> add the topic -> "Login/token") to subscribe
+      # now that anonymous reads are denied.
+      NTFY_SUBSCRIBE_TOKEN: ${NTFY_SUBSCRIBE_TOKEN:-}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=ntfy"
