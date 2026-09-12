@@ -135,8 +135,17 @@ its own, all skipped automatically without a TTY:
 | **Remove the sudo password prompt** | A `NOPASSWD:ALL` sudoers entry for the invoking user | Full passwordless sudo is a real privilege grant — safe now that code-server's LAN port requires its own login (plan.md §93), but still asked every time, not assumed |
 | **Free port 53 for Pi-hole** | Disables systemd-resolved's stub listener (`DNSStubListener=no` drop-in, resolved restarted) to free `127.0.0.53:53`, and replaces `/etc/resolv.conf` with a static `1.1.1.1 / 8.8.8.8` so the host and every container keep a resolver (plan.md §284, §339) | It's a host-DNS change; only matters if this host will run Pi-hole, and only shown when the stub listener is up. Recreate running containers afterwards so they pick up the new resolver |
 
-Say no (or just press Enter) to skip either one; re-run `./start.sh` later to
+Say no (or just press Enter) to skip any of them; re-run `./start.sh` later to
 be asked again.
+
+For an unattended install, two of the three can be pre-answered in
+`start.config` — `SETUP_FREE_PORT_53` and `SETUP_NOPASSWD_SUDO` (§422).
+Absent, they behave exactly as before: skipped, with no terminal to ask on.
+Anything other than a yes-spelling counts as no, so a typo cannot grant a
+privilege. The fixed-IP prompt is deliberately not pre-answerable — that
+needs the interface, address, gateway and DNS stated explicitly and
+`netplan apply` rather than `netplan try`, and a wrong value there cuts the
+host off.
 
 ### This host is already on the NetBird overlay — nothing to enroll
 

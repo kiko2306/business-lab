@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.92.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.92.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -244,10 +244,14 @@ it is done — not ticked off and left behind. Section references point at
       (§416.5) — no environment variable exists; it needs Uptime Kuma's own
       API after an admin exists, so it depends on the admin bootstrap above.
 
-- [ ] **`setup_server.sh`'s three y/N prompts aren't pre-answerable**
-      (§416.6) — fixed IP, NOPASSWD sudo, and freeing port 53 for Pi-hole
-      are all skipped silently on a no-TTY install because `start.config`
-      has no keys for them.
+- [ ] **The fixed-IP prompt still isn't pre-answerable** (§422 did the other
+      two) — `SETUP_FREE_PORT_53` and `SETUP_NOPASSWD_SUDO` now work from
+      `start.config`, but a static IP needs the interface, address, gateway
+      and DNS stated explicitly (no guessed defaults) *and* `netplan apply`
+      instead of `netplan try`, which auto-reverts with no terminal to
+      confirm on. Left out because a wrong value cuts the host off and it
+      cannot be verified against this host without risking the link it is
+      managed over (cf. §411.3).
 
 - [ ] **Vaultwarden ships `SIGNUPS_ALLOWED=true`** (§416.7) — anyone who
       reaches it could register if it were ever un-gated, and it blocks

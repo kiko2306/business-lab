@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.92.1] — 2026-09-12
+
+### Added
+
+- setup_server.sh's port-53 and passwordless-sudo prompts can now be pre-answered from start.config for an unattended install
+
 ## [0.92.0] — 2026-09-12
 
 ### Added

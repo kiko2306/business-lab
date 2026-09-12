@@ -18,6 +18,34 @@ cd "$(dirname "${BASH_SOURCE[0]}")"
 log() { printf '==> %s\n' "$1"; }
 warn() { printf 'warning: %s\n' "$1" >&2; }
 
+# --- start.config: pre-answer this file's own prompts --------------------------
+#
+# start.sh loads start.config into .env, but only *after* it sources this file
+# (it has to define its .env helpers first), so the opt-in prompts below were
+# unreachable on a no-TTY install even with the answers sitting in that file.
+# Read just the keys this file owns, directly, rather than reordering
+# start.sh. A real environment variable still wins, matching the
+# EXPAND_VG_ASSUME_YES idiom already used further down.
+if [ -f start.config ]; then
+  while IFS='=' read -r sc_key sc_val; do
+    sc_val="${sc_val%$'\r'}"
+    [ -n "$sc_val" ] || continue
+    case "$sc_key" in
+      SETUP_FREE_PORT_53) [ -n "${SETUP_FREE_PORT_53:-}" ] || export SETUP_FREE_PORT_53="$sc_val" ;;
+      SETUP_NOPASSWD_SUDO) [ -n "${SETUP_NOPASSWD_SUDO:-}" ] || export SETUP_NOPASSWD_SUDO="$sc_val" ;;
+    esac
+  done < start.config
+fi
+
+# A pre-answer of "yes" in any of the spellings a human would type; anything
+# else (including "no") means skip, so a typo can never grant a privilege.
+setup_preanswered_yes() {
+  case "${1:-}" in
+    y | Y | yes | YES | Yes | true | 1) return 0 ;;
+    *) return 1 ;;
+  esac
+}
+
 if [ "$(id -u)" -ne 0 ]; then
   echo "error: this script installs system packages and manages services — run it with sudo:" >&2
   echo "  sudo ./setup_server.sh" >&2
@@ -725,7 +753,8 @@ ensure_static_resolv_conf() {
   log "Set /etc/resolv.conf to 1.1.1.1 / 8.8.8.8 — recreate running containers (per compose project) to pick up the new resolver"
 }
 
-if [ -t 0 ] && command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved; then
+# A pre-answer stands in for the TTY, same as the sudoers prompt below.
+if { [ -t 0 ] || [ -n "${SETUP_FREE_PORT_53:-}" ]; } && command -v systemctl >/dev/null 2>&1 && systemctl is-active --quiet systemd-resolved; then
   STUB_ACTIVE=yes
   if command -v ss >/dev/null 2>&1 && ! ss -H -lun 'sport = :53' 2>/dev/null | grep -q '127.0.0.53'; then
     STUB_ACTIVE=no
@@ -740,8 +769,15 @@ if [ -t 0 ] && command -v systemctl >/dev/null 2>&1 && systemctl is-active --qui
     echo "from binding the DNS port. This disables resolved's local stub listener,"
     echo "points /etc/resolv.conf at public resolvers (1.1.1.1 / 8.8.8.8), and"
     echo "restarts systemd-resolved. Only needed if this host runs Pi-hole."
-    printf 'Disable the stub listener? [y/N]: '
-    read -r STUB_CONFIRM
+    if [ -n "${SETUP_FREE_PORT_53:-}" ]; then
+      # Pre-answered in start.config (or the environment) — say so rather than
+      # appearing to have been asked.
+      log "SETUP_FREE_PORT_53=${SETUP_FREE_PORT_53} — not asking"
+      STUB_CONFIRM="$(setup_preanswered_yes "$SETUP_FREE_PORT_53" && echo y || echo n)"
+    else
+      printf 'Disable the stub listener? [y/N]: '
+      read -r STUB_CONFIRM
+    fi
     if [ "$STUB_CONFIRM" = "y" ] || [ "$STUB_CONFIRM" = "Y" ]; then
       mkdir -p "$(dirname "$RESOLVED_STUB_DROPIN")"
       printf '[Resolve]\nDNSStubListener=no\n' > "$RESOLVED_STUB_DROPIN"
@@ -766,7 +802,9 @@ fi
 # -root path) requires its own login (plan.md §93) — but it is still a real
 # privilege grant, so this asks for a typed confirmation every time, not a
 # single y/N.
-if [ "$TARGET_USER" != "root" ] && [ -t 0 ]; then
+# A pre-answer stands in for the TTY this would otherwise need — that is the
+# whole point of it, for an unattended install.
+if [ "$TARGET_USER" != "root" ] && { [ -t 0 ] || [ -n "${SETUP_NOPASSWD_SUDO:-}" ]; }; then
   SUDOERS_FILE="/etc/sudoers.d/90-${TARGET_USER}-nopasswd"
   if [ -f "$SUDOERS_FILE" ]; then
     log "Passwordless sudo is already set up for '${TARGET_USER}' ($SUDOERS_FILE)"
@@ -775,8 +813,13 @@ if [ "$TARGET_USER" != "root" ] && [ -t 0 ]; then
     echo "Remove the sudo password prompt for '${TARGET_USER}'?"
     echo "This grants full passwordless sudo (NOPASSWD:ALL) — any shell"
     echo "running as '${TARGET_USER}' becomes root with no password asked."
-    printf 'Type YES to proceed, anything else to skip: '
-    read -r NOPASSWD_CONFIRM
+    if [ -n "${SETUP_NOPASSWD_SUDO:-}" ]; then
+      log "SETUP_NOPASSWD_SUDO=${SETUP_NOPASSWD_SUDO} — not asking"
+      NOPASSWD_CONFIRM="$(setup_preanswered_yes "$SETUP_NOPASSWD_SUDO" && echo YES || echo no)"
+    else
+      printf 'Type YES to proceed, anything else to skip: '
+      read -r NOPASSWD_CONFIRM
+    fi
     # Case-insensitive — see the matching fixed-IP prompt above (§94).
     case "$NOPASSWD_CONFIRM" in
       [Yy][Ee][Ss]) NOPASSWD_CONFIRM=YES ;;

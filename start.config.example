@@ -44,3 +44,21 @@ TAILSCALE_AUTH_KEY=
 #   scopes: auth_keys + policy_file, tagged tag:businesslab
 TAILSCALE_OAUTH_CLIENT_ID=
 TAILSCALE_OAUTH_CLIENT_SECRET=
+
+# setup_server.sh's opt-in host changes, for a genuinely unattended install.
+# Both are skipped entirely when absent (and when there is no terminal to ask
+# on), so leaving them blank keeps today's behaviour. Anything other than a
+# yes-spelling counts as no, so a typo cannot grant a privilege.
+#
+#   SETUP_FREE_PORT_53   disables systemd-resolved's stub listener and points
+#                        /etc/resolv.conf at 1.1.1.1/8.8.8.8, freeing :53 for
+#                        Pi-hole. Only set this if the host will run Pi-hole.
+#   SETUP_NOPASSWD_SUDO  grants the invoking user full NOPASSWD:ALL sudo — a
+#                        real privilege grant, so it is never implied.
+#
+# Not covered: the fixed-IP prompt. Pre-answering that needs the interface,
+# address, gateway and DNS stated explicitly and `netplan apply` instead of
+# `netplan try` (which auto-reverts with no terminal to confirm on), and a
+# wrong value there cuts off the host. See the README TODO item.
+SETUP_FREE_PORT_53=
+SETUP_NOPASSWD_SUDO=
