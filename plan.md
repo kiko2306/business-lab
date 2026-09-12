@@ -28083,3 +28083,73 @@ the *client*, which is the half that had to work. Verifying a feature against
 the transport I happened to choose, rather than the one the real client uses,
 is how both of these got through — and the masking bug means the documented
 recovery path had never been walked either.
+
+## 429. ntfy still 401'd: the stored password wasn't the one ntfy had
+
+§428's fix stored a password as well as a token, and subscribing from the
+phone *still* failed. This time it was not the client.
+
+### Diagnosis, without reading the secret
+
+Splitting the two credentials separated cause from symptom immediately:
+
+```
+bearer token       -> 200
+basic subscriber   -> 401
+```
+
+Both were written by the *same* `saveServiceEnv` call at the same moment, so
+the account existed and the token was fine — only the password was wrong.
+Fingerprinting the stored value rather than printing it:
+
+```
+NTFY_SUBSCRIBE_TOKEN    | len=32 | shape=aa_aaaa9aaaa9aa99a9a9a99aa9aaaa9
+NTFY_SUBSCRIBE_PASSWORD | len=11 | shape=aaa@Aaaaaaa
+```
+
+`generateComplexPassword()` produces **24** characters with at least one
+digit and one of `!@#%^*-_=+`. An 11-character value with no digit cannot
+have come from it, so something overwrote it after the hook ran — ntfy's auth
+database kept the real password and `.env` no longer matched it.
+
+Ruled out along the way, each by reading the code rather than guessing:
+`parseEnvFile` keeps everything after the first `=` (no inline-comment
+truncation), and `saveServiceEnv` writes `${key}=${value}` with only a trim.
+A stray `#` or `@` mangling the round-trip was the obvious theory and it was
+wrong. **What overwrote it is still unidentified.**
+
+### Guarded by state, not by a theory of the cause
+
+Two changes, both aimed at "this must not fail silently again":
+
+- `looksGenerated()` treats a stored password that *cannot* have come from
+  the generator as no password at all, so the account is re-issued rather
+  than left broken. Deliberately a check on the observable state, since the
+  cause is unknown.
+- After saving, the value is read straight back and compared. A credential
+  that does not survive the trip to `.env` is useless, and the only symptom
+  is a client saying "not authorized" while nothing server-side notices.
+
+Also `force`, so an operator (or this session) can re-issue on demand.
+
+### Verified live after a forced re-issue
+
+```
+length=24 generated-shape=true
+anonymous            -> 403
+subscriber+password  -> 200
+```
+
+The guard fired on the way (`the stored subscriber password is not one this
+generated — re-issuing`), and the round-trip check passed silently, which is
+what it should do when things are right.
+
+### The pattern across §425, §428 and §429
+
+Three attempts at one feature, and each failure was in a layer the previous
+verification did not cover: the server accepted a Bearer token (§425), the
+client wanted a password (§428), and the password on disk was not the one the
+server held (§429). Every step was "verified" against the thing I had just
+built rather than against the whole path the user actually walks — which for
+this feature is *phone → Cloudflare → Authelia → ntfy → auth db*. The lesson
+already recorded in §428 stands, one layer deeper.
