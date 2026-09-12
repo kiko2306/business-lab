@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.95.1] — 2026-09-12
+
+### Fixed
+
+- Authelia bypass paths now tolerate a query string, so the ntfy app's `/json?poll=1` subscription is actually admitted
+
 ## [0.95.0] — 2026-09-12
 
 ### Added

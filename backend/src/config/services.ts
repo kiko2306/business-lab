@@ -862,8 +862,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     //   * no `/admin` — Vaultwarden's admin panel stays behind Authelia as
     //     well as its own ADMIN_TOKEN.
     //   * no `/` — the web vault still requires an Authelia session.
+    // The trailing `(\?.*)?$` on the anchored entry is not decoration:
+    // Authelia matches these against the path *and query string* (§425).
     autheliaBypassPaths: [
-      '^/identity/connect/token$',
+      '^/identity/connect/token(\?.*)?$',
       '^/api($|/)',
       '^/notifications/hub($|/)',
       '^/events($|/)',
@@ -1176,7 +1178,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // `POST /<topic>` — publishing — is deliberately absent, so publishing
     // from outside still needs an Authelia session. /v1/health is admitted so
     // the app's "test connection" works without one.
-    autheliaBypassPaths: ['^/[A-Za-z0-9_-]{1,64}/(json|sse|ws|raw)$', '^/v1/health$'],
+    // `(\?.*)?$`, not a bare `$`: Authelia matches `resources` against the
+    // path **and the query string**, and the ntfy app subscribes with
+    // `/json?poll=1&since=…`. Verified the hard way — a bare `$` here let
+    // /v1/health through and kept 302-ing the actual subscription (§425).
+    autheliaBypassPaths: ['^/[A-Za-z0-9_-]{1,64}/(json|sse|ws|raw)(\?.*)?$', '^/v1/health(\?.*)?$'],
     healthCheck: {
       enabled: true,
       type: 'http',
