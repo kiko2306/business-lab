@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.87.0] — 2026-09-12
+
+### Added
+
+- NetBird: reach the box's LAN from a client whose own network uses the same range, via a NETMAPed `10.177.1.x` alias range that needs nothing configured client-side
+
 ## [0.86.0] — 2026-09-12
 
 ### Removed

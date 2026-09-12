@@ -204,6 +204,66 @@ services:
       # came from (plan.md §410/§411.1), not from any network fault.
       - ./data/client:/var/lib/netbird
 
+  # Makes the box's LAN reachable from a remote client whose own network uses
+  # the same range — the near-universal 192.168.1.0/24 (plan.md §412). NetBird
+  # can't win that fight client-side: it puts its routes in a separate
+  # `netbird` table consulted at `ip rule` priority 110, below priority 105's
+  # `lookup main suppress_prefixlength 0`, which serves the client's own
+  # directly-connected LAN first (§411.5). So instead of competing for
+  # 192.168.1.x, a second, deliberately-unused range is advertised and NETMAPed
+  # 1:1 onto the real LAN here: 10.177.1.30 -> 192.168.1.30, last octet
+  # preserved. Nothing to configure on any client, and their own 192.168.1.x
+  # keeps working — including their default gateway, which is why a client-side
+  # `ip rule` can never be the answer for the whole range.
+  #
+  # Reuses netbirdio/netbird purely because it is already pulled and its Alpine
+  # base ships iptables-nft — no second image, no new licence row.
+  netbird-lan-alias:
+    mem_limit: 32m
+    mem_reservation: 8m
+    image: netbirdio/netbird:latest
+    restart: unless-stopped
+    # Needs the host's own netns and nat table — the rules apply to traffic
+    # arriving on wt0, which netbird-client creates in that same netns.
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    environment:
+      # Both written by netbirdRoutingPeer.ts (backend) as a pre-up hook, from
+      # the one place that decides the mapping, so the advertised resource and
+      # the NETMAP rule can never disagree. Empty until NETBIRD_API_TOKEN is
+      # set — same "never blocks a start" reasoning as NB_SETUP_KEY above.
+      NETBIRD_LAN_CIDR: "${NETBIRD_LAN_CIDR:-}"
+      NETBIRD_LAN_ALIAS_CIDR: "${NETBIRD_LAN_ALIAS_CIDR:-}"
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        set -eu
+        if [ -z "$$NETBIRD_LAN_CIDR" ] || [ -z "$$NETBIRD_LAN_ALIAS_CIDR" ]; then
+          echo "netbird-lan-alias: no LAN/alias range yet (set NETBIRD_API_TOKEN) - idle"
+          exec tail -f /dev/null
+        fi
+        # No -o on the masquerade: matching the destination is enough and saves
+        # guessing the LAN interface name. Without it the LAN device sees the
+        # client's 100.64/10 source and has no route back — NetBird's own
+        # masquerade can't cover this, its rule is keyed to a mark set from the
+        # pre-NETMAP destination.
+        PRE="PREROUTING -i wt0 -d $$NETBIRD_LAN_ALIAS_CIDR -j NETMAP --to $$NETBIRD_LAN_CIDR"
+        POST="POSTROUTING -s 100.64.0.0/10 -d $$NETBIRD_LAN_CIDR -j MASQUERADE"
+        echo "netbird-lan-alias: $$NETBIRD_LAN_ALIAS_CIDR -> $$NETBIRD_LAN_CIDR"
+        # Re-asserted rather than set once: a docker daemon restart rebuilds the
+        # nat table from scratch and drops anything it did not put there.
+        while :; do
+          for rule in "$$PRE" "$$POST"; do
+            iptables-nft -t nat -C $$rule 2>/dev/null || {
+              iptables-nft -t nat -A $$rule
+              echo "netbird-lan-alias: installed: $$rule"
+            }
+          done
+          sleep 60
+        done
+
 networks:
   netbird-net:
     driver: bridge

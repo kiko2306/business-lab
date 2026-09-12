@@ -3,7 +3,7 @@ import { getPublishedUpstreamPort } from '../config/services';
 import { getHostGatewayIp } from '../utils/network';
 import { getLanCidr } from './networkScan';
 import { readAppEnvValue, saveServiceEnv } from './appEnv';
-import { ensureNetbirdRoutingPeer, normalizeCidr } from './netbirdRoutingPeer';
+import { aliasCidrFor, ensureNetbirdRoutingPeer, normalizeCidr } from './netbirdRoutingPeer';
 
 vi.mock('../config/services', () => ({ getPublishedUpstreamPort: vi.fn() }));
 vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn() }));
@@ -73,8 +73,8 @@ beforeEach(() => {
   mockedGateway.mockResolvedValue('10.201.0.1');
   mockedLanCidr.mockResolvedValue('192.168.1.236/24');
   // Default: a real API token, no secondary address configured. Individual
-  // tests override with mockImplementation when they need the secondary
-  // address set.
+  // Tests override with mockImplementation when they need a specific .env
+  // value (e.g. a hand-set NETBIRD_LAN_ALIAS_CIDR).
   mockedReadEnv.mockImplementation((_service, key) => (key === 'NETBIRD_API_TOKEN' ? 'a-real-token' : null));
   mockedSave.mockResolvedValue({} as Awaited<ReturnType<typeof saveServiceEnv>>);
   vi.stubGlobal('fetch', vi.fn());
@@ -98,6 +98,24 @@ describe('normalizeCidr', () => {
     expect(normalizeCidr('not-an-ip')).toBeNull();
     expect(normalizeCidr('192.168.1.5')).toBeNull();
     expect(normalizeCidr('192.168.1.5/33')).toBeNull();
+  });
+});
+
+describe('aliasCidrFor', () => {
+  it('takes the base address and the LAN\'s own prefix length', () => {
+    expect(aliasCidrFor('192.168.1.0/24', '10.177.1.0')).toBe('10.177.1.0/24');
+  });
+
+  // NETMAP rewrites only the host part, so a /24 alias over a /23 LAN would
+  // map half of it and quietly black-hole the rest.
+  it('re-masks the base to the LAN prefix rather than trusting the base\'s own', () => {
+    expect(aliasCidrFor('192.168.0.0/23', '10.177.1.0/24')).toBe('10.177.0.0/23');
+    expect(aliasCidrFor('10.0.0.0/8', '10.177.1.0/24')).toBe('10.0.0.0/8');
+  });
+
+  it('returns null for input it cannot make sense of', () => {
+    expect(aliasCidrFor('192.168.1.0', '10.177.1.0')).toBeNull();
+    expect(aliasCidrFor('192.168.1.0/24', 'nonsense')).toBeNull();
   });
 });
 
@@ -138,7 +156,7 @@ describe('ensureNetbirdRoutingPeer', () => {
     expect(mockedSave).not.toHaveBeenCalled();
   });
 
-  it('advertises the host LAN as the one and only resource', async () => {
+  it('advertises the host LAN and a same-prefix alias range beside it', async () => {
     const resourcePosts: unknown[] = [];
     vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string; body?: string }) => {
       const method = init?.method ?? 'GET';
@@ -150,7 +168,43 @@ describe('ensureNetbirdRoutingPeer', () => {
 
     await ensureNetbirdRoutingPeer('netbird-vpn');
 
-    expect(resourcePosts).toEqual([expect.objectContaining({ name: 'LAN', address: '192.168.1.0/24' })]);
+    // Both, not one: NetBird derives its forward-accept and masquerade rules
+    // from the advertised CIDR, and the sidecar has already rewritten an
+    // aliased packet's destination back to the real LAN before it reaches the
+    // forward hook — drop the real resource and every aliased packet is
+    // dropped (plan.md §412).
+    expect(resourcePosts).toEqual([
+      expect.objectContaining({ name: 'LAN', address: '192.168.1.0/24' }),
+      expect.objectContaining({ name: 'LAN alias', address: '10.177.1.0/24' }),
+    ]);
+  });
+
+  it('hands the sidecar the same pair it advertised', async () => {
+    vi.mocked(fetch).mockImplementation(fetchEverythingMissing as typeof fetch);
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+    expect(mockedSave).toHaveBeenCalledWith('netbird-vpn', {
+      NETBIRD_LAN_CIDR: '192.168.1.0/24',
+      NETBIRD_LAN_ALIAS_CIDR: '10.177.1.0/24',
+    });
+  });
+
+  it('honours a hand-set alias base but re-masks it to the LAN prefix', async () => {
+    mockedReadEnv.mockImplementation((_service, key) => {
+      if (key === 'NETBIRD_API_TOKEN') return 'a-real-token';
+      if (key === 'NETBIRD_LAN_ALIAS_CIDR') return '10.50.7.0/16'; // deliberately the wrong prefix
+      return null;
+    });
+    const resourcePosts: unknown[] = [];
+    vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string; body?: string }) => {
+      if ((init?.method ?? 'GET') === 'POST' && new URL(url).pathname.endsWith('/resources')) {
+        resourcePosts.push(JSON.parse(init!.body!));
+      }
+      return fetchEverythingMissing(url, init);
+    }) as typeof fetch);
+
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+
+    expect(resourcePosts[1]).toEqual(expect.objectContaining({ name: 'LAN alias', address: '10.50.7.0/24' }));
   });
 
   it('never throws when the management API is unreachable (cold first start)', async () => {

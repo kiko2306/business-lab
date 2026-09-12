@@ -39,6 +39,13 @@ const RESOURCE_GROUP_NAME = 'business-lab-lan';
 const ALL_PEERS_GROUP_NAME = 'All'; // NetBird's own built-in group
 const NETWORK_NAME = 'Business Lab LAN';
 const RESOURCE_NAME = 'LAN';
+const ALIAS_RESOURCE_NAME = 'LAN alias';
+const LAN_CIDR_ENV = 'NETBIRD_LAN_CIDR';
+const ALIAS_CIDR_ENV = 'NETBIRD_LAN_ALIAS_CIDR';
+// Deliberately obscure: the whole point is a range no home router hands out,
+// and it also has to miss Docker's own pool on this host (10.201.x — see
+// start.sh). Overridable via .env for the rare client already using it.
+const DEFAULT_ALIAS_BASE = '10.177.1.0';
 const POLICY_NAME = 'Business Lab: LAN resource access';
 const SETUP_KEY_NAME = 'Business Lab routing peer';
 const SETUP_KEY_EXPIRES_IN = 31536000; // 365 days — NetBird's own max
@@ -90,6 +97,18 @@ export function normalizeCidr(hostCidr: string): string | null {
   const netInt = (ipInt & mask) >>> 0;
   const netOctets = [24, 16, 8, 0].map((shift) => (netInt >>> shift) & 0xff);
   return `${netOctets.join('.')}/${prefix}`;
+}
+
+/**
+ * The alias network to advertise alongside the real LAN, always at the LAN's
+ * own prefix length. iptables NETMAP rewrites only the host part of the
+ * address, so a /24 alias in front of a /23 LAN would silently map just half
+ * of it — the kind of quiet half-working result §411.5 went looking for.
+ */
+export function aliasCidrFor(lanCidr: string, aliasBase: string): string | null {
+  const prefix = lanCidr.split('/')[1];
+  if (!prefix) return null;
+  return normalizeCidr(`${aliasBase.split('/')[0]}/${prefix}`);
 }
 
 async function nbRequest<T>(baseUrl: string, token: string, method: string, path: string, body?: unknown): Promise<T> {
@@ -237,11 +256,41 @@ export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<voi
       return;
     }
 
+    // Advertised in addition to the real LAN, never instead of it: NetBird
+    // generates its own forward-accept and masquerade rules from the
+    // advertised CIDR, and by the time a packet reaches the forward hook the
+    // netbird-lan-alias sidecar has already NETMAPped its destination back to
+    // the real LAN. Drop the real resource and netbird-acl-forward-filter's
+    // trailing `iifname "wt0" drop` eats every aliased packet (plan.md §412).
+    const aliasBase = (readAppEnvValue(SERVICE, ALIAS_CIDR_ENV) ?? '').trim() || DEFAULT_ALIAS_BASE;
+    const aliasCidr = aliasCidrFor(cidr, aliasBase);
+    if (!aliasCidr) {
+      logger.warn('NetBird routing peer: could not derive the LAN alias range — skipping the alias', {
+        cidr,
+        aliasBase,
+      });
+    }
+
     const allGroupId = await ensureGroup(baseUrl, token, ALL_PEERS_GROUP_NAME);
     const routerGroupId = await ensureGroup(baseUrl, token, ROUTER_GROUP_NAME);
     const resourceGroupId = await ensureGroup(baseUrl, token, RESOURCE_GROUP_NAME);
     const networkId = await ensureNetwork(baseUrl, token, NETWORK_NAME);
     await ensureResource(baseUrl, token, networkId, RESOURCE_NAME, cidr, [resourceGroupId]);
+    if (aliasCidr) {
+      await ensureResource(baseUrl, token, networkId, ALIAS_RESOURCE_NAME, aliasCidr, [resourceGroupId]);
+      // Read back by the netbird-lan-alias sidecar, which owns the NETMAP
+      // rule. Written here rather than derived in the sidecar so one place
+      // decides the mapping and the two halves can never disagree; this runs
+      // as a pre-up hook, so the values are on disk before compose reads them.
+      // Only on an actual change — this runs on every start, and rewriting
+      // .env each time would churn the file for nothing.
+      if (
+        readAppEnvValue(SERVICE, LAN_CIDR_ENV) !== cidr ||
+        readAppEnvValue(SERVICE, ALIAS_CIDR_ENV) !== aliasCidr
+      ) {
+        await saveServiceEnv(SERVICE, { [LAN_CIDR_ENV]: cidr, [ALIAS_CIDR_ENV]: aliasCidr });
+      }
+    }
     await ensureRouter(baseUrl, token, networkId, routerGroupId);
     await ensurePolicy(baseUrl, token, allGroupId, resourceGroupId);
     await ensureSetupKey(baseUrl, token, routerGroupId);

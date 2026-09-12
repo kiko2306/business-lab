@@ -107,33 +107,50 @@ here once a year when the old one expires (§405 — this half genuinely can't
 self-renew, NetBird has no way to mint a token without a human holding a
 session in its own UI first).
 
-**If a client's own network uses the same range as this box's LAN** (very
-common — most routers default to `192.168.1.0/24`), their machine already
-has a directly-connected route for it, which beats the NetBird one, so the
-LAN resource is unusable to them. Reach the box on the routing peer's
-**NetBird overlay IP** instead — `netbird status` on any enrolled peer
-lists it, e.g. `ssh mat@100.94.52.176`, `http://100.94.52.176:10001`. It
-works because `netbird-client` runs `network_mode: host`, so that address
-is the host's and every service on the box answers on it; and it can never
-collide, being inside `100.64.0.0/10`, which no consumer router hands out.
-Other devices on the box's LAN stay unreachable for that client — the only
-real fixes there are renumbering one side's LAN, or reaching them through
-the box (plan.md §411.2).
+#### When a client's own network uses the same range as this box's LAN
 
-Two things about that collision are worth knowing before someone burns an
-afternoon on it (verified from a colliding client, plan.md §411.5):
+Very common — most routers default to `192.168.1.0/24`. Their machine
+already has a directly-connected route for it, which beats the NetBird one,
+so `192.168.1.x` over the VPN reaches *their* network, not this box's.
+Nothing needs setting up for it; two ranges handle it automatically.
 
-- **`netbird networks deselect` / `select` does not help.** NetBird puts its
-  routes in a separate `netbird` routing table, consulted by `ip rule`
-  priority 110 — *below* priority 105's `lookup main suppress_prefixlength
-  0`, which serves the client's own directly-connected LAN. Deselecting only
-  empties the netbird table; selecting cannot make it win. The overlay IP is
-  unaffected either way, since it rides the plain `100.94.0.0/16` route on
-  `wt0`.
+**The box itself: the routing peer's NetBird overlay IP.** `netbird status`
+on any enrolled peer lists it, e.g. `ssh mat@100.94.52.176`,
+`http://100.94.52.176:10001`. It works because `netbird-client` runs
+`network_mode: host`, so that address is the host's and every service on the
+box answers on it; and it can never collide, being inside `100.64.0.0/10`,
+which no consumer router hands out.
+
+**Other devices on the box's LAN: the alias range, `10.177.1.x`** (plan.md
+§412). The last octet is preserved, so a LAN device is reachable at its own
+address with the prefix swapped:
+
+| On the box's LAN | Over the VPN, from anywhere |
+|---|---|
+| `192.168.1.1` (its gateway) | `10.177.1.1` |
+| `192.168.1.30` | `10.177.1.30` |
+| `192.168.1.236` (the host) | `10.177.1.236`, or the overlay IP |
+
+Nothing to configure on any client, and the client's own `192.168.1.x` keeps
+working — including its default gateway, which is exactly why a client-side
+routing tweak can never be the answer for the whole range. Under the hood the
+`netbird-lan-alias` sidecar NETMAPs the alias onto the real LAN, and the
+backend advertises both as NetBird resources; set `NETBIRD_LAN_ALIAS_CIDR` in
+this app's config panel if `10.177.1.x` is itself in use somewhere.
+
+Two more things worth knowing before someone burns an afternoon on it
+(verified from a colliding client, plan.md §411.5):
+
+- **`netbird networks deselect` / `select` does not help**, and is not what
+  the alias does. NetBird puts its routes in a separate `netbird` routing
+  table, consulted by `ip rule` priority 110 — *below* priority 105's
+  `lookup main suppress_prefixlength 0`, which serves the client's own
+  directly-connected LAN. Deselecting only empties the netbird table;
+  selecting cannot make it win.
 - **A colliding address can answer from the wrong machine, silently.**
   `192.168.1.1` from such a client reaches *their own router*, not the box's
-  LAN. So don't "test the VPN" against a LAN IP — a reply proves nothing
-  about which side answered. Test the overlay IP.
+  LAN. So don't "test the VPN" against a `192.168.1.x` address — a reply
+  proves nothing about which side answered. Test the overlay IP or the alias.
 
 ### Optional: automate Tailscale's own setup
 
