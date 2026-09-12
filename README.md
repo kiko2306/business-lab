@@ -223,6 +223,22 @@ it is done — not ticked off and left behind. Section references point at
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
 
+- [ ] **Confirm the NetBird phone login completes on the device-code flow**
+      (§413) — `PKCEAuthorizationFlow` is gone from `management.json`, so the
+      client should fall back to the device flow instead of dead-ending on
+      `http://localhost:53000`. Expect a code to enter at
+      `https://authelia.<domain>/consent/openid/device-authorization` rather
+      than a browser redirect. Needs a phone; everything server-side is
+      verified. If it still fails, capture what the app shows — the next
+      suspect is the app ignoring the fallback rather than the flow config.
+
+- [ ] **Authelia 401s two API endpoints on a loop** (§413, noticed in its
+      logs) — something polls `ntfy.<domain>/homelab-alerts/json` every ~5 s
+      and gets a 401 redirect to the login page, and Vaultwarden's
+      `/identity/connect/token` gets the same. Both look like API paths
+      caught by forward-auth that need a bypass rule. The ntfy one is
+      probably the alert integration failing silently.
+
 - [ ] **Delete the obsolete `netbird-router-*` peers in the NetBird
       dashboard** (§410/§411.1) — the cause is fixed (the routing peer was
       mounting the pre-0.78 `/etc/netbird` state path, so it never

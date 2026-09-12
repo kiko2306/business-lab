@@ -27032,3 +27032,103 @@ No new image and so no new `docs/licences.md` row: the sidecar reuses
 `netbirdio/netbird`, already pulled for the routing peer, whose Alpine base
 ships `iptables-nft` (`nft` itself is absent — hence iptables, not nftables,
 for the rules).
+
+## 413. NetBird mobile login dead-ended on localhost:53000 — native clients moved to the device-code flow
+
+Reported: connecting the VPN on a phone, Authelia login succeeds and the
+browser then lands on `http://localhost:53000` with connection refused.
+
+### Cause
+
+`http://localhost:53000/` appears in exactly one place: the `RedirectURLs` of
+`PKCEAuthorizationFlow` in `apps/netbird-vpn/data/management.json`. It is RFC
+8252 loopback — the client itself listens on that port and the browser hands
+the authorization code back to it locally. A phone never listens there, so the
+redirect has nowhere to land.
+
+Confirmed from NetBird's own client source rather than guessed
+(`client/internal/auth/oauth.go`):
+
+```go
+func shouldUseDeviceFlow(force bool, isUnixDesktopClient bool) bool {
+	return force || (runtime.GOOS == "linux" || runtime.GOOS == "freebsd") && !isUnixDesktopClient
+}
+```
+
+There is no Android or iOS branch. Every platform except headless
+Linux/FreeBSD **tries PKCE first**, and only falls back to the device-code
+flow if fetching the PKCE config from management fails. Matching upstream
+reports: netbirdio/netbird#1392 ("failed to login android localhost:53000
+refused") and #1335 on Chromebook.
+
+Management serves one config to every client and the client takes PKCE
+whenever it can get it, so there is no way to serve PKCE to desktops and the
+device flow to phones. The only server-side lever is to stop advertising PKCE.
+
+### What landed
+
+`PKCEAuthorizationFlow` removed from `config/management.json.example`, plus
+`backend/src/services/netbirdAuthFlow.ts` — a pre-up hook that strips the key
+from an **existing** `data/management.json`. Not in `start.sh`, which
+generates that file, for the §410-era reason: the dashboard's Update page
+deploys a new checkout without running `start.sh`, and `management.json` is
+never regenerated once it exists because it holds `DataStoreEncryptionKey`.
+Read-compare-then-write, returning null on "already correct", so
+netbird-management is only bounced when something actually changed — the same
+care `start.sh`'s Signal.URI patch takes, and for the same reason: a restart
+drops every connected peer.
+
+This also fixes Windows, where 53000 sits in the Hyper-V/WSL excluded port
+range: the client silently picks a different port from its fallback list, and
+Authelia rejects it because only `:53000` is a registered `redirect_uri`. So
+PKCE here was only ever working on a machine where that one port happened to
+be free.
+
+Authelia's two loopback `redirect_uris` are deliberately **kept** registered —
+a deployment whose `management.json` still carries the PKCE flow then keeps
+working instead of failing differently. Their comment now says they are no
+longer reached, and why.
+
+### Verified before changing anything
+
+That the fallback lands somewhere that works, rather than assuming it:
+
+```
+POST https://authelia.tx-home-utils.com/api/oidc/device-authorization
+  client_id=netbird-dashboard&scope=openid profile email offline_access
+→ 200 {"device_code":"authelia_dc_…","user_code":"GHNGZVMC","interval":10,
+       "verification_uri":".../consent/openid/device-authorization"}
+```
+
+Notable: Authelia issues it despite `require_pkce: true` on this client — PKCE
+is required of the authorization-code grant, not of the device-code grant. The
+discovery document also advertises
+`urn:ietf:params:oauth:grant-type:device_code`, which the client config already
+listed in `grant_types`, so nothing needed adding on the Authelia side.
+
+### Verified on the host
+
+- Hook run live: `['DeviceAuthorizationFlow', 'PKCEAuthorizationFlow']` →
+  `['DeviceAuthorizationFlow']`, logged once; second run silent.
+- `DataStoreEncryptionKey` still 44 chars, file mode unchanged (in-place
+  rewrite, same inode — it is bind-mounted read-only into management).
+- netbird-management restarted clean; this client reconnected
+  (`Management: Connected`, `Signal: Connected`) and the §412 alias range
+  still answers (`10.177.1.30:8080` → 200, `10.177.1.236:10001` → 0.87.1).
+
+### Still unproven
+
+The phone itself. Everything above establishes that PKCE is gone, that the
+client falls back to the device flow when it is, and that Authelia's device
+flow works — but the actual "log in on the phone" path needs the phone. README
+item until confirmed; expect a code to enter at
+`https://authelia.<domain>/consent/openid/device-authorization` instead of a
+browser redirect.
+
+### Noticed while reading Authelia's logs, not fixed here
+
+Authelia is 401ing two API endpoints on a tight loop: something polls
+`ntfy.<domain>/homelab-alerts/json` every ~5 s and gets
+`401 → redirect to the login page`, and Vaultwarden's
+`/identity/connect/token` gets the same treatment. Both look like API paths
+being caught by forward-auth that need a bypass rule. Separate README item.
