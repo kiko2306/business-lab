@@ -223,18 +223,18 @@ it is done — not ticked off and left behind. Section references point at
       pastes a fresh token in. Wire an alert into the existing
       alertNotify/ntfy system so this isn't a silent failure.
 
-- [ ] **Five apps still need a human to claim the admin account** (§416.3,
-      n8n done in §419) — Navidrome, Uptime Kuma, Twenty, Vikunja, Jellyfin.
-      Copy `n8nAdminBootstrap.ts`. Per §419, **check each app's
-      `getExposability()` before copying DocuSeal's exposure gate** — it made
-      n8n's bootstrap a silent no-op, and Jellyfin is LAN-only so it would do
-      the same there. Vikunja (`POST /api/v1/register`) and Jellyfin
-      (`/Startup/User` + `/Startup/Complete`; `StartupWizardCompleted` is
-      `false` on the host right now, so it is genuinely testable) are the
-      same shape. Navidrome needs its `createAdmin` endpoint confirmed.
-      **Uptime Kuma drives setup over socket.io, not REST** — needs a raw
-      engine.io handshake or a new dependency; decide before starting it.
-      Twenty is a GraphQL `signUp` mutation on a fast-moving API.
+- [ ] **Two apps still need a human to claim the admin account** (§416.3;
+      n8n §419, Jellyfin + Navidrome §420, Vikunja dissolved — its OIDC
+      login creates the user by itself) — **Uptime Kuma** and **Twenty**.
+      Copy `navidromeAdminBootstrap.ts`; no exposure gate (§419).
+      - **Uptime Kuma** drives setup over socket.io, not REST. Needs a raw
+        engine.io handshake or a new dependency — a decision to take before
+        starting, not an implementation detail.
+      - **Twenty** is a GraphQL `signUp` mutation on a fast-moving API;
+        confirm it against the running instance first.
+      When probing either, confirm a route with a **GET that returns 405**,
+      never a POST — probing Jellyfin's `/Startup/Complete` completed its
+      wizard as a side effect (§420).
 
 - [ ] **Build Kimai's `MAILER_URL` from the global mail settings** (§416.4)
       — documented as by-hand only because the per-field injection can't

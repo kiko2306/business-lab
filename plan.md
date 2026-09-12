@@ -27521,3 +27521,84 @@ genuinely testable) look like the same shape as this one. Navidrome needs its
 socket.io**, not REST, so it needs either a raw engine.io handshake or a new
 dependency — decide that one before starting it. Twenty is a GraphQL
 `signUp` mutation on a fast-moving API.
+
+## 420. Jellyfin and Navidrome admin bootstraps; Vikunja needs none (§416.3 continued)
+
+Second batch of §416.3, after n8n in §419. Same shape each time: poll a
+read-only state signal, act only on an explicit "not set up yet", create the
+account from the Authelia admin's identity plus a generated
+`*_ADMIN_PASSWORD`, never gate on exposure (§419).
+
+### Jellyfin
+
+`lanOnly`, no OIDC, so its own login is the only gate — and until the wizard
+runs there is no account at all: whoever reaches the host port first claims
+the server. `POST /Startup/User` then `POST /Startup/Complete`, with the
+Authelia admin's **username** (Jellyfin logins have no email field).
+
+Two things learned the hard way:
+
+- **`/Startup/Complete` flips `StartupWizardCompleted` whether or not a user
+  was created.** So the order matters: complete-then-create locks in a server
+  with no account and no way back through the wizard. The code does user
+  first, with a comment saying why.
+- **`GET /Startup/User` is not a setup check.** It answers `{"Name":"root"}`
+  on a completely fresh install, because that is the name Jellyfin *proposes*
+  for the first user. `StartupWizardCompleted` on `/System/Info/Public` is the
+  only trustworthy signal.
+
+Both of those were found by a probe that was not read-only: `POST
+/Startup/Complete`, issued to check whether the route existed, completed the
+wizard and left a passwordless `root` admin. Recovered by stopping the app,
+deleting `apps/jellyfin/data/config` (a fresh install — default plugin
+configs, no libraries, no media) and restarting, which restored
+`StartupWizardCompleted: false`. Navidrome's route was then confirmed with
+`GET /auth/createAdmin` → **405**, which proves the route exists without
+invoking it. That is the method to use next time.
+
+### Navidrome
+
+No OIDC, so again its own login is the only gate. `POST /auth/createAdmin`
+with username + password.
+
+Navidrome has no JSON endpoint for "does an admin exist", so state comes from
+the flag it embeds in its own app shell — and that config arrives as a JSON
+*string* inside a JS assignment (`window.__APP_CONFIG__ = "{...}"`), so the
+quotes are backslash-escaped: `\"firstTime\":true`. The matcher accepts both
+forms and the test pins each.
+
+### Vikunja: dissolved, like §417
+
+No bootstrap written, because there is no admin to claim:
+
+- Vikunja's OIDC provider **creates the user on first Authelia sign-in**, so
+  the account appears with no manual step already.
+- Vikunja has no "first user is admin" concept — it is multi-user with open
+  registration, so a "first admin" has no meaning.
+- The one related knob, `VIKUNJA_AUTH_LOCAL_ENABLED`, is already deliberately
+  left `true` with a recorded rationale (§216/§217: "so a misconfigured IdP
+  can't lock you out", to be turned off by an admin after one working OIDC
+  sign-in).
+
+Writing a bootstrap here would create a **local** account nobody needs
+alongside the OIDC one that appears by itself — actively worse than nothing.
+§416.3 was simply wrong to list it.
+
+### Verified live, both apps
+
+| | Jellyfin | Navidrome |
+|---|---|---|
+| State before | `StartupWizardCompleted: False` | `firstTime: true` |
+| After | `True`, wizard completed as `mat` | `false`, admin created as `mat` |
+| Second run | "already completed its startup wizard" | "already has an admin account" |
+| Generated password signs in | `POST /Users/AuthenticateByName` → **200** | `POST /auth/login` → **200** |
+
+The login check is the one that matters: an account that was created but
+cannot be signed into looks identical from the outside.
+
+### Still open from §416.3
+
+**Uptime Kuma** — drives setup over socket.io, not REST; needs a raw
+engine.io handshake or a new dependency, and that is a decision, not an
+implementation. **Twenty** — GraphQL `signUp` on a fast-moving API, not yet
+confirmed against the running instance.
