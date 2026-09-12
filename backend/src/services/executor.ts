@@ -45,6 +45,7 @@ import { reconcileJellyfinFirstAdmin } from './jellyfinAdminBootstrap';
 import { reconcileNavidromeFirstAdmin } from './navidromeAdminBootstrap';
 import { reconcileUptimeKumaFirstAdmin } from './uptimeKumaAdminBootstrap';
 import { ensureNtfySubscriberToken } from './ntfyAuthBootstrap';
+import { reconcileUptimeKumaMailNotification } from './uptimeKumaMailNotification';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
 import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 import { reconcileItflowMailCron } from './itflowMailCron';
@@ -364,6 +365,10 @@ async function composeUpWithManagedConfig(
   // anonymous reads are denied (§425). Writes ntfy's auth db via a throwaway
   // run container, so after `up`; no-op otherwise and once a token exists.
   await ensureNtfySubscriberToken(serviceName);
+  // Uptime Kuma: mirror the global mail settings into its own SMTP
+  // notification — it has no env var for this (§427). After the admin
+  // bootstrap above, and after `up`; no-op otherwise.
+  await reconcileUptimeKumaMailNotification(serviceName);
   // ITFlow: run its first-run setup wizard (schema import + admin) so exposing
   // it direct (§344/§350) has no manual step and no claim race. The wizard's
   // first POST creates the schema — the itfloworg image doesn't. After `up`;

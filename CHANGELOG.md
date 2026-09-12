@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.97.0] — 2026-09-12
+
+### Added
+
+- Uptime Kuma's email notification is now created from the global mail settings, the last app that needed its SMTP details entered by hand
+
 ## [0.96.0] — 2026-09-12
 
 ### Added
