@@ -11,7 +11,7 @@ vi.mock('../utils/mailSettings', async () => {
 
 import { getService } from '../config/services';
 import { getMailConfig } from '../utils/mailSettings';
-import { buildMailEnvOverrides } from './mailEnv';
+import { buildMailEnvOverrides, buildSmtpDsn } from './mailEnv';
 
 const mockedGetService = vi.mocked(getService);
 const mockedGetMailConfig = vi.mocked(getMailConfig);
@@ -255,5 +255,38 @@ describe('vaultwarden mail wiring', () => {
     expect(keys?.fromAddress).toEqual(['SMTP_FROM']);
     // The map is the part that silently breaks if dropped.
     expect(keys?.smtpEncryptionMap).toEqual({ tls: 'starttls', ssl: 'force_tls', none: 'off' });
+  });
+});
+
+describe('buildSmtpDsn', () => {
+  const base = { host: 'smtp.example.com', port: 587, user: 'bot@example.com', password: 'pw', encryption: 'tls' as const };
+
+  it('builds a plain smtp:// DSN for STARTTLS', () => {
+    expect(buildSmtpDsn(base)).toBe('smtp://bot%40example.com:pw@smtp.example.com:587');
+  });
+
+  it('uses smtps:// for implicit TLS', () => {
+    expect(buildSmtpDsn({ ...base, port: 465, encryption: 'ssl' })).toBe(
+      'smtps://bot%40example.com:pw@smtp.example.com:465'
+    );
+    expect(buildSmtpDsn({ ...base, encryption: 'none' })).toBe('smtp://bot%40example.com:pw@smtp.example.com:587');
+  });
+
+  // The real bug this guards: a generated mailbox password containing @ / : #
+  // silently truncates or re-targets the DSN, and the symptom is just "mail
+  // doesn't send".
+  it('percent-encodes credentials that would otherwise break the URL', () => {
+    expect(buildSmtpDsn({ ...base, user: 'a/b', password: 'p@ss:w#rd/' })).toBe(
+      'smtp://a%2Fb:p%40ss%3Aw%23rd%2F@smtp.example.com:587'
+    );
+  });
+
+  it('omits the credential and port sections when there is nothing to put there', () => {
+    expect(buildSmtpDsn({ ...base, user: null, password: null })).toBe('smtp://smtp.example.com:587');
+    expect(buildSmtpDsn({ ...base, port: null })).toBe('smtp://bot%40example.com:pw@smtp.example.com');
+  });
+
+  it('returns null with no host, so nothing is injected', () => {
+    expect(buildSmtpDsn({ ...base, host: null })).toBeNull();
   });
 });

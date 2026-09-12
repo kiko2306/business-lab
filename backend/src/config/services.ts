@@ -668,6 +668,12 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     icon: 'clock',
     category: 'Productivity',
     composePath: 'apps/kimai/docker-compose.yml',
+    // Kimai reads SMTP from one Symfony Mailer DSN, not per-field vars, so
+    // it gets smtpDsn instead of the usual smtpHost/smtpUser/... set — see
+    // buildSmtpDsn in mailEnv.ts. Before this it was the one app whose mail
+    // docs said "set it by hand" purely because the injector couldn't
+    // compose a DSN (§422).
+    mailEnvKeys: { smtpDsn: ['KIMAI_MAILER_URL'] },
     healthCheck: {
       enabled: true,
       type: 'http',

@@ -74,11 +74,51 @@ export async function buildMailEnvOverrides(serviceName: string): Promise<Record
     assign(overrides, keys.imapEncryption, config.imapEncryption);
   }
 
+  // Kimai takes the lot as one Symfony Mailer DSN; per-field injection can't
+  // express that, which is why its mail was documented as a by-hand step.
+  assign(
+    overrides,
+    keys.smtpDsn,
+    buildSmtpDsn({
+      host: config.smtpHost,
+      port: config.smtpPort,
+      user: config.smtpUser,
+      password: config.smtpPassword,
+      encryption: config.smtpEncryption,
+    })
+  );
+
   for (const [key, value] of Object.entries(keys.staticWhenConfigured ?? {})) {
     overrides[key] = String(value);
   }
 
   return overrides;
+}
+
+/**
+ * A Symfony Mailer DSN from the global settings, or null when there is no
+ * host to build one from.
+ *
+ * `encodeURIComponent` on the credentials is load-bearing, not defensive: a
+ * generated mailbox password routinely contains `@`, `/`, `:` or `#`, any of
+ * which silently truncates or re-targets a DSN — the failure looks like
+ * "mail just doesn't send". `smtps://` for implicit TLS (465); plain `smtp://`
+ * otherwise, which is what Symfony wants for STARTTLS and for no encryption.
+ * Exported for the test.
+ */
+export function buildSmtpDsn(config: {
+  host: string | null;
+  port: number | null;
+  user: string | null;
+  password: string | null;
+  encryption: MailEncryption;
+}): string | null {
+  if (!config.host) return null;
+  const scheme = config.encryption === 'ssl' ? 'smtps' : 'smtp';
+  const credentials =
+    config.user ? `${encodeURIComponent(config.user)}:${encodeURIComponent(config.password ?? '')}@` : '';
+  const port = config.port ? `:${config.port}` : '';
+  return `${scheme}://${credentials}${config.host}${port}`;
 }
 
 /** 'none' is the only case that isn't encrypted; both tls and ssl are. */

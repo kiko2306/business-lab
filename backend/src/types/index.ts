@@ -118,6 +118,13 @@ export interface ServiceMailEnvKeys {
   imapPassword?: string[];
   imapEncryption?: string[];
   /** Set verbatim whenever mail is configured — e.g. MAIL_ENABLED=true. */
+  /**
+   * Env vars that take the whole SMTP config as a single Symfony-style DSN
+   * (`smtp://user:pass@host:port`) rather than one field each — Kimai's
+   * `MAILER_URL`. Composed by buildMailEnvOverrides, credentials
+   * percent-encoded, and `smtps://` for implicit TLS.
+   */
+  smtpDsn?: string[];
   staticWhenConfigured?: Record<string, string>;
 }
 

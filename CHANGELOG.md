@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.92.0] — 2026-09-12
+
+### Added
+
+- Kimai's SMTP settings are now injected from the global mail config as a composed Symfony DSN, instead of being the one app you had to configure by hand
+
 ## [0.91.0] — 2026-09-12
 
 ### Added

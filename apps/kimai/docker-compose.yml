@@ -44,6 +44,11 @@ services:
       # per-field mail injection can't build — set it here by hand if wanted
       # (smtp://user:pass@host:port). Kimai runs fine without it; admin
       # recovery is "change KIMAI_ADMIN_PASSWORD and restart", not email.
+      # Injected by the dashboard from the global mail settings as a composed
+      # Symfony DSN (mailEnv.ts's buildSmtpDsn, §422) — Kimai takes the whole
+      # SMTP config as one URL, so it can't use the per-field injection every
+      # other app gets. `null://null` keeps Kimai booting with mail disabled
+      # until those settings exist.
       MAILER_URL: ${KIMAI_MAILER_URL:-null://null}
     labels:
       - "homepage.group=Productivity"

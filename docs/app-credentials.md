@@ -121,9 +121,9 @@ config from their environment get it injected automatically at start (restart
 the app to apply, same as exposure):
 
 **Vaultwarden**, **BookStack**, **n8n** (user-management emails), **Paperless**
-(sending only), **Vikunja**.
+(sending only), **Vikunja**, **Kimai** (as a single DSN — §422).
 
-None of the following read mail config from their environment — for two of
+None of the following read mail config from their environment — for one of
 them that just means applying the settings by hand, and nothing warns you if
 you don't:
 
@@ -133,9 +133,11 @@ you don't:
 - **Uptime Kuma** — an email alert is an SMTP *notification* created under
   **Settings → Notifications**. There is no environment variable for it.
 - **Kimai** — reads SMTP from a single `MAILER_URL` DSN
-  (`smtp://user:pass@host:port`), which the per-field injection can't build.
-  Set `KIMAI_MAILER_URL` in `apps/kimai/.env` (config panel). Kimai runs fine
-  without it.
+  (`smtp://user:pass@host:port`). The dashboard now composes that DSN from
+  the same global settings and injects it as `KIMAI_MAILER_URL` at start
+  (§422), so there is nothing to set by hand — restart Kimai to apply, same
+  as the others. Credentials are percent-encoded, and implicit TLS gets
+  `smtps://`.
 
 Paperless' *document intake* over IMAP is also its own per-account setting
 (**Settings → Mail**), separate from the global config.
