@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.97.3] — 2026-09-12
+
+### Fixed
+
+- ntfy's subscriber credential is re-issued if the stored password isn't one the dashboard generated, and the write is now verified by reading it back
+
 ## [0.97.2] — 2026-09-12
 
 ### Fixed

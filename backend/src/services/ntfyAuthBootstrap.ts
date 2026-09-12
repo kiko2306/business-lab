@@ -82,15 +82,34 @@ function buildScript(password: string, recreate: boolean): string {
   ].join('\n');
 }
 
-export async function ensureNtfySubscriberToken(serviceName: string): Promise<void> {
+/**
+ * A stored password that cannot have come from `generateComplexPassword()`
+ * (24 chars, always at least one digit and one of `!@#%^*-_=+`) means
+ * something overwrote it after this hook stored the real one — which is
+ * exactly what happened live: ntfy's `.env` ended up holding an 11-character
+ * value with no digit, so the phone app's credential no longer matched
+ * ntfy's auth database and subscribing returned 401 (§429). Treated as "no
+ * usable password", so the account is re-issued rather than left broken.
+ */
+export function looksGenerated(password: string): boolean {
+  return password.length === 24 && /[0-9]/.test(password) && /[!@#%^*\-_=+]/.test(password);
+}
+
+export async function ensureNtfySubscriberToken(serviceName: string, force = false): Promise<void> {
   if (serviceName !== NTFY_SERVICE) return;
 
   const existingToken = (readAppEnvValue(NTFY_SERVICE, NTFY_TOKEN_KEY) ?? '').trim();
-  const existingPassword = (readAppEnvValue(NTFY_SERVICE, NTFY_PASSWORD_KEY) ?? '').trim();
-  if (existingToken && existingPassword) return;
+  const storedPassword = (readAppEnvValue(NTFY_SERVICE, NTFY_PASSWORD_KEY) ?? '').trim();
+  const existingPassword = looksGenerated(storedPassword) ? storedPassword : '';
+  if (storedPassword && !existingPassword) {
+    logger.warn(
+      'ntfy: the stored subscriber password is not one this generated — re-issuing the account (§429)'
+    );
+  }
+  if (existingToken && existingPassword && !force) return;
   // A token but no password means this ran before §428 and the phone app has
   // no credential it can use. Recreate the user so both exist.
-  const recreate = Boolean(existingToken) && !existingPassword;
+  const recreate = force || (Boolean(existingToken) && !existingPassword);
 
   const resolved = resolveComposeFile(NTFY_SERVICE);
   if (!resolved?.composeFile) return;
@@ -109,6 +128,18 @@ export async function ensureNtfySubscriberToken(serviceName: string): Promise<vo
       return;
     }
     await saveServiceEnv(NTFY_SERVICE, { [NTFY_TOKEN_KEY]: token, [NTFY_PASSWORD_KEY]: password });
+
+    // Read it straight back. The credential is useless if what lands in .env
+    // is not what ntfy was given, and that failed silently once already —
+    // the app just says "not authorized" and nothing here notices (§429).
+    const storedBack = (readAppEnvValue(NTFY_SERVICE, NTFY_PASSWORD_KEY) ?? '').trim();
+    if (storedBack !== password) {
+      logger.error(
+        'ntfy: the subscriber password did not survive the round-trip to .env — the phone app will get 401',
+        { wrote: password.length, readBack: storedBack.length }
+      );
+      return;
+    }
     logger.info(
       `ntfy: ${recreate ? 're-created' : 'created'} the read-only '${SUBSCRIBER_USER}' account — ` +
         'username/password for the phone app, token for the CLI, both in ntfy\'s config panel'
