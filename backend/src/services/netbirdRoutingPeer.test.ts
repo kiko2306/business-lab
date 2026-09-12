@@ -3,7 +3,7 @@ import { getPublishedUpstreamPort } from '../config/services';
 import { getHostGatewayIp } from '../utils/network';
 import { getLanCidr } from './networkScan';
 import { readAppEnvValue, saveServiceEnv } from './appEnv';
-import { aliasCidrFor, ensureNetbirdRoutingPeer, normalizeCidr } from './netbirdRoutingPeer';
+import { aliasCidrFor, ensureNetbirdRoutingPeer, isRejectedCredential, normalizeCidr } from './netbirdRoutingPeer';
 
 vi.mock('../config/services', () => ({ getPublishedUpstreamPort: vi.fn() }));
 vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn() }));
@@ -264,5 +264,26 @@ describe('ensureNetbirdRoutingPeer', () => {
     }) as typeof fetch);
     await ensureNetbirdRoutingPeer('netbird-vpn');
     expect(mockedSave).toHaveBeenCalledWith('netbird-vpn', { NETBIRD_ROUTING_PEER_SETUP_KEY: 'NEW-SETUP-KEY' });
+  });
+});
+
+describe('isRejectedCredential', () => {
+  // Only an explicit rejection from NetBird counts — §407's alert must not
+  // fire on the flaky-start failures that retry by themselves.
+  it('matches the 401/403 nbRequest reports', () => {
+    expect(isRejectedCredential('NetBird API GET /api/networks -> 401: {"message":"unauthorized"}')).toBe(true);
+    expect(isRejectedCredential('NetBird API POST /api/groups -> 403: forbidden')).toBe(true);
+  });
+
+  it('does not match transport failures or other statuses', () => {
+    for (const message of [
+      'fetch failed',
+      'The operation was aborted due to timeout',
+      'NetBird API GET /api/networks -> 500: internal',
+      'NetBird API GET /api/networks -> 404: not found',
+      'ECONNREFUSED 172.17.0.1:10250',
+    ]) {
+      expect(isRejectedCredential(message)).toBe(false);
+    }
   });
 });

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.94.0] — 2026-09-12
+
+### Added
+
+- an ntfy alert when NetBird rejects the dashboard's API token, instead of VPN auto-provisioning stopping silently
+
 ## [0.93.1] — 2026-09-12
 
 ### Fixed

@@ -37,6 +37,7 @@ import { getPublishedUpstreamPort } from '../config/services';
 import { getHostGatewayIp } from '../utils/network';
 import { getLanCidr } from './networkScan';
 import { readAppEnvValue, saveServiceEnv } from './appEnv';
+import { publishAlert } from '../utils/alertNotify';
 
 const SERVICE = 'netbird-vpn';
 const API_TOKEN_ENV = 'NETBIRD_API_TOKEN';
@@ -125,6 +126,17 @@ export function aliasCidrFor(lanCidr: string, aliasBase: string): string | null 
   const prefix = lanCidr.split('/')[1];
   if (!prefix) return null;
   return normalizeCidr(`${aliasBase.split('/')[0]}/${prefix}`);
+}
+
+/**
+ * True for NetBird answering 401/403 — i.e. the PAT is expired, revoked or
+ * wrong — as opposed to a transport failure, which retries by itself. Keyed
+ * off the `-> <status>:` that nbRequest puts in its error message. Exported
+ * for the test: mistaking a transient failure for a dead credential would
+ * alert on every flaky start.
+ */
+export function isRejectedCredential(errorMessage: string): boolean {
+  return /-> 40[13]:/.test(errorMessage);
 }
 
 async function nbRequest<T>(baseUrl: string, token: string, method: string, path: string, body?: unknown): Promise<T> {
@@ -349,9 +361,34 @@ export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<boo
     // serving, and a revoked PAT throws here too. Self-heals on the next
     // start/restart — never blocks this one. Any .env write that already
     // happened is still reported, so its consumers get recreated.
+    const message = (error as Error).message;
     logger.warn('NetBird routing peer: auto-provisioning failed, leaving existing config untouched', {
-      error: (error as Error).message,
+      error: message,
     });
+
+    // A rejected PAT is the one failure here that never self-heals: NetBird
+    // caps Personal Access Tokens at 365 days with no never-expires option,
+    // and its API cannot mint a replacement without a human holding a session
+    // in NetBird's own UI. Until now that hit the cap and stopped silently,
+    // leaving auto-provisioning dead until someone noticed (§407). A
+    // transport failure is not this — it retries on the next start — so only
+    // an explicit 401/403 from NetBird alerts.
+    if (isRejectedCredential(message)) {
+      const published = await publishAlert({
+        title: 'NetBird token rejected',
+        message:
+          'NetBird rejected the dashboard\'s Personal Access Token, so VPN auto-provisioning has stopped. ' +
+          'Tokens expire after 365 days (NetBird\'s maximum) and cannot self-renew. Create a new one in ' +
+          'NetBird → Settings → Personal Access Tokens and paste it into NETBIRD_API_TOKEN in the ' +
+          'NetBird VPN config panel.',
+        tags: ['key', 'warning'],
+      });
+      logger.error(
+        published
+          ? 'NetBird: PAT rejected — alert published to the ntfy topic'
+          : 'NetBird: PAT rejected — could not publish an alert (is ntfy installed and running?)'
+      );
+    }
     return envChanged;
   }
 }
