@@ -228,14 +228,11 @@ it is done — not ticked off and left behind. Section references point at
       an authenticated user. Revisit by reading the pinned version's
       upstream source for the exact mutation — not by probing.
 
-- [ ] **Build Kimai's `MAILER_URL` from the global mail settings** (§416.4)
-      — documented as by-hand only because the per-field injection can't
-      compose a DSN, but it is just `smtp://user:pass@host:port` from fields
-      the dashboard already holds.
-
 - [ ] **Uptime Kuma's SMTP notification isn't covered by global mail**
-      (§416.5) — no environment variable exists; it needs Uptime Kuma's own
-      API after an admin exists, so it depends on the admin bootstrap above.
+      (§416.5) — no environment variable exists; it is a row in its own
+      `setting` table / a Socket.IO call. Now unblocked: §421 created the
+      admin, and `uptimeKumaAdminBootstrap.ts` already speaks the Socket.IO
+      frames needed, so this can reuse both.
 
 - [ ] **The fixed-IP prompt still isn't pre-answerable** (§422 did the other
       two) — `SETUP_FREE_PORT_53` and `SETUP_NOPASSWD_SUDO` now work from
