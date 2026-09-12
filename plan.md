@@ -27455,3 +27455,69 @@ A full `./start.sh` run on a fresh clone — it is a root host bootstrap, and
 this host is already bootstrapped. The changed paths are the two prompt
 branches and the seeding block; the seeding logic is what the fixture check
 covers.
+
+## 419. n8n's owner account is claimed automatically (1 of §416.3's six apps)
+
+First of the six apps §416.3 listed as still needing a human to claim the
+admin account. `n8nAdminBootstrap.ts`, post-`up`, mirroring
+`docusealAdminBootstrap.ts`: poll `/rest/settings`, and if n8n says no owner
+exists, `POST /rest/owner/setup` with the Authelia admin's email and a
+generated `N8N_ADMIN_PASSWORD`.
+
+n8n community has no SSO (SAML is enterprise-only), so it always keeps its
+own login; this makes that login usable with no manual step instead of
+landing the admin on a setup wizard.
+
+### Two things worth keeping
+
+**`readSetupState` fails closed.** `showSetupOnFirstLoad` on n8n's own
+`/rest/settings` is n8n's answer to "does an owner exist yet", and anything
+that is not literally `true` is read as *already owned*. An upstream rename
+therefore makes this skip, not POST the setup endpoint on every start of a
+live n8n. That is the case the unit test pins, not the happy path.
+
+**The carrier env var goes in the n8n service's own `environment:` block**,
+not the shared `x-n8n-db-env` anchor it first landed in — that anchor is
+merged into the workflow-import container too, which has no use for an admin
+password.
+
+### The exposure gate was wrong, and only the live run showed it
+
+The first version copied DocuSeal's `if (!exposureRow?.enabled) return;`.
+It type-checked, all 829 tests passed, and against the host it did **nothing
+at all** — no owner, no log line. `getExposability('n8n')` refuses outright:
+
+> n8n is a sensitive gateway — reach it over the NetBird/Tailscale overlay,
+> not the public tunnel.
+
+So n8n's `service_exposure` row is permanently `enabled: false` and the gate
+returned every time. DocuSeal's gate is right *for DocuSeal* — public,
+directly exposed, and un-exposed it keeps its own onboarding — but n8n's
+wizard is a step for the admin whether or not it is on the tunnel. Gate
+removed.
+
+Worth carrying into the remaining five: **check each app's exposability
+before copying that gate.** `jellyfin` (LAN-only) and `kopia` are the other
+two rows with `enabled: false`, both deliberate, so Jellyfin's bootstrap must
+not gate on exposure either. Nothing here was a stale row.
+
+### Verified live
+
+- Before: `showSetupOnFirstLoad = True`. After: `False`, with
+  `n8n owner account created`.
+- Second run: `n8n already has an owner account; nothing to bootstrap`.
+- **The generated password actually signs in** — `POST /rest/login` with the
+  value from `.env` → `200`. A created account that can't log in would have
+  looked identical from the outside; the generated `*_ADMIN_PASSWORD` shape
+  (24 chars, mixed case, digit, safe specials) satisfies n8n's own policy.
+
+### Still open from §416.3
+
+Navidrome, Uptime Kuma, Twenty, Vikunja, Jellyfin. Notes from probing them:
+Vikunja (`POST /api/v1/register`) and Jellyfin (`/Startup/User` +
+`/Startup/Complete`, and `StartupWizardCompleted: false` right now, so it is
+genuinely testable) look like the same shape as this one. Navidrome needs its
+`createAdmin` endpoint confirmed. **Uptime Kuma drives setup over
+socket.io**, not REST, so it needs either a raw engine.io handshake or a new
+dependency — decide that one before starting it. Twenty is a GraphQL
+`signUp` mutation on a fast-moving API.
