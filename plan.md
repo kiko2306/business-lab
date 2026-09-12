@@ -27132,3 +27132,15 @@ Authelia is 401ing two API endpoints on a tight loop: something polls
 `401 → redirect to the login page`, and Vaultwarden's
 `/identity/connect/token` gets the same treatment. Both look like API paths
 being caught by forward-auth that need a bypass rule. Separate README item.
+
+## 413.1. Confirmed on the phone
+
+The §413 device-code flow works: login completes on the phone instead of
+dead-ending on `http://localhost:53000`. README item deleted.
+
+The §412 alias also confirmed from the phone, via the symptom that makes a
+collision obvious: `192.168.1.30` worked on mobile data and failed on WiFi —
+mobile data is a carrier CGNAT range with nothing competing with the NetBird
+route, while the same phone on a `192.168.1.0/24` WiFi has a
+directly-connected route that wins. `10.177.1.30` works on both. That
+"mobile data yes, WiFi no" tell is now in `docs/deployment-guide.md`.

@@ -138,6 +138,13 @@ routing tweak can never be the answer for the whole range. Under the hood the
 backend advertises both as NetBird resources; set `NETBIRD_LAN_ALIAS_CIDR` in
 this app's config panel if `10.177.1.x` is itself in use somewhere.
 
+The clearest symptom of a collision, worth recognising on sight: **a LAN
+address works from mobile data but not from WiFi.** Mobile data puts the
+client in a carrier CGNAT range where nothing competes with the NetBird
+route; the same phone on a `192.168.1.0/24` WiFi has a directly-connected
+route that wins. The alias range works on both, which is why it is the
+address to hand out.
+
 Two more things worth knowing before someone burns an afternoon on it
 (verified from a colliding client, plan.md §411.5):
 
