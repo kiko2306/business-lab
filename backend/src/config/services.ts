@@ -1168,6 +1168,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     icon: 'bell',
     category: 'Monitoring & Management',
     composePath: 'apps/ntfy/docker-compose.yml',
+    // Both are generated for the human to copy into the ntfy phone app, so
+    // the config panel must show them rather than mask them (§428).
+    readableSecrets: ['NTFY_SUBSCRIBE_TOKEN', 'NTFY_SUBSCRIBE_PASSWORD'],
     // The ntfy phone/desktop apps subscribe with an ntfy access token and
     // cannot follow Authelia's 401-redirect-to-login-portal, so they retried
     // forever (plan.md §415). Safe to admit *only* because ntfy now runs with

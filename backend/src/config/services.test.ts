@@ -694,3 +694,29 @@ describe('autheliaBypassPaths', () => {
     expect(matchesAny(vw, '/')).toBe(false);
   });
 });
+
+// §428: a credential generated for the human to copy elsewhere has to be
+// readable in the config panel, and the *_ADMIN_PASSWORD convention that
+// covers app logins does not cover every such case — ntfy's subscriber
+// credentials go into a phone app.
+describe('readableSecrets', () => {
+  it('never marks a key that is also hidden — hidden always wins', () => {
+    for (const service of Object.values(SERVICES)) {
+      for (const key of service.readableSecrets ?? []) {
+        expect(service.hiddenGeneratedSecrets ?? [], `${service.name}: ${key}`).not.toContain(key);
+        expect(service.hiddenEnvKeys ?? [], `${service.name}: ${key}`).not.toContain(key);
+      }
+    }
+  });
+
+  // A guard against this becoming a habit: every entry turns a write-only
+  // secret into a readable one, so the list should stay short and deliberate.
+  it('is declared only where a human genuinely has to read the value', () => {
+    const declaring = Object.values(SERVICES)
+      .filter((s) => s.readableSecrets?.length)
+      .map((s) => s.name)
+      .sort();
+    expect(declaring).toEqual(['ntfy']);
+    expect(SERVICES.ntfy.readableSecrets).toEqual(['NTFY_SUBSCRIBE_TOKEN', 'NTFY_SUBSCRIBE_PASSWORD']);
+  });
+});

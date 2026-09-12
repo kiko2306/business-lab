@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.97.2] — 2026-09-12
+
+### Fixed
+
+- ntfy's subscriber credentials are now shown in its config panel instead of masked — they exist to be copied into the phone app
+
 ## [0.97.1] — 2026-09-12
 
 ### Fixed

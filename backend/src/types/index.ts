@@ -297,6 +297,14 @@ export interface ServiceDefinition {
    * app, so they are written as narrowly as the client allows — anchored, and
    * never a bare prefix that would also admit a registration or admin path.
    */
+  /**
+   * Secret-shaped keys whose value the config panel must show rather than
+   * mask, because the human has to copy it somewhere (ntfy's subscriber
+   * credentials go into the phone app). The `*_ADMIN_PASSWORD` convention
+   * covers app logins automatically; this is for the cases it does not
+   * (plan.md §428).
+   */
+  readableSecrets?: string[];
   autheliaBypassPaths?: string[];
   oidcClient?: {
     redirectPaths: string[];
