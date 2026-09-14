@@ -209,6 +209,21 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Kopia's API goes unresponsive under a maintenance-loop stall**
+      (found live on `home-srv-01`, 2026-09-14) — `docker logs kopia-kopia-1`
+      shows it endlessly repeating "Running quick maintenance… Compacting an
+      eligible uncompacted epoch… Advancing epoch markers… Finished quick
+      maintenance." without converging, and its own healthcheck starts
+      failing ("Health check exceeded timeout (10s)") — at which point every
+      backend call to it (`provisionBackupSource`, `getBackupSourceStatus`)
+      times out at the fixed 20s (`REQUEST_TIMEOUT_MS`,
+      `backend/src/services/kopiaClient.ts`), so the app-data half of the
+      backup silently cannot run until Kopia recovers or is restarted.
+      Needs investigating: why the epoch compaction never finishes (backlog
+      from the size of `/source/apps`? a corrupt/large epoch?), and whether
+      the backend should detect and surface "Kopia is stuck in maintenance"
+      as its own status rather than a generic timeout.
+
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch
