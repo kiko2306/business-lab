@@ -27963,3 +27963,50 @@ exists in its data volume from the manual signup in §372, so the bootstrap's
 first live run there should read `already-owned` and no-op, which itself
 exercises the real GraphQL call). Needs a start + log check before this
 counts as proven, not just tested.
+
+## 438.1 §438 proven live — and the source-only read had one real bug
+
+Ran `startService('twenty', 1)` directly inside the deployed `backend-1`
+(same technique as §435 — no dashboard session needed) against Twenty on
+`home-srv-01`. First run: `checkUserExists` for the real Authelia admin
+email came back `already-owned` (the manual signup from §372 used that same
+email), so the reconcile correctly no-opped in 1.3s. To prove the actual
+*create* path — not just the no-op — this box's own no-guarantees-data rule
+applies: `docker compose down -v` + `sudo rm -rf apps/twenty/data/{db,storage,valkey}`
+on Twenty's own project, then `startService` again.
+
+**That run caught a real bug the source read alone missed.** Every call
+first 404'd with `Cannot query field "checkUserExists" on type "Query"`
+against `/graphql`. `AuthResolver` carries `@MetadataResolver()`, not the
+plain `@Resolver()` a `/graphql`-only read would assume — that decorator
+tags the class into Twenty's `'metadata'` GraphQL schema scope, which
+`app.module.ts` mounts at `/metadata` (`ApiPath.Metadata`), a completely
+different endpoint from the `/graphql` (`ApiPath.GraphQL`) one this file
+originally targeted. Confirmed by testing both: `/graphql` gives the parse
+error for every one of `AuthResolver`'s methods (not just `checkUserExists`
+— `signUp`, `signIn`, `getLoginTokenFromCredentials` all missing too, which
+is what gave away that the whole resolver class was mounted elsewhere, not
+that individual fields were gone); `/metadata` answers correctly. Fixed in
+`twentyClient.ts`, both client and orchestration tests updated, pushed
+through `dev`→`beta`, rebuilt on `home-srv-01` — the version-bump hook
+should have blocked the fix commit (it touches `backend/src` with no VERSION
+move) but didn't fire; bumped it in a follow-up commit instead of rewriting
+history, and this is worth someone independently checking why the hook
+missed it.
+
+With the endpoint fixed, the full reset-and-create run succeeded end to
+end: `startService` → Twenty's ~2m23s first-boot migrations → `checkUserExists`
+(`needs-signup`) → `signUp` → `signUpInNewWorkspace` → **"Twenty workspace
+owner created", email: miguelamtx@gmail.com**. A follow-up `checkUserExists`
+read `already-owned`; a second `startService` call logged "Twenty already
+has a workspace owner; nothing to bootstrap" and completed in ~1.4s —
+idempotent for real, not just by test. `curl https://twenty.tx-home-utils.com/`
+returns 200.
+
+**The lesson, restated for future §-work**: §421's original mandate —
+"revisit by reading the pinned version's upstream source... not by
+probing" — was necessary but not sufficient. Source pins down *what* to
+call; only a request against the real running container proves *where*.
+Both matter, and skipping the second one here would have shipped a
+bootstrap that always logged "gave up: the app never became reachable" and
+never actually worked.
