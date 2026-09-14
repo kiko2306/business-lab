@@ -33,6 +33,7 @@ import { requireCapability } from './middleware/requireCapability';
 import { initWebSocket, sseHandler } from './services/realtime';
 import { startupLogsHandler } from './services/serviceLogs';
 import { startBackupScheduler } from './services/backupScheduler';
+import { startKopiaRcloneKeepalive } from './services/kopiaClient';
 import { reconcileRemovedServices } from './services/exposure';
 import { syncAutheliaAccessControlSafe } from './services/autheliaAccessControl';
 import { syncAutheliaOidcClientsSafe } from './services/autheliaOidcClients';
@@ -229,6 +230,7 @@ ensureSelfUpdateTable()
     console.error('Unable to ensure self-update schema:', err.message);
   });
 startBackupScheduler();
+startKopiaRcloneKeepalive();
 // An app dropped from the registry keeps its NPM proxy host and Cloudflare
 // hostname otherwise, with no page left in the dashboard to switch them off.
 reconcileRemovedServices().catch((err: Error) => {

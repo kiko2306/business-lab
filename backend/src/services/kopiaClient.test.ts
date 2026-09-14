@@ -1,10 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-// kopiaClient only imports the logger; a bare stub keeps the module isolated.
+// kopiaClient only imports the logger and appEnv; bare stubs keep the module
+// isolated from the filesystem.
 vi.mock('../utils/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
+vi.mock('./appEnv', () => ({ readAppEnvValue: vi.fn() }));
 
+import logger from '../utils/logger';
+import { readAppEnvValue } from './appEnv';
 import {
   checkKopiaConnection,
   cookieHeader,
@@ -12,10 +16,13 @@ import {
   getBackupSourceStatus,
   getRestoreTaskStatus,
   listSnapshots,
+  pingRcloneBridge,
   provisionBackupSource,
   restoreSnapshot,
   runSnapshotNow,
 } from './kopiaClient';
+
+const readAppEnvValueMock = vi.mocked(readAppEnvValue);
 
 describe('extractCsrfToken', () => {
   it('pulls the token out of the meta tag', () => {
@@ -119,6 +126,49 @@ describe('checkKopiaConnection', () => {
     const result = await checkKopiaConnection('wrong');
     expect(result.ok).toBe(false);
     expect(result.detail).toMatch(/KOPIA_SERVER_PASSWORD/);
+  });
+});
+
+describe('pingRcloneBridge', () => {
+  beforeEach(() => {
+    readAppEnvValueMock.mockReset();
+    vi.mocked(logger.warn).mockClear();
+  });
+
+  it('does nothing when the backend is not rclone', async () => {
+    readAppEnvValueMock.mockReturnValue(null); // BACKUP_REPO_KIND unset (filesystem default)
+    await pingRcloneBridge();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does nothing when rclone is configured but has no password yet', async () => {
+    readAppEnvValueMock.mockImplementation((_app, key) => (key === 'BACKUP_REPO_KIND' ? 'rclone' : null));
+    await pingRcloneBridge();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('pings the repository status when rclone is configured with a password', async () => {
+    readAppEnvValueMock.mockImplementation((_app, key) =>
+      key === 'BACKUP_REPO_KIND' ? 'rclone' : key === 'KOPIA_SERVER_PASSWORD' ? 'pw' : null
+    );
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse())
+      .mockResolvedValueOnce(jsonResponse({ connected: true, description: 'Repository in RClone' }));
+
+    await pingRcloneBridge();
+
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(logger.warn).not.toHaveBeenCalled();
+  });
+
+  it('logs a warning, never throws, when the ping fails (the bridge is wedged)', async () => {
+    readAppEnvValueMock.mockImplementation((_app, key) =>
+      key === 'BACKUP_REPO_KIND' ? 'rclone' : key === 'KOPIA_SERVER_PASSWORD' ? 'pw' : null
+    );
+    fetchMock.mockRejectedValueOnce(new DOMException('The operation was aborted due to timeout', 'TimeoutError'));
+
+    await expect(pingRcloneBridge()).resolves.toBeUndefined();
+    expect(logger.warn).toHaveBeenCalledWith('Kopia keepalive ping failed', expect.objectContaining({ detail: expect.any(String) }));
   });
 });
 

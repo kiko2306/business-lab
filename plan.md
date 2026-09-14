@@ -28459,3 +28459,42 @@ to the rclone bridge so it never goes idle long enough to wedge, or have the
 backend detect this exact timeout signature and auto-restart the `kopia`
 container. No code change this session — investigation only, at the user's
 request, before committing to one of those.
+
+## 435. A keepalive ping for Kopia's rclone bridge
+
+§434 root-caused the stall to `rclone serve webdav` (the subprocess Kopia
+spawns for `BACKUP_REPO_KIND=rclone`) going stale after ~14.5h idle and
+wedging the whole HTTP server behind it — a known, open class of upstream
+bug, not this repo's code. Asked to add a periodic keepalive rather than
+leave it manual or build full auto-restart detection.
+
+**Design**: reused `checkKopiaConnection` (`kopiaClient.ts`) — already
+existing, already tested, already exactly the right shape (open a session,
+`GET /api/v1/repo/status`, never throws) — rather than writing a new probe.
+The new piece is `pingRcloneBridge()`, gated two ways before it does
+anything: `BACKUP_REPO_KIND !== 'rclone'` skips (filesystem/s3 never spawn
+the bridge subprocess and don't have this failure mode), and no
+`KOPIA_SERVER_PASSWORD` yet skips (nothing to ping). `startKopiaRcloneKeepalive()`
+mirrors `backupScheduler.ts`'s `startBackupScheduler` shape exactly — an
+immediate call plus a `setInterval`, both wrapped in `.catch` even though
+the inner call never throws, matching the existing defensive style — wired
+into `index.ts` right next to it. 30 minutes: comfortably under the ~14.5h
+idle window that triggered the real incident, for the cost of one cheap
+read-only status call.
+
+Deliberately did NOT build the auto-restart option floated in §434 — the
+user asked specifically for the keepalive, and restarting a container
+automatically from a background timer is a materially bigger, riskier
+piece of automation (needs to distinguish "bridge is wedged" from "Kopia is
+mid-restart already" from "Kopia is genuinely down for another reason") that
+deserves its own decision, not a default bundled in because it was on the
+table.
+
+Verified: backend typecheck + full suite (882 tests — 4 new, covering the
+two skip-gates, a successful ping, and a failed ping logging a warning
+without throwing). Not yet proven against `home-srv-01` — that's the real
+test, since this box is exactly the `BACKUP_REPO_KIND=rclone` case the ping
+exists for, and the mock-based tests can't tell us whether the immediate
+on-startup ping actually reaches the real bridge. Next: deploy to `beta`,
+confirm the ping fires and succeeds against the live Kopia, then merge to
+`main`.

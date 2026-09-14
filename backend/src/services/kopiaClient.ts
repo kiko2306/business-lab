@@ -20,6 +20,7 @@
  */
 
 import logger from '../utils/logger';
+import { readAppEnvValue } from './appEnv';
 
 /**
  * What Kopia snapshots: the managed apps/ tree, mounted read-only into the
@@ -248,6 +249,48 @@ export async function checkKopiaConnection(password: string): Promise<{ ok: bool
   } catch (error) {
     return { ok: false, detail: (error as Error).message };
   }
+}
+
+// ---------------------------------------------------------------------------
+// keepalive
+// ---------------------------------------------------------------------------
+
+/**
+ * How often to ping Kopia so its rclone bridge never sits idle long enough to
+ * wedge (plan.md §434). `BACKUP_REPO_KIND=rclone` makes Kopia route every
+ * repository operation through a separately-spawned `rclone serve webdav`
+ * subprocess; that subprocess went stale after ~14.5h idle and took the whole
+ * HTTP server down with it — a known, still-open class of upstream bug
+ * (kopia/kopia#5124, #4791, #5107), not something in this repo's own code.
+ * 30 minutes is comfortably under the idle window that triggered it, for the
+ * cost of one cheap, read-only status call.
+ */
+const KEEPALIVE_INTERVAL_MS = 30 * 60 * 1000;
+
+/**
+ * Only the rclone backend spawns that bridge subprocess — filesystem and s3
+ * don't, and don't have this failure mode, so there is nothing worth pinging
+ * for them.
+ */
+export async function pingRcloneBridge(): Promise<void> {
+  if (readAppEnvValue('kopia', 'BACKUP_REPO_KIND') !== 'rclone') {
+    return;
+  }
+  const password = readAppEnvValue('kopia', 'KOPIA_SERVER_PASSWORD');
+  if (!password) {
+    return;
+  }
+  const result = await checkKopiaConnection(password);
+  if (!result.ok) {
+    logger.warn('Kopia keepalive ping failed', { detail: result.detail });
+  }
+}
+
+export function startKopiaRcloneKeepalive(): void {
+  pingRcloneBridge().catch((error: Error) => logger.error('Initial Kopia keepalive ping failed', { error: error.message }));
+  setInterval(() => {
+    pingRcloneBridge().catch((error: Error) => logger.error('Kopia keepalive ping failed', { error: error.message }));
+  }, KEEPALIVE_INTERVAL_MS);
 }
 
 // ---------------------------------------------------------------------------
