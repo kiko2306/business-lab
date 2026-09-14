@@ -219,8 +219,13 @@ it is done — not ticked off and left behind. Section references point at
       times out at the fixed 20s (`REQUEST_TIMEOUT_MS`,
       `backend/src/services/kopiaClient.ts`), so the app-data half of the
       backup silently cannot run until Kopia recovers or is restarted.
-      Needs investigating: why the epoch compaction never finishes (backlog
-      from the size of `/source/apps`? a corrupt/large epoch?), and whether
+      `docker compose restart` (in `apps/kopia/`) cleared it immediately —
+      status calls went from a 20s timeout to 49ms, the repository (rclone/FTP
+      to `portoinf.dyndns-server.com`) reconnected clean, 0 snapshot errors —
+      but that's a hand restart, not a fix: the loop's actual trigger is still
+      unknown, so this can recur. Needs investigating: why the epoch
+      compaction never finishes (backlog from the size of `/source/apps`? a
+      corrupt/large epoch?), and whether
       the backend should detect and surface "Kopia is stuck in maintenance"
       as its own status rather than a generic timeout.
 
