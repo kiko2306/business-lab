@@ -24856,157 +24856,36 @@ heading — P1 through P12 are all done.
 
 Docs-only, no code — no version bump, no host verification needed.
 
-## 396. A real off-host FTP destination surfaced a stale-volume bug in `applyKopiaTarget` (§131.4)
+## 396. Off-host FTP backup destination proven end to end — two real bugs found and fixed (former §396–§399, compacted 2026-09-14)
 
-@mat got a genuinely new, separate FTP server (`portoinf.dyndns-server.com`)
-— unlike the uncooperative test NAS, this one actually answers: "FTP server
-reachable and credentials accepted" from the destination test. First real
-chance to close the long-parked off-host-backup item.
+A genuinely reachable off-host FTP server (`portoinf.dyndns-server.com`,
+replacing an uncooperative test NAS that had dead-ended across SMB/FTP/NFS
+at §265–§269) finally let the long-parked "prove a real external backup
+destination" README item (§131.4) close. Two real defects surfaced only
+under an actual off-host upload, both root-caused from logs/kernel evidence
+rather than guessed, and both fixed in code:
 
-Saved the new `ftp` destination (previous kind was `smb`, pointed at a dead
-`192.168.1.38`). Dashboard reported success. Starting Kopia then failed:
-`docker compose could not start this service`.
+- **`applyKopiaTarget`'s volume-recreation cleanup only ran when Kopia was
+  already running**, so saving a new destination while Kopia was stopped
+  left the old, immutably-configured Docker volume in place — the next
+  start silently reused it against dead config. Fixed: the `down` +
+  `volume rm` cleanup now runs unconditionally on every destination save.
+- **Kopia's `mem_limit: 192m` had only ever been proven against an empty
+  repository** — a real 30-app upload through rclone's FTP bridge silently
+  OOM-killed the container on every attempt (found in `dmesg`; Docker's own
+  `OOMKilled` flag missed it because the killed PID wasn't the container's
+  PID 1). Fixed: `mem_limit: 768m` / `mem_reservation: 192m`, evidence-based
+  headroom rather than a bare-minimum retune.
 
-**Root cause, found by reading `applyKopiaTarget()`, not guessing.**
-Kopia was stopped at save time (container state `Created`, never actually
-started). The function's volume-recreation step —
-`docker compose down` + `docker volume rm -f kopia_backup-target` + `up` —
-only ran inside the "Kopia is currently running" branch. Not running →
-early return with just "Saved. Start Kopia to use it," **skipping the
-volume cleanup entirely**. Docker named volumes are immutable once created
-(CIFS `driver_opts` baked in at creation time), so the old SMB-configured
-`kopia_backup-target` volume survived untouched. The next manual Start
-reused it as-is — confirmed directly: `docker compose up` printed "Volume
-exists but doesn't match configuration in compose file. Recreate (data will
-be lost)?" and, with no TTY to answer, silently kept the stale one, still
-trying to mount `//192.168.1.38/share` — dead host, immediate failure.
+With both fixes deployed and verified live, a real 3.4 GB / 52,107-file
+snapshot landed on the real off-host server, and a restore (via Kopia's own
+CLI — the dashboard restore route is still unwired, same gap §266 hit)
+matched it byte-for-byte, matching §266's `disk`-kind bar exactly.
 
-**Fix**: the "is Kopia running" check now only decides whether to bring it
-back *up* afterward — the `down` + `volume rm` cleanup runs unconditionally
-every time a destination is saved, whether Kopia is running, stopped, or
-merely `Created`. `docker compose down` is a safe no-op-ish call either way
-(and correctly cleans up a `Created`-but-never-started container, which
-still held a reference blocking the volume removal).
-
-No new test — `kopiaTargetApply.test.ts`'s own header already states why:
-`applyKopiaTarget` is a thin shell over `docker`, proven live rather than
-mocked, same as the rest of this file's Docker-orchestration half. Backend
-typecheck clean, 757/757 tests pass (unaffected — `buildEnvValues`/
-`ensureKopiaRepoDir` are what's actually unit-tested here, neither touched).
-
-Not yet re-verified live — needs a deploy + re-save to confirm the stale
-volume actually gets cleared and Kopia starts clean against the real FTP
-destination this time. Staying on `dev` until that's proven — this is
-exactly the "touches Docker/backups" case the verification gate exists for.
-
-## 397. Kopia OOM-killed on every real upload to the FTP destination — `mem_limit` too low (§131.4)
-
-§396's fix let the FTP destination genuinely connect and create a repository
-(confirmed live — real progress, unlike the old NAS). Actually triggering
-"Back up now" told a different story: `started: true, dumped: 30` from the
-backend every time, but `kopia snapshot list --all` stayed empty across
-three consecutive attempts, and `docker inspect` showed Kopia's container
-quietly restarting (`RestartCount` 1 → 2 → 3) a few seconds after each
-trigger — clean `ExitCode=0`, nothing in `docker logs`, `OOMKilled: false`.
-Looked like a mystery at first: no backend code path restarts Kopia as part
-of a backup run (checked `runAppDataBackup`/`snapshotAppData` directly), no
-autoheal/watchtower container exists, no healthcheck-triggered restart
-mechanism is even possible in plain Compose.
-
-**Root cause, found in the host's own kernel log** (`dmesg`), not guessed:
-`Memory cgroup out of memory: Killed process ... (kopia) ...` — a genuine
-OOM kill, timed to the second with each restart. `apps/kopia/docker-
-compose.yml` had `mem_limit: 192m`, which was only ever proven against
-connecting to/creating an *empty* repository (§221's s3 proof, §265-269's
-NAS attempts that never got past `repository create` either) — nobody had
-proven a real upload before. Actually walking and content-hashing 30 apps'
-worth of data, through rclone's `--vfs-cache-mode=writes` buffering over the
-FTP bridge, needs real headroom. Docker's own `OOMKilled` flag missed it
-because the killed PID wasn't the container's PID 1 in Docker's accounting,
-even though the kernel took the whole container down regardless — which is
-exactly why `docker logs` showed a clean, silent restart with zero error
-text: nothing in the kopia process itself ever got the chance to log
-anything, it was killed from outside.
-
-Fixed: `mem_limit: 192m` → `768m`, `mem_reservation: 48m` → `192m`. Not a
-precisely-measured minimum — a real, evidence-based bump with actual
-headroom rather than a bare-minimum retune, since app data will only grow.
-
-Not `backend/src`/`frontend/src` — no version bump. Not yet re-verified
-live — needs a deploy + Kopia restart (compose resource limits only apply
-to a freshly created container, so a plain re-trigger isn't enough this
-time) and one more "Back up now" to confirm a snapshot actually lands.
-Staying on `dev`.
-
-## 398. §397 verified live — a real off-host FTP snapshot landed (§131.4)
-
-Deployed, restarted Kopia (fresh container, `Memory=805306368` = 768 MiB
-confirmed, `RestartCount=0`), clicked "Back up now" once more. This time:
-no OOM in `dmesg`, no restart, `kopia server start`'s process stayed alive
-through the whole upload (confirmed mid-flight: RSS ~461 MB, real CPU,
-disk/network I/O wait state — genuinely working, not stalled). A few
-minutes later:
-
-```
-root@kopia:/source/apps
-  2026-09-11 13:02:19 WEST k2fcfdc65125b9a1fc1c928730f2805b4
-  3.4 GB dgrwxrwxr-x files:52107 dirs:4648
-  (latest-1,hourly-1,daily-1,weekly-1,monthly-1,annual-1)
-```
-
-A real 3.4 GB, 52,107-file snapshot, genuinely sitting on
-`portoinf.dyndns-server.com` — off-host hardware that actually cooperates,
-unlike the test NAS across three protocols (§265/§268/§269).
-
-**This is the proof the long-parked README item was waiting on.** Two real
-bugs found and fixed to get here (§396's stale-volume issue, §397's OOM),
-neither a code-complete-but-unproven gap — both were genuine defects only a
-real upload against real off-host hardware could surface, exactly why this
-item stayed open instead of being called done from the `disk`-kind proof
-alone.
-
-**Not yet closing the README item outright** — §266's `disk`-kind proof
-went one step further (byte-for-byet restore, not just a snapshot). Whether
-to also prove a restore from this FTP destination before deleting the item
-is @mat's call, not a coding decision.
-
-## 399. `ftp` off-host destination proven end to end — snapshot + byte-for-byte restore (§131.4 closed)
-
-Matched §266's own bar exactly, on real off-host hardware this time
-(`portoinf.dyndns-server.com`, not the uncooperative test NAS).
-
-No dashboard route exists yet for a Kopia snapshot restore
-(`restoreSnapshot`/`getRestoreTaskStatus` in `kopiaClient.ts` are built but
-unwired — same gap §266 hit) — used Kopia's own CLI directly instead,
-restoring to a throwaway path inside the container (`/tmp/restore-test`),
-never touching the live `/source/apps` tree:
-
-```
-docker exec kopia-kopia-1 kopia restore k2fcfdc65125b9a1fc1c928730f2805b4 /tmp/restore-test
-```
-
-- **File count**: 52,107 restored — exact match to the snapshot's
-  `fileCount: 52107`.
-- **Bytes**: `du -sb` first read 3,423,520,778 — ~19.65 MB over the
-  snapshot's `totalSize: 3403870713`. Didn't take that as a discrepancy
-  without checking why: `du` measures disk-block allocation, not logical
-  file size, and 52,107 mostly-small files each round up to their block
-  boundary — exactly the kind of gap block overhead produces. Summed real
-  logical sizes instead (`find -printf %s`, careful to avoid both awk's
-  scientific-notation default output and a 32-bit `%d` overflow at this
-  size — `%.0f` for full precision): **`3403870713`** — byte-for-byte
-  identical to the snapshot's own total. The `du` gap was purely a
-  measurement artifact, not missing data.
-
-Temp restore directory cleaned up afterward (`rm -rf`, same "state left
-behind" discipline as §266).
-
-**README item closed.** The `disk`, `s3`, and now `ftp` destination kinds
-are all proven end to end, snapshot and restore, against genuinely separate
-hardware — not just code-complete. `ftps`/`sftp` share the same rclone code
-path `ftp` just proved (§267's own design), so this closes the whole
-off-host-hardware thread the item existed for, not just the one protocol
-tested.
+**README item closed.** `disk`, `s3`, and `ftp` are all proven end to end on
+genuinely separate hardware; `ftps`/`sftp` share the same rclone path `ftp`
+just proved (§267's design), so this closes the whole off-host-hardware
+thread, not just one protocol. No open threads.
 
 ## 400. README TODO: removed stray empty section headers
 
