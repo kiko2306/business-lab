@@ -28010,3 +28010,29 @@ call; only a request against the real running container proves *where*.
 Both matter, and skipping the second one here would have shipped a
 bootstrap that always logged "gave up: the app never became reachable" and
 never actually worked.
+
+## 439. Users-page frontend fixes were never deployed to home-srv-01
+
+Three consecutive frontend-only commits (the SSO app-access grid layout, the
+long-hostname overflow-into-next-column fix, the app filter box) were each
+verified with `ng build` plus a screenshot against the throwaway
+`docker-compose.test.yml` stack — real proof the code worked, but not proof
+it had *shipped*. None of the three rebuilt or redeployed the actual
+`frontend` container on `home-srv-01`; only the Twenty backend work in
+§438/§438.1 triggered a `git pull` + rebuild there, and that rebuild only
+touched `backend`. The user caught it by screenshotting the live dashboard
+and seeing the pre-fix overflow bug still present.
+
+Fixed by pulling `beta` (now at the filter-box commit) and rebuilding
+`frontend` on `home-srv-01`; confirmed via the served `main-*.js` chunk hash
+matching the just-built bundle.
+
+**The gap, restated so it doesn't repeat**: "verified" for a frontend change
+means built and rendered, same as a backend change means typechecked and
+tested — neither is "deployed" on its own. `docs/development-guide.md`'s
+verification loop deploys after *any* commit meant to land; a screenshot
+against a local throwaway stack is verification of the *code*, not of what
+`home-srv-01` is currently serving. Worth checking specifically after a run
+of docs/frontend/backend-only commits in a row, since the deploy step is
+easy to fold into "only backend changed" reasoning that was true for the
+commit before it but not the one after.
