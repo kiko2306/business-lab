@@ -227,12 +227,3 @@ it is done — not ticked off and left behind. Section references point at
       signups once the first workspace exists, so the race is one click by
       an authenticated user. Revisit by reading the pinned version's
       upstream source for the exact mutation — not by probing.
-
-- [ ] **Delete the obsolete `netbird-router-*` peers in the NetBird
-      dashboard** (§410/§411.1) — the cause is fixed (the routing peer was
-      mounting the pre-0.78 `/etc/netbird` state path, so it never
-      persisted its identity and registered afresh on every recreate), but
-      the identities it already leaked have to be removed by hand: delete
-      every `netbird-router*` peer except the one currently connected, so
-      the router group has exactly one live member. Needs a NetBird
-      dashboard login, which the agent does not have.

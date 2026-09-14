@@ -27881,3 +27881,12 @@ deleted its DNS record. Verified live: `curl` against
 `homelab.tx-home-utils.com` now fails to resolve (DNS record gone) while
 `businesslab.tx-home-utils.com` still returns 200 — the tunnel's other
 ingress rules were untouched by the merge.
+
+## 437. Dropped the netbird-router peer-cleanup TODO
+
+Removed the README item asking to delete the leaked `netbird-router-*`
+peers in the NetBird dashboard (§410/§411.1) — the user asked for it to be
+dropped from the list. The underlying cause was already fixed in §410/§411.1
+(the pre-0.78 `/etc/netbird` state-path mount); this was only the manual
+cleanup of identities the bug had already leaked, gated on a NetBird
+dashboard login the agent doesn't have, so it needed a human either way.
