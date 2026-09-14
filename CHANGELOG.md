@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.100.2] — 2026-09-14
+
+### Fixed
+
+- SSO app access chips: long hostnames no longer overflow into neighboring columns
+
 ## [0.100.1] — 2026-09-14
 
 ### Fixed

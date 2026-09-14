@@ -15,6 +15,11 @@
   padding: 0.4rem 0.6rem 0.4rem 2.1rem;
   border: 1px solid var(--bs-border-color);
   border-radius: 0.375rem;
+  overflow: hidden;
+  /* Hostnames (e.g. it-tools.tx-home-utils.com) have no spaces to wrap on —
+     without this they overflow the chip and bleed into the next column,
+     since CSS multi-column layout doesn't clip overflow between columns. */
+  overflow-wrap: anywhere;
 }
 
 .app-access-chip:has(.form-check-input:checked) {
