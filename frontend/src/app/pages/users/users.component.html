@@ -70,7 +70,7 @@
           Which exposed apps this account may reach through single sign-on.
           None by default.
         </p>
-        <div class="d-flex flex-wrap gap-3">
+        <div class="app-access-grid">
           <div class="form-check" *ngFor="let option of appOptions">
             <input
               class="form-check-input"
@@ -228,7 +228,7 @@
                   />
                 </div>
                 <span class="form-label small fw-semibold d-block mb-1">SSO app access</span>
-                <div class="d-flex flex-wrap gap-3" *ngIf="appOptions.length; else noAppOptions">
+                <div class="app-access-grid" *ngIf="appOptions.length; else noAppOptions">
                   <div class="form-check" *ngFor="let option of appOptions">
                     <input
                       class="form-check-input"
