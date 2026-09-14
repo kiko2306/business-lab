@@ -28219,3 +28219,70 @@ itself, and publishing from the internal senders never needed one.
 
 Took four rounds (§425, §428, §429, §430). The diagnostic order that would
 have found it in one is now in `docs/app-credentials.md`.
+
+## 431. The fixed-IP prompt is now pre-answerable — the last of the three
+
+README TODO item left open since §422 did the other two
+(`SETUP_FREE_PORT_53`, `SETUP_NOPASSWD_SUDO`). The fixed-IP prompt was
+deliberately excluded then: it needs four values, not a yes/no, and the
+existing interactive path's safety net (`netplan try`'s auto-revert) has no
+terminal to confirm on in an unattended run.
+
+**Design, matching the TODO item's own suggestion rather than reopening the
+question**: `SETUP_FIXED_IP_IFACE`/`_ADDR`/`_GATEWAY`/`_DNS` in
+`start.config`, all four required together — a partial set is a stated
+mistake, not a signal to guess the rest from `ip route`/`resolv.conf` the
+way the interactive prompt's own defaults do. `netplan generate` validates
+the file before trusting it. Crucially, the unattended path **never calls
+`netplan try` or `netplan apply`** — it writes the file and stops, taking
+effect on the next boot, which an unattended install already gets. That
+sidesteps the actual risk (a wrong gateway/DNS cutting off the session used
+to fix it) entirely rather than trying to replace `try`'s human-in-the-loop
+confirmation with something automated.
+
+`setup_server.sh`'s existing outer gate (`[ -t 0 ] && command -v
+netplan`) became `command -v netplan && { [ -t 0 ] || any SETUP_FIXED_IP_*
+set }`, with the branch inside split three ways: file already exists
+(unchanged — reports and leaves it alone regardless of which path got it
+there), interactive (byte-for-byte the existing prompt flow, untouched), or
+this new unattended branch. The existing interactive path was not
+restructured beyond the outer gate — same reasoning as §422's other two,
+minimal diff over a script whose failure mode is "wrong values on a host
+reached over SSH."
+
+New `scripts/test-fixed-ip.sh`, mirroring `test-vg-expansion.sh`'s own
+established shape for this exact class of script (extract the block by its
+boundary comment, not line number, so an edit to `setup_server.sh` can't
+silently leave the test exercising stale lines) but far lighter — no
+`--privileged`, no real LVM, since this block only ever writes a YAML file
+and shells out to `netplan generate`. A stub `netplan` in the container's
+own `PATH` answers `generate` only, and fails loudly (exit 99, "called with
+unexpected subcommand") if the unattended path ever reaches for `try` — the
+regression this whole design exists to prevent, made into an actual
+assertion rather than something to eyeball in a diff. `FIXED_IP_FILE` is
+redirected into the container's own `/work/netplan/` (sed on the extracted
+copy, not an env-var override — the real script assigns it unconditionally)
+so nothing here can touch a real `/etc/netplan` even outside the container.
+5 scenarios, 9 assertions: silent no-op with nothing set, the full
+happy path (file content, correct comma-spaced DNS list, "not applied
+live" in the output), a partial set refused with no file written, a
+`netplan generate` rejection cleaning up after itself, and an
+already-configured host left untouched even with `SETUP_FIXED_IP_*` set.
+All pass.
+
+`bash -n` and a containerized `shellcheck -x` both clean on the whole of
+`setup_server.sh` (the three pre-existing SC2015/SC2001 style notes are all
+well outside this block, unchanged). Docs updated: `start.config.example`
+gained the four keys with the same "why" `setup_server.sh`'s own comment
+carries; `first-run.md`'s prompt table and its "what's pre-answerable"
+paragraph both updated — the fixed-IP row now says what happens differently
+when pre-answered (written-not-applied) instead of just linking to this
+TODO item.
+
+Not a Docker/exposure/networking change to the *running* stack — it's
+`setup_server.sh`, exercised only on a fresh, not-yet-provisioned host, and
+`home-srv-01` already has its fixed IP set (the "already configured, left
+alone" branch is what it would hit regardless of what's in `start.config`).
+Verified via the containerized test above rather than against the live
+host — there is no live host this specific code path is meant to run
+against a second time.

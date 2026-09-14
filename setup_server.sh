@@ -33,6 +33,10 @@ if [ -f start.config ]; then
     case "$sc_key" in
       SETUP_FREE_PORT_53) [ -n "${SETUP_FREE_PORT_53:-}" ] || export SETUP_FREE_PORT_53="$sc_val" ;;
       SETUP_NOPASSWD_SUDO) [ -n "${SETUP_NOPASSWD_SUDO:-}" ] || export SETUP_NOPASSWD_SUDO="$sc_val" ;;
+      SETUP_FIXED_IP_IFACE) [ -n "${SETUP_FIXED_IP_IFACE:-}" ] || export SETUP_FIXED_IP_IFACE="$sc_val" ;;
+      SETUP_FIXED_IP_ADDR) [ -n "${SETUP_FIXED_IP_ADDR:-}" ] || export SETUP_FIXED_IP_ADDR="$sc_val" ;;
+      SETUP_FIXED_IP_GATEWAY) [ -n "${SETUP_FIXED_IP_GATEWAY:-}" ] || export SETUP_FIXED_IP_GATEWAY="$sc_val" ;;
+      SETUP_FIXED_IP_DNS) [ -n "${SETUP_FIXED_IP_DNS:-}" ] || export SETUP_FIXED_IP_DNS="$sc_val" ;;
     esac
   done < start.config
 fi
@@ -620,21 +624,27 @@ fi
 
 # --- Optional: set a fixed (static) IP for this host -------------------------
 #
-# Prompted, never automatic: applying the wrong address, gateway or DNS on a
-# box reached over SSH can cut off the very session used to fix it. Skipped
-# outright when there's no terminal to confirm on, or when netplan isn't the
-# thing managing networking here (anything but stock Ubuntu Server).
+# Interactively prompted by default: applying the wrong address, gateway or
+# DNS on a box reached over SSH can cut off the very session used to fix it.
+# `netplan try`'s auto-revert (below) is the actual safety net for that —
+# it's the only thing that makes asking a human safe.
 #
-# Applied with `netplan try`, not `netplan apply` — try activates the new
-# config, waits for an ENTER within the timeout to keep it, and otherwise
-# reverts on its own. That auto-revert is the actual safety net for "typed
-# the wrong gateway"; nothing here second-guesses the values beyond that.
+# For an unattended install (start.config, no TTY to ask on) there is no one
+# to confirm a `netplan try` prompt, so that safety net doesn't exist — the
+# unattended branch below never applies live at all. It requires all four
+# values (SETUP_FIXED_IP_IFACE/_ADDR/_GATEWAY/_DNS) explicitly, no guessed
+# defaults, validates with `netplan generate`, and only *writes* the file —
+# it takes effect on the next boot, which an unattended install has anyway,
+# rather than ever touching the live link unattended (README TODO, §422).
+#
+# Skipped outright when netplan isn't the thing managing networking here
+# (anything but stock Ubuntu Server).
 FIXED_IP_FILE="/etc/netplan/90-homelab-fixed-ip.yaml"
-if [ -t 0 ] && command -v netplan >/dev/null 2>&1; then
+if command -v netplan >/dev/null 2>&1 && { [ -t 0 ] || [ -n "${SETUP_FIXED_IP_IFACE:-}${SETUP_FIXED_IP_ADDR:-}${SETUP_FIXED_IP_GATEWAY:-}${SETUP_FIXED_IP_DNS:-}" ]; }; then
   if [ -f "$FIXED_IP_FILE" ]; then
     log "A fixed IP is already configured in $FIXED_IP_FILE — leaving it alone"
     echo "  (delete that file and re-run to reconfigure)"
-  else
+  elif [ -t 0 ]; then
     echo
     printf 'Set a fixed (static) IP for this host now? [y/N]: '
     read -r SET_FIXED_IP_ANS
@@ -705,6 +715,45 @@ YAML
         else
           log "Skipped — this host keeps its current network configuration"
         fi
+      fi
+    fi
+  else
+    # Unattended (start.config, no TTY): all four required explicitly — no
+    # guessed default stands in for a value the operator did not state, since
+    # a wrong guess here cannot be walked back without a terminal to confirm
+    # `netplan try`.
+    log "SETUP_FIXED_IP_* — not asking"
+    if [ -z "${SETUP_FIXED_IP_IFACE:-}" ] || [ -z "${SETUP_FIXED_IP_ADDR:-}" ] || [ -z "${SETUP_FIXED_IP_GATEWAY:-}" ] || [ -z "${SETUP_FIXED_IP_DNS:-}" ]; then
+      echo "error: SETUP_FIXED_IP_IFACE, _ADDR, _GATEWAY and _DNS must all be set together for an unattended fixed IP — partial config given, skipping." >&2
+    else
+      FIXED_DNS_YAML="$(printf '%s' "$SETUP_FIXED_IP_DNS" | sed 's/,/, /g')"
+      cat > "$FIXED_IP_FILE" <<YAML
+network:
+  version: 2
+  ethernets:
+    ${SETUP_FIXED_IP_IFACE}:
+      dhcp4: no
+      addresses: [${SETUP_FIXED_IP_ADDR}]
+      routes:
+        - to: default
+          via: ${SETUP_FIXED_IP_GATEWAY}
+      nameservers:
+        addresses: [${FIXED_DNS_YAML}]
+YAML
+      chmod 600 "$FIXED_IP_FILE"
+
+      # Same reasoning as the interactive path above: left running, cloud-init
+      # would silently revert this on the next boot.
+      if [ -d /etc/cloud/cloud.cfg.d ] && [ ! -f /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg ]; then
+        printf 'network: {config: disabled}\n' > /etc/cloud/cloud.cfg.d/99-disable-network-config.cfg
+        log "Disabled cloud-init's network config (it would otherwise revert this on reboot)"
+      fi
+
+      if netplan generate; then
+        log "Wrote $FIXED_IP_FILE (validated with 'netplan generate') — NOT applied live, no terminal here to confirm a wrong gateway/DNS. Takes effect on the next boot: ${SETUP_FIXED_IP_ADDR}"
+      else
+        echo "error: 'netplan generate' rejected the generated config — removing $FIXED_IP_FILE, fixed IP not set." >&2
+        rm -f "$FIXED_IP_FILE"
       fi
     fi
   fi

@@ -55,10 +55,23 @@ TAILSCALE_OAUTH_CLIENT_SECRET=
 #                        Pi-hole. Only set this if the host will run Pi-hole.
 #   SETUP_NOPASSWD_SUDO  grants the invoking user full NOPASSWD:ALL sudo — a
 #                        real privilege grant, so it is never implied.
-#
-# Not covered: the fixed-IP prompt. Pre-answering that needs the interface,
-# address, gateway and DNS stated explicitly and `netplan apply` instead of
-# `netplan try` (which auto-reverts with no terminal to confirm on), and a
-# wrong value there cuts off the host. See the README TODO item.
 SETUP_FREE_PORT_53=
 SETUP_NOPASSWD_SUDO=
+
+# Fixed (static) IP for this host — optional, and all four values below are
+# required together if you set any of them (no guessed defaults for an
+# unattended install). Unlike the interactive prompt, this never runs
+# `netplan apply`/`netplan try` live — there is no terminal to confirm a
+# wrong gateway or DNS server would cut the host off, so it only *writes*
+# the netplan config (after validating it with `netplan generate`) and takes
+# effect on the next boot, which an unattended install has anyway.
+#
+#   SETUP_FIXED_IP_IFACE     e.g. eth0 — `ip -4 route show default` on the
+#                            host names the one to use.
+#   SETUP_FIXED_IP_ADDR      e.g. 192.168.1.50/24 — with the prefix.
+#   SETUP_FIXED_IP_GATEWAY   e.g. 192.168.1.1
+#   SETUP_FIXED_IP_DNS       e.g. 1.1.1.1,8.8.8.8 — comma-separated.
+SETUP_FIXED_IP_IFACE=
+SETUP_FIXED_IP_ADDR=
+SETUP_FIXED_IP_GATEWAY=
+SETUP_FIXED_IP_DNS=

@@ -131,21 +131,27 @@ its own, all skipped automatically without a TTY:
 
 | Prompt | What it does | Why it asks instead of just doing it |
 |---|---|---|
-| **Set a fixed IP** | Writes a netplan config for a static address, applied with `netplan try` (auto-reverts unless you press ENTER within 45s) | A wrong gateway/DNS value can cut off the very session used to fix it |
+| **Set a fixed IP** | Writes a netplan config for a static address, applied with `netplan try` (auto-reverts unless you press ENTER within 45s) — or, pre-answered in `start.config`, written and validated but **not applied live** (takes effect on the next boot instead) | A wrong gateway/DNS value can cut off the very session used to fix it, or an unattended install with no one to confirm `try` |
 | **Remove the sudo password prompt** | A `NOPASSWD:ALL` sudoers entry for the invoking user | Full passwordless sudo is a real privilege grant — safe now that code-server's LAN port requires its own login (plan.md §93), but still asked every time, not assumed |
 | **Free port 53 for Pi-hole** | Disables systemd-resolved's stub listener (`DNSStubListener=no` drop-in, resolved restarted) to free `127.0.0.53:53`, and replaces `/etc/resolv.conf` with a static `1.1.1.1 / 8.8.8.8` so the host and every container keep a resolver (plan.md §284, §339) | It's a host-DNS change; only matters if this host will run Pi-hole, and only shown when the stub listener is up. Recreate running containers afterwards so they pick up the new resolver |
 
 Say no (or just press Enter) to skip any of them; re-run `./start.sh` later to
 be asked again.
 
-For an unattended install, two of the three can be pre-answered in
-`start.config` — `SETUP_FREE_PORT_53` and `SETUP_NOPASSWD_SUDO` (§422).
-Absent, they behave exactly as before: skipped, with no terminal to ask on.
-Anything other than a yes-spelling counts as no, so a typo cannot grant a
-privilege. The fixed-IP prompt is deliberately not pre-answerable — that
-needs the interface, address, gateway and DNS stated explicitly and
-`netplan apply` rather than `netplan try`, and a wrong value there cuts the
-host off.
+For an unattended install, all three can be pre-answered in `start.config`
+(§422, §423). Absent, they behave exactly as before: skipped, with no
+terminal to ask on.
+
+`SETUP_FREE_PORT_53` and `SETUP_NOPASSWD_SUDO` are plain yes/no — anything
+other than a yes-spelling counts as no, so a typo cannot grant a privilege.
+
+The fixed IP needs `SETUP_FIXED_IP_IFACE`, `_ADDR`, `_GATEWAY` and `_DNS`
+**all four**, set together — no guessed defaults for a value the operator
+didn't state, since a wrong one has no terminal to walk it back from. That's
+also why the unattended path never runs `netplan try`/`netplan apply` at
+all: it only writes the config (validated first with `netplan generate`)
+and leaves it for the next boot, rather than ever risking the live link
+unattended.
 
 ### This host is already on the NetBird overlay — nothing to enroll
 
