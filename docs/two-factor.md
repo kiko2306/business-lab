@@ -1,8 +1,8 @@
 # Two-factor authentication (TOTP)
 
 The management dashboard is reachable from the internet over the Cloudflare
-Tunnel (`homelab.tx-home-utils.com` / `api-homelab.tx-home-utils.com`),
-independent of whether any managed app is exposed. Its login is username +
+Tunnel (`businesslab.tx-home-utils.com`), independent of whether any managed
+app is exposed. Its login is username +
 password only. Time-based one-time passwords (TOTP, RFC 6238) add a second
 factor to that login.
 

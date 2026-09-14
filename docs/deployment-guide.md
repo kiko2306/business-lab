@@ -42,7 +42,7 @@ sudo ./start.sh
 The only command run on the host. For an unattended run, fill
 `start.config` (from `start.config.example`) with the four values above
 first. `start.sh` installs Docker, provisions the tunnel, brings up the core
-stack, and publishes the dashboard at `https://homelab.<domain>`. Everything
+stack, and publishes the dashboard at `https://businesslab.<domain>`. Everything
 else is done from the dashboard.
 
 Full walk-through of the prompts and the `setup_server.sh` sub-prompts (fixed

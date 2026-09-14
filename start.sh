@@ -728,7 +728,7 @@ fi
 # attack surface without adding capability.
 if [ "$CF_READY" = "1" ] && [ -n "$BASE_DOMAIN" ] && [ -n "${CF_TUNNEL_ID:-}" ]; then
   DASH_SUB="$(current_value DASHBOARD_SUBDOMAIN)"
-  DASH_SUB="${DASH_SUB:-homelab}"
+  DASH_SUB="${DASH_SUB:-businesslab}"
   DASH_HOST="${DASH_SUB}.${BASE_DOMAIN}"
   DASH_PORT="$(current_value FRONTEND_PORT)"
   DASH_PORT="${DASH_PORT:-10001}"

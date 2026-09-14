@@ -53,7 +53,7 @@ hostname. Nothing else is ever published at the apex.
 The **dashboard's own hostname is the exception**: `start.sh` publishes it and
 routes the tunnel **straight to the frontend port, bypassing Nginx Proxy
 Manager**, so a broken NPM can still be repaired through the dashboard. Its
-subdomain defaults to `homelab` and is set by `DASHBOARD_SUBDOMAIN` in the
+subdomain defaults to `businesslab` and is set by `DASHBOARD_SUBDOMAIN` in the
 root `.env`. The API is deliberately **not** published.
 
 ## The two things that are yours and bite

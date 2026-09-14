@@ -191,7 +191,7 @@ routing-peer container, fixed there with `NB_DISABLE_DNS`).
 
 ```
 http://<this-host>:10001          always
-https://homelab.<your-domain>     once the tunnel is up
+https://businesslab.<your-domain> once the tunnel is up
 ```
 
 That is deliberate but easy to misread as a failure. `start.sh` brings up the
@@ -203,8 +203,8 @@ started from the dashboard, so nothing else is running or published yet.
 differently from every other app: the tunnel routes **straight to
 `localhost:<FRONTEND_PORT>`, bypassing Nginx Proxy Manager**. Routing it
 through NPM would make the one tool you would use to repair a broken NPM
-depend on NPM being healthy. The subdomain defaults to `homelab` and can be
-changed with `DASHBOARD_SUBDOMAIN` in the root `.env`.
+depend on NPM being healthy. The subdomain defaults to `businesslab` and can
+be changed with `DASHBOARD_SUBDOMAIN` in the root `.env`.
 
 The **API is not published**. The frontend proxies `/api` to the backend over
 the compose network, so a public API hostname would add attack surface without
