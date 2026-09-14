@@ -20,10 +20,10 @@ services:
       APP_SECRET: ${TWENTY_APP_SECRET}
       ENCRYPTION_KEY: ${TWENTY_APP_SECRET}
       STORAGE_TYPE: local
-      # First visitor creates the workspace owner. Lock it down from
-      # Settings → Admin Panel → Configuration Variables once that account
-      # exists (takes effect live, no restart).
-      IS_SIGN_UP_ENABLED: ${TWENTY_SIGN_UP_ENABLED:-true}
+      # Twenty ignores this env var — it renders in the config panel only, so
+      # the generated value backend/src/services/twentyAdminBootstrap.ts (§421)
+      # signs up with is visible/backup-able, same convention as DocuSeal's.
+      TWENTY_ADMIN_PASSWORD: ${TWENTY_ADMIN_PASSWORD:-}
       NODE_PORT: 3000
     labels:
       - "homepage.group=Productivity"

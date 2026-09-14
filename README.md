@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.99.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.100.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -215,15 +215,3 @@ it is done — not ticked off and left behind. Section references point at
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
-
-- [ ] **Twenty's workspace owner is still claimed by hand** (§421) — the
-      only one of §416.3's six not automated, and deliberately: at
-      `v2.39.5` GraphQL introspection is disabled, `clientConfig` and
-      `checkUserExists` no longer exist on `Query` (so there is no
-      read-only way to ask whether a workspace exists), and the auth
-      surface is login-token/OTP based. Guessing mutations against a live
-      CRM risks a half-created workspace that cannot be re-claimed.
-      Low urgency: Twenty is behind Authelia and upstream disables new
-      signups once the first workspace exists, so the race is one click by
-      an authenticated user. Revisit by reading the pinned version's
-      upstream source for the exact mutation — not by probing.

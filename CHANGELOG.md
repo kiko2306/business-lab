@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.100.0] — 2026-09-14
+
+### Added
+
+- Twenty's workspace owner is claimed automatically on start, closing the first-visitor-claims-it race (§421)
+
 ## [0.99.2] — 2026-09-14
 
 ### Changed

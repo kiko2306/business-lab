@@ -40,6 +40,7 @@ import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import { applyImmichConfig } from './immichConfig';
 import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { reconcileDocusealFirstAdmin } from './docusealAdminBootstrap';
+import { reconcileTwentyFirstAdmin } from './twentyAdminBootstrap';
 import { reconcileN8nFirstAdmin } from './n8nAdminBootstrap';
 import { reconcileJellyfinFirstAdmin } from './jellyfinAdminBootstrap';
 import { reconcileNavidromeFirstAdmin } from './navidromeAdminBootstrap';
@@ -340,6 +341,11 @@ async function composeUpWithManagedConfig(
   // the outer gate and this just creates the admin account. After `up`; no-op
   // otherwise.
   await reconcileDocusealFirstAdmin(serviceName);
+  // Twenty: claim the workspace-owner account so an exposed Twenty shows a
+  // login instead of the first-visitor-claims-it signup form (§421). GraphQL
+  // against the running server, so after `up`; no-op otherwise and once an
+  // owner already exists.
+  await reconcileTwentyFirstAdmin(serviceName);
   // Home Assistant: run its onboarding so exposing it direct (§344) has no
   // first-visitor-claims-owner race. Clean JSON API with a real `done` flag.
   // After `up`; no-op otherwise.
