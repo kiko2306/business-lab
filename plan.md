@@ -28326,7 +28326,13 @@ test pinned the old `--entrypoint mysqldump` args). Proved against the real
 stack — the actual failure mode is image-specific, not something a mock
 would catch: ran the new `sh -c` fallback against `mariadb:11.4`,
 `lscr.io/linuxserver/mariadb:latest` and `mysql:8.0` on `home-srv-01`, all
-three resolve to a working dump client. itflow and kimai were stopped by
-the user this morning (2026-09-14 07:22, unrelated to this) — deploying and
-re-verifying the actual dump path against a live `itflow-db`/`kimai-db`
-container is still open, see below.
+three resolve to a working dump client.
+
+Shipped `dev` → `beta` (rebuilt and restarted `backend-1` on `home-srv-01`,
+clean logs) → `main`. itflow and kimai were stopped by the user at the time
+(2026-09-14 07:22, unrelated to this); once the user brought both back up,
+`dumpOneApp('itflow')` and `dumpOneApp('kimai')` were run directly inside
+the deployed `backend-1` container against the live `itflow-db`/`kimai-db`
+containers: both dumped clean (`itflow.sql` 1272 KB, `kimai.sql` 49 KB,
+real `mariadb-dump` SQL headers) — the fix is proven end-to-end, not just
+against the bare images.
