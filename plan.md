@@ -28492,9 +28492,9 @@ table.
 
 Verified: backend typecheck + full suite (882 tests — 4 new, covering the
 two skip-gates, a successful ping, and a failed ping logging a warning
-without throwing). Not yet proven against `home-srv-01` — that's the real
-test, since this box is exactly the `BACKUP_REPO_KIND=rclone` case the ping
-exists for, and the mock-based tests can't tell us whether the immediate
-on-startup ping actually reaches the real bridge. Next: deploy to `beta`,
-confirm the ping fires and succeeds against the live Kopia, then merge to
-`main`.
+without throwing). Deployed to `beta`/`home-srv-01` and proved against the
+real bridge: `pingRcloneBridge()` run directly inside the deployed
+`backend-1` resolved cleanly in 42.8ms with no warning logged — a real
+round trip to this box's actual `BACKUP_REPO_KIND=rclone` Kopia, not a
+mock. The gate correctly recognised this box's config as the one that
+needed it.
