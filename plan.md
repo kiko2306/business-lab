@@ -28402,3 +28402,60 @@ push and rebuild, same loop as always; this isn't the class of
 "prove against the real stack" §432's itflow/kimai fix needed (no
 Docker/exposure/networking/backup-data change here), so the deploy is
 routine rather than a required proof step.
+
+## 434. Root-caused the Kopia stall: an idle rclone bridge, not the epoch compaction
+
+Asked to look into why Kopia's epoch compaction "got stuck" (§433's closing
+finding, worked around there with a restart). The restart's own read of
+`docker logs --tail 50` — repeating "Running quick maintenance… Compacting…
+Finished quick maintenance." — turned out to be a misdiagnosis, caught by
+reading the *persistent* log instead of the truncated container tail.
+
+`apps/kopia/data/logs/cli-logs/*-server-start.0.log` is bind-mounted, so it
+survived the restart and covered the whole incident. It showed the hourly
+quick-maintenance cycles (05:42, 06:42, 07:42) each completing in under a
+second, right on schedule — the "endless loop" was just three days of
+identical successful cycles stacked back-to-back in a 50-line tail, nothing
+more. The actual fault was different and, in hindsight, more informative: at
+08:04:37 the log goes completely silent — no entries of any kind, not even
+debug-level ones — until the 08:07:27 restart. Cross-referencing that gap
+against the failed calls: `openSession()` (`kopiaClient.ts`) fetches `/` for
+a CSRF token, the container's own healthcheck curls that same `/`, and both
+hung the full 20s `REQUEST_TIMEOUT_MS` throughout that window — while the
+scheduler's internal ticking (a separate code path, no repository access
+needed) kept logging normally. Internal engine alive, HTTP layer dead: that
+split is what pointed at the HTTP server rather than the maintenance logic.
+
+`docker exec kopia-kopia-1 ps aux` explained it: `BACKUP_REPO_KIND=rclone`
+(this box's destination is FTP, via `apps/kopia/entrypoint.sh`'s rclone
+bridge) makes Kopia route every single repository operation — including,
+apparently, whatever `/` needs to serve the CSRF-gated UI shell — through a
+separately-spawned `rclone serve webdav backup:backup/portoinf` subprocess
+over a local RC/webdav port. When that subprocess wedges, Kopia's whole HTTP
+mux blocks behind it, because there is no operation that doesn't eventually
+need the repository. A plain `docker compose restart` respawns a fresh
+`rclone` process (confirmed: its PID's start time matched the restart
+exactly) and that alone cleared it — no repository repair, no data loss (the
+last snapshot's `lastSnapshotErrorCount` read 0 both before and after).
+
+Matches a known, still-open class of upstream bug rather than anything in
+this repo's own code: kopia/kopia#5124, #4791 and #5107 all describe an
+rclone-backed remote (OneDrive/R2 in their cases, FTP here) going silently
+unresponsive after sitting idle, fixed only by restarting the process that
+holds the rclone subprocess. The idle-then-stale pattern fits exactly: the
+last successful snapshot was 17:40 the previous day, ~14.5h before the
+`08:01` run that hit the stall — the bridge had been sitting untouched the
+whole time. The compose file's own comment already flags this backend as
+risky (upstream's own "not actively tested, may cause data loss" warning,
+printed on every start) — this is that risk showing up as a hang rather than
+data loss, not a new one.
+
+Not fixed in code — this is upstream Kopia/rclone behavior, and the
+compose-file comment already carries the *known* risk of this backend.
+README TODO (§433's entry) corrected to the real mechanism and left open,
+now naming three concrete mitigation options for whoever picks it up: leave
+it manual (this box has no uptime guarantee), add a periodic keepalive ping
+to the rclone bridge so it never goes idle long enough to wedge, or have the
+backend detect this exact timeout signature and auto-restart the `kopia`
+container. No code change this session — investigation only, at the user's
+request, before committing to one of those.

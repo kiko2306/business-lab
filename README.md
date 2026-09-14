@@ -209,25 +209,31 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Kopia's API goes unresponsive under a maintenance-loop stall**
-      (found live on `home-srv-01`, 2026-09-14) — `docker logs kopia-kopia-1`
-      shows it endlessly repeating "Running quick maintenance… Compacting an
-      eligible uncompacted epoch… Advancing epoch markers… Finished quick
-      maintenance." without converging, and its own healthcheck starts
-      failing ("Health check exceeded timeout (10s)") — at which point every
-      backend call to it (`provisionBackupSource`, `getBackupSourceStatus`)
-      times out at the fixed 20s (`REQUEST_TIMEOUT_MS`,
-      `backend/src/services/kopiaClient.ts`), so the app-data half of the
-      backup silently cannot run until Kopia recovers or is restarted.
-      `docker compose restart` (in `apps/kopia/`) cleared it immediately —
-      status calls went from a 20s timeout to 49ms, the repository (rclone/FTP
-      to `portoinf.dyndns-server.com`) reconnected clean, 0 snapshot errors —
-      but that's a hand restart, not a fix: the loop's actual trigger is still
-      unknown, so this can recur. Needs investigating: why the epoch
-      compaction never finishes (backlog from the size of `/source/apps`? a
-      corrupt/large epoch?), and whether
-      the backend should detect and surface "Kopia is stuck in maintenance"
-      as its own status rather than a generic timeout.
+- [ ] **Kopia's rclone bridge can go unresponsive after sitting idle**
+      (found live on `home-srv-01`, 2026-09-14; root-caused same day) — the
+      persistent maintenance log (`apps/kopia/data/logs/cli-logs/`, survives a
+      restart) showed the hourly quick-maintenance cycles completing
+      normally throughout; the earlier "endlessly repeating" read of
+      `docker logs --tail 50` was a misdiagnosis — those are just many
+      identical, successful hourly cycles stacked in a truncated tail, not a
+      loop. The real fault: Kopia's HTTP server went totally unresponsive
+      (every call, including its own healthcheck's `curl` to `/`, hung the
+      full 20s `REQUEST_TIMEOUT_MS` in `backend/src/services/kopiaClient.ts`)
+      while the internal scheduler kept ticking fine — because
+      `BACKUP_REPO_KIND=rclone` makes Kopia route every repository op through
+      a separately-spawned `rclone serve webdav` subprocess (visible in
+      `docker exec kopia-kopia-1 ps aux`), and that subprocess had gone
+      stale after ~14.5h idle since the last successful snapshot. Matches a
+      known, still-open class of upstream bug, not something in this repo's
+      code: [kopia#5124](https://github.com/kopia/kopia/issues/5124),
+      [kopia#4791](https://github.com/kopia/kopia/issues/4791),
+      [kopia#5107](https://github.com/kopia/kopia/issues/5107) all describe
+      an rclone-backed remote hanging after idle, cured only by a restart
+      (which respawns a fresh `rclone` process) — exactly what fixed this.
+      Open question is only the mitigation: leave it manual (this box has no
+      uptime guarantee), add a periodic keepalive ping to the rclone bridge,
+      or have the backend auto-restart the `kopia` container when it detects
+      this exact timeout pattern.
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
