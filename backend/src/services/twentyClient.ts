@@ -1,10 +1,22 @@
 /**
  * Twenty GraphQL client — only what twentyAdminBootstrap.ts needs.
  *
- * Twenty v2.39.5 disables GraphQL introspection, so this is built by reading
- * the pinned tag's own source (`twentyhq/twenty` @ `twenty/v2.39.5`), not by
- * probing the live endpoint — the auth surface is small and stable enough
- * that the exact operations below are worth pinning as source-verified:
+ * Twenty v2.39.5 disables GraphQL introspection, so this was built by reading
+ * the pinned tag's own source (`twentyhq/twenty` @ `twenty/v2.39.5`) — but the
+ * source read alone was not enough and got the endpoint wrong: `AuthResolver`
+ * is `@MetadataResolver()`-scoped (`resolver-schema-scope.type.ts`: `'core' |
+ * 'metadata' | 'admin'`), which `app.module.ts` mounts at `ApiPath.Metadata`
+ * (`/metadata`), not the `/graphql` path `ApiPath.GraphQL` serves — a plain
+ * `Cannot query field "checkUserExists" on type "Query"` against `/graphql`
+ * against the real deployed host is what caught it. Every call below targets
+ * `/metadata`, confirmed live. The lesson restated for anyone touching this
+ * file: a pinned-tag source read narrows down *what* to call, but only a
+ * request against the real running container proves *where* — CLAUDE.md's
+ * "claim nothing works because it type-checks" applies to reading source as
+ * much as it does to writing code.
+ *
+ * The auth surface is small and stable enough that the exact operations
+ * below are worth pinning as source-verified:
  *
  * - `checkUserExists(email)` — public query, auth.resolver.ts:169-175 — DOES
  *   exist in this version (an earlier investigation, §421, concluded it and
@@ -60,7 +72,7 @@ async function graphqlRequest<T>(
   accessToken?: string
 ): Promise<GraphQLResponse<T> | null> {
   try {
-    const response = await fetch(`${baseUrl}/graphql`, {
+    const response = await fetch(`${baseUrl}/metadata`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

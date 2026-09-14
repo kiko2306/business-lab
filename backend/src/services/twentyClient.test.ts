@@ -57,7 +57,7 @@ describe('getTwentyAccessToken', () => {
     const token = await getTwentyAccessToken('http://twenty', 'signUp', 'a@b.com', 'pw');
     expect(token).toBe('tok-1');
     expect(fetchMock).toHaveBeenCalledWith(
-      'http://twenty/graphql',
+      'http://twenty/metadata',
       expect.objectContaining({ method: 'POST' })
     );
   });
