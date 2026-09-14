@@ -14883,426 +14883,48 @@ never throws. Backend suite 479 passing (11 new), frontend build clean.
 
 New user-facing feature.
 
-## 185. Plan — per-application backup / restore (§131.4, 2026-09-04)
-
-Picked from the README. Multi-part, so this is the planning pass
-([[plan-first-then-todo]]): design here, slices to the README list, then @mat
-picks the first one.
-
-### Where backups stand, and why per-app is a *separate* store
-
-Two backup mechanisms exist today and neither can do one app:
-
-- **The management-stack archive** (`backup.ts` `createBackupArchive`) — the
-  dashboard's own Postgres + a settings/users slice, `.tar.gz` under
-  `backups/`. Restored by `routes/backup.ts POST /restore` (`psql -f`). Nothing
-  to do with the managed apps.
-- **The Duplicati job** (`duplicatiClient.ts`) — ONE job over the whole
-  `/source/apps` tree, driven by the dashboard scheduler after
-  `dumpAllAppDatabases` writes `apps/*/data/_dump/*.sql`. It is the offsite,
-  versioned, encrypted story. But: its restore API writes nothing (§75.3), it
-  is slated for replacement by Kopia (§81.5), and "restore just this app" from
-  it means a path-filtered partial restore of a tree archive — exactly the
-  fiddly CLI operation §75.3 says not to build a button on yet.
-
-So per-app backup is built as its **own local, self-contained archive**, not a
-slice of Duplicati:
-
-- independent of the Duplicati→Kopia churn — usable today, unchanged after;
-- self-contained: one `.tar.gz` per app with its consistent DB dump(s) +
-  SQLite snapshot(s) + the rest of `data/`, restorable on its own;
-- the §183-proven replay path (`psql` / `mysql` / `sqlite .restore`) is the
-  restore engine — that verification was the groundwork for this.
-
-Duplicati/Kopia stays the offsite/versioned backup. Per-app is the
-"I'm about to reconfigure this app, give me a five-second rollback point" tool.
-The distinction goes in the UI and `docs/`.
-
-### Design
-
-**Archive** — `services/appBackup.ts`:
-
-- `backupOneApp(name)`: take the maintenance lock (so it can't race an update
-  or the scheduled dump, §176/§103), dump *this app's* database(s) into
-  `apps/<name>/data/_dump/` and snapshot its SQLite files (reuse the
-  `appDumps.ts` internals — factor `dumpServerDatabase` / a single-app SQLite
-  path out as exported helpers), then
-  `tar -czf backups/apps/<name>/<name>-<ISO>.tar.gz -C apps/<name> data`
-  with the same live-DB exclusions Duplicati uses (`data/db/`, `data/pgdata/`,
-  `*-wal`, `*-shm`) — the `_dump/*.sql` and `*.sqlite` files ARE included, they
-  are the consistent copy. Write a small `manifest.json` into the archive:
-  app, timestamp, `backup.engine`, dashboard version (`version.ts`), byte
-  sizes, list of dumps.
-- `listAppBackups(name)`: `readdir backups/apps/<name>/`, newest first, with
-  size + ctime + parsed manifest.
-- `deleteAppBackup(name, file)` / `resolveAppBackupPath` with the same
-  `safeBackupFileName` guard as `backup.ts`.
-- Per-app retention: keep last N (reuse the global `retentionCount`, or a
-  dedicated setting — decide in the slice).
-
-**Restore** — `restoreOneApp(name, file)`:
-
-1. stop the app (`executor.stopService`) — the DB *container* stays up;
-2. extract the archive to a temp dir;
-3. replay `_dump/*.sql` into the running DB container (§183: `psql` for
-   postgres, `mariadb`/`mysql` for maria/mysql) and `.restore` each `*.sqlite`
-   over its live file;
-4. copy the non-DB `data/` payload back over `apps/<name>/data/` (rsync-style,
-   deleting removed files) — skipping the live-DB dirs, which step 3 owns;
-5. start the app.
-
-Confirm-gated (destructive, outward-facing). Never a root `compose down`.
-
-**Gaps carried, not solved** (each gets a UI note, mirroring §75.4 /
-`recovery-troubleshooting.md`):
-
-- **OnlyOffice bundled PG** — no online dump path; per-app backup is a raw
-  copy of `data/` while stopped, restore is file-level.
-- **BoltDB / H2 apps** (file-browser, stirling-pdf) — `findSqliteFiles`
-  rejects them by header; raw file copy, stop-restore-start, accepted-risk.
-- Apps with **no `backup` field and no SQLite** — just a `data/` tarball,
-  which is already correct.
-
-**Routes** — on the service resource, behind the existing `backups:manage`
-capability:
-
-- `POST /api/services/:name/backup` — back up now
-- `GET  /api/services/:name/backups` — list this app's snapshots
-- `GET  /api/services/:name/backups/:file` — download
-- `DELETE /api/services/:name/backups/:file` — delete
-- `POST /api/services/:name/backup/restore` — restore `{ file }`, confirm-gated
-
-Audit rows reuse `action: 'backup_create'` / a new `'backup_restore'` with
-`resource: '<name>'`.
-
-**UI** — a "Backups" section on the service card (`service-card.component`):
-"Back up now", a snapshot list with **Restore** (confirm modal, per the UI
-rules — no native dialog), **Download**, **Delete**. `service-state.service.ts`
-gains the calls. The multi-page Backups page (§131.1) can later grow a
-per-app overview table, but that is optional and folded into the last slice.
-
-### Slices (to the README)
-
-1. **`appBackup.ts` — archive + list + delete** (backend) — the archive
-   writer, the lister, retention, path-safety; factor per-app dump helpers out
-   of `appDumps.ts`. Unit tests (manifest, naming, retention, traversal
-   guard).
-2. **Per-app backup routes** (backend) — the four non-restore routes above,
-   audit rows, wired behind `backups:manage`. Prove a backup archive is
-   produced for a Postgres app and a SQLite app on the live stack.
-3. **Per-app restore** (backend) — `restoreOneApp` + the confirm-gated route.
-   Prove a Postgres app and a SQLite app round-trip (change data → restore →
-   data back) on the live stack.
-4. **Service-card UI** (frontend) — the Backups section, list, Back up now,
-   Restore/Download/Delete, confirm modal, service-state calls, specs. Run
-   `scripts/e2e-tests.sh` (touches the service card).
-5. **Docs + Backups-page overview** (frontend/docs) — `recovery-troubleshooting.md`
-   and `it-admin.md` on what a per-app archive is vs the offsite backup and how
-   to restore one by hand; optional per-app table on the Backups page.
-
-## 186. §185 slice 1 — the per-app backup archive (2026-09-04)
-
-`services/appBackup.ts` + `appDumps.dumpOneApp`. Backend only, no routes/UI
-(slices 2–4).
-
-### What it does
-
-`backupOneApp(name)`, under the shared maintenance lock (can't race an image
-update or the scheduled dump, §103/§176):
-
-1. `dumpOneApp(name)` — the per-app twin of `dumpAllAppDatabases`: dumps this
-   app's server DB if it has a `backup` entry (reusing the existing
-   `dumpServerDatabase`), and snapshots its SQLite files
-   (`findSqliteFiles(...).filter(app)` → `dumpSqliteBatch`). Same never-throws
-   contract; an unreachable DB is a failed `DumpOutcome`, not an exception.
-2. `tar -czf backups/apps/<name>/<name>-<ISO>.tar.gz --exclude data/db
-   --exclude data/pgdata --exclude '*-wal' --exclude '*-shm' --exclude '*.part'
-   -C apps/<name> data`. The exclude set is the Duplicati job's filter set
-   (duplicatiClient.ts): the live DB directory and SQLite side-files restore
-   torn — the consistent copy is the `_dump/*.sql` / `*.sqlite` files, which
-   are inside `data/` and therefore in the archive.
-3. A `<base>.manifest.json` sidecar: app, ISO timestamp, `APP_VERSION`,
-   `backup.engine` (null for a SQLite-only/data-only app), archive bytes, the
-   `dumps[]` that succeeded and `dumpFailures[]` that did not.
-4. `pruneAppBackups(name, 10)` — keep the 10 newest, oldest first, sidecars
-   too.
-
-Plus `listAppBackups` (newest first, parsed sidecar, tolerates a
-missing/corrupt one), `deleteAppBackup` (archive + sidecar), and
-`resolveAppBackupPath` — the same `safeBackupFileName` + `resolve().startsWith`
-traversal guard `backup.ts` uses, applied to **both** the app name and the file
-name.
-
-### Decisions
-
-- **Its own local store, not a slice of Duplicati.** Reasons in §185: the
-  Duplicati restore API writes nothing (§75.3), Duplicati is leaving for Kopia
-  (§81.5), and a path-filtered partial restore of a tree archive is exactly the
-  fiddly CLI op §75.3 says not to build a button on. A standalone per-app
-  `.tar.gz` is usable today and unchanged by the engine swap. The offsite job
-  stays the versioned/encrypted story; this is the five-second rollback point.
-- **Manifest is a sidecar, not inside the archive.** busybox tar in the
-  runtime image (`node:20-alpine`) supports neither repeated `-C` (to add a
-  member from another dir) nor safe selective `--dereference`, and a downloaded
-  archive doesn't need our bookkeeping to be restored by hand — it needs
-  `data/_dump/*.sql`, which is in it. The lister reads the sidecar without
-  unpacking. (§185 said "into the archive"; changed here for that reason.)
-- **`APP_BACKUP_ROOT` from `process.cwd()`**, not imported from `backup.ts`'s
-  `BACKUP_DIR`. `vi.mock('./backup', importOriginal)` does not re-run its
-  factory on `vi.resetModules()`, so a `BACKUP_DIR` pulled through it froze at
-  the first test's tmpdir. Deriving from `process.cwd()` directly matches how
-  `backup.ts` does it and lets the test stub cwd the same way
-  `backup.test.ts` does for `pruneOldBackups`.
-- **Retention 10, a module const.** Local rollback points, not history; a
-  dedicated setting can come if asked.
-
-### Verified
-
-- `appBackup.test.ts` — 19 tests: traversal guard (name + file), tar args
-  (excludes present, `-C <appDir> data`), manifest shape, data-only app
-  (`engine: null`), dump-failure still archives + surfaces, retention prune
-  oldest-first, list newest-first + corrupt-sidecar tolerance, delete removes
-  both. Backend suite 479 → 498.
-- **Live stack** (built + recreated backend, ran the compiled module in the
-  container so it goes through docker-socket-proxy exactly like production):
-  - `backupOneApp('paperless')` — fresh `pg_dump` (579 KB), 422 KB archive.
-    `tar -tzf` confirms **no** `data/db/`, `-wal`, `-shm`, `.part`; **has**
-    `data/_dump/paperless.sql`, `data/media/…`, `data/consume/…`. Sidecar
-    written, `listAppBackups` reads it back.
-  - `backupOneApp('vaultwarden')` ×2 — `engine: null`, `dumps: ["sqlite"]`,
-    archive has `data/_dump/db.sqlite` (the `.backup` snapshot). Two archives,
-    prune left both (< 10).
-  - Smoke archives removed from the backups volume afterward.
-
-Patch bump 0.16.0 → 0.16.1 (internal, no user-facing surface yet).
-
-## 187. §185 slice 2 — the per-app backup API (2026-09-04)
-
-Four routes on the service resource (`routes/services.ts`), all behind
-`backups:manage` (the same capability `/api/backups/*` uses):
-
-| Route | Does |
-|---|---|
-| `POST /api/services/:name/backup` | `appBackup.backupOneApp` — dump + archive now |
-| `GET  /api/services/:name/backups` | `listAppBackups` — newest first, with the manifest |
-| `GET  /api/services/:name/backups/:file` | `res.download` the archive |
-| `DELETE /api/services/:name/backups/:file` | `deleteAppBackup` — archive + sidecar |
-
-`schemas.serviceBackupFileParams` validates `:name` + `:file` (Joi's
-`backupNameSchema`, `^[a-zA-Z0-9._-]+$`), so a traversal name is a 422 before
-the handler. Audit rows: `backup_create` / `backup_delete` with
-`resource: <serviceName>` and `metadata.trigger: 'per-app'` (kept distinct
-from the scheduler's `resource: 'app-data'` so `getLastAppDataDump` is
-unaffected).
-
-### The archive step had to move out of the backend process
-
-First live call through the API failed:
-
-    tar: can't open 'data/valkey/dump.rdb': Permission denied
-    tar: can't open 'data/data/index/.managed.json': Permission denied
-
-The backend runs as a non-root user (`appuser`, Dockerfile). App data files
-are owned by root or the app's own uid, often mode 0600 — `appuser` genuinely
-cannot read them. The slice-1 "live" check passed only because it was run via
-`docker exec` (root). `findSqliteFiles` already knows this ("unreadable app
-data … is not our business") and `dumpSqliteBatch` already works around it by
-snapshotting **in a container**.
-
-So `writeArchive` now runs `tar` as root in a throwaway
-`alpine:latest` container: `-v <appDir>:/src:ro -v <backupsVolume>:/out`,
-`tar -czf /out/apps/<name>/<file> --exclude … -C /src data`. busybox tar
-honours `--exclude` and a single `-C` (repeated `-C` it does **not** — checked
-against the image, §184 notes the same). The backups volume name is found
-once via `docker inspect $(hostname) --format '…Destination "/app/backups"…'`
-and cached; when it can't be found (non-containerised dev, unsupported per
-CLAUDE.md) it falls back to in-process `tar`.
-
-**Ownership works out:** the caller creates `backups/apps/<name>/` as
-`appuser`, so the manifest sidecar write and the retention prune succeed;
-only the archive file lands `root:root 0644`, which `appuser` can still
-`fs.stat`, `res.download`, and `fs.rm` (unlink needs write on the *directory*,
-which it owns — not the file).
-
-### Verified through the authenticated API on the live stack
-
-Minted a `webmaster` access token (signed with the backend's `JWT_SECRET`) —
-no dashboard creds in an agent session, §176 precedent — and called every
-route against `tx-home-utils.com`'s backend:
-
-- `POST …/paperless/backup` → 201, fresh `pg_dump` (580 KB), 414 KB archive.
-  `tar -tzf` confirms **no** `data/db/`, `-wal`, `-shm`, `.part`; **has**
-  `data/_dump/paperless.sql`, `data/media/documents/…`, and
-  `data/valkey/dump.rdb` — the file that failed before, now readable.
-- `GET …/paperless/backups` → the entry with a parsed manifest.
-- `GET …/paperless/backups/<file>` → 200, 424448 bytes, valid gzip/tar.
-- `POST …/vaultwarden/backup` → `engine: null`, `dumps: [{kind: "sqlite"}]`.
-- `user`-role token → **403**; unknown app → **400**; missing file → **404**;
-  `..%2Fevil` file name → **422** (Joi). Audit rows present for create +
-  delete. `DELETE` → list empty. Smoke archives + audit rows removed after.
-
-### Tests
-
-`appBackup.test.ts` +1 (20): the new one asserts `writeArchive` issues
-`docker run --rm -v <appDir>:/src:ro -v <vol>:/out alpine:latest tar … -C /src
-data` when `docker inspect` reports a volume; the rest still exercise the
-in-process fallback. Suite 499. No route-layer test — thin handlers over the
-tested service, no HTTP harness in this project (§176 precedent).
-
-Minor bump 0.16.1 → 0.17.0 (new API surface).
-
-## 188. §185 slice 3 — per-app restore (2026-09-04)
-
-`POST /api/services/:name/backup/restore` `{ file }` → `appBackup.restoreOneApp`,
-behind `backups:manage`. Body validated by `schemas.serviceBackupRestore`.
-Audit row `backup_restore`, `resource: <serviceName>`, `metadata.warnings`.
-
-### `restoreOneApp(name, file, userId)`, under the maintenance lock
-
-1. **`stopService`** — the same one the dashboard button uses (`compose down`),
-   so exposure teardown / Home Page follow.
-2. **File restore in a root alpine container**: `tar -xzf` the archive to a
-   scratch dir, `find /data -mindepth 1 -maxdepth 1 ! -name db -exec rm -rf`
-   then `cp -a` the archive's `data/.` back. `data/db` (the live server-DB
-   directory) is deliberately kept — the server DB is restored by replaying
-   its SQL dump, not by swapping files. Then for each `data/_dump/*.sqlite`,
-   `cp` the consistent snapshot over the live file it matches by basename.
-   Root because the backend user cannot rewrite app data (slice 2's finding).
-3. **Server-DB replay** (`backup.engine` set): `docker compose … up -d
-   <db-service>` alone, poll its healthcheck (`docker inspect …
-   .State.Health.Status`), then `appDumps.restoreServerDatabase` — a throwaway
-   container on the DB's image/network, `psql -f /restore.sql` (the dump
-   carries `--clean --if-exists`) or `mysql`/`mariadb < /restore.sql`, creds
-   read from the running container. The `mysql`-vs-`mariadb` binary name is
-   picked at run time (`command -v mariadb`), since the `mysql` compat symlink
-   is gone from MariaDB 11.
-4. **`startService`** — full app back up.
-
-A failed replay or a DB that never goes healthy is a **warning**, not a
-failure: the app is still brought back up. `databaseRestore` is `null` for a
-SQLite-only / data-only app.
-
-### Two bugs found while proving it
-
-- **`tar: invalid magic`** on the first live call. `restoreOneApp` mounted the
-  archive as `-v ${archivePath}:/archive.tar.gz` — but `archivePath`
-  (`/app/backups/apps/<name>/<file>`) only exists *inside the backend
-  container*; `docker run -v` resolves paths on the **host**, so the bind
-  created an empty file. Same lesson as slice 2's archive write: mount the
-  backups **volume** (`-v <vol>:/backups:ro`) and address the archive by its
-  path within it. The `data/` mount stays a direct host path — the apps tree
-  is bind-mounted at the same absolute path host and container.
-- The health-probe format string `{{if .State.Health}}…{{else}}{{.State.Running}}{{end}}`
-  needed the `else` branch for DB images without a healthcheck (none here, but
-  defensive).
-
-### Verified end to end through the authenticated API on the live stack
-
-- **n8n (Postgres)**: backed up (1 workflow, 22 `execution_entity`). Mutated —
-  deleted all executions, renamed the workflow to "MUTATED BEFORE RESTORE",
-  dropped a sentinel file into `data/n8n/`. `POST …/n8n/backup/restore` (39 s,
-  no warnings). After: **22** executions, workflow name **"CrowdSec alert
-  relay (managed)"**, 129 tables, **sentinel gone**, all three n8n containers
-  healthy, `/healthz` `{"status":"ok"}`.
-- **Vaultwarden (SQLite)**: backed up (1 user, 1 cipher). Mutated —
-  `delete from ciphers`, sentinel file. Restore (5 s, `databaseRestore: null`,
-  no warnings). After: **1** cipher again (from the `_dump/db.sqlite` snapshot
-  copied over the live file), sentinel gone, container healthy.
-- Unit: `appBackup.test.ts` +5 (25) — the stop→files→db-up→replay→start order,
-  the SQLite/data-only skip, warning-on-replay-failure, 404 on a missing
-  archive (without stopping the app), traversal name. Suite 504.
-
-Smoke archives + audit rows removed after; the dev box is back to its
-pre-test state (no-guarantees box regardless).
-
-Minor bump 0.17.0 → 0.18.0 (new API surface). The backend loop (backup +
-restore) is complete; slice 4 is the UI.
-
-## 189. §185 slice 4 — per-app backups in the service card (2026-09-04)
-
-First frontend piece of §185. A "Backups" section on every app's Settings
-modal (`service-card.component`), between Exposure and Admin account:
-
-- **Back up now** → `POST …/backup`; toasts success, or an error toast when
-  the response carries `dumpFailures`.
-- A list of the app's snapshots (newest first): `{{ createdAt | date:'medium' }}`
-  and a `413 KB · postgres · 1 dump failed` detail line built from the
-  manifest (`· details unavailable` when the sidecar is missing).
-- Per row: **Download** (blob → anchor click, like the global Backups page),
-  **Restore**, **Delete**. `backupBusyFile` puts a spinner on the acting row
-  and disables the others.
-
-Restore and Delete go through the app-wide `ConfirmService` modal
-(`confirm.ask({ danger: true, … })`) rather than a new modal or
-`window.confirm` — that service already exists for exactly this and mounts one
-`ConfirmDialogComponent` in `AppComponent`. On a successful restore the toast
-includes any `warnings`, and `serviceState.refresh()` runs because the backend
-stopped and started the app.
-
-`OperationsService` gains `listAppBackups` / `createAppBackup` /
-`restoreAppBackup` / `deleteAppBackup` / `downloadAppBackup`; the response
-shapes went into `core/models.ts` (`AppBackupEntry`, `AppBackupManifest`,
-`AppRestoreResponse`, …). The list loads on `openSettings()`.
-
-### Layout
-
-Rows are `d-flex flex-wrap` — on a narrow modal the action buttons wrap under
-the timestamp/detail column instead of overflowing (no horizontal scroll,
-`ui-design-rules`). Only one real CSS rule (`.app-backup-meta { min-width: 0;
-flex: 1 1 12rem }`) — everything else is Bootstrap utilities — after the first
-cut tripped the component's 4.10 kB CSS budget by ~400 bytes.
-
-### Verified
-
-- Frontend `npm run build` clean (no new budget warnings); `npm run test:ci`
-  **46** (+5: the detail-line formatter incl. the failed-dump and
-  no-manifest cases, restore/delete gated on confirm, list loads on open).
-- `scripts/e2e-tests.sh` — the browser suite (auth, nav across all pages,
-  Users, the full TOTP journey) still green: **13 passed, 3 skipped**.
-- Backend + frontend images rebuilt and recreated (`up -d --no-deps`, not a
-  root `compose down`); dashboard serves 200 on `0.19.0`.
-- Not click-tested through the live authenticated UI in this session (no
-  dashboard creds to an agent); the API it drives is proven end to end in
-  §187/§188, the component logic is unit-tested, and the shell is covered by
-  the E2E run above.
-
-Minor bump 0.18.0 → 0.19.0 (user-facing UI). Slice 5 (docs + optional Backups-
-page table) is all that's left of §185.
-
-## 190. §185 slice 5 — per-app backup docs; §185 closed (2026-09-04)
-
-Docs only.
-
-- **`docs/recovery-troubleshooting.md`** — reworked the Backup/restore section
-  around the fact that there are now **two** backups: a table contrasting the
-  scheduled off-site archive (whole `apps/` tree, versioned, encrypted, DR)
-  with per-app snapshots (one local `.tar.gz` per app, last 10, a rollback
-  point). Documented the five `/api/services/:name/backup[s]` endpoints and
-  what Restore actually does (stop → replace `data/` keeping `data/db` →
-  replay the SQL dump → SQLite snapshots over live files → start; a failed
-  replay is a warning). The manual `psql`/`mariadb` replay stays as the
-  "check a dump first / backend is down" fallback, no longer the only path.
-- **`docs/it-admin.md`** — the Backups section now names both mechanisms and
-  where each lives (Backups page vs an app's Settings → Backups).
-- **`docs/user-guide.md`** — a plain-language bullet: take a per-app snapshot
-  before reconfiguring or updating an app; Restore rolls that one app back.
-
-### Backups-page overview table — dropped
-
-§185 slice 5 offered an optional per-app table on the Backups page. Not built:
-a useful version needs a new aggregation endpoint (per-app counts / last-backup
-across ~36 apps) and a table of mostly-empty rows, for information already one
-click away on each app's card. If a fleet-wide view is wanted later it's its
-own small feature, not backup plumbing.
-
-### §185 done
-
-Per-app backup / restore is complete: `appBackup.ts` + `dumpOneApp` /
-`restoreServerDatabase` (§186), the four archive/list/download/delete routes
-(§187), the restore route (§188), the service-card UI (§189), and these docs.
-Proven end to end on the live stack throughout. No open threads.
-
-Docs only — no version bump.
+## 185. Per-application backup / restore — built, proven live (former §185–§190, compacted 2026-09-14)
+
+Picked off the README (§131.4). Two backup mechanisms already existed —
+the dashboard's own stack archive, and one Duplicati job over the whole
+`apps/` tree — and neither could back up or restore a single app: the tree
+job's restore API wrote nothing (§75.3) and it was mid-migration to Kopia
+(§81.5) anyway, so "restore just this app" would have meant a path-filtered
+partial restore of a tree archive — rejected as the fiddly CLI op §75.3 says
+not to build a button on. Built instead as its own local, self-contained
+mechanism: one `.tar.gz` per app, independent of the Duplicati→Kopia churn,
+usable as a five-second rollback point distinct from the offsite/versioned
+backup.
+
+**What shipped**: `services/appBackup.ts` — `backupOneApp(name)` dumps the
+app's DB(s) + SQLite files (reusing `appDumps.ts` internals) and tars
+`data/` (excluding live DB dirs/WAL/SHM) into `backups/apps/<name>/`, with a
+JSON manifest **sidecar** rather than a member of the archive (busybox tar
+in the runtime image can't do repeated `-C`). Both the archive write and the
+restore's file replace run in a throwaway root `alpine` container mounting
+the named backups Docker volume, not a host path — the backend runs as
+non-root `appuser` and genuinely cannot read most app data (the same
+constraint `dumpSqliteBatch` already worked around). `restoreOneApp` stops
+the app, replaces `data/` (keeping `data/db`), replays the SQL dump via
+`psql`/`mysql`/`mariadb`, copies SQLite snapshots over live files, restarts;
+a failed DB replay is a warning, not a failure. Four archive/list/
+download/delete routes plus a confirm-gated restore route, all behind
+`backups:manage`; a "Backups" section on every app's service-card Settings
+modal (back up now / list / restore / download / delete).
+
+**Verified live, end to end**: mutate-then-restore proofs against the real
+stack on n8n (Postgres — executions deleted, workflow renamed, restored back
+to the pre-mutation state) and Vaultwarden (SQLite — cipher deleted,
+restored back). Docs (`recovery-troubleshooting.md`, `it-admin.md`,
+`user-guide.md`) now distinguish this per-app rollback tool from the offsite
+versioned backup.
+
+**Dropped, not revisited**: a fleet-wide per-app overview table on the
+Backups page — would need a new aggregation endpoint for what's mostly
+empty rows, for information already one click away on each app's own card.
+Its own small feature if ever wanted, not backup plumbing.
+
+No open threads.
 
 ## 191. Periodic exposure drift reconciliation (2026-09-04)
 
