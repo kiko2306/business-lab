@@ -28531,6 +28531,17 @@ real — its output showed `Published the dashboard at
 https://businesslab.tx-home-utils.com` and `Created the DNS record for
 businesslab.tx-home-utils.com`; `curl` against the live tunnel confirmed
 both `businesslab.tx-home-utils.com` (new, 200) and `homelab.tx-home-utils.com`
-(old, still 200 — the stale rule) respond. Old `homelab.*` ingress/DNS
-record left in place pending the user's call on when to retire it (a live
-DNS/tunnel change to a URL that may still be bookmarked or open).
+(old, still 200 — the stale rule) respond.
+
+**§436.1 — old `homelab.*` retired.** User asked to remove it. Ran a
+one-off cleanup (not added to `start.sh`: this is a single historical
+leftover from the rename, not a recurring condition the bootstrap script
+needs to detect) using the exact same `cf_api`/`json_field` helpers and
+merge-not-replace pattern as `start.sh`'s own dashboard-publish block —
+read `CLOUDFLARE_API_TOKEN`/`_ACCOUNT_ID`/`_ZONE_ID`/`_TUNNEL_ID` from the
+live host's `.env`, dropped `homelab.tx-home-utils.com` from the tunnel's
+ingress list (PUT the merged config back, never a blind replace), then
+deleted its DNS record. Verified live: `curl` against
+`homelab.tx-home-utils.com` now fails to resolve (DNS record gone) while
+`businesslab.tx-home-utils.com` still returns 200 — the tunnel's other
+ingress rules were untouched by the merge.
