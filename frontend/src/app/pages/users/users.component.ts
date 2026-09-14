@@ -66,6 +66,10 @@ export class UsersComponent implements OnInit {
   // SSO app-access for the create form (§151/2b) — a checkbox per grantable
   // app, all off by default (an explicit allowlist).
   protected newAppAccess: Record<string, boolean> = {};
+  // Filters the visible grid only — never touches newAppAccess/accessApps,
+  // so a filtered-out app stays checked or unchecked as it was.
+  protected newAppFilter = '';
+  protected accessAppFilter = '';
 
   // The grantable apps (exposed + Authelia-protected), loaded once.
   protected appOptions: AppAccessOption[] = [];
@@ -197,6 +201,14 @@ export class UsersComponent implements OnInit {
     }
   }
 
+  protected filterAppOptions(filter: string): AppAccessOption[] {
+    const q = filter.trim().toLowerCase();
+    if (!q) return this.appOptions;
+    return this.appOptions.filter(
+      (o) => o.label.toLowerCase().includes(q) || (o.hostname ?? '').toLowerCase().includes(q)
+    );
+  }
+
   createUser(): void {
     if (this.createForm.invalid || !this.newRolesValid() || !this.newCapsValid()) {
       this.createForm.markAllAsTouched();
@@ -231,6 +243,7 @@ export class UsersComponent implements OnInit {
           this.newRoles = { webmaster: false, admin: true, user: false };
           this.newCaps = allCapsRecord(true);
           this.newAppAccess = {};
+          this.newAppFilter = '';
           this.load();
         },
         error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to create user.')),
@@ -257,6 +270,7 @@ export class UsersComponent implements OnInit {
     this.accessEditId = user.id;
     this.accessEmail = user.email ?? '';
     this.accessApps = {};
+    this.accessAppFilter = '';
     for (const option of this.appOptions) {
       this.accessApps[option.serviceName] = (user.appAccess ?? []).includes(option.serviceName);
     }
@@ -266,6 +280,7 @@ export class UsersComponent implements OnInit {
     this.accessEditId = null;
     this.accessEmail = '';
     this.accessApps = {};
+    this.accessAppFilter = '';
   }
 
   private emailLooksValid(value: string): boolean {

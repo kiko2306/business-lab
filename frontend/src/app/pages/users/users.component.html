@@ -70,9 +70,19 @@
             SSO app access
             <span class="text-body-secondary fw-normal">· {{ pickedAppCount(newAppAccess) }} of {{ appOptions.length }} selected</span>
           </span>
-          <div class="btn-group btn-group-sm">
-            <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, true)">Select all</button>
-            <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, false)">Clear</button>
+          <div class="d-flex gap-2">
+            <input
+              type="search"
+              class="form-control form-control-sm"
+              style="max-width: 200px"
+              placeholder="Filter apps…"
+              [(ngModel)]="newAppFilter"
+              [ngModelOptions]="{ standalone: true }"
+            />
+            <div class="btn-group btn-group-sm">
+              <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, true)">Select all</button>
+              <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, false)">Clear</button>
+            </div>
           </div>
         </div>
         <p class="form-text mt-0 mb-2">
@@ -80,7 +90,7 @@
           None by default.
         </p>
         <div class="app-access-grid">
-          <div class="form-check app-access-chip" *ngFor="let option of appOptions">
+          <div class="form-check app-access-chip" *ngFor="let option of filterAppOptions(newAppFilter)">
             <input
               class="form-check-input"
               type="checkbox"
@@ -94,6 +104,7 @@
               <span class="badge text-bg-secondary ms-1" *ngFor="let group of option.requiredGroups">{{ group }}</span>
             </label>
           </div>
+          <p class="form-text mb-0" *ngIf="newAppFilter && !filterAppOptions(newAppFilter).length">No apps match "{{ newAppFilter }}".</p>
         </div>
       </div>
       <div class="col-12 col-md-4 d-grid">
@@ -241,13 +252,23 @@
                     SSO app access
                     <span class="text-body-secondary fw-normal">· {{ pickedAppCount(accessApps) }} of {{ appOptions.length }} selected</span>
                   </span>
-                  <div class="btn-group btn-group-sm">
-                    <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, true)">Select all</button>
-                    <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, false)">Clear</button>
+                  <div class="d-flex gap-2">
+                    <input
+                      type="search"
+                      class="form-control form-control-sm"
+                      style="max-width: 200px"
+                      placeholder="Filter apps…"
+                      [(ngModel)]="accessAppFilter"
+                      [ngModelOptions]="{ standalone: true }"
+                    />
+                    <div class="btn-group btn-group-sm">
+                      <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, true)">Select all</button>
+                      <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, false)">Clear</button>
+                    </div>
                   </div>
                 </div>
                 <div class="app-access-grid" *ngIf="appOptions.length; else noAppOptions">
-                  <div class="form-check app-access-chip" *ngFor="let option of appOptions">
+                  <div class="form-check app-access-chip" *ngFor="let option of filterAppOptions(accessAppFilter)">
                     <input
                       class="form-check-input"
                       type="checkbox"
@@ -261,6 +282,7 @@
                       <span class="badge text-bg-secondary ms-1" *ngFor="let group of option.requiredGroups">{{ group }}</span>
                     </label>
                   </div>
+                  <p class="form-text mb-0" *ngIf="accessAppFilter && !filterAppOptions(accessAppFilter).length">No apps match "{{ accessAppFilter }}".</p>
                 </div>
                 <ng-template #noAppOptions>
                   <p class="form-text mt-0">No apps are exposed behind Authelia yet.</p>
