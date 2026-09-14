@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.100.1] — 2026-09-14
+
+### Fixed
+
+- Twenty admin bootstrap: auth mutations live at /metadata, not /graphql
+
 ## [0.100.0] — 2026-09-14
 
 ### Added
