@@ -27515,211 +27515,46 @@ So repeated starts converge rather than accumulate. The notification was not
 fired — that would send a real email — but its transport, recipient and
 type are what the read-back confirms.
 
-## 428. The ntfy app's 403: a token where the app wanted a password
+## 428. ntfy's phone app, from unauthorized to confirmed working — three real bugs across four attempts (former §428–§430.1, compacted 2026-09-14)
 
-Reported from the phone: subscribing to `https://ntfy.tx-home-utils.com`
-returned
+§425 exposed ntfy behind an Authelia bypass and was called verified on a
+`curl -H "Authorization: Bearer …"` 200 — proving the server, not the
+client the feature actually existed for. Getting the Android app itself
+authenticated took three more rounds, each surfacing a real bug in a layer
+the previous check hadn't covered:
 
-```
-io.heckel.ntfy.service.NotAuthorizedException: User not authorized, HTTP 403
-```
+- **§428 — the app wanted a password, only a token existed.** ntfy's
+  Android app authenticates as a user (username/password), not with a
+  bearer token; §425 had minted and discarded the password inline. Fixed:
+  both a token (CLI/HTTP) and a password (apps) are now generated and
+  stored. Along the way, the config panel was found to mask both — the
+  `readableSecrets` registry field now lets an app opt a write-only secret
+  into being readable back, alongside (not instead of) the existing
+  `*_ADMIN_PASSWORD` convention.
+- **§429 — the stored password wasn't the one ntfy actually had.** Not a
+  client bug this time: fingerprinting (not printing) the stored value
+  showed it didn't match `generateComplexPassword()`'s shape, so something
+  overwrote it after the save hook ran. The exact cause was never
+  identified — ruled out `.env` parsing/round-trip truncation by reading the
+  code, nothing else was conclusively pinned down. Guarded rather than
+  fixed at the cause: `looksGenerated()` treats a password that couldn't
+  have come from the generator as absent and re-issues the account, and a
+  post-save read-back now confirms what was written actually stuck.
+- **§430 — the app's own pre-flight check was never in the bypass list.**
+  Every server-side signal looked healthy; the app still said "no
+  connection." NPM's per-host access log named it in one line: the Android
+  app calls `GET /<topic>/auth` to validate credentials *before*
+  subscribing, and §425's bypass admitted `json|sse|ws|raw` but not `auth`,
+  so Authelia silently redirected that pre-flight check to the login
+  portal. Fixed by adding `auth` to the bypass (it's ntfy's own
+  authorization check, still 403 to anonymous).
 
-§425's protection working as designed — ntfy refusing an unauthenticated
-read — with the app holding no credential it could use. Two separate
-mistakes, both mine, both in §425.
-
-### 1. The credential the app asks for was never stored
-
-§425 minted an access token and generated the `subscriber` account's
-password *inline*, discarding it, on a code comment asserting "the password
-is never used — the app authenticates with the token". Wrong. ntfy's own
-docs describe the Android app in terms of a **"user configured for a
-server"** and its troubleshooting reads "Username/password may be
-incorrect" — the form wants a username and a password, and there was none to
-give it.
-
-Both are now generated and stored: username/password for the phone and
-desktop apps, `Authorization: Bearer tk_…` for the CLI and raw HTTP. An
-existing deployment converges — a token with no stored password *is* the
-pre-fix state, so the user is recreated (taking its old tokens with it) and a
-fresh token minted alongside the new password. A deployment already holding
-both is left alone, since `ntfy token add` mints a new token on every call.
-
-Verified against the public hostname, all three paths at once:
-
-```
-no credential       -> 403 denied
-username+password   -> 200 OK, topic readable
-bearer token        -> 200 OK, topic readable
-```
-
-### 2. The config panel masked the very values it told you to read
-
-`.env.example` and §425 both said to read the token in ntfy's config panel.
-It wasn't there: `getServiceEnvStatus('ntfy')` returned
-`value=NULL (masked)` for both keys, because `SECRET_KEY_PATTERN` masks
-anything token- or password-shaped.
-
-The panel already reveals one class of secret — a generated
-`*_ADMIN_PASSWORD`, so an app with no SSO can have its login read back — and
-the comment governing it asserted that convention was "precise enough that
-no separate per-service opt-in list is needed". ntfy is the counter-example:
-credentials generated *for the human to copy somewhere else*, neither of
-which ends in `ADMIN_PASSWORD`. So there is now an explicit `readableSecrets`
-registry field alongside the convention, and the comment says so instead of
-claiming otherwise.
-
-Registry tests enforce that nothing is declared readable *and* hidden
-(hidden always wins, so such a key would be silently unreadable), and that
-the list stays limited to ntfy — every entry converts a write-only secret
-into a readable one.
-
-Confirmed live: both keys now come back `visible in the panel`.
-
-### What this cost, and the lesson
-
-§425 was called verified on the strength of `curl -H "Authorization: Bearer
-…"` returning 200. That proved the *server* was right and said nothing about
-the *client*, which is the half that had to work. Verifying a feature against
-the transport I happened to choose, rather than the one the real client uses,
-is how both of these got through — and the masking bug means the documented
-recovery path had never been walked either.
-
-## 429. ntfy still 401'd: the stored password wasn't the one ntfy had
-
-§428's fix stored a password as well as a token, and subscribing from the
-phone *still* failed. This time it was not the client.
-
-### Diagnosis, without reading the secret
-
-Splitting the two credentials separated cause from symptom immediately:
-
-```
-bearer token       -> 200
-basic subscriber   -> 401
-```
-
-Both were written by the *same* `saveServiceEnv` call at the same moment, so
-the account existed and the token was fine — only the password was wrong.
-Fingerprinting the stored value rather than printing it:
-
-```
-NTFY_SUBSCRIBE_TOKEN    | len=32 | shape=aa_aaaa9aaaa9aa99a9a9a99aa9aaaa9
-NTFY_SUBSCRIBE_PASSWORD | len=11 | shape=aaa@Aaaaaaa
-```
-
-`generateComplexPassword()` produces **24** characters with at least one
-digit and one of `!@#%^*-_=+`. An 11-character value with no digit cannot
-have come from it, so something overwrote it after the hook ran — ntfy's auth
-database kept the real password and `.env` no longer matched it.
-
-Ruled out along the way, each by reading the code rather than guessing:
-`parseEnvFile` keeps everything after the first `=` (no inline-comment
-truncation), and `saveServiceEnv` writes `${key}=${value}` with only a trim.
-A stray `#` or `@` mangling the round-trip was the obvious theory and it was
-wrong. **What overwrote it is still unidentified.**
-
-### Guarded by state, not by a theory of the cause
-
-Two changes, both aimed at "this must not fail silently again":
-
-- `looksGenerated()` treats a stored password that *cannot* have come from
-  the generator as no password at all, so the account is re-issued rather
-  than left broken. Deliberately a check on the observable state, since the
-  cause is unknown.
-- After saving, the value is read straight back and compared. A credential
-  that does not survive the trip to `.env` is useless, and the only symptom
-  is a client saying "not authorized" while nothing server-side notices.
-
-Also `force`, so an operator (or this session) can re-issue on demand.
-
-### Verified live after a forced re-issue
-
-```
-length=24 generated-shape=true
-anonymous            -> 403
-subscriber+password  -> 200
-```
-
-The guard fired on the way (`the stored subscriber password is not one this
-generated — re-issuing`), and the round-trip check passed silently, which is
-what it should do when things are right.
-
-### The pattern across §425, §428 and §429
-
-Three attempts at one feature, and each failure was in a layer the previous
-verification did not cover: the server accepted a Bearer token (§425), the
-client wanted a password (§428), and the password on disk was not the one the
-server held (§429). Every step was "verified" against the thing I had just
-built rather than against the whole path the user actually walks — which for
-this feature is *phone → Cloudflare → Authelia → ntfy → auth db*. The lesson
-already recorded in §428 stands, one layer deeper.
-
-## 430. "No connection": the app's credential check was never in the bypass
-
-Fourth attempt at this one feature, and the first one diagnosed from the
-client's own request rather than from a theory about it.
-
-### What the evidence was, once I went looking for it
-
-Everything I could test from the server said yes: ntfy, Authelia and the
-home page all up; the domain served over **both** IPv4 (`172.67.145.117`)
-and IPv6; Pi-hole answering with Cloudflare addresses and no local override;
-the held-open `json` stream returning `200 application/x-ndjson` with data;
-the WebSocket `OPEN` in 2.4 s; and the stored credential still valid. The
-user's browser reached `/v1/health` fine. The app still said "no connection".
-
-ntfy's own log said only `subscribers=0` and logged no authentication
-failure — which was the clue, not the dead end it looked like: the request
-was never reaching ntfy at all. NPM's per-host access log had it in one
-line:
-
-```
-GET /homelab-alerts/auth -> 302   "ntfy/1.25.2 (play; Android 16; SDK 36)"
-```
-
-The Android app calls **`GET /<topic>/auth`** to validate its credentials
-*before* subscribing. The §425 bypass admitted `json|sse|ws|raw` and not
-`auth`, so Authelia redirected that check to the login portal, the app never
-got as far as subscribing, and the failure surfaced as a connection error
-rather than an authorisation one.
-
-Adding `auth` exposes nothing — it is ntfy's own authorisation check, 403 to
-an anonymous caller and 200 only to a credential ntfy accepts. Verified after
-the fix, and the distinction that matters is *who answers*:
-
-```
-/auth  anonymous        -> 403 from ntfy
-/auth  with credential  -> 200 from ntfy
-```
-
-### The actual lesson, four sections late
-
-§425 → §428 → §429 → here, each failure in a layer the previous check did not
-cover. The common thread is not carelessness about any one layer; it is that
-**every diagnosis started from the server's point of view**, and the one
-artefact that describes the client's — NPM's access log, which was there the
-whole time and answered it in a single line — was only consulted at the
-fourth attempt.
-
-For any "the app can't reach it" report against an exposed service, read
-`/data/logs/proxy-host-<n>_access.log` in the NPM container **first**. It
-gives the exact path, status and user-agent, which is precisely the
-information no amount of server-side curl can infer.
-
-Worth checking the same way if Vaultwarden's clients ever misbehave: its
-bypass list was written from the same kind of reasoning about which
-endpoints a client "should" need.
-
-## 430.1. Confirmed on the phone
-
-The ntfy app subscribes and receives on `homelab-alerts` with the
-`subscriber` username/password. §415 is closed end to end: the alert stream
-is unreadable anonymously, readable with a credential the dashboard issues
-itself, and publishing from the internal senders never needed one.
-
-Took four rounds (§425, §428, §429, §430). The diagnostic order that would
-have found it in one is now in `docs/app-credentials.md`.
+**§430.1 confirmed live on the phone** — subscribe and receive both work
+with the issued credential. The lesson (read NPM's per-host access log
+first for any "the app can't reach it" report, rather than diagnosing from
+the server's side) is written into `docs/app-credentials.md`. Open thread:
+what actually overwrote the password in §429 was never root-caused, only
+guarded against.
 
 ## 431. The fixed-IP prompt is now pre-answerable — the last of the three
 
