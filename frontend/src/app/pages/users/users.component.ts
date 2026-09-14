@@ -187,6 +187,16 @@ export class UsersComponent implements OnInit {
     return this.appOptions.map((o) => o.serviceName).filter((name) => record[name]);
   }
 
+  protected pickedAppCount(record: Record<string, boolean>): number {
+    return this.pickedApps(record).length;
+  }
+
+  protected setAllApps(record: Record<string, boolean>, value: boolean): void {
+    for (const option of this.appOptions) {
+      record[option.serviceName] = value;
+    }
+  }
+
   createUser(): void {
     if (this.createForm.invalid || !this.newRolesValid() || !this.newCapsValid()) {
       this.createForm.markAllAsTouched();

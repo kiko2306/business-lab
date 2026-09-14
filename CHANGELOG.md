@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.99.2] — 2026-09-14
+
+### Changed
+
+- Users page: SSO app access gets select-all/clear, a selected count, chip-style checkboxes, and column-aligned layout
+
 ## [0.99.1] — 2026-09-14
 
 ### Changed

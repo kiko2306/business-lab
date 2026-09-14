@@ -65,13 +65,22 @@
         <div class="form-text text-danger" *ngIf="!newCapsValid()">An admin needs at least one feature.</div>
       </div>
       <div class="col-12" *ngIf="appOptions.length">
-        <span class="form-label small fw-semibold d-block mb-1">SSO app access</span>
+        <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
+          <span class="form-label small fw-semibold mb-0">
+            SSO app access
+            <span class="text-body-secondary fw-normal">· {{ pickedAppCount(newAppAccess) }} of {{ appOptions.length }} selected</span>
+          </span>
+          <div class="btn-group btn-group-sm">
+            <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, true)">Select all</button>
+            <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, false)">Clear</button>
+          </div>
+        </div>
         <p class="form-text mt-0 mb-2">
           Which exposed apps this account may reach through single sign-on.
           None by default.
         </p>
         <div class="app-access-grid">
-          <div class="form-check" *ngFor="let option of appOptions">
+          <div class="form-check app-access-chip" *ngFor="let option of appOptions">
             <input
               class="form-check-input"
               type="checkbox"
@@ -227,9 +236,18 @@
                     autocomplete="off"
                   />
                 </div>
-                <span class="form-label small fw-semibold d-block mb-1">SSO app access</span>
+                <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1" *ngIf="appOptions.length">
+                  <span class="form-label small fw-semibold mb-0">
+                    SSO app access
+                    <span class="text-body-secondary fw-normal">· {{ pickedAppCount(accessApps) }} of {{ appOptions.length }} selected</span>
+                  </span>
+                  <div class="btn-group btn-group-sm">
+                    <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, true)">Select all</button>
+                    <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, false)">Clear</button>
+                  </div>
+                </div>
                 <div class="app-access-grid" *ngIf="appOptions.length; else noAppOptions">
-                  <div class="form-check" *ngFor="let option of appOptions">
+                  <div class="form-check app-access-chip" *ngFor="let option of appOptions">
                     <input
                       class="form-check-input"
                       type="checkbox"
