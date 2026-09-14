@@ -28498,3 +28498,39 @@ real bridge: `pingRcloneBridge()` run directly inside the deployed
 round trip to this box's actual `BACKUP_REPO_KIND=rclone` Kopia, not a
 mock. The gate correctly recognised this box's config as the one that
 needed it.
+
+## 436. Dashboard subdomain renamed: `homelab` → `businesslab`
+
+`DASHBOARD_SUBDOMAIN`'s fallback default (`start.sh`) changed from `homelab`
+to `businesslab`, so a fresh `./start.sh` run now publishes the dashboard at
+`https://businesslab.tx-home-utils.com` instead of `https://homelab.tx-home-utils.com`.
+This was flagged during the recent Tier-2 rebrand (see the note near
+plan.md:25079) as its own migration task — this is that task.
+
+Confirmed via `plan.md` §58/§58.2 that the dashboard is deliberately outside
+the `SERVICES` exposure registry (no managed-app entry, no `service_exposure`
+row), so there is no database row to migrate — the subdomain lives in exactly
+one place: the `DASH_SUB` fallback in `start.sh`'s tunnel-publish block. Docs
+updated to match (`first-run.md`, `webmaster.md`, `deployment-guide.md`,
+`two-factor.md` — the last of which also had a stale `api-homelab.*` mention
+predating the "API stays internal" decision, corrected while touching that
+line). Left `backend/src/utils/corsOrigin.test.ts` alone — its `homelab.*`
+strings are arbitrary same-origin-matching fixtures, not the real subdomain,
+and unrelated to this change. Also left `totpSecret.ts`'s HKDF info string
+(`'homelab-totp-secret-v1'`) alone — despite the name, it's a fixed
+domain-separation constant baked into every existing user's derived TOTP
+secret, not a hostname; changing it would invalidate live 2FA enrollments.
+
+**Live-host cutover** (`tx-home-utils.com`, a no-guarantees dev/test box):
+the tunnel-merge logic in `start.sh` only adds/updates the ingress rule for
+the *current* `DASH_HOST` — it never deletes a stale one for a hostname that
+fell out of use, so re-running `start.sh` after this change publishes
+`businesslab.*` alongside the still-live `homelab.*` rather than replacing
+it. Confirmed: deployed to `beta`/`home-srv-01` and ran `./start.sh` for
+real — its output showed `Published the dashboard at
+https://businesslab.tx-home-utils.com` and `Created the DNS record for
+businesslab.tx-home-utils.com`; `curl` against the live tunnel confirmed
+both `businesslab.tx-home-utils.com` (new, 200) and `homelab.tx-home-utils.com`
+(old, still 200 — the stale rule) respond. Old `homelab.*` ingress/DNS
+record left in place pending the user's call on when to retire it (a live
+DNS/tunnel change to a URL that may still be bookmarked or open).
