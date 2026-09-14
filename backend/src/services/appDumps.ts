@@ -325,14 +325,28 @@ export interface DumpReport {
 /**
  * Dump every app database. Never throws — one broken app must not stop the
  * rest being made safe.
+ *
+ * `onStep`, when given, is called just BEFORE each step starts (so a caller
+ * driving a progress display shows "dumping X" live, not only after X
+ * finishes) with the 1-based step index, the total step count, and a label —
+ * an app name for a server database, or "SQLite databases" for the one
+ * batched step covering all of them.
  */
-export async function dumpAllAppDatabases(): Promise<DumpReport> {
+export async function dumpAllAppDatabases(
+  onStep?: (index: number, total: number, label: string) => void
+): Promise<DumpReport> {
   const appsDir = getAppsDir();
   const outcomes: DumpOutcome[] = [];
 
-  for (const [name, definition] of Object.entries(SERVICES)) {
-    const backup = definition.backup;
-    if (!backup) continue;
+  const backupApps = Object.entries(SERVICES).filter(([, definition]) => definition.backup);
+  const sqliteFiles = findSqliteFiles(appsDir);
+  const total = backupApps.length + (sqliteFiles.length > 0 ? 1 : 0);
+  let step = 0;
+
+  for (const [name, definition] of backupApps) {
+    step += 1;
+    onStep?.(step, total, name);
+    const backup = definition.backup!;
     const appDir = path.join(appsDir, name);
     try {
       outcomes.push(await dumpServerDatabase(name, backup.service, backup.engine, appDir));
@@ -341,10 +355,14 @@ export async function dumpAllAppDatabases(): Promise<DumpReport> {
     }
   }
 
-  try {
-    outcomes.push(...(await dumpSqliteBatch(findSqliteFiles(appsDir), appsDir)));
-  } catch (error) {
-    logger.error('SQLite snapshot batch failed', { error: (error as Error).message });
+  if (sqliteFiles.length > 0) {
+    step += 1;
+    onStep?.(step, total, 'SQLite databases');
+    try {
+      outcomes.push(...(await dumpSqliteBatch(sqliteFiles, appsDir)));
+    } catch (error) {
+      logger.error('SQLite snapshot batch failed', { error: (error as Error).message });
+    }
   }
 
   const ok = outcomes.filter((o) => o.ok).length;

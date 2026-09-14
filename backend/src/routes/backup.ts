@@ -22,6 +22,7 @@ import {
 } from '../services/backup';
 import { getBackupSourceStatus } from '../services/kopiaClient';
 import { runAppDataBackup } from '../services/backupScheduler';
+import { getBackupProgress } from '../services/backupProgress';
 import { readAppEnvValue } from '../services/appEnv';
 
 const router = Router();
@@ -136,6 +137,17 @@ router.post('/dump-apps', async (req: Request, res: Response) => {
  * snapshot it triggers is not, so success here means "queued", and the
  * schedule card's status is where the result lands.
  */
+/**
+ * GET /api/backups/run/progress — polled by the "Back up now" modal while a
+ * POST /run request is in flight, so it can show the step actually running
+ * (which app, how many to go) instead of a plain spinner. One global state,
+ * not per-user — the dump loop it reports on is already serialised to a
+ * single run at a time (withMaintenanceLock), so there's only ever one to see.
+ */
+router.get('/run/progress', (_req: Request, res: Response) => {
+  return res.json(getBackupProgress());
+});
+
 router.post('/run', async (req: Request, res: Response) => {
   try {
     const result = await runAppDataBackup('manual');

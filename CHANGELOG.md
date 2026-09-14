@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.98.0] — 2026-09-14
+
+### Added
+
+- Show real step-by-step progress in a modal for the manual "Back up now" run
+
 ## [0.97.5] — 2026-09-14
 
 ### Fixes

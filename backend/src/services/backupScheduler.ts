@@ -3,6 +3,7 @@ import { dumpAllAppDatabases } from './appDumps';
 import { snapshotAppData as snapshotKopiaAppDataNow } from './kopiaClient';
 import { readAppEnvValue } from './appEnv';
 import { withMaintenanceLock } from './maintenanceLock';
+import { startBackupProgress, reportBackupStep, setBackupPhase, finishBackupProgress } from './backupProgress';
 import logger from '../utils/logger';
 import {
   BackupRunOutcome,
@@ -160,7 +161,8 @@ export async function runAppDataBackup(
 async function runAppDataBackupLocked(
   trigger: 'scheduled' | 'manual'
 ): Promise<{ ok: boolean; detail: string }> {
-  const report = await dumpAllAppDatabases();
+  startBackupProgress(trigger);
+  const report = await dumpAllAppDatabases((index, total, label) => reportBackupStep(index, total, label));
 
   // Which apps failed and why, not merely how many. §86.3: a scheduled run
   // recorded `failed: 8` and nothing else, and by the time anyone looked the
@@ -195,9 +197,11 @@ async function runAppDataBackupLocked(
       result: 'failure',
       metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail },
     }).catch(() => {});
+    finishBackupProgress(false, detail);
     return { ok: false, detail };
   }
 
+  setBackupPhase('snapshotting');
   const run = await snapshotKopiaAppDataNow(password);
   logger.info('App-data backup', { started: run.started, detail: run.detail, dumped: report.ok, trigger });
   await writeAuditLog({
@@ -218,6 +222,7 @@ async function runAppDataBackupLocked(
     report.failed > 0
       ? `${run.detail}; ${report.failed} database dump${report.failed === 1 ? '' : 's'} failed`
       : run.detail;
+  finishBackupProgress(ok, detail);
   return { ok, detail };
 }
 

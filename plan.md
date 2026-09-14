@@ -28336,3 +28336,69 @@ the deployed `backend-1` container against the live `itflow-db`/`kimai-db`
 containers: both dumped clean (`itflow.sql` 1272 KB, `kimai.sql` 49 KB,
 real `mariadb-dump` SQL headers) — the fix is proven end-to-end, not just
 against the bare images.
+
+## 433. Real step-by-step progress for the manual "Back up now" run
+
+Asked whether the manual app-data backup could show progress in a modal.
+Answered the cheap version first (a blocking spinner modal, zero backend
+change — `POST /backups/run` is already one ~20s call) versus the real
+version (which app, how many to go), and the user asked for the real one.
+
+**Design**: `POST /backups/run` stays exactly the blocking call it already
+was — no queueing, no async job id. A new global, in-memory
+`backupProgress.ts` module is updated live by the same dump loop as it runs;
+the frontend polls a new `GET /backups/run/progress` on a plain
+`setInterval`-style RxJS `timer` while the modal is open, concurrently with
+the still-in-flight `POST`. No new streaming transport: this repo already
+has a WebSocket/SSE channel (`realtime.ts`) for service status, but it
+broadcasts every 15s — too coarse for a step that can finish in under a
+second — and a cheap poll for one screen beat a second stream.
+
+`dumpAllAppDatabases` (`appDumps.ts`) takes an optional `onStep(index, total,
+label)` callback, called just *before* each step starts (an app name, or one
+"SQLite databases" step for the batched SQLite pass) so the UI shows "dumping
+X" live rather than only after X finishes. `backupScheduler.ts`'s
+`runAppDataBackupLocked` — shared by both the scheduled and the manual
+run — drives the state machine: `startBackupProgress(trigger)` →
+`reportBackupStep` per dump → `setBackupPhase('snapshotting')` once dumps
+finish and the Kopia snapshot is triggered → `finishBackupProgress(ok,
+detail)` at every return path, including the "no destination password"
+early exit. Scheduled runs update the same global state as manual ones —
+deliberately not partitioned per-trigger, since the dump loop is already
+serialised to one run at a time by `withMaintenanceLock`, and building
+per-trigger isolation for an edge case (a scheduled check landing mid-manual-run)
+that the maintenance lock's own key scheme doesn't even fully prevent
+would be solving a problem nothing else in this path solves either.
+
+Frontend (`backups.component.ts`/`.html`/`.css`): a modal mirroring
+`confirm-dialog.component`'s hand-rolled backdrop/dialog structure (no modal
+library for one screen) opens on click, polls `GET /run/progress` every
+500ms (self-update's panel polls its own status at 3s, but its steps —
+pull, build — each run tens of seconds; a per-app dump step is much
+shorter), and shows a Bootstrap progress bar plus the current app name.
+The `POST /run` promise resolving already means the backend marked the run
+`done` — so its `next`/`error` handler does one more immediate progress
+fetch rather than waiting up to 500ms for the next poll tick to show the
+final numbers. The modal stays open on the result (ok or failed, with
+detail) until the user clicks Close, rather than auto-dismissing.
+
+Verified: backend typecheck + full suite (878 tests, new `backupProgress.test.ts`
+covering the state machine) and frontend `test:ci` (60 tests, 2 new —
+step-by-step polling through a manual run, and the error path leaving the
+modal showing a failure rather than stuck "running") + `ng build`, all
+green. Then actually clicked it: brought up `docker-compose.test.yml`
+(built from the working tree, so this exercised the real change, pre-commit),
+signed in with Playwright, and drove the Backups page by hand with a
+throwaway spec (screenshotted, then deleted — never committed). The stack
+has no real docker socket or Kopia password, so every app's "dump" fails
+fast — but that made the mechanism easy to see rather than hiding it: the
+very first frame after clicking "Back up now" caught the modal mid-run —
+`Dumping nginx-proxy-manager… 1 of 12` with the progress bar filled to
+1/12 — then it correctly settled on the red "the backup engine has no
+password configured yet" / "App data backup did not start…" state with a
+working Close button. Real HTTP round trips against a live backend, not a
+mock. Not deployed to `home-srv-01` yet — next is the normal `dev` → `beta`
+push and rebuild, same loop as always; this isn't the class of
+"prove against the real stack" §432's itflow/kimai fix needed (no
+Docker/exposure/networking/backup-data change here), so the deploy is
+routine rather than a required proof step.

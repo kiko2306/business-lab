@@ -14,6 +14,7 @@ import {
   AutheliaAdminUser,
   AutheliaAdminUserUpdate,
   BackupListResponse,
+  BackupProgress,
   BackupScheduleConfig,
   BackupScheduleSettings,
   BackupStatusResponse,
@@ -92,6 +93,10 @@ export class OperationsService {
 
   runAppDataBackup(): Observable<{ ok: boolean; message: string }> {
     return this.http.post<{ ok: boolean; message: string }>(`${API_BASE_URL}/backups/run`, {});
+  }
+
+  getBackupProgress(): Observable<BackupProgress> {
+    return this.http.get<BackupProgress>(`${API_BASE_URL}/backups/run/progress`);
   }
 
   updateBackupSchedule(config: BackupScheduleSettings): Observable<{ message: string }> {

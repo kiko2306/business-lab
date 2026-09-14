@@ -1,12 +1,19 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { Subscription, catchError, of, switchMap, timer } from 'rxjs';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
-import { BackupFile, BackupScheduleConfig, BackupStatusResponse } from '../../core/models';
+import { BackupFile, BackupProgress, BackupScheduleConfig, BackupStatusResponse } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
+
+/** How often the "Back up now" modal polls GET /backups/run/progress. Each
+ * step (one app's dump) can finish in well under a second, so this needs to
+ * be faster than the 3s the self-update panel polls at — that page's steps
+ * (pull, build) each run tens of seconds. */
+const PROGRESS_POLL_MS = 500;
 
 /**
  * Backups & restore on its own route (§131.1): the schedule, the on-demand
@@ -22,7 +29,7 @@ import { extractErrorMessage } from '../../core/api';
   templateUrl: './backups.component.html',
   styleUrl: './backups.component.css',
 })
-export class BackupsComponent implements OnInit {
+export class BackupsComponent implements OnInit, OnDestroy {
   private readonly operations = inject(OperationsService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
@@ -38,13 +45,21 @@ export class BackupsComponent implements OnInit {
     consecutiveFailures: 0,
   };
   protected savingSchedule = false;
-  protected runningAppDataBackup = false;
   protected backupStatus: BackupStatusResponse | null = null;
+
+  protected showRunModal = false;
+  protected progress: BackupProgress | null = null;
+  protected runError: string | null = null;
+  private pollSubscription?: Subscription;
 
   ngOnInit(): void {
     this.loadBackups();
     this.loadSchedule();
     this.loadBackupStatus();
+  }
+
+  ngOnDestroy(): void {
+    this.pollSubscription?.unsubscribe();
   }
 
   loadBackups(): void {
@@ -125,22 +140,62 @@ export class BackupsComponent implements OnInit {
   runAppDataBackup(): void {
     // Dumps every app database then triggers a Kopia snapshot — the same path
     // the scheduler takes, so a manual run is never a generation stale (§74.6).
-    // The dump is synchronous, so this request runs ~20s.
-    this.runningAppDataBackup = true;
+    // The dump is synchronous (~20s), so the modal polls GET /run/progress
+    // for the step actually running instead of sitting on an indeterminate
+    // spinner for the whole request.
+    this.progress = null;
+    this.runError = null;
+    this.showRunModal = true;
+    this.startProgressPolling();
+
     this.operations.runAppDataBackup().subscribe({
       next: (response) => {
-        this.runningAppDataBackup = false;
+        this.fetchFinalProgress();
         this.toast.success(response.message);
         this.loadBackupStatus();
       },
       error: (error) => {
-        this.runningAppDataBackup = false;
-        this.toast.error(extractErrorMessage(error, 'Unable to run the app data backup.'));
+        this.runError = extractErrorMessage(error, 'Unable to run the app data backup.');
+        this.fetchFinalProgress();
         // Even a run that "did not start" dumped databases and wrote an audit
         // row — refresh the card so any dump failures show.
         this.loadBackupStatus();
       },
     });
+  }
+
+  private startProgressPolling(): void {
+    this.pollSubscription?.unsubscribe();
+    this.pollSubscription = timer(0, PROGRESS_POLL_MS)
+      .pipe(switchMap(() => this.operations.getBackupProgress().pipe(catchError(() => of(null)))))
+      .subscribe((progress) => {
+        if (!progress) {
+          return;
+        }
+        this.progress = progress;
+        if (!progress.running) {
+          this.pollSubscription?.unsubscribe();
+        }
+      });
+  }
+
+  /**
+   * The POST to /run only resolves once the backend has already marked the
+   * run done, so one extra fetch here shows the final numbers right away
+   * instead of waiting for the next poll tick (or, if something threw before
+   * the backend could mark it done, at least the last state it reached).
+   */
+  private fetchFinalProgress(): void {
+    this.pollSubscription?.unsubscribe();
+    this.operations.getBackupProgress().subscribe({
+      next: (progress) => (this.progress = progress),
+      error: () => {},
+    });
+  }
+
+  closeRunModal(): void {
+    this.showRunModal = false;
+    this.pollSubscription?.unsubscribe();
   }
 
   /**

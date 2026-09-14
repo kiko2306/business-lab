@@ -464,6 +464,19 @@ export interface BackupStatusResponse {
   lastAppData: BackupLastAppDataDump | null;
 }
 
+export interface BackupProgress {
+  running: boolean;
+  trigger: 'scheduled' | 'manual' | null;
+  phase: 'idle' | 'dumping' | 'snapshotting' | 'done';
+  index: number;
+  total: number;
+  label: string | null;
+  startedAt: string | null;
+  finishedAt: string | null;
+  ok: boolean | null;
+  detail: string | null;
+}
+
 export interface HealthAlert {
   metric: string;
   value: number;

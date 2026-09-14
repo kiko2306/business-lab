@@ -90,8 +90,8 @@
                  goes through the same dump-then-snapshot path, so a manual
                  run to check a new destination is never a generation stale.
                  Runs ~20s (the dump is synchronous). -->
-            <button class="btn btn-sm btn-outline-secondary" [disabled]="runningAppDataBackup" (click)="runAppDataBackup()">
-              {{ runningAppDataBackup ? 'Backing up…' : 'Back up now' }}
+            <button class="btn btn-sm btn-outline-secondary" [disabled]="showRunModal" (click)="runAppDataBackup()">
+              Back up now
             </button>
             <button class="btn btn-sm btn-outline-primary" [disabled]="savingSchedule" (click)="saveSchedule()">
               Save schedule
@@ -157,4 +157,44 @@
       </div>
     </div>
   </app-panel>
+
+  <div class="backup-progress-backdrop" *ngIf="showRunModal">
+    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" aria-label="Backing up app data">
+      <div class="backup-progress-body">
+        <h2 class="h5 mb-3">Backing up app data</h2>
+
+        <ng-container [ngSwitch]="progress?.phase">
+          <p class="mb-2" *ngSwitchCase="'snapshotting'">Triggering the backup engine snapshot&hellip;</p>
+          <p class="mb-2"
+             *ngSwitchCase="'done'"
+             [class.text-success]="progress?.ok === true"
+             [class.text-danger]="progress?.ok === false">
+            {{ progress?.detail }}
+          </p>
+          <p class="mb-2" *ngSwitchDefault>
+            {{ progress?.label ? ('Dumping ' + progress?.label + '…') : 'Starting…' }}
+          </p>
+        </ng-container>
+
+        <div class="progress" style="height: 0.5rem" *ngIf="progress && progress.phase === 'dumping' && progress.total > 0">
+          <div
+            class="progress-bar"
+            role="progressbar"
+            [style.width.%]="(progress.index / progress.total) * 100"
+            [attr.aria-valuenow]="progress.index"
+            aria-valuemin="0"
+            [attr.aria-valuemax]="progress.total"
+          ></div>
+        </div>
+        <p class="text-body-secondary small mt-1 mb-0" *ngIf="progress && progress.phase === 'dumping' && progress.total > 0">
+          {{ progress.index }} of {{ progress.total }}
+        </p>
+
+        <p class="text-danger small mt-2 mb-0" *ngIf="runError">{{ runError }}</p>
+      </div>
+      <div class="backup-progress-foot" *ngIf="progress?.phase === 'done' || runError">
+        <button type="button" class="btn btn-primary" (click)="closeRunModal()">Close</button>
+      </div>
+    </div>
+  </div>
 </main>
