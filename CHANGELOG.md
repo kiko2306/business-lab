@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.97.5] — 2026-09-14
+
+### Fixes
+
+- Fix scheduled backups silently dropping the itflow/kimai database dumps — mariadb-dump replaces the removed mysqldump compat symlink
+
 ## [0.97.4] — 2026-09-12
 
 ### Fixed

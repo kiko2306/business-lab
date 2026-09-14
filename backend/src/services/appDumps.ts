@@ -174,12 +174,18 @@ async function dumpServerDatabase(
     if (!db) {
       return { ...base, ok: false, detail: 'could not determine the database name from the container' };
     }
-    args = ['run', '--rm', '--network', network, '-e', `MYSQL_PWD=${password}`,
-            '--entrypoint', 'mysqldump', image,
-            // --single-transaction takes a consistent snapshot without locking
-            // the app out for the duration.
-            '--single-transaction', '--quick', '--no-tablespaces',
-            '-h', service, '-u', user, db];
+    args = ['run', '--rm', '--network', network,
+            '-e', `MYSQL_PWD=${password}`, '-e', `RH=${service}`, '-e', `RU=${user}`, '-e', `RD=${db}`,
+            '--entrypoint', 'sh', image,
+            // `mariadb-dump` in current MariaDB images (the `mysqldump` compat
+            // symlink is gone in 11.x, same rename restoreServerDatabase
+            // already works around); `mysqldump` in mysql:8. Missing this
+            // silently dropped every itflow/kimai dump for days while the
+            // scheduled run still reported "success".
+            '-c', 'if command -v mariadb-dump >/dev/null 2>&1; then D=mariadb-dump; else D=mysqldump; fi; ' +
+              // --single-transaction takes a consistent snapshot without
+              // locking the app out for the duration.
+              'exec "$D" --single-transaction --quick --no-tablespaces -h "$RH" -u "$RU" "$RD"'];
   }
 
   const result = await run('docker', args);

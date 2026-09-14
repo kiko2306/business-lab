@@ -28286,3 +28286,47 @@ alone" branch is what it would hit regardless of what's in `start.config`).
 Verified via the containerized test above rather than against the live
 host — there is no live host this specific code path is meant to run
 against a second time.
+
+## 432. Scheduled backups were silently dropping itflow's and kimai's database dumps
+
+Asked to check for errors on the scheduled backup. `settings` showed the
+schedule healthy (`lastOutcome: success`, `consecutiveFailures: 0`), but the
+audit log told a different story: every scheduled run since at least
+2026-09-11 recorded `app-data` as `success` while carrying two per-app
+failures in its `failures` metadata —  itflow and kimai's `mariadb` dumps,
+same error each time: `docker: ... exec: "mysqldump": executable file not
+found in $PATH`. The run-level "success" is correct by design (§88.5's
+choice: a dump failing for one app must not put the whole schedule into
+retry) — but nothing short of reading individual audit rows surfaced that
+two apps' databases hadn't had a real dump in days.
+
+Reproduced directly on the host: `docker run --rm --entrypoint mysqldump
+mariadb:11.4 --version` fails with exactly that error. Current MariaDB
+images (11.x, including plain `mariadb:latest`) dropped the `mysqldump`
+compat symlink — only `mariadb-dump` is on `$PATH` now. `restoreServerDatabase`
+in the same file (`appDumps.ts`) already worked around this exact rename for
+restores (`command -v mariadb` fallback); `dumpServerDatabase`'s mariadb
+branch never got the equivalent fix and hardcoded `--entrypoint mysqldump`.
+
+Checked which of the registry's three mariadb/mysql-backed apps were
+actually affected: bookstack-db runs `lscr.io/linuxserver/mariadb`, which
+still ships the `mysqldump` symlink; npm-db runs `mysql:8.0`, which was
+never renamed. Only itflow-db and kimai-db (plain `mariadb:latest` /
+`mariadb:11.4`) hit the missing binary — confirmed by running the same
+`--entrypoint sh -c 'command -v mariadb-dump || mysqldump'` probe against
+all three images on the host.
+
+**Fix**: `dumpServerDatabase`'s mariadb/mysql branch now overrides the
+entrypoint to `sh -c` and picks `mariadb-dump` when present, falling back to
+`mysqldump`, mirroring `restoreServerDatabase`'s existing client-selection
+shell one-liner rather than inventing a second pattern for the same rename.
+
+Verified: backend typecheck + full test suite green (876 tests, no existing
+test pinned the old `--entrypoint mysqldump` args). Proved against the real
+stack — the actual failure mode is image-specific, not something a mock
+would catch: ran the new `sh -c` fallback against `mariadb:11.4`,
+`lscr.io/linuxserver/mariadb:latest` and `mysql:8.0` on `home-srv-01`, all
+three resolve to a working dump client. itflow and kimai were stopped by
+the user this morning (2026-09-14 07:22, unrelated to this) — deploying and
+re-verifying the actual dump path against a live `itflow-db`/`kimai-db`
+container is still open, see below.
