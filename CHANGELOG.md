@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.102.1] — 2026-09-15
+
+### Fixed
+
+- Stop the Tailscale/NetBird auto-restart reconciler restarting healthy services every 16 minutes: restarts now need Uptime Kuma to agree and happen at most once per outage
+
 ## [0.102.0] — 2026-09-15
 
 ### Reliability

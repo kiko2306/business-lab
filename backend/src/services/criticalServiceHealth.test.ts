@@ -2,33 +2,63 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../utils/exposureSettings', () => ({ getExposureConfig: vi.fn() }));
 vi.mock('../utils/alertNotify', () => ({ publishAlert: vi.fn() }));
-vi.mock('../config/services', () => ({ resolveComposeFile: vi.fn() }));
+vi.mock('../config/services', () => ({ resolveComposeFile: vi.fn(), getPublishedUpstreamPort: vi.fn() }));
+vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn(async () => '10.201.0.1') }));
 vi.mock('./netbirdAuthFlow', () => ({ managementJsonPath: vi.fn(() => '/fake/management.json') }));
 vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 vi.mock('fs/promises', () => ({ default: { readFile: vi.fn() } }));
 
-const execFileMock = vi.fn((..._args: unknown[]) => {
-  const cb = _args[_args.length - 1] as (err: Error | null, result: { stdout: string; stderr: string }) => void;
+const execFileMock = vi.fn((...args: unknown[]) => {
+  const cb = args[args.length - 1] as (err: Error | null, result: { stdout: string; stderr: string }) => void;
   cb(null, { stdout: '', stderr: '' });
 });
 vi.mock('child_process', () => ({ execFile: (...args: unknown[]) => execFileMock(...args) }));
 
 import { getExposureConfig } from '../utils/exposureSettings';
 import { publishAlert } from '../utils/alertNotify';
-import { resolveComposeFile } from '../config/services';
+import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import fs from 'fs/promises';
+import { parseKumaMonitorStatus } from './criticalServiceHealth';
 
 const mockedGetExposureConfig = vi.mocked(getExposureConfig);
 const mockedPublishAlert = vi.mocked(publishAlert);
 const mockedResolveComposeFile = vi.mocked(resolveComposeFile);
+const mockedKumaPort = vi.mocked(getPublishedUpstreamPort);
 const mockedReadFile = vi.mocked(fs.readFile);
 
-function allHealthy() {
-  vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 401 } as Response));
+const FUNNEL_URL = 'https://businesslab-signal.tail122b53.ts.net/';
+const KUMA_METRICS = 'http://10.201.0.1:10370/metrics';
+
+function kumaLine(url: string, status: number) {
+  return `monitor_status{monitor_name="x",monitor_type="http",monitor_url="${url}",monitor_hostname="null",monitor_port="null"} ${status}`;
 }
 
-function allUnreachable() {
-  vi.stubGlobal('fetch', vi.fn().mockRejectedValue(new Error('ECONNREFUSED')));
+/**
+ * Probes all fail or all succeed; Uptime Kuma's /metrics answers with the
+ * given status for every probed URL, or is unreachable when kuma is null.
+ */
+function stubFetch({ probesUp, kuma }: { probesUp: boolean; kuma: number | null }) {
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async (url: string) => {
+      if (url === KUMA_METRICS) {
+        if (kuma === null) throw new Error('ECONNREFUSED');
+        const urls = [FUNNEL_URL, 'https://netbird-vpn-api.example.com/api/networks', 'https://netbird-vpn-relay.example.com/'];
+        const text = urls.map((u) => kumaLine(u, kuma)).join('\n');
+        return { ok: true, status: 200, text: async () => text } as unknown as Response;
+      }
+      if (!probesUp) throw new TypeError('fetch failed');
+      return { ok: false, status: 405, body: null } as unknown as Response;
+    })
+  );
+}
+
+function restartedProjects() {
+  return execFileMock.mock.calls.map((call) => (call[1] as string[])[2]);
+}
+
+async function passes(check: () => Promise<void>, n: number) {
+  for (let i = 0; i < n; i += 1) await check();
 }
 
 beforeEach(() => {
@@ -51,74 +81,121 @@ beforeEach(() => {
     composeFile: `/apps/${name}/docker-compose.yml`,
     composeArgs: `-f /apps/${name}/docker-compose.yml`,
   }));
-  execFileMock.mockClear();
+  mockedKumaPort.mockReturnValue(10370);
   mockedPublishAlert.mockResolvedValue(true);
+});
+
+describe('parseKumaMonitorStatus', () => {
+  const metrics = [
+    '# HELP monitor_status Monitor Status (1 = UP, 0= DOWN, 2= PENDING, 3= MAINTENANCE)',
+    kumaLine('https://authelia.example.com/api/health', 1),
+    kumaLine(FUNNEL_URL, 0),
+  ].join('\n');
+
+  it('reads the status of the monitor probing the given URL', () => {
+    expect(parseKumaMonitorStatus(metrics, FUNNEL_URL)).toBe(0);
+    expect(parseKumaMonitorStatus(metrics, 'https://authelia.example.com/api/health')).toBe(1);
+  });
+
+  it('is null when no monitor probes that URL', () => {
+    expect(parseKumaMonitorStatus(metrics, 'https://nope.example.com/')).toBeNull();
+    expect(parseKumaMonitorStatus('', FUNNEL_URL)).toBeNull();
+  });
 });
 
 describe('checkCriticalServices', () => {
   it('does nothing when every probe is reachable', async () => {
-    allHealthy();
+    stubFetch({ probesUp: true, kuma: 1 });
     const { checkCriticalServices } = await import('./criticalServiceHealth');
-    await checkCriticalServices();
+    await passes(checkCriticalServices, 5);
     expect(execFileMock).not.toHaveBeenCalled();
     expect(mockedPublishAlert).not.toHaveBeenCalled();
   });
 
-  it('restarts the owning compose project after 3 consecutive failures, not before', async () => {
-    allUnreachable();
+  // §444: the probe failed from the backend for an hour while Uptime Kuma saw
+  // a 405 every minute, and each restart dropped every real NetBird client.
+  it('never restarts while Uptime Kuma sees the same URL up', async () => {
+    stubFetch({ probesUp: false, kuma: 1 });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 20);
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
+
+  it('does not treat Uptime Kuma "pending" as confirmation', async () => {
+    stubFetch({ probesUp: false, kuma: 2 });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 5);
+    expect(execFileMock).not.toHaveBeenCalled();
+  });
+
+  it('restarts after 3 failures when Uptime Kuma confirms down — once per project, not once per probe', async () => {
+    stubFetch({ probesUp: false, kuma: 0 });
     const { checkCriticalServices } = await import('./criticalServiceHealth');
 
-    await checkCriticalServices();
-    await checkCriticalServices();
+    await passes(checkCriticalServices, 2);
     expect(execFileMock).not.toHaveBeenCalled();
 
     await checkCriticalServices();
-    // Tailscale + the two NetBird probes (management, relay) all fail together
-    // here, but NetBird's project is one compose file — restarted at most once
-    // per pass per project, not once per failing probe within it.
-    const restartedProjects = execFileMock.mock.calls.map((call) => (call[1] as string[])[2]);
-    expect(new Set(restartedProjects)).toEqual(new Set(['tailscale', 'netbird-vpn']));
-    expect(mockedPublishAlert).toHaveBeenCalled();
+    expect(restartedProjects().sort()).toEqual(['netbird-vpn', 'tailscale']);
+    expect(mockedPublishAlert).toHaveBeenCalledTimes(2);
   });
 
-  it('does not restart again inside the cooldown window even if still down', async () => {
-    allUnreachable();
+  // The recovery path must not go dark just because Uptime Kuma is down too.
+  it('falls back to its own probe when Uptime Kuma is unreachable', async () => {
+    stubFetch({ probesUp: false, kuma: null });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 3);
+    expect(restartedProjects().sort()).toEqual(['netbird-vpn', 'tailscale']);
+  });
+
+  it('restarts at most once per outage, then alerts that it gave up', async () => {
+    stubFetch({ probesUp: false, kuma: null });
     const { checkCriticalServices } = await import('./criticalServiceHealth');
 
-    await checkCriticalServices();
-    await checkCriticalServices();
-    await checkCriticalServices(); // triggers the first restart
+    await passes(checkCriticalServices, 3); // first restart
     execFileMock.mockClear();
     mockedPublishAlert.mockClear();
 
-    await checkCriticalServices();
-    await checkCriticalServices();
+    await passes(checkCriticalServices, 30);
     expect(execFileMock).not.toHaveBeenCalled();
-    expect(mockedPublishAlert).not.toHaveBeenCalled();
+    // One "didn't help" alert per project, not one per pass.
+    expect(mockedPublishAlert).toHaveBeenCalledTimes(2);
+    expect(mockedPublishAlert.mock.calls.every(([a]) => a.title.includes("didn't help"))).toBe(true);
+  });
+
+  it('re-arms once everything has recovered', async () => {
+    stubFetch({ probesUp: false, kuma: null });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 6); // restart, then gave up
+
+    stubFetch({ probesUp: true, kuma: 1 });
+    await checkCriticalServices();
+
+    execFileMock.mockClear();
+    stubFetch({ probesUp: false, kuma: null });
+    await passes(checkCriticalServices, 3);
+    expect(restartedProjects().sort()).toEqual(['netbird-vpn', 'tailscale']);
   });
 
   it('resets the failure count once a probe recovers', async () => {
-    allUnreachable();
+    stubFetch({ probesUp: false, kuma: null });
     const { checkCriticalServices } = await import('./criticalServiceHealth');
-    await checkCriticalServices();
+    await passes(checkCriticalServices, 2);
+
+    stubFetch({ probesUp: true, kuma: 1 });
     await checkCriticalServices();
 
-    allHealthy();
-    await checkCriticalServices(); // recovers before hitting the 3-failure threshold
-
-    allUnreachable();
-    await checkCriticalServices();
-    await checkCriticalServices();
-    expect(execFileMock).not.toHaveBeenCalled(); // only 2 consecutive since the recovery
+    stubFetch({ probesUp: false, kuma: null });
+    await passes(checkCriticalServices, 2);
+    expect(execFileMock).not.toHaveBeenCalled();
   });
 
-  it('quietly no-ops the restart when the service has no compose file (not installed)', async () => {
-    allUnreachable();
+  it('quietly skips the restart when the service has no compose file (not installed)', async () => {
+    stubFetch({ probesUp: false, kuma: null });
     mockedResolveComposeFile.mockReturnValue(null);
     const { checkCriticalServices } = await import('./criticalServiceHealth');
-    await checkCriticalServices();
-    await checkCriticalServices();
-    await checkCriticalServices();
+    await passes(checkCriticalServices, 6);
     expect(execFileMock).not.toHaveBeenCalled();
+    expect(mockedPublishAlert).not.toHaveBeenCalled();
   });
 });

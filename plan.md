@@ -28325,3 +28325,68 @@ notification via `monitor_notification`, and every one's latest heartbeat is
 200, Tailscale Funnel 405, NetBird management 401, NetBird relay 404 — the
 `100-599` accepted-range design working as intended, not one false-down.
 `beta` → `main` merged.
+
+## 444. The §443 auto-restart reconciler was itself the "Funnel drops every ~16 min"
+
+User report: Tailscale Funnel dropping connection roughly every 16 minutes.
+
+**Cause — our own code**: `criticalServiceHealth.ts` restarted `tailscale` at
+11:14:49, 11:30:49, 11:46:49 and 12:02:49 — 3 failed passes × 2 min, then the
+15-min cooldown, i.e. exactly 16 min apart. Its probe of the Funnel hostname
+had failed 32 passes in a row (11:10–12:12, plus one at 12:22), each failure
+fast (~1.3 s after the pass started, not the 10 s timeout). Over the same
+window Uptime Kuma's monitor for the *same URL* recorded a 405 every minute
+without a single miss, including straight across every restart. The Funnel
+was healthy; every "fix" dropped every real NetBird client.
+
+**Ruled out**:
+- *The probe code itself*: the identical fetch (never reading the body,
+  `AbortSignal.timeout(10000)`) run in a long-lived loop inside the backend
+  container afterwards went 24/24, and the real reconciler also recovered on
+  its own from 12:24. So it was a failure *window* on the backend container's
+  path, not a permanently broken probe — and it is over, so it could not be
+  replayed.
+- *Tailscale packet-filter drops*: `tailscaled` logs
+  `Drop: TCP{[fd7a:115c:a1e0::…] > […]:36130} no rules matched` (36130 is
+  peerapi, where Funnel ingress nodes hand connections over). Counted per 10
+  minutes it is a flat ~15 since 09:30 — one per Funnel request (Uptime Kuma
+  10 + reconciler 5), unchanged during the failure window, and every request
+  still succeeded. An ingress's first handoff attempt is dropped and it falls
+  back. Background noise, not the cause.
+
+What differs between the two vantage points is container, resolver (backend
+is Alpine/musl, Uptime Kuma is Debian/glibc — musl does no RFC 6724 address
+sorting, and the Funnel name rotates across several ingress IPs) and HTTP
+client (undici vs axios). Which of those mattered is unknown: the reconciler
+swallowed the error.
+
+**Fix — make any future false positive cheap, whatever its cause**
+(`criticalServiceHealth.ts`):
+- *Corroborate before acting*: a restart only goes ahead if Uptime Kuma's
+  monitor for the same URL agrees it is down (status 0). Read from Uptime
+  Kuma's Prometheus `/metrics` — no Socket.IO: with `disableAuth` on, 1.23.17's
+  `apiAuth` middleware skips basic auth entirely (read `server/auth.js` at that
+  tag; confirmed live, 200 with `monitor_status{…,monitor_url="…"} 1`).
+  Matched on URL, not monitor name. Pending (2) / maintenance (3) do not
+  confirm. If Uptime Kuma isn't installed, unreachable, or has no monitor for
+  the URL, the probe decides alone — keeps §443's "recovery path must not go
+  dark when Uptime Kuma is down too".
+- *One restart per outage*: after a restart, if the probe reaches the
+  threshold again, alert once ("auto-restart didn't help") and stop
+  restarting that project until every one of its probes is healthy again.
+  Replaces the 15-min cooldown, which is precisely what turned one false
+  positive into a restart every 16 minutes forever.
+- *Restart state per project*, not per probe — NetBird's management and relay
+  probes could previously each restart `netbird-vpn` in the same pass.
+- *Log the error* (`name: message (cause code)`) on every failed probe, and
+  cancel the response body so the socket is released.
+
+Rejected: dropping auto-restart for Tailscale altogether — §442's wedged
+Funnel really did need a restart, and the user asked for self-healing; with
+both guards the worst a wrong probe can now cost is one restart. Rejected:
+corroborating via Uptime Kuma's Socket.IO heartbeat events — a persistent
+authenticated socket for a yes/no that `/metrics` answers with one GET.
+
+Verified: `./scripts/check.sh backend typecheck` and `test` clean (920
+tests; the reconciler's suite rewritten around the veto, the confirmation,
+the one-restart breaker and re-arming).
