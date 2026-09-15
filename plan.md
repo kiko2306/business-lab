@@ -28402,3 +28402,23 @@ nothing (all probes healthy) and `tailscale` has not been restarted since
 container's hour-long failure window is still unknown; the next occurrence
 will log the error and, while Uptime Kuma disagrees, restart nothing.
 `beta` → `main` merged.
+
+## 445. Diagnosed "no internet on phone when connected to NetBird" — upstream Android bug, not our config
+
+User report, not a code change. Ruled out exit-node/full-tunnel routing first: the
+phone's NetBird app (Recursos tab) shows only the two scoped LAN resources
+(`192.168.1.0/24`, `10.177.1.0/24` alias range) toggled on, both provisioned
+by `netbirdRoutingPeer.ts` (§404/§405) — no `0.0.0.0/0` resource, so NetBird
+shouldn't touch internet-bound traffic at all. Ruled out DNS next: a raw-IP
+request (`1.1.1.1`) while connected still hit `ERR_TIMEOUT`, not just domain
+lookups, so it's not a resolver problem like §368/§411 were on the server side.
+
+That combination — scoped LAN routes only, still loses all other connectivity
+once connected — matches [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96)
+exactly (same resource shape, same symptom), open and unfixed upstream as of
+this session. Confirmed this is the Android client app itself, not something
+misconfigured in `apps/netbird-vpn/` or `netbirdRoutingPeer.ts`.
+
+README item added to recheck that issue periodically and delete the item once
+it's closed upstream (or an app update happens to fix it for us). No code
+changed; nothing to verify against the live stack.

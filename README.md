@@ -215,4 +215,12 @@ it is done — not ticked off and left behind. Section references point at
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
+- [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
+      — matches upstream
+      [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),
+      open/unfixed. Our server-side routes are correctly scoped (two `/24` LAN
+      resources, no exit node), so this is the mobile app itself, not this
+      repo's config. Check that issue periodically; delete this item once it's
+      closed upstream (or once an app update fixes it for us, whichever comes
+      first).
 
