@@ -28178,3 +28178,9 @@ flips to `0` in the sqlite store).
 one manual re-login on their own device (Windows NetBird client, NetBird
 mobile app) — disabling the setting stops the *next* forced logout, it
 doesn't un-expire a session that already lapsed.
+
+**Verified live** on `home-srv-01`: user restarted the NetBird VPN app from
+the dashboard; `docker logs business-lab-backend-1` shows "NetBird: disabled
+account-wide peer login expiration..."; the sqlite store confirms
+`accounts.settings_peer_login_expiration_enabled = 0` for the real account;
+all six `netbird-vpn` containers came back healthy. `beta` → `main` merged.
