@@ -28056,5 +28056,21 @@ written against this exact version's API quirks, §438); `uptime-kuma:1`→2.x
 is a major-version jump; kimai's `mariadb:11.4` is the LTS line, `11.8` is
 not. Each is its own future task if wanted, not a routine bump.
 
-Deployed: `git pull` on `beta` + `docker compose pull && up -d` for
-`apps/scrutiny` on home-srv-01; container came up healthy on the new tag.
+Deploying it surfaced a real trap: `apps/scrutiny/docker-compose.override.yml`
+(the self-update system's digest-pin, §209) still pinned `image:` to the old
+`v0.9.3-omnibus@sha256:…`. That file is a second `-f` on every compose
+invocation and wins over the base file, so `git pull` + `docker compose pull
+&& up -d` silently recreated the *old* image — the compose-file edit alone
+does nothing for an app the self-update has ever pinned. The dashboard's own
+fix for this is the per-app "Unpin" action (`clearImagePins`); there being no
+browser session to click it through, did the equivalent by hand — removed the
+override file — which is exactly the file's own documented fallback ("delete
+it... to float back to the tags in docker-compose.yml"), then re-pulled.
+Confirmed on `home-srv-01`: `docker inspect` shows
+`ghcr.io/analogj/scrutiny:v0.9.4-omnibus`, container `healthy`,
+`/api/summary` returns 200.
+
+**Worth remembering for the next manual version bump**: any app that has ever
+been through a self-update carries this override, and it will silently mask a
+compose-file tag edit. Check for `apps/<name>/docker-compose.override.yml`
+before assuming a `docker compose pull` picked up a new pin.
