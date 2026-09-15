@@ -28390,3 +28390,15 @@ authenticated socket for a yes/no that `/metrics` answers with one GET.
 Verified: `./scripts/check.sh backend typecheck` and `test` clean (920
 tests; the reconciler's suite rewritten around the veto, the confirmation,
 the one-restart breaker and re-arming).
+
+**Verified live** on `home-srv-01` (0.102.1): from inside the rebuilt backend
+container, the deployed `dist/` code (`getHostGatewayIp` +
+`getPublishedUpstreamPort('uptime-kuma')` → `http://10.201.0.1:10370/metrics`,
+then `parseKumaMonitorStatus`) reads status 1 for the Funnel, NetBird
+management and NetBird relay URLs — so the veto has a real verdict to use,
+not a silent "unknown". The first reconciler pass after deploy logged
+nothing (all probes healthy) and `tailscale` has not been restarted since
+12:02:49, the last restart the old code made. The cause of the backend
+container's hour-long failure window is still unknown; the next occurrence
+will log the error and, while Uptime Kuma disagrees, restart nothing.
+`beta` → `main` merged.
