@@ -6,7 +6,7 @@ services:
     # to a tagged release, not `latest-omnibus`/`nightly-omnibus` — upstream's
     # own docs warn those update the image with no notice, which is exactly
     # what a client box must not do. Bump this deliberately.
-    image: ghcr.io/analogj/scrutiny:v0.9.3-omnibus
+    image: ghcr.io/analogj/scrutiny:v0.9.4-omnibus
     restart: unless-stopped
     # SMART data needs raw access to every physical disk. The upstream example
     # enumerates `devices: [/dev/sda, /dev/sdb, ...]` — a host-specific list

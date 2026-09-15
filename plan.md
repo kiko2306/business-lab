@@ -28036,3 +28036,25 @@ against a local throwaway stack is verification of the *code*, not of what
 of docs/frontend/backend-only commits in a row, since the deploy step is
 easy to fold into "only backend changed" reasoning that was true for the
 commit before it but not the one after.
+
+## 440. Scrutiny bumped to v0.9.4-omnibus
+
+Audited every pinned (non-`latest`/`stable`/`release`) image tag across
+`apps/*/docker-compose.yml` for a safe upstream bump. Most images float
+already and update on every pull; the pinned ones: `guacamole` (`1.6.0`) and
+`it-tools` (`2024.10.22-7ca5933`) are already at the newest upstream release.
+`scrutiny` (`v0.9.3-omnibus`) had a newer `v0.9.4-omnibus` (2026-09-13,
+confirmed present on ghcr.io) whose release notes are dependency bumps
+(js-yaml, fast-uri) and docs fixes only — no schema or breaking changes, so
+bumped it.
+
+Left alone, each for its own reason: `navidrome` 0.63.2→0.64.0 carries an
+upstream-documented internal-ID re-encoding migration ("back up your database
+before upgrading"); `twenty` v2.39.5→v2.40.0 is deliberately pinned
+(one-way DB migrations, and `twentyClient.ts`/`twentyAdminBootstrap.ts` are
+written against this exact version's API quirks, §438); `uptime-kuma:1`→2.x
+is a major-version jump; kimai's `mariadb:11.4` is the LTS line, `11.8` is
+not. Each is its own future task if wanted, not a routine bump.
+
+Deployed: `git pull` on `beta` + `docker compose pull && up -d` for
+`apps/scrutiny` on home-srv-01; container came up healthy on the new tag.
