@@ -44,10 +44,6 @@ const BETWEEN_SERVICES_MS = 2_000;
 /** Heartbeat: when a reconcile pass last completed. */
 export const EXPOSURE_RECONCILE_LAST_RUN_KEY = 'exposure_reconcile_last_run_at';
 
-// "Nobody asked for this" — the same sentinel `reconcileRemovedServices` uses
-// for the audit rows `provisionServiceIfEnabled` writes per hostname.
-const SYSTEM_USER_ID = 0;
-
 export interface ExposureReconcileSummary {
   checked: number;
   reconciled: number;
@@ -83,8 +79,8 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
 
   for (const name of services) {
     try {
-      await ensureAutoExposure(name, SYSTEM_USER_ID);
-      const result = await provisionServiceIfEnabled(name, SYSTEM_USER_ID);
+      await ensureAutoExposure(name, null);
+      const result = await provisionServiceIfEnabled(name, null);
       // Not exposable (samba, tailscale, nginx-proxy-manager, …) — nothing to
       // check, don't count it or the summary reads "40 checked, 6 failed".
       if (!result.attempted) {
@@ -109,8 +105,8 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
   // drift (a hand-edited configuration.yml, or an app auto-exposed on a start
   // that didn't itself run the sync). Idempotent; restarts Authelia only if
   // the rendered block actually moved.
-  await syncAutheliaAccessControlSafe('exposure_reconcile', SYSTEM_USER_ID);
-  await syncAutheliaOidcClientsSafe('exposure_reconcile', SYSTEM_USER_ID);
+  await syncAutheliaAccessControlSafe('exposure_reconcile', null);
+  await syncAutheliaOidcClientsSafe('exposure_reconcile', null);
 
   // Re-provisioning can flip a hostname from failed to provisioned, which is
   // the point its Home Page tile becomes linkable.

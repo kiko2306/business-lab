@@ -593,7 +593,7 @@ export async function startService(serviceName: string, userId: number): Promise
  *    point at that day. The pins are cleared first, so the pull always fetches
  *    the tags in the base compose file rather than re-fetching a pinned digest.
  */
-export async function pullAndRecreateService(serviceName: string, userId: number): Promise<ServiceActionResult> {
+export async function pullAndRecreateService(serviceName: string, userId: number | null): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
     throw { statusCode: 400, message: `Invalid service name: ${serviceName}` } as HttpError;
   }
@@ -697,11 +697,6 @@ export async function pullAndRecreateService(serviceName: string, userId: number
   }
 }
 
-// A self-update has no signed-in request behind it once it reaches this
-// step (it can be triggered by a human, but runs detached) — same "system
-// actor" convention exposureReconciler.ts uses for its own unattended runs.
-const SYSTEM_USER_ID = 0;
-
 // A short pause between apps: back-to-back `docker compose pull`s across the
 // whole ~36-app roster is bursty registry traffic for no benefit, since this
 // now only ever runs once per self-update rather than on a recurring sweep.
@@ -748,7 +743,7 @@ export async function updateAllInstalledApps(
       continue;
     }
     try {
-      const result = await pullAndRecreateService(service.name, userId ?? SYSTEM_USER_ID);
+      const result = await pullAndRecreateService(service.name, userId);
       results.push({ serviceName: service.name, ok: true, message: result.message });
     } catch (error) {
       const message = (error as HttpError).message || (error as Error).message;
@@ -1067,7 +1062,7 @@ export async function restartService(serviceName: string, userId: number): Promi
  * Log an audit event to the database
  */
 export async function logAuditEvent(
-  userId: number,
+  userId: number | null,
   action: string,
   resource: string,
   result: string,

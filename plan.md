@@ -28074,3 +28074,54 @@ Confirmed on `home-srv-01`: `docker inspect` shows
 been through a self-update carries this override, and it will silently mask a
 compose-file tag edit. Check for `apps/<name>/docker-compose.override.yml`
 before assuming a `docker compose pull` picked up a new pin.
+
+## 441. `audit_logs` FK violations traced to a fake `user_id=0` "system" sentinel
+
+User pointed at `business-lab-database-1`'s own Postgres log
+(`docker logs`), which showed the same error recurring in bursts:
+
+```
+ERROR:  insert or update on table "audit_logs" violates foreign key constraint "audit_logs_user_id_fkey"
+STATEMENT:  INSERT INTO audit_logs (user_id, action, resource, result, metadata)
+```
+
+Bursts of 12-30+ in under a minute, roughly every 6 hours — matching the
+exposure reconciler's cadence exactly.
+
+**Root cause**: three independent call sites invented a `SYSTEM_USER_ID = 0`
+(or literal `0`) to stand in for "no real user" on unattended/background
+actions — `exposureReconciler.ts`'s 6-hourly sweep, `exposure.ts`'s
+orphaned-service cleanup, and `executor.ts`'s unattended self-update path.
+`audit_logs.user_id` is `INTEGER REFERENCES users(id) ON DELETE SET NULL`
+(`database/init.sql`) — nullable, specifically so a deleted/absent user
+doesn't break the row. `writeAuditLog()` already defaults `userId` to
+`null` and the schema already supports it; the bug was three call sites
+faking a numeric id (`0`, which no user ever has — Postgres `SERIAL` starts
+at 1) instead of passing the `null` the column was built for, because the
+functions in between (`ensureAutoExposure`, `deprovisionServiceExposure`,
+`provisionServiceIfEnabled`, `pullAndRecreateService`, `logAuditEvent`) were
+typed `userId: number`, not `number | null` — the type signature forced the
+workaround. `syncAutheliaAccessControlSafe`/`syncAutheliaOidcClientsSafe`
+already took `number | null` correctly; only the exposure/executor family
+didn't.
+
+Confirmed `userId` in every one of these functions is pass-through-only (into
+`writeAuditLog`), never a DB lookup or arithmetic — safe to widen. Fix:
+widened all five signatures to `number | null`, replaced the three sentinel
+call sites with `null`, deleted both now-dead `SYSTEM_USER_ID` constants
+(`exposureReconciler.ts`, `executor.ts`). One test
+(`exposureReconciler.test.ts`) asserted the old `0` sentinel; updated it to
+expect `null`.
+
+**Effect**: the failure was silent in the application logs — every
+`writeAuditLog()` call site already wraps in `.catch(() => {})`, so nothing
+crashed or surfaced in the backend's own logs, only in Postgres's. The real
+cost was a quietly broken audit trail: every exposure-reconcile pass,
+orphaned-app teardown and unattended self-update never actually recorded its
+`exposure_provision`/`exposure_deprovision`/`SERVICE_UPDATE` audit rows,
+going back to whenever each of those three call sites was written.
+
+Verified: `./scripts/check.sh backend typecheck` and `test` both clean (901
+tests, including the corrected reconciler test). Not yet deployed to
+home-srv-01 — next reconcile pass (~6h cadence) or a restart of `backend`
+will prove it against the real Postgres FK.

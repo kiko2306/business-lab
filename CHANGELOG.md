@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.101.1] — 2026-09-15
+
+### Fixed
+
+- Stop the exposure reconciler, orphan-service cleanup and unattended self-update from silently dropping their audit-log entries: each used `user_id=0` as a "system" sentinel, which doesn't reference a real row and always failed the `audit_logs` foreign-key check. They now pass `null`, which the column already allows.
+
 ## [0.101.0] — 2026-09-14
 
 ### Added

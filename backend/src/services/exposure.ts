@@ -96,7 +96,7 @@ export async function getServiceExposureRow(serviceName: string): Promise<Servic
  * `true` when it created, enabled or tore down a row — the caller then
  * regenerates the Authelia access-control rules + OIDC clients.
  */
-export async function ensureAutoExposure(serviceName: string, userId: number): Promise<boolean> {
+export async function ensureAutoExposure(serviceName: string, userId: number | null): Promise<boolean> {
   if (serviceName.includes(':')) {
     return false;
   }
@@ -266,7 +266,7 @@ interface ProvisionHostnameOptions {
   grpc: boolean;
   globalConfig: ExposureGlobalConfig;
   originUrl: string;
-  userId: number;
+  userId: number | null;
   auditResource: string;
 }
 
@@ -275,7 +275,7 @@ interface DeprovisionHostnameOptions {
   hostname: string;
   npmHostId: number | null;
   globalConfig: ExposureGlobalConfig;
-  userId: number;
+  userId: number | null;
   auditResource: string;
   /** Drop the service_exposure row entirely, rather than marking it torn down. */
   deleteRow: boolean;
@@ -361,7 +361,7 @@ async function deprovisionHostname({
  * served traffic. That is the bug this function exists to fix, and it is why
  * it runs even when the row is already marked not_provisioned.
  */
-export async function deprovisionServiceExposure(serviceName: string, userId: number): Promise<void> {
+export async function deprovisionServiceExposure(serviceName: string, userId: number | null): Promise<void> {
   const globalConfig = await getExposureConfig();
   if (!globalConfig) {
     logger.warn(`Cannot deprovision ${serviceName}: exposure settings are incomplete`);
@@ -544,8 +544,8 @@ export async function reconcileRemovedServices(): Promise<void> {
 
   for (const name of orphans) {
     logger.info('Removing exposure for a service that is no longer in the registry', { service: name });
-    // userId 0: nobody asked for this, the registry changed underneath it.
-    await deprovisionServiceExposure(name, 0).catch((error: Error) => {
+    // No real user: nobody asked for this, the registry changed underneath it.
+    await deprovisionServiceExposure(name, null).catch((error: Error) => {
       logger.error('Could not deprovision a removed service', { service: name, error: error.message });
     });
     // deprovisionServiceExposure keeps the primary row so a re-enable can
@@ -596,7 +596,7 @@ async function ensureNpmAdminBootstrapped(): Promise<void> {
   logger.info('Rotated Nginx Proxy Manager off its default admin credentials');
 }
 
-export async function provisionServiceIfEnabled(serviceName: string, userId: number): Promise<ExposureProvisionResult> {
+export async function provisionServiceIfEnabled(serviceName: string, userId: number | null): Promise<ExposureProvisionResult> {
   const exposureRow = await getServiceExposureRow(serviceName);
   if (!exposureRow || !exposureRow.enabled) {
     return { attempted: false };

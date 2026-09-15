@@ -83,8 +83,9 @@ describe('reconcileExposureDrift', () => {
       'vaultwarden',
       'samba',
     ]);
-    // userId 0 — the "system" sentinel.
-    expect(exposure.provisionServiceIfEnabled).toHaveBeenCalledWith('nextcloud', 0);
+    // userId null — no real user behind an unattended reconcile pass (the
+    // audit_logs FK rejects a fake numeric id, §441).
+    expect(exposure.provisionServiceIfEnabled).toHaveBeenCalledWith('nextcloud', null);
     // samba is not exposable (attempted:false) — not counted.
     expect(summary).toEqual({ checked: 2, reconciled: 2, failed: [] });
     expect(audit.writeAuditLog).not.toHaveBeenCalled();
