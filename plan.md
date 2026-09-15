@@ -28422,3 +28422,14 @@ misconfigured in `apps/netbird-vpn/` or `netbirdRoutingPeer.ts`.
 README item added to recheck that issue periodically and delete the item once
 it's closed upstream (or an app update happens to fix it for us). No code
 changed; nothing to verify against the live stack.
+
+## 446. Named the upgrade trigger on Scrutiny's `privileged: true` ponytail marker
+
+`/ponytail-debt` flagged `apps/scrutiny/docker-compose.yml`'s `ponytail:`
+comment (§decision predates the numbered plan) as `no-trigger` — it named
+the ceiling (a per-host `devices:` list someone has to keep current) but not
+what would justify revisiting it. Added one: if the backend ever grows a way
+to enumerate `/dev/sd*` and inject a `devices:` list itself, the same way
+other per-host values in this file come from `.env`, that satisfies
+principle 2 without `privileged`. Comment-only; no behaviour change, nothing
+to verify against the live stack.

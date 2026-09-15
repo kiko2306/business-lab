@@ -15,7 +15,10 @@ services:
     # edit. The backend that manages this stack is already root-equivalent on
     # the host (README), so this doesn't widen the real trust boundary.
     # ponytail: privileged over a per-host `devices:` list someone has to keep
-    # current every time a disk is added or swapped.
+    # current every time a disk is added or swapped. Upgrade if the backend
+    # ever grows a way to enumerate `/dev/sd*` and inject a `devices:` list
+    # itself (an `.env`-driven override, like the rest of this file's
+    # per-host values) — that would satisfy principle 2 without `privileged`.
     privileged: true
     ports:
       - "${SCRUTINY_PORT:-10480}:8080"
