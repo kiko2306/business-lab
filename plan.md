@@ -28314,3 +28314,14 @@ pending deploy to `home-srv-01` and a restart of the `uptime-kuma` app from
 the dashboard (the trigger point for `ensureCriticalServiceMonitors`), then
 confirming the five monitors and the ntfy notification actually appear in
 its UI and an induced failure actually pages.
+
+**Verified live** on `home-srv-01`: user restarted the Uptime Kuma app;
+backend logs confirm `Uptime Kuma: critical-service monitors reconciled`.
+Read `apps/uptime-kuma/data/kuma.db` directly (read-only, via the same
+`keinos/sqlite3` throwaway-container approach §442 used) and confirmed all
+five monitors exist with the intended URLs, all linked to the new ntfy
+notification via `monitor_notification`, and every one's latest heartbeat is
+`status=1` (up) with exactly the status code expected: NPM 200, Authelia
+200, Tailscale Funnel 405, NetBird management 401, NetBird relay 404 — the
+`100-599` accepted-range design working as intended, not one false-down.
+`beta` → `main` merged.

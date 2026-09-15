@@ -216,10 +216,3 @@ it is done — not ticked off and left behind. Section references point at
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
 
-- [ ] **Verify the Uptime Kuma critical-service monitors against the real
-      instance** (§443) — `uptimeKumaCriticalMonitors.ts` auto-provisions 5
-      monitors (NPM/Authelia/Tailscale Funnel/NetBird management+relay) + an
-      ntfy notification on the next `uptime-kuma` restart; not yet confirmed
-      live (monitors actually appear, an induced failure actually pages).
-      `criticalServiceHealth.ts`'s Tailscale/NetBird auto-restart reconciler
-      ships alongside it, same deploy.
