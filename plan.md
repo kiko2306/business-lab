@@ -28214,3 +28214,103 @@ Funnel path wedges again and this section is the first place to look.
 Phone (`garnet_eea`) had not attempted to reconnect since 2026-09-13 as of
 this check — needs the user to force-close and reopen the NetBird app (or
 toggle its connection) to make it retry now that Signal is reachable again.
+
+## 443. Fast external-reachability monitoring for NPM/Authelia/Tailscale/NetBird
+
+Follow-up to §442: the user asked what would prevent that class of outage
+recurring for the four services everything else depends on — NPM, Authelia,
+Tailscale, NetBird. Both failures that day shared a shape worth naming
+explicitly: neither container crashed, so `restart: unless-stopped` never
+fired, and every *local* health signal reported fine (`docker ps` showed
+"Up", `tailscale status` showed Online/Running) while the actual
+externally-visible path was broken. A Docker-level healthcheck run from
+inside the same container would not have caught either one — it would have
+asked the same question that was already answering "fine."
+
+**Checked current state first**: NPM and Authelia already have
+`restart: unless-stopped` + a real healthcheck. Tailscale and NetBird's six
+containers have `restart: unless-stopped` but no healthcheck at all.
+
+**Considered and not done**: Docker `healthcheck:` blocks on
+Tailscale/NetBird's containers — would only catch an actual crash-loop, which
+`restart: unless-stopped` already recovers from, and neither of §442's
+incidents was a crash. Not worth the added compose surface (and uncertain
+tool availability in netbird's mostly from-scratch images) for a failure
+class already covered.
+
+**Detection + alerting, and act, ended up as two separate pieces** — an
+initial pass tried to skip Uptime Kuma entirely (it has no REST API for
+monitor CRUD, only an undocumented Socket.IO protocol) in favour of one
+hand-rolled polling loop doing both jobs; the user asked for the Uptime Kuma
+route specifically, which is the better call — Uptime Kuma already has ntfy
+wired in as a first-class notification provider, checks on a far faster
+cadence than a hand-rolled loop would default to, and gives a free visual
+uptime history:
+
+**Built — `backend/src/services/uptimeKumaCriticalMonitors.ts`**: auto-
+provisions, via the same hand-rolled Socket.IO v4 transport
+`uptimeKumaAdminBootstrap.ts`/`uptimeKumaMailNotification.ts` already use
+(confirmed against the pinned `louislam/uptime-kuma:1` image's exact
+deployed version, `1.23.17`, by reading its actual `server/server.js` off
+GitHub at that tag — not the `master` branch, which is an unrelated 2.x
+rewrite with a different socket-handler layout entirely):
+
+- one ntfy notification ("Critical service alerts (ntfy)", pointed at the
+  same internal ntfy URL/topic `publishAlert` already posts to)
+- five HTTP monitors, each the exact public path a real client would use,
+  not a container-internal shortcut: NPM (`https://<base domain>/`, the Home
+  Page, public by design — §111), Authelia
+  (`https://authelia.<base domain>/api/health`), Tailscale's Funnel hostname
+  (read live from `Signal.URI` in `apps/netbird-vpn/data/management.json`
+  rather than assumed as `businesslab-signal`, since `TS_HOSTNAME` is
+  overridable — this one monitor also covers NetBird's signal path, which
+  rides the same Funnel hostname), NetBird management
+  (`https://netbird-vpn-api.<base domain>/api/networks`, the same
+  unauthenticated liveness endpoint `netbirdRoutingPeer.ts`'s
+  `waitForManagement` already uses), NetBird relay
+  (`https://netbird-vpn-relay.<base domain>/`)
+- every monitor accepts any HTTP status (`100-599`, split across Uptime
+  Kuma's five status-code-range buckets) — a real response (NetBird's
+  401/404, Tailscale's 405) must not trip it; only a transport failure
+  (timeout/refused/TLS hang, exactly what the wedged Funnel produced) should
+
+**The one real landmine, documented for whoever touches this next**: a
+monitor's `add` handler has **no server-side dedup at all** — confirmed
+reading the handler, it always `R.dispense`s a fresh row, no name lookup, no
+id-optional upsert path (unlike `addNotification`, which upserts cleanly by
+the id you pass it). So unlike every sibling Socket.IO file here, this one
+cannot use the "wait a fixed interval, then act" pattern — missing the
+current `monitorList` and creating anyway would leave a fresh duplicate of
+every monitor on every backend restart. `runSession()` therefore polls for
+both `notificationList` and `monitorList` to actually arrive (up to 8s)
+before creating anything, and skips the whole pass rather than guess if
+either doesn't show up in time.
+
+**Built — `backend/src/services/criticalServiceHealth.ts`**: the one thing
+Uptime Kuma can't do — act. A reconciler in the same shape as
+`exposureReconciler.ts` but on a far faster cadence (2 min vs. exposure's
+6h), re-probing Tailscale + NetBird's management/relay itself (deliberately
+independent of Uptime Kuma, so the auto-restart path doesn't go dark just
+because Uptime Kuma itself is having a bad day) and restarting the owning
+compose project — `docker compose -p <project> restart`, the same mechanism
+`autheliaAccessControl.ts`/`autheliaOidcClients.ts` already use for
+Authelia, and exactly what a dashboard "Restart" click does by hand — after
+3 consecutive failures, with a 15-minute cooldown between attempts so a
+still-broken service isn't bounced forever. **NPM and Authelia are
+intentionally absent from this file — alert-only, the user's explicit
+call**: everything exposed routes through both, and a blind auto-restart
+risks masking a real incident (a bad cert renewal, a DB problem) instead of
+surfacing it; Tailscale/NetBird are cheap and stateless to bounce, so
+auto-recovery there is a clear win with no real downside.
+
+Wired into `backend/src/services/executor.ts` (the Uptime Kuma monitor
+reconcile, alongside `reconcileUptimeKumaMailNotification`) and
+`backend/src/index.ts` (the auto-restart reconciler, alongside
+`startExposureReconciler()`).
+
+Verified: `./scripts/check.sh backend typecheck` and `test` clean (914
+tests, 11 new). Not yet proven against the real Uptime Kuma instance —
+pending deploy to `home-srv-01` and a restart of the `uptime-kuma` app from
+the dashboard (the trigger point for `ensureCriticalServiceMonitors`), then
+confirming the five monitors and the ntfy notification actually appear in
+its UI and an induced failure actually pages.

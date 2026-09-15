@@ -47,6 +47,7 @@ import { reconcileNavidromeFirstAdmin } from './navidromeAdminBootstrap';
 import { reconcileUptimeKumaFirstAdmin } from './uptimeKumaAdminBootstrap';
 import { ensureNtfySubscriberToken } from './ntfyAuthBootstrap';
 import { reconcileUptimeKumaMailNotification } from './uptimeKumaMailNotification';
+import { ensureCriticalServiceMonitors } from './uptimeKumaCriticalMonitors';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
 import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 import { reconcileItflowMailCron } from './itflowMailCron';
@@ -375,6 +376,10 @@ async function composeUpWithManagedConfig(
   // notification — it has no env var for this (§427). After the admin
   // bootstrap above, and after `up`; no-op otherwise.
   await reconcileUptimeKumaMailNotification(serviceName);
+  // Uptime Kuma: auto-provision the NPM/Authelia/Tailscale/NetBird external
+  // monitors + their ntfy notification (§443) — no click-through wizard on a
+  // fresh deployment. After `up`; no-op otherwise.
+  await ensureCriticalServiceMonitors(serviceName);
   // ITFlow: run its first-run setup wizard (schema import + admin) so exposing
   // it direct (§344/§350) has no manual step and no claim race. The wizard's
   // first POST creates the schema — the itfloworg image doesn't. After `up`;

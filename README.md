@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.101.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.102.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -215,3 +215,11 @@ it is done — not ticked off and left behind. Section references point at
       dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
       upstream); add a Redis-backed store only if pushes prove noisy in
       practice.
+
+- [ ] **Verify the Uptime Kuma critical-service monitors against the real
+      instance** (§443) — `uptimeKumaCriticalMonitors.ts` auto-provisions 5
+      monitors (NPM/Authelia/Tailscale Funnel/NetBird management+relay) + an
+      ntfy notification on the next `uptime-kuma` restart; not yet confirmed
+      live (monitors actually appear, an induced failure actually pages).
+      `criticalServiceHealth.ts`'s Tailscale/NetBird auto-restart reconciler
+      ships alongside it, same deploy.

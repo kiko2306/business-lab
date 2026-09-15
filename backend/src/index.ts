@@ -39,6 +39,7 @@ import { syncAutheliaAccessControlSafe } from './services/autheliaAccessControl'
 import { syncAutheliaOidcClientsSafe } from './services/autheliaOidcClients';
 import { reconcileRemovedAppProjects } from './services/removedAppCleanup';
 import { startExposureReconciler } from './services/exposureReconciler';
+import { startCriticalServiceHealthMonitor } from './services/criticalServiceHealth';
 import { regenerateHomepageServices } from './services/homepageConfig';
 import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
 import { ensureSocialDraftsTable } from './services/socialDrafts';
@@ -253,6 +254,11 @@ reconcileRemovedAppProjects().catch((err: Error) => {
 // live NPM/Cloudflare state so hand-edits or a rotated token that broke
 // provisioning get caught and fixed instead of sitting silently broken.
 startExposureReconciler();
+// Tailscale/NetBird: auto-restart after repeated external-reachability
+// failures — the fast-cadence counterpart to the exposure reconciler above,
+// independent of Uptime Kuma's own monitors so the recovery path doesn't go
+// dark if Uptime Kuma itself is down (§443).
+startCriticalServiceHealthMonitor();
 // The Home Page's services.yaml is otherwise only rewritten on a start/stop or
 // an exposure toggle — so a backend restart after app state changed (or a
 // fresh deploy) would leave it stale. Reconcile it once on boot. Best-effort

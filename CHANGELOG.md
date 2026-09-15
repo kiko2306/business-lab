@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.102.0] — 2026-09-15
+
+### Reliability
+
+- Auto-provision Uptime Kuma monitors + ntfy alerts and add an auto-restart reconciler for NPM/Authelia/Tailscale/NetBird external reachability
+
 ## [0.101.2] — 2026-09-15
 
 ### NetBird
