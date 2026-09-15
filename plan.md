@@ -28184,3 +28184,33 @@ the dashboard; `docker logs business-lab-backend-1` shows "NetBird: disabled
 account-wide peer login expiration..."; the sqlite store confirms
 `accounts.settings_peer_login_expiration_enabled = 0` for the real account;
 all six `netbird-vpn` containers came back healthy. `beta` → `main` merged.
+
+**Second, independent problem found in the same incident**: after the fix
+above, both clients were still stuck "Connecting…". Not a regression of
+§442's fix — `netbird-management`'s logs showed no more login-expiry errors
+at all post-restart. The actual blocker: NetBird's **Signal** server is
+reached over a Tailscale Funnel hostname
+(`businesslab-signal.tail122b53.ts.net`, `apps/netbird-vpn/data/management.json`'s
+`Signal.URI` — the `requires: tailscale` dependency in `services.ts`), and
+that hostname's TLS handshake was hanging from every external vantage point
+tried (this machine, and `home-srv-01` itself over the public path) — TCP
+connects to Tailscale's Funnel front-end, Client Hello sent, then silence.
+Internally the `tailscale-tailscale-1` container looked healthy (`tailscale
+status`: Online, BackendState Running; `tailscale netcheck`: DERP reachable,
+Madrid 20ms) and `tailscale funnel status` claimed the funnel was on — the
+funnel's actual HTTPS-forwarding path was wedged despite every local
+health signal reporting fine, after 3 days of uptime with no error logged
+anywhere. Not diagnosable further from the logs available; restarted the
+`tailscale` app's own compose project (`docker compose restart` in
+`apps/tailscale/`, not a root-level teardown). Its own logs then showed real
+client traffic within a second of coming back up ("received a proxy request
+for plaintext gRPC" ×5) and the public endpoint started answering (405 on a
+plain GET, the correct response for a gRPC-only endpoint, instead of a
+timeout). `PRT-DEV-01` (Windows) shows `peer_status_connected = 1` as of
+09:09:17, same session. No code change here — this was a wedged Tailscale
+daemon, not something `netbirdRoutingPeer.ts` touches; noting it in case the
+Funnel path wedges again and this section is the first place to look.
+
+Phone (`garnet_eea`) had not attempted to reconnect since 2026-09-13 as of
+this check — needs the user to force-close and reopen the NetBird app (or
+toggle its connection) to make it retry now that Signal is reachable again.
