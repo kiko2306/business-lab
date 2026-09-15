@@ -39,6 +39,18 @@ function fetchEverythingMissing(url: string, init?: { method?: string; body?: st
   return Promise.resolve(jsonResponse({ id: `${path}-${body.name ?? 'created'}`, name: body.name }));
 }
 
+// A GET /api/accounts with peer login expiration still enabled — every other
+// fixture below overrides this when the test cares about the PUT it triggers.
+function fetchAccountsMissing(url: string, init?: { method?: string; body?: string }) {
+  const path = new URL(url).pathname;
+  if (path === '/api/accounts' && (init?.method ?? 'GET') === 'GET') {
+    return Promise.resolve(
+      jsonResponse([{ id: 'acct-1', settings: { peer_login_expiration_enabled: true, dns_domain: 'netbird.internal' } }])
+    );
+  }
+  return fetchEverythingMissing(url, init);
+}
+
 // Routes every GET to "already exists and is valid", so the whole
 // ensure-chain is a no-op past the reads.
 function fetchEverythingPresent(url: string, init?: { method?: string }) {
@@ -62,6 +74,9 @@ function fetchEverythingPresent(url: string, init?: { method?: string }) {
   }
   if (path === '/api/policies') {
     return Promise.resolve(jsonResponse([{ id: 'pol-1', name: 'Business Lab: LAN resource access' }]));
+  }
+  if (path === '/api/accounts') {
+    return Promise.resolve(jsonResponse([{ id: 'acct-1', settings: { peer_login_expiration_enabled: false } }]));
   }
   // resources
   return Promise.resolve(jsonResponse([{ id: 'res-1', name: 'LAN' }]));
@@ -237,6 +252,36 @@ describe('ensureNetbirdRoutingPeer', () => {
   it('reports no .env change when everything is already provisioned', async () => {
     vi.mocked(fetch).mockImplementation(fetchEverythingPresent as typeof fetch);
     await expect(ensureNetbirdRoutingPeer('netbird-vpn')).resolves.toBe(false);
+  });
+
+  // §441: interactively-authenticated peers (native client login on Windows/
+  // phone) were getting logged out every 24h by NetBird's default account
+  // setting, needing a manual re-login to reconnect.
+  it('disables account-wide peer login expiration, preserving the rest of the settings', async () => {
+    const accountPuts: unknown[] = [];
+    vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string; body?: string }) => {
+      if ((init?.method ?? 'GET') === 'PUT' && new URL(url).pathname === '/api/accounts/acct-1') {
+        accountPuts.push(JSON.parse(init!.body!));
+      }
+      return fetchAccountsMissing(url, init);
+    }) as typeof fetch);
+
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+
+    expect(accountPuts).toEqual([
+      expect.objectContaining({
+        id: 'acct-1',
+        settings: { peer_login_expiration_enabled: false, dns_domain: 'netbird.internal' },
+      }),
+    ]);
+  });
+
+  it('leaves account settings alone once peer login expiration is already disabled', async () => {
+    vi.mocked(fetch).mockImplementation(fetchEverythingPresent as typeof fetch);
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+    // fetchEverythingPresent throws on any non-GET, so reaching here at all
+    // means no PUT was attempted against /api/accounts.
+    expect(fetch).toHaveBeenCalled();
   });
 
   // Found live (§405.2): NetBird's GET /api/groups?name=X answers 404, not

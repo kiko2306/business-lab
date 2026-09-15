@@ -95,6 +95,11 @@ interface NbSetupKey {
   valid: boolean;
   key: string;
 }
+interface NbAccount {
+  id: string;
+  settings: Record<string, unknown>;
+  [key: string]: unknown;
+}
 
 /**
  * "a.b.c.d/nn" as reported by `ip addr` (a host address, not a network
@@ -185,6 +190,35 @@ async function waitForManagement(baseUrl: string): Promise<boolean> {
     }
   }
   return false;
+}
+
+// NetBird's default account setting logs an interactively-authenticated peer
+// (native client login — Windows, iOS/Android, the device-code flow
+// ensureNetbirdDeviceCodeFlow keeps working on mobile, §413) out every 24h,
+// requiring a manual re-login before it reconnects. Found live (§441): both
+// phone and Windows peers going unreachable traced to
+// "peer login has expired, please log in once more" in netbird-management's
+// logs, recurring every ~24h. There's no untrusted multi-tenant population on
+// this account to protect against with a forced re-auth cadence — every peer
+// is a device the account owner already controls — so this switches the
+// account to the same non-expiring posture already used for setup keys/PATs
+// elsewhere in this file (see the no_token_expirations convention). PUT
+// requires the full settings object back, so this only ever flips the one
+// field on whatever GET returned rather than guessing at the rest of the
+// schema.
+async function ensureAccountSettings(baseUrl: string, token: string): Promise<void> {
+  const accounts = await nbRequest<NbAccount[]>(baseUrl, token, 'GET', '/api/accounts');
+  const account = accounts[0];
+  if (!account) return;
+  if (account.settings.peer_login_expiration_enabled === false) return;
+
+  await nbRequest(baseUrl, token, 'PUT', `/api/accounts/${account.id}`, {
+    ...account,
+    settings: { ...account.settings, peer_login_expiration_enabled: false },
+  });
+  logger.info(
+    'NetBird: disabled account-wide peer login expiration — phone/Windows peers no longer need a manual re-login every 24h (§441)'
+  );
 }
 
 async function ensureGroup(baseUrl: string, token: string, name: string): Promise<string> {
@@ -308,6 +342,8 @@ export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<boo
       logger.warn('NetBird routing peer: management never became reachable — skipping auto-provisioning');
       return false;
     }
+
+    await ensureAccountSettings(baseUrl, token);
 
     const cidr = normalizeCidr(await getLanCidr());
     if (!cidr) {

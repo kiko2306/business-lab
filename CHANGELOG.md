@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.101.2] — 2026-09-15
+
+### NetBird
+
+- Disable account-wide peer login expiration so interactively-authenticated peers (Windows, phone) stop needing a manual re-login every 24h
+
 ## [0.101.1] — 2026-09-15
 
 ### Fixed

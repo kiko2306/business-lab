@@ -28125,3 +28125,56 @@ Verified: `./scripts/check.sh backend typecheck` and `test` both clean (901
 tests, including the corrected reconciler test). Not yet deployed to
 home-srv-01 — next reconcile pass (~6h cadence) or a restart of `backend`
 will prove it against the real Postgres FK.
+
+## 442. NetBird: account-wide peer login expiration was logging out Windows/phone peers every 24h
+
+User reported "netbird is broken again i can't connect via windows or phone."
+`docker logs netbird-vpn-netbird-management-1` on `home-srv-01` showed the
+real error, not a connectivity fault:
+
+```
+WARN ... failed logging in peer <id>: peer login has expired, please log in once more
+```
+
+Two distinct peer IDs, recurring roughly every 24h. Queried the management
+sqlite store directly (read-only, via a throwaway `keinos/sqlite3` container
+— `apps/netbird-vpn/data/management/store.db`) to confirm:
+`accounts.settings_peer_login_expiration_enabled = 1`,
+`settings_peer_login_expiration = 86400000000000` (ns = 24h). NetBird's
+default: any peer enrolled via interactive login (the OIDC device-code flow
+`ensureNetbirdDeviceCodeFlow`/§413 keeps working on mobile) — as opposed to a
+setup key — gets logged out on that cadence and needs a fresh browser/SSO
+round-trip to reconnect. The routing-peer container itself (enrolled via
+setup key, `netbirdRoutingPeer.ts`/§404) is unaffected; only human-carried
+devices are.
+
+There's no multi-tenant population on this account to defend against with a
+forced re-auth cadence — every peer is a device the account owner already
+controls — so this is the same shape as the `no_token_expirations` convention
+already applied to setup keys and PATs elsewhere in this file: prefer
+non-expiring over expiring wherever the third-party UI/API offers the choice.
+
+**Fix**: `ensureAccountSettings()` added to `netbirdRoutingPeer.ts`
+(`backend/src/services/netbirdRoutingPeer.ts`), called at the top of
+`ensureNetbirdRoutingPeer` — the same idempotent-on-every-start pattern the
+rest of the file already uses. `GET /api/accounts`, and if
+`settings.peer_login_expiration_enabled` isn't already `false`, `PUT` the
+account back with that one field flipped and everything else GET returned
+carried through unchanged (NetBird's PUT replaces the whole settings object,
+and guessing at its full schema wasn't worth it when GET already hands back
+every field that needs to survive the round-trip). No `.env` write, so no
+container recreate needed — just a log line on the one run that actually
+flips it.
+
+Verified: `./scripts/check.sh backend typecheck` and `test` clean (903 tests,
+2 new — one asserting the PUT body when expiration is enabled, one asserting
+no write happens once it's already disabled). Not yet proven against the real
+NetBird API — pending deploy to `home-srv-01` (dev → beta → rebuild backend →
+restart the NetBird VPN app from the dashboard, which re-runs
+`ensureNetbirdRoutingPeer` → confirm `settings_peer_login_expiration_enabled`
+flips to `0` in the sqlite store).
+
+**Not fixed by this change**: the two peers that already expired still need
+one manual re-login on their own device (Windows NetBird client, NetBird
+mobile app) — disabling the setting stops the *next* forced logout, it
+doesn't un-expire a session that already lapsed.
