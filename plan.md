@@ -30274,3 +30274,46 @@ grantee an ITFlow admin". Wired into `noSsoCredentialFanout.ts`'s
 `itflowUserProvisioning.test.ts` cases + the `noSsoCredentialFanout.test.ts`
 update for the third provisioner). Not yet verified against the real
 stack — next section.
+
+## 492. §491 verified live — one real bug found and fixed
+
+Deployed to `home-srv-01` (`beta` fast-forwarded, backend rebuilt, `GET
+/version` confirmed at each step). ITFlow itself was down on that host
+(its `apps/itflow/.env` and data volume were still there from an earlier
+session, just no running containers) — started it directly with `docker
+compose up` in its own project dir (allowed: CLAUDE.md's "down on a
+managed app's own project is fine" cuts both ways for up), then ran
+`reconcileItflowFirstAdmin` (already-existing code, unrelated to this
+change) to resync the admin identity/password before testing the new
+code path.
+
+First `provisionItflowUser` run failed outright. Diagnosed step by step
+(sign-in first, then the CSRF-token GET) and found the actual bug: every
+ITFlow modal page — not just the ones this code touches — wraps its real
+HTML body as `{"content": "..."}` (`includes/modal_footer.php`,
+unconditional, not just for genuine AJAX callers). §491's `extractCsrfToken`
+was regexing the raw JSON text, whose quotes are backslash-escaped, so it
+never matched. Fixed in `itflowClient.ts`'s `fetchCsrfToken` to
+`JSON.parse` the body and decode `content` first. Commit `f2b8fb7`,
+version-bumped to 0.112.1, redeployed.
+
+With that fixed, `provisionItflowUser` run twice back-to-back
+(`FirstPass123!` then `SecondPass456!` for the same throwaway email)
+returned `created` then `updated`. Proved the password genuinely changed,
+not just that the function returned a plausible result: `curl`'d ITFlow's
+own `/login.php` directly (with the same `X-Forwarded-Proto: https` header
+the client sends, since `config_https_only` blocks a plain request
+otherwise) with both passwords. `FirstPass123!` → 401 "Incorrect
+password"; `SecondPass456!` → 302 redirect to `agent/clients.php`, a real
+authenticated session. `encryptUserSpecificKey()`'s session-bound wrap
+took effect for real, not a guess at its shape. Cleaned up the throwaway
+account and its `user_settings` row afterward (direct DB delete via
+`itflowDb.ts`, prepared statement, closed before the follow-up plain
+queries — mysqli errors on overlapping in-flight statements); the real
+admin account (`user_id = 1`, `miguelamtx@gmail.com`) untouched
+throughout. Stopped ITFlow's containers again afterward, restoring the
+host to the state this section found it in.
+
+§480/§491's ITFlow fan-out is proven end to end. README's ITFlow item
+deleted. `beta` → `main`: left unmerged per [[main-merge-requires-request]]
+— ready whenever asked for.

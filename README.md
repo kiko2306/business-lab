@@ -234,9 +234,6 @@ per-app items depend on it, and each other app item is independent of the
 rest (§341's DocuSeal SSO precedent: "looks doable" and "is doable" differ
 per app, so no batch-approval here, one at a time).
 
-- [ ] **ITFlow**: extend past the single `/setup`-wizard admin to per-user
-      accounts — check whether its own user-management API supports this
-      without SSO.
 - [ ] **Kimai**: no bootstrap file exists yet (seeded via
       `ADMINMAIL`/`ADMINPASS` env, `kimai:user:create` at boot only) — check
       its user-management API for free-tier per-user creation.
