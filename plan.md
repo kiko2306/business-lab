@@ -28841,3 +28841,21 @@ no test exercised the rate-limit wiring itself). Not yet deployed — this
 touches request handling but not Docker/exposure/networking, so no live
 SSH verification is required by CLAUDE.md's gate, but it hasn't been proven
 live either; flag that if asked to call this "done" beyond `dev`. 0.104.5.
+
+## 460. §459 deployed to `beta`
+
+`dev` fast-forwarded onto `beta` (both were even before this) and pulled +
+rebuilt `business-lab-backend` on `home-srv-01`. Backend came up clean
+(`docker logs`: `Homelab backend listening on port 3000`, no errors);
+`GET /version` and `GET /health` (both public, unauthenticated) answered
+200 repeatedly over the host-only port mapping (`127.0.0.1:10000`).
+
+Not verified end-to-end: actually driving `/health/system` past the old
+200/15min shared budget and confirming it now succeeds where it used to
+429 requires an authenticated session generating that much traffic, which
+this session doesn't have (same limitation as recent sections — no
+dashboard login). The fix is a straightforward limiter-instance swap
+covered by the same passing test suite; deploying it clean is what this
+session can confirm live.
+
+Left on `beta`, unmerged to `main` per [[main-merge-requires-request]].
