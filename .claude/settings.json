@@ -38,6 +38,12 @@
           },
           {
             "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/require-image-date-bump.sh\"",
+            "timeout": 10,
+            "statusMessage": "Checking the image last-checked date"
+          },
+          {
+            "type": "command",
             "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/hooks/secret-scan.sh\"",
             "timeout": 10,
             "statusMessage": "Scanning the commit for known secret formats"

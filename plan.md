@@ -28512,3 +28512,37 @@ registry-rate-limit dependency.
 
 38 `apps/*/docker-compose.yml` touched, comment-only, `yaml.safe_load`
 clean on all of them. No backend/frontend code changed — no version bump.
+
+## 450. Enforce §449's date bump with a Claude-only commit hook
+
+§449 added a "Last checked for a newer image" comment to every compose file
+so a comment-only edit could force a `:latest` app back into self-update's
+diff-based scope, same as a real version-tag bump. That only works if the
+date actually gets bumped — easy to forget mid-loop, same failure mode
+`require-version-bump.sh` already guards against for `VERSION`.
+
+Added `.claude/hooks/require-image-date-bump.sh`, wired into `settings.json`
+alongside the existing `PreToolUse`/`Bash` hooks: blocks a `git commit` that
+adds/removes an `image:` line in `apps/<name>/docker-compose.yml` unless
+that same file's date-comment line also changed. Deleted files and
+non-image edits (ports, volumes, healthchecks) are exempt.
+
+Named explicitly as a **Claude condition, not a real git hook**: it only
+fires when Claude Code itself runs `git commit` via its Bash tool, with
+this repo's `.claude/settings.json` loaded — it does nothing for a human's
+own `git commit`, and nothing runs on `beta`'s or `main`'s deployed hosts
+(nothing commits there). User confirmed this scope explicitly before
+building it, having first proposed a full git hook.
+
+Standing workflow going forward (per user, this session): "check if X can
+be safely updated" → if yes, bump the date (and the pinned tag, if it has
+one) in the same commit — not a separate step to remember.
+
+Verified: manually exercised the script's diff-detection logic (jq isn't
+installed in this shell, so the `.tool_input.command` extraction was
+stubbed for the test, matching how `require-version-bump.sh` would need
+the same workaround) against three cases — image tag changed with no date
+bump (blocks), both changed together (passes), and a non-image edit like
+`mem_limit` with no date bump (passes, correctly exempt). Not something to
+verify against the live stack — it only affects Claude's own commit
+attempts, not anything running in Docker.
