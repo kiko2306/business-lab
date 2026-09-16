@@ -230,7 +230,13 @@ export async function signIn(baseUrl: string, email: string, password: string): 
   return { state: 'signed-in', cookie: postLoginCookies.length ? cookieHeader(postLoginCookies) : formCookie };
 }
 
-/** GET `path` for a session-bound `csrf_token`, refreshing the cookie the same way docusealClient.ts's form drivers do. */
+/**
+ * GET `path` for a session-bound `csrf_token`, refreshing the cookie the
+ * same way docusealClient.ts's form drivers do. Every modal page's real
+ * HTML body is wrapped as `{"content": "..."}` by `includes/modal_footer.php`
+ * (unconditionally — not just for actual AJAX callers), so the token has to
+ * be pulled out of the decoded `content` string, not the raw JSON text.
+ */
 async function fetchCsrfToken(baseUrl: string, cookie: string, path: string): Promise<{ token: string; cookie: string } | null> {
   let response: Response;
   try {
@@ -239,7 +245,15 @@ async function fetchCsrfToken(baseUrl: string, cookie: string, path: string): Pr
     return null;
   }
   if (response.status !== 200) return null;
-  const token = extractCsrfToken(await response.text());
+  let html: string;
+  try {
+    const parsed = JSON.parse(await response.text()) as { content?: unknown };
+    if (typeof parsed.content !== 'string') return null;
+    html = parsed.content;
+  } catch {
+    return null;
+  }
+  const token = extractCsrfToken(html);
   if (!token) return null;
   const refreshed = readSetCookies(response.headers);
   return { token, cookie: refreshed.length ? cookieHeader(refreshed) : cookie };
