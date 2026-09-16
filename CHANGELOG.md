@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.111.2] — 2026-09-16
+
+### Fixed
+
+- NocoDB fan-out invite sent the wrong org-role string (viewer instead of nocodb-sdk's org-level-viewer), 400ing on every invite
+
 ## [0.111.1] — 2026-09-16
 
 ### Fixed

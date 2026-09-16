@@ -32,12 +32,18 @@ export async function signIn(baseUrl: string, email: string, password: string): 
 
 export type InviteUserResult = 'created' | 'already-exists' | 'failed';
 
+// nocodb-sdk's OrgUserRoles enum — org-user-add only accepts these two string
+// values (org-users.service.ts#userAdd), not the plain 'viewer'/'creator'
+// names the role dropdown displays. Found live (2026-09-16): the bare name
+// 400s with "Invalid role".
+const ORG_VIEWER_ROLE = 'org-level-viewer';
+
 /** POST /api/v1/users, signed in as the org super admin. Community edition allows only viewer/creator roles. */
 export async function inviteUser(baseUrl: string, token: string, email: string): Promise<InviteUserResult> {
   const response = await fetch(`${baseUrl}/api/v1/users`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'xc-auth': token },
-    body: JSON.stringify({ email, roles: 'viewer' }),
+    body: JSON.stringify({ email, roles: ORG_VIEWER_ROLE }),
     signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
   }).catch(() => null);
   if (!response) return 'failed';
