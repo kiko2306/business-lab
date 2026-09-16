@@ -29647,3 +29647,21 @@ existing drift-sync tests already covered the calling shape; the bug was in
 which cookie value flowed to the PATCH, invisible to mocks that don't model
 Rails' session-rotation behaviour). `scripts/bump-version.sh patch Fixed …`
 → 0.108.1.
+
+## 479. §478 verified live — DocuSeal's admin login is the real email now
+
+User restarted DocuSeal again on the fixed `0.108.1` backend. Log:
+`Synced DocuSeal's admin login email from admin@example.com to
+miguelamtx@gmail.com`. Confirmed at both ends, not just trusting the log
+line:
+
+- SQLite `users` row on `home-srv-01`: `email=miguelamtx@gmail.com,
+  first_name=mat, last_name=Admin` (the `Admin` last name is `splitName`'s
+  documented fallback for a single-word Authelia display name — expected,
+  not a bug).
+- `apps/docuseal/.env`: `DOCUSEAL_ADMIN_EMAIL=miguelamtx@gmail.com` — the
+  tracked value now agrees with what's actually in DocuSeal, so the next
+  start takes the no-op path (matches Authelia's email, no HTTP calls) per
+  the unit tests in §477 rather than needing to be proven again live.
+
+`beta` → `main`: left unmerged per [[main-merge-requires-request]].
