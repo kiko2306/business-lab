@@ -1391,6 +1391,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // hide a form), just for a client that isn't a browser at all. The app's
     // own Basic Auth (backend/src/services/webdavConfig.ts) is the real gate.
     skipAutheliaProtection: true,
+    // A backup/sync destination for native clients, not something a person
+    // browses to — same reasoning as OnlyOffice. No Home Page tile.
+    hideFromHomePage: true,
   },
 };
 

@@ -29473,3 +29473,12 @@ not appear on the NAS. Left for the user to decide whether to move it or
 just re-run the backup now that the NAS mount is live.
 
 `beta` → `main`: left unmerged per [[main-merge-requires-request]].
+
+## 474. WebDAV dropped from the Home Page
+
+Set `hideFromHomePage: true` on WebDAV in `services.ts`, same reasoning as
+OnlyOffice (§131.2): it's a backup/sync destination for native clients
+(SQL Backup Master, etc.), not something a person opens in a browser — no
+tile earns its place. Requested directly by the user, not read off the TODO
+list. `./scripts/check.sh backend typecheck`/`test` clean (942 passing).
+`scripts/bump-version.sh patch Changed …` → 0.107.1.
