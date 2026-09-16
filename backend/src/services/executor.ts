@@ -18,6 +18,7 @@ import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { applySambaConfig } from './sambaConfig';
 import { applyWebdavConfig } from './webdavConfig';
+import { applyWebdavMount } from './webdavMount';
 import { ensureKopiaRepoDir } from './kopiaTargetApply';
 import { clearImagePins, writeImagePins, pickLocalDigest, parseImageRef } from './composeOverride';
 import { withMaintenanceLock } from './maintenanceLock';
@@ -222,6 +223,11 @@ async function composeUpWithManagedConfig(
   // a missing data/smb.conf makes Docker create the bind source as a directory
   // and the entrypoint aborts.
   await applySambaConfig(serviceName, appDir);
+  // WebDAV: swap its storage volume to a NAS mount (or back to local) before
+  // rendering config.yml or compose up — the volume swap may itself need to
+  // stop the container and remove the old volume so the imminent compose up
+  // recreates it fresh, so this runs first of the two.
+  await applyWebdavMount(serviceName, appDir);
   // WebDAV: render data/config.yml (users + behindProxy) before compose up —
   // load-bearing, not just exposure polish. The image has no shell to
   // template env vars into a config file itself (FROM scratch), and with no

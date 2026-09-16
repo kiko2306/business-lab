@@ -64,7 +64,9 @@ export async function applyWebdavConfig(serviceName: string, appDir: string): Pr
 
   try {
     const dataDir = path.join(appDir, 'data');
-    fs.mkdirSync(path.join(dataDir, 'files'), { recursive: true });
+    // Just this directory — applyWebdavMount owns data/files, created only
+    // when storage is the local fallback (a NAS mount needs no local dir).
+    fs.mkdirSync(dataDir, { recursive: true });
 
     const envPath = path.join(appDir, '.env');
     const env = fs.existsSync(envPath) ? parseEnvFile(envPath) : {};

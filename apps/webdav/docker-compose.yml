@@ -26,6 +26,14 @@ services:
       # can't spell that syntax out literally, or the scanner picks it up too).
       WEBDAV_USERNAME: ${WEBDAV_USERNAME:-admin}
       WEBDAV_PASSWORD: ${WEBDAV_PASSWORD:-}
+      # Optional: store files on a NAS's SMB share instead of local disk.
+      # Same carrier trick as the two above — webdavMount.ts turns these into
+      # the WEBDAV_MOUNT_* options the volume below actually reads. Blank
+      # server keeps the local default. Restart after changing any of these.
+      WEBDAV_NAS_SERVER: ${WEBDAV_NAS_SERVER:-}
+      WEBDAV_NAS_SHARE: ${WEBDAV_NAS_SHARE:-}
+      WEBDAV_NAS_USERNAME: ${WEBDAV_NAS_USERNAME:-}
+      WEBDAV_NAS_PASSWORD: ${WEBDAV_NAS_PASSWORD:-}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=WebDAV"
@@ -34,8 +42,20 @@ services:
       - "homepage.description=WebDAV file server for app/appliance backup destinations"
     volumes:
       - ./data/config.yml:/config.yml:ro
-      - ./data/files:/data
+      - webdav-storage:/data
     # No healthcheck: FROM scratch has no shell to run a CMD-SHELL probe, and
     # every path requires Basic Auth (§0.2's per-app licence/security notes
     # don't cover this, but same shape as CrowdSec's "nothing unauthenticated
     # to probe") — services.ts sets healthCheck.enabled: false to match.
+
+volumes:
+  # One templated volume whose three local-driver options serve a bind or an
+  # SMB share, same shape as Kopia's own backup-target volume. Written by
+  # webdavMount.ts from WEBDAV_NAS_* — the default keeps files in this app's
+  # own data dir.
+  webdav-storage:
+    driver: local
+    driver_opts:
+      type: ${WEBDAV_MOUNT_TYPE:-none}
+      o: ${WEBDAV_MOUNT_OPTIONS:-bind}
+      device: ${WEBDAV_MOUNT_DEVICE:-./data/files}

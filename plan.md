@@ -29358,3 +29358,82 @@ failure mode.
 
 `./scripts/check.sh backend test` clean (938, +1 new).
 `scripts/bump-version.sh patch Fixed …` → 0.106.2.
+
+## 472. WebDAV storage can live on a NAS's SMB share, not just local disk
+
+Prompted directly: after §469 proved SQL Backup Master pushing to WebDAV
+over the internet, the ask was to have those files actually land on the
+NAS at `192.168.1.50` — "a settings setup in app, need access credentials
+and a path" — rather than on the dashboard host's own local disk
+(`apps/webdav/data/files/`).
+
+**Reused Kopia's own mechanism rather than inventing one.** Kopia's backup
+destination (§265–268) already solves "let a container's storage be a
+disk/SMB/NFS location chosen through the dashboard": a compose `volumes:`
+entry using Docker's `local` driver, whose `driver_opts` (`type`/`o`/
+`device`) are templated from three env vars
+(`BACKUP_MOUNT_TYPE`/`OPTIONS`/`DEVICE`) that `kopiaTargetApply.ts` writes.
+`toMountSpec()` in `backend/src/utils/backupTarget.ts` already turns a
+`{server, share, username, password}` shape into the right CIFS options
+string (`vers=3.0`, `uid=1000`, credentials) — reused directly rather than
+re-derived.
+
+**Where this differs from Kopia's version, deliberately smaller:**
+
+- Kopia's destination is one **global** setting on the Settings page,
+  switchable across disk/smb/nfs/s3/ftp/sftp, reached through a dedicated
+  route (`PUT /settings/backup-target`) and its own apply-and-recreate
+  action (`applyKopiaTarget`). WebDAV's need is narrower — one app, one
+  kind (SMB, a "NAS network folder") — so it's four plain per-app fields
+  (`WEBDAV_NAS_SERVER`/`SHARE`/`USERNAME`/`PASSWORD`) edited through
+  WebDAV's own *ordinary* config panel. No new route, no new frontend code:
+  the generic field-discovery mechanism (fixed in §470) already renders
+  them once they're referenced in the compose file.
+- No dedicated "apply" action either. `backend/src/services/webdavMount.ts`
+  (`applyWebdavMount`) runs in the same pre-start hook as
+  `applyWebdavConfig`, on every start: recompute the mount from
+  `WEBDAV_NAS_*`, compare against what's already recorded in `.env`, and
+  only on an actual change stop the container and `docker volume rm` the
+  old `webdav_webdav-storage` volume before the caller's own `compose up`
+  (later in the same start) recreates it fresh. Docker does not recreate a
+  named volume whose definition changed on its own — the same trap
+  `kopiaTargetApply.ts` already documents and fixes — so this is not
+  optional plumbing, it's the one part of Kopia's rigor that had to carry
+  over unchanged. An ordinary restart with unchanged NAS fields does
+  nothing extra.
+- `WEBDAV_MOUNT_TYPE`/`OPTIONS`/`DEVICE` (the raw CIFS options string) are
+  `managedEnvKeys` — shown read-only in the panel, since hand-editing an
+  opaque `vers=3.0,uid=1000,…` string is exactly the confusion the
+  friendlier NAS fields exist to avoid. (Kopia's own equivalent three vars
+  aren't marked this way — an existing rough edge there, not touched here;
+  out of scope for a WebDAV-specific task.)
+
+**Compose file**: `./data/files:/data` bind mount replaced with a
+`webdav-storage` named volume, same `driver: local` / templated
+`driver_opts` shape as Kopia's `backup-target` volume. Default values
+(`none`/`bind`/`./data/files`) keep today's behaviour byte-for-byte when no
+NAS server is set — a `type=none,o=bind` local-driver volume pointed at the
+same host path is indistinguishable from the bind mount it replaces, so the
+file already sitting there from §468/§469's live test needs no migration.
+
+Carried over the §471 lesson explicitly: none of the new comments spell out
+the substitution syntax literally, and the existing registry-wide "no
+phantom VAR key" test (§471) plus a check of the raw
+`extractComposeEnvVars` output on the real file confirm all four new NAS
+fields plus the three managed mount fields are discovered, all optional
+(blank default), none phantom.
+
+**Tests**: `backend/src/services/webdavMount.test.ts` — NAS setting
+resolution/trimming, the local-fallback mount, and the CIFS mount shape
+(device, username/password, `vers=3.0`) built via the real `toMountSpec`.
+`./scripts/check.sh backend typecheck`/`test` clean (942, +5 new).
+`scripts/bump-version.sh minor Added …` → 0.107.0 (a real user-facing
+feature, not just a fix).
+
+**Not yet verified live** — the same gate as §468: this touches Docker
+volumes and needs proving against the real stack, specifically the part
+unit tests can't reach (an actual CIFS mount succeeding against
+`192.168.1.50`, and the volume-swap-on-change path actually removing and
+recreating the volume without orphaning the local files already sitting in
+`apps/webdav/data/files/`). Left on `dev`, unmerged into `beta`/`main`,
+until deployed and exercised with the user's real NAS credentials.
