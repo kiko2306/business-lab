@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.116.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.116.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -223,17 +223,4 @@ it is done — not ticked off and left behind. Section references point at
       repo's config. Check that issue periodically; delete this item once it's
       closed upstream (or once an app update fixes it for us, whichever comes
       first).
-### Credential fan-out to no-SSO apps (§480)
-
-User's call, tradeoff accepted explicitly: mirror each dashboard user's real
-username/email/password into every app they have access to, including the
-apps that can't sit behind Authelia at all (currently generated,
-per-app-unique credentials instead). Do the core mechanism first — the
-per-app items depend on it, and each other app item is independent of the
-rest (§341's DocuSeal SSO precedent: "looks doable" and "is doable" differ
-per app, so no batch-approval here, one at a time).
-
-- [ ] **Jellyfin**: extend past the single admin account created at startup
-      — check its user-management API for headless per-user creation
-      (`lanOnly`, so lower priority — never on the public tunnel).
 

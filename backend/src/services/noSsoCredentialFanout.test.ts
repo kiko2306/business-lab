@@ -40,7 +40,7 @@ beforeEach(() => {
 
 describe('getNoSsoCredentialAppNames', () => {
   it('lists every app with a provisioner today', () => {
-    expect(getNoSsoCredentialAppNames()).toEqual(['docuseal', 'nocodb', 'itflow', 'kimai', 'home-assistant']);
+    expect(getNoSsoCredentialAppNames()).toEqual(['docuseal', 'nocodb', 'itflow', 'kimai', 'home-assistant', 'jellyfin']);
   });
 });
 

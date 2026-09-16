@@ -41,6 +41,7 @@ function fakeClient(currentRows: { service_name: string }[]) {
 const REGISTRY: Record<string, { label: string; autheliaGroups?: string[] }> = {
   vaultwarden: { label: 'Vaultwarden' },
   bookstack: { label: 'BookStack', autheliaGroups: ['wiki-editors'] },
+  jellyfin: { label: 'Jellyfin' },
 };
 
 beforeEach(() => {
@@ -144,6 +145,20 @@ describe('getGrantableAppOptions', () => {
     getNoSsoCredentialAppNames.mockReturnValue([]);
 
     expect(await getGrantableAppOptions()).toEqual(await getAppAccessOptions());
+  });
+
+  it('includes a no-SSO provisioner app that has no exposure row at all (lanOnly, e.g. Jellyfin)', async () => {
+    // No 'jellyfin' row from the DB at all — lanOnly apps never get one.
+    query.mockResolvedValue({ rows: [{ service_name: 'vaultwarden', hostname: 'v' }] });
+    isAutheliaProtectionRequired.mockImplementation((name: string) => name === 'vaultwarden');
+    getNoSsoCredentialAppNames.mockReturnValue(['jellyfin']);
+
+    const options = await getGrantableAppOptions();
+
+    expect(options).toEqual([
+      { serviceName: 'jellyfin', label: 'Jellyfin', hostname: null, requiredGroups: [] },
+      { serviceName: 'vaultwarden', label: 'Vaultwarden', hostname: 'v', requiredGroups: [] },
+    ]);
   });
 });
 

@@ -80,10 +80,30 @@ export async function getAppAccessOptionNames(): Promise<Set<string>> {
  * §481). This is what the Users & Roles picker and grant validation use;
  * Authelia's own generators deliberately keep using `getAppAccessOptions`
  * above instead (see its doc comment).
+ *
+ * A no-SSO provisioner app doesn't actually need a `service_exposure` row
+ * to be grantable — its own login is the access control, not Authelia's.
+ * That held by construction for the first five (all `skipAutheliaProtection`,
+ * exposed directly with just their own login), but Jellyfin is `lanOnly`:
+ * `getExposability()` always reports it non-exposable, so it never gets an
+ * exposure row and the `getExposedServiceOptions` filter alone would always
+ * exclude it, even with a provisioner registered. Any no-SSO app missing
+ * from the exposed set is added back here with no hostname (there's no
+ * public URL to show) rather than left permanently ungrantable.
  */
 export async function getGrantableAppOptions(): Promise<AppAccessOption[]> {
   const noSsoNames = new Set(getNoSsoCredentialAppNames());
-  return getExposedServiceOptions((name) => isAutheliaProtectionRequired(name) || noSsoNames.has(name));
+  const exposedOptions = await getExposedServiceOptions((name) => isAutheliaProtectionRequired(name) || noSsoNames.has(name));
+
+  const exposedNames = new Set(exposedOptions.map((option) => option.serviceName));
+  const unexposedNoSsoOptions = [...noSsoNames]
+    .filter((name) => !exposedNames.has(name))
+    .map((name) => {
+      const service = getService(name);
+      return { serviceName: name, label: service?.label ?? name, hostname: null, requiredGroups: [] };
+    });
+
+  return [...exposedOptions, ...unexposedNoSsoOptions].sort((a, b) => a.label.localeCompare(b.label));
 }
 
 /** Every grantable service name (Authelia + no-SSO), for validating a submitted access list. */

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.116.2] — 2026-09-16
+
+### Added
+
+- Jellyfin joins the no-SSO credential fan-out (§480): grant it in Users & Roles and a matching account is created/updated via Jellyfin's own REST API
+
 ## [0.116.1] — 2026-09-16
 
 ### Fixed

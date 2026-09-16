@@ -59,12 +59,21 @@
  * approach as `uptimeKumaAdminBootstrap.ts`), authenticated with a fresh
  * access token from HA's own username/password OAuth2 flow rather than a
  * stored one. See `homeAssistantUserProvisioning.ts`'s doc comment.
+ *
+ * Jellyfin is the last one on the README's list, and the odd one out:
+ * `lanOnly`, so it never has a `service_exposure` row at all —
+ * `getGrantableAppOptions` (userAppAccess.ts) was widened to list a no-SSO
+ * provisioner app even with no exposure row, specifically so this one can
+ * be granted. Otherwise the simplest of the bunch: `jellyfinUserProvisioning.ts`
+ * drives Jellyfin's own full REST API directly, no DB script or scraped
+ * session required.
  */
 
 import logger from '../utils/logger';
 import { disableDocusealTeamMember, provisionDocusealTeamMember } from './docusealTeamProvisioning';
 import { disableHomeAssistantUser, provisionHomeAssistantUser } from './homeAssistantUserProvisioning';
 import { disableItflowUser, provisionItflowUser } from './itflowUserProvisioning';
+import { disableJellyfinUser, provisionJellyfinUser } from './jellyfinUserProvisioning';
 import { disableKimaiUser, provisionKimaiUser } from './kimaiUserProvisioning';
 import { disableNocodbUser, provisionNocodbUser } from './nocodbUserProvisioning';
 
@@ -83,6 +92,7 @@ const PROVISIONERS: Record<string, Provisioner> = {
   itflow: provisionItflowUser,
   kimai: provisionKimaiUser,
   'home-assistant': provisionHomeAssistantUser,
+  jellyfin: provisionJellyfinUser,
 };
 
 const DEPROVISIONERS: Record<string, Deprovisioner> = {
@@ -91,6 +101,7 @@ const DEPROVISIONERS: Record<string, Deprovisioner> = {
   itflow: disableItflowUser,
   kimai: disableKimaiUser,
   'home-assistant': disableHomeAssistantUser,
+  jellyfin: disableJellyfinUser,
 };
 
 /** Apps that can accept a fanned-out credential today. */
