@@ -25,6 +25,11 @@ services:
       # DocuSeal's first-run /setup wizard (services/docusealAdminBootstrap.ts):
       # DocuSeal community has no SSO, so the admin still logs in with this.
       DOCUSEAL_ADMIN_PASSWORD: ${DOCUSEAL_ADMIN_PASSWORD:-}
+      # NOT read by DocuSeal either, and not shown in the config panel — pure
+      # backend bookkeeping of which email the account currently logs in
+      # with, so a later change to the Authelia admin's own email can be
+      # detected and re-applied instead of silently going stale (§475).
+      DOCUSEAL_ADMIN_EMAIL: ${DOCUSEAL_ADMIN_EMAIL:-}
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=DocuSeal"

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.108.0] — 2026-09-16
+
+### Added
+
+- DocuSeal's admin bootstrap now re-syncs the account's login email if it drifts from the Authelia admin's own email
+
 ## [0.107.2] — 2026-09-16
 
 ### Fixed

@@ -29512,3 +29512,93 @@ pulled + rebuilt + restarted the backend, `GET /version` → `0.107.2`.
 `href: https://docuseal.tx-home-utils.com/sign_in` for the DocuSeal tile,
 and that URL returns the real login form (HTTP 200). `beta` → `main`: left
 unmerged per [[main-merge-requires-request]].
+
+## 477. DocuSeal's admin account was stuck on a placeholder email — added a re-sync
+
+User checked their DocuSeal login and found the account wasn't under their
+real email. Diagnosed live rather than guessed: queried the real SQLite DB
+on `home-srv-01` via a throwaway `sqlite3` container bind-mounted read-only
+over `apps/docuseal/data/docuseal` (no `sqlite3` binary on the host or in
+DocuSeal's own Alpine image) —
+
+```
+id=1  email=admin@example.com  first_name=Admin  last_name=Admin  created_at=2026-09-09
+```
+
+— against the *current* Authelia admin (`getAutheliaAdminUser()` on the live
+backend: `miguelamtx@gmail.com`). `plan.md` §341 explains the mismatch: the
+very first DocuSeal admin bootstrap ran back on 2026-09-09 when the Authelia
+admin's own email was still the placeholder `admin@example.com` — its log
+line even says so (`Created DocuSeal's first admin (admin@example.com)`).
+The Authelia admin's email was corrected sometime after, but
+`reconcileDocusealFirstAdmin` is idempotent by construction ("once any user
+exists, never touch it again" — `getSetupState` reports `already-setup` and
+it just returns), so DocuSeal's login silently never followed.
+
+**Considered and rejected**: editing the email straight in DocuSeal's own
+Profile settings by hand. That's a real fix for right now but not a code
+path — the next time the Authelia admin's email changes (or on any other
+install this bootstrap ever runs against), the same drift would silently
+recur with nothing to catch it. Principle 3 says automate what's derivable;
+this is derivable — both emails are just an HTTP request away.
+
+**Considered and rejected**: reading/writing DocuSeal's SQLite file directly
+from backend code, the way the diagnosis above did read-only. Would work,
+but there's no existing precedent for the backend touching another app's
+data file directly (backup engines shell into the DB's own container and
+run `mysqldump`/`pg_dump`, never touch files raw) and it would silently
+desync from Rails' own validations/callbacks. Fragile against a future
+DocuSeal schema change, too.
+
+**Checked before trusting a web-form fix**: whether changing email needs
+email confirmation first. `User` model's `devise :...` line (checked on the
+real upstream source) is `two_factor_authenticatable, :recoverable,
+:rememberable, :validatable, :trackable, :lockable` — no `:confirmable`,
+even though the `users` table has `confirmation_token`/`unconfirmed_email`
+columns (unused by the community edition's model). Confirmed against
+`spec/system/profile_settings_spec.rb`: `user.email` changes immediately on
+`ProfileController#update_contact`, no pending state, no mailer. So a
+scripted email change actually takes effect — this isn't the Devise
+reconfirm trap it looks like at first glance.
+
+**Shipped**: `docusealClient.ts` gained `signIn` (GET+POST `/sign_in`, same
+CSRF/cookie dance as `getSetupState`/`createFirstAdmin`, session cookie
+rotates on success so the POST response's `Set-Cookie` is what's used
+afterwards) and `updateProfileEmail` (GET `/settings/profile` for a
+session-bound token, PATCH `/settings/profile/update_contact`).
+`docusealAdminBootstrap.ts` gained `DOCUSEAL_ADMIN_EMAIL` — a hidden,
+backend-only carrier env (`hiddenEnvKeys`, not shown in the config panel,
+same shape as `DOCUSEAL_ADMIN_PASSWORD` but never user-facing) recording
+which email the account is currently believed to hold. On every start where
+`already-setup`: if the tracked email matches Authelia's current admin,
+no-op (no HTTP call at all — the common case costs nothing); if it's
+missing (no install has run this code yet) or differs, sign in as the
+tracked value and PATCH the profile to the new one, then persist the new
+tracked value. Signing in as `LEGACY_UNTRACKED_EMAIL` (`admin@example.com`)
+covers this one pre-existing install's specific gap — it's the exact value
+§341 logged, not a guess — every install created after this ships records
+its own tracked email at creation and never needs the fallback. A failed
+sign-in or a rejected update just logs and retries next start, matching
+the rest of this file's "never blocks a start" shape.
+
+`backend/src/config/services.ts` — added `DOCUSEAL_ADMIN_EMAIL` to
+`hiddenEnvKeys`. `apps/docuseal/docker-compose.yml` — added the carrier env
+line (comment worded to avoid the §471/§474 phantom-VAR landmine: describes
+the substitution without spelling `${VAR}` literally).
+
+**Tests**: `docusealAdminBootstrap.test.ts` — no-op when tracked matches
+current, drift + successful sync, drift + failed sign-in (no update
+attempted), drift + rejected update (no env write), fallback to the legacy
+email when nothing is tracked yet, and the creation path now recording its
+own tracked email. `docusealClient.ts`'s new functions follow the existing
+convention of no direct unit tests (only the pure `extractAuthenticityToken`/
+`cookieHeader` helpers are, per the pre-existing `getSetupState`/
+`createFirstAdmin` precedent) — the branching is exercised through the
+bootstrap tests instead, which mock the client module wholesale.
+`./scripts/check.sh backend typecheck`/`test` clean (946, +4 new).
+`scripts/bump-version.sh minor Added …` → 0.108.0.
+
+**Not yet verified live** — needs a real DocuSeal account actually signed
+into and PATCHed on `home-srv-01`, not just mocks. Left on `dev`, unmerged,
+until deployed and exercised against the real `admin@example.com` account
+found above.

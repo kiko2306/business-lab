@@ -14,9 +14,18 @@
  * poll for the webapp, drive the flow, best-effort (never throws, never
  * blocks the start). Runs after `docker compose up` on every DocuSeal start.
  *
- * Idempotent by construction: once any user exists, DocuSeal's
+ * Idempotent by construction for *creation*: once any user exists, DocuSeal's
  * `ensure_first_user_not_created!` redirects /setup away, which
- * `getSetupState` reports as `already-setup`.
+ * `getSetupState` reports as `already-setup`. That account's login email can
+ * still drift from Authelia's, though — the Authelia admin's own email is
+ * editable after the fact, and the account created here is never touched
+ * again by construction. §475: the very first DocuSeal admin (2026-09-09) was
+ * created while the Authelia admin's email was still a placeholder
+ * (`admin@example.com`), which was later changed — DocuSeal's login silently
+ * kept the placeholder forever, since nothing ever re-checked it. `syncAdminEmail`
+ * below re-checks on every start and logs into the account to fix it when it
+ * has, using `DOCUSEAL_ADMIN_EMAIL_KEY` to remember what email the account is
+ * currently believed to hold (same carrier-env trick as the password).
  */
 
 import logger from '../utils/logger';
@@ -24,11 +33,18 @@ import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services
 import { getHostGatewayIp } from '../utils/network';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
-import { readAppEnvValue } from './appEnv';
-import { createFirstAdmin, getSetupState } from './docusealClient';
+import { readAppEnvValue, saveServiceEnv } from './appEnv';
+import { createFirstAdmin, getSetupState, signIn, updateProfileEmail } from './docusealClient';
 
 export const DOCUSEAL_SERVICE = 'docuseal';
 export const DOCUSEAL_ADMIN_PASSWORD_KEY = 'DOCUSEAL_ADMIN_PASSWORD';
+export const DOCUSEAL_ADMIN_EMAIL_KEY = 'DOCUSEAL_ADMIN_EMAIL';
+// The one pre-existing install (§341) has no DOCUSEAL_ADMIN_EMAIL recorded —
+// this feature didn't exist yet when its account was created — so the first
+// drift check on that install has nothing to sign in as except the literal
+// email §475 found still sitting in its `users` table. Any install created
+// after this shipped records its own email at creation and never needs this.
+const LEGACY_UNTRACKED_EMAIL = 'admin@example.com';
 // Compose always sets ${DOCUSEAL_PORT:-10150}; this only covers a parse miss.
 const FALLBACK_PORT = 10150;
 const ACCOUNT_NAME = 'DocuSeal';
@@ -51,6 +67,47 @@ function splitName(displayName: string | undefined): { firstName: string; lastNa
   if (parts.length === 0) return { firstName: 'Admin', lastName: 'User' };
   if (parts.length === 1) return { firstName: parts[0], lastName: 'Admin' };
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
+}
+
+/**
+ * Re-sync the existing admin's login email to Authelia's current one when
+ * they've drifted apart. No-op if `DOCUSEAL_ADMIN_EMAIL_KEY` already matches
+ * (the common case, checked every start but costing no request). A failed
+ * sign-in or update just logs and retries next start — same "never blocks"
+ * shape as the rest of this file.
+ */
+async function syncAdminEmail(
+  baseUrl: string,
+  currentEmail: string,
+  password: string,
+  firstName: string,
+  lastName: string
+): Promise<void> {
+  const trackedEmail = readAppEnvValue(DOCUSEAL_SERVICE, DOCUSEAL_ADMIN_EMAIL_KEY) ?? LEGACY_UNTRACKED_EMAIL;
+  if (trackedEmail === currentEmail) {
+    return;
+  }
+
+  const signInResult = await signIn(baseUrl, trackedEmail, password);
+  if (signInResult.state !== 'signed-in') {
+    logger.warn(
+      `DocuSeal admin email sync skipped: could not sign in as ${trackedEmail} to change it to ${currentEmail} — log in and update it by hand from DocuSeal's own Profile settings if this persists`
+    );
+    return;
+  }
+
+  const updateResult = await updateProfileEmail(baseUrl, {
+    cookie: signInResult.cookie,
+    email: currentEmail,
+    firstName,
+    lastName,
+  });
+  if (updateResult === 'updated') {
+    await saveServiceEnv(DOCUSEAL_SERVICE, { [DOCUSEAL_ADMIN_EMAIL_KEY]: currentEmail });
+    logger.info(`Synced DocuSeal's admin login email from ${trackedEmail} to ${currentEmail}`);
+  } else {
+    logger.error('DocuSeal admin email sync: the profile update was rejected — will retry next start');
+  }
 }
 
 export async function reconcileDocusealFirstAdmin(serviceName: string): Promise<void> {
@@ -101,7 +158,7 @@ export async function reconcileDocusealFirstAdmin(serviceName: string): Promise<
       }
 
       if (state.state === 'already-setup') {
-        logger.info('DocuSeal already has an admin account; nothing to bootstrap');
+        await syncAdminEmail(baseUrl, email, password, firstName, lastName);
         return;
       }
 
@@ -117,8 +174,9 @@ export async function reconcileDocusealFirstAdmin(serviceName: string): Promise<
       });
       if (result === 'created') {
         logger.info(`Created DocuSeal's first admin (${email}) via the /setup wizard`);
+        await saveServiceEnv(DOCUSEAL_SERVICE, { [DOCUSEAL_ADMIN_EMAIL_KEY]: email });
       } else if (result === 'already-setup') {
-        logger.info('DocuSeal already has an admin account; nothing to bootstrap');
+        await syncAdminEmail(baseUrl, email, password, firstName, lastName);
       } else {
         logger.error('DocuSeal admin bootstrap: the /setup POST failed (validation or CSRF) — will retry next start');
       }
