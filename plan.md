@@ -29482,3 +29482,24 @@ OnlyOffice (§131.2): it's a backup/sync destination for native clients
 tile earns its place. Requested directly by the user, not read off the TODO
 list. `./scripts/check.sh backend typecheck`/`test` clean (942 passing).
 `scripts/bump-version.sh patch Changed …` → 0.107.1.
+
+## 475. DocuSeal's Home Page tile now links straight to /sign_in
+
+User noticed the tile sends to `https://docuseal.tx-home-utils.com/` and
+asked why it doesn't land on the login form directly. Checked with curl
+against the live host: bare root is a marketing/landing splash (18917
+bytes, an unauthenticated nav page with a "Sign In" link) — not the actual
+login form, which lives at `/sign_in` (10586 bytes, the real `<form
+action="/sign_in">`). Same shape as Pi-hole — see the `webPath` comment at
+`services.ts:480` — which needed the same fix for the same reason: bare
+root doesn't get you to the working UI.
+
+Set `webPath: '/sign_in'` on DocuSeal in `services.ts`, which
+`homepageConfig.ts` appends to the public hostname when building each
+tile's `href`. Left `docker-compose.yml`'s `homepage.href=http://localhost:…`
+label bare (no `/sign_in`), matching Pi-hole's own compose file — that label
+is for a human reading the file, the generator ignores it in favour of
+`webPath` (`plan.md` §112.3 / Conventions in `CLAUDE.md`).
+
+`./scripts/check.sh backend typecheck`/`test` clean (942 passing).
+`scripts/bump-version.sh patch Fixed …` → 0.107.2.
