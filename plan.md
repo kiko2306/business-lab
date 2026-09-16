@@ -30851,3 +30851,56 @@ calls need proving against a live Jellyfin the way §501 proved Kimai's
 direct-SQL path: grant a real dashboard user Jellyfin access, confirm the
 account actually gets created in the running container, and log in for
 real. Next session.
+
+## 504. §503 verified live — real Jellyfin auth header bug found and fixed, real login proven
+
+Deployed to `home-srv-01` (`beta` fast-forwarded, backend rebuilt, `GET
+/version` → 0.116.2). Jellyfin had never actually been started on this box
+before — no containers existed at all — so this also exercised
+`startService('jellyfin', 1)` for real (the same function the dashboard's
+Start button calls) before any provisioning could be tested.
+
+First provisioning attempt failed immediately: `provisionJellyfinUser`
+returned `admin-sign-in-failed`. Not credential drift — direct `curl`-style
+calls from inside the backend container confirmed the generated admin
+password was correct; the header was wrong. This Jellyfin image is
+**12.0.0**, newer than any version in training data, and its real,
+live-fetched OpenAPI spec (`/api-docs/openapi.json` — Jellyfin serves its
+own) names the auth security scheme's header `Authorization`, not the
+legacy `X-Emby-Authorization` that `jellyfinClient.ts` was written against
+(and that most third-party Jellyfin examples/docs still show). The old
+header wasn't rejected with 401 — it was silently ignored and every call
+400'd, including sign-in itself. Fixed by switching to `Authorization`
+(client identity for sign-in, `Authorization: MediaBrowser ..., Token="…"`
+for authenticated calls) — confirmed with raw `fetch` calls against the
+real server before touching the client code, then again after the fix
+compiled and redeployed.
+
+With that fixed, ran the same create → disable → re-grant round trip
+§498 ran for Kimai, this time also driving real logins at each step
+(`POST /Users/AuthenticateByName` against the actual running Jellyfin, not
+just trusting the function's return value), all against a throwaway
+`fanout-test@example.com` account:
+
+- **Create**: `provisionJellyfinUser(...)` → `'created'`. Real login with
+  the set password → `200`.
+- **Disable**: `disableJellyfinUser(...)` → `'disabled'`. Same login now
+  → `403` — Jellyfin's own account-disabled rejection, not a network
+  failure.
+- **Re-grant** (new password): `provisionJellyfinUser(...)` again → `'updated'`.
+  Login with the *new* password → `200`; login with the *old* password →
+  `401`. Confirms one call both re-enables the account and rotates the
+  password, matching the exact revoke-then-regrant path Users & Roles
+  hits.
+
+Cleaned up: fetched the real admin token, listed `/Users`, found the
+throwaway account by name and `DELETE`d it — confirmed only the real `mat`
+admin account remained afterward. Scratch test scripts removed from the
+container and the local scratchpad.
+
+§503 is proven end to end, including a real bug the type-checker and unit
+tests couldn't have caught (a wrong HTTP header name against a specific
+upstream version) — exactly the class of thing this repo's "don't claim
+something works because it type-checks" rule exists for. `beta` → `main`:
+left unmerged per [[main-merge-requires-request]] — ready whenever asked
+for.
