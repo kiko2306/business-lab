@@ -430,6 +430,7 @@ async function provisionHostname({
       websocket: ALLOW_WEBSOCKET_UPGRADE,
       autheliaProtected,
       grpc,
+      baseDomain: globalConfig.baseDomain,
     });
 
     // Persist ownership before the Cloudflare call so a later retry can safely

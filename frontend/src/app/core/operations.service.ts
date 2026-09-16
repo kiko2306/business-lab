@@ -191,6 +191,15 @@ export class OperationsService {
     );
   }
 
+  /** Sent from the public /access-denied page (plan.md §463) — reachable signed out. */
+  submitAccessRequest(hostname: string, email: string, reason: string): Observable<void> {
+    return this.http.post<void>(
+      `${API_BASE_URL}/access-requests`,
+      { hostname, email, reason },
+      { context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
   listUsers(): Observable<AdminUserListResponse> {
     return this.http.get<AdminUserListResponse>(`${API_BASE_URL}/users`);
   }

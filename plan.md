@@ -28949,3 +28949,85 @@ omitting them — `??` only catches null/undefined. Changed to
 `user.email || user.name || user.id`.
 
 `beta` → `main`: left unmerged per [[main-merge-requires-request]].
+
+## 463. Themed "access denied" page + request-access email for a group-denied app
+
+A user opening an app they're authenticated for but not authorised for (not
+in that app's Authelia group) hit nginx's bare default 403 — no theme, no
+branding, no way to ask for access. Traced the actual mechanism first
+(§151/§151.6 designed the access-control model itself but explicitly left
+"a non-listed one 403s" as the end state, nothing further):
+`apps/nginx-proxy-manager/snippets/authelia-authrequest.conf`'s `auth_request`
+to Authelia's forward-auth endpoint only maps **401** to a redirect
+(`error_page 401 =302 $redirection_url;`, using Authelia's own `Location`
+header to its login portal) — a **403** (authenticated, wrong group) carries
+no `Location` header for auth_request to redirect with, so nginx just
+propagated the raw status with its own compiled-in error body. No app in this
+stack customises 403 handling.
+
+**Rejected: a vendored static HTML page**, the same shape as CrowdSec's
+`apps/nginx-proxy-manager/crowdsec-bouncer/templates/ban.html`. It's the only
+existing precedent for "themed page for a non-2xx nginx response" in this
+repo, but it can't hold a live form — CrowdSec's ban page is static Lua-served
+HTML with no backend call. This page needs to submit an email, so it has to
+be a real page with real JS, not a vendored static file.
+
+**Built instead: redirect to a new public Angular route**, the same pattern
+already used for /set-password and /recovery — reachable signed out, styled
+by the existing shared `.auth-page`/`.auth-card` classes so it matches the
+dashboard without any new CSS. `npmClient.ts`'s `AUTHELIA_ADVANCED_CONFIG`
+(now `buildAutheliaAdvancedConfig(baseDomain)`, since it needs the dashboard's
+own hostname) adds `error_page 403 = @access_denied;` inside `location /`,
+and a sibling named location `location @access_denied { return 302
+https://<baseDomain>/access-denied?host=$host; }`. The named-location
+indirection exists because `error_page`'s inline form can't itself issue a
+redirect with a literal status transform in one step the way this needs to
+carry `$host` through; splitting it into an internal jump then a `return 302`
+is the standard nginx idiom for turning an upstream error into a real browser
+redirect. `$host` (the denied app's own hostname, e.g. `paperless.example.com`)
+rides along as a query param — the new page shows it back to the user and
+includes it in the request-access email, no server-side hostname→service
+lookup needed (deliberately: an unauthenticated endpoint resolving arbitrary
+hostnames to internal service names is an enumeration surface for no real
+benefit — the raw hostname already tells a homelab admin exactly which app it
+is).
+
+`ensureProxyHost`/`buildProxyHostPayload` gained a `baseDomain` field
+(`EnsureProxyHostOptions`/`ProxyHostWriteOptions`), threaded from the one real
+caller, `provisionHostname` in `exposure.ts`, which already had `globalConfig`
+in scope.
+
+**Recipient email**: no "admin notification" field existed anywhere — the
+closest things were the per-user `users.email` column and Authelia's own
+single-admin account email (already reused elsewhere as an alert target, e.g.
+`uptimeKumaMailNotification.ts`), neither of which is "the email set on
+Settings". Per explicit direction, this reuses the Settings → Email panel's
+existing `mail_from_address` (`MAIL_SETTINGS_KEYS.fromAddress`) as the
+recipient too — the mailbox already configured there for outbound mail (invite
+emails, `plan.md §158`) is also where a request lands, no new setting. Backend:
+new `POST /api/access-requests` (`backend/src/routes/accessRequests.ts`,
+public, its own rate limiter, Joi-validated hostname/email/reason), mounted
+unauthenticated next to `/auth` and `/recovery`. Sends via the existing
+`sendMail()` (`utils/mailSend.ts`), which gained a `replyTo` field so the
+admin can just hit reply — the requester's own address is the Reply-To
+header. Returns 503 with a plain message when mail isn't configured yet
+(`getMailConfig()` returns null), so the frontend shows that instead of a
+generic failure.
+
+Frontend: `frontend/src/app/pages/access-denied/` — reads `?host=`, shows
+"you don't have permission", a form for email + reason. `OperationsService`
+gained `submitAccessRequest()` (same `SKIP_AUTH`/`SKIP_GLOBAL_ERROR_HANDLING`
+context as the recovery/invitation calls it sits beside). Route added to
+`app.routes.ts` outside the `ShellComponent`/`authGuard` tree, same as
+`/set-password` and `/recovery` — the whole point is a visitor with no
+dashboard session can reach it.
+
+**Verified**: `./scripts/check.sh backend typecheck` and `backend test` both
+clean (928 tests, +1 new: `npmClient.test.ts` asserts the `error_page 403`
+and `return 302 .../access-denied?host=$host` lines land in the Authelia
+advanced_config). `./scripts/check.sh frontend build` and `frontend test`
+both clean (74 tests, unchanged — the new component mirrors `set-password`'s
+already-untested form shape, nothing non-trivial enough to need its own
+spec). Not yet proven against the real stack — the nginx redirect and the
+mail send both need a live Authelia-protected app to hit; pending deploy to
+`home-srv-01`.

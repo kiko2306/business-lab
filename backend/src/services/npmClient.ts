@@ -39,6 +39,10 @@ interface EnsureProxyHostOptions {
   websocket: boolean;
   autheliaProtected: boolean;
   grpc: boolean;
+  // Only used when autheliaProtected — where the 403 redirect below sends a
+  // locked-out user. Always passed through regardless, so callers don't need
+  // to know which branch cares.
+  baseDomain: string;
 }
 
 // Gates a proxy host behind Authelia's forward-auth — see the snippet files
@@ -49,20 +53,36 @@ interface EnsureProxyHostOptions {
 // allow_websocket_upgrade on (true for every app here) — so it has to be
 // re-added here too, or apps that depend on it (e.g. code-server's
 // workbench) break with a WebSocket close code 1006.
-const AUTHELIA_ADVANCED_CONFIG = [
-  'include /snippets/authelia-location.conf;',
-  '',
-  'location / {',
-  // proxy.conf already sets proxy_http_version 1.1 — do not redeclare it
-  // here, nginx treats a second copy in the same location as a fatal
-  // "duplicate directive" and refuses to reload the whole host.
-  '    include /snippets/proxy.conf;',
-  '    include /snippets/authelia-authrequest.conf;',
-  '    proxy_set_header Upgrade $http_upgrade;',
-  '    proxy_set_header Connection "upgrade";',
-  '    proxy_pass $forward_scheme://$server:$port;',
-  '}',
-].join('\n');
+//
+// An authenticated user who isn't in the app's allowed group gets a plain
+// 403 from Authelia's forward-auth subrequest — auth_request only maps a 401
+// (via authelia-authrequest.conf's error_page) since that carries a
+// `Location` header to redirect to; a 403 doesn't, so without this it just
+// falls through to nginx's bare default error page. Route it to the
+// dashboard's own themed "access denied" page instead, carrying the denied
+// hostname so that page (and the request-access email it sends) know what
+// was asked for.
+function buildAutheliaAdvancedConfig(baseDomain: string): string {
+  return [
+    'include /snippets/authelia-location.conf;',
+    '',
+    'location / {',
+    // proxy.conf already sets proxy_http_version 1.1 — do not redeclare it
+    // here, nginx treats a second copy in the same location as a fatal
+    // "duplicate directive" and refuses to reload the whole host.
+    '    include /snippets/proxy.conf;',
+    '    include /snippets/authelia-authrequest.conf;',
+    '    proxy_set_header Upgrade $http_upgrade;',
+    '    proxy_set_header Connection "upgrade";',
+    '    proxy_pass $forward_scheme://$server:$port;',
+    '    error_page 403 = @access_denied;',
+    '}',
+    '',
+    'location @access_denied {',
+    `    return 302 https://${baseDomain}/access-denied?host=$host;`,
+    '}',
+  ].join('\n');
+}
 
 // Native gRPC (mobile/desktop/CLI clients) requires HTTP/2 all the way to
 // the upstream — proxy_pass never speaks HTTP/2 to the backend regardless of
@@ -139,12 +159,13 @@ function computeAdvancedConfig(opts: {
   forwardHost: string;
   forwardPort: number;
   websocket: boolean;
+  baseDomain: string;
 }): string {
   if (opts.grpc) {
     return buildGrpcAdvancedConfig(opts.forwardHost, opts.forwardPort);
   }
   if (opts.autheliaProtected) {
-    return AUTHELIA_ADVANCED_CONFIG;
+    return buildAutheliaAdvancedConfig(opts.baseDomain);
   }
   return buildPlainAdvancedConfig(opts.websocket);
 }
@@ -422,7 +443,7 @@ export async function bootstrapNpmAdminIfDefault(npmApiUrl: string): Promise<{ e
 
 type ProxyHostWriteOptions = Pick<
   EnsureProxyHostOptions,
-  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc'
+  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc' | 'baseDomain'
 > & {
   // Only set (non-zero) for grpc hosts — see ensureGrpcCertificate. Cloudflare
   // requires the origin to terminate real TLS+HTTP2/ALPN for gRPC to work at
@@ -438,6 +459,7 @@ export function buildProxyHostPayload({
   websocket,
   autheliaProtected,
   grpc,
+  baseDomain,
   certificateId,
 }: ProxyHostWriteOptions) {
   return {
@@ -459,7 +481,7 @@ export function buildProxyHostPayload({
     http2_support: grpc ? true : false,
     hsts_enabled: false,
     hsts_subdomains: false,
-    advanced_config: computeAdvancedConfig({ autheliaProtected, grpc, forwardHost, forwardPort, websocket }),
+    advanced_config: computeAdvancedConfig({ autheliaProtected, grpc, forwardHost, forwardPort, websocket, baseDomain }),
   };
 }
 
@@ -541,13 +563,24 @@ export async function ensureProxyHost({
   websocket,
   autheliaProtected,
   grpc,
+  baseDomain,
 }: EnsureProxyHostOptions): Promise<EnsureProxyHostResult> {
   const baseUrl = npmApiUrl.replace(/\/+$/, '');
   const token = await login(baseUrl, npmEmail, npmPassword);
   const certificateId = grpc ? await ensureGrpcCertificate(baseUrl, token, hostname) : 0;
   const existing = await findProxyHostByDomain(baseUrl, token, hostname);
 
-  const options = { hostname, forwardScheme, forwardHost, forwardPort, websocket, autheliaProtected, grpc, certificateId };
+  const options = {
+    hostname,
+    forwardScheme,
+    forwardHost,
+    forwardPort,
+    websocket,
+    autheliaProtected,
+    grpc,
+    baseDomain,
+    certificateId,
+  };
 
   if (!existing) {
     let created: NpmProxyHost;
@@ -578,7 +611,14 @@ export async function ensureProxyHost({
     throw new Error(`Nginx Proxy Manager host for ${hostname} already exists and is not managed by this service.`);
   }
 
-  const expectedAdvancedConfig = computeAdvancedConfig({ autheliaProtected, grpc, forwardHost, forwardPort, websocket });
+  const expectedAdvancedConfig = computeAdvancedConfig({
+    autheliaProtected,
+    grpc,
+    forwardHost,
+    forwardPort,
+    websocket,
+    baseDomain,
+  });
   const needsUpdate =
     existing.forward_scheme !== forwardScheme ||
     existing.forward_host !== forwardHost ||

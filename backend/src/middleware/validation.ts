@@ -229,6 +229,14 @@ export const schemas = {
   invitationAccept: Joi.object({
     password: passwordSchema.required(),
   }),
+  // Public "request access" form on the /access-denied page (plan.md §463):
+  // the hostname the user was turned away from, their own address to reply
+  // to, and a free-text reason.
+  accessRequest: Joi.object({
+    hostname: domainSchema.required(),
+    email: emailSchema.required(),
+    reason: Joi.string().trim().min(1).max(2000).required(),
+  }),
   recoveryResetAdminPassword: Joi.object({
     username: usernameSchema.required(),
     password: passwordSchema.required(),

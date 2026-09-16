@@ -16,6 +16,7 @@ import usersRouter from './routes/users';
 import networkRouter from './routes/network';
 import selfUpdateRouter from './routes/selfUpdate';
 import socialRouter from './routes/social';
+import accessRequestsRouter from './routes/accessRequests';
 import { getAppVersion } from './version';
 import {
   ensureUserRolesTable,
@@ -178,6 +179,8 @@ for (const prefix of ROUTE_PREFIXES) {
   // Auth routes (setup/login are partially gated inside the router)
   app.use(`${prefix}/auth`, authRouter);
   app.use(`${prefix}/recovery`, recoveryRouter);
+  // Public, same reasoning as recovery above — see accessRequests.ts.
+  app.use(`${prefix}/access-requests`, accessRequestsRouter);
   // The SSE stream authenticates via a short-lived ticket, so it must be
   // registered before the JWT gate below.
   app.get(`${prefix}/services/stream`, streamLimiter, sseHandler);

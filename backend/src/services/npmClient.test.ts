@@ -19,6 +19,7 @@ const baseOptions = {
   websocket: true,
   autheliaProtected: false,
   grpc: false,
+  baseDomain: 'example.com',
 };
 
 function mockLogin() {
@@ -39,6 +40,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: false,
+      baseDomain: 'example.com',
       certificateId: 0,
     });
 
@@ -72,6 +74,7 @@ describe('buildProxyHostPayload', () => {
       websocket: false,
       autheliaProtected: false,
       grpc: false,
+      baseDomain: 'example.com',
       certificateId: 0,
     });
 
@@ -89,6 +92,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: false,
+      baseDomain: 'example.com',
       certificateId: 0,
     });
 
@@ -105,6 +109,7 @@ describe('buildProxyHostPayload', () => {
       websocket: undefined as unknown as boolean,
       autheliaProtected: false,
       grpc: false,
+      baseDomain: 'example.com',
       certificateId: 0,
     });
     expect(payload.allow_websocket_upgrade).toBe(false);
@@ -120,11 +125,29 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: true,
       grpc: false,
+      baseDomain: 'example.com',
       certificateId: 0,
     });
 
     expect(payload.advanced_config).toContain('include /snippets/authelia-location.conf;');
     expect(payload.advanced_config).toContain('include /snippets/authelia-authrequest.conf;');
+  });
+
+  it('redirects a group-denied (403) request to the dashboard\'s access-denied page', () => {
+    const payload = buildProxyHostPayload({
+      hostname: 'paperless.example.com',
+      forwardScheme: 'http',
+      forwardHost: '172.17.0.1',
+      forwardPort: 8000,
+      websocket: true,
+      autheliaProtected: true,
+      grpc: false,
+      baseDomain: 'example.com',
+      certificateId: 0,
+    });
+
+    expect(payload.advanced_config).toContain('error_page 403 = @access_denied;');
+    expect(payload.advanced_config).toContain('return 302 https://example.com/access-denied?host=$host;');
   });
 
   it('forces allow_websocket_upgrade off when protected, even if requested on', () => {
@@ -139,6 +162,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: true,
       grpc: false,
+      baseDomain: 'example.com',
       certificateId: 0,
     });
 
@@ -154,6 +178,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: true,
+      baseDomain: 'example.com',
       certificateId: 42,
     });
 
@@ -178,6 +203,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: false,
+      baseDomain: 'example.com',
       certificateId: 42,
     });
 

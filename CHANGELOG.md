@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.105.0] — 2026-09-16
+
+### Access
+
+- Themed access-denied page for a group-denied app, with a request-access email form
+
 ## [0.104.7] — 2026-09-16
 
 ### Fixed

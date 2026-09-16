@@ -14,6 +14,7 @@ export interface OutgoingMail {
   to: string;
   subject: string;
   text: string;
+  replyTo?: string;
 }
 
 function transportFor(config: MailConfig): nodemailer.Transporter {
@@ -46,6 +47,7 @@ export async function sendMail(mail: OutgoingMail): Promise<void> {
     await transport.sendMail({
       from: fromHeader(config),
       to: mail.to,
+      replyTo: mail.replyTo,
       subject: mail.subject,
       text: mail.text,
     });

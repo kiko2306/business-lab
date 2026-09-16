@@ -14,6 +14,7 @@ import { AuditLogsComponent } from './pages/audit-logs/audit-logs.component';
 import { UsersComponent } from './pages/users/users.component';
 import { SelfUpdateComponent } from './pages/self-update/self-update.component';
 import { RecoveryComponent } from './pages/recovery/recovery.component';
+import { AccessDeniedComponent } from './pages/access-denied/access-denied.component';
 import { authGuard } from './guards/auth.guard';
 import { guestGuard } from './guards/guest.guard';
 import { requireCapability, requireAnyCapability } from './guards/capability.guard';
@@ -38,6 +39,12 @@ export const routes: Routes = [
     // Public invite landing (plan.md §158): reachable signed out, no guard.
     path: 'set-password',
     component: SetPasswordComponent,
+  },
+  {
+    // Where a group-denied (403) Authelia request now 302s (plan.md §463):
+    // reachable signed out, no guard.
+    path: 'access-denied',
+    component: AccessDeniedComponent,
   },
   {
     // The authenticated shell: one header/footer around every signed-in page.
