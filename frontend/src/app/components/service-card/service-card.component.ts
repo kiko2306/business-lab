@@ -121,6 +121,15 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     return `Pinned to ${(this.service.pinnedImages ?? []).join(', ')} — Unpin to follow the compose-file tags again`;
   }
 
+  /** The app's own compose file hardcodes a version (compat), not a self-update pin. */
+  protected versionPinned(): boolean {
+    return (this.service.versionPinned?.length ?? 0) > 0;
+  }
+
+  protected versionPinnedTitle(): string {
+    return `Version pinned to ${(this.service.versionPinned ?? []).join(', ')} — set in this app's own compose file`;
+  }
+
   async unpin(): Promise<void> {
     const confirmed = await this.confirm.ask({
       title: `Unpin ${this.service.label}`,

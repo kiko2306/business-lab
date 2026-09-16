@@ -12,6 +12,7 @@ import {
   clearImagePins,
   parseImageRef,
   pickLocalDigest,
+  baseTagPins,
 } from './composeOverride';
 
 let appDir = '';
@@ -139,5 +140,34 @@ describe('pickLocalDigest', () => {
 
   it('returns null for a locally built image, which has no digests at all', () => {
     expect(pickLocalDigest([], 'business-lab-backend')).toBeNull();
+  });
+});
+
+describe('baseTagPins', () => {
+  it('reports non-latest tags from the base compose file', () => {
+    const composeFile = path.join(appDir, 'docker-compose.yml');
+    fs.writeFileSync(
+      composeFile,
+      yaml.dump({
+        services: {
+          guacamole: { image: 'guacamole/guacamole:1.6.0' },
+          guacd: { image: 'guacamole/guacd:1.6.0' },
+        },
+      })
+    );
+    expect(baseTagPins(composeFile)).toEqual(['1.6.0']);
+  });
+
+  it('reports nothing when every image floats on latest', () => {
+    const composeFile = path.join(appDir, 'docker-compose.yml');
+    fs.writeFileSync(composeFile, yaml.dump({ services: { app: { image: 'clamav/clamav:latest' } } }));
+    expect(baseTagPins(composeFile)).toEqual([]);
+  });
+
+  it('treats an unparseable or missing compose file as no pins rather than throwing', () => {
+    const composeFile = path.join(appDir, 'docker-compose.yml');
+    fs.writeFileSync(composeFile, ': not yaml : [');
+    expect(baseTagPins(composeFile)).toEqual([]);
+    expect(baseTagPins(path.join(appDir, 'missing.yml'))).toEqual([]);
   });
 });

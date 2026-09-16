@@ -359,6 +359,9 @@ export interface ServiceStatusPayload {
   // the app's managed docker-compose.override.yml. Non-empty = frozen on
   // that build until the operator clears it with "Unpin".
   pinnedImages?: string[];
+  // Non-`latest` tags baked into the app's own docker-compose.yml (compat
+  // pin, e.g. Guacamole/guacd matching versions) — informational, no action.
+  versionPinned?: string[];
   ports?: ServicePortMapping[];
   // The service's public hostname, only when exposure is enabled and
   // provisioned successfully — null/absent otherwise, including for

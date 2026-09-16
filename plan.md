@@ -28451,3 +28451,25 @@ Verified: `./scripts/check.sh backend typecheck` and `test` clean (921
 tests, one new for the purge query). Not yet verified live against
 `home-srv-01` — no exposure/Docker/networking surface touched, so this
 ships behind the usual dev→beta→main promotion rather than a host check.
+
+## 448. Version-pinned badge — apps whose base compose tag isn't `latest`
+
+Distinct from the existing digest pin: self-update's "Pinned"/"Unpin"
+(§209, `composeOverride.ts`) is dynamic state the dashboard writes and
+clears on every pull. What this adds is informational only — a handful of
+apps (Guacamole, Scrutiny, Kimai's MariaDB, `postgres:16-alpine`, …)
+hardcode an exact version *in their own `docker-compose.yml`*, for compat
+reasons no pull ever moves past. There is no matching "unpin" action for
+that: compose files are read-only to the backend (CLAUDE.md "Never"),
+so the only way to change it is a human editing the file in git.
+
+Added `baseTagPins(composeFile)` (`composeOverride.ts`) — reads the base
+compose file, returns the de-duped set of non-`latest` image tags via the
+existing `parseImageRef`. Wired into `status.ts` as `versionPinned` next to
+the existing `pinnedImages`, threaded through `ServiceStatusPayload` and the
+frontend `ServiceStatus` model to a badge-only line on the service card
+(🔒 "version pinned", tooltip names the tag(s)) — no button, since there is
+nothing for one to do.
+
+Verified: `./scripts/check.sh backend typecheck`/`test` (924 tests, +3 new)
+and `frontend test`/`build` (62/62, +2 new) all clean.

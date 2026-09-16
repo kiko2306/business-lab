@@ -168,6 +168,36 @@ export function writeImagePins(appDir: string, pins: Map<string, string | null>)
   logger.info('Wrote compose image pins', { file, services: Object.keys(services) });
 }
 
+/**
+ * Non-`latest` image tags in an app's *base* compose file — e.g. Guacamole's
+ * `1.6.0` (must match `guacd`) or Scrutiny's `v0.9.4-omnibus` (ponytail
+ * debt). Unlike the digest pins above, this is a choice baked into
+ * `docker-compose.yml` itself: nothing the dashboard writes or an "Unpin"
+ * button could touch, since compose files are read-only to the backend
+ * (CLAUDE.md "Never"). Informational only — surfaced as a badge, no action.
+ */
+export function baseTagPins(composeFile: string): string[] {
+  let doc: OverrideDoc | null;
+  try {
+    doc = yaml.load(fs.readFileSync(composeFile, 'utf8')) as OverrideDoc | null;
+  } catch (error) {
+    logger.warn('Could not read compose file for version pins', { composeFile, error: (error as Error).message });
+    return [];
+  }
+
+  const tags = new Set<string>();
+  for (const def of Object.values(doc?.services ?? {})) {
+    if (typeof def?.image !== 'string') {
+      continue;
+    }
+    const ref = parseImageRef(def.image);
+    if (ref && !ref.pinned && ref.reference !== 'latest') {
+      tags.add(ref.reference);
+    }
+  }
+  return [...tags];
+}
+
 /** Drop the whole override file (the "Unpin" action). */
 export function clearImagePins(appDir: string): void {
   const file = overridePath(appDir);

@@ -110,6 +110,9 @@ export interface ServiceStatus {
   // docker-compose.override.yml (`repo:tag@sha256:…`). Non-empty means the app
   // is frozen on that build until "Unpin".
   pinnedImages?: string[];
+  // Non-`latest` tags baked into the app's own compose file (e.g. Guacamole
+  // must match guacd's version) — informational badge, nothing to unpin.
+  versionPinned?: string[];
   ports?: ServicePortMapping[];
   exposedHostname?: string | null;
   // URL path suffix for the app's web UI when it isn't the bare root

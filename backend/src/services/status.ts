@@ -10,7 +10,7 @@ import http from 'http';
 import logger from '../utils/logger';
 import { getAllServices, getService, getProjectName, getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getServiceExposureRow } from './exposure';
-import { pinnedImages } from './composeOverride';
+import { baseTagPins, pinnedImages } from './composeOverride';
 import { ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
 
 /**
@@ -278,6 +278,9 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
     // can say so.
     const resolvedForPins = resolveComposeFile(serviceName);
     const pinned = resolvedForPins?.appDir ? [...pinnedImages(resolvedForPins.appDir).values()] : [];
+    // Version pin baked into docker-compose.yml itself (compat, not
+    // self-update) — informational badge only, see baseTagPins' docstring.
+    const versionPinned = resolvedForPins?.composeFile ? baseTagPins(resolvedForPins.composeFile) : [];
 
     return {
       name: serviceName,
@@ -292,6 +295,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       dependsOn: service.dependsOn,
       requires: service.requires,
       pinnedImages: pinned,
+      versionPinned,
       ports,
       exposedHostname,
       webPath: service.webPath,

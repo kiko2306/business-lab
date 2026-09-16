@@ -286,3 +286,33 @@ describe('ServiceCardComponent unpin (§401)', () => {
     expect(args.danger).toBe(true);
   });
 });
+
+describe('ServiceCardComponent versionPinned', () => {
+  let component: ServiceCardComponent;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh', 'unpinService']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+        { provide: AuthService, useValue: jasmine.createSpyObj('AuthService', ['isWebmaster']) },
+      ],
+    }).compileComponents();
+
+    component = TestBed.createComponent(ServiceCardComponent).componentInstance;
+  });
+
+  it('is false when the compose file has no non-latest tags', () => {
+    component.service = service('clamav', 'running', { versionPinned: [] });
+    expect(component['versionPinned']()).toBe(false);
+  });
+
+  it('is true and names the tag when the base compose file pins a version', () => {
+    component.service = service('guacamole', 'running', { versionPinned: ['1.6.0'] });
+    expect(component['versionPinned']()).toBe(true);
+    expect(component['versionPinnedTitle']()).toContain('1.6.0');
+  });
+});

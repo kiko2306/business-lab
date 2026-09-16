@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.102.3] — 2026-09-16
+
+### Frontend
+
+- Show a version-pinned badge for apps whose base compose tag isn't latest
+
 ## [0.102.2] — 2026-09-16
 
 ### Backend

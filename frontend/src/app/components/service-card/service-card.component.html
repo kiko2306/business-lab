@@ -28,6 +28,9 @@
       <span *ngIf="pinned()" class="text-info-emphasis" [title]="pinnedTitle()">
         · 📌 pinned to a fixed image
       </span>
+      <span *ngIf="versionPinned()" class="text-body-secondary" [title]="versionPinnedTitle()">
+        · 🔒 version pinned
+      </span>
       <span *ngIf="service.error" class="text-danger">· {{ service.error }}</span>
     </div>
 
