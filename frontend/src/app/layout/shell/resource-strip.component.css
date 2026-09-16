@@ -4,29 +4,48 @@
 
 .rs {
   display: flex;
-  align-items: center;
-  gap: 0.85rem;
+  align-items: stretch;
+  gap: 0.9rem;
 }
 
 .rs__meter {
   display: flex;
-  align-items: center;
-  gap: 0.4rem;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 4.6rem;
+}
+
+.rs__top {
+  display: flex;
+  align-items: baseline;
+  gap: 0.3rem;
   font-size: 0.72rem;
   font-weight: 600;
-  letter-spacing: 0.03em;
-  color: var(--bs-secondary-color);
+  letter-spacing: 0.02em;
   white-space: nowrap;
 }
 
+.rs__icon {
+  font-size: 0.85rem;
+  line-height: 1;
+  /* Baseline-aligned text pulls an emoji glyph up; nudge it back down. */
+  transform: translateY(1px);
+}
+
+.rs__primary {
+  font-variant-numeric: tabular-nums;
+  color: var(--bs-body-color);
+}
+
 .rs__label {
-  min-width: 2.2rem;
+  color: var(--bs-secondary-color);
+  font-weight: 500;
 }
 
 .rs__track {
-  display: inline-block;
-  width: 52px;
-  height: 6px;
+  display: block;
+  width: 100%;
+  height: 5px;
   border-radius: 999px;
   background: var(--bs-tertiary-bg);
   overflow: hidden;
@@ -40,18 +59,11 @@
   transition: width 0.4s ease;
 }
 
-.rs__val {
-  min-width: 2.4rem;
-  text-align: right;
-  font-variant-numeric: tabular-nums;
-  color: var(--bs-body-color);
-}
-
 .rs__meter[data-level='warn'] .rs__fill {
   background: var(--bs-warning, #f59e0b);
 }
 
-.rs__meter[data-level='warn'] .rs__val {
+.rs__meter[data-level='warn'] .rs__primary {
   color: var(--bs-warning-text-emphasis, #f59e0b);
 }
 
@@ -59,7 +71,7 @@
   background: var(--bs-danger, #ef4444);
 }
 
-.rs__meter[data-level='crit'] .rs__val {
+.rs__meter[data-level='crit'] .rs__primary {
   color: var(--bs-danger-text-emphasis, #ef4444);
 }
 
@@ -72,9 +84,8 @@
     gap: 0.5rem;
   }
 
-  .rs__track {
+  .rs__meter {
     flex: 1 1 auto;
-    width: auto;
-    max-width: 96px;
+    min-width: 0;
   }
 }

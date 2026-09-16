@@ -28672,3 +28672,40 @@ the cache getter is a one-line accessor, same untested-without-Docker
 convention as the rest of `networkScan.ts`) and `frontend test`/`build`
 (67/67, +1 new confirming `hostLanIp` wins over `window.location.hostname`
 when set). 0.104.1.
+
+## 455. Resource strip matched to gethomepage's own widget: icons, free-space text, 5s polling
+
+User: shared screenshots of Home Page's `resources` widget (icon, headline
+number, thin bar per metric — "10% CPU", "8.7 GiB Free", "310 GB Free")
+next to the dashboard's own header strip (a plain label-bar-percent row for
+all three), asking for the UI to match and noting Home Page "seems more
+accurate and updates more often."
+
+`apps/home-page/data/widgets.yaml` runs gethomepage's built-in `resources`
+widget (`cpu: true, memory: true, disk: /`) — no special host mounts of its
+own; Linux's default (non-`pid: host`) `/proc` visibility is enough for
+CPU/memory, and its container's overlay root happens to sit on the same
+disk as the host. The dashboard's own `/api/health` (`health.ts`) already
+has *better* inputs than that — `os.cpus()`/`os.totalmem()`, plus a
+`/hostfs` bind mount specifically so disk numbers reflect the real host
+root, not the Docker data-root overlay (§83.3). The gap was never data
+quality, only presentation and cadence.
+
+`resource-strip.component.ts`: `Meter` gains an `icon` and splits `primary`
+(the headline number) from `label` (what it is) — CPU keeps a percent
+("13% CPU", matching gethomepage's own CPU widget), memory/disk switch from
+percent-used to free space, formatted the same way gethomepage's own
+widgets do (binary GiB for memory, one decimal; decimal GB for disk,
+whole number) via two new pure formatters. The utilisation bar underneath
+still tracks percent-used regardless of what the headline number shows —
+same as gethomepage's own bars. Poll interval 30s → 5s, matching
+gethomepage's snappier default cadence — cheap either way (a running
+tick-counter diff plus `df`).
+
+Verified: `./scripts/check.sh frontend test`/`build` (73/73, +6 new —
+`resource-strip.component.spec.ts` didn't exist before; covers the CPU/
+memory/disk formatting, the "—" fallback when no disk could be measured,
+independent per-meter thresholds, and the actual poll-and-apply flow via
+`fakeAsync`). No backend change, so no backend re-run needed. UI-only —
+not proven live against the real host (no dashboard credentials to
+screenshot the authenticated page), same limitation noted in §452.

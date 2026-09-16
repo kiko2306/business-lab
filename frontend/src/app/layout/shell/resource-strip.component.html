@@ -1,7 +1,10 @@
 <div class="rs" *ngIf="meters as list">
-  <div class="rs__meter" *ngFor="let m of list" [attr.data-level]="level(m)" [title]="m.label + ' ' + m.value + '%'">
-    <span class="rs__label">{{ m.label }}</span>
-    <span class="rs__track"><span class="rs__fill" [style.width.%]="m.value"></span></span>
-    <span class="rs__val">{{ m.value }}%</span>
+  <div class="rs__meter" *ngFor="let m of list" [attr.data-level]="level(m)" [title]="m.title">
+    <div class="rs__top">
+      <span class="rs__icon" aria-hidden="true">{{ m.icon }}</span>
+      <span class="rs__primary">{{ m.primary }}</span>
+      <span class="rs__label">{{ m.label }}</span>
+    </div>
+    <span class="rs__track"><span class="rs__fill" [style.width.%]="m.percent"></span></span>
   </div>
 </div>

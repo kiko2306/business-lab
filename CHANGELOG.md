@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.104.2] — 2026-09-16
+
+### Frontend
+
+- Match the header's resource strip to gethomepage's own widget: icons, free-space figures, 5s polling
+
 ## [0.104.1] — 2026-09-16
 
 ### Backend
