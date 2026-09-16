@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.0] — 2026-09-16
+
+### Added
+
+- MeshCentral re-added for endpoints that can't join the NetBird/Tailscale overlay — Guacamole covers the overlay case, this covers the rest, exposed directly with its own login (no Authelia double-gate)
+
 ## [0.116.2] — 2026-09-16
 
 ### Added

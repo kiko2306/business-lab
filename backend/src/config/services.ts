@@ -571,15 +571,76 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // (services.ts, nginx-proxy-manager) for why these are hidden without
     // auto-generation.
     hiddenEnvKeys: ['GUACAMOLE_DB_USER', 'GUACAMOLE_DB_NAME'],
-    // Chosen over MeshCentral for machines on the overlay (§84.1) precisely
-    // because it needs no agent: no pinned certificate hash to go wrong behind
-    // the tunnel, and Authelia can gate it without breaking anything, since
-    // there is no agent to fail a forward-auth redirect.
+    // For machines *on* the overlay (§84.1) precisely because it needs no
+    // agent: no pinned certificate hash to go wrong behind the tunnel, and
+    // Authelia can gate it without breaking anything, since there is no
+    // agent to fail a forward-auth redirect. MeshCentral (below) is the
+    // agent-based counterpart, for endpoints that can't join the overlay.
     //
     // Not on the public tunnel, though: it's RDP/VNC/SSH to every overlay
     // host behind one login — the highest-value target in the registry.
     // Reach it over the NetBird/Tailscale overlay (plan.md §210.3).
     overlayOnly: true,
+  },
+  'meshcentral': {
+    name: 'meshcentral',
+    label: 'MeshCentral',
+    description: 'Remote management for endpoints outside the overlay',
+    icon: 'remote',
+    category: 'Networking & Security',
+    composePath: 'apps/meshcentral/docker-compose.yml',
+    healthCheck: {
+      // The container's internal scheme flips with exposure state (HTTPS
+      // standalone, plain HTTP once tlsOffload is set), so a fixed-URL probe
+      // here can't win. The compose healthcheck tries both; the dashboard
+      // reads container status.
+      enabled: false,
+    },
+    // Published as mesh.<base-domain>, not meshcentral.<base-domain> — "mesh"
+    // is what the agent config and the operator reach for, and it keeps the
+    // address stable if the implementation is ever swapped.
+    exposureSubdomain: 'mesh',
+    // Its whole point is reaching endpoints that are *not* on the overlay
+    // (Guacamole's job, above, for the ones that are) — an installed agent
+    // dialing home over the public tunnel, from a machine that may not even
+    // be one of ours. Checked live against upstream source
+    // (webserver.js): the agent's own WebSocket (`agent.ashx`) and the
+    // installer/enrolment endpoints it needs before it has any session at
+    // all (`agentinvite`, `invite`, `meshagents`, `meshosxagent`,
+    // `meshsettings`, `agentdownload.ashx`, `agenttransfer.ashx`) carry no
+    // MeshCentral session cookie and can't complete an HTML login redirect —
+    // Authelia's forward-auth would just break them. The browser-facing
+    // control/relay endpoints (`control.ashx`, `webrelay.ashx`, etc.) *do*
+    // check MeshCentral's own session, so gating the whole hostname behind
+    // Authelia would still mean a human passes Authelia *and then*
+    // MeshCentral's own login — the exact "two logins" case §342 exists to
+    // avoid, and this app has no OIDC/SAML in the community edition to hide
+    // that second form. Exposed directly with only MeshCentral's own login,
+    // same category as DocuSeal/Kimai/Twenty — simpler than carrying a
+    // bypass-path list for the agent endpoints, since there is no Authelia
+    // gate here to bypass in the first place.
+    skipAutheliaProtection: true,
+    // MeshCentral is config-file driven; the image rewrites config.json from
+    // these env vars at start (DYNAMIC_CONFIG=true in the compose file).
+    //   HOSTNAME  -> settings.cert + domains."".certUrl host: the public name
+    //               agents pin. Without the right value agents fail with
+    //               "Agent bad web cert hash" behind Cloudflare (§62.2).
+    //   TLS_OFFLOAD -> settings.tlsOffload = the NPM container's source IP, so
+    //                  MeshCentral serves plain HTTP for NPM to wrap (exposure
+    //                  proxies http, never https) — needed regardless of the
+    //                  Authelia decision above, since NPM is still the ingress.
+    //   TRUSTED_PROXY=true -> honour NPM's X-Forwarded-* headers.
+    exposureEnvKeys: {
+      host: ['MESHCENTRAL_HOSTNAME'],
+      gatewayOnExposure: ['MESHCENTRAL_TLS_OFFLOAD'],
+      staticOnExposure: { MESHCENTRAL_TRUSTED_PROXY: 'true' },
+    },
+    managedEnvKeys: ['MESHCENTRAL_HOSTNAME', 'MESHCENTRAL_TLS_OFFLOAD', 'MESHCENTRAL_TRUSTED_PROXY'],
+    // No auto-generated admin account: MeshCentral's first account is
+    // claimed by whoever completes its own signup wizard first, same as
+    // Guacamole's guacadmin/guacadmin before rotation. Automating that
+    // first-claim (matching Twenty's/Home Assistant's owner-claim bootstraps)
+    // is a real README follow-up, not required for the app to be usable.
   },
   'dozzle': {
     name: 'dozzle',

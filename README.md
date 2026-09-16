@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.116.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.117.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -223,4 +223,22 @@ it is done — not ticked off and left behind. Section references point at
       repo's config. Check that issue periodically; delete this item once it's
       closed upstream (or once an app update fixes it for us, whichever comes
       first).
+- [ ] **MeshCentral: prove real agent enrolment through the public tunnel**
+      — the app is up and reachable (§505/§506), but the actual point of
+      re-adding it is agents on machines that aren't ours, dialing in over
+      Cloudflare + NPM rather than the overlay. Needs a real second device
+      (VM or spare machine) to install the agent on and confirm: the
+      installer/`agent.ashx` endpoints actually bypass Authelia as coded,
+      the cert path holds (`REVERSE_PROXY`/`certUrl` — MeshCentral's
+      documented fix for "Agent bad web cert hash" behind a proxy that
+      isn't MeshCentral's own TLS), and a KVM/terminal session actually
+      relays over WebSocket without WebRTC. Nothing here can be proven from
+      the dashboard host alone.
+- [ ] **MeshCentral: automate the first-account claim** — first visitor
+      to the wizard owns the server today (documented in
+      `docs/app-credentials.md`), same as Guacamole's `guacadmin` before
+      §200 automated it. Worth the same treatment (`meshcentralAdminBootstrap.ts`
+      driving `POST /createaccount` with a generated password) once the
+      live-agent proof above lands — lower priority since it's a one-time
+      manual step, not a recurring one.
 
