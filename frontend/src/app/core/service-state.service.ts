@@ -52,6 +52,7 @@ export class ServiceStateService {
     starting: 0,
   });
   private readonly lastUpdatedSubject = new BehaviorSubject<string | null>(null);
+  private readonly hostLanIpSubject = new BehaviorSubject<string | null>(null);
   private readonly refreshingSubject = new BehaviorSubject(false);
   private readonly operatingSubject = new BehaviorSubject<Record<string, ServiceAction | null>>({});
   private readonly connectionStatusSubject = new BehaviorSubject<ConnectionStatus>('connecting');
@@ -69,6 +70,7 @@ export class ServiceStateService {
 
   readonly services$ = this.servicesSubject.asObservable();
   readonly summary$ = this.summarySubject.asObservable();
+  readonly hostLanIp$ = this.hostLanIpSubject.asObservable();
   readonly lastUpdated$ = this.lastUpdatedSubject.asObservable();
   readonly refreshing$ = this.refreshingSubject.asObservable();
   readonly operating$ = this.operatingSubject.asObservable();
@@ -151,6 +153,7 @@ export class ServiceStateService {
     this.servicesSubject.next(response.services);
     this.summarySubject.next(response.summary);
     this.lastUpdatedSubject.next(response.timestamp);
+    this.hostLanIpSubject.next(response.hostLanIp ?? null);
   }
 
   private async connectWebSocket(): Promise<void> {

@@ -58,6 +58,11 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
   @Input() loadingAction: ServiceAction | null = null;
+  // The Docker host's real LAN IP (networkScan.ts), for a lanOnly/overlayOnly
+  // app's access link — falls back to this dashboard's own hostname (wrong
+  // when that's a public subdomain the tunnel doesn't forward raw ports on)
+  // only if the backend hasn't resolved one yet.
+  @Input() hostLanIp: string | null = null;
 
   @Output() actionRequested = new EventEmitter<ServiceAction>();
 
@@ -129,7 +134,8 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     if (!this.service.webPort) {
       return null;
     }
-    return `http://${window.location.hostname}:${this.service.webPort}${this.service.webPath ?? ''}`;
+    const host = this.hostLanIp ?? window.location.hostname;
+    return `http://${host}:${this.service.webPort}${this.service.webPath ?? ''}`;
   }
 
   requestAction(action: ServiceAction): void {

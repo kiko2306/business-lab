@@ -11,6 +11,7 @@ import logger from '../utils/logger';
 import { getAllServices, getService, getProjectName, getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getServiceExposureRow } from './exposure';
 import { baseTagPins, pinnedImages } from './composeOverride';
+import { getCachedHostLanIp } from './networkScan';
 import { ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
 
 /**
@@ -328,6 +329,7 @@ export async function getAllServiceStatus(): Promise<ServiceStatusResponse> {
   return {
     timestamp: new Date(),
     services: statuses,
+    hostLanIp: getCachedHostLanIp(),
     summary: {
       total: statuses.length,
       running: statuses.filter((s) => s.state === 'running').length,

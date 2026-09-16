@@ -11,6 +11,7 @@
  */
 
 import { execFile } from 'child_process';
+import logger from '../utils/logger';
 
 const SCAN_IMAGE = 'instrumentisto/nmap:latest';
 const SCAN_TIMEOUT_MS = 60_000;
@@ -98,4 +99,34 @@ export async function getLanCidr(): Promise<string> {
     'run', '--rm', '--network', 'host', '--entrypoint', 'sh', SCAN_IMAGE, '-c', RESOLVE_LAN_CIDR,
   ]);
   return stdout.trim();
+}
+
+// Rarely changes on a fixed host, and this spins up a throwaway container —
+// too slow to redo on every status poll. Cached and refreshed on a long
+// cadence, matching startSelfUpdateCheckSweeper/startAuditLogPurgeSweeper.
+let cachedHostLanIp: string | null = null;
+const HOST_LAN_IP_REFRESH_MS = 6 * 60 * 60_000;
+
+/**
+ * The host's own LAN IP (no prefix) — what a LAN/overlay-only app's access
+ * link (§453) should point at, since the dashboard's own hostname is a
+ * public subdomain when reached over the Cloudflare tunnel and Cloudflare
+ * only forwards 80/443, not an app's raw published port.
+ */
+export function getCachedHostLanIp(): string | null {
+  return cachedHostLanIp;
+}
+
+export function startHostLanIpRefresh(): void {
+  const sweep = () => {
+    getLanCidr()
+      .then((cidr) => {
+        cachedHostLanIp = cidr.split('/')[0] || null;
+      })
+      .catch((error: Error) => {
+        logger.warn('Could not resolve the host LAN IP', { error: error.message });
+      });
+  };
+  sweep();
+  setInterval(sweep, HOST_LAN_IP_REFRESH_MS).unref();
 }

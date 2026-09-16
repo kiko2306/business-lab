@@ -43,7 +43,7 @@
     subtitle="What is up right now — with its public URL and published host ports"
   >
     <ng-container *ngIf="serviceState.services$ | async as services; else loadingState">
-      <ng-container *ngIf="groupRunningPortsByCategory(services) as portGroups">
+      <ng-container *ngIf="groupRunningPortsByCategory(services, serviceState.hostLanIp$ | async) as portGroups">
         <ng-container *ngIf="portGroups.length; else noPortsState">
           <div class="service-group mb-3" *ngFor="let group of portGroups; trackBy: trackByCategory">
             <h3 class="h6 text-body-secondary text-uppercase mb-2">
@@ -145,6 +145,7 @@
                 [service]="service"
                 [allServices]="services"
                 [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
+                [hostLanIp]="serviceState.hostLanIp$ | async"
                 (actionRequested)="handleAction(service.name, $event)"
               ></app-service-card>
             </div>

@@ -28636,3 +28636,39 @@ test`/`build` (66/66, +5 new — DOM-rendered checks for the lanOnly tag, the
 overlayOnly tag, the URL built from `window.location.hostname` + `webPort`,
 null when not running, and that it does *not* render alongside an exposed
 hostname). 0.104.0 (minor — new user-visible capability).
+
+## 454. LAN/overlay links use the Docker host's real LAN IP, not the dashboard's own hostname
+
+User: §453's lanOnly/overlayOnly link was wrong — it reused
+`window.location.hostname`, which is the dashboard's *own* public subdomain
+when reached over the Cloudflare tunnel. Cloudflare/NPM only forward
+80/443, so `https://dashboard.example.com:10450` was never actually
+reachable; it needs the Docker host's real LAN IP instead.
+
+`networkScan.ts` already resolves this exact value for NetBird's routing
+peer (`getLanCidr()` — "a.b.c.d/nn", a host address, not yet masked to a
+network address) via a throwaway `--network host` container, because the
+backend container itself sits on the internal bridge and can't see its own
+LAN-facing interface. Added `getCachedHostLanIp()` / `startHostLanIpRefresh()`
+on top of it: strips the CIDR down to the bare IP, cached and refreshed
+every 6h (`index.ts`, alongside the other sweepers) rather than spinning up
+a container on every status poll.
+
+Threaded through as `hostLanIp` on `ServiceStatusResponse` (host-wide, not
+per-service — unlike everything else on that payload) → `service-state.
+service.ts`'s new `hostLanIp$` → `<app-service-card [hostLanIp]="...">` →
+`lanAccessUrl()`, which now prefers it over `window.location.hostname`
+(kept as the fallback for before the sweeper's first resolve completes).
+
+Fixed the same bug at its other occurrence while here:
+`apps.component.ts`'s `buildRunningAppUrl`/`groupRunningPortsByCategory`
+(the "running apps and ports" table's LAN link) had the identical
+`window.location.hostname` mistake for any non-exposed running app, not
+just lanOnly/overlayOnly ones — same root cause, same fix, threaded through
+the same `hostLanIp$`.
+
+Verified: `./scripts/check.sh backend typecheck`/`test` (924, unchanged —
+the cache getter is a one-line accessor, same untested-without-Docker
+convention as the rest of `networkScan.ts`) and `frontend test`/`build`
+(67/67, +1 new confirming `hostLanIp` wins over `window.location.hostname`
+when set). 0.104.1.

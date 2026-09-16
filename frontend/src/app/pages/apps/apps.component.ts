@@ -53,25 +53,29 @@ interface ServicePortGroup {
 // isn't at the bare root (e.g. Pi-hole's `/admin`, NPM's admin panel on :81).
 // Rows are grouped by the same category as the full apps list so the two views
 // line up.
-function buildRunningAppUrl(service: ServiceStatus): string | null {
+function buildRunningAppUrl(service: ServiceStatus, hostLanIp: string | null): string | null {
   const suffix = service.webPath ?? '';
   if (service.exposedHostname) {
     return `https://${service.exposedHostname}${suffix}`;
   }
   if (service.webPort) {
-    return `http://${window.location.hostname}:${service.webPort}${suffix}`;
+    // Not window.location.hostname: when this dashboard is reached over its
+    // own public subdomain, that hostname doesn't forward an app's raw port
+    // (Cloudflare/NPM only carry 80/443) — the actual Docker host's LAN IP
+    // does, for a browser on the LAN or the overlay VPN either way.
+    return `http://${hostLanIp ?? window.location.hostname}:${service.webPort}${suffix}`;
   }
   return null;
 }
 
-function groupRunningPortsByCategory(services: ServiceStatus[]): ServicePortGroup[] {
+function groupRunningPortsByCategory(services: ServiceStatus[], hostLanIp: string | null): ServicePortGroup[] {
   const byCategory = new Map<string, ServicePortRow[]>();
   for (const service of services) {
     if (service.state !== 'running' || !service.ports?.length) {
       continue;
     }
     const category = service.category ?? 'Other';
-    const url = buildRunningAppUrl(service);
+    const url = buildRunningAppUrl(service, hostLanIp);
     const row: ServicePortRow = { serviceName: service.name, label: service.label, url, ports: service.ports };
     const bucket = byCategory.get(category);
     if (bucket) {

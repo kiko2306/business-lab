@@ -43,6 +43,7 @@ import { startCriticalServiceHealthMonitor } from './services/criticalServiceHea
 import { regenerateHomepageServices } from './services/homepageConfig';
 import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
 import { startAuditLogPurgeSweeper } from './utils/audit';
+import { startHostLanIpRefresh } from './services/networkScan';
 import { ensureSocialDraftsTable } from './services/socialDrafts';
 
 const apiLimiter = rateLimit({
@@ -267,6 +268,7 @@ startCriticalServiceHealthMonitor();
 regenerateHomepageServices();
 startSelfUpdateCheckSweeper();
 startAuditLogPurgeSweeper();
+startHostLanIpRefresh();
 
 const server = app.listen(PORT, () => {
   console.log(`Homelab backend listening on port ${PORT}`);

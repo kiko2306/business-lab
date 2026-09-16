@@ -158,6 +158,9 @@ export interface ServiceStatusResponse {
   timestamp: string;
   services: ServiceStatus[];
   summary: ServiceSummary;
+  // Host-wide, not per-service — where a LAN/overlay-only app's access link
+  // points instead of the dashboard's own (possibly public) hostname.
+  hostLanIp?: string | null;
 }
 
 /** Which Cloudflare account holds the client's zone (plan.md §203/§357). */

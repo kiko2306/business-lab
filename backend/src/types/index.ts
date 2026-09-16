@@ -393,6 +393,9 @@ export interface ServiceStatusResponse {
   timestamp: Date;
   services: ServiceStatusPayload[];
   summary: ServiceStatusSummary;
+  // Host-wide, not per-service — a LAN/overlay-only app's access link
+  // targets this instead of the dashboard's own (possibly public) hostname.
+  hostLanIp?: string | null;
 }
 
 export interface ResolvedComposeFile {

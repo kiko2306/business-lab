@@ -301,9 +301,16 @@ describe('ServiceCardComponent lanAccessUrl', () => {
     component = fixture.componentInstance;
   });
 
-  it('builds a LAN URL from this dashboard\'s own hostname and the app\'s published port', () => {
+  it('falls back to this dashboard\'s own hostname when the backend has not resolved a LAN IP yet', () => {
     component.service = service('clamav', 'running', { lanOnly: true, webPort: 10450 });
+    component.hostLanIp = null;
     expect(component['lanAccessUrl']()).toBe(`http://${window.location.hostname}:10450`);
+  });
+
+  it('prefers the Docker host\'s real LAN IP over this dashboard\'s own (possibly public) hostname', () => {
+    component.service = service('clamav', 'running', { lanOnly: true, webPort: 10450 });
+    component.hostLanIp = '192.168.1.236';
+    expect(component['lanAccessUrl']()).toBe('http://192.168.1.236:10450');
   });
 
   it('is null when the app has no published port (not running)', () => {
