@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.110.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.110.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -234,13 +234,6 @@ per-app items depend on it, and each other app item is independent of the
 rest (§341's DocuSeal SSO precedent: "looks doable" and "is doable" differ
 per app, so no batch-approval here, one at a time).
 
-- [ ] **DocuSeal: update an existing account's password, not just create**
-      (§482) — `createTeamUser` 422s on a duplicate active email rather than
-      updating it, so a user who already has a DocuSeal account and later
-      changes their dashboard password gets a logged warning, not a synced
-      account. Needs a lookup-by-email path (parsing the `/settings/users`
-      listing for the row's id, since there's no search-by-email API) then a
-      `PATCH /users/:id`.
 - [ ] **NocoDB**: no bootstrap file exists yet (seeded via
       `NC_ADMIN_EMAIL`/`NC_ADMIN_PASSWORD` env only) — check whether
       multi-user invites are free-tier or Enterprise-gated before building

@@ -30010,3 +30010,74 @@ restart needed: `homepageConfig.ts` parses the compose file's label text
 directly rather than live container labels, so a backend restart alone
 (which calls `regenerateHomepageServices()` on boot) was enough. `beta` →
 `main`: left unmerged per [[main-merge-requires-request]].
+
+## 487. DocuSeal fan-out updates an existing account's password, not just create
+
+Picked up the README's "§482" item: `createTeamUser` 422s on a duplicate
+active email instead of updating it, so a user who already has a DocuSeal
+account and later changes their dashboard password only got a logged
+warning, not a synced account. The README's own plan for this ("lookup the
+user's id by parsing `/settings/users`, then `PATCH /users/:id`") turned out
+to be wrong once checked against DocuSeal's actual source (read live off
+GitHub — `docusealco/docuseal`, not guessed): `UsersController#update` does
+
+```ruby
+@user.update(attrs.except(*(current_user == @user ? %i[password otp_required_for_login role] : %i[password])))
+```
+
+`:password` is excluded from **every** update through that action, both
+self-edit and admin-editing-someone-else — there is no HTTP form path that
+can set another user's password at all. The only password-reset mechanism
+DocuSeal has is Devise's email-token flow
+(`InvitationsController < Devise::PasswordsController`); the plaintext token
+only ever exists in the outbound email, and the DB stores just a digest, so
+there's nothing to scrape or replay. Even reviving an archived account via
+`create` ignores the submitted password and assigns
+`SecureRandom.hex` instead. Confirmed this is a real "looks doable" vs "is
+doable" gap (§341 precedent) before building anything, and took it back to
+the user rather than pushing ahead on the wrong plan.
+
+**Rejected**: hand-computing a bcrypt hash (`bcryptjs` is already a backend
+dependency, and `config.stretches = 10` with no pepper is confirmed from
+DocuSeal's `devise.rb`) and writing it straight into
+`apps/docuseal/data/docuseal.sqlite`'s `users.encrypted_password` column —
+technically reachable, since `APPS_DIR` is already mounted read-write into
+the backend. User's call: this bypasses DocuSeal's own application layer
+entirely to touch live auth data, and hardcodes an assumption about its
+hash cost/pepper that would silently drift the moment a future image bumps
+Devise's config — a materially different (and more fragile) kind of
+automation than anything else in §480.
+
+**Built instead** (`backend/src/services/docusealDb.ts`): same approach
+`itflowDb.ts` already established for exactly this class of problem — reach
+the app through its own runtime instead of its data files. A `docker
+compose run --rm --no-deps -T --entrypoint /bin/sh docuseal` one-off
+container pipes a base64'd Ruby script into `/app/bin/rails runner -`,
+which does `User.active.find_by(email: ...).update!(password: ...)`. This
+goes through Devise's own `password=` setter — the *model* layer has no
+password restriction, only the controller does — so it gets hashed exactly
+the way Devise expects regardless of cost/pepper, the same way `rails
+runner` would if a human ran it by hand, no bespoke hash math. Email and
+password travel in via `-e DOCUSEAL_FANOUT_EMAIL`/`-e
+DOCUSEAL_FANOUT_PASSWORD` environment variables, never interpolated into
+the script text, matching `itflowDb.ts`'s existing precedent for secret
+handling.
+
+`docusealTeamProvisioning.ts`'s `provisionDocusealTeamMember` now falls
+back to `setDocusealUserPassword` when `createTeamUser` returns
+`already-exists`, returning a new `'updated'` outcome on success (still
+`'already-exists'`, now meaning "found but the update itself failed", if
+the container run comes back `not-found`/`failed`).
+`noSsoCredentialFanout.ts`'s stale `(§481)` comment/warning wording, which
+predated this fix, is updated to match.
+
+`./scripts/check.sh backend typecheck`/`test` clean (965 passing, +5 new
+`docusealDb.test.ts` cases mocking `child_process.exec` the same way
+`itflowDb.test.ts` does). `scripts/bump-version.sh patch Changed …` →
+0.111.0.
+
+**Not yet verified live** — needs the same kind of proof §484 used for the
+create path: a real duplicate-email fan-out against the actual DocuSeal
+container on `home-srv-01`, confirming the container run actually executes
+and the sign-in afterward succeeds with the new password. Left on `dev`,
+unmerged.

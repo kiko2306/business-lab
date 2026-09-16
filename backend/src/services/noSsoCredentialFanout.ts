@@ -13,12 +13,11 @@
  * Assistant, Jellyfin) don't have a provisioner built yet; each is its own
  * README item.
  *
- * Only covers *creating* an account on first grant. DocuSeal's own
- * `createTeamUser` 422s on a duplicate active email rather than updating
- * it, and there's no lookup-by-email path built yet to find an existing
- * account's id and PATCH it instead (§481) — a user who already has an
- * account there and later changes their dashboard password gets a clear
- * "can't update yet" warning logged, not a silent no-op.
+ * DocuSeal also covers a later password change, not just first grant (§482):
+ * `provisionDocusealTeamMember` falls back to setting the password directly
+ * via `rails runner` in DocuSeal's own container when `createTeamUser` 422s
+ * on a duplicate active email, since DocuSeal's own `UsersController#update`
+ * has no way to do this over HTTP at all.
  *
  * Deliberately NOT wired into the recovery-mode / `recoverAdmin.ts` break-
  * glass paths (§482) — those exist specifically to work when the system is
@@ -61,7 +60,7 @@ export async function fanOutNoSsoCredentials(grantedApps: string[], input: NoSso
       const outcome = await provision(input);
       if (outcome === 'already-exists') {
         logger.warn(
-          `No-SSO credential fan-out (${serviceName}) for ${input.email}: an account already exists there and this can't update its password yet (§481) — it may now be out of sync.`
+          `No-SSO credential fan-out (${serviceName}) for ${input.email}: an account already exists there and the password update itself failed — it may now be out of sync.`
         );
       } else {
         logger.info(`No-SSO credential fan-out (${serviceName}) for ${input.email}: ${outcome}`);

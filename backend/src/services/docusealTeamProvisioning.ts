@@ -10,16 +10,13 @@
  * confirmation email required (§475: no `:confirmable` module on the User
  * model), so the account is usable immediately, not pending a click.
  *
- * Not yet wired to anything. This is the DocuSeal-specific slice of §480's
- * credential fan-out; the core mechanism — extending `user_app_access` to
- * include no-SSO apps, and hooking the six plaintext-password call sites —
- * is a separate, not-yet-built README item. This module only proves
- * DocuSeal's own side works. It also only covers *creating* an account:
- * re-running it for someone who already has one (e.g. after a later
- * password change) needs an update path this doesn't have yet — DocuSeal's
- * `POST /users` 422s on a duplicate active email rather than updating it,
- * and finding that person's DocuSeal user id to PATCH instead means parsing
- * the `/settings/users` listing, which nothing here does.
+ * `createTeamUser` 422s on a duplicate active email rather than updating it
+ * — DocuSeal's own `POST /users` form has no update mode. When that happens,
+ * this falls back to `setDocusealUserPassword` (docusealDb.ts), which sets
+ * the password directly via `rails runner` in DocuSeal's own container
+ * (§482) — the one path that actually can update an existing account,
+ * since `UsersController#update` itself always strips `:password` from an
+ * admin's edit of another user.
  */
 
 import logger from '../utils/logger';
@@ -32,9 +29,11 @@ import {
   splitName,
 } from './docusealAdminBootstrap';
 import { createTeamUser, signIn } from './docusealClient';
+import { setDocusealUserPassword } from './docusealDb';
 
 export type ProvisionDocusealTeamMemberResult =
   | 'created'
+  | 'updated'
   | 'already-exists'
   | 'failed'
   | 'admin-not-configured'
@@ -74,10 +73,19 @@ export async function provisionDocusealTeamMember(
 
   if (result === 'created') {
     logger.info(`Created a DocuSeal team account for ${input.email}`);
-  } else if (result === 'already-exists') {
-    logger.info(`DocuSeal already has an account for ${input.email}`);
-  } else {
-    logger.error(`DocuSeal team-member provisioning failed for ${input.email}`);
+    return result;
   }
+  if (result === 'already-exists') {
+    const updateResult = await setDocusealUserPassword(input.email, input.password);
+    if (updateResult === 'updated') {
+      logger.info(`Updated the existing DocuSeal team account's password for ${input.email}`);
+      return 'updated';
+    }
+    logger.warn(`DocuSeal already has an account for ${input.email} but its password could not be updated`, {
+      updateResult,
+    });
+    return 'already-exists';
+  }
+  logger.error(`DocuSeal team-member provisioning failed for ${input.email}`);
   return result;
 }

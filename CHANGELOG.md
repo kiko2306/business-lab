@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.110.2] — 2026-09-16
+
+### Changed
+
+- DocuSeal no-SSO fan-out now updates an existing account's password (rails runner in its own container), not just creates new ones
+
 ## [0.110.1] — 2026-09-16
 
 ### Changed

@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readAppEnvValue } from './appEnv';
 import { DOCUSEAL_ADMIN_EMAIL_KEY, DOCUSEAL_ADMIN_PASSWORD_KEY, resolveDocusealBaseUrl } from './docusealAdminBootstrap';
 import { createTeamUser, signIn } from './docusealClient';
+import { setDocusealUserPassword } from './docusealDb';
 import { provisionDocusealTeamMember } from './docusealTeamProvisioning';
 
 vi.mock('./appEnv', () => ({ readAppEnvValue: vi.fn() }));
@@ -10,12 +11,14 @@ vi.mock('./docusealAdminBootstrap', async (importOriginal) => ({
   resolveDocusealBaseUrl: vi.fn(),
 }));
 vi.mock('./docusealClient', () => ({ createTeamUser: vi.fn(), signIn: vi.fn() }));
+vi.mock('./docusealDb', () => ({ setDocusealUserPassword: vi.fn() }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 const mockedReadEnv = vi.mocked(readAppEnvValue);
 const mockedBaseUrl = vi.mocked(resolveDocusealBaseUrl);
 const mockedSignIn = vi.mocked(signIn);
 const mockedCreate = vi.mocked(createTeamUser);
+const mockedSetPassword = vi.mocked(setDocusealUserPassword);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -70,8 +73,17 @@ describe('provisionDocusealTeamMember', () => {
     );
   });
 
-  it('passes through already-exists', async () => {
+  it('falls back to setDocusealUserPassword on a duplicate email and reports updated', async () => {
     mockedCreate.mockResolvedValue('already-exists');
+    mockedSetPassword.mockResolvedValue('updated');
+    const result = await provisionDocusealTeamMember({ email: 'bob@example.com', password: 'pw' });
+    expect(mockedSetPassword).toHaveBeenCalledWith('bob@example.com', 'pw');
+    expect(result).toBe('updated');
+  });
+
+  it('reports already-exists when the password update itself fails', async () => {
+    mockedCreate.mockResolvedValue('already-exists');
+    mockedSetPassword.mockResolvedValue('not-found');
     const result = await provisionDocusealTeamMember({ email: 'bob@example.com', password: 'pw' });
     expect(result).toBe('already-exists');
   });
