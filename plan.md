@@ -29767,3 +29767,87 @@ accounts created, disabled, re-granted, and logged into for real at every
 step, not just asserted from a function's return value. The README's whole
 "Credential fan-out to no-SSO apps" section is closed; no open threads
 remain from this run.
+
+## 505. MeshCentral re-added — for a case Guacamole doesn't cover
+
+User's ask, with a concrete reason this time: MeshCentral was already added
+once (§264) and removed nine days later (§320) as redundant with
+Guacamole, since every endpoint the stack managed lived on the NetBird/
+Tailscale overlay, where Guacamole reaches in agentlessly. That's still
+true — but the user now has a real case Guacamole structurally can't
+serve: endpoints that are *not* on the overlay at all (machines that
+aren't ours to enroll in NetBird). MeshCentral's whole distinct value was
+always exactly this ("optional once Guacamole reaches endpoints over
+NetBird" — §264's own words); it just didn't have a live use until now.
+
+**Restored, not reinvented**: `apps/meshcentral/` and the `services.ts`
+entry are the same compose shape §264 built and §320 only ever deleted for
+being unused, not for being wrong — same image, same `DYNAMIC_CONFIG` env
+wiring, same `exposureEnvKeys.gatewayOnExposure` mechanism (§320 kept that
+mechanism and its test alive specifically for a future registry user; this
+is that user). Two things did change, deliberately, rather than
+copy-pasting a five-year-old — well, nine-day-old — decision forward
+unexamined:
+
+**Port**: §264 used `10550`; re-derived `10510` instead, since `docs/ports.md`'s
+alphabetical-in-tens scheme now has kimai at `10500` and miniflux at
+`10520` — meshcentral sorts directly between them, and `10510` was free.
+Reusing the stale historical port would have skipped past two apps added
+after MeshCentral's removal (navidrome, twenty) without following the
+scheme that placed them.
+
+**Authelia exposure — the real decision**: §264 shipped MeshCentral
+sitting behind Authelia's forward-auth, with a comment flagging the actual
+question as unresolved: does forward-auth break agent enrolment, and does
+the agent endpoint need its own hostname to dodge it? That question was
+never answered — §320 removed the app nine days later for an unrelated
+reason before anyone found out. Read MeshCentral's own route registrations
+live off `Ylianst/MeshCentral`'s `webserver.js` (not guessed, not taken
+from a third-party blog post) rather than re-ship the same unresolved
+question a second time:
+
+- The agent's actual connection (`agent.ashx`, WebSocket) and everything an
+  agent needs *before* it has any session — `agentinvite`, `invite`,
+  `meshagents`, `meshosxagent`, `meshsettings`, `agentdownload.ashx`,
+  `agenttransfer.ashx` — carry no MeshCentral session cookie and can't
+  complete an HTML login redirect. Authelia's forward-auth would simply
+  break every one of them.
+- The browser-facing control/relay endpoints (`control.ashx`,
+  `webrelay.ashx`, `webider.ashx`, `localrelay.ashx`) all wrap
+  `PerformWSSessionAuth` — MeshCentral's *own* session check. So even with
+  every agent path correctly bypassed, a human would still clear Authelia
+  and *then* MeshCentral's own login — exactly the "two logins" shape §342
+  exists to rule out, for an app with no OIDC/SAML in the community
+  edition to hide the second form behind.
+
+Chose `skipAutheliaProtection: true` over building an `autheliaBypassPaths`
+list for the eight agent-only endpoints above — same category as
+DocuSeal/Kimai/Twenty, and strictly simpler: no bypass list to keep in
+sync with upstream's route table, because there is no Authelia gate here
+to bypass in the first place. `exposureEnvKeys` (TLS_OFFLOAD/TRUSTED_PROXY)
+is unchanged either way — NPM is still the ingress regardless of the
+Authelia decision, so MeshCentral still needs to trust it as a reverse
+proxy. Guacamole's own registry comment (which used to read "chosen over
+MeshCentral") is reworded to "the agent-based counterpart" now that both
+exist for genuinely different jobs.
+
+**Not done**: automating the first-account claim (MeshCentral has no
+env/CLI hook for it, unlike Kimai/NocoDB's seed-on-boot vars — would need
+a `meshcentralAdminBootstrap.ts` driving `POST /createaccount` the way
+Twenty's/Home Assistant's bootstraps drive their own onboarding APIs).
+Left as a README follow-up rather than built speculatively — matches how
+this codebase has repeatedly shipped an app's manual first-run wizard
+first and automated the claim later once the app was proven to be staying
+(Guacamole §200, Twenty §421, Home Assistant §347).
+
+`./scripts/check.sh backend typecheck`/`test` clean (1075 passing, no
+change to test count — no new backend logic, just a registry entry and
+static compose/env files). README gets two new items: the real-agent live
+proof (needs a second device this session doesn't have) and the
+first-account automation follow-up. `docs/ports.md`, `docs/app-credentials.md`
+and `docs/licences.md` (Apache-2.0, clean, confirmed live against the
+current upstream LICENSE file) all updated. Not yet verified against the
+real stack — next section covers what could be proven from the dashboard
+host alone (the app starts, is reachable on its own hostname with no
+Authelia gate, and isn't a double-login); real agent enrolment stays the
+README item above.
