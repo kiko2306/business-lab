@@ -29503,3 +29503,12 @@ is for a human reading the file, the generator ignores it in favour of
 
 `./scripts/check.sh backend typecheck`/`test` clean (942 passing).
 `scripts/bump-version.sh patch Fixed …` → 0.107.2.
+
+## 476. §475 verified live
+
+Deployed to `home-srv-01`: `dev` fast-forwarded into `beta` (`3103453`),
+pulled + rebuilt + restarted the backend, `GET /version` → `0.107.2`.
+`apps/home-page/data/services.yaml` on the host now generates
+`href: https://docuseal.tx-home-utils.com/sign_in` for the DocuSeal tile,
+and that URL returns the real login form (HTTP 200). `beta` → `main`: left
+unmerged per [[main-merge-requires-request]].
