@@ -29801,3 +29801,45 @@ missed a real cookie bug in this exact request-chaining pattern
 (GET-for-token → POST), so this needs the same live proof before it's
 trusted, not just unit tests against mocks that can't model DocuSeal's own
 session-rotation behaviour. Left on `dev`, unmerged.
+
+## 482. §481 verified live — DocuSeal team-member provisioning works first try
+
+Deployed to `home-srv-01` (`beta` fast-forwarded to `4c28abf`, rebuilt +
+restarted, `GET /version` → `0.109.0`). Exercised the new code directly
+against the running container (`docker exec ... node -e`, same technique
+already used earlier this session to read `getAutheliaAdminUser()` output —
+invoking already-written, already-unit-tested code for verification, not
+hand-configuring anything):
+
+```
+provisionDocusealTeamMember({ email: 'docuseal-test-verify@example.com',
+  password: 'Verify-Test-Pw-123', displayName: 'Test Verify' })
+→ 'created'
+```
+
+Unlike §478's `updateProfileEmail`, this one worked on the first live
+attempt — no stale-cookie bug this time. Confirmed at three levels, not
+just the return value:
+
+- SQLite `users` row: `id=2, email=docuseal-test-verify@example.com,
+  first_name=Test, last_name=Verify, role=admin` — the display-name split
+  and the "every team member is admin, community has no other role"
+  finding both landed exactly as coded.
+- A real sign-in with those exact credentials succeeded (303 to `/`, not
+  back to `/sign_in`) — proves the password was set usably, not left as
+  DocuSeal's own `SecureRandom.hex` fallback.
+- Confirms DocuSeal's own multi-user creation genuinely isn't gated behind
+  anything in the self-hosted community edition — the real open question
+  this task existed to answer.
+
+**Cleaned up the throwaway account** rather than leave test residue on a
+real instance: signed in as the real admin, `DELETE /users/2`. DocuSeal's
+`destroy` action archives rather than hard-deletes
+(`@user.update!(archived_at:)`) — confirmed in the DB (`archived_at` now
+set) and confirmed the archived account can no longer sign in (302 back to
+`/sign_in`). The real admin account (`miguelamtx@gmail.com`) is untouched.
+
+DocuSeal's own side of §480 is proven end to end. Still open: the core
+mechanism (README item) that would actually call this from a real "grant
+access" flow, and the update-on-password-rotation path §481 flagged as not
+built. `beta` → `main`: left unmerged per [[main-merge-requires-request]].
