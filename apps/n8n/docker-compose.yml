@@ -10,6 +10,11 @@ x-n8n-db-env: &n8n-db-env
   DB_POSTGRESDB_PASSWORD: ${N8N_DB_PASSWORD}
   N8N_ENCRYPTION_KEY: ${N8N_ENCRYPTION_KEY}
 
+# Last checked for a newer image: 2026-09-16 - bump this date (even with
+# no other change) to force a re-pull on every machine that pulls this
+# commit; self-update only recreates an app whose apps/<name>/** changed
+# since its last deploy, so this is what moves a `latest`-tagged image
+# forward without a version-tag bump to diff against (§449).
 services:
   # n8n runs as uid/gid 1000 (node) but Docker creates ./data/n8n root-owned,
   # so it can't write /home/node/.n8n/config. One-off chown; exits 0.

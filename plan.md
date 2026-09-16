@@ -28473,3 +28473,42 @@ nothing for one to do.
 
 Verified: `./scripts/check.sh backend typecheck`/`test` (924 tests, +3 new)
 and `frontend test`/`build` (62/62, +2 new) all clean.
+
+## 449. A "last checked" comment in every compose file, to force `:latest` apps back into self-update's scope
+
+Follow-on to §343/§448. §343's `classifyDeploy()` scopes a self-update's
+`docker compose pull` + recreate to only the apps whose `apps/<name>/**`
+appears in `git diff --name-only <from>..<to>` — deliberate, to avoid a
+15-minute recreate-everything sweep on every deploy. The gap: an app on
+`:latest` never produces a diff line when upstream publishes a new image
+(the compose file text doesn't change), so it silently sits outside scope
+forever, unlike an app with an explicit version tag where bumping the tag
+*is* the diff.
+
+`classifyDeploy` works on file paths only (`git diff --name-only`), not on
+what kind of line changed inside them — a pure comment edit qualifies just
+as well as a real functional change. So every `apps/<name>/docker-compose.yml`
+now opens with:
+
+```
+# Last checked for a newer image: 2026-09-16 - bump this date (even with
+# no other change) to force a re-pull on every machine that pulls this
+# commit; self-update only recreates an app whose apps/<name>/** changed
+# since its last deploy, so this is what moves a `latest`-tagged image
+# forward without a version-tag bump to diff against (§449).
+```
+
+Workflow going forward: "check if X can be updated" ends with either (a)
+bumping X's pinned tag, if it has one, or (b) bumping this date comment, if
+it's still on `:latest` — either one is a real file change that lands X in
+`scope.apps` on every machine's next self-update, the same guarantee §448's
+discussion established only explicit tags had. No new code, no new UI —
+this is the existing diff-scoping mechanism, used as designed. Supersedes
+the earlier plan (this session) to hunt down and pin an exact upstream
+version for every `:latest` app via Docker Hub/GHCR digest-matching — that
+work is dropped as unnecessary now that the comment alone gets the same
+propagation guarantee, with no risk of mis-identifying a version and no
+registry-rate-limit dependency.
+
+38 `apps/*/docker-compose.yml` touched, comment-only, `yaml.safe_load`
+clean on all of them. No backend/frontend code changed — no version bump.

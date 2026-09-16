@@ -1,4 +1,9 @@
 
+# Last checked for a newer image: 2026-09-16 - bump this date (even with
+# no other change) to force a re-pull on every machine that pulls this
+# commit; self-update only recreates an app whose apps/<name>/** changed
+# since its last deploy, so this is what moves a `latest`-tagged image
+# forward without a version-tag bump to diff against (§449).
 services:
   immich-server:
     mem_limit: 900m
