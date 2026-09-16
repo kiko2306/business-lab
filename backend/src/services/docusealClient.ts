@@ -265,3 +265,76 @@ export async function updateProfileEmail(
   }
   return 'failed';
 }
+
+export type DocusealCreateUserResult = 'created' | 'already-exists' | 'failed';
+
+export interface DocusealCreateUserInput {
+  cookie: string;
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+}
+
+/**
+ * POST /users, signed in as an existing admin — `UsersController#create`,
+ * DocuSeal's own "invite a team member" form. Community edition has exactly
+ * one role (`User::ROLES = [ADMIN_ROLE]`), so every team member created this
+ * way is an admin; there's no lesser role to ask for. Unlike Devise's own
+ * signup, `password` only gets a random value when the field is left blank,
+ * so submitting one here sets it directly — no confirmation link needed
+ * (same no-`:confirmable` finding as `updateProfileEmail`, §475).
+ *
+ * A duplicate *active* email 422s with an "already exists." error on the
+ * email field (checked against the real locale string, not guessed) — the
+ * one failure mode worth telling apart, since a caller re-running this for
+ * the same person needs to know to update instead of create. Every other
+ * validation failure also 422s and comes back `failed` indistinguishably.
+ */
+export async function createTeamUser(
+  baseUrl: string,
+  input: DocusealCreateUserInput
+): Promise<DocusealCreateUserResult> {
+  let formResponse: Response;
+  try {
+    formResponse = await fetch(`${baseUrl}/users/new`, {
+      headers: { Cookie: input.cookie },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    return 'failed';
+  }
+  if (formResponse.status !== 200) return 'failed';
+  const token = extractAuthenticityToken(await formResponse.text());
+  if (!token) return 'failed';
+  const refreshedCookies = readSetCookies(formResponse.headers);
+  const cookie = refreshedCookies.length ? cookieHeader(refreshedCookies) : input.cookie;
+
+  const body = new URLSearchParams({
+    authenticity_token: token,
+    'user[first_name]': input.firstName,
+    'user[last_name]': input.lastName,
+    'user[email]': input.email,
+    'user[password]': input.password,
+  });
+
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/users`, {
+      method: 'POST',
+      redirect: 'manual',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Cookie: cookie },
+      body: body.toString(),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    return 'failed';
+  }
+  if (response.type === 'opaqueredirect' || (response.status >= 300 && response.status < 400)) {
+    return 'created';
+  }
+  if (response.status === 422 && /already exists/i.test(await response.text())) {
+    return 'already-exists';
+  }
+  return 'failed';
+}

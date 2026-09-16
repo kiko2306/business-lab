@@ -55,14 +55,17 @@ const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function resolveDocusealBaseUrl(): Promise<string> {
+// Exported for docusealTeamProvisioning.ts — same cross-project base URL a
+// per-user account create needs to sign in as the admin against, and the
+// same name-splitting rule for whatever display name the grantee has.
+export async function resolveDocusealBaseUrl(): Promise<string> {
   const port = getPublishedUpstreamPort(DOCUSEAL_SERVICE) ?? FALLBACK_PORT;
   const host = await getHostGatewayIp();
   return `http://${host}:${port}`;
 }
 
-/** Split an Authelia display name into first/last; fall back to Admin / User. */
-function splitName(displayName: string | undefined): { firstName: string; lastName: string } {
+/** Split a display name into first/last; fall back to Admin / User. */
+export function splitName(displayName: string | undefined): { firstName: string; lastName: string } {
   const parts = (displayName ?? '').trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return { firstName: 'Admin', lastName: 'User' };
   if (parts.length === 1) return { firstName: parts[0], lastName: 'Admin' };

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.109.0] — 2026-09-16
+
+### Added
+
+- DocuSeal team-member provisioning: create a real per-user account matching a dashboard user's own credentials (§480, not yet wired to the dashboard)
+
 ## [0.108.1] — 2026-09-16
 
 ### Fixed

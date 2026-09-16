@@ -29737,3 +29737,67 @@ work, and DocuSeal's own SSO precedent showed that "looks doable" and "is
 doable" can differ per app). Not batched — each app's outcome (native
 multi-user API exists vs. doesn't) can't be known until investigated, so
 batch-approval doesn't fit here; propose/implement one at a time.
+
+## 481. DocuSeal side of §480's credential fan-out — team-member provisioning
+
+Starting with DocuSeal, per the user's pick (de-risk the one app already
+being worked on before building the shared plumbing).
+
+**Checked DocuSeal's own source before writing anything** (routes.rb,
+`users_controller.rb`, the `new`/`_form` views, and the real `already_exists`
+locale string via `config/locales/i18n.yml`) rather than assume the shape:
+
+- `POST /users` — `UsersController#create` — is plain open-source
+  functionality (`app/controllers/`, not `app/proprietary/` where SSO lives),
+  no seat-count or licence check in the code. Community edition has exactly
+  one role (`User::ROLES = [ADMIN_ROLE]`), so every account created this way
+  is an admin — there's no lesser role to request even if we wanted one.
+- The form (`user[first_name/last_name/email/password]`) sets the password
+  directly from what's submitted — `@user.password = SecureRandom.hex if
+  @user.password.blank?` only kicks in when the field is left empty. Same
+  no-`:confirmable` finding as §475 applies here too: no confirmation email
+  gate on activation.
+- A duplicate *active* email 422s with the literal string "already exists."
+  (checked the real locale file rather than guessing the wording) — the one
+  failure worth distinguishing from every other validation failure.
+
+**Shipped**: `docusealClient.ts` gained `createTeamUser` (GET `/users/new`
+for a session-bound CSRF token — same "use the cookie THIS response set,
+not an older one" rule §478 had to learn the hard way — then POST `/users`).
+New `docusealTeamProvisioning.ts` wraps it: signs in as the tracked DocuSeal
+admin (`DOCUSEAL_ADMIN_EMAIL`/`_PASSWORD`, kept current by §477's sync) and
+creates the target account, splitting whatever display name it's given the
+same way `docusealAdminBootstrap.ts` already does (now exported:
+`resolveDocusealBaseUrl`, `splitName`).
+
+**Deliberately incomplete, flagged rather than hidden**: this only covers
+*creating* an account. Re-running it for someone who already has one (the
+real case once a dashboard user later changes their password) 422s as
+"already exists" today with no update path — DocuSeal's `POST /users`
+won't update an existing active user, and finding their DocuSeal user id to
+`PATCH /users/:id` instead means parsing the `/settings/users` listing HTML,
+which nothing here does yet. Left for whoever wires this into the core
+mechanism (still a separate, not-yet-built README item) — updating on
+password rotation is exactly what that wiring needs to solve, not something
+to half-build here without a caller to prove it against.
+
+**Not wired to anything yet** — no route, no button, nothing calls
+`provisionDocusealTeamMember`. This is the DocuSeal-specific proof that the
+approach works; `user_app_access` still structurally excludes DocuSeal
+(§480), so there's no real "list of users with access to DocuSeal" for
+anything to loop over until the core mechanism exists.
+
+**Tests**: `docusealTeamProvisioning.test.ts` (new) — no admin tracked yet,
+admin sign-in failure, successful create with name-splitting, the
+no-display-name fallback, and both non-`created` outcomes passed through
+unchanged. `docusealClient.ts`'s `createTeamUser` follows the established
+convention of no direct test (branching covered through the wrapper's
+mocks, same as `getSetupState`/`createFirstAdmin`/`signIn`/
+`updateProfileEmail`). `./scripts/check.sh backend typecheck`/`test` clean
+(952, +6 new). `scripts/bump-version.sh minor Added …` → 0.109.0.
+
+**Not yet verified live** — §478 already proved that code-reading alone
+missed a real cookie bug in this exact request-chaining pattern
+(GET-for-token → POST), so this needs the same live proof before it's
+trusted, not just unit tests against mocks that can't model DocuSeal's own
+session-rotation behaviour. Left on `dev`, unmerged.
