@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.112.0] — 2026-09-16
+
+### Added
+
+- ITFlow credential fan-out (§480): signs in as ITFlow's own admin and drives its user-management forms (its own session-bound credential-encryption key has no cold-script equivalent), giving fanned-out users a Technician account
+
 ## [0.111.2] — 2026-09-16
 
 ### Fixed

@@ -1,24 +1,28 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { provisionDocusealTeamMember } from './docusealTeamProvisioning';
+import { provisionItflowUser } from './itflowUserProvisioning';
 import { provisionNocodbUser } from './nocodbUserProvisioning';
 import { fanOutNoSsoCredentials, getNoSsoCredentialAppNames } from './noSsoCredentialFanout';
 
 vi.mock('./docusealTeamProvisioning', () => ({ provisionDocusealTeamMember: vi.fn() }));
 vi.mock('./nocodbUserProvisioning', () => ({ provisionNocodbUser: vi.fn() }));
+vi.mock('./itflowUserProvisioning', () => ({ provisionItflowUser: vi.fn() }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 const mockedProvision = vi.mocked(provisionDocusealTeamMember);
 const mockedProvisionNocodb = vi.mocked(provisionNocodbUser);
+const mockedProvisionItflow = vi.mocked(provisionItflowUser);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedProvision.mockResolvedValue('created');
   mockedProvisionNocodb.mockResolvedValue('created');
+  mockedProvisionItflow.mockResolvedValue('created');
 });
 
 describe('getNoSsoCredentialAppNames', () => {
   it('lists every app with a provisioner today', () => {
-    expect(getNoSsoCredentialAppNames()).toEqual(['docuseal', 'nocodb']);
+    expect(getNoSsoCredentialAppNames()).toEqual(['docuseal', 'nocodb', 'itflow']);
   });
 });
 

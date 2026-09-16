@@ -9,15 +9,22 @@
  * Keyed by service name in PROVISIONERS below; an app only becomes
  * grantable in Users & Roles (see `getGrantableAppOptions` in
  * userAppAccess.ts) once it has an entry here. `skipAutheliaProtection`
- * alone isn't enough — most of the no-SSO apps (ITFlow, Kimai, Home
- * Assistant, Jellyfin) don't have a provisioner built yet; each is its own
- * README item.
+ * alone isn't enough — the remaining no-SSO apps (Kimai, Home Assistant,
+ * Jellyfin) don't have a provisioner built yet; each is its own README
+ * item.
  *
  * NocoDB's own org-user Meta API turned out to be plain OSS (confirmed
  * against upstream's `org-users.controller.ts`/`users.service.ts`, no
  * Business/Enterprise gate on this path) — `provisionNocodbUser` invites
  * through it, then sets the real password via the same reset-token flow a
  * human clicking the (never-sent, no SMTP configured) invite email would.
+ *
+ * ITFlow has no such API at all — `provisionItflowUser` signs in as the
+ * ITFlow admin and drives its own `admin/users.php` add/edit forms,
+ * because the one function that can correctly wrap its site-wide
+ * credential-encryption key for a new/changed user (`encryptUserSpecificKey()`)
+ * only works from a live logged-in session, the same session-only gap
+ * `itflowAdminBootstrap.ts` already found on the admin's own password sync.
  *
  * DocuSeal also covers a later password change, not just first grant (§482):
  * `provisionDocusealTeamMember` falls back to setting the password directly
@@ -34,6 +41,7 @@
 
 import logger from '../utils/logger';
 import { provisionDocusealTeamMember } from './docusealTeamProvisioning';
+import { provisionItflowUser } from './itflowUserProvisioning';
 import { provisionNocodbUser } from './nocodbUserProvisioning';
 
 export interface NoSsoCredentialInput {
@@ -47,6 +55,7 @@ type Provisioner = (input: NoSsoCredentialInput) => Promise<string>;
 const PROVISIONERS: Record<string, Provisioner> = {
   docuseal: provisionDocusealTeamMember,
   nocodb: provisionNocodbUser,
+  itflow: provisionItflowUser,
 };
 
 /** Apps that can accept a fanned-out credential today. */

@@ -87,7 +87,9 @@ const RETRY_DELAY_MS = 3000;
 const SECURITY_FUNCTIONS_PATH = '/var/www/localhost/htdocs/functions/security.php';
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function resolveItflowBaseUrl(): Promise<string> {
+// Exported for itflowUserProvisioning.ts — same cross-project base URL a
+// per-user account create/update needs to sign in as the admin against.
+export async function resolveItflowBaseUrl(): Promise<string> {
   const port = getPublishedUpstreamPort(ITFLOW_SERVICE) ?? FALLBACK_PORT;
   const host = await getHostGatewayIp();
   return `http://${host}:${port}`;

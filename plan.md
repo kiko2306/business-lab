@@ -30209,3 +30209,68 @@ untouched throughout.
 §480/§489's NocoDB fan-out is proven end to end. README's NocoDB item
 deleted. `beta` → `main`: left unmerged per [[main-merge-requires-request]]
 — ready whenever asked for.
+
+## 491. ITFlow credential fan-out (§480)
+
+Third app off the no-SSO fan-out list. Unlike NocoDB (§489), ITFlow has no
+REST user-management API at all — reverse-engineered the flow straight
+from `itflow-org/itflow`'s `master` branch (`gh api search/code` + raw
+GitHub fetches), the same way as §489.
+
+`admin/post/users.php`'s `add_user`/`edit_user` handlers are plain form
+POSTs behind a session + CSRF token (`admin/post.php`, gated on
+`$session_is_admin`), not gated by any licence tier — ITFlow's whole
+codebase is one free edition, no Enterprise split to check for. Two
+wrinkles past that:
+
+1. **No duplicate-email check.** `users.user_email` has no unique
+   constraint, and `add_user` never looks for an existing row — re-running
+   it for the same address creates a second account instead of updating
+   the first. Unlike DocuSeal (422) or NocoDB (400), ITFlow gives no
+   signal to branch on. Added a lookup of our own first: a plain
+   `SELECT user_id FROM users WHERE user_email = ?` through
+   `itflowDb.ts` (the same PHP-through-the-container approach
+   `itflowAdminBootstrap.ts` already uses for the admin's own identity
+   sync) — a read, so none of the session/encryption concerns below apply
+   to it.
+2. **Password encryption needs a live session.** ITFlow wraps a site-wide
+   credential-encryption master key per-user, under their login password
+   (`functions/security.php`). The function for an *additional* user,
+   `encryptUserSpecificKey()`, reads `$_SESSION['user_encryption_session_ciphertext']`
+   and a `$_COOKIE` value that only get set at login — there is no
+   cold-script equivalent, the same gap `itflowAdminBootstrap.ts`'s
+   `reconcileAdminPassword` already found and documented for the admin's
+   *own* password sync (`setupFirstUserSpecificKey()` is first-user-only:
+   it *generates* a new master key, which would orphan every already-
+   encrypted secret in ITFlow if reused for a second user). So the write
+   has to be the real HTTP flow, signed in as the ITFlow admin — no way
+   around it, and no internals to reach for instead.
+
+Also found live-in-source, not just inferred: `login.php` always has
+`$config_https_only = TRUE` once the wizard has run (`setup/index.php`
+writes it unconditionally) and 403s a plain-HTTP request unless
+`X-Forwarded-Proto: https` is set — this backend talks to the container
+directly, not through the Tunnel/NPM, so `itflowClient.ts`'s new
+`signIn()` sends that header itself, declaring the same thing a real proxy
+would.
+
+**Built**: `itflowClient.ts` gained `signIn()` (drives `/login.php`,
+form + cookie, same shape as `docusealClient.ts`'s `signIn`), `addUser()`
+and `updateUserPassword()` (drive `admin/post.php`'s `add_user`/
+`edit_user`, CSRF token scraped from the relevant modal page first).
+`itflowAdminBootstrap.ts`'s private `resolveItflowBaseUrl` is now exported
+for reuse, same as DocuSeal's. `itflowUserProvisioning.ts`'s
+`provisionItflowUser` ties it together: sign in as admin → look up an
+existing account by email (`itflowDb.ts`) → `updateUserPassword` if found,
+`addUser` if not. Every fanned-out user gets ITFlow's built-in
+"Technician" role — `setup/seed_data.php` seeds Accountant/Technician/
+Administrator at fixed ids 1/2/3 on every install, so hardcoding
+`role_id = 2` is stable across installs with no lookup, and Technician
+(not Administrator) matches "give them a working login", not "make every
+grantee an ITFlow admin". Wired into `noSsoCredentialFanout.ts`'s
+`PROVISIONERS` map.
+
+`./scripts/check.sh backend typecheck`/`test` clean (983 passing, +9 new
+`itflowUserProvisioning.test.ts` cases + the `noSsoCredentialFanout.test.ts`
+update for the third provisioner). Not yet verified against the real
+stack — next section.
