@@ -29031,3 +29031,62 @@ already-untested form shape, nothing non-trivial enough to need its own
 spec). Not yet proven against the real stack — the nginx redirect and the
 mail send both need a live Authelia-protected app to hit; pending deploy to
 `home-srv-01`.
+
+## 464. §463 verified live on `beta` — caught the bare-domain redirect bug
+
+Deployed §463 to `home-srv-01` (`beta`) and checked NPM's actual generated
+config for `paperless.tx-home-utils.com` (`/data/nginx/proxy_host/13.conf`
+inside the `nginx-proxy-manager` container). First pass redirected to
+`https://tx-home-utils.com/access-denied` — the bare domain, which
+`curl`ing it live showed serves the **Home Page** app (gethomepage), not the
+dashboard (`plan.md §111`: the Home Page is deliberately public at the bare
+domain). The dashboard itself lives at its own `DASHBOARD_SUBDOMAIN`
+(`businesslab.<domain>` by default, `plan.md §457`) — `npmClient.ts` had used
+`globalConfig.baseDomain` directly instead of the dashboard's actual
+hostname.
+
+Fixed by reusing `getDashboardBaseUrl()` (`utils/generalSettings.ts`,
+already built for §457's invite-link fix — operator override if set,
+otherwise `https://<DASHBOARD_SUBDOMAIN>.<baseDomain>`) instead of
+hand-building the URL from the bare base domain. `EnsureProxyHostOptions`'s
+`baseDomain` field renamed to `dashboardUrl` throughout `npmClient.ts`
+end-to-end; `exposure.ts`'s `provisionHostname` now calls
+`getDashboardBaseUrl()` once (falling back to `https://<baseDomain>` only in
+the pathological case it returns null — shouldn't happen here, since
+`globalConfig.baseDomain` is already guaranteed present).
+
+Verified after the fix, all against the real stack:
+- `docker exec ... node -e "provisionServiceIfEnabled('paperless', null)"`
+  (the same code path the dashboard's own Restart button calls) rewrote
+  `paperless.tx-home-utils.com`'s NPM host; `/data/nginx/proxy_host/13.conf`
+  now reads `return 302 https://businesslab.tx-home-utils.com/access-denied?host=$host;`
+  inside a `location @access_denied` reached via `error_page 403 =
+  @access_denied;` on `location /`.
+- `nginx -t` inside the NPM container: config valid, reloaded clean.
+- `GET https://businesslab.tx-home-utils.com/access-denied?host=paperless.tx-home-utils.com`
+  → 200, the normal Angular SPA shell (same `try_files` fallback already
+  proven for `/set-password`/`/recovery`).
+- `POST https://businesslab.tx-home-utils.com/api/access-requests` with a
+  valid body → 204, a real email sent through this host's actual configured
+  mailbox (no error in `business-lab-backend-1`'s logs); with an invalid
+  body (bad email, empty reason) → 422 with the two expected Joi messages.
+- `reconcileExposureDrift()` (the same function the 6h reconciler sweep
+  calls) run directly instead of waiting for its interval: `{"checked":30,
+  "reconciled":30,"failed":[]}`. Confirmed stack-wide: 22 of the NPM hosts
+  now carry `error_page 403` (the Authelia-protected ones), the other 11 do
+  not (correctly untouched — no Authelia, no named location needed);
+  `nginx -t` stays valid across all of them. Home Page, dashboard, and
+  paperless all still reachable with their expected status codes afterwards.
+
+Not tested: the actual browser click-path (a real Authelia session,
+authenticated but not in an app's group, actually hitting the 403 and
+landing on the page) — simulating that needs either a real test user's
+Authelia login or resetting a live user's dashboard password via recovery
+mode, both more invasive than this host's disposable-data model calls for
+justifying here. The mechanism itself (`auth_request` → `error_page 403` →
+named location → `return 302`) is the same nginx idiom already proven live
+for months by the adjacent 401 case in the same file
+(`authelia-authrequest.conf`'s `error_page 401 =302 $redirection_url;`), so
+this is judged a reasonable stopping point rather than a gap.
+
+`beta` → `main`: left unmerged per [[main-merge-requires-request]].
