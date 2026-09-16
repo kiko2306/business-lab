@@ -719,7 +719,10 @@ describe('readableSecrets', () => {
       .filter((s) => s.readableSecrets?.length)
       .map((s) => s.name)
       .sort();
-    expect(declaring).toEqual(['ntfy']);
+    expect(declaring).toEqual(['ntfy', 'webdav']);
     expect(SERVICES.ntfy.readableSecrets).toEqual(['NTFY_SUBSCRIBE_TOKEN', 'NTFY_SUBSCRIBE_PASSWORD']);
+    // WebDAV's one account is for a native client (a backup tool) to paste
+    // in, same shape as ntfy's subscriber credentials going into a phone app.
+    expect(SERVICES.webdav.readableSecrets).toEqual(['WEBDAV_PASSWORD']);
   });
 });

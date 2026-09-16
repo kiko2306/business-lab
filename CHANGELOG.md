@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.106.0] — 2026-09-16
+
+### Added
+
+- WebDAV app — a native-client backup/sync destination behind the Cloudflare Tunnel, picked over MinIO (dead upstream, licences.md)
+
 ## [0.105.2] — 2026-09-16
 
 ### Improved

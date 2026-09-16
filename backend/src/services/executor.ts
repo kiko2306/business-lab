@@ -17,6 +17,7 @@ import { ensureGeneratedSecrets } from './appEnv';
 import { getAppTimezone } from '../utils/generalSettings';
 import { applyExposureConfigFiles } from './exposureConfigFiles';
 import { applySambaConfig } from './sambaConfig';
+import { applyWebdavConfig } from './webdavConfig';
 import { ensureKopiaRepoDir } from './kopiaTargetApply';
 import { clearImagePins, writeImagePins, pickLocalDigest, parseImageRef } from './composeOverride';
 import { withMaintenanceLock } from './maintenanceLock';
@@ -221,6 +222,11 @@ async function composeUpWithManagedConfig(
   // a missing data/smb.conf makes Docker create the bind source as a directory
   // and the entrypoint aborts.
   await applySambaConfig(serviceName, appDir);
+  // WebDAV: render data/config.yml (users + behindProxy) before compose up —
+  // load-bearing, not just exposure polish. The image has no shell to
+  // template env vars into a config file itself (FROM scratch), and with no
+  // config.yml at all the container has no user and nothing answers.
+  await applyWebdavConfig(serviceName, appDir);
   // Kopia: a local (type=none) repository bind fails to mount if its directory
   // does not exist yet, and apps/*/data/ is gitignored — so create it before
   // `compose up`, the same reason applySambaConfig runs here.

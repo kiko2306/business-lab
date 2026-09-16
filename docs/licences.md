@@ -81,6 +81,7 @@ operate within, listed again at the end.
 | Uptime Kuma | MIT | ✅ Clean | |
 | Vaultwarden | **AGPL-3.0** | ✅ Clean | unmodified |
 | Vikunja | **AGPL-3.0** | ✅ Clean | unmodified |
+| WebDAV (`hacdias/webdav`) | **MIT** | ✅ Clean | stock unmodified, single self-contained Go binary (`FROM scratch`, no bundled sidecars). Actively maintained (GHCR + Docker Hub images). Picked over MinIO for the same S3-shaped need: MinIO's community edition had its admin console stripped in 2025 and the whole repo was archived April 2026 — dead, regardless of its AGPL-3.0 licence being otherwise fine under this model. |
 | Web Terminal (wetty) | MIT | ✅ Clean | |
 
 ## Infrastructure & dependency images

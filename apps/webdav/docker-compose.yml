@@ -1,0 +1,33 @@
+
+# Last checked for a newer image: 2026-09-16 - bump this date (even with
+# no other change) to force a re-pull on every machine that pulls this
+# commit; self-update only recreates an app whose apps/<name>/** changed
+# since its last deploy, so this is what moves a `latest`-tagged image
+# forward without a version-tag bump to diff against (§449).
+services:
+  webdav:
+    mem_limit: 96m
+    mem_reservation: 24m
+    image: ghcr.io/hacdias/webdav:latest
+    restart: unless-stopped
+    # The image is FROM scratch (no shell, no env-var config support) — the
+    # dashboard renders the whole config.yml (backend/src/services/webdavConfig.ts)
+    # and this just points the binary at it.
+    command: ["-c", "/config.yml"]
+    ports:
+      - "${WEBDAV_PORT:-10590}:6065"
+    environment:
+      TZ: ${TZ:-UTC}
+    labels:
+      - "homepage.group=Monitoring & Backup"
+      - "homepage.name=WebDAV"
+      - "homepage.icon=webdav.png"
+      - "homepage.href=http://localhost:${WEBDAV_PORT:-10590}"
+      - "homepage.description=WebDAV file server for app/appliance backup destinations"
+    volumes:
+      - ./data/config.yml:/config.yml:ro
+      - ./data/files:/data
+    # No healthcheck: FROM scratch has no shell to run a CMD-SHELL probe, and
+    # every path requires Basic Auth (§0.2's per-app licence/security notes
+    # don't cover this, but same shape as CrowdSec's "nothing unauthenticated
+    # to probe") — services.ts sets healthCheck.enabled: false to match.
