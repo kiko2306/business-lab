@@ -29665,3 +29665,75 @@ line:
   the unit tests in §477 rather than needing to be proven again live.
 
 `beta` → `main`: left unmerged per [[main-merge-requires-request]].
+
+## 480. Planning pass — mirror real user credentials into no-SSO apps (2026-09-16)
+
+User's ask, following the DocuSeal email-drift fix (§477–§479) and the "why
+isn't the password just mine" follow-up: **when a dashboard user has access
+to an app, that app's username/email/password should match what the user
+set in the dashboard** — not a per-app generated secret.
+
+**Already true for most apps.** Anything behind Authelia (the majority)
+already gives exactly this: one Authelia identity, `user_app_access` grants
+who can reach it, no separate credential. The gap is specifically the
+apps that can't sit behind Authelia at all — DocuSeal, NocoDB, ITFlow,
+Kimai, Home Assistant, Jellyfin (§342's "expose-direct, own login only"
+set) — where today a single shared *admin* account is bootstrapped with the
+Authelia admin's email and a **generated** password, deliberately not the
+user's real one (§341/§342: don't let a third-party app's own database hold
+a copy of a password that matters elsewhere).
+
+**Surfaced the tradeoff before building anything**: mirroring the real
+password means it now lives (hashed, but still) inside every one of these
+apps' own user tables too — a breach of any single one of them stops being
+"a throwaway string leaks" and becomes "the user's real password leaks."
+User chose to accept that tradeoff explicitly (asked directly, see
+transcript) in favour of not having a separate secret to track per app.
+
+**Researched the actual mechanics before scoping the work** (Explore
+agent, read-only) — this is a bigger lift than it looks:
+
+- **Where a plaintext password actually exists, server-side, before it's
+  hashed** — the only places a "push it to other apps" hook could go:
+  `auth.ts:141` (invitation accept), `auth.ts:173` (initial webmaster
+  setup), `recovery.ts:56` (self-service forgot-password), `users.ts:426`
+  (admin resets another user's password), `recoverAdmin.ts:99,147` (CLI
+  recovery script). Six sites, all calling `hashPassword()` immediately —
+  nothing today intercepts the plaintext for anything else.
+- **`user_app_access` structurally excludes these six apps already.**
+  `getAppAccessOptions()` filters to `isAutheliaProtectionRequired(name)` —
+  true, i.e. **any `skipAutheliaProtection: true` app can never appear in
+  the grantable list today.** "When a user has access to an app" doesn't
+  currently mean anything for these six; the access model itself has to
+  grow before a fan-out hook has anything to loop over.
+- **None of the six has per-user account creation wired up anywhere in
+  this codebase** — every existing bootstrap (`docusealAdminBootstrap.ts`,
+  `itflowAdminBootstrap.ts`, `homeAssistantAdminBootstrap.ts`,
+  `jellyfinAdminBootstrap.ts`) creates exactly one shared admin/owner
+  account, matching the Authelia *admin* specifically, never a per-grantee
+  account. NocoDB and Kimai don't even have a bootstrap file — they're
+  seeded via env vars at boot (`NC_ADMIN_EMAIL`/`PASSWORD`,
+  `ADMINMAIL`/`ADMINPASS`), no HTTP API involved at all yet.
+- **Real open risk, same shape as DocuSeal's SSO turning out to be
+  Pro-only**: whether each app's community/free edition even *has* an API
+  for creating additional users is unverified per-app. DocuSeal and
+  Home Assistant have local multi-user models upstream; NocoDB, ITFlow and
+  Kimai's multi-user support may be admin-console-only or
+  Enterprise-gated. This needs checking against each app's real source/API
+  the same way §341 checked DocuSeal's SSO, not assumed.
+- **A real design gap, not yet solved**: granting a user access to one of
+  these apps *after* they last changed their dashboard password means the
+  plaintext is gone — there is no stored copy to push at grant time. Options
+  (not decided yet): create the per-app account with a fresh generated
+  password and let it silently pick up the real one next time that user
+  changes their dashboard password; or force a password-reset email at
+  grant time so the plaintext becomes available again immediately. Whoever
+  picks this up decides when they get there — flagging it now so it isn't
+  discovered mid-implementation.
+
+**Scope split into README items** (core mechanism + one per app, since each
+app's feasibility check and provisioning API are genuinely independent
+work, and DocuSeal's own SSO precedent showed that "looks doable" and "is
+doable" can differ per app). Not batched — each app's outcome (native
+multi-user API exists vs. doesn't) can't be known until investigated, so
+batch-approval doesn't fit here; propose/implement one at a time.

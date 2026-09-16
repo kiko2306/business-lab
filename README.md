@@ -224,3 +224,44 @@ it is done — not ticked off and left behind. Section references point at
       closed upstream (or once an app update fixes it for us, whichever comes
       first).
 
+### Credential fan-out to no-SSO apps (§480)
+
+User's call, tradeoff accepted explicitly: mirror each dashboard user's real
+username/email/password into every app they have access to, including the
+apps that can't sit behind Authelia at all (currently generated,
+per-app-unique credentials instead). Do the core mechanism first — the
+per-app items depend on it, and each other app item is independent of the
+rest (§341's DocuSeal SSO precedent: "looks doable" and "is doable" differ
+per app, so no batch-approval here, one at a time).
+
+- [ ] **Core mechanism**: extend `user_app_access`/`getAppAccessOptions()` to
+      include `skipAutheliaProtection` apps (currently filtered out
+      entirely — §342), and hook the six plaintext-password sites
+      (`auth.ts:141,173`, `recovery.ts:56`, `users.ts:426`,
+      `recoverAdmin.ts:99,147`) into a dispatcher that pushes the real
+      password to every no-SSO app the user has access to. Also decide what
+      happens when access is *granted* with no plaintext available (create
+      with a generated password that self-heals on the user's next
+      dashboard password change, or force an immediate reset email) —
+      flagged in §480, not resolved.
+- [ ] **DocuSeal**: extend the single-admin bootstrap to real per-user
+      accounts matching each grantee's dashboard credentials. Community
+      edition has a local multi-user model upstream — verify its
+      account-creation API isn't Pro-gated the way SSO was (§341).
+- [ ] **NocoDB**: no bootstrap file exists yet (seeded via
+      `NC_ADMIN_EMAIL`/`NC_ADMIN_PASSWORD` env only) — check whether
+      multi-user invites are free-tier or Enterprise-gated before building
+      anything.
+- [ ] **ITFlow**: extend past the single `/setup`-wizard admin to per-user
+      accounts — check whether its own user-management API supports this
+      without SSO.
+- [ ] **Kimai**: no bootstrap file exists yet (seeded via
+      `ADMINMAIL`/`ADMINPASS` env, `kimai:user:create` at boot only) — check
+      its user-management API for free-tier per-user creation.
+- [ ] **Home Assistant**: extend past the single-owner onboarding wizard —
+      HA's multi-user model is real but typically UI-driven; check whether
+      its API supports creating additional persons/users headlessly.
+- [ ] **Jellyfin**: extend past the single admin account created at startup
+      — check its user-management API for headless per-user creation
+      (`lanOnly`, so lower priority — never on the public tunnel).
+
