@@ -30381,3 +30381,41 @@ DocuSeal admin-password drift found along the way (real bug, but a
 different one from §493's — deliberately not fixed in passing). `beta` →
 `main`: left unmerged per [[main-merge-requires-request]] — ready
 whenever asked for.
+
+## 495. DocuSeal admin password drift reconciliation
+
+README item from §494's live verification: `docusealAdminBootstrap.ts`
+re-syncs the admin's *email* on drift (`syncAdminEmail`, §475) but never
+had an equivalent for the password — found live, the tracked
+`DOCUSEAL_ADMIN_PASSWORD` no longer signed in at all against the real
+account, silently breaking `provisionDocusealTeamMember`'s admin sign-in
+step (the disable/archive path was unaffected, since it goes through
+`rails runner` directly).
+
+ITFlow already has exactly this fix (`itflowAdminBootstrap.ts`'s
+`reconcileAdminPassword`, §382), but its shape doesn't carry straight
+over: ITFlow's version exists because setting a password there also has
+to re-wrap a session-bound credential-encryption key, which needs a
+`rails runner`-equivalent script anyway since no HTTP form can do it
+cold. DocuSeal's password column carries no such key — `setDocusealUserPassword`
+already goes through `User#update!(password:)` with no session
+requirement at all, so the new `reconcileDocusealAdminPassword`
+(`docusealDb.ts`) is simpler than its ITFlow counterpart: one script,
+`User.active.find_by(email:)` then `valid_password?` (Devise's own bcrypt
+check) to decide whether an update is even needed, mirroring ITFlow's
+"check first so a normal start writes nothing" shape without needing the
+encryption-key machinery.
+
+Wired into `docusealAdminBootstrap.ts`'s `reconcileDocusealFirstAdmin`
+right after `syncAdminEmail` in both `already-setup` branches, looked up
+by the *tracked* email (`getTrackedAdminEmail()`, factored out of
+`syncAdminEmail`'s own inline computation) — if email sync just ran, that
+tracked value already reflects the new email `saveServiceEnv` just wrote,
+so the password lookup can't target a stale address.
+
+`./scripts/check.sh backend typecheck`/`test` clean (1019 passing, +8 new:
+5 in `docusealDb.test.ts` for the new function, 3 in
+`docusealAdminBootstrap.test.ts` for the wiring). `scripts/bump-version.sh
+minor Added …` → 0.114.0. Not yet verified against the real stack — next
+section, and it also settles whether the live DocuSeal admin sign-in
+gap §494 found is actually fixed by this.

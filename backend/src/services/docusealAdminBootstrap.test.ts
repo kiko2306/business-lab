@@ -5,6 +5,7 @@ import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue, saveServiceEnv } from './appEnv';
 import { createFirstAdmin, getSetupState, signIn, updateProfileEmail } from './docusealClient';
+import { reconcileDocusealAdminPassword } from './docusealDb';
 import {
   DOCUSEAL_ADMIN_EMAIL_KEY,
   DOCUSEAL_ADMIN_PASSWORD_KEY,
@@ -26,6 +27,7 @@ vi.mock('./docusealClient', () => ({
   signIn: vi.fn(),
   updateProfileEmail: vi.fn(),
 }));
+vi.mock('./docusealDb', () => ({ reconcileDocusealAdminPassword: vi.fn() }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 const mockedResolve = vi.mocked(resolveComposeFile);
@@ -39,6 +41,7 @@ const mockedState = vi.mocked(getSetupState);
 const mockedCreate = vi.mocked(createFirstAdmin);
 const mockedSignIn = vi.mocked(signIn);
 const mockedUpdateEmail = vi.mocked(updateProfileEmail);
+const mockedReconcilePassword = vi.mocked(reconcileDocusealAdminPassword);
 
 const resolved = () =>
   ({
@@ -70,6 +73,7 @@ beforeEach(() => {
   mockedCreate.mockResolvedValue('created');
   mockedSignIn.mockResolvedValue({ state: 'failed' });
   mockedUpdateEmail.mockResolvedValue('updated');
+  mockedReconcilePassword.mockResolvedValue('unchanged');
 });
 
 describe('reconcileDocusealFirstAdmin', () => {
@@ -210,5 +214,33 @@ describe('reconcileDocusealFirstAdmin', () => {
       expect.any(String),
       expect.objectContaining({ firstName: 'Admin', lastName: 'User' })
     );
+  });
+
+  it('already-setup: also reconciles the admin password, looked up by the tracked email', async () => {
+    mockedState.mockResolvedValue({ state: 'already-setup' });
+    mockedReadEnv.mockImplementation((_service, key) =>
+      key === DOCUSEAL_ADMIN_PASSWORD_KEY ? 'generated-docuseal-pw' : 'mig@example.com'
+    );
+
+    await reconcileDocusealFirstAdmin('docuseal');
+
+    expect(mockedReconcilePassword).toHaveBeenCalledWith('mig@example.com', 'generated-docuseal-pw');
+  });
+
+  it('already-setup: password reconcile still runs even when the email sync is a no-op', async () => {
+    mockedState.mockResolvedValue({ state: 'already-setup' });
+    mockedReadEnv.mockImplementation((_service, key) =>
+      key === DOCUSEAL_ADMIN_PASSWORD_KEY ? 'generated-docuseal-pw' : 'mig@example.com'
+    );
+
+    await reconcileDocusealFirstAdmin('docuseal');
+
+    expect(mockedSignIn).not.toHaveBeenCalled();
+    expect(mockedReconcilePassword).toHaveBeenCalledTimes(1);
+  });
+
+  it('freshly created admin: does not also attempt a password reconcile on the same run', async () => {
+    await reconcileDocusealFirstAdmin('docuseal');
+    expect(mockedReconcilePassword).not.toHaveBeenCalled();
   });
 });

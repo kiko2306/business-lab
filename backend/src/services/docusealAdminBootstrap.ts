@@ -26,6 +26,17 @@
  * below re-checks on every start and logs into the account to fix it when it
  * has, using `DOCUSEAL_ADMIN_EMAIL_KEY` to remember what email the account is
  * currently believed to hold (same carrier-env trick as the password).
+ *
+ * The password side of that same gap went unfixed until §495: found live
+ * (2026-09-16) that the tracked `DOCUSEAL_ADMIN_PASSWORD` no longer signed
+ * in at all — nothing here ever re-checked it, the same class of bug as
+ * §475's email drift. `reconcileAdminPassword` below closes it the same
+ * way ITFlow's own admin-password sync does (itflowAdminBootstrap.ts,
+ * §382): `valid_password?` first, so an unchanged password costs nothing
+ * on a normal start, then update through `docusealDb.ts`'s rails-runner
+ * path only on an actual mismatch — no live session needed, unlike
+ * `syncAdminEmail` above, since DocuSeal's password column wraps no
+ * session-bound encryption key the way ITFlow's does.
  */
 
 import logger from '../utils/logger';
@@ -35,6 +46,7 @@ import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue, saveServiceEnv } from './appEnv';
 import { createFirstAdmin, getSetupState, signIn, updateProfileEmail } from './docusealClient';
+import { reconcileDocusealAdminPassword } from './docusealDb';
 
 export const DOCUSEAL_SERVICE = 'docuseal';
 export const DOCUSEAL_ADMIN_PASSWORD_KEY = 'DOCUSEAL_ADMIN_PASSWORD';
@@ -72,6 +84,11 @@ export function splitName(displayName: string | undefined): { firstName: string;
   return { firstName: parts[0], lastName: parts.slice(1).join(' ') };
 }
 
+/** The email the admin account is currently believed to hold — see the file header. */
+function getTrackedAdminEmail(): string {
+  return readAppEnvValue(DOCUSEAL_SERVICE, DOCUSEAL_ADMIN_EMAIL_KEY) ?? LEGACY_UNTRACKED_EMAIL;
+}
+
 /**
  * Re-sync the existing admin's login email to Authelia's current one when
  * they've drifted apart. No-op if `DOCUSEAL_ADMIN_EMAIL_KEY` already matches
@@ -86,7 +103,7 @@ async function syncAdminEmail(
   firstName: string,
   lastName: string
 ): Promise<void> {
-  const trackedEmail = readAppEnvValue(DOCUSEAL_SERVICE, DOCUSEAL_ADMIN_EMAIL_KEY) ?? LEGACY_UNTRACKED_EMAIL;
+  const trackedEmail = getTrackedAdminEmail();
   if (trackedEmail === currentEmail) {
     return;
   }
@@ -111,6 +128,25 @@ async function syncAdminEmail(
   } else {
     logger.error('DocuSeal admin email sync: the profile update was rejected — will retry next start');
   }
+}
+
+/**
+ * Re-sync the existing admin's password to the config-panel value when
+ * it's drifted (§495). Looked up by whatever email the account currently
+ * holds — called after `syncAdminEmail`, so if that just ran, this already
+ * sees the new one. Never throws; logs and retries next start on failure.
+ */
+async function reconcileAdminPassword(password: string): Promise<void> {
+  const trackedEmail = getTrackedAdminEmail();
+  const result = await reconcileDocusealAdminPassword(trackedEmail, password);
+  if (result === 'synced') {
+    logger.info(`Synced DocuSeal's admin password for ${trackedEmail} to the config panel value`);
+  } else if (result === 'not-found') {
+    logger.warn(`DocuSeal admin password sync skipped: no account found for ${trackedEmail}`);
+  } else if (result === 'failed') {
+    logger.error('DocuSeal admin password sync failed — will retry next start');
+  }
+  // 'unchanged' — the common case every start, nothing to log.
 }
 
 export async function reconcileDocusealFirstAdmin(serviceName: string): Promise<void> {
@@ -162,6 +198,7 @@ export async function reconcileDocusealFirstAdmin(serviceName: string): Promise<
 
       if (state.state === 'already-setup') {
         await syncAdminEmail(baseUrl, email, password, firstName, lastName);
+        await reconcileAdminPassword(password);
         return;
       }
 
@@ -180,6 +217,7 @@ export async function reconcileDocusealFirstAdmin(serviceName: string): Promise<
         await saveServiceEnv(DOCUSEAL_SERVICE, { [DOCUSEAL_ADMIN_EMAIL_KEY]: email });
       } else if (result === 'already-setup') {
         await syncAdminEmail(baseUrl, email, password, firstName, lastName);
+        await reconcileAdminPassword(password);
       } else {
         logger.error('DocuSeal admin bootstrap: the /setup POST failed (validation or CSRF) — will retry next start');
       }

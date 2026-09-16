@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.114.0] — 2026-09-16
+
+### Added
+
+- DocuSeal admin password drift reconciliation (§495): re-syncs the tracked admin password on every start via rails runner's valid_password? check, closing the same gap syncAdminEmail already fixed for a drifted email
+
 ## [0.113.0] — 2026-09-16
 
 ### Added

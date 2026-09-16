@@ -19,6 +19,16 @@
  * through the model directly needs only the email, same as the password
  * path, and sets the identical column.
  *
+ * `reconcileDocusealAdminPassword` (§495): `docusealAdminBootstrap.ts` already
+ * re-syncs the admin's *email* on drift (`syncAdminEmail`) but had nothing
+ * for the password — found live (2026-09-16), the tracked
+ * `DOCUSEAL_ADMIN_PASSWORD` no longer signed in at all. Same idea as
+ * `itflowAdminBootstrap.ts`'s `reconcileAdminPassword`: check with
+ * `valid_password?` first, so a normal start where nothing changed writes
+ * nothing, then update only on an actual mismatch — no live session
+ * needed either way, unlike ITFlow's version (DocuSeal's password column
+ * carries no session-bound encryption key to re-wrap).
+ *
  * `docker compose run`, not `exec` — same socket-proxy constraint as
  * nextcloudOcc.ts/itflowDb.ts. Email/password travel in through `-e NAME`
  * environment variables, never interpolated into the script text.
@@ -96,6 +106,35 @@ export async function archiveDocusealUser(email: string): Promise<DocusealArchiv
     DOCUSEAL_FANOUT_EMAIL: email,
   });
   if (output === 'archived') return 'archived';
+  if (output === 'not-found') return 'not-found';
+  return 'failed';
+}
+
+export type DocusealReconcilePasswordResult = 'synced' | 'unchanged' | 'not-found' | 'failed';
+
+const RECONCILE_PASSWORD_SCRIPT = [
+  "u = User.active.find_by(email: ENV['DOCUSEAL_FANOUT_EMAIL'])",
+  'if u',
+  "  if u.valid_password?(ENV['DOCUSEAL_FANOUT_PASSWORD'])",
+  "    puts 'unchanged'",
+  '  else',
+  "    u.update!(password: ENV['DOCUSEAL_FANOUT_PASSWORD'])",
+  "    puts 'synced'",
+  '  end',
+  'else',
+  "  puts 'not-found'",
+  'end',
+].join('\n');
+
+/** §495: sync the admin's password only when it has actually drifted from the config-panel value. */
+export async function reconcileDocusealAdminPassword(email: string, password: string): Promise<DocusealReconcilePasswordResult> {
+  const output = await runDocusealRailsScript(
+    RECONCILE_PASSWORD_SCRIPT,
+    ['DOCUSEAL_FANOUT_EMAIL', 'DOCUSEAL_FANOUT_PASSWORD'],
+    { ...process.env, DOCUSEAL_FANOUT_EMAIL: email, DOCUSEAL_FANOUT_PASSWORD: password }
+  );
+  if (output === 'synced') return 'synced';
+  if (output === 'unchanged') return 'unchanged';
   if (output === 'not-found') return 'not-found';
   return 'failed';
 }
