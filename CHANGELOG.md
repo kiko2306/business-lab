@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.104.7] — 2026-09-16
+
+### Fixed
+
+- NetBird auto-approval log line: fall back through email/name/id instead of just email
+
 ## [0.104.6] — 2026-09-16
 
 ### Fixed

@@ -102,6 +102,7 @@ interface NbAccount {
 }
 interface NbUser {
   id: string;
+  name?: string;
   email?: string;
   pending_approval?: boolean;
 }
@@ -254,7 +255,9 @@ async function approvePendingUsers(baseUrl: string, token: string): Promise<void
   const users = await nbRequest<NbUser[]>(baseUrl, token, 'GET', '/api/users');
   for (const user of users.filter((u) => u.pending_approval)) {
     await nbRequest(baseUrl, token, 'POST', `/api/users/${user.id}/approve`);
-    logger.info(`NetBird: approved pending user ${user.email ?? user.id} (§463)`);
+    // Found live (§462): NetBird defaults email/name to "" rather than
+    // omitting them, so `??` never falls through to the id — `||` does.
+    logger.info(`NetBird: approved pending user ${user.email || user.name || user.id} (§463)`);
   }
 }
 

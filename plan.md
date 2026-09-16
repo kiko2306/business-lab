@@ -28906,3 +28906,46 @@ container: 927 tests pass (924 baseline + 3 new — disables
 once already off, approves a pending user while skipping an already-active
 one). Not yet proven against the real NetBird API — pending deploy to
 `home-srv-01`.
+
+## 462. §461 verified live on `beta`
+
+`dev` fast-forwarded onto `beta`, pulled + rebuilt `business-lab-backend` on
+`home-srv-01` — clean, `GET /version` answering `0.104.6`. That alone
+doesn't exercise the new code: `ensureNetbirdRoutingPeer` only runs inside
+the backend's authenticated start/restart route, not a shell-level
+`docker compose restart` (tried first, just to confirm the app still comes
+back healthy — it did, but the fix itself needs the dashboard's own
+Restart). User clicked Restart on the NetBird VPN app from the dashboard.
+
+`docker logs business-lab-backend-1` for that request:
+
+```
+NetBird: disabled account-wide peer login expiration and new-user approval
+gating — phone/Windows peers no longer need a manual re-login every 24h
+(§441), and a new user no longer needs a manual Team > Users approval click
+before their first peer connects (§463)
+NetBird: approved pending user  (§463)
+```
+
+(The blank name after "approved pending user" is `user.email` coming back
+as NetBird's default empty string rather than `undefined` — `??` only falls
+back on null/undefined, so the `user.id` fallback never fires. Cosmetic;
+the approve call itself hit the right user, confirmed below.)
+
+Confirmed against the real store, read-only (`keinos/sqlite3` against
+`apps/netbird-vpn/data/management/store.db`, same technique as §442):
+`accounts.settings_peer_login_expiration_enabled = 0` and
+`accounts.settings_extra_user_approval_required = 0` for the one real
+account, and all three `users` rows (`owner` + two `user`-role, one of them
+`frias`) show `blocked = 0, pending_approval = 0` — the auto-approve caught
+a pending user beyond the one `frias` had already been unblocked by hand,
+confirming this wasn't a no-op. All six `netbird-vpn` containers came back
+`Up` after the restart.
+
+Fixed in the same commit, since it's a one-liner surfaced by this exact
+change: the log's blank name was `user.email ?? user.id` never falling
+through, because NetBird defaults `email`/`name` to `""` rather than
+omitting them — `??` only catches null/undefined. Changed to
+`user.email || user.name || user.id`.
+
+`beta` → `main`: left unmerged per [[main-merge-requires-request]].
