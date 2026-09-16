@@ -30419,3 +30419,31 @@ so the password lookup can't target a stale address.
 minor Added …` → 0.114.0. Not yet verified against the real stack — next
 section, and it also settles whether the live DocuSeal admin sign-in
 gap §494 found is actually fixed by this.
+
+## 496. §495 verified live — real DocuSeal admin account, genuinely fixed
+
+Deployed to `home-srv-01` (`beta` fast-forwarded, backend rebuilt, `GET
+/version` → 0.114.0). Ran `reconcileDocusealFirstAdmin('docuseal')`
+directly against the real, already-drifted admin account §494 found
+(the one with `miguelamtx@gmail.com` — not a throwaway):
+
+- First run: `"Synced DocuSeal's admin password for miguelamtx@gmail.com
+  to the config panel value"`. Signed in against the real DocuSeal
+  container with the tracked password immediately afterward — `signed-in`
+  where it had previously failed outright.
+- Second run: silent no-op (`valid_password?` true, nothing logged,
+  matching the "an unchanged start costs nothing" design) — idempotent.
+- The actual thing this was blocking: `provisionDocusealTeamMember` (the
+  §480 fan-out's DocuSeal create/update path, which needs a working admin
+  sign-in) now succeeds again — created a throwaway team account for real,
+  deleted it afterward via the same rails-runner cleanup pattern as
+  §487/488/494.
+
+The real admin's session was never disrupted by any of this — reconcile
+only ever writes when the password is genuinely wrong, and this run
+started from a genuinely-wrong state, so the one write it made is exactly
+what fixed the account, not a side effect of testing.
+
+§495 is proven end to end. README's DocuSeal item deleted. `beta` →
+`main`: left unmerged per [[main-merge-requires-request]] — ready
+whenever asked for.
