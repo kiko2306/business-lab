@@ -224,16 +224,16 @@ it is done — not ticked off and left behind. Section references point at
       closed upstream (or once an app update fixes it for us, whichever comes
       first).
 - [ ] **MeshCentral: prove real agent enrolment through the public tunnel**
-      — the app is up and reachable (§505/§506), but the actual point of
-      re-adding it is agents on machines that aren't ours, dialing in over
-      Cloudflare + NPM rather than the overlay. Needs a real second device
-      (VM or spare machine) to install the agent on and confirm: the
-      installer/`agent.ashx` endpoints actually bypass Authelia as coded,
-      the cert path holds (`REVERSE_PROXY`/`certUrl` — MeshCentral's
-      documented fix for "Agent bad web cert hash" behind a proxy that
-      isn't MeshCentral's own TLS), and a KVM/terminal session actually
-      relays over WebSocket without WebRTC. Nothing here can be proven from
-      the dashboard host alone.
+      — the app is up, reachable at its own hostname with no Authelia gate,
+      and its own login page confirmed live (§505/§506), but the actual
+      point of re-adding it is agents on machines that aren't ours, dialing
+      in over Cloudflare + NPM rather than the overlay. Needs a real second
+      device (VM or spare machine) to install the agent on and confirm: the
+      cert path holds (`REVERSE_PROXY`/`certUrl` — MeshCentral's documented
+      fix for "Agent bad web cert hash" behind a proxy that isn't
+      MeshCentral's own TLS) and a KVM/terminal session actually relays over
+      WebSocket without WebRTC. Nothing here can be proven from the
+      dashboard host alone.
 - [ ] **MeshCentral: automate the first-account claim** — first visitor
       to the wizard owns the server today (documented in
       `docs/app-credentials.md`), same as Guacamole's `guacadmin` before
@@ -241,4 +241,19 @@ it is done — not ticked off and left behind. Section references point at
       driving `POST /createaccount` with a generated password) once the
       live-agent proof above lands — lower priority since it's a one-time
       manual step, not a recurring one.
+- [ ] **First-ever exposure of an app may need one extra restart** (§506)
+      — `startService` computes an app's exposure env overrides (Host
+      allow-lists, public URLs, `gatewayOnExposure` values) *before*
+      auto-exposure creates and enables that app's `service_exposure` row
+      on its very first start, so the container's first boot bakes in
+      pre-exposure values. Found live on MeshCentral (hard 502: it serves
+      its own HTTPS until `TLS_OFFLOAD` is set, so the mismatch is fatal
+      there) — a second start picks up the right values immediately.
+      Other `exposureEnvKeys` apps likely hit the same race more quietly
+      (a stale Host-allow-list for one boot, not a hard failure), which is
+      probably why nobody's noticed it before. Worth checking how many
+      apps are actually affected before deciding whether `startService`
+      should provision exposure *before* the first `compose up` instead —
+      that reorder touches every app's start path, so it's not a
+      one-line fix.
 
