@@ -29851,3 +29851,67 @@ real stack — next section covers what could be proven from the dashboard
 host alone (the app starts, is reachable on its own hostname with no
 Authelia gate, and isn't a double-login); real agent enrolment stays the
 README item above.
+
+## 506. §505 verified live — reachable, own-login-only confirmed; a first-boot exposure-race found
+
+Deployed to `home-srv-01` (`beta` fast-forwarded, backend rebuilt, `GET
+/version` → 0.117.0). Started MeshCentral for the first time ever on this
+host via `startService('meshcentral', 1)` (the same function the
+dashboard's Start button calls) — it auto-exposed itself to
+`mesh.tx-home-utils.com` and picked up a Home Page tile with no manual
+step, both as designed.
+
+**First real bug, found immediately**: `https://mesh.tx-home-utils.com/`
+502'd. Traced it rather than assumed a config mistake: the container was
+serving its own self-signed **HTTPS** on 443 (confirmed with a direct
+`curl -k` to the published port) while NPM's proxy host forwards plain
+HTTP — exactly the mismatch `TLS_OFFLOAD`/`REVERSE_PROXY` exist to
+prevent. `readAppEnvValue` on `MESHCENTRAL_TLS_OFFLOAD`/`_HOSTNAME` came
+back `null`, which first looked like the env-override mechanism silently
+failing — it wasn't. `exposureEnv.ts`'s own doc comment says so: these
+overrides are merged into `docker compose up`'s process environment for
+that one invocation, never persisted to `.env` — checking the `.env` file
+was checking the wrong layer entirely. The real cause is an ordering gap
+in `executor.ts`'s `startService`: `composeUpWithManagedConfig` (which
+computes and injects these overrides) runs *before*
+`ensureAutoExposure`/`provisionServiceIfEnabled` on line ~522 vs ~537-538
+— so on an app's **very first ever start**, the container boots with
+whatever the `service_exposure` row held *before* this call created and
+enabled it, i.e. nothing. MeshCentral hard-fails on this because its
+entrypoint bakes `tlsOffload` into `config.json` and picks an HTTP-vs-HTTPS
+listener from it at boot; most other `exposureEnvKeys` apps would likely
+just serve with a stale Host-allow-list or wrong public URL for one boot
+instead of a hard protocol-mismatch 502 — which is probably why this
+hasn't been noticed before now.
+
+Confirmed the fix is exactly "start it again": with the `service_exposure`
+row now `enabled: true` from the first pass, a second `startService` call
+recreated the container with the right env — `docker compose exec
+meshcentral env` showed `TLS_OFFLOAD=10.201.0.1`, `TRUSTED_PROXY=true`,
+`HOSTNAME=mesh.tx-home-utils.com` all correctly set, `config.json` on disk
+matched, and the container's own log line changed from "HTTPS server
+running" to **"HTTP server running on port 443"**. `https://mesh.tx-home-utils.com/`
+then returned `200` with MeshCentral's real `<title>MeshCentral -
+Login</title>` page — no Authelia login anywhere in the chain, confirming
+`skipAutheliaProtection` behaves as designed: the "two logins" case §505
+reasoned through never occurs, because there is no Authelia gate to layer
+on MeshCentral's own. `/meshsettings` (401) and `/meshagents` (404) came
+back as MeshCentral's *own* app-level responses, not an Authelia redirect
+— consistent with no forward-auth sitting in front. Home Page tile
+confirmed correct in the real `services.yaml` (group, name, icon,
+description, and `href` pointing at the real hostname).
+
+Not fixed in code: reordering `startService` so exposure provisioning runs
+before the first `compose up` touches every exposable app's start path,
+which is a materially bigger, riskier change than this task's actual
+scope, and the workaround (start it twice) is a single restart with no
+data-loss risk. Added a narrow README item to investigate how many other
+`exposureEnvKeys` apps are silently affected on their very first exposure,
+separate from MeshCentral's item above.
+
+Not proven, and can't be from this host alone: a real agent — on a
+machine that isn't part of this stack — actually enrolling through
+`agent.ashx` over the public tunnel, and a KVM/terminal session actually
+relaying without WebRTC. That stays the open README item. `beta` → `main`:
+left unmerged per [[main-merge-requires-request]] — ready whenever asked
+for.
