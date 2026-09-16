@@ -30535,3 +30535,42 @@ new: 4 in `kimaiDb.test.ts`, 7 in `kimaiUserProvisioning.test.ts`, plus
 `noSsoCredentialFanout.test.ts` updated for the fourth provisioner).
 `scripts/bump-version.sh minor Added …` → 0.115.0. Not yet verified
 against the real stack — next section.
+
+## 498. §497 verified live — real Kimai account, create/disable/re-grant all proven
+
+Deployed to `home-srv-01` (`beta` fast-forwarded, backend rebuilt, `GET
+/version` → 0.115.0). Called `provisionKimaiUser`/`disableKimaiUser`
+directly (`docker exec business-lab-backend-1 node -e ...`, requiring the
+compiled `dist/services/kimaiUserProvisioning.js` — same function-level
+depth as §492's ITFlow check) against the real, running `kimai-kimai-1` /
+`kimai-kimai-db-1` containers with a throwaway `fanout-test@example.com`
+account:
+
+- **Create**: `provisionKimaiUser(...)` → `'created'`. Real row confirmed
+  (`kimai2_users`): `username`/`email` both the throwaway address, `roles`
+  = `a:1:{i:0;s:9:"ROLE_USER";}`, `enabled = 1`, bcrypt password. Logged in
+  for real against `POST /en/login_check` (CSRF scraped from the login
+  page first, matching how Kimai's own form works) — `302` to `/` with a
+  session cookie, i.e. a genuine successful login.
+- **Disable**: `disableKimaiUser(...)` → `'disabled'`. Same login attempt
+  now `302`s back to `/en/login` instead of `/` — Kimai's own
+  `UserChecker` rejecting the disabled account, not a network-level
+  failure.
+- **Re-grant**: `provisionKimaiUser(...)` again (same email) → `'updated'`
+  (the `ON DUPLICATE KEY UPDATE` branch, not a second insert). Login
+  immediately works again (`302` to `/`) — confirms the same call both
+  re-enables the account and refreshes the password in one statement, the
+  exact scenario a revoke-then-regrant in Users & Roles hits.
+
+Didn't re-run §493/494's broader real-*route* sweep (`PUT /:id/access` →
+opportunistic fan-out on login) — that mechanism is already proven generic
+across the other three apps, and `kimai: provisionKimaiUser` is a uniform
+`PROVISIONERS` map entry with no new route-level behavior to prove.
+
+Cleaned up: `DELETE FROM kimai2_users WHERE email = 'fanout-test@example.com'`
+— confirmed only the real `admin` row remains afterward.
+
+§497 is proven end to end: create, disable, and re-grant all write and
+read back correctly against the real container, with real logins
+succeeding/failing exactly as expected at each step. `beta` → `main`: left
+unmerged per [[main-merge-requires-request]] — ready whenever asked for.
