@@ -78,4 +78,19 @@ describe('ResourceStripComponent', () => {
     expect(component['meters']?.map((m) => m.key)).toEqual(['cpu', 'memory', 'disk']);
     discardPeriodicTasks();
   }));
+
+  it('renders one line-art SVG icon per meter, not emoji text', fakeAsync(() => {
+    const fixture = TestBed.createComponent(ResourceStripComponent);
+    const operations = TestBed.inject(OperationsService) as jasmine.SpyObj<OperationsService>;
+    operations.getHealth.and.returnValue(of(health()));
+
+    fixture.componentInstance.ngOnInit();
+    tick(0);
+    fixture.detectChanges();
+
+    const icons = fixture.nativeElement.querySelectorAll('svg.rs__icon');
+    expect(icons.length).toBe(3);
+    expect(fixture.nativeElement.textContent).not.toMatch(/[\u{1F300}-\u{1FAFF}]/u);
+    discardPeriodicTasks();
+  }));
 });

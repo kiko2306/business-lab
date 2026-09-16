@@ -17,7 +17,7 @@
 
 .rs__top {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: 0.3rem;
   font-size: 0.72rem;
   font-weight: 600;
@@ -26,10 +26,17 @@
 }
 
 .rs__icon {
-  font-size: 0.85rem;
-  line-height: 1;
-  /* Baseline-aligned text pulls an emoji glyph up; nudge it back down. */
-  transform: translateY(1px);
+  width: 0.85rem;
+  height: 0.85rem;
+  flex: none;
+  fill: none;
+  /* Plain line icon, not an emoji — follows the surrounding text colour
+     (white on this app's dark theme, dark on light), matching gethomepage's
+     own monochrome widget icons rather than colourful emoji glyphs. */
+  stroke: currentColor;
+  stroke-width: 1.3;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .rs__primary {

@@ -28709,3 +28709,25 @@ independent per-meter thresholds, and the actual poll-and-apply flow via
 `fakeAsync`). No backend change, so no backend re-run needed. UI-only —
 not proven live against the real host (no dashboard credentials to
 screenshot the authenticated page), same limitation noted in §452.
+
+## 456. Resource strip icons: plain white line-art SVG, not emoji
+
+User: didn't like the colourful emoji icons from §455 — wanted plain white
+ones matching gethomepage's own icon style.
+
+Replaced the three emoji glyphs (🖥️🧠💽) with three small inline SVGs (a
+chip outline for CPU, a RAM-stick outline for memory, a stacked-cylinder
+outline for disk), styled `stroke: currentColor` / `fill: none` rather than
+a hardcoded colour — renders white on this app's dark theme (matching what
+was asked for) and adapts correctly if the theme is ever light, unlike a
+literal `color: white` would. Picked via `[ngSwitch]="m.key"` in the
+template; `Meter` drops the now-unused `icon` field. No icon font, no new
+dependency — plain inline SVG, same as any other native HTML element.
+
+Verified: `./scripts/check.sh frontend test`/`build` (74/74, +1 new —
+renders the component with real health data and confirms exactly 3
+`svg.rs__icon` elements exist and no emoji codepoints remain in the
+rendered text). Same live-screenshot limitation as §452/§455 (no
+dashboard login to view the real page). Deployed to `beta` only — merging
+to `main` is now on request, not automatic once verified (user, this
+session).

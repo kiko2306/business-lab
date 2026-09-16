@@ -1,4 +1,4 @@
-import { NgFor, NgIf } from '@angular/common';
+import { NgFor, NgIf, NgSwitch, NgSwitchCase } from '@angular/common';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { switchMap, timer } from 'rxjs';
@@ -7,7 +7,6 @@ import { OperationsService } from '../../core/operations.service';
 
 interface Meter {
   key: 'cpu' | 'memory' | 'disk';
-  icon: string;
   /** The headline number, e.g. "13%" or "8.7 GiB". */
   primary: string;
   /** What the headline number is, e.g. "CPU" or "Free". */
@@ -43,16 +42,17 @@ function worstDisk(disks: DiskUsage[]): DiskUsage | null {
 /**
  * A compact CPU / memory / disk read-out in the shell header — visually and
  * functionally matched to gethomepage's own `resources` widget on the Home
- * Page (§147.2, §455): an icon, the headline number gethomepage itself would
- * show (percent for CPU, free space for memory/disk), and a utilisation bar
- * underneath. `/utils` keeps the detailed Health panel; this is the
+ * Page (§147.2, §455, §456): a plain white line icon per metric (inline SVG,
+ * `currentColor` — no icon font, no emoji), the headline number gethomepage
+ * itself would show (percent for CPU, free space for memory/disk), and a
+ * utilisation bar underneath. `/utils` keeps the detailed Health panel; this is the
  * always-visible summary. Best-effort: a failed poll just leaves the last
  * numbers up, and nothing renders until the first success.
  */
 @Component({
   selector: 'app-resource-strip',
   standalone: true,
-  imports: [NgFor, NgIf],
+  imports: [NgFor, NgIf, NgSwitch, NgSwitchCase],
   templateUrl: './resource-strip.component.html',
   styleUrl: './resource-strip.component.css',
 })
@@ -88,7 +88,6 @@ export class ResourceStripComponent implements OnInit {
     return [
       {
         key: 'cpu',
-        icon: '🖥️',
         primary: `${cpuPercent}%`,
         label: 'CPU',
         title: `CPU ${cpuPercent}%`,
@@ -98,7 +97,6 @@ export class ResourceStripComponent implements OnInit {
       },
       {
         key: 'memory',
-        icon: '🧠',
         primary: formatGiB(memoryFreeBytes),
         label: 'Free',
         title: `Memory ${memoryPercent}% used, ${formatGiB(memoryFreeBytes)} free`,
@@ -108,7 +106,6 @@ export class ResourceStripComponent implements OnInit {
       },
       {
         key: 'disk',
-        icon: '💽',
         primary: disk ? formatGB(disk.availableBytes) : '—',
         label: 'Free',
         title: disk ? `Disk ${diskPercent}% used, ${formatGB(disk.availableBytes)} free` : 'Disk usage unavailable',

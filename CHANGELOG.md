@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.104.3] — 2026-09-16
+
+### Frontend
+
+- Replace the resource strip's emoji icons with plain white line-art SVGs, matching gethomepage's style
+
 ## [0.104.2] — 2026-09-16
 
 ### Frontend
