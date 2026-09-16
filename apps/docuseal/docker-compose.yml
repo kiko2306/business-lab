@@ -31,7 +31,7 @@ services:
       # detected and re-applied instead of silently going stale (§475).
       DOCUSEAL_ADMIN_EMAIL: ${DOCUSEAL_ADMIN_EMAIL:-}
     labels:
-      - "homepage.group=Productivity"
+      - "homepage.group=Files"
       - "homepage.name=DocuSeal"
       - "homepage.icon=docuseal.png"
       - "homepage.href=http://localhost:${DOCUSEAL_PORT:-10150}"

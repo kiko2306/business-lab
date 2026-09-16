@@ -633,7 +633,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'DocuSeal',
     description: 'Document signing and fillable PDF forms',
     icon: 'signature',
-    category: 'Productivity',
+    // Same dashboard category as Stirling-PDF/Samba, the other two apps in
+    // the Home Page's "Files" group below — grouped with them, not with the
+    // general Productivity set.
+    category: 'Backup & Storage',
     composePath: 'apps/docuseal/docker-compose.yml',
     healthCheck: {
       enabled: true,

@@ -29988,3 +29988,14 @@ admin accounts on both sides untouched throughout.
 
 §480's core mechanism is proven end to end for its one wired app. `beta` →
 `main`: left unmerged per [[main-merge-requires-request]].
+
+## 485. DocuSeal moved from Productivity to Files
+
+User's call: DocuSeal's Home Page group is now `Files` (matching
+Stirling-PDF/Samba's existing group) instead of `Productivity`; the
+dashboard's own category moved to `Backup & Storage` to match — the same
+dashboard category those other two "Files" apps already use, so this joins
+an existing grouping rather than inventing a new one-off dashboard category
+for a single app. `./scripts/check.sh backend typecheck`/`test` clean (960
+passing, no behavior changed, just data). `scripts/bump-version.sh patch
+Changed …` → 0.110.1.
