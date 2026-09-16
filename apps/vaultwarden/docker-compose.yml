@@ -18,8 +18,8 @@ services:
       # backend/src/config/services.ts — not set by hand. Left unset, Vaultwarden
       # simply runs without email, which disables invitations and 2FA-by-email.
       #
-      # Compose's ${VAR:-} still *defines* the container env var, just as an
-      # empty string — and Vaultwarden's config parser treats a present-but-
+      # An empty-string default still *defines* the container env var, just as
+      # an empty string — and Vaultwarden's config parser treats a present-but-
       # empty SMTP_HOST/SMTP_FROM as "configured" (Some("")), not "unset"
       # (None), which is a different code path with its own validation error
       # ("Both SMTP_HOST and SMTP_FROM need to be set..."). No default value

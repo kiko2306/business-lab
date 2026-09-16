@@ -549,6 +549,23 @@ const composeText = (composePath: string) => {
   return fs.readFileSync(found, 'utf8');
 };
 
+describe('compose comments never spell out a literal variable-substitution example', () => {
+  // extractComposeEnvVars scans raw file text for ${...}, comments included —
+  // it can't tell a real reference from a comment illustrating the syntax.
+  // webdav's own comment about this fix wrote `${VAR}` literally and got a
+  // phantom required "VAR" field in the config panel for its trouble (found
+  // live); vaultwarden had the same landmine (`${VAR:-}`) pre-existing.
+  // Fixed by rewording both comments to describe the syntax without writing
+  // it; this guards against a third one.
+  it('produces no phantom "VAR" key from any service compose file', () => {
+    for (const service of Object.values(SERVICES)) {
+      const text = composeText(service.composePath);
+      const keys = extractComposeEnvVars(text).map((v) => v.key);
+      expect(keys, `${service.name}: a comment likely spells out \${VAR} literally`).not.toContain('VAR');
+    }
+  });
+});
+
 describe('Home Page discovery labels', () => {
   // homepageConfig.ts generates the Home Page's services.yaml from these
   // labels (name/group/icon/description) — a tile per running, exposed app

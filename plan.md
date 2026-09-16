@@ -29319,3 +29319,42 @@ deliberately generated but never panel-visible (internal-only, consumed by
 even though only a test file and an `apps/` compose file changed — neither
 strictly required by the version-bump hook, bumped anyway since it's worth
 a changelog line).
+
+## 471. §470's fix itself created a phantom required field — the scanner can't tell a comment from a real reference
+
+While fixing §470, my own explanatory comment made it worse before it got
+better. The first fix's comment in `apps/webdav/docker-compose.yml` said:
+
+> "it builds its field list from `${VAR}` references in this file"
+
+`extractComposeEnvVars` scans the **raw file text** for `${...}` — it has no
+concept of a YAML comment, so writing the literal syntax to explain it
+created a real match: a phantom `VAR` key with no default, `required: true`.
+Confirmed empirically (not just by reading the regex) by running
+`extractComposeEnvVars` against the actual file in a throwaway probe
+script — it printed a `VAR` entry sitting right alongside
+`WEBDAV_USERNAME`/`WEBDAV_PASSWORD`. Reworded the comment to describe the
+mechanism without spelling out the syntax.
+
+**Went looking for the same landmine elsewhere** rather than assume webdav
+was the only place a comment ever wrote out example syntax. Grepped every
+`apps/*/docker-compose.yml` for a `${` inside a comment line: three hits.
+`authelia` and `netbird-vpn` both mention `${BASE_DOMAIN}` in a comment, but
+harmlessly — `BASE_DOMAIN` is *already* a real, deliberately-required
+reference elsewhere in both files (confirmed by probing each in isolation),
+so the comment adds nothing new. `vaultwarden` was the real second hit:
+`# Compose's ${VAR:-} still *defines* the container env var...` — a
+genuinely phantom, pre-existing `VAR` field (harmless since it carries an
+empty-string default, so not `required`, but a meaningless field cluttering
+Vaultwarden's config panel regardless). Reworded the same way.
+
+**New registry-wide test**: `extractComposeEnvVars` must never produce a
+literal `VAR` key for any service's compose file — cheap, specific, and
+would have caught both instances before they shipped. Not a general
+"comments can't contain `${`" lint (a real explanation sometimes needs to
+reference a real, already-declared var by name, which is fine) — narrowly
+targeted at the "explaining the syntax accidentally created the syntax"
+failure mode.
+
+`./scripts/check.sh backend test` clean (938, +1 new).
+`scripts/bump-version.sh patch Fixed …` → 0.106.2.

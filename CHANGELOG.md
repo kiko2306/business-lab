@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.106.2] — 2026-09-16
+
+### Fixed
+
+- WebDAV config-panel comment created a phantom required VAR field (the scanner can't tell a comment from a real reference); found and fixed the same landmine pre-existing in Vaultwarden's compose file
+
 ## [0.106.1] — 2026-09-16
 
 ### Fixed

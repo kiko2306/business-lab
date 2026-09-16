@@ -20,9 +20,10 @@ services:
       TZ: ${TZ:-UTC}
       # NOT read by the binary — its config is data/config.yml, rendered by
       # webdavConfig.ts from these same .env values. This is only a carrier so
-      # the dashboard's config panel discovers and shows the fields (it builds
-      # its field list from ${VAR} references in this file, same trick ntfy's
-      # NTFY_SUBSCRIBE_TOKEN/PASSWORD already use).
+      # the dashboard's config panel discovers and shows the fields (it scans
+      # this file for variable-substitution references, same trick ntfy's
+      # NTFY_SUBSCRIBE_TOKEN/PASSWORD already use — and note this comment
+      # can't spell that syntax out literally, or the scanner picks it up too).
       WEBDAV_USERNAME: ${WEBDAV_USERNAME:-admin}
       WEBDAV_PASSWORD: ${WEBDAV_PASSWORD:-}
     labels:
