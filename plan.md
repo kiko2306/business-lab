@@ -30748,3 +30748,37 @@ after `up` like every other post-start reconciler in that file.
 `kimaiAdminBootstrap.test.ts`). `scripts/bump-version.sh patch Fixed …` →
 0.116.1. README's Kimai TODO item deleted. Not yet verified against the
 real stack — next section.
+
+## 502. §501 verified live — real Kimai admin drift fixed, real login proven
+
+Deployed to `home-srv-01` (`beta` fast-forwarded, backend rebuilt, `GET
+/version` → 0.116.1). Confirmed the drift for real first, not assumed:
+queried `kimai2_users` directly (mounted PHP script through the same
+`docker compose run` shape `kimaiDb.ts` uses) — the `admin` row's email
+was still `admin@example.com`, exactly what the README TODO's live finding
+said. Authelia's real admin email is `miguelamtx@gmail.com` (same account
+DocuSeal's §496 fixed).
+
+Ran `reconcileKimaiAdminAccount('kimai')` directly against the running
+backend container (`docker compose exec backend node -e ...`, same
+"function call against the real DB/container" shape §496 used):
+
+- First run: `"Synced Kimai's admin account (miguelamtx@gmail.com) to the
+  current config-panel/Authelia values"`. Re-queried `kimai2_users`
+  directly afterward — `email` now reads `miguelamtx@gmail.com`, the write
+  genuinely landed.
+- Second run: silent no-op — no log line, matching the "unchanged costs
+  nothing" design.
+- **Real login, driven by hand with `curl` against Kimai's actual
+  `/en/login` + `/en/login_check` form** (CSRF token scraped from the
+  login page, not skipped), not through this repo's own code: with the
+  synced email + the tracked `KIMAI_ADMIN_PASSWORD`, a follow-up `GET
+  /en/profile` redirects to `/en/wizard/intro` (past the login gate,
+  Kimai's own first-time-user landing) — where the same request with no
+  session cookie at all redirects to `/en/login`. A genuine protocol-level
+  login, not just the wrapping function's return value.
+
+§501 is proven end to end: real drift confirmed, real write confirmed via
+direct query, real login confirmed via the actual form. README's Kimai
+item was already deleted in §501's commit. `beta` → `main`: left unmerged
+per [[main-merge-requires-request]] — ready whenever asked for.
