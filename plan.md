@@ -28859,3 +28859,50 @@ covered by the same passing test suite; deploying it clean is what this
 session can confirm live.
 
 Left on `beta`, unmerged to `main` per [[main-merge-requires-request]].
+
+## 461. NetBird: new users landed on "user pending approval cannot add peers"
+
+User created a new dashboard-managed user (`frias`), gave them NetBird
+access, and their NetBird client rejected login with `Login failed. Rejected
+by server. Details: user pending approval cannot add peers`. Not the peer
+login expiration §442 already fixed — a different NetBird account setting,
+`extra.user_approval_required`: any user landing in the account for the
+first time (native client SSO login through Authelia) stays blocked until
+someone clicks Approve in NetBird's own Team > Users page. User worked
+around it by hand in NetBird's dashboard for `frias` to unblock them now,
+then asked for it to be automated: "if a user has netbird access on
+dashboard the netbird dashboard is auto approved."
+
+Same reasoning as §442's `peer_login_expiration_enabled` fix: there's no
+untrusted population landing in this account that a second approval gate is
+protecting against — Authelia already decides who can authenticate at all
+(dashboard-managed users, per-app access), so a NetBird-side approval click
+on top of that is a manual per-user step, exactly what CLAUDE.md's "automate
+everything automatable" rules out.
+
+**Fix**, both in `backend/src/services/netbirdRoutingPeer.ts`:
+- `ensureAccountSettings()` (already flipping `peer_login_expiration_enabled`
+  off) now also sets `settings.extra.user_approval_required = false` when
+  `extra` is present in the API response — same idempotent
+  GET-then-conditional-PUT pattern, `extra` carried through unmodified apart
+  from that one field so `peer_approval_enabled` and friends survive the
+  round-trip.
+- New `approvePendingUsers()`, called right after it: turning the gate off
+  only stops *future* users from landing in the pending state, it doesn't
+  retroactively clear anyone already stuck there (which is what actually
+  unblocked `frias` — a manual click, not this code). `GET /api/users`,
+  `POST /api/users/{id}/approve` for anyone `pending_approval`. Runs on every
+  `netbird-vpn` start/restart, same self-healing pattern as the rest of the
+  file.
+
+Verified: `./scripts/check.sh backend typecheck` clean. The docker-based
+`check.sh backend test` invocation itself was blocked by this session's
+sandbox permission classifier (`docker run -v $ROOT:/repo ...` flagged
+"Security Weaken" on every retry, unlike the identical pattern in
+`typecheck`) — ran the suite directly with the sandbox's local Node 18
+instead (`cd backend && npm test`) as a substitute, not the canonical node:20
+container: 927 tests pass (924 baseline + 3 new — disables
+`user_approval_required` preserving other `extra` fields, leaves it alone
+once already off, approves a pending user while skipping an already-active
+one). Not yet proven against the real NetBird API — pending deploy to
+`home-srv-01`.

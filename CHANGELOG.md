@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.104.6] — 2026-09-16
+
+### Fixed
+
+- NetBird: auto-approve new users instead of requiring a manual click in NetBird's own dashboard
+
 ## [0.104.5] — 2026-09-16
 
 ### Fixed

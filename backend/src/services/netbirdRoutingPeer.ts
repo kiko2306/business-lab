@@ -97,8 +97,13 @@ interface NbSetupKey {
 }
 interface NbAccount {
   id: string;
-  settings: Record<string, unknown>;
+  settings: Record<string, unknown> & { extra?: Record<string, unknown> };
   [key: string]: unknown;
+}
+interface NbUser {
+  id: string;
+  email?: string;
+  pending_approval?: boolean;
 }
 
 /**
@@ -202,23 +207,55 @@ async function waitForManagement(baseUrl: string): Promise<boolean> {
 // this account to protect against with a forced re-auth cadence — every peer
 // is a device the account owner already controls — so this switches the
 // account to the same non-expiring posture already used for setup keys/PATs
-// elsewhere in this file (see the no_token_expirations convention). PUT
-// requires the full settings object back, so this only ever flips the one
-// field on whatever GET returned rather than guessing at the rest of the
+// elsewhere in this file (see the no_token_expirations convention).
+//
+// Same reasoning applies to `extra.user_approval_required` (§463): a new
+// user (native client SSO login through Authelia) stays blocked with
+// "user pending approval cannot add peers" until someone clicks Approve in
+// NetBird's own Team > Users page — a manual per-user console-equivalent
+// step CLAUDE.md's "automate everything automatable" rules out, and Authelia
+// already gates who can authenticate at all, so a second approval gate here
+// is redundant. `extra` is itself optional on the response, so this only
+// sets it when the field is actually present in the schema.
+//
+// PUT requires the full settings object back, so this only ever flips known
+// fields on whatever GET returned rather than guessing at the rest of the
 // schema.
 async function ensureAccountSettings(baseUrl: string, token: string): Promise<void> {
   const accounts = await nbRequest<NbAccount[]>(baseUrl, token, 'GET', '/api/accounts');
   const account = accounts[0];
   if (!account) return;
-  if (account.settings.peer_login_expiration_enabled === false) return;
+
+  const extra = account.settings.extra;
+  const expirationAlreadyOff = account.settings.peer_login_expiration_enabled === false;
+  const approvalAlreadyOff = !extra || extra.user_approval_required === false;
+  if (expirationAlreadyOff && approvalAlreadyOff) return;
 
   await nbRequest(baseUrl, token, 'PUT', `/api/accounts/${account.id}`, {
     ...account,
-    settings: { ...account.settings, peer_login_expiration_enabled: false },
+    settings: {
+      ...account.settings,
+      peer_login_expiration_enabled: false,
+      ...(extra ? { extra: { ...extra, user_approval_required: false } } : {}),
+    },
   });
   logger.info(
-    'NetBird: disabled account-wide peer login expiration — phone/Windows peers no longer need a manual re-login every 24h (§441)'
+    'NetBird: disabled account-wide peer login expiration and new-user approval gating — phone/Windows peers no longer need a manual re-login every 24h (§441), and a new user no longer needs a manual Team > Users approval click before their first peer connects (§463)'
   );
+}
+
+// Turning off `user_approval_required` above only stops *future* users from
+// landing in the pending state — it doesn't retroactively clear anyone
+// already stuck there (found live, §463: a user created and given a
+// password still hit "user pending approval cannot add peers" on first
+// login). Approves any already-pending user on every start/restart, the
+// same idempotent catch-up pattern as the rest of this file.
+async function approvePendingUsers(baseUrl: string, token: string): Promise<void> {
+  const users = await nbRequest<NbUser[]>(baseUrl, token, 'GET', '/api/users');
+  for (const user of users.filter((u) => u.pending_approval)) {
+    await nbRequest(baseUrl, token, 'POST', `/api/users/${user.id}/approve`);
+    logger.info(`NetBird: approved pending user ${user.email ?? user.id} (§463)`);
+  }
 }
 
 async function ensureGroup(baseUrl: string, token: string, name: string): Promise<string> {
@@ -344,6 +381,7 @@ export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<boo
     }
 
     await ensureAccountSettings(baseUrl, token);
+    await approvePendingUsers(baseUrl, token);
 
     const cidr = normalizeCidr(await getLanCidr());
     if (!cidr) {

@@ -284,6 +284,98 @@ describe('ensureNetbirdRoutingPeer', () => {
     expect(fetch).toHaveBeenCalled();
   });
 
+  // §463: a new user (SSO login through Authelia) landed on "user pending
+  // approval cannot add peers" — NetBird's `extra.user_approval_required`
+  // account setting, a separate gate from peer login expiration above.
+  it('disables new-user approval gating, preserving the rest of extra settings', async () => {
+    const accountPuts: unknown[] = [];
+    vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string; body?: string }) => {
+      const path = new URL(url).pathname;
+      const method = init?.method ?? 'GET';
+      if (method === 'PUT' && path === '/api/accounts/acct-1') {
+        accountPuts.push(JSON.parse(init!.body!));
+        return Promise.resolve(jsonResponse({}));
+      }
+      if (method === 'GET' && path === '/api/accounts') {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              id: 'acct-1',
+              settings: {
+                peer_login_expiration_enabled: false,
+                extra: { user_approval_required: true, peer_approval_enabled: true },
+              },
+            },
+          ])
+        );
+      }
+      return fetchEverythingMissing(url, init);
+    }) as typeof fetch);
+
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+
+    expect(accountPuts).toEqual([
+      expect.objectContaining({
+        id: 'acct-1',
+        settings: expect.objectContaining({
+          extra: { user_approval_required: false, peer_approval_enabled: true },
+        }),
+      }),
+    ]);
+  });
+
+  it('leaves extra settings alone once user approval is already disabled', async () => {
+    vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string; body?: string }) => {
+      const path = new URL(url).pathname;
+      const method = init?.method ?? 'GET';
+      if (method !== 'GET') throw new Error(`unexpected write: ${method} ${path}`);
+      if (path === '/api/accounts') {
+        return Promise.resolve(
+          jsonResponse([
+            {
+              id: 'acct-1',
+              settings: { peer_login_expiration_enabled: false, extra: { user_approval_required: false } },
+            },
+          ])
+        );
+      }
+      return fetchEverythingMissing(url, init);
+    }) as typeof fetch);
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+    expect(fetch).toHaveBeenCalled();
+  });
+
+  // Turning the gate off only stops future users from landing in the pending
+  // state — a user already stuck there (like the one that surfaced §463)
+  // needs an explicit approve.
+  it('approves any user already stuck in pending approval', async () => {
+    const approvals: string[] = [];
+    vi.mocked(fetch).mockImplementation(((url: string, init?: { method?: string }) => {
+      const path = new URL(url).pathname;
+      const method = init?.method ?? 'GET';
+      if (method === 'GET' && path === '/api/users') {
+        return Promise.resolve(
+          jsonResponse([
+            { id: 'user-1', email: 'frias@example.com', pending_approval: true },
+            { id: 'user-2', email: 'already-active@example.com', pending_approval: false },
+          ])
+        );
+      }
+      if (method === 'POST' && path === '/api/users/user-1/approve') {
+        approvals.push(path);
+        return Promise.resolve(jsonResponse({}));
+      }
+      if (method === 'POST' && path === '/api/users/user-2/approve') {
+        throw new Error('should not approve a user that is not pending');
+      }
+      return fetchAccountsMissing(url, init as { method?: string; body?: string });
+    }) as typeof fetch);
+
+    await ensureNetbirdRoutingPeer('netbird-vpn');
+
+    expect(approvals).toEqual(['/api/users/user-1/approve']);
+  });
+
   // Found live (§405.2): NetBird's GET /api/groups?name=X answers 404, not
   // 200 [], when nothing matches — a real API response shape, not a timing
   // fluke, so it gets its own regression test rather than folding into the
