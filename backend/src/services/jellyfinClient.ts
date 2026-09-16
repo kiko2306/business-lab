@@ -9,8 +9,12 @@
  * account. Disable/re-enable flips `Policy.IsDisabled`, fetched and posted
  * back whole since there's no partial-policy-update endpoint.
  *
- * Every call needs `X-Emby-Authorization` identifying the calling client —
- * Jellyfin 401s without it even on unauthenticated endpoints like sign-in.
+ * Every call needs a client-identifying auth header or Jellyfin 400s, even
+ * on sign-in. Found live (2026-09-16) against a real 12.0.0 server: the
+ * legacy `X-Emby-Authorization` header (still what most third-party
+ * examples show) gets ignored and 400s here — this version's own OpenAPI
+ * spec (`/api-docs/openapi.json`) names the security scheme `Authorization`,
+ * and only that header name actually authenticates.
  */
 
 const REQUEST_TIMEOUT_MS = 15_000;
@@ -20,9 +24,8 @@ const CLIENT_AUTH_HEADER =
 function authHeaders(token?: string): Record<string, string> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'X-Emby-Authorization': CLIENT_AUTH_HEADER,
+    Authorization: token ? `${CLIENT_AUTH_HEADER}, Token="${token}"` : CLIENT_AUTH_HEADER,
   };
-  if (token) headers['X-Emby-Token'] = token;
   return headers;
 }
 
