@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.115.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.116.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -245,9 +245,6 @@ per-app items depend on it, and each other app item is independent of the
 rest (§341's DocuSeal SSO precedent: "looks doable" and "is doable" differ
 per app, so no batch-approval here, one at a time).
 
-- [ ] **Home Assistant**: extend past the single-owner onboarding wizard —
-      HA's multi-user model is real but typically UI-driven; check whether
-      its API supports creating additional persons/users headlessly.
 - [ ] **Jellyfin**: extend past the single admin account created at startup
       — check its user-management API for headless per-user creation
       (`lanOnly`, so lower priority — never on the public tunnel).

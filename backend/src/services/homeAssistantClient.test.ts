@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { createOwner, getOnboardingState } from './homeAssistantClient';
+import { createOwner, getAdminAccessToken, getOnboardingState } from './homeAssistantClient';
 
 const BASE = 'http://ha.test';
 const realFetch = globalThis.fetch;
@@ -60,5 +60,52 @@ describe('createOwner', () => {
   it('is failed on any other status', async () => {
     vi.mocked(fetch).mockResolvedValue(jsonRes(500, {}));
     expect(await createOwner(BASE, input)).toBe('failed');
+  });
+});
+
+describe('getAdminAccessToken', () => {
+  it('drives the three-step login flow and returns the access token', async () => {
+    const f = vi
+      .mocked(fetch)
+      .mockResolvedValueOnce(jsonRes(200, { flow_id: 'flow-1', type: 'form' }))
+      .mockResolvedValueOnce(jsonRes(200, { type: 'create_entry', result: 'auth-code' }))
+      .mockResolvedValueOnce(jsonRes(200, { access_token: 'token-abc', expires_in: 1800 }));
+
+    const result = await getAdminAccessToken(BASE, 'admin', 'pw');
+
+    expect(result).toEqual({ state: 'ok', accessToken: 'token-abc' });
+    expect(f.mock.calls[0][0]).toBe(`${BASE}/auth/login_flow`);
+    expect(f.mock.calls[1][0]).toBe(`${BASE}/auth/login_flow/flow-1`);
+    const step2Body = JSON.parse((f.mock.calls[1][1] as RequestInit).body as string);
+    expect(step2Body).toEqual({ client_id: `${BASE}/`, username: 'admin', password: 'pw' });
+    expect(f.mock.calls[2][0]).toBe(`${BASE}/auth/token`);
+    const tokenBody = (f.mock.calls[2][1] as RequestInit).body as string;
+    expect(tokenBody).toContain('grant_type=authorization_code');
+    expect(tokenBody).toContain('code=auth-code');
+  });
+
+  it('fails when the login flow never returns a flow_id', async () => {
+    vi.mocked(fetch).mockResolvedValue(jsonRes(200, {}));
+    expect(await getAdminAccessToken(BASE, 'admin', 'pw')).toEqual({ state: 'failed' });
+  });
+
+  it('fails when the credentials are wrong (the flow re-renders a form, not create_entry)', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonRes(200, { flow_id: 'flow-1' }))
+      .mockResolvedValueOnce(jsonRes(200, { type: 'form', errors: { base: 'invalid_auth' } }));
+    expect(await getAdminAccessToken(BASE, 'admin', 'wrong')).toEqual({ state: 'failed' });
+  });
+
+  it('fails when the token exchange itself fails', async () => {
+    vi.mocked(fetch)
+      .mockResolvedValueOnce(jsonRes(200, { flow_id: 'flow-1' }))
+      .mockResolvedValueOnce(jsonRes(200, { type: 'create_entry', result: 'auth-code' }))
+      .mockResolvedValueOnce(jsonRes(400, {}));
+    expect(await getAdminAccessToken(BASE, 'admin', 'pw')).toEqual({ state: 'failed' });
+  });
+
+  it('is failed on a network error', async () => {
+    vi.mocked(fetch).mockRejectedValue(new Error('ECONNREFUSED'));
+    expect(await getAdminAccessToken(BASE, 'admin', 'pw')).toEqual({ state: 'failed' });
   });
 });

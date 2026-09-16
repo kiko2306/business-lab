@@ -31,7 +31,9 @@ const MAX_ATTEMPTS = 30;
 const RETRY_DELAY_MS = 3000;
 const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-async function resolveHaBaseUrl(): Promise<string> {
+// Exported for homeAssistantUserProvisioning.ts — same cross-project base URL
+// a per-user account create/update needs to sign in as the owner against.
+export async function resolveHaBaseUrl(): Promise<string> {
   // HA is host-networked (no ports mapping) — hostNetworkPort in the registry,
   // reached from the backend container over the host gateway.
   const port = getService(HA_SERVICE)?.hostNetworkPort ?? FALLBACK_PORT;

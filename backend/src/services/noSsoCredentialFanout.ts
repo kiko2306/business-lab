@@ -9,8 +9,8 @@
  * Keyed by service name in PROVISIONERS below; an app only becomes
  * grantable in Users & Roles (see `getGrantableAppOptions` in
  * userAppAccess.ts) once it has an entry here. `skipAutheliaProtection`
- * alone isn't enough — the remaining no-SSO apps (Home Assistant, Jellyfin)
- * don't have a provisioner built yet; each is its own README item.
+ * alone isn't enough — Jellyfin is the one no-SSO app left with no
+ * provisioner (`lanOnly`, so lower priority) — its own README item.
  *
  * NocoDB's own org-user Meta API turned out to be plain OSS (confirmed
  * against upstream's `org-users.controller.ts`/`users.service.ts`, no
@@ -52,10 +52,18 @@
  * can never change an existing one's password over HTTP, and the only web
  * form that can needs a live signed-in session for one field. See that
  * module's doc comment for the full reasoning.
+ *
+ * Home Assistant (§499) has no REST user-management API at all — the same
+ * `config/auth/*` WebSocket commands its own frontend Users page drives,
+ * spoken from `homeAssistantClient.ts` over the `ws` package (same
+ * approach as `uptimeKumaAdminBootstrap.ts`), authenticated with a fresh
+ * access token from HA's own username/password OAuth2 flow rather than a
+ * stored one. See `homeAssistantUserProvisioning.ts`'s doc comment.
  */
 
 import logger from '../utils/logger';
 import { disableDocusealTeamMember, provisionDocusealTeamMember } from './docusealTeamProvisioning';
+import { disableHomeAssistantUser, provisionHomeAssistantUser } from './homeAssistantUserProvisioning';
 import { disableItflowUser, provisionItflowUser } from './itflowUserProvisioning';
 import { disableKimaiUser, provisionKimaiUser } from './kimaiUserProvisioning';
 import { disableNocodbUser, provisionNocodbUser } from './nocodbUserProvisioning';
@@ -74,6 +82,7 @@ const PROVISIONERS: Record<string, Provisioner> = {
   nocodb: provisionNocodbUser,
   itflow: provisionItflowUser,
   kimai: provisionKimaiUser,
+  'home-assistant': provisionHomeAssistantUser,
 };
 
 const DEPROVISIONERS: Record<string, Deprovisioner> = {
@@ -81,6 +90,7 @@ const DEPROVISIONERS: Record<string, Deprovisioner> = {
   nocodb: disableNocodbUser,
   itflow: disableItflowUser,
   kimai: disableKimaiUser,
+  'home-assistant': disableHomeAssistantUser,
 };
 
 /** Apps that can accept a fanned-out credential today. */
