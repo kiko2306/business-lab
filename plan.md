@@ -30707,3 +30707,44 @@ bootstrap, create, disable, and re-grant all confirmed via the real OAuth2
 protocol, not just the wrapping function's return value. `beta` → `main`:
 left unmerged per [[main-merge-requires-request]] — ready whenever asked
 for.
+
+## 501. Kimai admin identity re-sync (README TODO)
+
+Closes the README TODO left open at the end of §497: Kimai's entrypoint only
+ever *creates* the admin (`kimai:user:create admin` from
+`ADMINMAIL`/`ADMINPASS`, no-ops once the row exists), so a
+`KIMAI_ADMIN_EMAIL`/`KIMAI_ADMIN_PASSWORD` change after first boot never
+reached the real account — the same drift class DocuSeal's
+`reconcileDocusealAdminPassword` (§495) closed for its own admin.
+`tx-home-utils.com`'s Kimai admin row was confirmed still holding a stale
+email from its first boot.
+
+Same shape as DocuSeal's fix, with one difference driven by how each app's
+own admin account is identified. DocuSeal's account *is* keyed by its
+login email (created with the webmaster's email as the row's identity), so
+its reconcile is split: a live HTTP profile-update for the email side
+(the model has app-level side effects Direct SQL shouldn't skip) and a
+direct DB write for the password. Kimai's entrypoint instead creates the
+admin under a **fixed username** (`admin`) — email is just another column
+on that row, with no session-bound state wrapped around it — so
+`kimaiDb.ts`'s new `reconcileKimaiAdminIdentity(email, password)` looks the
+row up by `username = 'admin'` and corrects both columns in one
+`password_verify()`-gated write: unchanged in the common case (nothing to
+write on a normal start), `synced` when either has drifted, `not-found`
+before the entrypoint's first boot has run.
+
+`kimaiAdminBootstrap.ts` wraps it the same way `docusealAdminBootstrap.ts`
+does: no-op for any other service, no-op when Kimai isn't installed, no-op
+when it isn't exposed (same gate as DocuSeal — Kimai is exposed directly
+with only its own login, `skipAutheliaProtection`, §342, so that's the only
+time a drifted identity is actually reachable), reads
+`KIMAI_ADMIN_PASSWORD` from its own `.env` and the current Authelia admin
+email the same way `adminSeedEnv.ts` does for the `up`-time injection.
+Wired into `executor.ts` right after `reconcileDocusealFirstAdmin`, run
+after `up` like every other post-start reconciler in that file.
+
+`./scripts/check.sh backend typecheck`/`test` clean (1064 passing, +13 new:
+5 in `kimaiDb.test.ts` for `reconcileKimaiAdminIdentity`, 8 in
+`kimaiAdminBootstrap.test.ts`). `scripts/bump-version.sh patch Fixed …` →
+0.116.1. README's Kimai TODO item deleted. Not yet verified against the
+real stack — next section.

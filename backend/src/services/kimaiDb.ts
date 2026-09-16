@@ -9,6 +9,18 @@
  * container from the compose service's own `environment:` block (it's how
  * Kimai itself connects), so the script just parses that directly with
  * PHP's `parse_url()`.
+ *
+ * `reconcileKimaiAdminIdentity` — README TODO found live (2026-09-16):
+ * Kimai's entrypoint only ever *creates* the admin (`kimai:user:create
+ * admin` from ADMINMAIL/ADMINPASS, no-ops once the row exists), so a
+ * KIMAI_ADMIN_EMAIL/KIMAI_ADMIN_PASSWORD change after first boot never
+ * reaches the real account — same drift class DocuSeal's
+ * `reconcileDocusealAdminPassword` (§495) closed. Looked up by the
+ * entrypoint's fixed `username` ('admin'), not email, since email is
+ * exactly the column that can drift. Both columns are corrected in one
+ * write — unlike DocuSeal's split (a live HTTP call for email, a direct
+ * write for password), Kimai's `kimai2_users` wraps neither column in any
+ * session-bound state, so there's nothing a direct write could break.
  */
 
 import { exec } from 'child_process';
@@ -67,4 +79,40 @@ export async function runKimaiDbScript(
       }
     );
   });
+}
+
+export type KimaiReconcileAdminResult = 'synced' | 'unchanged' | 'not-found' | 'failed';
+
+const RECONCILE_ADMIN_SCRIPT = [
+  "$email = getenv('KIMAI_FANOUT_EMAIL');",
+  "$password = getenv('KIMAI_FANOUT_PASSWORD');",
+  "$stmt = $pdo->prepare(\"SELECT email, password FROM kimai2_users WHERE username = 'admin'\");",
+  '$stmt->execute();',
+  '$row = $stmt->fetch(PDO::FETCH_ASSOC);',
+  'if (!$row) {',
+  "  echo 'not-found';",
+  '} else {',
+  "  $emailChanged = $row['email'] !== $email;",
+  "  $passwordChanged = !password_verify($password, $row['password']);",
+  '  if (!$emailChanged && !$passwordChanged) {',
+  "    echo 'unchanged';",
+  '  } else {',
+  "    $hash = $passwordChanged ? password_hash($password, PASSWORD_BCRYPT, ['cost' => 13]) : $row['password'];",
+  "    $upd = $pdo->prepare(\"UPDATE kimai2_users SET email = :email, password = :hash WHERE username = 'admin'\");",
+  "    $upd->execute([':email' => $email, ':hash' => $hash]);",
+  "    echo 'synced';",
+  '  }',
+  '}',
+];
+
+/** §501: re-sync Kimai's admin (email + password) only when it's actually drifted from the tracked values. */
+export async function reconcileKimaiAdminIdentity(email: string, password: string): Promise<KimaiReconcileAdminResult> {
+  const result = await runKimaiDbScript(RECONCILE_ADMIN_SCRIPT, {
+    env: { ...process.env, KIMAI_FANOUT_EMAIL: email, KIMAI_FANOUT_PASSWORD: password },
+    passEnv: ['KIMAI_FANOUT_EMAIL', 'KIMAI_FANOUT_PASSWORD'],
+  });
+  if (result.ok && result.output.includes('synced')) return 'synced';
+  if (result.ok && result.output.includes('unchanged')) return 'unchanged';
+  if (result.ok && result.output.includes('not-found')) return 'not-found';
+  return 'failed';
 }

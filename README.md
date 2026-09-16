@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.116.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.116.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -223,18 +223,6 @@ it is done — not ticked off and left behind. Section references point at
       repo's config. Check that issue periodically; delete this item once it's
       closed upstream (or once an app update fixes it for us, whichever comes
       first).
-- [ ] **Kimai admin identity never re-syncs after first boot** — found live
-      while building §497's credential fan-out: the image's entrypoint only
-      ever *creates* the admin (`kimai:user:create admin`, no-ops once the
-      row exists), so a `KIMAI_ADMIN_EMAIL`/`KIMAI_ADMIN_PASSWORD` change
-      after that first boot never reaches the real account — same drift
-      class as DocuSeal's (§494/495), just not fixed here (out of scope for
-      §497, which only needed *other* users' rows, not the admin's own).
-      `tx-home-utils.com`'s admin row is still the wizard's placeholder
-      `admin@example.com` today. Fix the same shape as
-      `reconcileDocusealAdminPassword`/ITFlow's `reconcileAdminPassword`:
-      detect drift with `password_verify()` first, write via a cold script
-      (`kimaiDb.ts` already exists for this), no live session needed.
 ### Credential fan-out to no-SSO apps (§480)
 
 User's call, tradeoff accepted explicitly: mirror each dashboard user's real

@@ -42,6 +42,7 @@ import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import { applyImmichConfig } from './immichConfig';
 import { reconcileImmichFirstAdmin } from './immichAdminBootstrap';
 import { reconcileDocusealFirstAdmin } from './docusealAdminBootstrap';
+import { reconcileKimaiAdminAccount } from './kimaiAdminBootstrap';
 import { reconcileTwentyFirstAdmin } from './twentyAdminBootstrap';
 import { reconcileN8nFirstAdmin } from './n8nAdminBootstrap';
 import { reconcileJellyfinFirstAdmin } from './jellyfinAdminBootstrap';
@@ -354,6 +355,11 @@ async function composeUpWithManagedConfig(
   // the outer gate and this just creates the admin account. After `up`; no-op
   // otherwise.
   await reconcileDocusealFirstAdmin(serviceName);
+  // Kimai: re-sync its admin's email/password when they've drifted from the
+  // config-panel/Authelia values since first boot (§501) — the entrypoint
+  // that seeds the account only ever creates it, never updates it. DB write
+  // against the running kimai-db, so after `up`; no-op otherwise.
+  await reconcileKimaiAdminAccount(serviceName);
   // Twenty: claim the workspace-owner account so an exposed Twenty shows a
   // login instead of the first-visitor-claims-it signup form (§421). GraphQL
   // against the running server, so after `up`; no-op otherwise and once an
