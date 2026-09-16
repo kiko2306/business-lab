@@ -29112,3 +29112,15 @@ reads "Access request: Paperless (paperless.tx-home-utils.com)".
 Verified: `./scripts/check.sh backend typecheck`/`test` clean (931, +3 new —
 `accessRequests.test.ts` covers the primary-exposure match, the
 secondary-suffix strip, and the no-match fallback).
+
+## 466. §465 verified live on `beta`
+
+Deployed to `home-srv-01`, `GET /api/version` → `0.105.2`. `POST
+/api/access-requests` against the real `paperless.tx-home-utils.com`
+exposure row → 204, no error in `business-lab-backend-1`'s logs — a real
+email sent with subject "Access request: Paperless
+(paperless.tx-home-utils.com)", confirming `describeApp()`'s
+`service_exposure` reverse lookup resolves correctly against live data, not
+just the mocked test.
+
+`beta` → `main`: left unmerged per [[main-merge-requires-request]].
