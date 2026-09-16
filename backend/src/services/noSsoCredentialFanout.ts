@@ -9,9 +9,8 @@
  * Keyed by service name in PROVISIONERS below; an app only becomes
  * grantable in Users & Roles (see `getGrantableAppOptions` in
  * userAppAccess.ts) once it has an entry here. `skipAutheliaProtection`
- * alone isn't enough — the remaining no-SSO apps (Kimai, Home Assistant,
- * Jellyfin) don't have a provisioner built yet; each is its own README
- * item.
+ * alone isn't enough — the remaining no-SSO apps (Home Assistant, Jellyfin)
+ * don't have a provisioner built yet; each is its own README item.
  *
  * NocoDB's own org-user Meta API turned out to be plain OSS (confirmed
  * against upstream's `org-users.controller.ts`/`users.service.ts`, no
@@ -46,11 +45,19 @@
  * all). Re-granting access re-provisions it (the create/update path
  * already un-archives DocuSeal and re-sets NocoDB/ITFlow's password), so
  * there's no separate "re-enable" entry point needed here.
+ *
+ * Kimai (§497) is the one app here with no HTTP call at all —
+ * `kimaiUserProvisioning.ts` writes `kimai2_users` directly through a cold
+ * PHP script (`kimaiDb.ts`), because Kimai's REST API can create a user but
+ * can never change an existing one's password over HTTP, and the only web
+ * form that can needs a live signed-in session for one field. See that
+ * module's doc comment for the full reasoning.
  */
 
 import logger from '../utils/logger';
 import { disableDocusealTeamMember, provisionDocusealTeamMember } from './docusealTeamProvisioning';
 import { disableItflowUser, provisionItflowUser } from './itflowUserProvisioning';
+import { disableKimaiUser, provisionKimaiUser } from './kimaiUserProvisioning';
 import { disableNocodbUser, provisionNocodbUser } from './nocodbUserProvisioning';
 
 export interface NoSsoCredentialInput {
@@ -66,12 +73,14 @@ const PROVISIONERS: Record<string, Provisioner> = {
   docuseal: provisionDocusealTeamMember,
   nocodb: provisionNocodbUser,
   itflow: provisionItflowUser,
+  kimai: provisionKimaiUser,
 };
 
 const DEPROVISIONERS: Record<string, Deprovisioner> = {
   docuseal: disableDocusealTeamMember,
   nocodb: disableNocodbUser,
   itflow: disableItflowUser,
+  kimai: disableKimaiUser,
 };
 
 /** Apps that can accept a fanned-out credential today. */

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.115.0] — 2026-09-16
+
+### Added
+
+- Kimai joins the §480 no-SSO credential fan-out — direct DB write, no live session needed
+
 ## [0.114.0] — 2026-09-16
 
 ### Added
