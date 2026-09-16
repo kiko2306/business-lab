@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.110.0] — 2026-09-16
+
+### Added
+
+- Core mechanism for §480's credential fan-out: app-access grants now include no-SSO apps, and password-set/reset now pushes matching credentials into them
+
 ## [0.109.0] — 2026-09-16
 
 ### Added

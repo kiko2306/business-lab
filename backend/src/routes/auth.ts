@@ -18,6 +18,8 @@ import { effectiveCapabilities } from '../auth/capabilities';
 import { getUserCapabilities, getUserRoles, setUserRoles } from '../services/userRoles';
 import { acceptInvitation, verifyInvitation } from '../services/userInvitations';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
+import { getUserAppAccess } from '../services/userAppAccess';
+import { fanOutNoSsoCredentials } from '../services/noSsoCredentialFanout';
 import {
   generateRecoveryCodes,
   generateTotpSecret,
@@ -153,6 +155,17 @@ router.post(
 
       // The account now has a password hash — write it into Authelia (§157).
       await syncAutheliaUsersSafe('invitation_accepted', activated.userId);
+
+      // Same for any no-SSO app already granted at invite time (§480) — this
+      // is the first moment this account has ever had a real password.
+      if (activated.email) {
+        const grantedApps = await getUserAppAccess(activated.userId);
+        await fanOutNoSsoCredentials(grantedApps, {
+          email: activated.email,
+          password,
+          displayName: activated.username,
+        });
+      }
 
       const session = await issueSession({ id: activated.userId, username: activated.username });
       return res.json(session);

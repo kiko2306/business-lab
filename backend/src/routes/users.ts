@@ -21,11 +21,13 @@ import {
 } from '../services/userRoles';
 import {
   getAppAccessForUsers,
-  getAppAccessOptionNames,
-  getAppAccessOptions,
+  getGrantableAppOptionNames,
+  getGrantableAppOptions,
+  getUserAppAccess,
   setUserAppAccess,
 } from '../services/userAppAccess';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
+import { fanOutNoSsoCredentials } from '../services/noSsoCredentialFanout';
 import { createInvitation } from '../services/userInvitations';
 import { sendMail, mailIsConfigured } from '../utils/mailSend';
 import { getDashboardBaseUrl } from '../utils/generalSettings';
@@ -82,18 +84,19 @@ async function rejectUnknownAppAccess(appAccess: string[]): Promise<string | nul
   if (appAccess.length === 0) {
     return null;
   }
-  const allowed = await getAppAccessOptionNames();
+  const allowed = await getGrantableAppOptionNames();
   const unknown = appAccess.filter((name) => !allowed.has(name));
-  return unknown.length ? `Not an SSO-reachable app: ${unknown.join(', ')}.` : null;
+  return unknown.length ? `Not a grantable app: ${unknown.join(', ')}.` : null;
 }
 
 // ---------------------------------------------------------------------------
-// GET /api/users/app-access-options — the apps an account can be granted SSO
-// access to: those currently exposed and Authelia-protected (plan.md §151).
+// GET /api/users/app-access-options — the apps an account can be granted
+// access to: Authelia-protected apps plus the no-SSO apps that have a
+// credential-fanout provisioner (plan.md §151, §480).
 // ---------------------------------------------------------------------------
 router.get('/app-access-options', async (_req: Request, res: Response) => {
   try {
-    return res.json({ items: await getAppAccessOptions() });
+    return res.json({ items: await getGrantableAppOptions() });
   } catch (error) {
     console.error('App access options error:', (error as Error).message);
     return res.status(500).json({ error: 'Unable to load the app list.' });
@@ -424,8 +427,8 @@ router.put(
 
     try {
       const passwordHash = await hashPassword(password);
-      const result = await query<{ id: number; username: string }>(
-        'UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING id, username',
+      const result = await query<{ id: number; username: string; email: string | null }>(
+        'UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING id, username, email',
         [id, passwordHash]
       );
       const user = result.rows[0];
@@ -442,6 +445,13 @@ router.put(
 
       // The hash Authelia holds for this account has to follow the reset.
       const warning = await syncAutheliaUsersSafe('user_password_reset', req.user?.id ?? null);
+
+      // Same for any no-SSO app this account has a credential-fanout account
+      // in (§480) — this is the plaintext's one moment to exist server-side.
+      if (user.email) {
+        const grantedApps = await getUserAppAccess(user.id);
+        await fanOutNoSsoCredentials(grantedApps, { email: user.email, password, displayName: user.username });
+      }
 
       return res.json({ message: 'Password updated successfully.', ...(warning ? { warning } : {}) });
     } catch (error) {

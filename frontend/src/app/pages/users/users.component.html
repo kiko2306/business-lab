@@ -7,7 +7,7 @@
     </p>
   </div>
 
-  <app-panel key="users:add" title="Add user" subtitle="Username, email, roles, an admin's features, and the apps they reach through SSO — the new user gets an email to set their own password">
+  <app-panel key="users:add" title="Add user" subtitle="Username, email, roles, an admin's features, and the apps they can access — the new user gets an email to set their own password">
     <div class="alert alert-warning" *ngIf="mailConfigured === false">
       New users are invited by email, so the shared mailbox has to be set up first.
       <a routerLink="/settings">Configure it in Settings</a>.
@@ -67,7 +67,7 @@
       <div class="col-12" *ngIf="appOptions.length">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
           <span class="form-label small fw-semibold mb-0">
-            SSO app access
+            App access
             <span class="text-body-secondary fw-normal">· {{ pickedAppCount(newAppAccess) }} of {{ appOptions.length }} selected</span>
           </span>
           <div class="d-flex gap-2">
@@ -115,7 +115,7 @@
     </form>
   </app-panel>
 
-  <app-panel key="users:list" title="Accounts" subtitle="Existing users — their email, roles, an admin's features, and the apps they reach through SSO">
+  <app-panel key="users:list" title="Accounts" subtitle="Existing users — their email, roles, an admin's features, and the apps they can access">
     <div class="table-responsive table-stack-wrap">
       <table class="table table-sm table-stack align-middle mb-0">
         <thead>
@@ -139,7 +139,7 @@
                 <span *ngIf="user.email">{{ user.email }}</span>
                 <span class="text-body-secondary" *ngIf="!user.email">—</span>
                 <div class="form-text mt-0" *ngIf="user.appAccess?.length">
-                  {{ user.appAccess?.length }} SSO app{{ user.appAccess?.length === 1 ? '' : 's' }}
+                  {{ user.appAccess?.length }} app{{ user.appAccess?.length === 1 ? '' : 's' }}
                 </div>
               </td>
               <td data-label="Roles">
@@ -249,7 +249,7 @@
                 </div>
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1" *ngIf="appOptions.length">
                   <span class="form-label small fw-semibold mb-0">
-                    SSO app access
+                    App access
                     <span class="text-body-secondary fw-normal">· {{ pickedAppCount(accessApps) }} of {{ appOptions.length }} selected</span>
                   </span>
                   <div class="d-flex gap-2">

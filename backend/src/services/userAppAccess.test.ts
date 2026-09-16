@@ -13,10 +13,15 @@ const { getService, isAutheliaProtectionRequired } = vi.hoisted(() => ({
 }));
 vi.mock('../config/services', () => ({ getService, isAutheliaProtectionRequired }));
 
+const { getNoSsoCredentialAppNames } = vi.hoisted(() => ({ getNoSsoCredentialAppNames: vi.fn() }));
+vi.mock('./noSsoCredentialFanout', () => ({ getNoSsoCredentialAppNames }));
+
 import {
   getAppAccessForUsers,
   getAppAccessOptionNames,
   getAppAccessOptions,
+  getGrantableAppOptionNames,
+  getGrantableAppOptions,
 } from './userAppAccess';
 
 const REGISTRY: Record<string, { label: string; autheliaGroups?: string[] }> = {
@@ -31,6 +36,8 @@ beforeEach(() => {
   isAutheliaProtectionRequired.mockReset();
   // Default: every app is Authelia-gated unless a test says otherwise.
   isAutheliaProtectionRequired.mockReturnValue(true);
+  getNoSsoCredentialAppNames.mockReset();
+  getNoSsoCredentialAppNames.mockReturnValue([]);
 });
 
 describe('getAppAccessOptions', () => {
@@ -95,6 +102,49 @@ describe('getAppAccessOptionNames', () => {
     });
     const names = await getAppAccessOptionNames();
     expect(names).toEqual(new Set(['vaultwarden', 'bookstack']));
+  });
+});
+
+describe('getGrantableAppOptions', () => {
+  it('includes a no-SSO app with a credential-fanout provisioner even though it is not Authelia-protected', async () => {
+    query.mockResolvedValue({
+      rows: [
+        { service_name: 'vaultwarden', hostname: 'v' },
+        { service_name: 'docuseal', hostname: 'd' },
+        { service_name: 'nocodb', hostname: 'n' },
+      ],
+    });
+    isAutheliaProtectionRequired.mockImplementation((name: string) => name === 'vaultwarden');
+    getNoSsoCredentialAppNames.mockReturnValue(['docuseal']);
+
+    const options = await getGrantableAppOptions();
+
+    // nocodb has neither Authelia protection nor a provisioner yet — still excluded.
+    expect(options.map((o) => o.serviceName).sort()).toEqual(['docuseal', 'vaultwarden']);
+  });
+
+  it('is just getAppAccessOptions when no app has a no-SSO provisioner', async () => {
+    query.mockResolvedValue({ rows: [{ service_name: 'vaultwarden', hostname: 'v' }] });
+    isAutheliaProtectionRequired.mockReturnValue(true);
+    getNoSsoCredentialAppNames.mockReturnValue([]);
+
+    expect(await getGrantableAppOptions()).toEqual(await getAppAccessOptions());
+  });
+});
+
+describe('getGrantableAppOptionNames', () => {
+  it('is the set of Authelia-grantable plus no-SSO-provisioned service names', async () => {
+    query.mockResolvedValue({
+      rows: [
+        { service_name: 'vaultwarden', hostname: 'v' },
+        { service_name: 'docuseal', hostname: 'd' },
+      ],
+    });
+    isAutheliaProtectionRequired.mockImplementation((name: string) => name === 'vaultwarden');
+    getNoSsoCredentialAppNames.mockReturnValue(['docuseal']);
+
+    const names = await getGrantableAppOptionNames();
+    expect(names).toEqual(new Set(['vaultwarden', 'docuseal']));
   });
 });
 

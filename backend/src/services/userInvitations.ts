@@ -67,7 +67,7 @@ export async function verifyInvitation(token: string): Promise<InvitationTarget 
 export async function acceptInvitation(
   token: string,
   passwordHash: string
-): Promise<{ userId: number; username: string } | null> {
+): Promise<{ userId: number; username: string; email: string | null } | null> {
   return withTransaction(async (client: PoolClient) => {
     const claim = await client.query<{ id: number; user_id: number }>(
       `UPDATE user_invitations SET accepted_at = NOW()
@@ -79,11 +79,11 @@ export async function acceptInvitation(
     if (!row) {
       return null;
     }
-    const user = await client.query<{ username: string }>(
-      'UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING username',
+    const user = await client.query<{ username: string; email: string | null }>(
+      'UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING username, email',
       [row.user_id, passwordHash]
     );
     await client.query('DELETE FROM user_invitations WHERE user_id = $1 AND id <> $2', [row.user_id, row.id]);
-    return { userId: row.user_id, username: user.rows[0].username };
+    return { userId: row.user_id, username: user.rows[0].username, email: user.rows[0].email };
   });
 }

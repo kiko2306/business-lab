@@ -62,12 +62,12 @@ describe('acceptInvitation', () => {
   it('claims the token, sets the hash, drops sibling invites, returns the account', async () => {
     query
       .mockResolvedValueOnce({ rows: [{ id: 99, user_id: 7 }] }) // claim
-      .mockResolvedValueOnce({ rows: [{ username: 'ann' }] }) // set hash
+      .mockResolvedValueOnce({ rows: [{ username: 'ann', email: 'ann@example.com' }] }) // set hash
       .mockResolvedValueOnce({ rows: [] }); // delete siblings
 
     const result = await acceptInvitation('tok', '$2b$hash');
 
-    expect(result).toEqual({ userId: 7, username: 'ann' });
+    expect(result).toEqual({ userId: 7, username: 'ann', email: 'ann@example.com' });
     expect(query.mock.calls[0][0]).toMatch(/UPDATE user_invitations SET accepted_at = NOW\(\)/);
     expect(query.mock.calls[1][0]).toMatch(/UPDATE users SET password_hash = \$2/);
     expect(query.mock.calls[1][1]).toEqual([7, '$2b$hash']);

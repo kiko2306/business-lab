@@ -29843,3 +29843,109 @@ DocuSeal's own side of §480 is proven end to end. Still open: the core
 mechanism (README item) that would actually call this from a real "grant
 access" flow, and the update-on-password-rotation path §481 flagged as not
 built. `beta` → `main`: left unmerged per [[main-merge-requires-request]].
+
+## 483. Core mechanism for §480's credential fan-out
+
+Extended the access-grant model to cover no-SSO apps and hooked the real
+password-change sites into the dispatcher, so granting DocuSeal access
+and then setting/resetting that person's password actually provisions a
+matching account — not just the create-only proof from §481.
+
+**Access model**: rather than widen `getAppAccessOptions()` itself (as
+originally sketched in §480's README item), added a separate
+`getGrantableAppOptions()`/`getGrantableAppOptionNames()` pair in
+`userAppAccess.ts` that unions Authelia-protected apps with whatever's
+registered in the new `noSsoCredentialFanout.ts` (currently just
+`docuseal`). Deliberately did **not** touch `getAppAccessOptions()`'s own
+behaviour: `autheliaSync.ts`, `autheliaAccessControl.ts` and
+`autheliaOidcClients.ts` all call it directly to derive Authelia groups,
+`access_control` rules and OIDC clients, and widening it would have handed
+DocuSeal an Authelia `access_control` rule it must never have (§342: an app
+is either behind Authelia with its own form hidden, or exposed direct with
+only its own login — never both, and access_control rules for a
+skip-Authelia app would have been exactly that, even if inert in practice
+since NPM never forwards its requests to Authelia). `routes/users.ts`'s
+picker endpoint and grant validation now use the wider pair; the narrower
+one is untouched and still used only by the three Authelia generators. Both
+row-shapes come from one shared private helper
+(`getExposedServiceOptions`) so the SQL and mapping aren't duplicated.
+
+**Dispatcher**: new `noSsoCredentialFanout.ts` — a small
+`{ serviceName: provisionFn }` registry (just `docuseal` today, calling
+§481's `provisionDocusealTeamMember`) plus `fanOutNoSsoCredentials`, which
+loops a user's granted-app list and calls whichever provisioners match,
+never throwing (one app's failure doesn't stop the others), and logging an
+explicit warning rather than silence when an app comes back `already-exists`
+(§481's still-open update gap).
+
+**Wired into 3 of the 6 plaintext-password sites the earlier research
+found, 2 skipped on purpose, 1 already a no-op**:
+
+- `auth.ts` invitation-accept (`POST /api/auth/invitation/:token`) — the
+  primary case this whole feature exists for: an admin creates a user,
+  grants DocuSeal access (stored in `user_app_access` before the invitee
+  even has a password), the invitee accepts and sets their real password,
+  and *that* plaintext — the first one this account has ever had — is what
+  gets pushed. `acceptInvitation` in `userInvitations.ts` now also returns
+  `email` (it already updated the row; just hadn't returned it) so the
+  route has enough to call the fan-out with.
+- `users.ts` `PUT /:id/password` (admin resets another account's password)
+  — the rotation case: same `RETURNING` addition (`email`), same fan-out
+  call, right after the existing `syncAutheliaUsersSafe` call it already
+  does for Authelia.
+- `auth.ts` `/setup` (the very first user ever) — **not wired**: at that
+  exact moment `user_app_access` cannot have any rows for a user id that
+  didn't exist a moment ago, so the call would be a guaranteed no-op. Left
+  out rather than added for the sake of symmetry.
+- `recovery.ts`'s localhost-only break-glass admin-password-reset and
+  `recoverAdmin.ts`'s CLI recovery script — **deliberately not wired**. Both
+  exist specifically to work when the system is already in a degraded,
+  locked-out state; adding a network round-trip to a third-party app's own
+  login form is exactly the kind of extra failure surface that shouldn't
+  sit on a break-glass path. Documented in `noSsoCredentialFanout.ts`'s own
+  header, not just here, so it reads as a decision, not a gap someone
+  "finishes" later.
+
+**A real remaining limitation, named rather than hidden**: granting an
+*existing* user access to DocuSeal through the per-row picker doesn't push
+anything by itself — `setUserAppAccess` is a plain grant-list write with no
+password involved. The account only gets created the next time that
+person's password is touched (an admin reset, today; there's no separate
+self-service "change my own password" endpoint to hook). Chose not to add
+an automatic forced password-reset email as a side effect of ticking a
+checkbox — that felt like a surprising thing for a checkbox to trigger —
+so today's model is "grant access, then reset their password to sync it
+in," two steps, not one. Revisit if that proves confusing in practice.
+
+**User-facing copy fixed to match**: `users.component.html`/`.ts` and
+`home.component.ts` said "SSO app access" / "reach through SSO" in four
+places — accurate before this change, actively wrong after, since the same
+picker now grants DocuSeal access too and DocuSeal is emphatically not SSO.
+Reworded to plain "app access" rather than invent new terminology.
+
+**Tests**: `userAppAccess.test.ts` — `getGrantableAppOptions` including a
+provisioned no-SSO app while still excluding an unprovisioned one (nocodb),
+and matching `getAppAccessOptions` exactly when no app has a provisioner.
+`noSsoCredentialFanout.test.ts` (new) — dispatches to a provisioner that
+has one, silently skips a granted app that doesn't (e.g. an Authelia app,
+which never has one), never throws on a rejected provisioner or an
+`already-exists` outcome. `userInvitations.test.ts` updated for
+`acceptInvitation`'s new `email` field. No new route-level tests for
+`auth.ts`/`users.ts` — matches this codebase's existing convention of
+route handlers staying thin and untested directly, with the service-layer
+functions they call carrying the real test coverage.
+`./scripts/check.sh backend typecheck`/`test` clean (960, +8 new).
+`./scripts/check.sh frontend build`/`test` clean (74 passing, pre-existing
+bundle-size/CSS-selector warnings only). `scripts/bump-version.sh minor
+Added …` → 0.110.0.
+
+Deleted the "Core mechanism" and "DocuSeal" README items (both done);
+added a narrower "DocuSeal: update, not just create" item for the
+still-open rotation gap above.
+
+**Not yet verified live** — this touches real password-handling routes
+(`auth.ts`, `users.ts`) that had no route-level tests before this change
+either, so needs proving against the real stack: a genuine invitation
+accept with DocuSeal access granted beforehand, confirmed to actually
+create a matching DocuSeal account, not just unit-tested mocks. Left on
+`dev`, unmerged.

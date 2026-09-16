@@ -63,15 +63,18 @@ export class UsersComponent implements OnInit {
   // Feature grants for a new admin (§152b). Shown only when Admin is picked
   // and Webmaster is not; starts all-on (which equals "no grant rows").
   protected newCaps: Record<Capability, boolean> = allCapsRecord(true);
-  // SSO app-access for the create form (§151/2b) — a checkbox per grantable
-  // app, all off by default (an explicit allowlist).
+  // App access for the create form (§151/2b, §480) — a checkbox per
+  // grantable app, all off by default (an explicit allowlist). Covers both
+  // Authelia-gated apps and the no-SSO apps that mirror the user's real
+  // credentials instead (currently just DocuSeal).
   protected newAppAccess: Record<string, boolean> = {};
   // Filters the visible grid only — never touches newAppAccess/accessApps,
   // so a filtered-out app stays checked or unchecked as it was.
   protected newAppFilter = '';
   protected accessAppFilter = '';
 
-  // The grantable apps (exposed + Authelia-protected), loaded once.
+  // The grantable apps — exposed + Authelia-protected, or exposed + a
+  // no-SSO credential-fanout provisioner (§480) — loaded once.
   protected appOptions: AppAccessOption[] = [];
 
   protected items: AdminUser[] = [];
@@ -264,7 +267,7 @@ export class UsersComponent implements OnInit {
       });
   }
 
-  // --- Per-row Access editor (email + SSO app list) ---
+  // --- Per-row Access editor (email + app-access list) ---
 
   protected startAccessEdit(user: AdminUser): void {
     this.accessEditId = user.id;

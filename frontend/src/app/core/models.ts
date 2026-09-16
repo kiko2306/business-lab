@@ -498,7 +498,8 @@ export interface AdminUser {
   // Effective capabilities the account holds — an admin's grants (or all-on
   // when it has none), everything for a webmaster, nothing for a user.
   capabilities?: string[];
-  // Managed apps this account may reach through Authelia SSO (plan.md §151).
+  // Managed apps this account may reach — through Authelia SSO, or (§480) a
+  // no-SSO app that mirrors this account's own credentials instead.
   appAccess?: string[];
   // false while the account's set-password invite is still outstanding (§158).
   active?: boolean;
@@ -508,7 +509,7 @@ export interface AdminUserListResponse {
   items: AdminUser[];
 }
 
-/** One choice in the SSO app-access picker — GET /api/users/app-access-options. */
+/** One choice in the app-access picker — GET /api/users/app-access-options. */
 export interface AppAccessOption {
   serviceName: string;
   label: string;

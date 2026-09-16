@@ -71,7 +71,7 @@ export class HomeComponent {
     },
     {
       title: 'Users & roles',
-      description: 'Accounts, the roles they hold, and — ahead — per-app SSO access.',
+      description: 'Accounts, the roles they hold, and per-app access.',
       link: '/users',
       capability: 'users:manage',
     },

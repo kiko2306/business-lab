@@ -17,6 +17,7 @@
 import { PoolClient } from 'pg';
 import { query, withTransaction } from '../utils/database';
 import { getService, isAutheliaProtectionRequired } from '../config/services';
+import { getNoSsoCredentialAppNames } from './noSsoCredentialFanout';
 
 export interface AppAccessOption {
   serviceName: string;
@@ -27,21 +28,21 @@ export interface AppAccessOption {
 }
 
 /**
- * The apps that can currently be granted — exposed, excluding Home Page and
- * Authelia (see the module doc comment). Ordered by label for a stable
- * picker. Secondary exposure rows (`<app>:api`, `<app>:relay`, `homepage:apex`
- * — anything with a colon) are exposure legs of an app, not apps you grant SSO
- * access to, and their `<name>` breaks both the `appAccess` pattern check and
- * `app-<name>` group naming — so they're filtered out here.
+ * Exposed services, filtered by `matches` and shaped into `AppAccessOption`s.
+ * Secondary exposure rows (`<app>:api`, `<app>:relay`, `homepage:apex` —
+ * anything with a colon) are exposure legs of an app, not apps you grant
+ * access to, and their `<name>` breaks both the `appAccess` pattern check
+ * and `app-<name>` group naming — so they're filtered out here, before
+ * `matches` ever sees them.
  */
-export async function getAppAccessOptions(): Promise<AppAccessOption[]> {
+async function getExposedServiceOptions(matches: (serviceName: string) => boolean): Promise<AppAccessOption[]> {
   const result = await query<{ service_name: string; hostname: string | null }>(
     `SELECT service_name, hostname
      FROM service_exposure
      WHERE enabled = TRUE AND service_name NOT LIKE '%:%'`
   );
   return result.rows
-    .filter((row) => isAutheliaProtectionRequired(row.service_name))
+    .filter((row) => matches(row.service_name))
     .map((row) => {
       const service = getService(row.service_name);
       return {
@@ -54,9 +55,40 @@ export async function getAppAccessOptions(): Promise<AppAccessOption[]> {
     .sort((a, b) => a.label.localeCompare(b.label));
 }
 
-/** Just the grantable service names, for validating a submitted access list. */
+/**
+ * The apps that can currently be granted Authelia SSO access — exposed,
+ * excluding Home Page and Authelia (see the module doc comment). Ordered by
+ * label for a stable picker. Authelia's own group/access_control/OIDC-client
+ * generation (autheliaSync.ts, autheliaAccessControl.ts,
+ * autheliaOidcClients.ts) calls this directly, not `getGrantableAppOptions`
+ * below — a no-SSO app must never pick up an Authelia group or
+ * access_control rule (§342: expose-direct or hide-the-form, never both).
+ */
+export async function getAppAccessOptions(): Promise<AppAccessOption[]> {
+  return getExposedServiceOptions(isAutheliaProtectionRequired);
+}
+
+/** Just the Authelia-grantable service names, for the group/rule generators. */
 export async function getAppAccessOptionNames(): Promise<Set<string>> {
   const options = await getAppAccessOptions();
+  return new Set(options.map((option) => option.serviceName));
+}
+
+/**
+ * Every app a dashboard user can be granted access to — Authelia-gated apps
+ * plus the no-SSO apps that have a credential-fanout provisioner (§480,
+ * §481). This is what the Users & Roles picker and grant validation use;
+ * Authelia's own generators deliberately keep using `getAppAccessOptions`
+ * above instead (see its doc comment).
+ */
+export async function getGrantableAppOptions(): Promise<AppAccessOption[]> {
+  const noSsoNames = new Set(getNoSsoCredentialAppNames());
+  return getExposedServiceOptions((name) => isAutheliaProtectionRequired(name) || noSsoNames.has(name));
+}
+
+/** Every grantable service name (Authelia + no-SSO), for validating a submitted access list. */
+export async function getGrantableAppOptionNames(): Promise<Set<string>> {
+  const options = await getGrantableAppOptions();
   return new Set(options.map((option) => option.serviceName));
 }
 
