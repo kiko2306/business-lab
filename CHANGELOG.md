@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.105.2] — 2026-09-16
+
+### Improved
+
+- Access-request email now names the app (label + hostname), not just the raw hostname
+
 ## [0.105.1] — 2026-09-16
 
 ### Fixed

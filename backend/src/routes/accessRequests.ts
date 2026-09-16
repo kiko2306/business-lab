@@ -3,8 +3,31 @@ import rateLimit from 'express-rate-limit';
 import { schemas, validateBody } from '../middleware/validation';
 import { sendMail } from '../utils/mailSend';
 import { getMailConfig } from '../utils/mailSettings';
+import { query } from '../utils/database';
+import { SERVICES } from '../config/services';
 
 const router = Router();
+
+/**
+ * A human-readable "<app label> (<hostname>)" for the email, falling back to
+ * the bare hostname when it isn't recognised (exposure disabled since the
+ * redirect was generated, or the request was hand-crafted). Looks up
+ * `service_exposure` rather than recomputing `buildExposureHostname` for
+ * every registry entry — it's the same table the exposure system already
+ * keeps in step, so this is a reverse lookup against data that's already
+ * authoritative, not a second copy of the hostname-building logic.
+ */
+export async function describeApp(hostname: string): Promise<string> {
+  const result = await query<{ service_name: string }>(
+    'SELECT service_name FROM service_exposure WHERE hostname = $1 LIMIT 1',
+    [hostname]
+  );
+  // Secondary exposures key as `<service>:<suffix>` (exposure.ts) — the base
+  // service is what has a label.
+  const serviceName = result.rows[0]?.service_name.split(':')[0];
+  const label = serviceName ? SERVICES[serviceName]?.label : undefined;
+  return label ? `${label} (${hostname})` : hostname;
+}
 
 // Public and unauthenticated by nature — the person hitting this is exactly
 // the one Authelia just turned away, so they may have no dashboard session at
@@ -34,11 +57,12 @@ router.post('/', accessRequestLimiter, validateBody(schemas.accessRequest), asyn
         .json({ error: 'Email is not configured on this dashboard yet — contact an administrator directly.' });
     }
 
+    const app = await describeApp(hostname);
     await sendMail({
       to: mailConfig.fromAddress,
       replyTo: email,
-      subject: `Access request: ${hostname}`,
-      text: `${email} is requesting access to ${hostname}.\n\nReason:\n${reason}`,
+      subject: `Access request: ${app}`,
+      text: `${email} is requesting access to ${app}.\n\nReason:\n${reason}`,
     });
 
     return res.status(204).send();

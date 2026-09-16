@@ -29090,3 +29090,25 @@ for months by the adjacent 401 case in the same file
 this is judged a reasonable stopping point rather than a gap.
 
 `beta` → `main`: left unmerged per [[main-merge-requires-request]].
+
+## 465. Access-request email names the app, not just its hostname
+
+Feedback on §463: the email must clearly say which app the request is for.
+It already did, technically — subject and body both carried the raw
+hostname (`Access request: paperless.tx-home-utils.com`) — but a hostname
+isn't the app's name, it's a decision the reader has to make themselves.
+
+`backend/src/routes/accessRequests.ts` gained `describeApp(hostname)`:
+looks up `service_exposure` for the row whose `hostname` column matches (a
+reverse lookup against data the exposure system already keeps
+authoritative, rather than recomputing `buildExposureHostname` for every
+registry entry), strips a secondary exposure's `:suffix` (e.g.
+`netbird-vpn:api`) back to its base service name, and resolves that against
+`SERVICES[name].label`. Falls back to the bare hostname when nothing
+matches (exposure disabled since the redirect was generated, or a
+hand-crafted request) — same failure mode as today, never worse. Email now
+reads "Access request: Paperless (paperless.tx-home-utils.com)".
+
+Verified: `./scripts/check.sh backend typecheck`/`test` clean (931, +3 new —
+`accessRequests.test.ts` covers the primary-exposure match, the
+secondary-suffix strip, and the no-match fallback).
