@@ -120,19 +120,74 @@ export async function getAppAccessForUsers(userIds: number[]): Promise<Record<nu
   return out;
 }
 
+export interface AppAccessDiff {
+  added: string[];
+  removed: string[];
+}
+
 /**
- * Replace an account's app-access list wholesale, in one transaction.
- * `serviceNames` is trusted to be a validated, deduplicated set of currently
- * grantable app names.
+ * Replace an account's app-access list, in one transaction — a real diff
+ * against the current rows (not a blanket delete+reinsert), so an app that
+ * stays granted keeps its row, and with it, any `pending_fanout` marker
+ * (§493) untouched. `serviceNames` is trusted to be a validated,
+ * deduplicated set of currently grantable app names.
+ *
+ * `markAddedPending`: set on a newly-granted no-SSO app's row when the
+ * caller already knows this account has a dashboard password (so a fan-out
+ * is owed but can't happen right now — see the schema comment in
+ * database.ts). Never set on an Authelia-gated app's row; that access
+ * takes effect through the group sync, not a queued fan-out.
  */
-export async function setUserAppAccess(userId: number, serviceNames: string[]): Promise<void> {
-  await withTransaction(async (client: PoolClient) => {
-    await client.query('DELETE FROM user_app_access WHERE user_id = $1', [userId]);
-    for (const serviceName of serviceNames) {
+export async function setUserAppAccess(
+  userId: number,
+  serviceNames: string[],
+  opts: { markAddedPending?: boolean } = {}
+): Promise<AppAccessDiff> {
+  const noSsoNames = new Set(getNoSsoCredentialAppNames());
+  return withTransaction(async (client: PoolClient) => {
+    const current = await client.query<{ service_name: string }>(
+      'SELECT service_name FROM user_app_access WHERE user_id = $1',
+      [userId]
+    );
+    const currentSet = new Set(current.rows.map((row) => row.service_name));
+    const nextSet = new Set(serviceNames);
+    const added = serviceNames.filter((name) => !currentSet.has(name));
+    const removed = [...currentSet].filter((name) => !nextSet.has(name));
+
+    for (const serviceName of removed) {
+      await client.query('DELETE FROM user_app_access WHERE user_id = $1 AND service_name = $2', [userId, serviceName]);
+    }
+    for (const serviceName of added) {
+      const pending = Boolean(opts.markAddedPending) && noSsoNames.has(serviceName);
       await client.query(
-        'INSERT INTO user_app_access (user_id, service_name) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [userId, serviceName]
+        'INSERT INTO user_app_access (user_id, service_name, pending_fanout) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
+        [userId, serviceName, pending]
       );
     }
+    return { added, removed };
   });
+}
+
+/** No-SSO apps still owed a fan-out to this user's next login (§493). */
+export async function getPendingNoSsoFanoutApps(userId: number): Promise<string[]> {
+  const noSsoNames = getNoSsoCredentialAppNames();
+  if (noSsoNames.length === 0) {
+    return [];
+  }
+  const result = await query<{ service_name: string }>(
+    'SELECT service_name FROM user_app_access WHERE user_id = $1 AND pending_fanout = TRUE AND service_name = ANY($2::text[])',
+    [userId, noSsoNames]
+  );
+  return result.rows.map((row) => row.service_name);
+}
+
+/** Clear the pending-fanout marker after a fan-out attempt, successful or not (§493) — never retried more than once per login. */
+export async function clearPendingNoSsoFanout(userId: number, serviceNames: string[]): Promise<void> {
+  if (serviceNames.length === 0) {
+    return;
+  }
+  await query('UPDATE user_app_access SET pending_fanout = FALSE WHERE user_id = $1 AND service_name = ANY($2::text[])', [
+    userId,
+    serviceNames,
+  ]);
 }

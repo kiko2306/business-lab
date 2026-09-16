@@ -354,3 +354,30 @@ export async function updateUserPassword(baseUrl: string, input: ItflowUpdateUse
   }
   return isRedirect(response) ? 'updated' : 'failed';
 }
+
+export type ItflowDisableUserResult = 'disabled' | 'failed';
+
+/**
+ * GET `admin/post.php?disable_user=<id>&csrf_token=...` (§493) — the
+ * "Disable" link `admin/users.php` renders for an active user
+ * (`admin/post/users.php`'s `$_GET['disable_user']` branch). `csrf_token`
+ * is session-global (`$_SESSION['csrf_token']`, one value for the whole
+ * login), so this reuses the same modal-page fetch the add/edit flows use
+ * to grab it rather than scraping the listing page's query-string links.
+ */
+export async function disableUser(baseUrl: string, cookie: string, userId: number): Promise<ItflowDisableUserResult> {
+  const csrf = await fetchCsrfToken(baseUrl, cookie, `/admin/modals/user/user_edit.php?id=${userId}`);
+  if (!csrf) return 'failed';
+
+  let response: Response;
+  try {
+    response = await fetch(`${baseUrl}/admin/post.php?disable_user=${userId}&csrf_token=${encodeURIComponent(csrf.token)}`, {
+      redirect: 'manual',
+      headers: { ...PROXY_HEADERS, Cookie: csrf.cookie },
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+  } catch {
+    return 'failed';
+  }
+  return isRedirect(response) ? 'disabled' : 'failed';
+}

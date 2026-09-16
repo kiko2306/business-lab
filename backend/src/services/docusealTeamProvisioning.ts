@@ -17,6 +17,11 @@
  * (§482) — the one path that actually can update an existing account,
  * since `UsersController#update` itself always strips `:password` from an
  * admin's edit of another user.
+ *
+ * `disableDocusealTeamMember` (§493): revoking dashboard access archives
+ * the account rather than deleting it, reusing `docusealDb.ts`'s
+ * `archiveDocusealUser` — the same rails-runner container as the password
+ * path, no admin sign-in needed since it goes through the model directly.
  */
 
 import logger from '../utils/logger';
@@ -29,7 +34,7 @@ import {
   splitName,
 } from './docusealAdminBootstrap';
 import { createTeamUser, signIn } from './docusealClient';
-import { setDocusealUserPassword } from './docusealDb';
+import { archiveDocusealUser, setDocusealUserPassword } from './docusealDb';
 
 export type ProvisionDocusealTeamMemberResult =
   | 'created'
@@ -88,4 +93,20 @@ export async function provisionDocusealTeamMember(
   }
   logger.error(`DocuSeal team-member provisioning failed for ${input.email}`);
   return result;
+}
+
+export type DisableDocusealTeamMemberResult = 'disabled' | 'not-found' | 'failed';
+
+export async function disableDocusealTeamMember(email: string): Promise<DisableDocusealTeamMemberResult> {
+  const result = await archiveDocusealUser(email);
+  if (result === 'archived') {
+    logger.info(`Archived the DocuSeal team account for ${email}`);
+    return 'disabled';
+  }
+  if (result === 'not-found') {
+    logger.warn(`No DocuSeal account found for ${email} to archive`);
+    return 'not-found';
+  }
+  logger.error(`Failed to archive the DocuSeal team account for ${email}`);
+  return 'failed';
 }

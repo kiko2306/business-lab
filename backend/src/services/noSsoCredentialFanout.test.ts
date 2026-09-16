@@ -1,23 +1,29 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { provisionDocusealTeamMember } from './docusealTeamProvisioning';
-import { provisionItflowUser } from './itflowUserProvisioning';
-import { provisionNocodbUser } from './nocodbUserProvisioning';
-import { fanOutNoSsoCredentials, getNoSsoCredentialAppNames } from './noSsoCredentialFanout';
+import { disableDocusealTeamMember, provisionDocusealTeamMember } from './docusealTeamProvisioning';
+import { disableItflowUser, provisionItflowUser } from './itflowUserProvisioning';
+import { disableNocodbUser, provisionNocodbUser } from './nocodbUserProvisioning';
+import { deprovisionNoSsoCredentials, fanOutNoSsoCredentials, getNoSsoCredentialAppNames } from './noSsoCredentialFanout';
 
-vi.mock('./docusealTeamProvisioning', () => ({ provisionDocusealTeamMember: vi.fn() }));
-vi.mock('./nocodbUserProvisioning', () => ({ provisionNocodbUser: vi.fn() }));
-vi.mock('./itflowUserProvisioning', () => ({ provisionItflowUser: vi.fn() }));
+vi.mock('./docusealTeamProvisioning', () => ({ provisionDocusealTeamMember: vi.fn(), disableDocusealTeamMember: vi.fn() }));
+vi.mock('./nocodbUserProvisioning', () => ({ provisionNocodbUser: vi.fn(), disableNocodbUser: vi.fn() }));
+vi.mock('./itflowUserProvisioning', () => ({ provisionItflowUser: vi.fn(), disableItflowUser: vi.fn() }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 const mockedProvision = vi.mocked(provisionDocusealTeamMember);
 const mockedProvisionNocodb = vi.mocked(provisionNocodbUser);
 const mockedProvisionItflow = vi.mocked(provisionItflowUser);
+const mockedDisableDocuseal = vi.mocked(disableDocusealTeamMember);
+const mockedDisableNocodb = vi.mocked(disableNocodbUser);
+const mockedDisableItflow = vi.mocked(disableItflowUser);
 
 beforeEach(() => {
   vi.clearAllMocks();
   mockedProvision.mockResolvedValue('created');
   mockedProvisionNocodb.mockResolvedValue('created');
   mockedProvisionItflow.mockResolvedValue('created');
+  mockedDisableDocuseal.mockResolvedValue('disabled');
+  mockedDisableNocodb.mockResolvedValue('disabled');
+  mockedDisableItflow.mockResolvedValue('disabled');
 });
 
 describe('getNoSsoCredentialAppNames', () => {
@@ -48,5 +54,32 @@ describe('fanOutNoSsoCredentials', () => {
   it('does not throw on an already-exists outcome (logged as a warning, not an error)', async () => {
     mockedProvision.mockResolvedValue('already-exists');
     await expect(fanOutNoSsoCredentials(['docuseal'], input)).resolves.toBeUndefined();
+  });
+});
+
+describe('deprovisionNoSsoCredentials', () => {
+  it('calls the deprovisioner for a revoked app that has one', async () => {
+    await deprovisionNoSsoCredentials(['docuseal'], 'bob@example.com');
+    expect(mockedDisableDocuseal).toHaveBeenCalledWith('bob@example.com');
+  });
+
+  it('silently skips a revoked app with no deprovisioner', async () => {
+    await deprovisionNoSsoCredentials(['vaultwarden'], 'bob@example.com');
+    expect(mockedDisableDocuseal).not.toHaveBeenCalled();
+    expect(mockedDisableNocodb).not.toHaveBeenCalled();
+    expect(mockedDisableItflow).not.toHaveBeenCalled();
+  });
+
+  it('does not throw when a deprovisioner rejects, and still processes the rest', async () => {
+    mockedDisableDocuseal.mockRejectedValueOnce(new Error('boom'));
+    await expect(deprovisionNoSsoCredentials(['docuseal', 'nocodb'], 'bob@example.com')).resolves.toBeUndefined();
+    expect(mockedDisableNocodb).toHaveBeenCalledWith('bob@example.com');
+  });
+
+  it('calls each of the three deprovisioners for their own app', async () => {
+    await deprovisionNoSsoCredentials(['docuseal', 'nocodb', 'itflow'], 'bob@example.com');
+    expect(mockedDisableDocuseal).toHaveBeenCalledWith('bob@example.com');
+    expect(mockedDisableNocodb).toHaveBeenCalledWith('bob@example.com');
+    expect(mockedDisableItflow).toHaveBeenCalledWith('bob@example.com');
   });
 });

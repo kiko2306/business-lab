@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readAppEnvValue } from './appEnv';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { findUserId, inviteUser, setPassword, signIn } from './nocodbClient';
-import { provisionNocodbUser } from './nocodbUserProvisioning';
+import { disableNocodbUser, provisionNocodbUser } from './nocodbUserProvisioning';
 
 vi.mock('./appEnv', () => ({ readAppEnvValue: vi.fn() }));
 vi.mock('./autheliaUsers', () => ({ getAutheliaAdminUser: vi.fn() }));
@@ -98,5 +98,44 @@ describe('provisionNocodbUser', () => {
     mockedSetPassword.mockResolvedValue(false);
     const result = await provisionNocodbUser({ email: 'bob@example.com', password: 'pw' });
     expect(result).toBe('already-exists');
+  });
+});
+
+describe('disableNocodbUser', () => {
+  it('skips when no admin account is tracked yet', async () => {
+    mockedGetAdmin.mockReturnValue(null);
+    const result = await disableNocodbUser('bob@example.com');
+    expect(result).toBe('admin-not-configured');
+    expect(mockedFindUserId).not.toHaveBeenCalled();
+  });
+
+  it('reports admin-sign-in-failed and never looks up the account', async () => {
+    mockedSignIn.mockResolvedValue(null);
+    const result = await disableNocodbUser('bob@example.com');
+    expect(result).toBe('admin-sign-in-failed');
+    expect(mockedFindUserId).not.toHaveBeenCalled();
+  });
+
+  it('reports not-found when no account exists for the email', async () => {
+    mockedFindUserId.mockResolvedValue(null);
+    const result = await disableNocodbUser('bob@example.com');
+    expect(result).toBe('not-found');
+    expect(mockedSetPassword).not.toHaveBeenCalled();
+  });
+
+  it('locks the account by resetting its password to an unknown value', async () => {
+    const result = await disableNocodbUser('bob@example.com');
+    expect(mockedFindUserId).toHaveBeenCalledWith('http://10.201.0.1:10280', 'admin-token', 'bob@example.com');
+    expect(mockedSetPassword).toHaveBeenCalledWith('http://10.201.0.1:10280', 'admin-token', 'user-42', expect.any(String));
+    // The password handed to setPassword is never the caller's input — there is none — and isn't a fixed string.
+    const usedPassword = mockedSetPassword.mock.calls[0][3];
+    expect(usedPassword.length).toBeGreaterThanOrEqual(8);
+    expect(result).toBe('disabled');
+  });
+
+  it('reports failed when the password reset itself fails', async () => {
+    mockedSetPassword.mockResolvedValue(false);
+    const result = await disableNocodbUser('bob@example.com');
+    expect(result).toBe('failed');
   });
 });

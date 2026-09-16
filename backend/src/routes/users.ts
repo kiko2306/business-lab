@@ -20,6 +20,7 @@ import {
   webmasterCount,
 } from '../services/userRoles';
 import {
+  clearPendingNoSsoFanout,
   getAppAccessForUsers,
   getGrantableAppOptionNames,
   getGrantableAppOptions,
@@ -27,7 +28,7 @@ import {
   setUserAppAccess,
 } from '../services/userAppAccess';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
-import { fanOutNoSsoCredentials } from '../services/noSsoCredentialFanout';
+import { deprovisionNoSsoCredentials, fanOutNoSsoCredentials } from '../services/noSsoCredentialFanout';
 import { createInvitation } from '../services/userInvitations';
 import { sendMail, mailIsConfigured } from '../utils/mailSend';
 import { getDashboardBaseUrl } from '../utils/generalSettings';
@@ -332,15 +333,22 @@ router.put(
         return res.status(400).json({ error: badApp });
       }
 
-      const target = await query<{ username: string }>(
-        'UPDATE users SET email = $2 WHERE id = $1 RETURNING username',
+      const target = await query<{ username: string; password_hash: string | null }>(
+        'UPDATE users SET email = $2 WHERE id = $1 RETURNING username, password_hash',
         [id, email.trim()]
       );
       if (!target.rows[0]) {
         return res.status(404).json({ error: 'User not found.' });
       }
 
-      await setUserAppAccess(id, appAccess);
+      const hasPassword = target.rows[0].password_hash !== null;
+      const { removed } = await setUserAppAccess(id, appAccess, { markAddedPending: hasPassword });
+
+      // Revoking a no-SSO app locks the account it created there — best
+      // effort, never blocks this response (§493).
+      if (removed.length) {
+        await deprovisionNoSsoCredentials(removed, email.trim());
+      }
 
       await writeAuditLog({
         userId: req.user?.id ?? null,
@@ -448,9 +456,12 @@ router.put(
 
       // Same for any no-SSO app this account has a credential-fanout account
       // in (§480) — this is the plaintext's one moment to exist server-side.
+      // Covers every granted app unconditionally, so it also settles any
+      // pending_fanout marker (§493) without waiting for the next login.
       if (user.email) {
         const grantedApps = await getUserAppAccess(user.id);
         await fanOutNoSsoCredentials(grantedApps, { email: user.email, password, displayName: user.username });
+        await clearPendingNoSsoFanout(user.id, grantedApps);
       }
 
       return res.json({ message: 'Password updated successfully.', ...(warning ? { warning } : {}) });

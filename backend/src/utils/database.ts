@@ -167,6 +167,13 @@ export async function ensureUserAppAccessSchema(): Promise<void> {
         PRIMARY KEY (user_id, service_name)
     )
   `);
+  // §493: a no-SSO app granted to a user who already has a dashboard
+  // password can't be fanned out immediately — the dashboard only ever
+  // holds the plaintext in memory at invite-accept or an admin password
+  // reset. This row is the marker that lets the user's own next login
+  // (where their real password passes through the bcrypt check) fan it
+  // out then, instead of silently never provisioning it.
+  await query('ALTER TABLE user_app_access ADD COLUMN IF NOT EXISTS pending_fanout BOOLEAN NOT NULL DEFAULT FALSE');
 }
 
 /**

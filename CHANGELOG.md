@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.113.0] — 2026-09-16
+
+### Added
+
+- No-SSO app access now provisions/deprovisions for real (§493): granting an already-passworded user a DocuSeal/NocoDB/ITFlow account queues a fan-out for their next login, and revoking access locks the app account instead of leaving it untouched
+
 ## [0.112.1] — 2026-09-16
 
 ### Fixed

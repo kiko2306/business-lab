@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { exec } from 'child_process';
 import { resolveComposeFile } from '../config/services';
-import { setDocusealUserPassword } from './docusealDb';
+import { archiveDocusealUser, setDocusealUserPassword } from './docusealDb';
 
 vi.mock('child_process', () => ({ exec: vi.fn() }));
 vi.mock('../config/services', () => ({ resolveComposeFile: vi.fn() }));
@@ -63,6 +63,47 @@ describe('setDocusealUserPassword', () => {
       cb(new Error('boom'), '', 'no such service: docuseal');
     }) as unknown as typeof exec);
     const result = await setDocusealUserPassword('a@example.com', 'pw');
+    expect(result).toBe('failed');
+  });
+});
+
+describe('archiveDocusealUser', () => {
+  it('is not installed → fails without touching docker', async () => {
+    mockedResolve.mockReturnValue({
+      projectName: 'docuseal',
+      appDir: '/apps/docuseal',
+      composeFile: null,
+      composeArgs: '',
+    } as ReturnType<typeof resolveComposeFile>);
+    const result = await archiveDocusealUser('a@example.com');
+    expect(result).toBe('failed');
+    expect(mockedExec).not.toHaveBeenCalled();
+  });
+
+  it('archives the user, passing only the email via -e', async () => {
+    mockedExec.mockImplementation(((_c: string, _o: unknown, cb: (...a: unknown[]) => void) => {
+      cb(null, 'archived\n', '');
+    }) as unknown as typeof exec);
+    const result = await archiveDocusealUser('a@example.com');
+    expect(result).toBe('archived');
+    const command = mockedExec.mock.calls[0][0] as string;
+    expect(command).toContain('-e DOCUSEAL_FANOUT_EMAIL');
+    expect(command).not.toContain('DOCUSEAL_FANOUT_PASSWORD');
+  });
+
+  it('reports a missing account as not-found', async () => {
+    mockedExec.mockImplementation(((_c: string, _o: unknown, cb: (...a: unknown[]) => void) => {
+      cb(null, 'not-found\n', '');
+    }) as unknown as typeof exec);
+    const result = await archiveDocusealUser('nobody@example.com');
+    expect(result).toBe('not-found');
+  });
+
+  it('never throws when the container command fails', async () => {
+    mockedExec.mockImplementation(((_c: string, _o: unknown, cb: (...a: unknown[]) => void) => {
+      cb(new Error('boom'), '', 'no such service: docuseal');
+    }) as unknown as typeof exec);
+    const result = await archiveDocusealUser('a@example.com');
     expect(result).toBe('failed');
   });
 });

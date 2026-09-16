@@ -1,11 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
-const { query } = vi.hoisted(() => ({ query: vi.fn() }));
-vi.mock('../utils/database', () => ({
-  query,
-  // setUserAppAccess uses withTransaction; not exercised here.
-  withTransaction: vi.fn(),
-}));
+const { query, withTransaction } = vi.hoisted(() => ({ query: vi.fn(), withTransaction: vi.fn() }));
+vi.mock('../utils/database', () => ({ query, withTransaction }));
 
 const { getService, isAutheliaProtectionRequired } = vi.hoisted(() => ({
   getService: vi.fn(),
@@ -17,12 +13,30 @@ const { getNoSsoCredentialAppNames } = vi.hoisted(() => ({ getNoSsoCredentialApp
 vi.mock('./noSsoCredentialFanout', () => ({ getNoSsoCredentialAppNames }));
 
 import {
+  clearPendingNoSsoFanout,
   getAppAccessForUsers,
   getAppAccessOptionNames,
   getAppAccessOptions,
   getGrantableAppOptionNames,
   getGrantableAppOptions,
+  getPendingNoSsoFanoutApps,
+  setUserAppAccess,
 } from './userAppAccess';
+
+/** A fake `PoolClient` good enough for `withTransaction`'s callback: records every `.query()` call and answers the current-rows SELECT from `currentRows`. */
+function fakeClient(currentRows: { service_name: string }[]) {
+  const calls: { sql: string; params: unknown[] }[] = [];
+  const client = {
+    query: vi.fn((sql: string, params: unknown[] = []) => {
+      calls.push({ sql, params });
+      if (sql.includes('SELECT service_name FROM user_app_access')) {
+        return Promise.resolve({ rows: currentRows });
+      }
+      return Promise.resolve({ rows: [] });
+    }),
+  };
+  return { client, calls };
+}
 
 const REGISTRY: Record<string, { label: string; autheliaGroups?: string[] }> = {
   vaultwarden: { label: 'Vaultwarden' },
@@ -31,6 +45,7 @@ const REGISTRY: Record<string, { label: string; autheliaGroups?: string[] }> = {
 
 beforeEach(() => {
   query.mockReset();
+  withTransaction.mockReset();
   getService.mockReset();
   getService.mockImplementation((name: string) => REGISTRY[name]);
   isAutheliaProtectionRequired.mockReset();
@@ -170,6 +185,81 @@ describe('getAppAccessForUsers', () => {
   it('short-circuits with no ids', async () => {
     const out = await getAppAccessForUsers([]);
     expect(out).toEqual({});
+    expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('setUserAppAccess', () => {
+  beforeEach(() => {
+    getNoSsoCredentialAppNames.mockReturnValue(['docuseal', 'nocodb', 'itflow']);
+  });
+
+  it('diffs against the current rows instead of a blanket delete+reinsert', async () => {
+    const { client, calls } = fakeClient([{ service_name: 'vaultwarden' }, { service_name: 'docuseal' }]);
+    withTransaction.mockImplementation((fn: (c: unknown) => unknown) => fn(client));
+
+    const diff = await setUserAppAccess(1, ['vaultwarden', 'nocodb']);
+
+    expect(diff).toEqual({ added: ['nocodb'], removed: ['docuseal'] });
+    // vaultwarden (unchanged) is never touched — no DELETE/INSERT mentions it.
+    const deletes = calls.filter((c) => c.sql.startsWith('DELETE'));
+    const inserts = calls.filter((c) => c.sql.startsWith('INSERT'));
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0].params).toEqual([1, 'docuseal']);
+    expect(inserts).toHaveLength(1);
+    expect(inserts[0].params).toEqual([1, 'nocodb', false]);
+  });
+
+  it('marks a newly-added no-SSO app pending when markAddedPending is set', async () => {
+    const { client, calls } = fakeClient([]);
+    withTransaction.mockImplementation((fn: (c: unknown) => unknown) => fn(client));
+
+    await setUserAppAccess(1, ['nocodb'], { markAddedPending: true });
+
+    const inserts = calls.filter((c) => c.sql.startsWith('INSERT'));
+    expect(inserts[0].params).toEqual([1, 'nocodb', true]);
+  });
+
+  it('never marks an Authelia-gated app pending, even with markAddedPending set', async () => {
+    const { client, calls } = fakeClient([]);
+    withTransaction.mockImplementation((fn: (c: unknown) => unknown) => fn(client));
+
+    await setUserAppAccess(1, ['vaultwarden'], { markAddedPending: true });
+
+    const inserts = calls.filter((c) => c.sql.startsWith('INSERT'));
+    expect(inserts[0].params).toEqual([1, 'vaultwarden', false]);
+  });
+});
+
+describe('getPendingNoSsoFanoutApps', () => {
+  it('queries pending rows restricted to today\'s no-SSO app names', async () => {
+    getNoSsoCredentialAppNames.mockReturnValue(['docuseal', 'nocodb']);
+    query.mockResolvedValue({ rows: [{ service_name: 'nocodb' }] });
+
+    const result = await getPendingNoSsoFanoutApps(1);
+
+    expect(result).toEqual(['nocodb']);
+    expect(query.mock.calls[0][1]).toEqual([1, ['docuseal', 'nocodb']]);
+  });
+
+  it('short-circuits with no query when no app has a provisioner', async () => {
+    getNoSsoCredentialAppNames.mockReturnValue([]);
+    const result = await getPendingNoSsoFanoutApps(1);
+    expect(result).toEqual([]);
+    expect(query).not.toHaveBeenCalled();
+  });
+});
+
+describe('clearPendingNoSsoFanout', () => {
+  it('clears the flag for the given apps', async () => {
+    query.mockResolvedValue({ rows: [] });
+    await clearPendingNoSsoFanout(1, ['nocodb', 'itflow']);
+    expect(query.mock.calls[0][0]).toMatch(/SET pending_fanout = FALSE/);
+    expect(query.mock.calls[0][1]).toEqual([1, ['nocodb', 'itflow']]);
+  });
+
+  it('short-circuits with no query for an empty list', async () => {
+    await clearPendingNoSsoFanout(1, []);
     expect(query).not.toHaveBeenCalled();
   });
 });

@@ -18,7 +18,7 @@ import { effectiveCapabilities } from '../auth/capabilities';
 import { getUserCapabilities, getUserRoles, setUserRoles } from '../services/userRoles';
 import { acceptInvitation, verifyInvitation } from '../services/userInvitations';
 import { syncAutheliaUsersSafe } from '../services/autheliaSync';
-import { getUserAppAccess } from '../services/userAppAccess';
+import { clearPendingNoSsoFanout, getPendingNoSsoFanoutApps, getUserAppAccess } from '../services/userAppAccess';
 import { fanOutNoSsoCredentials } from '../services/noSsoCredentialFanout';
 import {
   generateRecoveryCodes,
@@ -56,6 +56,7 @@ interface UserRow {
   username: string;
   password_hash?: string;
   totp_enabled?: boolean;
+  email?: string | null;
 }
 
 /**
@@ -242,7 +243,7 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
 
   try {
     const result = await query<UserRow>(
-      'SELECT id, username, password_hash, totp_enabled FROM users WHERE username = $1',
+      'SELECT id, username, email, password_hash, totp_enabled FROM users WHERE username = $1',
       [username]
     );
     const user = result.rows[0];
@@ -262,6 +263,18 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
         result: 'failure',
       }).catch(() => {});
       return res.status(401).json({ error: 'Invalid username or password' });
+    }
+
+    // The password just verified is this account's one further chance to
+    // fan out into a no-SSO app that was granted after invite-accept (§493)
+    // — settle it before anything else touches the response, whether or
+    // not a TOTP step follows.
+    if (user.email) {
+      const pendingApps = await getPendingNoSsoFanoutApps(user.id);
+      if (pendingApps.length) {
+        await fanOutNoSsoCredentials(pendingApps, { email: user.email, password, displayName: user.username });
+        await clearPendingNoSsoFanout(user.id, pendingApps);
+      }
     }
 
     // Password is right but a second factor is due: hand back a short-lived

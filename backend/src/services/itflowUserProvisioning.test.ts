@@ -2,9 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readAppEnvValue } from './appEnv';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { resolveItflowBaseUrl } from './itflowAdminBootstrap';
-import { addUser, signIn, updateUserPassword } from './itflowClient';
+import { addUser, disableUser, signIn, updateUserPassword } from './itflowClient';
 import { runItflowDbScript } from './itflowDb';
-import { provisionItflowUser } from './itflowUserProvisioning';
+import { disableItflowUser, provisionItflowUser } from './itflowUserProvisioning';
 
 vi.mock('./appEnv', () => ({ readAppEnvValue: vi.fn() }));
 vi.mock('./autheliaUsers', () => ({ getAutheliaAdminUser: vi.fn() }));
@@ -12,7 +12,7 @@ vi.mock('./itflowAdminBootstrap', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./itflowAdminBootstrap')>()),
   resolveItflowBaseUrl: vi.fn(),
 }));
-vi.mock('./itflowClient', () => ({ signIn: vi.fn(), addUser: vi.fn(), updateUserPassword: vi.fn() }));
+vi.mock('./itflowClient', () => ({ signIn: vi.fn(), addUser: vi.fn(), updateUserPassword: vi.fn(), disableUser: vi.fn() }));
 vi.mock('./itflowDb', () => ({ runItflowDbScript: vi.fn() }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
@@ -22,6 +22,7 @@ const mockedBaseUrl = vi.mocked(resolveItflowBaseUrl);
 const mockedSignIn = vi.mocked(signIn);
 const mockedAddUser = vi.mocked(addUser);
 const mockedUpdatePassword = vi.mocked(updateUserPassword);
+const mockedDisableUser = vi.mocked(disableUser);
 const mockedRunDbScript = vi.mocked(runItflowDbScript);
 
 beforeEach(() => {
@@ -32,6 +33,7 @@ beforeEach(() => {
   mockedSignIn.mockResolvedValue({ state: 'signed-in', cookie: 'PHPSESSID=admin' });
   mockedRunDbScript.mockResolvedValue({ ok: true, output: 'NOT_FOUND' });
   mockedAddUser.mockResolvedValue('created');
+  mockedDisableUser.mockResolvedValue('disabled');
 });
 
 describe('provisionItflowUser', () => {
@@ -109,5 +111,42 @@ describe('provisionItflowUser', () => {
     const result = await provisionItflowUser({ email: 'bob@example.com', password: 'pw' });
     expect(mockedAddUser).toHaveBeenCalled();
     expect(result).toBe('created');
+  });
+});
+
+describe('disableItflowUser', () => {
+  it('skips when no admin account is tracked yet', async () => {
+    mockedGetAdmin.mockReturnValue(null);
+    const result = await disableItflowUser('bob@example.com');
+    expect(result).toBe('admin-not-configured');
+    expect(mockedRunDbScript).not.toHaveBeenCalled();
+  });
+
+  it('reports admin-sign-in-failed and never looks up the account', async () => {
+    mockedSignIn.mockResolvedValue({ state: 'failed' });
+    const result = await disableItflowUser('bob@example.com');
+    expect(result).toBe('admin-sign-in-failed');
+    expect(mockedRunDbScript).not.toHaveBeenCalled();
+  });
+
+  it('reports not-found when the DB lookup finds no account', async () => {
+    mockedRunDbScript.mockResolvedValue({ ok: true, output: 'NOT_FOUND' });
+    const result = await disableItflowUser('bob@example.com');
+    expect(result).toBe('not-found');
+    expect(mockedDisableUser).not.toHaveBeenCalled();
+  });
+
+  it('disables the account found by the DB lookup', async () => {
+    mockedRunDbScript.mockResolvedValue({ ok: true, output: 'FOUND\n42' });
+    const result = await disableItflowUser('bob@example.com');
+    expect(mockedDisableUser).toHaveBeenCalledWith('http://10.201.0.1:10420', 'PHPSESSID=admin', 42);
+    expect(result).toBe('disabled');
+  });
+
+  it('reports failed when the disable action itself fails', async () => {
+    mockedRunDbScript.mockResolvedValue({ ok: true, output: 'FOUND\n42' });
+    mockedDisableUser.mockResolvedValue('failed');
+    const result = await disableItflowUser('bob@example.com');
+    expect(result).toBe('failed');
   });
 });

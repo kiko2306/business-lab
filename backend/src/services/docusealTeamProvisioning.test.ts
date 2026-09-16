@@ -2,8 +2,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readAppEnvValue } from './appEnv';
 import { DOCUSEAL_ADMIN_EMAIL_KEY, DOCUSEAL_ADMIN_PASSWORD_KEY, resolveDocusealBaseUrl } from './docusealAdminBootstrap';
 import { createTeamUser, signIn } from './docusealClient';
-import { setDocusealUserPassword } from './docusealDb';
-import { provisionDocusealTeamMember } from './docusealTeamProvisioning';
+import { archiveDocusealUser, setDocusealUserPassword } from './docusealDb';
+import { disableDocusealTeamMember, provisionDocusealTeamMember } from './docusealTeamProvisioning';
 
 vi.mock('./appEnv', () => ({ readAppEnvValue: vi.fn() }));
 vi.mock('./docusealAdminBootstrap', async (importOriginal) => ({
@@ -11,7 +11,7 @@ vi.mock('./docusealAdminBootstrap', async (importOriginal) => ({
   resolveDocusealBaseUrl: vi.fn(),
 }));
 vi.mock('./docusealClient', () => ({ createTeamUser: vi.fn(), signIn: vi.fn() }));
-vi.mock('./docusealDb', () => ({ setDocusealUserPassword: vi.fn() }));
+vi.mock('./docusealDb', () => ({ setDocusealUserPassword: vi.fn(), archiveDocusealUser: vi.fn() }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 const mockedReadEnv = vi.mocked(readAppEnvValue);
@@ -19,6 +19,7 @@ const mockedBaseUrl = vi.mocked(resolveDocusealBaseUrl);
 const mockedSignIn = vi.mocked(signIn);
 const mockedCreate = vi.mocked(createTeamUser);
 const mockedSetPassword = vi.mocked(setDocusealUserPassword);
+const mockedArchive = vi.mocked(archiveDocusealUser);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -91,6 +92,27 @@ describe('provisionDocusealTeamMember', () => {
   it('passes through failed', async () => {
     mockedCreate.mockResolvedValue('failed');
     const result = await provisionDocusealTeamMember({ email: 'bob@example.com', password: 'pw' });
+    expect(result).toBe('failed');
+  });
+});
+
+describe('disableDocusealTeamMember', () => {
+  it('archives the account and reports disabled', async () => {
+    mockedArchive.mockResolvedValue('archived');
+    const result = await disableDocusealTeamMember('bob@example.com');
+    expect(mockedArchive).toHaveBeenCalledWith('bob@example.com');
+    expect(result).toBe('disabled');
+  });
+
+  it('reports not-found when no account exists for the email', async () => {
+    mockedArchive.mockResolvedValue('not-found');
+    const result = await disableDocusealTeamMember('bob@example.com');
+    expect(result).toBe('not-found');
+  });
+
+  it('reports failed when the archive itself fails', async () => {
+    mockedArchive.mockResolvedValue('failed');
+    const result = await disableDocusealTeamMember('bob@example.com');
     expect(result).toBe('failed');
   });
 });
