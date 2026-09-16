@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.111.1] — 2026-09-16
+
+### Fixed
+
+- NocoDB fan-out signed in with the wrong admin email — adminSeedEnv.ts never persists NOCODB_ADMIN_EMAIL to .env, so it now reads the live Authelia admin email directly, like the other no-SSO bootstraps
+
 ## [0.111.0] — 2026-09-16
 
 ### Added

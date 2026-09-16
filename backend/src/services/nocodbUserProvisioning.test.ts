@@ -1,9 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readAppEnvValue } from './appEnv';
+import { getAutheliaAdminUser } from './autheliaUsers';
 import { findUserId, inviteUser, setPassword, signIn } from './nocodbClient';
 import { provisionNocodbUser } from './nocodbUserProvisioning';
 
 vi.mock('./appEnv', () => ({ readAppEnvValue: vi.fn() }));
+vi.mock('./autheliaUsers', () => ({ getAutheliaAdminUser: vi.fn() }));
 vi.mock('../config/services', () => ({ getPublishedUpstreamPort: vi.fn(() => 10280) }));
 vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn(async () => '10.201.0.1') }));
 vi.mock('./nocodbClient', () => ({
@@ -15,6 +17,7 @@ vi.mock('./nocodbClient', () => ({
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 const mockedReadEnv = vi.mocked(readAppEnvValue);
+const mockedGetAdmin = vi.mocked(getAutheliaAdminUser);
 const mockedSignIn = vi.mocked(signIn);
 const mockedInvite = vi.mocked(inviteUser);
 const mockedFindUserId = vi.mocked(findUserId);
@@ -22,8 +25,8 @@ const mockedSetPassword = vi.mocked(setPassword);
 
 beforeEach(() => {
   vi.clearAllMocks();
+  mockedGetAdmin.mockReturnValue({ username: 'admin', email: 'admin@example.com', displayName: 'Admin', groups: [] });
   mockedReadEnv.mockImplementation((_service, key) => {
-    if (key === 'NOCODB_ADMIN_EMAIL') return 'admin@example.com';
     if (key === 'NOCODB_ADMIN_PASSWORD') return 'admin-pw';
     return null;
   });
@@ -34,7 +37,14 @@ beforeEach(() => {
 });
 
 describe('provisionNocodbUser', () => {
-  it('skips when no admin account is tracked yet', async () => {
+  it('skips when no admin account is tracked yet (no Authelia admin email)', async () => {
+    mockedGetAdmin.mockReturnValue(null);
+    const result = await provisionNocodbUser({ email: 'bob@example.com', password: 'pw' });
+    expect(result).toBe('admin-not-configured');
+    expect(mockedSignIn).not.toHaveBeenCalled();
+  });
+
+  it('skips when the generated admin password is not set', async () => {
     mockedReadEnv.mockReturnValue(null);
     const result = await provisionNocodbUser({ email: 'bob@example.com', password: 'pw' });
     expect(result).toBe('admin-not-configured');
