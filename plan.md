@@ -30164,3 +30164,48 @@ update for the second provisioner). `scripts/bump-version.sh minor Added …`
 fix to the existing DocuSeal path).
 
 Not yet verified against the real stack — next section.
+
+## 490. §489 verified live — two real bugs found and fixed
+
+Deployed to `home-srv-01` (`beta` fast-forwarded, backend rebuilt, `GET
+/version` confirmed at each step) and ran `provisionNocodbUser` directly
+(one-off script inside the backend container, importing the compiled
+`dist/services/nocodbUserProvisioning.js` — same approach as §484/§487)
+against the real NocoDB container. Found two bugs the type-checked/unit-
+tested code couldn't have caught, both only visible against the live app:
+
+1. **Wrong admin email.** `readAppEnvValue('nocodb', 'NOCODB_ADMIN_EMAIL')`
+   returned a generated-looking string, not the real admin login —
+   `adminSeedEnv.ts` merges that value over the shell environment for each
+   `docker compose up` and explicitly never persists it back to `.env`
+   (its own doc comment already said so; §489's write-up just hadn't
+   connected that to what `readAppEnvValue` would see). Fixed by reading
+   `getAutheliaAdminUser()` directly, matching how DocuSeal/ITFlow's own
+   bootstraps already get the current admin identity.
+2. **Wrong role string.** NocoDB's invite 400'd with `"Invalid role"` — the
+   role dropdown shows "viewer"/"creator", but `nocodb-sdk`'s
+   `OrgUserRoles` enum values are `org-level-viewer`/`org-level-creator`;
+   `org-users.service.ts#userAdd` validates against the enum values, not
+   the display names. Fixed the literal in `nocodbClient.ts`.
+
+Each fix got its own commit (`6903f75`, `87cf876`), version-bumped
+(0.111.1, 0.111.2), redeployed and re-tested in turn — a bisect-by-fix
+loop rather than one bulk "make it work" commit, so each one is
+independently revertable and the plan record shows what was actually
+wrong, not just that something was.
+
+With both fixed, `provisionNocodbUser` run twice back-to-back
+(`FirstPass123!` then `SecondPass456!` for the same throwaway email)
+returned `created` then `updated`. Proved the password genuinely changed
+on NocoDB's side, not just that the function returned a plausible result:
+`curl`'d NocoDB's own `/api/v1/auth/user/signin` directly with both
+passwords. `FirstPass123!` → 400 "Invalid credentials"; `SecondPass456!` →
+200 with a real JWT. The reset-token flow took effect for real, through
+NocoDB's own bcrypt path, not a guess at its shape. Cleaned up the
+throwaway account afterward (`DELETE /api/v1/users/:id`, confirmed 200);
+the real admin account (`miguelamtx@gmail.com`, a distinct user id)
+untouched throughout.
+
+§480/§489's NocoDB fan-out is proven end to end. README's NocoDB item
+deleted. `beta` → `main`: left unmerged per [[main-merge-requires-request]]
+— ready whenever asked for.

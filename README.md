@@ -234,10 +234,6 @@ per-app items depend on it, and each other app item is independent of the
 rest (§341's DocuSeal SSO precedent: "looks doable" and "is doable" differ
 per app, so no batch-approval here, one at a time).
 
-- [ ] **NocoDB**: no bootstrap file exists yet (seeded via
-      `NC_ADMIN_EMAIL`/`NC_ADMIN_PASSWORD` env only) — check whether
-      multi-user invites are free-tier or Enterprise-gated before building
-      anything.
 - [ ] **ITFlow**: extend past the single `/setup`-wizard admin to per-user
       accounts — check whether its own user-management API supports this
       without SSO.
