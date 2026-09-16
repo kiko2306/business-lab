@@ -29949,3 +29949,42 @@ either, so needs proving against the real stack: a genuine invitation
 accept with DocuSeal access granted beforehand, confirmed to actually
 create a matching DocuSeal account, not just unit-tested mocks. Left on
 `dev`, unmerged.
+
+## 484. §483 verified live — invitation-accept fan-out works end to end
+
+Deployed to `home-srv-01` (`beta` fast-forwarded to `b3552c6`, backend +
+frontend rebuilt, `GET /version` → `0.110.0`). No dashboard admin session
+available to drive this through the real UI, so exercised the actual public
+route the fix touches rather than only the underlying service functions:
+
+- Seeded a throwaway dashboard user via a one-off script run inside the
+  backend container (`INSERT INTO users` with the exact shape
+  `routes/users.ts`'s own create endpoint uses, then `setUserAppAccess(id,
+  ['docuseal'])`, then the real `createInvitation()` — reusing the actual
+  service functions, not hand-rolled SQL for the parts that already have
+  one) to get a genuine invitation token.
+- `curl -X POST http://localhost:10000/api/auth/invitation/<token>` — the
+  same **public**, unauthenticated route a real invitee's browser calls —
+  with a real password. Returned a normal access/refresh token pair, so the
+  invitation-accept path itself kept working.
+- Backend log confirmed the fan-out actually fired from that request, not
+  just from a unit test: `"Created a DocuSeal team account for
+  fanout-test-verify@example.com"` immediately followed by `"No-SSO
+  credential fan-out (docuseal) for fanout-test-verify@example.com:
+  created"`.
+- SQLite `users` row in DocuSeal confirmed a third account
+  (`fanout-test-verify@example.com`, first/last split from the one-word
+  dashboard username as documented: `fanout-test-verify` / `Admin`).
+- A real sign-in with that exact email + the exact password just submitted
+  to the dashboard's invitation-accept endpoint succeeded (303 to `/`) —
+  the credential genuinely matches, not just a same-shaped independent one.
+
+**Cleaned up both ends**: archived the DocuSeal test account the same way
+as §482 (signed in as the real admin, `DELETE /users/3`, confirmed
+`archived_at` set and the account can no longer sign in — 302 back to
+`/sign_in`), and deleted the throwaway dashboard user row + its
+`user_app_access`/`refresh_tokens` rows via another one-off script. Real
+admin accounts on both sides untouched throughout.
+
+§480's core mechanism is proven end to end for its one wired app. `beta` →
+`main`: left unmerged per [[main-merge-requires-request]].
