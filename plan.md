@@ -29233,3 +29233,44 @@ app starts, `data/config.yml` renders with real credentials, WebDAV
 hostname, and `skipAutheliaProtection` actually keeps Authelia from
 redirecting a raw WebDAV request. Left on `dev`, unmerged, until that
 happens.
+
+## 469. §468 verified live on `beta`
+
+Deployed to `home-srv-01`: pulled `beta` (`422ae0d`), `docker compose build
+backend` + `up -d backend` — clean start, `GET /version` → `0.106.0`, no
+errors in `business-lab-backend-1`'s logs. Started WebDAV from the dashboard
+UI.
+
+`apps/webdav/data/config.yml` rendered correctly on that first start: real
+`WEBDAV_USERNAME=admin` / a genuine 64-hex-char generated
+`WEBDAV_PASSWORD`, `permissions: CRUD`. `behindProxy: false` on this first
+render, as expected — `ensureAutoExposure` runs *after*
+`composeUpWithManagedConfig` in `executor.ts` (confirmed by reading it), so
+the exposure row doesn't exist yet when `applyWebdavConfig` reads it on an
+app's very first start; same lifecycle ntfy's `NTFY_BEHIND_PROXY` and
+Vikunja's managed `config.yml` already have — a second start picks up the
+flip. Cosmetic only (affects logged visitor IPs, not whether requests
+succeed) and not a new gap this app introduced.
+
+`service_exposure` row confirmed: `webdav | enabled=t |
+webdav.tx-home-utils.com`, provisioned automatically with no exposure step
+touched — exactly the "exposure is automatic" contract (§331).
+
+Full request path proven, both directly on the container and over the real
+public hostname (Cloudflare Tunnel → NPM → app):
+
+- Anonymous `GET` → **401** in both cases — critically, over the public
+  hostname this is WebDAV's own 401, *not* a 302 to Authelia's login
+  portal, confirming `skipAutheliaProtection` actually keeps Authelia from
+  intercepting a raw WebDAV request the way a native client needs.
+- `PROPFIND` with Basic Auth → **207** locally and over
+  `https://webdav.tx-home-utils.com/`.
+- `PUT`/`GET`/`DELETE` with Basic Auth over the public hostname → **201** /
+  **200** / **204** — the file landed on the host at
+  `apps/webdav/data/files/`, proving the exact write path SQL Backup Master
+  (or any WebDAV-capable backup tool) would use from the internet, no VPN,
+  no port-forward. Test files deleted after.
+
+README item was never added for this (came from conversation, not the
+backlog) — nothing to delete there. `beta` → `main`: left unmerged per
+[[main-merge-requires-request]].
