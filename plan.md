@@ -30074,10 +30074,42 @@ predated this fix, is updated to match.
 `./scripts/check.sh backend typecheck`/`test` clean (965 passing, +5 new
 `docusealDb.test.ts` cases mocking `child_process.exec` the same way
 `itflowDb.test.ts` does). `scripts/bump-version.sh patch Changed …` →
-0.111.0.
+0.110.2.
 
-**Not yet verified live** — needs the same kind of proof §484 used for the
-create path: a real duplicate-email fan-out against the actual DocuSeal
-container on `home-srv-01`, confirming the container run actually executes
-and the sign-in afterward succeeds with the new password. Left on `dev`,
-unmerged.
+## 488. §487 verified live
+
+Deployed to `home-srv-01` (`beta` fast-forwarded to `7ddde93`, backend
+rebuilt, `GET /version` → `0.110.2`). Called `provisionDocusealTeamMember`
+directly (one-off script run inside the backend container, importing the
+compiled `dist/services/docusealTeamProvisioning.js` — same "exercise the
+real code path, not a mock" approach as §484) twice for the same email:
+
+- First call, password `FirstPass123!` → `created` (the already-proven
+  path).
+- Second call, password `SecondPass456!` → `updated` — the new path this
+  section adds. Backend log confirmed the `rails runner` fallback actually
+  fired: `"Updated the existing DocuSeal team account's password for
+  fanout-test-update@example.com"`.
+
+Proved the password genuinely changed on DocuSeal's side, not just that the
+function returned a plausible-looking result: signed in directly against
+the real DocuSeal container (curl, DocuSeal's own `/sign_in` form) with
+both passwords. `FirstPass123!` → 422 (rejected); `SecondPass456!` → 303
+(signed in). The `rails runner` write took effect for real, through
+Devise's own bcrypt hashing, not a guess at its format.
+
+**Cleanup hit the same class of bug `updateProfileEmail`'s comment already
+documents**: reusing the pre-GET cookie for the delete form's POST 422'd
+(stale CSRF, wrong session) — fixed by refreshing the cookie from
+`/settings/users`'s own `Set-Cookie` response before submitting, same fix
+already applied there. First delete attempt's silent failure was also
+caught by an unreliable verification check (`!html.includes('archived')`,
+true regardless of whether the target row was still present) — re-verified
+properly afterward with a direct sign-in attempt against the archived
+account, confirmed redirected back to `/sign_in` rather than in. Real
+admin account (`miguelamtx@gmail.com`, DocuSeal user id distinct from the
+throwaway one) untouched throughout.
+
+§482/§487's DocuSeal password-update path is proven end to end. `beta` →
+`main`: left unmerged per [[main-merge-requires-request]] — ready whenever
+asked for.
