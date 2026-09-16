@@ -28433,3 +28433,21 @@ to enumerate `/dev/sd*` and inject a `devices:` list itself, the same way
 other per-host values in this file come from `.env`, that satisfies
 principle 2 without `privileged`. Comment-only; no behaviour change, nothing
 to verify against the live stack.
+
+## 447. Audit logs purged after 30 days
+
+Requirement: audit_logs must not accumulate forever. Added
+`purgeOldAuditLogs()` (`backend/src/utils/audit.ts`) — a single `DELETE FROM
+audit_logs WHERE created_at < NOW() - INTERVAL '30 days'` — and
+`startAuditLogPurgeSweeper()`, run once at boot and every 6h thereafter,
+matching the existing `startSelfUpdateCheckSweeper` pattern
+(`selfUpdate.ts`). Wired into `index.ts` alongside the other sweepers.
+Fixed 30-day window, no settings-page control: nothing here is a per-app
+token or a value the operator would ever want to change (principle 3 —
+automate what needs no human input), unlike backup retention which is a
+deliberate user choice.
+
+Verified: `./scripts/check.sh backend typecheck` and `test` clean (921
+tests, one new for the purge query). Not yet verified live against
+`home-srv-01` — no exposure/Docker/networking surface touched, so this
+ships behind the usual dev→beta→main promotion rather than a host check.

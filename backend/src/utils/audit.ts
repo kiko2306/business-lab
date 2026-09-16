@@ -1,4 +1,32 @@
 import { query } from './database';
+import logger from './logger';
+
+const RETENTION_DAYS = 30;
+
+/** Delete audit_logs rows older than the retention window. Returns rows removed. */
+export async function purgeOldAuditLogs(): Promise<number> {
+  const result = await query(
+    `DELETE FROM audit_logs WHERE created_at < NOW() - INTERVAL '${RETENTION_DAYS} days'`
+  );
+  return result.rowCount ?? 0;
+}
+
+export function startAuditLogPurgeSweeper(): void {
+  const SWEEP_INTERVAL_MS = 6 * 60 * 60_000;
+  const run = () => {
+    purgeOldAuditLogs()
+      .then((deleted) => {
+        if (deleted > 0) {
+          logger.info('Purged audit logs past the retention window', { deleted, retentionDays: RETENTION_DAYS });
+        }
+      })
+      .catch((error: Error) => {
+        logger.error('Audit log purge failed', { error: error.message });
+      });
+  };
+  run();
+  setInterval(run, SWEEP_INTERVAL_MS).unref();
+}
 
 interface WriteAuditLogOptions {
   userId?: number | null;

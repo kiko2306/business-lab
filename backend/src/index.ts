@@ -42,6 +42,7 @@ import { startExposureReconciler } from './services/exposureReconciler';
 import { startCriticalServiceHealthMonitor } from './services/criticalServiceHealth';
 import { regenerateHomepageServices } from './services/homepageConfig';
 import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
+import { startAuditLogPurgeSweeper } from './utils/audit';
 import { ensureSocialDraftsTable } from './services/socialDrafts';
 
 const apiLimiter = rateLimit({
@@ -265,6 +266,7 @@ startCriticalServiceHealthMonitor();
 // inside the helper (§114).
 regenerateHomepageServices();
 startSelfUpdateCheckSweeper();
+startAuditLogPurgeSweeper();
 
 const server = app.listen(PORT, () => {
   console.log(`Homelab backend listening on port ${PORT}`);
