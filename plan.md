@@ -29437,3 +29437,39 @@ unit tests can't reach (an actual CIFS mount succeeding against
 recreating the volume without orphaning the local files already sitting in
 `apps/webdav/data/files/`). Left on `dev`, unmerged into `beta`/`main`,
 until deployed and exercised with the user's real NAS credentials.
+
+## 473. §472 verified live — SQL Backup Master's write lands on the real NAS
+
+Deployed to `home-srv-01`: pulled `beta` (`bd9f0de`), rebuilt + restarted the
+backend, `GET /version` → `0.107.0`. User filled in WebDAV's new NAS fields
+in its config panel (server `192.168.1.50`, share `CliBackups`, real
+credentials) and restarted the app themselves.
+
+Confirmed at three levels, not just trusting the compose file:
+
+- `docker volume inspect webdav_webdav-storage` — recreated (new
+  `CreatedAt`) with `type=cifs`, `device=//192.168.1.50/CliBackups`,
+  credentials in `driver_opts.o`. `applyWebdavMount`'s change-detection
+  correctly saw `WEBDAV_MOUNT_*` differ from what was on disk and did the
+  `down` + `volume rm` before this start's `compose up` recreated it — the
+  exact path that only exercises on a real change (confirmed indirectly:
+  the volume's `CreatedAt` moved to this start, not `webdav`'s original
+  install time).
+- `findmnt`/`mount` on the host, root/sudo: a live kernel CIFS mount of
+  `//192.168.1.50/CliBackups` at the volume's `_data` mountpoint — not a
+  silently-failed mount serving an empty local directory instead.
+- A real `PUT`/`DELETE` over `https://webdav.tx-home-utils.com/` (same
+  public path §469 proved): the file appeared directly inside
+  `CliBackups` on the NAS (confirmed via `sudo ls` on the mountpoint,
+  alongside what is visibly a real, already-in-use share — dozens of
+  actively-dated client folders, not an empty test bucket) and was cleanly
+  removed after.
+
+Confirmed the documented "no migration" caveat is real, not just a
+disclaimer: the earlier SQL Backup Master test file
+(`EPISODIO-…-Full.zip`, §469) is still sitting on the dashboard host's local
+disk at `apps/webdav/data/files/`, untouched by the volume swap — it does
+not appear on the NAS. Left for the user to decide whether to move it or
+just re-run the backup now that the NAS mount is live.
+
+`beta` → `main`: left unmerged per [[main-merge-requires-request]].
