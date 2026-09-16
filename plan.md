@@ -28546,3 +28546,27 @@ bump (blocks), both changed together (passes), and a non-image edit like
 `mem_limit` with no date bump (passes, correctly exempt). Not something to
 verify against the live stack — it only affects Claude's own commit
 attempts, not anything running in Docker.
+
+## 451. NetBird checked — 0.78.1 -> 0.78.2, safe patch, first real use of §449/§450
+
+`check if netbird can be safely updated`, applying the §449/§450 workflow for
+real for the first time. `apps/netbird-vpn/docker-compose.yml` runs 5 images,
+all on `:latest`: `netbirdio/netbird` (client, used twice — `netbird-client`
+and `netbird-lan-alias`), `management`, `signal`, `relay`, and `dashboard`
+(a separately-versioned project, already tracking its own `latest`).
+
+Confirmed via the Docker Registry v2 API directly (`registry-1.docker.io`,
+anonymous pull token — `hub.docker.com`'s web API was still rate-limiting
+this session's IP from the §448/§449 digest-matching work) that the running
+digest for `netbird`/`management`/`signal`/`relay` matches tag `0.78.1`
+exactly, and `latest` on all four now resolves to `0.78.2` — so a pull picks
+up all four together, no partial-version skew. `0.78.2`'s GitHub release
+notes: a Windows tray deadlock fix (irrelevant, no Windows here) and a
+wireguard-go bump — no breaking changes, patch-level. Judged safe.
+
+Bumped the date comment (no tag to bump — still `:latest` by design, §449).
+Since the file already carried today's date from the original rollout, a
+bare date wouldn't have produced a diff for classifyDeploy to see, so the
+line now also names what was checked/found: `(0.78.1 -> 0.78.2, patch,
+safe)`. `require-image-date-bump.sh` was a no-op here (no `image:` line
+changed) — correctly, since it only guards that case.
