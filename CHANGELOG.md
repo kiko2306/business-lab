@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.108.1] — 2026-09-16
+
+### Fixed
+
+- DocuSeal admin email sync: carry the session cookie Rails refreshes on GET, not the stale sign-in one, into the profile PATCH
+
 ## [0.108.0] — 2026-09-16
 
 ### Added

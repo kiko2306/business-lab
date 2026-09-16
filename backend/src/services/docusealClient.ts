@@ -231,6 +231,14 @@ export async function updateProfileEmail(
   if (formResponse.status !== 200) return 'failed';
   const token = extractAuthenticityToken(await formResponse.text());
   if (!token) return 'failed';
+  // Rails' cookie session store re-issues Set-Cookie on almost every request
+  // (Devise's `trackable` touches the session on this GET) — the CSRF token
+  // just parsed is signed against whatever session THIS response set, so the
+  // PATCH has to carry that cookie forward, not the one `signIn` produced.
+  // Found live (§477 follow-up): every step worked replayed through a real
+  // cookie jar, but reusing the pre-GET cookie here got every PATCH a 422.
+  const refreshedCookies = readSetCookies(formResponse.headers);
+  const cookie = refreshedCookies.length ? cookieHeader(refreshedCookies) : input.cookie;
 
   const body = new URLSearchParams({
     _method: 'patch',
@@ -245,7 +253,7 @@ export async function updateProfileEmail(
     response = await fetch(`${baseUrl}/settings/profile/update_contact`, {
       method: 'PATCH',
       redirect: 'manual',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Cookie: input.cookie },
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded', Cookie: cookie },
       body: body.toString(),
       signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
     });

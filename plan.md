@@ -29602,3 +29602,48 @@ bootstrap tests instead, which mock the client module wholesale.
 into and PATCHed on `home-srv-01`, not just mocks. Left on `dev`, unmerged,
 until deployed and exercised against the real `admin@example.com` account
 found above.
+
+## 478. §477 live-verified — found and fixed a stale-cookie bug in the process
+
+User clicked Restart on DocuSeal. Backend log: sign-in succeeded, then
+`DocuSeal admin email sync: the profile update was rejected — will retry
+next start`. Reproduced by hand instead of guessing: replayed the exact
+same GET/POST/GET/PATCH sequence with `curl -b/-c` against
+`http://localhost:10150` on `home-srv-01`, and it worked — 302 redirect, and
+the SQLite `users` row actually flipped to `miguelamtx@gmail.com`. Since the
+manual replay succeeded where the code failed, the bug was in the code, not
+the mechanism (and the live account was now sitting on the *correct* email
+as a side effect of proving that).
+
+**Root cause**: Rails' cookie-based session store re-issues `Set-Cookie` on
+almost every request — Devise's `trackable` touches the session on the
+`GET /settings/profile` that fetches the CSRF token. `updateProfileEmail`
+parsed that token but then PATCHed using the *original* sign-in cookie, not
+the one that GET response had just set. The CSRF token is signed against
+whatever session the GET response belongs to, so token and cookie
+disagreed — Rails' default is to reject that as 422 with no distinguishing
+body content (why the earlier "profile update was rejected" log gave no
+further clue). `curl -b/-c` didn't hit this because a real cookie jar
+updates on every response, GET included; my hand-rolled cookie-forwarding
+only updated it after `signIn`'s own POST.
+
+**Fix**: `updateProfileEmail` now reads `Set-Cookie` off the
+`GET /settings/profile` response too, and uses that (falling back to the
+passed-in cookie only if the GET set none) for the PATCH — same "always
+carry the freshest cookie forward" rule `signIn` already applies to its own
+GET-then-POST pair, just missing on this second hop.
+
+**Restored the pre-test state before redeploying**: reverted the live
+account back to `admin@example.com` by hand (same curl-with-a-real-jar
+technique, in reverse), specifically so the *fixed* code's redeploy would be
+proving itself against a genuine drift, not a no-op — matching "make the
+code do it, then prove the code path", not "leave it manually fixed and
+call the code path proven". No signed documents exist on this account
+(`templates` table was empty both times it was checked), so flipping the
+login row back and forth carried no data risk.
+
+`./scripts/check.sh backend typecheck`/`test` clean (946, unchanged — the
+existing drift-sync tests already covered the calling shape; the bug was in
+which cookie value flowed to the PATCH, invisible to mocks that don't model
+Rails' session-rotation behaviour). `scripts/bump-version.sh patch Fixed …`
+→ 0.108.1.
