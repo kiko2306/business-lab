@@ -30782,3 +30782,72 @@ backend container (`docker compose exec backend node -e ...`, same
 direct query, real login confirmed via the actual form. README's Kimai
 item was already deleted in §501's commit. `beta` → `main`: left unmerged
 per [[main-merge-requires-request]] — ready whenever asked for.
+
+## 503. Jellyfin joins the §480 fan-out — closing the README section
+
+`beta` fast-forwarded to `main` first (§502's Kimai work, already verified —
+just the merge itself, requested explicitly this session).
+
+Then the last README item under "Credential fan-out to no-SSO apps
+(§480)": Jellyfin. Its own API turned out to be the easy case of the
+bunch — a real REST API, no cold DB script (Kimai) or WebSocket workaround
+(Home Assistant) needed. `Users/AuthenticateByName` signs in as the
+generated-password admin `jellyfinAdminBootstrap.ts` already creates;
+`Users/New` creates a user; `Users/{id}/Password` lets an admin set
+*another* user's password directly with no `CurrentPw` (the same thing the
+Jellyfin web UI's own Dashboard → Users → Password tab does cross-account);
+`Users/{id}/Policy` (fetch-whole, post-whole — no partial update exists)
+flips `IsDisabled` for disable/re-enable. Jellyfin has no separate email
+field on a user (`jellyfinAdminBootstrap.ts`'s own doc comment already
+established this) — same call Kimai made for the same reason, the
+dashboard user's email is used as the Jellyfin username, so there's
+nothing separate to pick or collide on and `disableJellyfinUser` can still
+find the right account from just the email the shared `Deprovisioner`
+signature hands it.
+
+The real finding was upstream of the API, though: every existing §480 app
+gets fanned out through a `user_app_access` grant, and what's grantable
+(`getGrantableAppOptions`, `userAppAccess.ts`) was filtered down from
+`service_exposure WHERE enabled = TRUE`. That was never wrong for the
+first five — DocuSeal/NocoDB/ITFlow/Kimai/Home-Assistant are all
+`skipAutheliaProtection`, exposed *directly* with just their own login, so
+they always have an enabled exposure row. Jellyfin is `lanOnly`:
+`getExposability()` reports it permanently non-exposable, so it never gets
+a `service_exposure` row at all — with the provisioner written and
+registered but the filter left alone, Jellyfin would still never appear in
+the grant picker. Not a bug in what shipped so far, just a case the first
+five apps never exercised: "no-SSO" and "exposed" happened to coincide
+every time until now.
+
+Asked rather than guessed which way to resolve it (three shapes: widen the
+grant picker to admit no-SSO apps regardless of exposure, so Jellyfin
+becomes an explicit opt-in checkbox like the rest; auto-provision every
+dashboard user unconditionally, since LAN reachability was never gated by
+the dashboard anyway; or land the provisioner unregistered and defer the
+grant-model question). Chose the first — `getGrantableAppOptions` now
+computes the exposed set exactly as before, then adds back any no-SSO
+provisioner app missing from it with `hostname: null` (there's no public
+URL to show) instead of leaving it permanently ungrantable. `getAppAccessOptions`
+(the Authelia group/rule generator's own input) is untouched — this only
+widens the *picker*, not what gets an Authelia access-control rule.
+Frontend needed no change at all: `option.hostname` was already
+`string | null` and the template already guards the "· hostname" suffix on
+`*ngIf="option.hostname"`.
+
+New: `jellyfinClient.ts` (the bare REST calls — sign-in, find-by-name,
+create, set-password, set-disabled) and `jellyfinUserProvisioning.ts`
+(`provisionJellyfinUser`/`disableJellyfinUser`, same admin-session shape as
+`nocodbUserProvisioning.ts`), wired into `noSsoCredentialFanout.ts`'s
+`PROVISIONERS`/`DEPROVISIONERS` maps. `./scripts/check.sh backend
+typecheck`/`test` clean (1075 passing, +11 new: 10 in
+`jellyfinUserProvisioning.test.ts`, 1 in `userAppAccess.test.ts` covering
+the lanOnly-with-no-exposure-row case). `scripts/bump-version.sh patch
+Added …` → 0.117.1. README's whole "Credential fan-out to no-SSO apps
+(§480)" section deleted — Jellyfin was the last open item, closing the
+run that started at §480/§481.
+
+Not yet verified against the real stack — the admin-authenticated REST
+calls need proving against a live Jellyfin the way §501 proved Kimai's
+direct-SQL path: grant a real dashboard user Jellyfin access, confirm the
+account actually gets created in the running container, and log in for
+real. Next session.
