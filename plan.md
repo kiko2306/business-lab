@@ -30574,3 +30574,81 @@ Cleaned up: `DELETE FROM kimai2_users WHERE email = 'fanout-test@example.com'`
 read back correctly against the real container, with real logins
 succeeding/failing exactly as expected at each step. `beta` → `main`: left
 unmerged per [[main-merge-requires-request]] — ready whenever asked for.
+
+## 499. Home Assistant credential fan-out (§480) — the OAuth2 login flow, not the REST API
+
+README item: Home Assistant's no-SSO fan-out, next after Kimai (§497).
+`home-srv-01` had no Home Assistant container running at all (present in
+`apps/home-assistant/` with real prior `data/`, but torn down) — reverse-
+engineered from `home-assistant/core`'s actual source (`gh api`, same as
+ITFlow's §491 approach) rather than a live instance, then proved the design
+by starting the real container for §500's verification.
+
+**What's actually there.** HA's multi-user model is real: a `User` (name,
+group membership, active flag) and a `homeassistant`-provider `Credentials`
+row (username/password) are separate objects, linked. But **none of it is
+REST** — `/api/*` is the states/services API, not user management. The
+create/update/list operations are the exact WebSocket commands HA's own
+frontend Users page sends (`components/config/auth.py`:
+`config/auth/list`, `config/auth/create`, `config/auth/update`;
+`components/config/auth_provider_homeassistant.py`:
+`config/auth_provider/homeassistant/create`, `…/admin_change_password`) —
+undocumented as a *public* API, but real application code, not scraped
+HTML, and `config/auth/list`'s own `_user_info()` helper already resolves
+each user's HA username from their credentials, so no extra lookup index
+is needed to find an existing fanned-out account by email.
+
+**Getting an admin session without storing a token.** Every one of those
+commands requires an authenticated WebSocket connection
+(`@websocket_api.require_admin` / an owner check on the password-change
+one). Rather than mint and persist a long-lived access token (a new secret
+to track, rotate, and worry about drifting — the exact shape of problem
+§495/498 just fixed for DocuSeal/Kimai's *admin* accounts), this drives
+the same OAuth2 flow HA's own mobile app uses to sign a user in with a
+plain username/password (`components/auth/login_flow.py`,
+`components/auth/__init__.py` — publicly documented at
+`developers.home-assistant.io/docs/auth_api`, not reverse-engineered):
+`POST /auth/login_flow` → `POST /auth/login_flow/{id}` (username/password,
+returns an authorization code) → `POST /auth/token` (form-urlencoded,
+exchanges the code for a 30-minute `access_token`). A fresh token per
+provisioning call, same "sign in fresh, never persist" shape as ITFlow's
+`signIn()`. `client_id`/`redirect_uri` only need to share a scheme+host
+(`indieauth.verify_redirect_uri` does a same-origin string check, no
+external fetch) — confirmed reading `indieauth.py` directly rather than
+guessing, since a wrong assumption here would have meant either a live
+network fetch of our own base URL (pointless) or a rejected login.
+
+**Speaking WebSocket from the backend**: already established precedent —
+`uptimeKumaAdminBootstrap.ts` already drives Uptime Kuma's Socket.IO setup
+over the `ws` package the backend already depends on. HA's own WS protocol
+is far simpler (plain JSON frames, no Engine.IO/Socket.IO envelope):
+`auth_required` → `{type:"auth", access_token}` → `auth_ok`, then one
+`{id, type: "config/auth/…"}` per call, matched back by `id`. Added
+`getAdminAccessToken` and a generic `runHaWsCommand` to
+`homeAssistantClient.ts` (one command per connection — reconnecting per
+call is simpler than pooling for an action this infrequent) rather than
+scraping HTML, and rather than storing a secret.
+
+Every fanned-out user gets HA's built-in `system-users` group
+(`GROUP_ID_USER`, `homeassistant/auth/const.py`), not `system-admin` —
+same "a working login, not a bigger grant" reasoning as ITFlow's
+Technician role and Kimai's `ROLE_USER`. The HA username is the email
+address (matching Kimai's choice, §497) since HA's own login has no
+separate "sign in with email" fallback the way Kimai's does — the
+fanned-out username itself has to be the lookup key.
+`disableHomeAssistantUser` flips `is_active: false` via `config/auth/update`
+(§493's disable-not-delete shape); HA's own login rejects an inactive
+user, and re-granting flips it back (plus refreshes the password) through
+the same `provisionHomeAssistantUser` call, re-activating if it finds the
+account already disabled.
+
+`resolveHaBaseUrl` (previously private to `homeAssistantAdminBootstrap.ts`)
+is now exported, same as ITFlow/DocuSeal's base-URL resolvers, for
+`homeAssistantUserProvisioning.ts` to reuse.
+
+`./scripts/check.sh backend typecheck`/`test` clean (1051 passing, +21
+new: 5 in `homeAssistantClient.test.ts` for `getAdminAccessToken`, 16 in
+`homeAssistantUserProvisioning.test.ts`, plus `noSsoCredentialFanout.test.ts`
+updated for the fifth provisioner). `scripts/bump-version.sh minor Added …`
+→ 0.116.0. Not yet verified against the real stack (no HA container was
+even running on `home-srv-01` to test against) — next section.
