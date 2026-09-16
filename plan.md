@@ -30652,3 +30652,58 @@ new: 5 in `homeAssistantClient.test.ts` for `getAdminAccessToken`, 16 in
 updated for the fifth provisioner). `scripts/bump-version.sh minor Added …`
 → 0.116.0. Not yet verified against the real stack (no HA container was
 even running on `home-srv-01` to test against) — next section.
+
+## 500. §499 verified live — real HA owner, fresh onboarding, full OAuth2 round trip proven
+
+Deployed to `home-srv-01` (`beta` fast-forwarded, backend rebuilt, `GET
+/version` → 0.116.0). Home Assistant had no container at all on this host
+(`apps/home-assistant/` existed with stale prior `data/`, torn down) —
+`docker compose up` in its own project started it, then `docker compose
+down` + wipe `./data` + `up` again for a **genuinely fresh** onboarding
+(the stale data volume's own prior owner account would have made this a
+test against old state, not the real first-run path a new deployment
+actually hits). `GET /api/onboarding` confirmed all four steps undone
+before bootstrapping.
+
+- **Owner bootstrap**: `reconcileHomeAssistantFirstAdmin('home-assistant')`
+  → `"Created Home Assistant's owner account (mat) via onboarding"` —
+  confirms this section's fan-out code has a real owner session to build
+  on, not a stale/mismatched one.
+- **Create**: `provisionHomeAssistantUser(...)` → `'created'` for a
+  throwaway `fanout-test@example.com`. Drove the real three-step OAuth2
+  login flow by hand with `curl` (not through the app's own code, to keep
+  this an independent check): `POST /auth/login_flow` → `POST
+  /auth/login_flow/{id}` with that password → `{"type":"create_entry",
+  "result":"<code>"}`, then `POST /auth/token` → a real `access_token` +
+  `refresh_token` pair. A genuine login, proven at the protocol level, not
+  just "the function returned created".
+- **Disable**: `disableHomeAssistantUser(...)` → `'disabled'`. The same
+  login flow now fails at the *first* step already:
+  `{"message":"Login blocked: User is not active"}` — HA's own
+  `async_user_not_allowed_do_auth` check, not a network-level failure.
+- **Re-grant**: `provisionHomeAssistantUser(...)` again → `'updated'`
+  (found the existing inactive user, changed the password, flipped
+  `is_active` back via `config/auth/update` — the second WS call
+  `provisionHomeAssistantUser` only makes when it finds an inactive
+  match). Login immediately works again (`create_entry`) — re-enable and
+  password-refresh both proven in one call, the exact revoke-then-regrant
+  scenario Users & Roles hits.
+
+Cleaned up via the same `getAdminAccessToken`/`runHaWsCommand` primitives
+(no UI, no separate mechanism to trust): looked up the throwaway user by
+username, `config/auth/delete`'d it, then listed again — only the
+system-generated no-username row (present on every fresh HA install) and
+the real owner `mat` remained. `docker compose down` on `home-assistant`'s
+own project afterward, restoring the host to the state this section found
+it in — no container, matching before.
+
+Didn't re-run §493/494's broader real-*route* sweep for the same reason
+§498 didn't for Kimai: that mechanism is already proven generic, and
+`'home-assistant': provisionHomeAssistantUser` is a uniform `PROVISIONERS`
+map entry with no new route-level behavior.
+
+§499 is proven end to end against a genuinely fresh instance: owner
+bootstrap, create, disable, and re-grant all confirmed via the real OAuth2
+protocol, not just the wrapping function's return value. `beta` → `main`:
+left unmerged per [[main-merge-requires-request]] — ready whenever asked
+for.
