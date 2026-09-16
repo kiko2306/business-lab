@@ -9,9 +9,15 @@
  * Keyed by service name in PROVISIONERS below; an app only becomes
  * grantable in Users & Roles (see `getGrantableAppOptions` in
  * userAppAccess.ts) once it has an entry here. `skipAutheliaProtection`
- * alone isn't enough — most of the no-SSO apps (NocoDB, ITFlow, Kimai, Home
+ * alone isn't enough — most of the no-SSO apps (ITFlow, Kimai, Home
  * Assistant, Jellyfin) don't have a provisioner built yet; each is its own
  * README item.
+ *
+ * NocoDB's own org-user Meta API turned out to be plain OSS (confirmed
+ * against upstream's `org-users.controller.ts`/`users.service.ts`, no
+ * Business/Enterprise gate on this path) — `provisionNocodbUser` invites
+ * through it, then sets the real password via the same reset-token flow a
+ * human clicking the (never-sent, no SMTP configured) invite email would.
  *
  * DocuSeal also covers a later password change, not just first grant (§482):
  * `provisionDocusealTeamMember` falls back to setting the password directly
@@ -28,6 +34,7 @@
 
 import logger from '../utils/logger';
 import { provisionDocusealTeamMember } from './docusealTeamProvisioning';
+import { provisionNocodbUser } from './nocodbUserProvisioning';
 
 export interface NoSsoCredentialInput {
   email: string;
@@ -39,6 +46,7 @@ type Provisioner = (input: NoSsoCredentialInput) => Promise<string>;
 
 const PROVISIONERS: Record<string, Provisioner> = {
   docuseal: provisionDocusealTeamMember,
+  nocodb: provisionNocodbUser,
 };
 
 /** Apps that can accept a fanned-out credential today. */

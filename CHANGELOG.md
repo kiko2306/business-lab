@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.111.0] — 2026-09-16
+
+### Added
+
+- NocoDB credential fan-out (§480): mirrors a dashboard user's real email/password into a NocoDB account via its own org-user REST API (invite + reset-token password set), no Enterprise gate on that path
+
 ## [0.110.2] — 2026-09-16
 
 ### Changed

@@ -1,0 +1,80 @@
+/**
+ * Create/update a NocoDB account for a dashboard user, matching their own
+ * email/password rather than a per-app generated secret (§480 — the user's
+ * explicit choice, accepting that the credential then also lives, hashed,
+ * in NocoDB's own database).
+ *
+ * Signs in as the super admin NocoDB already seeds on every start
+ * (NC_ADMIN_EMAIL/NC_ADMIN_PASSWORD — services.ts) and drives its own
+ * org-user REST API (nocodbClient.ts): invite, then set the password via
+ * the reset-token flow, since inviting alone never sets one.
+ */
+
+import logger from '../utils/logger';
+import { getPublishedUpstreamPort } from '../config/services';
+import { getHostGatewayIp } from '../utils/network';
+import { readAppEnvValue } from './appEnv';
+import { findUserId, inviteUser, setPassword, signIn } from './nocodbClient';
+
+export const NOCODB_SERVICE = 'nocodb';
+const NOCODB_ADMIN_EMAIL_KEY = 'NOCODB_ADMIN_EMAIL';
+const NOCODB_ADMIN_PASSWORD_KEY = 'NOCODB_ADMIN_PASSWORD';
+// Compose always sets ${NOCODB_PORT:-10280}; this only covers a parse miss.
+const FALLBACK_PORT = 10280;
+
+export type ProvisionNocodbUserResult =
+  | 'created'
+  | 'updated'
+  | 'already-exists'
+  | 'failed'
+  | 'admin-not-configured'
+  | 'admin-sign-in-failed';
+
+export interface NocodbUserInput {
+  email: string;
+  password: string;
+}
+
+async function resolveNocodbBaseUrl(): Promise<string> {
+  const port = getPublishedUpstreamPort(NOCODB_SERVICE) ?? FALLBACK_PORT;
+  const host = await getHostGatewayIp();
+  return `http://${host}:${port}`;
+}
+
+export async function provisionNocodbUser(input: NocodbUserInput): Promise<ProvisionNocodbUserResult> {
+  const adminEmail = readAppEnvValue(NOCODB_SERVICE, NOCODB_ADMIN_EMAIL_KEY);
+  const adminPassword = readAppEnvValue(NOCODB_SERVICE, NOCODB_ADMIN_PASSWORD_KEY);
+  if (!adminEmail || !adminPassword) {
+    logger.warn('NocoDB user provisioning skipped: no admin account tracked yet');
+    return 'admin-not-configured';
+  }
+
+  const baseUrl = await resolveNocodbBaseUrl();
+  const token = await signIn(baseUrl, adminEmail, adminPassword);
+  if (!token) {
+    logger.warn(`NocoDB user provisioning skipped: could not sign in as ${adminEmail}`);
+    return 'admin-sign-in-failed';
+  }
+
+  const inviteOutcome = await inviteUser(baseUrl, token, input.email);
+  if (inviteOutcome === 'failed') {
+    logger.error(`NocoDB user provisioning failed for ${input.email}`);
+    return 'failed';
+  }
+
+  const userId = await findUserId(baseUrl, token, input.email);
+  if (!userId) {
+    logger.error(`NocoDB user provisioning: could not find ${input.email} after inviting it`);
+    return 'failed';
+  }
+
+  const passwordSet = await setPassword(baseUrl, token, userId, input.password);
+  if (!passwordSet) {
+    logger.warn(`NocoDB already has an account for ${input.email} but its password could not be set`);
+    return inviteOutcome === 'created' ? 'failed' : 'already-exists';
+  }
+
+  const outcome = inviteOutcome === 'created' ? 'created' : 'updated';
+  logger.info(`${outcome === 'created' ? 'Created' : 'Updated'} a NocoDB account for ${input.email}`);
+  return outcome;
+}

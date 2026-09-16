@@ -30113,3 +30113,54 @@ throwaway one) untouched throughout.
 §482/§487's DocuSeal password-update path is proven end to end. `beta` →
 `main`: left unmerged per [[main-merge-requires-request]] — ready whenever
 asked for.
+
+## 489. NocoDB credential fan-out (§480)
+
+Second app off the no-SSO fan-out list, after DocuSeal (§481-488). The
+README item said to check whether multi-user invites are free-tier or
+Enterprise-gated before building anything — checked against upstream
+source directly rather than trusting doc-page summaries (a websearch on
+NocoDB's own docs gave conflicting answers: one page's Collaboration Meta
+API note reads as gating *all* user endpoints behind Business+, which
+turned out to be about Teams/workspace-role features, not the plain
+org-user CRUD).
+
+Pulled `org-users.controller.ts` and `org-users.service.ts` /
+`users.service.ts` straight from `nocodb/nocodb`'s `master` branch (via
+`gh api search/code` + raw GitHub fetches). No licence/plan check anywhere
+on `POST /api/v1/users` (org user list/add/update/delete), `generate-reset-
+url`, or the auth routes — it's plain OSS, unlike the Teams/Scripts/Views
+Meta APIs the docs do gate.
+
+One wrinkle: `POST /api/v1/users` only invites (email + role) and never
+takes a password — and a bare community install has no SMTP plugin
+configured, so the invite email it tries to send never arrives. Read
+`userAdd` in `org-users.service.ts` far enough to see the same reset-token
+mechanism a human clicking that (unsent) link would hit is itself a public
+API: `POST /api/v1/users/:id/generate-reset-url` (super-admin) mints a
+token, `POST /auth/password/reset/:token` (public, no auth) applies a
+password through NocoDB's own bcrypt path
+(`users.service.ts#passwordReset`). No `docker exec`, no internals — a
+three-call REST sequence: invite → generate-reset-url → password/reset.
+
+**Built**: `nocodbClient.ts` (the four raw fetch calls — signIn,
+inviteUser, findUserId, setPassword) + `nocodbUserProvisioning.ts`
+(`provisionNocodbUser`, same shape as `provisionDocusealTeamMember`: signs
+in as the super admin NocoDB already seeds every start
+`NOCODB_ADMIN_EMAIL`/`NOCODB_ADMIN_PASSWORD`, services.ts), invites, looks
+up the new/existing user's id (the create response carries none), sets the
+password via the reset-token flow either way — so the same call path
+handles both first grant and a later password change, no DocuSeal-style
+"update has no HTTP path" fallback needed here since the reset flow always
+works. Wired into `noSsoCredentialFanout.ts`'s `PROVISIONERS` map, which is
+also what makes NocoDB show up as a grantable app in Users & Roles
+(`getGrantableAppOptions` derives its list from that map's keys, no
+separate wiring).
+
+`./scripts/check.sh backend typecheck`/`test` clean (973 passing, +9 new
+`nocodbUserProvisioning.test.ts` cases + the `noSsoCredentialFanout.test.ts`
+update for the second provisioner). `scripts/bump-version.sh minor Added …`
+→ 0.111.0 (minor, not patch — a new app gaining fan-out support, not a
+fix to the existing DocuSeal path).
+
+Not yet verified against the real stack — next section.
