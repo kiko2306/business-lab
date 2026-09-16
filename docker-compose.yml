@@ -51,6 +51,11 @@ services:
       JWT_ACCESS_EXPIRES: ${JWT_ACCESS_EXPIRES:-1h}
       JWT_REFRESH_EXPIRES: ${JWT_REFRESH_EXPIRES:-7d}
       CORS_ORIGIN: ${CORS_ORIGIN:-http://localhost:80}
+      # Same value start.sh reads to provision the dashboard's own tunnel
+      # ingress hostname (docs/first-run.md) — needed here too so invite/
+      # set-password emails (generalSettings.ts's getDashboardBaseUrl) guess
+      # the right subdomain when no explicit dashboardUrl is set in Settings.
+      DASHBOARD_SUBDOMAIN: ${DASHBOARD_SUBDOMAIN:-}
       SCRIPTS_DIR: /scripts
       APPS_DIR: ${APPS_DIR:?APPS_DIR must be set to an absolute path in .env}
       REPO_ROOT: ${REPO_ROOT:?REPO_ROOT must be set to an absolute path in .env}

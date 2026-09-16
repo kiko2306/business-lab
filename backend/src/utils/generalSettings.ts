@@ -16,6 +16,14 @@ export const DEFAULT_UPDATE_BRANCH = 'main';
 // pins a different value. Changeable from Settings in the dashboard.
 export const DEFAULT_TIMEZONE = 'Europe/Lisbon';
 
+// Must match start.sh's own DASH_SUB default — that's the subdomain it
+// actually provisions in the tunnel ingress for the dashboard's own
+// hostname (docs/first-run.md). Used only as a fallback guess below; an
+// operator who set DASHBOARD_SUBDOMAIN to something else in the root .env
+// needs to also set the dashboard URL explicitly in Settings, since that
+// value lives outside any backend container's env.
+export const DEFAULT_DASHBOARD_SUBDOMAIN = 'businesslab';
+
 /** True for an IANA zone name Node recognises (e.g. "Europe/Lisbon", "UTC"). */
 export function isValidTimezone(tz: unknown): tz is string {
   if (typeof tz !== 'string' || !tz.trim()) {
@@ -111,9 +119,11 @@ export async function setDashboardUrl(url: string): Promise<void> {
 
 /**
  * Base URL for links the dashboard emails (invite / set-password, plan.md
- * §158): the operator-set value if present, otherwise a `dashboard.<domain>`
- * guess from the exposure base domain, otherwise null — the caller refuses to
- * send a link it can't build.
+ * §158): the operator-set value if present, otherwise a guess built from the
+ * exposure base domain plus the dashboard's own subdomain (DASHBOARD_SUBDOMAIN
+ * in the root .env, passed through in docker-compose.yml — same value
+ * start.sh provisions in the tunnel ingress), otherwise null — the caller
+ * refuses to send a link it can't build.
  */
 export async function getDashboardBaseUrl(): Promise<string | null> {
   const stored = await getStoredDashboardUrl();
@@ -122,7 +132,8 @@ export async function getDashboardBaseUrl(): Promise<string | null> {
   }
   const exposure = await getExposureConfig();
   if (exposure?.baseDomain) {
-    return `https://dashboard.${exposure.baseDomain}`;
+    const subdomain = process.env.DASHBOARD_SUBDOMAIN?.trim() || DEFAULT_DASHBOARD_SUBDOMAIN;
+    return `https://${subdomain}.${exposure.baseDomain}`;
   }
   return null;
 }

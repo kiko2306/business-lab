@@ -28731,3 +28731,48 @@ rendered text). Same live-screenshot limitation as §452/§455 (no
 dashboard login to view the real page). Deployed to `beta` only — merging
 to `main` is now on request, not automatic once verified (user, this
 session).
+
+## 457. Set-password invite links guessed the wrong subdomain
+
+User: a newly created user's invite email arrived, but the link
+(`https://dashboard.tx-home-utils.com/set-password?token=...`) failed with
+`ERR_NAME_NOT_RESOLVED`.
+
+Root cause: `getDashboardBaseUrl()` (`generalSettings.ts`) only has a real
+URL to send when the operator has set one explicitly in Settings; absent
+that, it guesses one from the exposure base domain. The guess was hardcoded
+to `dashboard.<domain>` — but that hostname is never provisioned anywhere.
+The dashboard's own public hostname is set up by `start.sh` itself
+(`docs/first-run.md` — the tunnel routes straight to the frontend port,
+bypassing NPM, since the dashboard can't depend on NPM to reach the tool
+that repairs NPM), using `DASHBOARD_SUBDOMAIN` from the root `.env`,
+defaulting to `businesslab`. `dashboard.tx-home-utils.com` has no DNS
+record at all; `businesslab.tx-home-utils.com` does (confirmed via
+`getent hosts`) — the guess and the actual provisioned hostname had just
+drifted apart.
+
+Fix: `DASHBOARD_SUBDOMAIN` is now passed through to the backend container
+in `docker-compose.yml` (previously only `start.sh` on the host read it, to
+build the tunnel ingress rule — the backend had no access to it at all).
+`getDashboardBaseUrl()`'s guess reads `process.env.DASHBOARD_SUBDOMAIN`,
+falling back to `businesslab` (a new `DEFAULT_DASHBOARD_SUBDOMAIN`
+constant) to match `start.sh`'s own default — so the guess now tracks
+whatever the operator actually configured, not a second, independent
+literal that only matched by accident.
+
+Not fixed by this change: the invite already sent on the live host still
+has the broken link (the user's email, the DB row, the token are all
+already there with the old guess baked into history — nothing to do with
+the code path, since the link is generated once at send time). Once this
+deploys, resending the invitation (`POST
+/api/users/:id/invitation/resend`) will mint a fresh link using the
+corrected guess.
+
+Verified: `./scripts/check.sh backend typecheck`/`test` (924, unchanged —
+`getDashboardBaseUrl` reads `process.env` directly, same
+untested-without-a-running-stack convention as the rest of this file's DB
+reads). Not yet deployed/proven live — no Docker/exposure/networking
+change beyond adding one pass-through env var, but per CLAUDE.md this
+still needs proving against the real stack (SSH deploy) before it counts
+as done, since it touches how the dashboard's own hostname is resolved.
+0.104.4.

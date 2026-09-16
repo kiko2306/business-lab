@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.104.4] — 2026-09-16
+
+### Fixed
+
+- Invite/set-password email links guessed the wrong dashboard subdomain (`dashboard.<domain>`, unprovisioned) instead of the one start.sh actually publishes (`businesslab.<domain>` by default, or `DASHBOARD_SUBDOMAIN`)
+
 ## [0.104.3] — 2026-09-16
 
 ### Frontend
