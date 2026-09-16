@@ -30317,3 +30317,67 @@ host to the state this section found it in.
 §480/§491's ITFlow fan-out is proven end to end. README's ITFlow item
 deleted. `beta` → `main`: left unmerged per [[main-merge-requires-request]]
 — ready whenever asked for.
+
+## 494. §493 verified live — both directions proven through the real HTTP routes
+
+Deployed to `home-srv-01` (`beta` fast-forwarded, backend rebuilt, `GET
+/version` confirmed). Confirmed the schema migration landed
+(`\d user_app_access` on the live DB shows `pending_fanout boolean not
+null default false`).
+
+**Disable, each app independently**, created a throwaway account then
+disabled it, verifying the *disable* call itself, decoupled from whichever
+app's admin-session plumbing happened to be healthy that day:
+
+- **NocoDB**: `provisionNocodbUser` → `disableNocodbUser`. Old password
+  rejected (400 "Invalid credentials") afterward — account exists, locked.
+- **ITFlow**: `provisionItflowUser` → `disableItflowUser`. Login 401s
+  "Incorrect username or password" — traced this to `login.php`'s own
+  agent-lookup query filtering `AND user_status = 1`, so a disabled row
+  never even reaches the password check; the generic message is
+  deliberate, not a bug.
+- **DocuSeal**: found live that the tracked `DOCUSEAL_ADMIN_PASSWORD`
+  no longer signs in against the real account at all (422) — pre-existing
+  drift, unrelated to this change (`docusealAdminBootstrap.ts` only ever
+  re-syncs the admin's *email* on a mismatch, never its password; ITFlow
+  got that exact fix in §382, DocuSeal never did — now a README item).
+  Since `archiveDocusealUser` goes through `rails runner` directly and
+  needs no admin session at all, this didn't block verifying it: created a
+  throwaway user the same way, archived it, and — because a failed Devise
+  login *also* 302s (back to `/sign_in`, with a flash error, indistinguishable
+  from a real login at the HTTP-status level) — confirmed the lock for
+  real by probing a genuinely gated page (`/settings/users`) with the
+  resulting cookie: redirected to `/sign_in`, not served. `docusealClient.ts`'s
+  own `isRedirect()`-only success check has this same blind spot for a
+  *negative* case, but nothing in this codebase currently relies on
+  telling "wrong password" apart from "right password, locked account" —
+  worth knowing about, not worth changing today.
+
+**Grant and revoke, end to end, through the real routes** — not scripted
+shortcuts: inserted a throwaway dashboard user with a known password
+directly (bypassing the invite flow, to start from "already has a
+password" — the exact precondition this feature targets), called
+`setUserAppAccess(id, ['nocodb'], { markAddedPending: true })` the same
+way `PUT /:id/access` does, confirmed `pending_fanout` was set, then:
+
+1. `POST /api/auth/login` with that real password (curl, the actual
+   route) → `pending_fanout` cleared, and NocoDB now has a real, working
+   account signing in with that same password. The opportunistic fan-out
+   fired for real off a genuine login request, not a direct function call.
+2. Minted a short-lived admin-scoped JWT for the throwaway account
+   (`signAccessToken`, plus a real `admin` role row — the route re-derives
+   capabilities from the DB, a JWT claiming `roles: ['admin']` alone 403's)
+   and called the real `PUT /api/users/:id/access` with `appAccess: []` →
+   the NocoDB account was locked (400 "Invalid credentials" on the old
+   password) as a direct result of that one HTTP call.
+
+Cleaned up throughout: the throwaway NocoDB/ITFlow/DocuSeal accounts and
+the throwaway dashboard user all deleted; ITFlow's containers stopped
+again, restoring it to the state §491/§492 found it in. Confirmed the real
+three dashboard accounts (`mat`, `miguel`, `frias`) untouched.
+
+§493 is proven end to end, both directions. Added a README item for the
+DocuSeal admin-password drift found along the way (real bug, but a
+different one from §493's — deliberately not fixed in passing). `beta` →
+`main`: left unmerged per [[main-merge-requires-request]] — ready
+whenever asked for.

@@ -223,6 +223,14 @@ it is done — not ticked off and left behind. Section references point at
       repo's config. Check that issue periodically; delete this item once it's
       closed upstream (or once an app update fixes it for us, whichever comes
       first).
+- [ ] **DocuSeal's tracked admin password no longer signs in** (found live,
+      §494) — `docusealAdminBootstrap.ts` re-syncs the admin's *email* on a
+      mismatch (`syncAdminEmail`) but has no equivalent for the password;
+      ITFlow got that exact fix in §382 (`reconcileAdminPassword`), DocuSeal
+      never did. Until fixed, `provisionDocusealTeamMember`'s admin-sign-in
+      step fails for every new/changed DocuSeal team member (the disable/
+      archive path is unaffected — it doesn't need a session). Build a
+      DocuSeal `reconcileAdminPassword` the same shape as ITFlow's.
 
 ### Credential fan-out to no-SSO apps (§480)
 
