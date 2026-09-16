@@ -356,8 +356,8 @@ export interface ServiceStatusPayload {
   dependsOn?: string[];
   requires?: string[];
   // Image refs (`repo:tag@sha256:…`) the last self-update (§209) pinned into
-  // the app's managed docker-compose.override.yml. Non-empty = frozen on
-  // that build until the operator clears it with "Unpin".
+  // the app's managed docker-compose.override.yml — what's actually
+  // installed, surfaced on the card as a version-info badge.
   pinnedImages?: string[];
   // Non-`latest` tags baked into the app's own docker-compose.yml (compat
   // pin, e.g. Guacamole/guacd matching versions) — informational, no action.
@@ -374,6 +374,11 @@ export interface ServiceStatusPayload {
   // set — e.g. NPM's admin :81, not its proxy :80), while running. Lets the
   // dashboard offer a LAN link even when the app isn't publicly exposed.
   webPort?: number | null;
+  // Registry-declared exposure ceiling (services.ts) — never on the public
+  // tunnel regardless of getExposability(). Lets the card label a LAN/overlay
+  // link with why it isn't a public one.
+  lanOnly?: boolean;
+  overlayOnly?: boolean;
 }
 
 export interface ServiceStatusSummary {

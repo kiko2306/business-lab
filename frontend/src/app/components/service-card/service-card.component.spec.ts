@@ -281,3 +281,63 @@ describe('ServiceCardComponent installedVersion', () => {
     expect(Array.from(root.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Unpin')).toBe(false);
   });
 });
+
+describe('ServiceCardComponent lanAccessUrl', () => {
+  let fixture: ComponentFixture<ServiceCardComponent>;
+  let component: ServiceCardComponent;
+
+  beforeEach(async () => {
+    await TestBed.configureTestingModule({
+      imports: [ServiceCardComponent],
+      providers: [
+        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
+        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
+        { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
+      ],
+    }).compileComponents();
+
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    component = fixture.componentInstance;
+  });
+
+  it('builds a LAN URL from this dashboard\'s own hostname and the app\'s published port', () => {
+    component.service = service('clamav', 'running', { lanOnly: true, webPort: 10450 });
+    expect(component['lanAccessUrl']()).toBe(`http://${window.location.hostname}:10450`);
+  });
+
+  it('is null when the app has no published port (not running)', () => {
+    component.service = service('clamav', 'stopped', { lanOnly: true, webPort: null });
+    expect(component['lanAccessUrl']()).toBeNull();
+  });
+
+  it('renders a lanOnly link, tagged, when the app is LAN-only', () => {
+    component.service = service('clamav', 'running', { lanOnly: true, webPort: 10450 });
+    component.allServices = [component.service];
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('a.badge') as HTMLAnchorElement | null;
+    expect(link?.textContent?.trim()).toBe('lanOnly');
+    expect(link?.getAttribute('href')).toBe(`http://${window.location.hostname}:10450`);
+  });
+
+  it('renders an overlayOnly link, tagged, when the app is overlay-only', () => {
+    component.service = service('guacamole', 'running', { overlayOnly: true, webPort: 10240 });
+    component.allServices = [component.service];
+    fixture.detectChanges();
+
+    const link = fixture.nativeElement.querySelector('a.badge') as HTMLAnchorElement | null;
+    expect(link?.textContent?.trim()).toBe('overlayOnly');
+  });
+
+  it('does not render the LAN/overlay link when the app is publicly exposed instead', () => {
+    component.service = service('nextcloud', 'running', { exposedHostname: 'nextcloud.example.com' });
+    component.allServices = [component.service];
+    fixture.detectChanges();
+
+    const badges = Array.from(fixture.nativeElement.querySelectorAll('a.badge')) as HTMLAnchorElement[];
+    expect(badges.some((b) => b.textContent?.trim() === 'lanOnly' || b.textContent?.trim() === 'overlayOnly')).toBe(
+      false
+    );
+  });
+});

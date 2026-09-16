@@ -28608,3 +28608,31 @@ template via `fixture.detectChanges()` and confirms the ⓥ badge's title
 and the absence of the old badges/button in the DOM — the strongest check
 available without live dashboard credentials to screenshot the real page).
 0.103.0 (minor — removes a user-facing action).
+
+## 453. LAN/overlay access link on the service card, tagged lanOnly or overlayOnly
+
+User: same access-link pattern as the exposed apps' badge, for apps that
+never get one — tag it `lanOnly` or `overlayOnly` per app, leave the exposed
+badge untouched.
+
+`lanOnly`/`overlayOnly` (`services.ts`) were registry-only until now — never
+threaded through `getServiceStatus` to the frontend. Added both to
+`ServiceStatusPayload` (`status.ts`, `types/index.ts`) as a plain passthrough
+of the registry value, and to the frontend `ServiceStatus` model.
+
+`service-card.component.ts` gains `lanAccessUrl()` — the same
+`http://<dashboard's own hostname>:<webPort>` pair `apps.component.ts`'s
+`buildRunningAppUrl` already builds for the "running apps" table's LAN link,
+for the same reason: a browser on the LAN or the overlay VPN reaches this
+host the same way regardless of which network got it there. Template adds
+one `*ngIf="!service.exposedHostname && (lanOnly || overlayOnly) && webPort"`
+link right after (not instead of) the existing exposed-hostname one,
+labelled `lanOnly`/`overlayOnly` rather than the hostname.
+
+Verified: `./scripts/check.sh backend typecheck`/`test` (924, unchanged —
+the two new fields are one-line passthroughs, same untested-individually
+convention as `dependsOn`/`requires` in this file) and `frontend
+test`/`build` (66/66, +5 new — DOM-rendered checks for the lanOnly tag, the
+overlayOnly tag, the URL built from `window.location.hostname` + `webPort`,
+null when not running, and that it does *not* render alongside an exposed
+hostname). 0.104.0 (minor — new user-visible capability).

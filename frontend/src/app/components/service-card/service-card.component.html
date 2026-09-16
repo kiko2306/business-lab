@@ -17,6 +17,16 @@
       >
         {{ service.exposedHostname }}{{ service.webPath }}
       </a>
+      <a
+        *ngIf="!service.exposedHostname && (service.lanOnly || service.overlayOnly) && lanAccessUrl()"
+        class="badge text-bg-secondary border text-decoration-none"
+        [href]="lanAccessUrl()"
+        target="_blank"
+        rel="noopener noreferrer"
+        [title]="'Open ' + lanAccessUrl()"
+      >
+        {{ service.lanOnly ? 'lanOnly' : 'overlayOnly' }}
+      </a>
     </div>
     <div class="service-row-sub">
       <span class="text-truncate">{{ service.description }}</span>

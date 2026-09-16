@@ -117,6 +117,10 @@ export interface ServiceStatus {
   // Published host port of the app's web UI while running — used for a LAN
   // "open" link when the app isn't publicly exposed.
   webPort?: number | null;
+  // Never on the public tunnel regardless of exposability — labels why the
+  // LAN link is the only one (lanOnly) or names the overlay VPN (overlayOnly).
+  lanOnly?: boolean;
+  overlayOnly?: boolean;
 }
 
 export interface AutheliaAdminUser {

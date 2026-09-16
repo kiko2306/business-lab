@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.104.0] — 2026-09-16
+
+### Frontend
+
+- Show a LAN/overlay access link, tagged lanOnly or overlayOnly, for apps kept off the public tunnel
+
 ## [0.103.0] — 2026-09-16
 
 ### Frontend

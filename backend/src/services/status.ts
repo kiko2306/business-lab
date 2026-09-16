@@ -300,6 +300,8 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       exposedHostname,
       webPath: service.webPath,
       webPort,
+      lanOnly: service.lanOnly,
+      overlayOnly: service.overlayOnly,
     };
   } catch (error) {
     const message = (error as Error).message;
