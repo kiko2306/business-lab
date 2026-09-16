@@ -30447,3 +30447,91 @@ what fixed the account, not a side effect of testing.
 §495 is proven end to end. README's DocuSeal item deleted. `beta` →
 `main`: left unmerged per [[main-merge-requires-request]] — ready
 whenever asked for.
+
+## 497. Kimai credential fan-out (§480) — direct DB write, no HTTP at all
+
+README item: Kimai's no-SSO fan-out, next in the §480 list after ITFlow
+(§491/493). Read Kimai 2.66's actual source live on `tx-home-utils.com`
+(`kimai-kimai-1`) rather than guessing from docs, since the right approach
+here turned out to differ from all three existing provisioners.
+
+**What's actually there.** Kimai does have a real REST API
+(`src/API/UserController.php`): `POST /api/users` creates a user with a
+plaintext `plainPassword` field, no CSRF (`UserApiCreateForm` sets
+`csrf_protection: false`), submitted as flat JSON — genuinely simple. But
+`PATCH /api/users/{id}` (`UserApiEditForm`) never re-adds `plainPassword`
+the way the create form does, so **the API can create a user but can never
+change an existing one's password**. The only place that can is the web
+`/profile/{username}/password` route (`ProfileController::passwordAction`,
+gated by the `password_other_profile` role permission a super-admin has),
+which needs a live signed-in session and a scraped CSRF token — the same
+shape ITFlow's *whole* write path needed (§491's doc comment).
+
+**Rejected: mirror ITFlow (session + CSRF scraping for everything).**
+Doable — confirmed `/login` → POST `/login_check` with `_username`/
+`_password`/`_csrf_token` is a plain Symfony `form_login`, and
+`loadUserByIdentifier` matches `username` OR `email` — but Kimai's create
+form has far more required fields than the API (language/locale/timezone
+via `include_preferences`, a `RepeatedType` password, Symfony's
+form-name-prefixed field names), and doing this for password-set alone
+while using the API for create/disable would mean building and
+maintaining *two* auth mechanisms for one app.
+
+**Rejected: hybrid (stored API token + session scrape only for
+password-set).** Kimai's API tokens are pre-created opaque records
+(`AccessToken`/`TokenAuthenticator`, `stateless: true` firewall) — there's
+no password-grant login endpoint for the API, so getting one still means
+either a session-based token-creation form (defeats the point) or a cold
+DB write to mint one directly. Once a cold DB write is on the table
+anyway, doing the *whole* thing that way is less code, not more.
+
+**What shipped: a cold PHP script through the app's own container**
+(`kimaiDb.ts`, `kimaiUserProvisioning.ts`) — no live session, no CSRF, no
+stored token. `bin/console security:hash-password -n '<pw>'
+'App\Entity\User'` (run live to confirm) came back
+`Symfony\Component\PasswordHasher\Hasher\MigratingPasswordHasher` wrapping
+a plain `$2y$13$...` bcrypt string — i.e. exactly what PHP's own
+`password_hash($pw, PASSWORD_BCRYPT, ['cost' => 13])` produces, with no
+per-session wrapping the way ITFlow's `encryptUserSpecificKey()` needs
+(§491's doc comment again — that's *why* ITFlow couldn't do this).
+`kimai2_users.roles` was confirmed live as Doctrine's legacy PHP-`serialize()`
+array type (`Types::ARRAY`), not JSON — the real admin row's `roles` column
+reads literally `a:1:{i:0;s:16:"ROLE_SUPER_ADMIN";}`. And
+`kimai2_users.password`/`.enabled`/`.email` are plain columns with no
+side effects to replicate. So the script just does
+`INSERT ... ON DUPLICATE KEY UPDATE` on the unique `email` column —
+create and password-refresh-on-regrant are the same one statement, no
+separate lookup step. `kimaiDb.ts` doesn't need ITFlow's `config.php`-require
+trick either: `DATABASE_URL` is already in the container's environment
+from the compose service's own definition, so the script just
+`parse_url()`s it directly. `disableKimaiUser` flips `enabled = 0`
+(§493's disable-not-delete shape) — Kimai's own `UserChecker` rejects a
+disabled account at login, and re-granting flips it back through the same
+upsert.
+
+Every fanned-out user gets `ROLE_USER` (`User::DEFAULT_ROLE`), not
+`ROLE_SUPER_ADMIN` — same "a working login, not a bigger grant" reasoning
+as ITFlow's Technician role. `username` is set to the email address:
+Kimai accepts either as a login identifier
+(`UserRepository::loadUserByIdentifier`), so there's no separate username
+to pick or collide on.
+
+**Found along the way, not fixed here:** the real admin row on
+`tx-home-utils.com` still has `email = 'admin@example.com'` — the
+wizard-seeded placeholder. The image's entrypoint only ever *creates* the
+admin (`kimai:user:create admin`, no-ops once the row exists — the
+`[ ! -a "$ADMINMAIL" ]` guard in `/entrypoint.sh` is effectively always
+true, a file-existence test against an email string, not what it looks
+like it's checking), so `KIMAI_ADMIN_EMAIL`/`KIMAI_ADMIN_PASSWORD`
+changing after first boot never reaches the real account. Same drift
+class as DocuSeal's §494/495, found the same way (reading the real row),
+and fixable the same way (`kimaiDb.ts` already exists to write it) — but
+it's the *admin's own* identity, not another user's row, genuinely
+outside this section's scope. Added as its own README item rather than
+fixed in passing.
+
+`./scripts/check.sh backend typecheck`/`test` clean (1030 passing, +11
+new: 4 in `kimaiDb.test.ts`, 7 in `kimaiUserProvisioning.test.ts`, plus
+`noSsoCredentialFanout.test.ts` updated for the fourth provisioner).
+`scripts/bump-version.sh minor Added …` → 0.115.0. Not yet verified
+against the real stack — next section.
