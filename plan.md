@@ -29999,3 +29999,14 @@ an existing grouping rather than inventing a new one-off dashboard category
 for a single app. `./scripts/check.sh backend typecheck`/`test` clean (960
 passing, no behavior changed, just data). `scripts/bump-version.sh patch
 Changed …` → 0.110.1.
+
+## 486. §485 verified live
+
+Deployed to `home-srv-01` (`beta` → `b201e2f`, backend rebuilt, `GET
+/version` → `0.110.1`). `apps/home-page/data/services.yaml` now groups
+DocuSeal under `Files` alongside Stirling-PDF (Samba is `lanOnly`, so it
+has no tile — expected, unrelated to this change). No docuseal container
+restart needed: `homepageConfig.ts` parses the compose file's label text
+directly rather than live container labels, so a backend restart alone
+(which calls `regenerateHomepageServices()` on boot) was enough. `beta` →
+`main`: left unmerged per [[main-merge-requires-request]].
