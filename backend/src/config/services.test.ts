@@ -725,4 +725,25 @@ describe('readableSecrets', () => {
     // in, same shape as ntfy's subscriber credentials going into a phone app.
     expect(SERVICES.webdav.readableSecrets).toEqual(['WEBDAV_PASSWORD']);
   });
+
+  // The config panel's field list comes from extractComposeEnvVars against
+  // the app's own compose file (appEnv.ts loadStatus), not from services.ts
+  // directly — a readableSecrets key the compose file never references as
+  // `${VAR}` is declared but invisible, exactly the webdav bug found live
+  // (§470): the panel showed nothing to read, despite the value being
+  // generated correctly underneath. Same trick as ntfy's
+  // NTFY_SUBSCRIBE_TOKEN/PASSWORD fixes it — pass the key through as a
+  // compose `environment:` entry even if the app itself never reads it.
+  it('every readable secret is referenced in its own compose file, so the panel can show it', () => {
+    for (const service of Object.values(SERVICES)) {
+      if (!service.readableSecrets?.length) continue;
+      const text = composeText(service.composePath);
+      const referenced = new Set(extractComposeEnvVars(text).map((v) => v.key));
+      for (const key of service.readableSecrets) {
+        expect(referenced.has(key), `${service.name}: ${key} is readableSecrets but not in its compose file`).toBe(
+          true
+        );
+      }
+    }
+  });
 });

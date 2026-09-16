@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.106.1] — 2026-09-16
+
+### Fixed
+
+- WebDAV username/password now show in the config panel (were generated correctly but invisible — not referenced in the compose file)
+
 ## [0.106.0] — 2026-09-16
 
 ### Added

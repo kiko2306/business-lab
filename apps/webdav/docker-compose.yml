@@ -18,6 +18,13 @@ services:
       - "${WEBDAV_PORT:-10590}:6065"
     environment:
       TZ: ${TZ:-UTC}
+      # NOT read by the binary — its config is data/config.yml, rendered by
+      # webdavConfig.ts from these same .env values. This is only a carrier so
+      # the dashboard's config panel discovers and shows the fields (it builds
+      # its field list from ${VAR} references in this file, same trick ntfy's
+      # NTFY_SUBSCRIBE_TOKEN/PASSWORD already use).
+      WEBDAV_USERNAME: ${WEBDAV_USERNAME:-admin}
+      WEBDAV_PASSWORD: ${WEBDAV_PASSWORD:-}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=WebDAV"
