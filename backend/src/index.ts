@@ -60,6 +60,19 @@ const streamLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many stream requests, please try again later' },
 });
+// The shell header polls /health/system every 5s on every page (§455/§456) —
+// 12 req/min just from that, continuously, for as long as a tab is open. On
+// the shared apiLimiter (200/15min, ~13/min average) that alone crowded out
+// real requests (creating a user, loading the Users page) with 429s. Same
+// fix as the SSE/log streams above: split continuous, expected polling onto
+// its own generous budget instead of sharing one with occasional mutations.
+const healthLimiter = rateLimit({
+  windowMs: 60 * 1000,
+  max: 120,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { error: 'Too many requests, please try again later' },
+});
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -188,8 +201,9 @@ for (const prefix of ROUTE_PREFIXES) {
   app.use(`${prefix}/self-update`, ...protectedGate(), requireCapability('system:update'), selfUpdateRouter);
   app.use(`${prefix}/social`, ...protectedGate(), requireCapability('settings:manage'), socialRouter);
   // Mounted after the public liveness probe above, so GET /health stays public
-  // while GET /health/system and /health/thresholds remain protected.
-  app.use(`${prefix}/health`, ...protectedGate(), healthRouter);
+  // while GET /health/system and /health/thresholds remain protected. Its own
+  // limiter, not apiLimiter — see healthLimiter above.
+  app.use(`${prefix}/health`, healthLimiter, setupModeMiddleware(false), authMiddleware, healthRouter);
 }
 
 // Global error handler

@@ -28800,3 +28800,44 @@ one-click check the user can do next time they create a user.
 
 Left on `beta`, unmerged to `main` per [[main-merge-requires-request]] —
 merge on request only.
+
+## 459. Header health poll starved the rest of the API of its rate-limit budget
+
+User: after creating a user on the Users & roles page, the dashboard filled
+with stacked "Too many requests, please try again later" toasts.
+
+Root cause: today's earlier change (§455/§456, commit `c676897`) sped up the
+shell header's resource strip (`resource-strip.component.ts`) from a 30s
+poll to 5s — 12 requests/min to `GET /health/system`, continuously, on every
+page, for as long as any tab is open. That endpoint shared `apiLimiter`
+(200 requests/15min, ~13/min average) with every other authenticated route.
+12/min from one always-on background poll alone left almost nothing for
+actual use — loading the Users page (3 GETs on init) or creating a user
+tipped it over, after which *every* request from that IP 429'd, and the
+global `apiErrorInterceptor` toasts on every failed request with no dedupe,
+so the stacked errors in the report are one toast per poll tick.
+
+`backend/src/routes/health.ts` still had a stale comment claiming "the
+header strip polls every ~30s" — left over from before `c676897`, itself a
+small sign the cadence change's consequences weren't traced through.
+
+Fix: gave `/health` its own limiter (`healthLimiter`, 120/min) instead of
+sharing `apiLimiter`, the same pattern already used for the SSE stream and
+startup-log endpoints (`streamLimiter`) — continuous, expected polling
+shouldn't compete with occasional mutations for the same budget. Left the
+5s cadence itself alone (a deliberate, already-approved design choice, not
+the bug); fixed the stale "~30s" comment in `health.ts` to say 5s.
+
+Considered and rejected: reverting the poll back to 30s — undoes a decision
+made earlier the same session for unrelated reasons (matching gethomepage's
+widget), and doesn't fix the general problem that a shared budget lets any
+one continuous poller starve real traffic. Also considered: raising
+`apiLimiter`'s ceiling — doesn't fix the shared-budget problem, just delays
+it, and dilutes what `apiLimiter` is actually meant to catch (abuse of
+mutation-adjacent traffic).
+
+Verified: `./scripts/check.sh backend typecheck`/`test` (924, unchanged —
+no test exercised the rate-limit wiring itself). Not yet deployed — this
+touches request handling but not Docker/exposure/networking, so no live
+SSH verification is required by CLAUDE.md's gate, but it hasn't been proven
+live either; flag that if asked to call this "done" beyond `dev`. 0.104.5.

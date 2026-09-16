@@ -33,7 +33,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 
 /**
  * Percent of CPU time spent non-idle. When reads are spaced out (the header
- * strip polls every ~30s) this is the average over that gap, computed for
+ * strip polls every ~5s) this is the average over that gap, computed for
  * free from the running tick counters. When called again too soon — or for
  * the first time after boot — it takes a fresh 150ms sample instead so a
  * near-zero interval can't produce a garbage number.
