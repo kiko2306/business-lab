@@ -41,8 +41,10 @@ interface EnsureProxyHostOptions {
   grpc: boolean;
   // Only used when autheliaProtected — where the 403 redirect below sends a
   // locked-out user. Always passed through regardless, so callers don't need
-  // to know which branch cares.
-  baseDomain: string;
+  // to know which branch cares. The dashboard's own base URL (e.g.
+  // https://businesslab.example.com), NOT the bare exposure base domain —
+  // that's the Home Page's hostname (plan.md §111), a different app.
+  dashboardUrl: string;
 }
 
 // Gates a proxy host behind Authelia's forward-auth — see the snippet files
@@ -62,7 +64,7 @@ interface EnsureProxyHostOptions {
 // dashboard's own themed "access denied" page instead, carrying the denied
 // hostname so that page (and the request-access email it sends) know what
 // was asked for.
-function buildAutheliaAdvancedConfig(baseDomain: string): string {
+function buildAutheliaAdvancedConfig(dashboardUrl: string): string {
   return [
     'include /snippets/authelia-location.conf;',
     '',
@@ -79,7 +81,7 @@ function buildAutheliaAdvancedConfig(baseDomain: string): string {
     '}',
     '',
     'location @access_denied {',
-    `    return 302 https://${baseDomain}/access-denied?host=$host;`,
+    `    return 302 ${dashboardUrl}/access-denied?host=$host;`,
     '}',
   ].join('\n');
 }
@@ -159,13 +161,13 @@ function computeAdvancedConfig(opts: {
   forwardHost: string;
   forwardPort: number;
   websocket: boolean;
-  baseDomain: string;
+  dashboardUrl: string;
 }): string {
   if (opts.grpc) {
     return buildGrpcAdvancedConfig(opts.forwardHost, opts.forwardPort);
   }
   if (opts.autheliaProtected) {
-    return buildAutheliaAdvancedConfig(opts.baseDomain);
+    return buildAutheliaAdvancedConfig(opts.dashboardUrl);
   }
   return buildPlainAdvancedConfig(opts.websocket);
 }
@@ -443,7 +445,7 @@ export async function bootstrapNpmAdminIfDefault(npmApiUrl: string): Promise<{ e
 
 type ProxyHostWriteOptions = Pick<
   EnsureProxyHostOptions,
-  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc' | 'baseDomain'
+  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc' | 'dashboardUrl'
 > & {
   // Only set (non-zero) for grpc hosts — see ensureGrpcCertificate. Cloudflare
   // requires the origin to terminate real TLS+HTTP2/ALPN for gRPC to work at
@@ -459,7 +461,7 @@ export function buildProxyHostPayload({
   websocket,
   autheliaProtected,
   grpc,
-  baseDomain,
+  dashboardUrl,
   certificateId,
 }: ProxyHostWriteOptions) {
   return {
@@ -481,7 +483,7 @@ export function buildProxyHostPayload({
     http2_support: grpc ? true : false,
     hsts_enabled: false,
     hsts_subdomains: false,
-    advanced_config: computeAdvancedConfig({ autheliaProtected, grpc, forwardHost, forwardPort, websocket, baseDomain }),
+    advanced_config: computeAdvancedConfig({ autheliaProtected, grpc, forwardHost, forwardPort, websocket, dashboardUrl }),
   };
 }
 
@@ -563,7 +565,7 @@ export async function ensureProxyHost({
   websocket,
   autheliaProtected,
   grpc,
-  baseDomain,
+  dashboardUrl,
 }: EnsureProxyHostOptions): Promise<EnsureProxyHostResult> {
   const baseUrl = npmApiUrl.replace(/\/+$/, '');
   const token = await login(baseUrl, npmEmail, npmPassword);
@@ -578,7 +580,7 @@ export async function ensureProxyHost({
     websocket,
     autheliaProtected,
     grpc,
-    baseDomain,
+    dashboardUrl,
     certificateId,
   };
 
@@ -617,7 +619,7 @@ export async function ensureProxyHost({
     forwardHost,
     forwardPort,
     websocket,
-    baseDomain,
+    dashboardUrl,
   });
   const needsUpdate =
     existing.forward_scheme !== forwardScheme ||

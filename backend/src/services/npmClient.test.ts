@@ -19,7 +19,7 @@ const baseOptions = {
   websocket: true,
   autheliaProtected: false,
   grpc: false,
-  baseDomain: 'example.com',
+  dashboardUrl: 'https://businesslab.example.com',
 };
 
 function mockLogin() {
@@ -40,7 +40,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: false,
-      baseDomain: 'example.com',
+      dashboardUrl: 'https://businesslab.example.com',
       certificateId: 0,
     });
 
@@ -74,7 +74,7 @@ describe('buildProxyHostPayload', () => {
       websocket: false,
       autheliaProtected: false,
       grpc: false,
-      baseDomain: 'example.com',
+      dashboardUrl: 'https://businesslab.example.com',
       certificateId: 0,
     });
 
@@ -92,7 +92,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: false,
-      baseDomain: 'example.com',
+      dashboardUrl: 'https://businesslab.example.com',
       certificateId: 0,
     });
 
@@ -109,7 +109,7 @@ describe('buildProxyHostPayload', () => {
       websocket: undefined as unknown as boolean,
       autheliaProtected: false,
       grpc: false,
-      baseDomain: 'example.com',
+      dashboardUrl: 'https://businesslab.example.com',
       certificateId: 0,
     });
     expect(payload.allow_websocket_upgrade).toBe(false);
@@ -125,7 +125,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: true,
       grpc: false,
-      baseDomain: 'example.com',
+      dashboardUrl: 'https://businesslab.example.com',
       certificateId: 0,
     });
 
@@ -142,12 +142,12 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: true,
       grpc: false,
-      baseDomain: 'example.com',
+      dashboardUrl: 'https://businesslab.example.com',
       certificateId: 0,
     });
 
     expect(payload.advanced_config).toContain('error_page 403 = @access_denied;');
-    expect(payload.advanced_config).toContain('return 302 https://example.com/access-denied?host=$host;');
+    expect(payload.advanced_config).toContain('return 302 https://businesslab.example.com/access-denied?host=$host;');
   });
 
   it('forces allow_websocket_upgrade off when protected, even if requested on', () => {
@@ -162,7 +162,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: true,
       grpc: false,
-      baseDomain: 'example.com',
+      dashboardUrl: 'https://businesslab.example.com',
       certificateId: 0,
     });
 
@@ -178,7 +178,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: true,
-      baseDomain: 'example.com',
+      dashboardUrl: 'https://businesslab.example.com',
       certificateId: 42,
     });
 
@@ -203,7 +203,7 @@ describe('buildProxyHostPayload', () => {
       websocket: true,
       autheliaProtected: false,
       grpc: false,
-      baseDomain: 'example.com',
+      dashboardUrl: 'https://businesslab.example.com',
       certificateId: 42,
     });
 

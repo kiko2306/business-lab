@@ -21,6 +21,7 @@ import path from 'path';
 import { parseEnvFile } from '../utils/envFile';
 import { query } from '../utils/database';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig, getNpmApiUrl } from '../utils/exposureSettings';
+import { getDashboardBaseUrl } from '../utils/generalSettings';
 import { getHostGatewayIp } from '../utils/network';
 import { SERVICES, buildExposureHostname, getPublishedUpstreamPort, getService, isAutheliaProtectionRequired } from '../config/services';
 import { bootstrapNpmAdminIfDefault, deleteProxyHost, ensureProxyHost, NpmProxyHostPartialCreateError } from './npmClient';
@@ -417,6 +418,13 @@ async function provisionHostname({
   const upstreamHost = await getHostGatewayIp();
   await recordUpstreamConfig(exposureKey, upstreamHost, upstreamPort);
 
+  // Where an Authelia 403 (group-denied) redirects to — the dashboard's own
+  // hostname, NOT the bare exposure base domain (that's the Home Page's
+  // hostname, a different app — plan.md §111/§457). getDashboardBaseUrl()
+  // always resolves once exposure's baseDomain is set (which it is here),
+  // falling back to the bare domain only in the pathological case it doesn't.
+  const dashboardUrl = (await getDashboardBaseUrl()) ?? `https://${globalConfig.baseDomain}`;
+
   try {
     const npmResult = await ensureProxyHost({
       npmApiUrl: globalConfig.npmApiUrl,
@@ -430,7 +438,7 @@ async function provisionHostname({
       websocket: ALLOW_WEBSOCKET_UPGRADE,
       autheliaProtected,
       grpc,
-      baseDomain: globalConfig.baseDomain,
+      dashboardUrl,
     });
 
     // Persist ownership before the Cloudflare call so a later retry can safely
