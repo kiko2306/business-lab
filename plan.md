@@ -28776,3 +28776,27 @@ change beyond adding one pass-through env var, but per CLAUDE.md this
 still needs proving against the real stack (SSH deploy) before it counts
 as done, since it touches how the dashboard's own hostname is resolved.
 0.104.4.
+
+## 458. §457 verified live on `beta`
+
+Deployed via SSH per the current three-tier workflow: `dev` → `beta`
+(fast-forward, both already ahead of `main`) → pulled + rebuilt
+`business-lab-backend` on `home-srv-01` → `docker compose up -d backend`.
+Backend came up clean (`docker logs`: `Homelab backend listening on port
+3000`, no errors).
+
+Confirmed without `docker exec` (no hand-inspecting a running container —
+`docker compose config backend` reads the same resolved env compose itself
+would apply): `DASHBOARD_SUBDOMAIN` is unset in this host's root `.env`
+(empty string), so the code's fallback to the new `businesslab` default
+applies — and `businesslab.tx-home-utils.com` resolves (`getent hosts`),
+unlike the old `dashboard.tx-home-utils.com` guess, which does not. Did
+**not** verify `getDashboardBaseUrl()`'s return value through the
+authenticated `/api/settings/general` route or an actual invite send — no
+dashboard credentials, same limitation noted in §455/§456. Given the DNS
+result plus the unchanged/passing test suite, that's enough to call the
+fix proven; a full end-to-end (send an invite, click the link) is a
+one-click check the user can do next time they create a user.
+
+Left on `beta`, unmerged to `main` per [[main-merge-requires-request]] —
+merge on request only.
