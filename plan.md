@@ -29124,3 +29124,33 @@ email sent with subject "Access request: Paperless
 just the mocked test.
 
 `beta` → `main`: left unmerged per [[main-merge-requires-request]].
+
+## 467. Investigated auto-filling the access-denied email field from Authelia — skipped
+
+Asked whether the request-access email field (§463) could auto-fill from
+Authelia's own knowledge of who was denied. Checked Authelia's actual source
+(v4.39.24, this stack's running version, via `gh api`/`gh search code` against
+`authelia/authelia`): `Remote-User`/`Remote-Email`/`Remote-Groups` are set in
+exactly one place, `handleAuthzAuthorizedStandard`
+(`internal/handlers/handler_authz_common.go`), which only runs on the
+`AuthzResultAuthorized` (200) branch of `Authz.Handler`
+(`internal/handlers/handler_authz.go`). The `AuthzResultForbidden` branch
+calls only `ctx.ReplyForbidden()` — no headers set. So the nginx
+`auth_request_set $email ...` machinery §463 already relies on for the
+authorized case has nothing to read on a 403; there is no denied-user
+identity to capture at the point the redirect fires.
+
+The one workaround that would actually work: the dashboard backend calling
+Authelia's own forward-auth endpoint (`/api/authz/auth-request`) itself,
+server-side, against a bypass'd URL (e.g. `https://authelia.<domain>/`) with
+the visitor's forwarded session cookie — that only requires being logged
+into Authelia at all, not authorized for the denied app, and returns the
+real, unredacted email in a 200 response's headers. (Ruled out Authelia's
+other identity endpoint, `/api/user/info` — its `emails` are redacted,
+`j***n@example.com`, useless for a field whose value gets sent as-is.)
+
+Rejected: real new surface (a public endpoint forwarding the visitor's
+Authelia session cookie server-side, a raw header-reading HTTP call — the
+existing `httpJson.ts` helper only reads JSON bodies, not headers) for a
+convenience that saves typing one's own email once. User's call, given the
+tradeoff: skip it. The manual field from §463 stays as-is.
