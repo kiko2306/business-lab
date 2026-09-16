@@ -85,10 +85,6 @@ export interface ServicePortMapping {
 // batch step of a Business Lab self-update, never independently per app.
 export type ServiceAction = 'start' | 'stop';
 
-// The above, plus "unpin" — a loading-indicator tag for the Unpin button,
-// which posts to its own endpoint rather than `/services/:name/:action`.
-export type ServiceOperation = ServiceAction | 'unpin';
-
 export interface ServiceStatus {
   name: string;
   label: string;
@@ -107,11 +103,11 @@ export interface ServiceStatus {
   // state and warned about, never blocking.
   requires?: string[];
   // Image refs the last self-update (§209) pinned into the app's managed
-  // docker-compose.override.yml (`repo:tag@sha256:…`). Non-empty means the app
-  // is frozen on that build until "Unpin".
+  // docker-compose.override.yml (`repo:tag@sha256:…`) — what's actually
+  // installed. Surfaced on the card as a single version-info badge.
   pinnedImages?: string[];
   // Non-`latest` tags baked into the app's own compose file (e.g. Guacamole
-  // must match guacd's version) — informational badge, nothing to unpin.
+  // must match guacd's version) — falls back to this when nothing's pinned.
   versionPinned?: string[];
   ports?: ServicePortMapping[];
   exposedHostname?: string | null;

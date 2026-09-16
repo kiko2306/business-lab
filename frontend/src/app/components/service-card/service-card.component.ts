@@ -21,11 +21,9 @@ import {
   ServiceEnvField,
   ServiceEnvStatus,
   ServiceAction,
-  ServiceOperation,
   ServiceStatus,
   StartupActionEvent,
 } from '../../core/models';
-import { AuthService } from '../../core/auth.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
@@ -57,16 +55,9 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly confirm = inject(ConfirmService);
   private readonly zone = inject(NgZone);
 
-  // Unpin is webmaster-only (backend requireWebmaster mirrors this) — it can
-  // silently trigger an unvetted image pull on the next recreate, outside
-  // the self-update batch's own review, so it's not just apps:control like
-  // start/stop/restart. Computed once; a role change takes a fresh login to
-  // show up here, same as every other capability-gated element.
-  protected readonly isWebmaster = inject(AuthService).isWebmaster();
-
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
-  @Input() loadingAction: ServiceOperation | null = null;
+  @Input() loadingAction: ServiceAction | null = null;
 
   @Output() actionRequested = new EventEmitter<ServiceAction>();
 
@@ -112,39 +103,19 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   @ViewChild('startupLogBody') private startupLogBody?: ElementRef<HTMLElement>;
 
-  /** The last self-update (§209) pinned this app to a specific image digest. */
-  protected pinned(): boolean {
-    return (this.service.pinnedImages?.length ?? 0) > 0;
-  }
-
-  protected pinnedTitle(): string {
-    return `Pinned to ${(this.service.pinnedImages ?? []).join(', ')} — Unpin to follow the compose-file tags again`;
-  }
-
-  /** The app's own compose file hardcodes a version (compat), not a self-update pin. */
-  protected versionPinned(): boolean {
-    return (this.service.versionPinned?.length ?? 0) > 0;
-  }
-
-  protected versionPinnedTitle(): string {
-    return `Version pinned to ${(this.service.versionPinned ?? []).join(', ')} — set in this app's own compose file`;
-  }
-
-  async unpin(): Promise<void> {
-    const confirmed = await this.confirm.ask({
-      title: `Unpin ${this.service.label}`,
-      message:
-        `Unpin ${this.service.label}? On its next restart it'll float to whatever ` +
-        `image its compose tag currently resolves to — not the version the last ` +
-        `update verified. Only use this to recover from a bad or stale pin; wait ` +
-        `for the next scheduled update otherwise.`,
-      confirmText: 'Unpin',
-      danger: true,
-    });
-    if (!confirmed) {
-      return;
+  /**
+   * What's actually installed: the last self-update's pinned image ref
+   * (exact digest) when there is one, else the version baked into the app's
+   * own compose file, else just "latest" (never pulled by a self-update).
+   */
+  protected installedVersion(): string {
+    if (this.service.pinnedImages?.length) {
+      return this.service.pinnedImages.join(', ');
     }
-    this.serviceState.unpinService(this.service.name);
+    if (this.service.versionPinned?.length) {
+      return this.service.versionPinned.join(', ');
+    }
+    return 'latest';
   }
 
   requestAction(action: ServiceAction): void {

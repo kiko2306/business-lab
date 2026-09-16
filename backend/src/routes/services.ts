@@ -7,12 +7,11 @@ import { Router, Request, Response, NextFunction } from 'express';
 import fs from 'fs/promises';
 import rateLimit from 'express-rate-limit';
 import auth from '../middleware/auth';
-import { requireCapability, requireWebmaster } from '../middleware/requireCapability';
+import { requireCapability } from '../middleware/requireCapability';
 import * as executor from '../services/executor';
 import * as status from '../services/status';
 import { createStreamTicket } from '../services/realtime';
-import { getService, isValidServiceName, resolveComposeFile } from '../config/services';
-import { clearImagePins, pinnedImages } from '../services/composeOverride';
+import { getService, isValidServiceName } from '../config/services';
 import { schemas, validateParams, validateBody } from '../middleware/validation';
 import { getServiceEnvStatus, saveServiceEnv } from '../services/appEnv';
 import { getAutheliaAdminUser, updateAutheliaAdminUser } from '../services/autheliaUsers';
@@ -141,75 +140,6 @@ router.post(
         service: serviceName,
         message: httpError.message,
         details: httpError.details,
-      });
-    }
-  }
-);
-
-/**
- * POST /api/services/:name/update/unpin
- * Drop the managed docker-compose.override.yml image pins a self-update
- * (§209) wrote, so the app floats back to the tags in its base compose file
- * until the next self-update pulls and re-pins it. Recreates the container
- * when it is running so the change takes effect now.
- *
- * `requireWebmaster`, not `requireCapability('apps:control')` — an admin
- * gets that capability by default too, but unpinning can silently trigger
- * an unvetted image pull the moment the container recreates (found live,
- * §401), outside the self-update batch's own review. That risk belongs to
- * the webmaster, not every account that can start/stop/restart an app.
- */
-router.post(
-  '/:name/update/unpin',
-  serviceLimiter,
-  auth,
-  requireWebmaster(),
-  validateParams(schemas.serviceNameParam),
-  validateServiceAllowlist,
-  async (req: Request, res: Response) => {
-    const serviceName = req.params.name;
-    const userId = req.user!.id;
-
-    try {
-      const resolved = resolveComposeFile(serviceName);
-      if (!resolved?.appDir || !resolved.composeFile) {
-        return res.status(404).json({ error: 'Service is not installed', service: serviceName });
-      }
-
-      const had = pinnedImages(resolved.appDir).size;
-      clearImagePins(resolved.appDir);
-      await writeAuditLog({
-        userId,
-        action: 'service_update_unpin',
-        resource: serviceName,
-        result: 'success',
-        metadata: { hadPins: had },
-      }).catch(() => {});
-
-      let recreated = false;
-      if (had) {
-        const state = (await status.getServiceStatus(serviceName)).state;
-        if (state === 'running') {
-          await executor.restartService(serviceName, userId);
-          recreated = true;
-        }
-      }
-
-      return res.json({
-        success: true,
-        service: serviceName,
-        message: had
-          ? `Cleared ${had} image pin${had === 1 ? '' : 's'}${recreated ? ' and recreated the container' : ''}.`
-          : 'No image pins to clear.',
-        recreated,
-      });
-    } catch (error) {
-      const httpError = error as HttpError;
-      logger.error(`Unpin failed: ${serviceName}`, { userId, error: httpError.message });
-      return res.status(httpError.statusCode || 500).json({
-        error: 'Failed to unpin service images',
-        service: serviceName,
-        message: httpError.message,
       });
     }
   }

@@ -6,6 +6,7 @@
       <span class="service-name">{{ service.label }}</span>
       <span class="badge text-bg-{{ stateBadge(service.state) }}">{{ service.state }}</span>
       <span class="badge bg-body-tertiary border" [ngClass]="healthClass()">{{ healthLabel() }}</span>
+      <span class="badge bg-body-tertiary border" [title]="'Installed: ' + installedVersion()">ⓥ</span>
       <a
         *ngIf="service.exposedHostname"
         class="badge text-bg-secondary border text-decoration-none"
@@ -24,12 +25,6 @@
       </span>
       <span *ngIf="dependenciesSatisfied() && degradedBy().length" class="text-warning-emphasis">
         · {{ degradedTitle() }}
-      </span>
-      <span *ngIf="pinned()" class="text-info-emphasis" [title]="pinnedTitle()">
-        · 📌 pinned to a fixed image
-      </span>
-      <span *ngIf="versionPinned()" class="text-body-secondary" [title]="versionPinnedTitle()">
-        · 🔒 version pinned
       </span>
       <span *ngIf="service.error" class="text-danger">· {{ service.error }}</span>
     </div>
@@ -60,16 +55,6 @@
     >
       <span *ngIf="loadingAction === 'start'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
       <span *ngIf="loadingAction !== 'start'">Start</span>
-    </button>
-    <button
-      *ngIf="pinned() && isWebmaster"
-      type="button"
-      class="btn btn-outline-secondary btn-sm"
-      [disabled]="loadingAction !== null"
-      [title]="pinnedTitle()"
-      (click)="unpin()"
-    >
-      Unpin
     </button>
     <button
       type="button"

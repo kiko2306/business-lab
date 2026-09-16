@@ -7,7 +7,6 @@ import {
   ConnectionStatus,
   ServiceAction,
   ServiceActionResponse,
-  ServiceOperation,
   ServiceStatus,
   ServiceStatusResponse,
   ServiceSummary,
@@ -54,7 +53,7 @@ export class ServiceStateService {
   });
   private readonly lastUpdatedSubject = new BehaviorSubject<string | null>(null);
   private readonly refreshingSubject = new BehaviorSubject(false);
-  private readonly operatingSubject = new BehaviorSubject<Record<string, ServiceOperation | null>>({});
+  private readonly operatingSubject = new BehaviorSubject<Record<string, ServiceAction | null>>({});
   private readonly connectionStatusSubject = new BehaviorSubject<ConnectionStatus>('connecting');
   // Fires once per start attempt with the `docker compose up` outcome, so the
   // startup-log popup can show the command's own error (e.g. a port clash)
@@ -109,34 +108,6 @@ export class ServiceStateService {
 
   stopService(serviceName: string): void {
     this.runServiceAction(serviceName, 'stop');
-  }
-
-  /**
-   * Drop the image pins the last self-update (§209) wrote into the app's
-   * managed docker-compose.override.yml, so it floats back to the tags in
-   * its base compose file until the next self-update re-pins it. The
-   * backend recreates the container when it is running.
-   */
-  unpinService(serviceName: string): void {
-    this.operatingSubject.next({ ...this.operatingSubject.value, [serviceName]: 'unpin' });
-    this.http
-      .post<{ message: string }>(
-        `${API_BASE_URL}/services/${serviceName}/update/unpin`,
-        {},
-        { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
-      )
-      .pipe(
-        tap((response) => this.toast.success(response.message)),
-        switchMap(() => this.fetchServices(false)),
-        finalize(() => {
-          this.operatingSubject.next({ ...this.operatingSubject.value, [serviceName]: null });
-        }),
-        catchError((error) => {
-          this.toast.error(extractErrorMessage(error, `Unable to unpin ${serviceName}.`));
-          return EMPTY;
-        })
-      )
-      .subscribe();
   }
 
   /**

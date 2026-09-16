@@ -28570,3 +28570,41 @@ bare date wouldn't have produced a diff for classifyDeploy to see, so the
 line now also names what was checked/found: `(0.78.1 -> 0.78.2, patch,
 safe)`. `require-image-date-bump.sh` was a no-op here (no `image:` line
 changed) — correctly, since it only guards that case.
+
+## 452. Consolidated the two pin badges + Unpin button into one hover version-info badge; deleted Unpin
+
+User: don't need the "📌 pinned to a fixed image" / "🔒 version pinned" text
+badges or the Unpin button — just a compact "ⓥ" indicator showing the
+installed version on hover, for every app.
+
+Replaced both `*ngIf`-conditional badges in `service-card.component.html`
+with one always-shown `<span title="Installed: ...">ⓥ</span>` next to the
+state/health badges. `installedVersion()` (`service-card.component.ts`)
+picks the most precise thing available: the self-update digest pin
+(`pinnedImages`) when there is one, else the base-compose-file tag
+(`versionPinned`), else `'latest'`.
+
+**Unpin deleted, not just hidden** — user's call, explicitly: "now the apps
+update will be triggered from dev commits, all machines will match versions
+after getting the latest git pull" (§449/§450 make the digest-pin's original
+job — recovering from a bad/stale pull — largely moot, since every machine
+converges on whatever `dev` says regardless). With no UI path left to
+trigger it, keeping it would just be dead code. Removed: the
+`POST /:name/update/unpin` route and its now-unused `composeOverride`/
+`requireWebmaster` imports in `routes/services.ts`; `unpinService()` in
+`service-state.service.ts`; the `ServiceOperation` type alias (was just
+`ServiceAction | 'unpin'`, now callers use `ServiceAction` directly);
+`pinned()`/`pinnedTitle()`/`unpin()`/`versionPinned()`/`versionPinnedTitle()`
+and the now-dead `isWebmaster`/`AuthService` injection in
+`service-card.component.ts`. `pinPulledImages`/`clearImagePins` themselves
+are untouched — they still run automatically on every self-update pull
+(§209); only the manual, user-triggered clear-the-pin action is gone.
+
+Verified: `./scripts/check.sh backend typecheck`/`test` (924, unchanged —
+nothing backend-side depended on the deleted route beyond itself) and
+`frontend test`/`build` (61/61, +1 net after removing 5 unpin/versionPinned
+tests and adding 4 for `installedVersion`, one of which renders the real
+template via `fixture.detectChanges()` and confirms the ⓥ badge's title
+and the absence of the old badges/button in the DOM — the strongest check
+available without live dashboard credentials to screenshot the real page).
+0.103.0 (minor — removes a user-facing action).

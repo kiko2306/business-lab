@@ -1,7 +1,6 @@
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
 import { of } from 'rxjs';
 import { ServiceCardComponent } from './service-card.component';
-import { AuthService } from '../../core/auth.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
@@ -30,7 +29,6 @@ describe('ServiceCardComponent dependencies', () => {
         { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
         { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
-        { provide: AuthService, useValue: jasmine.createSpyObj('AuthService', ['isWebmaster']) },
       ],
     }).compileComponents();
 
@@ -148,7 +146,6 @@ describe('ServiceCardComponent per-app backups', () => {
         { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
         { provide: ConfirmService, useValue: confirm },
-        { provide: AuthService, useValue: jasmine.createSpyObj('AuthService', ['isWebmaster']) },
       ],
     }).compileComponents();
 
@@ -199,7 +196,6 @@ describe('ServiceCardComponent startup log batching (§371)', () => {
         { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
         { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
-        { provide: AuthService, useValue: jasmine.createSpyObj('AuthService', ['isWebmaster']) },
       ],
     }).compileComponents();
 
@@ -233,61 +229,8 @@ describe('ServiceCardComponent startup log batching (§371)', () => {
   }));
 });
 
-// Unpin can silently trigger an unvetted image pull on the next recreate
-// (found live, §401) — webmaster-only, and confirmed before it fires, same
-// as every other destructive action this component has.
-describe('ServiceCardComponent unpin (§401)', () => {
-  let component: ServiceCardComponent;
-  let serviceState: jasmine.SpyObj<ServiceStateService>;
-  let confirm: jasmine.SpyObj<ConfirmService>;
-  let auth: jasmine.SpyObj<AuthService>;
-
-  beforeEach(async () => {
-    serviceState = jasmine.createSpyObj('ServiceStateService', ['refresh', 'unpinService']);
-    confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
-    auth = jasmine.createSpyObj('AuthService', ['isWebmaster']);
-
-    await TestBed.configureTestingModule({
-      imports: [ServiceCardComponent],
-      providers: [
-        { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
-        { provide: ServiceStateService, useValue: serviceState },
-        { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
-        { provide: ConfirmService, useValue: confirm },
-        { provide: AuthService, useValue: auth },
-      ],
-    }).compileComponents();
-
-    component = TestBed.createComponent(ServiceCardComponent).componentInstance;
-    component.service = service('itflow', 'running', { pinnedImages: ['itfloworg/itflow@sha256:abc'] });
-  });
-
-  it('exposes isWebmaster from AuthService, read once at construction', () => {
-    auth.isWebmaster.and.returnValue(true);
-    const fresh = TestBed.createComponent(ServiceCardComponent).componentInstance;
-    expect(fresh['isWebmaster']).toBe(true);
-  });
-
-  it('only unpins after the user confirms', async () => {
-    confirm.ask.and.resolveTo(false);
-    await component.unpin();
-    expect(serviceState.unpinService).not.toHaveBeenCalled();
-
-    confirm.ask.and.resolveTo(true);
-    await component.unpin();
-    expect(serviceState.unpinService).toHaveBeenCalledWith('itflow');
-  });
-
-  it('names the service and warns about an unvetted image in the confirm prompt', async () => {
-    confirm.ask.and.resolveTo(false);
-    await component.unpin();
-    const args = confirm.ask.calls.mostRecent().args[0];
-    expect(args.message).toContain('itflow');
-    expect(args.danger).toBe(true);
-  });
-});
-
-describe('ServiceCardComponent versionPinned', () => {
+describe('ServiceCardComponent installedVersion', () => {
+  let fixture: ComponentFixture<ServiceCardComponent>;
   let component: ServiceCardComponent;
 
   beforeEach(async () => {
@@ -295,24 +238,46 @@ describe('ServiceCardComponent versionPinned', () => {
       imports: [ServiceCardComponent],
       providers: [
         { provide: OperationsService, useValue: jasmine.createSpyObj('OperationsService', ['getServiceEnv']) },
-        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh', 'unpinService']) },
+        { provide: ServiceStateService, useValue: jasmine.createSpyObj('ServiceStateService', ['refresh']) },
         { provide: ToastService, useValue: jasmine.createSpyObj('ToastService', ['success', 'error']) },
         { provide: ConfirmService, useValue: jasmine.createSpyObj('ConfirmService', ['ask']) },
-        { provide: AuthService, useValue: jasmine.createSpyObj('AuthService', ['isWebmaster']) },
       ],
     }).compileComponents();
 
-    component = TestBed.createComponent(ServiceCardComponent).componentInstance;
+    fixture = TestBed.createComponent(ServiceCardComponent);
+    component = fixture.componentInstance;
   });
 
-  it('is false when the compose file has no non-latest tags', () => {
-    component.service = service('clamav', 'running', { versionPinned: [] });
-    expect(component['versionPinned']()).toBe(false);
+  it('prefers the self-update digest pin when there is one', () => {
+    component.service = service('itflow', 'running', {
+      pinnedImages: ['itfloworg/itflow:latest@sha256:abc'],
+      versionPinned: [],
+    });
+    expect(component['installedVersion']()).toBe('itfloworg/itflow:latest@sha256:abc');
   });
 
-  it('is true and names the tag when the base compose file pins a version', () => {
-    component.service = service('guacamole', 'running', { versionPinned: ['1.6.0'] });
-    expect(component['versionPinned']()).toBe(true);
-    expect(component['versionPinnedTitle']()).toContain('1.6.0');
+  it('falls back to the base compose tag when nothing is digest-pinned yet', () => {
+    component.service = service('guacamole', 'running', { pinnedImages: [], versionPinned: ['1.6.0'] });
+    expect(component['installedVersion']()).toBe('1.6.0');
+  });
+
+  it('falls back to "latest" when neither is set', () => {
+    component.service = service('clamav', 'running', { pinnedImages: [], versionPinned: [] });
+    expect(component['installedVersion']()).toBe('latest');
+  });
+
+  it('renders a single ⓥ badge with the version in its title, and no pinned badges or Unpin button', () => {
+    component.service = service('guacamole', 'running', { pinnedImages: [], versionPinned: ['1.6.0'] });
+    component.allServices = [component.service];
+    fixture.detectChanges();
+
+    const root: HTMLElement = fixture.nativeElement;
+    const versionBadge = Array.from(root.querySelectorAll('span')).find((el) => el.textContent?.trim() === 'ⓥ');
+    expect(versionBadge).withContext('ⓥ badge should render').toBeTruthy();
+    expect(versionBadge?.getAttribute('title')).toBe('Installed: 1.6.0');
+
+    expect(root.textContent).not.toContain('pinned to a fixed image');
+    expect(root.textContent).not.toContain('version pinned');
+    expect(Array.from(root.querySelectorAll('button')).some((b) => b.textContent?.trim() === 'Unpin')).toBe(false);
   });
 });
