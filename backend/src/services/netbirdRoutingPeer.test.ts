@@ -436,10 +436,18 @@ describe('isStaleRouterPeer', () => {
   const peer = (over: Record<string, unknown>) =>
     ({ id: 'p', name: 'netbird-router', connected: false, ...over }) as Parameters<typeof isStaleRouterPeer>[0];
 
-  it('deletes a suffixed router peer nothing has seen for over a day', () => {
+  // Every registration carries the plain NB_HOSTNAME as `name`; only
+  // dns_label gets NetBird's duplicate suffix.
+  it('deletes a router peer nothing has seen for over a day', () => {
     expect(
-      isStaleRouterPeer(peer({ name: 'netbird-router-93-231', last_seen: '2026-09-12T09:00:00Z' }), now)
+      isStaleRouterPeer(peer({ dns_label: 'netbird-router-93-231', last_seen: '2026-09-12T09:00:00Z' }), now)
     ).toBe(true);
+  });
+
+  // The live case that broke the first version (§507): management still
+  // reports a long-dead container's peer as connected.
+  it('deletes one management still claims is connected but has not seen for days', () => {
+    expect(isStaleRouterPeer(peer({ connected: true, last_seen: '2026-09-11T18:35:09Z' }), now)).toBe(true);
   });
 
   it('deletes one that never connected at all (NetBird zero time)', () => {
@@ -447,16 +455,15 @@ describe('isStaleRouterPeer', () => {
     expect(isStaleRouterPeer(peer({}), now)).toBe(true);
   });
 
-  // The live router is what this whole file exists to provision — it can be
-  // disconnected for the seconds between `compose up` and its registration,
-  // and deleting it is exactly the zombie-making bug being cleaned up.
-  it('spares the connected router, and one only briefly away', () => {
-    expect(isStaleRouterPeer(peer({ name: 'netbird-router-52-176', connected: true }), now)).toBe(false);
+  // This runs right after `compose up`, so the live router can be seconds
+  // from a restart — deleting it recreates the zombie bug being cleaned up.
+  it('spares a router seen within the cutoff, connected or not', () => {
+    expect(isStaleRouterPeer(peer({ connected: true, last_seen: '2026-09-17T11:59:00Z' }), now)).toBe(false);
     expect(isStaleRouterPeer(peer({ last_seen: '2026-09-17T11:30:00Z' }), now)).toBe(false);
   });
 
   it('never touches a peer that is not a routing peer', () => {
-    expect(isStaleRouterPeer(peer({ name: 'prt-dev-01', last_seen: '2025-01-01T00:00:00Z' }), now)).toBe(false);
+    expect(isStaleRouterPeer(peer({ name: 'PRT-DEV-01', last_seen: '2025-01-01T00:00:00Z' }), now)).toBe(false);
     expect(isStaleRouterPeer(peer({ name: 'netbird-routerish', last_seen: '2025-01-01T00:00:00Z' }), now)).toBe(
       false
     );

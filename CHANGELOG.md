@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.2] — 2026-09-17
+
+### Fixed
+
+- NetBird stale-peer pruning now keys on last_seen alone — management reports a long-dead routing peer as `connected: true`, so gating on that flag skipped the very zombies it was meant to remove
+
 ## [0.117.1] — 2026-09-17
 
 ### Fixed

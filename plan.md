@@ -29961,3 +29961,37 @@ whose own LAN is also `192.168.1.0/23` — `ip rule` priority 105's `lookup main
 suppress_prefixlength 0` serves the client's directly-connected LAN before the
 `netbird` table at priority 110. That is §411.5/§412 behaving exactly as
 documented; the answer is the alias range (`10.177.1.236`), which works.
+
+### 507.1 The `connected` guard was wrong — proven by the live run
+
+First deploy of the above deleted **two** peers and left three. Dumping
+`GET /api/peers` against the real management server explained why, and the
+data is worth recording because it contradicts the obvious reading of the API:
+
+```
+{"name":"netbird-router","dns":"netbird-router.netbird.selfhosted",      "connected":true,"last_seen":"2026-09-11T18:01:12Z"}
+{"name":"netbird-router","dns":"netbird-router-108-245.netbird.selfhosted","connected":true,"last_seen":"2026-09-11T18:35:09Z"}
+{"name":"netbird-router","dns":"netbird-router-93-231.netbird.selfhosted", "connected":true,"last_seen":"2026-09-11T18:58:41Z"}
+{"name":"netbird-router","dns":"netbird-router-52-176.netbird.selfhosted", "connected":true,"last_seen":"2026-09-17T20:37:54Z"}
+```
+
+Two findings, neither guessable from the client side:
+
+1. **`connected` is not trustworthy.** All three zombies report
+   `connected: true` with a `last_seen` six days stale — management never
+   reaped the session record of a container that no longer exists. The
+   `!peer.connected` guard, added precisely to protect the live router, is
+   what stopped the cleanup working. Dropped: `last_seen` alone is both
+   sufficient and safe, since a live router updates it continuously and one
+   merely mid-restart is minutes old, not a day. A router genuinely off for
+   over a day and pruned just re-registers with the setup key on next boot.
+2. **`name` carries no suffix.** Every registration's `name` is the plain
+   `NB_HOSTNAME` (`netbird-router`); only `dns_label` gets NetBird's
+   `-52-176` disambiguator. The prefix test matched anyway via its equality
+   branch, but the log line now prints `dns_label` — with four identical
+   `name`s, it was otherwise impossible to tell which peer had been deleted.
+
+The first version's guard was the "defensive extra condition that silently
+disables the feature" failure mode, and only a run against the real management
+server could have shown it — the client's `netbird status -d` view reports these
+same peers as `Connecting`, which reads as *not* connected.

@@ -111,6 +111,10 @@ interface NbAccount {
 interface NbPeer {
   id: string;
   name: string;
+  // The only field carrying NetBird's duplicate-name suffix
+  // (netbird-router-52-176); `name` stays the plain NB_HOSTNAME for every
+  // registration, so it identifies which peer a log line is about.
+  dns_label?: string;
   connected: boolean;
   last_seen?: string;
 }
@@ -383,12 +387,19 @@ async function ensureSetupKey(baseUrl: string, token: string, routerGroupId: str
  * is bound to, and every client keeps trying to reach them (they show as
  * permanently "Connecting" in `netbird status -d`).
  *
- * Disconnected AND stale, both: this runs right after `docker compose up`,
- * when the real router may not have registered yet, and deleting the live
- * peer would recreate the very zombie it is cleaning up.
+ * `last_seen` alone decides it, deliberately — the peer's `connected` flag
+ * cannot be trusted here. Confirmed live (§507): all three zombies came back
+ * `connected: true` with a `last_seen` six days old, because management never
+ * reaped the gRPC session record of a container that no longer exists. Gating
+ * on `connected` is what stopped the first version of this deleting them.
+ *
+ * `last_seen` is the safe guard on its own: a live router updates it
+ * continuously, so one merely mid-restart when this runs (right after `docker
+ * compose up`) is minutes old, nowhere near the cutoff. A router genuinely
+ * powered off for over a day and then deleted simply re-registers with the
+ * setup key on its next boot.
  */
 export function isStaleRouterPeer(peer: NbPeer, now: number): boolean {
-  if (peer.connected) return false;
   if (peer.name !== ROUTER_PEER_NAME && !peer.name.startsWith(`${ROUTER_PEER_NAME}-`)) return false;
   // A peer that never once connected carries NetBird's zero time
   // ("0001-01-01T00:00:00Z"), which is stale by any measure.
@@ -402,7 +413,7 @@ async function pruneStaleRouterPeers(baseUrl: string, token: string): Promise<vo
   for (const peer of peers.filter((p) => isStaleRouterPeer(p, now))) {
     await nbRequest(baseUrl, token, 'DELETE', `/api/peers/${peer.id}`);
     logger.info('NetBird: deleted a stale routing-peer registration', {
-      peer: peer.name,
+      peer: peer.dns_label ?? peer.name,
       lastSeen: peer.last_seen,
     });
   }
