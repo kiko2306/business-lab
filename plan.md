@@ -29915,3 +29915,49 @@ machine that isn't part of this stack — actually enrolling through
 relaying without WebRTC. That stays the open README item. `beta` → `main`:
 left unmerged per [[main-merge-requires-request]] — ready whenever asked
 for.
+
+## 507. Stale `netbird-router-*` peers are now pruned by the provisioner
+
+Noticed from a client, not the host: `netbird status -d` on a laptop showed
+**four** `netbird-router-*` peers — `52-176` Connected, and `93-231`,
+`103-170`, `108-245` stuck in `Connecting` with no WireGuard handshake ever
+recorded. Not a network fault: these are the registrations left behind by the
+`/etc/netbird` vs `/var/lib/netbird` mount bug closed in §410/§411.1. That fix
+stopped *new* zombies being created; it could not remove the ones NetBird had
+already recorded, and NetBird keeps a peer registration forever once made.
+
+They are not inert. Each sits in the `business-lab-netbird-router` group the
+LAN network's router is bound to, and every client in the account keeps trying
+to reach them — which is the permanent `Connecting` state above.
+
+Deleting them by hand through NetBird's dashboard was the obvious move and is
+exactly what CLAUDE.md rules out: it evaporates on the next deployment, and the
+next account that hits this carries the same mess. Instead `ensureNetbirdRoutingPeer`
+grew a final `pruneStaleRouterPeers` step — `GET /api/peers`, `DELETE
+/api/peers/<id>` for anything matching `isStaleRouterPeer`.
+
+Two guards, both necessary:
+
+- **Name prefix, not equality.** NetBird suffixes a duplicate name, so the
+  *live* router is itself called `netbird-router-52-176`. Matching
+  `NB_HOSTNAME` exactly would have found nothing.
+- **Disconnected AND unseen for 24h.** This runs straight after `docker
+  compose up`, when the real router may not have registered yet, so
+  "disconnected" alone would delete the live peer — which re-registers under a
+  *new* suffixed name and recreates the exact bug being cleaned up. A peer that
+  never once connected carries NetBird's zero time (`0001-01-01T00:00:00Z`),
+  handled as stale via the `NaN`/old-timestamp branch.
+
+Placed last in the provisioning run deliberately: the function's shared
+`catch` swallows the remainder of the run, and housekeeping must never cost
+the network/resource/router/policy/setup-key provisioning above it.
+
+Unit tests cover the predicate (`isStaleRouterPeer`) rather than the API calls,
+per the file's existing convention — the live/brief-restart case is the one
+that matters, since getting it wrong is self-perpetuating.
+
+Incidental, not a repo change: `192.168.1.236` is unreachable from a client
+whose own LAN is also `192.168.1.0/23` — `ip rule` priority 105's `lookup main
+suppress_prefixlength 0` serves the client's directly-connected LAN before the
+`netbird` table at priority 110. That is §411.5/§412 behaving exactly as
+documented; the answer is the alias range (`10.177.1.236`), which works.

@@ -61,6 +61,14 @@ const POLICY_NAME = 'Business Lab: LAN resource access';
 const SETUP_KEY_NAME = 'Business Lab routing peer';
 const SETUP_KEY_EXPIRES_IN = 31536000; // 365 days — NetBird's own max
 
+// NB_HOSTNAME on netbird-client in apps/netbird-vpn/docker-compose.yml.
+// NetBird suffixes a duplicate name (netbird-router-52-176), so this is a
+// prefix, never an equality test.
+const ROUTER_PEER_NAME = 'netbird-router';
+// A live router that is merely mid-restart reconnects in seconds; anything
+// silent for a day is a registration nothing will ever come back to.
+const STALE_PEER_MS = 24 * 60 * 60 * 1000;
+
 const REQUEST_TIMEOUT_MS = 10_000;
 // Up to 60s (20 x 3s) for management to start serving, same budget as
 // docusealAdminBootstrap/immichAdminBootstrap — `up` returns well before
@@ -99,6 +107,12 @@ interface NbAccount {
   id: string;
   settings: Record<string, unknown> & { extra?: Record<string, unknown> };
   [key: string]: unknown;
+}
+interface NbPeer {
+  id: string;
+  name: string;
+  connected: boolean;
+  last_seen?: string;
 }
 interface NbUser {
   id: string;
@@ -361,6 +375,40 @@ async function ensureSetupKey(baseUrl: string, token: string, routerGroupId: str
 }
 
 /**
+ * Every recreate of netbird-client used to register a brand-new peer — the
+ * /etc/netbird-vs-/var/lib/netbird mount bug (§410/§411.1) — and NetBird
+ * keeps a registration forever once made, so an account fixed after that bug
+ * still carries netbird-router-NNN-NNN peers that will never reconnect. They
+ * are not inert: each one sits in the router group the LAN network's router
+ * is bound to, and every client keeps trying to reach them (they show as
+ * permanently "Connecting" in `netbird status -d`).
+ *
+ * Disconnected AND stale, both: this runs right after `docker compose up`,
+ * when the real router may not have registered yet, and deleting the live
+ * peer would recreate the very zombie it is cleaning up.
+ */
+export function isStaleRouterPeer(peer: NbPeer, now: number): boolean {
+  if (peer.connected) return false;
+  if (peer.name !== ROUTER_PEER_NAME && !peer.name.startsWith(`${ROUTER_PEER_NAME}-`)) return false;
+  // A peer that never once connected carries NetBird's zero time
+  // ("0001-01-01T00:00:00Z"), which is stale by any measure.
+  const lastSeen = peer.last_seen === undefined ? NaN : Date.parse(peer.last_seen);
+  return Number.isNaN(lastSeen) || lastSeen < now - STALE_PEER_MS;
+}
+
+async function pruneStaleRouterPeers(baseUrl: string, token: string): Promise<void> {
+  const peers = await nbRequest<NbPeer[]>(baseUrl, token, 'GET', '/api/peers');
+  const now = Date.now();
+  for (const peer of peers.filter((p) => isStaleRouterPeer(p, now))) {
+    await nbRequest(baseUrl, token, 'DELETE', `/api/peers/${peer.id}`);
+    logger.info('NetBird: deleted a stale routing-peer registration', {
+      peer: peer.name,
+      lastSeen: peer.last_seen,
+    });
+  }
+}
+
+/**
  * Returns true when it wrote new values to .env, i.e. when the containers
  * that read them have to be recreated to see them — see the note at the top
  * of this file.
@@ -431,6 +479,9 @@ export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<boo
     await ensureRouter(baseUrl, token, networkId, routerGroupId);
     await ensurePolicy(baseUrl, token, allGroupId, resourceGroupId);
     if (await ensureSetupKey(baseUrl, token, routerGroupId)) envChanged = true;
+    // Last: housekeeping, and a failure here must not cost the provisioning
+    // above (the shared catch below would swallow the rest of the run).
+    await pruneStaleRouterPeers(baseUrl, token);
 
     return envChanged;
   } catch (error) {

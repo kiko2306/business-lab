@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.1] — 2026-09-17
+
+### Fixed
+
+- NetBird auto-provisioning now deletes stale netbird-router-* peer registrations left over by the pre-§411.1 mount bug — they never reconnect, sit in the router group, and show as permanently "Connecting" on every client
+
 ## [0.117.0] — 2026-09-16
 
 ### Added

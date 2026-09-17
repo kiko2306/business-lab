@@ -3,7 +3,13 @@ import { getPublishedUpstreamPort } from '../config/services';
 import { getHostGatewayIp } from '../utils/network';
 import { getLanCidr } from './networkScan';
 import { readAppEnvValue, saveServiceEnv } from './appEnv';
-import { aliasCidrFor, ensureNetbirdRoutingPeer, isRejectedCredential, normalizeCidr } from './netbirdRoutingPeer';
+import {
+  aliasCidrFor,
+  ensureNetbirdRoutingPeer,
+  isRejectedCredential,
+  isStaleRouterPeer,
+  normalizeCidr,
+} from './netbirdRoutingPeer';
 
 vi.mock('../config/services', () => ({ getPublishedUpstreamPort: vi.fn() }));
 vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn() }));
@@ -422,5 +428,37 @@ describe('isRejectedCredential', () => {
     ]) {
       expect(isRejectedCredential(message)).toBe(false);
     }
+  });
+});
+
+describe('isStaleRouterPeer', () => {
+  const now = Date.parse('2026-09-17T12:00:00Z');
+  const peer = (over: Record<string, unknown>) =>
+    ({ id: 'p', name: 'netbird-router', connected: false, ...over }) as Parameters<typeof isStaleRouterPeer>[0];
+
+  it('deletes a suffixed router peer nothing has seen for over a day', () => {
+    expect(
+      isStaleRouterPeer(peer({ name: 'netbird-router-93-231', last_seen: '2026-09-12T09:00:00Z' }), now)
+    ).toBe(true);
+  });
+
+  it('deletes one that never connected at all (NetBird zero time)', () => {
+    expect(isStaleRouterPeer(peer({ last_seen: '0001-01-01T00:00:00Z' }), now)).toBe(true);
+    expect(isStaleRouterPeer(peer({}), now)).toBe(true);
+  });
+
+  // The live router is what this whole file exists to provision — it can be
+  // disconnected for the seconds between `compose up` and its registration,
+  // and deleting it is exactly the zombie-making bug being cleaned up.
+  it('spares the connected router, and one only briefly away', () => {
+    expect(isStaleRouterPeer(peer({ name: 'netbird-router-52-176', connected: true }), now)).toBe(false);
+    expect(isStaleRouterPeer(peer({ last_seen: '2026-09-17T11:30:00Z' }), now)).toBe(false);
+  });
+
+  it('never touches a peer that is not a routing peer', () => {
+    expect(isStaleRouterPeer(peer({ name: 'prt-dev-01', last_seen: '2025-01-01T00:00:00Z' }), now)).toBe(false);
+    expect(isStaleRouterPeer(peer({ name: 'netbird-routerish', last_seen: '2025-01-01T00:00:00Z' }), now)).toBe(
+      false
+    );
   });
 });
