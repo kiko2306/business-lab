@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.10] — 2026-09-18
+
+### Fixed
+
+- NetBird's management Job stream is no longer cut by the proxy every 60 seconds (it reconnected ~68 times an hour).
+
 ## [0.117.9] — 2026-09-18
 
 ### Fixed
