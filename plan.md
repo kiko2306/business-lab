@@ -939,421 +939,6 @@ to open each service card or run `docker ps` by hand.
   credentials weren't on hand. Worth a quick visual pass next time the
   dashboard is open.
 
-## 20. Session Log — 2026-08-27 (cont.): NetBird "peers not showing"
-
-### 20.1 Reported
-NetBird's dashboard `/peers` page shows no peers.
-
-### 20.2 Investigated
-Checked the live deployment directly (all three `netbird-vpn-*` containers
-running, ~3h uptime):
-- **`netbird-management` logs**: on boot, `No records in table peers, no
-  migration needed` — the peers table is genuinely empty, not a rendering
-  bug. Across the container's full uptime there is exactly one `/api/peers`
-  request logged, my own manual `curl` just now (`401`, expected without a
-  token) — **zero peer registration/login attempts have ever reached
-  management**. No client has ever run `netbird up` against this server.
-- **OIDC/auth plumbing**: healthy. Management fetches Authelia's OIDC config
-  successfully after one transient `502` retry at boot (cold-start race
-  between containers, not a config error — self-recovers, unrelated to
-  peers). The dashboard's own login flow completes fine — its access log
-  shows a real browser session hitting `/nb-auth` then `/peers` with a
-  `200`, i.e. dashboard login through Authelia already works.
-- **Public exposure**: both hostnames are provisioned and reachable —
-  `netbird-vpn.tx-home-utils.com` (dashboard) and
-  `netbird-vpn-api.tx-home-utils.com` (management API, the second hostname
-  the SPA calls directly from the browser per `additionalExposures` in
-  `backend/src/config/services.ts`). Confirmed live: `service_exposure` DB
-  rows for both show `status: provisioned` with no `last_error`, and
-  `curl https://netbird-vpn-api.tx-home-utils.com/api/peers` returns a
-  correct `401` (reachable, auth-gated, not a 502/timeout/DNS failure).
-- **STUN/TURN**: `data/management.json` has `"Stuns": []` and
-  `"TURNConfig": {"Turns": []}` — none configured. This doesn't affect
-  whether a peer *registers* (shows up in the list at all), only whether two
-  registered peers can actually establish a direct/relayed connection to
-  each other afterward. Worth fixing before this is relied on for real
-  connectivity, but it isn't the cause of an empty peers list.
-
-### 20.3 Conclusion
-Not a bug in this deployment's NetBird setup as far as could be verified —
-the peers list is empty because **no device has ever connected a NetBird
-client to this management server**, not because of a broken dashboard,
-auth, or exposure path. All the infrastructure a peer enrollment would need
-(public hostnames, OIDC, management API) checks out live. Could not verify
-further in this environment: there is no NetBird client available here to
-actually attempt `netbird up --management-url
-https://netbird-vpn-api.tx-home-utils.com` end-to-end.
-
-### 20.4 Root causes found and fixed (live debugging with the user)
-Two independent bugs, found by walking the browser dashboard and the mobile
-app through the failure live rather than guessing from logs alone.
-
-**Bug 1 — dashboard: missing `offline_access` scope.**
-`apps/netbird-vpn/docker-compose.yml`'s `AUTH_SUPPORTED_SCOPES` was `"openid
-profile email"` — no `offline_access` — even though Authelia's
-`netbird-dashboard` OIDC client (`apps/authelia/config/configuration.yml`)
-already allows `offline_access` and the `refresh_token` grant. Without
-requesting it, Authelia never issues a refresh token, so the dashboard's
-access token simply expired with no way to renew it, and every API call
-(including the peers list) started failing with `401 token expired` —
-confirmed live via the browser console. **Fixed**: added `offline_access`
-to `AUTH_SUPPORTED_SCOPES`; redeployed
-(`docker compose up -d --force-recreate netbird-dashboard`).
-
-**Bug 2 (the real blocker) — mobile/native clients: gRPC needs HTTP/2, proxy
-was HTTP/1.1-only.** After fixing Bug 1, the mobile app still failed with
-`failed to check SSO support: failed getting management service public
-key`. Root cause: NPM's proxy host for `netbird-vpn-api.tx-home-utils.com`
-had `http2 off;` / `proxy_http_version 1.1;`. That's fine for the browser
-dashboard (grpc-web tunnels over plain HTTP/1.1), but native NetBird clients
-(mobile/desktop/CLI) speak real gRPC, which needs HTTP/2 end-to-end —
-`proxy_pass` never speaks HTTP/2 to the upstream no matter what. This is
-almost certainly why the peers table was empty in the first place (§20.2):
-no native client could ever complete the initial gRPC handshake, through
-any reverse-proxy path, regardless of the dashboard bug above.
-
-**Fixed and automated**, not just patched live:
-- `backend/src/types/index.ts` — `ServiceAdditionalExposure` gained an
-  optional `grpc?: boolean` field.
-- `backend/src/config/services.ts` — netbird-vpn's `additionalExposures`
-  entry (the `-api` hostname) now sets `grpc: true`.
-- `backend/src/services/npmClient.ts` — new `buildGrpcAdvancedConfig(host,
-  port)` builds a `location / { grpc_pass grpc://host:port; }` block (fully
-  replacing NPM's auto-generated one, same pattern as the existing Authelia
-  block). `buildProxyHostPayload` now sets `http2_support: true` and this
-  `advanced_config`, and forces `allow_websocket_upgrade` off, whenever
-  `grpc` is true. `ensureProxyHost`'s drift check now also compares
-  `http2_support`, so a live host that regresses gets self-healed on the
-  next provisioning run (e.g. the existing "re-verify" button).
-- `backend/src/services/exposure.ts` — threads `grpc` from each
-  `additionalExposures` entry through to `ensureProxyHost` (primary hostname
-  always passes `grpc: false`).
-- Tests: `npmClient.test.ts` (+3: payload shape with `grpc: true`, drift
-  detection when grpc turns on) and `exposure.test.ts` (updated to assert
-  `grpc: true`/`false` land on the right hostname). Backend suite now 57
-  tests, `tsc --noEmit` clean.
-- **Verified live**: rebuilt and redeployed the backend
-  (`docker compose up -d --build backend`), then called
-  `provisionServiceIfEnabled('netbird-vpn', 1)` directly inside the running
-  container — this is the same path a real service start/re-verify takes,
-  not a one-off script. Confirmed `/data/nginx/proxy_host/10.conf` now has
-  `http2 on;` and `location / { grpc_pass grpc://172.17.0.1:8080; }`,
-  `nginx -t` passes, and `GET /api/peers` still correctly returns `401`
-  (REST traffic still works through the same `grpc_pass`'d location — the
-  management server's combined HTTP+gRPC handler serves both fine, this
-  isn't an either/or).
-- **This is now automated for every future setup** — a fresh deployment or
-  a rebuilt backend image provisions gRPC support on NetBird's API hostname
-  from the registry entry alone, no manual NPM/nginx editing needed. Any
-  other future service that mixes real gRPC with REST on one port can reuse
-  the same `grpc: true` flag on its `additionalExposures` entry.
-- **Not yet confirmed**: an actual end-to-end peer enrollment from the
-  mobile app (the user was retrying at the time this was written). If it
-  still fails after both fixes, the next thing to check is
-  `apps/netbird-vpn/data/management.json`'s empty `Stuns`/`TURNConfig.Turns`
-  — that wouldn't block registration but could block two registered peers
-  from actually connecting to each other.
-
-### 20.5 Status: still broken after both fixes — pick up here next session
-Both fixes in §20.4 are live and confirmed applied (not just "should be
-applied" — actually checked): NPM's `10.conf` has `http2 on;` +
-`grpc_pass grpc://172.17.0.1:8080;` (`nginx -t` passes), and Cloudflare's
-tunnel config for `netbird-vpn-api.tx-home-utils.com` has
-`originRequest.http2Origin: true` (confirmed via `GET
-.../cfd_tunnel/{id}/configurations` directly, not just "we wrote it").
-`journalctl -u cloudflared` shows cloudflared reloaded that exact config at
-`2026-08-27T10:45:28Z` (`event=... Updated to new configuration ...
-netbird-vpn-api.tx-home-utils.com ... originRequest:{"http2Origin":true}`).
-
-**Yet the mobile app retry after all of this still fails with the same
-`failed to check SSO support: failed getting management service public
-key`.** Don't re-apply either fix again next session — both are verifiably
-live. The bug is somewhere past them. Two concrete leads, unexplored:
-
-1. **No request-level cloudflared log for `netbird-vpn-api` at all, before
-   or after the config reload.** `journalctl -u cloudflared --since <retry
-   time>` shows nothing hostname-matching `netbird-vpn-api` — not a success,
-   not a `502`, nothing. Either the mobile app's request never actually
-   reaches Cloudflare's edge for this hostname (DNS? a client-side cached
-   failure without a new attempt? wrong hostname/port entered in the app?),
-   or cloudflared logs gRPC-level failures at a level below `INF` (default).
-   **Next step**: run `cloudflared` with `--loglevel debug` (or bump the
-   systemd unit's log level, then `journalctl -u cloudflared -f`) and watch
-   it live during a fresh mobile-app retry, to see whether the request
-   arrives at all and if so exactly how it fails.
-2. **`http2Origin` may require an HTTPS origin to mean anything.**
-   Cloudflare's own docs describe `http2Origin` as negotiating HTTP/2 via
-   ALPN — which is a TLS handshake feature. The origin service here is
-   `http://192.168.1.23` (confirmed live, in both the NPM payload and the
-   cloudflared config dump above) — **plain HTTP, no TLS**, because this
-   whole chain (NPM → management) was built as an internal cleartext hop
-   with TLS terminated at Cloudflare's edge. If `http2Origin` is a no-op
-   against a non-TLS origin, cloudflared may still be talking HTTP/1.1 to
-   NPM regardless of the flag, which would explain the persisting failure
-   even with everything upstream of that hop fixed. **Not yet confirmed
-   either way** — needs the debug-log check in (1) to see what protocol
-   cloudflared actually negotiates, or a targeted search of cloudflared's
-   docs/source for whether `http2Origin` silently no-ops on an `http://`
-   service URL.
-   - If confirmed, the fix would be giving NPM's `netbird-vpn-api` host a
-     real TLS listener (self-signed is fine, `noTLSVerify: true` on the
-     Cloudflare Tunnel side) so cloudflared can ALPN-negotiate HTTP/2 for
-     real, matching NetBird's own documented nginx reverse-proxy examples
-     (which assume `listen 443 ssl http2;`, not a cleartext listener). That
-     would mean widening `additionalExposures`/`ensureProxyHost` further:
-     an `https`-scheme origin option for `grpc` exposures specifically,
-     since every other exposure in this app deliberately stays plain HTTP
-     internally (TLS only at the edge) — this one may be the exception.
-
-**Also still unconfirmed** (unrelated to the above, don't forget): whether
-`Stuns`/`TURNConfig.Turns` being empty in
-`apps/netbird-vpn/data/management.json` would block anything further even
-if enrollment itself starts working — irrelevant until enrollment succeeds
-at all.
-
-### 20.5a New detail from the user, changes the leading hypothesis
-The mobile app's actual error also includes **`403` with an unexpected
-`Content-Type: text/html`** (the user reported this after the write-up
-above was already logged). This reframes things:
-
-- A `403` + HTML body is Cloudflare's own edge block/challenge page shape
-  (WAF rule or Bot Fight Mode), not something NPM or the management
-  container would produce for a gRPC call — nginx's own 403 error page is
-  also HTML by default, but see below for why Cloudflare's edge is more
-  likely than nginx here.
-- This lines up with the already-noted oddity in 20.5 item 1: **zero
-  request-level cloudflared log entries for `netbird-vpn-api`, before or
-  after the config reload, across multiple retries.** If Cloudflare's edge
-  is blocking/challenging the request before it ever reaches the tunnel,
-  cloudflared would never log it at all — which is exactly what's observed.
-  A native gRPC client (Go-based user agent, binary protobuf POST body, no
-  browser session/cookies, first contact with no prior page load) is a very
-  typical profile for Cloudflare's Bot Fight Mode or a managed WAF rule to
-  challenge, since it looks nothing like a browser.
-- Also worth reconsidering: nginx's `grpc_pass` does **not** require the
-  downstream (client-facing) leg to already be HTTP/2 — it translates
-  whatever protocol the client used into HTTP/2 toward the upstream
-  regardless. That's consistent with the earlier `curl .../api/peers` test
-  succeeding over what was almost certainly a plain HTTP/1.1 hop. So the
-  `http2Origin`/TLS-ALPN theory from 20.5 item 2 is weaker than first
-  thought — nginx's own protocol translation may make it unnecessary. Don't
-  chase that lead first next session; chase the Cloudflare edge one below.
-
-### 20.6 Outstanding TODO (superseded — see 20.7 for what actually happened)
-- [x] **Get Claude access to Cloudflare Security Events/WAF for this zone.**
-      Done — user widened the existing exposure API token's permissions
-      (Zone Settings, Firewall Services, Zone WAF, Analytics, all Read) in
-      the Cloudflare dashboard. The app reads the same stored token, so no
-      code change was needed.
-- [x] **Check Cloudflare's zone security settings.** Done — checked
-      `security_level` (medium, default), `/firewall/rules` (empty, 0
-      legacy rules), and `/rulesets` (only the 3 stock managed rulesets,
-      no custom ones). Security Events (`firewallEventsAdaptive` via
-      GraphQL) came back empty even for requests that were actively being
-      403'd live — the block turned out not to be a WAF/Bot Fight Mode
-      event at all, hence nothing logged there. See 20.7.
-- [x] **~~Add a WAF/Bot Fight Mode exception~~ — not applicable.** The real
-      cause wasn't WAF/bot related. See 20.7.
-- [ ] **Debug-log cloudflared during a live mobile-app retry** — no longer
-      needed; root cause found without it (20.7). Leaving unchecked only in
-      case the HTTPS-origin work in 20.7's TODO surfaces something new that
-      needs it.
-- [x] **Determine whether `http2Origin` needs an HTTPS origin.** Confirmed
-      yes — `http2Origin` sets Go's `http.Transport.ForceAttemptHTTP2`,
-      which only affects TLS (ALPN) connections and is a no-op against a
-      plain `http://` origin. See 20.7 for the fix this implies.
-- [ ] **Confirm a real peer actually enrolls and shows up** — still open,
-      blocked on the HTTPS-origin work in 20.7. **Priority: P0** —
-      **Estimate: S**
-- [x] ~~**Configure STUN/TURN**~~ — **DONE.** STUN configured in §46.8
-      (two public servers). TURN was deliberately **not** used: it needs a
-      port-forward, so `netbirdio/relay` (WebSocket) took its place in §50.3.
-      Note §54.1 — with no port-forward every session relays anyway. —
-      **Estimate: S–M**
-
-### 20.7 Session continued (2026-08-27, same day): real root cause found — Cloudflare's zone-level gRPC toggle was off
-With Security Events access in hand, the WAF/Bot Fight Mode lead from 20.5a
-turned out to be a dead end — `firewallEventsAdaptive` was empty even
-seconds after reproducing the 403 live, meaning nothing was logging it as a
-WAF/bot decision at all. That absence was the actual clue.
-
-**Root cause, confirmed by isolation testing:** Cloudflare has a dedicated,
-dashboard-only **gRPC toggle** per zone (**Network tab → gRPC**). When it's
-off, the edge itself rejects *any* request carrying a
-`content-type: application/grpc` (or `application/grpc+proto`) header with
-a bare `403 Forbidden` / `text/html` body — before the request ever reaches
-the tunnel or origin, and without generating a WAF/Bot Fight Mode event.
-This is documented behavior
-(https://developers.cloudflare.com/network/grpc-connections/), not a
-misconfiguration on our side.
-
-Proved this two ways:
-1. Sent a POST with `content-type: application/grpc` (real gRPC framing,
-   no `te: trailers` even needed to trigger it) directly to
-   `netbird-vpn-api.tx-home-utils.com` — got the exact 403/text-html the
-   mobile app reports, byte-for-byte (`<hr><center>cloudflare</center>`
-   template). The request never showed up in NPM's
-   `proxy-host-10_access.log` at all — confirming it never left Cloudflare's
-   edge.
-2. Sent the *same header* to **`paperless.tx-home-utils.com`** (a
-   completely unrelated, already-working host on the same zone) — also
-   403'd. Proved it's a zone-wide setting, not anything specific to the
-   `netbird-vpn-api` proxy host or its NPM/tunnel config, before touching
-   any of that config further.
-
-**User enabled the gRPC toggle this session.** That clears the edge-level
-block, but it does **not** by itself make gRPC work end-to-end — Cloudflare
-requires the *origin* to speak real TLS + HTTP/2 via ALPN on port 443
-(https://developers.cloudflare.com/network/grpc-connections/, "origin must
-listen on 443, support TLS, and advertise HTTP/2 over ALPN"). This confirms
-lead 2 from 20.5 was right: our origin is `http://192.168.1.23` (plain,
-cleartext) with `http2Origin: true` on the tunnel side — and `http2Origin`
-only forces HTTP/2 over an *existing* TLS connection (it maps to Go's
-`http.Transport.ForceAttemptHTTP2`, which is meaningless for a non-TLS
-`http://` URL; cloudflared has no h2c/cleartext-HTTP2 support to the
-origin). So even with the zone toggle on, this specific host will still
-fail until the origin hop is real TLS.
-
-### 20.8 Implemented and verified live: real TLS origin for grpc exposures
-Built and shipped the fix described above:
-- `backend/src/services/npmClient.ts`: added `ensureGrpcCertificate` —
-  idempotently finds or creates a self-signed `"other"`-provider NPM
-  certificate for the hostname (`openssl req -x509 ...`, uploaded via
-  NPM's `/api/nginx/certificates` + `/upload` multipart endpoint) and
-  attaches it (`certificate_id`, `ssl_forced: true`) only when `grpc` is
-  true. `buildProxyHostPayload`/`ensureProxyHost`'s drift-detection now
-  also compares `certificate_id`/`ssl_forced`.
-- `backend/src/utils/httpJson.ts`: `requestJson` gained a `rawBody` option
-  so the multipart cert upload could reuse the same mockable client
-  instead of hand-rolling a second raw `http`/`https` request path.
-- `backend/src/services/cloudflareTunnelClient.ts`:
-  `EnsureIngressRouteOptions`/`ensureIngressRoute` gained `noTLSVerify` and
-  `originServerName`, alongside the existing `http2Origin`, with drift
-  detection extended to cover all three.
-- `backend/src/services/exposure.ts`: added `getNpmGrpcOriginUrl`
-  (`https://` on 443, vs. the plain-`http://` `getNpmOriginUrl` every other
-  exposure uses) and wired `noTLSVerify`/`originServerName` into
-  `provisionHostname`'s `ensureIngressRoute` call, both keyed off the
-  existing `grpc` flag.
-- `backend/Dockerfile`: added the `openssl` package (cert generation shells
-  out to it).
-
-All covered by unit tests (`npmClient.test.ts`, `cloudflareTunnelClient.test.ts`,
-`exposure.test.ts`) and rebuilt/redeployed live. Re-ran
-`POST /api/services/netbird-vpn/exposure/verify` after deploying — both
-exposures provisioned with no error. Confirmed on the actual infra:
-- NPM's `10.conf` now has `listen 443 ssl` + `http2 on` with a real
-  self-signed cert (`/data/custom_ssl/npm-1/`), still `grpc_pass
-  grpc://172.17.0.1:8080;`.
-- The Cloudflare tunnel ingress rule for `netbird-vpn-api.tx-home-utils.com`
-  now reads `"service": "https://192.168.1.23"` with
-  `originRequest: { http2Origin: true, noTLSVerify: true, originServerName:
-  "netbird-vpn-api.tx-home-utils.com" }`.
-- **End-to-end proof**: a real gRPC call (`content-type: application/grpc`,
-  `POST /management.ManagementService/GetServerKey`) through the public
-  hostname now returns `HTTP/2 200` with `content-type: application/grpc`
-  — this is the exact call the mobile app's SSO check makes first. NPM's
-  access log shows it landing correctly: `POST https ... 200 200 ...
-  Sent-to 172.17.0.1`.
-
-### 20.9 Real mobile-app retry: new failure — cloudflared drops gRPC trailers (upstream bug, not ours)
-20.7/20.8 were necessary but **not sufficient**. Retried with the actual
-NetBird Android app (not just synthetic `curl`) against
-`https://netbird-vpn-api.tx-home-utils.com` and got a *new*, different
-error:
-
-> failed to check SSO support: failed getting management service public
-> key: rpc error: code = Internal desc = server closed the stream without
-> sending trailers
-
-Live evidence pointed the same way before the app confirmed it: NPM's
-access log showed the real client (`grpc-go/1.80.0` user agent, not curl)
-successfully calling `GetServerKey` and getting `200` — repeatedly, every
-few seconds, in a tight loop, never progressing. That pattern (success
-status, no visible error, but no forward progress) is consistent with a
-gRPC client that never received a `grpc-status` trailer and is silently
-retrying. Re-ran the same call manually with `curl -v --http2`: got the
-`200` response headers and a correctly-framed protobuf body, but **no
-trailing HEADERS frame with `grpc-status` at all** — curl's verbose output
-ends right after the body, nothing further.
-
-**Root cause: this is an open, unresolved cloudflared bug, not a config
-problem.** Found
-https://github.com/cloudflare/cloudflared/issues/1641 ("gRPC response body
-and trailers stripped through tunnel even with TLS+ALPN+h2 origin") —
-symptom, setup, and error message match ours exactly:
-`code = Internal desc = server closed the stream without sending
-trailers`, reproduced with the exact same origin shape we now have
-(self-signed TLS origin, `http2Origin: true`, `noTLSVerify: true`).
-Reported against cloudflared 2025.8.1 and 2026.3.0, still open, no
-workaround documented. The dashboard (browser) works fine because it uses
-**grpc-web over HTTP/1.1** — a completely different, unaffected code path
-— not real gRPC. Real gRPC (what every native client — mobile, desktop,
-CLI — uses) apparently cannot complete a unary call through a Cloudflare
-Tunnel right now, regardless of origin config on our end.
-
-**Do not re-attempt more Cloudflare Tunnel / `http2Origin` / cert tuning
-next session** — 20.7/20.8's origin-TLS work is correct and necessary
-(confirmed: NPM correctly serves `grpc_pass` over real TLS+HTTP2 now,
-verified independently of this bug), but no amount of NPM/tunnel
-configuration fixes a bug in cloudflared's own frame handling.
-
-### 20.10 Proposed fix (not yet implemented — needs user's router): bypass the tunnel for this one host
-Only real way around a transport-level bug in cloudflared is to stop using
-cloudflared for this hostname. Plan, pending the user setting up a
-port-forward (can't be done remotely from here):
-
-1. **Router**: port-forward 443 (or a chosen public port) directly to the
-   NPM host's LAN IP. Needs a static public IP or DDNS if the ISP doesn't
-   give one — unconfirmed which the user has.
-2. **DNS**: switch `netbird-vpn-api.tx-home-utils.com` to **unproxied**
-   (grey-cloud) in Cloudflare, so traffic goes client → router → NPM
-   directly instead of through the tunnel. Every other exposure in this
-   app stays proxied/tunneled as-is — this would be the one exception.
-3. **Certificate**: the self-signed cert from 20.8 (`ensureGrpcCertificate`
-   in `npmClient.ts`) only worked because `noTLSVerify: true` on the tunnel
-   side skipped validation. A directly-exposed client (the real NetBird
-   app) will do normal CA validation, so this host needs a **real**
-   Let's Encrypt cert instead. NPM already supports DNS-01 issuance via a
-   Cloudflare plugin (`certbot-dns-cloudflare`, confirmed present in NPM's
-   `/app/certbot/dns-plugins.json` — needs
-   `dns_cloudflare_api_token=<token>`, and the app's existing stored
-   Cloudflare API token already has DNS edit rights, since it already
-   creates DNS records). This avoids needing port 80 exposed for an
-   HTTP-01 challenge. Implementation-wise: `ensureGrpcCertificate` needs a
-   second path (`provider: 'letsencrypt'`, `meta.dns_challenge: true`,
-   `meta.dns_provider: 'cloudflare'`) instead of the self-signed `'other'`
-   provider one, used only for hosts that go this direct-exposure route.
-4. **App code**: needs a way to mark a given `additionalExposures` entry
-   (or the primary exposure) as "direct" vs "tunneled" — right now
-   everything assumes the Cloudflare Tunnel unconditionally. This is a
-   bigger change than 20.7/20.8 was; size it up properly before starting,
-   don't rush it in like the gRPC flag was.
-5. Once live, retest the mobile app the same way as this session.
-
-**Alternative not yet explored**: whether NetBird's own `Relay`/`Signal`
-components (separate from the Management API) could stand in for direct
-enrollment instead of reworking exposure topology — lower priority, only
-worth a look if the router port-forward turns out to be impractical.
-
-### 20.11 Outstanding TODO — ALL CLOSED, see §54
-
-> **Superseded 2026-08-31.** Every item below is resolved or withdrawn. Left
-> in place for the reasoning trail, but **do not action any of it** — the
-> port-forward approach it assumes was formally withdrawn by the user.
-
-- [x] ~~**User: confirm whether a router port-forward + (static IP or DDNS)
-      is feasible**~~ — **WITHDRAWN (§51.1).** The user rejected a router
-      change; §0 principle 1 stands. Never re-propose it.
-- [x] ~~**Implement 20.10**~~ — **WITHDRAWN** with the above.
-- [x] ~~**Confirm a real peer actually enrolls and shows up**~~ — **DONE**
-      (§46.13 first enrolment, §53.3 both peers connected).
-- [ ] **Configure STUN/TURN** — `Stuns`/`TURNConfig.Turns` are both empty in
-      `apps/netbird-vpn/data/management.json`. Won't block registration, but
-      peers behind NAT likely can't connect to each other without it. Not
-      worth touching until enrollment itself works. **Priority: P1** —
-      **Estimate: S–M**
-
 ## 21. Session Log — 2026-08-28: Container status fixes + backlog of exposed-app issues
 
 Shipped this session (git `d1977a7`..`7b8e4a4`):
@@ -2833,160 +2418,6 @@ Recreated → healthy.
 
 **Dashboard: 30 / 30 running, all healthy, 0 error, 0 stopped.**
 
-## 24. Session Log — 2026-08-29: NetBird — real root cause found, dashboard works, first peer enrolled
-
-Picks up Track D (§23.1) / §20-21.3. Both bugs below were found and fixed
-live against the real deployment; a real peer was enrolled and confirmed in
-both the REST API and the browser dashboard — the first time this has ever
-worked (§20.3: "no device has ever connected a NetBird client to this
-management server").
-
-### 24.1 Bug 1 (fixed) — NPM's `grpc_pass` fix from §20.4/§20.8 broke the
-browser dashboard's own REST calls
-`backend/src/services/npmClient.ts`'s `buildGrpcAdvancedConfig` (added in
-§20.4 to give native/mobile gRPC clients a working `grpc_pass` location) set
-`location / { grpc_pass ...; }` unconditionally — routing **every** request
-to `netbird-vpn-api.tx-home-utils.com`, including the dashboard's own REST
-calls (`/api/instance`, `/api/peers`, `/api/users`, ...), through nginx's
-native gRPC proxy. Real HTTP/2 gRPC requires trailers end-to-end, and the
-already-known upstream cloudflared bug (§20.9,
-https://github.com/cloudflare/cloudflared/issues/1641) strips them — so
-every REST call from the browser just hung forever. That's why the dashboard
-showed a spinner and never progressed ("loads then bounces back").
-
-**Fixed**: `buildGrpcAdvancedConfig` now only sends requests with
-`Content-Type: application/grpc` (native gRPC) through `grpc_pass`;
-everything else (REST, grpc-web) falls through to a plain HTTP/1.1
-`proxy_pass`, like every other app. Verified live: `curl /api/instance` now
-returns instantly instead of hanging, native `GetServerKey` still correctly
-routes through `grpc_pass`. Backend suite still 121/121 passing (no test
-changes needed — existing assertions on the `grpc_pass` line still hold).
-
-### 24.2 Bug 2 (the real blocker, fixed) — `NETBIRD_TOKEN_SOURCE: accessToken`
-was wrong for this Authelia setup
-Even after 24.1, the dashboard still looped: login → consent → a few seconds
-on `/peers` → bounced back to a fresh Authelia consent screen, repeating
-indefinitely (confirmed independent of my own browser automation — it
-reproduced with a completely passive `wait`, and matches the user's original
-report on their Android phone). Live evidence: `oauth2_consent_session` rows
-showed `granted=1` on every attempt (the user's Accept clicks always
-succeeded), yet **zero** requests to `/api/oidc/token` ever appeared in NPM's
-access log — the SPA received a valid authorization code but never
-attempted the exchange, then silently restarted the whole login flow
-(console showed a recurring `Uncaught (in promise)` exception right before
-each bounce).
-
-Root cause, found by manually driving the OAuth exchange with `curl` (own
-PKCE `code_verifier`/`code_challenge`, browser only for the interactive
-Accept click) to isolate the SPA entirely: Authelia issues an **opaque**
-access token for the `netbird-dashboard` client (no
-`access_token_signed_response_alg` configured) — confirmed via
-`GET /api/oidc/userinfo` (200 with the opaque token). But
-`netbird-management`'s own auth middleware
-(`shared/auth/jwt/validator.go`) parses the bearer as a **JWT** and rejects
-anything else: `token is malformed: token contains an invalid number of
-segments` → `401 token invalid`. Since `apps/netbird-vpn/docker-compose.yml`
-had `NETBIRD_TOKEN_SOURCE: accessToken`, literally every authenticated API
-call the dashboard ever made 401'd — that's why the SPA kept restarting
-login: from its perspective, auth kept failing.
-
-Confirmed by swapping which token I sent as Bearer against the live API:
-the opaque `access_token` → `401 token invalid`; the `id_token` (always a
-real JWT) → `200` with real user data.
-
-**Fixed**: `NETBIRD_TOKEN_SOURCE: idToken` in
-`apps/netbird-vpn/docker-compose.yml`. Redeployed
-(`docker compose up -d --force-recreate netbird-dashboard`). Verified live in
-a real browser session: dashboard loads normally, held stable through the
-~10-15s window that previously always bounced, Settings → Setup Keys works,
-created a real setup key through the actual UI (`claude-test-peer`), used it
-to enroll a real `netbird` client container (on the same Docker network,
-`http://netbird-management:80` — no tunnel, no router change), confirmed
-`connected: true` via `GET /api/peers` **and** saw it rendered live in the
-browser's Peers table (`ebdcd045581d`, `100.111.119.221`, "just now"). Test
-peer and setup key deleted afterward to leave the account clean.
-
-### 24.3 Side change made, of uncertain value — Authelia `consent_mode`
-Also changed both `netbird-dashboard` and left `netbird-cli` clients'
-`consent_mode` from `implicit` to `pre-configured` in
-`apps/authelia/config/configuration.yml`, on the theory (confirmed by
-https://github.com/authelia/authelia/discussions/10668) that `implicit`
-never actually skips consent for a client requesting `offline_access`
-regardless of mode. In practice, `pre-configured` **also** never persisted a
-reusable grant in this Authelia version (v4.39.20) — `oauth2_consent_preconfiguration`
-stayed at 0 rows after multiple real Accepts, matching a known class of open
-upstream bugs (https://github.com/authelia/authelia/discussions/10346,
-#10345). **This did not turn out to matter**: 24.2 was the actual bug, and
-with it fixed the dashboard's token no longer expires/fails every few
-seconds, so the consent screen is no longer being re-triggered on a tight
-loop — a normal user should now only see it rarely (real token expiry, ~1h
-default). Left as `pre-configured` since it's not worse than `implicit` and
-is the more correct choice if Authelia's persistence bug is ever fixed
-upstream; not worth reverting.
-
-### 24.4 User question: would dropping Authelia from netbird-vpn have been simpler?
-No — neither of today's two real bugs (24.1, 24.2) were caused by Authelia
-itself; Authelia was issuing valid tokens the whole time. NetBird's
-self-hosted management has no built-in username/password store — it always
-delegates to an external OIDC IdP, so "removing Authelia" would mean standing
-up a *different* IdP (Keycloak, Zitadel, NetBird's own hosted option, ...),
-which is more work, not less, and would lose the unified SSO this deployment
-already has across every other exposed app (paperless, nextcloud, immich,
-...). Not recommended.
-
-### 24.5 Still open — unchanged from §20.9-21.3, not addressed this session
-Native/mobile/CLI gRPC enrollment **through the public Cloudflare Tunnel
-hostname** (`netbird-vpn-api.tx-home-utils.com`) is still blocked by the
-upstream cloudflared gRPC-trailers bug — confirmed still present on the
-current cloudflared version (`2026.8.2`) via a live `grpcurl` test
-(`DeadlineExceeded`). This is unrelated to 24.1/24.2 and unrelated to
-Authelia. The browser dashboard and setup-key enrollment both work today
-because REST/grpc-web traffic no longer needs real gRPC trailers (24.1) —
-but a real phone/laptop enrolling from outside the LAN still needs one of
-the §21.3 options (Relay/Signal, Tailscale overlay, or a router
-port-forward per §20.10) to get native gRPC to management without going
-through the tunnel. Track D item 3 (STUN/TURN, `apps/netbird-vpn/data/management.json`)
-is also still open and still untouched.
-
-### 24.6 Live mobile retest, same session — confirms 24.5, decision deferred
-User entered `https://netbird-vpn-api.tx-home-utils.com` in the real NetBird
-Android app right after 24.1-24.2 shipped, in case those fixes incidentally
-helped. They didn't (expected — 24.5 already called this): NPM's access log
-showed the exact same signature as §20.9 — `grpc-go/1.80.0` calling
-`POST .../GetServerKey` every 10-15s in a tight loop, `200` every time, never
-progressing, no hard error surfaced in the app yet. Live, current-timestamp
-confirmation that the cloudflared trailers bug is still the sole blocker for
-native clients, unchanged by anything in this session.
-
-Discussed the two remaining options with the user:
-- **Tailscale-overlay relay** (§21.3 option b): real downside surfaced in
-  discussion — NetBird's client holds a *persistent* streaming connection to
-  management for policy/peer updates (`connecting to Management Service
-  updates stream`, seen live in every client boot log this session), not a
-  one-time enrollment call. So routing management over Tailscale would mean
-  the phone needs **both Tailscale and NetBird active simultaneously,
-  always** — not just to enroll. User asked whether NetBird-only (no second
-  app) is possible at all.
-- **Router port-forward + real cert, direct (ungrayed) exposure for just
-  this one hostname** (§20.10): the only path that lets NetBird work alone
-  on mobile, because it removes cloudflared's HTTP/2 proxy layer entirely
-  for this one host (raw TCP forward, no trailers-stripping proxy in the
-  path) — every other app stays tunneled as-is. This is the one deliberate,
-  narrow exception to §0 principle 1 ("no router changes") that the
-  project's own §21.3 anticipated needing user sign-off for. Still needs:
-  confirmation of a static public IP or DDNS, the actual router change
-  (can't be done remotely from here), grey-clouding the DNS record, and the
-  `ensureGrpcCertificate` DNS-01 Let's Encrypt path from §20.10 item 3 (not
-  yet built — today's `ensureGrpcCertificate` only does the self-signed
-  `noTLSVerify` cert for the *tunneled* path, which wouldn't be trusted by a
-  directly-exposed native client).
-
-**Decision: deferred, user will revisit.** No code changes this round for
-mobile itself — 24.1-24.2 (dashboard + setup-key path) are the only things
-that shipped and are confirmed working. Next session, resume at: does the
-user have a static IP/DDNS, and do they want to proceed with the port
-forward, or reconsider Tailscale-alongside despite the two-app cost.
-
 ## 25. Price Compare — built out over 2026-08-29/30 (former §25–§45, compacted 2026-09-03)
 
 `apps/price-compare` is a managed app (its own Express server, flat-JSON
@@ -3109,686 +2540,203 @@ matching behaviour. This section is the compacted summary.
   pó", fresh produce absent from some stores' own top search results.
 
 
-## 46. Session Log — 2026-08-30 (cont.): NetBird over Cloudflare Tunnel — **SOLVED**: cloudflared's QUIC transport was eating the gRPC trailers
-
-Resumes Track D (§23.1) / §24.5-24.6. User's framing: make NetBird work over
-Cloudflare Tunnel, **no router port-forward** — i.e. explicitly rules out the
-§20.10 / §24.6 port-forward plan, so the §0 principle 1 exception stays off
-the table.
-
-### 46.1 Isolation test — the origin chain is not the problem
-
-Drove raw gRPC by hand instead of guessing: `GetServerKey` takes an empty
-message, so the whole request body is five zero bytes
-(`\x00` compression flag + 4-byte length 0), which `curl --http2` can post
-directly with `content-type: application/grpc` + `te: trailers`. Same request,
-three points in the chain:
-
-| # | Path | HTTP | body | `grpc-status` trailer |
-|---|------|------|------|----------------------|
-| 1 | direct h2c → `netbird-management` `10.201.0.1:8080` | 200 | 61 B, real key | **present** |
-| 2 | → NPM `:443` (SNI `netbird-vpn-api`), cloudflared bypassed | 200 | 61 B, real key | **present** |
-| 3 | → Cloudflare edge (full public path) | 200 | 61 B, real key | **MISSING** |
-
-Two things follow, and both correct earlier assumptions in this plan:
-
-- **The origin chain is correct.** NPM's `grpc_pass` (§20.4/§24.1) and
-  `netbird-management` return a complete, trailer-carrying gRPC response.
-  Nothing on our side of cloudflared needs fixing. NPM access log confirms
-  both requests arrived and were served identically (`200 200 - POST https
-  ... [Length 61]`).
-- **§20.9's description is now out of date.** It recorded the body *and*
-  trailers being stripped; today the body comes through intact and **only the
-  trailers are dropped**. cloudflared has partially improved since. The
-  practical effect is unchanged — grpc-go treats a response with no
-  `grpc-status` as `server closed the stream without sending trailers`, so the
-  client retries forever, which is exactly the §24.6 loop
-  (`GetServerKey` every 10-15 s, 200 every time, never progressing).
-
-### 46.2 Ruled out, with evidence
-
-- **Zone gRPC toggle**: ON (checked in the dashboard, Network page). Also
-  confirmed indirectly — see §46.3, a zone *without* it returns `403` +
-  an HTML body, which is the §20.7 signature, not what our hostname does.
-- **Zone WebSockets**: ON (matters later, see §46.5).
-- **cloudflared version**: `2026.8.2`, current.
-- **NPM HTTP/2**: `http2 on;` is present in `proxy_host/10.conf`.
-- **Tunnel origin config**: `http2Origin: true`, `noTLSVerify: true`,
-  `originServerName: netbird-vpn-api.tx-home-utils.com`, `service:
-  https://192.168.1.23` — all as Cloudflare's gRPC docs require.
-- **Not the `--protocol http2` fallback theory**: the connector negotiated
-  `quic` cleanly (`SUMMARY: Environment is healthy. cloudflared will use
-  'quic' as primary protocol`), so it is *not* silently degraded.
-
-### 46.3 Likely root cause: cloudflared's QUIC backbone drops HTTP/2 trailers
-
-`journalctl` shows the connector registering all four connections with
-`protocol=quic`. A battle-tested community guide for exactly this stack
-(https://github.com/nexstacksg/netbird-self-hosting-guide) states the
-connector must be pinned to `--protocol http2`, because "NetBird's management
-API is gRPC (HTTP/2 with trailers). cloudflared's QUIC backbone has known
-issues passing HTTP/2 trailers reliably", and names the precise error our
-client would see: `rpc error: code = Internal desc = server closed the stream
-without sending trailers`. That is a one-to-one match with §46.1 row 3.
-
-Upstream https://github.com/cloudflare/cloudflared/issues/1641 is still open,
-unlabelled, with no maintainer response and no workaround recorded — so the
-transport flag is the only lead, not a documented fix.
-
-**Caveat, recorded honestly**: Cloudflare's own docs
-(https://developers.cloudflare.com/network/grpc-connections/) say Cloudflare
-Tunnel supports gRPC "via private subnet routing" only and that **public
-hostname deployments are not supported**. So the `--protocol http2` route is
-an unsupported-but-reported-working configuration, not a blessed one. It may
-work; it is not guaranteed to keep working.
-
-### 46.4 Why it took a user-run command to verify
-
-The hypothesis is **untested**. Two independent permission boundaries blocked
-every route to testing it, and neither should be worked around:
-
-1. **No passwordless sudo.** cloudflared here is a *host systemd* service
-   (§17.2), and `--protocol` is a connector-process flag — it cannot be set
-   from the remotely-managed tunnel config. Changing it needs
-   `/etc/systemd/system/cloudflared.service.d/`.
-2. **`/etc/cloudflared/token` is `0600 root:root`**, so a second replica
-   couldn't be started for a side-by-side test either. The Cloudflare **API**
-   *is* reachable with the stored token (`/user/tokens/verify` → `active`),
-   but `GET /accounts/{acct}/cfd_tunnel/{id}/token` — the call that would hand
-   over the connector token so a replica could be run in Docker without sudo —
-   is gated as credential extraction, same as the dashboard route below. Creating a *separate*
-   tunnel to test with was tried (created and then deleted again, account left
-   as found, 5 tunnels); pulling its connector token out of the dashboard was
-   correctly refused by the sandbox as credential extraction.
-
-A **credential-free A/B was attempted** — two `cloudflared` quick tunnels
-against the same NPM origin, one `--protocol quic`, one `--protocol http2`,
-so transport was the only variable. It came back **inconclusive**: both
-returned `403` + HTML, because `trycloudflare.com` is a zone with the gRPC
-toggle *off*. Useful by-product: that is the §20.7 403 signature, which
-re-confirms the toggle genuinely is on for `tx-home-utils.com` (our hostname
-returns 200 + body). Both quick tunnels were stopped; the production
-connector (PID 1409) was never touched and stayed `active` throughout.
-
-**The one-line test the next session needs** (~5 s tunnel blip, fully
-reversible, affects every hostname on the tunnel, not just NetBird):
-
-```
-sudo mkdir -p /etc/systemd/system/cloudflared.service.d
-printf '[Service]\nExecStart=\nExecStart=/usr/bin/cloudflared --no-autoupdate --protocol http2 tunnel run --token-file /etc/cloudflared/token\n' | sudo tee /etc/systemd/system/cloudflared.service.d/override.conf
-sudo systemctl daemon-reload && sudo systemctl restart cloudflared
-```
-
-Re-run the §46.1 row-3 curl afterwards; a `grpc-status: 0` line appearing
-after the blank line is the whole pass/fail signal. Revert = delete the
-override file + `daemon-reload` + `restart`. Trade-off if it is kept: the
-http2 transport is a fully supported cloudflared mode (it is the standard
-fallback when UDP is blocked) but gives up UDP/ICMP proxying — irrelevant
-here, `warp-routing` is `{"enabled":false}` on this tunnel.
-
-### 46.5 Even with trailers fixed, three things still block a real remote phone
-
-Worth stating plainly because §24.5 framed the trailers bug as the *sole*
-blocker. It is the sole blocker for `GetServerKey`; it is not the sole blocker
-for a working phone. Found by reading the live config this session:
-
-1. **Signal is internal-only.** `apps/netbird-vpn/data/management.json` has
-   `Signal: { Proto: "http", URI: "netbird-vpn:80" }` — a Docker-internal
-   hostname handed out to clients, which no phone can resolve. Signal is also
-   gRPC, so it needs its own public hostname *and* depends on the same trailer
-   fix. `netbird-vpn-netbird-vpn-1` (the signal container) publishes no ports
-   today.
-2. **No NAT traversal at all.** `Stuns: []` and `TURNConfig.Turns: []` are
-   both empty (the still-open Track D item 3). Without them two remote peers
-   can discover nothing.
-3. **TURN can't be the fallback here.** A TURN server needs a port-forward,
-   which is exactly what's excluded. The no-port-forward answer is
-   **`netbirdio/relay`**, which speaks WebSocket over HTTPS and therefore
-   *does* traverse a Cloudflare Tunnel (zone WebSockets already on, §46.2).
-   It is not in `apps/netbird-vpn/docker-compose.yml` at all yet. STUN can
-   point at a public server (e.g. Google's) since the client reaches it
-   directly over UDP, never through our tunnel.
-
-So the full no-port-forward shape is: management (gRPC, tunnel) + signal
-(gRPC, tunnel, new hostname) + relay (WebSocket, tunnel) + public STUN.
-Deliberately **not** built this session — all three depend on the §46.4 test
-passing first, and building them before that would be churn if the transport
-flag turns out not to fix trailers.
-
-### 46.6 If the transport flag does not work
-
-Then gRPC over a tunnel *public hostname* is genuinely a dead end (which is
-what Cloudflare documents), and the remaining no-port-forward options all
-cost a second always-on app on the phone, because NetBird holds a *persistent*
-management stream (§24.6), not a one-time enrollment call:
-
-- **Cloudflare Tunnel private subnet routing + WARP client** — the path
-  Cloudflare's own docs say gRPC is supported on. Free tier covers it. But if
-  WARP is already up on the phone, NetBird has little left to add, so this is
-  close to self-defeating.
-- **Tailscale overlay** (§21.3 option b) — already in the stack, same
-  two-app cost, already analysed in §24.6.
-- **A cheap public-IP VPS fronting the gRPC hostnames** — no router change,
-  but new infrastructure and cost, and outside "using cloudflare tunnel".
-
-Nothing here changes the §24.6 conclusion that a port-forward is the only
-single-app answer; it just confirms it is not the *only* answer if a second
-app is acceptable.
-
-### 46.7 CONFIRMED — the transport flag fixes it. §20.9/§24.5 are overturned.
-
-User applied the §46.4 override. Connector came back as
-`Initial protocol http2`, all four connections `protocol=http2`. Re-ran the
-§46.1 row-3 request unchanged:
-
-```
-http=200 size=61
-grpc-status: 0          <-- present, through the Cloudflare edge
-```
-
-**Native gRPC now completes end-to-end through a Cloudflare Tunnel public
-hostname.** This directly contradicts §20.9's "no amount of NPM/tunnel
-configuration fixes a bug in cloudflared's own frame handling" and §24.5's
-framing of it as an unfixable upstream blocker. It was never an unfixable
-bug — it was the **connector's transport protocol**, and it is one flag.
-The §20.10 / §24.6 router port-forward plan is **no longer needed** and
-should not be pursued.
-
-Proven with a real client, not just `curl`: `netbirdio/netbird:latest` pointed
-at `https://netbird-vpn-api.tx-home-utils.com` (over the public internet →
-Cloudflare → tunnel, not the Docker network §24.2 used) got back real
-*application-level* gRPC statuses —
-
-```
-failed to login to Management Service: rpc error:
-  code = PermissionDenied desc = no peer auth method provided,
-  please use a setup key or interactive SSO login
-```
-
-— which is the management server's own reply, received and parsed by grpc-go.
-That whole round trip requires trailers. Previously the identical client just
-looped on `GetServerKey` forever (§24.6).
-
-**Regression check, same http2 transport**: `homelab` 200, `authelia` 200,
-`immich` 200, `ntfy` 200 (WebSocket host), `netbird-vpn` / `paperless` /
-`nextcloud` 302 (normal auth redirects). Zero `ERR` lines from the new
-connector process — the 18 in the journal are all the *old* PID shutting
-down. No downside observed from dropping QUIC.
-
-**Keep the override.** Note it is a systemd drop-in at
-`/etc/systemd/system/cloudflared.service.d/override.conf`, i.e. **host state
-outside this repo** and outside its backups — same class of footgun as §17.2.
-If this host is ever rebuilt, NetBird silently breaks again until the flag is
-re-applied.
-
-### 46.8 Shipped alongside: Signal exposed publicly + STUN configured
-
-§46.5 items 1 and 2, both fixed and deployed this session.
-
-**Signal (§46.5 item 1).** It was never reachable by a remote peer — management
-handed clients `Signal: {Proto: http, URI: "netbird-vpn:80"}`, a Docker-internal
-name. §24.2's test peer only worked because it sat on that same Docker network.
-Fixed by giving signal the same treatment `netbird-vpn-api` already had:
-
-- `apps/netbird-vpn/docker-compose.yml` — the `netbird-vpn` (signal) container
-  published no ports at all; now publishes `${NETBIRD_SIGNAL_PORT:-8086}:80`.
-- `apps/netbird-vpn/.env` + `.env.example` — `NETBIRD_SIGNAL_PORT=8086`
-  (8082-8085 were already taken on this host).
-- `backend/src/config/services.ts` — second `additionalExposures` entry,
-  `{ suffix: 'signal', label: 'Signal', portEnvVar: 'NETBIRD_SIGNAL_PORT',
-  grpc: true }`. `grpc: true` matters: signal is native gRPC like management,
-  so it needs the `buildGrpcAdvancedConfig` `grpc_pass` path, not plain
-  `proxy_pass`.
-- `data/management.json` + `config/management.json.example` — `Signal` is now
-  `{Proto: https, URI: "netbird-vpn-signal.tx-home-utils.com:443"}`.
-
-**STUN (§46.5 item 2, half of it).** `Stuns` was `[]`. Now points at two public
-servers (`stun.cloudflare.com:3478`, `stun.l.google.com:19302`). Deliberately
-public rather than self-hosted: the client reaches STUN **directly over UDP**,
-never through our tunnel, so this needs no port-forward and no new container.
-
-**Deployed and verified live**: backend rebuilt + recreated, signal + management
-containers recreated, `provisionServiceIfEnabled('netbird-vpn', 1)` run inside
-the container (`success: true`). Confirmed end to end —
-
-- NPM `proxy_host/33.conf` created for `netbird-vpn-signal.tx-home-utils.com`
-  with `http2 on;` and `grpc_pass grpc://10.201.0.1:8086`.
-- Cloudflare tunnel ingress added with `http2Origin`/`noTLSVerify`/
-  `originServerName`, DNS resolving to Cloudflare.
-- gRPC **through the edge**, with trailers, on both the success and the error
-  path: `signalexchange.SignalExchange/Send` → `grpc-status: 0`; a bogus method
-  → `grpc-status: 12` + `grpc-message: unknown method ...`. Proper trailer
-  propagation, not a fluke of one endpoint.
-
-Backend suite **121/121**, `tsc --noEmit` clean (run in a `node:20-alpine`
-container — this host has no node/npm installed).
-
-### 46.9 Still open: relay (§46.5 item 3) — deliberately not built
-
-`TURNConfig.Turns` is still `[]` and `netbirdio/relay` is still not deployed.
-STUN alone gets peers connected only when hole-punching succeeds; a phone on
-mobile-data CGNAT talking to a home server with no port-forward will often need
-a relay fallback. The no-port-forward answer remains `netbirdio/relay`
-(WebSocket over HTTPS, so it traverses the tunnel — zone WebSockets already on).
-
-**Not built this session on purpose.** Every conclusion above was *measured*,
-and relay can't be measured without a real setup key to enroll a peer with —
-the dashboard needs an Authelia login. Shipping unverifiable config would
-break that pattern. Sketch for whoever picks it up: relay service in the
-compose file with `NB_EXPOSED_ADDRESS=rels://netbird-vpn-relay.<base>:443`,
-`NB_LISTEN_ADDRESS=:33080`, `NB_AUTH_SECRET=<generated>`; a third
-`additionalExposures` entry (suffix `relay`, `grpc: false` — it is WebSocket,
-not gRPC, so it wants NPM's websocket support rather than `grpc_pass`); and a
-matching `Relay` block in `management.json` carrying the *same* secret.
-
-Test it only after a real peer enrols and its status is checked — if direct
-P2P already works on the user's actual networks, relay is optional.
-
-### 46.10 start.sh now re-asserts the cloudflared flag (answers "can start.sh fix the out-of-repo problem?")
-
-Yes — and it is the right place. `start.sh` already runs as root, already manages
-systemd units, and already solves the *exact* analogous footgun one block
-earlier: the Docker `default-address-pools` write to `/etc/docker/daemon.json`
-(the [[docker-address-pool-gateway]] problem). The cloudflared drop-in is the
-same shape of host state, so it now gets the same treatment.
-
-Added a block before the Compose-plugin check that writes
-`/etc/systemd/system/cloudflared.service.d/10-grpc-http2.conf` containing:
-
-```
-[Service]
-Environment=TUNNEL_TRANSPORT_PROTOCOL=http2
-```
-
-**First attempt used the wrong mechanism.** It originally read the unit's
-`ExecStart`, inserted `--protocol http2`, and wrote it back — which only worked
-if `cloudflared.service` *already existed*. But `start.sh` does not install
-cloudflared (it is a separate host service, §17.2), so on a genuinely fresh
-machine it usually does **not** exist at that point, the block no-op'd, and the
-new host silently inherited the exact bug this is meant to prevent — see §46.15.
-
-The environment-variable form fixes that: systemd applies drop-ins whenever the
-unit later appears, so **install order stops mattering**, and it needs to know
-nothing about the unit's `ExecStart` (whose token path and flags vary per host).
-An explicit `--protocol` on the command line still takes precedence, so a
-deliberate per-host choice is never overridden.
-
-Verified live that cloudflared actually honours the variable — ran it with
-`TUNNEL_TRANSPORT_PROTOCOL=http2` and got `INF Initial protocol http2` /
-`Registered tunnel connection ... protocol=http2`. `bash -n` clean; the guard
-greps the drop-in for the setting so a second run is a no-op; the restart is
-attempted only when cloudflared is installed *and* already active, and degrades
-to `warn` (never `exit`), matching the docker-restart block's tone.
-
-Note this host still also carries the manual `override.conf` written earlier
-tonight. Harmless — both say http2 — but it can be deleted once `start.sh` has
-run, leaving the managed drop-in as the single source of truth.
-
-### 46.11 Phone enrolled, then bounced after Authelia login — native PKCE was pointed at the *web dashboard*
-
-User's phone enrolled successfully (first time ever through the tunnel) but hit
-a browser error page after the Authelia login.
-
-**Evidence** (NPM access logs, 22:08-22:09): the app's RPCs all succeeded —
-`GetPKCEAuthorizationFlow`, `GetServerKey`, `Login`, all `200` from
-`grpc-go/1.80.0`. So the app used the **PKCE** flow. Then the phone's browser
-(`Android ... Chrome/150 Mobile`) landed on
-`netbird-vpn.tx-home-utils.com/nb-auth?code=...`.
-
-That is the **web dashboard's** redirect URI, not the app's. Root cause, in
-`data/management.json`:
-
-```
-PKCEAuthorizationFlow.ProviderConfig.RedirectURLs = [
-  "https://netbird-vpn.tx-home-utils.com/nb-auth",
-  "https://netbird-vpn.tx-home-utils.com/nb-silent-auth" ]
-```
-
-Native clients (Android/desktop/CLI) run a throwaway **loopback listener** and
-expect the authorization code delivered there (RFC 8252); NetBird's documented
-default is `http://localhost:53000/`. Because management advertised the SPA's
-URLs instead, Authelia happily issued the code — to the *web dashboard*, in the
-phone's browser, where an SPA with no matching `code_verifier` could do nothing
-with it. The app never received its code.
-
-**Second bug, same class as §24.2**: `UseIDToken` was `false`, so a native
-client would send Authelia's **opaque** `access_token` as the bearer — and
-management parses bearers as JWTs and rejects anything else (`token contains an
-invalid number of segments`). This is precisely why the dashboard needed
-`NETBIRD_TOKEN_SOURCE: idToken`; the native path had the identical latent bug
-waiting behind the redirect bug.
-
-**Fixed:**
-- `RedirectURLs` → `["http://localhost:53000/"]`, `UseIDToken` → `true`
-  (`data/management.json` + `config/management.json.example`).
-- `apps/authelia/config/configuration.yml` — `netbird-dashboard` gains
-  `http://localhost:53000/` and `http://localhost:53000` (Authelia matches
-  `redirect_uri` by exact string, so both slash variants are registered).
-  Native clients deliberately **reuse this client** rather than `netbird-cli`:
-  management validates the bearer's audience against
-  `HttpConfig.AuthAudience` = `netbird-dashboard`, so a token minted for a
-  different `client_id` would be rejected.
-
-**Verified** with a positive *and* negative control against the live authorize
-endpoint: `redirect_uri=http://localhost:53000/` → `302` into the login flow
-(accepted); `http://localhost:59999/bogus` → `error=invalid_request ... 'The
-redirect_uri parameter does not match any of the OAuth 2.0 Client's
-pre-registered redirect_uris'`. Authelia restarted healthy; the only client
-warning it logs is the pre-existing `netbird-cli` `offline_access`/`response_type`
-one, untouched by this change.
-
-**Not claimed**: that this fully explains the *red* page specifically — the
-Authelia container had already been recreated, so its stdout log of what the
-phone actually sent was gone, and the NPM logs only prove the code went to the
-dashboard. The misdirected redirect is a real bug and is definitely fixed;
-whether the exact interstitial the user saw was that, remains to be confirmed
-by a retry.
-
-### 46.12 Still broken and NOT fixed: the CLI's device-authorization flow
-
-`DeviceAuthorizationFlow.Provider` is `""`, so `netbird login` from a headless
-client fails with `InvalidArgument: no provider found in the protocol for`
-(reproduced live this session). Headless clients prefer device flow over PKCE,
-so this is the path a laptop/CLI takes — the phone is unaffected.
-
-Deliberately not fixed, because a correct fix is more than setting
-`Provider: "hosted"`: `netbird-cli`'s audience is `netbird-cli` while
-management validates against `AuthAudience: netbird-dashboard`, so its tokens
-would be rejected even once the provider is set, and `UseIDToken` is `false`
-there too (§24.2 again). Getting it right means aligning the audience in both
-Authelia and `management.json` — and it cannot be verified without an
-interactive device login, which is the same reason relay was left alone
-(§46.9).
-
-### 46.13 CONFIRMED by the user — phone login works, first real peer enrolled
-
-User retried after §46.11 and reported it working. Verified independently in
-management's own store (`/var/lib/netbird/store.db`, `peers` table):
-
-```
-name       : garnet_eea
-netbird ip : 100.111.123.196
-os / ver   : Android / 0.71.0
-last login : 2026-08-30 22:23
-```
-
-This is the **first real device ever enrolled end-to-end over the public
-Cloudflare Tunnel** — §24.2's peer was a container on the internal Docker
-network, and every attempt through the tunnel before today looped forever
-(§20.9, §24.6). Chain now proven working in full: native gRPC over the tunnel
-(§46.7) → signal reachable publicly (§46.8) → native PKCE login against
-Authelia (§46.11).
-
-`peer_status_connected` reads `false` at time of checking, which is expected —
-the app was no longer in the foreground; it is not a fault.
-
-> **CORRECTION (2026-08-31, §51.6).** The original text here read the
-> `location_connection_ip` `2a01:14:120:cfb0:...` as the phone's and concluded
-> "the phone was on home WiFi, so the CGNAT path is untested". That was a
-> **misattribution** — `2a01:14:120:cfb0:16b3:1fff:fe13:fbca` is *this
-> server's own* global IPv6. The phone's recorded connection IP is
-> `87.196.82.251` (Porto; the server is in Guimarães). The mobile-data path
-> has been exercised all along. See §51.6.
-
-**§0 principle 1 held**: no router port-forward, no static IP, no DDNS. The
-§20.10 / §24.6 port-forward exception was never needed and is now formally
-withdrawn.
-
-### 46.14 Next, in priority order
-
-1. **A second peer.** There is exactly one peer in the account, so there is
-   nothing for the phone to reach yet. Wanting to reach home services means a
-   peer on this host (likely a *routing* peer advertising the LAN / the Docker
-   service subnets), which needs the client installed on the host — root, and
-   a real design choice about which routes to advertise.
-2. **Re-test from mobile data, not WiFi** — the case §46.9 predicts will need
-   relay. If peers connect off-WiFi, relay stays optional.
-3. Relay (§46.9) and the CLI device flow (§46.12), both still open.
-
-### 46.15 "Would a brand-new server hit this again?" — what carries over and what doesn't
-
-Audited every fix from this session against a clean `git clone` + `sudo ./start.sh`.
-
-**Carried by the repo — a new server gets these automatically:**
-
-| Fix | Where it lives |
-|---|---|
-| cloudflared pinned to http2 | `start.sh` drop-in (§46.10, order-independent) |
-| Signal published + its port | `apps/netbird-vpn/docker-compose.yml`, `.env.example` |
-| Signal public hostname provisioning | `additionalExposures` in `backend/src/config/services.ts` |
-| STUN servers | `apps/netbird-vpn/config/management.json.example` |
-| PKCE `RedirectURLs` + `UseIDToken` | same example file |
-| Authelia loopback `redirect_uri` | `apps/authelia/config/configuration.yml` |
-
-**Does NOT carry over — still manual on a new host:**
-
-1. **The base domain is hardcoded.** `config/management.json.example` and
-   `apps/authelia/config/configuration.yml` both name
-   `tx-home-utils.com` throughout (Authelia endpoints, the signal URI, the
-   dashboard redirect URIs). A different domain means editing both before first
-   start — `apps/netbird-vpn/.env.example` already warns about this, and that
-   warning now covers more files than when it was written.
-2. **`data/management.json` must still be generated** from the example with a
-   real `DataStoreEncryptionKey` (documented in `.env.example`). The STUN/PKCE
-   fixes only reach a new host through that generation step — editing the
-   example does nothing for an *existing* host that already has a `data/` copy.
-3. **cloudflared itself is not installed by `start.sh`**, nor is the tunnel
-   created or its hostnames routed. Only the http2 setting is asserted.
-4. **§46.9 relay and §46.12 device flow are still unfixed** — a new server
-   inherits both gaps, because they were never fixed here either.
-
-So: the *silent, hard-to-diagnose* failure (QUIC eating gRPC trailers, which
-cost this project several sessions and a nearly-accepted router port-forward)
-is now automated away. What remains manual is the ordinary per-deployment
-configuration a new domain needs, which fails loudly and obviously rather than
-silently.
-
-## 47. Session Log — 2026-08-30 (cont.): `start.sh` bootstraps Cloudflare + NetBird end-to-end
-
-Answers §46.15's "what doesn't carry over" by removing almost all of it. A
-clean `git clone` + `sudo ./start.sh` on a new host now asks three questions
-and configures the rest.
-
-### 47.1 What start.sh now asks for, and what it derives
-
-Prompts (once; remembered in the root `.env`, which is already gitignored and
-`chmod 600`, so no new secret file or ignore rule was needed):
-**base domain**, **Cloudflare API token** (read silently), **tunnel name**
-(defaults to the hostname).
-
-Everything else is derived rather than typed:
-- **Zone ID *and* account ID from one call** — `GET /zones?name=<domain>`
-  returns the zone with its owning account embedded.
-- **The tunnel**, looked up by name and created only if absent. Created with
-  **`config_src: "cloudflare"`**, which is not optional: the dashboard
-  publishes ingress with `PUT /cfd_tunnel/{id}/configurations`
-  (`cloudflareTunnelClient.ts`), and against a locally-configured tunnel that
-  call is *accepted* but the connector never reads it — every exposure would
-  silently 404. Exactly the failure shape §46 was about, so it is commented in
-  place.
-- **The connector token**, fetched from the API — so it never has to be pasted
-  in, and is never written to a file.
-- **cloudflared itself**, downloaded per-arch and `service install`ed, but only
-  when no `cloudflared.service` already exists, so re-runs can't repoint a
-  connector that may be serving a different tunnel.
-
-The §46.10 http2 drop-in is written before any of this, so a connector
-installed here picks it up immediately.
-
-Non-interactive safety: if the values are absent *and* there is no TTY, the
-whole block is skipped with a warning instead of hanging — an unattended
-re-run still brings the stack up.
-
-### 47.2 The domain is no longer hardcoded anywhere
-
-§46.15 listed this as the main thing that didn't carry over. All three config
-files are now templated:
-
-- **`apps/authelia/config/configuration.yml`** — all 6 occurrences became
-  `{{ env "BASE_DOMAIN" }}`, enabled by adding
-  `--config.experimental.filters template` to the container command.
-  Verified this filter exists and works on v4.39.20 before relying on it.
-  **Gotcha found the hard way and now commented in the file**: the filter
-  templates the *whole file, comments included* — a literal template action
-  written inside an explanatory comment made Authelia fail to start with
-  `template: config.template:66: unexpected <.> in operand`.
-- **`apps/netbird-vpn/docker-compose.yml`** — the 4 endpoint/label literals
-  became `${BASE_DOMAIN}`.
-- **`apps/netbird-vpn/config/management.json.example`** — 8 occurrences became
-  `${BASE_DOMAIN}`; `start.sh` renders `data/management.json` from it with the
-  domain substituted and a fresh 32-byte `DataStoreEncryptionKey`, replacing
-  the python snippet that used to live in a comment in `.env.example`.
-
-`start.sh` also now generates Authelia's four required secrets and its OIDC
-JWKS (`data/oidc-secrets.yml`), which were previously a manual `openssl genrsa`
-recipe. User bootstrap stays with the dashboard (`autheliaUsers.ts`).
-
-### 47.3 Exposure settings are seeded, not retyped
-
-After the stack is up, `start.sh` writes `exposure_base_domain`,
-`cloudflare_tunnel_token`, and the account/zone/tunnel IDs into the `settings`
-table, so the dashboard's Exposure page is pre-filled on first login. The
-upsert has a `WHERE settings.value IS NULL OR settings.value = ''` guard, so a
-value already set from the dashboard always wins over a re-run.
-
-### 47.4 Verified
-
-Mechanisms were each proven before being built on, not assumed:
-
-- `TUNNEL_TRANSPORT_PROTOCOL=http2` genuinely works → `INF Initial protocol
-  http2` (this is what let §46.10 drop the fragile ExecStart rewrite).
-- Authelia's `template` filter genuinely substitutes — proven with a *negative*
-  control: `BASE_DOMAIN='not a domain'` produced
-  `redirect uri 'https://netbird-vpn.not a domain/nb-auth' could not be parsed`,
-  quoting the substituted value.
-- Real config validates clean for `tx-home-utils.com` **and** for an unrelated
-  `example.org` (only the pre-existing `netbird-cli` warning).
-- `management.json` generation for `example.org` yields correct URLs
-  throughout, a 32-byte key, and no leftover `${BASE_DOMAIN}` placeholders.
-- `json_field` checked against every real Cloudflare response shape used, plus
-  the `success:false` and empty-array cases (must return empty, not crash).
-- `bash -n` clean; **shellcheck clean at `-S warning`**.
-
-Live regression after restarting Authelia, management and the dashboard on the
-templated config: OIDC issuer correct, both real redirect URIs still accepted
-and a bogus one still rejected, gRPC trailers still arriving for management and
-signal, all services 200/302, and the enrolled peer (`garnet_eea`) intact.
-Backend 121/121, `tsc` clean.
-
-### 47.5 Still not automated
-
-- **`BASE_DOMAIN` is written into each app's `.env` by `start.sh`**, so
-  changing the base domain later from the dashboard alone won't move Authelia
-  or NetBird — that needs a re-run (or hand-editing those two `.env`s). A
-  cleaner fix would be a `baseDomainEnvKeys` field injected by
-  `exposureEnv.ts` from the stored setting, keeping the DB as the single source
-  of truth; not done here because Authelia needs the value at *first boot*,
-  before any exposure row exists.
-- Relay (§46.9) and the CLI device flow (§46.12) remain open.
-
-## 48. Reference: every fix NetBird needed, in one place
-
-NetBird took the longest of anything in this project to get working, and the
-reasons are scattered across §20, §21, §24, §46 and §47. This is the
-consolidated list — what was actually wrong, and where the fix now lives. Read
-this first if NetBird ever breaks again, or before standing it up elsewhere.
-
-The through-line: **almost every one of these failed silently.** No stack
-trace, no 500, usually an HTTP `200` — a client retrying forever, or a
-dashboard spinner. That is why it took so many passes, and why each item below
-names the *observable symptom* rather than just the fix.
-
-### 48.1 Transport — getting native gRPC through the tunnel at all
-
-| # | Problem | Symptom | Fix, and where it lives now |
-|---|---|---|---|
-| 1 | cloudflared's **QUIC** backbone drops HTTP/2 trailers | `200` + correct body but **no `grpc-status`**; grpc-go says "server closed the stream without sending trailers"; client loops on `GetServerKey` forever | `TUNNEL_TRANSPORT_PROTOCOL=http2` systemd drop-in, asserted by `start.sh` (§46.7, §46.10) |
-| 2 | Cloudflare **zone gRPC toggle** off | `403` + an HTML body, *before* traffic ever reaches the tunnel — nothing in NPM or cloudflared logs | Zone → Network → gRPC = on (§20.7) |
-| 3 | Tunnel origin not HTTP/2 | gRPC can't negotiate | `http2Origin: true`, `noTLSVerify: true`, `originServerName`, and an `https://` origin (§20.8) |
-| 4 | NPM proxied gRPC as HTTP/1.1 | `failed to check SSO support: failed getting management service public key` | `grpc_pass` via `buildGrpcAdvancedConfig` (`npmClient.ts`), driven by `grpc: true` on the exposure (§20.4) |
-| 5 | ...but `grpc_pass` applied to **everything** | browser dashboard hung forever on its own REST calls — REST doesn't carry trailers either | the `grpc_pass` is conditional on `$http_content_type = "application/grpc"`; REST/grpc-web fall through to plain `proxy_pass` (§24.1) |
-
-Items 2-5 were each found and fixed in earlier sessions and were all genuinely
-necessary — but none of them mattered until item 1 was fixed, which is why
-progress kept stalling. **Item 1 was misdiagnosed for several sessions as an
-unfixable upstream cloudflared bug** (§20.9, §24.5), and nearly cost a router
-port-forward that would have broken §0 principle 1. It was one flag.
-
-### 48.2 Authentication — Authelia and native clients
-
-| # | Problem | Symptom | Fix |
-|---|---|---|---|
-| 6 | `AUTH_SUPPORTED_SCOPES` missing `offline_access` | no refresh token issued; every API call `401 token expired` shortly after login | added to `AUTH_SUPPORTED_SCOPES` (§20.11) |
-| 7 | `NETBIRD_TOKEN_SOURCE: accessToken` | Authelia issues an **opaque** access token; management parses bearers as JWTs → `token contains an invalid number of segments` → SPA restarted login in a loop | `NETBIRD_TOKEN_SOURCE: idToken` — the id_token is always a real JWT (§24.2) |
-| 8 | Native PKCE `RedirectURLs` pointed at the **web dashboard** | phone enrolled, then the code was delivered to `/nb-auth` in the browser instead of to the app; the app never received it | `RedirectURLs: ["http://localhost:53000/"]` — native clients run a loopback listener (RFC 8252) (§46.11) |
-| 9 | Same opaque-token bug as #7, on the native path | would have bitten the moment #8 was fixed | `UseIDToken: true` in `PKCEAuthorizationFlow` (§46.11) |
-| 10 | Loopback redirect not registered with the IdP | Authelia rejects `redirect_uri` | `http://localhost:53000/` **and** the no-slash variant on the `netbird-dashboard` client — Authelia matches by exact string (§46.11) |
-
-On #10: native clients deliberately **reuse the `netbird-dashboard` client**
-rather than `netbird-cli`, because management validates the bearer's audience
-against `HttpConfig.AuthAudience`, which is `netbird-dashboard`. A token minted
-for a different `client_id` is rejected.
-
-### 48.3 Reachability — what a remote peer actually needs
-
-| # | Problem | Symptom | Fix |
-|---|---|---|---|
-| 11 | **Signal** advertised as the internal `netbird-vpn:80` | peer registers and appears in the dashboard, then can never connect to anything — no remote client can resolve that name | signal's port published + its own `netbird-vpn-signal.<domain>` exposure with `grpc: true`; `Signal.URI` points there (§46.8) |
-| 12 | `Stuns: []` and `Turns: []` | no NAT traversal at all | public STUN servers (client reaches them **directly over UDP**, never through the tunnel — so still no port-forward) (§46.8) |
-
-§24.2's original test peer only worked because it ran on the same Docker
-network, where `netbird-vpn:80` resolves. That masked #11 completely.
-
-### 48.4 Reproducibility — so a new host doesn't relive all of it
-
-| # | Problem | Fix |
-|---|---|---|
-| 13 | The http2 setting was pure host state, outside the repo and its backups | `start.sh` writes the drop-in every run, before cloudflared is even installed (§46.10, §47.1) |
-| 14 | Domain hardcoded in Authelia, NetBird compose, and `management.json` | all templated from `BASE_DOMAIN` (§47.2) |
-| 15 | Tunnel, connector, OIDC keys, `management.json` all set up by hand | `start.sh` prompts for 3 values and derives the rest (§47.1, §47.3) |
-| 16 | A locally-configured tunnel silently ignores the dashboard's ingress writes | tunnels are created with `config_src: "cloudflare"` (§47.1) |
-
-### 48.5 Still open
-
-- ~~**Relay** (§46.9)~~ — **built and deployed, §50.** `netbirdio/relay` over
-  WebSocket for when hole-punching fails.
-- ~~**CLI device-authorization flow** (§46.12)~~ — **fixed, §50.**
-  `Provider: "hosted"`, device flow repointed at the `netbird-dashboard`
-  client (audience realigned), `UseIDToken: true`.
-- The enrolled phone has only been tested on **home WiFi**, not mobile data
-  (§46.13) — still true; §50 built the relay path but a real CGNAT peer-to-peer
-  relayed connection has not yet been observed end to end.
-
-### 48.6 Security fix found while documenting the manual steps (2026-08-30)
-
-Auditing "what can't `start.sh` do" turned up a live leak:
-**`apps/authelia/config/users_database.yml` was tracked in this PUBLIC
-repository**, carrying the SSO account's username, display name, email and a
-**bcrypt password hash** — the credentials guarding every app behind Authelia.
-Present since `92c14b4`.
-
-The file's own header said to replace the example before production, but the
-file itself was still committed, so the real hash went up with it.
-
-Fixed:
-- `apps/authelia/config/users_database.yml.example` added, with a placeholder
-  hash that cannot authenticate and the `authelia crypto hash generate` recipe.
-- The real file is now in `.gitignore` and `git rm --cached`'d — it stays on
-  disk, so the running deployment was untouched (verified: Authelia healthy,
-  `authelia.<domain>` still `200`).
-- `start.sh` copies the template when the real file is missing (a fresh clone
-  now has only the template, and Authelia will not start without the real one),
-  `chmod 600`, and warns loudly that the password is a placeholder.
-
-**Still required from the user, and not something this repo can do:** the hash
-is in git history, so removing it from `HEAD` does not un-publish it. The
-password should be **rotated**. Purging history (`git filter-repo` + a force
-push) is a separate, destructive decision and was deliberately not done here.
-
-Worth noting the same class of mistake is already handled correctly elsewhere
-in this repo — `data/oidc-secrets.yml`, `apps/*/data/`, `.env`, and CrowdSec's
-`*-bouncer.yaml` are all gitignored-with-a-template. This one file was simply
-missed.
+## 46. NetBird through a Cloudflare Tunnel — how it was made to work (former §20, §24, §46–§48, §50–§55, compacted 2026-09-18)
+
+NetBird took longer to get working than anything else in this project:
+2026-08-27 to 08-31, across eleven sections. **Almost every failure was
+silent** (an HTTP 200, a client retrying forever, a spinner), which is why
+the entries below name the observable symptom as well as the fix. The code,
+`start.sh`, `apps/netbird-vpn/` and `apps/tailscale/` are the source of
+truth now; this keeps the conclusions, the rejected approaches, and every
+anchor that later sections or code still cite. It supersedes §172's
+2026-09-03 decision not to compact this range (see the compaction rule in
+CLAUDE.md).
+
+**The shape that works.** Management (gRPC), the dashboard and the relay go
+through the Cloudflare Tunnel, whose connector is pinned to the `http2`
+transport. **Signal goes through Tailscale Funnel**, because Cloudflare
+can't carry it on any transport. The relay (WebSocket) is the permanent data
+path. STUN uses public servers. The home host is a routing peer for the LAN.
+The phone runs NetBird only. No router change anywhere (§0 principle 1).
+
+### Anchors
+
+**§20** — 2026-08-27, "peers list empty". No client had ever reached
+management, so no dashboard or auth bug was involved. Fixed on the way: the
+dashboard's `AUTH_SUPPORTED_SCOPES` lacked `offline_access`, so no refresh
+token was issued and every call started 401ing. NPM also proxied gRPC as
+HTTP/1.1, which native clients can't use; `grpc: true` on an
+`additionalExposures` entry now makes `buildGrpcAdvancedConfig`
+(`npmClient.ts`) emit `grpc_pass` with `http2 on`. Found next: Cloudflare's
+**zone gRPC toggle** (Network → gRPC) was off. With it off the edge answers
+any `application/grpc` request with `403` + an HTML body, logs no WAF event,
+and never reaches the tunnel (proven by the same 403 on an unrelated
+hostname). Cloudflare also requires a TLS + HTTP/2 (ALPN) origin, and
+`http2Origin` is a no-op against `http://`, so gRPC exposures got a
+self-signed NPM cert (`ensureGrpcCertificate`), an `https://` origin,
+`noTLSVerify` and `originServerName`.
+
+**§20.9** — Native clients then failed with "server closed the stream
+without sending trailers". Blamed at the time on the open cloudflared issue
+#1641, recorded as an unfixable upstream bug, with a warning not to tune
+further. **Overturned by §46.7:** it was the connector's QUIC transport.
+`npmClient.ts` cites this entry for why only
+`content-type: application/grpc` takes the `grpc_pass` path (see §24).
+
+**§20.10** — The proposed escape: a router port-forward and a grey-clouded
+DNS record with a real Let's Encrypt cert for the API hostname.
+**Withdrawn (§51.1): it breaks §0 principle 1. Never re-propose it.**
+
+**§20.11** — That session's TODO list. All closed: the port-forward
+withdrawn, peer enrolment done (§46.13, §53.3), STUN done, and TURN
+deliberately replaced by the relay because TURN needs a port-forward.
+
+**§24** — 2026-08-29: the dashboard works and the first peer enrols (a
+container on the internal Docker network, not through the tunnel).
+(1) An unconditional `grpc_pass` made the browser's own REST calls hang,
+because they lost their trailers too. `grpc_pass` is now conditional on
+`$http_content_type = "application/grpc"`, and REST/grpc-web fall through to
+`proxy_pass`. (2) `NETBIRD_TOKEN_SOURCE: accessToken` made the SPA loop on
+login: Authelia issues an **opaque** access token, and management accepts
+only JWT bearers ("token contains an invalid number of segments"). Fixed
+with `idToken`. Side change: Authelia `consent_mode: pre-configured`, kept,
+although in v4.39.x it doesn't actually persist grants. Dropping Authelia
+wouldn't have helped: NetBird always needs an external OIDC IdP.
+
+**§46** — 2026-08-30: **native gRPC works through the tunnel.** A
+three-hop isolation test (direct → NPM → Cloudflare edge, raw `curl --http2`
+of `GetServerKey`) showed the origin chain returning trailers and the edge
+dropping them. **§46.7** — confirmed: pinning the connector to `http2`
+brings `grpc-status: 0` back through the edge, and a real client then got
+application-level gRPC errors. §20.9 and §24's "unfixable" were wrong;
+it was one flag, and the port-forward plan was never needed. No regressions
+on the other hostnames. **§46.8** — signal got its own public hostname (a
+second `grpc: true` exposure; later removed, §54.4) and `Stuns` was set to
+public servers (the client reaches STUN directly over UDP, never through the
+tunnel). **§46.9** — relay deliberately not built yet, since there was no
+enrolled peer to measure it with. Built in §50.3. **§46.10** — `start.sh`
+asserts the transport with a systemd drop-in,
+`/etc/systemd/system/cloudflared.service.d/10-grpc-http2.conf` containing
+`Environment=TUNNEL_TRANSPORT_PROTOCOL=http2`. A first version rewrote
+`ExecStart`, which no-ops on a fresh host where cloudflared isn't installed
+yet; an env drop-in applies whenever the unit appears. An explicit
+`--protocol` still wins. **§46.11** — also fixed the same day: native PKCE
+`RedirectURLs` pointed at the web dashboard's `/nb-auth` instead of the RFC
+8252 loopback `http://localhost:53000/`, and `UseIDToken` was false (the
+§24 opaque-token trap again). Native clients reuse the `netbird-dashboard`
+Authelia client, because management checks the bearer audience against
+`AuthAudience = netbird-dashboard`, and Authelia needs both slash variants
+of the loopback URI. **§46.13** — the first real device, an Android phone,
+enrolled end to end through the tunnel. (Its note that the phone was on
+home Wi-Fi was a misattribution; see §51.6.)
+
+**§47** — 2026-08-30: `start.sh` bootstraps Cloudflare + NetBird.
+**§47.1** — it prompts once for base domain, API token and tunnel name, and
+derives the rest: zone + account id from one call, the tunnel (created only
+if absent, **with `config_src: "cloudflare"`**, because a locally-configured
+tunnel silently ignores the dashboard's ingress writes), the connector
+token (fetched, never written to a file), and cloudflared installed only
+when no unit exists. Authelia, NetBird's compose and `management.json` are
+templated from `BASE_DOMAIN` (Authelia via its `template` filter, which also
+templates *comments*, so a literal template action in a comment breaks
+startup). **§47.3** — exposure settings are seeded into `settings` with a
+guard, so a value already set in the dashboard wins over a re-run.
+
+**§48** — the consolidated fix list: sixteen fixes across transport,
+authentication, reachability and reproducibility. Everything on it is in
+this section. **§48.6** — security fix found while writing it:
+`apps/authelia/config/users_database.yml`, with a real bcrypt hash, was
+tracked in this public repo. It's now gitignored with a `.example`, and
+`start.sh` seeds it. The hash stays in git history, so the password needed
+rotating. (§48.7 and §48.8, the multi-container "first published port wins"
+regression and its audit, were appended physically inside §49 and remain
+there unchanged.)
+
+**§50** — 2026-08-31. The CLI device flow was fixed (`Provider: hosted`,
+repointed at the `netbird-dashboard` client, `UseIDToken: true`). The home
+host enrolled with a setup key. **§50.2** — "phone can't reach the router":
+signal's **bidirectional** `ConnectStream` never registers through the
+tunnel, while unary calls and server-streaming `Sync` work. Blamed at the
+time on request-body buffering; **corrected by §52.2**. **§50.3** — relay
+built: `netbirdio/relay` (WebSocket; `NB_EXPOSED_ADDRESS
+rels://netbird-vpn-relay.<domain>:443`, a secret generated by `start.sh`,
+also substituted into `management.json`), plus a third exposure with
+`grpc: false`. Verified: the relay answers `426` through the edge and peers
+connect to it over `ws` after QUIC fails ALPN. **§50.4** — QUIC is no
+escape: the trailers still drop, so management breaks. **§50.5** — NPM's
+default 60 s `grpc_read_timeout` tore idle streams down.
+`buildGrpcAdvancedConfig` now sets 3600 s read/send timeouts +
+`grpc_socket_keepalive`. It's correct hardening, but it was not the fix.
+(§517 later added a `Job` decline beside it.) **§50.6** — management
+needs `http2` and signal seemed to need `quic`; one connector can't do
+both. Options were A (port-forward, later withdrawn) and B (a second QUIC
+connector for signal). **§50.8** — ruled out: signal's `ws-proxy`
+has only a WASM client; native clients always dial plain gRPC.
+**§50.9** — cloudflared 2026.8.3 re-tested on QUIC: trailers still missing.
+
+**§51** — the plan for option B (a second tunnel on QUIC, signal only)
+and its durable version B2. B2 was never built: §52 disproved its premise.
+**§51.1** — the port-forward withdrawn by @mat, permanently. **§51.6** —
+correction: the phone had been on mobile data all along. §46.13 had read
+the *server's own* public IPv6 as the phone's. Method note: on a host that
+is also a peer, check an address against its own `ip -6 addr` before
+attributing it to a client. (**§51.7** — the co-located home peer hairpins out
+through Cloudflare, so `netbird status` on the host is a faithful test of a
+remote peer's path.)
+
+**§52** — the spike built for B (tunnel B on QUIC) found the real root
+cause. **§52.2** — **Cloudflare doesn't flush response headers while a
+stream is still open.** Signal registration is a metadata header; the
+server replies with headers only and then waits. Direct and via-NPM hops
+return `x-wiretrustee-peer-registered: 1` with the stream held open;
+through Cloudflare, no headers arrive at all. The control, the same call
+without the peer-id header (a complete response), returns promptly. So
+self-hosted NetBird **signal cannot work behind a Cloudflare Tunnel on any
+transport**; B and every transport flag are dead, and NPM is exonerated.
+**§52.5** — the spike's teardown was owed at the time. The host side is
+gone (checked 2026-09-18: no `cloudflared-signal` unit, no token file).
+Tunnel B's (`7e8771c5-…`) deletion in Cloudflare wasn't re-checked in this
+pass.
+
+**§53** — **solved:** signal is published through **Tailscale Funnel**
+from the tailscale container already in the stack. Funnel serves the public
+internet, so the phone still runs NetBird only; that's why it isn't
+"option E, a second overlay". Funnel flushes headers on an open stream and
+passes trailers. Gotcha: the first request to a new Funnel hostname returns
+nothing while its cert provisions, so warm it with one plain request before
+concluding anything. **§53.2** — enabling it needs the `funnel` node
+attribute (a one-click ACL link Tailscale prints) and `Signal.URI` pointed
+at the node's `ts.net` name. **§53.3** — both peers (phone and home
+routing peer) connected for the first time.
+
+**§54** — scope closed. Sessions are **Relayed, permanently**: with no
+port-forward the home peer's WireGuard port can't be reached, so there are
+no ICE candidates, and the relay's bandwidth is the practical ceiling.
+Funnel visitors don't count as tailnet devices. Made reproducible:
+`start.sh` prompts for `TAILSCALE_AUTH_KEY` alongside the Cloudflare
+values, starts the tailscale app, enables Funnel, and writes
+`NETBIRD_SIGNAL_HOSTNAME` / `Signal.URI` in place (never regenerating
+`management.json`, which holds the store key). It surfaces the enablement
+URL when Funnel isn't allowed yet, and only ever warns. The Cloudflare
+`signal` exposure was removed from `services.ts`, with tests asserting it
+stays gone. **§54.4** — the dead Cloudflare signal path (tunnel ingress
+rule, DNS record, NPM host, `netbird-vpn:signal` row) was removed **by
+hand**, because there was no deprovisioning path then. Built later (§57).
+
+**§55** — `start.sh`'s Funnel phase executed against the live host on both
+paths. A real bug caught by reading first: it restarted management on every
+run, not only when `Signal.URI` changed. The restart is now gated on a
+real change, and a harness proved the rewrite preserves the store key, the
+relay block and key order. Stale TODOs in §0.1, §20.11 and §21.3 that told a
+cold session to build the withdrawn port-forward were closed, with the
+originals struck through.
+
+### Still open when compacted
+
+- The interactive CLI device login is configured correctly but was never
+  exercised end to end (the home peer uses a setup key).
+- NetBird's Android client routes all traffic through the tunnel once
+  connected: upstream `netbirdio/android-client#96`, tracked in the README.
 
 ## 49. Fresh-setup test plan (`setup_test/`)
 
@@ -4069,828 +3017,6 @@ Two notes worth keeping:
 
 Suite 122/122; all services verified serving afterwards
 (`portainer` 200, NetBird gRPC trailers still arriving).
-
-## 50. Session Log — 2026-08-31: relay deployed, CLI device flow fixed, signal still blocked
-
-User asked whether a phone on NetBird should be able to reach `192.168.1.1`
-(their router). It could not, and unwinding why closed out both §48.5
-open items.
-
-### 50.1 CLI device-authorization flow (was §46.12)
-
-`netbird up` on a headless host (the intended routing peer) failed with
-`InvalidArgument: no provider found in the protocol for` — `Provider: ""` in
-`DeviceAuthorizationFlow`. Setting `Provider: "hosted"` got past that but then
-`token is not a well-formed JWT`: the flow's `ProviderConfig` pointed at a
-separate `netbird-cli` OIDC client whose opaque access token management can't
-validate (the §24.2 / §46.11 trap again).
-
-Fixed by pointing the device flow at the **same `netbird-dashboard` client**
-the PKCE flow already reuses, for the same reason (management validates the
-bearer audience against `HttpConfig.AuthAudience = netbird-dashboard`):
-
-- `apps/authelia/config/configuration.yml` — `netbird-dashboard` gains the
-  `urn:ietf:params:oauth:grant-type:device_code` grant; the now-unused
-  `netbird-cli` client removed.
-- `data/management.json` + `config/management.json.example` —
-  `DeviceAuthorizationFlow.ProviderConfig` `ClientID`/`Audience` →
-  `netbird-dashboard`, `UseIDToken: true`.
-
-Verified: Authelia restarts clean with the new grant; management reloads with
-`Provider: hosted`. The headless peer was ultimately enrolled with a **setup
-key** (simpler for an always-on routing peer — no token to expire), so the
-interactive device login itself is configured-correct but not yet exercised
-end to end.
-
-### 50.2 Root cause of "phone can't reach the router": Signal bidi stream dies through the tunnel
-
-Route config was fine once set (routing peer = the home host, resource
-`192.168.1.0/24`). The blocker: **neither peer can hold a Signal
-`ConnectStream`**. Live evidence —
-
-| RPC | Type | Through the tunnel |
-|---|---|---|
-| `ManagementService/Sync` | server-streaming | works (reconnects every 15–45 min) |
-| `SignalExchange/Send` (what §46.8 verified) | unary | works |
-| `SignalExchange/ConnectStream` | **bidirectional** | dies every ~60–75 s, forever |
-
-NPM logs `upstream prematurely closed connection` on `ConnectStream`; the
-client loops on `didn't receive a registration header from the Signal server`.
-`cloudflared --protocol http2` buffers the request body, so client→server
-streaming inside a live gRPC call never flushes — unary and server-streaming
-survive, bidi does not. §46.8 only ever tested the unary `Send`. This is the
-§46.5/§46.6 prediction confirmed with a real peer: gRPC bidi over a tunnel
-*public hostname* is a dead end.
-
-**Relay does not rescue this** (see §50.5). Signal is still mandatory —
-peers exchange connection candidates over it even for a relayed path, and the
-client's engine start blocks on `wait for signal stream` and never completes,
-which is *why* `netbird status` hangs (the daemon isn't crashed, it's stuck
-in engine init). Relay is necessary for the CGNAT data path but not
-sufficient on its own.
-
-### 50.3 Relay built (was §46.9 / §48.5)
-
-- `apps/netbird-vpn/docker-compose.yml` — `netbird-relay` service
-  (`netbirdio/relay:latest`), `NB_LISTEN_ADDRESS=:33080`,
-  `NB_EXPOSED_ADDRESS=rels://netbird-vpn-relay.${BASE_DOMAIN}:443`,
-  `NB_AUTH_SECRET=${NETBIRD_RELAY_AUTH_SECRET}`, published `:8087->33080`
-  (8080–8086, 8090, 8096 were taken).
-- `apps/netbird-vpn/.env(.example)` — `NETBIRD_RELAY_PORT=8087`,
-  `NETBIRD_RELAY_AUTH_SECRET` (generated by `start.sh`).
-- `config/management.json.example` + `data/management.json` — `Relay` block
-  (`Addresses: [rels://netbird-vpn-relay.<base>:443]`, `CredentialsTTL: 24h`,
-  `Secret:` = the same env secret). Schema confirmed against netbird's own
-  `management.json.tmpl`.
-- `start.sh` — `ensure_app_secret … NETBIRD_RELAY_AUTH_SECRET`, and the
-  management.json generator now also substitutes `${NETBIRD_RELAY_AUTH_SECRET}`
-  (like `${BASE_DOMAIN}`). `bash -n` clean.
-- `backend/src/config/services.ts` — third `additionalExposures` entry
-  `{ suffix: 'relay', … grpc: false }`. `grpc: false` ⇒ plain HTTP origin +
-  NPM websocket-upgrade, no `grpc_pass`, no cloudflared `http2Origin` — which
-  is exactly why it traverses the tunnel where signal can't. No automation
-  change needed; the non-gRPC path already does websocket upgrade.
-
-**Deployed and verified live:** relay container up (`WS server listening
-:33080`); management reloaded with the `Relay` block; backend rebuilt +
-recreated; `provisionServiceIfEnabled('netbird-vpn', 1)` → NPM `proxy_host/
-34.conf` for `netbird-vpn-relay.tx-home-utils.com` (websocket headers,
-`10.201.0.1:8087`), Cloudflare DNS + tunnel ingress added. `GET /relay`
-through the edge → `426 Upgrade Required` **from the relay process itself**
-(not an nginx/CF error) — full CF→NPM→relay path intact. Backend suite
-122/122, `tsc` clean.
-
-**Relay path proven reachable.** After the home peer restarted, the relay
-container logged real peer connections through the edge:
-`WS client connected from 172.23.0.1:… / peer connected [peer_id: sha-…]`,
-two distinct peer IDs. The client log confirms the client side too:
-`dialing Relay server via quic` fails (`tls: no application protocol` — no
-ALPN through CF/NPM, expected) then `successfully dialed via: ws` →
-`relay connection established` → `chosen home Relay server`. So the
-WebSocket-over-tunnel path works end to end. What's still missing is Signal
-(§50.2), without which the peers never actually pair.
-
-### 50.4 QUIC is not an escape hatch — trailers still break (cloudflared 2026.8.2)
-
-Tested directly: flipped the `override.conf` from `--protocol http2` to
-`--protocol quic`, `daemon-reload`, restart cloudflared (came up
-`protocol=quic`, UDP 7844 to Cloudflare is open here, QUIC precheck passes),
-restarted `netbird` on the home host. Result:
-
-```
-Management: Disconnected, reason: failed getting Management Service public key:
-  rpc error: code = Internal desc = server closed the stream without sending trailers
-```
-
-The exact §20.9 / §46.4 trailers bug, still present. So the two protocols are
-**mutually exclusive** on this cloudflared version:
-
-| transport | gRPC trailers (unary — management `GetServerKey`) | gRPC bidi (signal `ConnectStream`) |
-|---|---|---|
-| `http2` | ✅ works | ❌ stream opens, no client→server data ever flushes |
-| `quic`  | ❌ `stream closed without trailers` | ✅ (would work — never got to test, engine bails on management first) |
-
-Reverted to `http2`.
-
-### 50.5 nginx `grpc_read_timeout` bump — removed a symptom, not the cause
-
-`buildGrpcAdvancedConfig` in `backend/src/services/npmClient.ts` now adds, to
-both gRPC vhosts (signal + management-api):
-
-```
-grpc_read_timeout 3600s;
-grpc_send_timeout 3600s;
-grpc_socket_keepalive on;
-```
-
-Rationale: NPM's default `grpc_read_timeout` is 60 s, and signal's
-`ConnectStream` is idle between messages — so nginx was tearing the stream
-down at ~60 s, the client reconnecting in a tight loop
-(`upstream prematurely closed connection` in `proxy-host-33_error.log`, one
-per cycle). After the change (backend rebuilt, re-provisioned, `nginx -t` +
-reload) those errors **stopped** — the stream now stays open.
-
-But `netbird status` still hangs and signal still never registers the peer
-(signal container logs nothing for the attempts). The open stream carries no
-client→server payload: `cloudflared http2` is buffering the request body, so
-signal's `stream.Recv()` blocks forever. **This is a correct hardening to
-keep** (the 60 s teardown was real and would bite any long-lived stream), but
-it is not the fix.
-
-Also checked whether signal could ride the tunnel the way relay does: the
-signal **client** (`shared/signal/client/grpc.go`) is gRPC-only — no
-WebSocket transport, unlike relay's `race_dialer`. The signal *server*'s
-":80 HTTP server with WebSocket proxy" log line is not a client-reachable WS
-endpoint for `ConnectStream`. So the relay trick doesn't transfer.
-
-### 50.6 Where it stands — decision pending
-
-NetBird cannot fully work through a single Cloudflare Tunnel: management needs
-`http2` (trailers), signal needs `quic` (bidi), and no NPM/cloudflared knob
-bridges that. Everything built this session stays regardless — relay is
-required for the eventual CGNAT data path, the gRPC timeout bump is correct.
-Two options remain for signal, neither yet chosen:
-
-- **A — router port-forward for the signal hostname only** (revives §20.10).
-  One NAT rule; `netbird-vpn-signal` DNS set to unproxied (grey-cloud); a real
-  Let's Encrypt cert on its NPM host via the CF DNS-01 plugin (the app's CF
-  token already has the rights). Management / dashboard / relay stay on the
-  existing tunnel. Low risk, fully documented. Breaks §0 principle 1.
-- **B — a second `cloudflared` running `--protocol quic`, for signal only.**
-  New CF tunnel + second `cloudflared` service on the host;
-  `netbird-vpn-signal` DNS → tunnel B. Keeps the no-port-forward principle.
-  Unverified risk: signal's unary `Send` may hit the same trailers bug under
-  QUIC (its `ConnectStream` — the one that matters — is a stream and should be
-  fine). Needs a live test.
-
-Recommended: try **B** first (preserves §0.1; fast to validate), fall back to
-**A** if signal also breaks on QUIC.
-
-### 50.7 Carry-over check
-
-In the repo — a fresh `git clone` + `sudo ./start.sh` gets: the relay service,
-its secret, the `Relay` block in generated `management.json`, the relay
-exposure, and the gRPC `grpc_read_timeout` directives (via
-`buildGrpcAdvancedConfig`, applied on the next provision of any gRPC host).
-Same two caveats as §46.15: the base domain is still hardcoded in
-`management.json.example` / `configuration.yml`, and an existing host whose
-`data/management.json` already exists won't gain the `Relay` block from the
-template edit alone — it was added to the live file by hand this session.
-**Not** in the repo: whichever of §50.6 A/B is eventually chosen for signal.
-
-### 50.8 Option C ruled out with evidence: signal's ws-proxy is browser-only
-
-Before choosing between §50.6 A and B, checked whether signal could ride the
-existing tunnel as **WebSocket** the way relay does — the signal container
-does log `running HTTP server with WebSocket proxy`, and netbird has a
-`util/wsproxy` package mounting `/ws-proxy/signal` (`ProxyPath` +
-`SignalComponent`) on the signal server. NetBird's own `nginx.tmpl.conf` even
-proxies that endpoint.
-
-It does not help us. The only ws-proxy **client** is
-`util/wsproxy/client/dialer_js.go` — `syscall/js`, i.e. WASM. And the native
-dialer is explicit about it:
-
-```go
-// client/grpc/dialer_generic.go   //go:build !js
-func WithCustomDialer(_ bool, _ string) grpc.DialOption {
-    return grpc.WithContextDialer(dialContext)   // both args ignored
-}
-```
-
-Native clients (Android, Linux, desktop) discard the component path and dial
-plain gRPC. The ws-proxy exists for browser/WASM clients only. So there is no
-client-side switch that puts signal on WebSocket, and §50.6 remains an A-or-B
-choice.
-
-### 50.9 Next steps, in order
-
-1. ~~**Upgrade cloudflared to 2026.8.3 and re-test QUIC**~~ **DONE — FAILED.**
-   Upgraded and flipped to `--protocol quic` (all four connections
-   registered `protocol=quic`). Management still dies with
-   `server closed the stream without sending trailers`. Confirmed at the
-   wire level, not just via the client — raw curl to
-   `/management.ManagementService/GetServerKey`:
-
-   ```
-   HTTP/2 200 / content-type: application/grpc / 60-byte body
-   ...and no grpc-status trailer at all
-   ```
-
-   The §20.9 signature, unchanged in 2026.8.3. Reverted to `http2`.
-2. **Option B** — second `cloudflared` on `--protocol quic`, signal only.
-   Full plan in §51.
-3. ~~**Option A** (router port-forward)~~ — **withdrawn, see §51.1.**
-
-Whichever lands, the §50.3 relay and §50.5 timeout work is a prerequisite for
-the eventual CGNAT path and stays.
-
-## 51. Plan (next session): signal on a second QUIC connector — B1 spike, then B2
-
-**Status: not started.** Written 2026-08-31 at the end of §50, to be picked up
-cold. Everything needed to execute is in this section.
-
-### 51.1 Why this, and why Option A is withdrawn
-
-NetBird needs two gRPC behaviours that **one** cloudflared connector cannot
-provide simultaneously (measured, §50.2/§50.4/§50.9):
-
-| transport | unary + trailers (management) | bidi streaming (signal `ConnectStream`) |
-|---|---|---|
-| `http2` | works | broken — stream opens, client→server body never flushes |
-| `quic`  | broken — `stream closed without trailers` | works |
-
-Both confirmed on cloudflared **2026.8.3** (current). No NPM directive bridges
-it: §50.5's `grpc_read_timeout` bump removed the 60 s teardown but not the
-buffering. §50.8 ruled out signal-over-WebSocket — the ws-proxy client is
-WASM-only (`dialer_js.go`); the native dialer discards the component path.
-
-So: **run two connectors and split by protocol.** Management, dashboard, relay
-and every other app stay on the existing `http2` tunnel; only
-`netbird-vpn-signal` moves to a second `quic` tunnel.
-
-**Option A (router port-forward for the signal hostname) is withdrawn** by the
-user's decision, 2026-08-31 — it breaks §0 principle 1, which is
-non-negotiable. It should not be re-proposed. If B fails, the honest answer is
-"self-hosted NetBird cannot fully traverse a Cloudflare Tunnel", and the
-fallback is a different overlay (Tailscale, already in the stack), not a
-router change.
-
-**Why B is expected to work.** The trailers bug only breaks calls that must
-*terminate*. The signal vhost's access log shows both peers calling **only**
-`SignalExchange/ConnectStream` — no unary `Send`. A long-lived bidi stream
-never sends trailers anyway, so the bug is not on its path.
-
-### 51.2 Facts needed to execute (verified 2026-08-31)
-
-| | |
-|---|---|
-| CF account id | `59e4586e167be8dcd5911159d5413c2d` |
-| CF zone id | `beb5ec7b05175c74bde76a68e4c81519` |
-| Tunnel A id (existing, http2) | `c10f64f0-5dfc-4ecb-8fb9-d87b8d5a342c` |
-| Base domain | `tx-home-utils.com` |
-| gRPC origin (what tunnel ingress points at) | `https://192.168.1.23:443` |
-| Existing unit | `/etc/systemd/system/cloudflared.service`, token at `/etc/cloudflared/token`, `--protocol http2` forced by `override.conf` |
-| Signal hostname / NPM vhost | `netbird-vpn-signal.tx-home-utils.com` → `proxy_host/33.conf` → `10.201.0.1:8086` |
-
-Ingress for the signal hostname must be created on tunnel B with the same
-origin options the automation uses for gRPC (see `provisionHostname` in
-`backend/src/services/exposure.ts`): `http2Origin: true`, `noTLSVerify: true`,
-`originServerName: <hostname>`, plus a catch-all `http_status:404` rule last.
-
-**Routing is decided by the DNS CNAME target**, not by which tunnels hold the
-ingress. So the spike does not need to remove anything from tunnel A — leave
-it, and rollback is a single DNS flip back to
-`c10f64f0-5dfc-4ecb-8fb9-d87b8d5a342c.cfargotunnel.com`.
-
-### 51.3 B1 — disposable spike (goal: prove signal works over QUIC)
-
-Prerequisite: a Cloudflare API token with **Cloudflare Tunnel: Edit** on the
-account (the app's existing token has Zone DNS rights; tunnel-create may need
-adding). `sudo` on `home-srv-01` throughout.
-
-1. **Create tunnel B** (`netbird-signal-quic`) — dashboard or
-   `POST /accounts/<acct>/cfd_tunnel`. Record its **id** and **token**.
-2. **Add signal ingress to tunnel B** —
-   `PUT /accounts/<acct>/cfd_tunnel/<tunnelB>/configurations` with one rule for
-   `netbird-vpn-signal.tx-home-utils.com` → `https://192.168.1.23:443`
-   (`http2Origin`, `noTLSVerify`, `originServerName`), then the 404 catch-all.
-3. **Second connector on the host**, explicitly QUIC — note the flag goes on
-   `ExecStart` because §46.10's `TUNNEL_TRANSPORT_PROTOCOL` drop-in only
-   applies to `cloudflared.service`:
-   ```
-   /etc/cloudflared/token-signal            (0600, tunnel B's token)
-   /etc/systemd/system/cloudflared-signal.service
-     ExecStart=/usr/bin/cloudflared --no-autoupdate --protocol quic \
-       tunnel run --token-file /etc/cloudflared/token-signal
-   ```
-   `daemon-reload`, `enable --now`. Expect `Initial protocol quic`.
-4. **Flip signal's DNS CNAME** to `<tunnelB>.cfargotunnel.com` (stay proxied).
-5. **Verify, in order** — do not skip to step 3 of the list:
-   - tunnel A still `protocol=http2`; dashboard + management unaffected
-     (`netbird-vpn.<domain>` 302, management `GetServerKey` curl still returns
-     `grpc-status: 0`);
-   - `sudo systemctl restart netbird && netbird status --detail` on the home
-     host → **`Management: Connected` AND `Signal: Connected`**, and the
-     command *returns* instead of hanging (the hang is the engine blocking on
-     `wait for signal stream`, so a prompt return is itself the signal);
-   - relay picks up: `Relays:` populated; peers show `Connected`;
-   - phone (on **mobile data**, not WiFi — §46.13) opens `192.168.1.1`.
-6. **Teardown if it fails**: flip DNS back to tunnel A, `disable --now
-   cloudflared-signal`, delete the unit + token, delete tunnel B.
-
-**Known fragility, and the reason B1 is explicitly disposable**: the app's
-exposure automation stores exactly one `exposure_cloudflare_tunnel_id`, and
-`ensureTunnelDnsRecord` rewrites each hostname's CNAME to
-`${tunnelId}.cfargotunnel.com`. So **any re-provision of `netbird-vpn` drags
-signal back to tunnel A and silently breaks it again.** Do not leave B1 in
-place as a permanent state — it is the §17.2 / §46.15 out-of-repo footgun in
-its purest form. Either follow with B2 or tear it down.
-
-### 51.4 B2 — make it durable and repo-managed (only if B1 succeeds)
-
-Goal: the second tunnel becomes a first-class concept so re-provisioning is
-safe and a rebuilt host reproduces it.
-
-- **`backend/src/types/index.ts`** — `ServiceAdditionalExposure` gains a
-  semantic flag, e.g. `bidiStreaming?: boolean` (name it for *why*, not for
-  "use tunnel 2": it documents that this upstream needs a QUIC connector
-  because it holds a bidirectional gRPC stream).
-- **`backend/src/config/services.ts`** — set it on the `signal` entry only.
-- **Settings** — a second, optional tunnel id (e.g.
-  `exposure_cloudflare_tunnel_id_bidi`) alongside the existing one, plus its
-  token for the connector. Optional by design: when unset, everything falls
-  back to the single tunnel and today's behaviour is unchanged.
-- **`backend/src/services/exposure.ts`** — `provisionHostname` takes the
-  `tunnelId` to use; `provisionServiceIfEnabled` picks the bidi tunnel for
-  flagged exposures when it is configured, else the default. `ensureIngressRoute`
-  and `ensureTunnelDnsRecord` already take `tunnelId`, so the change is
-  threading it through, not new Cloudflare logic.
-- **`service_exposure`** — consider recording which tunnel a row was
-  provisioned into, so a later reconcile can detect drift.
-- **`start.sh`** — assert the second connector the way §46.10 asserts the
-  http2 drop-in: write `cloudflared-signal.service` (or a drop-in) with
-  `--protocol quic`, order-independent, no-op on re-run, `warn` never `exit`.
-- **UI** — the second tunnel id/token belong in the exposure settings form,
-  per §0 principle 2 (no console configuration).
-- **Tests** — extend `exposure.test.ts`: a flagged additionalExposure
-  provisions into the bidi tunnel id; an unflagged one into the default; and
-  with no bidi tunnel configured, a flagged one still uses the default.
-
-### 51.5 Open questions to settle during B1
-
-- Does the app's existing Cloudflare token have tunnel-create rights, or does
-  a new/edited token need to be issued? (Affects whether B2 can create tunnel
-  B itself or must be handed an id.)
-- Does anything else in the stack want bidi gRPC? Only signal today, but the
-  flag should be checked against future services.
-- Does the phone actually need relay once signal works, or does hole-punching
-  succeed between mobile data and this host? Relay stays either way. Note the
-  phone **is** on mobile data (§51.6), so whatever B1 shows is the real
-  remote-peer answer, not a home-WiFi shortcut.
-
-### 51.6 Correction: the phone has been on mobile data all along
-
-User pushed back on the repeated "only tested on home WiFi" caveat. They were
-right; it originated in §46.13 and propagated from there. Checked properly:
-
-| | address | city (CF geo) |
-|---|---|---|
-| `home-srv-01` own public IPv6 (`ip -6 addr`, `ifconfig.co -6`) | `2a01:14:120:cfb0:16b3:1fff:fe13:fbca` | Guimarães |
-| `garnet_eea` (phone) `location_connection_ip` | `87.196.82.251` | Porto |
-
-§46.13 read the `2a01:14:120:cfb0:…` address as the *phone's* and concluded it
-was on the home LAN. It is the **server's own** global IPv6. In the signal
-vhost access log both addresses appear because the home peer hairpins out to
-its own public hostname through Cloudflare — so one of the two "clients"
-hitting signal is this host itself.
-
-Consequences:
-
-- **The CGNAT / mobile-data path is not an untested unknown.** Every
-  `ConnectStream` attempt from the phone today came from `87.196.82.251`, a
-  different network and city from the server. §50.2's failure is a genuine
-  remote-peer failure.
-- **§46.9's relay rationale is confirmed, not hypothetical** — the remote peer
-  really is off-network, so relay is on the likely path once signal works.
-- Any future "test it from mobile data first" advice is already satisfied;
-  don't re-raise it.
-
-Method note worth keeping: when reading `location_connection_ip` or proxy
-access logs on a host that is *also* a peer, always check the address against
-the host's own `ip -6 addr` before attributing it to a client. Two of this
-project's conclusions have now turned on that (§48.7's "auth problem" that was
-routing, and this one).
-
-### 51.7 Two things settled before B1: the CF token, and the co-located host
-
-**Token — sufficient, no change needed.** §51.5's first open question is
-answered. The token stored in `settings.cloudflare_tunnel_token` verifies
-(`This API Token is valid and active`) and successfully lists the account's
-tunnels, which proves `Account → Cloudflare Tunnel` is live on it. With
-`Zone → DNS → Edit` also present, that covers every B1 call:
-
-| B1 step | API | permission |
-|---|---|---|
-| create tunnel B | `POST /accounts/<acct>/cfd_tunnel` | Cloudflare Tunnel: Edit |
-| add signal ingress | `PUT …/cfd_tunnel/<id>/configurations` | Cloudflare Tunnel: Edit |
-| fetch tunnel B's connector token | `GET …/cfd_tunnel/<id>/token` | Cloudflare Tunnel: Edit |
-| repoint signal's CNAME | `PATCH /zones/<zone>/dns_records/<id>` | Zone DNS: Edit |
-
-Two notes. The token also carries Workers KV/Scripts, Account Filter Lists,
-WAF, Firewall and Analytics rights it does not need — broader than
-least-privilege for a credential sitting in the app's database; worth trimming
-someday, not a blocker. And **the account hosts five tunnels**
-(`home-srv-01`, `pbordo-redirects`, `pi`, `pi-srv-live-01`, `pipoka-design`) —
-B1 adds a sixth; scope every call to the new id and leave the others alone.
-
-**The NetBird client runs on the same host as the NetBird server.** Raised by
-the user. Checked what it actually costs:
-
-- **The home peer hairpins.** `netbird-vpn-signal` / `-api` resolve on this
-  host to Cloudflare edge IPv6 (`2606:4700:…`), so the client goes
-  LAN → Cloudflare (lis/mad) → back down its own tunnel → NPM → the signal
-  container **on the same box**. That is why the server's own public IPv6
-  shows up as a "client" in the signal vhost log (§51.6).
-- **It is not disrupting the host**, which was the real risk on a box running
-  NPM, cloudflared and every container: `wt0` is up (`100.111.227.79`) but
-  installs **no** route for `192.168.1.0/24`, so there is no self-routing loop
-  from advertising the LAN it already sits on; and `resolvectl` shows `wt0`
-  with `Current Scopes: none` / `-DefaultRoute`, so netbird has **not**
-  hijacked systemd-resolved — the host still resolves via `192.168.1.1`.
-- **It is not an escape hatch.** The tempting move is split-DNS on the host
-  (`/etc/hosts` → `192.168.1.23`) so the home peer reaches signal over the LAN
-  and skips the tunnel entirely. It does not work as-is: `Signal.URI` is
-  `…:443` with `Proto: https`, and NPM serves a **self-signed** cert for that
-  hostname (`ensureGrpcCertificate`, accepted today only because cloudflared
-  sets `noTLSVerify`). The netbird client validates against the system cert
-  pool and would reject it, and `/etc/hosts` cannot redirect the port. It
-  could be made to work by issuing a real Let's Encrypt cert for
-  `netbird-vpn-signal` via NPM's DNS-01 (the token has the rights) — but it
-  would still only fix the *home* peer. The phone must reach signal publicly
-  regardless, so co-location changes nothing about the actual blocker.
-
-**The useful consequence for B1**: because the home peer's traffic takes the
-*same public path* as the phone's, `netbird status` on `home-srv-01` is a
-faithful test of the phone's experience. **B1 can be validated entirely from
-the server** — `Management: Connected` + `Signal: Connected` there means the
-phone's path works too. The phone is then a confirmation, not the experiment.
-
-## 52. B1 executed — and it found the real root cause. Option B is dead.
-
-**Date: 2026-08-31, same session as §50/§51.** B1 was built and cut over. It
-did not work, but it produced the decisive diagnosis this problem has been
-missing since §20.9.
-
-### 52.1 What was built (and has since been rolled back)
-
-- Tunnel B `netbird-signal-quic` created,
-  id `7e8771c5-a1a5-46bf-895e-d8ee9af3957a`, with a single ingress rule for
-  `netbird-vpn-signal.tx-home-utils.com` → `https://192.168.1.23`
-  (`http2Origin`/`noTLSVerify`/`originServerName`), mirroring tunnel A's rule,
-  plus the 404 catch-all.
-- `cloudflared-signal.service` on the host, `--protocol quic`, own token at
-  `/etc/cloudflared/token-signal`. Registered four connections `protocol=quic`,
-  zero errors, and picked up the ingress config correctly.
-- Signal's DNS CNAME flipped to tunnel B, then **rolled back** to tunnel A.
-
-Everything else stayed on tunnel A throughout; management kept returning
-`grpc-status: 0` and `netbird-vpn`/`authelia`/`homelab` were unaffected across
-the whole cutover.
-
-### 52.2 The real root cause: Cloudflare will not flush headers on an open stream
-
-Signal registration is **not a message** — it is a gRPC **metadata header**.
-From `signal/server/signal.go`:
-
-```go
-id := metadata.ValueFromIncomingContext(stream.Context(), proto.HeaderId)
-if id == "" { return nil, status.Errorf(codes.FailedPrecondition, "missing connection header: %s", ...) }
-...
-err = stream.SendHeader(s.successHeader)   // x-wiretrustee-peer-registered: 1
-```
-
-(`HeaderId = "x-wiretrustee-peer-id"`, `shared/signal/proto/constants.go`.)
-So the handshake is: client sends a header → server replies with **headers
-only** → both sides then sit idle until a peer has something to signal.
-
-Probed the same request at all three hops:
-
-| path | result |
-|---|---|
-| direct to signal container (`10.201.0.1:8086`, h2c, no proxy) | `x-wiretrustee-peer-registered: 1`, stream stays open ✅ |
-| via NPM over the LAN (`--resolve` to `192.168.1.23`, bypasses cloudflared) | `x-wiretrustee-peer-registered: 1`, stream stays open ✅ |
-| via Cloudflare (tunnel B, QUIC) | **no response headers at all** ❌ |
-
-And the control that pins the mechanism — the *same* call through the edge
-**without** the peer-id header, so the server rejects immediately and the
-response is **complete**: `HTTP/2 200` returned promptly.
-
-**Therefore: the Cloudflare path delivers complete responses fine, but never
-flushes response headers while a stream is still open.** Signal's handshake is
-headers-only-then-wait, so it can never complete through Cloudflare.
-
-### 52.3 What this overturns
-
-- **NPM/nginx is exonerated.** `grpc_pass` forwards the custom header and holds
-  the stream correctly (hop 2 proves it). §50.5's `grpc_read_timeout` bump was
-  still worth keeping, but it was never the fix.
-- **§50.2's "bidi request-body buffering" diagnosis was wrong** — or rather,
-  half-right for the wrong reason. Nothing about the *request* body is the
-  problem; it is the *response* headers.
-- **Option B is dead, and so is any transport flag.** http2 and quic both fail
-  identically here, because the failure is in Cloudflare's edge response
-  handling, not the connector transport. §51's whole premise ("signal needs
-  quic for bidi") is disproved.
-- Combined with §50.4 (quic breaks management's trailers), the honest summary
-  is: **self-hosted NetBird signal cannot work behind a Cloudflare Tunnel at
-  all**, on any transport. This is not a tuning problem.
-
-### 52.4 Remaining options — all need a decision
-
-Option A (router port-forward) remains **withdrawn** by user decision (§51.1).
-What is actually left:
-
-- **D — host signal on a small public-IP box** (VPS, or a free tier such as
-  Oracle Cloud / fly.io). `netbirdio/signal` with a real cert; point
-  `Signal.URI` at it. Management/dashboard/relay stay on the tunnel. **Respects
-  §0 principle 1** — no router change — at the cost of one external dependency.
-  Currently the most promising path.
-- **E — a different overlay for the phone entirely** (Tailscale is already in
-  the stack). Abandons self-hosted NetBird for remote access rather than
-  fixing it. Cheapest in effort, loses the NetBird investment.
-- **F — accept LAN-only NetBird.** Everything works when both peers are on the
-  home network; remote access comes from elsewhere.
-
-### 52.5 Teardown still owed (needs sudo)
-
-DNS is already rolled back to tunnel A. Still to remove on the host:
-
-```
-sudo systemctl disable --now cloudflared-signal
-sudo rm /etc/systemd/system/cloudflared-signal.service /etc/cloudflared/token-signal
-sudo systemctl daemon-reload
-```
-
-and delete tunnel B (`7e8771c5-a1a5-46bf-895e-d8ee9af3957a`) from Cloudflare.
-Leaving it costs nothing functionally but is exactly the §46.15 class of
-out-of-repo state that has bitten this project repeatedly.
-
-**Nothing from §51.4 (B2) should be built.** The flag it was going to add
-(`bidiStreaming` → second tunnel) is based on a premise §52.2 disproves.
-
-## 53. SOLVED — Tailscale Funnel replaces Cloudflare for signal. Both peers connected.
-
-**2026-08-31, immediately after §52.** The user rejected option A (§51.1) and
-option E (an overlay on the phone would mean two apps). Chose **G**: keep
-Cloudflare for everything else, publish **signal only** via **Tailscale
-Funnel**.
-
-Crucially G is *not* E: Funnel serves the **public internet**, so the phone
-runs **NetBird only**, exactly as before. Tailscale runs on the server, in the
-container that was already in the stack.
-
-### 53.1 The probe Cloudflare failed, Funnel passes
-
-Same request, same three-hop method as §52.2, now through
-`https://5a300b08a105.tail122b53.ts.net`:
-
-```
-HTTP/2 200
-content-type: application/grpc
-trailer: Grpc-Status, Grpc-Message, Grpc-Status-Details-Bin
-x-wiretrustee-peer-registered: 1      <-- registration succeeded
-curl exit: 124                        <-- stream stayed OPEN
-```
-
-And the control (no `x-wiretrustee-peer-id`) returns promptly with
-`grpc-status: 9` / `grpc-message: missing connection header: …` — so **trailers
-work too**, which Cloudflare's QUIC transport had also broken (§50.4).
-
-**Funnel flushes response headers on a still-open stream. Cloudflare does
-not.** That single difference is the whole problem, and it is now solved.
-
-One gotcha worth recording: the *first* Funnel request returned nothing at all,
-which briefly looked like the Cloudflare failure repeating. It was TLS cert
-provisioning on first use. A plain `GET` returned `405 allow: POST` (signal's
-gRPC server answering) and every request after that was fine. **Warm the
-hostname with one plain request before concluding anything about Funnel.**
-
-### 53.2 What changed
-
-- `tailscale funnel --bg --https=443 http://10.201.0.1:8086` on the tailscale
-  container (which could already reach signal via the docker gateway).
-  Required enabling the `funnel` node attribute — Tailscale's CLI prints a
-  one-click `login.tailscale.com/f/funnel?node=…` link that writes the ACL
-  entry.
-- `apps/netbird-vpn/data/management.json` — `Signal.URI`
-  `netbird-vpn-signal.tx-home-utils.com:443` → `5a300b08a105.tail122b53.ts.net:443`.
-- management restarted.
-
-### 53.3 Result
-
-```
-garnet_eea   (phone, Android)   peer_status_connected: 1
-home-srv-01  (routing peer)     peer_status_connected: 1
-```
-
-**Both peers connected simultaneously for the first time in the project.**
-`home-srv-01` had been stuck at `connected: 0` since 09:44 across every
-attempt in §50–§52. Both also register on the relay
-(`peer connected [peer_id: sha-…]`, two distinct ids).
-
-So the full working chain is now: management + dashboard + relay over the
-**Cloudflare** tunnel (http2, trailers intact), signal over **Tailscale
-Funnel**, relay as the WebSocket data path (§50.3), route
-`192.168.1.0/24` via `home-srv-01` (§50).
-
-### 53.4 Still to do
-
-1. **Confirm the phone actually reaches `192.168.1.1`** — peers are connected;
-   end-to-end routing is the last unverified link.
-2. **Tear down the dead B1 spike** (§52.5): `cloudflared-signal.service`,
-   `/etc/cloudflared/token-signal`, and Cloudflare tunnel B
-   `7e8771c5-a1a5-46bf-895e-d8ee9af3957a`. It carries nothing now.
-3. **Make G reproducible — currently it is NOT in the repo.** This is the
-   §46.15 footgun again, and worse than usual because the ts.net hostname is
-   generated per-node:
-   - the funnel config lives in the tailscale container's state volume, not
-     in `apps/tailscale/docker-compose.yml`;
-   - `Signal.URI` in `config/management.json.example` still points at
-     `netbird-vpn-signal.${BASE_DOMAIN}`, so a fresh `start.sh` would generate
-     a broken config;
-   - `backend/src/config/services.ts` still provisions a `signal`
-     additionalExposure through Cloudflare that is now **unused**.
-   Decide: templatise the funnel hostname (it is per-install, so it likely
-   becomes a prompt/setting like `BASE_DOMAIN`), drop the Cloudflare signal
-   exposure, and have `start.sh`/the dashboard set up Funnel.
-4. Consider whether the now-unused `netbird-vpn-signal.<domain>` Cloudflare
-   hostname and its NPM vhost should be removed.
-
-## 54. VPN scope closed — Funnel made reproducible, Cloudflare signal path removed
-
-Follow-on to §53, same session. §53.4's three items are done.
-
-### 54.1 Connection type: Relayed, permanently
-
-`netbird status --detail` on the home peer, with everything working:
-
-```
-Connection type: Relayed
-ICE candidate (Local/Remote): -/-
-Relay server address: rels://netbird-vpn-relay.tx-home-utils.com:443
-Networks: 192.168.1.0/24
-```
-
-**No ICE candidates at all.** With no port-forward (§0 principle 1) the home
-peer's WireGuard port is unreachable from outside, so hole-punching cannot
-complete and every session relays. Relay is therefore the **permanent data
-path here, not a fallback** — which retroactively justifies §50.3 completely,
-and means relay throughput is the operating norm. Worth remembering if
-performance is ever questioned: all phone↔home traffic crosses
-`netbird-relay` and the Cloudflare Tunnel.
-
-### 54.2 Capacity, for the record
-
-- **Users**: unbounded — gated only by Authelia's `users_database.yml` (1 today).
-- **Peers**: unbounded by NetBird; self-hosted has no license cap. Practical
-  ceiling is `StoreConfig.Engine: sqlite` and host RAM (comfortable into the
-  low hundreds); NetBird supports Postgres beyond that.
-- **Tailscale Funnel**: docs state non-configurable bandwidth limits with no
-  numbers and document **no** concurrent-connection limit. Signal holds one
-  idle long-lived stream per peer and carries only candidate exchange, so this
-  is cheap. Note **Funnel visitors are not tailnet devices** — NetBird peers
-  do not consume the Tailscale plan's device count; only the server node does.
-- **The real ceiling is relay bandwidth** (§54.1), since everything relays.
-
-Comfortable for a household (roughly ten people / a few dozen devices). The
-strain case is many simultaneous relayed sessions moving bulk data through the
-Cloudflare Tunnel; the fix there would be moving signal+relay to a public-IP
-host, which is nowhere near necessary yet.
-
-### 54.3 Reproducibility — Funnel is now in the repo
-
-§53.4 item 3. Previously none of G existed outside the running host.
-
-- **`config/management.json.example`** — `Signal.URI` is now
-  `${NETBIRD_SIGNAL_HOSTNAME}:443`, no longer a `${BASE_DOMAIN}` hostname.
-- **`.env(.example)`** — new `NETBIRD_SIGNAL_HOSTNAME`, documented with *why*
-  it is not a Cloudflare hostname. Stale comments claiming signal needs a
-  `<BASE_DOMAIN>` hostname were corrected in the same file.
-- **`start.sh`**:
-  - prompts for `TAILSCALE_AUTH_KEY` **next to the Cloudflare prompts** — the
-    user's call, and the right one: Tailscale is the same class of
-    prerequisite (an account + key that must exist beforehand), and NetBird
-    has no working signalling without it;
-  - starts the tailscale app itself (`-p tailscale`, matching the project name
-    the dashboard uses, so no duplicate stack) rather than waiting for someone
-    to start it from the dashboard — otherwise a first run finishes with a
-    NetBird that silently cannot connect any peer;
-  - derives the gateway **from inside the tailscale container** (`ip route`)
-    rather than assuming docker0's `10.201.0.1`, so it is correct on whatever
-    bridge network that app lands on — verified both reach signal;
-  - enables Funnel, reads the node's `DNSName`, writes
-    `NETBIRD_SIGNAL_HOSTNAME`, patches `Signal.URI` **in place** (never
-    regenerating `management.json`, which holds the store encryption key), and
-    restarts management;
-  - detects "Funnel is not enabled" and surfaces Tailscale's one-click
-    enablement URL. That step cannot be automated — it writes a tailnet ACL.
-  - The whole phase only ever `warn`s, never exits.
-- **`services.ts`** — the `signal` `additionalExposure` is **removed**, with a
-  comment saying why it must not come back: it provisions perfectly cleanly
-  and still never works.
-- **Tests** — three new cases in `services.test.ts` asserting `api` and
-  `relay` are exposed, `signal` is **not**, and the primary hostname stays
-  pinned to the dashboard port. Suite **125/125**, `tsc` clean.
-
-### 54.4 Dead Cloudflare signal path removed from the live host
-
-There is no deprovisioning path in the codebase (`deleteProxyHost` exists but
-is never called, and nothing removes tunnel ingress), so this was manual:
-
-- tunnel A ingress: `netbird-vpn-signal` rule dropped (40 → 39 rules);
-- its DNS record deleted;
-- NPM proxy host 33 deleted;
-- the `netbird-vpn:signal` `service_exposure` row deleted.
-
-Verified afterwards: management gRPC still `grpc-status: 0`, signal via Funnel
-still returns `x-wiretrustee-peer-registered: 1`, `netbird-vpn` 302,
-`authelia`/`homelab`/`immich` 200, and `netbird-vpn-signal.<domain>` is gone.
-
-**Worth building someday**: an exposure deprovision path, so removing an
-`additionalExposure` cleans up after itself instead of stranding an NPM host,
-a tunnel ingress rule and a DNS record.
-
-## 55. start.sh's Funnel phase validated; stale NetBird TODOs pruned
-
-### 55.1 A real bug, caught by reading before running
-
-The §54.3 Funnel block restarted `netbird-management` **unconditionally**
-whenever `data/management.json` existed — not only when `Signal.URI` actually
-changed. Every re-run of `start.sh` would therefore have bounced NetBird and
-every connected peer for no reason.
-
-Restructured to read-compare-then-write in the shell (rather than letting the
-Python writer decide), so the restart is gated on a real change. That shape is
-deliberate: the write and the restart are two different decisions and only one
-of them is idempotent.
-
-### 55.2 Both paths executed against the live host
-
-Extracted the block plus the helpers it depends on into a harness and ran it
-for real — this code had only ever been `bash -n`'d.
-
-**No-op path** (the state this host is already in):
-
-```
-==> NetBird signal is published via Tailscale Funnel at 5a300b08a105.tail122b53.ts.net
-==> NetBird Signal.URI already points at 5a300b08a105.tail122b53.ts.net:443
-```
-`management.json` unchanged, `.env` unchanged, management's `StartedAt`
-unchanged — genuinely idempotent.
-
-**Change path** (what a fresh install actually hits), simulated by injecting
-the `signal-not-configured.invalid` placeholder the generator writes:
-
-```
-==> Set NetBird Signal.URI to 5a300b08a105.tail122b53.ts.net:443
-==> restarted netbird-management to pick up the signal address
-```
-
-And the check that mattered most — the file is rewritten wholesale by
-`json.dump`, so:
-
-| | |
-|---|---|
-| `DataStoreEncryptionKey` intact | **True** |
-| `Relay` block intact | **True** |
-| key order identical | **True** |
-| difference vs. the pre-test backup | **nothing differs** |
-
-Both peers reconnected on their own afterwards and management gRPC still
-returns `grpc-status: 0`.
-
-### 55.3 Stale TODOs pruned
-
-plan.md was still carrying **P0** items instructing a future session to
-implement a router port-forward the user has explicitly withdrawn. A cold
-session would have acted on them — the same failure mode as §46.13's
-misattribution, which is exactly why this matters.
-
-- **§20.11** — all four items closed: the port-forward confirm and §20.10
-  itself marked **WITHDRAWN (§51.1)** with "never re-propose"; "confirm a real
-  peer enrols" marked **DONE** (§46.13/§53.3); STUN/TURN marked **DONE**,
-  noting TURN was deliberately replaced by relay because TURN needs a
-  port-forward.
-- **§21.3** — closed with the outcome of all three options, and the key
-  correction that **the real blocker was never the trailers bug** but
-  Cloudflare not flushing response headers on an open stream (§52.2).
-- **§0.1 item 3** (Docker address-pool exhaustion) — closed, verified on the
-  live host: `daemon.json` carries the widened pool and 38 networks are in
-  use, past the ~31 default ceiling.
-
-Original text is left in place under each, struck through — the reasoning
-trail is worth keeping; the instruction to act on it is not.
 
 ## 56. Tunnel ingress audit — dead rules removed, browser SSH replaced by an Authelia-gated app
 
@@ -30326,3 +28452,52 @@ applied.
 Verified on home-srv-01 through `startService('pihole')`: generated
 password → **200, valid session**; a wrong one → 401. LAN DNS (§528,
 `listeningMode ALL`) still answers.
+
+## 530. plan.md compaction pass 3 — cited sections compacted with their anchors kept
+
+Asked for "compact plan". The rule then was absolute: never compact a
+section that later sections or code still cite. That had already stopped
+§172's pass 2. Under it, only five small, coherent runs qualified (~450
+lines, ~1.5 % of the file). @mat chose to also do the NetBird saga, with a
+rule change first.
+
+**Rule change** (d256f53, CLAUDE.md): a cited section may be compacted if
+every cited anchor survives as a labelled entry (`**§50.5** — <conclusion>`)
+in the compacted section, so each existing citation still resolves by
+search and nothing outside `plan.md` changes. §172 rejected the earlier
+idea of keeping whole subsections, which saved little; keeping only each
+anchor's conclusion is what makes it worthwhile. This replaced the plan I
+first offered, which was to rewrite ~60 citations across code comments,
+`start.sh`, compose files, docs and older sections: the guarantee is the
+same with far less churn. New `scripts/plan-citations.py` lists every
+`§N`/`§N.M` citation (plan, code, apps, scripts, docs) that resolves
+nowhere. A pass may add no new lines to its output. d6ac9a1 made it skip
+compacted sections' own "(former …)" titles.
+
+**What it found first:** **45 citations already dangled**, mostly from pass 1
+(§165): code in `apps/price-compare/` still cites §38–§45, and §0.2/§0.3
+(principles in a list, not headings) are cited throughout. Left as they
+are; only new danglers are gated.
+
+**Compacted:**
+- a4f5165: five closed runs, each cited only from within itself:
+  sections 160–161 (invite flow), 385–386 (`setup_server.sh` prompts),
+  391–392 (rebrand tier 2), 393–395 (data-protection / commercial
+  positions) and 464–467 (access-denied follow-ups), now §160, §385,
+  §391, §393 and §464. −476 lines.
+- This commit: the NetBird saga. §20, §24, §46–§48 and §50–§55 (11 sections,
+  ~2,070 lines) became one ~200-line §46 with a labelled entry for each of
+  the ~35 cited anchors (§20.9 … §55). The run isn't contiguous: §21–§23
+  and §49 are other topics and are untouched. §48.7/§48.8 were appended
+  physically inside §49, so they stay there as real headings. One stated
+  fact was re-checked rather than carried over: the §52.5 spike teardown
+  (host unit and token confirmed gone; tunnel B's Cloudflare deletion not
+  re-checked).
+
+**Check:** `plan-citations.py` before and after each pass shows no new
+dangling targets; pass 1 even cleared four (their only citations were in
+compacted text). plan.md went from 30,686 to ~28,500 lines.
+
+**Not compacted, and why:** the backup build-out (§66–§90) and the 2FA
+slices (§127–§137) that §172 also named could now qualify under the new
+rule, but each is a separate, reviewable pass, not part of this one.
