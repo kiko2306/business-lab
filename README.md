@@ -234,21 +234,3 @@ it is done — not ticked off and left behind. Section references point at
       MeshCentral's own TLS) and a KVM/terminal session actually relays over
       WebSocket without WebRTC. Nothing here can be proven from the
       dashboard host alone.
-- [ ] **First-ever exposure of an app may need one extra restart** (§506)
-      — `startService` computes an app's exposure env overrides (Host
-      allow-lists, public URLs, `gatewayOnExposure` values) *before*
-      auto-exposure creates and enables that app's `service_exposure` row
-      on its very first start, so the container's first boot bakes in
-      pre-exposure values. Found live on MeshCentral (hard 502: it serves
-      its own HTTPS until `TLS_OFFLOAD` is set, so the mismatch is fatal
-      there) — a second start picks up the right values immediately.
-      Other `exposureEnvKeys` apps likely hit the same race more quietly
-      (a stale Host-allow-list for one boot, not a hard failure), which is
-      probably why nobody's noticed it before. Worth checking how many
-      apps are actually affected before deciding whether `startService`
-      should provision exposure *before* the first `compose up` instead —
-      that reorder touches every app's start path, so it's not a
-      one-line fix. The same ordering leaves a second gap (§512): on a
-      MeshCentral start, its create-account form is public for the few
-      seconds between `compose up` and the admin-claim bootstrap. Exposing
-      after the claim would close it.

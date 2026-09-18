@@ -30577,3 +30577,45 @@ revokes sessions, §514 OnlyOffice memory, §515 `writeAuditLog`,
 Twenty signup (already closed), §520 login audit username/IP, §521 login
 hardening, §522 HSTS/CSP, §523 refresh-token purge, §525/§526 stopped apps
 (+ NPM memory).
+
+## 527. An app's first-ever exposed start boots with exposed values
+
+README item from §506. `startService` rendered the env overrides, exposure
+config files and OIDC client env (all keyed off `service_exposure.enabled`)
+in `composeUpWithManagedConfig`, but only created or enabled that row
+afterwards in `ensureAutoExposure`. So an app's very first start booted with
+pre-exposure values, and a second start fixed it. MeshCentral was a hard
+502; the other affected apps got a quieter bad first boot (stale Host
+allow-lists, no SSO). Counted: **19 apps** carry `exposureEnvKeys`, an
+exposure config file or an `oidcClient`.
+
+The README expected a risky reorder of "provisioning before up". It isn't
+needed: the render reads only the row's `enabled` (plus registry + base
+domain), never provisioning status, and `ensureAutoExposure` is a DB-only
+upsert. New `settleAutoExposure()` runs `ensureAutoExposure` and, when it
+changed something, the Authelia access-control + OIDC-client sync (also
+derived only from enabled rows) **before** compose up, in both `startService`
+and `pullAndRecreateService`. So an OIDC app's client exists in Authelia
+before the app's first boot too. Publishing (NPM host, tunnel ingress, DNS)
+stays after `up`. `restartService` never touched exposure, and the row
+exists by then.
+
+No unit test: `startService` has none, and pinning this order would mean
+mocking ~30 modules, which mostly tests the mocks. The live reproduction is
+the check. On home-srv-01 (0.117.20), MeshCentral was reset to
+never-exposed (`stopService`, `deprovisionServiceExposure`, row deleted, NPM
+host gone), then started **once** through `startService`. First boot
+(restart count 0) had `TLS_OFFLOAD=10.201.0.1`, `TRUSTED_PROXY=true`,
+`HOSTNAME=mesh.tx-home-utils.com`, served plain HTTP locally, and
+`https://mesh.tx-home-utils.com/` answered **200** (previously a 502 until a
+second start). Admin claim intact (`newAccount="false"`). The hostname
+wasn't queried while its DNS record was gone, to avoid negative caching
+(§524).
+
+§512's claim gap: the admin bootstraps run inside
+`composeUpWithManagedConfig`, i.e. before publishing, so on a first-ever
+start the hostname doesn't exist until after the claim. The only remaining
+window is a start with **wiped app data behind an already-published
+hostname** (e.g. a restore gone wrong): a few seconds between `up` and the
+claim. Recorded here rather than as a TODO: closing it would mean
+unpublishing on stop, which §524 option A rejected.
