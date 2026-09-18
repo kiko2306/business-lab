@@ -255,11 +255,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### From the 2026-09-18 review (§511)
 
-- [ ] **NetBird router peer drops its management stream ~68×/hour** —
-      steady for the client's whole uptime: `502 Bad Gateway` on the job
-      stream and `RST_STREAM INTERNAL_ERROR` on the main one, via
-      `netbird-vpn-api.<domain>` (Cloudflare → NPM). Find the timeout, and
-      whether remote peers see it too.
 - [ ] **NocoDB: signup is probably open, and error reporting is on** — no
       `nc_app_settings` row, so invite-only signup is at its default (off)
       on a hostname with no Authelia. Its info endpoint reports

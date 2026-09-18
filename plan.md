@@ -30252,3 +30252,53 @@ decremented the same bucket as plain ones (119 → 115). Over the tunnel, a
 forged `127.0.0.1` also counted against the real client (119 → 117). nginx
 now logs the real tunnel client instead of the gateway. The dashboard serves
 200, and E2E passed 12/12.
+
+## 517. NetBird's management streams: the Job stream declined at NPM
+
+§511 flagged the router peer (`netbird-client` on this host) dropping its
+management streams ~68 times an hour. It turned out to be two stacked
+timeouts, and remote peers were hit too: six client addresses got the same
+failures that morning.
+
+**Job stream.** NetBird 0.5x+ opens a second, **bidirectional** RPC,
+`ManagementService/Job`, for remote debug-bundle requests. Its client side
+sits idle.
+1. First timeout: NPM answered it **408** after 60 s. That's
+   `client_body_timeout`, which times gaps between request-body reads. §50.5's
+   `grpc_read_timeout` only covers the other direction. **Tried and
+   rejected** (3c4b87a, 0.117.10): raising `client_body_timeout` to 3600s.
+   The 408 went away, but the stream then died at Cloudflare's 100 s origin
+   timeout (**524**). That's §52's finding again: Cloudflare doesn't flush
+   response headers on an open bidi stream, so `Job` can never complete
+   through the tunnel.
+2. The part that mattered: each Job failure reset the cloudflared→NPM HTTP/2
+   connection that every peer's `Sync` shares. NPM's log showed every
+   client's Sync ending in the same second as a Job failure.
+
+**Fix** (61614c7, 0.117.11): `buildGrpcAdvancedConfig` adds
+`location = /management.ManagementService/Job` answering straight away with
+`grpc-status: 12` (UNIMPLEMENTED). The v0.78.2 client source
+(`shared/management/client/grpc.go`) treats `codes.Unimplemented` on Job as
+permanent: it logs "Job feature is not supported" and stops dialling it.
+Only `PermissionDenied` is the other non-retried code, and that one also
+disconnects the peer, so it was the wrong choice. The cost is the dashboard's
+remote debug-bundle feature, which could never work through the tunnel
+anyway. The `client_body_timeout` line was reverted in the same commit.
+
+Verified on home-srv-01 over 15 minutes, provisioned through
+`provisionServiceIfEnabled('netbird-vpn')`: `curl` through Cloudflare gets
+`HTTP/2 200` + `grpc-status: 12`. The router peer logged "Job feature is not
+supported" once and never dialled Job again. No more Job 400/524s, and
+peers' Sync reconnects are no longer synchronised.
+
+**Remaining, and not ours to fix:** each peer's `Sync` still ends every
+~125 s (125.2 / 125.3 / 125.2 s measured). cloudflared logs `context
+canceled` for that request at each of those instants, and NPM sees upstream
+`200`, so the **Cloudflare edge** cancels a long origin stream that carries
+no data. Its proxy read timeout is Enterprise-only to change, and
+management can't use the QUIC tunnel instead (§50.6: it needs HTTP/2
+trailers). Impact is log noise and a ~1 s resync every two minutes per peer.
+WireGuard tunnels between peers don't depend on Sync staying open. Router
+peer warnings went from ~68/h (Job + Sync, all peers dropping together) to
+~28/h (Sync only, independent). README item deleted: nothing left in this
+repo's control.
