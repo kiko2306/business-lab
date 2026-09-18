@@ -30212,3 +30212,43 @@ resource) and never throws. Deleted:
   capabilities now come from `getUserRoles`, which gives the same answer.
 
 One regression test: an insert failure resolves and logs.
+
+## 516. The backend no longer trusts a LAN client's `X-Forwarded-For`
+
+§511 finding, proven before fixing. `frontend/nginx.conf` passed the
+client's `X-Forwarded-For` through untouched, and the backend trusts one hop
+(`trust proxy` 1). So `req.ip` was whatever a LAN or overlay client sent,
+including `127.0.0.1`, the value recovery mode's `isLocalRequest()` accepts.
+Live proof, from the host to `192.168.1.236:10001/api/auth/setup-status`:
+each forged value got its own fresh `RateLimit-Remaining: 119` bucket.
+Tunnel traffic was never affected, because Cloudflare appends the real
+client and one-hop trust took that last entry.
+
+Topology, measured from nginx's access log: cloudflared is a **host systemd
+service** dialing `localhost:10001`, so tunnel requests reach nginx from the
+Docker bridge gateway (`10.201.1.1`). LAN requests arrive from the client's
+own address.
+
+Fix, all in the frontend image:
+- `40-real-ip-from-gateway.sh`, an nginx entrypoint hook, writes
+  `set_real_ip_from <default gateway>` at every start. The subnet comes from
+  start.sh's daemon address pools, so it can't be hardcoded. With no gateway
+  it writes an empty file, so nothing is trusted. That fails safe.
+- `nginx.conf`: `real_ip_header X-Forwarded-For` + `real_ip_recursive on`,
+  and the `/api` locations **overwrite** `X-Forwarded-For` with the resolved
+  `$remote_addr`. The backend's `trust proxy` 1 is unchanged and now correct.
+- `docker-compose.test.yml` mounts the hook too. The first E2E run caught
+  that the test stack only mounted `nginx.conf`, and the strict `include`
+  stopped nginx from starting. Kept strict on purpose: in production a
+  missing hook should fail loudly.
+
+Known ceiling: a process on the host itself also arrives from the gateway,
+so it can still set the header. The host is already trusted (it can run
+commands in the backend container).
+
+Verified on home-srv-01 (0.117.9): the hook logged `trusting X-Forwarded-For
+from gateway 10.201.1.1`. LAN requests with forged `127.0.0.1` / `10.9.9.77`
+decremented the same bucket as plain ones (119 → 115). Over the tunnel, a
+forged `127.0.0.1` also counted against the real client (119 → 117). nginx
+now logs the real tunnel client instead of the gateway. The dashboard serves
+200, and E2E passed 12/12.
