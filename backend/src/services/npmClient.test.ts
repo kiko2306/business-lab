@@ -186,7 +186,7 @@ describe('buildProxyHostPayload', () => {
     for (const autheliaProtected of [false, true]) {
       const config = buildProxyHostPayload({ ...base, autheliaProtected, grpc: false }).advanced_config ?? '';
       const locationRoot = config.slice(config.indexOf('location / {'), config.indexOf('\n}', config.indexOf('location / {')));
-      expect(locationRoot).toContain('error_page 502 503 504 @app_unavailable;');
+      expect(locationRoot).toContain('error_page 502 503 504 = @app_unavailable;');
       expect(config).toContain('location @app_unavailable {');
       expect(config).toContain('$host isn’t running right now');
       const named = config.slice(config.indexOf('location @app_unavailable {'));

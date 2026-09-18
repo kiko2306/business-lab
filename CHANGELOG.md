@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.18] — 2026-09-18
+
+### Fixed
+
+- The "isn't running" page now actually reaches visitors through Cloudflare (it was sent as a 502, which Cloudflare replaced).
+
 ## [0.117.17] — 2026-09-18
 
 ### Changed

@@ -74,7 +74,11 @@ interface EnsureProxyHostOptions {
 // is off, so an app's own error pages still pass through untouched. No
 // add_header in the named location, or it would drop the server-scope HSTS
 // (§402.1).
-const APP_UNAVAILABLE_ERROR_PAGE = '    error_page 502 503 504 @app_unavailable;';
+// `=` matters: without it nginx keeps the original 502 as the status, and
+// Cloudflare replaces the body of an origin 502 with its own plain-text one,
+// so the page never reached a visitor (found live, §525). With it, the named
+// location's 503 is the status and Cloudflare passes the page through.
+const APP_UNAVAILABLE_ERROR_PAGE = '    error_page 502 503 504 = @app_unavailable;';
 const APP_UNAVAILABLE_LOCATION = [
   'location @app_unavailable {',
   '    default_type text/html;',
