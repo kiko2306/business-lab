@@ -1,7 +1,12 @@
 
 services:
   nginx-proxy-manager:
-    mem_limit: 256m
+    # 256m OOM-killed it on 2026-09-18 (§525): its Node backend runs with
+    # --max_old_space_size=250, so the heap alone can fill 256m, and a burst
+    # of ~30 proxy-host writes (a generated-config change hitting every host)
+    # took the nginx master down with it. Orphaned workers kept serving, but
+    # no reload could apply again until the container was recreated.
+    mem_limit: 512m
     mem_reservation: 96m
     image: jc21/nginx-proxy-manager:latest
     restart: unless-stopped
