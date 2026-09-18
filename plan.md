@@ -28527,3 +28527,56 @@ it was "enabled". That's a manual apply step principle 3 forbids, and the
 same silent-failure shape as §46.
 
 README item added. Not yet fixed.
+
+## 532. CrowdSec alert and enforcement settings apply on save; pipeline proven end to end
+
+Fixes §531. **Correction to §531:** the Cloudflare worker bouncer not
+running is by design (§117.4, compose `edge-bouncer` profile: it crash-loops
+on `cfut_` API tokens). Enforcement here is NPM's Lua bouncer (§119).
+
+**Fix (6410b92).** `appsToApplyAlertSettings()` (`utils/alertNotify.ts`)
+maps each changed setting to the running apps that render it on start, in
+dependency order: alerts → n8n + CrowdSec; topic → n8n + Uptime Kuma;
+enforcement → CrowdSec + NPM. n8n first so the webhook exists; CrowdSec
+before NPM because CrowdSec's start renders the block NPM loads.
+`PUT /api/settings/alerts` now runs `restartService` for each (which leaves
+an app that isn't running alone; its next start renders the same config)
+and reports what it restarted, what wasn't running, and what failed.
+`applied: false` shows as a warning, not a green tick. The Settings hints
+no longer say "applies on the next restart". Unit tests pin the mapping and
+order.
+
+**Found on the way (bbf2e5e).** `n8n-workflows-init` had `mem_limit: 96m`,
+only ever exercised with an empty `workflows/` (it exits before starting
+the CLI). The first real import was **OOM-killed (137)**, and n8n, which
+depends on it, stayed down. Raised to 1g (it runs for seconds and reserves
+nothing).
+
+Also unexplained: NPM had no `http_top.conf` at all (no real-IP block, no
+bouncer block), although the enforcement toggle writes it immediately. One
+call to `applyNpmCrowdsecConfig()` wrote it cleanly (`nginx -t` passed).
+CrowdSec's start re-renders it, which the new apply-on-save path now
+triggers.
+
+**Proven live on home-srv-01 (0.117.21), with a real detection:** after
+the apply (n8n, CrowdSec, NPM restarted), CrowdSec's `profiles.yaml` has
+`- http_default` on both profiles and n8n holds `homelabCrowdsecAlertRelay`,
+active. 30 probing requests through NPM, carrying a documentation IP
+(`203.0.113.9`) in the forwarded headers the way cloudflared delivers a
+real client, produced:
+- NPM logging the client as `203.0.113.9`;
+- CrowdSec alert 186 (`crowdsecurity/http-probing`) with a 4 h ban;
+- an n8n relay run with status `success` in the same second, i.e. the
+  push to ntfy (the operator confirmed pushes arriving);
+- NPM answering that IP **403** while another IP got 200. The `nginx`
+  bouncer's `last_pull` went from never to 14:41.
+
+The test ban was deleted afterwards (the IP got 200 again).
+`cscli notifications test` proved unreliable as a probe (it delivered once
+in three tries, likely because the plugin's 30 s `group_wait` outlives the
+`cscli` process), so a real detection is the check to use.
+
+Consequence: CrowdSec had raised ~50 real alerts in the prior week
+(http-probing, sensitive-files and CVE probes from public IPs), none of
+which were pushed. They will be now, which makes the §118.4a dedupe item
+measurable at last.
