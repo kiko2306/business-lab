@@ -32,6 +32,10 @@ FROM nginx:1.27-alpine AS runtime
 RUN rm /etc/nginx/conf.d/default.conf
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+# The nginx image's entrypoint runs /docker-entrypoint.d/*.sh on every start;
+# this one writes the trusted-proxy line nginx.conf includes.
+COPY 40-real-ip-from-gateway.sh /docker-entrypoint.d/
+RUN chmod 755 /docker-entrypoint.d/40-real-ip-from-gateway.sh
 COPY --from=build /app/dist/business-lab-frontend/browser /usr/share/nginx/html
 
 EXPOSE 80

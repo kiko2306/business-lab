@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.9] — 2026-09-18
+
+### Fixed
+
+- A LAN or VPN client can no longer claim to be localhost to the dashboard backend by sending its own X-Forwarded-For header (it bypassed the login rate limit and recovery mode's localhost-only check).
+
 ## [0.117.8] — 2026-09-18
 
 ### Fixed

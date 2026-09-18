@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.117.8** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.117.9** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -255,12 +255,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### From the 2026-09-18 review (§511)
 
-- [ ] **Backend trusts a client-supplied `X-Forwarded-For` from the
-      LAN/overlay** — `frontend/nginx.conf` passes the header through and
-      `trust proxy` is 1, so `X-Forwarded-For: 127.0.0.1` makes `req.ip`
-      localhost: bypasses recovery mode's localhost-only check and the login
-      rate limit. Tunnel traffic is fine (Cloudflare appends the real IP).
-      Found by reading the code; prove it on a LAN request before fixing.
 - [ ] **NetBird router peer drops its management stream ~68×/hour** —
       steady for the client's whole uptime: `502 Bad Gateway` on the job
       stream and `RST_STREAM INTERNAL_ERROR` on the main one, via

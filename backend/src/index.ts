@@ -78,9 +78,10 @@ const healthLimiter = rateLimit({
 const app = express();
 const PORT = process.env.PORT || 3000;
 
-// Behind Cloudflare Tunnel / Nginx Proxy Manager there is exactly one reverse
-// proxy hop in front of this container, so express-rate-limit and req.ip can
-// trust the single nearest X-Forwarded-For entry. Override via TRUST_PROXY if
+// Exactly one proxy hop sits in front of this container: the frontend's
+// nginx, which resolves the real client (tunnel or LAN) and *overwrites*
+// X-Forwarded-For with it (frontend/nginx.conf, §516). So express-rate-limit
+// and req.ip trust that single entry. Override via TRUST_PROXY if
 // the deployment adds more hops (e.g. an additional load balancer). Numeric
 // values must be passed as an actual Number — express-rate-limit treats a
 // numeric *string* as a trusted IP/subnet rather than a hop count.
