@@ -255,6 +255,12 @@ it is done — not ticked off and left behind. Section references point at
 
 ### From the 2026-09-18 review (§511)
 
-- [ ] **Stopped apps keep public hostnames that 502** (home-assistant,
-      itflow, twenty) — and the reconciler reports them "healthy" because it
-      checks NPM/Cloudflare config, not the upstream.
+- [ ] **Stopped apps: a proper "not running" page instead of NPM's bare
+      502** (§524, option C) — `error_page 502 503 504` inside each generated
+      `location /` (plain and Authelia variants; the Authelia snippet's own
+      `error_page 401` stops server-level inheritance) pointing at a named
+      location that returns a small 503 page naming `$host`. No `add_header`
+      there, or it drops the server-scope HSTS (§402.1). gRPC hosts excluded.
+- [ ] **Exposure reconciler: report stopped apps, not "all healthy"**
+      (§524, option D) — after the NPM/Cloudflare check, look at container
+      state and log/summarise stopped-but-exposed apps separately.

@@ -30482,3 +30482,31 @@ Verified on home-srv-01 (0.117.16): 263 dead / 4 live before the deploy.
 The boot sweep logged `Purged expired or revoked refresh tokens, deleted:
 263`, leaving 0 dead / 4 live, so every usable session survived. One unit
 test pins the statement.
+
+## 524. Plan — stopped apps keep their hostname, get a real "not running" page
+
+§511's last finding. Stopping an app never touches its exposure (§331 ties
+exposure to exposability, not run state), so a stopped app's hostname
+answers NPM's bare 502, and the 6-hourly reconciler calls it healthy because
+it checks NPM/Cloudflare config, not the upstream. Nothing leaks: nothing
+listens behind it.
+
+Options weighed (operator chose C + D, 2026-09-18):
+- **A. Deprovision on stop, re-provision on start. Rejected.** Deleting and
+  re-creating the DNS record means resolvers that asked in between cache
+  NXDOMAIN for the zone's negative TTL (SOA minimum **1800 s**, checked), so
+  a restarted app could be unreachable for up to 30 min. Each start/stop of
+  an Authelia-gated app would also change the access rules and restart
+  Authelia (brief SSO outage for everything), make start depend on the
+  Cloudflare API, and turn §506's first-exposure race into an every-start
+  race.
+- **B. Disable the NPM proxy host while stopped. Rejected.** DNS and the
+  Authelia rules stay put, but visitors get NPM's default site, which is no
+  clearer, and it adds NPM API churn plus a new exposure state.
+- **C. Keep everything; generated NPM config serves a small "<host> isn't
+  running right now" 503 in place of the bare 502.** Config generation only,
+  and it also covers a crashed or still-booting app.
+- **D. Reconciler reports stopped-but-exposed apps separately** instead of
+  "all healthy".
+
+C and D are independent; each gets its own commit.
