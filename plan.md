@@ -30350,3 +30350,28 @@ read from source in twentyClient.ts and is now proven live. If that default
 ever flips upstream, or someone sets the variable, signup reopens. Joining
 the existing workspace still needs its invite hash. Twenty was put back to
 stopped afterwards, as it was before the check.
+
+## 520. Login audit rows carry username and client IP
+
+§511 finding. A failed dashboard login was audited as `login / auth /
+failure` with no user row, no username and no address, so a brute-force run
+was a column of anonymous failures. `routes/auth.ts` now writes
+`metadata: { username, ip }` on a failed password login, and `{ ip }` on
+successful logins, the 2FA challenge and 2FA success/failure (those already
+have `user_id`). `req.ip` is trustworthy since §516: the frontend nginx
+resolves the client and overwrites `X-Forwarded-For`.
+
+The Audit Logs page and CSV didn't show `metadata` at all, so without a
+display change the data would only be reachable through SQL. `routes/audit.ts`
+now selects `COALESCE(u.username, metadata->>'username')` as the User column,
+so a failed login shows the name it tried, plus `metadata->>'ip'` as a new
+**IP** column in the table and the CSV. The attempted username is bounded by
+the login schema's `usernameSchema`, so a password pasted into the username
+box mostly fails validation before it can be recorded. Rows age out with the
+30-day audit purge.
+
+Verified on home-srv-01 (0.117.13), using the audit API's own SELECT: a
+failed login over the tunnel recorded `audit-probe-520` with the real public
+IPv6. One from the LAN, sent with a forged `X-Forwarded-For: 127.0.0.1`,
+recorded `192.168.1.236`. Older rows show empty, as expected. E2E 12/12,
+frontend 74/74, backend 1093/1093.
