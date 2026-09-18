@@ -56,8 +56,16 @@ with its outcome captured in code/tests/docs — may be compacted in a bounded,
 reviewable pass: replace the run with one short section that keeps the durable
 facts, the **conclusion** of each rejected approach (not the blow-by-blow), and
 any still-open threads, titled `... (former §X–§Y, compacted <date>)`. Do this
-as its own `plan:` commit so the diff can be reviewed and reverted. Never
-compact a section that later sections still build on or cross-reference.
+as its own `plan:` commit so the diff can be reviewed and reverted.
+
+A section that later sections or code still cite can be compacted only if
+every cited anchor survives as a labelled entry in the compacted section
+(`**§50.5** — <its conclusion>`), so each existing `§` citation still
+resolves by search and nothing outside `plan.md` has to change.
+`scripts/plan-citations.py` lists every citation that resolves nowhere: run
+it before and after, and the pass may add **no new** lines. §172 rejected an
+earlier form of this, which kept whole subsections and so saved little.
+Keeping only each anchor's conclusion is what makes it worth doing.
 
 It is read **a section at a time, never whole**. `plan-index.md` lists every
 section with the `sed` range that reads it; regenerate it with
