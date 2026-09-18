@@ -350,14 +350,38 @@ describe('recording what the run actually did', () => {
 
     await runScheduledBackupCheck();
 
-    // The old order was stamp-then-dump, which is why a total app-data failure
+    // Claimed as failed first (§508), success only once the data has moved —
+    // the old stamp-success-then-dump order is why a total app-data failure
     // still left a fresh timestamp behind it (§86.2).
-    expect(order).toEqual(['dump', 'engine', 'stamp']);
+    expect(order).toEqual(['stamp', 'dump', 'engine', 'stamp']);
+    expect(backup.recordBackupScheduleRun.mock.calls.map((c) => c[0])).toEqual(['failed', 'success']);
   });
 
   it('records success when the app data reached the engine', async () => {
     await runScheduledBackupCheck();
     expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('success');
+  });
+
+  it('has the run recorded as failed before the dump starts (§508)', async () => {
+    // A dump that OOM-kills the process never returns, so whatever is stamped
+    // by the time it starts is what the next boot sees.
+    let stampedWhenDumpStarted: unknown[] = [];
+    dumps.dumpAllAppDatabases.mockImplementation(async () => {
+      stampedWhenDumpStarted = backup.recordBackupScheduleRun.mock.calls.map((c) => c[0]);
+      return { ok: 3, failed: 0, outcomes: [] };
+    });
+
+    await runScheduledBackupCheck();
+
+    expect(stampedWhenDumpStarted).toEqual(['failed']);
+  });
+
+  it('counts a failed run once, not once for the claim and again at the end', async () => {
+    kopia.snapshotAppData.mockResolvedValue({ started: false, detail: 'rejected the password' });
+
+    await runScheduledBackupCheck();
+
+    expect(backup.recordBackupScheduleRun.mock.calls.map((c) => c[0])).toEqual(['failed']);
   });
 
   it('records failure when the engine refused to start', async () => {
@@ -366,6 +390,7 @@ describe('recording what the run actually did', () => {
     await runScheduledBackupCheck();
 
     expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
+    expect(backup.recordBackupScheduleRun).not.toHaveBeenCalledWith('success');
   });
 
   it('records failure when there is no password to hand the engine', async () => {
@@ -374,6 +399,7 @@ describe('recording what the run actually did', () => {
     await runScheduledBackupCheck();
 
     expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
+    expect(backup.recordBackupScheduleRun).not.toHaveBeenCalledWith('success');
   });
 
   it('records failure when every dump failed, since nothing was made safe', async () => {
@@ -382,6 +408,7 @@ describe('recording what the run actually did', () => {
     await runScheduledBackupCheck();
 
     expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
+    expect(backup.recordBackupScheduleRun).not.toHaveBeenCalledWith('success');
   });
 
   it('still records success when only some dumps failed', async () => {
@@ -399,6 +426,7 @@ describe('recording what the run actually did', () => {
     await runScheduledBackupCheck();
 
     expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
+    expect(backup.recordBackupScheduleRun).not.toHaveBeenCalledWith('success');
   });
 });
 

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.4] — 2026-09-18
+
+### Fixed
+
+- A scheduled backup that crashes the backend no longer re-runs on every boot — the run is recorded as failed before it starts, so a crash waits out the retry back-off
+
 ## [0.117.3] — 2026-09-18
 
 ### Fixed

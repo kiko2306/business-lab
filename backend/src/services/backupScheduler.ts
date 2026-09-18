@@ -77,6 +77,14 @@ export async function runScheduledBackupCheck(): Promise<void> {
     return;
   }
 
+  // Claim the run as failed BEFORE doing any work, and let only a clean finish
+  // overwrite it (§508). A run that takes the process down with it — a 723 MB
+  // dump OOM-killing the backend — never reaches the end-of-run stamp, so the
+  // old timestamp stayed put, the next boot found the backup overdue again,
+  // and one crash became 853 restarts ~40 s apart. Claimed up front, a crash
+  // counts as a failure and waits out the MAX_FAST_RETRIES back-off instead.
+  await recordBackupScheduleRun('failed');
+
   try {
     const fileName = await createBackupArchive();
     await writeAuditLog({
@@ -98,14 +106,16 @@ export async function runScheduledBackupCheck(): Promise<void> {
     // stale.
     const appData = await runAppDataBackup();
 
-    // Stamped here, at the end, with what actually happened — not before the
-    // app data has moved, and not unconditionally. Doing it the old way is why
-    // 2026-09-01 left a fresh timestamp, a `success` audit row and a 24-hour
-    // wait on a run whose app data never left the machine (§86.2).
-    await recordBackupScheduleRun(appData.ok ? 'success' : 'failed');
+    // Success is stamped here, at the end — not before the app data has
+    // moved, and not unconditionally. Doing it the old way is why 2026-09-01
+    // left a fresh timestamp, a `success` audit row and a 24-hour wait on a
+    // run whose app data never left the machine (§86.2). A failed run needs
+    // no second stamp: the claim above already recorded it.
+    if (appData.ok) {
+      await recordBackupScheduleRun('success');
+    }
   } catch (error) {
     logger.error('Scheduled backup failed', { error: (error as Error).message });
-    await recordBackupScheduleRun('failed').catch(() => {});
     await writeAuditLog({
       userId: null,
       action: 'backup_create',
