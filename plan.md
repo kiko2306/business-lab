@@ -10,12 +10,12 @@ If a design can't meet them, it doesn't ship until it can.
    Cloudflare Tunnel (and, for peers, the existing overlay VPNs). Anything
    that would need a forwarded port is out of scope or must find a
    tunnel/overlay path (see §21.3 / §20.11 for NetBird).
-2. **No console configuration.** The only command a human runs on the host
+2. **No console configuration.** (**§0.2**) The only command a human runs on the host
    is `./start.sh` (first-time bootstrap of the management stack). Every
    other setting — credentials, exposure, per-app config, secrets — is
    entered and applied through the dashboard UI. No hand-edited YAML/env/conf
    files, no `docker exec`, no `cscli`/CLI steps in a runbook.
-3. **Automate everything automatable.** Any configuration the system has
+3. **Automate everything automatable.** (**§0.3**) Any configuration the system has
    enough information to derive or generate, it must do on its own, with no
    user step. Examples already in place: exposure env overrides
    (`exposureEnv.ts`), Home Assistant's `http:` block
@@ -243,6 +243,11 @@ Preferred update strategies, in order:
 - [x] Recovery workflows
 - [x] UI polish and mobile refinement — dashboard grouping/collapsibles,
       PWA install, responsive header + stacked tables on phones. See §23.
+
+**§13.3** — the original roadmap's third phase (2026-08-24, before §13 became
+milestones): "nice-to-have: service templates, theming, mobile layout
+refinements". Mobile landed (§23); service templates and theming were never
+built.
 
 ## 13.1 Priority and Estimate Reference
 
@@ -2514,7 +2519,7 @@ matching behaviour. This section is the compacted summary.
 
 ### Open threads (not tracked in the README TODO)
 
-- **Play Store publishing** (former §26.4/§26.11/§26.12) — a new Google Play
+- **Play Store publishing** (**§26.4**, **§26.11**, **§26.12**) — a new Google Play
   developer account "MatDevOps" (`miguel.teixeira@portoinf.com`, account ID
   5508494745434403267, Individual) was created because
   `miguelamtx@gmail.com`'s old developer account is permanently closed and
@@ -2526,11 +2531,11 @@ matching behaviour. This section is the compacted summary.
   work, but nothing sells it. Needs a processor decision: Google Play Billing
   (once the account above is live) vs. Stripe/Paddle. `ADSENSE_CLIENT_ID` is
   also still unset — the owner needs to create an AdSense account.
-- **Android push activation failed on one older phone** (former §26.8) —
+- **Android push activation failed on one older phone** (**§26.8**) —
   `AbortError: push service error` in `pushManager.subscribe()` before any
   request reached the server; the exact same code/keys worked on a newer
   phone, so it is device/Play-Services-specific, root cause never isolated.
-- **Matching levers not pursued** (former §43.17): a tiny synonym map
+- **Matching levers not pursued** (**§43.17**): a tiny synonym map
   (`whitening→branqueadora`, `tangerina→clementina`, …) as a NoMatch-only
   fallback query; query relaxation to `[head noun] + [brand]` on NoMatch;
   corpus-derived word weighting. The AI fallback + manual override already
@@ -2539,6 +2544,35 @@ matching behaviour. This section is the compacted summary.
   "Amaciador de cabelo" vs "Condicionador", "Achocolatado" vs "Chocolate em
   pó", fresh produce absent from some stores' own top search results.
 
+### Anchors cited by `apps/price-compare/` and later sections (added 2026-09-18, §535)
+
+- **§26.9** — store research. Minipreço has no online store of its own
+  (minipreco.pt redirects into Auchan.pt since Auchan absorbed its
+  e-commerce), so Auchan is the stand-in.
+- **§30.2** — two live Lidl mismatches: "Açúcar 1 kg" matched a 2 kg bag
+  (`looksLikeMultiPack` only caught "N x SIZE"), and an Activia yogurt Lidl
+  doesn't stock matched an unrelated one. Fixed with
+  `looksLikeSizeMismatch` and a brand-aware reject in `scrapers.js`.
+- **§38** — a second reverted matching fix: using `headWordMismatch` as a
+  hard reject fixed the Atum/Iogurte case but falsely rejected six correct
+  matches ("Postas de Bacalhau Seco", …). Final 300-item refresh: 62.4 %
+  (749/1200).
+- **§39** — bug reports are per-store (the 🐞 button sits on each store's
+  price row and the server records `reportedStore`), in an in-page modal
+  instead of `window.prompt()`.
+- **§40** — a rename that kept reverting was a real data race:
+  `refreshProductsForUser` wrote back the whole product list captured at the
+  *start* of a minutes-long refresh, discarding any edit made meanwhile.
+- **§41** — an optional `brand` field; the store search combines
+  `${name} ${brand}`. Also the shopping list.
+- **§43** — the large accuracy pass: a UI-blocking loading screen during
+  refresh, an offline test harness replaying captured candidates, and
+  query sanitisation.
+- **§43.10** — full-pool refresh went 63.9 % → 61.5 % match, a deliberate
+  precision-for-recall trade (a wrong price is worse than none).
+- **§45** — bug reports where the pack or €/kg the store shows wasn't in the
+  app: multi-pack €/kg computed off the single-unit size, and missing Lidl
+  €/kg. Fixed in the scrapers.
 
 ## 46. NetBird through a Cloudflare Tunnel — how it was made to work (former §20, §24, §46–§48, §50–§55, compacted 2026-09-18)
 
@@ -2902,7 +2936,7 @@ forced to the WSL case to check the wording and layout.
 
 ### 49.5 Docker/Compose install commands added to the test plan
 
-`setup_test/README.md` §2.2 now carries the explicit install, since `start.sh`'s
+`setup_test/README.md`'s step 2.2 now carries the explicit install, since `start.sh`'s
 own `get.docker.com` fallback doesn't give a WSL user anything to verify before
 starting. Uses Docker's official apt repo, which provides the engine and
 `docker-compose-plugin` (i.e. `docker compose` v2) in one install; the
@@ -2910,7 +2944,7 @@ standalone `docker-compose` binary is not used by this project.
 
 Distro-derived rather than hardcoded — `$ID` and `$VERSION_CODENAME` from
 `/etc/os-release` — so the same lines work on Debian or Ubuntu. Ordered after
-§2.1 because `systemctl enable --now docker` needs systemd.
+its step 2.1 because `systemctl enable --now docker` needs systemd.
 
 Two WSL-specific notes: Docker Desktop's WSL integration must be turned **off**
 for the distro first, or `docker` resolves to the Desktop shim rather than the
@@ -12981,6 +13015,20 @@ Its own small feature if ever wanted, not backup plumbing.
 
 No open threads.
 
+### Anchors (added 2026-09-18, §535)
+
+- **§187** — the per-app backup API: `POST/GET/DELETE
+  /api/services/:name/backup(s)[/:file]` behind `backups:manage`. The archive
+  step moved out of the backend into a root alpine container, because the
+  backend's non-root `appuser` can't read app data (found on the first live
+  call).
+- **§188** — per-app restore (`restoreOneApp`, under the maintenance lock):
+  `stopService` → file restore in a root container (keeping `data/db`, SQLite
+  snapshots copied back) → server-DB replay from its dump in a throwaway
+  container (`mysql` vs `mariadb` picked at run time) → `startService`. A
+  failed replay is a warning, not a failure. Proven live on n8n (Postgres)
+  and Vaultwarden (SQLite).
+
 ## 191. Periodic exposure drift reconciliation (2026-09-04)
 
 README item — `POST /exposure/verify` re-asserts one service's hostname on
@@ -13464,7 +13512,7 @@ S3/B2/SFTP/`gdrive` back.
 
 ### Docs
 
-`app-credentials.md`, `ports.md` (§10150 added to "retired ports"),
+`app-credentials.md`, `ports.md` (port 10150 added to "retired ports"),
 `licences.md` (row + LinuxServer.io mention), `raspberry-pi.md`,
 `user-guide.md`, `recovery-troubleshooting.md` — every Duplicati mention
 updated or removed. `apps/kopia/docker-compose.yml`, `.env.example` and
@@ -21322,7 +21370,9 @@ Live HA recovered by hand to exactly this shape; `home-assistant.<domain>`
 
 ## 349. ITFlow bootstrap parked — the itfloworg image isn't migrating its schema (2026-09-10)
 
-§348 (readiness gate) was reverted too. Live: after a `start`, the ITFlow
+**§348** — the ITFlow setup-wizard bootstrap unparked behind a "form present ⇒
+schema up" readiness gate (871cd1d); renumbered into this section when parked.
+It was reverted too. Live: after a `start`, the ITFlow
 database has **no tables at all** (`Table 'itflow.users' doesn't exist`), yet
 `GET /setup/?user` still renders the `add_user` form — so the "form present ⇒
 schema up" gate is a false positive (`$install_is_live` fails *open*, not
@@ -21727,6 +21777,13 @@ Decisions taken and not revisited:
 No open threads from P9 itself. P10 (turnkey build spec) partly depends on
 P9a and stays its own README item; backup-passphrase custody is the separate
 §84.5/§74 thread.
+
+### Anchors (added 2026-09-18, §535)
+
+- **§359** — `cloudflare_account_model` (`self-controlled` | `contracted`),
+  recorded only, nothing branches on it (§203); and the token test warns when
+  a Cloudflare token spans more than one zone (`countTokenZones`), i.e. is
+  account-wide rather than zone-scoped (§202's blast radius).
 
 ## 362. §239 NPM-admin-over-overlay verified — and a signal-drift gap in self-update (2026-09-10)
 
@@ -24668,7 +24725,7 @@ else's UI.
 
 ### The seven gaps that *are* automatable
 
-1. **Host NetBird enrollment is a console step** — `docs/first-run.md`
+1. (**§416.1**) **Host NetBird enrollment is a console step** — `docs/first-run.md`
    documents `sudo netbird up --disable-dns` with a browser SSO login, which
    is a straight principle-2 violation. The material to remove it already
    exists: the dashboard mints setup keys through the PAT, and
@@ -24678,26 +24735,26 @@ else's UI.
    note: needs its **own** setup key, not the routing peer's — that one
    auto-joins `business-lab-netbird-router`, and enrolling the host with it
    would register a second router.
-2. **`start.config` asks for the wrong Tailscale credential.** It accepts
+2. (**§416.2**) **`start.config` asks for the wrong Tailscale credential.** It accepts
    `TAILSCALE_AUTH_KEY` — 90-day, must be re-typed — but not
    `TAILSCALE_OAUTH_CLIENT_ID`/`_SECRET`, which is non-expiring and makes the
    dashboard mint and re-mint that key itself (§408). So an unattended client
    install currently bakes in a credential that dies in 90 days, when the
    self-renewing one could be pre-seeded instead.
-3. **Six apps still need a human to claim the admin account** — Navidrome,
+3. (**§416.3**) **Six apps still need a human to claim the admin account** — Navidrome,
    Uptime Kuma, n8n, Twenty, Vikunja, Jellyfin. Four bootstraps of exactly
    this shape already exist to copy. It also closes a real first-visit claim
    race on a publicly exposed app rather than relying on Authelia being in
    front.
-4. **Kimai's mail is documented as by-hand** because the per-field injection
+4. (**§416.4**) **Kimai's mail is documented as by-hand** because the per-field injection
    can't build its single `MAILER_URL` DSN — but that DSN is just
    `smtp://user:pass@host:port` from fields the dashboard already holds.
-5. **Uptime Kuma's SMTP notification** has no environment variable; it needs
+5. (**§416.5**) **Uptime Kuma's SMTP notification** has no environment variable; it needs
    its API after an admin exists, so it depends on (3).
-6. **`setup_server.sh`'s three y/N prompts** (fixed IP, NOPASSWD sudo, free
+6. (**§416.6**) **`setup_server.sh`'s three y/N prompts** (fixed IP, NOPASSWD sudo, free
    port 53 for Pi-hole) are not pre-answerable through `start.config`, so a
    genuinely unattended install silently skips all three.
-7. **Vaultwarden ships `SIGNUPS_ALLOWED=true`**, which needs an admin
+7. (**§416.7**) **Vaultwarden ships `SIGNUPS_ALLOWED=true`**, which needs an admin
    decision and also blocks §415's client-API bypass.
 
 ### Ordering
@@ -25040,6 +25097,26 @@ Six apps listed. **Four automated** — n8n (§419), Jellyfin and Navidrome
 (§420). **One declined** — Twenty, above. Every one of the four was verified
 against the live host, and in all four the generated password was proven to
 actually authenticate, not merely that the account appeared.
+
+## 422. Kimai mail DSN and `start.config`-answerable prompts (reconstructed 2026-09-18)
+
+Never written at the time: the numbers skip from §421 to §423 although
+later sections cite §422. Reconstructed from its two commits (2026-09-12),
+which closed §416.4 and §416.6:
+
+- **Kimai mail** (d472ba2). Kimai takes its whole SMTP config as one
+  Symfony Mailer DSN (`MAILER_URL`), which the per-field mail injection
+  couldn't express. New `smtpDsn` mail key built by `buildSmtpDsn`:
+  `smtps://` for implicit TLS, plain `smtp://` for STARTTLS and for none,
+  and **credentials percent-encoded**. That last part is load-bearing: a
+  generated mailbox password routinely contains `@`, `:` or `#`, any of which
+  silently truncates or re-targets a DSN, and mail simply stops. Tests pin
+  that case.
+- **Prompts** (64d019e). `setup_server.sh`'s port-53 and sudo prompts were
+  TTY-gated, so a no-TTY install skipped them even with answers available
+  (it's sourced before `start.sh` loads `start.config`). It now reads its
+  own two keys from `start.config` directly; a real environment variable
+  still wins. Only a yes-spelling counts, so a typo can't grant NOPASSWD sudo.
 
 ## 423. Per-path Authelia bypasses — and the `$` that took Authelia down
 
@@ -27536,6 +27613,32 @@ step, not just asserted from a function's return value. The README's whole
 "Credential fan-out to no-SSO apps" section is closed; no open threads
 remain from this run.
 
+### Anchors cited by backend code (added 2026-09-18, §535)
+
+- **§481** — DocuSeal team-member provisioning via its own `POST /users`
+  (open source, no seat check; community edition has one role, so every
+  account is an admin). **§482** — verified live first try.
+- **§493** — never written as a section; the work is commit 6d0b89f,
+  verified live the same day through the real HTTP routes. Grant: `setUserAppAccess` diffs the
+  rows, and a newly granted no-SSO app for an already-passworded user is
+  marked `pending_fanout`. The user's next login (when the plaintext
+  passes through bcrypt) fans it out, and an admin password reset clears it.
+  Revoke: **disable, don't delete** — DocuSeal's archive, ITFlow's own
+  Disable action, a scrambled password for NocoDB (no disable flag).
+  Re-granting re-provisions through the create/update path.
+- **§495** — DocuSeal admin password drift: the tracked
+  `DOCUSEAL_ADMIN_PASSWORD` had stopped signing in, silently breaking team
+  provisioning. Now reconciled on start (the same idea as ITFlow's §382).
+- **§497** — Kimai fan-out writes its DB directly. Its REST API can create a
+  user but can never change a password (`PATCH` never re-adds
+  `plainPassword`).
+- **§499** — Home Assistant fan-out uses HA's own OAuth2 login flow plus
+  the frontend's WebSocket admin commands (`config/auth/*`); user
+  management isn't REST.
+- **§501** — Kimai admin identity re-sync: its entrypoint only ever
+  *creates* the admin, so an email or password change after first boot never
+  reached the account. Now reconciled on start (the DocuSeal §495 pattern).
+
 ## 505. MeshCentral re-added — for a case Guacamole doesn't cover
 
 User's ask, with a concrete reason this time: MeshCentral was already added
@@ -28634,3 +28737,33 @@ approved two upkeep items, in this order:
 2. **Compaction pass 4, the backup build-out (§66–§90)**, then **pass 5,
    the 2FA slices (§127–§137)**, each under the §530 rule and each its own
    `plan:` commit.
+
+## 535. Every plan.md citation resolves again (0 dangling)
+
+§534 item 1. `scripts/plan-citations.py` started at 41 dangling targets,
+and the causes turned out to be more varied than "Price Compare leftovers":
+
+- **Earlier compactions under the old rule** had removed sections that code
+  or plan still cite: §25 (Price Compare, 2026-09-03), §185 (per-app backup,
+  09-14), §357 (P9, 09-10), and §480 (no-SSO fan-out, 09-16, cited 30+ times
+  from `backend/src`). Each now carries labelled anchors with the
+  conclusions, recovered from the parent of its compaction commit (5 of §25's
+  ids were already described in its open threads and just needed labels).
+- **Two sections never written.** §422 (Kimai mail DSN + `start.config`
+  prompts) and §493 (no-SSO grant/revoke: `pending_fanout`,
+  disable-not-delete) shipped as commits with no plan section; the numbers
+  simply skip. §422 is reconstructed in place from d472ba2/64d019e, and §493
+  is an anchor in §480 from 6d0b89f.
+- **List items, not headings:** the §0 principles (§0.2/§0.3, 48 citations
+  between them), §416's seven gaps, §13.3 (the original roadmap's
+  nice-to-have phase), §348 (renamed into §349 when parked). All labelled
+  where they live.
+- **Not citations at all:** a stray `§` before port number 10150; two §49 lines cited
+  `setup_test/README.md`'s own step numbers.
+- **Checker gaps** (in `plan-citations.py`): a label that runs on into its
+  text (`**§436.1 — …**`) now counts, and a file's citation of its *own*
+  numbered heading resolves.
+
+Result: the checker prints nothing, so from here on any pass that breaks a
+reference shows up as the only line in its output. No citation outside plan.md was edited; code comments and docs keep their
+original `§` numbers.
