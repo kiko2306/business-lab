@@ -256,12 +256,3 @@ it is done — not ticked off and left behind. Section references point at
       should provision exposure *before* the first `compose up` instead —
       that reorder touches every app's start path, so it's not a
       one-line fix.
-
-
-### Backups
-
-- [ ] **Nextcloud `/NAS` FTP mount indexes the whole NAS** (§508) — the
-      hand-added external storage `frias@192.168.1.50//` is rooted at the
-      NAS root: 3.3 M `oc_filecache` rows, 2.2 GB table. Operator decision:
-      narrow it to a subfolder or drop it. Streaming dumps (§508) stopped it
-      crashing the backend but not the ~900 MB dump/backup size.

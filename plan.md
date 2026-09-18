@@ -30073,3 +30073,25 @@ same time: `getAllServiceStatus()` inside the running backend returns in
 the loop stopped. The toast is the frontend's fallback for a response with
 no error body, i.e. the backend unreachable — the crash loop, or the deploy
 restarts at 08:46 and 09:00.
+
+## 510. Nextcloud's orphaned `/NAS` index cleared
+
+The operator removed §508's `/NAS` FTP mount in Nextcloud's UI, but its
+3,300,512 `oc_filecache` rows and its `oc_storages` row
+(`ftp::frias@192.168.1.50//`, numeric id 5) stayed behind. Nextcloud 34
+removes a storage through its mount rows (`Storage::cleanByMountId`), and
+those were already gone, so nothing found it. `occ files:cleanup` only
+clears rows whose *storage* row is missing, so it deleted 0. There's no
+`occ` command for this, and `Storage::remove()` no longer exists in 34.
+
+Done by hand, with the operator's go-ahead, as a one-off data cleanup (not
+config, so there's nothing for the backend to automate): one transaction
+deleting `oc_filecache where storage = 5` and the `oc_storages` row, after
+checking no `oc_mounts` row pointed at it. Then `vacuum full oc_filecache`.
+A plain `VACUUM` fails in that container: a parallel vacuum overflows the
+default 64 MB `/dev/shm`, so `parallel 0` is needed. Harmless for
+autovacuum, which never runs in parallel.
+
+Result: `oc_filecache` 2.2 GB → 328 kB, database 2.3 GB → 82 MB, a fresh
+`pg_dump` 910 MB → 3.5 MB. `occ status` is healthy, and `occ info:storages`
+lists only the home, admin, data and `/Shared` storages.
