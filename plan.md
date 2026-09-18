@@ -30467,3 +30467,18 @@ Noted, not changed:
   `max-age=14400` (zone Browser Cache TTL). The origin sent `no-cache`
   before this change too, and service-worker update checks bypass the HTTP
   cache by spec (`updateViaCache: 'imports'`).
+
+## 523. Expired and revoked refresh tokens are purged
+
+Found during §513: nothing ever deleted `refresh_tokens` rows (261 of 267
+dead on home-srv-01). `purgeDeadRefreshTokens()` in `utils/audit.ts` runs
+`DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked` on the
+existing 6-hourly audit-purge sweeper (and at boot), with its own catch so
+one failure doesn't hide the other. It only removes rows `/auth/refresh`
+already refuses: that route answers a missing row exactly as it answers a
+revoked or expired one, so no behaviour changes.
+
+Verified on home-srv-01 (0.117.16): 263 dead / 4 live before the deploy.
+The boot sweep logged `Purged expired or revoked refresh tokens, deleted:
+263`, leaving 0 dead / 4 live, so every usable session survived. One unit
+test pins the statement.
