@@ -209,6 +209,13 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Pi-hole: check the admin password is actually applied** (§528) —
+      `apps/pihole/docker-compose.yml` still passes `WEBPASSWORD`, the
+      Pi-hole v5 variable. v6 (the image is `latest`) reads
+      `FTLCONF_webserver_api_password` instead, so the generated
+      `PIHOLE_WEB_PASSWORD` may not be what protects the web UI. Confirm
+      on the live instance, then switch the variable.
+
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch

@@ -30619,3 +30619,45 @@ window is a start with **wiped app data behind an already-published
 hostname** (e.g. a restore gone wrong): a few seconds between `up` and the
 claim. Recorded here rather than as a TODO: closing it would mean
 unpublishing on stop, which §524 option A rejected.
+
+## 528. Dashboard "Unable to reach the backend API": Pi-hole was dropping all LAN DNS
+
+Reported with a screenshot: every dashboard call failing with "Unable to
+reach the backend API" and "Unable to load …".
+
+Ruled out, in order:
+- **Backend:** up, 0 restarts, no OOM; `/api/version` answers 200 through
+  the frontend nginx.
+- **My redeploys:** that toast fires only for HTTP status 0
+  (`api-error.interceptor.ts`), i.e. no response reached the browser. A
+  backend restart makes the frontend nginx answer 502, a different message.
+- **§522's CSP:** the served bundle's `apiUrl` is `""` (same origin), and a
+  headless Chromium loading the live `https://businesslab…/login` got 200 on
+  its API calls, with no console errors and the service worker registered.
+- **The telling fact:** since the frontend container restarted at 11:54
+  (§522 deploy), its nginx had logged **no browser traffic at all**, only
+  curls and that headless probe. The page rendered because `sw.js` falls
+  back to the cached shell when a navigation fails at the network level;
+  `/api` is never intercepted, so every call failed with status 0. The
+  browser couldn't connect to the hostname at all.
+
+Cause: the Pi-hole on this host, which the LAN uses for DNS, answered on
+127.0.0.1 but **not on its LAN address** (`dig @192.168.1.236` UDP timed out,
+TCP reset). Pi-hole v6's `dns.listeningMode` defaults to `LOCAL`, which
+answers only the container's own subnets. On a Docker bridge network, LAN
+queries keep their 192.168.x source, so every one was dropped. The compose
+file never set it; this wasn't introduced today, but a LAN machine
+resolving through Pi-hole couldn't resolve the dashboard once its cached
+record expired. The dev box (resolver 1.1.1.1) never saw it.
+
+Fix (9dc516e): `FTLCONF_dns_listeningMode: "ALL"`, Pi-hole's documented
+setting for bridge mode. Port 53 is reachable from the LAN and the overlays
+only (no port forwarding), so this doesn't make an internet-open resolver.
+Applied through `startService('pihole')`: `listeningMode` reads `ALL`, and
+`dig @192.168.1.236` now answers over UDP and TCP for the dashboard and for
+other names.
+
+Not yet confirmed from the reporting browser: whether its machine resolves
+through Pi-hole, and that a reload now works. Found on the way and added to
+the README rather than fixed in passing: the compose file still passes
+Pi-hole v5's `WEBPASSWORD`; v6 reads `FTLCONF_webserver_api_password`.
