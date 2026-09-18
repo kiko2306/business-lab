@@ -8058,320 +8058,67 @@ Backend rebuilt with the script in `dist/`, against the live database:
 - 2FA for admin accounts (separate README item) is the larger security gap and
   wants its own planned build.
 
-## 127. Plan — 2FA (TOTP) for admin accounts
+## 127. Two-factor authentication (TOTP) for dashboard accounts (former §127–§130, §132, §137, compacted 2026-09-18)
 
-The dashboard is internet-facing over the tunnel (`homelab.tx-home-utils.com`,
-`api-homelab.tx-home-utils.com`), independent of the per-service exposure
-feature, and login is username + bcrypt password only. Add TOTP (RFC 6238) as a
-second factor, per account, opt-in per account but enforced once enabled.
+Built 2026-09-03 in five slices. The code (`routes/auth.ts`,
+`utils/totp.ts`, `utils/totpSecret.ts`, `utils/jwt.ts`,
+`pages/login`, `pages/account`) and `docs/two-factor.md` are the source of
+truth. §131, §133–§136 sit between these slices but are other topics and
+stay in place.
 
-Not Authelia: Authelia already fronts *exposed apps*, but the management
-dashboard's own auth is this backend's `/auth/*`, and putting Authelia in front
-of it would couple the tool that starts Authelia to Authelia being up. This is
-a change to the backend's own login.
+### Anchors
 
-### 127.1 What exists (survey)
+**§127** — the plan, cited by `routes/auth.ts`, `utils/database.ts` and
+`database/init.sql`. The dashboard is internet-facing and login was
+password-only, so: TOTP (RFC 6238) per account, opt-in, enforced once
+enabled. **Not Authelia**, which would couple the tool that starts Authelia
+to Authelia being up. Enrolment is self-service only; admins don't enrol
+others.
 
-- `POST /auth/login` {username,password} → bcrypt check → `{accessToken (1h
-  JWT), refreshToken (7d JWT, row in `refresh_tokens`), user}`. Also `/setup`
-  (first admin), `/refresh`, `/logout`. `middleware/auth.ts` verifies the
-  access JWT.
-- `users`: `id, username, password_hash, is_setup_complete, created_at`.
-  Schema lives in `database/init.sql` **and** as idempotent
-  `ALTER/CREATE ... IF NOT EXISTS` functions called fire-and-forget from
-  `index.ts` at boot (`dropLegacyRoleColumn`, `ensureServiceExposureTable`,
-  …) — both get updated together.
-- Frontend: Angular standalone. `pages/login`, `pages/users` (admin list +
-  password reset + delete), `core/auth.service.ts` (persists the whole
-  session to `localStorage` `homelab.session`), `interceptors/auth.interceptor.ts`,
-  `guards/auth.guard.ts`. No per-user "account/security" page yet.
-- `./start.sh recover` (§126) is the lockout escape hatch.
-- No OTP/QR library in either `package.json`.
+**§127.2** — design, cited by `totpSecret.ts`. `otplib` + `qrcode` (QR
+rendered server-side as SVG, so no frontend dependency). The secret is
+sealed at rest with AES-256-GCM under HKDF-SHA256(`JWT_SECRET`, info
+`homelab-totp-secret-v1`): nothing new to configure; rotating `JWT_SECRET`
+forces re-enrolment and fails closed. 10 single-use recovery codes, stored
+as SHA-256 (high-entropy, so a slow KDF adds nothing). Login stays one
+endpoint until MFA passes: password OK + enrolled → `202 {mfaRequired,
+mfaToken}` (a 5-minute JWT, `purpose: mfa`, its own HKDF key
+`homelab-mfa-token-v1`, so it can never pass as an access token), finished
+at `POST /auth/login/totp`.
 
-### 127.2 Design decisions
+**§128** — slice A, enrolment API: `/auth/totp/{status,setup,activate,
+disable}`. Disable takes a current code *xor* the password. Schema is
+`users.totp_*` + `totp_recovery_codes`, in `init.sql` and the
+`ensureTotpSchema()` boot migration. `withTransaction` was added so
+enabling and inserting codes land together.
 
-- **Library**: `otplib` (pure JS, no native deps — fine on node:20-alpine) for
-  TOTP; `qrcode` (pure JS) to render the enrolment QR **server-side** as an SVG
-  data URI, so the frontend needs no new dependency. Both MIT. They are normal
-  bundled npm deps like `bcryptjs`/`jsonwebtoken`, so **no `docs/licences.md`
-  row** (that convention covers apps and base/sidecar images, not libraries).
-- **Secret at rest**: AES-256-GCM, key = HKDF-SHA256(`JWT_SECRET`,
-  info `"totp-secret-v1"`). Nothing new to configure — matches §0 principle 3.
-  A helper `utils/totpSecret.ts` (`sealSecret`/`openSecret`), unit-tested.
-- **Recovery codes**: 10 per enrolment, single-use, shown once. Store only
-  SHA-256 hashes (the codes are high-entropy random, so a fast hash is fine and
-  bcrypt's cost is pointless at 10/user).
-- **Login stays one endpoint until MFA passes**: password-OK + `totp_enabled`
-  returns `202 {mfaRequired:true, mfaToken}` where `mfaToken` is a 5-minute
-  JWT with `purpose:"mfa"` and no API authority; `POST /auth/login/totp`
-  {mfaToken, code} finishes it (code = 6-digit TOTP, window ±1, or a recovery
-  code). Hard rate limit on the second step.
-- **Enrolment is authenticated**: a logged-in user turns on their own 2FA.
-  Admins do not enrol on behalf of others (they can already reset a password;
-  forcing a factor onto someone else's phone is not a flow we need).
+**§129** — slice B, enforced at login. Recovery codes are consumed in the
+same `UPDATE … WHERE used_at IS NULL RETURNING` that checks them (no
+replay or race). A latent bug surfaced: two refresh tokens minted for one
+user in the same second were byte-identical and hit the UNIQUE constraint
+(500), routine once 2FA put two token issues seconds apart; fixed with a
+random `jti`. Lockout escape: `./start.sh recover disable-2fa <username>`
+(`reset-password` deliberately leaves 2FA alone: a lost password and a lost
+phone are different events).
 
-### 127.3 Schema
+**§130** — slice C, the login screen's second step: `mfaToken` held in
+memory only, a recovery-code toggle, "Start over" (the token dies after
+5 min).
 
-```sql
-ALTER TABLE users
-  ADD COLUMN IF NOT EXISTS totp_secret TEXT,             -- sealed; NULL until enrolled
-  ADD COLUMN IF NOT EXISTS totp_enabled BOOLEAN NOT NULL DEFAULT FALSE,
-  ADD COLUMN IF NOT EXISTS totp_enrolled_at TIMESTAMPTZ;
+**§132** — slice D, the Account security page (`/account`): set up (the
+server's QR, with the secret shown for manual entry), activate, recovery
+codes shown once with download and copy, disable. The QR is injected via
+`bypassSecurityTrustHtml` (it's our own backend's SVG).
 
-CREATE TABLE IF NOT EXISTS totp_recovery_codes (
-  id         SERIAL PRIMARY KEY,
-  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-  code_hash  TEXT NOT NULL,
-  used_at    TIMESTAMPTZ,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
-);
-```
+**§137** — slice E, the docs: `docs/two-factor.md`, `openapi.yaml`, the
+user guide, the IT-admin page, `app-credentials.md` and the security
+checklist, each checked against the shipped code's strings and status codes.
 
-`init.sql` gets the same, and `ensureTotpColumns()` / `ensureTotpRecoveryTable()`
-join the boot migration calls in `index.ts`.
-
-### 127.4 Endpoints
-
-| Method | Path | Auth | Purpose |
-|---|---|---|---|
-| POST | `/auth/totp/setup` | access JWT | make a pending secret, return `{otpauthUri, qrSvg, secret}` |
-| POST | `/auth/totp/activate` | access JWT | `{code}` → verify pending secret, `totp_enabled=true`, return the 10 recovery codes once |
-| POST | `/auth/totp/disable` | access JWT | `{code}` **or** `{password}` re-check, clear secret + codes |
-| GET  | `/auth/totp/status` | access JWT | `{enabled, enrolledAt, recoveryCodesRemaining}` |
-| POST | `/auth/totp/recovery-codes` | access JWT | `{code}` → regenerate, invalidate old (may fold into a later slice) |
-| POST | `/auth/login/totp` | mfaToken | `{mfaToken, code}` → tokens |
-
-`/auth/login` unchanged shape on the happy path; adds the `202` branch.
-
-### 127.5 Lockout interaction
-
-Add `./start.sh recover disable-2fa <username>` (new command in
-`scripts/recover-admin.sh` + `recoverAdmin.ts`): clears `totp_*` and deletes
-that user's recovery codes. `reset-password` deliberately does **not** also
-drop 2FA — losing the password and losing the phone are different events.
-
-### 127.6 Slices (each shippable + verifiable on its own)
-
-- **A — TOTP core + enrolment API (backend).** deps, schema + migrations,
-  `utils/totpSecret.ts`, `utils/totp.ts` (generate/verify/recovery codes),
-  `/auth/totp/{setup,activate,disable,status}`, tests. No login change yet.
-  Verify: enrol with `curl` + a real authenticator app, `status` reflects it,
-  `disable` needs a valid code.
-- **B — enforce at login (backend).** `/auth/login` `202` branch,
-  `/auth/login/totp`, recovery-code path, rate limits, audit actions
-  (`login_mfa_challenge/success/failure`, `login_recovery_code_used`).
-  `./start.sh recover disable-2fa`. Verify: full round-trip with a TOTP code
-  and with a recovery code; lockout cleared by the recover command.
-- **C — frontend login step.** Login component becomes 2-step on
-  `202 mfaRequired` (mfaToken in memory only), "use a recovery code" toggle;
-  `auth.service.ts` + `models.ts`. Verify: sign in through the UI with 2FA on.
-- **D — frontend enrolment UI.** New Account/Security page (or section):
-  status, set up (render `qrSvg`), activate, show/download recovery codes,
-  disable. Verify: enrol and disable entirely through the UI.
-- **E — docs.** `docs/two-factor.md`, `openapi.yaml`, `user-guide.md`,
-  `it-admin.md`, `app-credentials.md` note; the `recover disable-2fa` path.
-
-Build A→B→C→D→E; A and B are the security substance, each a session or less.
-
-## 128. 2FA slice A done — TOTP core + enrolment API
-
-§127 slice A. Enrolment works end to end; login is **not** yet gated on it
-(slice B).
-
-### 128.1 What landed
-
-- **Deps**: `otplib@^12` (TOTP), `qrcode@^1.5` (server-rendered enrolment QR),
-  `@types/qrcode`. All MIT, transitive deps MIT — normal bundled libraries
-  like `bcryptjs`/`jsonwebtoken`, so no `docs/licences.md` row (that covers
-  apps and images, not npm libs). `npm audit` findings are all pre-existing
-  (vitest/vite, qs/body-parser) — nothing from the new packages.
-- **`utils/totpSecret.ts`** — `sealSecret`/`openSecret`, AES-256-GCM under a
-  key derived from `JWT_SECRET` via `crypto.hkdfSync('sha256', …, info
-  "homelab-totp-secret-v1")`. Format `v1:<iv>:<tag>:<ciphertext>` base64url.
-  Nothing new to configure; rotating `JWT_SECRET` forces re-enrolment (an
-  acceptable cost, and it fails closed — `openSecret` throws rather than
-  returning garbage).
-- **`utils/totp.ts`** — `generateTotpSecret`, `totpKeyUri` (issuer "Homelab
-  Management"), `totpQrSvg` (inline `<svg>`), `verifyTotp` (±1 step window,
-  returns false on non-6-digit or malformed input rather than throwing),
-  `generateRecoveryCodes` (10 × `xxxxx-xxxxx` hex), `normaliseRecoveryCode`,
-  `hashRecoveryCode` (SHA-256 — the code is already high-entropy, a slow KDF
-  would just add latency to checking ten per attempt).
-- **Schema** (`database/init.sql` + `ensureTotpSchema()` boot migration in
-  `utils/database.ts`, called from `index.ts` beside the other `ensure*`):
-  `users.totp_secret TEXT`, `users.totp_enabled BOOLEAN DEFAULT FALSE`,
-  `users.totp_enrolled_at TIMESTAMPTZ`; `totp_recovery_codes (id, user_id FK
-  ON DELETE CASCADE, code_hash, used_at, created_at)` + a `user_id` index.
-- **`withTransaction(fn)`** added to `utils/database.ts` — BEGIN/COMMIT/
-  ROLLBACK on one pooled client, so enabling 2FA and inserting its recovery
-  codes land together (and disable clears both together).
-- **Routes** on the existing `/auth` router, all behind `authMiddleware`
-  (login is untouched):
-  - `GET /auth/totp/status` → `{enabled, enrolledAt, recoveryCodesRemaining}`.
-  - `POST /auth/totp/setup` → seals a pending secret (`totp_enabled` stays
-    false), returns `{otpauthUri, qrSvg, secret}`. 409 if already enabled.
-  - `POST /auth/totp/activate` `{code}` → verify against the pending secret,
-    then in one transaction flip `totp_enabled`, stamp `totp_enrolled_at`,
-    replace the recovery-code rows; returns the 10 codes once. `authLimiter`.
-  - `POST /auth/totp/disable` `{code}` xor `{password}` → re-verify, then clear
-    `totp_*` and delete recovery codes. `authLimiter`.
-  - Schemas `totpActivate` / `totpDisable` (`.xor('code','password')`) in
-    `middleware/validation.ts`.
-  - Audit actions `totp_activate` / `totp_disable` (success + failure).
-
-### 128.2 Verified (real stack)
-
-Backend rebuilt (lockfile in sync, image `npm ci` clean); `ensureTotpSchema`
-added the columns + table to the live DB (`\d users`, `\d totp_recovery_codes`
-confirm). Against a throwaway admin, with codes computed from the returned
-secret via `otplib` in the container:
-
-- status before → `{enabled:false, …:0}`.
-- setup → base32 secret + correct `otpauth://…issuer=Homelab%20Management…`
-  URI + `<svg>`; **DB stores `v1:…`, not the base32** — sealing works.
-- activate `000000` → 400 + `totp_activate/failure`; activate the real code →
-  `{enabled:true, recoveryCodes:[10]}`; DB has 10 rows, all 64-hex, unused.
-- status after → `{enabled:true, enrolledAt, recoveryCodesRemaining:10}`.
-- setup again → 409.
-- disable wrong password → 400 + failure audit; correct password → 200
-  `{enabled:false}`, DB: secret NULL, disabled, enrolled_at NULL, 0 codes.
-- re-enrol, disable via a **current TOTP code** (not password) → 200.
-- disable with neither / both of code+password → 422 (validation).
-- 369 backend tests pass (+16: `totp` 10, `totpSecret` 6); typecheck clean.
-- Throwaway user and its rows deleted.
-
-### 128.3 Next (slice B)
-
-`/auth/login` returns `202 {mfaRequired, mfaToken}` when `totp_enabled`;
-`POST /auth/login/totp` finishes it with a TOTP code or a recovery code
-(stamp `used_at`); rate-limit the second step hard; audit
-`login_mfa_challenge/success/failure`, `login_recovery_code_used`. Add
-`./start.sh recover disable-2fa <username>`.
-
-## 129. 2FA slice B done — TOTP enforced at login
-
-§127 slice B. A user with `totp_enabled` now needs a code to log in.
-
-### 129.1 What landed
-
-- **`utils/jwt.ts`**
-  - `signMfaToken(userId)` / `verifyMfaToken` — a 5-minute hand-off token,
-    payload `{ id, purpose: 'mfa' }`, signed with a key of its own
-    (HKDF-SHA256 of `JWT_SECRET`, info `homelab-mfa-token-v1`). Signing it with
-    a distinct key means it can never be replayed as an access token even on a
-    deployment where `JWT_REFRESH_SECRET` is unset; `verifyMfaToken` also
-    checks the `purpose` claim.
-  - **`signRefreshToken` now adds a random `jti`.** Latent bug slice B
-    surfaced: the refresh payload was just `{ id }`, so two tokens minted for
-    the same user in the same wall-clock second were byte-identical and the
-    second `INSERT` hit `refresh_tokens.token`'s UNIQUE constraint (a 500). A
-    2FA login issues a token seconds after `/auth/login` handed back the
-    challenge, so this went from "nobody logs in twice a second" to routine.
-    `jti` makes every token unique; the DB still keys on the token string, no
-    schema change.
-- **`routes/auth.ts`**
-  - `/auth/login`: password OK **and** `totp_enabled` → `202 { mfaRequired:
-    true, mfaToken }`, no session created. Audit `login_mfa_challenge`.
-  - `POST /auth/login/totp` `{ mfaToken, code }` — verify the hand-off token,
-    then a 6-digit `code` is checked as TOTP, anything else as a recovery
-    code. Recovery codes are consumed in the same `UPDATE … SET used_at =
-    NOW() WHERE … AND used_at IS NULL RETURNING id` that checks them, so a
-    replay/race can't spend one twice. Success → `issueSession` (extracted:
-    the shared token-issue + refresh-row tail). Audit `login_mfa`
-    (success/failure) and `login_recovery_code_used`.
-  - Schema `authLoginTotp` in `middleware/validation.ts`.
-- **`./start.sh recover disable-2fa <username>`** — new subcommand in
-  `recoverAdmin.ts` (`disableTotp`, uses a new pure `parseUsername` helper —
-  no password) and `scripts/recover-admin.sh` (username only, no password
-  prompt). Clears `totp_*`, deletes recovery codes, audits
-  `recovery_disable_2fa`. `reset-password` still leaves 2FA alone — a lost
-  password and a lost phone are separate events.
-- Docs: the `disable-2fa` line added to `recovery-troubleshooting.md`.
-
-### 129.2 Frontend note (until slice C)
-
-The Angular login page still expects `/auth/login` to always return a session.
-Nobody has enrolled (the enrolment UI is slice D), so nothing is broken today
-— but **do not enable 2FA on your own account via curl before slice C ships**,
-or that account's dashboard login will bounce.
-
-### 129.3 Verified (real stack)
-
-Backend rebuilt. Against a throwaway admin, codes computed with `otplib` in the
-container:
-
-- password login while enrolled → `202 {mfaRequired, mfaToken}`, no tokens.
-- `/auth/login/totp`: wrong code → 401 + `login_mfa/failure`; correct TOTP →
-  `{accessToken, refreshToken, user}`; the issued access token works on
-  `/api/users` (200) and the refresh token on `/auth/refresh` (200); the
-  `mfaToken` itself on `/api/users` → 401.
-- recovery code: first use → 200, `used_at` stamped, `login_recovery_code_used`
-  audited; reuse → 401; DB shows 1/10 used.
-- garbage `mfaToken` and an access token passed as `mfaToken` → 401.
-- three logins for one user in quick succession → all 200 (the `jti` fix; was
-  a 500 on the second before it).
-- `./start.sh recover disable-2fa` → `totp_enabled` false, secret NULL, 0
-  recovery rows; password-only login returns a session again.
-- 376 backend tests pass (+7: jwt 5, recoverAdmin `parseUsername` 2);
-  typecheck + shellcheck clean.
-
-### 129.4 Next (slice C)
-
-Angular login: on `202 mfaRequired`, swap to a code step (mfaToken kept in
-memory only), POST `/auth/login/totp`, with a "use a recovery code" toggle;
-`auth.service.ts` + `models.ts`.
-
-## 130. 2FA slice C done — the login screen's second step
-
-§127 slice C. The Angular login page now handles the `202` challenge from
-slice B.
-
-### 130.1 What landed
-
-- **`core/models.ts`**: `MfaChallenge { mfaRequired: true; mfaToken }`,
-  `LoginResult = AuthResponse | MfaChallenge`, and an `isMfaChallenge()`
-  guard.
-- **`core/auth.service.ts`**:
-  - `login()` now returns `Observable<LoginResult>` and only calls
-    `persistSession` when the result is a real token pair — a `202` challenge
-    is passed straight through, no session written.
-  - New `completeMfaLogin(mfaToken, code)` → `POST /auth/login/totp`, trims the
-    code, persists the session on success. Both use `SKIP_AUTH` +
-    `SKIP_GLOBAL_ERROR_HANDLING` like the other auth calls.
-- **`pages/login/login.component.ts`**: a `stage` of `'credentials' | 'mfa'`.
-  On `isMfaChallenge`, stash the `mfaToken` in a private field (memory only,
-  never localStorage), switch to `stage === 'mfa'`. A second reactive form
-  (`code`, 6–32 chars) submits via `submitMfa()`. `toggleRecoveryCode()`
-  flips the field's label / `inputmode` / `autocomplete` / placeholder
-  between a 6-digit code and `xxxxx-xxxxx`. `backToCredentials()` ("Start
-  over") clears the token and code and returns to step one — needed because
-  the `mfaToken` dies after 5 minutes.
-- **`login.component.html`**: the credentials `<form>` is `*ngIf="stage ===
-  'credentials'"`; a new MFA `<form>` for the other stage, with the
-  recovery-code toggle and "Start over" as `btn-link`s. Heading/subtitle
-  switch with the stage; the `/setup` prompt only shows on step one.
-- Specs: 4 new in `login.component.spec.ts` (challenge → `stage='mfa'` and no
-  nav; `submitMfa` calls `completeMfaLogin` and navigates; a rejected code
-  keeps the stage and shows the error; "Start over" resets), 2 in
-  `auth.service.spec.ts` (a 202 body is not persisted; `completeMfaLogin`
-  posts `{mfaToken, code}` trimmed and persists).
-
-### 130.2 Verified
-
-- `npm run test:ci` — 34 frontend specs pass; `npm run build` — exit 0
-  (the bundle-budget and `.form-floating` CSS warnings are pre-existing).
-- Frontend image rebuilt and running; `/login` serves 200 and the production
-  `main.js` contains `auth/login/totp`, i.e. the new path shipped.
-- A full browser click-through is left to a manual check / slice D's UI work;
-  the two-step contract is what the specs and the slice-B end-to-end run
-  already exercised.
-
-### 130.3 Next (slice D)
-
-An Account/Security page: `GET /auth/totp/status`, "Set up" (render the
-server `qrSvg` + show the secret), activate, show/download the recovery
-codes, disable. After D, a real user can turn 2FA on from the UI — which is
-also when it becomes safe to.
+**Changed since (§521):** a TOTP code's time step is now claimed atomically
+at login (`users.totp_last_step`), so a code can't be replayed inside its
+~90 s window; failed second-factor codes are capped at 5 per account per 15
+minutes (`mfaUserLimiter`); and unknown or not-yet-activated usernames now
+fail exactly like a wrong password.
 
 ## 131. Plan — features & architecture rules: multi-page dashboard, wiring priority, SSO roles, updates/backups, infra, strategy (2026-09-03)
 
@@ -8682,75 +8429,6 @@ whether icon assets exist; the multi-page dashboard layout; FTP vs FTPS vs
 SFTP; whether "prioritise wiring" is a hard stop on the app backlog;
 Playwright vs Cypress for E2E.
 
-## 132. 2FA slice D done — the Account security page
-
-§127 slice D. A logged-in user can now turn their own 2FA on and off entirely
-from the dashboard. After this, 2FA is safe to enable (slice C already handled
-the two-step login, but nothing offered enrolment through the UI).
-
-### 132.1 What landed
-
-- **`core/models.ts`**: `TotpStatus`, `TotpSetupResponse`,
-  `TotpActivateResponse` — the three response shapes from the slice-A
-  endpoints.
-- **`core/operations.service.ts`**: `getTotpStatus()`, `setupTotp()`,
-  `activateTotp(code)`, `disableTotp({code} | {password})` — plain
-  access-JWT calls to `/auth/totp/{status,setup,activate,disable}`. They sit
-  here (not `AuthService`) because they run with a session; the login-time
-  second factor stays on `AuthService` where it runs without one.
-- **`pages/account/`** — new standalone `AccountComponent`, route `/account`
-  behind `authGuard`, "Security" link added to the dashboard header. One card
-  with a four-state view machine (`loading → status`, then `enrolling` and
-  `recovery-codes` reachable only by walking the flow):
-  - **status**: badge + enrolled date + recovery-codes-remaining when on;
-    "Set up two-factor authentication" when off.
-  - **enrolling**: `setupTotp()` → render the server `qrSvg` (via
-    `DomSanitizer.bypassSecurityTrustHtml` — it's our own backend's SVG, and
-    Angular would otherwise strip the `<path>`s) + the secret as
-    `user-select-all` text for manual entry; a 6-digit field →
-    `activateTotp()`. "Cancel" drops back to status (the pending secret is
-    inert until activated).
-  - **recovery-codes**: shown once, straight after activate. Download (a
-    `Blob` + synthetic `<a download>` — this is the real app, not an
-    Artifact, so a client-side download is fine) and Copy
-    (`navigator.clipboard`) buttons; "I've saved them" reloads status.
-  - **disable** (inline in status): a current 6-digit code *or* the account
-    password — neither field individually required, `disable()` rejects the
-    submit only if both are empty, then sends `{code}` xor `{password}` to
-    match the backend's `.xor()` schema.
-- **`account.component.css`**: fixes the QR box at 220px and scales the
-  injected SVG with `:host ::ng-deep .qr svg` (the `[innerHTML]` content
-  carries no encapsulation attribute, and the backend's `<svg>` has only a
-  `viewBox`). `::ng-deep` is deprecated-without-replacement and the standard
-  idiom for exactly this; first use in the codebase.
-- **`account.component.spec.ts`**: 8 specs — status load → correct panel;
-  setup renders QR + secret; activate shows the codes and toasts; a rejected
-  code keeps `enrolling` and surfaces the message; enabled state renders the
-  disable form + enrolled date; disable with neither field is a no-op with a
-  message; disable with a (trimmed) code and with a password each call the
-  service with the right body and reload status.
-
-### 132.2 Verified
-
-- `npm run test:ci` — **42 specs pass** (34 from slice C + 8 new); `npm run
-  build` — exit 0 (the bundle-budget and `.form-floating` CSS warnings are
-  pre-existing, §130.2).
-- Frontend image rebuilt and recreated in the running stack; `GET /` and
-  `GET /account` both 200, and the production `main-*.js` contains all four
-  `auth/totp/{status,setup,activate,disable}` paths.
-- The backend side of every one of these calls was already proven end-to-end
-  against the real stack in slice A (§128.2: setup → activate → status →
-  disable round-trip with codes from `otplib`). What's left is a human
-  click-through with a real authenticator app (scan the QR, activate, sign
-  out, sign back in through the slice-C two-step, disable) — the one step an
-  agent session can't do.
-
-### 132.3 Next (slice E)
-
-Docs: `docs/two-factor.md`, `openapi.yaml` (the six endpoints + the `202`
-login branch), `user-guide.md`, `it-admin.md`, an `app-credentials.md` note,
-and document `./start.sh recover disable-2fa <username>`.
-
 ## 133. §131.4 — the displayed app version (`0.0.1`)
 
 First piece of §131.4's "version control". A semver string now shows in the
@@ -8993,49 +8671,6 @@ The other §131.1 areas (Exposure, Backups, Updates, Users & roles, Settings,
 Utils) still live under `/dashboard` as panels rather than their own routes —
 the README item stays, minus "Apps". More visual tweaks expected on the dark
 palette, panels and menu.
-
-## 137. 2FA slice E done — the docs (2026-09-03)
-
-§127 slice E, closing the 2FA epic (slices A–D: §128–130, §132). Docs only, no
-code.
-
-### 137.1 What landed
-
-- **`docs/two-factor.md`** (new) — the reference page: threat model (the
-  dashboard is internet-facing, password-only; not Authelia and why), the
-  turn-on flow via Account security, the two-step sign-in, recovery codes,
-  turning it off, the `./start.sh recover disable-2fa <username>` lockout
-  path, and a "How it works" section (otplib/qrcode, AES-256-GCM secret at
-  rest under an HKDF of `JWT_SECRET` — so rotating it forces re-enrolment —
-  SHA-256 recovery-code hashes consumed atomically, the 5-minute `purpose:mfa`
-  hand-off token). Plus the audit-action table and a pointer to openapi.yaml.
-- **`docs/openapi.yaml`** — added the `202 {mfaRequired, mfaToken}` branch to
-  `/auth/login`, and `/auth/login/totp` + `/auth/totp/{status,setup,activate,
-  disable}` with request/response shapes and the real status codes (409 on
-  setup-when-enabled, 400 on wrong activate code, 422 on the `.xor` violation
-  at disable).
-- **`docs/user-guide.md`** — a "Two-factor authentication" section.
-- **`docs/it-admin.md`** — a Day-to-day bullet: enrolment is self-service, the
-  `recover disable-2fa` escape hatch is username-only, and rotating
-  `JWT_SECRET` invalidates every enrolment.
-- **`docs/app-credentials.md`** — a short "The dashboard's own login" section
-  (it is the first login a user makes, before any managed app) linking
-  two-factor.md.
-- **`docs/security-checklist.md`** — a checked line for the feature.
-- **`README.md`** — two-factor.md added to the Documentation list; the "2FA
-  slice E — docs" TODO item deleted.
-
-`docs/recovery-troubleshooting.md` already documented `disable-2fa` (added in
-slice B, §129.1), so it was left as is.
-
-### 137.2 Verified
-
-Prose against the shipped code: response shapes and status codes read out of
-`routes/auth.ts` and `middleware/validation.ts`; the issuer string
-("Homelab Management"), recovery-code format (`xxxxx-xxxxx`, 10, SHA-256) and
-the `homelab-totp-secret-v1` / `homelab-mfa-token-v1` HKDF infos out of
-`utils/totp.ts` / `utils/totpSecret.ts` / `utils/jwt.ts`. No code or tests
-touched; nothing to run.
 
 ## 138. §131.5 — the no-guarantees dev/test rule, written down (2026-09-03)
 
@@ -27646,3 +27281,20 @@ labelled entry with its conclusion, and the uncited sections got short
 labelled entries too, for traceability. The section says Duplicati has
 since been replaced by Kopia and points to where each open item closed
 (§102, §106, §183, §509). `plan-citations.py`: 0 before, 0 after.
+
+## 537. Compaction pass 5 — the 2FA slices
+
+§534's last item. §172 named "the 2FA slices (§127–§137)", but §131 (the
+features-and-architecture plan, with its §131.x ids cited 80+ times from code
+and later sections) and §133–§136 (version display, app shell, the
+version-bump hook, the UI pass) sit inside that range and are other topics.
+Only the 2FA sections were compacted: §127–§130, §132 and §137, 427 lines,
+into one §127 of ~60 lines. Five anchors are cited from outside
+(§127, §127.2, §128, §132, §137), from `routes/auth.ts`, `utils/database.ts`,
+`database/init.sql`, `totpSecret.ts` and later sections. The section also
+records what §521 changed since (step replay protection, the per-account
+cap, no username oracle). `plan-citations.py`: 0 before, 0 after.
+
+§534 is done: citations 41 → 0, and passes 4 and 5 took plan.md from
+~29,000 to ~27,300 lines. The remaining runs §172 worried about are closed;
+anything further should wait until a run genuinely closes out.

@@ -207,10 +207,6 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
-### plan.md upkeep (§534)
-
-- [ ] **Compaction pass 5: the 2FA slices (§127–§137)**, same rule.
-
 ### Exposure and platform
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
