@@ -30095,3 +30095,25 @@ autovacuum, which never runs in parallel.
 Result: `oc_filecache` 2.2 GB → 328 kB, database 2.3 GB → 82 MB, a fresh
 `pg_dump` 910 MB → 3.5 MB. `occ status` is healthy, and `occ info:storages`
 lists only the home, admin, data and `/Shared` storages.
+
+## 511. Review 2026-09-18 — live logs, public logins, code smells
+
+A review pass over the live host (`home-srv-01`, 0.117.4) and the code: every
+container's last 24 h of logs, every public hostname requested from outside
+without following redirects, `routes/auth.ts` read in full, and both test
+suites run (backend 1085/1085, frontend 74/74).
+
+The findings went into the README TODO list, under "From the 2026-09-18
+review". The one that couldn't wait: **MeshCentral's public login page served
+`newAccount="true"` with no users**, so anyone could have created its site
+admin. `ALLOW_NEW_ACCOUNTS=false` doesn't cover the first account
+(webserver.js admits it whenever the domain has no users). As a stopgap it was
+stopped on the host (`docker compose stop` on its own project), and the public
+hostname went to 502. That replaces the older, lower-priority "automate the
+first-account claim" item.
+
+Checked and **not** a problem: Vaultwarden's `^/api($|/)` Authelia bypass
+admits `/api/accounts/register`, but Vaultwarden 2026.6 answers it 404, so it
+doesn't reopen §423. Authelia's ~47 "user not found" errors a day are a device
+at one IP still presenting a session for the deleted user `subscriber`.
+Authelia rejects it correctly.

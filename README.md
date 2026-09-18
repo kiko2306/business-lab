@@ -234,13 +234,6 @@ it is done — not ticked off and left behind. Section references point at
       MeshCentral's own TLS) and a KVM/terminal session actually relays over
       WebSocket without WebRTC. Nothing here can be proven from the
       dashboard host alone.
-- [ ] **MeshCentral: automate the first-account claim** — first visitor
-      to the wizard owns the server today (documented in
-      `docs/app-credentials.md`), same as Guacamole's `guacadmin` before
-      §200 automated it. Worth the same treatment (`meshcentralAdminBootstrap.ts`
-      driving `POST /createaccount` with a generated password) once the
-      live-agent proof above lands — lower priority since it's a one-time
-      manual step, not a recurring one.
 - [ ] **First-ever exposure of an app may need one extra restart** (§506)
       — `startService` computes an app's exposure env overrides (Host
       allow-lists, public URLs, `gatewayOnExposure` values) *before*
@@ -256,3 +249,52 @@ it is done — not ticked off and left behind. Section references point at
       should provision exposure *before* the first `compose up` instead —
       that reorder touches every app's start path, so it's not a
       one-line fix.
+
+### From the 2026-09-18 review (§511)
+
+- [ ] **MeshCentral: anyone can create its site admin** — publicly exposed
+      without Authelia, and its login page served `newAccount="true"`
+      (MeshCentral always admits the first account as site admin, whatever
+      `ALLOW_NEW_ACCOUNTS` says). Replaces the old "automate the first-account
+      claim" item; it can't wait for the agent proof.
+- [ ] **MeshCentral's compose healthcheck fails whenever it's exposed** —
+      the plain-HTTP fallback probes `:80`, but with `tlsOffload` it serves
+      HTTP on `443`.
+- [ ] **Backend trusts a client-supplied `X-Forwarded-For` from the
+      LAN/overlay** — `frontend/nginx.conf` passes the header through and
+      `trust proxy` is 1, so `X-Forwarded-For: 127.0.0.1` makes `req.ip`
+      localhost: bypasses recovery mode's localhost-only check and the login
+      rate limit. Tunnel traffic is fine (Cloudflare appends the real IP).
+      Found by reading the code; prove it on a LAN request before fixing.
+- [ ] **A password reset doesn't revoke the user's sessions** —
+      `routes/users.ts` sets the new hash but leaves `refresh_tokens` live
+      (only `scripts/recoverAdmin.ts` revokes), so an old session keeps
+      refreshing for up to 7 days.
+- [ ] **NetBird router peer drops its management stream ~68×/hour** —
+      steady for the client's whole uptime: `502 Bad Gateway` on the job
+      stream and `RST_STREAM INTERNAL_ERROR` on the main one, via
+      `netbird-vpn-api.<domain>` (Cloudflare → NPM). Find the timeout, and
+      whether remote peers see it too.
+- [ ] **OnlyOffice runs at ~95% of its 640 MiB `mem_limit` idle** — an open
+      document may OOM it. Raise the limit.
+- [ ] **NocoDB: signup is probably open, and error reporting is on** — no
+      `nc_app_settings` row, so invite-only signup is at its default (off)
+      on a hostname with no Authelia. Its info endpoint reports
+      `errorReportingEnabled: true`; set `NC_DISABLE_ERR_REPORTS`.
+- [ ] **Twenty: confirm public signup is closed after the bootstrap** — no
+      `IS_SIGN_UP_DISABLED`; not running at review time, so unverified.
+- [ ] **Failed dashboard logins are audited without username or IP** — no
+      way to spot brute force from `audit_logs`.
+- [ ] **Dashboard login hardening** — invited usernames answer 403 vs 401
+      (enumeration); unknown users skip the bcrypt compare (timing); a TOTP
+      code can be replayed inside its window; no per-`mfaToken` attempt cap.
+- [ ] **Public dashboard HTML has no HSTS/CSP** — helmet only covers `/api`.
+- [ ] **Stopped apps keep public hostnames that 502** (home-assistant,
+      itflow, twenty) — and the reconciler reports them "healthy" because it
+      checks NPM/Cloudflare config, not the upstream.
+- [ ] **`writeAuditLog` should never throw** — log and swallow inside it,
+      delete the ~50 `.catch(() => {})` at call sites and its `42703`
+      fallback. Today `/auth/login` awaits it uncaught *after* issuing a
+      session, so an audit insert failure 500s a successful login.
+      `/auth/setup` also re-implements `issueSession()` and its own audit
+      insert.
