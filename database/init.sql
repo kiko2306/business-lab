@@ -18,6 +18,9 @@ CREATE TABLE IF NOT EXISTS users (
     totp_secret       TEXT,
     totp_enabled      BOOLEAN NOT NULL DEFAULT FALSE,
     totp_enrolled_at  TIMESTAMPTZ,
+    -- Last TOTP time step accepted at login; a code for this step or an
+    -- earlier one is a replay (plan.md §521).
+    totp_last_step    BIGINT,
     -- Contact address, and the address written into Authelia's user database
     -- for an SSO account (plan.md §151). Nullable: accounts created before
     -- this column keep NULL until edited; the users API requires it on create.

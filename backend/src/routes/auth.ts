@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { query, withTransaction } from '../utils/database';
@@ -26,6 +27,7 @@ import {
   hashRecoveryCode,
   totpKeyUri,
   totpQrSvg,
+  totpStep,
   verifyTotp,
 } from '../utils/totp';
 import { openSecret, sealSecret } from '../utils/totpSecret';
@@ -50,6 +52,38 @@ const statusLimiter = rateLimit({
   legacyHeaders: false,
   message: { error: 'Too many requests, please try again later' },
 });
+
+// The per-IP limiter above doesn't stop a 2FA guesser who rotates addresses,
+// and the mfaToken only proves the password. Counting failed codes per
+// *account* caps guesses at 5 per 15 min whatever the source (§521). Requests
+// without a valid mfaToken aren't counted here: they fail on the token alone.
+function mfaUserKey(req: Request): string | null {
+  try {
+    return `mfa-user:${verifyMfaToken((req.body as { mfaToken?: string })?.mfaToken ?? '').id}`;
+  } catch {
+    return null;
+  }
+}
+
+const mfaUserLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+  standardHeaders: true,
+  legacyHeaders: false,
+  skip: (req) => mfaUserKey(req) === null,
+  keyGenerator: (req) => mfaUserKey(req) ?? 'unused',
+  message: { error: 'Too many wrong codes. Wait 15 minutes, then sign in again.' },
+});
+
+// A real bcrypt hash of a password nobody has. An unknown or not-yet-activated
+// username is compared against it, so every failed login costs the same bcrypt
+// time and says the same thing (§521): no username oracle by timing or status.
+let dummyHash: Promise<string> | null = null;
+function getDummyHash(): Promise<string> {
+  dummyHash ??= hashPassword(crypto.randomBytes(24).toString('base64'));
+  return dummyHash;
+}
 
 interface UserRow {
   id: number;
@@ -227,15 +261,12 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
     );
     const user = result.rows[0];
 
-    // An invited account has no password hash yet (plan.md §158) — it can't be
-    // logged into, and saying so is more useful than "invalid credentials".
-    if (user && !user.password_hash) {
-      return res
-        .status(403)
-        .json({ error: "This account hasn't been activated yet — check your email for the set-password link." });
-    }
-
-    if (!user || !(await verifyPassword(password, user.password_hash ?? ''))) {
+    // An invited account has no password hash yet (§158). It used to get its
+    // own 403 "not activated yet", which told anyone which usernames exist;
+    // it now fails like a wrong password (§521). The invitee has the emailed
+    // set-password link either way.
+    const passwordOk = await verifyPassword(password, user?.password_hash ?? (await getDummyHash()));
+    if (!user || !user.password_hash || !passwordOk) {
       // Username and client IP (resolved by the frontend nginx, §516) are
       // what make a brute-force run visible on the Audit Logs page (§520).
       await writeAuditLog({
@@ -287,7 +318,7 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
 // Takes the mfaToken from /auth/login plus a 6-digit TOTP code or a recovery
 // code. On success it issues the real session.
 // ---------------------------------------------------------------------------
-router.post('/login/totp', authLimiter, validateBody(schemas.authLoginTotp), async (req: Request, res: Response) => {
+router.post('/login/totp', authLimiter, validateBody(schemas.authLoginTotp), mfaUserLimiter, async (req: Request, res: Response) => {
   const { mfaToken, code } = req.body as { mfaToken: string; code: string };
 
   let userId: number;
@@ -314,7 +345,18 @@ router.post('/login/totp', authLimiter, validateBody(schemas.authLoginTotp), asy
     let viaRecoveryCode = false;
 
     if (isTotpShape) {
-      ok = verifyTotp(trimmed, openSecret(user.totp_secret));
+      // Accept each time step at most once: claim it in the same statement
+      // that checks it, so a code seen over a shoulder or replayed from a
+      // capture within its ~90 s validity is refused (§521).
+      const step = totpStep(trimmed, openSecret(user.totp_secret));
+      if (step !== null) {
+        const claimed = await query(
+          `UPDATE users SET totp_last_step = $2
+           WHERE id = $1 AND (totp_last_step IS NULL OR totp_last_step < $2)`,
+          [userId, step]
+        );
+        ok = claimed.rowCount === 1;
+      }
     } else {
       // Recovery code: consume it in the same statement that checks it, so a
       // replay or a race can't spend it twice.
@@ -492,7 +534,7 @@ router.post('/totp/setup', authLimiter, authMiddleware, async (req: Request, res
     }
 
     const secret = generateTotpSecret();
-    await query('UPDATE users SET totp_secret = $2, totp_enabled = FALSE WHERE id = $1', [userId, sealSecret(secret)]);
+    await query('UPDATE users SET totp_secret = $2, totp_enabled = FALSE, totp_last_step = NULL WHERE id = $1', [userId, sealSecret(secret)]);
 
     const otpauthUri = totpKeyUri(row.username, secret);
     const qrSvg = await totpQrSvg(otpauthUri);
@@ -588,7 +630,7 @@ router.post(
 
       await withTransaction(async (client) => {
         await client.query(
-          'UPDATE users SET totp_secret = NULL, totp_enabled = FALSE, totp_enrolled_at = NULL WHERE id = $1',
+          'UPDATE users SET totp_secret = NULL, totp_enabled = FALSE, totp_enrolled_at = NULL, totp_last_step = NULL WHERE id = $1',
           [userId]
         );
         await client.query('DELETE FROM totp_recovery_codes WHERE user_id = $1', [userId]);

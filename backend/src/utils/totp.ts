@@ -32,18 +32,31 @@ export function totpQrSvg(otpauthUri: string): Promise<string> {
   return QRCode.toString(otpauthUri, { type: 'svg', margin: 1 });
 }
 
-/** True if `code` is a valid 6-digit token for `secret` right now (±1 step). */
-export function verifyTotp(code: string, secret: string): boolean {
+/**
+ * The absolute 30 s time step `code` is valid for (current ±1), or null. Login
+ * stores the step it accepted so the same code can't be replayed inside its
+ * ~90 s window (§521).
+ */
+export function totpStep(code: string, secret: string, now: number = Date.now()): number | null {
   const trimmed = String(code ?? '').trim();
   if (!/^\d{6}$/.test(trimmed)) {
-    return false;
+    return null;
   }
   try {
-    return authenticator.check(trimmed, secret);
+    // One instant for both the check and the step it's counted from, so a
+    // rollover between the two can't shift the result by one.
+    const pinned = authenticator.clone({ ...authenticator.options, epoch: now });
+    const delta = pinned.checkDelta(trimmed, secret);
+    return delta === null ? null : Math.floor(now / 1000 / pinned.allOptions().step) + delta;
   } catch {
-    // otplib throws on a malformed secret rather than returning false.
-    return false;
+    // otplib throws on a malformed secret rather than returning null.
+    return null;
   }
+}
+
+/** True if `code` is a valid 6-digit token for `secret` right now (±1 step). */
+export function verifyTotp(code: string, secret: string): boolean {
+  return totpStep(code, secret) !== null;
 }
 
 /**

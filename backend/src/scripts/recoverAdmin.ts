@@ -178,7 +178,7 @@ async function disableTotp(): Promise<void> {
   const { id: userId, totp_enabled } = rows[0];
 
   await query(
-    'UPDATE users SET totp_secret = NULL, totp_enabled = FALSE, totp_enrolled_at = NULL WHERE id = $1',
+    'UPDATE users SET totp_secret = NULL, totp_enabled = FALSE, totp_enrolled_at = NULL, totp_last_step = NULL WHERE id = $1',
     [userId]
   );
   await query('DELETE FROM totp_recovery_codes WHERE user_id = $1', [userId]);

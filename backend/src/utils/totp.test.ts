@@ -7,6 +7,7 @@ import {
   normaliseRecoveryCode,
   totpKeyUri,
   totpQrSvg,
+  totpStep,
   verifyTotp,
 } from './totp';
 
@@ -77,5 +78,31 @@ describe('totpQrSvg', () => {
     const svg = await totpQrSvg(totpKeyUri('alice', generateTotpSecret()));
     expect(svg.trimStart().startsWith('<svg')).toBe(true);
     expect(svg).toContain('</svg>');
+  });
+});
+
+describe('totpStep', () => {
+  const secret = generateTotpSecret();
+  // Mid-step, so ±1 can't straddle a boundary by accident.
+  const now = 1_789_730_015_000;
+  const step = Math.floor(now / 30_000);
+  const codeAt = (ms: number) => authenticator.clone({ ...authenticator.options, epoch: ms }).generate(secret);
+
+  it('returns the absolute step the code was generated for', () => {
+    expect(totpStep(codeAt(now), secret, now)).toBe(step);
+  });
+
+  // Login refuses any step <= the last one it accepted, so the window's
+  // neighbours must map to distinct, correctly ordered steps.
+  it('maps the previous and next step inside the window to step-1 / step+1', () => {
+    expect(totpStep(codeAt(now - 30_000), secret, now)).toBe(step - 1);
+    expect(totpStep(codeAt(now + 30_000), secret, now)).toBe(step + 1);
+  });
+
+  it('returns null outside the window, for a wrong code, and for non-codes', () => {
+    expect(totpStep(codeAt(now - 90_000), secret, now)).toBeNull();
+    expect(totpStep('abcdef', secret, now)).toBeNull();
+    expect(totpStep('12345', secret, now)).toBeNull();
+    expect(totpStep('000000', 'not base32!', now)).toBeNull();
   });
 });

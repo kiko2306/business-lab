@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.14] — 2026-09-18
+
+### Fixed
+
+- Dashboard login no longer reveals which usernames exist (by status or timing), refuses a 2FA code already used, and allows at most 5 wrong 2FA codes per account per 15 minutes.
+
 ## [0.117.13] — 2026-09-18
 
 ### Added
