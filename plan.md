@@ -30510,3 +30510,44 @@ Options weighed (operator chose C + D, 2026-09-18):
   "all healthy".
 
 C and D are independent; each gets its own commit.
+
+## 525. §524 C — "not running" page for stopped apps; NPM OOM found on rollout
+
+`npmClient.ts` adds to the plain and Authelia `location /` blocks
+`error_page 502 503 504 = @app_unavailable;`, plus a named location returning
+a small 503 HTML page: "*<$host> isn't running right now*". The directive has
+to be inside `location /`, because `authelia-authrequest.conf` declares its
+own `error_page 401` and nginx then inherits none from the server block. Only
+nginx-generated upstream failures land there (`proxy_intercept_errors` is
+off), so apps' own error pages pass through. There's no `add_header` in the
+named location (§402.1), so server-scope HSTS survives. gRPC hosts are
+excluded. Unit test covers both variants and the gRPC exclusion.
+
+**Found live, fixed (3418a9d):** the first version had no `=`. nginx then
+keeps the *original* 502 as the status, and Cloudflare replaces an origin
+502's body with its own `text/plain` one, so the page never reached a
+visitor (same `text/plain` 502 seen on NetBird's Job stream in §517). With
+`=`, the named location's 503 is the status and Cloudflare passes the page
+through.
+
+**Incident on rollout (90cabcc):** a generated-config change makes every
+proxy host drift at once. Running the full reconcile to apply it rewrote ~30
+hosts back to back, and NPM's Node backend was **OOM-killed** at its 256m
+limit (it runs with `--max_old_space_size=250`, which can fill the whole
+limit on its own). The nginx master died with it (`oom=true`); orphaned
+workers kept serving the old config, and every later reload logged
+`kill(310, 1) failed (3: No such process)`. Public traffic looked fine, but
+no config change could apply, and nothing would have served once those
+workers exited. The reconcile reported 12/32 with "NPM login failed: 502".
+`mem_limit` raised to 512m, and NPM recreated through the real
+`startService('nginx-proxy-manager')`, which brought back a fresh master
+matching the pidfile. The re-run reconcile went **32/32**, with NPM peaking
+at **231 MiB** (so 256m had no headroom) and no kills or failed reloads.
+
+Verified on home-srv-01 (0.117.18): stopped home-assistant / itflow / twenty
+answer **503 text/html** "…isn't running right now" through Cloudflare
+with HSTS. Every running hostname answers as before (200 / 302-to-Authelia
+/ 401 webdav), the gRPC host still declines Job with `grpc-status: 12`, and
+34 of 35 NPM host files carry the page (the one without is the gRPC host).
+Gated stopped apps (e.g. bookstack) have the directive in `location /`; a
+visitor sees the page after Authelia login, which the agent can't do.
