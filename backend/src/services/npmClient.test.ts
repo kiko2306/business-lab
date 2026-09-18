@@ -169,6 +169,33 @@ describe('buildProxyHostPayload', () => {
     expect(payload.allow_websocket_upgrade).toBe(false);
   });
 
+  // §524: a stopped app's hostname stays up, so nginx's own 502 needs a real
+  // page. The error_page must sit *inside* location / (the Authelia snippet's
+  // own error_page 401 blocks server-level inheritance), and gRPC hosts must
+  // not get an HTML body where a client expects a gRPC status.
+  it('serves the not-running page on upstream failure for plain and Authelia hosts, not gRPC', () => {
+    const base = {
+      hostname: 'itflow.example.com',
+      forwardScheme: 'http' as const,
+      forwardHost: '172.17.0.1',
+      forwardPort: 8000,
+      websocket: true,
+      dashboardUrl: 'https://businesslab.example.com',
+      certificateId: 0,
+    };
+    for (const autheliaProtected of [false, true]) {
+      const config = buildProxyHostPayload({ ...base, autheliaProtected, grpc: false }).advanced_config ?? '';
+      const locationRoot = config.slice(config.indexOf('location / {'), config.indexOf('\n}', config.indexOf('location / {')));
+      expect(locationRoot).toContain('error_page 502 503 504 @app_unavailable;');
+      expect(config).toContain('location @app_unavailable {');
+      expect(config).toContain('$host isn’t running right now');
+      const named = config.slice(config.indexOf('location @app_unavailable {'));
+      expect(named).not.toContain('add_header');
+    }
+    const grpc = buildProxyHostPayload({ ...base, autheliaProtected: false, grpc: true }).advanced_config ?? '';
+    expect(grpc).not.toContain('@app_unavailable');
+  });
+
   it('uses grpc_pass with http2_support and a real cert/SSL on for a grpc upstream', () => {
     const payload = buildProxyHostPayload({
       hostname: 'netbird-vpn-api.example.com',

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.17] — 2026-09-18
+
+### Changed
+
+- A stopped (or crashed, or still-starting) app's public address now shows a short "isn't running right now" page instead of a bare 502.
+
 ## [0.117.16] — 2026-09-18
 
 ### Fixed

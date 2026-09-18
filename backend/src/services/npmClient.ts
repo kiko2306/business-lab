@@ -64,6 +64,30 @@ interface EnsureProxyHostOptions {
 // dashboard's own themed "access denied" page instead, carrying the denied
 // hostname so that page (and the request-access email it sends) know what
 // was asked for.
+// A stopped, crashed or still-booting app keeps its hostname (§331 exposes by
+// registry, not run state; §524 weighs the alternatives), so nginx's own 502
+// is what a visitor got. This names the host and says why instead. The
+// `error_page` line has to sit inside each `location /`: nginx inherits
+// error_page from the server block only into locations that declare none, and
+// authelia-authrequest.conf declares its own 401 one. Only nginx's own
+// 502/503/504 (upstream unreachable) land here, since proxy_intercept_errors
+// is off, so an app's own error pages still pass through untouched. No
+// add_header in the named location, or it would drop the server-scope HSTS
+// (§402.1).
+const APP_UNAVAILABLE_ERROR_PAGE = '    error_page 502 503 504 @app_unavailable;';
+const APP_UNAVAILABLE_LOCATION = [
+  'location @app_unavailable {',
+  '    default_type text/html;',
+  "    return 503 '" +
+    '<!doctype html><html lang="en"><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1"><title>Not running</title></head>' +
+    '<body style="font-family:system-ui,sans-serif;max-width:32rem;margin:15vh auto;padding:0 1rem;color:#333">' +
+    '<h1 style="font-size:1.4rem">$host isn’t running right now</h1>' +
+    '<p>The app behind this address is stopped or still starting. Try again in a minute, ' +
+    "or start it from the dashboard.</p></body></html>';",
+  '}',
+].join('\n');
+
 function buildAutheliaAdvancedConfig(dashboardUrl: string): string {
   return [
     'include /snippets/authelia-location.conf;',
@@ -78,11 +102,14 @@ function buildAutheliaAdvancedConfig(dashboardUrl: string): string {
     '    proxy_set_header Connection "upgrade";',
     '    proxy_pass $forward_scheme://$server:$port;',
     '    error_page 403 = @access_denied;',
+    APP_UNAVAILABLE_ERROR_PAGE,
     '}',
     '',
     'location @access_denied {',
     `    return 302 ${dashboardUrl}/access-denied?host=$host;`,
     '}',
+    '',
+    APP_UNAVAILABLE_LOCATION,
   ].join('\n');
 }
 
@@ -161,7 +188,10 @@ function buildPlainAdvancedConfig(websocket: boolean): string {
       ? ['    proxy_set_header Upgrade $http_upgrade;', '    proxy_set_header Connection "upgrade";']
       : []),
     '    proxy_pass $forward_scheme://$server:$port;',
+    APP_UNAVAILABLE_ERROR_PAGE,
     '}',
+    '',
+    APP_UNAVAILABLE_LOCATION,
   ].join('\n');
 }
 
