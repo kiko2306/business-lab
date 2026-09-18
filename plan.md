@@ -13533,105 +13533,34 @@ work: the invite-based user-creation flow (§158).
   action.
 - Settings: a "Dashboard URL" field (pre-filled with the derived default).
 
-## 160. §158 slice 158a done — invite-based user creation, backend (2026-09-03)
+## 160. Invite-based user creation, backend + UI (former §160–§161, compacted 2026-09-18)
 
-Backend half of §158. Minor bump 0.9.5 → 0.10.0 (breaking API change:
-`POST /api/users` drops `password`).
+§158's two slices, shipped 2026-09-03 (0.10.0 backend, 0.10.1 UI).
+Dashboard-created users are invited by email instead of being given a
+creator-chosen password.
 
-### 160.1 What changed
-
-- **`nodemailer`** dependency + `utils/mailSend.ts` (`sendMail({to,subject,
-  text})`, `mailIsConfigured()`) — the repo had only the raw-socket *tester*
-  (`services/mailTest.ts`), no sender.
-- **Schema.** `password_hash` is now nullable (`ensureUserInvitationsSchema()`
-  + `init.sql`); new `user_invitations(id, user_id FK CASCADE, token_hash,
-  expires_at, accepted_at, created_at)` + a `token_hash` index — SHA-256 hash
-  only, like `totp_recovery_codes`. Verified on the live DB.
-- **`services/userInvitations.ts`** — `createInvitation(userId)` (72 h TTL,
-  supersedes any prior unaccepted invite, returns the plaintext token once),
-  `verifyInvitation(token)` (live token → `{userId,username,email}`),
-  `acceptInvitation(token, hash)` (single-transaction claim → set hash → drop
-  siblings; `null` if the token isn't claimable, so a race can't set a
-  password twice).
-- **`POST /api/users`** — no `password`; `email` now required. Refuses unless
-  the mailbox is configured **and** a dashboard base URL resolves. Creates the
-  row with `password_hash = NULL` (inactive), mints an invite, emails the
-  `<baseUrl>/set-password?token=…` link best-effort (a send failure →
-  `warning`, not a rollback). No Authelia sync yet — a hash-less account is
-  skipped by it (§157).
-- **`POST /api/users/:id/invitation/resend`** (`users:manage`) — fresh token +
-  re-send, only while the account is still pending.
-- **`GET /api/users`** items gain `active` (`password_hash IS NOT NULL`).
-- **`routes/auth.ts`** — public `GET /api/auth/invitation/:token` →
-  `{username,email}` or 410; `POST /api/auth/invitation/:token` `{password}` →
-  accept, Authelia sync, issue a session. `/login` now 403s a hash-less
-  account with "not activated yet — check your email".
-- **Dashboard URL** — `settings.dashboard_url` (via `generalSettings.ts`),
-  surfaced on `GET/PUT /api/settings/general`; `getDashboardBaseUrl()` returns
-  it, or a `https://dashboard.<baseDomain>` guess, or null.
-- `/setup` and `./start.sh recover` unchanged — they still set a password.
-- 5 new unit tests (`userInvitations.test.ts`). Backend `npm test` 415/415,
-  typecheck clean.
-
-### 160.2 Verified on the live stack
-
-Backend redeployed at 0.10.0. `users.password_hash` now nullable,
-`user_invitations` table + index present, no migration errors. `GET
-/api/auth/invitation/<bad>` → 410. Full invite→email→accept round-trip needs
-a real mailbox + the 158b UI — proven there.
-
-### 160.3 Next
-
-158b — the frontend: create form loses the password field (mail-unconfigured
-guard), a public `/set-password` page, a "Pending invite" badge + "Resend
-invite" on the Users list, and the Dashboard URL field in Settings.
-
-## 161. §158 slice 158b done — invite-flow UI (2026-09-03)
-
-Frontend half of §158. Patch bump 0.10.0 → 0.10.1. Closes §158.
-
-- **Add-user form** (`users.component`): the password field is gone; a note
-  says a set-password link is emailed and the account stays inactive until
-  used. When `GET /api/settings/mail` reports `configured: false` a warning
-  with a link to Settings shows and the submit button (now "Create user &
-  send invite") is disabled. On success the toast reports the invite went to
-  the address, or surfaces the `warning` if the send failed.
-- **`/set-password?token=` page** (new `SetPasswordComponent`, public route,
-  no guard): calls `GET /auth/invitation/:token`; on a bad/expired token
-  shows the error and a sign-in link, otherwise a password + confirm form
-  that calls `POST /auth/invitation/:token`, persists the returned session
-  and lands on `/home`.
-- **Users list**: a "Pending invite" badge on any row with `active === false`,
-  a "Resend invite" action for it (`POST /users/:id/invitation/resend`), and
-  "Reset password" is hidden until the account is active.
-- **Settings → General**: a "Dashboard URL" field (validated as a bare
-  http(s) origin), showing `dashboardUrlEffective`; blank uses the derived
-  `dashboard.<baseDomain>` guess. `saveGeneralSettings` now sends it too and
-  reloads.
-- `AuthService.getInvitation` / `acceptInvitation`; `operations.createUser`
-  drops the password arg and returns `{ user, invitePending, warning? }`;
-  `operations.resendInvite`.
-
-### 161.1 Verified
-
-`frontend`: `npm run build` clean (pre-existing warnings), `npm run test:ci`
-42/42. Redeployed; `/api/version` → `0.10.1`; `/set-password` route serves.
-
-### 161.2 Needs a live round-trip by @mat
-
-The box now has a real mailbox. To close the loop: set the Dashboard URL in
-Settings → General to the real dashboard hostname, create a test user, follow
-the emailed link, set a password, and confirm the account flips to active,
-signs in, and appears in Authelia's `users_database.yml` (the accept path
-runs the §157 sync). Also confirm login on an un-activated account gives the
-"check your email" message.
-
-### 161.3 §158 done
-
-Dashboard-created users are now invited by email end to end: no
-creator-chosen password, 72-hour single-use link, inactive until accepted,
-then synced into Authelia. `/setup` and `./start.sh recover` keep their
-direct password path.
+- **Backend.** `users.password_hash` is nullable. `user_invitations` stores
+  only a SHA-256 token hash, with a 72 h TTL, and a new invite supersedes
+  older ones (`services/userInvitations.ts`). Accepting is one transaction
+  (claim → set hash → drop siblings), so a race can't set a password twice.
+  `POST /api/users` takes no password, requires `email`, and refuses unless
+  the mailbox is configured and a dashboard base URL resolves. The send is
+  best-effort (a failure comes back as a `warning`, not a rollback). Also
+  added: `POST /api/users/:id/invitation/resend`, `active` on
+  `GET /api/users`, and public `GET|POST /api/auth/invitation/:token` (410
+  when unusable; accepting syncs Authelia and issues a session).
+  `nodemailer` + `utils/mailSend.ts` were added because only a raw-socket
+  tester existed; `settings.dashboard_url` builds the link.
+- **UI.** Add-user form without a password (disabled, with a Settings link,
+  while mail is unconfigured); a public `/set-password?token=` page; a
+  "Pending invite" badge + "Resend invite"; a Dashboard URL field under
+  Settings → General.
+- `/setup` and `./start.sh recover` still set a password directly.
+- Verified then: live schema, `/api/auth/invitation/<bad>` → 410, UI
+  build/tests. The full mailbox round-trip was left for @mat.
+- **Changed since:** `/login`'s own 403 "not activated yet" for an invited
+  account was removed in §521 because it revealed which usernames exist. It
+  now fails like a wrong password.
 
 ## 162. §131.5 — Samba LAN-only SMB share added (2026-09-03)
 
@@ -24479,50 +24408,17 @@ key) now stays converged with the dashboard's declared config on every
 start, instead of being frozen at whatever the one-shot wizard produced.
 §380–§383 all confirmed working on the real stack.
 
-## 385. §94 exercised live — real bug found: the fixed-IP confirm was case-sensitive (2026-09-11)
+## 385. `setup_server.sh` prompts exercised live; case-insensitive confirm (former §385–§386, compacted 2026-09-18)
 
-First `sudo ./setup_server.sh` run only proved the idempotent skip path (both
-settings were already applied from an earlier session) — not what §94 asked
-for. @mat removed `/etc/netplan/90-homelab-fixed-ip.yaml` and
-`/etc/sudoers.d/90-mat-nopasswd` and re-ran to force the real prompts.
-
-**Passwordless-sudo prompt: correct.** Typed `YES`, got
-`Passwordless sudo enabled for 'mat'`.
-
-**Fixed-IP prompt: real bug.** Typed `yes` (lowercase, the natural answer),
-and `[ "$FIXED_IP_CONFIRM" = "YES" ]` silently took the skip branch —
-`Skipped — this host keeps its current network configuration`. Fails safe
-(no wrong value got applied), but it's exactly the class of thing §94 exists
-to catch: a prompt that doesn't do what a reasonable typed answer implies,
-with zero feedback telling the operator their input wasn't recognized.
-
-Fixed in `setup_server.sh`: both confirmations (`FIXED_IP_CONFIRM`,
-`NOPASSWD_CONFIRM`) now `case`-normalize `[Yy][Ee][Ss]` to `YES` before the
-comparison — still requires the full word typed (the deliberate
-"not a single y/N" friction the sudo prompt's own comment calls for stays),
-just not the capitalization. `bash -n` clean, `shellcheck` clean (same 3
-pre-existing SC2015/SC2001 infos, unrelated to this change, nothing new).
-
-Not `backend/src`/`frontend/src` — no version bump. Committed to `dev`.
-**Not yet re-proven live** — the fix is shellcheck/syntax-verified only, same
-bar the original code shipped at; a third `netplan try` pass to prove the
-fixed comparison itself would need @mat again. Their call whether that's
-worth one more live pass or whether code review + shellcheck is enough for
-a one-line case-normalization change.
-
-## 386. §385 fix verified live — §94 closed (2026-09-11)
-
-Deployed, then a third `sudo ./setup_server.sh` pass with the two files
-removed again. This time lowercase `yes` for **both** prompts:
-
-- Fixed-IP: `Type YES to apply, anything else to skip: yes` → applied via
-  `netplan try`, accepted within the 45s window, `Fixed IP applied and
-  confirmed: 192.168.1.236/24`.
-- Passwordless sudo: `yes` → `Passwordless sudo enabled for 'mat'`.
-
-Both prompts now behave as `docs/first-run.md` documents, with the case
-bug §385 found and fixed no longer reproducible. §94 closed — first genuine
-live exercise of both prompts, not just their syntax/shellcheck check.
+§94 asked for a genuine live run of `setup_server.sh`'s two prompts, not just
+the idempotent skip path. With `/etc/netplan/90-homelab-fixed-ip.yaml` and
+`/etc/sudoers.d/90-mat-nopasswd` removed to force them, the sudo prompt
+worked. The fixed-IP prompt, though, treated a lowercase `yes` as "skip"
+(`[ "$X" = "YES" ]`), silently but safely. Fixed: both confirmations
+normalise `[Yy][Ee][Ss]` to `YES`. The full word is still required, keeping
+the deliberate friction. A third live pass with lowercase `yes` applied the
+fixed IP through `netplan try` (`192.168.1.236/24`) and enabled passwordless
+sudo. §94 closed.
 
 ## 387. §367 OAuth client crash-looped — `--advertise-tags` was missing (2026-09-11)
 
@@ -24648,213 +24544,56 @@ open indefinitely.
 
 Docs-only — no version bump, no host verification needed.
 
-## 391. P8 — rebrand tier 2 implemented (§84.2)
+## 391. Rebrand tier 2: `homelab-*` → `business-lab-*` (former §391–§392, compacted 2026-09-18)
 
-Mapped the full scope before touching anything, since "all safe, all
-cosmetic" (the original §84.2 framing) turned out to have two real
-exceptions the tiering didn't anticipate:
+P8 / §84.2. Renamed: package and Angular project names (and the build output
+path), both image tags, the network (`business-lab-net`), the compose project
+(`name: business-lab`), the local test image, and `start.sh`'s
+`db_container()` filter. The filter must match the compose `name:` exactly,
+or the live-DB lookup silently finds nothing.
 
-- **The exposure/CrowdSec config markers** (`HA_MARKER_BEGIN/END` in
-  `exposureConfigFiles.ts`, `NPM_REALIP_MARKER_*`/`NPM_BOUNCER_MARKER_*` in
-  `crowdsecConfig.ts`) are `# >>> homelab-management: ... >>>` comment
-  fences the backend searches NPM's on-disk generated config for, to
-  replace its own managed block. Read `replaceMarkedBlock()`: when the
-  fence isn't found, it **appends** a new block rather than replacing —
-  renaming the marker text would mean every live host's *existing* config
-  (carrying the old marker) gets a duplicate block on the next reconcile,
-  not a clean swap. Left these alone — same call as Tier 3's own test ("real
-  cost, no user-visible benefit"), just found inside what looked like Tier 2.
-- **`n8nWorkflows.ts`'s `ALERT_TEST_SCENARIO`** matching key — same class of
-  internal-only identifier, left alone for the same reason.
-- **The compose project name** (`homelab-management`, directory-derived —
-  confirmed live: `docker volume ls`/`docker network ls` on the host all
-  carry that prefix) backs 4 **named volumes** (`db-data`, `scripts-data`,
-  `logs-data`, `backups-data`). A naive project rename would make Compose
-  create new, empty volumes under the new prefix and orphan the real
-  Postgres data/logs/backups. Fixed by pinning each volume's `name:` to its
-  *current* literal Docker volume name (`homelab-management_*`) — the
-  project identity changes, the actual data volumes don't move at all.
-  Confirmed the one place that reads a volume name at runtime
-  (`appBackup.ts`'s `backupsVolumeName()`) does it via live `docker inspect`
-  of its own container's mounts, not a hardcoded string — so pinning is
-  sufficient, no code change needed there.
+Kept on purpose, because renaming costs more than it shows:
+- the `# >>> homelab-management: … >>>` config markers
+  (`exposureConfigFiles.ts`, `crowdsecConfig.ts`) and n8n's
+  `ALERT_TEST_SCENARIO` key. `replaceMarkedBlock()` *appends* when it can't
+  find its fence, so renaming them would duplicate the managed block on
+  every live host;
+- the `POSTGRES_DB`/`POSTGRES_USER` defaults and the GitHub repo name.
+  (The `DASHBOARD_SUBDOMAIN` default was renamed separately, §436.)
 
-**What actually changed**, `homelab-*` → `business-lab-*`: both
-`package.json` `name`s (+ matching `package-lock.json` `name` fields, both
-occurrences each — root and the `packages[""]` entry), the Angular project
-name + build output path (`angular.json`, `frontend/Dockerfile`'s `COPY`,
-`docker-compose.test.yml`'s bind mount, `frontend/karma.conf.js`'s coverage
-dir), the two Docker image tags (`business-lab-backend`/`-frontend`, both
-`docker-compose.yml` and `docker-compose.test.yml`), the network
-(`business-lab-net`), the compose project (`name: business-lab`, new
-top-level key — see the volume-pinning above), `scripts/check.sh` +
-`CLAUDE.md`'s matching `business-lab-frontend-test` local dev image name,
-`start.sh`'s `db_container()` filter
-(`com.docker.compose.project=business-lab` — **must** match the compose
-file's `name:` exactly or the live-DB-credential lookup silently finds
-nothing), and `setup_test/README.md`'s image-tag mentions. Test fixtures in
-`composeOverride.test.ts`/`backupScheduler.test.ts` updated for consistency
-(arbitrary strings, not load-bearing).
+The data volumes keep their `homelab-management_*` names: each is pinned with
+`name:` **and `external: true`**. A bare project rename would have created
+new, empty volumes and orphaned Postgres, logs and backups. `name:` alone
+worked but drew a "created for project homelab-management" warning at
+cutover; `external: true` is the correct form, and it also makes
+`docker compose down -v` refuse to delete them. `appBackup.ts` reads its
+volume name from the live mounts, so nothing else had to change. @mat ran
+the cutover (a repo-root `down`, which the agent's guard refuses by design):
+all six containers came up under `business-lab` with the original volumes
+attached and none recreated.
 
-**Deliberately untouched**, matching Tier 3 (real cost, no visible benefit,
-or genuinely risky for a string nobody sees): `POSTGRES_DB`/`POSTGRES_USER`
-defaults (`homelab`, both the real compose file and the ephemeral
-`docker-compose.test.yml`), the `DASHBOARD_SUBDOMAIN` default (`homelab.
-<domain>` — a public-hostname change, its own migration task), the GitHub
-repo name, and the two config markers above.
+## 393. Data-protection and commercial positions decided (former §393–§395, compacted 2026-09-18)
 
-Backend typecheck clean, 757/757 tests pass; frontend `build` (confirms the
-Angular rename: output lands at `dist/business-lab-frontend` as expected)
-and `test:ci` (55/55, rebuilding `business-lab-frontend-test` fresh under
-the new name) both clean. `docker compose config` validated on both compose
-files (project name, volume pins, and syntax all confirmed correct).
+P11 and P12 / §84.5, talked through with @mat rather than drafted solo. The
+outcomes live in `docs/data-protection-position.md` and
+`docs/commercial-plan.md`.
 
-**Not yet live** — this is the real maintenance window the README item
-named, and the cutover itself needs @mat's hands: bringing the *old*
-`homelab-management`-named stack down to free the fixed host ports
-(`10000`/`10001`) is a repo-root `docker compose down`, which
-`.claude/hooks/bash-guards.sh` refuses for the agent by design — correctly,
-here it's exactly the kind of action that needs a human's own call, not a
-routed-around block. Staying on `dev` until @mat runs the cutover and it's
-proven live.
-
-## 392. §391 verified live — and `external: true` was missing from the volume pin (2026-09-11)
-
-@mat ran the cutover (`docker compose down` under the old project, `git
-pull`, `docker compose up -d --build`). Confirmed live:
-
-- All 6 containers up clean under the new project:
-  `business-lab-{frontend,backend,database,docker-socket-proxy,
-  self-update-watchdog,watchdog-docker-proxy}-1`.
-- Volumes correctly **not** recreated — `docker volume ls` still shows the
-  original `homelab-management_{db,scripts,logs,backups}-data`, no new
-  empty ones, no orphaned old containers left behind.
-- Network came up as `business-lab_business-lab-net`.
-- Backend log clean: `Homelab backend listening on port 3000`, Home Page
-  services.yaml regenerated (28 tiles) — talking to Postgres and the app
-  registry fine.
-
-**But `docker compose up` printed a warning** §391 didn't anticipate:
-`volume "homelab-management_backups-data" already exists but was created
-for project "homelab-management" (expected "business-lab"). Use `external:
-true` to use an existing volume`. Harmless this time (the stack came up and
-the data's there — confirmed above), but `name:` alone isn't the fully
-correct way to reference a volume you don't want this project to think it
-owns; `external: true` is what actually says that. Added it to all four
-volume definitions. Bonus effect, not just quieting the warning: an
-`external` volume is something `docker compose down -v` **refuses to
-remove**, even if `-v` is ever passed by accident later — strictly safer
-than the `name:`-only pin.
-
-`docker compose config` validated clean. Not `backend/src`/`frontend/src` —
-no version bump, matching this session's own precedent for compose-only
-fixes. §391/§392 close P8 — README item to be deleted next.
-
-## 393. P11 — data protection position decided and written up (§84.5)
-
-Talked it through with @mat rather than drafting it solo — this is a
-business stance, the README item's own framing ("decide, then write up —
-not a coding session"). Narrowed first: §84.7 already resolved the social-
-token half (client's own app, client's own box, no processor relationship
-at all) — nothing left to decide there, just worth stating explicitly since
-an earlier draft (§84.3a) assumed the opposite.
-
-Two live decisions, both @mat's call:
-
-- **Backup key custody: the client holds their own Kopia repository
-  passphrase, Business Lab never sees or stores a copy.** The purest
-  liability position — never a custodian of the means to decrypt a client's
-  data — traded against "if they lose it, backups are unrecoverable and
-  that's fully on them," stated plainly as a real support-conversation cost,
-  not glossed over.
-- **DR promise: best-effort, no formal SLA.** Backups protect against data
-  loss; hardware replacement/rebuild happens on an informal ~1–3 business
-  day window, not a contracted uptime guarantee. Matches what a small/solo
-  MSP operation can actually deliver without spare hardware or a warm
-  cloud-failover path on permanent standby — the honest trade for offices
-  choosing this over enterprise SaaS specifically for cost.
-
-**Controller vs processor** wasn't really an open question — the
-architecture only supports one answer (no central Business Lab server holds
-any client's data; each box is a fully separate install the client owns) —
-so it's presented in the write-up as the derived default (client = controller
-of their own business data, Business Lab = processor for setup/support/
-maintenance, formalized as a DPA clause) rather than something negotiated.
-
-New `docs/data-protection-position.md` — the stance and its reasoning, not
-the actual DPA contract language (that needs real legal drafting against a
-real jurisdiction/template; explicitly out of scope, flagged as such in the
-doc). Public repo, unlike P12: this is policy, not pricing/sales collateral,
-so §84.4's public-repo caveat doesn't apply — being visible is a trust
-signal, not a leak. Cross-links the turnkey build spec and flags P12 and
-licence due diligence as the two things it deliberately doesn't cover.
-Linked from README's doc list. README item deleted.
-
-Docs-only, no code — no version bump, no host verification needed.
-
-## 394. P12 unblocked — no generic SaaS-cost inventory (§84.5/§84.7 decision, 2026-09-11)
-
-§84.7 had P12 blocked on "the SaaS inventory + monthly costs from @mat" — a
-pre-built table of what each app replaces and the generic monthly saving.
-@mat's call: **skip it.** The real savings math is client-by-client — it
-depends on what *that specific client* already pays for (which tools, how
-many seats), so a generic inventory would be either too vague to use in a
-sales conversation or wrong for any given client. Calculated live, per
-client, at the sales conversation instead — not something to pre-build into
-the plan.
-
-This drops the one hard blocker P12 had. What's left of it (hardware BOM —
-already provable from the turnkey build spec, §390; support model;
-onboarding time per client; what happens to a client's data when they stop
-paying, which §393's controller/processor stance already answers most of —
-it's their box, nothing happens to it) is still open, and — like P11 —
-needs talking through rather than drafting solo, since it's business
-decisions, not something derivable from the code.
-
-README item's blocked-on clause removed; item re-scoped to reflect what's
-actually left.
-
-## 395. P12 — commercial plan talked through and written up (§84.5)
-
-Talked through the remaining open pieces with @mat (hardware BOM and the
-what-happens-on-nonpayment question were already resolved — the turnkey
-build spec, §390, and §393's controller/processor stance respectively):
-
-- **Pricing structure: flat monthly retainer**, not tiered or hourly —
-  simplest to sell and administer for a small/solo operation, one price
-  covers domain management + configuration + maintenance (the three pillars
-  the README's "What it is, and how it's sold" already named).
-- **Onboarding: a separate one-time setup fee**, distinct from the ongoing
-  monthly retainer that starts after handover.
-- **Support response time: best-effort, no contracted SLA** — same shape as
-  P11's DR stance, an honest internal target rather than a penalty-backed
-  promise. Consistent story across the whole offering rather than a stricter
-  commitment on support than on disaster recovery.
-- **Onboarding time estimate**, derived from `deployment-guide.md`'s actual
-  steps and confirmed as-is: **~1 business day hands-on** (`start.sh` +
-  prompts, Cloudflare/domain wiring, the deployment checklist, starting and
-  configuring the turnkey spec's ~14-app default bundle, client accounts,
-  handoff walkthrough), **~3–5 business days calendar time** — the gap is
-  client-side coordination (DNS/domain readiness, scheduling), not server
-  time.
-
-**No actual € figures** — the retainer amount and setup fee are real
-pricing decisions only @mat can set, and inventing plausible-sounding
-numbers for a real commercial document would be presumptuous. Left as
-clearly marked blanks instead.
-
-**§84.6's "lands as an Artifact, not a repo commit" call was superseded
-mid-build** — @mat: with no real € figures in it, this is a structure/
-template document, not competitive-sensitive pricing data, and can be
-public the same way `data-protection-position.md` is. New
-`docs/commercial-plan.md` — hardware BOM (cross-referencing the turnkey
-build spec rather than repeating it), the pricing structure with blank
-figures, the onboarding table, the support stance, and the
-nothing-happens-to-their-box nonpayment answer. Linked from README's doc
-list. README item deleted, and with it the now-empty "Business Lab (§84)"
-heading — P1 through P12 are all done.
-
-Docs-only, no code — no version bump, no host verification needed.
+- **Data protection.** The client holds their own Kopia passphrase and
+  Business Lab never keeps a copy; if they lose it, the backups are
+  unrecoverable, and the document says so plainly. Disaster recovery is
+  best-effort (~1–3 business days, no SLA). The client is the controller and
+  Business Lab the processor (a DPA clause; real legal drafting is out of
+  scope).
+- **Commercial.** A flat monthly retainer plus a one-time setup fee.
+  Best-effort support with no SLA, consistent with the DR stance.
+  Onboarding takes ~1 business day hands-on and 3–5 calendar days. No €
+  figures: they're left as marked blanks for @mat to set.
+- **Rejected:** a generic SaaS-cost inventory, which was §84.7's blocker for
+  P12. The savings depend on what each client already pays, so they're
+  worked out per client in the sales conversation.
+- **Superseded:** §84.6's call that the commercial plan be an Artifact, not
+  a repo file. Without real figures it's a template, and it can be public
+  like the data-protection document.
 
 ## 396. Off-host FTP backup destination proven end to end — two real bugs found and fixed (former §396–§399, compacted 2026-09-14)
 
@@ -29032,128 +28771,31 @@ spec). Not yet proven against the real stack — the nginx redirect and the
 mail send both need a live Authelia-protected app to hit; pending deploy to
 `home-srv-01`.
 
-## 464. §463 verified live on `beta` — caught the bare-domain redirect bug
+## 464. Access-denied redirect follow-ups (former §464–§467, compacted 2026-09-18)
 
-Deployed §463 to `home-srv-01` (`beta`) and checked NPM's actual generated
-config for `paperless.tx-home-utils.com` (`/data/nginx/proxy_host/13.conf`
-inside the `nginx-proxy-manager` container). First pass redirected to
-`https://tx-home-utils.com/access-denied` — the bare domain, which
-`curl`ing it live showed serves the **Home Page** app (gethomepage), not the
-dashboard (`plan.md §111`: the Home Page is deliberately public at the bare
-domain). The dashboard itself lives at its own `DASHBOARD_SUBDOMAIN`
-(`businesslab.<domain>` by default, `plan.md §457`) — `npmClient.ts` had used
-`globalConfig.baseDomain` directly instead of the dashboard's actual
-hostname.
+Follow-ups to §463 (Authelia 403 → the dashboard's access-denied page with a
+request-access email).
 
-Fixed by reusing `getDashboardBaseUrl()` (`utils/generalSettings.ts`,
-already built for §457's invite-link fix — operator override if set,
-otherwise `https://<DASHBOARD_SUBDOMAIN>.<baseDomain>`) instead of
-hand-building the URL from the bare base domain. `EnsureProxyHostOptions`'s
-`baseDomain` field renamed to `dashboardUrl` throughout `npmClient.ts`
-end-to-end; `exposure.ts`'s `provisionHostname` now calls
-`getDashboardBaseUrl()` once (falling back to `https://<baseDomain>` only in
-the pathological case it returns null — shouldn't happen here, since
-`globalConfig.baseDomain` is already guaranteed present).
-
-Verified after the fix, all against the real stack:
-- `docker exec ... node -e "provisionServiceIfEnabled('paperless', null)"`
-  (the same code path the dashboard's own Restart button calls) rewrote
-  `paperless.tx-home-utils.com`'s NPM host; `/data/nginx/proxy_host/13.conf`
-  now reads `return 302 https://businesslab.tx-home-utils.com/access-denied?host=$host;`
-  inside a `location @access_denied` reached via `error_page 403 =
-  @access_denied;` on `location /`.
-- `nginx -t` inside the NPM container: config valid, reloaded clean.
-- `GET https://businesslab.tx-home-utils.com/access-denied?host=paperless.tx-home-utils.com`
-  → 200, the normal Angular SPA shell (same `try_files` fallback already
-  proven for `/set-password`/`/recovery`).
-- `POST https://businesslab.tx-home-utils.com/api/access-requests` with a
-  valid body → 204, a real email sent through this host's actual configured
-  mailbox (no error in `business-lab-backend-1`'s logs); with an invalid
-  body (bad email, empty reason) → 422 with the two expected Joi messages.
-- `reconcileExposureDrift()` (the same function the 6h reconciler sweep
-  calls) run directly instead of waiting for its interval: `{"checked":30,
-  "reconciled":30,"failed":[]}`. Confirmed stack-wide: 22 of the NPM hosts
-  now carry `error_page 403` (the Authelia-protected ones), the other 11 do
-  not (correctly untouched — no Authelia, no named location needed);
-  `nginx -t` stays valid across all of them. Home Page, dashboard, and
-  paperless all still reachable with their expected status codes afterwards.
-
-Not tested: the actual browser click-path (a real Authelia session,
-authenticated but not in an app's group, actually hitting the 403 and
-landing on the page) — simulating that needs either a real test user's
-Authelia login or resetting a live user's dashboard password via recovery
-mode, both more invasive than this host's disposable-data model calls for
-justifying here. The mechanism itself (`auth_request` → `error_page 403` →
-named location → `return 302`) is the same nginx idiom already proven live
-for months by the adjacent 401 case in the same file
-(`authelia-authrequest.conf`'s `error_page 401 =302 $redirection_url;`), so
-this is judged a reasonable stopping point rather than a gap.
-
-`beta` → `main`: left unmerged per [[main-merge-requires-request]].
-
-## 465. Access-request email names the app, not just its hostname
-
-Feedback on §463: the email must clearly say which app the request is for.
-It already did, technically — subject and body both carried the raw
-hostname (`Access request: paperless.tx-home-utils.com`) — but a hostname
-isn't the app's name, it's a decision the reader has to make themselves.
-
-`backend/src/routes/accessRequests.ts` gained `describeApp(hostname)`:
-looks up `service_exposure` for the row whose `hostname` column matches (a
-reverse lookup against data the exposure system already keeps
-authoritative, rather than recomputing `buildExposureHostname` for every
-registry entry), strips a secondary exposure's `:suffix` (e.g.
-`netbird-vpn:api`) back to its base service name, and resolves that against
-`SERVICES[name].label`. Falls back to the bare hostname when nothing
-matches (exposure disabled since the redirect was generated, or a
-hand-crafted request) — same failure mode as today, never worse. Email now
-reads "Access request: Paperless (paperless.tx-home-utils.com)".
-
-Verified: `./scripts/check.sh backend typecheck`/`test` clean (931, +3 new —
-`accessRequests.test.ts` covers the primary-exposure match, the
-secondary-suffix strip, and the no-match fallback).
-
-## 466. §465 verified live on `beta`
-
-Deployed to `home-srv-01`, `GET /api/version` → `0.105.2`. `POST
-/api/access-requests` against the real `paperless.tx-home-utils.com`
-exposure row → 204, no error in `business-lab-backend-1`'s logs — a real
-email sent with subject "Access request: Paperless
-(paperless.tx-home-utils.com)", confirming `describeApp()`'s
-`service_exposure` reverse lookup resolves correctly against live data, not
-just the mocked test.
-
-`beta` → `main`: left unmerged per [[main-merge-requires-request]].
-
-## 467. Investigated auto-filling the access-denied email field from Authelia — skipped
-
-Asked whether the request-access email field (§463) could auto-fill from
-Authelia's own knowledge of who was denied. Checked Authelia's actual source
-(v4.39.24, this stack's running version, via `gh api`/`gh search code` against
-`authelia/authelia`): `Remote-User`/`Remote-Email`/`Remote-Groups` are set in
-exactly one place, `handleAuthzAuthorizedStandard`
-(`internal/handlers/handler_authz_common.go`), which only runs on the
-`AuthzResultAuthorized` (200) branch of `Authz.Handler`
-(`internal/handlers/handler_authz.go`). The `AuthzResultForbidden` branch
-calls only `ctx.ReplyForbidden()` — no headers set. So the nginx
-`auth_request_set $email ...` machinery §463 already relies on for the
-authorized case has nothing to read on a 403; there is no denied-user
-identity to capture at the point the redirect fires.
-
-The one workaround that would actually work: the dashboard backend calling
-Authelia's own forward-auth endpoint (`/api/authz/auth-request`) itself,
-server-side, against a bypass'd URL (e.g. `https://authelia.<domain>/`) with
-the visitor's forwarded session cookie — that only requires being logged
-into Authelia at all, not authorized for the denied app, and returns the
-real, unredacted email in a 200 response's headers. (Ruled out Authelia's
-other identity endpoint, `/api/user/info` — its `emails` are redacted,
-`j***n@example.com`, useless for a field whose value gets sent as-is.)
-
-Rejected: real new surface (a public endpoint forwarding the visitor's
-Authelia session cookie server-side, a raw header-reading HTTP call — the
-existing `httpJson.ts` helper only reads JSON bodies, not headers) for a
-convenience that saves typing one's own email once. User's call, given the
-tradeoff: skip it. The manual field from §463 stays as-is.
+- **Bug caught live:** the redirect went to `https://<baseDomain>/access-denied`,
+  but the bare domain serves the Home Page (§111), not the dashboard.
+  `npmClient.ts` now takes `dashboardUrl` from `getDashboardBaseUrl()`
+  (§457). Verified on the host: the generated
+  `error_page 403 = @access_denied` → `return 302
+  https://businesslab.<domain>/access-denied?host=$host`; `nginx -t` clean on
+  every host after a full reconcile; a real request email sent (204); an
+  invalid body → 422. The authenticated-but-not-in-group browser path wasn't
+  clicked through, since the same nginx idiom already serves the 401 case.
+- **The email names the app, not just the hostname.** `describeApp()` in
+  `routes/accessRequests.ts` looks up the `service_exposure` row for the
+  hostname (stripping a secondary `:suffix`) and uses the registry label,
+  falling back to the hostname. Verified live: "Access request: Paperless
+  (paperless.<domain>)".
+- **Rejected:** auto-filling the requester's email from Authelia. On a 403,
+  Authelia sets no `Remote-*` headers (only the authorized branch does,
+  checked in v4.39.24's source), and `/api/user/info` redacts emails. The
+  only route that works, a server-side call to `/api/authz/auth-request`
+  with the visitor's forwarded session cookie, adds new attack surface to
+  save typing one address. Skipped at @mat's call.
 
 ## 468. New app: WebDAV, for native clients that need a backup destination over HTTPS
 
