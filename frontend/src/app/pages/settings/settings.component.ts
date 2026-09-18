@@ -114,7 +114,7 @@ export class SettingsComponent implements OnInit {
   protected alertSettings: AlertNotifySettings | null = null;
   protected alertsLoading = true;
   protected savingAlerts = false;
-  protected alertsFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  protected alertsFeedback: { type: 'success' | 'danger' | 'info' | 'warning'; message: string } | null = null;
   // Editable copy of the ntfy topic; committed on "Save topic".
   protected alertTopicDraft = '';
   protected readonly alertTopicPattern = /^[A-Za-z0-9_-]{1,64}$/;
@@ -277,7 +277,9 @@ export class SettingsComponent implements OnInit {
             enforceNpm: response.enforceNpm,
           };
           this.alertTopicDraft = response.topic;
-          this.alertsFeedback = { type: 'success', message: response.message };
+          // Saved either way; `applied: false` means a restart that makes it
+          // take effect failed, which is worth more than a green tick (§532).
+          this.alertsFeedback = { type: response.applied === false ? 'warning' : 'success', message: response.message };
         },
         error: (error) => {
           this.alertsFeedback = {

@@ -170,7 +170,7 @@
           <label class="form-check-label" for="crowdsecAlertsEnabled">
             <span class="fw-semibold">CrowdSec intrusion alerts</span>
             <span class="d-block text-body-secondary small">
-              A push whenever CrowdSec flags an IP. Applies on the next CrowdSec restart.
+              A push whenever CrowdSec flags an IP. Applies when saved: CrowdSec and n8n restart if running.
             </span>
           </label>
         </div>
@@ -207,8 +207,9 @@
           <span class="d-block text-body-secondary small">
             Off, CrowdSec only watches and alerts. On, every proxied request has its
             client IP checked against CrowdSec's decision list and banned IPs get a
-            403 — and the alerts start saying so. Applies after restarting CrowdSec
-            and Nginx Proxy Manager.
+            403 — and the alerts start saying so. Applies when saved: CrowdSec and
+            Nginx Proxy Manager restart if running (a few seconds' blip on every
+            public site).
           </span>
         </label>
       </div>
@@ -220,6 +221,7 @@
         [ngClass]="{
           'text-success': alertsFeedback.type === 'success',
           'text-danger': alertsFeedback.type === 'danger',
+          'text-warning-emphasis': alertsFeedback.type === 'warning',
           'text-body-secondary': alertsFeedback.type === 'info'
         }"
       >

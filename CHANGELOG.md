@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.21] — 2026-09-18
+
+### Fixed
+
+- Saving CrowdSec alert, ban-enforcement or topic settings now applies them straight away (restarting CrowdSec, n8n, Uptime Kuma or Nginx Proxy Manager as needed) instead of waiting for a manual restart that never happened.
+
 ## [0.117.20] — 2026-09-18
 
 ### Fixed

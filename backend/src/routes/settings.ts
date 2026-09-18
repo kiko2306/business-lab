@@ -32,12 +32,16 @@ import {
   setUpdateBranch,
 } from '../utils/generalSettings';
 import {
+  appsToApplyAlertSettings,
   getAlertNotifyConfig,
   isValidAlertTopic,
   setAlertTopic,
   setCrowdsecAlertsEnabled,
   setCrowdsecEnforceNpm,
 } from '../utils/alertNotify';
+import { restartService } from '../services/executor';
+import logger from '../utils/logger';
+import { getService } from '../config/services';
 import { applyNpmCrowdsecConfig } from '../services/crowdsecConfig';
 import { runAlertTest, AlertSource } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
@@ -814,17 +818,34 @@ router.put('/alerts', async (req: Request, res: Response) => {
       },
     });
 
+    // Apply now, not "on the next restart" (§532). Each of these settings is
+    // rendered into its app's config only when that app starts, and saving
+    // used to stop at "Restart CrowdSec to apply" (n8n wasn't even
+    // mentioned). The next restart was a host reboot, which re-uses the stale
+    // files, so alerts and bans stayed off for days (§531). restartService
+    // re-renders and recreates, and leaves an app that isn't running alone:
+    // its next start renders the same config.
+    const restarted: string[] = [];
+    const notRunning: string[] = [];
+    const failed: string[] = [];
+    for (const app of appsToApplyAlertSettings({ topic: hasTopic, crowdsec: hasCrowdsec, enforce: hasEnforce })) {
+      const label = getService(app)?.label ?? app;
+      try {
+        const result = await restartService(app, req.user!.id);
+        (result.message.includes('not currently running') ? notRunning : restarted).push(label);
+      } catch (error) {
+        logger.error(`Applying alert settings: restart of ${app} failed`, { error: (error as { message?: string }).message });
+        failed.push(label);
+      }
+    }
+
     const saved = await getAlertNotifyConfig();
-    return res.json({
-      ...saved,
-      message: hasEnforce
-        ? // Two restarts, and each does a different half: CrowdSec registers
-          // the `nginx` bouncer key, NPM loads (or drops) the Lua block.
-          `Saved. Restart CrowdSec and Nginx Proxy Manager to ${saved.enforceNpm ? 'start enforcing bans' : 'stop enforcing bans'}.`
-        : saved.crowdsecEnabled
-          ? 'Saved. Restart CrowdSec to apply, then subscribe to the topic in ntfy.'
-          : 'Saved. Restart CrowdSec to apply.',
-    });
+    const parts = ['Saved.'];
+    if (restarted.length) parts.push(`Applied: restarted ${restarted.join(', ')}.`);
+    if (notRunning.length) parts.push(`${notRunning.join(', ')} not running; applies when started.`);
+    if (failed.length) parts.push(`Could not restart ${failed.join(', ')}; restart it from Apps to apply.`);
+    if (saved.crowdsecEnabled && hasCrowdsec) parts.push('Subscribe to the topic in ntfy to receive pushes.');
+    return res.json({ ...saved, applied: failed.length === 0, message: parts.join(' ') });
   } catch {
     return res.status(500).json({ error: 'Unable to save alert settings.' });
   }

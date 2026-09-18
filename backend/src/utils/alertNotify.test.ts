@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_ALERT_TOPIC, isValidAlertTopic } from './alertNotify';
+import { DEFAULT_ALERT_TOPIC, appsToApplyAlertSettings, isValidAlertTopic } from './alertNotify';
 
 describe('isValidAlertTopic', () => {
   it('accepts ntfy-legal topic names', () => {
@@ -23,5 +23,34 @@ describe('isValidAlertTopic', () => {
   it('has a readable default', () => {
     expect(DEFAULT_ALERT_TOPIC).toBe('homelab-alerts');
     expect(isValidAlertTopic(DEFAULT_ALERT_TOPIC)).toBe(true);
+  });
+});
+
+describe('appsToApplyAlertSettings', () => {
+  const none = { topic: false, crowdsec: false, enforce: false };
+
+  it('restarts the relay and CrowdSec for the alerts toggle', () => {
+    expect(appsToApplyAlertSettings({ ...none, crowdsec: true })).toEqual(['n8n', 'crowdsec']);
+  });
+
+  it('restarts CrowdSec before NPM for enforcement, since CrowdSec renders the block NPM loads', () => {
+    expect(appsToApplyAlertSettings({ ...none, enforce: true })).toEqual(['crowdsec', 'nginx-proxy-manager']);
+  });
+
+  it('restarts every consumer of the topic', () => {
+    expect(appsToApplyAlertSettings({ ...none, topic: true })).toEqual(['n8n', 'uptime-kuma']);
+  });
+
+  it('dedupes and keeps the dependency order when everything changes', () => {
+    expect(appsToApplyAlertSettings({ topic: true, crowdsec: true, enforce: true })).toEqual([
+      'n8n',
+      'uptime-kuma',
+      'crowdsec',
+      'nginx-proxy-manager',
+    ]);
+  });
+
+  it('restarts nothing when nothing changed', () => {
+    expect(appsToApplyAlertSettings(none)).toEqual([]);
   });
 });

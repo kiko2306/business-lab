@@ -141,3 +141,23 @@ export async function publishAlert(alert: {
     return false;
   }
 }
+
+/**
+ * Which running apps must restart for a change to these settings to take
+ * effect, in the order to restart them (§532). Each setting is rendered into
+ * its app's config only when that app starts, so saving without this left
+ * the whole alert and ban path silently off for days (§531):
+ *   - CrowdSec alerts → n8n's relay workflow + CrowdSec's profiles.yaml
+ *   - topic → n8n's relay workflow + Uptime Kuma's critical-monitor push
+ *   - enforcement → CrowdSec (renders NPM's bouncer block) + NPM (loads it)
+ * n8n first, so the webhook exists before CrowdSec can post to it; CrowdSec
+ * before NPM, because CrowdSec's start renders the block NPM then loads.
+ */
+export function appsToApplyAlertSettings(changed: { topic: boolean; crowdsec: boolean; enforce: boolean }): string[] {
+  const apps = new Set<string>();
+  if (changed.crowdsec || changed.topic) apps.add('n8n');
+  if (changed.topic) apps.add('uptime-kuma');
+  if (changed.crowdsec || changed.enforce) apps.add('crowdsec');
+  if (changed.enforce) apps.add('nginx-proxy-manager');
+  return ['n8n', 'uptime-kuma', 'crowdsec', 'nginx-proxy-manager'].filter((app) => apps.has(app));
+}
