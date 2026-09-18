@@ -207,6 +207,19 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
+### plan.md upkeep (§534)
+
+- [ ] **Clear the 45 citations that already dangle** —
+      `scripts/plan-citations.py` lists them: mostly
+      `apps/price-compare/` code citing §38–§45 (removed by pass 1,
+      §165) and the §0.2/§0.3 principles, which are list items, not
+      headings. Add labelled anchors so the checker reads zero and a future
+      break stands out.
+- [ ] **Compaction pass 4: the backup build-out (§66–§90)**, under the
+      §530 rule (every cited anchor kept as a labelled entry, no new
+      dangling citations).
+- [ ] **Compaction pass 5: the 2FA slices (§127–§137)**, same rule.
+
 ### Exposure and platform
 
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node

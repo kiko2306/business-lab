@@ -28618,3 +28618,19 @@ Then the real failure path: n8n stopped via `stopService` → pending at
 (alert relay) Up" 3 min later, relay workflow still active. The email half
 isn't visible from here (no SMTP error in Uptime Kuma's log); the operator's
 inbox is the check.
+
+## 534. Plan — plan.md upkeep: dangling citations, then two more compaction passes
+
+Nothing on the README list could move (dedupe waits on real alert volume;
+NetBird Android on upstream; MeshCentral on a second device), so @mat
+approved two upkeep items, in this order:
+
+1. **Clear the pre-existing dangling citations** (45 at §530). Mostly
+   `apps/price-compare/` code citing §38–§45, removed by pass 1 (§165), plus
+   the §0.2/§0.3 principles, which are list items. Labelled anchors in
+   `plan.md` only: the §25 compacted section for the Price Compare ids,
+   bold labels on the §0 list items. Goal: `plan-citations.py` prints
+   nothing.
+2. **Compaction pass 4, the backup build-out (§66–§90)**, then **pass 5,
+   the 2FA slices (§127–§137)**, each under the §530 rule and each its own
+   `plan:` commit.
