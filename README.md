@@ -252,14 +252,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### From the 2026-09-18 review (§511)
 
-- [ ] **MeshCentral: anyone can create its site admin** — publicly exposed
-      without Authelia, and its login page served `newAccount="true"`
-      (MeshCentral always admits the first account as site admin, whatever
-      `ALLOW_NEW_ACCOUNTS` says). Replaces the old "automate the first-account
-      claim" item; it can't wait for the agent proof.
-- [ ] **MeshCentral's compose healthcheck fails whenever it's exposed** —
-      the plain-HTTP fallback probes `:80`, but with `tlsOffload` it serves
-      HTTP on `443`.
 - [ ] **Backend trusts a client-supplied `X-Forwarded-For` from the
       LAN/overlay** — `frontend/nginx.conf` passes the header through and
       `trust proxy` is 1, so `X-Forwarded-For: 127.0.0.1` makes `req.ip`
