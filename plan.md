@@ -30551,3 +30551,29 @@ with HSTS. Every running hostname answers as before (200 / 302-to-Authelia
 34 of 35 NPM host files carry the page (the one without is the gRPC host).
 Gated stopped apps (e.g. bookstack) have the directive in `location /`; a
 visitor sees the page after Authelia login, which the agent can't do.
+
+## 526. §524 D — the reconciler reports stopped apps; §511 review closed
+
+`reconcileExposureDrift` checked NPM + Cloudflare config only, so a pass with
+a dozen exposed-but-stopped apps logged "all exposed services healthy".
+After a service's exposure checks out, it now asks `getServiceStatus` (the
+dashboard's own status source) and lists anything not `running` in a new
+`summary.notRunning`, logged as "hostnames provisioned, but some apps behind
+them are not running". These aren't failures: no audit row, and `failed`
+and the warn path are unchanged. Test added; the status mock is reset per
+test so an override can't leak.
+
+Verified on home-srv-01 (0.117.19): a live pass reported 32/32 reconciled,
+0 failed, and exactly the 14 exposed apps with no running container
+(bookstack, code-server, home-assistant, immich, it-tools, itflow, mealie,
+miniflux, navidrome, pantry, paperless, price-compare, twenty, vikunja).
+There was no config drift this time, so no NPM writes, and NPM had no OOM.
+
+That was the last §511 item. The README's "From the 2026-09-18 review"
+section is empty and removed. What the review found and where each item
+went: §512 MeshCentral admin claim + healthcheck, §513 password reset
+revokes sessions, §514 OnlyOffice memory, §515 `writeAuditLog`,
+§516 X-Forwarded-For, §517 NetBird Job stream, §518 NocoDB signup, §519
+Twenty signup (already closed), §520 login audit username/IP, §521 login
+hardening, §522 HSTS/CSP, §523 refresh-token purge, §525/§526 stopped apps
+(+ NPM memory).

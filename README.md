@@ -252,5 +252,3 @@ it is done — not ticked off and left behind. Section references point at
       MeshCentral start, its create-account form is public for the few
       seconds between `compose up` and the admin-claim bootstrap. Exposing
       after the claim would close it.
-
-### From the 2026-09-18 review (§511)
