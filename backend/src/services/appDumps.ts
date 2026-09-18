@@ -23,6 +23,7 @@
 import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
+import { pipeline } from 'stream/promises';
 import { SERVICES, getAppsDir } from '../config/services';
 import logger from '../utils/logger';
 
@@ -106,17 +107,56 @@ function ensureDumpDir(appDir: string): string {
 }
 
 /**
- * Write a dump, but only replace the previous one once the new one succeeded.
+ * Stream a dump command's stdout into `finalPath`, replacing the previous dump
+ * only once the new one succeeded. Exported for tests.
  *
- * Writing straight to the final path would destroy the last good dump the
- * moment a dump starts failing — so a broken database would quietly take the
- * backup with it.
+ * Streamed, never buffered (§508): holding the whole dump in memory put a
+ * 723 MB Nextcloud dump inside a 768 MB backend, which the kernel OOM-killed
+ * on every boot — the overdue scheduled backup restarted it each time.
+ *
+ * Written to `.part` and renamed: writing straight to the final path would
+ * destroy the last good dump the moment a dump starts failing — so a broken
+ * database would quietly take the backup with it.
  */
-function commitDump(finalPath: string, data: Buffer): number {
+export async function dumpToFile(
+  finalPath: string,
+  command: string,
+  args: string[],
+  timeoutMs = DUMP_TIMEOUT_MS
+): Promise<{ ok: boolean; bytes: number; stderr: string }> {
   const tmp = `${finalPath}.part`;
-  fs.writeFileSync(tmp, data);
+  const child = spawn(command, args);
+  let stderr = '';
+  child.stderr.on('data', (d) => (stderr += d.toString()));
+  const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
+  const exited = new Promise<number>((resolve) => {
+    child.on('error', (e) => {
+      stderr += e.message;
+      resolve(-1);
+    });
+    child.on('close', (code) => resolve(code ?? -1));
+  });
+
+  let writeFailed = false;
+  try {
+    await pipeline(child.stdout, fs.createWriteStream(tmp));
+  } catch (error) {
+    // Disk full or unwritable: stop the dump rather than let it run on into
+    // a broken pipe.
+    writeFailed = true;
+    stderr += (error as Error).message;
+    child.kill('SIGKILL');
+  }
+  const code = await exited;
+  clearTimeout(timer);
+
+  const bytes = fs.existsSync(tmp) ? fs.statSync(tmp).size : 0;
+  if (writeFailed || code !== 0 || bytes === 0) {
+    fs.rmSync(tmp, { force: true });
+    return { ok: false, bytes: 0, stderr: stderr || 'dump produced no output' };
+  }
   fs.renameSync(tmp, finalPath);
-  return data.length;
+  return { ok: true, bytes, stderr };
 }
 
 async function dumpServerDatabase(
@@ -188,13 +228,11 @@ async function dumpServerDatabase(
               'exec "$D" --single-transaction --quick --no-tablespaces -h "$RH" -u "$RU" "$RD"'];
   }
 
-  const result = await run('docker', args);
-  if (result.code !== 0 || result.stdout.length === 0) {
-    return { ...base, ok: false, detail: (result.stderr || 'dump produced no output').trim().slice(0, 300) };
+  const result = await dumpToFile(dumpPath, 'docker', args);
+  if (!result.ok) {
+    return { ...base, ok: false, detail: result.stderr.trim().slice(0, 300) };
   }
-
-  const bytes = commitDump(dumpPath, result.stdout);
-  return { ...base, ok: true, bytes, detail: `dumped ${(bytes / 1024).toFixed(0)} KB` };
+  return { ...base, ok: true, bytes: result.bytes, detail: `dumped ${(result.bytes / 1024).toFixed(0)} KB` };
 }
 
 /** SQLite files, found by header rather than by extension. Exported for tests. */

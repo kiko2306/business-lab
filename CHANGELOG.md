@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.3] — 2026-09-18
+
+### Fixed
+
+- App database dumps stream to disk instead of being buffered in memory — a 723 MB Nextcloud dump OOM-killed the backend on every boot
+
 ## [0.117.2] — 2026-09-17
 
 ### Fixed

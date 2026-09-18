@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.117.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.117.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -257,3 +257,21 @@ it is done — not ticked off and left behind. Section references point at
       that reorder touches every app's start path, so it's not a
       one-line fix.
 
+
+### Backups
+
+- [ ] **Stream database dumps to disk instead of buffering them** (§508)
+      — `appDumps.ts` held a whole `pg_dump` in memory; Nextcloud's
+      723 MB dump OOM-killed the 768 MB backend on every boot from
+      2026-09-17 19:28 UTC. Any large enough database does the same.
+- [ ] **A crashed scheduled backup retries on every boot** (§508) — an
+      overdue app-data backup starts immediately on startup, so a backup
+      that kills the backend turns into a restart loop (853 restarts,
+      ~40 s apart), and each boot's partial `backup-*.tar.gz` prunes the
+      previous archive under retention 1. Needs a back-off after an
+      unfinished run, and pruning only after a *successful* archive.
+- [ ] **Nextcloud `/NAS` FTP mount indexes the whole NAS** (§508) — the
+      hand-added external storage `frias@192.168.1.50//` is rooted at the
+      NAS root: 3.3 M `oc_filecache` rows, 2.2 GB table. Operator decision:
+      narrow it to a subfolder or drop it. Streaming dumps (above) stops it
+      crashing the backend but not the dump/backup size.

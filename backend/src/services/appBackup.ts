@@ -52,7 +52,7 @@ export const APP_BACKUP_RETENTION = 10;
 /**
  * Live database directories and side-files, excluded from the archive — the
  * `_dump/*.sql` and `*.sqlite` snapshots are the consistent copy. `*.part` is
- * an in-progress dump `commitDump` has not renamed yet.
+ * an in-progress dump `dumpToFile` has not renamed yet.
  */
 const TAR_EXCLUDES = ['data/db', 'data/pgdata', '*-wal', '*-shm', '*.part'];
 

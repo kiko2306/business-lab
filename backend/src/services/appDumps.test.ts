@@ -13,7 +13,7 @@ vi.mock('../config/services', () => ({
   getAppsDir: vi.fn(),
 }));
 
-import { findSqliteFiles } from './appDumps';
+import { dumpToFile, findSqliteFiles } from './appDumps';
 
 const SQLITE_HEADER = Buffer.from('SQLite format 3 ');
 
@@ -75,5 +75,39 @@ describe('findSqliteFiles', () => {
     } finally {
       fs.chmodSync(locked, 0o755);
     }
+  });
+});
+
+describe('dumpToFile', () => {
+  let dir: string;
+  let out: string;
+
+  beforeEach(() => {
+    dir = fs.mkdtempSync(path.join(os.tmpdir(), 'dumptofile-'));
+    out = path.join(dir, 'app.sql');
+    fs.writeFileSync(out, 'previous good dump');
+  });
+  afterEach(() => fs.rmSync(dir, { recursive: true, force: true }));
+
+  it('streams a successful dump into place, larger than any one chunk', async () => {
+    // ~2 MB: many pipe chunks, so this exercises the stream, not one buffer.
+    const result = await dumpToFile(out, 'sh', ['-c', 'head -c 2000000 /dev/zero']);
+    expect(result.ok).toBe(true);
+    expect(result.bytes).toBe(2_000_000);
+    expect(fs.statSync(out).size).toBe(2_000_000);
+    expect(fs.existsSync(`${out}.part`)).toBe(false);
+  });
+
+  it('keeps the previous dump when the command fails partway', async () => {
+    const result = await dumpToFile(out, 'sh', ['-c', 'printf partial; echo boom >&2; exit 3']);
+    expect(result).toMatchObject({ ok: false, stderr: 'boom\n' });
+    expect(fs.readFileSync(out, 'utf8')).toBe('previous good dump');
+    expect(fs.existsSync(`${out}.part`)).toBe(false);
+  });
+
+  it('treats empty output as a failure', async () => {
+    const result = await dumpToFile(out, 'sh', ['-c', 'exit 0']);
+    expect(result.ok).toBe(false);
+    expect(fs.readFileSync(out, 'utf8')).toBe('previous good dump');
   });
 });
