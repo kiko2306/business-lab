@@ -25,9 +25,16 @@ hits = subprocess.run(
     f"grep -rnoE '§[0-9]+(\\.[0-9]+)?' {SOURCES} 2>/dev/null",
     shell=True, capture_output=True, text=True).stdout.splitlines()
 
+# A compacted section's own heading names the sections it replaced,
+# "(former §X–§Y, compacted <date>)"; those are a record, not citations.
+former_lines = {f'plan.md:{n}' for n, line in enumerate(plan.split('\n'), 1)
+                if line.startswith('## ') and '(former ' in line}
+
 dangling = {}
 for hit in hits:
     location, cite = hit.rsplit(':', 1)
+    if location in former_lines:
+        continue
     if cite[1:] not in targets:
         dangling.setdefault(cite[1:], []).append(location)
 
