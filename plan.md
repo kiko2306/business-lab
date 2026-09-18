@@ -30417,3 +30417,53 @@ log in with code X (200), log in again with X (**401**), then wrong codes
 until the 6th failure got **429 "Too many wrong codes"**. The live host
 (0.117.14) has no 2FA account the agent can use, so the timing measurement
 above is the live proof there.
+
+## 522. Dashboard page: HSTS, CSP and Referrer-Policy
+
+§511 finding. The tunnel routes the dashboard hostname straight to the
+frontend nginx, bypassing NPM (docs/first-run.md), so nothing added HSTS or
+a CSP, and helmet only covers `/api`. `frontend/nginx.conf` now sends, with
+`always`: HSTS `max-age=63072000` (no `includeSubDomains`: every app hostname
+is NPM's to set; browsers ignore it on the LAN `http://` address),
+`Referrer-Policy`, and
+`default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline';
+img-src 'self' data:; font-src 'self' data:; connect-src 'self';
+worker-src 'self'; manifest-src 'self'; object-src 'none'; base-uri 'self';
+form-action 'self'; frame-ancestors 'self'`.
+
+What shaped the policy:
+- Angular's production build inlined critical CSS and loaded the main
+  stylesheet with `onload="this.media='all'"`, an inline handler a strict
+  `script-src` blocks, which would leave the page unstyled. Turned
+  `inlineCritical` off in `angular.json` (a first-paint optimisation only)
+  rather than adding `'unsafe-hashes'` to `script-src`.
+- `style-src` needs `'unsafe-inline'`: Angular injects a `<style>` per
+  component at runtime. Proven below.
+- No external origins anywhere in `frontend/src`; `data:` covers Bootstrap's
+  form-control SVGs.
+- Existing bug fixed on the way: `location = /sw.js` had its own
+  `add_header Cache-Control`, and nginx drops *all* inherited server-level
+  `add_header`s from a location that declares any, so the service worker
+  script got no security headers. It now uses `expires -1`, which sends the
+  same `Cache-Control: no-cache` without `add_header`.
+
+New E2E spec `csp.spec.ts`: asserts the header is served, visits all ten
+shell pages, and fails on any CSP console report. First draft waited for
+`networkidle`, which never arrives because the shell holds a realtime stream
+open; it now waits for each page's `h1`. Proven both ways: 13/13 green with
+the real policy, and with `'unsafe-inline'` removed from `style-src` it
+failed with "Refused to apply inline style…", taking three other specs down
+with it (which is also the proof `'unsafe-inline'` is required).
+
+Live on home-srv-01 (0.117.15): `/` and `/sw.js` carry all four headers
+through Cloudflare, and the page links one plain stylesheet with no inline
+handler.
+
+Noted, not changed:
+- `/api` responses now carry helmet's headers *and* nginx's (two CSPs,
+  two HSTS). `X-Frame-Options` was already doubled there before this
+  change. Harmless on JSON.
+- Cloudflare rewrites `sw.js`'s origin `Cache-Control: no-cache` to
+  `max-age=14400` (zone Browser Cache TTL). The origin sent `no-cache`
+  before this change too, and service-worker update checks bypass the HTTP
+  cache by spec (`updateViaCache: 'imports'`).
