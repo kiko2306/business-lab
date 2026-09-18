@@ -209,9 +209,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### plan.md upkeep (§534)
 
-- [ ] **Compaction pass 4: the backup build-out (§66–§90)**, under the
-      §530 rule (every cited anchor kept as a labelled entry, no new
-      dangling citations).
 - [ ] **Compaction pass 5: the 2FA slices (§127–§137)**, same rule.
 
 ### Exposure and platform

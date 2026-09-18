@@ -4082,184 +4082,132 @@ Claim the setup wizard **before exposing it** — the standing rule for wizard
 apps, and it matters more here since ITFlow holds client documentation and
 credentials. Then turn on exposure with **Authelia required**.
 
-## 66. Backup audit — the dashboard is covered, every app is not
+## 66. App-data backups, the Duplicati era: from "nothing is backed up" to a proven restore (former §66–§68, §70–§75, §79, §86, §88–§90, compacted 2026-09-18)
 
-Triggered by counting the project's databases (§65 follow-on). 9 database
-containers, 18 embedded stores, and a backup that touches none of them.
+2026-08-31 to 09-02. The engine then was Duplicati; it was later replaced
+by **Kopia** (§81.5, §192), and the code (`appDumps.ts`, `appBackup.ts`,
+`backupScheduler.ts`, `kopiaClient.ts`) is the source of truth now. This
+keeps what outlived the engine: the consistency rules for dumps, how a run
+records whether it worked, and the lessons, including the one CLAUDE.md
+cites (§75.7). Sections §69, §76–§78, §80–§85 and §87 sit in this date range
+but are other topics and are left in place.
 
-### 66.1 Correction first
+### Anchors
 
-An initial reading of `createBackupArchive()` suggested the dashboard's own
-credentials were only partially captured, because `settings.json` filters to
-`cloudflare_%` / `health_%` / `backup_schedule_%`. **That was wrong.**
-`pg_dump` is called with no `-t`, so it dumps the *entire* dashboard database —
-settings table included. Verified by generating an archive and grepping the
-dump: `exposure_npm_password`, `mail_smtp_password` and
-`cloudflare_tunnel_token` are all present. `settings.json` is a convenience
-extract, not the backup.
+**§66** — the audit. The dashboard's own archive was complete (`pg_dump`
+of the whole DB, settings included), but **nothing under `apps/` was
+backed up** (1.8 GB, including Vaultwarden, Authelia and every `.env`), and
+Duplicati was running with zero jobs. The non-trivial part: copying a live
+database file isn't a backup, so a dump step has to come before any file
+copy. Shape chosen: the dashboard orchestrates consistent dumps; the engine
+does transport and retention; the small dashboard archive stays as is.
 
-So the dashboard's own state is genuinely covered. The gap is elsewhere, and it
-is total.
+**§67** (uncited) — destinations chosen in the dashboard, in two families:
+mounted (disk/SMB/NFS as one templated Docker volume; SMB `vers=3.0` and
+`uid/gid` defaults, because the failures otherwise read as wrong
+credentials) versus engine-native (Google Drive). The test *writes* through
+a throwaway volume, since creating one proves nothing. Guard-rails reject
+disk paths under `/home`, `/root` and `/var/lib/docker`, and commas in
+mount credentials. **§68** (uncited) — saving must also *apply*: write the
+env, `down`, **remove the named volume** (Docker never recreates a changed
+one, so the container would silently keep the old destination), `up`. The
+dashboard owns the job, with a generated encryption passphrase kept in
+settings (losing it makes every backup unreadable) and no engine-side
+schedule.
 
-### 66.2 The gap
+**§70** — consistent dumps, cited by `backupScheduler.ts`. Server DBs are
+declared (`backup: { engine, service }`), with credentials read from the
+running container; SQLite is **discovered by file header**, not extension
+(BoltDB, H2 and shelve files also end in `.db`). Found by running, not
+reasoning: `docker exec` is blocked by the socket proxy (by design; dumps run
+as throwaway containers on the app's network instead), `pg_dump` must come
+from the **same image** as the DB (Postgres 14/15/16 side by side), and s6
+entrypoints *hang* on an argument (so `--entrypoint` the client). Dumps
+write to `.part` and rename on success, so a failing dump keeps the last
+good one. `pg_dump --clean --if-exists`, `mysqldump --single-transaction`,
+SQLite `.backup`. Order in a run: archive → prune → **dump → engine**;
+engine first would archive the previous dump. Live DB dirs and WAL/SHM
+files are excluded from the file backup.
 
-`createBackupArchive()` writes exactly three things — `database.sql`,
-`settings.json`, `users.json` — and **never touches `apps/`**. Nothing under
-any app's `data/` is in a backup:
+**§71** (uncited) — status after §70, and three recurring themes: state
+written once outside the repo drifts; a read before the write that decides
+it; verify by running. **§72**, **§73** (uncited) — the first real runs failed.
+Google Drive AuthIDs only work from Duplicati's *legacy* OAuth handler; a
+colon in the AuthID was being URL-encoded away; and an engine-side schedule
+had crept back in. Lesson: when a component blames something else, test
+that claim directly (one `curl` per service would have saved three code
+changes).
 
-| Not backed up | Size |
-|---|---|
-| Nextcloud (files + Postgres) | 935 MB |
-| ITFlow (client documentation, tickets, billing) | 348 MB |
-| Nginx Proxy Manager (hosts, certificates) | 207 MB |
-| BookStack | 164 MB |
-| NetBird (`store.db` **and** the key that decrypts it) | 71 MB |
-| Immich, Paperless, Vaultwarden, Authelia, the rest | — |
-| **`apps/` total** | **1.8 GB** |
+**§74** — destinations became *provable*: ask the engine
+(`remoteoperation/test`, the same path a backup uses) rather than declining
+to verify. Create a missing remote folder only on an exact
+`missing-folder`. **§74.5** — every Drive backup had failed because
+`oauth-url` was built by appending `/refresh` to a URL that already had a
+query string (405). Split into login and refresh constants. It stayed
+hidden behind a code comment wrongly asserting the option was ignored:
+**verify a claim before writing it down as a comment**. **§74.6** — no
+on-demand "Back up now" existed; any such button must run the dump-first
+path (`runAppDataBackup`), never the bare engine trigger, or each manual
+backup archives the previous dump. (Built later; the constraint still
+holds.) First backup completed and the **first restore proven** (a
+sha-identical SQLite, `integrity_check ok`, real rows); 0 of 527 live-DB
+files in the archive.
 
-Vaultwarden's vault and Authelia's user database are in there. So is every
-generated secret in `apps/*/.env`.
+**§75** — the close-out plan for the backup scope. **§75.1** — measure
+first: had the unattended schedule ever produced a version? (Answered by
+§86: no.) **§75.2** — make backup state visible in the dashboard (closed in
+§102). **§75.3** — the engine's restore API returned OK and wrote nothing,
+worse than failing; don't wire a button to an unproven restore. Closed by
+removal along with Duplicati. **§75.4** — BoltDB/H2 apps have no consistent
+dump (closed as documented accepted risk in §106). **§75.6** — carry-over
+list at the time (VPS fresh-setup test, MeshCentral, n8n workflows, the
+signal-port coupling, the `mailEnvKeys` retrofit); each tracked or closed
+separately since. **§75.7** — the thread through it all, cited by CLAUDE.md:
+three times a component's account of itself was wrong and testing the
+behaviour was right (the OAuth error, a comment, job detail saying
+`Sources: null` mid-run). **The record of what was tried and rejected is the
+part that keeps turning out to matter.**
 
-**Duplicati is running, has `apps/` mounted read-only at `/source/apps`, and
-has zero backup jobs configured.** The plumbing was put in (§0.1 item 2); the
-job never was. So the capability exists and does nothing — arguably worse than
-not having it, because the app's presence implies coverage.
+**§79** (uncited) — retention was only applied when a backup was *made*,
+so lowering "keep last" deleted nothing, and an archive from any other route
+lived forever. Now pruned on save and on every hourly check, and
+`pruneOldBackups` no longer reports a failed unlink as deleted.
 
-### 66.3 The part that makes this non-trivial
+**§86** — §75.1's measurement: still one version. The scheduler had fired;
+the engine handoff got a 401. **§86.1** — that 401 couldn't be reproduced
+and wasn't chased, since the engine was being replaced. **§86.2** — the
+engine-independent defect, cited by the scheduler, backup code and the
+Backups page: the run was **stamped before the part that matters**, so a
+run whose app data never left the host looked successful from every angle
+(fixed in §90). **§86.3** — the SQL dumps went stale on that run for
+exactly the apps with a separate DB container (investigated in §88).
 
-**Copying a live database file is not a backup.** Right now
-`apps/*/data` contains active WAL files (`kuma.db-wal`, `vaultwarden
-db.sqlite3-wal`, `vikunja.db-wal`, …) and six running Postgres containers. A
-file-level copy taken mid-write can restore to a corrupt or torn state, and
-nothing will tell you until you try to use it.
+**§88** — not 9 apps but one code path: all eight server-DB dumps failed
+while every SQLite one succeeded, and it wasn't reproducible the next day.
+A lead (an exposure provision 2m41s earlier; `--network` is what separates
+the two paths) stays a lead. **§88.4** — the actual defect: the audit row
+kept only a count, and backend logs died with the container, so the failure
+couldn't be diagnosed afterwards. **§88.5** — built: per-app `failures:
+[{app, kind, detail}]` on the audit row (capped at 25, true count kept), and
+a row even on the no-password early return. **§88.6** — two databases
+nobody dumped (Guacamole's Postgres, OnlyOffice's bundled one).
+**§89** (uncited) closed Guacamole and made it a registry-wide test: any
+compose file running a DB image must declare `backup:`, and a declared
+`backup.service` must exist, because a typo would report "not running —
+skipped", i.e. green. Backend logs moved to a named volume, rotated at
+5 MB.
 
-So a correct backup needs a **dump step before the file copy**:
-
-- **Postgres containers** (6) — `pg_dump` inside the container to
-  `apps/<app>/data/_dump/`.
-- **MariaDB/MySQL** (3) — `mariadb-dump` / `mysqldump` the same way.
-- **SQLite** (14) — `sqlite3 .backup`, which is safe against a live writer;
-  a plain `cp` is not.
-- **BoltDB / H2** (4) — portainer, file-browser, stirling-pdf, celerybeat.
-  No standard online dump; these likely need the container stopped, or accept
-  a best-effort copy and document the caveat honestly.
-
-Only then is a file-level backup of `apps/` meaningful.
-
-### 66.4 Proposed shape
-
-Split by what each tool is good at:
-
-1. **The dashboard orchestrates consistency.** A "prepare app backups" step
-   that walks the registry, and for each app with a known database runs the
-   right dump into `apps/<app>/data/_dump/`. This is a natural fit for the
-   existing service registry — a `backup:` block per service saying which
-   engine and container, in the same spirit as `exposureEnvKeys`.
-2. **Duplicati does transport and retention.** It already has `apps/` mounted
-   and is built for incremental, deduplicated, encrypted, versioned backups to
-   a remote. At 1.8 GB growing (Immich and Nextcloud dominate), tarballs in the
-   dashboard's own archive are the wrong tool — that archive is ~135 KB and
-   meant for config.
-3. **The dashboard's existing backup stays as it is.** It covers the dashboard,
-   it is small, and it is the thing you need to rebuild the control plane.
-
-### 66.5 Open questions
-
-- **Where do backups go?** Duplicati needs a destination — another disk, a NAS,
-  S3/B2, or a remote over NetBird. Nothing is configured, and a backup that
-  never leaves the host does not survive the failure that matters most.
-- **Circularity**: Duplicati's own config lives in `apps/duplicati/data`.
-  Backing it up with itself is fine for file loss but useless if Duplicati is
-  what is lost — its config should also land in the dashboard's small archive.
-- Should the dump step be **automatic before every Duplicati run**, or a
-  scheduled dashboard job? The first is more correct; the second is simpler.
-- **BoltDB/H2 apps**: stop-to-back-up, or document as best-effort?
-- Retention and encryption policy — Duplicati supports both, neither is chosen.
-
-**Priority**: this is the highest-value outstanding work in the project.
-Everything else built recently is recoverable by re-running `start.sh`; the
-data is not.
-
-## 67. Backup destination, chosen in the dashboard
-
-Answers §66.5's open question — where backups go — with the user's requirement:
-another disk, a NAS, a network drive, or Google Drive, all selectable in the UI.
-
-### 67.1 Two families, and the difference is structural
-
-| Family | Kinds | How it works |
-|---|---|---|
-| **Mounted** | disk, SMB, NFS | The kernel mounts it; Duplicati just sees a directory. Testable here. |
-| **Duplicati backend** | Google Drive | No kernel filesystem exists for it. Duplicati speaks the API itself via a target URL. Nothing to mount. |
-
-Google Drive was added on request *after* the mounted design was built, and it
-does not fit it — which is why it became a second family rather than a fourth
-option. `toMountSpec()` **throws** for a backend kind rather than returning a
-plausible-looking spec: a volume built from one would be accepted by Docker and
-fail only when a backup ran.
-
-### 67.2 One volume shape serves all three mounted kinds
-
-Docker's local driver takes the same three options regardless of protocol,
-verified before building on it:
-
-```
-disk  type=none  o=bind                    device=/mnt/backups
-nfs   type=nfs   o=addr=10.0.0.5,rw        device=:/volume1/backup
-smb   type=cifs  o=username=…,vers=3.0,…   device=//10.0.0.5/backup
-```
-
-So `apps/duplicati/docker-compose.yml` needs **one** templated volume driven by
-three env vars, not a branch per protocol. The old `./data/backups:/backups`
-bind — same disk as the data — is now the fallback default, documented as
-protecting against a deleted file and nothing else.
-
-Two defaults that prevent common, badly-reported failures:
-
-- **`vers=3.0` for SMB.** SMB1 is disabled by default everywhere now; omitting
-  a version makes the kernel negotiate down and fail with a bare "permission
-  denied" that reads exactly like wrong credentials.
-- **`uid=1000,gid=1000`.** Without them the share mounts and Duplicati cannot
-  write to it.
-
-Both are skipped if the user supplied their own, so the escape hatch still wins.
-
-### 67.3 The test actually mounts and writes
-
-`POST /settings/backup-target/test` creates a throwaway volume with the real
-options, runs a container that writes and deletes a probe file, then removes
-the volume. Creating the volume proves nothing on its own — Docker accepts the
-options without touching the network and mounts lazily — so **the write is the
-test**.
-
-Kernel mount errors are terse and routinely misread, so failures are translated:
-"permission denied" on SMB suggests credentials, on NFS suggests the export is
-not shared to this host; "invalid argument" suggests an SMB version mismatch.
-
-For Google Drive the endpoint returns **success with an explicit caveat** rather
-than a green tick that proves nothing: Duplicati reaches it directly, so this
-dashboard cannot verify it, and the UI says to use Duplicati's own
-"Test connection" on the job.
-
-### 67.4 Guard-rails
-
-- A `disk` path under `/home`, `/root` or `/var/lib/docker` is **rejected** —
-  it dies with the machine, defeating the point.
-- A comma in a username or password is rejected: mount options are
-  comma-separated, so it would silently corrupt the mount rather than fail.
-- Passwords and the Google AuthID are write-only in the API — reads report only
-  whether they are set.
-
-Twelve tests over the mount specs, the target URL, family separation and the
-guard-rails. **160/160.** Verified live end to end: a real bind destination
-created a volume, mounted it, wrote through it and cleaned up.
-
-### 67.5 Still to do
-
-This chooses *where*. §66's dump orchestration — making the app databases
-consistent before they are copied — is still open, and remains the more
-important half. A destination without consistent dumps still backs up torn
-SQLite and live Postgres files.
+**§90** — §86.2 fixed: `recordBackupScheduleRun(outcome)` writes
+`last_run_at` (attempted, drives cadence), `last_outcome`,
+`last_success_at` (the value worth alarming on) and
+`consecutive_failures`. A run counts as successful when app data reached
+the engine; a run where nothing dumped fails. Failures retry hourly for
+`MAX_FAST_RETRIES` = 3, then fall back to the cadence (retrying forever on
+success-only stamping would be a treadmill). **§90.3** — the Backups page
+showed the tick, not the outcome; it now shows the outcome, turns red, and
+says "Last working backup: …" or "No scheduled backup has ever succeeded".
+(§509 later moved the *claim* of a run to before the work, so a crash counts
+as one failure; success is still stamped only at the end.)
 
 ## 69. VPN broke — the port renumbering silently killed signal
 
@@ -4309,687 +4257,6 @@ hostname. Neither is built.
 that is not the repo and not Docker has no mechanism keeping it true. That is
 now three for three — the cloudflared drop-in (§17.2/§46.10), the Authelia
 snippet (§59.3), and this.
-
-## 68. Saving a destination now applies it, and the dashboard owns the Duplicati job
-
-Two gaps found by the user asking the obvious question — *"if Duplicati needs a
-restart after saving, shouldn't saving restart it?"* Yes, and it was worse than
-that.
-
-### 68.1 The destination was saved but never applied
-
-`PUT /settings/backup-target` wrote the choice to the settings table and
-stopped. But `apps/duplicati/docker-compose.yml` reads
-`BACKUP_MOUNT_TYPE/OPTIONS/DEVICE` from that app's **`.env`**, and nothing wrote
-them — so the compose file was reading variables nobody set, and the UI happily
-reported a destination that had no effect whatsoever.
-
-### 68.2 …and a restart alone would not have fixed it
-
-The more subtle half: **Docker does not recreate a named volume whose
-definition changed.** `docker compose restart`, or even `up -d
---force-recreate`, reuses the existing volume. The container would come back
-still mounted at the *previous* destination while every UI surface said
-otherwise — confidently wrong, and only discoverable by inspecting the volume.
-
-So applying a destination is a three-step sequence, and the middle step is the
-one that is easy to omit:
-
-1. write the mount vars into `apps/duplicati/.env`
-2. `docker compose down` — a volume in use cannot be removed
-3. `docker volume rm duplicati_backup-target`
-4. `docker compose up -d`
-
-Removing the volume never touches the data: for bind, NFS and SMB volumes the
-contents live on the target, not in Docker.
-
-Verified live against the user's real Google Drive configuration —
-`applied: true, restarted: true`, Duplicati back up, and the `.env` now carries
-the values.
-
-### 68.3 The dashboard now creates the backup job
-
-The old response ended with *"Set it as the target in your Duplicati backup
-job"* — telling the user to go and rebuild, by hand, in another UI, a decision
-they had just made in this one. That is the §0 principle 2 problem exactly.
-
-Duplicati's API turned out to be straightforward, confirmed by experiment
-before writing any code: `POST /api/v1/auth/login` with the password the
-dashboard itself generated returns a JWT, and `POST /api/v1/backups` accepts a
-job. A throwaway job was created and deleted to learn the payload shape rather
-than guessing it.
-
-`services/duplicatiClient.ts` now creates or updates one job the dashboard
-owns, with the destination it was told about — `file:///backups` for a mounted
-kind, the `googledrive://…?authid=…` URL for a backend one.
-
-Three decisions worth keeping:
-
-- **A generated encryption passphrase, stored in settings.** Duplicati backups
-  cannot be restored without it, so losing it makes every backup permanently
-  unreadable — worse than no backup, because it looks like it is working. It is
-  generated once, survives a Duplicati rebuild, and is returned to the UI so it
-  can be recorded off-box.
-- **Created with no schedule.** A job that starts uploading 1.8 GB the instant
-  it is defined is a surprise; the first run should be the user's choice.
-- **Retention `7D:1D,4W:1W,12M:1M`** — daily for a week, weekly for a month,
-  monthly for a year, rather than keeping everything.
-
-### 68.4 Still open
-
-§66's dump orchestration. The job now exists and points somewhere real, but it
-still copies **live** database files — six running Postgres containers and
-fourteen SQLite stores with active WAL files. That is next.
-
-## 70. App database dumps — making the file backup meaningful
-
-Implements §66. A file-level backup of `apps/` was copying six live Postgres
-containers, three MariaDB/MySQL, and fourteen SQLite files with open
-write-ahead logs. Every database is now dumped to `apps/<app>/data/_dump/`
-first, so the file backup captures a consistent snapshot.
-
-### 70.1 Two ways of finding databases, deliberately different
-
-**Server databases are declared**, but only barely: `backup: { engine,
-service }` on the service. Credentials are **not** declared — they are read
-from the running container with `docker inspect`, so a password rotated in the
-dashboard cannot leave a stale copy in the registry.
-
-**SQLite is discovered, not declared.** Fourteen apps embed one, several in
-paths nobody would think to list, and scanning by **file header** rather than
-extension matters: portainer and file-browser use BoltDB, stirling-pdf uses
-H2, and paperless has a Python shelve — all with a `.db` extension.
-Snapshotting those with `sqlite3` would produce garbage that still looks like
-a successful backup.
-
-### 70.2 Three failures found by running it, not by reasoning
-
-**`docker exec` is blocked, and correctly so.** Every server dump failed with
-`unable to upgrade to tcp, received 403`. The backend reaches Docker through
-`docker-socket-proxy`, whose allowlist has `CONTAINERS`, `POST` and
-`ALLOW_START` but deliberately **not** `EXEC` — exec is arbitrary code
-execution in another container. The fix was *not* to widen the allowlist:
-dumps now run as a throwaway container on the app's own network, which the
-proxy already permits and which does the same job. Trading a real security
-boundary for convenience would have been the easy wrong answer.
-
-**Client and server versions must match.** This stack runs Postgres 14, 15 and
-16 side by side, and `pg_dump` refuses to dump a newer server. So the dump runs
-from the **same image as the database container**, read from `docker inspect`.
-
-**An init system swallowed the command.** With the right image chosen,
-bookstack still hung forever. `lscr.io/linuxserver/mariadb` has `/init` (s6) as
-its entrypoint, which starts services and never runs the argument — so the dump
-did not fail, it *hung*, which is worse. Now every dump passes
-`--entrypoint pg_dump` / `--entrypoint mysqldump`, running the binary directly
-whatever the image wraps it in.
-
-### 70.3 Details that matter on restore day
-
-- **Dumps are written to `.part` and renamed on success.** Writing straight to
-  the final path would destroy the last good dump the moment dumping starts
-  failing — a broken database would quietly take the backup with it.
-- **`pg_dump --clean --if-exists`** so a dump replays over an existing database
-  instead of erroring on every object.
-- **`mysqldump --single-transaction`** for a consistent snapshot without
-  locking the app out for the duration.
-- **A stopped app is skipped, not failed.** Otherwise one app being off would
-  report the whole backup as failed.
-- **SQLite uses `.backup`**, safe against a live writer; a plain copy can catch
-  a partial transaction and misses the WAL entirely.
-
-### 70.4 The Duplicati job now excludes what it should
-
-`data/db/`, `data/pgdata/`, and `*-wal` / `*-shm` are filtered out. Their
-contents are already in the dumps, consistently — and excluding them stops the
-same data being stored twice (203 MB for NPM's MySQL alone) while removing
-files that cannot be safely restored anyway.
-
-### 70.5 Verified live
-
-7 of 8 server databases dumping (immich 50 MB, nextcloud 884 KB, paperless
-448 KB, n8n 444 KB, nocodb 332 KB, NPM 108 KB, itflow 4 KB) plus 22 SQLite
-snapshots, all with a valid `SQLite format 3` header.
-
-Five tests on discovery: header detection, rejecting non-SQLite `.db` files,
-never re-snapshotting its own output, ignoring unregistered directories, and
-surviving an unreadable directory rather than aborting the scan. **165/165.**
-
-### 70.6 Wired into the schedule
-
-The scheduled run now does, in order:
-
-1. the dashboard's own archive (control plane) — unchanged
-2. prune old archives — unchanged
-3. **dump every app database** (§70.1)
-4. **trigger the Duplicati job**
-
-**The order is the point.** Running Duplicati first would archive the
-*previous* dump, quietly making every backup a cycle stale — the kind of fault
-nobody notices until a restore is short by a day.
-
-Three failure choices, all in the same direction — a partial backup beats none:
-
-- Dump failures are logged and the run continues; the dumps that succeeded are
-  still worth backing up, and a stopped app already counts as a success.
-- No Duplicati password (the app has never been started) skips the app-data
-  half rather than erroring.
-- The whole app-data step is wrapped so it cannot fail the dashboard archive
-  that already succeeded.
-
-## 71. Next session — where things stand and what to pick up
-
-### 71.1 What backups look like now, end to end
-
-| Piece | Status |
-|---|---|
-| Choose destination (disk / SMB / NFS / Google Drive) | dashboard, applied on save |
-| Destination actually mounted | automatic — env written, volume removed, Duplicati recreated |
-| Duplicati job created and owned by the dashboard | automatic |
-| Databases dumped consistently before backup | automatic, 8 servers + 22 SQLite |
-| Scheduled: archive → prune → dump → Duplicati run | automatic |
-| Live DB files excluded from the file backup | automatic |
-
-**One thing the user must do by hand, and it matters more than anything else
-here:** record the backup encryption passphrase somewhere off this machine. It
-is shown after provisioning the job. Duplicati backups **cannot be restored
-without it** — losing it makes every backup permanently unreadable while
-continuing to look healthy.
-
-### 71.2 The obvious next step: prove a restore
-
-Everything above is untested in the only way that counts. A backup nobody has
-restored from is a hypothesis. Worth doing deliberately:
-
-- restore one `_dump/*.sql` into a scratch database and confirm the data is
-  there;
-- restore a `_dump/*.sqlite` snapshot and open it;
-- run a Duplicati restore of a single file to a temp path.
-
-That is a session's work on its own and is the highest-value thing left.
-
-### 71.3 Other open items, in rough priority
-
-1. **Fresh-setup test on the VPS** (§61.5) — `start.sh` gained a great deal
-   this session and only the port allocator has been exercised on a clean tree.
-   Prompts, cloudflared install, tunnel creation from nothing and Tailscale
-   joining a fresh tailnet are all untested.
-2. **MeshCentral** (§62.2) — planned, not built. Expect a live session for the
-   agent certificate; also decide whether Authelia in front breaks agent
-   enrolment.
-3. **n8n pre-built workflows** (§64) — settle first whether several of those
-   are really dashboard features rather than automations.
-4. **Signal-port coupling** (§69) — changing NetBird's signal port from the
-   dashboard still silently breaks Tailscale Funnel. Either re-assert Funnel on
-   config change, or add a health check that probes the Funnel hostname.
-5. **Retrofit `mailEnvKeys`** to Uptime Kuma, n8n, BookStack, Paperless,
-   Vikunja — Vaultwarden is wired and proves the mechanism (§63.4).
-6. **BoltDB/H2 apps have no consistent backup** — portainer, file-browser,
-   stirling-pdf are copied live with no dump equivalent. Either stop them
-   briefly during backup or document it as best-effort.
-
-### 71.4 Themes worth carrying forward
-
-Three things went wrong repeatedly this session, and all three are the same
-shape:
-
-- **State written once into something that is neither the repo nor Docker has
-  nothing keeping it true.** The cloudflared drop-in, the Authelia snippet, and
-  Tailscale Funnel's target all drifted (§69). Anything written by a one-off
-  command needs re-asserting on every run.
-- **A read that happens before the write that determines it.** Two ordering
-  bugs in `start.sh` (§61) and one in the port allocator's own fix. Invisible on
-  a host where the values already exist; only a fresh tree surfaces them.
-- **Verify by running, not by reasoning.** `docker exec` blocked by the socket
-  proxy, `pg_dump` version mismatches, and an s6 entrypoint that *hangs* rather
-  than failing were all found by executing the thing (§70.2). None would have
-  been predicted from reading.
-
-## 72. First real backup run — failed, and that is the point of running it
-
-Triggered the first backup to Google Drive. All 30 databases dumped cleanly
-(`DUMPS ok=30 failed=0`), Duplicati started, and then:
-
-```
-Failed to authorize using the OAuth service: No such key.
- ---> HttpRequestException: 404 (Not Found)
-```
-
-Zero files, zero bytes uploaded. Two separate faults, one of them mine.
-
-### 72.1 The AuthID is not valid for this Duplicati
-
-Duplicati's own error names the handler it validates against:
-`duplicati-oauth-handler.appspot.com?type=googledrive`. The dashboard was
-linking `oauth-service.duplicati.com` instead — a *different* service. A token
-minted there is accepted by the form, stored happily, and fails only at backup
-time with a 404 from the OAuth lookup, which reads like a network problem
-rather than a wrong token.
-
-Corrected the link, and the UI now says explicitly that the token must come
-from that page. **The user must generate a new AuthID** — the stored one cannot
-be made to work.
-
-This is precisely the gap §67.3 flagged: the dashboard cannot verify a
-Google Drive destination, so the first real run is the test. It found the
-problem on the first attempt.
-
-### 72.2 The job carried a broken schedule — my bug
-
-Duplicati's scheduler was logging, every cycle:
-
-```
-Unable to find a valid date, given the start date 1/1/0001 12:36:00 AM,
-the repetition interval 1D
-```
-
-The job was created with `{Repeat: '1D'}` and no start time, which Duplicati
-cannot turn into a next-run date.
-
-The fix is not to add a start time — it is to **remove the Duplicati-side
-schedule entirely**. The dashboard's own scheduler already drives this job, and
-the order is load-bearing: dump every database, *then* run Duplicati. A
-schedule inside Duplicati fires independently of that, backing up whatever
-dumps happen to be lying around — silently archiving stale data while
-reporting success. §68.3 said the job should be created without a schedule;
-the route then passed a frequency through and reintroduced one.
-
-`provisionBackupJob` now never sets a Duplicati schedule. The frequency
-argument is kept for reporting intent, not delegated.
-
-### 72.3 What the run did prove
-
-Not nothing — the parts before the upload all worked:
-
-- 8 server dumps + 22 SQLite snapshots, no failures
-- the dashboard triggered Duplicati through its API and the job started
-- `/source/apps` is visible inside the container (36 apps, 2.5 GB)
-- the failure surfaced immediately and precisely, rather than silently
-
-### 72.4 Next
-
-1. User generates a fresh AuthID from the corrected link and saves it.
-2. Re-run "Create / update backup job" (removes the broken schedule) and
-   trigger again.
-3. Then the actual objective: **restore something**. Nothing has yet proven the
-   passphrase, the archive format, or that a dump can be replayed.
-
-## 73. Google Drive OAuth — four failed runs, and what they actually proved
-
-The first real backup failed four times. Worth recording in full, because the
-error message was actively misleading and I acted on it three times before
-testing it.
-
-### 73.1 The error, and why it misleads
-
-```
-Failed to authorize using the OAuth service: No such key.
-If the problem persists, try generating a new authid token from:
-https://duplicati-oauth-handler.appspot.com?type=googledrive
- ---> HttpRequestException: 404 (Not Found)
-```
-
-It reads as "your token is expired or wrong". It is not. The token is fine;
-Duplicati is asking a service that has never heard of it.
-
-### 73.2 What was established, by testing rather than reading
-
-Querying **one AuthID against both services directly** settled it in a single
-command — which is what should have happened after the first failure:
-
-| Service | Result |
-|---|---|
-| `duplicati-oauth-handler.appspot.com/refresh` (legacy — what Duplicati asks) | `404 {"error":"No such key"}` |
-| `oauth-service.duplicati.com/refresh` (current — what the website offers) | `200 {"access_token": …}` |
-
-The token exists, in the newer service. Duplicati 2.3.0.4 only consults the
-legacy one. **Setting the job's `oauth-url` to the newer service does not
-help** — verified: the option is stored on the job and the failure still names
-the appspot handler, so this build's Google Drive backend ignores it.
-
-**Conclusion: the AuthID must be generated from the legacy handler**, because
-that is the only service this Duplicati will look in.
-
-### 73.3 One real bug found on the way
-
-`toDuplicatiUrl` ran the AuthID through `encodeURIComponent`, turning the colon
-Duplicati AuthIDs contain into `%3A`. That would have produced the *same*
-"No such key" error independently. Fixed — the AuthID is inserted raw, and
-characters that genuinely would break the URL (`&`, `#`, `?`, whitespace) are
-rejected at save time instead. Regression test asserts the colon survives.
-
-Worth noting this made diagnosis harder: two independent causes producing one
-identical error message.
-
-### 73.4 What I got wrong, in order
-
-1. Blamed the user's token and had them regenerate one that was never broken.
-2. "Corrected" the UI link to the legacy handler — which was *right*, on wrong
-   reasoning.
-3. Reverted that to the newer service after the token test — which was *wrong*,
-   because the test showed where the token lived, not where Duplicati looks.
-4. Added `oauth-url` expecting it to bridge the two. It is ignored.
-
-The link is now back on the legacy handler, this time with the evidence
-recorded next to it so it does not get "fixed" again, and the UI explains why
-it must not be the newer service the Duplicati website offers.
-
-**The lesson, and it generalises:** when a component reports a fault in
-something else — a credential, a network, another service — test that claim
-directly before acting on it. One `curl` against each service would have
-replaced three code changes and a needless token regeneration.
-
-### 73.5 Still not proven
-
-No backup has completed. Nothing has been uploaded, nothing restored. The
-dumps, the trigger path and the source mount all work; the destination does
-not, pending an AuthID from the legacy handler.
-
-## 74. Destinations can now be proven, including Google Drive
-
-§67.3 shipped a "Test destination" button that worked for disk/SMB/NFS and
-returned an honest "cannot verify this from here" for Google Drive. §73 is what
-that costs: four failed backup runs, several wrong diagnoses, and a needlessly
-regenerated token — all to discover something a working test would have said in
-seconds.
-
-### 74.1 The test that was available all along
-
-Duplicati exposes `POST /api/v1/remoteoperation/test` with `{"path": "<target
-url>"}`. It lists the destination's contents **using the same code path a
-backup uses**, so its verdict is authoritative rather than indicative.
-
-Against the current (bad) credential it returns, in about a second, the exact
-error the four backup runs took minutes each to produce:
-
-```
-Error listing content: Failed to authorize using the OAuth service: No such key.
-```
-
-Two details that made this non-obvious:
-
-- The payload key is `path`, not `url`. A wrong key returns a bare `400` with
-  no hint.
-- The URL must be built from **our own settings**, not read back from the saved
-  job. Duplicati masks secrets in the job it returns, and testing that value
-  fails with `Unmasked URL contains password placeholder` — which reads like a
-  bug in the caller rather than "you were handed a redacted value".
-
-### 74.2 What changed
-
-- `testDestinationUrl()` in `duplicatiClient.ts`, which strips Duplicati's
-  machine-readable prefix and surfaces the half after `user-information:`.
-- The test endpoint now branches by family: mounted kinds keep the container
-  mount-and-write probe (which works even when Duplicati is stopped), backend
-  kinds go through Duplicati.
-- The **Test destination** button is no longer hidden for Google Drive, and the
-  note beside it now says a pass means a backup will connect — because it does.
-
-### 74.3 The general lesson
-
-The earlier version was *honest* about not being able to verify — and honesty
-about a gap is not the same as closing it. "We can't check this" left the only
-feedback path a full backup run, which is slow, and whose failure message
-pointed at the wrong thing.
-
-**Where a component owns a capability the dashboard lacks, ask that component
-rather than declining to answer.** Duplicati could always test its own
-destinations; nothing was needed except calling it.
-
-### 74.4 Test destination now creates a missing folder
-
-User's call, and correct: if the only thing wrong is that the folder does not
-exist, reporting a failure the user cannot act on from the dashboard is not
-useful — creating it is the only thing they would do next.
-
-Hit this immediately after the credential started working: the destination went
-from `No such key` (auth) to `missing-folder`, a completely different and much
-better failure. Duplicati does not create the folder itself, and a backup
-against a missing one fails with a bare `missing-folder` — which, following an
-auth error of similar shape, reads like another credential fault.
-
-Both **Test destination** and job provisioning now create it. Two constraints:
-
-- **Only when the destination reports exactly `missing-folder`.** Any other
-  failure is reported untouched. Creating blindly would paper over precisely
-  the credential and connectivity faults that took four runs to diagnose.
-- **Local disk paths are left alone.** A typo'd path would silently create a
-  stray directory somewhere on the filesystem; a remote folder is namespaced
-  inside the destination, so the risk is not comparable.
-
-Verified end to end against a folder that did not exist:
-`missing-folder` → `created the destination folder` → `connected and listed its
-contents`.
-
-### 74.5 The Google Drive backup was broken by a malformed `oauth-url` — mine
-
-Every backup to Google Drive had failed. No backup had **ever** completed:
-`last started: never`, `versions: -`. The errors mutated across runs, which is
-what made this expensive — `No such key`, then `403 Forbidden`, then
-`TimeoutException` inside `GoogleDrive.GetFolderIdAsync`. Each one points
-somewhere plausible and wrong: expired token, revoked permission, bad network.
-
-Ruled out by direct test rather than inference, which is the only reason this
-got found:
-
-| Hypothesis | Test | Result |
-|---|---|---|
-| Credential dead | refresh AuthID at the handler | 200, access token |
-| Scope too narrow | `tokeninfo` on the access token | `drive.file` — sufficient |
-| Drive full | `about?fields=storageQuota` | 96 GB free |
-| Cannot write | multipart upload to the folder | **HTTP 200** |
-| Ambiguous folder | search folders by name | exactly one |
-| Container egress | curl googleapis *inside* the container | HTTP 200, 0.36s |
-
-Everything the failure blamed was healthy. The job itself held the fault:
-
-    oauth-url = https://duplicati-oauth-handler.appspot.com/?type=googledrive/refresh
-
-Built by appending `/refresh` to a constant that already ended in a query
-string. The resulting path is `/`, the query is `type=googledrive/refresh`, and
-that address answers **405 Method Not Allowed** — verified against the correct
-`/refresh`, which answers 200 with a token. So every token refresh mid-backup
-failed, and the *downstream* symptoms were 403s and folder-resolution timeouts.
-
-The handler has two endpoints that are not interchangeable:
-
-- `/?type=googledrive` — the **login page**, for a human to get an AuthID
-- `/refresh` — the **refresh endpoint**, what the job's `oauth-url` must be
-
-One constant served both. Now split into `DUPLICATI_OAUTH_LOGIN_URL` and
-`DUPLICATI_OAUTH_REFRESH_URL`, used verbatim with no string surgery, plus three
-regression tests — one asserts the exact concatenation that caused this cannot
-produce the refresh URL.
-
-**Why it stayed hidden.** A comment I had written above that line asserted the
-build *ignored* `oauth-url` — so the value looked inert and went unread for
-several debugging rounds. It was never ignored. A note recording a conclusion as
-settled fact stopped the line being questioned; the note was the bug's cover.
-Reasserting §73's lesson, one level up: verify a claim before **writing it down
-as a comment**, because a wrong comment outlives the session that made it.
-
-After the fix, the first run ever to get past `PreBackupVerify`: uploading, with
-encrypted `.dblock`/`.dindex` files appearing in Drive.
-
-### 74.6 Gap: no on-demand "Back up now" in the dashboard
-
-Found while confirming dump ordering. `runBackupJobNow` has exactly one caller —
-`runAppDataBackup` in `backupScheduler.ts`, which dumps databases first, so no
-code path archives stale dumps. That guarantee is sound.
-
-But it also means the **only** way a backup starts is the scheduler. There is no
-endpoint behind a dashboard button, so a user who has just changed a destination
-cannot verify it end to end without waiting for the next scheduled run. Every
-run performed while debugging today went through the service layer directly,
-which a user cannot do.
-
-Not built — outside the destination-selection scope that was asked for. The
-implementation is small and the ordering constraint is the only subtlety: it
-must call `runAppDataBackup`, never `runBackupJobNow`, or it will archive the
-previous dump and quietly make each manual backup a generation stale.
-
-### 74.7 RESTORE PROVEN — §71.2 closed
-
-The first backup in this project's history completed, and the first restore
-succeeded. Until now the whole system was a hypothesis: `last started: never`.
-
-**Backup.** 15:39 → 17:13 (1h33m), 35,263 files, 1.228 GiB source → 593 MiB
-encrypted on Google Drive, 1 version.
-
-**Restore.** Via `duplicati-cli` inside the container — the same path a real
-recovery uses, not the server API:
-
-    Downloading dindex volumes, then 2 dblocks (~99 MiB)
-    Restored 1 (616.000 KiB) files to /tmp/restore-proof
-    Duration of restore: 00:00:56
-
-Verification of `vikunja.sqlite`, pulled from Drive and decrypted:
-
-| Check | Result |
-|---|---|
-| sha256 vs original | **identical** (`f3b7383f…b85f`) |
-| size | 630784 bytes, exact match |
-| `PRAGMA integrity_check` | `ok` |
-| tables | 38 |
-| `users` rows | 1 — real data, not an empty shell |
-
-**Exclusions verified by behaviour, not config.** 527 files live in `data/db/`
-directories on disk; **0** are in the backup. The live-database excludes work.
-Worth stating how this was checked: reading job detail *while the job ran*
-returned `Filters: null` **and** `Sources: null`, which looked alarming — but a
-job with null sources cannot be reading `/source/apps/...`, which it demonstrably
-was. Self-reported config was unreliable mid-run; the archive's own contents
-were not. Same lesson as §74.5, third instance: **test the behaviour, not the
-component's account of itself.**
-
-**Note on the server-API restore.** `POST /api/v1/backup/2/restore` returned
-`{"Status":"OK"}` and reached `Restore_Complete` having written **nothing**, with
-no error logged. A restore that reports success and silently produces no files is
-worse than one that fails. The CLI path works; the API call needs its parameter
-shape worked out before anything in the dashboard depends on it. Filed for next
-session — the original file was never touched (mtime and checksum unchanged), so
-nothing was damaged proving this.
-
-## 75. Next session (2026-09-02): close out the backup scope
-
-Today the backup system went from never having worked to backup + restore both
-proven (§74.5, §74.7). What remains is turning *"a backup can be made"* into
-*"backups are happening, visibly, for everything."*
-
-Ordered by what actually reduces risk, not by effort.
-
-### 75.1 FIRST, before touching code: did last night's scheduled run succeed?
-
-Every successful backup so far was triggered by hand. The scheduler fires — but
-its last run, `2026-08-31T19:37:31Z`, was during the broken period, so it has
-**never produced a working backup**. Schedule is `daily`, so a run was due
-around 19:37 on 2026-09-01.
-
-This is the single most informative thing available tomorrow and it costs one
-command. Run it before anything else, because the answer changes the priorities
-below:
-
-```
-docker exec homelab-management-backend-1 node -e "require('./dist/loadEnv');require('./dist/utils/database').query(\"SELECT key,value FROM settings WHERE key='backup_schedule_last_run_at'\").then(r=>{console.log(r.rows[0]);process.exit(0)})"
-```
-
-then confirm Duplicati agrees a *second* version exists (1 version = only the
-manual run; 2 = the schedule works unattended):
-
-```
-curl -sS -X POST http://localhost:10150/api/v1/auth/login -H 'Content-Type: application/json' --data "{\"Password\":\"$(grep -E '^DUPLICATI_WEB_PASSWORD=' apps/duplicati/.env | cut -d= -f2-)\"}"
-# then GET /api/v1/backups and read Metadata.BackupListCount
-```
-
-- **2 versions** → the schedule works. Close this item, move to 75.2.
-- **still 1** → the scheduler is the top priority, above everything else. A
-  backup system nobody triggers is not a backup system. Start at
-  `runScheduledBackupCheck` / `shouldRunScheduledBackup` in
-  `services/backupScheduler.ts`, and check the container was actually up at
-  19:37.
-
-### 75.2 Make backup state visible in the dashboard
-
-`grep` for last-run/status in `settings-panel.component.html` returns **zero
-matches**. There is no way to see whether backups are working without the CLI.
-
-This ranks second only because 75.1 might change what needs showing. It is the
-direct cause of how bad today got: the system failed silently for its entire
-existence, and nothing surfaced it. Fixing the failure without fixing the
-silence just means the next failure is discovered the same way.
-
-Minimum useful surface, all of it already available from
-`GET /api/v1/backups` → `Metadata`:
-
-- last run time and its outcome (success / failed / never)
-- version count and size on the destination
-- the destination it actually used, so a stale config is visible
-- an explicit **"never run"** state — not a blank, which reads as fine
-
-Backend already exposes most of this via `duplicatiClient`. The work is a route
-returning it plus a card in the settings panel.
-
-### 75.3 Fix the restore API, or remove it
-
-`POST /api/v1/backup/2/restore` returns `{"Status":"OK"}`, reaches
-`Restore_Complete`, writes **nothing**, and logs no error (§74.7). A restore that
-reports success and produces no files is worse than one that fails outright,
-because it will be believed.
-
-`duplicati-cli` restores correctly — proven today, byte-identical — so recovery
-is possible; only the API path is broken. Options, in order of preference:
-
-1. Work out the correct parameter shape (`paths` encoding and `time` format are
-   the suspects — the same call rejected `filter` without `time`, so this API is
-   picky about both) and add a test that asserts a file actually lands.
-2. Have the dashboard shell out to `duplicati-cli`, which is already proven.
-3. If neither is quick: make the endpoint fail loudly rather than return OK.
-
-Do **not** wire a restore button to this until a test proves bytes arrive.
-
-### 75.4 Three apps still have no consistent backup
-
-`portainer`, `file-browser`, `stirling-pdf` — BoltDB and H2, **0 dump files
-each** (verified). Their live database files are copied raw, which can restore
-corrupt. `findSqliteFiles` correctly refuses them by header (there is already a
-test asserting this), so they are not silently mis-snapshotted — they are simply
-uncovered.
-
-Either add a stop-copy-start snapshot for these three, or write the decision
-down in `docs/` as accepted risk with the reason. Both are fine; leaving it
-undecided is not.
-
-### 75.5 Lower priority, genuinely deferrable
-
-- **Prove a non-Drive destination.** `disk` / `SMB` / `NFS` are built and
-  unexercised. Lower risk than it looks: Drive is the destination that does not
-  die with the LAN, and it is the one that works.
-- **Prove a Postgres/MySQL restore.** Only SQLite has been round-tripped. The
-  SQL dumps restore via `psql`/`mysql` import — a different path, untested.
-- **"Back up now" button** (§74.6). Must call `runAppDataBackup`, never
-  `runBackupJobNow`, or it archives the previous dump and each manual backup is
-  a generation stale.
-- **`backup_target_folder` is empty**, falling back to the `homelab-backups`
-  default inside `toDuplicatiUrl`. Works, but the dashboard shows a blank field
-  for a folder that is actually in use. Populate it.
-- **Retention is unexercised** — `7D:1D,4W:1W,12M:1M` with only one version.
-  Exercises itself over time; nothing to do but check later.
-
-### 75.6 Carry-over from earlier sections, unchanged
-
-VPS fresh-setup test (§61.5), MeshCentral (§62.2), n8n pre-built workflows
-(§64), signal-port coupling still uncovered (§69), `mailEnvKeys` retrofit to
-Uptime Kuma / n8n / BookStack / Paperless / Vikunja.
-
-### 75.7 The thread running through today
-
-Three separate times, a component's account of itself was wrong and testing the
-behaviour was right: the OAuth error blamed the token (§73), a comment claimed
-`oauth-url` was ignored (§74.5), and job detail reported `Sources: null` for a
-job demonstrably reading those sources (§74.7). Each cost real time.
-
-Tomorrow's first action (75.1) is deliberately a measurement, not a change, for
-the same reason.
 
 ## 76. Home Assistant discovers nothing, because it was on a bridge
 
@@ -5286,64 +4553,6 @@ deliberately, because the ask was `~/`. Worth revisiting alongside whether
     mounts:  /home/mat -> /home/mat (rw=true)
     health:  running / healthy
     inside:  /home/mat/www/homelab-management visible, same path as the host
-
-## 79. Session Log — 2026-09-01: retention was a promise nothing kept
-
-Two things reported off the dashboard: the backup schedule controls sat bare on
-the page while every neighbouring block is a card, and the list showed **four**
-backups while the setting said *keep last 3*.
-
-### 79.1 Why the count disagreed with the setting
-
-Retention was only ever applied as a side effect of *making* a backup —
-`POST /api/backups/create` (when the schedule is enabled) and the scheduled run.
-Nothing enforced it at any other moment. So:
-
-- lowering *keep last* from 14 to 3 deleted nothing; the extra archives sat
-  there until the next backup happened to run, with the list contradicting the
-  number the user had just saved;
-- an archive that arrived by any other route stayed forever. That is exactly
-  what had happened here — `backup-2026-08-31T20-08-13-327Z.tar.gz` has **no
-  `backup_create` audit row**, so it was not made by either code path, and
-  nothing was ever going to remove it.
-
-The fix puts enforcement where the promise is made rather than where backups
-are created:
-
-- `PUT /api/backups/schedule` prunes after saving (when automatic backups are
-  on) and reports what it deleted, so the list matches the number immediately.
-- `runScheduledBackupCheck` prunes on **every** check, including the ones where
-  nothing is due — one hour is the worst-case lag for drift like the orphan
-  above, instead of forever.
-- `pruneOldBackups` no longer reports a file as deleted when its `unlink`
-  failed. It swallowed the error and returned the name anyway; now that callers
-  put that count in a toast, a lie there would be visible.
-
-The dashboard re-reads the backup list after saving the schedule — without it
-the pruned archives stay on screen until the next poll.
-
-### 79.2 Verified live
-
-Rebuilt and restarted `backend`/`frontend`. On boot the daily run was due, and
-pruned to exactly three:
-
-    "Pruned backups beyond the retention count"
-    deleted: [backup-2026-08-30…, backup-2026-08-29…]  retentionCount: 3
-
-The not-due branch is the new path, so it was proven separately: a backdated
-surplus archive was planted in `/app/backups` and the backend restarted with
-nothing due. It deleted the planted file, left the three real archives alone,
-and created no backup —
-
-    "Pruned backups beyond the retention count"
-    deleted: [backup-2026-08-01T00-00-00-000Z.tar.gz]  retentionCount: 3
-
-### 79.3 The card
-
-The schedule switch, frequency, *keep last* and **Save schedule** now live in a
-`card border-0 shadow-sm` with a *Schedule* heading and a line saying what
-retention does — matching the settings panel and the health block. The archive
-list stays outside it: it is the section's content, not one of its settings.
 
 ## 80. Session Log — 2026-09-01: dependencies, the running panel, and the start page
 
@@ -6562,109 +5771,6 @@ command's — the same shape of mistake that let a type error reach the user's
 build this morning, caught this time because the answer looked wrong. Redirect
 to a file, echo the real `$?`, then grep the file.
 
-## 86. §75.1 answered: the schedule has still never produced a version
-
-The measurement §75.1 asked for, run before touching anything, as instructed.
-
-**`BackupListCount = 1`.** Duplicati's only version is still
-`20260901T153928Z` — the manual run. So the answer is the second branch: the
-scheduler is the top priority, above the rest of §75.
-
-But the scheduler is not the part that is broken, and the failure is recorded:
-
-    2026-09-01T19:40:39Z | backup_create | app-data | failure |
-      "Duplicati rejected the password. It is the DUPLICATI_WEB_PASSWORD
-       in the app's configuration."
-      dumped: 18, failed: 8
-
-`backup_schedule_last_run_at` is `2026-09-01T19:40:27Z` — after the §74 fixes,
-not during the broken period as §75.1 assumed. The scheduler fired on time, the
-dashboard archive succeeded, 18 app databases dumped, and the handoff to
-Duplicati got a 401.
-
-### 86.1 The 401 is not reproducible, and was not worth chasing
-
-The same credential works now: a probe using the backend's own
-`readAppEnvValue('duplicati', 'DUPLICATI_WEB_PASSWORD')` and `/api/v1/auth/login`
-returns an access token. Nothing explains the difference from the evidence
-available —
-
-- `apps/duplicati/.env` has not been written since 2026-08-31T20:31, so the
-  password did not change between the working 15:39 run and the 19:40 failure.
-- The container was created 2026-09-01T15:23 (saving the destination recreates
-  it) and not recreated again until the 2026-09-02 restart, `RestartCount: 0`.
-- Duplicati's container log has no entry at all in the 19:30–19:50 window, and
-  logs nothing about authentication either way.
-
-The most likely story is that Duplicati's stored web password diverged from the
-env var while the container ran, and the 2026-09-02 restart re-applied
-`DUPLICATI__WEBSERVICE_PASSWORD` and healed it. That is a guess, and it was
-deliberately not pursued further: **Duplicati is scheduled for replacement by
-Kopia (§81.5)**. Spending the session on the auth behaviour of the engine that
-is leaving buys nothing that survives the swap.
-
-What matters is which findings are engine-independent. Two are.
-
-### 86.2 Engine-independent defect: the run is stamped before the part that matters
-
-`runScheduledBackupCheck` calls `setBackupScheduleLastRun` immediately after
-`createBackupArchive()`, and only then `runAppDataBackup()` — which never
-throws, by design, so that an app-data problem cannot lose the dashboard
-archive that already succeeded.
-
-The consequence is that 2026-09-01 looks like a successful scheduled run from
-every angle the system exposes. `backup_schedule_last_run_at` is set, the
-`backup_create` audit row for the archive says `success`, and
-`shouldRunScheduledBackup` will not try again for 24 hours — while the app data,
-which is the entire point, was never sent anywhere. A total failure of the
-app-data half is indistinguishable from success unless someone reads the
-*second* audit row.
-
-This is our code, not Duplicati's, and it carries over to Kopia unchanged. It
-also makes §75.2 (surface backup state) sharper: showing
-`backup_schedule_last_run_at` in the dashboard would have shown a green
-timestamp on the day nothing was backed up. The state worth surfacing is the
-app-data outcome, not the scheduler tick.
-
-### 86.3 Engine-independent finding: the SQL dumps went stale on the same run
-
-25 apps have a `data/_dump` directory. After the 19:40 run, 16 held dumps from
-19:40 and 9 still held dumps from the 14:54 manual run — matching the
-`failed: 8` in the audit metadata.
-
-The stale ones are not a random 9. They are disproportionately the apps with a
-**separate database container**: bookstack, immich, itflow, n8n, nextcloud,
-nginx-proxy-manager, nocodb, paperless, pihole. The apps that dumped fine at
-19:40 are mostly single-container SQLite ones. That points at the SQL-dump path
-(`docker exec` into the database container) rather than at anything Duplicati
-does, so it is a real, current, engine-independent gap: even a working Kopia
-snapshot taken tonight would archive a day-old dump for those nine apps.
-
-Not diagnosed here — it is a separate piece of work and now a TODO item.
-
-### 86.4 Observed in passing: a 5.3 GB WAL in Duplicati's own data
-
-`apps/duplicati/data/config/HQFQYTBBPZ.sqlite` is 184 KB with a **5,323,320,192
-byte** `-wal` beside it, untouched since 2026-09-01T17:15 — the end of the
-restore test. Two things follow. It is corroborating evidence that no backup
-operation has opened that database since 17:15, which is consistent with the
-19:40 run never reaching Duplicati. And it sits inside `apps/`, which is exactly
-the tree Duplicati is pointed at (`/source/apps`), so the engine is carrying its
-own uncheckpointed WAL as source data.
-
-### 86.5 What this does to the §75 ordering
-
-§75.1 said the answer reorders the list. It does:
-
-- **Fixing Duplicati's scheduler handoff is not worth doing.** It is one
-  unreproducible 401 in a component with a replacement already planned.
-- **§75.2 (surface backup state) is now first**, and its requirement changed:
-  the app-data outcome is the thing to show, because §86.2 means the scheduler's
-  own timestamp is actively misleading.
-- **§86.2 and §86.3 are new work** and both survive the move to Kopia.
-- **§75.3 (the restore API) is closed by removal, not by repair** — it goes when
-  Duplicati goes, and the Kopia restore proof replaces it.
-
 ## 87. Plan — a second disk, and claiming it from start.sh (2026-09-02)
 
 Asked for: *"take a look for the new ssd i added and check if we can expand the
@@ -6816,253 +5922,6 @@ than reasoning about the commands and hoping.
 Unchanged, and still the next storage job: `/` is untouched at 98 G / 59% used,
 and `/var/lib/containerd` is still holding roughly 45 GB there. Removing the
 old trees reclaims more on `/` than this disk could have.
-
-## 88. §86.3 investigated: the whole server-dump path went down at once
-
-The question was why 9 apps kept stale dumps through the 2026-09-01 scheduled
-run. The count in the README was wrong and the real shape is sharper.
-
-### 88.1 It was not 9 apps, it was one code path
-
-Exactly **8** apps declare a `backup:` entry in the registry — `npm`, `itflow`,
-`bookstack`, `n8n`, `paperless`, `nextcloud`, `immich`, `nocodb` — and the audit
-metadata for the run said `failed: 8`. Those are the same eight. So it was not a
-scattering of unlucky apps: **every server-database dump failed and every SQLite
-one succeeded.**
-
-That narrows it to what the two paths do differently. Both shell out to
-`docker run`, so Docker itself was working — 18 SQLite snapshots came out of the
-same run, from a container that even does `apk add sqlite` over the network. The
-server path is the only one that passes `--network <the app's network>` and
-`--entrypoint <client binary>`, and it is the only one that failed.
-
-### 88.2 It is not a standing breakage
-
-Running `dumpAllAppDatabases()` against the live stack today: **31 outcomes, 0
-failures**, including all eight server databases — immich 50.7 MB, nextcloud
-899 KB, paperless 500 KB, n8n 442 KB, nocodb 336 KB, npm 109 KB, bookstack
-56 KB, itflow 1 KB. So the path works, and 2026-09-01 was a moment, not a bug
-sitting in the code.
-
-`commitDump` is why the stale dumps were stale rather than absent: it writes to
-`.part` and renames only on success, so a failing dump preserves the last good
-one instead of destroying it. That design worked exactly as intended.
-
-### 88.3 The one lead, and why it stays a lead
-
-The audit log has a single other entry in the window:
-
-    2026-09-01T19:37:46Z | exposure_provision | nginx-proxy-manager | success
-
-Two minutes and forty-one seconds before the dumps. Exposure provisioning is
-network work, and `--network` is precisely what separates the path that failed
-from the path that did not. That is suggestive and it is *not* evidence, so it
-is recorded here as a lead rather than a conclusion.
-
-### 88.4 Why it cannot be settled, which is the actual defect
-
-Both places that would have answered it were empty:
-
-- **`runAppDataBackup` recorded only a count.** `report.outcomes` carries a
-  per-app `detail` for every failure — "connection refused", "network not
-  found", whatever `pg_dump` said — and the audit row kept `failed: 8` and threw
-  the rest away.
-- **The backend's log files live inside the container.** `LOG_DIR` is
-  `process.cwd()/logs`, not a mounted volume, so `docker logs` and the log files
-  both start at the container's creation. The backend was recreated at
-  2026-09-02T08:33 and 2026-09-01 went with it.
-
-That is the second diagnosis in this session stopped by the same wall — the
-Duplicati 401 in §86.1 was the first. A backup system whose failures are not
-legible afterwards is a backup system that gets debugged by guessing.
-
-### 88.5 Built: failures are recorded per app, with reasons
-
-`runAppDataBackup` now puts `failures: [{ app, kind, detail }]` on the audit row
-alongside the count, capped at 25 entries with the true `failed` count kept
-separately so a truncated list is visibly truncated. The same list goes to the
-warning log.
-
-It also writes an audit row on the **no-password early return**, which
-previously returned silently. That mattered more than it looks: a run whose
-dumps all failed and which then found no Duplicati password left no app-data row
-at all, and the only trace was the archive row above it saying `success`.
-
-Four tests in `backupScheduler.test.ts` cover it — the failure list reaching the
-row, the early return still recording, the cap holding the true count, and an
-empty list when everything succeeded. The mocks for `appDumps`, `appEnv`,
-`duplicatiClient` and `audit` are now hoisted so the audit metadata can be
-asserted on at all; they were previously inline and unreachable from the tests.
-
-Verified against the real stack as far as it can be without triggering a 90
-minute backup: the outcome shape the mapping consumes was taken from a live
-`dumpAllAppDatabases()` run (31 real outcomes), `audit_logs.metadata` is `jsonb`
-with no length limit so the nested array round-trips, and the rebuilt backend is
-running with the new code in `dist`. The first real row lands on tonight's
-scheduled run.
-
-### 88.6 Found on the way: two databases nobody dumps
-
-`guacamole` runs a separate `guacamole-db` Postgres 16 service and declares no
-`backup:` entry, so its database is never dumped — its live Postgres files get
-copied raw, which is the §75.4 failure mode on an app added yesterday.
-`onlyoffice` has the same exposure with its bundled Postgres, and is harder
-because the database is not a separate compose service.
-
-Both are new TODO items rather than fixed in passing.
-
-## 89. Two gaps from §88, closed
-
-### 89.1 The backend's logs now outlive the container
-
-`docker-compose.yml` mounts a `logs-data` named volume at `/app/logs`, and
-`LOG_DIR` is overridable so tests can point it somewhere disposable.
-
-Persisting them created a second problem that had to be solved in the same
-change. Nothing rotated these files — which was survivable only because they
-died with the container every few days, an accidental rotation nobody designed.
-Making them permanent without a cap would have traded a lost-evidence bug for an
-unbounded-growth one, on the filesystem §87 had just finished enlarging. So the
-logger rotates at 5 MB, keeping one previous generation as `<level>.log.1`.
-
-Three details worth recording:
-
-- **The size is tracked in memory, seeded from disk on first write.** Stat-ing
-  on every line would be a syscall per log entry for a number already known;
-  seeding from disk rather than starting at zero means a restart cannot let a
-  file grow past the cap.
-- **Rotation happens before the append that would cross the cap**, not after,
-  so the cap is a ceiling rather than a line the file sits above until something
-  else is logged.
-- **Both the rotation and the append are wrapped.** A full or read-only disk
-  must not crash the process over a log line, and the `console.log` above it is
-  still reaching Docker's log driver either way.
-
-Four tests in `logger.test.ts` — per-level files, appending, rotation at the cap
-keeping the previous generation, and picking up an existing file's size instead
-of restarting the count. The rotation test writes two 3 MB entries rather than
-5 MB of ordinary lines: same branch, a hundred times faster.
-
-**Proven on the real stack, against the exact failure from §88.4**: a line
-logged at 09:57:55 is still in `/app/logs/info.log` inside a container
-*created* at 09:58:09. Before this change that line would have gone with the
-old container.
-
-### 89.2 Guacamole's database is dumped, and the gap is now a test
-
-`backup: { engine: 'postgres', service: 'guacamole-db' }` on the registry entry.
-Verified against the live stack: `dumpAllAppDatabases()` returns 32 outcomes and
-0 failures, with `guacamole postgres dumped 60 KB` and a 61,482-byte
-`apps/guacamole/data/_dump/guacamole.sql` on disk.
-
-The more useful half is the registry-wide test, because guacamole shipped
-without a `backup:` entry yesterday and nothing caught it:
-
-- **Every app whose compose file runs a database image must declare `backup:`.**
-  Matching on the image (`postgres|mariadb|mysql|percona`) rather than the
-  service name catches the vendor variants this stack actually runs —
-  `lscr.io/linuxserver/mariadb`, `ghcr.io/immich-app/postgres:14-vectorchord…`,
-  `jc21`'s `mysql:8.0`. Nine apps match; all nine now declare one.
-- **A declared `backup.service` must exist in the compose file.** This one is
-  about a failure that is invisible rather than loud: `findContainer` returning
-  nothing is reported as `not running — skipped`, which counts as a *success*.
-  A typo in that field would therefore mean an app silently never backed up,
-  reported green.
-
-`composeText` was lifted from inside the Home Page describe to module scope so
-both registry-wide checks share it rather than duplicating the filename probing.
-
-**What this test cannot see** is onlyoffice: its Postgres runs inside the
-documentserver image rather than as its own compose service, so there is no
-image line to match on. That stays an open item.
-
-## 90. §86.2 fixed: the run is stamped with what it did, not that it happened
-
-`runScheduledBackupCheck` called `setBackupScheduleLastRun` immediately after
-the dashboard archive and *before* `runAppDataBackup`, which never throws. So a
-run whose app data never left the machine produced a fresh timestamp, a
-`success` audit row for the archive, and a 24-hour wait before the next attempt
-— which is exactly what 2026-09-01 looked like from every angle the system
-exposed.
-
-### 90.1 Three problems, and why only two of them are about the stamp
-
-The README item named three: a green timestamp, a `success` audit row, and the
-day-long wait. The first two are the same bug — the schedule recorded *that* it
-ran and never *whether* it worked. The third is a separate decision, and the
-obvious fix for it is wrong.
-
-Moving the stamp to the end and only writing it on success would mean a
-persistently failing backup re-runs at every hourly check, forever: a full
-dashboard archive, thirty-odd database dumps and a 50 MB immich dump every
-hour, for a backup that is failing because it is misconfigured and will fail
-identically next hour. That is a treadmill, not a retry.
-
-### 90.2 Built
-
-`setBackupScheduleLastRun` is replaced by `recordBackupScheduleRun(outcome)`,
-one writer for four values that only make sense together:
-
-| Setting | Meaning |
-|---|---|
-| `backup_schedule_last_run_at` | when a run was last **attempted** — drives the cadence |
-| `backup_schedule_last_outcome` | `success` or `failed` |
-| `backup_schedule_last_success_at` | when one last worked **end to end** |
-| `backup_schedule_consecutive_failures` | the current failure streak |
-
-`lastSuccessAt` is the value worth alarming on: "last run was an hour ago" is
-reassuring and can be true while nothing has been backed up for a week.
-
-The stamp now happens **after** `runAppDataBackup`, which returns `{ ok }`
-rather than `void`. A run counts as successful when the app data reached the
-engine. Individual dump failures are on the audit row (§88.5) and do not fail
-the run — one app's database being unreachable should not put the whole
-schedule into retry — but a run where *nothing* dumped has made nothing safe,
-whatever the engine then did with it, so `report.ok === 0 && report.failed > 0`
-fails it.
-
-For the third problem: a failed run retries at the next hourly check rather
-than a period later, for `MAX_FAST_RETRIES = 3` consecutive failures, then
-falls back to the configured cadence and waits for a human. `getBackupSchedule`
-already returns the whole config to the dashboard, so the new fields reach the
-API for free.
-
-### 90.3 The dashboard was showing the lie, so it changed too
-
-`dashboard.component.html` rendered `Last scheduled backup: {{ lastRunAt }}` —
-the tick, with no outcome. Fixing the data and leaving that on screen would not
-have fixed anything a user can see. It now shows the outcome beside the
-timestamp, turns red on a failure, and on a failure adds the line that actually
-matters: *Last working backup: …*, or "No scheduled backup has ever succeeded"
-— which is what this host would have said all week. A schedule that has never
-run says so, rather than rendering nothing.
-
-`BackupScheduleConfig` was split so the settings the user chooses are
-`BackupScheduleSettings`; `updateBackupSchedule` takes that instead of an
-`Omit<…, 'lastRunAt'>` that would have silently grown three more fields to send.
-
-### 90.4 Verified
-
-254 backend tests (11 new), 22 frontend tests, backend typecheck and frontend
-build clean.
-
-Against the real stack, in two halves, because the whole path ends in a
-90-minute upload nobody asked for:
-
-- **The read path, deployed.** `getBackupScheduleConfig()` in the running
-  container returns the three new fields defaulted correctly for rows that do
-  not exist yet, and the startup check correctly did *not* fire — the schedule
-  is not due until 19:40 and `backup_schedule_last_run_at` was untouched.
-- **The write path, against the real Postgres.** `recordBackupScheduleRun` was
-  driven through failed → failed → success and checked at each step: the
-  outcome is set, the streak starts at 1 and increments to 2, a failure does
-  **not** move `lastSuccessAt`, success resets the streak to 0 and sets
-  `lastSuccessAt` equal to `lastRunAt`. Seven assertions, all passing, then the
-  original `last_run_at` was written back and the three new keys deleted, so the
-  table is exactly as it was found.
-
-The first row written by an actual scheduled run lands tonight at ~19:40, and
-that run is now also the test of whether §86.2's retry path behaves.
 
 ## 91. Two cleanups: a healthcheck that was always red, and a feature with no users
 
@@ -28767,3 +27626,23 @@ and the causes turned out to be more varied than "Price Compare leftovers":
 Result: the checker prints nothing, so from here on any pass that breaks a
 reference shows up as the only line in its output. No citation outside plan.md was edited; code comments and docs keep their
 original `§` numbers.
+
+## 536. Compaction pass 4 — the Duplicati-era backup build-out
+
+§534 item 2. §172 named "the backup build-out (§66–§90)", but that range
+isn't one topic: it interleaves the backup work with the VPN port break
+(§69), Home Assistant discovery (§76–§77), code-server (§78), dependencies
+(§80), roster changes (§81), the update check (§82), the Docker storage move
+(§83, §83.6), the live Business Lab product plan (§84, 148 citations), the
+Cloudflare token (§85) and the second disk (§87). Only the backup sections
+were compacted: §66–§68, §70–§75, §79, §86 and §88–§90, 14 sections and
+1,268 lines, into one §66 of ~125 lines. The others stay in place, as in
+pass 3 (§530).
+
+21 anchors are cited from outside the run, most by backup code
+(`backupScheduler.ts`, `backup.ts`, `appBackup.ts`, `kopiaClient.ts`,
+`logger.ts`, the Backups page) and one by CLAUDE.md (§75.7). Each is a
+labelled entry with its conclusion, and the uncited sections got short
+labelled entries too, for traceability. The section says Duplicati has
+since been replaced by Kopia and points to where each open item closed
+(§102, §106, §183, §509). `plan-citations.py`: 0 before, 0 after.
