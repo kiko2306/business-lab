@@ -19,7 +19,8 @@ SOURCES = ('plan.md backend/src frontend/src apps docs scripts start.sh '
 
 plan = open('plan.md', encoding='utf-8').read()
 targets = set(re.findall(r'^##+\s+(\d+(?:\.\d+)?)[a-z]?[.\s]', plan, re.M))
-targets |= set(re.findall(r'\*\*§(\d+(?:\.\d+)?)\*\*', plan))
+# A label may run on into its text: `**§436.1 — old host retired.**`.
+targets |= set(re.findall(r'\*\*§(\d+(?:\.\d+)?)(?=\*\*|\s)', plan))
 
 hits = subprocess.run(
     f"grep -rnoE '§[0-9]+(\\.[0-9]+)?' {SOURCES} 2>/dev/null",
@@ -30,10 +31,31 @@ hits = subprocess.run(
 former_lines = {f'plan.md:{n}' for n, line in enumerate(plan.split('\n'), 1)
                 if line.startswith('## ') and '(former ' in line}
 
+# A document with its own numbered headings (setup_test/README.md's
+# "### 2.1 …") cites those by the same numbers; resolve a citation against the
+# citing file's own headings before calling it dangling.
+own_headings = {}
+
+
+def resolves_in_own_file(location, target):
+    path = location.split(':', 1)[0]
+    if path == 'plan.md':
+        return False
+    if path not in own_headings:
+        try:
+            text = open(path, encoding='utf-8', errors='ignore').read()
+        except OSError:
+            text = ''
+        own_headings[path] = set(re.findall(r'^#+\s+(\d+(?:\.\d+)?)[.\s]', text, re.M))
+    return target in own_headings[path]
+
+
 dangling = {}
 for hit in hits:
     location, cite = hit.rsplit(':', 1)
     if location in former_lines:
+        continue
+    if resolves_in_own_file(location, cite[1:]):
         continue
     if cite[1:] not in targets:
         dangling.setdefault(cite[1:], []).append(location)
