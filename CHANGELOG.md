@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.22] — 2026-09-18
+
+### Added
+
+- Uptime Kuma now also watches the security-alert pipeline (CrowdSec, the n8n relay and ntfy), alerting by email as well as push, so a dead alert path no longer goes unnoticed.
+
 ## [0.117.21] — 2026-09-18
 
 ### Fixed

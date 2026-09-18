@@ -2,7 +2,9 @@
  * Auto-provisions Uptime Kuma monitors for the four services everything else
  * depends on — NPM, Authelia, Tailscale's Funnel (which also carries
  * NetBird's signal traffic), and NetBird's management/relay — plus an ntfy
- * notification wired to all of them (plan.md §443).
+ * notification wired to all of them (plan.md §443). Since §533 also the
+ * alert pipeline itself (CrowdSec, the n8n relay, ntfy), alerting by email
+ * as well, since ntfy can't report its own outage.
  *
  * Built after two outages (§442) sat undetected because every *local* health
  * signal reported fine while the actual external path was broken — only a
@@ -37,10 +39,12 @@ import { getExposureConfig } from '../utils/exposureSettings';
 import { getAlertNotifyConfig } from '../utils/alertNotify';
 import { getSignalHostname } from './criticalServiceHealth';
 import { decodeFrame, isAckOk, DecodedFrame } from './uptimeKumaAdminBootstrap';
-import { findExistingId } from './uptimeKumaMailNotification';
+import { findExistingId, NOTIFICATION_NAME as MAIL_NOTIFICATION_NAME } from './uptimeKumaMailNotification';
 
 const SERVICE = 'uptime-kuma';
 const NTFY_SERVICE = 'ntfy';
+const N8N_SERVICE = 'n8n';
+const CROWDSEC_SERVICE = 'crowdsec';
 const FALLBACK_PORT = 10370;
 export const NOTIFICATION_NAME = 'Critical service alerts (ntfy)';
 
@@ -57,9 +61,29 @@ interface KumaMonitorRow {
   name?: string;
 }
 
+/**
+ * Where a monitor's alert goes. The public-path monitors push over ntfy.
+ * The alert-pipeline monitors (§533) also email, and ntfy's own monitor
+ * emails *only*: a push about ntfy being down would go through ntfy.
+ */
+type NotifyVia = 'ntfy' | 'ntfy+email' | 'email';
+
 interface DesiredMonitor {
   name: string;
   url: () => Promise<string | null>;
+  notify: NotifyVia;
+  /** Defaults to "any HTTP response"; a real health endpoint passes only on 2xx. */
+  acceptedStatuses?: string[];
+}
+
+/**
+ * Resolve a monitor's notification ids. Without an email notification (mail
+ * not configured), everything falls back to ntfy, so ntfy's own monitor still
+ * shows up in Uptime Kuma instead of alerting nowhere. Exported for the test.
+ */
+export function notificationIdsFor(notify: NotifyVia, ntfyId: number, emailId: number | null): number[] {
+  if (emailId === null || notify === 'ntfy') return [ntfyId];
+  return notify === 'email' ? [emailId] : [ntfyId, emailId];
 }
 
 /**
@@ -72,7 +96,12 @@ interface DesiredMonitor {
 const ACCEPT_ANY_STATUS = ['100-199', '200-299', '300-399', '400-499', '500-599'];
 
 /** Exported for the test — accepted_statuscodes and notificationIDList are what actually make alerting work. */
-export function defaultMonitor(name: string, url: string, notificationId: number): Record<string, unknown> {
+export function defaultMonitor(
+  name: string,
+  url: string,
+  notificationIds: number[],
+  acceptedStatuses: string[] = ACCEPT_ANY_STATUS
+): Record<string, unknown> {
   return {
     type: 'http',
     name,
@@ -85,13 +114,13 @@ export function defaultMonitor(name: string, url: string, notificationId: number
     resendInterval: 0,
     maxretries: 1,
     timeout: 10,
-    notificationIDList: { [notificationId]: true },
+    notificationIDList: Object.fromEntries(notificationIds.map((id) => [id, true])),
     ignoreTls: false,
     upsideDown: false,
     packetSize: 56,
     expiryNotification: false,
     maxredirects: 10,
-    accepted_statuscodes: ACCEPT_ANY_STATUS,
+    accepted_statuscodes: acceptedStatuses,
     dns_resolve_type: 'A',
     dns_resolve_server: '1.1.1.1',
     docker_container: '',
@@ -130,6 +159,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         const config = await getExposureConfig();
         return config ? `https://${config.baseDomain}/` : null;
       },
+      notify: 'ntfy',
     },
     {
       name: 'Authelia (public)',
@@ -137,6 +167,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         const config = await getExposureConfig();
         return config ? `https://authelia.${config.baseDomain}/api/health` : null;
       },
+      notify: 'ntfy',
     },
     {
       name: 'Tailscale Funnel (also NetBird signal)',
@@ -144,6 +175,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         const host = await getSignalHostname();
         return host ? `https://${host}/` : null;
       },
+      notify: 'ntfy',
     },
     {
       name: 'NetBird management (public)',
@@ -151,6 +183,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         const config = await getExposureConfig();
         return config ? `https://netbird-vpn-api.${config.baseDomain}/api/networks` : null;
       },
+      notify: 'ntfy',
     },
     {
       name: 'NetBird relay (public)',
@@ -158,8 +191,42 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         const config = await getExposureConfig();
         return config ? `https://netbird-vpn-relay.${config.baseDomain}/` : null;
       },
+      notify: 'ntfy',
+    },
+    // The alert pipeline itself (§533): CrowdSec → n8n relay → ntfy. Any one
+    // of them down means security alerts stop with nothing saying so, which
+    // is how §531 went unnoticed for six days. Real health endpoints, so
+    // only 2xx passes. Each is skipped when its app isn't installed.
+    {
+      name: 'CrowdSec (alert source)',
+      // Over the crowdsec-lapi network Uptime Kuma joins; LAPI isn't published.
+      url: async () => (installed(CROWDSEC_SERVICE) ? 'http://crowdsec:8080/health' : null),
+      notify: 'ntfy+email',
+      acceptedStatuses: ['200-299'],
+    },
+    {
+      name: 'n8n (alert relay)',
+      url: async () => hostPortUrl(N8N_SERVICE, '/healthz'),
+      notify: 'ntfy+email',
+      acceptedStatuses: ['200-299'],
+    },
+    {
+      name: 'ntfy (push server)',
+      url: async () => hostPortUrl(NTFY_SERVICE, '/v1/health'),
+      notify: 'email',
+      acceptedStatuses: ['200-299'],
     },
   ];
+}
+
+function installed(service: string): boolean {
+  return Boolean(resolveComposeFile(service)?.composeFile);
+}
+
+/** An app's published port via the host gateway, the same route the ntfy notification uses. */
+async function hostPortUrl(service: string, path: string): Promise<string | null> {
+  const port = installed(service) ? getPublishedUpstreamPort(service) : null;
+  return port ? `http://${await getHostGatewayIp()}:${port}${path}` : null;
 }
 
 /** The internal ntfy URL publishAlert() posts to — same host-gateway route, no dependency on the tunnel. */
@@ -238,13 +305,19 @@ export function runSession(baseWsUrl: string, notification: Record<string, unkno
         return;
       }
       const notificationId = notifBody.id;
+      // Created before this on the same start (executor runs the mail
+      // reconcile first); null when mail isn't configured.
+      const emailId = findExistingId(notificationListArgs, MAIL_NOTIFICATION_NAME);
 
       const existingNames = findExistingMonitorNames(monitorList);
       for (const monitor of monitors) {
         if (existingNames.has(monitor.name)) continue; // only creates — never overwrites a hand-edited monitor
         const url = await monitor.url();
         if (!url) continue; // that service's config isn't ready yet
-        const addAck = await call('add', defaultMonitor(monitor.name, url, notificationId));
+        const addAck = await call(
+          'add',
+          defaultMonitor(monitor.name, url, notificationIdsFor(monitor.notify, notificationId, emailId), monitor.acceptedStatuses)
+        );
         if (!isAckOk(addAck)) {
           logger.warn(`Uptime Kuma critical monitors: failed to add "${monitor.name}"`, {
             error: (addAck.args?.[0] as { msg?: string } | undefined)?.msg,
@@ -301,7 +374,7 @@ export async function ensureCriticalServiceMonitors(serviceName: string): Promis
     name: NOTIFICATION_NAME,
     type: 'ntfy',
     isDefault: true,
-    applyExisting: false, // only the 5 monitors this file owns should use it
+    applyExisting: false, // only the monitors this file owns should use it
     ntfyserverurl: serverUrl,
     ntfytopic: topic,
     ntfyPriority: 4,

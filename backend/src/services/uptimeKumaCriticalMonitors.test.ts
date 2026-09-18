@@ -1,22 +1,22 @@
 import { describe, expect, it } from 'vitest';
-import { defaultMonitor, findExistingMonitorNames } from './uptimeKumaCriticalMonitors';
+import { defaultMonitor, findExistingMonitorNames, notificationIdsFor } from './uptimeKumaCriticalMonitors';
 
 describe('defaultMonitor', () => {
   // A transport failure is the only thing that should count as down — a real
   // HTTP response (NetBird's 401/404, Tailscale's 405) must not trip the
   // monitor, or every one of these would falsely alert as soon as it existed.
   it('accepts any HTTP status code, not just 2xx', () => {
-    const monitor = defaultMonitor('NetBird management (public)', 'https://netbird-vpn-api.example.com/api/networks', 3);
+    const monitor = defaultMonitor('NetBird management (public)', 'https://netbird-vpn-api.example.com/api/networks', [3]);
     expect(monitor.accepted_statuscodes).toEqual(['100-199', '200-299', '300-399', '400-499', '500-599']);
   });
 
   it('wires the given notification id into notificationIDList', () => {
-    const monitor = defaultMonitor('Authelia (public)', 'https://authelia.example.com/api/health', 7);
+    const monitor = defaultMonitor('Authelia (public)', 'https://authelia.example.com/api/health', [7]);
     expect(monitor.notificationIDList).toEqual({ 7: true });
   });
 
   it('carries the name/url/type through unchanged', () => {
-    const monitor = defaultMonitor('Tailscale Funnel (also NetBird signal)', 'https://signal.example.ts.net/', 1);
+    const monitor = defaultMonitor('Tailscale Funnel (also NetBird signal)', 'https://signal.example.ts.net/', [1]);
     expect(monitor.type).toBe('http');
     expect(monitor.name).toBe('Tailscale Funnel (also NetBird signal)');
     expect(monitor.url).toBe('https://signal.example.ts.net/');
@@ -45,5 +45,34 @@ describe('findExistingMonitorNames', () => {
 
   it('is empty for an empty monitor list', () => {
     expect(findExistingMonitorNames({})).toEqual(new Set());
+  });
+});
+
+describe('notificationIdsFor', () => {
+  // ntfy can't report its own outage, so its monitor must reach the operator
+  // some other way (§533).
+  it('sends the ntfy monitor to email only', () => {
+    expect(notificationIdsFor('email', 3, 9)).toEqual([9]);
+  });
+
+  it('sends the pipeline monitors to both', () => {
+    expect(notificationIdsFor('ntfy+email', 3, 9)).toEqual([3, 9]);
+  });
+
+  it('keeps the public-path monitors on ntfy', () => {
+    expect(notificationIdsFor('ntfy', 3, 9)).toEqual([3]);
+  });
+
+  it('falls back to ntfy when no email notification exists, rather than alerting nowhere', () => {
+    expect(notificationIdsFor('email', 3, null)).toEqual([3]);
+    expect(notificationIdsFor('ntfy+email', 3, null)).toEqual([3]);
+  });
+});
+
+describe('defaultMonitor with a health endpoint', () => {
+  it('wires every notification id and passes only the given statuses', () => {
+    const monitor = defaultMonitor('n8n (alert relay)', 'http://10.201.0.1:10240/healthz', [3, 9], ['200-299']);
+    expect(monitor.notificationIDList).toEqual({ 3: true, 9: true });
+    expect(monitor.accepted_statuscodes).toEqual(['200-299']);
   });
 });
