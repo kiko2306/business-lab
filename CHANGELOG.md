@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.6] — 2026-09-18
+
+### Fixed
+
+- MeshCentral's admin bootstrap now reaches the server once it's exposed (it tried HTTPS against the plain-HTTP port and gave up).
+
 ## [0.117.5] — 2026-09-18
 
 ### Fixed

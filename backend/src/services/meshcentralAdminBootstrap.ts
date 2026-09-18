@@ -48,16 +48,6 @@ export function readSetupState(loginPageHtml: string): SetupState {
   return /\bnewAccount="true"/.test(loginPageHtml) ? 'needs-admin' : 'already-setup';
 }
 
-/**
- * Standalone, MeshCentral serves its own self-signed HTTPS. Once exposed,
- * TLS is offloaded to NPM and it serves plain HTTP on the same port. The
- * managed MESHCENTRAL_TLS_OFFLOAD value is what decides which one.
- */
-function baseUrl(host: string, port: number): string {
-  const offloaded = Boolean(readAppEnvValue(MESHCENTRAL_SERVICE, 'MESHCENTRAL_TLS_OFFLOAD'));
-  return `${offloaded ? 'http' : 'https'}://${host}:${port}`;
-}
-
 async function getSetupState(url: string): Promise<SetupState> {
   try {
     const response = await requestJson(`${url}/`, { timeout: REQUEST_TIMEOUT_MS, insecureTls: true });
@@ -88,10 +78,19 @@ export async function reconcileMeshcentralFirstAdmin(serviceName: string): Promi
 
   try {
     const port = getPublishedUpstreamPort(MESHCENTRAL_SERVICE) ?? FALLBACK_PORT;
-    const url = baseUrl(await getHostGatewayIp(), port);
+    const host = await getHostGatewayIp();
 
     for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const state = await getSetupState(url);
+      // Standalone it serves its own self-signed HTTPS; exposed, TLS is
+      // offloaded to NPM and it serves plain HTTP on the same port. Try both,
+      // like the compose healthcheck. MESHCENTRAL_TLS_OFFLOAD can't decide it:
+      // exposure injects it at start and never writes it to .env.
+      let url = `http://${host}:${port}`;
+      let state = await getSetupState(url);
+      if (state === 'unreachable') {
+        url = `https://${host}:${port}`;
+        state = await getSetupState(url);
+      }
 
       if (state === 'unreachable') {
         if (attempt === MAX_ATTEMPTS) {
