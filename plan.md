@@ -30302,3 +30302,33 @@ WireGuard tunnels between peers don't depend on Sync staying open. Router
 peer warnings went from ~68/h (Job + Sync, all peers dropping together) to
 ~28/h (Sync only, independent). README item deleted: nothing left in this
 repo's control.
+
+## 518. NocoDB's public signup closed
+
+§511 finding, now confirmed live. NocoDB is exposed without Authelia, and its
+bundle's defaults are `invite_only_signup: false`. Nothing had ever stored a
+different value (`nc_app_settings` is absent from `nc_store`).
+
+**Tried and rejected:** `NC_INVITE_ONLY_SIGNUP: "true"` (97abbca), which
+NocoDB's env-var docs describe as "signup is possible only via invitations".
+On 2026.08.2 it did nothing. With it set, a signup probe from outside
+(`POST /api/v1/auth/user/signup`, `@example.invalid` address) **created an
+account** (org-level viewer), and the info endpoint still said
+`inviteOnlySignup: false`. The line was removed and the reason noted in the
+compose file. The same commit's `NC_DISABLE_ERR_REPORTS: "true"` did work
+(`errorReportingEnabled` true → false), so it stays.
+
+**Fix** (30c294b): `ensureNocodbInviteOnlySignup`, run by `startService`
+after `up`. It signs in as the super admin through the same path user
+provisioning uses (retrying ~2 min while NocoDB boots), reads
+`GET /api/v1/app-settings`, and if signup is open it posts the whole object
+back with `invite_only_signup: true`. The endpoint replaces the object, so
+the other keys are kept. Dashboard-managed users are unaffected: they come
+in by invite + reset link (`nocodbUserProvisioning.ts`), never signup.
+
+Verified on home-srv-01 (0.117.12), through the real `startService`: it
+logged "Closed NocoDB public signup". The outside probe now gets **400 "Not
+allowed to signup, contact super admin."** and the info endpoint reports
+`inviteOnlySignup: true`. A second start wrote nothing. The probe account
+from the first test was deleted through the admin API; the refused one was
+never created.

@@ -255,10 +255,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### From the 2026-09-18 review (§511)
 
-- [ ] **NocoDB: signup is probably open, and error reporting is on** — no
-      `nc_app_settings` row, so invite-only signup is at its default (off)
-      on a hostname with no Authelia. Its info endpoint reports
-      `errorReportingEnabled: true`; set `NC_DISABLE_ERR_REPORTS`.
 - [ ] **Twenty: confirm public signup is closed after the bootstrap** — no
       `IS_SIGN_UP_DISABLED`; not running at review time, so unverified.
 - [ ] **Failed dashboard logins are audited without username or IP** — no
