@@ -17,6 +17,17 @@ services:
     environment:
       TZ: ${TZ:-UTC}
       WEBPASSWORD: ${PIHOLE_WEB_PASSWORD}
+      # Pi-hole v6 defaults to LOCAL: answer only clients on its own subnets.
+      # On a bridge network a LAN client's query arrives with its real
+      # 192.168.x source, which is not the container's subnet, so every LAN
+      # query was dropped (UDP timeout, TCP reset) and only the host's own
+      # loopback queries (arriving from the Docker gateway) got answers.
+      # Found 2026-09-18 when a LAN browser couldn't resolve the dashboard
+      # (§528). ALL is Pi-hole's documented setting for Docker bridge mode.
+      # Port 53 is reachable only from the LAN and the VPN overlays, never
+      # the internet (no port forwarding, principle 1), so this doesn't make
+      # it an open resolver.
+      FTLCONF_dns_listeningMode: "ALL"
     labels:
       - "homepage.group=Infrastructure"
       - "homepage.name=Pi-hole"
