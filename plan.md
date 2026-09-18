@@ -30332,3 +30332,21 @@ allowed to signup, contact super admin."** and the info endpoint reports
 `inviteOnlySignup: true`. A second start wrote nothing. The probe account
 from the first test was deleted through the admin API; the refused one was
 never created.
+
+## 519. Twenty's public signup: confirmed closed, no change needed
+
+§511 finding. Twenty is exposed without Authelia and its compose sets no
+`IS_SIGN_UP_DISABLED`. Started through the real `startService` (the owner
+bootstrap logged "already has a workspace owner") and probed from outside on
+`/metadata`, where Twenty serves its auth mutations (`/graphql` answers
+"Cannot query field", see twentyClient.ts). A stranger's `signUp` gets
+`SIGNUP_DISABLED` / "Sign up is disabled.", and `checkUserExists` for the
+probe address returns `exists: false`, so nothing was created.
+
+What keeps it closed is Twenty's single-workspace default: with
+`IS_MULTIWORKSPACE_ENABLED` unset (false), `signUp` is refused once any
+workspace exists, which the owner bootstrap guarantees. That was already
+read from source in twentyClient.ts and is now proven live. If that default
+ever flips upstream, or someone sets the variable, signup reopens. Joining
+the existing workspace still needs its invite hash. Twenty was put back to
+stopped afterwards, as it was before the check.

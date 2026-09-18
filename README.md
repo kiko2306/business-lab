@@ -255,8 +255,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### From the 2026-09-18 review (§511)
 
-- [ ] **Twenty: confirm public signup is closed after the bootstrap** — no
-      `IS_SIGN_UP_DISABLED`; not running at review time, so unverified.
 - [ ] **Failed dashboard logins are audited without username or IP** — no
       way to spot brute force from `audit_logs`.
 - [ ] **Dashboard login hardening** — invited usernames answer 403 vs 401
