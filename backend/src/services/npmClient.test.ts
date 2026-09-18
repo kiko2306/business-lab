@@ -188,9 +188,11 @@ describe('buildProxyHostPayload', () => {
     // Long-lived NetBird streams (signal ConnectStream) must survive past the
     // default 60s grpc_read_timeout or peer setup never completes.
     expect(payload.advanced_config).toContain('grpc_read_timeout 3600s;');
-    // ...and so must a bidi stream whose client goes quiet (Job): that one is
-    // timed by client_body_timeout, which 408'd it every 60s (§517).
-    expect(payload.advanced_config).toContain('client_body_timeout 3600s;');
+    // Job can't survive Cloudflare and its 524 dropped every peer's Sync, so
+    // it is answered UNIMPLEMENTED locally, which the client treats as
+    // permanent (§517).
+    expect(payload.advanced_config).toContain('location = /management.ManagementService/Job {');
+    expect(payload.advanced_config).toContain('add_header grpc-status 12 always;');
     // Cloudflare requires a real TLS+HTTP2/ALPN hop to the origin for gRPC
     // to negotiate at all — see exposure.ts getNpmGrpcOriginUrl.
     expect(payload.certificate_id).toBe(42);

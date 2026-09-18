@@ -105,6 +105,20 @@ function buildAutheliaAdvancedConfig(dashboardUrl: string): string {
 // front-end side, since native gRPC still needs it.
 function buildGrpcAdvancedConfig(forwardHost: string, forwardPort: number): string {
   return [
+    // Management's Job RPC (NetBird 0.5x+, remote debug-bundle requests) is a
+    // bidi stream, and Cloudflare never flushes response headers on an open
+    // bidi stream (§52), so it always died at Cloudflare's 100s origin
+    // timeout (524). Worse, that reset the cloudflared→NPM HTTP/2 connection
+    // every peer's Sync shares, dropping all of them every ~2 min (§517).
+    // Answer it UNIMPLEMENTED (grpc-status 12) at once: the client then logs
+    // "Job feature is not supported" and stops dialling it for good, instead
+    // of retrying. Costs only the remote debug-bundle button.
+    'location = /management.ManagementService/Job {',
+    '    default_type application/grpc;',
+    '    add_header grpc-status 12 always;',
+    '    add_header grpc-message "Job%20stream%20unavailable%20behind%20Cloudflare%20Tunnel" always;',
+    '    return 200;',
+    '}',
     'location / {',
     '    if ($http_content_type = "application/grpc") {',
     `        grpc_pass grpc://${forwardHost}:${forwardPort};`,
@@ -119,12 +133,6 @@ function buildGrpcAdvancedConfig(forwardHost: string, forwardPort: number): stri
     '    grpc_read_timeout 3600s;',
     '    grpc_send_timeout 3600s;',
     '    grpc_socket_keepalive on;',
-    "    # grpc_read_timeout only covers the upstream's replies. A bidi stream",
-    "    # whose *client* goes quiet (management's Job stream, NetBird 0.5x+) is",
-    "    # timed by client_body_timeout instead, default 60s between two body",
-    "    # reads: nginx answered it 408 every minute, the client logged it as a",
-    '    # 502 and re-dialled, ~68 times an hour (plan.md §517).',
-    '    client_body_timeout 3600s;',
     '    include /snippets/proxy.conf;',
     `    proxy_pass http://${forwardHost}:${forwardPort};`,
     '}',
