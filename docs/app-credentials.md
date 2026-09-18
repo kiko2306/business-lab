@@ -29,7 +29,7 @@ that, each admin can add a TOTP second factor to their own login from
 | App | Default | Notes |
 |---|---|---|
 | **Nginx Proxy Manager** | none — see Notes | No human step. The moment the dashboard first needs NPM's API (provisioning the first app's exposure) it detects the unclaimed install and either creates the first admin user itself (current NPM ships with none at all — its own UI's unauthenticated `POST /users` on first run) or, on an older pinned image still shipping `admin@example.com`/`changeme`, logs in with that and rotates it — either way to a generated password it then owns (`bootstrapNpmAdminIfDefault`, `npmClient.ts`; plan.md §285). That password is never shown back through the dashboard (same write-only pattern as every other hidden secret); **Settings → Networking → Test connection** confirms it's working. Only touch these fields by hand if you've already changed NPM's password some other way and need to tell the dashboard the new value. |
-| **Pi-hole** | password = `PIHOLE_WEB_PASSWORD` in its config | Ships as `change-me`; set a real value in the dashboard before starting. |
+| **Pi-hole** | password = `PIHOLE_WEB_PASSWORD` in its config | Auto-generated on first start, shown in the dashboard's config panel. Applied through v6's `FTLCONF_webserver_api_password` on every start (§529). |
 | **Guacamole** | `guacadmin` / `GUACAMOLE_ADMIN_PASSWORD` (generated, hidden) | Ships as `guacadmin`/`guacadmin`; the dashboard rotates that password to a generated one over Guacamole's own REST API the first time it logs in successfully after a start, so the shipped default stops working — no human step. Its Postgres password is a separate generated secret, unrelated to this. |
 
 ## Generated — read the value in the dashboard

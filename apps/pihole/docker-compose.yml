@@ -16,7 +16,12 @@ services:
       - "${PIHOLE_WEB_PORT:-10320}:80/tcp"
     environment:
       TZ: ${TZ:-UTC}
-      WEBPASSWORD: ${PIHOLE_WEB_PASSWORD}
+      # Pi-hole v6 reads its web/API password from this. The v5 name
+      # (WEBPASSWORD) that was here is ignored by v6, which then protected the
+      # UI with a random password printed only to its log, while the
+      # dashboard showed a generated one that didn't work (§529). FTLCONF_*
+      # values are applied on every start and override the stored hash.
+      FTLCONF_webserver_api_password: ${PIHOLE_WEB_PASSWORD}
       # Pi-hole v6 defaults to LOCAL: answer only clients on its own subnets.
       # On a bridge network a LAN client's query arrives with its real
       # 192.168.x source, which is not the container's subnet, so every LAN
