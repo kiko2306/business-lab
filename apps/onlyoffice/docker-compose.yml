@@ -5,7 +5,12 @@
 # forward without a version-tag bump to diff against (§449).
 services:
   onlyoffice:
-    mem_limit: 640m
+    # 640m was never OOM-killed, but idle it hit the limit 11,085 times
+    # (memory.events `max`): anon ~250 MiB + kernel ~70 MiB left ~300 MiB for
+    # an open document, and its font/cache files were evicted constantly.
+    # Upstream's minimum is 2 GB for the whole server; 1g gives an edit
+    # session real headroom without reserving it (§514).
+    mem_limit: 1g
     mem_reservation: 256m
     image: onlyoffice/documentserver:latest
     restart: unless-stopped
