@@ -5,7 +5,7 @@ vi.mock('./database', () => db);
 const log = vi.hoisted(() => ({ default: { error: vi.fn(), info: vi.fn() } }));
 vi.mock('./logger', () => log);
 
-import { purgeOldAuditLogs, writeAuditLog } from './audit';
+import { purgeDeadRefreshTokens, purgeOldAuditLogs, writeAuditLog } from './audit';
 
 describe('purgeOldAuditLogs', () => {
   it('deletes rows older than 30 days and reports the count removed', async () => {
@@ -31,5 +31,15 @@ describe('writeAuditLog', () => {
       'Audit log write failed',
       expect.objectContaining({ action: 'login', error: 'connection refused' })
     );
+  });
+});
+
+describe('purgeDeadRefreshTokens', () => {
+  // Only rows /auth/refresh would already refuse: expired or revoked.
+  it('deletes expired or revoked refresh tokens and reports the count', async () => {
+    db.query.mockResolvedValueOnce({ rowCount: 261 });
+
+    expect(await purgeDeadRefreshTokens()).toBe(261);
+    expect(db.query.mock.calls.at(-1)?.[0]).toBe('DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked');
   });
 });

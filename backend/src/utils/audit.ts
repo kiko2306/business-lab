@@ -11,6 +11,17 @@ export async function purgeOldAuditLogs(): Promise<number> {
   return result.rowCount ?? 0;
 }
 
+/**
+ * Delete refresh tokens that can never be used again: expired, or revoked
+ * (logout, password reset). `/auth/refresh` answers a missing row exactly as
+ * it answers a revoked or expired one, so this changes no behaviour. Nothing
+ * else ever deleted them: home-srv-01 had 261 dead rows of 267 (§523).
+ */
+export async function purgeDeadRefreshTokens(): Promise<number> {
+  const result = await query('DELETE FROM refresh_tokens WHERE expires_at < NOW() OR revoked');
+  return result.rowCount ?? 0;
+}
+
 export function startAuditLogPurgeSweeper(): void {
   const SWEEP_INTERVAL_MS = 6 * 60 * 60_000;
   const run = () => {
@@ -22,6 +33,15 @@ export function startAuditLogPurgeSweeper(): void {
       })
       .catch((error: Error) => {
         logger.error('Audit log purge failed', { error: error.message });
+      });
+    // Same cadence, same kind of housekeeping; its own catch so one failing
+    // doesn't hide the other.
+    purgeDeadRefreshTokens()
+      .then((deleted) => {
+        if (deleted > 0) logger.info('Purged expired or revoked refresh tokens', { deleted });
+      })
+      .catch((error: Error) => {
+        logger.error('Refresh token purge failed', { error: error.message });
       });
   };
   run();

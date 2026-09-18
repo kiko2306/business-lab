@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.16] — 2026-09-18
+
+### Fixed
+
+- Expired and revoked dashboard sessions are now cleaned out of the database every 6 hours instead of piling up forever.
+
 ## [0.117.15] — 2026-09-18
 
 ### Added
