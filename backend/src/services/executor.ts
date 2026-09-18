@@ -48,6 +48,7 @@ import { reconcileN8nFirstAdmin } from './n8nAdminBootstrap';
 import { reconcileJellyfinFirstAdmin } from './jellyfinAdminBootstrap';
 import { reconcileNavidromeFirstAdmin } from './navidromeAdminBootstrap';
 import { reconcileMeshcentralFirstAdmin } from './meshcentralAdminBootstrap';
+import { ensureNocodbInviteOnlySignup } from './nocodbUserProvisioning';
 import { reconcileUptimeKumaFirstAdmin } from './uptimeKumaAdminBootstrap';
 import { ensureNtfySubscriberToken } from './ntfyAuthBootstrap';
 import { reconcileUptimeKumaMailNotification } from './uptimeKumaMailNotification';
@@ -387,6 +388,9 @@ async function composeUpWithManagedConfig(
   // can't be claimed by a visitor (it has no Authelia gate). HTTP against the
   // running server, so after `up`; no-op otherwise.
   await reconcileMeshcentralFirstAdmin(serviceName);
+  // NocoDB: close its public signup (its default leaves it open, and it has
+  // no Authelia gate). Admin REST against the running app, so after `up`.
+  await ensureNocodbInviteOnlySignup(serviceName);
   // Uptime Kuma: create the admin so its setup form can't be claimed by a
   // visitor (§421). Socket.IO against the running app, so after `up`; no-op
   // otherwise.

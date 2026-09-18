@@ -90,3 +90,25 @@ export async function setPassword(baseUrl: string, token: string, userId: string
   }).catch(() => null);
   return applyResponse?.status === 200;
 }
+
+/** GET /api/v1/app-settings, as the super admin. Null on any failure. */
+export async function getAppSettings(baseUrl: string, token: string): Promise<Record<string, unknown> | null> {
+  const response = await fetch(`${baseUrl}/api/v1/app-settings`, {
+    headers: { 'xc-auth': token },
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  }).catch(() => null);
+  if (!response || response.status !== 200) return null;
+  const body: unknown = await response.json().catch(() => null);
+  return body && typeof body === 'object' ? (body as Record<string, unknown>) : null;
+}
+
+/** POST /api/v1/app-settings, as the super admin. It replaces the whole object, so send every key. */
+export async function saveAppSettings(baseUrl: string, token: string, settings: Record<string, unknown>): Promise<boolean> {
+  const response = await fetch(`${baseUrl}/api/v1/app-settings`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'xc-auth': token },
+    body: JSON.stringify(settings),
+    signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+  }).catch(() => null);
+  return Boolean(response && response.status >= 200 && response.status < 300);
+}

@@ -1,8 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { readAppEnvValue } from './appEnv';
 import { getAutheliaAdminUser } from './autheliaUsers';
-import { findUserId, inviteUser, setPassword, signIn } from './nocodbClient';
-import { disableNocodbUser, provisionNocodbUser } from './nocodbUserProvisioning';
+import { findUserId, getAppSettings, inviteUser, saveAppSettings, setPassword, signIn } from './nocodbClient';
+import { disableNocodbUser, ensureNocodbInviteOnlySignup, provisionNocodbUser } from './nocodbUserProvisioning';
 
 vi.mock('./appEnv', () => ({ readAppEnvValue: vi.fn() }));
 vi.mock('./autheliaUsers', () => ({ getAutheliaAdminUser: vi.fn() }));
@@ -13,6 +13,8 @@ vi.mock('./nocodbClient', () => ({
   inviteUser: vi.fn(),
   findUserId: vi.fn(),
   setPassword: vi.fn(),
+  getAppSettings: vi.fn(),
+  saveAppSettings: vi.fn(),
 }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
@@ -137,5 +139,40 @@ describe('disableNocodbUser', () => {
     mockedSetPassword.mockResolvedValue(false);
     const result = await disableNocodbUser('bob@example.com');
     expect(result).toBe('failed');
+  });
+});
+
+describe('ensureNocodbInviteOnlySignup', () => {
+  const mockedGetSettings = vi.mocked(getAppSettings);
+  const mockedSaveSettings = vi.mocked(saveAppSettings);
+
+  it('turns invite-only on, keeping the other settings, when signup is open', async () => {
+    mockedGetSettings.mockResolvedValue({ invite_only_signup: false, restrict_workspace_creation: false });
+    mockedSaveSettings.mockResolvedValue(true);
+    await ensureNocodbInviteOnlySignup('nocodb', 0);
+    expect(mockedSaveSettings).toHaveBeenCalledWith('http://10.201.0.1:10280', 'admin-token', {
+      invite_only_signup: true,
+      restrict_workspace_creation: false,
+    });
+  });
+
+  it('writes nothing when signup is already invite-only', async () => {
+    mockedGetSettings.mockResolvedValue({ invite_only_signup: true });
+    await ensureNocodbInviteOnlySignup('nocodb', 0);
+    expect(mockedSaveSettings).not.toHaveBeenCalled();
+  });
+
+  // NocoDB answers sign-in only once it has booted, well after `up` returns.
+  it('retries sign-in while NocoDB is still booting', async () => {
+    mockedSignIn.mockResolvedValueOnce(null).mockResolvedValueOnce(null).mockResolvedValue('admin-token');
+    mockedGetSettings.mockResolvedValue({ invite_only_signup: true });
+    await ensureNocodbInviteOnlySignup('nocodb', 0);
+    expect(mockedSignIn).toHaveBeenCalledTimes(3);
+    expect(mockedGetSettings).toHaveBeenCalled();
+  });
+
+  it('ignores every other service', async () => {
+    await ensureNocodbInviteOnlySignup('kimai', 0);
+    expect(mockedSignIn).not.toHaveBeenCalled();
   });
 });

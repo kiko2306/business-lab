@@ -31,7 +31,7 @@ import { getPublishedUpstreamPort } from '../config/services';
 import { getHostGatewayIp } from '../utils/network';
 import { readAppEnvValue } from './appEnv';
 import { getAutheliaAdminUser } from './autheliaUsers';
-import { findUserId, inviteUser, setPassword, signIn } from './nocodbClient';
+import { findUserId, getAppSettings, inviteUser, saveAppSettings, setPassword, signIn } from './nocodbClient';
 
 export const NOCODB_SERVICE = 'nocodb';
 const NOCODB_ADMIN_PASSWORD_KEY = 'NOCODB_ADMIN_PASSWORD';
@@ -138,4 +138,43 @@ export async function disableNocodbUser(email: string): Promise<DisableNocodbUse
   }
   logger.info(`Locked the NocoDB account for ${email} (password reset to a value nobody knows)`);
   return 'disabled';
+}
+
+// NocoDB boots in ~20-40 s after `up`; sign-in fails (null) until it answers.
+const SIGN_IN_ATTEMPTS = 40;
+const SIGN_IN_RETRY_MS = 3000;
+
+/**
+ * Keep NocoDB's public signup closed (§518). It is exposed without Authelia,
+ * and its own default is `invite_only_signup: false`, so anyone could
+ * register as an org-level viewer. NC_INVITE_ONLY_SIGNUP, documented for
+ * exactly this, did nothing on 2026.08.2 (checked live), so this sets the
+ * app setting through the super admin's API on every start. Users are added
+ * by invite (provisionNocodbUser), which invite-only doesn't affect.
+ */
+export async function ensureNocodbInviteOnlySignup(serviceName: string, retryDelayMs = SIGN_IN_RETRY_MS): Promise<void> {
+  if (serviceName !== NOCODB_SERVICE) return;
+
+  let session = await signInAsNocodbAdmin();
+  for (let attempt = 1; session.state === 'admin-sign-in-failed' && attempt < SIGN_IN_ATTEMPTS; attempt += 1) {
+    await new Promise((resolve) => setTimeout(resolve, retryDelayMs));
+    session = await signInAsNocodbAdmin();
+  }
+  if (session.state !== 'signed-in') {
+    logger.warn('NocoDB signup policy not checked: could not sign in as the tracked admin', { state: session.state });
+    return;
+  }
+
+  const settings = await getAppSettings(session.baseUrl, session.token);
+  if (!settings) {
+    logger.warn('NocoDB signup policy not checked: could not read its app settings');
+    return;
+  }
+  if (settings.invite_only_signup === true) return;
+
+  if (await saveAppSettings(session.baseUrl, session.token, { ...settings, invite_only_signup: true })) {
+    logger.info('Closed NocoDB public signup (invite_only_signup: true)');
+  } else {
+    logger.error('Failed to close NocoDB public signup');
+  }
 }

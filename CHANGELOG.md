@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.12] — 2026-09-18
+
+### Fixed
+
+- NocoDB's public signup is now closed on every start (it was open to anyone, and its NC_INVITE_ONLY_SIGNUP switch had no effect).
+
 ## [0.117.11] — 2026-09-18
 
 ### Fixed

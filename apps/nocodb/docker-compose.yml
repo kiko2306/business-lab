@@ -26,10 +26,9 @@ services:
       # rewrites it to the public https:// hostname once exposure is enabled.
       NC_PUBLIC_URL: ${NOCODB_PUBLIC_URL:-http://localhost:8011}
       NC_DISABLE_TELE: ${NOCODB_DISABLE_TELEMETRY:-true}
-      # Exposed without Authelia, and NocoDB's own default leaves public signup
-      # open (invite_only_signup: false). The dashboard adds users by invite
-      # (nocodbUserProvisioning.ts), never through signup, so close it (§518).
-      NC_INVITE_ONLY_SIGNUP: "true"
+      # No NC_INVITE_ONLY_SIGNUP: documented, but it left signup open on
+      # 2026.08.2. The dashboard closes signup through NocoDB's app-settings
+      # API on every start instead (ensureNocodbInviteOnlySignup, §518).
       # Sentry error reports. Documented as off by default, but a live
       # instance reported errorReportingEnabled: true, so say it explicitly.
       NC_DISABLE_ERR_REPORTS: "true"
