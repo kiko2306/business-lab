@@ -29995,3 +29995,42 @@ The first version's guard was the "defensive extra condition that silently
 disables the feature" failure mode, and only a run against the real management
 server could have shown it — the client's `netbird status -d` view reports these
 same peers as `Connecting`, which reads as *not* connected.
+
+## 508. Outage review 2026-09-18 — backend OOM loop from buffered DB dumps
+
+Asked to explain the latest Authelia/NPM/Tailscale/NetBird outage. Findings,
+from Uptime Kuma's heartbeat table (ntfy only caches 12 h), the host journal
+and the socket-proxy access log:
+
+- **2026-09-18 08:18–08:22 UTC, all five monitors down together** — WAN, not
+  the stack. `cloudflared` got DNS *and* TCP dial timeouts to Cloudflare edge
+  IPs; no container restarted; Kuma resolves via 1.1.1.1/8.8.8.8, not
+  Pi-hole. No NIC event on the host → ISP/router side. No repo change.
+- **Authelia/NPM, 09-15 14:47** — a manual `apt upgrade -y` + reboot (~50 s).
+- **NetBird, 09-16 10:31** — the §461 deploy recreating it.
+- **Tailscale, 09-17 07:51** — `criticalServiceHealth.ts` restart after the
+  Funnel's `*.ts.net` name returned `ENOTFOUND`. That failure recurs
+  (00:53, 07:48, 19:22, 03:39) and self-heals in ~4 min every other time,
+  so the restart likely wasn't needed. Its warn lines were not in
+  `warn.log` either — not chased.
+
+The real finding: **the backend had been OOM-killed every ~40 s since
+2026-09-17 19:28 UTC (853 restarts)**. The overdue scheduled app-data backup
+runs right after boot, and `appDumps.ts` buffered each `pg_dump` in memory
+(`Buffer.concat`) before writing it. Nextcloud's dump had reached 723 MB
+against the backend's 768 MB limit — `oc_filecache` is 2.2 GB, 3.3 M rows,
+from a hand-added FTP external storage (`/NAS`, rooted at the NAS's `//`).
+
+Fix: `dumpToFile` pipes the dump command's stdout straight into
+`<app>.sql.part` (`stream/promises` `pipeline`) and renames it into place
+only on exit 0 with non-empty output — the old keep-the-last-good-dump
+guarantee, without the buffer. A write error kills the dump. Tests run real
+`sh` commands through it (2 MB success, mid-way failure, empty output).
+
+Verified on home-srv-01 (0.117.3): first boot after deploy streamed a
+**910 MB** `nextcloud.sql` with the backend at ~60 MB, 31/31 dumps OK, Kopia
+snapshot triggered, restart count 0.
+
+Still open (README): the boot-time retry that turned one crash into a loop
+(and prunes the previous archive with each partial one), and the `/NAS`
+mount's size — an operator call.

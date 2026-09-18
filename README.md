@@ -260,10 +260,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Backups
 
-- [ ] **Stream database dumps to disk instead of buffering them** (§508)
-      — `appDumps.ts` held a whole `pg_dump` in memory; Nextcloud's
-      723 MB dump OOM-killed the 768 MB backend on every boot from
-      2026-09-17 19:28 UTC. Any large enough database does the same.
 - [ ] **A crashed scheduled backup retries on every boot** (§508) — an
       overdue app-data backup starts immediately on startup, so a backup
       that kills the backend turns into a restart loop (853 restarts,
@@ -273,5 +269,5 @@ it is done — not ticked off and left behind. Section references point at
 - [ ] **Nextcloud `/NAS` FTP mount indexes the whole NAS** (§508) — the
       hand-added external storage `frias@192.168.1.50//` is rooted at the
       NAS root: 3.3 M `oc_filecache` rows, 2.2 GB table. Operator decision:
-      narrow it to a subfolder or drop it. Streaming dumps (above) stops it
-      crashing the backend but not the dump/backup size.
+      narrow it to a subfolder or drop it. Streaming dumps (§508) stopped it
+      crashing the backend but not the ~900 MB dump/backup size.
