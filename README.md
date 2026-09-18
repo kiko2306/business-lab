@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.117.12** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.117.13** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -255,8 +255,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### From the 2026-09-18 review (§511)
 
-- [ ] **Failed dashboard logins are audited without username or IP** — no
-      way to spot brute force from `audit_logs`.
 - [ ] **Dashboard login hardening** — invited usernames answer 403 vs 401
       (enumeration); unknown users skip the bcrypt compare (timing); a TOTP
       code can be replayed inside its window; no per-`mfaToken` attempt cap.

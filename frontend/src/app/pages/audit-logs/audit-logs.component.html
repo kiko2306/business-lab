@@ -37,6 +37,7 @@
           <tr>
             <th>Time</th>
             <th>User</th>
+            <th>IP</th>
             <th>Action</th>
             <th>Resource</th>
             <th>Result</th>
@@ -46,6 +47,7 @@
           <tr *ngFor="let item of items">
             <td data-label="Time">{{ item.created_at | date:'dd/MM/yyyy, HH:mm' }}</td>
             <td data-label="User">{{ item.username || 'system' }}</td>
+            <td data-label="IP">{{ item.ip || '—' }}</td>
             <td data-label="Action">{{ item.action }}</td>
             <td data-label="Resource">{{ item.resource || '—' }}</td>
             <td data-label="Result">
@@ -55,7 +57,7 @@
             </td>
           </tr>
           <tr *ngIf="!items.length && !loading">
-            <td colspan="5" class="text-center text-body-secondary py-4">No audit logs found.</td>
+            <td colspan="6" class="text-center text-body-secondary py-4">No audit logs found.</td>
           </tr>
         </tbody>
       </table>

@@ -11,6 +11,7 @@ interface AuditLogRow {
   resource: string | null;
   result: string;
   created_at: string;
+  ip: string | null;
 }
 
 function parsePaging(value: unknown, fallback: number): number {
@@ -58,13 +59,14 @@ function buildFilters(params: AuditFilterParams): { whereSql: string; values: un
 }
 
 function toCsv(rows: AuditLogRow[]): string {
-  const header = ['id', 'username', 'action', 'resource', 'result', 'created_at'];
+  const header = ['id', 'username', 'ip', 'action', 'resource', 'result', 'created_at'];
   const lines = [header.join(',')];
 
   for (const row of rows) {
     const cols = [
       row.id,
       row.username ?? '',
+      row.ip ?? '',
       row.action ?? '',
       row.resource ?? '',
       row.result ?? '',
@@ -86,7 +88,10 @@ router.get('/', validateQuery(schemas.auditQuery), async (req: Request, res: Res
 
   try {
     const listQuery = `
-      SELECT a.id, a.action, a.resource, a.result, a.created_at, u.username
+      SELECT a.id, a.action, a.resource, a.result, a.created_at,
+             -- A failed login has no user row; show the username it tried (§520).
+             COALESCE(u.username, a.metadata->>'username') AS username,
+             a.metadata->>'ip' AS ip
       FROM audit_logs a
       LEFT JOIN users u ON u.id = a.user_id
       ${whereSql}
@@ -119,7 +124,10 @@ router.get('/export.csv', validateQuery(schemas.auditQuery), async (req: Request
   try {
     const limit = 100000;
     const result = await query<AuditLogRow>(
-      `SELECT a.id, a.action, a.resource, a.result, a.created_at, u.username
+      `SELECT a.id, a.action, a.resource, a.result, a.created_at,
+             -- A failed login has no user row; show the username it tried (§520).
+             COALESCE(u.username, a.metadata->>'username') AS username,
+             a.metadata->>'ip' AS ip
        FROM audit_logs a
        LEFT JOIN users u ON u.id = a.user_id
        ${whereSql}

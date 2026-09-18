@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.13] — 2026-09-18
+
+### Added
+
+- Audit Logs now show the client IP for dashboard logins, and the username a failed login tried; both are in the CSV export too.
+
 ## [0.117.12] — 2026-09-18
 
 ### Fixed

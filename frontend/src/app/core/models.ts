@@ -340,6 +340,7 @@ export interface AuditLogEntry {
   resource: string | null;
   result: string;
   created_at: string;
+  ip: string | null;
 }
 
 export interface AuditLogResponse {

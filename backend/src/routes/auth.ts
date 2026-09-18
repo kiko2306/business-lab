@@ -236,10 +236,13 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
     }
 
     if (!user || !(await verifyPassword(password, user.password_hash ?? ''))) {
+      // Username and client IP (resolved by the frontend nginx, §516) are
+      // what make a brute-force run visible on the Audit Logs page (§520).
       await writeAuditLog({
         action: 'login',
         resource: 'auth',
         result: 'failure',
+        metadata: { username, ip: req.ip },
       });
       return res.status(401).json({ error: 'Invalid username or password' });
     }
@@ -259,12 +262,18 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
     // Password is right but a second factor is due: hand back a short-lived
     // token to spend at /auth/login/totp. No session is created yet.
     if (user.totp_enabled) {
-      await writeAuditLog({ userId: user.id, action: 'login_mfa_challenge', resource: 'auth', result: 'success' });
+      await writeAuditLog({
+        userId: user.id,
+        action: 'login_mfa_challenge',
+        resource: 'auth',
+        result: 'success',
+        metadata: { ip: req.ip },
+      });
       return res.status(202).json({ mfaRequired: true, mfaToken: signMfaToken(user.id) });
     }
 
     const session = await issueSession(user);
-    await writeAuditLog({ userId: user.id, action: 'login', resource: 'auth', result: 'success' });
+    await writeAuditLog({ userId: user.id, action: 'login', resource: 'auth', result: 'success', metadata: { ip: req.ip } });
     return res.json(session);
   } catch (err) {
     console.error('Login error:', (err as Error).message);
@@ -320,12 +329,12 @@ router.post('/login/totp', authLimiter, validateBody(schemas.authLoginTotp), asy
     }
 
     if (!ok) {
-      await writeAuditLog({ userId, action: 'login_mfa', resource: 'auth', result: 'failure' });
+      await writeAuditLog({ userId, action: 'login_mfa', resource: 'auth', result: 'failure', metadata: { ip: req.ip } });
       return res.status(401).json({ error: 'That code is not valid.' });
     }
 
     const session = await issueSession(user);
-    await writeAuditLog({ userId, action: 'login_mfa', resource: 'auth', result: 'success' });
+    await writeAuditLog({ userId, action: 'login_mfa', resource: 'auth', result: 'success', metadata: { ip: req.ip } });
     if (viaRecoveryCode) {
       await writeAuditLog({ userId, action: 'login_recovery_code_used', resource: 'auth', result: 'success' });
     }
