@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.117.14** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.117.15** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -255,7 +255,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### From the 2026-09-18 review (§511)
 
-- [ ] **Public dashboard HTML has no HSTS/CSP** — helmet only covers `/api`.
 - [ ] **Stopped apps keep public hostnames that 502** (home-assistant,
       itflow, twenty) — and the reconciler reports them "healthy" because it
       checks NPM/Cloudflare config, not the upstream.

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.15] — 2026-09-18
+
+### Added
+
+- The dashboard page now sends HSTS, a Content-Security-Policy and a Referrer-Policy; the service worker script gets the security headers it used to miss.
+
 ## [0.117.14] — 2026-09-18
 
 ### Fixed
