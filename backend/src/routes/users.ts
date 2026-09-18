@@ -435,8 +435,18 @@ router.put(
 
     try {
       const passwordHash = await hashPassword(password);
+      // Revoke the account's refresh tokens in the same statement: a reset is
+      // usually "someone else may have this password", and without it an old
+      // session keeps refreshing for up to JWT_REFRESH_EXPIRES (7 d). Access
+      // tokens already issued still run out their own lifetime (1 h).
       const result = await query<{ id: number; username: string; email: string | null }>(
-        'UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING id, username, email',
+        `WITH updated AS (
+           UPDATE users SET password_hash = $2 WHERE id = $1 RETURNING id, username, email
+         ), revoked AS (
+           UPDATE refresh_tokens SET revoked = TRUE
+           WHERE user_id IN (SELECT id FROM updated) AND revoked = FALSE
+         )
+         SELECT id, username, email FROM updated`,
         [id, passwordHash]
       );
       const user = result.rows[0];

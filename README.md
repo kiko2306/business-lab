@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.117.6** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.117.7** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -258,10 +258,6 @@ it is done — not ticked off and left behind. Section references point at
       localhost: bypasses recovery mode's localhost-only check and the login
       rate limit. Tunnel traffic is fine (Cloudflare appends the real IP).
       Found by reading the code; prove it on a LAN request before fixing.
-- [ ] **A password reset doesn't revoke the user's sessions** —
-      `routes/users.ts` sets the new hash but leaves `refresh_tokens` live
-      (only `scripts/recoverAdmin.ts` revokes), so an old session keeps
-      refreshing for up to 7 days.
 - [ ] **NetBird router peer drops its management stream ~68×/hour** —
       steady for the client's whole uptime: `502 Bad Gateway` on the job
       stream and `RST_STREAM INTERNAL_ERROR` on the main one, via
@@ -290,3 +286,7 @@ it is done — not ticked off and left behind. Section references point at
       session, so an audit insert failure 500s a successful login.
       `/auth/setup` also re-implements `issueSession()` and its own audit
       insert.
+- [ ] **Expired refresh tokens are never purged** — `refresh_tokens` on
+      home-srv-01 held 267 rows, 261 of them expired (§513). Harmless
+      (`/auth/refresh` checks `expires_at`), but it grows forever; a delete
+      in the existing audit-log purge sweeper would cover it.

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.7] — 2026-09-18
+
+### Fixed
+
+- Resetting a user's password (or the admin's, in recovery mode) now signs out that user's existing sessions.
+
 ## [0.117.6] — 2026-09-18
 
 ### Fixed

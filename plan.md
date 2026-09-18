@@ -30154,3 +30154,19 @@ Remaining gap: the few seconds between `up` and the claim, when the form is
 public. Closing it would need the claim before the container is reachable
 (no route in MeshCentral for that), or exposure after the claim, which is
 the §506 start-ordering item.
+
+## 513. A password reset now revokes the account's refresh tokens
+
+§511 finding. `PUT /api/users/:id/password` and the recovery-mode
+`reset-admin-password` set the new hash but left `refresh_tokens` live, so a
+session minted with the old password kept refreshing for up to 7 days. Only
+`scripts/recoverAdmin.ts` revoked. Both routes now revoke in the same
+statement as the hash update (a data-modifying CTE), so it's atomic. Access
+tokens already issued still expire on their own (1 h), which is the known
+ceiling. Invitation accept doesn't need it: it only ever sets a *first*
+password.
+
+Proven against home-srv-01's database inside a rolled-back transaction: the
+statement returned the user and took their live tokens from 265 to 0, and an
+unknown id matched nothing. That's also how the new README item turned up:
+261 of the 267 rows were long expired.

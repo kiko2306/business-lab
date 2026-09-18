@@ -55,10 +55,16 @@ router.post('/reset-admin-password', validateBody(schemas.recoveryResetAdminPass
   try {
     const passwordHash = await hashPassword(password);
     const result = await query<{ id: number }>(
-      `UPDATE users
-       SET password_hash = $2
-       WHERE username = $1
-       RETURNING id`,
+      // Same statement revokes the account's refresh tokens, as
+      // scripts/recoverAdmin.ts does: a recovery reset means the old password
+      // (and any session minted with it) is no longer trusted.
+      `WITH updated AS (
+         UPDATE users SET password_hash = $2 WHERE username = $1 RETURNING id
+       ), revoked AS (
+         UPDATE refresh_tokens SET revoked = TRUE
+         WHERE user_id IN (SELECT id FROM updated) AND revoked = FALSE
+       )
+       SELECT id FROM updated`,
       [username, passwordHash]
     );
 
