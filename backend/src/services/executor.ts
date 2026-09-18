@@ -491,6 +491,29 @@ interface ServiceActionResult {
 /**
  * Start a service using docker compose up
  */
+/**
+ * Auto-exposure (§331): every exposable app is exposed, no opt-in. Settle the
+ * app's `service_exposure` row, and the Authelia rules + OIDC clients derived
+ * from the set of enabled rows, **before** `compose up` (§527). The env
+ * overrides, exposure config files and OIDC client env this boot is rendered
+ * with all key off the row's `enabled`, so settling it after `up` (as before)
+ * gave an app's very first boot pre-exposure values: a hard 502 on
+ * MeshCentral, and for the other exposure/OIDC apps a first boot with stale
+ * Host allow-lists or no SSO until a second start. DB + Authelia config only;
+ * publishing (NPM, tunnel, DNS) still happens after `up`. Neither call throws.
+ */
+async function settleAutoExposure(serviceName: string, userId: number | null): Promise<void> {
+  if (await ensureAutoExposure(serviceName, userId)) {
+    // A row just created, enabled or torn down changes the set of
+    // Authelia-gated hostnames and OIDC clients. Restarts Authelia only if
+    // the rules actually moved. Without it an auto-exposed app gets an NPM
+    // host + DNS but no access_control rule, and Authelia's default-deny
+    // 403s everyone (§331 follow-up).
+    await syncAutheliaAccessControlSafe('auto_exposure', userId);
+    await syncAutheliaOidcClientsSafe('auto_exposure', userId);
+  }
+}
+
 export async function startService(serviceName: string, userId: number): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
     throw {
@@ -525,6 +548,8 @@ export async function startService(serviceName: string, userId: number): Promise
     const startTime = new Date();
     logger.info(`Starting service: ${serviceName}`, { userId, service: serviceName });
 
+    await settleAutoExposure(serviceName, userId);
+
     // Keep the app's own reverse-proxy config in step with its exposed
     // hostname before it (re)starts: env overrides for most apps, a config
     // file for the few that need it (Home Assistant).
@@ -547,22 +572,12 @@ export async function startService(serviceName: string, userId: number): Promise
 
     logger.info(`Service started successfully: ${serviceName}`, { userId });
 
-    // Auto-exposure (§331): every exposable app is exposed, no opt-in — keep
-    // the row in step with getExposability() before provisioning it.
-    const exposureChanged = await ensureAutoExposure(serviceName, userId);
+    // The row was settled before `up` (settleAutoExposure); now publish it:
+    // NPM host, tunnel ingress, DNS.
     const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error: Error) => {
       logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
       return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };
     });
-    // A row that was just created, enabled or torn down changes the set of
-    // Authelia-gated hostnames and OIDC clients — regenerate both (idempotent,
-    // restarts Authelia only if the rules actually moved). Without this an
-    // auto-exposed app gets an NPM host + DNS but no access_control rule, so
-    // Authelia's default-deny 403s everyone (§331 follow-up).
-    if (exposureChanged) {
-      await syncAutheliaAccessControlSafe('auto_exposure', userId);
-      await syncAutheliaOidcClientsSafe('auto_exposure', userId);
-    }
 
     // A newly-started (and exposed) app gets a Home Page tile; a newly-exposed
     // one changes its link. Regenerate after provisioning so the tile reflects
@@ -660,6 +675,8 @@ export async function pullAndRecreateService(serviceName: string, userId: number
   await ensureGeneratedSecrets(serviceName);
   ensureServiceSecrets(serviceName, appDir, composeFile);
 
+  await settleAutoExposure(serviceName, userId);
+
   // The pull recreates against the base compose tags, not the current pins.
   const baseArgs = `-f ${composeFile}`;
   const startTime = new Date();
@@ -707,22 +724,12 @@ export async function pullAndRecreateService(serviceName: string, userId: number
     });
     logger.info(`Service updated: ${serviceName}`, { userId, updated });
 
-    // Auto-exposure (§331): every exposable app is exposed, no opt-in — keep
-    // the row in step with getExposability() before provisioning it.
-    const exposureChanged = await ensureAutoExposure(serviceName, userId);
+    // The row was settled before `up` (settleAutoExposure); now publish it:
+    // NPM host, tunnel ingress, DNS.
     const exposure = await provisionServiceIfEnabled(serviceName, userId).catch((error: Error) => {
       logger.error(`Unexpected exposure provisioning error for ${serviceName}`, { error: error.message });
       return { attempted: true, success: false, warning: 'Exposure provisioning failed unexpectedly.' };
     });
-    // A row that was just created, enabled or torn down changes the set of
-    // Authelia-gated hostnames and OIDC clients — regenerate both (idempotent,
-    // restarts Authelia only if the rules actually moved). Without this an
-    // auto-exposed app gets an NPM host + DNS but no access_control rule, so
-    // Authelia's default-deny 403s everyone (§331 follow-up).
-    if (exposureChanged) {
-      await syncAutheliaAccessControlSafe('auto_exposure', userId);
-      await syncAutheliaOidcClientsSafe('auto_exposure', userId);
-    }
 
     return {
       success: true,

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.20] — 2026-09-18
+
+### Fixed
+
+- An app's very first start with exposure now boots with its public-hostname settings (and, for SSO apps, its Authelia client) already in place, instead of needing a second start.
+
 ## [0.117.19] — 2026-09-18
 
 ### Changed
