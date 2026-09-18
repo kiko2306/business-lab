@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.117.18** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.117.19** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -254,7 +254,3 @@ it is done — not ticked off and left behind. Section references point at
       after the claim would close it.
 
 ### From the 2026-09-18 review (§511)
-
-- [ ] **Exposure reconciler: report stopped apps, not "all healthy"**
-      (§524, option D) — after the NPM/Cloudflare check, look at container
-      state and log/summarise stopped-but-exposed apps separately.

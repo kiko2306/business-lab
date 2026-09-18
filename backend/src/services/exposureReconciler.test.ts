@@ -14,6 +14,7 @@ const authelia = vi.hoisted(() => ({
   syncAutheliaOidcClientsSafe: vi.fn(async () => null),
 }));
 const registry = vi.hoisted(() => ({ SERVICES: {} as Record<string, unknown> }));
+const status = vi.hoisted(() => ({ getServiceStatus: vi.fn(async (name: string) => ({ name, state: 'running' })) }));
 
 vi.mock('../utils/database', () => db);
 vi.mock('../utils/audit', () => audit);
@@ -23,6 +24,7 @@ vi.mock('./homepageConfig', () => homepage);
 vi.mock('./autheliaAccessControl', () => ({ syncAutheliaAccessControlSafe: authelia.syncAutheliaAccessControlSafe }));
 vi.mock('./autheliaOidcClients', () => ({ syncAutheliaOidcClientsSafe: authelia.syncAutheliaOidcClientsSafe }));
 vi.mock('../config/services', () => registry);
+vi.mock('./status', () => status);
 vi.mock('../utils/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -41,6 +43,7 @@ async function reconcileExposureDrift(): ReturnType<typeof reconcile> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  status.getServiceStatus.mockImplementation(async (name: string) => ({ name, state: 'running' }));
   vi.useFakeTimers();
   // Two exposable (nextcloud, vaultwarden), one not (samba), plus a secondary key.
   registry.SERVICES = { nextcloud: {}, vaultwarden: {}, samba: {}, 'nextcloud:api': {} };
@@ -87,7 +90,7 @@ describe('reconcileExposureDrift', () => {
     // audit_logs FK rejects a fake numeric id, §441).
     expect(exposure.provisionServiceIfEnabled).toHaveBeenCalledWith('nextcloud', null);
     // samba is not exposable (attempted:false) — not counted.
-    expect(summary).toEqual({ checked: 2, reconciled: 2, failed: [] });
+    expect(summary).toEqual({ checked: 2, reconciled: 2, failed: [], notRunning: [] });
     expect(audit.writeAuditLog).not.toHaveBeenCalled();
     expect(homepage.regenerateHomepageServices).toHaveBeenCalledOnce();
   });
@@ -124,10 +127,27 @@ describe('reconcileExposureDrift', () => {
       checked: 2,
       reconciled: 1,
       failed: [{ service: 'vaultwarden', error: 'NPM host 7 not found' }],
+      notRunning: [],
     });
     expect(audit.writeAuditLog).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'exposure_reconcile', result: 'failure' })
     );
+  });
+
+  // §526: a provisioned hostname with a stopped app behind it isn't a
+  // failure (no audit row), but mustn't be summarised as "all healthy".
+  it('reports exposed apps that are not running separately from failures', async () => {
+    status.getServiceStatus.mockImplementation(async (name: string) => ({
+      name,
+      state: name === 'vaultwarden' ? 'stopped' : 'running',
+    }));
+
+    const summary = await reconcileExposureDrift();
+
+    expect(summary?.reconciled).toBe(2);
+    expect(summary?.failed).toEqual([]);
+    expect(summary?.notRunning).toEqual([{ service: 'vaultwarden', state: 'stopped' }]);
+    expect(audit.writeAuditLog).not.toHaveBeenCalled();
   });
 
   it('treats a thrown provisioning error as a failure, not a crash', async () => {

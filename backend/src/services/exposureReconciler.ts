@@ -26,6 +26,7 @@ import { SERVICES } from '../config/services';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { ensureAutoExposure, getServiceExposureRow, provisionServiceIfEnabled } from './exposure';
 import { regenerateHomepageServices } from './homepageConfig';
+import { getServiceStatus } from './status';
 import { syncAutheliaAccessControlSafe } from './autheliaAccessControl';
 import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
 import logger from '../utils/logger';
@@ -48,6 +49,10 @@ export interface ExposureReconcileSummary {
   checked: number;
   reconciled: number;
   failed: { service: string; error: string }[];
+  // Hostname provisioned fine, but no app behind it: visitors get the
+  // "isn't running" page (§525). Reported apart so a pass with stopped apps
+  // doesn't read as "all healthy" (§526).
+  notRunning: { service: string; state: string }[];
 }
 
 /**
@@ -75,7 +80,7 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
   // provisionServiceIfEnabled; orphaned names are reconcileRemovedServices' job.
   const services = Object.keys(SERVICES).filter((name) => !name.includes(':'));
 
-  const summary: ExposureReconcileSummary = { checked: 0, reconciled: 0, failed: [] };
+  const summary: ExposureReconcileSummary = { checked: 0, reconciled: 0, failed: [], notRunning: [] };
 
   for (const name of services) {
     try {
@@ -90,6 +95,8 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
       const row = await getServiceExposureRow(name);
       if (result.success && row?.status !== 'failed') {
         summary.reconciled += 1;
+        const { state } = await getServiceStatus(name);
+        if (state !== 'running') summary.notRunning.push({ service: name, state });
       } else {
         summary.failed.push({ service: name, error: row?.last_error ?? result.warning ?? 'unknown error' });
       }
@@ -126,6 +133,12 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
       resource: 'exposure',
       result: 'failure',
       metadata: { ...summary },
+    });
+  } else if (summary.notRunning.length) {
+    logger.info('Exposure reconciliation: hostnames provisioned, but some apps behind them are not running', {
+      checked: summary.checked,
+      reconciled: summary.reconciled,
+      notRunning: summary.notRunning,
     });
   } else {
     logger.info('Exposure reconciliation: all exposed services healthy', {
