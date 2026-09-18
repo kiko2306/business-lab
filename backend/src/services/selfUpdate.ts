@@ -441,7 +441,7 @@ async function runSelfUpdateSequence(
         build: buildTargets,
         apps: scope.apps === null ? 'all' : [...scope.apps],
       },
-    }).catch(() => {});
+    });
 
     // Nothing the deploy changed needs a build, an app recreate or a restart —
     // a version bump, docs, plan.md. The `git pull` above is the whole update;
@@ -452,7 +452,7 @@ async function runSelfUpdateSequence(
         action: 'self_update_trigger',
         resource: toCommit,
         metadata: { fromCommit: check.currentCommit, toCommit, scope: 'pull-only' },
-      }).catch(() => {});
+      });
       await updateRun(runId, { state: 'done', finished: true });
       logger.info('Self-update: pull-only, nothing to rebuild or restart', { runId });
       return;
@@ -513,7 +513,7 @@ async function runSelfUpdateSequence(
         appsUpdated: appResults.length - appsFailed.length,
         appsFailed: appsFailed.map((r) => r.serviceName),
       },
-    }).catch(() => {});
+    });
 
     if (!scope.backend) {
       // Backend image unchanged — no self-restart, so the run finishes here.
@@ -605,7 +605,7 @@ export async function reconcileDanglingSelfUpdateRun(): Promise<void> {
       action: 'self_update_complete',
       resource: latest.toCommit ?? undefined,
       metadata: { fromCommit: latest.fromCommit, toCommit: latest.toCommit },
-    }).catch(() => {});
+    });
     return;
   }
 
@@ -623,6 +623,6 @@ export async function reconcileDanglingSelfUpdateRun(): Promise<void> {
     action: 'self_update_reconcile_failed',
     resource: latest.toCommit ?? undefined,
     metadata: { state: latest.state, toCommit: latest.toCommit, actualCommit },
-  }).catch(() => {});
+  });
 }
 

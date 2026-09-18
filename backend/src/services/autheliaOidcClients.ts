@@ -248,7 +248,7 @@ export async function syncAutheliaOidcClientsSafe(
       resource: trigger,
       result: 'failure',
       metadata: { error: message },
-    }).catch(() => {});
+    });
     return 'The exposure change was saved, but updating Authelia OIDC clients failed — check the server logs.';
   }
 }

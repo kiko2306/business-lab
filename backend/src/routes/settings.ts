@@ -179,7 +179,7 @@ router.put(
         action: 'settings_change',
         resource: CLOUDFLARE_ACCOUNT_MODEL_KEY,
         result: 'success',
-      }).catch(() => {});
+      });
       return res.json({ accountModel: req.body.model, message: 'Cloudflare account model saved.' });
     } catch {
       return res.status(500).json({ error: 'Unable to save the Cloudflare account model.' });
@@ -203,7 +203,7 @@ router.put('/cloudflare-token', validateBody(schemas.cloudflareTokenUpdate), asy
       action: 'settings_change',
       resource: CLOUDFLARE_TOKEN_KEY,
       result: 'success',
-    }).catch(() => {});
+    });
 
     return res.json({
       configured: true,
@@ -287,7 +287,7 @@ router.put('/claude-key', validateBody(schemas.claudeKeyUpdate), async (req: Req
       action: 'settings_change',
       resource: CLAUDE_API_KEY_SETTING,
       result: 'success',
-    }).catch(() => {});
+    });
 
     // Push the new key into Mealie's AI recipe parser if it's running (§238).
     // Detached: the reconcile polls Mealie for up to a minute, and a Mealie
@@ -384,7 +384,7 @@ router.put('/exposure', validateBody(schemas.exposureGlobalSettings), async (req
       action: 'settings_change',
       resource: 'exposure_config',
       result: 'success',
-    }).catch(() => {});
+    });
 
     return res.json({ message: 'Exposure settings saved successfully.' });
   } catch {
@@ -513,7 +513,7 @@ router.put('/mail', validateBody(schemas.mailSettings), async (req: Request, res
       action: 'settings_change',
       resource: 'mail_config',
       result: 'success',
-    }).catch(() => {});
+    });
 
     return res.json({ message: 'Mail settings saved. Restart an app for it to pick them up.' });
   } catch {
@@ -613,7 +613,7 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
       action: 'settings_change',
       resource: 'backup_target',
       result: 'success',
-    }).catch(() => {});
+    });
 
     // Saving alone leaves Kopia mounted at the previous destination while the
     // UI claims otherwise, so apply it here rather than asking the user to
@@ -737,7 +737,7 @@ router.put('/general', async (req: Request, res: Response) => {
         .filter(Boolean)
         .join(', '),
       result: 'success',
-    }).catch(() => {});
+    });
 
     return res.json({
       timezone,
@@ -812,7 +812,7 @@ router.put('/alerts', async (req: Request, res: Response) => {
         ...(hasCrowdsec ? { crowdsecEnabled: body.crowdsecEnabled } : {}),
         ...(hasEnforce ? { enforceNpm: body.enforceNpm } : {}),
       },
-    }).catch(() => {});
+    });
 
     const saved = await getAlertNotifyConfig();
     return res.json({
@@ -846,7 +846,7 @@ router.post('/alerts/test', async (req: Request, res: Response) => {
     resource: 'ntfy_alerts_test',
     result: result.ok ? 'success' : 'failure',
     metadata: { source },
-  }).catch(() => {});
+  });
 
   return res.status(result.ok ? 200 : 502).json(result);
 });

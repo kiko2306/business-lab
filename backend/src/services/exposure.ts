@@ -335,7 +335,7 @@ async function deprovisionHostname({
       resource: auditResource,
       result: 'success',
       metadata: { hostname },
-    }).catch(() => {});
+    });
 
     logger.info(`Deprovisioned exposure for ${hostname}`);
   } catch (error) {
@@ -348,7 +348,7 @@ async function deprovisionHostname({
       resource: auditResource,
       result: 'failure',
       metadata: { hostname, error: message },
-    }).catch(() => {});
+    });
   }
 }
 
@@ -480,7 +480,7 @@ async function provisionHostname({
       resource: auditResource,
       result: 'success',
       metadata: { hostname, npmResult, cfResult },
-    }).catch(() => {});
+    });
 
     return { attempted: true, success: true, hostname };
   } catch (error) {
@@ -504,7 +504,7 @@ async function provisionHostname({
       resource: auditResource,
       result: 'failure',
       metadata: { hostname, error: message },
-    }).catch(() => {});
+    });
 
     return {
       attempted: true,
@@ -569,7 +569,7 @@ export async function reconcileRemovedServices(): Promise<void> {
       resource: name,
       result: 'success',
       metadata: { reason: 'service removed from the registry' },
-    }).catch(() => {});
+    });
   }
 }
 

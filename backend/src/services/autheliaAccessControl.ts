@@ -225,7 +225,7 @@ export async function syncAutheliaAccessControlSafe(
       resource: trigger,
       result: 'failure',
       metadata: { error: message },
-    }).catch(() => {});
+    });
     return 'The exposure change was saved, but updating Authelia access rules failed — check the server logs.';
   }
 }

@@ -90,7 +90,7 @@ router.post('/create', async (req: Request, res: Response) => {
       downloadUrl: `/api/backups/download/${encodeURIComponent(fileName)}`,
     });
   } catch (error) {
-    await writeAuditLog({ userId, action: 'backup_create', resource: 'backup', result: 'failure' }).catch(() => {});
+    await writeAuditLog({ userId, action: 'backup_create', resource: 'backup', result: 'failure' });
     logger.error('Backup creation failed', { error: (error as Error).message, userId });
     return res.status(500).json({ error: 'Unable to create backup.' });
   }
@@ -112,7 +112,7 @@ router.post('/dump-apps', async (req: Request, res: Response) => {
       resource: 'app-databases',
       result: report.failed === 0 ? 'success' : 'failure',
       metadata: { ok: report.ok, failed: report.failed },
-    }).catch(() => {});
+    });
     return res.json({
       message: report.failed === 0
         ? `Dumped ${report.ok} database${report.ok === 1 ? '' : 's'}.`
@@ -229,7 +229,7 @@ router.post('/restore', validateBody(schemas.backupRestore), async (req: Request
     await writeAuditLog({ userId, action: 'backup_restore', resource: fileName, result: 'success' });
     return res.json({ message: 'Backup restored successfully.' });
   } catch (error) {
-    await writeAuditLog({ userId, action: 'backup_restore', resource: fileName, result: 'failure' }).catch(() => {});
+    await writeAuditLog({ userId, action: 'backup_restore', resource: fileName, result: 'failure' });
     logger.error('Backup restore failed', { error: (error as Error).message, userId, fileName });
     return res.status(500).json({ error: 'Unable to restore backup.' });
   } finally {
@@ -257,7 +257,7 @@ router.put('/schedule', validateBody(schemas.backupScheduleUpdate), async (req: 
       action: 'settings_change',
       resource: 'backup_schedule',
       result: 'success',
-    }).catch(() => {});
+    });
 
     // Retention describes the directory, not just the moment a backup is made.
     // Without this, lowering "keep last" leaves the extra archives sitting

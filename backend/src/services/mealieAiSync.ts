@@ -198,7 +198,7 @@ export async function syncMealieAiProvider(serviceName: string): Promise<void> {
           action: 'settings_change',
           resource: 'mealie_ai_provider',
           result: 'success',
-        }).catch(() => {});
+        });
       }
       return;
     }
@@ -227,7 +227,7 @@ export async function syncMealieAiProvider(serviceName: string): Promise<void> {
       action: 'settings_change',
       resource: 'mealie_ai_provider',
       result: 'success',
-    }).catch(() => {});
+    });
   } catch (error) {
     logger.warn('Mealie AI sync failed', { error: (error as Error).message });
   }

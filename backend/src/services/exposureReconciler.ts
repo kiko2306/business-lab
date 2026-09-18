@@ -126,7 +126,7 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
       resource: 'exposure',
       result: 'failure',
       metadata: { ...summary },
-    }).catch(() => {});
+    });
   } else {
     logger.info('Exposure reconciliation: all exposed services healthy', {
       checked: summary.checked,

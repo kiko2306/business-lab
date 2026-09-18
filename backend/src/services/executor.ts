@@ -529,10 +529,16 @@ export async function startService(serviceName: string, userId: number): Promise
     });
 
     // Log the successful operation
-    await logAuditEvent(userId, 'SERVICE_START', serviceName, 'success', {
-      stdout: result.stdout,
-      stderr: result.stderr,
-      duration: new Date().getTime() - startTime.getTime(),
+    await writeAuditLog({
+      userId,
+      action: 'SERVICE_START',
+      resource: serviceName,
+      result: 'success',
+      metadata: {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        duration: new Date().getTime() - startTime.getTime(),
+      },
     });
 
     logger.info(`Service started successfully: ${serviceName}`, { userId });
@@ -575,11 +581,17 @@ export async function startService(serviceName: string, userId: number): Promise
     });
 
     // Log the failed operation
-    await logAuditEvent(userId, 'SERVICE_START', serviceName, 'failure', {
-      error: httpError.message,
-      stderr: httpError.stderr,
-      code: httpError.code,
-    }).catch((err: Error) => logger.error('Failed to log audit event', { error: err.message }));
+    await writeAuditLog({
+      userId,
+      action: 'SERVICE_START',
+      resource: serviceName,
+      result: 'failure',
+      metadata: {
+        error: httpError.message,
+        stderr: httpError.stderr,
+        code: httpError.code,
+      },
+    });
 
     throw {
       statusCode: 500,
@@ -679,9 +691,15 @@ export async function pullAndRecreateService(serviceName: string, userId: number
         : null;
     });
 
-    await logAuditEvent(userId, 'SERVICE_UPDATE', serviceName, 'success', {
-      updated: updated ?? 'unknown',
-      duration: new Date().getTime() - startTime.getTime(),
+    await writeAuditLog({
+      userId,
+      action: 'SERVICE_UPDATE',
+      resource: serviceName,
+      result: 'success',
+      metadata: {
+        updated: updated ?? 'unknown',
+        duration: new Date().getTime() - startTime.getTime(),
+      },
     });
     logger.info(`Service updated: ${serviceName}`, { userId, updated });
 
@@ -712,10 +730,16 @@ export async function pullAndRecreateService(serviceName: string, userId: number
   } catch (error) {
     const httpError = error as HttpError;
     logger.error(`Failed to update service: ${serviceName}`, { userId, error: httpError.message });
-    await logAuditEvent(userId, 'SERVICE_UPDATE', serviceName, 'failure', {
-      error: httpError.message,
-      stderr: httpError.stderr,
-    }).catch((err: Error) => logger.error('Failed to log audit event', { error: err.message }));
+    await writeAuditLog({
+      userId,
+      action: 'SERVICE_UPDATE',
+      resource: serviceName,
+      result: 'failure',
+      metadata: {
+        error: httpError.message,
+        stderr: httpError.stderr,
+      },
+    });
 
     throw {
       statusCode: 500,
@@ -954,10 +978,16 @@ export async function stopService(serviceName: string, userId: number): Promise<
     const result = await executeCommand(command, 60000); // 60s timeout for shutdown
 
     // Log the successful operation
-    await logAuditEvent(userId, 'SERVICE_STOP', serviceName, 'success', {
-      stdout: result.stdout,
-      stderr: result.stderr,
-      duration: new Date().getTime() - startTime.getTime(),
+    await writeAuditLog({
+      userId,
+      action: 'SERVICE_STOP',
+      resource: serviceName,
+      result: 'success',
+      metadata: {
+        stdout: result.stdout,
+        stderr: result.stderr,
+        duration: new Date().getTime() - startTime.getTime(),
+      },
     });
 
     logger.info(`Service stopped successfully: ${serviceName}`, { userId });
@@ -981,11 +1011,17 @@ export async function stopService(serviceName: string, userId: number): Promise<
     });
 
     // Log the failed operation
-    await logAuditEvent(userId, 'SERVICE_STOP', serviceName, 'failure', {
-      error: httpError.message,
-      stderr: httpError.stderr,
-      code: httpError.code,
-    }).catch((err: Error) => logger.error('Failed to log audit event', { error: err.message }));
+    await writeAuditLog({
+      userId,
+      action: 'SERVICE_STOP',
+      resource: serviceName,
+      result: 'failure',
+      metadata: {
+        error: httpError.message,
+        stderr: httpError.stderr,
+        code: httpError.code,
+      },
+    });
 
     throw {
       statusCode: 500,
@@ -1051,9 +1087,15 @@ export async function restartService(serviceName: string, userId: number): Promi
       forceRecreate: true,
     });
 
-    await logAuditEvent(userId, 'SERVICE_RESTART', serviceName, 'success', {
-      stdout: result.stdout,
-      stderr: result.stderr,
+    await writeAuditLog({
+      userId,
+      action: 'SERVICE_RESTART',
+      resource: serviceName,
+      result: 'success',
+      metadata: {
+        stdout: result.stdout,
+        stderr: result.stderr,
+      },
     });
 
     logger.info(`Service restarted successfully: ${serviceName}`, { userId });
@@ -1072,45 +1114,22 @@ export async function restartService(serviceName: string, userId: number): Promi
       stderr: httpError.stderr,
     });
 
-    await logAuditEvent(userId, 'SERVICE_RESTART', serviceName, 'failure', {
-      error: httpError.message,
-      stderr: httpError.stderr,
-      code: httpError.code,
-    }).catch((err: Error) => logger.error('Failed to log audit event', { error: err.message }));
+    await writeAuditLog({
+      userId,
+      action: 'SERVICE_RESTART',
+      resource: serviceName,
+      result: 'failure',
+      metadata: {
+        error: httpError.message,
+        stderr: httpError.stderr,
+        code: httpError.code,
+      },
+    });
 
     throw {
       statusCode: 500,
       message: `Failed to restart service ${serviceName}: ${httpError.message}`,
       details: httpError.stderr,
     } as HttpError;
-  }
-}
-
-/**
- * Log an audit event to the database
- */
-export async function logAuditEvent(
-  userId: number | null,
-  action: string,
-  resource: string,
-  result: string,
-  metadata: Record<string, unknown> = {}
-): Promise<void> {
-  try {
-    await writeAuditLog({
-      userId,
-      action,
-      resource,
-      result,
-      metadata,
-    });
-  } catch (error) {
-    // Don't throw; audit logging is non-critical
-    logger.error('Failed to write audit log', {
-      error: (error as Error).message,
-      userId,
-      action,
-      resource,
-    });
   }
 }

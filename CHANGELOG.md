@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.8] — 2026-09-18
+
+### Fixed
+
+- A failed audit-log write can no longer turn a successful login into an error.
+
 ## [0.117.7] — 2026-09-18
 
 ### Fixed

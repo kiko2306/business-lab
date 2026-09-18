@@ -30191,3 +30191,24 @@ from inside the backend: container recreated with a 1 GiB limit, `healthy`
 within 10 s. Nextcloud's `occ onlyoffice:documentserver --check` reports
 "successfully connected" (9.4.0.129). Idle I/O (~10 MB written per 30 s) is
 its bundled services, not a leak.
+
+## 515. `writeAuditLog` never throws; call-site guards deleted
+
+§511 finding. `writeAuditLog` rethrew any insert error, so 56 call sites
+each carried `.catch(() => {})`. The ones that didn't were a bug: `/auth/login`
+and `/auth/login/totp` awaited it *after* `issueSession()`, so a failed audit
+insert returned 500 for a login whose session had already been written.
+
+Now the helper catches and logs (`Audit log write failed`, with action and
+resource) and never throws. Deleted:
+- the 56 `.catch(() => {})`, plus the logout route's try/catch around it;
+- `executor.ts`'s `logAuditEvent`, a second never-throw wrapper around the
+  same helper (its 8 calls now call `writeAuditLog` directly), and the
+  `.catch(logger.error)` chained onto four of those;
+- the `42703` "no metadata column" fallback. `database/init.sql` has always
+  created the column, and nothing ever migrated it in;
+- `/auth/setup`'s copy of `issueSession()` and its raw `INSERT INTO
+  audit_logs`, now the shared helpers. Same response shape: the webmaster's
+  capabilities now come from `getUserRoles`, which gives the same answer.
+
+One regression test: an insert failure resolves and logs.

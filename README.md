@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.117.7** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.117.8** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -278,12 +278,6 @@ it is done — not ticked off and left behind. Section references point at
 - [ ] **Stopped apps keep public hostnames that 502** (home-assistant,
       itflow, twenty) — and the reconciler reports them "healthy" because it
       checks NPM/Cloudflare config, not the upstream.
-- [ ] **`writeAuditLog` should never throw** — log and swallow inside it,
-      delete the ~50 `.catch(() => {})` at call sites and its `42703`
-      fallback. Today `/auth/login` awaits it uncaught *after* issuing a
-      session, so an audit insert failure 500s a successful login.
-      `/auth/setup` also re-implements `issueSession()` and its own audit
-      insert.
 - [ ] **Expired refresh tokens are never purged** — `refresh_tokens` on
       home-srv-01 held 267 rows, 261 of them expired (§513). Harmless
       (`/auth/refresh` checks `expires_at`), but it grows forever; a delete

@@ -152,7 +152,7 @@ router.post(
         action: 'invitation_accepted',
         resource: activated.username,
         result: 'success',
-      }).catch(() => {});
+      });
 
       // The account now has a password hash — write it into Authelia (§157).
       await syncAutheliaUsersSafe('invitation_accepted', activated.userId);
@@ -195,36 +195,15 @@ router.post('/setup', authLimiter, setupModeMiddleware(true), validateBody(schem
 
     // The first account is the webmaster — every capability, always (§152).
     await setUserRoles(user.id, ['webmaster']);
-    const roles = ['webmaster'];
-    const capabilities = effectiveCapabilities(roles);
 
     // The webmaster now has an email + password hash, so it's a valid Authelia
     // user — push it into users_database.yml so SSO works without a second
     // "invite yourself" step. Best-effort: never block setup on it.
     await syncAutheliaUsersSafe('setup', user.id);
 
-    const accessToken = signAccessToken({ id: user.id, username: user.username, roles });
-    const refreshToken = signRefreshToken({ id: user.id });
-
-    const refreshExpiry = new Date(Date.now() + refreshTokenExpiryMs());
-    await query('INSERT INTO refresh_tokens (user_id, token, expires_at) VALUES ($1, $2, $3)', [
-      user.id,
-      refreshToken,
-      refreshExpiry,
-    ]);
-
-    await query('INSERT INTO audit_logs (user_id, action, resource, result) VALUES ($1, $2, $3, $4)', [
-      user.id,
-      'setup',
-      'users',
-      'success',
-    ]);
-
-    return res.status(201).json({
-      accessToken,
-      refreshToken,
-      user: { id: user.id, username: user.username, roles, capabilities },
-    });
+    const session = await issueSession(user);
+    await writeAuditLog({ userId: user.id, action: 'setup', resource: 'users', result: 'success' });
+    return res.status(201).json(session);
   } catch (err) {
     const error = err as { code?: string; message: string };
     if (error.code === '23505') {
@@ -261,7 +240,7 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
         action: 'login',
         resource: 'auth',
         result: 'failure',
-      }).catch(() => {});
+      });
       return res.status(401).json({ error: 'Invalid username or password' });
     }
 
@@ -280,9 +259,7 @@ router.post('/login', authLimiter, validateBody(schemas.authLogin), async (req: 
     // Password is right but a second factor is due: hand back a short-lived
     // token to spend at /auth/login/totp. No session is created yet.
     if (user.totp_enabled) {
-      await writeAuditLog({ userId: user.id, action: 'login_mfa_challenge', resource: 'auth', result: 'success' }).catch(
-        () => {}
-      );
+      await writeAuditLog({ userId: user.id, action: 'login_mfa_challenge', resource: 'auth', result: 'success' });
       return res.status(202).json({ mfaRequired: true, mfaToken: signMfaToken(user.id) });
     }
 
@@ -343,16 +320,14 @@ router.post('/login/totp', authLimiter, validateBody(schemas.authLoginTotp), asy
     }
 
     if (!ok) {
-      await writeAuditLog({ userId, action: 'login_mfa', resource: 'auth', result: 'failure' }).catch(() => {});
+      await writeAuditLog({ userId, action: 'login_mfa', resource: 'auth', result: 'failure' });
       return res.status(401).json({ error: 'That code is not valid.' });
     }
 
     const session = await issueSession(user);
     await writeAuditLog({ userId, action: 'login_mfa', resource: 'auth', result: 'success' });
     if (viaRecoveryCode) {
-      await writeAuditLog({ userId, action: 'login_recovery_code_used', resource: 'auth', result: 'success' }).catch(
-        () => {}
-      );
+      await writeAuditLog({ userId, action: 'login_recovery_code_used', resource: 'auth', result: 'success' });
     }
     return res.json(session);
   } catch (err) {
@@ -379,11 +354,7 @@ router.post('/logout', authLimiter, authMiddleware, validateBody(schemas.authLog
     }
   }
 
-  try {
-    await writeAuditLog({ userId, action: 'logout', resource: 'auth', result: 'success' });
-  } catch (err) {
-    console.error('Audit log error:', (err as Error).message);
-  }
+  await writeAuditLog({ userId, action: 'logout', resource: 'auth', result: 'success' });
 
   return res.json({ message: 'Logged out successfully' });
 });
@@ -550,7 +521,7 @@ router.post(
       }
 
       if (!verifyTotp(code, openSecret(row.totp_secret))) {
-        await writeAuditLog({ userId, action: 'totp_activate', resource: 'auth', result: 'failure' }).catch(() => {});
+        await writeAuditLog({ userId, action: 'totp_activate', resource: 'auth', result: 'failure' });
         return res.status(400).json({ error: 'That code is not valid. Check your authenticator app and try again.' });
       }
 
@@ -566,7 +537,7 @@ router.post(
         }
       });
 
-      await writeAuditLog({ userId, action: 'totp_activate', resource: 'auth', result: 'success' }).catch(() => {});
+      await writeAuditLog({ userId, action: 'totp_activate', resource: 'auth', result: 'success' });
       return res.json({ enabled: true, recoveryCodes });
     } catch (err) {
       console.error('TOTP activate error:', (err as Error).message);
@@ -602,7 +573,7 @@ router.post(
         ? await verifyPassword(password, row.password_hash)
         : Boolean(row.totp_secret && verifyTotp(code, openSecret(row.totp_secret)));
       if (!verified) {
-        await writeAuditLog({ userId, action: 'totp_disable', resource: 'auth', result: 'failure' }).catch(() => {});
+        await writeAuditLog({ userId, action: 'totp_disable', resource: 'auth', result: 'failure' });
         return res.status(400).json({ error: 'Provide a current 6-digit code or your account password.' });
       }
 
@@ -614,7 +585,7 @@ router.post(
         await client.query('DELETE FROM totp_recovery_codes WHERE user_id = $1', [userId]);
       });
 
-      await writeAuditLog({ userId, action: 'totp_disable', resource: 'auth', result: 'success' }).catch(() => {});
+      await writeAuditLog({ userId, action: 'totp_disable', resource: 'auth', result: 'success' });
       return res.json({ enabled: false });
     } catch (err) {
       console.error('TOTP disable error:', (err as Error).message);

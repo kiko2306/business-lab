@@ -179,7 +179,7 @@ router.post(
           dumped: result.manifest.dumps.length,
           dumpFailed: result.dumpFailures.length,
         },
-      }).catch(() => {});
+      });
       return res.status(201).json({
         success: true,
         service: serviceName,
@@ -201,7 +201,7 @@ router.post(
         resource: serviceName,
         result: 'failure',
         metadata: { trigger: 'per-app', error: httpError.message },
-      }).catch(() => {});
+      });
       return res.status(httpError.statusCode || 500).json({
         error: 'Failed to back up the app',
         service: serviceName,
@@ -236,7 +236,7 @@ router.post(
         resource: serviceName,
         result: result.warnings.length ? 'failure' : 'success',
         metadata: { file, warnings: result.warnings },
-      }).catch(() => {});
+      });
       return res.json({
         success: true,
         ...result,
@@ -253,7 +253,7 @@ router.post(
         resource: serviceName,
         result: 'failure',
         metadata: { file, error: httpError.message },
-      }).catch(() => {});
+      });
       return res.status(httpError.statusCode || 500).json({
         error: 'Failed to restore the app',
         service: serviceName,
@@ -334,7 +334,7 @@ router.delete(
         resource: name,
         result: 'success',
         metadata: { file },
-      }).catch(() => {});
+      });
       return res.json({ success: true, service: name, file, message: 'Backup deleted.' });
     } catch (error) {
       const message = (error as Error).message;
@@ -393,7 +393,7 @@ router.put(
         result: 'success',
         // Key names only — never the values.
         metadata: { changedKeys },
-      }).catch(() => {});
+      });
       return res.json({ message: 'Configuration saved.', ...envStatus });
     } catch (error) {
       const httpError = error as HttpError;
@@ -453,7 +453,7 @@ router.put(
         result: 'success',
         // Never the password — key names/flags only.
         metadata: { username: user.username, passwordChanged: Boolean(req.body.password) },
-      }).catch(() => {});
+      });
 
       return res.json({ message: restart.message, user });
     } catch (error) {

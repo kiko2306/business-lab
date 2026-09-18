@@ -196,6 +196,6 @@ export async function reconcileRemovedAppProjects(): Promise<void> {
       resource: name,
       result: 'success',
       metadata: { reason: 'app removed from the registry; project torn down and apps/ dir deleted on boot' },
-    }).catch(() => {});
+    });
   }
 }

@@ -150,7 +150,7 @@ export async function syncAutheliaUsersSafe(trigger: string, userId: number | nu
       resource: trigger,
       result: 'failure',
       metadata: { error: message },
-    }).catch(() => {});
+    });
     return 'The account was saved, but updating Authelia failed — check the server logs.';
   }
 }

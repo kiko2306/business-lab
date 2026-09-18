@@ -36,6 +36,12 @@ interface WriteAuditLogOptions {
   metadata?: Record<string, unknown>;
 }
 
+/**
+ * Never throws: the audit row records an action, it never decides whether the
+ * action happens. Callers used to each add `.catch(() => {})`, and the ones
+ * that forgot turned an audit insert failure into a 500 *after* the action had
+ * already taken effect (a login whose session was already issued).
+ */
 export async function writeAuditLog({
   userId = null,
   action,
@@ -43,17 +49,13 @@ export async function writeAuditLog({
   result = 'success',
   metadata = {},
 }: WriteAuditLogOptions): Promise<void> {
-  await query(
-    `INSERT INTO audit_logs (user_id, action, resource, result, metadata)
-     VALUES ($1, $2, $3, $4, $5)`,
-    [userId, action, resource, result, JSON.stringify(metadata ?? {})]
-  ).catch(async (error: { code?: string }) => {
-    if (error.code !== '42703') {
-      throw error;
-    }
+  try {
     await query(
-      'INSERT INTO audit_logs (user_id, action, resource, result) VALUES ($1, $2, $3, $4)',
-      [userId, action, resource, result]
+      `INSERT INTO audit_logs (user_id, action, resource, result, metadata)
+       VALUES ($1, $2, $3, $4, $5)`,
+      [userId, action, resource, result, JSON.stringify(metadata ?? {})]
     );
-  });
+  } catch (error) {
+    logger.error('Audit log write failed', { action, resource, error: (error as Error).message });
+  }
 }

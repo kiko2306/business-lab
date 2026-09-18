@@ -122,7 +122,7 @@ export async function runScheduledBackupCheck(): Promise<void> {
       resource: 'backup',
       result: 'failure',
       metadata: { trigger: 'scheduled' },
-    }).catch(() => {});
+    });
   }
 }
 
@@ -206,7 +206,7 @@ async function runAppDataBackupLocked(
       resource: 'app-data',
       result: 'failure',
       metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail },
-    }).catch(() => {});
+    });
     finishBackupProgress(false, detail);
     return { ok: false, detail };
   }
@@ -220,7 +220,7 @@ async function runAppDataBackupLocked(
     resource: 'app-data',
     result: run.started ? 'success' : 'failure',
     metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail: run.detail },
-  }).catch(() => {});
+  });
 
   // A run counts as successful when the app data reached the backup engine.
   // Individual dump failures are on the audit row (§88.5) and do not by

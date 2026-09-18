@@ -190,7 +190,7 @@ router.post('/', validateBody(schemas.userCreate), async (req: Request, res: Res
       action: 'user_create',
       resource: `${user.username} [${roles.join(', ')}]`,
       result: 'success',
-    }).catch(() => {});
+    });
 
     // No Authelia sync yet — an account with no password hash is skipped by
     // the sync (§157); it lands there when the invite is accepted.
@@ -256,7 +256,7 @@ router.put(
         action: 'user_roles_update',
         resource: `${target.rows[0].username} → [${roles.join(', ')}]`,
         result: 'success',
-      }).catch(() => {});
+      });
 
       // webmaster ↔ not changes Authelia group membership (the `admins` group
       // and every `app-*`).
@@ -304,7 +304,7 @@ router.put(
         action: 'user_capabilities_update',
         resource: `${target.rows[0].username} → [${effective.join(', ')}]`,
         result: 'success',
-      }).catch(() => {});
+      });
 
       return res.json({ message: 'Features updated.', capabilities: effective });
     } catch (error) {
@@ -355,7 +355,7 @@ router.put(
         action: 'user_access_update',
         resource: `${target.rows[0].username} → [${appAccess.join(', ') || 'no apps'}]`,
         result: 'success',
-      }).catch(() => {});
+      });
 
       const autheliaWarning = await syncAutheliaUsersSafe('user_access_update', req.user?.id ?? null);
       const warning = autheliaWarning || null;
@@ -412,7 +412,7 @@ router.post(
         action: 'user_invitation_resend',
         resource: user.username,
         result: warning ? 'failure' : 'success',
-      }).catch(() => {});
+      });
 
       return res.json({ message: 'Invite re-sent.', ...(warning ? { warning } : {}) });
     } catch (error) {
@@ -459,7 +459,7 @@ router.put(
         action: 'user_password_reset',
         resource: user.username,
         result: 'success',
-      }).catch(() => {});
+      });
 
       // The hash Authelia holds for this account has to follow the reset.
       const warning = await syncAutheliaUsersSafe('user_password_reset', req.user?.id ?? null);
@@ -518,7 +518,7 @@ router.delete('/:id', validateParams(schemas.userIdParam), async (req: Request, 
       action: 'user_delete',
       resource: user.username,
       result: 'success',
-    }).catch(() => {});
+    });
 
     const autheliaWarning = await syncAutheliaUsersSafe('user_delete', req.user?.id ?? null);
     const warning = autheliaWarning || null;
