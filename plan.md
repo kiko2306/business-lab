@@ -28501,3 +28501,29 @@ compacted text). plan.md went from 30,686 to ~28,500 lines.
 **Not compacted, and why:** the backup build-out (§66–§90) and the 2FA
 slices (§127–§137) that §172 also named could now qualify under the new
 rule, but each is a separate, reviewable pass, not part of this one.
+
+## 531. Found: CrowdSec alerting and ban enforcement never applied
+
+Found while checking whether §118.4a's alert-dedupe item was worth doing
+("only if pushes prove noisy"): there were no pushes to measure. n8n's
+database holds **zero workflows and zero executions**; its init container
+last ran 2026-09-09 ("no managed workflows to import"), and
+`apps/n8n/workflows/` has only `.gitkeep`. Yet `crowdsec_alerts_enabled` and
+`crowdsec_enforce_npm` are both `true` (set 2026-09-12 17:52).
+
+- CrowdSec's live `config/profiles.yaml` (rendered 09-08 09:24) still has
+  `# - http_default`, so it sends no notifications at all.
+- `cscli bouncers list`: `nginx` and `cloudflare` are registered, but
+  `last_pull` is empty for both. NPM has no CrowdSec config loaded, and no
+  Cloudflare worker bouncer container is running.
+
+Cause: `PUT /api/settings/alerts` only writes the setting and returns
+"Saved. Restart CrowdSec to apply…". It never mentions n8n, which needs a
+start to render its workflow. Both render only inside
+`composeUpWithManagedConfig`, i.e. a dashboard start. CrowdSec's and n8n's
+next restart (2026-09-15 14:48) was a host reboot, which re-uses the stale
+files. So the whole security-alert and ban path has been silently off since
+it was "enabled". That's a manual apply step principle 3 forbids, and the
+same silent-failure shape as §46.
+
+README item added. Not yet fixed.

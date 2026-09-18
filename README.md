@@ -209,6 +209,19 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **CrowdSec alerts and ban enforcement are on but not applied** (§531)
+      — both toggles were saved on 2026-09-12, but nothing has taken effect:
+      the live `profiles.yaml` still has `notifications:` commented out, n8n
+      holds **no** relay workflow (so zero alerts delivered), both bouncers
+      are registered but have never pulled (`last_pull` empty), NPM has no
+      CrowdSec config loaded, and the Cloudflare worker bouncer container
+      isn't running. Cause: saving a toggle only writes the setting and says
+      "Restart CrowdSec to apply" (n8n isn't even mentioned). Configs render
+      only on a *dashboard* start, and the next restart was a host reboot,
+      which bypasses that. Fix: saving applies immediately (re-render, and
+      restart the affected running apps through `startService`), then prove
+      it with the existing alert-test route and a real ban.
+
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch
