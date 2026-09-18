@@ -30375,3 +30375,45 @@ failed login over the tunnel recorded `audit-probe-520` with the real public
 IPv6. One from the LAN, sent with a forged `X-Forwarded-For: 127.0.0.1`,
 recorded `192.168.1.236`. Older rows show empty, as expected. E2E 12/12,
 frontend 74/74, backend 1093/1093.
+
+## 521. Dashboard login hardening: username oracle, TOTP replay, 2FA cap
+
+§511 finding, three fixes in `routes/auth.ts`.
+
+**Username oracle.** Unknown usernames skipped bcrypt, and invited
+(not-yet-activated) ones got their own 403. Measured through the tunnel on
+the old code: an existing user with a wrong password took ~0.72 s, an
+unknown one ~0.21 s. Now every failure runs `verifyPassword` (against a
+dummy bcrypt hash made once per process when there's no real hash) and
+returns the same 401 "Invalid username or password". After deploy: ~0.67 s
+for both. The first unknown-user request after boot takes ~1.1 s while the
+dummy hash is made, a one-off per process. The invited-account message
+(§158's "check your email") is gone, which is a deliberate trade: the
+invitee has the emailed link, and the frontend never special-cased the 403.
+
+**TOTP replay.** `verifyTotp` accepted any code valid in the ±1-step window,
+as often as it was sent. New `totpStep()` returns the absolute time step a
+code matched (otplib `checkDelta`, epoch pinned with a clone so check and
+step use one instant). Login claims that step with `UPDATE users SET
+totp_last_step = $2 WHERE id = $1 AND (totp_last_step IS NULL OR
+totp_last_step < $2)`, so the check and the claim are one atomic statement.
+New column `totp_last_step BIGINT`: `init.sql`, plus `ensureTotpSchema`'s
+`ADD COLUMN IF NOT EXISTS` (confirmed added on home-srv-01 at boot). It's
+cleared wherever the secret is replaced or removed (setup, disable,
+`recoverAdmin`). Side effect: two logins within the same 30 s step need the
+next code, the standard behaviour for authenticator apps.
+
+**2FA attempt cap.** Only the per-IP `authLimiter` (20 / 15 min) applied.
+Added `mfaUserLimiter` (express-rate-limit, already a dependency): 5 failed
+codes per **account** per 15 min, keyed on the user id inside the
+`mfaToken`, counting failures only. Requests without a valid token are
+skipped, since they fail on the token anyway.
+
+Verified: unit tests for `totpStep` (exact step, ±1 neighbours, outside the
+window, malformed input), backend 1096/1096, E2E 12/12 (includes the
+enrol → 2FA login → disable journey). Replay and the cap were proven against
+the disposable E2E stack (real Postgres) with a stdlib-TOTP script: enrol,
+log in with code X (200), log in again with X (**401**), then wrong codes
+until the 6th failure got **429 "Too many wrong codes"**. The live host
+(0.117.14) has no 2FA account the agent can use, so the timing measurement
+above is the live proof there.
