@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.117.5] — 2026-09-18
+
+### Fixed
+
+- MeshCentral's site-admin account is created by the dashboard on start, so its public create-account form can no longer be claimed by a visitor; its healthcheck no longer fails while exposed.
+
 ## [0.117.4] — 2026-09-18
 
 ### Fixed

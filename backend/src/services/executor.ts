@@ -47,6 +47,7 @@ import { reconcileTwentyFirstAdmin } from './twentyAdminBootstrap';
 import { reconcileN8nFirstAdmin } from './n8nAdminBootstrap';
 import { reconcileJellyfinFirstAdmin } from './jellyfinAdminBootstrap';
 import { reconcileNavidromeFirstAdmin } from './navidromeAdminBootstrap';
+import { reconcileMeshcentralFirstAdmin } from './meshcentralAdminBootstrap';
 import { reconcileUptimeKumaFirstAdmin } from './uptimeKumaAdminBootstrap';
 import { ensureNtfySubscriberToken } from './ntfyAuthBootstrap';
 import { reconcileUptimeKumaMailNotification } from './uptimeKumaMailNotification';
@@ -382,6 +383,10 @@ async function composeUpWithManagedConfig(
   // visitor (§420). REST against the running app, so after `up`; no-op
   // otherwise.
   await reconcileNavidromeFirstAdmin(serviceName);
+  // MeshCentral: create the site admin so its public create-account form
+  // can't be claimed by a visitor (it has no Authelia gate). HTTP against the
+  // running server, so after `up`; no-op otherwise.
+  await reconcileMeshcentralFirstAdmin(serviceName);
   // Uptime Kuma: create the admin so its setup form can't be claimed by a
   // visitor (§421). Socket.IO against the running app, so after `up`; no-op
   // otherwise.

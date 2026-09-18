@@ -26,8 +26,9 @@ services:
       HOSTNAME: "${MESHCENTRAL_HOSTNAME:-localhost}"
       REVERSE_PROXY: "${MESHCENTRAL_HOSTNAME:-}"
       REVERSE_PROXY_TLS_PORT: "443"
-      # First account (opened as a wizard, privately) owns the server. No open
-      # signup once that account exists.
+      # No open signup once an account exists. This does NOT cover the first
+      # account, which MeshCentral always admits as site admin; the dashboard
+      # creates that one on start (meshcentralAdminBootstrap.ts).
       ALLOW_NEW_ACCOUNTS: "false"
       # The Cloudflare Tunnel carries WebSocket-over-HTTPS cleanly but not
       # WebRTC's UDP, so keep KVM / file transfer off WebRTC — it would just
@@ -60,11 +61,13 @@ services:
       - ./data/meshcentral-files:/opt/meshcentral/meshcentral-files
     healthcheck:
       # The internal scheme depends on exposure state (HTTPS when standalone,
-      # plain HTTP once tlsOffload is set), so try both. curl is in the image.
+      # plain HTTP once tlsOffload is set), so try both — both on 443, since
+      # tlsOffload keeps the port and only drops TLS. Probing plain :80 here
+      # failed every check once exposed. curl is in the image.
       test:
         [
           "CMD-SHELL",
-          "curl -fks -o /dev/null https://localhost/ || curl -fs -o /dev/null http://localhost/",
+          "curl -fks -o /dev/null https://localhost/ || curl -fs -o /dev/null http://localhost:443/",
         ]
       interval: 30s
       timeout: 10s

@@ -17,6 +17,10 @@ export interface RequestJsonOptions {
   // header. Takes precedence over `body` if both are given.
   rawBody?: Buffer;
   timeout?: number;
+  // Accept a self-signed certificate. Only for a container on this host
+  // reached over the Docker gateway (MeshCentral's standalone HTTPS), never
+  // for a third-party API.
+  insecureTls?: boolean;
 }
 
 /**
@@ -25,7 +29,7 @@ export interface RequestJsonOptions {
  */
 export function requestJson<T = unknown>(
   urlString: string,
-  { method = 'GET', headers = {}, body, rawBody, timeout = 10000 }: RequestJsonOptions = {}
+  { method = 'GET', headers = {}, body, rawBody, timeout = 10000, insecureTls = false }: RequestJsonOptions = {}
 ): Promise<JsonResponse<T>> {
   return new Promise((resolve, reject) => {
     let url: URL;
@@ -46,7 +50,8 @@ export function requestJson<T = unknown>(
       requestHeaders['Content-Length'] = String(Buffer.byteLength(payload as string));
     }
 
-    const request = transport.request(url, { method, headers: requestHeaders }, (response) => {
+    const tlsOptions = url.protocol === 'https:' && insecureTls ? { rejectUnauthorized: false } : {};
+    const request = transport.request(url, { method, headers: requestHeaders, ...tlsOptions }, (response) => {
       let raw = '';
       response.on('data', (chunk) => {
         raw += chunk;
