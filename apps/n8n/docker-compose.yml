@@ -35,7 +35,12 @@ services:
   # so a rendered workflow is authoritative — UI edits to it are replaced
   # (plan.md §118.3). No-op when the directory is empty.
   n8n-workflows-init:
-    mem_limit: 96m
+    # The `n8n` CLI boots the whole app to import one workflow. 96m was only
+    # ever tested with an empty workflows/ dir (it exits before starting n8n);
+    # the first real import was OOM-killed (137), and n8n, which waits on this
+    # container, stayed down (§532). Runs for seconds, so the limit reserves
+    # nothing.
+    mem_limit: 1g
     image: docker.n8n.io/n8nio/n8n:latest
     restart: "no"
     depends_on:
