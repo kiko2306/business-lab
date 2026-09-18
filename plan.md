@@ -28580,3 +28580,41 @@ Consequence: CrowdSec had raised ~50 real alerts in the prior week
 (http-probing, sensitive-files and CVE probes from public IPs), none of
 which were pushed. They will be now, which makes the §118.4a dedupe item
 measurable at last.
+
+## 533. Uptime Kuma watches the alert pipeline itself
+
+Follow-up to §531/§532, proposed and approved in the same session. Nothing
+monitored CrowdSec, the n8n relay or ntfy. Uptime Kuma's auto-provisioned
+critical monitors (§443) covered only NPM, Authelia, the Funnel and
+NetBird. So the pipeline could die with no signal, which is how §531 lasted
+six days. ntfy is also the channel those monitors push through, so its own
+outage could never be reported by push.
+
+Three more monitors in `uptimeKumaCriticalMonitors.ts`, each skipped when
+its app isn't installed, all real health endpoints accepting **2xx only**
+(the public-path monitors keep "any HTTP response"):
+- **CrowdSec (alert source)**: `http://crowdsec:8080/health`. LAPI is
+  published nowhere, so Uptime Kuma now joins the external `crowdsec-lapi`
+  network the way NPM's bouncer does (compose `networks:` +
+  `externalNetworks` in the registry, created on start if missing).
+- **n8n (alert relay)**: `/healthz` on its published port via the host
+  gateway (the route the ntfy notification already uses).
+- **ntfy (push server)**: `/v1/health`, likewise.
+
+Notifications are chosen per monitor now (`notificationIdsFor`): CrowdSec
+and n8n alert by ntfy **and** email; ntfy's own monitor by **email only**;
+the original five stay on ntfy. Without a configured mail notification
+everything falls back to ntfy rather than alerting nowhere. The mail
+notification is reconciled before the monitors on every Uptime Kuma start,
+so its id is found on the first pass. Tests cover the routing and the 2xx
+acceptance.
+
+Verified on home-srv-01 (0.117.22), with Uptime Kuma recreated through
+`restartService`: it's on `crowdsec-lapi` + its default network, and the
+three new monitors exist with the right URLs and notification sets, all up.
+Then the real failure path: n8n stopped via `stopService` → pending at
++14 s, **down at +75 s**, and ntfy's cache shows "n8n (alert relay) Down
+[Uptime-Kuma]" in the same second. Restarted via `startService` → "n8n
+(alert relay) Up" 3 min later, relay workflow still active. The email half
+isn't visible from here (no SMTP error in Uptime Kuma's log); the operator's
+inbox is the check.
