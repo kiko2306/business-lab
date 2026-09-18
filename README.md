@@ -263,8 +263,6 @@ it is done — not ticked off and left behind. Section references point at
       stream and `RST_STREAM INTERNAL_ERROR` on the main one, via
       `netbird-vpn-api.<domain>` (Cloudflare → NPM). Find the timeout, and
       whether remote peers see it too.
-- [ ] **OnlyOffice runs at ~95% of its 640 MiB `mem_limit` idle** — an open
-      document may OOM it. Raise the limit.
 - [ ] **NocoDB: signup is probably open, and error reporting is on** — no
       `nc_app_settings` row, so invite-only signup is at its default (off)
       on a hostname with no Authelia. Its info endpoint reports

@@ -30170,3 +30170,24 @@ Proven against home-srv-01's database inside a rolled-back transaction: the
 statement returned the user and took their live tokens from 265 to 0, and an
 unknown id matched nothing. That's also how the new README item turned up:
 261 of the 267 rows were long expired.
+
+## 514. OnlyOffice's memory limit raised to 1g
+
+§511 flagged OnlyOffice at 610 / 640 MiB idle. The number was misleading.
+`docker stats` counts page cache, which grows to fill any cap and is
+reclaimed cheaply. At 640m the cgroup showed anon 253 MiB, file 287 MiB and
+kernel 70 MiB, with 0 OOM kills. The `memory.events` `max` count (11,085)
+also turned out to be mostly cache reclaim: after the raise it kept climbing
+at idle (174 → 4,129 in three minutes) while anon fell from 401 to 289 MiB
+and file cache grew into the new room.
+
+The real constraint is anon headroom. Anon peaks at ~410 MiB during boot,
+which under 640m left ~160 MiB for an open document. 1g leaves ~540 MiB
+without reserving it (`mem_reservation` stays 256m). Upstream's minimum is
+2 GB for the whole server, and the host had 8.7 GB available.
+
+Verified on home-srv-01 by running the real `startService('onlyoffice')`
+from inside the backend: container recreated with a 1 GiB limit, `healthy`
+within 10 s. Nextcloud's `occ onlyoffice:documentserver --check` reports
+"successfully connected" (9.4.0.129). Idle I/O (~10 MB written per 30 s) is
+its bundled services, not a leak.
