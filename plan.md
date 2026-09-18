@@ -30034,3 +30034,42 @@ snapshot triggered, restart count 0.
 Still open (README): the boot-time retry that turned one crash into a loop
 (and prunes the previous archive with each partial one), and the `/NAS`
 mount's size — an operator call.
+
+## 509. A crashing scheduled backup no longer re-runs on every boot
+
+§508's second half. `runScheduledBackupCheck` stamped the schedule only at
+the *end* of a run (§86.2: never stamp before the data has moved). A run
+that kills the process never reaches that line, so `last_run_at` kept its
+old value and every boot found the backup overdue again — that, not the
+dump alone, is what made one OOM into 853 restarts.
+
+Fix: `recordBackupScheduleRun('failed')` *before* any work, and
+`recordBackupScheduleRun('success')` only on a clean finish; a failed
+finish records nothing more, so a failure isn't counted twice. A crash
+now counts as one failure and waits out the existing back-off (hourly for
+`MAX_FAST_RETRIES` = 3, then the normal cadence). §86.2's invariant holds:
+success is still stamped only after the data reached Kopia. Side effect:
+for the minute or so a run takes, the Backups card shows the last outcome
+as failed — `backupProgress` shows the live run alongside it.
+
+Correction to §508: the per-boot `backup-*.tar.gz` files were **not**
+partial. `createBackupArchive` finishes the dashboard archive before the
+app-data step starts, so retention 1 was keeping the newest complete
+archive. No change needed there.
+
+Verified on home-srv-01 (0.117.4): backdated `backup_schedule_last_run_at`
+to 09-16, restarted the backend, and `kill -9`'d its PID from the host once
+`nextcloud.sql.part` was 31 MB in (the same signal as the OOM kill).
+Settings immediately read `failed` / 1 consecutive failure / `last_run_at`
+= the claim time; Docker restarted the backend and, over the next 100 s,
+it logged no backup activity and didn't restart again. The last good
+`nextcloud.sql` (08:47) was untouched. The orphaned `pg_dump` helper left a
+190 MB `nextcloud.sql.part` behind, which the next run overwrites (and
+`appBackup.ts` already excludes `*.part`).
+
+Also checked the "Unable to load service status." toast reported at the
+same time: `getAllServiceStatus()` inside the running backend returns in
+1.2 s, and no `Failed to get service status` error has been logged since
+the loop stopped. The toast is the frontend's fallback for a response with
+no error body, i.e. the backend unreachable — the crash loop, or the deploy
+restarts at 08:46 and 09:00.

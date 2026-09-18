@@ -260,12 +260,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Backups
 
-- [ ] **A crashed scheduled backup retries on every boot** (§508) — an
-      overdue app-data backup starts immediately on startup, so a backup
-      that kills the backend turns into a restart loop (853 restarts,
-      ~40 s apart), and each boot's partial `backup-*.tar.gz` prunes the
-      previous archive under retention 1. Needs a back-off after an
-      unfinished run, and pruning only after a *successful* archive.
 - [ ] **Nextcloud `/NAS` FTP mount indexes the whole NAS** (§508) — the
       hand-added external storage `frias@192.168.1.50//` is rooted at the
       NAS root: 3.3 M `oc_filecache` rows, 2.2 GB table. Operator decision:
