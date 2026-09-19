@@ -50,6 +50,14 @@ const RECONCILE_INTERVAL_MS = 2 * 60 * 1000;
 // first pass — a boot-time false positive helps no one.
 const INITIAL_DELAY_MS = 2 * 60 * 1000;
 const RESTART_AFTER = 3;
+// A name that doesn't resolve gets far longer (§543). The daily Tailscale
+// "drop" was this module: `ts.net` intermittently answers NXDOMAIN for the
+// live Funnel name, and 1.1.1.1/8.8.8.8 cache that for the zone's 300 s
+// negative TTL, so the probe fails for exactly ~5 min (3 passes) and then
+// recovers by itself. A restart can't clear a public resolver's cache — it
+// only dropped the tailnet. 8 passes (16 min) outlasts that window with room,
+// and still restarts if the name stays gone for real.
+const RESTART_AFTER_DNS = 8;
 const KUMA_SERVICE = 'uptime-kuma';
 const KUMA_DOWN = 0;
 
@@ -99,6 +107,11 @@ async function probeError(url: string): Promise<string | null> {
  * monitor renamed in Uptime Kuma's UI still counts. null when absent.
  * Exported for the test.
  */
+/** The probe failed to resolve the host, rather than to reach it. Exported for the test. */
+export function isDnsFailure(error: string): boolean {
+  return /\((ENOTFOUND|EAI_AGAIN)\)$/.test(error);
+}
+
 export function parseKumaMonitorStatus(metrics: string, url: string): number | null {
   const needle = `monitor_url="${url}"`;
   for (const line of metrics.split('\n')) {
@@ -202,7 +215,9 @@ async function handleProject(project: string, results: ProbeResult[]): Promise<v
     return;
   }
 
-  const atThreshold = results.filter((r) => r.error !== null && (failures.get(r.probe.name) ?? 0) >= RESTART_AFTER);
+  const atThreshold = results.filter(
+    (r) => r.error !== null && (failures.get(r.probe.name) ?? 0) >= (isDnsFailure(r.error) ? RESTART_AFTER_DNS : RESTART_AFTER)
+  );
   if (!atThreshold.length) return;
 
   if (s.awaitingRecovery) {

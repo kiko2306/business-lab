@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.3] — 2026-09-19
+
+### Fixed
+
+- Tailscale no longer drops daily: the auto-restart waits 16 min, not 6, when the Funnel name fails to resolve — ts.net's 5-min negative DNS cache clears on its own (§544).
+
 ## [0.119.2] — 2026-09-19
 
 ### Changed

@@ -18,7 +18,7 @@ import { getExposureConfig } from '../utils/exposureSettings';
 import { publishAlert } from '../utils/alertNotify';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import fs from 'fs/promises';
-import { parseKumaMonitorStatus } from './criticalServiceHealth';
+import { isDnsFailure, parseKumaMonitorStatus } from './criticalServiceHealth';
 
 const mockedGetExposureConfig = vi.mocked(getExposureConfig);
 const mockedPublishAlert = vi.mocked(publishAlert);
@@ -37,7 +37,7 @@ function kumaLine(url: string, status: number) {
  * Probes all fail or all succeed; Uptime Kuma's /metrics answers with the
  * given status for every probed URL, or is unreachable when kuma is null.
  */
-function stubFetch({ probesUp, kuma }: { probesUp: boolean; kuma: number | null }) {
+function stubFetch({ probesUp, kuma, dns = false }: { probesUp: boolean; kuma: number | null; dns?: boolean }) {
   vi.stubGlobal(
     'fetch',
     vi.fn(async (url: string) => {
@@ -47,7 +47,11 @@ function stubFetch({ probesUp, kuma }: { probesUp: boolean; kuma: number | null 
         const text = urls.map((u) => kumaLine(u, kuma)).join('\n');
         return { ok: true, status: 200, text: async () => text } as unknown as Response;
       }
-      if (!probesUp) throw new TypeError('fetch failed');
+      if (!probesUp) {
+        const error = new TypeError('fetch failed') as TypeError & { cause?: { code: string } };
+        if (dns) error.cause = { code: 'ENOTFOUND' };
+        throw error;
+      }
       return { ok: false, status: 405, body: null } as unknown as Response;
     })
   );
@@ -103,6 +107,15 @@ describe('parseKumaMonitorStatus', () => {
   });
 });
 
+describe('isDnsFailure', () => {
+  it('matches resolution failures only', () => {
+    expect(isDnsFailure('TypeError: fetch failed (ENOTFOUND)')).toBe(true);
+    expect(isDnsFailure('TypeError: fetch failed (EAI_AGAIN)')).toBe(true);
+    expect(isDnsFailure('TypeError: fetch failed (ECONNREFUSED)')).toBe(false);
+    expect(isDnsFailure('TimeoutError: The operation was aborted due to timeout')).toBe(false);
+  });
+});
+
 describe('checkCriticalServices', () => {
   it('does nothing when every probe is reachable', async () => {
     stubFetch({ probesUp: true, kuma: 1 });
@@ -138,6 +151,17 @@ describe('checkCriticalServices', () => {
     await checkCriticalServices();
     expect(restartedProjects().sort()).toEqual(['netbird-vpn', 'tailscale']);
     expect(mockedPublishAlert).toHaveBeenCalledTimes(2);
+  });
+
+  // §543: ts.net's 300 s negative cache made the Funnel name fail to resolve
+  // for ~5 min a day, and each time this restarted Tailscale for nothing.
+  it('rides out a DNS failure that lasts the negative-cache window, restarts if it persists', async () => {
+    stubFetch({ probesUp: false, kuma: 0, dns: true });
+    const { checkCriticalServices } = await import('./criticalServiceHealth');
+    await passes(checkCriticalServices, 7);
+    expect(execFileMock).not.toHaveBeenCalled();
+    await checkCriticalServices();
+    expect(restartedProjects().sort()).toEqual(['netbird-vpn', 'tailscale']);
   });
 
   // The recovery path must not go dark just because Uptime Kuma is down too.
