@@ -209,13 +209,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Tailscale auto-restart: don't restart on DNS failures** (§543) —
-      the daily ~5 min `ENOTFOUND` on the Funnel name is `ts.net`'s 300 s
-      negative cache; `criticalServiceHealth.ts` restarts Tailscale for it,
-      which is the drop users see, and never fixes anything.
-- [ ] **Backend file logs are unwritable** (§543) — `/app/logs` is
-      root-owned and node runs as `appuser`, so every file write silently
-      fails; chown it in `docker-entrypoint.sh` like `/app/backups`.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),

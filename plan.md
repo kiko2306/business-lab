@@ -27503,3 +27503,26 @@ Plan (README items):
    log them, don't count them toward the restart. A restart can't change a
    public resolver's cache.
 2. `docker-entrypoint.sh` chowns `/app/logs` like `/app/backups`.
+
+## 544. Tailscale auto-restart rides out DNS blips; backend file logs writable (§543 items 1–2)
+
+**1. DNS failures get a longer threshold, not a free pass.**
+`criticalServiceHealth.ts`: a probe whose error is a resolution failure
+(`isDnsFailure`: `(ENOTFOUND)`/`(EAI_AGAIN)` at the end of the probe's
+error string) needs `RESTART_AFTER_DNS = 8` consecutive passes (16 min)
+instead of 3 (6 min). The daily `ts.net` negative-cache window (300 s ≈ 3
+passes) never reaches it, so no restart and no drop. A name that stays gone
+still gets the last-resort restart. Ignoring DNS errors entirely was
+rejected: a Funnel name that really disappears would then never be acted
+on. Verified that Node's `fetch` in the live backend reports a missing
+`*.ts.net` name as exactly `TypeError: fetch failed (ENOTFOUND)`, which is
+the string the check matches. Unit tests: 7 DNS-failing passes → no
+restart, the 8th → restart. The live proof is a day without a Tailscale
+restart while Uptime Kuma still records its ~5-min `ENOTFOUND` window
+(0.119.3 deployed 09-19 16:2x UTC).
+
+**2. `docker-entrypoint.sh` chowns `/app/logs`**, guarded with `[ -d ]`
+because the self-update watchdog shares the entrypoint without mounting
+logs, and `set -e` would crash-loop it. Proven live (0.119.4): the files
+are now `appuser`-owned, the running backend appended `Regenerated Homepage
+services.yaml` to `info.log` itself, and the watchdog came up clean.
