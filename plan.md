@@ -27457,3 +27457,49 @@ lifted with `unbanCrowdsecIp` (3 decisions).
 Minor, not fixed: that push's "banned 4h" is the first alert's ban. With
 §541's escalation, the later alerts in the same scan carry longer bans, so
 the push understates the ban.
+
+## 543. Found: the daily Tailscale drop is our auto-restart reacting to a DNS blip it can't fix
+
+Reported: "Tailscale drops for some seconds, every day."
+
+- **The drop is a restart we cause.** `tailscale-tailscale-1` was created
+  09-11 and restarted in place 8 times since (09-15 ×6, 09-17 07:51, 09-19
+  15:45), each a clean external SIGTERM. dockerd's journal and the
+  socket-proxy's request log show `POST /containers/<tailscale>/restart`
+  from `10.201.1.5`, i.e. the backend. That's `criticalServiceHealth.ts`:
+  3 failed probes of the Funnel URL, corroborated by Uptime Kuma, trigger
+  `docker compose restart`.
+- **What fails is DNS, not Tailscale.** Uptime Kuma's heartbeats for
+  `https://businesslab-signal.tail122b53.ts.net/` show `getaddrinfo
+  ENOTFOUND` (NXDOMAIN, not a timeout) for exactly ~5 min, about once a
+  day: 09-16 19:21, 09-17 00:52 and 07:47, 09-18 03:38, 09-19 15:41. Other
+  hostnames resolve fine in the same windows (the exception is 09-18 08:16,
+  a general network blip). Containers resolve through 1.1.1.1/8.8.8.8
+  (daemon.json), so Pi-hole isn't involved. `ts.net`'s SOA negative TTL is
+  **300 s**. One transient NXDOMAIN from Tailscale's authoritative
+  servers is cached by the public resolvers for exactly the observed 5 min.
+- **The restart never helps.** Episodes that got one (09-17 07:51, 09-19
+  15:45) and episodes that didn't (09-16 19:21, 09-17 00:52, 09-18 03:38)
+  all recovered after the same ~5 min, when the negative cache expired. The
+  only effect of the restart is the few-second drop of the tailnet and
+  Funnel.
+- **Upstream, not ours:** the intermittent NXDOMAIN for a live Funnel name
+  comes from Tailscale's DNS. Real impact while it lasts: NetBird clients
+  resolving the signal URL through public DNS can't open new signalling
+  sessions. Existing tunnels are unaffected.
+
+**Found on the way: backend file logs have been silently dead.**
+`/app/logs` (the `logs-data` volume) and its files are root-owned and 644,
+but `node` runs as `appuser`. `writeLog`'s append fails with EACCES, which
+it swallows by design. The only lines in `info.log` are from root
+`docker exec` runs (e.g. §540/§541's `restartService` calls). So every
+backend log since a redeploy is console-only, and a backend recreate erases
+it. That's how this investigation lost the auto-restart's own log lines,
+the exact §86.1/§88.4 failure the volume was added to prevent.
+`docker-entrypoint.sh` chowns `/app/backups` but not `/app/logs`.
+
+Plan (README items):
+1. Auto-restart ignores DNS-resolution failures (`ENOTFOUND`/`EAI_AGAIN`):
+   log them, don't count them toward the restart. A restart can't change a
+   public resolver's cache.
+2. `docker-entrypoint.sh` chowns `/app/logs` like `/app/backups`.
