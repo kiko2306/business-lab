@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultMonitor, findExistingMonitorNames, notificationIdsFor, withRaisedRetries } from './uptimeKumaCriticalMonitors';
+import { defaultMonitor, findExistingMonitorNames, notificationIdsFor, reconciledRow } from './uptimeKumaCriticalMonitors';
 
 describe('defaultMonitor', () => {
   // A transport failure is the only thing that should count as down — a real
@@ -77,17 +77,28 @@ describe('defaultMonitor with a health endpoint', () => {
   });
 });
 
-describe('withRaisedRetries', () => {
-  const row = { id: 3, name: 'Tailscale Funnel (also NetBird signal)', maxretries: 1, url: 'https://x.ts.net/' };
+describe('reconciledRow', () => {
+  const row = {
+    id: 3,
+    name: 'Tailscale Funnel (also NetBird signal)',
+    maxretries: 1,
+    url: 'https://x.ts.net/',
+    notificationIDList: { '1': true, '2': true },
+  };
 
   it('raises a lower retry count, keeping every other field', () => {
-    expect(withRaisedRetries(row, 7)).toEqual({ ...row, maxretries: 7 });
+    expect(reconciledRow(row, 7)).toEqual({ ...row, maxretries: 7 });
   });
 
   it('never lowers a hand-raised count, and ignores monitors without a minimum', () => {
-    expect(withRaisedRetries({ ...row, maxretries: 10 }, 7)).toBeNull();
-    expect(withRaisedRetries({ ...row, maxretries: 7 }, 7)).toBeNull();
-    expect(withRaisedRetries(row, undefined)).toBeNull();
+    expect(reconciledRow({ ...row, maxretries: 10 }, 7)).toBeNull();
+    expect(reconciledRow({ ...row, maxretries: 7 }, 7)).toBeNull();
+    expect(reconciledRow(row, undefined)).toBeNull();
+  });
+
+  it('strips the applyExisting email notification when the ids must be exact', () => {
+    expect(reconciledRow({ ...row, maxretries: 7 }, 7, [2])).toEqual({ ...row, maxretries: 7, notificationIDList: { '2': true } });
+    expect(reconciledRow({ ...row, maxretries: 7, notificationIDList: { '2': true, '1': false } }, 7, [2])).toBeNull();
   });
 
   it('passes the retry count through to a new monitor', () => {

@@ -60,6 +60,7 @@ interface KumaMonitorRow {
   id?: number;
   name?: string;
   maxretries?: number;
+  notificationIDList?: Record<string, boolean>;
 }
 
 /**
@@ -77,6 +78,12 @@ interface DesiredMonitor {
   acceptedStatuses?: string[];
   /** Failed retries (60 s apart) before DOWN and an alert. Defaults to 1. */
   maxretries?: number;
+  /**
+   * Strip every other notification on each reconcile. The mail notification
+   * is `applyExisting` (uptimeKumaMailNotification.ts), so without this it
+   * re-attaches itself to this monitor on every Kuma start.
+   */
+  notifyOnlyVia?: boolean;
 }
 
 /**
@@ -156,19 +163,29 @@ export function findExistingMonitorNames(monitorList: Record<string, KumaMonitor
 }
 
 /**
- * The one field an existing monitor gets reconciled on: its retry count is
- * raised to `min` (never lowered, nothing else touched), so a deployment
- * provisioned before a monitor's `maxretries` existed picks it up. The row
+ * What an existing monitor gets reconciled on: its retry count is raised to
+ * `minRetries` (never lowered), and with `exactIds` its notifications are set
+ * to exactly those. Nothing else is touched, so hand edits survive. The row
  * is monitorList's full `toJSON()`, which is exactly what Kuma's own edit
  * page sends back to `editMonitor`. Null when nothing needs changing.
  * Exported for the test.
  */
-export function withRaisedRetries(
+export function reconciledRow(
   row: Record<string, unknown> & KumaMonitorRow,
-  min: number | undefined
+  minRetries: number | undefined,
+  exactIds?: number[]
 ): Record<string, unknown> | null {
-  if (min === undefined || typeof row.id !== 'number' || (row.maxretries ?? 0) >= min) return null;
-  return { ...row, maxretries: min };
+  if (typeof row.id !== 'number') return null;
+  const edited: Record<string, unknown> = { ...row };
+  if (minRetries !== undefined && (row.maxretries ?? 0) < minRetries) edited.maxretries = minRetries;
+  if (exactIds) {
+    const current = Object.keys(row.notificationIDList ?? {}).filter((id) => row.notificationIDList?.[id]);
+    if (current.sort().join() !== exactIds.map(String).sort().join()) {
+      // editMonitor replaces the monitor's notification rows wholesale.
+      edited.notificationIDList = Object.fromEntries(exactIds.map((id) => [String(id), true]));
+    }
+  }
+  return edited.maxretries === row.maxretries && edited.notificationIDList === row.notificationIDList ? null : edited;
 }
 
 async function desiredMonitors(): Promise<DesiredMonitor[]> {
@@ -201,6 +218,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
       // TTL (§543). 7 retries 60 s apart means DOWN only after ~7 min of
       // failure, so that blip stays silent and a real outage still alerts.
       maxretries: 7,
+      notifyOnlyVia: true,
     },
     {
       name: 'NetBird management (public)',
@@ -337,11 +355,11 @@ export function runSession(baseWsUrl: string, notification: Record<string, unkno
       const existingNames = findExistingMonitorNames(monitorList);
       for (const monitor of monitors) {
         if (existingNames.has(monitor.name)) {
-          // Only ever raises the retry count; anything hand-edited is left alone.
           const row = Object.values(monitorList).find((m) => m.name === monitor.name) as Record<string, unknown> & KumaMonitorRow;
-          const edited = withRaisedRetries(row, monitor.maxretries);
+          const exactIds = monitor.notifyOnlyVia ? notificationIdsFor(monitor.notify, notificationId, emailId) : undefined;
+          const edited = reconciledRow(row, monitor.maxretries, exactIds);
           if (edited && !isAckOk(await call('editMonitor', edited))) {
-            logger.warn(`Uptime Kuma critical monitors: failed to raise retries on "${monitor.name}"`);
+            logger.warn(`Uptime Kuma critical monitors: failed to reconcile "${monitor.name}"`);
           }
           continue;
         }

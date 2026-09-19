@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.8] — 2026-09-19
+
+### Changed
+
+- Tailscale Funnel alerts go to ntfy only, no longer also by email
+
 ## [0.119.7] — 2026-09-19
 
 ### Changed
