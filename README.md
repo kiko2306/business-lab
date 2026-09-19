@@ -209,6 +209,17 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **CrowdSec: whitelist OnlyOffice's static bundle** (§538) — opening a
+      document fired `http-crawl-non_statics` on the operator (alert #92);
+      with enforcement on, that is a 4 h lockout from every NPM host.
+- [ ] **CrowdSec: unban from the dashboard** (§538) — list local bans (not
+      the CAPI blocklist) with an Unban action; today it takes `cscli`.
+      Fix the `crowdsecConfig.ts` bouncer comment that says this exists.
+- [ ] **CrowdSec: escalate repeat-offender ban length** (§538) —
+      `duration_expr` in the rendered `profiles.yaml` (4 h, 8 h, …)
+      instead of a flat 4 h. Permanent bans were rejected.
+- [ ] **CrowdSec: NPM bouncer pull interval 10 s → 2 s** (§538) — optional;
+      shaves up to 8 s off a ~7–14 s time-to-ban.
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch

@@ -27298,3 +27298,48 @@ cap, no username oracle). `plan-citations.py`: 0 before, 0 after.
 §534 is done: citations 41 → 0, and passes 4 and 5 took plan.md from
 ~29,000 to ~27,300 lines. The remaining runs §172 worried about are closed;
 anything further should wait until a run genuinely closes out.
+
+## 538. CrowdSec review — what is hitting us, ban latency, ban length, unban
+
+Read-only review of the live alerts (#45–#211, 09-12 → 09-19) against NPM's
+access logs on home-srv-01.
+
+- **Threats.** 72 local alerts from 36 IPs, ~15/day, nearly all cloud ASNs
+  (GCP, DigitalOcean, AWS) plus Censys. Secret-file probes (`/.env*`,
+  `/.git/config`, `/.aws/credentials`: all 404), admin-panel and tech
+  fingerprinting, and CVE probes for software not run here (Jira
+  CVE-2021-26086 from a 5-IP DO botnet in one second, PHPUnit
+  CVE-2017-9841, ThinkPHP CVE-2018-20062). No alerted IP got anything but
+  the public Home Page and its assets (`?rest_route=/wp/v2/users/` → 200 is
+  the Home Page ignoring the query). Alert #186 is §532's test IP.
+- **False positive on the operator.** Alert #92 (MEO PT IPv6) was the
+  operator opening a document: OnlyOffice's versioned bundle
+  (`/9.4.0-<32 hex>/fonts/039`, `…png.bin`) has no static extension, so
+  `http-crawl-non_statics` (40 distinct non-static GETs per host) fired. It
+  predated enforcement (§532); today it would 403 the operator on every
+  NPM host, NetBird management included, for 4 h.
+- **Latency, measured.** Detection 1–4 s after the first probe; the NPM
+  bouncer pulls every 10 s (`UPDATE_FREQUENCY=10`). `34.87.243.166`: first
+  probe 11:34:13, alert 11:34:17, first 403 11:34:20 (7 s; 19 requests
+  through, 255 blocked). Worst case ~14 s. Fast scanners finish first
+  (`34.77.137.207`: 286 requests in ~3 s), so reactive bans never stop a
+  first burst; the protection is that nothing sensitive is served, plus the
+  26,475 preemptive CAPI decisions.
+- **Permanent bans: rejected.** False positives are real (above), scanner
+  IPs are recycled cloud addresses, the NPM decision cache is a fixed 50 MB
+  dict, and ban length doesn't touch the first burst. 4 h demonstrably
+  works (`130.12.180.117` returned 1.5 h later and got 403). Repeat
+  offenders (3 IPs came back 2–3×) are better served by CrowdSec's
+  escalating `duration_expr`.
+- **Unban from the dashboard doesn't exist.** `crowdsecConfig.ts`'s bouncer
+  comment claims it does; today it takes `cscli decisions delete`, which
+  §0.2 forbids. A banned operator can still reach the dashboard over the
+  LAN or Tailscale (the ban is only at NPM).
+
+Plan, each a README item, in this order:
+1. Whitelist OnlyOffice's versioned static bundle so opening a document
+   can't ban the operator.
+2. Unban from the dashboard: list local (not CAPI) decisions, delete one.
+   Fix the misleading comment.
+3. Escalating ban duration in the rendered `profiles.yaml`.
+4. Bouncer `UPDATE_FREQUENCY` 10 → 2 s (optional, marginal).
