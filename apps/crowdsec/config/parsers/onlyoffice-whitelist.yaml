@@ -1,0 +1,22 @@
+# Mounted into /etc/crowdsec/parsers/s02-enrich/ (plan.md §538). Static, so
+# checked in rather than rendered.
+#
+# OnlyOffice's editor loads dozens of files from a versioned bundle
+# (/9.4.0-<32 hex>/fonts/039, …/fonts_thumbnail.png.bin) whose names don't
+# end in an extension CrowdSec counts as static. Opening one document from
+# Nextcloud is 40+ distinct "non-static" GETs, so http-crawl-non_statics
+# banned the operator (alert #92) — and the ban at NPM covers every host.
+#
+# Drops only requests under that bundle prefix on the onlyoffice host; any
+# `..` or percent-encoding stays visible, so path-traversal probes aimed at
+# the prefix still reach the scenarios.
+name: homelab/onlyoffice-static-whitelist
+description: "OnlyOffice's versioned static bundle is not a crawl"
+whitelist:
+  reason: "OnlyOffice editor static bundle"
+  expression:
+    - >-
+      evt.Parsed.target_fqdn startsWith 'onlyoffice.' &&
+      evt.Parsed.request matches '^/[0-9.]+-[0-9a-f]{32}/' &&
+      !(evt.Parsed.request contains '..') &&
+      !(evt.Parsed.request contains '%')
