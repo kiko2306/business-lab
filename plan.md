@@ -27571,3 +27571,16 @@ including "Security page loads" and the 2FA enrol/sign-in/disable flow
 (no CrowdSec in that stack, so the panel shows its error line without
 breaking the page). Deployed as 0.119.6: the served `main-*.js` carries
 "Banned IPs" and no longer "Active bans".
+
+## 547. §544's DNS threshold proven live
+
+A reported "Tailscale connection drop" on 09-19 was the upstream `ts.net`
+NXDOMAIN window again (§543): `criticalServiceHealth` logged `ENOTFOUND`
+for the Funnel name at 19:20, 19:22 and 19:24 UTC. The name resolved again by
+19:26. The failure count stopped at 3 of the 8 needed, so `tailscale-tailscale-1`
+was not restarted. It had been up since 15:45 (its last restart, before 0.119.3),
+with a restart count of 0. The old rule would have restarted it at 19:24. What
+remains is the ~5 min in which clients resolving the name through public DNS
+(NetBird signalling, Uptime Kuma) can't open new sessions. That is upstream,
+and established tunnels ride it out. The `Drop: TCP … :36130 no rules matched`
+lines in the Tailscale log are tailnet ACL rejections, unrelated.
