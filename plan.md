@@ -27526,3 +27526,32 @@ because the self-update watchdog shares the entrypoint without mounting
 logs, and `set -e` would crash-loop it. Proven live (0.119.4): the files
 are now `appuser`-owned, the running backend appended `Regenerated Homepage
 services.yaml` to `info.log` itself, and the watchdog came up clean.
+
+## 545. CrowdSec pushes report the longest ban; correction to §542
+
+**Fix.** The relay's Code node (`n8nWorkflows.ts`) first collects each
+IP's longest ban across the whole batch, noise alerts included, and prints
+that on the IP's one line. Before, it printed the first alert's ban, which
+under §541's escalation understates the ban. A new test runs the Code node
+for real (`new Function('$input', '$getWorkflowStaticData', code)`), not
+just as text: 4h / 11h59m52s / 15h59m59.5s for one IP → `banned
+15h59m59.5s`.
+
+**Proven on home-srv-01 (0.119.5)** after `restartService('n8n')` re-rendered
+the workflow: a replayed 3-rule scan from `203.0.113.88` produced
+`http-probing — 203.0.113.88 · 13 events · banned 12h`, where that alert's
+own ban was 8 h and the admin-probing alert in the same batch carried 12 h.
+Test ban lifted with `unbanCrowdsecIp`.
+
+**Correction to §542: `group_wait` is a fixed cycle, not a window per
+alert.** CrowdSec's plugin watcher (`pkg/csplugin/watcher.go`) flushes when
+`now - lastSend >= group_wait` on a running ticker, and `lastSend` starts at
+watcher start rather than at the first alert of a batch. So a ~70 s scan is
+split whenever it crosses a 2-min boundary, and this replay came out as two
+pushes (`… banned 4h`, then `… banned 12h`). §542's replay just didn't cross
+one. Expected pushes per scan is ~1.5 at 2 min against ~3 at 30 s: still
+the improvement, but not "one scan, one push". Real cross-batch dedupe
+would still need state that survives between executions (§118.4a: n8n
+static data doesn't, for a CLI-imported workflow). Longer `group_wait`
+trades split probability against push delay (5 min ≈ 25 % split).
+Not pursued without a decision.

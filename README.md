@@ -209,9 +209,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **CrowdSec push understates escalated bans** (§542) — the relay
-      reports the first alert's ban; with §541 escalation a later alert in
-      the same batch can carry a longer one. Report each IP's longest.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),
