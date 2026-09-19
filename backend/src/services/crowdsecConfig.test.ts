@@ -96,7 +96,7 @@ describe('buildHttpNotificationYaml', () => {
   });
 
   it('batches bursts rather than sending one push per alert', () => {
-    expect(cfg.group_wait).toBe('30s');
+    expect(cfg.group_wait).toBe('2m');
     // int, not "10" — CrowdSec's plugin config rejects a quoted threshold.
     expect(cfg.group_threshold).toBe(10);
   });

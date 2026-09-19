@@ -556,7 +556,11 @@ log_level: info
 
 # group_wait / timeout are Go durations (unquoted string); group_threshold and
 # max_retry are ints — CrowdSec's plugin config rejects a quoted "10" here.
-group_wait: 30s
+# 2m, not 30s: one scan trips 2-3 scenarios up to ~70s apart, and at 30s each
+# landed in its own batch, so its own push (10 pushes for 5 IPs in a day).
+# In one batch the relay's per-IP dedupe makes it one push (§542). The ban
+# itself doesn't wait for this; only the notification does.
+group_wait: 2m
 group_threshold: 10
 max_retry: 2
 timeout: 10s

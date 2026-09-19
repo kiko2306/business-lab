@@ -19,7 +19,7 @@ type: http
 name: http_default
 log_level: info
 
-group_wait: 30s      # collect alerts this long before sending one message
+group_wait: 2m       # collect alerts this long before sending one message — long enough that one scan's several scenarios share a batch (plan.md §542)
 group_threshold: 10  # ...or send early once this many have piled up (int)
 max_retry: 2
 timeout: 10s

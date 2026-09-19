@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.2] — 2026-09-19
+
+### Changed
+
+- CrowdSec batches alert pushes over 2 minutes instead of 30 s, so one scan that trips several scenarios is one push, not three (§542).
+
 ## [0.119.1] — 2026-09-19
 
 ### Fixed
