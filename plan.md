@@ -27606,3 +27606,19 @@ field, so hand edits survive. It runs on every Kuma (re)start.
 **Proven on home-srv-01 (0.119.7):** after `restartService('uptime-kuma')`,
 Kuma's DB shows monitor 3 at `maxretries 7`, the other seven at 1, with URL,
 active flag and notifications unchanged.
+
+## 549. Tailscale Funnel alerts go to ntfy only
+
+Asked: no email for Tailscale errors. The Funnel monitor was provisioned
+`notify: 'ntfy'`, but the dashboard mail notification is `isDefault` +
+`applyExisting` (§427), and Kuma re-attaches it to every monitor each time
+it starts. A one-off removal wouldn't survive. `reconciledRow` (was
+`withRaisedRetries`, §548) also sets the notification list exactly for
+monitors with `notifyOnlyVia: true`. Only the Funnel has that flag. It runs
+after the mail reconcile on each Kuma start, and `editMonitor` replaces the
+monitor's notification rows wholesale. The other public-path monitors still
+get email through `applyExisting`, as before.
+
+**Proven on home-srv-01 (0.119.8):** after `restartService('uptime-kuma')`,
+which re-runs the mail `applyExisting` first, monitor 3's only notification is
+2 (ntfy) and `maxretries` is still 7. The other monitors keep 1 (email) + 2.
