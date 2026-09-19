@@ -27555,3 +27555,19 @@ would still need state that survives between executions (§118.4a: n8n
 static data doesn't, for a CLI-imported workflow). Longer `group_wait`
 trades split probability against push delay (5 min ≈ 25 % split).
 Not pursued without a decision.
+
+## 546. Banned IPs moved to the Security page
+
+§540 put the ban list inside Settings → "ntfy alerts", under the
+enforcement switch, and the operator couldn't find it. They expected it
+under **Security** (the nav's `/account` page). It's now its own panel
+there, `pages/account/crowdsec-bans.component.ts` ("Banned IPs"), which
+loads on page open instead of behind a Show button. It renders only with
+`settings:manage` (`AuthService.hasCapability`), because the
+`/api/settings/crowdsec/bans` routes sit behind that gate and every user
+sees the Security page. Removed from Settings. The account spec gets an
+`AuthService` stub. Frontend tests 74/74; the E2E suite passes 13/13,
+including "Security page loads" and the 2FA enrol/sign-in/disable flow
+(no CrowdSec in that stack, so the panel shows its error line without
+breaking the page). Deployed as 0.119.6: the served `main-*.js` carries
+"Banned IPs" and no longer "Active bans".
