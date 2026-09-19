@@ -55,17 +55,12 @@ describe('notificationIdsFor', () => {
     expect(notificationIdsFor('email', 3, 9)).toEqual([9]);
   });
 
-  it('sends the pipeline monitors to both', () => {
-    expect(notificationIdsFor('ntfy+email', 3, 9)).toEqual([3, 9]);
-  });
-
-  it('keeps the public-path monitors on ntfy', () => {
+  it('keeps every other monitor on ntfy only', () => {
     expect(notificationIdsFor('ntfy', 3, 9)).toEqual([3]);
   });
 
   it('falls back to ntfy when no email notification exists, rather than alerting nowhere', () => {
     expect(notificationIdsFor('email', 3, null)).toEqual([3]);
-    expect(notificationIdsFor('ntfy+email', 3, null)).toEqual([3]);
   });
 });
 
@@ -87,13 +82,13 @@ describe('reconciledRow', () => {
   };
 
   it('raises a lower retry count, keeping every other field', () => {
-    expect(reconciledRow(row, 7)).toEqual({ ...row, maxretries: 7 });
+    expect(reconciledRow(row, 7, [1, 2])).toEqual({ ...row, maxretries: 7 });
   });
 
   it('never lowers a hand-raised count, and ignores monitors without a minimum', () => {
-    expect(reconciledRow({ ...row, maxretries: 10 }, 7)).toBeNull();
-    expect(reconciledRow({ ...row, maxretries: 7 }, 7)).toBeNull();
-    expect(reconciledRow(row, undefined)).toBeNull();
+    expect(reconciledRow({ ...row, maxretries: 10 }, 7, [1, 2])).toBeNull();
+    expect(reconciledRow({ ...row, maxretries: 7 }, 7, [1, 2])).toBeNull();
+    expect(reconciledRow(row, undefined, [1, 2])).toBeNull();
   });
 
   it('strips the applyExisting email notification when the ids must be exact', () => {

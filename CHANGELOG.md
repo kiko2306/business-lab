@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.9] — 2026-09-19
+
+### Changed
+
+- Every Uptime Kuma critical-service alert goes to ntfy only; ntfy's own monitor still emails, since ntfy can't report its own outage
+
 ## [0.119.8] — 2026-09-19
 
 ### Changed

@@ -3,8 +3,9 @@
  * depends on — NPM, Authelia, Tailscale's Funnel (which also carries
  * NetBird's signal traffic), and NetBird's management/relay — plus an ntfy
  * notification wired to all of them (plan.md §443). Since §533 also the
- * alert pipeline itself (CrowdSec, the n8n relay, ntfy), alerting by email
- * as well, since ntfy can't report its own outage.
+ * alert pipeline itself (CrowdSec, the n8n relay, ntfy). Everything alerts
+ * over ntfy only (§550), except ntfy's own monitor, which emails, since
+ * ntfy can't report its own outage.
  *
  * Built after two outages (§442) sat undetected because every *local* health
  * signal reported fine while the actual external path was broken — only a
@@ -64,11 +65,10 @@ interface KumaMonitorRow {
 }
 
 /**
- * Where a monitor's alert goes. The public-path monitors push over ntfy.
- * The alert-pipeline monitors (§533) also email, and ntfy's own monitor
- * emails *only*: a push about ntfy being down would go through ntfy.
+ * Where a monitor's alert goes: ntfy (§550), except ntfy's own monitor,
+ * which emails, because a push about ntfy being down would go through ntfy.
  */
-type NotifyVia = 'ntfy' | 'ntfy+email' | 'email';
+type NotifyVia = 'ntfy' | 'email';
 
 interface DesiredMonitor {
   name: string;
@@ -78,12 +78,6 @@ interface DesiredMonitor {
   acceptedStatuses?: string[];
   /** Failed retries (60 s apart) before DOWN and an alert. Defaults to 1. */
   maxretries?: number;
-  /**
-   * Strip every other notification on each reconcile. The mail notification
-   * is `applyExisting` (uptimeKumaMailNotification.ts), so without this it
-   * re-attaches itself to this monitor on every Kuma start.
-   */
-  notifyOnlyVia?: boolean;
 }
 
 /**
@@ -92,8 +86,7 @@ interface DesiredMonitor {
  * shows up in Uptime Kuma instead of alerting nowhere. Exported for the test.
  */
 export function notificationIdsFor(notify: NotifyVia, ntfyId: number, emailId: number | null): number[] {
-  if (emailId === null || notify === 'ntfy') return [ntfyId];
-  return notify === 'email' ? [emailId] : [ntfyId, emailId];
+  return notify === 'email' && emailId !== null ? [emailId] : [ntfyId];
 }
 
 /**
@@ -164,8 +157,8 @@ export function findExistingMonitorNames(monitorList: Record<string, KumaMonitor
 
 /**
  * What an existing monitor gets reconciled on: its retry count is raised to
- * `minRetries` (never lowered), and with `exactIds` its notifications are set
- * to exactly those. Nothing else is touched, so hand edits survive. The row
+ * `minRetries` (never lowered), and its notifications are set to exactly
+ * `exactIds`. Nothing else is touched, so hand edits survive. The row
  * is monitorList's full `toJSON()`, which is exactly what Kuma's own edit
  * page sends back to `editMonitor`. Null when nothing needs changing.
  * Exported for the test.
@@ -173,17 +166,15 @@ export function findExistingMonitorNames(monitorList: Record<string, KumaMonitor
 export function reconciledRow(
   row: Record<string, unknown> & KumaMonitorRow,
   minRetries: number | undefined,
-  exactIds?: number[]
+  exactIds: number[]
 ): Record<string, unknown> | null {
   if (typeof row.id !== 'number') return null;
   const edited: Record<string, unknown> = { ...row };
   if (minRetries !== undefined && (row.maxretries ?? 0) < minRetries) edited.maxretries = minRetries;
-  if (exactIds) {
-    const current = Object.keys(row.notificationIDList ?? {}).filter((id) => row.notificationIDList?.[id]);
-    if (current.sort().join() !== exactIds.map(String).sort().join()) {
-      // editMonitor replaces the monitor's notification rows wholesale.
-      edited.notificationIDList = Object.fromEntries(exactIds.map((id) => [String(id), true]));
-    }
+  const current = Object.keys(row.notificationIDList ?? {}).filter((id) => row.notificationIDList?.[id]);
+  if (current.sort().join() !== exactIds.map(String).sort().join()) {
+    // editMonitor replaces the monitor's notification rows wholesale.
+    edited.notificationIDList = Object.fromEntries(exactIds.map((id) => [String(id), true]));
   }
   return edited.maxretries === row.maxretries && edited.notificationIDList === row.notificationIDList ? null : edited;
 }
@@ -218,7 +209,6 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
       // TTL (§543). 7 retries 60 s apart means DOWN only after ~7 min of
       // failure, so that blip stays silent and a real outage still alerts.
       maxretries: 7,
-      notifyOnlyVia: true,
     },
     {
       name: 'NetBird management (public)',
@@ -244,13 +234,13 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
       name: 'CrowdSec (alert source)',
       // Over the crowdsec-lapi network Uptime Kuma joins; LAPI isn't published.
       url: async () => (installed(CROWDSEC_SERVICE) ? 'http://crowdsec:8080/health' : null),
-      notify: 'ntfy+email',
+      notify: 'ntfy',
       acceptedStatuses: ['200-299'],
     },
     {
       name: 'n8n (alert relay)',
       url: async () => hostPortUrl(N8N_SERVICE, '/healthz'),
-      notify: 'ntfy+email',
+      notify: 'ntfy',
       acceptedStatuses: ['200-299'],
     },
     {
@@ -356,7 +346,10 @@ export function runSession(baseWsUrl: string, notification: Record<string, unkno
       for (const monitor of monitors) {
         if (existingNames.has(monitor.name)) {
           const row = Object.values(monitorList).find((m) => m.name === monitor.name) as Record<string, unknown> & KumaMonitorRow;
-          const exactIds = monitor.notifyOnlyVia ? notificationIdsFor(monitor.notify, notificationId, emailId) : undefined;
+          // Exact ids on every reconcile: the mail notification is
+          // `applyExisting` (uptimeKumaMailNotification.ts) and re-attaches
+          // itself to every monitor on each Kuma start (§549/§550).
+          const exactIds = notificationIdsFor(monitor.notify, notificationId, emailId);
           const edited = reconciledRow(row, monitor.maxretries, exactIds);
           if (edited && !isAckOk(await call('editMonitor', edited))) {
             logger.warn(`Uptime Kuma critical monitors: failed to reconcile "${monitor.name}"`);
