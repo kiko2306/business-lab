@@ -67,6 +67,15 @@ describe('buildProfilesYaml', () => {
       expect(doc.decisions[0].type).toBe('ban');
     }
   });
+
+  it('escalates repeat offenders on both profiles, capped at a week', () => {
+    const docs = yaml.loadAll(buildProfilesYaml(true)) as Array<{ duration_expr: string }>;
+    for (const doc of docs) {
+      expect(doc.duration_expr).toBe(
+        "Sprintf('%dh', GetDecisionsCount(Alert.GetValue()) >= 41 ? 168 : (GetDecisionsCount(Alert.GetValue()) + 1) * 4)"
+      );
+    }
+  });
 });
 
 describe('buildHttpNotificationYaml', () => {

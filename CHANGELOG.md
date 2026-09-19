@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.0] — 2026-09-19
+
+### Changed
+
+- CrowdSec bans escalate for repeat offenders — 4 h, then 8 h, 12 h… capped at a week — instead of a flat 4 h (§541).
+
 ## [0.118.0] — 2026-09-19
 
 ### Added

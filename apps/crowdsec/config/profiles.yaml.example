@@ -9,6 +9,9 @@
 # `http_default` notification is listed under `notifications:` when alerting is
 # enabled in the dashboard, and commented out when it is not. The notification
 # itself is configured in notifications/http.yaml (also rendered).
+#
+# duration_expr (plan.md §541) overrides the 4h for repeat offenders: 4h per
+# decision the IP already has, plus 4h, capped at 168h (a week).
 
 name: default_ip_remediation
 filters:
@@ -16,6 +19,7 @@ filters:
 decisions:
   - type: ban
     duration: 4h
+duration_expr: "Sprintf('%dh', GetDecisionsCount(Alert.GetValue()) >= 41 ? 168 : (GetDecisionsCount(Alert.GetValue()) + 1) * 4)"
 notifications:
   - http_default        # enabled/disabled from the dashboard
 on_success: break
@@ -26,6 +30,7 @@ filters:
 decisions:
   - type: ban
     duration: 4h
+duration_expr: "Sprintf('%dh', GetDecisionsCount(Alert.GetValue()) >= 41 ? 168 : (GetDecisionsCount(Alert.GetValue()) + 1) * 4)"
 notifications:
   - http_default
 on_success: break
