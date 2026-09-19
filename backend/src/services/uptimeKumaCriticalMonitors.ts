@@ -59,6 +59,7 @@ const ACK_WAIT_MS = 15_000;
 interface KumaMonitorRow {
   id?: number;
   name?: string;
+  maxretries?: number;
 }
 
 /**
@@ -74,6 +75,8 @@ interface DesiredMonitor {
   notify: NotifyVia;
   /** Defaults to "any HTTP response"; a real health endpoint passes only on 2xx. */
   acceptedStatuses?: string[];
+  /** Failed retries (60 s apart) before DOWN and an alert. Defaults to 1. */
+  maxretries?: number;
 }
 
 /**
@@ -100,7 +103,8 @@ export function defaultMonitor(
   name: string,
   url: string,
   notificationIds: number[],
-  acceptedStatuses: string[] = ACCEPT_ANY_STATUS
+  acceptedStatuses: string[] = ACCEPT_ANY_STATUS,
+  maxretries = 1
 ): Record<string, unknown> {
   return {
     type: 'http',
@@ -112,7 +116,7 @@ export function defaultMonitor(
     interval: 60,
     retryInterval: 60,
     resendInterval: 0,
-    maxretries: 1,
+    maxretries,
     timeout: 10,
     notificationIDList: Object.fromEntries(notificationIds.map((id) => [id, true])),
     ignoreTls: false,
@@ -151,6 +155,22 @@ export function findExistingMonitorNames(monitorList: Record<string, KumaMonitor
   return new Set(Object.values(monitorList).map((m) => m.name).filter((name): name is string => Boolean(name)));
 }
 
+/**
+ * The one field an existing monitor gets reconciled on: its retry count is
+ * raised to `min` (never lowered, nothing else touched), so a deployment
+ * provisioned before a monitor's `maxretries` existed picks it up. The row
+ * is monitorList's full `toJSON()`, which is exactly what Kuma's own edit
+ * page sends back to `editMonitor`. Null when nothing needs changing.
+ * Exported for the test.
+ */
+export function withRaisedRetries(
+  row: Record<string, unknown> & KumaMonitorRow,
+  min: number | undefined
+): Record<string, unknown> | null {
+  if (min === undefined || typeof row.id !== 'number' || (row.maxretries ?? 0) >= min) return null;
+  return { ...row, maxretries: min };
+}
+
 async function desiredMonitors(): Promise<DesiredMonitor[]> {
   return [
     {
@@ -176,6 +196,11 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
         return host ? `https://${host}/` : null;
       },
       notify: 'ntfy',
+      // Tailscale's DNS answers NXDOMAIN for the live Funnel name about once
+      // a day, and public resolvers cache that for ts.net's 300 s negative
+      // TTL (§543). 7 retries 60 s apart means DOWN only after ~7 min of
+      // failure, so that blip stays silent and a real outage still alerts.
+      maxretries: 7,
     },
     {
       name: 'NetBird management (public)',
@@ -311,12 +336,26 @@ export function runSession(baseWsUrl: string, notification: Record<string, unkno
 
       const existingNames = findExistingMonitorNames(monitorList);
       for (const monitor of monitors) {
-        if (existingNames.has(monitor.name)) continue; // only creates — never overwrites a hand-edited monitor
+        if (existingNames.has(monitor.name)) {
+          // Only ever raises the retry count; anything hand-edited is left alone.
+          const row = Object.values(monitorList).find((m) => m.name === monitor.name) as Record<string, unknown> & KumaMonitorRow;
+          const edited = withRaisedRetries(row, monitor.maxretries);
+          if (edited && !isAckOk(await call('editMonitor', edited))) {
+            logger.warn(`Uptime Kuma critical monitors: failed to raise retries on "${monitor.name}"`);
+          }
+          continue;
+        }
         const url = await monitor.url();
         if (!url) continue; // that service's config isn't ready yet
         const addAck = await call(
           'add',
-          defaultMonitor(monitor.name, url, notificationIdsFor(monitor.notify, notificationId, emailId), monitor.acceptedStatuses)
+          defaultMonitor(
+            monitor.name,
+            url,
+            notificationIdsFor(monitor.notify, notificationId, emailId),
+            monitor.acceptedStatuses,
+            monitor.maxretries
+          )
         );
         if (!isAckOk(addAck)) {
           logger.warn(`Uptime Kuma critical monitors: failed to add "${monitor.name}"`, {

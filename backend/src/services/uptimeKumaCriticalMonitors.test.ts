@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { defaultMonitor, findExistingMonitorNames, notificationIdsFor } from './uptimeKumaCriticalMonitors';
+import { defaultMonitor, findExistingMonitorNames, notificationIdsFor, withRaisedRetries } from './uptimeKumaCriticalMonitors';
 
 describe('defaultMonitor', () => {
   // A transport failure is the only thing that should count as down — a real
@@ -74,5 +74,24 @@ describe('defaultMonitor with a health endpoint', () => {
     const monitor = defaultMonitor('n8n (alert relay)', 'http://10.201.0.1:10240/healthz', [3, 9], ['200-299']);
     expect(monitor.notificationIDList).toEqual({ 3: true, 9: true });
     expect(monitor.accepted_statuscodes).toEqual(['200-299']);
+  });
+});
+
+describe('withRaisedRetries', () => {
+  const row = { id: 3, name: 'Tailscale Funnel (also NetBird signal)', maxretries: 1, url: 'https://x.ts.net/' };
+
+  it('raises a lower retry count, keeping every other field', () => {
+    expect(withRaisedRetries(row, 7)).toEqual({ ...row, maxretries: 7 });
+  });
+
+  it('never lowers a hand-raised count, and ignores monitors without a minimum', () => {
+    expect(withRaisedRetries({ ...row, maxretries: 10 }, 7)).toBeNull();
+    expect(withRaisedRetries({ ...row, maxretries: 7 }, 7)).toBeNull();
+    expect(withRaisedRetries(row, undefined)).toBeNull();
+  });
+
+  it('passes the retry count through to a new monitor', () => {
+    expect(defaultMonitor('m', 'https://x/', [1], undefined, 7).maxretries).toBe(7);
+    expect(defaultMonitor('m', 'https://x/', [1]).maxretries).toBe(1);
   });
 });
