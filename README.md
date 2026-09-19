@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.119.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.119.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -209,9 +209,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **CrowdSec: escalate repeat-offender ban length** (§538) —
-      `duration_expr` in the rendered `profiles.yaml` (4 h, 8 h, …)
-      instead of a flat 4 h. Permanent bans were rejected.
 - [ ] **CrowdSec: NPM bouncer pull interval 10 s → 2 s** (§538) — optional;
       shaves up to 8 s off a ~7–14 s time-to-ban.
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node

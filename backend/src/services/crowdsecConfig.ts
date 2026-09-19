@@ -505,8 +505,10 @@ function buildProfilesYaml(notify: boolean): string {
   // includes expired decisions until CrowdSec's 7d flush (db_config.flush)
   // and anything CAPI holds for the IP. One scan tripping several scenarios
   // at once escalates within itself (4h, 8h, 12h…), and a banned IP that
-  // keeps probing keeps raising alerts. A dashboard unban deletes the
-  // decisions, which also resets the count. Written as a ternary, not
+  // keeps probing keeps raising alerts. An unban does NOT reset it: LAPI
+  // soft-deletes (expires) decisions, which still count until the flush, so a
+  // repeat false positive on the operator within a week gets 8h — unban it
+  // again (verified live, §541). Written as a ternary, not
   // min(), so it doesn't depend on the expr version bundled with CrowdSec.
   const count = 'GetDecisionsCount(Alert.GetValue())';
   const durationExpr = `Sprintf('%dh', ${count} >= 41 ? 168 : (${count} + 1) * 4)`;

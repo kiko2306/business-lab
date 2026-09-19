@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.1] — 2026-09-19
+
+### Fixed
+
+- Correct the CrowdSec escalation comment: an unban expires decisions, it doesn't reset the repeat-offender count (§541).
+
 ## [0.119.0] — 2026-09-19
 
 ### Changed

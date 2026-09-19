@@ -27396,3 +27396,29 @@ returned the same 2 live bans as `cscli`. Then with `203.0.113.9`: 200 →
 within 12 s, and no decisions left. The routes answer 401 unauthenticated.
 Not exercised: the Settings table in a browser (no dashboard credentials
 here). The build and unit tests cover it.
+
+## 541. CrowdSec bans escalate for repeat offenders (§538 item 3)
+
+`buildProfilesYaml` adds a `duration_expr` to both profiles:
+`Sprintf('%dh', GetDecisionsCount(Alert.GetValue()) >= 41 ? 168 : (GetDecisionsCount(Alert.GetValue()) + 1) * 4)`,
+i.e. 4 h × (decisions the value already has + 1), capped at a week. The
+static `duration: 4h` stays as the fallback. It's a ternary rather than
+`min()` so it doesn't depend on the expr version bundled with CrowdSec.
+Permanent bans were rejected in §538.
+
+**What the count includes (found live).** Expired and dashboard-unbanned
+decisions count too. LAPI's `DELETE /v1/decisions` soft-deletes (expires)
+rather than removing, and rows persist until `db_config.flush.max_age`
+(7 d). So an unban does **not** reset escalation: a second false positive
+on the operator within a week gets 8 h (unban it again). One scan tripping
+several scenarios at once escalates within itself (4 h, 8 h, 12 h…), and a
+banned IP that keeps probing keeps raising alerts. Both are intended.
+
+**Proven on home-srv-01 (0.119.x):** after `restartService('crowdsec')`
+rendered the profile, CrowdSec came up healthy (a bad expression would
+have stopped it starting). Two 30-request 404 bursts as `203.0.113.9`
+got bans of **12 h**, then **16 h**. The IP already had 2 decisions (§532's
+#186 and §540's test #214, both deleted), which is how the soft-delete
+behaviour above surfaced. The comment I'd first written ("an unban resets
+the count") was wrong, and is corrected. Cleanup went through
+`unbanCrowdsecIp` (removed 2, IP back to 200).
