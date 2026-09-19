@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.5] — 2026-09-19
+
+### Fixed
+
+- CrowdSec pushes report each IP's longest ban in the batch — an escalated ban no longer shows as the first alert's 4 h (§545).
+
 ## [0.119.4] — 2026-09-19
 
 ### Fixed

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.119.4** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.119.5** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -209,6 +209,9 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **CrowdSec push understates escalated bans** (§542) — the relay
+      reports the first alert's ban; with §541 escalation a later alert in
+      the same batch can carry a longer one. Report each IP's longest.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),
