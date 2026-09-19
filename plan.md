@@ -27584,3 +27584,25 @@ remains is the ~5 min in which clients resolving the name through public DNS
 (NetBird signalling, Uptime Kuma) can't open new sessions. That is upstream,
 and established tunnels ride it out. The `Drop: TCP … :36130 no rules matched`
 lines in the Tailscale log are tailnet ACL rejections, unrelated.
+
+## 548. The Funnel's Uptime Kuma monitor ignores the daily DNS blip
+
+§547's blip still fails Kuma's Funnel probe for ~5 min, and at `maxretries: 1`
+that sends a DOWN push for something nobody can fix (§543). First we checked
+whether it could be prevented at all. It can't while signal lives on `ts.net`.
+Cloudflare can't carry signal (§52). NetBird's WebSocket signal path is still
+browser-only: the only `wsproxy` dialer in v0.79.0's source is
+`client/grpc/dialer_js.go`, so §50.8 still holds. A CNAME under our domain
+would still resolve the `ts.net` target, and Funnel serves only its own name.
+
+**Fix.** `uptimeKumaCriticalMonitors.ts` now gives the Funnel monitor
+`maxretries: 7` (DOWN after ~7 min against a 300 s negative cache). The other
+monitors keep 1. Existing deployments get the change through
+`withRaisedRetries`, which sends the monitorList row back through
+`editMonitor` with only `maxretries` raised. That is the same round trip
+Kuma's own edit page makes. It never lowers the value and touches no other
+field, so hand edits survive. It runs on every Kuma (re)start.
+
+**Proven on home-srv-01 (0.119.7):** after `restartService('uptime-kuma')`,
+Kuma's DB shows monitor 3 at `maxretries 7`, the other seven at 1, with URL,
+active flag and notifications unchanged.
