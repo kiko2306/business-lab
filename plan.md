@@ -27622,3 +27622,18 @@ get email through `applyExisting`, as before.
 **Proven on home-srv-01 (0.119.8):** after `restartService('uptime-kuma')`,
 which re-runs the mail `applyExisting` first, monitor 3's only notification is
 2 (ntfy) and `maxretries` is still 7. The other monitors keep 1 (email) + 2.
+
+## 550. Every critical-service alert goes to ntfy only
+
+Asked: ntfy only for all monitors. `reconciledRow` now enforces the exact
+notification list on every monitor this file owns, and §549's per-monitor
+`notifyOnlyVia` flag is gone. CrowdSec and n8n drop §533's `ntfy+email`
+for `ntfy`, and that mode is removed. The exception is the ntfy monitor itself.
+It keeps email, because a push about ntfy being down would go through ntfy
+and never arrive; with no mail configured it falls back to ntfy as before.
+Hand-made monitors still get email through the mail notification's
+`applyExisting`.
+
+**Proven on home-srv-01 (0.119.9):** after `restartService('uptime-kuma')`,
+monitors 1–7 have only notification 2 (ntfy), and monitor 8 (ntfy) has only
+1 (email). The Funnel is still at `maxretries 7`.
