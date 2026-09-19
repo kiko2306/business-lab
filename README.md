@@ -209,12 +209,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
-      dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
-      persist between executions for a CLI-imported workflow, so cross-batch
-      dedupe doesn't work. Mostly moot (CrowdSec aggregates per bucket
-      upstream); add a Redis-backed store only if pushes prove noisy in
-      practice.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),

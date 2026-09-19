@@ -27428,3 +27428,32 @@ operator declined it. It would shave at most 8 s off a 7–14 s time-to-ban,
 and a scan's first burst (~3 s) finishes before either interval. The
 protection is that nothing sensitive is served, plus the CAPI blocklist.
 §538 is closed.
+
+## 542. One scan, one push: CrowdSec batches alerts over 2 min (closes §118.4a)
+
+**Measured first.** In the 23 h after alerts started flowing (§532), the
+relay ran 17 times. 7 were tests; 10 were real pushes for 5 IPs. The
+duplicates were one scan split across batches: a scan trips 2–3 scenarios
+up to ~70 s apart, and the notification plugin's `group_wait: 30s` put
+each alert in its own batch. The relay's per-IP dedupe works only within a
+batch (n8n static data doesn't persist for a CLI-imported workflow,
+§118.4a).
+
+**Fix:** `group_wait: 2m` in the rendered `notifications/http.yaml` (and
+the example). One scan's alerts now share a batch, and the existing dedupe
+collapses them. On the measured day that's 6 pushes instead of 10. A
+repeat visit hours later (130.12.180.117, re-banned while banned) still
+pushes, which is useful. The cost is that a push can arrive up to 2 min
+after the ban; the ban itself still lands within ~7 s (§538). The Redis
+store the README item proposed was rejected: batching fixes the observed
+cause, and cross-batch duplicates beyond 2 min are real repeat events.
+
+**Proven on home-srv-01 (0.119.2):** a replayed scan from `203.0.113.77`
+(sensitive files, then 404 probing, then admin panels, over ~50 s) raised
+3 alerts (#218–#220) and **one** relay run, whose single push was
+`http-sensitive-files — 203.0.113.77 · 5 events · banned 4h`. Test ban
+lifted with `unbanCrowdsecIp` (3 decisions).
+
+Minor, not fixed: that push's "banned 4h" is the first alert's ban. With
+§541's escalation, the later alerts in the same scan carry longer bans, so
+the push understates the ban.
