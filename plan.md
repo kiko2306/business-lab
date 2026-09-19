@@ -27355,3 +27355,44 @@ the operator's IP was not an option (no static address).
 Proven on home-srv-01 with `cscli explain` against the real line from alert
 #92: whitelisted. The same line with `/../../etc/passwd` under the prefix,
 and the same path on the bare domain, still reach `http-crawl-non_statics`.
+
+## 540. Unban CrowdSec IPs from Settings (§538 item 2)
+
+Settings → alerts now has **Active bans**. It lists this host's own bans,
+one row per IP (the ~26k community-blocklist decisions are left out), and
+each row has **Unban**. `services/crowdsecBans.ts`, routes
+`GET`/`DELETE /api/settings/crowdsec/bans`, with the unban audit-logged.
+The `crowdsecConfig.ts` bouncer comment that claimed this already existed
+is corrected.
+
+**How it reaches CrowdSec.** Deleting a decision needs a *machine* JWT, and
+bouncer keys can only read. So:
+- A `dashboard` machine, whose password `CROWDSEC_DASHBOARD_PASSWORD` is a
+  hidden generated secret. A post-start hook registers it with `cscli -c
+  /staging/etc/crowdsec/config.yaml machines add … --force` in a throwaway
+  run container: exec is blocked by the socket proxy, and `/etc/crowdsec`
+  isn't a volume, so the image's staging config (same sqlite path) is the
+  one that works. A refused login re-runs the registration once, so a host
+  gets it without a CrowdSec restart.
+- The backend joins `crowdsec-lapi` at runtime (`docker network connect`,
+  before each call; "already exists" is the normal case). Rejected:
+  declaring that network in the root compose file. It's external, and the
+  dashboard would then fail to start on a host where CrowdSec never ran.
+- The rejected alternative for credentials was the image's `AGENT_USERNAME`/
+  `AGENT_PASSWORD` env vars. Besides registering a machine, they rewrite the
+  local agent's own LAPI credentials.
+
+**Dead end worth remembering.** Every hand-rolled login (BusyBox `wget`,
+`nc`) got 401 "incorrect Username or Password" with the right password.
+LAPI rejects a login whose User-Agent isn't exactly `name/version`
+("bad user agent", logged only as a *warning*), with the same 401 as a bad
+password. The backend sends `business-lab-dashboard/<VERSION>`. (`nc` also
+returned "context canceled" when it half-closed before the response.)
+
+**Proven on home-srv-01 (0.118.0):** `restartService('crowdsec')`
+generated the secret and registered `dashboard`. `listCrowdsecBans()`
+returned the same 2 live bans as `cscli`. Then with `203.0.113.9`: 200 →
+`cscli decisions add` → 403 → listed → `unbanCrowdsecIp` removed 1 → 200
+within 12 s, and no decisions left. The routes answer 401 unauthenticated.
+Not exercised: the Settings table in a browser (no dashboard credentials
+here). The build and unit tests cover it.

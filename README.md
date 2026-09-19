@@ -209,9 +209,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **CrowdSec: unban from the dashboard** (§538) — list local bans (not
-      the CAPI blocklist) with an Unban action; today it takes `cscli`.
-      Fix the `crowdsecConfig.ts` bouncer comment that says this exists.
 - [ ] **CrowdSec: escalate repeat-offender ban length** (§538) —
       `duration_expr` in the rendered `profiles.yaml` (4 h, 8 h, …)
       instead of a flat 4 h. Permanent bans were rejected.
