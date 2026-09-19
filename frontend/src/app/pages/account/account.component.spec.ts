@@ -1,5 +1,6 @@
 import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { AuthService } from '../../core/auth.service';
 import { of, throwError } from 'rxjs';
 import { AccountComponent } from './account.component';
 import { OperationsService } from '../../core/operations.service';
@@ -43,6 +44,8 @@ describe('AccountComponent', () => {
       providers: [
         { provide: OperationsService, useValue: operations },
         { provide: ToastService, useValue: toast },
+        // No ban panel in these tests: it's gated on settings:manage (§546).
+        { provide: AuthService, useValue: { hasCapability: () => false } },
         provideRouter([]),
       ],
     }).compileComponents();

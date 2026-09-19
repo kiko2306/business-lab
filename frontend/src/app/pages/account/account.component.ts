@@ -8,6 +8,8 @@ import { TotpStatus } from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
+import { AuthService } from '../../core/auth.service';
+import { CrowdsecBansComponent } from './crowdsec-bans.component';
 
 // Which panel is on screen. 'enrolling' and 'recovery-codes' are transient and
 // only reachable by walking through the flow — never on a fresh load.
@@ -16,7 +18,7 @@ type View = 'loading' | 'status' | 'enrolling' | 'recovery-codes';
 @Component({
   selector: 'app-account',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PanelComponent],
+  imports: [CommonModule, ReactiveFormsModule, PanelComponent, CrowdsecBansComponent],
   templateUrl: './account.component.html',
   styleUrl: './account.component.css',
 })
@@ -25,6 +27,8 @@ export class AccountComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly sanitizer = inject(DomSanitizer);
+  // The ban list's API sits behind `settings:manage` (§546).
+  protected readonly canManageBans = inject(AuthService).hasCapability('settings:manage');
 
   protected view: View = 'loading';
   protected status: TotpStatus | null = null;

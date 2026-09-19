@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.6] — 2026-09-19
+
+### Changed
+
+- CrowdSec's banned IPs moved to their own panel on the Security page, from inside Settings' ntfy panel (§546).
+
 ## [0.119.5] — 2026-09-19
 
 ### Fixed

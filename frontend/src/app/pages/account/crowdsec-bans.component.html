@@ -1,0 +1,51 @@
+<app-panel
+  key="account:crowdsec-bans"
+  title="Banned IPs"
+  subtitle="Addresses CrowdSec is blocking at Nginx Proxy Manager (this host's detections, not the community blocklist)"
+>
+  <div class="d-flex align-items-center gap-2 mb-2">
+    <button type="button" class="btn btn-sm btn-outline-secondary" [disabled]="loading" (click)="load()">
+      <span *ngIf="loading" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+      Refresh
+    </button>
+  </div>
+  <p class="text-body-secondary small mb-2">
+    If your own IP gets caught, unban it here — this page stays reachable over the LAN or
+    Tailscale while the public sites refuse it. Bans get longer for repeat offenders.
+  </p>
+  <p *ngIf="bans && !bans.length" class="small text-body-secondary mb-0">No active bans.</p>
+  <div *ngIf="bans?.length" class="table-responsive">
+    <table class="table table-sm align-middle small mb-0">
+      <thead>
+        <tr><th>IP</th><th>Why</th><th>Network</th><th>Expires in</th><th></th></tr>
+      </thead>
+      <tbody>
+        <tr *ngFor="let ban of bans">
+          <td class="font-monospace text-break">{{ ban.ip }}</td>
+          <td>
+            <div *ngFor="let scenario of ban.scenarios">{{ scenario.replace('crowdsecurity/', '') }}</div>
+          </td>
+          <td>{{ ban.country || '' }} {{ ban.asName || '' }}</td>
+          <td class="text-nowrap">{{ remaining(ban.expiresInSeconds) }}</td>
+          <td class="text-end">
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-danger"
+              [disabled]="unbanningIp !== null"
+              (click)="unban(ban.ip)"
+              [attr.aria-label]="'Unban ' + ban.ip"
+            >
+              <span *ngIf="unbanningIp === ban.ip" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
+              Unban
+            </button>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <span
+    *ngIf="feedback"
+    class="d-block small mt-2"
+    [ngClass]="feedback.type === 'success' ? 'text-success' : 'text-danger'"
+  >{{ feedback.message }}</span>
+</app-panel>

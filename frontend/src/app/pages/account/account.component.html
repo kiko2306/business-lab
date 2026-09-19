@@ -1,7 +1,7 @@
 <div class="container-fluid py-4">
   <div class="mb-4">
     <h1 class="h3 mb-1">Account security</h1>
-    <p class="text-body-secondary mb-0">Two-factor authentication for your own sign-in.</p>
+    <p class="text-body-secondary mb-0">Two-factor authentication for your own sign-in<span *ngIf="canManageBans">, and the IPs CrowdSec is blocking</span>.</p>
   </div>
 
   <div *ngIf="errorMessage" class="alert alert-danger">{{ errorMessage }}</div>
@@ -125,5 +125,7 @@
       </ng-container>
 
   </app-panel>
+
+  <app-crowdsec-bans *ngIf="canManageBans"></app-crowdsec-bans>
 </div>
 

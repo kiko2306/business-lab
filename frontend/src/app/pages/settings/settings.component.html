@@ -215,56 +215,6 @@
       </div>
     </div>
 
-    <div class="col-12">
-      <div class="d-flex align-items-center gap-2 mb-2">
-        <label class="form-label fw-semibold mb-0">Active bans</label>
-        <button type="button" class="btn btn-sm btn-outline-secondary" [disabled]="loadingBans" (click)="loadCrowdsecBans()">
-          <span *ngIf="loadingBans" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-          {{ crowdsecBans ? 'Refresh' : 'Show' }}
-        </button>
-      </div>
-      <span class="d-block text-body-secondary small mb-2">
-        IPs CrowdSec banned on this host. The community blocklist isn't listed. Unban your
-        own IP if it gets caught — this page stays reachable over the LAN or Tailscale while
-        the public sites refuse it.
-      </span>
-      <p *ngIf="crowdsecBans && !crowdsecBans.length" class="small text-body-secondary mb-0">No active bans.</p>
-      <div *ngIf="crowdsecBans?.length" class="table-responsive">
-        <table class="table table-sm align-middle small mb-0">
-          <thead>
-            <tr><th>IP</th><th>Why</th><th>Network</th><th>Expires in</th><th></th></tr>
-          </thead>
-          <tbody>
-            <tr *ngFor="let ban of crowdsecBans">
-              <td class="font-monospace text-break">{{ ban.ip }}</td>
-              <td>
-                <div *ngFor="let scenario of ban.scenarios">{{ scenario.replace('crowdsecurity/', '') }}</div>
-              </td>
-              <td>{{ ban.country || '' }} {{ ban.asName || '' }}</td>
-              <td class="text-nowrap">{{ formatBanRemaining(ban.expiresInSeconds) }}</td>
-              <td class="text-end">
-                <button
-                  type="button"
-                  class="btn btn-sm btn-outline-danger"
-                  [disabled]="unbanningIp !== null"
-                  (click)="unbanCrowdsecIp(ban.ip)"
-                  [attr.aria-label]="'Unban ' + ban.ip"
-                >
-                  <span *ngIf="unbanningIp === ban.ip" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-                  Unban
-                </button>
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <span
-        *ngIf="bansFeedback"
-        class="d-block small mt-2"
-        [ngClass]="bansFeedback.type === 'success' ? 'text-success' : 'text-danger'"
-      >{{ bansFeedback.message }}</span>
-    </div>
-
     <div class="col-12" *ngIf="alertsFeedback">
       <span
         class="small"
