@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.4] — 2026-09-19
+
+### Fixed
+
+- Backend log files are written again — /app/logs was root-owned, so every append from the appuser process failed silently (§544).
+
 ## [0.119.3] — 2026-09-19
 
 ### Fixed

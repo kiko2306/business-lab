@@ -7,6 +7,15 @@ set -eu
 # to appuser, so manual/scheduled backups can actually write to it.
 chown -R appuser:appgroup /app/backups
 
+# Same for logs-data (plan.md §543): root-owned, so node — running as appuser —
+# got EACCES on every log-file append, which utils/logger.ts swallows by
+# design. Backend logs were console-only for weeks and each recreate erased
+# them. Guarded because the self-update watchdog shares this entrypoint
+# without mounting logs, and `set -e` would crash-loop it on a missing path.
+if [ -d /app/logs ]; then
+  chown -R appuser:appgroup /app/logs
+fi
+
 # The dashboard writes each app's .env (services/appEnv.ts) and touches a few
 # config files directly under apps/<name>/. Those directories can be created
 # by whoever ran `git pull` or by a container, so they aren't necessarily
