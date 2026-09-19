@@ -209,9 +209,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **CrowdSec: whitelist OnlyOffice's static bundle** (§538) — opening a
-      document fired `http-crawl-non_statics` on the operator (alert #92);
-      with enforcement on, that is a 4 h lockout from every NPM host.
 - [ ] **CrowdSec: unban from the dashboard** (§538) — list local bans (not
       the CAPI blocklist) with an Unban action; today it takes `cscli`.
       Fix the `crowdsecConfig.ts` bouncer comment that says this exists.

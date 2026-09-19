@@ -27343,3 +27343,15 @@ Plan, each a README item, in this order:
    Fix the misleading comment.
 3. Escalating ban duration in the rendered `profiles.yaml`.
 4. Bouncer `UPDATE_FREQUENCY` 10 → 2 s (optional, marginal).
+
+## 539. CrowdSec whitelists OnlyOffice's static bundle (§538 item 1)
+
+`apps/crowdsec/config/parsers/onlyoffice-whitelist.yaml`, a checked-in
+s02-enrich whitelist mounted by compose (static, so not rendered). It drops
+requests on the `onlyoffice.` host under the versioned bundle prefix
+`/<version>-<32 hex>/`, unless the path contains `..` or `%`. Whitelisting
+the operator's IP was not an option (no static address).
+
+Proven on home-srv-01 with `cscli explain` against the real line from alert
+#92: whitelisted. The same line with `/../../etc/passwd` under the prefix,
+and the same path on the bare domain, still reach `http-crawl-non_statics`.
