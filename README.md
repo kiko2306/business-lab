@@ -209,8 +209,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **CrowdSec: NPM bouncer pull interval 10 s → 2 s** (§538) — optional;
-      shaves up to 8 s off a ~7–14 s time-to-ban.
 - [ ] **CrowdSec-alert dedupe needs a real store** (§118.4a) — the Code node
       dedupes by IP within one batch, but `$getWorkflowStaticData` doesn't
       persist between executions for a CLI-imported workflow, so cross-batch

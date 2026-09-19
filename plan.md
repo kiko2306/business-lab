@@ -27422,3 +27422,9 @@ got bans of **12 h**, then **16 h**. The IP already had 2 decisions (§532's
 behaviour above surfaced. The comment I'd first written ("an unban resets
 the count") was wrong, and is corrected. Cleanup went through
 `unbanCrowdsecIp` (removed 2, IP back to 200).
+
+**§538 item 4 dropped (2026-09-19).** NPM bouncer pull interval 10 s → 2 s: the
+operator declined it. It would shave at most 8 s off a 7–14 s time-to-ban,
+and a scan's first burst (~3 s) finishes before either interval. The
+protection is that nothing sensitive is served, plus the CAPI blocklist.
+§538 is closed.
