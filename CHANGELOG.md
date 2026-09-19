@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.118.0] — 2026-09-19
+
+### Added
+
+- Settings lists CrowdSec's active bans and unbans an IP — no `cscli` on the host when a false positive catches the operator (§540).
+
 ## [0.117.22] — 2026-09-18
 
 ### Added

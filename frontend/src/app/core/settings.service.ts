@@ -20,6 +20,7 @@ import {
   ExposureTestResponse,
   GeneralSettings,
   AlertNotifySettings,
+  CrowdsecBan,
   DeploymentStatus,
 } from './models';
 
@@ -181,6 +182,19 @@ export class SettingsService {
       input,
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
+  }
+
+  loadCrowdsecBans(): Observable<{ bans: CrowdsecBan[] }> {
+    return this.http.get<{ bans: CrowdsecBan[] }>(`${API_BASE_URL}/settings/crowdsec/bans`, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
+  }
+
+  unbanCrowdsecIp(ip: string): Observable<{ removed: number; message: string }> {
+    return this.http.delete<{ removed: number; message: string }>(`${API_BASE_URL}/settings/crowdsec/bans`, {
+      params: { ip },
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   testAlertSource(source: string): Observable<{ ok: boolean; message: string }> {

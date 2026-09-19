@@ -274,6 +274,17 @@ export interface AlertNotifySettings {
   enforceNpm: boolean;
 }
 
+// One banned IP from CrowdSec's own detections (not the community
+// blocklist), as listed under Settings for unbanning (plan.md §540).
+export interface CrowdsecBan {
+  ip: string;
+  scenarios: string[];
+  expiresInSeconds: number;
+  country: string | null;
+  asName: string | null;
+  since: string | null;
+}
+
 export interface ExposureSettingsInput {
   baseDomain: string;
   npmEmail: string;

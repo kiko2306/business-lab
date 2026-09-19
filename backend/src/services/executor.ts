@@ -51,6 +51,7 @@ import { reconcileMeshcentralFirstAdmin } from './meshcentralAdminBootstrap';
 import { ensureNocodbInviteOnlySignup } from './nocodbUserProvisioning';
 import { reconcileUptimeKumaFirstAdmin } from './uptimeKumaAdminBootstrap';
 import { ensureNtfySubscriberToken } from './ntfyAuthBootstrap';
+import { ensureCrowdsecDashboardMachine } from './crowdsecBans';
 import { reconcileUptimeKumaMailNotification } from './uptimeKumaMailNotification';
 import { ensureCriticalServiceMonitors } from './uptimeKumaCriticalMonitors';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
@@ -417,6 +418,10 @@ async function composeUpWithManagedConfig(
   // app-credentials.md. After reconcileItflowFirstAdmin: the `settings` row
   // this writes to only exists once that wizard has run.
   await reconcileItflowMailCron(serviceName);
+  // CrowdSec: register the dashboard's LAPI machine so Settings can list and
+  // lift bans (§540). Throwaway run against its data volume, so after `up`;
+  // no-op otherwise.
+  await ensureCrowdsecDashboardMachine(serviceName);
 
   // NetBird: create the routing peer's network/resource/router/policy/setup
   // key via NetBird's own management API, so there's no wizard

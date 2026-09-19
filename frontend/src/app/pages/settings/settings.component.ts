@@ -13,6 +13,7 @@ import {
   BackupTargetTestResponse,
   GeneralSettings,
   AlertNotifySettings,
+  CrowdsecBan,
   ClaudeKeySettings,
   DeploymentStatus,
 } from '../../core/models';
@@ -119,6 +120,12 @@ export class SettingsComponent implements OnInit {
   protected alertTopicDraft = '';
   protected readonly alertTopicPattern = /^[A-Za-z0-9_-]{1,64}$/;
   protected testingAlertSource: string | null = null;
+  // Loaded on demand, not with the page: each load joins the backend to
+  // CrowdSec's API network and logs in, and CrowdSec may not be running.
+  protected crowdsecBans: CrowdsecBan[] | null = null;
+  protected loadingBans = false;
+  protected unbanningIp: string | null = null;
+  protected bansFeedback: { type: 'success' | 'danger'; message: string } | null = null;
 
   ngOnInit(): void {
     this.loadDeployment();
@@ -261,6 +268,43 @@ export class SettingsComponent implements OnInit {
           };
         },
       });
+  }
+
+  loadCrowdsecBans(): void {
+    this.loadingBans = true;
+    this.bansFeedback = null;
+    this.settingsService
+      .loadCrowdsecBans()
+      .pipe(finalize(() => (this.loadingBans = false)))
+      .subscribe({
+        next: (res) => (this.crowdsecBans = res.bans),
+        error: (error) => {
+          this.bansFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to list CrowdSec bans.') };
+        },
+      });
+  }
+
+  unbanCrowdsecIp(ip: string): void {
+    this.unbanningIp = ip;
+    this.bansFeedback = null;
+    this.settingsService
+      .unbanCrowdsecIp(ip)
+      .pipe(finalize(() => (this.unbanningIp = null)))
+      .subscribe({
+        next: (res) => {
+          this.crowdsecBans = (this.crowdsecBans ?? []).filter((ban) => ban.ip !== ip);
+          this.bansFeedback = { type: 'success', message: res.message };
+        },
+        error: (error) => {
+          this.bansFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to unban that IP.') };
+        },
+      });
+  }
+
+  protected formatBanRemaining(seconds: number): string {
+    const hours = Math.floor(seconds / 3600);
+    const minutes = Math.floor((seconds % 3600) / 60);
+    return hours ? `${hours}h ${minutes}m` : `${minutes}m`;
   }
 
   private saveAlertSettings(input: { topic?: string; crowdsecEnabled?: boolean; enforceNpm?: boolean }): void {
