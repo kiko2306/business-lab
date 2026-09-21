@@ -31,6 +31,13 @@ services:
       # crowdsec-bouncer/crowdsec-nginx-bouncer.conf by the dashboard backend
       # (services/crowdsecConfig.ts) — the two ends can't drift.
       BOUNCER_KEY_nginx: ${CROWDSEC_NGINX_BOUNCER_KEY}
+      # Optional CrowdSec Console enrollment (§567.2). The image's own
+      # entrypoint (docker_start.sh) runs `cscli console enroll` with this on
+      # every start when it's non-empty — nothing here has to drive that
+      # itself. Empty default so a fresh clone with no key set still starts
+      # (extractComposeEnvVars/ensureServiceSecrets in the backend only
+      # blocks a start over a var with NO default, not an empty one).
+      ENROLL_KEY: ${CROWDSEC_CONSOLE_ENROLL_KEY:-}
     # So the notification-http plugin can reach ntfy's published port on the
     # host regardless of which compose-project bridge each app is on
     # (services/crowdsecConfig.ts renders the URL against this). plan.md §118.1.

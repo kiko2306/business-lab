@@ -28436,3 +28436,80 @@ Added `crowdsecurity/http-dos` and `crowdsecurity/whitelist-good-actors` to
 dependencies — harmless no-ops here, there's no sshd log source mounted),
 container reports healthy, `cscli lapi status` confirms the local API is
 still reachable.
+
+## 569. Built: CrowdSec Console enrollment (§567.2)
+
+Built as a two-line compose change plus docs, not a new backend
+subsystem — two things already existed that the plan (§567.2) assumed would
+need building:
+
+1. **The official `crowdsecurity/crowdsec` image already supports this
+   natively.** Its entrypoint (`/docker_start.sh`) runs `cscli console
+   enroll "$ENROLL_KEY"` itself on every start, whenever `ENROLL_KEY` is a
+   non-empty env var — no `cscli console enroll` call, no post-`up` hook,
+   no throwaway `docker compose run`/`docker exec` needed from this repo's
+   code at all (ponytail rung 4 — native feature beats hand-rolled
+   automation). Added `ENROLL_KEY: ${CROWDSEC_CONSOLE_ENROLL_KEY:-}` to
+   `apps/crowdsec/docker-compose.yml`'s `crowdsec` service — the `:-` empty
+   default matters: `backend/src/config/services.ts`'s
+   `extractComposeEnvVars`/`ensureServiceSecrets` blocks a service from
+   starting at all over a required var (no default) with no `.env` value, and
+   this one must stay fully optional.
+2. **The generic per-app secrets panel already handles "user types a token,
+   it's written into `apps/<name>/.env`."** `CROWDSEC_CONSOLE_ENROLL_KEY`
+   just needed to exist as a `${VAR}` reference in the compose file for
+   `appEnv.ts`'s `getServiceEnvStatus`/`saveServiceEnv` (already generic,
+   already driving CrowdSec's existing bouncer-key fields) to surface it as
+   a masked field in CrowdSec's Configuration panel — matches
+   `SECRET_KEY_PATTERN` (`_KEY$`) automatically. No frontend or route change
+   needed.
+
+Documented in `apps/crowdsec/.env.example`: create an account on
+app.crowdsec.net (Google or email/password — CrowdSec's own signup, nothing
+this dashboard can do), add a "security engine" there, paste the enroll key
+into the dashboard's CrowdSec Configuration panel, save, then accept the
+pending engine at app.crowdsec.net.
+
+**Verified live against `tx-home-utils.com`:**
+- `docker exec`'d the running container (developer shell, not backend code —
+  the socket-proxy restriction backend code operates under doesn't apply
+  here) with a real enroll key the user provided out-of-band: `cscli console
+  enroll -e context <key>` succeeded — "Watcher successfully enrolled. Visit
+  https://app.crowdsec.net to accept it." — proving the key and the
+  mechanism both work. `enrolled` stays `false` in `cscli console status`
+  until the account holder clicks Accept on the website; that is CrowdSec
+  Console's own design, not something to route around.
+- Recreated the container after adding `ENROLL_KEY` to the compose file
+  (`docker compose up -d`) with no `.env` value set yet — starts clean,
+  `cscli lapi status` still fine. Confirms the optional-by-default path is
+  safe for every existing deployment.
+- Could not complete the durable end-to-end path (key → dashboard
+  Configuration panel → `.env` → next start → `cscli console status`
+  `enrolled: true`) from this session: `.claude/hooks` deny every shell
+  read/write of a real `.env`, by design (`CLAUDE.md` — "a refusal … is the
+  rule working, find another way rather than routing around it"), and typing
+  it into the dashboard is exactly the human step principle 2 reserves for a
+  person. Left for the user to do once, in the UI.
+
+**A real caveat, not a bug: CAPI identity isn't persisted across a container
+*recreation*.** `/etc/crowdsec/online_api_credentials.yaml` (the CrowdSec
+Console/CAPI machine login) lives outside every bind-mounted path — only
+`/var/lib/crowdsec/data` (bouncer/machine registrations, decisions) is
+persisted. Verified live: a plain `docker compose restart` keeps the same
+CAPI login (same container, same writable layer) and an already-pending
+enrollment survives it; a *recreation* (`docker compose up -d` after any
+compose-file change, or the image self-update this app's compose file
+already does periodically per its top-of-file comment) gets a fresh
+container layer, so `docker_start.sh` re-runs `cscli capi register`, gets a
+brand-new machine identity, and — while `ENROLL_KEY` re-enrolls that new
+identity automatically on the next start — the account holder has to click
+Accept again in the Console for it, same as the very first time. Persisting
+this away would mean bind-mounting (or otherwise freezing) `config.yaml`
+itself, since the entrypoint's gate for re-registering is `config.yaml`'s
+`.api.server.online_client` key, not the credentials file's mere existence
+on disk — a materially bigger, riskier change (config.yaml is CrowdSec's own
+whole-service config, and freezing a copy of it risks drifting from what a
+future image version expects). Not built: the re-accept-after-recreation
+cost is real but bounded to how often this app's container actually gets
+recreated, which is far less often than it restarts. Revisit only if that
+turns out to be a live annoyance, not preemptively.
