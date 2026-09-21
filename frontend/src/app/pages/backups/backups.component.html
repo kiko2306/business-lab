@@ -46,6 +46,16 @@
             </select>
           </div>
           <div class="col-auto">
+            <label class="form-label small mb-1" for="backupScheduleRunAtTime">At</label>
+            <input
+              class="form-control form-control-sm"
+              type="time"
+              id="backupScheduleRunAtTime"
+              [(ngModel)]="schedule.runAtTime"
+              name="backupScheduleRunAtTime"
+            />
+          </div>
+          <div class="col-auto">
             <label class="form-label small mb-1" for="backupScheduleRetention">Keep last</label>
             <div class="d-flex align-items-center gap-2">
               <input

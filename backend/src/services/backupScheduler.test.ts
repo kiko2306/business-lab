@@ -76,6 +76,30 @@ describe('shouldRunScheduledBackup', () => {
     const now = new Date('2026-08-26T00:00:01Z');
     expect(shouldRunScheduledBackup(now, lastRunAt, 'weekly')).toBe(true);
   });
+
+  it('waits for the configured hour even once the interval has elapsed', () => {
+    const lastRunAt = '2026-08-26T00:00:00Z';
+    const now = new Date('2026-08-27T01:00:01Z'); // due, but not 03:00 local yet
+    expect(
+      shouldRunScheduledBackup(now, lastRunAt, 'daily', { outcome: null, consecutiveFailures: 0 }, '03:00')
+    ).toBe(false);
+  });
+
+  it('runs once due and the configured hour matches', () => {
+    const lastRunAt = '2026-08-26T00:00:00Z';
+    const now = new Date('2026-08-27T03:00:01Z');
+    expect(
+      shouldRunScheduledBackup(now, lastRunAt, 'daily', { outcome: null, consecutiveFailures: 0 }, '03:00')
+    ).toBe(true);
+  });
+
+  it('ignores the configured hour on a fast retry', () => {
+    const lastRunAt = '2026-08-27T13:00:00Z';
+    const now = new Date('2026-08-27T15:00:01Z'); // not 03:00, but a retry is due
+    expect(
+      shouldRunScheduledBackup(now, lastRunAt, 'daily', { outcome: 'failed', consecutiveFailures: 1 }, '03:00')
+    ).toBe(true);
+  });
 });
 
 describe('runScheduledBackupCheck', () => {

@@ -28784,3 +28784,23 @@ against `apps/webdav` (optionally backed by the same NAS over SMB, per
 §561's original framing) is left as a follow-up decision, not rolled into
 this build — the destination was deliberately restored to `ftp` rather than
 left switched, since that decision wasn't part of what was asked here.
+
+## 575. Built: backup schedule gained a time-of-day field
+
+The schedule only had `frequency` (`daily`/`weekly`); `shouldRunScheduledBackup`
+(`backend/src/services/backupScheduler.ts`) fired as soon as the elapsed-time
+threshold passed on the hourly poll, so a backup could land at any hour. Added
+`runAtTime` ("HH:mm", default `03:00`) alongside it: a new
+`backup_schedule_run_at_time` settings row (`backend/src/services/backup.ts`),
+validated in `backend/src/middleware/validation.ts`, and a
+`matchesRunAtHour()` gate in `shouldRunScheduledBackup` that only compares the
+local *hour* (the poll is hourly, so minutes are moot) — a fast retry after a
+failure still ignores it, since waiting for a specific hour would defeat the
+point of retrying fast. Frontend: a native `<input type="time">` next to the
+existing Frequency/Keep-last fields on `backups.component.html`, no new UI
+pattern needed since none existed to reuse. `./scripts/check.sh backend test`
+(111 files, 1151 tests, three new cases for the hour gate), `typecheck`, and
+`frontend build`/`test` (74/74) all pass. No live-stack verification needed —
+this only changes when the existing scheduler fires, not anything
+Docker/exposure/networking/backup-destination related, so nothing to prove
+against `tx-home-utils.com` beyond the tests above.

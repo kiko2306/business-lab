@@ -43,12 +43,31 @@ export interface LastRunState {
   consecutiveFailures: number;
 }
 
+/**
+ * The check is hourly, so `runAtTime` ("HH:mm") is honoured to the hour, not
+ * the minute — the poll only ever wakes up on the hour anyway.
+ */
+function matchesRunAtHour(now: Date, runAtTime: string | null | undefined): boolean {
+  if (!runAtTime) {
+    return true;
+  }
+  const hour = Number.parseInt(runAtTime.slice(0, 2), 10);
+  return Number.isFinite(hour) && now.getHours() === hour;
+}
+
 export function shouldRunScheduledBackup(
   now: Date,
   lastRunAt: string | null,
   frequency: BackupScheduleFrequency,
-  lastRun: LastRunState = { outcome: null, consecutiveFailures: 0 }
+  lastRun: LastRunState = { outcome: null, consecutiveFailures: 0 },
+  runAtTime: string | null = null
 ): boolean {
+  const retrying = lastRun.outcome === 'failed' && lastRun.consecutiveFailures <= MAX_FAST_RETRIES;
+  // A fast retry after a failure ignores the configured hour — waiting up to a
+  // day for the next matching hour would defeat the point of retrying fast.
+  if (!retrying && !matchesRunAtHour(now, runAtTime)) {
+    return false;
+  }
   if (!lastRunAt) {
     return true;
   }
@@ -56,7 +75,6 @@ export function shouldRunScheduledBackup(
   if (Number.isNaN(lastRunMs)) {
     return true;
   }
-  const retrying = lastRun.outcome === 'failed' && lastRun.consecutiveFailures <= MAX_FAST_RETRIES;
   return now.getTime() - lastRunMs >= (retrying ? CHECK_INTERVAL_MS : FREQUENCY_MS[frequency]);
 }
 
@@ -66,10 +84,13 @@ export async function runScheduledBackupCheck(): Promise<void> {
     return;
   }
   if (
-    !shouldRunScheduledBackup(new Date(), config.lastRunAt, config.frequency, {
-      outcome: config.lastOutcome,
-      consecutiveFailures: config.consecutiveFailures,
-    })
+    !shouldRunScheduledBackup(
+      new Date(),
+      config.lastRunAt,
+      config.frequency,
+      { outcome: config.lastOutcome, consecutiveFailures: config.consecutiveFailures },
+      config.runAtTime
+    )
   ) {
     // Still enforce retention on a check with nothing due: a lowered "keep
     // last", or an archive that arrived by some other route, would otherwise

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.126.0] — 2026-09-21
+
+### Backups
+
+- Add a time-of-day field to the backup schedule, so automatic backups run at a chosen hour instead of whenever the hourly check happens to land
+
 ## [0.125.0] — 2026-09-21
 
 ### Backup

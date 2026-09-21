@@ -9,6 +9,7 @@ export const BACKUP_DIR = path.join(process.cwd(), 'backups');
 export const BACKUP_SCHEDULE_SETTINGS_KEYS = {
   enabled: 'backup_schedule_enabled',
   frequency: 'backup_schedule_frequency',
+  runAtTime: 'backup_schedule_run_at_time',
   retentionCount: 'backup_schedule_retention_count',
   lastRunAt: 'backup_schedule_last_run_at',
   // What the last run actually did. Without these, a run that ticked and a run
@@ -21,9 +22,14 @@ export const BACKUP_SCHEDULE_SETTINGS_KEYS = {
 export type BackupScheduleFrequency = 'daily' | 'weekly';
 export type BackupRunOutcome = 'success' | 'failed';
 
+/** Matches the browser's native `<input type="time">` value: 24h "HH:mm". */
+const RUN_AT_TIME_PATTERN = /^([01]\d|2[0-3]):[0-5]\d$/;
+
 export interface BackupScheduleConfig {
   enabled: boolean;
   frequency: BackupScheduleFrequency;
+  /** Local server time the schedule tries to run at, e.g. "03:00". */
+  runAtTime: string;
   retentionCount: number;
   /** When the schedule last *attempted* a run. Drives the cadence. */
   lastRunAt: string | null;
@@ -38,9 +44,10 @@ export interface BackupScheduleConfig {
 }
 
 /** The settings a user chooses; the run-history fields are read, never defaulted. */
-const DEFAULT_SCHEDULE: Pick<BackupScheduleConfig, 'enabled' | 'frequency' | 'retentionCount'> = {
+const DEFAULT_SCHEDULE: Pick<BackupScheduleConfig, 'enabled' | 'frequency' | 'runAtTime' | 'retentionCount'> = {
   enabled: false,
   frequency: 'daily',
+  runAtTime: '03:00',
   retentionCount: 14,
 };
 
@@ -174,6 +181,9 @@ export async function getBackupScheduleConfig(): Promise<BackupScheduleConfig> {
   const retentionRaw = Number.parseInt(values[BACKUP_SCHEDULE_SETTINGS_KEYS.retentionCount] ?? '', 10);
   const retentionCount = Number.isFinite(retentionRaw) && retentionRaw > 0 ? retentionRaw : DEFAULT_SCHEDULE.retentionCount;
 
+  const runAtTimeRaw = values[BACKUP_SCHEDULE_SETTINGS_KEYS.runAtTime];
+  const runAtTime = runAtTimeRaw && RUN_AT_TIME_PATTERN.test(runAtTimeRaw) ? runAtTimeRaw : DEFAULT_SCHEDULE.runAtTime;
+
   const outcomeRaw = values[BACKUP_SCHEDULE_SETTINGS_KEYS.lastOutcome];
   const lastOutcome: BackupRunOutcome | null =
     outcomeRaw === 'success' || outcomeRaw === 'failed' ? outcomeRaw : null;
@@ -183,6 +193,7 @@ export async function getBackupScheduleConfig(): Promise<BackupScheduleConfig> {
   return {
     enabled: values[BACKUP_SCHEDULE_SETTINGS_KEYS.enabled] === 'true',
     frequency,
+    runAtTime,
     retentionCount,
     lastRunAt: values[BACKUP_SCHEDULE_SETTINGS_KEYS.lastRunAt] ?? null,
     lastOutcome,
@@ -194,11 +205,13 @@ export async function getBackupScheduleConfig(): Promise<BackupScheduleConfig> {
 export async function saveBackupScheduleConfig(config: {
   enabled: boolean;
   frequency: BackupScheduleFrequency;
+  runAtTime: string;
   retentionCount: number;
 }): Promise<void> {
   const values: Record<string, string> = {
     [BACKUP_SCHEDULE_SETTINGS_KEYS.enabled]: String(config.enabled),
     [BACKUP_SCHEDULE_SETTINGS_KEYS.frequency]: config.frequency,
+    [BACKUP_SCHEDULE_SETTINGS_KEYS.runAtTime]: config.runAtTime,
     [BACKUP_SCHEDULE_SETTINGS_KEYS.retentionCount]: String(config.retentionCount),
   };
   for (const [key, value] of Object.entries(values)) {

@@ -248,10 +248,10 @@ router.get('/schedule', async (_req: Request, res: Response) => {
 });
 
 router.put('/schedule', validateBody(schemas.backupScheduleUpdate), async (req: Request, res: Response) => {
-  const { enabled, frequency, retentionCount } = req.body;
+  const { enabled, frequency, runAtTime, retentionCount } = req.body;
 
   try {
-    await saveBackupScheduleConfig({ enabled, frequency, retentionCount });
+    await saveBackupScheduleConfig({ enabled, frequency, runAtTime, retentionCount });
     await writeAuditLog({
       userId: req.user?.id ?? null,
       action: 'settings_change',

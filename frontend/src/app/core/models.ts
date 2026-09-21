@@ -433,10 +433,12 @@ export interface AppRestoreResponse {
 
 export type BackupScheduleFrequency = 'daily' | 'weekly';
 
-/** The three values the user actually chooses; the rest is run history. */
+/** The values the user actually chooses; the rest is run history. */
 export interface BackupScheduleSettings {
   enabled: boolean;
   frequency: BackupScheduleFrequency;
+  /** Local server time the schedule tries to run at, "HH:mm". */
+  runAtTime: string;
   retentionCount: number;
 }
 

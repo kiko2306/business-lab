@@ -38,6 +38,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
   protected schedule: BackupScheduleConfig = {
     enabled: false,
     frequency: 'daily',
+    runAtTime: '03:00',
     retentionCount: 14,
     lastRunAt: null,
     lastOutcome: null,
@@ -218,8 +219,8 @@ export class BackupsComponent implements OnInit, OnDestroy {
 
   saveSchedule(): void {
     this.savingSchedule = true;
-    const { enabled, frequency, retentionCount } = this.schedule;
-    this.operations.updateBackupSchedule({ enabled, frequency, retentionCount }).subscribe({
+    const { enabled, frequency, runAtTime, retentionCount } = this.schedule;
+    this.operations.updateBackupSchedule({ enabled, frequency, runAtTime, retentionCount }).subscribe({
       next: (response) => {
         this.toast.success(response.message);
         this.savingSchedule = false;

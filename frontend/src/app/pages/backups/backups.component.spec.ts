@@ -69,7 +69,16 @@ describe('BackupsComponent', () => {
     ]);
     operations.listBackups.and.returnValue(of({ items: [] }));
     operations.getBackupSchedule.and.returnValue(
-      of({ enabled: false, frequency: 'daily', retentionCount: 14, lastRunAt: null, lastOutcome: null, lastSuccessAt: null, consecutiveFailures: 0 })
+      of({
+        enabled: false,
+        frequency: 'daily',
+        runAtTime: '03:00',
+        retentionCount: 14,
+        lastRunAt: null,
+        lastOutcome: null,
+        lastSuccessAt: null,
+        consecutiveFailures: 0,
+      })
     );
     operations.getBackupStatus.and.returnValue(of(emptyStatus));
     toast = jasmine.createSpyObj('ToastService', ['success', 'error']);

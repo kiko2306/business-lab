@@ -130,6 +130,9 @@ export const schemas = {
   backupScheduleUpdate: Joi.object({
     enabled: Joi.boolean().required(),
     frequency: Joi.string().valid('daily', 'weekly').required(),
+    runAtTime: Joi.string()
+      .pattern(/^([01]\d|2[0-3]):[0-5]\d$/)
+      .required(),
     retentionCount: Joi.number().integer().min(1).max(365).required(),
   }),
   backupTarget: Joi.object({
