@@ -27658,3 +27658,47 @@ sets `cachedCheck` directly right after the `git pull --ff-only` lands and
 `checkForUpdate()` already captured before the pull. Covered by a new
 `selfUpdate.test.ts` case asserting `status.check` reads "up to date"
 right after a run's pull, not just `latestRun`. Shipped as 0.119.10.
+
+## 552. Plan: ntfy alert on backup failure
+
+Investigated yesterday's failed app-data backup (2026-09-20 10:53–15:53):
+four consecutive `could not provision the Kopia backup source: The operation
+was aborted due to timeout` failures, root-caused to the same wedged
+rclone/FTP bridge from §434/§435 — the keepalive itself was failing too, so
+this was a genuine wedge, not just idle-timeout. No code bug; the scheduler's
+own backoff (hourly retries up to `MAX_FAST_RETRIES`, then daily) did its
+job. But nothing pushed a notification — the only way to know was reading
+the audit log. Asked for a plan to alert on this via ntfy; not implemented
+yet, planned only.
+
+**Design**: reuse `publishAlert()` (`backend/src/utils/alertNotify.ts`) —
+already the shared ntfy path `criticalServiceHealth.ts` and
+`netbirdRoutingPeer.ts` use (never throws, posts straight to ntfy's
+published port, no dependency on the tunnel/Authelia/n8n). No new topic, no
+new settings key.
+
+Hook it into `backupScheduler.ts` at the three existing
+`writeAuditLog(..., result: 'failure', ...)` call sites, adding one
+`publishAlert()` beside each, reusing the same `detail`/error string already
+built for the audit row:
+1. `runScheduledBackupCheck()`'s catch — the control-plane archive step
+   itself threw.
+2. `runAppDataBackupLocked()` — Kopia has no password configured yet.
+3. `runAppDataBackupLocked()` — `run.started === false` (yesterday's case).
+
+`title` names which half failed ("Backup: control-plane archive failed" /
+"Backup: app-data snapshot failed"), `tags: ['floppy_disk']`, `priority: 4`
+(the existing "high" convention — `5` stays reserved for
+"auto-restart gave up").
+
+No dedup/escalation logic: the scheduler's existing backoff already caps
+this at ~4 pushes before falling back to daily cadence, then at most one a
+day after that — the same shape `criticalServiceHealth.ts` needs a
+`gaveUpAlerted` flag for, not needed here since failures are already
+infrequent by construction.
+
+**Test**: extend `backupScheduler.test.ts` with `../utils/alertNotify`
+mocked the way `criticalServiceHealth.test.ts` does it, one case per failure
+branch asserting `publishAlert` was called with the right title/message.
+
+Tracked as a README TODO item until built.

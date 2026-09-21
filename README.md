@@ -228,3 +228,13 @@ it is done — not ticked off and left behind. Section references point at
       MeshCentral's own TLS) and a KVM/terminal session actually relays over
       WebSocket without WebRTC. Nothing here can be proven from the
       dashboard host alone.
+
+### Backups
+
+- [ ] **ntfy alert on backup failure** — planned in plan.md §552, not built.
+      Reuse `publishAlert()` (`backend/src/utils/alertNotify.ts`) from
+      `backupScheduler.ts`'s three existing failure-audit-log sites: the
+      control-plane archive's catch, Kopia-has-no-password, and
+      `run.started === false` (the rclone-bridge-timeout case investigated
+      this session). No new topic/settings; extend
+      `backupScheduler.test.ts` with one case per branch.
