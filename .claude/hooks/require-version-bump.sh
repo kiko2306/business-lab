@@ -30,9 +30,17 @@ fi
 cd "${CLAUDE_PROJECT_DIR:-.}" || exit 0
 git rev-parse --verify HEAD >/dev/null 2>&1 || exit 0
 
-# Everything this commit would carry: staged, plus tracked-but-unstaged in case
-# of `git commit -a`.
-changed=$( { git diff --cached --name-only; git diff --name-only HEAD; } 2>/dev/null | sort -u )
+# Everything this commit would actually carry: staged only, unless the
+# command itself is a `git commit -a`/`-am`/`--all`, in which case tracked-
+# but-unstaged changes ship too. Without this distinction, any unrelated
+# dirty file sitting in the working tree (e.g. a separate change awaiting its
+# own commit) falsely dragged into the check even though `git commit -m` never
+# touches it.
+if grep -qE '(^|[[:space:]])(--all|-[a-zA-Z]*a[a-zA-Z]*)([[:space:]]|$)' <<<"$cmd"; then
+  changed=$( { git diff --cached --name-only; git diff --name-only HEAD; } 2>/dev/null | sort -u )
+else
+  changed=$(git diff --cached --name-only 2>/dev/null | sort -u)
+fi
 [ -n "$changed" ] || exit 0
 
 # Shipping code = a non-test source file. Test/spec-only changes are treated as
