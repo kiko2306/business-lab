@@ -243,6 +243,19 @@ it is done — not ticked off and left behind. Section references point at
       repo's config. Check that issue periodically; delete this item once it's
       closed upstream (or once an app update fixes it for us, whichever comes
       first).
+- [ ] **Re-enable the CrowdSec Cloudflare Worker bouncer once its token bug is
+      fixed** — the edge-level bouncer (`cloudflare-worker-bouncer` in
+      `apps/crowdsec/docker-compose.yml`, behind the `edge-bouncer` compose
+      profile) would drop flagged IPs at the Cloudflare edge, further
+      upstream than the NPM Lua bouncer currently enforcing bans (plan.md
+      §567's #3, §23.17) — but as of v0.0.18 it crash-loops
+      ("Authentication error (10000)") against Cloudflare API tokens with the
+      newer `cfut_` prefix, even with full Workers/KV/Routes scope (verified
+      via curl). Its config is already rendered on every start
+      (`services/crowdsecConfig.ts`), so re-enabling it is just
+      `docker compose --profile edge-bouncer up -d` once a classic token
+      works or upstream fixes the auth path. Check periodically; delete this
+      item once it's fixed and the bouncer is confirmed enforcing live.
 - [ ] **MeshCentral: prove real agent enrolment through the public tunnel**
       — the app is up, reachable at its own hostname with no Authelia gate,
       and its own login page confirmed live (§505/§506), but the actual

@@ -28513,3 +28513,21 @@ future image version expects). Not built: the re-accept-after-recreation
 cost is real but bounded to how often this app's container actually gets
 recreated, which is far less often than it restarts. Revisit only if that
 turns out to be a live annoyance, not preemptively.
+
+## 570. Reviewed two CrowdSec hardening suggestions (bouncer placement, auditd)
+
+User asked whether two suggestions ("shift bouncers upstream" to a firewall
+or CDN level; add post-exploitation auditd + process-kill defenses) made
+sense here. Neither needed building: enforcement is already reverse-proxy
+level (NPM Lua bouncer), one of the two options that advice calls good; the
+further-upstream Cloudflare Worker bouncer already exists
+(`apps/crowdsec/docker-compose.yml`) but sits disabled behind the `cfut_`
+token bug (§23.17) — added a README TODO to recheck it periodically, same
+pattern as the NetBird-Android tracking item. A host-level
+`crowdsec-firewall-bouncer` (iptables/nftables) doesn't apply: violates
+principle 1 (no firewall rules) and can't see real attacker IPs anyway since
+all ingress is via Cloudflare Tunnel. auditd + a process-killing custom
+bouncer was rejected outright — needs host-level config outside the
+dashboard (principle 2) and hands an automated pipeline kill authority over
+host processes, a materially bigger trust boundary this project's threat
+model doesn't call for.
