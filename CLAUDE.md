@@ -40,8 +40,8 @@ credentials/tokens, and there uptime and client data do matter. The difference
 is the promises, not the exposure.
 
 The verification model is unchanged: this box stays the stack every
-Docker/exposure/networking/backup change is proven against before it is called
-done — that is exactly what a no-guarantees dev/test box is for.
+Docker/exposure/networking/backup change is proven against on `beta`, before
+it goes to `main` — that is exactly what a no-guarantees dev/test box is for.
 
 ## plan.md is the project's memory
 
@@ -105,28 +105,26 @@ page or the 2FA flow.
 
 The real branch flow has three stages: `dev` → `beta` → `main`. All work
 commits to the rolling `dev` branch — never straight to `beta` or `main`.
-`beta` and `main` are reserved for state that has already cleared the same
-verified-gate below; merging up the chain (fast-forward when possible) is
-itself the act of calling a change done, not a separate later step.
 
-When an implementation is done and verified — the affected workspace's checks
-pass, and anything touching Docker/exposure/networking/backups has been proven
-against the real stack — commit it and push to `dev`. Don't leave finished work
-sitting uncommitted, and don't batch several unrelated changes into one commit:
-one commit per coherent change, pushed as it lands. Once verified, merge `dev`
-into `beta` and push `beta` too — that is the routine next step for any
-verified change, done without asking each time. `beta` → `main` is different:
-merge and push `main` only with the user's **explicit go-ahead each time** —
-never on your own initiative, even when `beta` is fully verified. Branch off
-`dev` as much as needed to keep something isolated mid-investigation (a spike,
-a throwaway experiment); merge back into `dev`, not `beta` or `main`, and
-delete the branch once it has served its purpose.
+`dev` is always safe to commit and push to — that is what it is for. The
+affected workspace's checks (typecheck/test) should pass, but live-stack
+verification against Docker/exposure/networking/backups is **not** a gate for
+`dev`: commit and push as work lands, including work that is not yet proven
+against the real stack. Don't leave finished work sitting uncommitted, and
+don't batch several unrelated changes into one commit: one commit per
+coherent change, pushed as it lands.
 
-Verified is the gate — for the `dev` commit and for merging into `beta`. A
-change that type-checks but hasn't been run is not done, and does not get
-committed (or merged into `beta`) as though it were. If something is
-half-finished, say so and leave it on `dev`, unmerged, rather than pushing a
-checkpoint further up the chain.
+`beta` is where that live-stack verification happens. Merging `dev` into
+`beta` (fast-forward when possible) and pushing is the routine next step, done
+without asking each time — then prove anything touching
+Docker/exposure/networking/backups against the real stack on `beta`.
+`beta` → `main` only happens once that verification has passed, and even then
+only with the user's **explicit go-ahead each time** — never on your own
+initiative, even when `beta` is fully verified.
+
+Branch off `dev` as much as needed to keep something isolated
+mid-investigation (a spike, a throwaway experiment); merge back into `dev`,
+not `beta` or `main`, and delete the branch once it has served its purpose.
 
 Check `git status` before committing — the repo is public, and `.env` files must
 never be in the diff.
@@ -150,14 +148,14 @@ Every task runs through the same six steps, in order, every time:
    dead ends behind it) gets a few lines: what changed and why, no more.
    Padding a trivial item to look like an investigation is exactly the
    token/session-time cost this convention should avoid.
-5. **Commit and push to `dev`, on success — then merge to `beta`.** Success
-   means the affected workspace's checks pass and anything touching
-   Docker/exposure/networking/backups has been proven against the real
-   stack. If it is not verified, say so plainly and leave it uncommitted —
-   never push a checkpoint and never call it done. Once verified, merge
-   `dev` into `beta` and push both — see "Commits go to `dev`" above.
-   `beta` → `main` is a separate step that needs the user's go-ahead each
-   time; don't fold it into this one unasked.
+5. **Commit and push to `dev` once the affected workspace's checks pass —
+   then merge to `beta` and verify there.** `dev` has no live-stack gate; push
+   as it lands. Merge `dev` into `beta` and push both as the routine next
+   step, then prove anything touching Docker/exposure/networking/backups
+   against the real stack on `beta` — see "Commits go to `dev`" above.
+   `beta` → `main` is a separate step, only after that verification passes,
+   that needs the user's go-ahead each time; don't fold it into this one
+   unasked.
 6. **Back to step 1.** Report, re-read the list, propose again — unless the
    item just finished was part of a pre-approved batch (below), in which case
    move to the next item in that batch without re-proposing.
