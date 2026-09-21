@@ -75,12 +75,14 @@ describe('BackupsComponent', () => {
   beforeEach(async () => {
     operations = jasmine.createSpyObj('OperationsService', [
       'listBackups',
+      'listRemoteBackups',
       'getBackupSchedule',
       'getBackupStatus',
       'runAppDataBackup',
       'getBackupProgress',
     ]);
     operations.listBackups.and.returnValue(of({ items: [] }));
+    operations.listRemoteBackups.and.returnValue(of({ items: [] }));
     operations.getBackupSchedule.and.returnValue(
       of({
         enabled: false,

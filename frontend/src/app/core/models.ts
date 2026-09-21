@@ -381,6 +381,22 @@ export interface BackupListResponse {
   items: BackupFile[];
 }
 
+/** One Kopia snapshot of the managed apps/ tree — GET /backups/remote. */
+export interface RemoteBackupSnapshot {
+  id: string;
+  rootId: string;
+  startTime: string | null;
+  endTime: string | null;
+  sizeBytes: number | null;
+  fileCount: number | null;
+  /** Why retention keeps this one, e.g. `["latest-1","daily-1"]`. */
+  retentionReasons: string[];
+}
+
+export interface RemoteBackupListResponse {
+  items: RemoteBackupSnapshot[];
+}
+
 // ---- Per-app backup / restore (plan.md §185) ----
 
 export interface AppBackupDump {

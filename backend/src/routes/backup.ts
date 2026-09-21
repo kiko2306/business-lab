@@ -20,7 +20,7 @@ import {
   safeBackupFileName,
   saveBackupScheduleConfig,
 } from '../services/backup';
-import { getBackupSourceStatus } from '../services/kopiaClient';
+import { getBackupSourceStatus, listSnapshots } from '../services/kopiaClient';
 import { runAppDataBackup } from '../services/backupScheduler';
 import { getBackupProgress } from '../services/backupProgress';
 import { readAppEnvValue } from '../services/appEnv';
@@ -67,6 +67,27 @@ router.get('/status', async (_req: Request, res: Response) => {
   } catch (error) {
     logger.error('Unable to load backup status', { error: (error as Error).message });
     return res.status(500).json({ error: 'Unable to load backup status.' });
+  }
+});
+
+/**
+ * GET /api/backups/remote — the snapshots Kopia actually holds at the
+ * configured destination, newest first (mirrors GET / for the local
+ * archives). `listSnapshots` never throws and returns `[]` when there is no
+ * password yet or the source has no snapshots — same "degrade quietly"
+ * contract `/status` already relies on for this card.
+ */
+router.get('/remote', async (_req: Request, res: Response) => {
+  try {
+    const password = readAppEnvValue('kopia', 'KOPIA_SERVER_PASSWORD');
+    if (!password) {
+      return res.json({ items: [] });
+    }
+    const snapshots = await listSnapshots(password);
+    return res.json({ items: [...snapshots].reverse() });
+  } catch (error) {
+    logger.error('Unable to list remote backups', { error: (error as Error).message });
+    return res.status(500).json({ error: 'Unable to list remote backups.' });
   }
 });
 

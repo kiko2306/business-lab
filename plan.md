@@ -28821,3 +28821,47 @@ Updated the two Home-page tile descriptions that mentioned where the
 destination lived. `./scripts/check.sh frontend build` and `test` (74/74)
 pass; no backend change, so no live-stack proof needed — the same form now
 renders on a different page, nothing about how it talks to Kopia changed.
+
+## 577. Built and verified: "Local backups" title + a remote backups list
+
+Two small asks: label the existing archive list "Local backups" (there was no
+heading distinguishing it from anything else), and check whether a list of
+remote (Kopia) backups was feasible to add alongside it.
+
+It was more than feasible — `kopiaClient.ts`'s `listSnapshots(password, path?)`
+already existed, unit-tested and live-verified back when the Kopia client was
+first built (§193: "Patch bump 0.21.0 → 0.21.1 (internal — no route or UI
+yet)"), but nothing had ever called it from a route. Added
+`GET /api/backups/remote` (`routes/backup.ts`) — same shape as the existing
+`/status` route: reads the Kopia password via `readAppEnvValue`, returns
+`{ items: [] }` with no error when there is none yet, calls `listSnapshots`
+and reverses it to newest-first to match the local list's ordering. Frontend:
+`RemoteBackupSnapshot`/`RemoteBackupListResponse` in `models.ts`,
+`listRemoteBackups()` on `OperationsService`, and a second read-only
+list-group on the Backups page below "Local backups" — date, file count,
+size, and retention-reason badges (`latest-1`, `daily-2`, …) per snapshot, no
+download/restore actions since restoring a Kopia snapshot means picking a
+target path rather than a one-click download like the local `.tar.gz`
+archives (`restoreSnapshot` exists in the client but has no UI — a separate,
+bigger feature if ever wanted). Refreshed alongside the schedule/status cards
+after a manual "Back up now" run.
+
+**Verified against the real stack.** This landed while an unrelated,
+still-unverified change (syncing Kopia's retention policy to the schedule's
+"keep last" — §576's sibling work, not yet committed) sat in the same
+working tree; rather than deploy that too, the retention-sync files
+(`backupScheduler.ts`, `kopiaClient.ts`, `kopiaClient.test.ts`) were
+`git stash`ed out before rebuilding, so the containers only ran this
+feature's code. Rebuilt and restarted `business-lab-backend-1` +
+`-frontend-1`; confirmed the compiled route was in `dist`; called
+`listSnapshots` directly inside the backend container (same pattern as
+§574/§193's live checks) against this box's real repository —
+**11 real snapshots** came back with the exact shape the frontend expects
+(`startTime`, `sizeBytes` up to ~4.6 GB, `fileCount` ~49k,
+`retentionReasons` like `["latest-1","hourly-1","daily-1","weekly-1",
+"monthly-1","annual-1"]`); a plain `curl` to `/api/backups/remote` answered
+`401` (auth-gated, not 404/500 — the route is wired correctly). Stashed
+changes restored afterward, leaving the running containers matching exactly
+what this section commits — the retention-sync work stays out of the live
+stack until it separately gets verified. `./scripts/check.sh backend
+typecheck`/`test` (1155) and `frontend build`/`test` (74/74) all pass.

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.128.0] — 2026-09-21
+
+### Backups
+
+- Label the local archive list and add a read-only list of remote (Kopia) backups
+
 ## [0.127.0] — 2026-09-21
 
 ### Backups

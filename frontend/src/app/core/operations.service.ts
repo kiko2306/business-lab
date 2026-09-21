@@ -18,6 +18,7 @@ import {
   BackupScheduleConfig,
   BackupScheduleSettings,
   BackupStatusResponse,
+  RemoteBackupListResponse,
   DiscoveredHost,
   HealthStatus,
   ServiceEnvStatus,
@@ -52,6 +53,10 @@ export class OperationsService {
 
   listBackups(): Observable<BackupListResponse> {
     return this.http.get<BackupListResponse>(`${API_BASE_URL}/backups`);
+  }
+
+  listRemoteBackups(): Observable<RemoteBackupListResponse> {
+    return this.http.get<RemoteBackupListResponse>(`${API_BASE_URL}/backups/remote`);
   }
 
   createBackup(): Observable<{ message: string; fileName: string; downloadUrl: string }> {

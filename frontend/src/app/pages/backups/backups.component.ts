@@ -14,6 +14,7 @@ import {
   BackupTargetKind,
   BackupTargetSettings,
   BackupTargetTestResponse,
+  RemoteBackupSnapshot,
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
@@ -67,6 +68,8 @@ export class BackupsComponent implements OnInit, OnDestroy {
   protected backupTargetTestResult: BackupTargetTestResponse | null = null;
 
   protected backups: BackupFile[] = [];
+  protected remoteBackups: RemoteBackupSnapshot[] = [];
+  protected remoteBackupsLoading = true;
   protected schedule: BackupScheduleConfig = {
     enabled: false,
     frequency: 'daily',
@@ -87,6 +90,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
 
   ngOnInit(): void {
     this.loadBackups();
+    this.loadRemoteBackups();
     this.loadSchedule();
     this.loadBackupStatus();
     this.loadBackupTarget();
@@ -103,6 +107,24 @@ export class BackupsComponent implements OnInit, OnDestroy {
       },
       error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load backups.')),
     });
+  }
+
+  loadRemoteBackups(): void {
+    // Best-effort, like loadBackupStatus: no destination configured yet or
+    // Kopia unreachable both come back as an empty list rather than an error,
+    // and the destination card above already explains why.
+    this.remoteBackupsLoading = true;
+    this.operations
+      .listRemoteBackups()
+      .pipe(finalize(() => (this.remoteBackupsLoading = false)))
+      .subscribe({
+        next: (response) => {
+          this.remoteBackups = response.items;
+        },
+        error: () => {
+          this.remoteBackups = [];
+        },
+      });
   }
 
   createBackup(): void {
@@ -187,6 +209,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
         this.fetchFinalProgress();
         this.toast.success(response.message);
         this.loadBackupStatus();
+        this.loadRemoteBackups();
       },
       error: (error) => {
         this.runError = extractErrorMessage(error, 'Unable to run the app data backup.');
@@ -194,6 +217,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
         // Even a run that "did not start" dumped databases and wrote an audit
         // row — refresh the card so any dump failures show.
         this.loadBackupStatus();
+        this.loadRemoteBackups();
       },
     });
   }

@@ -376,7 +376,8 @@
       </div>
     </div>
 
-    <div class="list-group">
+    <h3 class="h5 mb-2">Local backups</h3>
+    <div class="list-group mb-4">
       <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2" *ngFor="let backup of backups">
         <div>
           <div class="fw-semibold">{{ backup.name }}</div>
@@ -392,6 +393,31 @@
       <div class="list-group-item text-body-secondary" *ngIf="!backups.length">
         No backups found yet.
       </div>
+    </div>
+
+    <!-- What Kopia holds at the configured destination — read-only, since
+         restoring one means picking a target path rather than a one-click
+         action like the local archives above. -->
+    <h3 class="h5 mb-2">Remote backups</h3>
+    <div class="list-group">
+      <div class="list-group-item text-body-secondary" *ngIf="remoteBackupsLoading">Loading…</div>
+      <ng-container *ngIf="!remoteBackupsLoading">
+        <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2" *ngFor="let snapshot of remoteBackups">
+          <div>
+            <div class="fw-semibold">{{ snapshot.startTime | date:'dd/MM/yyyy, HH:mm' }}</div>
+            <div class="small text-body-secondary">
+              <ng-container *ngIf="snapshot.fileCount !== null">{{ snapshot.fileCount }} files</ng-container>
+              <ng-container *ngIf="snapshot.sizeBytes !== null"> · {{ formatBytes(snapshot.sizeBytes) }}</ng-container>
+            </div>
+          </div>
+          <div class="d-flex gap-1 flex-wrap justify-content-end">
+            <span class="badge text-bg-secondary" *ngFor="let reason of snapshot.retentionReasons">{{ reason }}</span>
+          </div>
+        </div>
+        <div class="list-group-item text-body-secondary" *ngIf="!remoteBackups.length">
+          No remote backups found yet.
+        </div>
+      </ng-container>
     </div>
   </app-panel>
 
