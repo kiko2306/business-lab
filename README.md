@@ -209,6 +209,18 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Vikunja mobile/desktop clients can't connect — needs an Authelia
+      bypass on its API path** — planned in plan.md §554, not built. Browser
+      access works (OIDC login flow); the phone app calls `/api/v1/...`
+      directly with Vikunja's own JWT auth and gets Authelia's HTML login
+      page instead of JSON, same failure class already fixed for Vaultwarden
+      (§415) and ntfy (§425/§430). Add `autheliaBypassPaths: ['^/api($|/)']`
+      to Vikunja's `services.ts` entry (Vikunja's own auth still gates those
+      routes — this only removes Authelia's redundant outer gate), extend
+      `services.test.ts:669`'s allowlist to include `'vikunja'`, then verify
+      against the real host: install/open the Android app against
+      `https://<vikunja-host>/api/v1` and confirm it recognises the server
+      and logs in before merging to `main`.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),

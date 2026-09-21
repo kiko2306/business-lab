@@ -27765,3 +27765,41 @@ and the existing `publishAlert` call-site tests
 Tracked as a README TODO item until built; supersedes the plain `topic` field
 §552 assumed `publishAlert()` would use — that call passes `category:
 'backup'` once this lands.
+
+## 554. Plan: Authelia bypass for Vikunja's API, so mobile/desktop clients can connect
+
+User reported: Vikunja works fine in a browser but its Android app reports
+"does not recognize the server" against the same hostname.
+
+**Root cause**: every exposed app sits behind Cloudflare Tunnel → NPM →
+Authelia (`default_policy: deny`, per-app `one_factor` rule). A browser can
+follow Authelia's 302 to its login portal and complete the OIDC flow
+(Vikunja's own Authelia button, §270/§271/§278). Vikunja's mobile/desktop
+clients don't go through that — they call `/api/v1/...` directly with
+Vikunja's own JWT auth (login endpoint + bearer-token requests) and can't
+follow a browser redirect. With no bypass rule, Authelia gates that path too,
+so the app gets Authelia's HTML login page back instead of JSON from
+Vikunja's API and can't parse it as a Vikunja server — same failure class as
+Vaultwarden (§415) and ntfy (§425/§430), both of which already carry an
+`autheliaBypassPaths` entry for exactly this reason.
+
+**Design**: give Vikunja's `services.ts` entry an `autheliaBypassPaths` entry
+scoped to its API surface only, mirroring Vaultwarden's `^/api($|/)`:
+Vikunja's own auth still gates those routes (login requires a valid
+password/OIDC token; every other `/api/v1/...` route requires a valid
+bearer token) — the bypass removes Authelia's *redundant* outer gate, it
+does not remove authentication. Do **not** bypass `/` — the web UI keeps
+requiring an Authelia session, same as Vaultwarden's web vault.
+
+`services.test.ts:669` currently asserts the full list of apps carrying
+`autheliaBypassPaths` is exactly `['ntfy', 'vaultwarden']` — that assertion
+grows to include `'vikunja'`.
+
+**Verification plan (not done yet)**: after the code change, run
+`./scripts/check.sh backend test`, then prove it against the real stack per
+CLAUDE.md — install/open the Vikunja Android app against
+`https://<vikunja-host>/api/v1` on `tx-home-utils.com` and confirm it
+recognises the server and logs in, before calling this done and merging to
+`main`.
+
+Tracked as a README TODO item until built.
