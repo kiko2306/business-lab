@@ -34,11 +34,15 @@ vi.mock('./appDumps', () => dumps);
 vi.mock('./kopiaClient', () => kopia);
 vi.mock('./appEnv', () => appEnv);
 vi.mock('../utils/audit', () => audit);
+vi.mock('../utils/alertNotify', () => ({ publishAlert: vi.fn() }));
 vi.mock('../utils/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
 import { runAppDataBackup, runScheduledBackupCheck, shouldRunScheduledBackup } from './backupScheduler';
+import { publishAlert } from '../utils/alertNotify';
+
+const mockedPublishAlert = vi.mocked(publishAlert);
 
 describe('shouldRunScheduledBackup', () => {
   it('runs immediately when there is no prior run', () => {
@@ -215,6 +219,9 @@ describe('runAppDataBackup failure reporting', () => {
       failures: [{ app: 'paperless', kind: 'postgres', detail: 'connection refused' }],
     });
     expect(kopia.snapshotAppData).not.toHaveBeenCalled();
+    expect(mockedPublishAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Backup: app-data snapshot failed' })
+    );
   });
 
   it('caps the recorded failures while keeping the true count', async () => {
@@ -391,6 +398,9 @@ describe('recording what the run actually did', () => {
 
     expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
     expect(backup.recordBackupScheduleRun).not.toHaveBeenCalledWith('success');
+    expect(mockedPublishAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Backup: app-data snapshot failed' })
+    );
   });
 
   it('records failure when there is no password to hand the engine', async () => {
@@ -427,6 +437,9 @@ describe('recording what the run actually did', () => {
 
     expect(backup.recordBackupScheduleRun).toHaveBeenCalledWith('failed');
     expect(backup.recordBackupScheduleRun).not.toHaveBeenCalledWith('success');
+    expect(mockedPublishAlert).toHaveBeenCalledWith(
+      expect.objectContaining({ title: 'Backup: control-plane archive failed', message: 'no space left on device' })
+    );
   });
 });
 

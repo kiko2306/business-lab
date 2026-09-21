@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.120.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.121.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -296,14 +296,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Backups
 
-- [ ] **ntfy alert on backup failure** — planned in plan.md §552, not built.
-      Reuse `publishAlert()` (`backend/src/utils/alertNotify.ts`) from
-      `backupScheduler.ts`'s three existing failure-audit-log sites: the
-      control-plane archive's catch, Kopia-has-no-password, and
-      `run.started === false` (the rclone-bridge-timeout case investigated
-      this session). Extend `backupScheduler.test.ts` with one case per
-      branch. Pass `category: 'backup'` once §553 lands; a plain call with
-      no category if it lands first.
 - [ ] **A separate ntfy channel per alert category** — planned in plan.md
       §553, not built. Extend the `AlertSource` union
       (`backend/src/services/alertTest.ts`) to `crowdsec` | `critical-service`

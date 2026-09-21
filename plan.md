@@ -28234,3 +28234,30 @@ down, never blocks) is correct, not `dependsOn`. Trivial, mechanical; no new
 tests needed — `services.test.ts`'s registry-wide checks already cover
 `requires` entries generically. `./scripts/check.sh backend test`: 1124/1124
 passing.
+
+## 565. Built: ntfy alert on backup failure (§552)
+
+Wired `publishAlert()` (`backend/src/utils/alertNotify.ts`) into
+`backupScheduler.ts`'s three existing failure-audit-log sites, plain calls
+with no `category` (§553, which would add that argument, hasn't landed yet):
+
+1. `runScheduledBackupCheck()`'s catch — control-plane archive threw.
+   `title: 'Backup: control-plane archive failed'`, message is the thrown
+   error's own text.
+2. `runAppDataBackupLocked()` — Kopia has no password configured yet.
+3. `runAppDataBackupLocked()` — `run.started === false` (the rclone-bridge
+   wedge investigated in §552).
+
+Both app-data branches share `title: 'Backup: app-data snapshot failed'` —
+same failure as far as an operator needs to react, different `detail` string
+in the message. `tags: ['floppy_disk']`, `priority: 4`, matching §552's plan.
+No dedup/escalation logic added — the scheduler's existing fast-retry backoff
+(`MAX_FAST_RETRIES`) already caps repeat pushes.
+
+`backupScheduler.test.ts`: added the `../utils/alertNotify` mock
+(`criticalServiceHealth.test.ts`'s pattern) and one assertion per branch in
+the existing tests that already exercise it, rather than three new tests
+duplicating their setup — `'records failure when the archive itself throws'`,
+`'records the dump outcome even when the backup engine has no password'`,
+`'records failure when the engine refused to start'`. `./scripts/check.sh
+backend test`: 1124/1124 passing. `backend typecheck`: clean.

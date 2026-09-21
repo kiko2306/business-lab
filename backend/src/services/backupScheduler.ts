@@ -1,4 +1,5 @@
 import { writeAuditLog } from '../utils/audit';
+import { publishAlert } from '../utils/alertNotify';
 import { dumpAllAppDatabases } from './appDumps';
 import { snapshotAppData as snapshotKopiaAppDataNow } from './kopiaClient';
 import { readAppEnvValue } from './appEnv';
@@ -123,6 +124,12 @@ export async function runScheduledBackupCheck(): Promise<void> {
       result: 'failure',
       metadata: { trigger: 'scheduled' },
     });
+    await publishAlert({
+      title: 'Backup: control-plane archive failed',
+      message: (error as Error).message,
+      tags: ['floppy_disk'],
+      priority: 4,
+    });
   }
 }
 
@@ -207,6 +214,12 @@ async function runAppDataBackupLocked(
       result: 'failure',
       metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail },
     });
+    await publishAlert({
+      title: 'Backup: app-data snapshot failed',
+      message: `App data was not backed up: ${detail}.`,
+      tags: ['floppy_disk'],
+      priority: 4,
+    });
     finishBackupProgress(false, detail);
     return { ok: false, detail };
   }
@@ -221,6 +234,14 @@ async function runAppDataBackupLocked(
     result: run.started ? 'success' : 'failure',
     metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail: run.detail },
   });
+  if (!run.started) {
+    await publishAlert({
+      title: 'Backup: app-data snapshot failed',
+      message: `App data was not backed up: ${run.detail}.`,
+      tags: ['floppy_disk'],
+      priority: 4,
+    });
+  }
 
   // A run counts as successful when the app data reached the backup engine.
   // Individual dump failures are on the audit row (§88.5) and do not by
