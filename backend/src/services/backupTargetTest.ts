@@ -15,11 +15,13 @@ import {
   BackupTarget,
   RcloneRemoteConfig,
   S3ConnectArgs,
+  WebdavConnectArgs,
   isMountedKind,
   isRcloneKind,
   toMountSpec,
   toRcloneRemoteConfig,
   toS3ConnectArgs,
+  toWebdavConnectArgs,
 } from '../utils/backupTarget';
 import { readKopiaRepositoryPassword } from './kopiaTargetApply';
 import logger from '../utils/logger';
@@ -66,6 +68,9 @@ export interface BackupTargetTestResult {
 export async function testBackupTarget(target: BackupTarget): Promise<BackupTargetTestResult> {
   if (target.kind === 's3') {
     return testS3Target(toS3ConnectArgs(target));
+  }
+  if (target.kind === 'webdav') {
+    return testWebdavTarget(toWebdavConnectArgs(target));
   }
   if (isRcloneKind(target.kind)) {
     return testRcloneTarget(toRcloneRemoteConfig(target));
@@ -226,6 +231,60 @@ async function testS3Target(s3: S3ConnectArgs): Promise<BackupTargetTestResult> 
   return {
     success: false,
     message: 'Could not connect to the bucket.',
+    detail: (raw.slice(0, 400) || 'Kopia gave no output.') + hint,
+  };
+}
+
+/**
+ * Same shape as `testS3Target` — run Kopia's own `repository connect webdav`
+ * in a throwaway container and read its verdict, including the same
+ * "repository not initialized" = reachable-and-empty signature. No rclone
+ * bridge involved, so none of the ftp/sftp hints below apply.
+ */
+async function testWebdavTarget(w: WebdavConnectArgs): Promise<BackupTargetTestResult> {
+  if (!w.url || !w.username) {
+    return { success: false, message: 'Enter a WebDAV URL and username first.', detail: '' };
+  }
+
+  const password = readKopiaRepositoryPassword() || 'homelab-backup-target-test';
+
+  const args = [
+    'run', '--rm', '--entrypoint', 'kopia', 'kopia/kopia:latest',
+    'repository', 'connect', 'webdav',
+    `--url=${w.url}`,
+    `--webdav-username=${w.username}`,
+    `--webdav-password=${w.password}`,
+    `--password=${password}`,
+  ];
+  if (w.extraArgs) args.push(...w.extraArgs.split(/\s+/).filter(Boolean));
+
+  const result = await run('docker', args, S3_TIMEOUT_MS);
+  const raw = (result.stderr || result.stdout).trim();
+
+  if (result.code === 0 || /repository not initialized/i.test(raw)) {
+    return {
+      success: true,
+      message: 'Server reachable and credentials accepted.',
+      detail: result.code === 0
+        ? `A repository already exists at ${w.url}.`
+        : `${w.url} is empty — Kopia will create a repository there on Save.`,
+    };
+  }
+
+  logger.warn('WebDAV backup destination test failed', { detail: raw.slice(0, 200) });
+
+  let hint = '';
+  if (/401|403|unauthorized|forbidden/i.test(raw)) {
+    hint = ' Check the username and password.';
+  } else if (/dial tcp|timed out|no such host|i\/o timeout|connection refused/i.test(raw)) {
+    hint = ' The server did not respond — check the URL and that this host can reach it.';
+  } else if (/404|not found/i.test(raw)) {
+    hint = ' That path does not exist on the server — check the URL.';
+  }
+
+  return {
+    success: false,
+    message: 'Could not connect to the WebDAV server.',
     detail: (raw.slice(0, 400) || 'Kopia gave no output.') + hint,
   };
 }

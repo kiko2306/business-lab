@@ -31,6 +31,11 @@
  * first Kopia-native remote, done at §221 because it's also how you talk to
  * B2 and most NAS/on-prem object storage (MinIO, etc) — a real S3 endpoint
  * isn't the only thing "S3" buys here.
+ *
+ * `webdav` (§561) is Kopia's other native remote — no rclone bridge, unlike
+ * `ftp`/`ftps`/`sftp` above. It reuses the same five fields as `s3`: `server`
+ * is the full WebDAV URL, `username`/`password` are Basic Auth, `options` is
+ * raw extra `kopia repository create webdav` flags.
  */
 
 import { query } from './database';
@@ -45,10 +50,10 @@ export const BACKUP_TARGET_KEYS = {
   options: 'backup_target_options',
 } as const;
 
-export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 's3' | 'ftp' | 'ftps' | 'sftp';
+export type BackupTargetKind = 'disk' | 'smb' | 'nfs' | 's3' | 'ftp' | 'ftps' | 'sftp' | 'webdav';
 
 /** Every accepted kind, one source of truth for the type guard and Joi. */
-export const BACKUP_TARGET_KINDS: readonly BackupTargetKind[] = ['disk', 'smb', 'nfs', 's3', 'ftp', 'ftps', 'sftp'];
+export const BACKUP_TARGET_KINDS: readonly BackupTargetKind[] = ['disk', 'smb', 'nfs', 's3', 'ftp', 'ftps', 'sftp', 'webdav'];
 
 /** Kinds Kopia reaches through the bundled `rclone` rather than natively. */
 export function isRcloneKind(kind: BackupTargetKind): boolean {
@@ -195,6 +200,29 @@ export function toS3ConnectArgs(target: BackupTarget): S3ConnectArgs {
 }
 
 /**
+ * Translate a `webdav` destination into the flags `kopia repository create
+ * webdav` takes. Also a direct Kopia-native remote — no rclone bridge, no
+ * kernel mount — so it has no `BackupMountSpec` either.
+ */
+export interface WebdavConnectArgs {
+  /** Full WebDAV URL, e.g. `https://webdav.example.com/`. */
+  url: string;
+  username: string;
+  password: string;
+  /** Raw extra flags, appended verbatim. */
+  extraArgs: string;
+}
+
+export function toWebdavConnectArgs(target: BackupTarget): WebdavConnectArgs {
+  return {
+    url: target.server.trim(),
+    username: target.username,
+    password: target.password,
+    extraArgs: target.options.trim(),
+  };
+}
+
+/**
  * Translate an `ftp`/`ftps`/`sftp` destination into the values Kopia's
  * entrypoint writes into an `rclone.conf` (`[backup]` remote of the given
  * `type`) before it runs `kopia repository create rclone
@@ -269,6 +297,13 @@ export function validateTarget(target: BackupTarget): string | null {
   if (target.kind === 's3') {
     if (!target.share) return 'Enter the bucket name.';
     if (!target.username) return 'Enter the access key ID.';
+    return null;
+  }
+
+  if (target.kind === 'webdav') {
+    if (!target.server) return 'Enter the WebDAV URL, e.g. https://webdav.example.com/.';
+    if (!/^https?:\/\//i.test(target.server)) return 'The WebDAV URL must start with http:// or https://.';
+    if (!target.username) return 'Enter the WebDAV username.';
     return null;
   }
 

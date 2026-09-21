@@ -28691,3 +28691,96 @@ invoice/quote views" claim — the client-portal side was not separately
 checked (no client-role account exists on this box to test with), but given
 the agent-side direct-URL gap, it should be assumed to have the same gap
 until checked.
+
+## 574. Built and verified: `webdav` Kopia backup target (§561)
+
+Implemented §561's design exactly as planned — `webdav` as a fifth
+`BackupTargetKind`, parallel to `s3`, no rclone bridge:
+
+- `backupTarget.ts`: `'webdav'` added to `BackupTargetKind`/
+  `BACKUP_TARGET_KINDS`; new `toWebdavConnectArgs()` (server → full URL,
+  username/password → Basic Auth, options → raw extra flags);
+  `validateTarget` requires a `http(s)://` URL and a username.
+- `kopiaTargetApply.ts`'s `buildEnvValues`: new `webdav` branch writing
+  `BACKUP_REPO_KIND=webdav` + `BACKUP_WEBDAV_URL/USERNAME/PASSWORD/EXTRA_ARGS`,
+  blanking every other kind's vars.
+- `apps/kopia/docker-compose.yml`: `BACKUP_WEBDAV_*` passthrough added
+  alongside the existing s3/rclone vars.
+- `apps/kopia/entrypoint.sh`: new `webdav` branch — `kopia repository
+  create/connect webdav --url=... --webdav-username=... --webdav-password=...`,
+  no rclone.conf involved.
+- `middleware/validation.ts`: `backupTarget.kind` now validates against
+  `BACKUP_TARGET_KINDS` (imported) instead of a second hardcoded enum —
+  removes a duplicate list, not just adds `webdav` to it.
+- `backupTargetTest.ts`: new `testWebdavTarget`, same shape as `testS3Target`
+  (`kopia repository connect webdav` in a throwaway container, "repository
+  not initialized" read as "reachable and empty").
+- Frontend: `BackupTargetKind` widened in `models.ts`; a WebDAV option +
+  URL/username/password/extra-flags fieldset added to the Settings dropdown.
+  `saveBackupTarget()`'s existing kind-agnostic `else` branch already covered
+  it — no TS change needed there.
+- Docs: `app-credentials.md`'s Kopia row mentions the WebDAV kind.
+  `ports.md`/`licences.md` intentionally untouched — no new listener, no new
+  image, and neither `s3` nor `ftp` got a ports.md note either, so this
+  doesn't invent a new documentation convention.
+- Tests: `backupTarget.test.ts` and `kopiaTargetApply.test.ts` gained the
+  same coverage shape s3/ftp already have (`toWebdavConnectArgs`, validation,
+  `buildEnvValues` writes+blanks). No unit test for `testWebdavTarget` itself
+  — same as `testS3Target`/`testRcloneTarget`, it's a thin `docker run`
+  shell, proven live instead. `./scripts/check.sh backend test` (111 files,
+  1148 tests), `typecheck`, and `frontend build`/`test` all pass.
+
+**Verified against the real stack** (tx-home-utils.com), with the user's
+explicit go-ahead first since it meant touching the box's live backup
+destination: rebuilt and restarted `business-lab-backend-1` so `dist`
+carried the new code, then called `applyKopiaTarget` directly (same
+function the real `PUT /settings/backup-target` route calls) with a target
+pointing at this repo's own `apps/webdav` app, credentials read via the
+same `readAppEnvValue` the codebase already uses for cross-app config
+(`itflowBillingModule.ts` does the same thing) — no hand-edited `.env`, no
+`docker exec` into an app to configure it, only to *test* the dashboard's
+own code path, same as §573's `reconcileItflowBillingModule` invocation.
+`apps/webdav` and `apps/kopia` are on separate compose networks with no
+shared network declared, so the target URL used Kopia's own network gateway
+IP to reach the webdav app's published host port — confirmed reachable
+first with a plain `curl` (401, as expected pre-auth) before applying.
+
+- **`kopia repository create webdav`**: succeeded, but slow — Kopia's
+  default sharded blob-directory layout means one WebDAV request per
+  directory, and unlike a local/NFS/SMB mount or true native S3, each of
+  those is a full round trip to the small Go WebDAV server bundled here.
+  ~18 minutes wall clock (confirmed via the webdav app's own request log
+  staying live throughout — this was slow, not hung). Once created, `kopia
+  repository status` confirmed `Storage type: webdav` and the container
+  went `healthy`.
+- **Snapshot**: `kopia snapshot create /source/apps` (the same read-only
+  mount the whole managed-apps tree is backed up from) completed in 3m14s —
+  91,026 files, 7.1 GB actually restored (see below), no errors.
+- **Restore**: `kopia snapshot restore <id> /tmp/restore-test` completed
+  cleanly (91,026 files, 5,179 directories, 128 symlinks, 7.1 GB, exit 0).
+  Content-verified: several known-stable compose files (`kopia/`, `webdav/`,
+  `n8n/docker-compose.yml`) diffed byte-identical between `/source/apps` and
+  the restored copy. A raw file-count comparison (122,990 live vs 91,026 at
+  snapshot time) is not a discrepancy — `/source/apps` is a live 36-app
+  stack whose databases/logs/sessions keep writing between snapshot start
+  and the later recount, same caveat that applies to any backend, not
+  something specific to webdav.
+- Cleaned up the test restore directory, then restored the box's actual
+  destination (still `ftp`, unchanged in the `settings` table throughout —
+  `applyKopiaTarget` was called directly, bypassing the route that would
+  have overwritten it) via `getBackupTarget()` + `applyKopiaTarget()`, the
+  same two calls the route itself makes. Kopia came back up against the
+  original FTP destination and reported `healthy`.
+
+**Conclusion**: the webdav kind works cleanly against this repo's own
+`apps/webdav` app — no rclone-bridge staleness, no hang. It is slow to
+*create* a fresh repository (thousands of small directory-creation
+round trips), but that is a one-time cost; snapshot/restore of real data
+moved at a normal rate (7.1 GB in ~3–4 minutes each way). This also confirms
+§265/§266/§269's NAS hangs were not universal to "any network protocol" —
+webdav against a different, local server had no hang at all. Whether to
+migrate this box's live destination from `ftp` off the flaky NAS to `webdav`
+against `apps/webdav` (optionally backed by the same NAS over SMB, per
+§561's original framing) is left as a follow-up decision, not rolled into
+this build — the destination was deliberately restored to `ftp` rather than
+left switched, since that decision wasn't part of what was asked here.

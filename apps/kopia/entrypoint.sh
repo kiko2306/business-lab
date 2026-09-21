@@ -2,8 +2,9 @@
 # Kopia has no "create the repository if it is missing" start mode: `kopia
 # server start` refuses to run until a repository is connected. This wrapper
 # connects to the repository (filesystem under /repository, an s3 bucket —
-# plan.md §221, or an FTP server via the bundled rclone — plan.md §267),
-# creating it on the very first start, so the app auto-configures with
+# plan.md §221, a WebDAV server natively — plan.md §561, or an FTP server via
+# the bundled rclone — plan.md §267), creating it on the very first start, so
+# the app auto-configures with
 # nothing typed (§0.3).
 #
 # KOPIA_PASSWORD (repository encryption) and the two server credential pairs
@@ -28,6 +29,15 @@ if [ "${BACKUP_REPO_KIND:-filesystem}" = "s3" ]; then
     ${BACKUP_S3_ENDPOINT:+--endpoint="$BACKUP_S3_ENDPOINT"} \
     $BACKUP_S3_EXTRA_ARGS
   LABEL="s3://$BACKUP_S3_BUCKET"
+elif [ "${BACKUP_REPO_KIND:-filesystem}" = "webdav" ]; then
+  # Kopia's own native WebDAV backend — no rclone bridge, so none of the
+  # rclone `serve webdav` staleness (plan.md §434) applies here.
+  set -- webdav \
+    --url="$BACKUP_WEBDAV_URL" \
+    --webdav-username="$BACKUP_WEBDAV_USERNAME" \
+    --webdav-password="$BACKUP_WEBDAV_PASSWORD" \
+    $BACKUP_WEBDAV_EXTRA_ARGS
+  LABEL="$BACKUP_WEBDAV_URL"
 elif [ "${BACKUP_REPO_KIND:-filesystem}" = "rclone" ]; then
   # Kopia has no FTP or SFTP backend; it drives the rclone bundled in this
   # image instead. Build an rclone "backup" remote from the env the dashboard

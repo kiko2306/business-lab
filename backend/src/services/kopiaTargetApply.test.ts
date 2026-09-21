@@ -42,6 +42,28 @@ describe('buildEnvValues', () => {
     expect(values.BACKUP_MOUNT_DEVICE).toBe('/mnt/backups');
   });
 
+  it('writes the webdav vars and leaves s3/rclone/mount at their empty defaults', () => {
+    const values = buildEnvValues({
+      ...base, kind: 'webdav', server: 'https://webdav.example.com/',
+      username: 'kopia', password: 'pw', options: '--flag',
+    });
+    expect(values.BACKUP_REPO_KIND).toBe('webdav');
+    expect(values.BACKUP_WEBDAV_URL).toBe('https://webdav.example.com/');
+    expect(values.BACKUP_WEBDAV_USERNAME).toBe('kopia');
+    expect(values.BACKUP_WEBDAV_PASSWORD).toBe('pw');
+    expect(values.BACKUP_WEBDAV_EXTRA_ARGS).toBe('--flag');
+    expect(values.BACKUP_S3_BUCKET).toBe('');
+    expect(values.BACKUP_RCLONE_TYPE).toBe('');
+    expect(values.BACKUP_MOUNT_TYPE).toBe('none');
+  });
+
+  it('blanks every webdav var for a non-webdav target', () => {
+    const values = buildEnvValues({ ...base, kind: 's3', share: 'b', username: 'ak', password: 'sk' });
+    expect(values.BACKUP_WEBDAV_URL).toBe('');
+    expect(values.BACKUP_WEBDAV_USERNAME).toBe('');
+    expect(values.BACKUP_WEBDAV_PASSWORD).toBe('');
+  });
+
   it('writes the rclone vars for an ftp target and leaves s3/mount at their empty defaults', () => {
     const values = buildEnvValues({
       ...base, kind: 'ftps', server: '192.168.1.50:2121', username: 'frias', password: 'pw',

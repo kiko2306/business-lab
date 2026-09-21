@@ -72,6 +72,16 @@ services:
       BACKUP_RCLONE_REMOTE_PATH: ${BACKUP_RCLONE_REMOTE_PATH:-}
       BACKUP_RCLONE_TLS: ${BACKUP_RCLONE_TLS:-}
       BACKUP_RCLONE_EXTRA_ARGS: ${BACKUP_RCLONE_EXTRA_ARGS:-}
+      # WebDAV (BACKUP_REPO_KIND=webdav): Kopia's own native backend, no
+      # rclone bridge — the class of hang that bridge causes (plan.md §434)
+      # doesn't apply here. URL is the full WebDAV address (this repo's own
+      # apps/webdav app, or any other server); USERNAME/PASSWORD are Basic
+      # Auth.
+      BACKUP_WEBDAV_URL: ${BACKUP_WEBDAV_URL:-}
+      BACKUP_WEBDAV_USERNAME: ${BACKUP_WEBDAV_USERNAME:-}
+      BACKUP_WEBDAV_PASSWORD: ${BACKUP_WEBDAV_PASSWORD:-}
+      # Raw extra `kopia repository create webdav` flags, appended verbatim.
+      BACKUP_WEBDAV_EXTRA_ARGS: ${BACKUP_WEBDAV_EXTRA_ARGS:-}
     labels:
       - "homepage.group=Monitoring & Backup"
       - "homepage.name=Kopia"

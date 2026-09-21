@@ -1,6 +1,7 @@
 import { NextFunction, Request, Response } from 'express';
 import Joi, { ObjectSchema, ValidationError } from 'joi';
 import { CAPABILITIES, ROLES } from '../auth/capabilities';
+import { BACKUP_TARGET_KINDS } from '../utils/backupTarget';
 
 // At least one role, each a known name, no duplicates (plan.md §149).
 const rolesSchema = Joi.array()
@@ -132,7 +133,7 @@ export const schemas = {
     retentionCount: Joi.number().integer().min(1).max(365).required(),
   }),
   backupTarget: Joi.object({
-    kind: Joi.string().valid('disk', 'smb', 'nfs', 's3', 'ftp', 'ftps', 'sftp').required(),
+    kind: Joi.string().valid(...BACKUP_TARGET_KINDS).required(),
     path: Joi.string().trim().max(500).allow('').optional(),
     server: Joi.string().trim().max(255).allow('').optional(),
     share: Joi.string().trim().max(500).allow('').optional(),

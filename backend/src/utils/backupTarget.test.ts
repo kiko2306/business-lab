@@ -7,6 +7,7 @@ import {
   toMountSpec,
   toRcloneRemoteConfig,
   toS3ConnectArgs,
+  toWebdavConnectArgs,
   validateTarget,
 } from './backupTarget';
 
@@ -45,13 +46,14 @@ describe('toMountSpec', () => {
     expect(() => toMountSpec({ ...base, kind: 's3', share: 'bucket', username: 'ak', password: 'sk' })).toThrow();
     expect(() => toMountSpec({ ...base, kind: 'ftp', server: 'h' })).toThrow(/not a Docker mount/);
     expect(() => toMountSpec({ ...base, kind: 'ftps', server: 'h' })).toThrow();
+    expect(() => toMountSpec({ ...base, kind: 'webdav', server: 'https://h/' })).toThrow(/not a Docker mount/);
   });
 });
 
 describe('isMountedKind', () => {
   it('is true only for the kernel-mount kinds', () => {
     expect(['disk', 'smb', 'nfs'].every(isMountedKind as (k: string) => boolean)).toBe(true);
-    expect(['s3', 'ftp', 'ftps', 'sftp'].some(isMountedKind as (k: string) => boolean)).toBe(false);
+    expect(['s3', 'ftp', 'ftps', 'sftp', 'webdav'].some(isMountedKind as (k: string) => boolean)).toBe(false);
   });
 });
 
@@ -107,6 +109,20 @@ describe('toS3ConnectArgs', () => {
   });
 });
 
+describe('toWebdavConnectArgs', () => {
+  it('maps the shared form fields onto their webdav meaning', () => {
+    expect(toWebdavConnectArgs({
+      ...base, kind: 'webdav', server: 'https://webdav.example.com/',
+      username: 'kopia', password: 'pw', options: '--webdav-extra-flag',
+    })).toEqual({
+      url: 'https://webdav.example.com/',
+      username: 'kopia',
+      password: 'pw',
+      extraArgs: '--webdav-extra-flag',
+    });
+  });
+});
+
 describe('toKopiaRepositoryMount', () => {
   it('translates a destination the same way toMountSpec does — Kopia sees a plain directory', () => {
     expect(toKopiaRepositoryMount({ ...base, kind: 'disk', path: '/mnt/backups' }))
@@ -159,5 +175,16 @@ describe('validateTarget', () => {
     expect(validateTarget({ ...base, kind: 'sftp', server: 'h', username: '', password: 'p' })).toMatch(/SFTP username/);
     expect(validateTarget({ ...base, kind: 'sftp', server: 'h', username: 'u', password: '' })).toMatch(/SFTP password/);
     expect(validateTarget({ ...base, kind: 'sftp', server: 'h:2222', username: 'u', password: 'p' })).toBeNull();
+  });
+
+  it('requires a URL and username for webdav, rejecting a non-http(s) URL', () => {
+    expect(validateTarget({ ...base, kind: 'webdav', server: '' })).toMatch(/WebDAV URL/);
+    expect(validateTarget({ ...base, kind: 'webdav', server: 'webdav.example.com', username: 'u' })).toMatch(/http/);
+    expect(validateTarget({ ...base, kind: 'webdav', server: 'https://h/', username: '' })).toMatch(/WebDAV username/);
+    expect(validateTarget({ ...base, kind: 'webdav', server: 'https://h/', username: 'u' })).toBeNull();
+  });
+
+  it('does not reject a comma in a webdav password — no comma-joined mount options to corrupt', () => {
+    expect(validateTarget({ ...base, kind: 'webdav', server: 'https://h/', username: 'u', password: 'has,a,comma' })).toBeNull();
   });
 });

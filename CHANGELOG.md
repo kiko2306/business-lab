@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.125.0] — 2026-09-21
+
+### Backup
+
+- Add a native `webdav` Kopia backup destination alongside disk/SMB/NFS/S3/FTP/SFTP
+
 ## [0.124.0] — 2026-09-21
 
 ### Apps

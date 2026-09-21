@@ -496,6 +496,7 @@
         <option value="smb">Network drive (SMB / Windows share)</option>
         <option value="nfs">NAS (NFS export)</option>
         <option value="s3">S3-compatible bucket (AWS S3, MinIO, B2, Wasabi…)</option>
+        <option value="webdav">WebDAV server</option>
         <option value="ftp">FTP server</option>
         <option value="ftps">FTP server with TLS (FTPS)</option>
         <option value="sftp">SFTP server (over SSH)</option>
@@ -592,6 +593,37 @@
           <code>--disable-tls</code> for a plain-HTTP endpoint (a LAN MinIO,
           say); <code>--region=…</code> if your endpoint needs one.
         </div>
+      </div>
+    </ng-container>
+
+    <!-- WebDAV -->
+    <ng-container *ngIf="backupTargetForm.controls.kind.value === 'webdav'">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold" for="backupServer">URL</label>
+        <input id="backupServer" type="text" class="form-control" formControlName="server"
+               placeholder="https://webdav.example.com/" autocomplete="off" />
+        <div class="form-text">
+          Kopia's own native WebDAV backend — no bridging layer, unlike
+          FTP/SFTP below. Point it at this box's own
+          <code>apps/webdav</code> app or any other WebDAV server.
+        </div>
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="backupUser">Username</label>
+        <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
+      </div>
+      <div class="col-md-3">
+        <label class="form-label fw-semibold" for="backupPassword">Password</label>
+        <input id="backupPassword" type="password" class="form-control" formControlName="password"
+               [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+               autocomplete="new-password" />
+      </div>
+      <div class="col-12">
+        <label class="form-label fw-semibold" for="backupOptions">
+          Extra connection flags <span class="fw-normal text-body-secondary">(optional)</span>
+        </label>
+        <input id="backupOptions" type="text" class="form-control" formControlName="options" autocomplete="off" />
+        <div class="form-text">Passed straight to Kopia's <code>repository create webdav</code>.</div>
       </div>
     </ng-container>
 

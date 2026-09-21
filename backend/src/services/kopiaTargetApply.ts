@@ -37,6 +37,7 @@ import {
   toKopiaRepositoryMount,
   toRcloneRemoteConfig,
   toS3ConnectArgs,
+  toWebdavConnectArgs,
 } from '../utils/backupTarget';
 import { resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
@@ -144,7 +145,23 @@ export function buildEnvValues(target: BackupTarget): Record<string, string> {
     BACKUP_RCLONE_REMOTE_PATH: '',
     BACKUP_RCLONE_TLS: '',
     BACKUP_RCLONE_EXTRA_ARGS: '',
+    BACKUP_WEBDAV_URL: '',
+    BACKUP_WEBDAV_USERNAME: '',
+    BACKUP_WEBDAV_PASSWORD: '',
+    BACKUP_WEBDAV_EXTRA_ARGS: '',
   };
+
+  if (target.kind === 'webdav') {
+    const w = toWebdavConnectArgs(target);
+    return {
+      ...values,
+      BACKUP_REPO_KIND: 'webdav',
+      BACKUP_WEBDAV_URL: w.url,
+      BACKUP_WEBDAV_USERNAME: w.username,
+      BACKUP_WEBDAV_PASSWORD: w.password,
+      BACKUP_WEBDAV_EXTRA_ARGS: w.extraArgs,
+    };
+  }
 
   if (target.kind === 's3') {
     const s3 = toS3ConnectArgs(target);
