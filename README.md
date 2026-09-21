@@ -221,6 +221,20 @@ it is done — not ticked off and left behind. Section references point at
       against the real host: install/open the Android app against
       `https://<vikunja-host>/api/v1` and confirm it recognises the server
       and logs in before merging to `main`.
+- [ ] **Vikunja shows its own login page every visit instead of silently
+      completing Authelia SSO** — planned in plan.md §555, not built. Vikunja
+      only starts its OIDC flow on a button click, even with a live Authelia
+      session already in the browser; it supports `?redirectToProvider=authelia`
+      to skip straight to that redirect. Add an `oidcClient.autoRedirect` field
+      (`backend/src/types/index.ts`, set on Vikunja's entry in
+      `backend/src/config/services.ts`), thread it through
+      `exposure.ts`/`npmClient.ts` the same way `autheliaProtected`/`grpc`
+      already flow, and have `buildAutheliaAdvancedConfig` prepend a guarded
+      `location = /` redirect in NPM's `advanced_config` for Vikunja's proxy
+      host. Verify against the real host per the plan before merging to
+      `main`: bare-URL visit with a live Authelia session skips the login
+      page, no session still shows Authelia's real login form, no redirect
+      loop on reload, deep links and `/api/v1/...` unaffected.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),

@@ -27803,3 +27803,86 @@ recognises the server and logs in, before calling this done and merging to
 `main`.
 
 Tracked as a README TODO item until built.
+
+## 555. Plan: silent Authelia SSO for Vikunja (skip its own login page), every entry point
+
+User report: "vikunja still shows vikunja login page after authelia login." Live
+investigation on `tx-home-utils.com` found the OIDC wiring itself correct and
+working — `/api/v1/info` reports the `authelia` provider registered, Authelia's
+`vikunja` client config matches, and the container's access logs showed a real
+successful OIDC round trip minutes before the check (`GET
+/auth/openid/authelia?code=...` → `POST /api/v1/auth/openid/authelia/callback`
+200 → normal logged-in session).
+
+Clarified with the user: the actual complaint is that every visit to Vikunja
+shows its own login page with a "Login with Authelia" button that has to be
+clicked, even with a live Authelia SSO session already in the browser (Authelia
+itself shows no prompt). This is inherent to Vikunja's OIDC integration —
+Vikunja only starts the OIDC flow on a click, it never checks for an existing
+IdP session on page load. Vikunja does support a documented (community, not
+Vikunja's own config-options page) URL query parameter,
+`?redirectToProvider=<provider-key>`, that skips its login page and performs
+the same redirect a button click would; since the Authelia session is still
+valid, that redirect completes silently (Authelia's `vikunja` client already
+uses `consent_mode: 'implicit'`, so no consent screen either) and the user
+lands straight in the app.
+
+Offered two scopes: append the query param only to the Home Page tile link
+(small, ~2-line change reusing the existing per-app `webPath` pattern in
+`homepageConfig.ts`, but only fixes the dashboard-tile entry point) vs. an
+nginx-level redirect in NPM's `advanced_config` for Vikunja's proxy host,
+covering every entry point (tile, bookmark, typed URL, Authelia's own
+shortcuts). User chose the thorough option.
+
+**Design**: new optional field on the existing `oidcClient` block in
+`backend/src/types/index.ts` (~line 309-331), `autoRedirect?: boolean` — set
+`true` on Vikunja's entry (`backend/src/config/services.ts:1188-1243`). Thread
+it through the same path `autheliaProtected`/`grpc` already take:
+`exposure.ts`'s `ProvisionHostnameOptions`/`provisionHostname()`/
+`provisionServiceIfEnabled`'s primary-hostname call site (not the
+`additionalExposures` loop — nothing needs it on a secondary hostname), then
+`npmClient.ts`'s `EnsureProxyHostOptions`/`ProxyHostWriteOptions`/
+`computeAdvancedConfig()`. Both places `ensureProxyHost()` builds its options
+object — the create/update literal and the separate `expectedAdvancedConfig`
+literal used only for the drift check — must get the new field; that's the
+exact class of bug the comment above `computeAdvancedConfig` already warns
+about (a fix landing in only one of the two silently stops taking effect).
+`needsUpdate` needs no separate change — it already diffs the full
+`advanced_config` string.
+
+`buildAutheliaAdvancedConfig(dashboardUrl, oidcAutoRedirect)` factors its
+existing proxy body (the `include /snippets/proxy.conf;` … `error_page 502
+503 504 = @app_unavailable;` lines) into a shared array reused by both
+locations, then conditionally prepends, before the existing `location /`:
+
+```
+location = / {
+    if ($arg_redirectToProvider = '') {
+        return 302 $scheme://$host/?redirectToProvider=authelia;
+    }
+    <same proxy body as location />
+}
+```
+
+`location = /` is an exact match on the URI *path* only (nginx ignores the
+query string for location matching), so the redirected request — which now
+carries `?redirectToProvider=authelia` — matches the same block again but
+skips the `if`, falling through to the proxy body instead of looping.
+
+Scoped to Vikunja only for now; the mechanism is generic enough (one field on
+`oidcClient`) that Homebox/Mealie/Immich could opt in later with a one-line
+registry change, but nothing here builds that speculatively.
+
+**Not yet verified against the real stack** (mandatory before this is called
+done, per CLAUDE.md): `./scripts/check.sh backend test`; then, after
+deploying, confirm via NPM's API/UI that the `location = /` block landed;
+with a live Authelia session but no Vikunja session, hit the bare
+`https://vikunja.tx-home-utils.com/` URL directly and confirm it lands
+straight in the app with no visible login page; incognito (no Authelia
+session) hits the same URL and gets Authelia's real login form, not a loop;
+reload the authenticated bare URL a second time and confirm no loop/flash; a
+deep task/project link is served normally (only exact `/` is special-cased);
+`/api/v1/...` requests are unaffected (relevant to the still-open §554 item).
+
+Tracked as a README TODO item until built.
+
