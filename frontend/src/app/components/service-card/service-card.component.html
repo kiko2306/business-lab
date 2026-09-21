@@ -18,6 +18,16 @@
         {{ service.exposedHostname }}{{ service.webPath }}
       </a>
       <a
+        *ngFor="let extra of service.additionalExposureUrls"
+        class="badge text-bg-secondary border text-decoration-none"
+        [href]="'https://' + extra.hostname"
+        target="_blank"
+        rel="noopener noreferrer"
+        [title]="extra.label + ' URL — for the phone/desktop app, not the browser link above'"
+      >
+        {{ extra.label }}: {{ extra.hostname }}
+      </a>
+      <a
         *ngIf="!service.exposedHostname && (service.lanOnly || service.overlayOnly) && lanAccessUrl()"
         class="badge text-bg-secondary border text-decoration-none"
         [href]="lanAccessUrl()"

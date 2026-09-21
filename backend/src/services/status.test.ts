@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { aggregateContainerState, healthProbeReachable, hostNetworkPortMappings } from './status';
+import { aggregateContainerState, healthProbeReachable, hostNetworkPortMappings, resolveAdditionalExposureUrls } from './status';
+import { ServiceAdditionalExposure, ServiceExposureRow } from '../types';
 
 describe('aggregateContainerState', () => {
   it('is unknown with no containers', () => {
@@ -58,5 +59,60 @@ describe('hostNetworkPortMappings', () => {
     expect(hostNetworkPortMappings(8123)).toEqual([
       { hostPort: '8123', containerPort: '8123', protocol: 'tcp' },
     ]);
+  });
+});
+
+describe('resolveAdditionalExposureUrls', () => {
+  function row(overrides: Partial<ServiceExposureRow> = {}): ServiceExposureRow {
+    return {
+      service_name: 'netbird-vpn:api',
+      enabled: true,
+      hostname: 'netbird-vpn-api.example.com',
+      upstream_scheme: 'http',
+      upstream_host: null,
+      upstream_port: null,
+      websocket: true,
+      npm_host_id: null,
+      cf_hostname_id: null,
+      status: 'provisioned',
+      last_error: null,
+      updated_at: new Date(),
+      ...overrides,
+    };
+  }
+
+  const managementApi: ServiceAdditionalExposure = {
+    suffix: 'api',
+    label: 'Management API',
+    portEnvVar: 'NETBIRD_MGMT_PORT',
+    grpc: true,
+  };
+
+  it('is empty when the service declares no additionalExposures', () => {
+    expect(resolveAdditionalExposureUrls(undefined, [row()])).toEqual([]);
+  });
+
+  it('matches a live secondary row to its declared label by suffix', () => {
+    expect(resolveAdditionalExposureUrls([managementApi], [row()])).toEqual([
+      { label: 'Management API', hostname: 'netbird-vpn-api.example.com' },
+    ]);
+  });
+
+  it('matches an apex entry by the literal "apex" key', () => {
+    const apexExtra: ServiceAdditionalExposure = { apex: true, label: 'Bare domain', portEnvVar: 'HOMEPAGE_PORT' };
+    const apexRow = row({ service_name: 'homepage:apex', hostname: 'example.com' });
+    expect(resolveAdditionalExposureUrls([apexExtra], [apexRow])).toEqual([
+      { label: 'Bare domain', hostname: 'example.com' },
+    ]);
+  });
+
+  it('omits an entry with no row yet (not provisioned)', () => {
+    expect(resolveAdditionalExposureUrls([managementApi], [])).toEqual([]);
+  });
+
+  it('omits a row that is disabled, still provisioning, or has no hostname', () => {
+    expect(resolveAdditionalExposureUrls([managementApi], [row({ enabled: false })])).toEqual([]);
+    expect(resolveAdditionalExposureUrls([managementApi], [row({ status: 'not_provisioned' })])).toEqual([]);
+    expect(resolveAdditionalExposureUrls([managementApi], [row({ hostname: null })])).toEqual([]);
   });
 });

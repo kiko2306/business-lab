@@ -9,10 +9,10 @@ import https from 'https';
 import http from 'http';
 import logger from '../utils/logger';
 import { getAllServices, getService, getProjectName, getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getServiceExposureRow } from './exposure';
+import { getServiceExposureRow, getSecondaryExposureRows } from './exposure';
 import { baseTagPins, pinnedImages } from './composeOverride';
 import { getCachedHostLanIp } from './networkScan';
-import { ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
+import { ServiceAdditionalExposure, ServiceExposureRow, ServicePortMapping, ServiceState, ServiceStatusPayload, ServiceStatusResponse } from '../types';
 
 /**
  * The service's live public hostname, if exposure is enabled and was
@@ -26,6 +26,41 @@ async function getExposedHostname(serviceName: string): Promise<string | null> {
   } catch (error) {
     logger.error(`Error loading exposure status for service ${serviceName}`, { error: (error as Error).message });
     return null;
+  }
+}
+
+/**
+ * Resolve a service's declared `additionalExposures` (services.ts) against
+ * their live `service_exposure` rows — pure so it's unit-testable without a
+ * database, unlike its caller. Same provisioned/enabled rule as
+ * `getExposedHostname`; a row that isn't live yet is left out rather than
+ * shown with a null hostname.
+ */
+export function resolveAdditionalExposureUrls(
+  additionalExposures: ServiceAdditionalExposure[] | undefined,
+  secondaryRows: ServiceExposureRow[]
+): { label: string; hostname: string }[] {
+  if (!additionalExposures?.length) return [];
+  const rowByKey = new Map(secondaryRows.map((row) => [row.service_name.split(':').pop(), row]));
+  return additionalExposures.flatMap((extra) => {
+    const row = rowByKey.get(extra.apex ? 'apex' : extra.suffix);
+    if (!row || !row.enabled || row.status !== 'provisioned' || !row.hostname) return [];
+    return [{ label: extra.label, hostname: row.hostname }];
+  });
+}
+
+async function getAdditionalExposureUrls(
+  serviceName: string,
+  additionalExposures: ServiceAdditionalExposure[] | undefined
+): Promise<{ label: string; hostname: string }[]> {
+  if (!additionalExposures?.length) return [];
+  try {
+    return resolveAdditionalExposureUrls(additionalExposures, await getSecondaryExposureRows(serviceName));
+  } catch (error) {
+    logger.error(`Error loading secondary exposure status for service ${serviceName}`, {
+      error: (error as Error).message,
+    });
+    return [];
   }
 }
 
@@ -273,6 +308,8 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
           ? hostNetworkPortMappings(service.hostNetworkPort)
           : await getContainerPorts(getProjectName(serviceName));
     const exposedHostname = state === 'running' ? await getExposedHostname(serviceName) : null;
+    const additionalExposureUrls =
+      state === 'running' ? await getAdditionalExposureUrls(serviceName, service.additionalExposures) : [];
     // Image digests the last self-update (§209) pinned into
     // docker-compose.override.yml (composeOverride.ts). Non-empty means the
     // app is frozen on a specific build until "Unpin" — surfaced so the card
@@ -303,6 +340,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       webPort,
       lanOnly: service.lanOnly,
       overlayOnly: service.overlayOnly,
+      additionalExposureUrls,
     };
   } catch (error) {
     const message = (error as Error).message;

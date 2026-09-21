@@ -379,6 +379,12 @@ export interface ServiceStatusPayload {
   // link with why it isn't a public one.
   lanOnly?: boolean;
   overlayOnly?: boolean;
+  // This service's `additionalExposures` (services.ts) that are live right
+  // now — secondary hostnames a native client needs instead of the primary
+  // one, e.g. NetBird's mobile/desktop app configures itself against the
+  // Management API hostname, not the browser dashboard's. Only entries with
+  // a provisioned hostname are included (same rule as `exposedHostname`).
+  additionalExposureUrls?: { label: string; hostname: string }[];
 }
 
 export interface ServiceStatusSummary {

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.120.0] — 2026-09-21
+
+### Added
+
+- App cards show a tag for each additional exposure URL (e.g. NetBird's Management API), when it differs from the app's main URL
+
 ## [0.119.11] — 2026-09-21
 
 ### Removed

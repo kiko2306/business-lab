@@ -81,6 +81,20 @@ export async function getServiceExposureRow(serviceName: string): Promise<Servic
 }
 
 /**
+ * A service's `additionalExposures` rows (keyed `<service>:<suffix|apex>`,
+ * see the module docstring) — the secondary hostnames a native client
+ * (NetBird's mobile/desktop app hitting the Management API, not the browser
+ * dashboard) actually needs, surfaced by status.ts so the app card can show
+ * them alongside the primary URL rather than only the one a browser uses.
+ */
+export async function getSecondaryExposureRows(serviceName: string): Promise<ServiceExposureRow[]> {
+  const result = await query<ServiceExposureRow>('SELECT * FROM service_exposure WHERE service_name LIKE $1', [
+    `${serviceName}:%`,
+  ]);
+  return result.rows;
+}
+
+/**
  * Auto-exposure (plan.md §331): there is no per-app opt-in — every app
  * `getExposability()` allows *is* exposed, behind Authelia. This keeps the
  * `service_exposure` row in step with that rule; the actual NPM/Cloudflare

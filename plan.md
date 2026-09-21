@@ -28156,3 +28156,70 @@ other file changes; `frontend/src/app/pages/home/home.component.html`'s own
 Verified: `docker run … npm ci && npm run build` (frontend) succeeds (pre-existing
 initial-bundle-budget warning only, unrelated). No test referenced the
 deleted nav link itself.
+
+## 563. Built: tag an app's card with each additional-exposure URL that differs from its main one
+
+User asked: "in the apps that the container's exposure url is not the same
+as the one the phone/remote app uses, add a tag with the url for the app."
+
+**Which apps this actually is**: searched the registry
+(`backend/src/config/services.ts`) for anywhere a native client's URL
+already diverges from an app's main exposed hostname. Same-hostname,
+different-*path* cases (`autheliaBypassPaths` — Vaultwarden, ntfy, the
+planned Vikunja fix) don't qualify: the phone app still points at the same
+URL a browser does, just a different route under it. The one existing field
+that is genuinely a *different hostname* is `additionalExposures` — declared
+today only on `netbird-vpn` (Management API + Relay, each
+`<service>-<suffix>.<base-domain>`) and `homepage` (the bare-domain apex).
+NetBird is the textbook case: the dashboard card's URL
+(`netbird-vpn.<domain>`) is a static SPA a browser hits, but the NetBird
+mobile/desktop client has to be configured with the **Management API**
+hostname instead — a setup step a person can get wrong with no visual cue,
+since nothing in the UI showed that second URL at all. Checked Immich,
+Vikunja, MeshCentral, Vaultwarden and ntfy specifically (all have "native
+client" comments nearby) and confirmed each one's client authenticates
+against the *same* public hostname as the browser — genuinely nothing to
+add there.
+
+**Design**: `additionalExposures` entries were already provisioned into
+`service_exposure` (keyed `<service>:<suffix|apex>`, plan.md §16) but never
+read back out anywhere — no route, no type field, no frontend reference at
+all (`grep additionalExposures frontend/src` was empty before this). Added:
+
+- `getSecondaryExposureRows(serviceName)` (`services/exposure.ts`) — the
+  `SELECT … WHERE service_name LIKE '<service>:%'` query that already existed
+  inline in `provisionServiceIfEnabled`'s reconcile step, now exported so
+  `status.ts` can reuse it instead of duplicating it.
+- `resolveAdditionalExposureUrls(additionalExposures, secondaryRows)`
+  (`services/status.ts`) — pure, so it's unit-tested without a database
+  (`status.test.ts`): matches each declared entry to its live row by
+  suffix/`apex`, applying the same enabled+provisioned rule
+  `getExposedHostname` already uses for the primary hostname, so a
+  not-yet-provisioned secondary is simply omitted rather than shown null.
+- `ServiceStatusPayload.additionalExposureUrls` (`types/index.ts`, mirrored
+  in the frontend's `core/models.ts`) — `{ label, hostname }[]`, populated in
+  `getServiceStatus` only while `state === 'running'`, same as
+  `exposedHostname`.
+- `service-card.component.html` — one badge per entry, next to the existing
+  primary-URL badge, labelled from the registry's own `additionalExposures[].label`
+  (`Management API: netbird-vpn-api.<domain>`) with a title calling out that
+  it's for the phone/desktop app, not the browser link beside it.
+
+No new registry field or per-app opt-in needed — every app that already
+declares `additionalExposures` gets this for free, so it also covers
+`homepage`'s bare-domain entry (harmless: truthfully shows the Home Page is
+also reachable at the zone apex) without special-casing NetBird.
+
+**Verified against the real stack** (`tx-home-utils.com`), per CLAUDE.md:
+`./scripts/check.sh backend typecheck`; `./scripts/check.sh backend test`
+(1124 tests, including 5 new `resolveAdditionalExposureUrls` cases); a real
+frontend `npm ci && npm run build`; `./scripts/check.sh frontend test` (74/74).
+Rebuilt and restarted the dashboard's own `backend`/`frontend` containers
+(`docker compose up -d --build backend frontend` — individual services, not
+`compose down` at the root) and called `getServiceStatus` directly inside the
+running `business-lab-backend-1` container: `netbird-vpn` returned
+`exposedHostname: netbird-vpn.tx-home-utils.com` alongside
+`additionalExposureUrls: [{ label: 'Management API', hostname:
+'netbird-vpn-api.tx-home-utils.com' }, { label: 'Relay', hostname:
+'netbird-vpn-relay.tx-home-utils.com' }]` — confirming the two URLs really do
+differ, live, and that the new field resolves correctly end-to-end.

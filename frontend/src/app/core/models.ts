@@ -121,6 +121,11 @@ export interface ServiceStatus {
   // LAN link is the only one (lanOnly) or names the overlay VPN (overlayOnly).
   lanOnly?: boolean;
   overlayOnly?: boolean;
+  // Live secondary hostnames from this service's `additionalExposures`
+  // (services.ts) — the URL a native client (e.g. NetBird's mobile/desktop
+  // app, which points at the Management API, not the browser dashboard)
+  // actually needs, when it differs from `exposedHostname`.
+  additionalExposureUrls?: { label: string; hostname: string }[];
 }
 
 export interface AutheliaAdminUser {
