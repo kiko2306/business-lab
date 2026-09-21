@@ -13,8 +13,13 @@ services:
     environment:
       TZ: ${TZ:-UTC}
       # Parsers + scenarios for Nginx Proxy Manager access logs and generic
-      # HTTP attacks (path traversal, scanners, bad bots, known CVE probes).
-      COLLECTIONS: "crowdsecurity/nginx crowdsecurity/http-cve crowdsecurity/base-http-scenarios"
+      # HTTP attacks (path traversal, scanners, bad bots, known CVE probes,
+      # flood/brute-force bursts). whitelist-good-actors suppresses known-good
+      # crawlers/monitoring so they don't get banned alongside real attackers
+      # (plan.md §567.1). All three read the same NPM access logs and are
+      # enforced by the same NPM Lua bouncer already wired up (§119) — no new
+      # bouncer or log source needed.
+      COLLECTIONS: "crowdsecurity/nginx crowdsecurity/http-cve crowdsecurity/base-http-scenarios crowdsecurity/http-dos crowdsecurity/whitelist-good-actors"
       # Auto-registers a bouncer named "cloudflare" with this key on startup so
       # the worker bouncer below can authenticate to the local API. Keep it in
       # sync with crowdsec_config.lapi_key in cloudflare-worker-bouncer.yaml.

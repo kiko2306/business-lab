@@ -28350,3 +28350,89 @@ websocket API rather than rendering a file, harder to cleanly revert than
 the n8n case — but it is the identical one-line code pattern proven correct
 for n8n, plus the resolution logic itself is covered by
 `alertNotify.test.ts`.
+
+## 567. Plan: extra CrowdSec collections + CrowdSec Console enrollment
+
+Prompted by the user asking (a) whether any extra CrowdSec "configuration
+collection" makes sense on this server, and (b) to connect a CrowdSec Console
+account (Google or email/password) to use its central threat intel.
+
+**Current state** (survey before planning): `apps/crowdsec/docker-compose.yml`
+hardcodes `COLLECTIONS: "crowdsecurity/nginx crowdsecurity/http-cve
+crowdsecurity/base-http-scenarios"`, re-installed fresh on every container
+start (only `/var/lib/crowdsec/data` — the decisions DB and bouncer/machine
+registrations — is a persisted volume; the rest of `/etc/crowdsec` is not).
+Enforcement is the NPM-embedded Lua bouncer (§119/§124); the Cloudflare Worker
+edge bouncer stays off by default (Cloudflare `cfut_`-token auth bug, §23.17).
+There is no CrowdSec Console enrollment anywhere in the repo — no account
+linking, no enroll-key storage, no `cscli console enroll` call.
+
+**567.1 — Collections.** Two more from CrowdSec's hub fit without adding any
+new bouncer or log source, since they consume the same NPM access logs
+already read by `crowdsecurity/nginx`/`http-cve`/`base-http-scenarios` and are
+enforced by the same already-active NPM Lua bouncer:
+- `crowdsecurity/http-dos` — flood/rate-based HTTP scenarios (repeated
+  requests, brute-force-shaped bursts) that the existing collections don't
+  cover, which are all signature/CVE-probe based.
+- `crowdsecurity/whitelist-good-actors` — a whitelist, not a detection
+  collection: suppresses known-good crawlers/monitoring so they don't tainted
+  a real attacker's score or get banned outright. Directly relevant here since
+  ~36 apps sit behind NPM including health-checked/monitored ones.
+
+Rejected for now: `crowdsecurity/appsec-*` (deep WAF-style body inspection) —
+needs a different bouncer type (`appsec`) wired into NPM as a subrequest, a
+materially bigger change than a `COLLECTIONS` line. Left as a possible future
+item, not proposed now.
+
+Change is a one-line edit to `apps/crowdsec/docker-compose.yml`'s
+`COLLECTIONS` var — no service code, no settings, no secrets.
+
+**567.2 — Plan: CrowdSec Console enrollment.** CrowdSec Console
+(app.crowdsec.net) is CrowdSec's own SaaS: account creation (Google SSO or
+email/password) happens entirely on their site, outside this app's reach —
+nothing for the dashboard to build there. What the dashboard *can* and must
+own, per CLAUDE.md principle 2 (no console configuration on the host) and
+principle 3 (prompt once, in the UI, only for what can't be derived): a place
+to paste the one-time **enroll key** CrowdSec Console issues after the user
+adds a "security engine" there, and full automation of everything after that.
+
+Plumbing survey confirms this fits existing patterns with no new mechanism:
+- `docker exec` into the running `crowdsec` container is blocked by the
+  socket-proxy (per `appDumps.ts`, `crowdsecBans.ts`). The established
+  workaround, already used for `cscli machines add` in
+  `ensureCrowdsecDashboardMachine`, is a throwaway
+  `docker compose run --rm --no-deps --entrypoint /bin/sh crowdsec -c "cscli ..."`.
+  `cscli console enroll` uses the identical idiom.
+- `executor.ts`'s `composeUpWithManagedConfig` already runs a post-`up` hook
+  chain per service (Jellyfin/Navidrome/NocoDB/Uptime Kuma bootstrap, and for
+  CrowdSec itself, `ensureCrowdsecDashboardMachine`). A new
+  `ensureCrowdsecConsoleEnroll(serviceName)` call slots in next to it.
+- Must run on *every* start, not once: `/etc/crowdsec` (where enrollment
+  state lives) isn't in the persisted volume, only `/var/lib/crowdsec/data`
+  is — so a container recreation (image update, compose-file change) drops
+  enrollment. Made idempotent the same way `ensureCrowdsecDashboardMachine`
+  already is (treat "already enrolled" as success, not an error).
+- Enroll key storage: extend the existing `/api/settings/crowdsec` route with
+  a field for it, written into `apps/crowdsec/.env` via `writeAppEnvValue`
+  (the same mechanism as `CROWDSEC_DASHBOARD_PASSWORD`) — not the Postgres
+  settings table, since it's a per-app secret, not cross-app config.
+- One step stays manually on CrowdSec's own site and can't be automated away:
+  after the dashboard runs the enroll command, the pending security engine
+  shows up under "Accept" on app.crowdsec.net — the account holder has to
+  click it there once. That's CrowdSec's design, not a console-configuration
+  step on *this* host, so it doesn't violate principle 2.
+
+Not yet built. Next: implement 567.1 (mechanical, low-risk) and 567.2 (real
+feature — Settings UI field, route change, `ensureCrowdsecConsoleEnroll`,
+tests) as separate commits per the working loop.
+
+## 568. Built: extra CrowdSec collections (§567.1)
+
+Added `crowdsecurity/http-dos` and `crowdsecurity/whitelist-good-actors` to
+`COLLECTIONS` in `apps/crowdsec/docker-compose.yml`. Verified against
+`tx-home-utils.com`: `docker compose up -d` recreated the container,
+`cscli hub list` confirms both collections up-to-date and loaded
+(`whitelist-good-actors` pulled in `crowdsecurity/linux`/`sshd` as
+dependencies — harmless no-ops here, there's no sshd log source mounted),
+container reports healthy, `cscli lapi status` confirms the local API is
+still reachable.

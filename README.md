@@ -293,4 +293,22 @@ it is done — not ticked off and left behind. Section references point at
       ever protocol-specific. Verify with a real `kopia repository create` /
       snapshot / restore round trip against `tx-home-utils.com` before
       merging to `main`.
+- [ ] **CrowdSec Console enrollment** — planned in plan.md §567.2. Account
+      creation (Google or email/password) happens on CrowdSec's own site
+      (app.crowdsec.net) — nothing to build there. Build: a "CrowdSec Console
+      enroll key" field on the existing CrowdSec settings panel, saved into
+      `apps/crowdsec/.env` via the existing app-secret mechanism; a new
+      `ensureCrowdsecConsoleEnroll(serviceName)` alongside
+      `ensureCrowdsecDashboardMachine` in `executor.ts`'s post-`up` hook chain,
+      using the same throwaway `docker compose run --rm --no-deps
+      --entrypoint /bin/sh crowdsec -c "cscli console enroll ..."` idiom
+      already used for `cscli machines add` (real `docker exec` is blocked by
+      the socket-proxy). Must run idempotently on every start, not just once
+      — `/etc/crowdsec` isn't in the persisted volume, so a container
+      recreation drops enrollment. One step stays manual on CrowdSec's own
+      site regardless: the account holder has to click "Accept" on the
+      pending security engine at app.crowdsec.net after the dashboard runs
+      the enroll command. Verify against the real host — confirm the engine
+      shows up and gets accepted, and that enrollment survives a container
+      recreation — before merging to `main`.
 
