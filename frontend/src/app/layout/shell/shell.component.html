@@ -13,8 +13,6 @@
         </a>
         <app-resource-strip class="app-header__resources"></app-resource-strip>
         <nav class="app-header__actions" *ngIf="caps$ | async as caps">
-          <a class="app-nav__link" routerLink="/home" routerLinkActive="active"
-             [routerLinkActiveOptions]="{ exact: true }">Menu</a>
           <a class="app-nav__link" routerLink="/apps" routerLinkActive="active"
              *ngIf="caps.has('apps:control')">Apps</a>
           <a class="app-nav__link" routerLink="/backups" routerLinkActive="active"

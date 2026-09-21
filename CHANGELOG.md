@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.11] — 2026-09-21
+
+### Removed
+
+- Drop the redundant nav-bar Menu link (the brand link already goes to /home)
+
 ## [0.119.10] — 2026-09-21
 
 ### Fixed

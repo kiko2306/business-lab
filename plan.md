@@ -27930,3 +27930,42 @@ exists vs. being deliberately hand-added for some other reason). This is a
 one-time manual Cloudflare cleanup, not a code change — flag it as such
 rather than building automation for a single leftover record.
 
+## 557. Plan: drop the redundant "Menu" nav-bar link
+
+User asked to "drop dashbar menu item" — no literal `dashbar` exists in the
+frontend (checked nav labels and the header's CPU/RAM/disk resource strip
+component). Clarified with the user: "dashboard in the front end." Read
+`frontend/src/app/layout/shell/shell.component.html:16-17` and
+`frontend/src/app/app.routes.ts:56-63`: the nav bar's first link, labelled
+"Menu", routes to `/home` — but the brand/logo in the same header
+(`shell.component.html:5`) already links to `/home`, and the shell's root
+path `''` already redirects to `home` by default (`app.routes.ts:57-59`). So
+"Menu" is a redundant third way to reach the same page a user lands on by
+default and can already reach via the logo.
+
+**Interpretation flagged for confirmation before implementation** (this is a
+guess, not a directly-confirmed request): "drop dashbar menu item" = drop
+this redundant "Menu" nav-bar link
+(`shell.component.html:16-17`). If this isn't what was meant, correct it
+before work starts — nothing has been changed yet.
+
+**Design (if confirmed)**: delete the one `<a class="app-nav__link"
+routerLink="/home" ...>Menu</a>` entry from `shell.component.html`. No other
+file changes — the route, the logo's link, and the root-redirect all stay as
+they are; only the now-redundant nav entry goes. Trivial, no dead ends behind
+it — matches CLAUDE.md's "small, mechanical item" sizing for its own future
+plan.md record once actually done.
+
+## 562. Built: drop the redundant "Menu" nav-bar link (§557)
+
+Deleted the `<a routerLink="/home">Menu</a>` from
+`frontend/src/app/layout/shell/shell.component.html` (was lines 16-17) — the
+brand/logo link already goes to `/home`, and the root route redirects there
+by default, so it was a third, redundant way to reach the same page. No
+other file changes; `frontend/src/app/pages/home/home.component.html`'s own
+`<h1>Menu</h1>` page heading and the e2e test asserting it
+(`e2e/tests/nav.spec.ts:18`) are unrelated and untouched.
+
+Verified: `docker run … npm ci && npm run build` (frontend) succeeds (pre-existing
+initial-bundle-budget warning only, unrelated). No test referenced the
+deleted nav link itself.
