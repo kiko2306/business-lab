@@ -27637,3 +27637,24 @@ Hand-made monitors still get email through the mail notification's
 **Proven on home-srv-01 (0.119.9):** after `restartService('uptime-kuma')`,
 monitors 1–7 have only notification 2 (ntfy), and monitor 8 (ntfy) has only
 1 (email). The Funnel is still at `maxretries 7`.
+
+## 551. Self-update panel's commit/status badge went stale after a run finished
+
+Reported: the Self-Update page's card didn't reflect a just-finished update.
+Cause: `getSelfUpdateStatus()` serves `status.check` from the module-level
+`cachedCheck`, set only by `checkForUpdate()` — the "Check now" button, the
+pre-confirm check in `updateNow()`, and the 6h sweeper. `runSelfUpdateSequence`
+never touched it, so once a run reached `done` the card kept showing the
+pre-pull commit hash and "N commits behind" until the next sweep or a manual
+check. For any update that doesn't rebuild the backend (frontend-only or
+apps-only — the common case), that's the same long-lived process serving the
+stale value indefinitely; a backend rebuild already self-heals, since the new
+process's sweeper runs `checkForUpdate()` immediately on boot.
+
+**Fix.** `runSelfUpdateSequence` (`backend/src/services/selfUpdate.ts`) now
+sets `cachedCheck` directly right after the `git pull --ff-only` lands and
+`toCommit` is known — no extra fetch needed, since a fast-forward pull to
+`origin/<branch>` means the new HEAD is exactly the remote commit
+`checkForUpdate()` already captured before the pull. Covered by a new
+`selfUpdate.test.ts` case asserting `status.check` reads "up to date"
+right after a run's pull, not just `latestRun`. Shipped as 0.119.10.

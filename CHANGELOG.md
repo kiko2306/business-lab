@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.119.10] — 2026-09-21
+
+### Fixed
+
+- Self-update panel showed the stale commit/status badge after a run finished until the next 6h check or a manual "Check now"
+
 ## [0.119.9] — 2026-09-19
 
 ### Changed

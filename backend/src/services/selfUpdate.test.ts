@@ -235,6 +235,16 @@ describe('triggerSelfUpdate', () => {
     );
   });
 
+  it('refreshes status.check to "up to date" right after the pull, not just latestRun (§551)', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1);
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const status = await getSelfUpdateStatus();
+    expect(status.check).toMatchObject({ currentCommit: 'new222', remoteCommit: 'new222', commitsBehind: 0 });
+  });
+
   it('writes a durable "classified" breadcrumb with the resolved scope before building (§354)', async () => {
     mockAnUpdateFrom('old111', 'new222', 1, ['backend/src/routes/services.ts']);
 

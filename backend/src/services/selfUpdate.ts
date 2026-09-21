@@ -413,6 +413,21 @@ async function runSelfUpdateSequence(
     await runGit(['-C', repoRoot, 'pull', '--ff-only', 'origin', branch], { timeout: 60_000 });
     const toCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
     await updateRun(runId, { toCommit });
+    // The panel's "commits behind" badge is served from `cachedCheck`, which
+    // `checkForUpdate()` last set *before* this pull — left untouched, it
+    // would keep reading as behind until the 6h sweeper or a manual "Check
+    // now", even though the process serving it (unless the backend itself
+    // gets rebuilt below) is the same one that just landed the pull. A
+    // `--ff-only` pull to `origin/<branch>` means the new HEAD *is* the
+    // remote commit `checkForUpdate()` already captured, so no extra fetch
+    // is needed to know the check is now current.
+    cachedCheck = {
+      currentCommit: toCommit,
+      remoteCommit: check.remoteCommit,
+      commitsBehind: 0,
+      checkedAt: new Date().toISOString(),
+      branch: check.branch,
+    };
 
     const scope = await classifyDeploy(repoRoot, check.currentCommit, toCommit);
     const buildTargets = [
