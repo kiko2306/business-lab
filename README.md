@@ -285,6 +285,22 @@ it is done — not ticked off and left behind. Section references point at
       image. Verify live that the pinned ITFlow image version actually hides
       the dashboard widget and client-portal views too, not just the nav
       link (older versions reportedly left those visible).
+- [ ] **Point Kopia backups at the built-in WebDAV app** — planned in
+      plan.md §561. Kopia has a **native** `webdav` repository backend
+      (confirmed against kopia.io docs) — unlike the current `ftp`/`sftp`
+      destinations, which go through an internal rclone bridge that's caused
+      repeated hangs (§434/§435, still-open §552 alert). Add `webdav` as a
+      fifth `BackupTargetKind` (`backupTarget.ts`, `kopiaTargetApply.ts`,
+      `apps/kopia/entrypoint.sh`, validation, a `testWebdavTarget` reachability
+      check, and the Settings-page dropdown/fieldset) so it can be pointed at
+      `apps/webdav` (already running, Basic Auth creds already
+      dashboard-generated) or any other WebDAV server. Try it against the
+      built-in WebDAV app first — this box's NAS is known (§265/§266/§269) to
+      hang Kopia over SMB/FTP/NFS alike, so this also tests whether that was
+      ever protocol-specific. Verify with a real `kopia repository create` /
+      snapshot / restore round trip against `tx-home-utils.com` before
+      merging to `main`.
+
 ### Backups
 
 - [ ] **ntfy alert on backup failure** — planned in plan.md §552, not built.
