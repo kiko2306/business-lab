@@ -20,6 +20,7 @@ const baseOptions = {
   autheliaProtected: false,
   grpc: false,
   dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
 };
 
 function mockLogin() {
@@ -41,6 +42,7 @@ describe('buildProxyHostPayload', () => {
       autheliaProtected: false,
       grpc: false,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 0,
     });
 
@@ -75,6 +77,7 @@ describe('buildProxyHostPayload', () => {
       autheliaProtected: false,
       grpc: false,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 0,
     });
 
@@ -93,6 +96,7 @@ describe('buildProxyHostPayload', () => {
       autheliaProtected: false,
       grpc: false,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 0,
     });
 
@@ -110,6 +114,7 @@ describe('buildProxyHostPayload', () => {
       autheliaProtected: false,
       grpc: false,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 0,
     });
     expect(payload.allow_websocket_upgrade).toBe(false);
@@ -126,11 +131,57 @@ describe('buildProxyHostPayload', () => {
       autheliaProtected: true,
       grpc: false,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 0,
     });
 
     expect(payload.advanced_config).toContain('include /snippets/authelia-location.conf;');
     expect(payload.advanced_config).toContain('include /snippets/authelia-authrequest.conf;');
+  });
+
+  // §555: Vikunja never checks for a live Authelia session on page load, so a
+  // bare `/` visit needs nginx itself to kick off `?redirectToProvider=authelia`
+  // once, then fall through to the normal proxy body on the resulting request.
+  it('prepends a location = / auto-redirect only when oidcAutoRedirect is set on an Authelia-protected host', () => {
+    const withRedirect = buildProxyHostPayload({
+      hostname: 'vikunja.example.com',
+      forwardScheme: 'http',
+      forwardHost: '172.17.0.1',
+      forwardPort: 8000,
+      websocket: true,
+      autheliaProtected: true,
+      grpc: false,
+      dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: true,
+      certificateId: 0,
+    }).advanced_config ?? '';
+
+    expect(withRedirect).toContain('location = / {');
+    expect(withRedirect).toContain("if ($arg_redirectToProvider = '') {");
+    expect(withRedirect).toContain('return 302 $scheme://$host/?redirectToProvider=authelia;');
+    // The exact-match block must still fall through to the real proxy body,
+    // not just redirect and stop — else the second request (carrying the
+    // query param) would 302 forever.
+    const exactBlock = withRedirect.slice(
+      withRedirect.indexOf('location = / {'),
+      withRedirect.indexOf('location / {')
+    );
+    expect(exactBlock).toContain('proxy_pass $forward_scheme://$server:$port;');
+
+    const withoutRedirect = buildProxyHostPayload({
+      hostname: 'paperless.example.com',
+      forwardScheme: 'http',
+      forwardHost: '172.17.0.1',
+      forwardPort: 8000,
+      websocket: true,
+      autheliaProtected: true,
+      grpc: false,
+      dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
+      certificateId: 0,
+    }).advanced_config ?? '';
+    expect(withoutRedirect).not.toContain('location = / {');
+    expect(withoutRedirect).not.toContain('redirectToProvider');
   });
 
   it('redirects a group-denied (403) request to the dashboard\'s access-denied page', () => {
@@ -143,6 +194,7 @@ describe('buildProxyHostPayload', () => {
       autheliaProtected: true,
       grpc: false,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 0,
     });
 
@@ -163,6 +215,7 @@ describe('buildProxyHostPayload', () => {
       autheliaProtected: true,
       grpc: false,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 0,
     });
 
@@ -181,6 +234,7 @@ describe('buildProxyHostPayload', () => {
       forwardPort: 8000,
       websocket: true,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 0,
     };
     for (const autheliaProtected of [false, true]) {
@@ -206,6 +260,7 @@ describe('buildProxyHostPayload', () => {
       autheliaProtected: false,
       grpc: true,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 42,
     });
 
@@ -236,6 +291,7 @@ describe('buildProxyHostPayload', () => {
       autheliaProtected: false,
       grpc: false,
       dashboardUrl: 'https://businesslab.example.com',
+      oidcAutoRedirect: false,
       certificateId: 42,
     });
 

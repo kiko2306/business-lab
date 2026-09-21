@@ -28570,3 +28570,61 @@ Vikunja Android/desktop client, not just curl. The curl evidence above proves
 the root cause (Authelia's HTML redirect breaking JSON-expecting clients) is
 fixed, but nobody has pointed a real client at this host yet. Leaving that
 as a narrower README item rather than deleting it outright.
+
+## 572. Built: silent Authelia SSO redirect for Vikunja (§555)
+
+Implemented §555's design exactly as specified. New `oidcClient.autoRedirect?:
+boolean` field (`backend/src/types/index.ts`), set `true` on Vikunja's entry
+(`backend/src/config/services.ts`). Threaded through the same path
+`autheliaProtected`/`grpc` already take: `exposure.ts`'s
+`ProvisionHostnameOptions`/`provisionHostname()` (`oidcAutoRedirect: false`
+on the `additionalExposures` loop — nothing needs it on a secondary
+hostname) → `provisionServiceIfEnabled`'s primary-hostname call site, set from
+`serviceDef?.oidcClient?.autoRedirect` → `npmClient.ts`'s
+`EnsureProxyHostOptions`/`ProxyHostWriteOptions`/`computeAdvancedConfig()`.
+Both `ensureProxyHost()` literals (the create/update options object and the
+separate `expectedAdvancedConfig` used only for the drift check) carry the
+new field, per the plan's warning about that exact split-fix failure class.
+
+`buildAutheliaAdvancedConfig` now takes `oidcAutoRedirect` and, when set,
+prepends a `location = /` block ahead of the existing `location /`, both
+built from one shared `AUTHELIA_PROXY_BODY` array so the proxy body can't
+drift between the two. `services.test.ts` needed no changes (its
+`oidcClient` assertions are generic loops); `npmClient.test.ts` gained a
+dedicated test for the new block (redirect present/absent, and that the
+exact-match block still falls through to the real proxy body rather than
+dead-ending) plus `oidcAutoRedirect: false` on every existing literal now
+that the field is required. `./scripts/check.sh backend test` (110 files,
+1134 tests) and `typecheck` both pass.
+
+**Verified against the real stack**: rebuilt/restarted the backend; since
+the exposure reconciler only re-provisions on a 10-minute-delayed sweep,
+manually invoked `provisionServiceIfEnabled('vikunja', null)` from
+`dist/services/exposure.js` inside the running container (the same function
+the reconciler and `startService` call — not a bypass of the real code
+path) to push the new NPM config immediately. Confirmed via
+`/data/nginx/proxy_host/27.conf` inside the NPM container that the
+`location = /` block landed verbatim.
+
+End-to-end against the public hostname:
+- Bare `GET https://vikunja.tx-home-utils.com/`, no cookies at all → `302`
+  to `?redirectToProvider=authelia` (nginx's own redirect, fires before
+  Authelia's auth_request even runs — by design, the `if` is the first
+  thing in the block).
+- Following that once → `302` to Authelia's real login page, `rd` pointing
+  at the `?redirectToProvider=authelia` URL — an anonymous visitor still
+  lands on a real login form, not a loop, just one extra hop first.
+- `GET /tasks/1` (deep link) → `302` straight to Authelia's login with `rd`
+  pointing at `/tasks/1` — the exact-match block is untouched, confirming
+  non-`/` paths are unaffected.
+- `GET /api/v1/info` → still `200` with Vikunja's JSON — confirms §554's
+  bypass and this change don't interact.
+
+**What curl can't prove**: the actual silent-SSO round trip — a *live*
+Authelia session hitting bare `/` and landing straight in Vikunja with no
+visible login page, and a reload not looping — needs a real authenticated
+browser, which requires human credentials this session doesn't have and
+shouldn't acquire. Mechanically this is Vikunja's own already-proven OIDC
+path (§555's investigation logged a real successful round trip) triggered
+one 302 earlier than before, so there's no new failure mode introduced, but
+it's not been watched happen. Narrowed the README item to that one check.

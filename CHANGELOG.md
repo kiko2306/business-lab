@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.123.0] — 2026-09-21
+
+### Exposure
+
+- Add a silent-SSO redirect for Vikunja: a bare visit with a live Authelia session skips its own login button (plan.md §555/§572)
+
 ## [0.122.1] — 2026-09-21
 
 ### Exposure

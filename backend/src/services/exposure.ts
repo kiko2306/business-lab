@@ -279,6 +279,9 @@ interface ProvisionHostnameOptions {
   existingNpmHostId: number | null;
   autheliaProtected: boolean;
   grpc: boolean;
+  // See oidcClient.autoRedirect (plan.md §555) — only meaningful when
+  // autheliaProtected, always passed through regardless.
+  oidcAutoRedirect: boolean;
   globalConfig: ExposureGlobalConfig;
   originUrl: string;
   userId: number | null;
@@ -418,6 +421,7 @@ async function provisionHostname({
   existingNpmHostId,
   autheliaProtected,
   grpc,
+  oidcAutoRedirect,
   globalConfig,
   originUrl,
   userId,
@@ -453,6 +457,7 @@ async function provisionHostname({
       autheliaProtected,
       grpc,
       dashboardUrl,
+      oidcAutoRedirect,
     });
 
     // Persist ownership before the Cloudflare call so a later retry can safely
@@ -663,6 +668,7 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
     existingNpmHostId: exposureRow.npm_host_id,
     autheliaProtected: isAutheliaProtectionRequired(serviceName),
     grpc: false,
+    oidcAutoRedirect: Boolean(serviceDef?.oidcClient?.autoRedirect),
     globalConfig,
     originUrl,
     userId,
@@ -687,6 +693,7 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
       existingNpmHostId: extraRow.npm_host_id,
       autheliaProtected: false,
       grpc,
+      oidcAutoRedirect: false,
       globalConfig,
       // Cloudflare requires a real TLS+HTTP2/ALPN hop to the origin for
       // gRPC — plain HTTP + http2Origin is a no-op (see

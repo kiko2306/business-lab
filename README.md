@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.122.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.123.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -216,20 +216,15 @@ it is done — not ticked off and left behind. Section references point at
       HTML login page, `/` still gated). What's left is a real Vikunja
       Android/desktop client pointed at `https://<vikunja-host>/api/v1` to
       confirm it recognises the server and logs in, before merging to `main`.
-- [ ] **Vikunja shows its own login page every visit instead of silently
-      completing Authelia SSO** — planned in plan.md §555, not built. Vikunja
-      only starts its OIDC flow on a button click, even with a live Authelia
-      session already in the browser; it supports `?redirectToProvider=authelia`
-      to skip straight to that redirect. Add an `oidcClient.autoRedirect` field
-      (`backend/src/types/index.ts`, set on Vikunja's entry in
-      `backend/src/config/services.ts`), thread it through
-      `exposure.ts`/`npmClient.ts` the same way `autheliaProtected`/`grpc`
-      already flow, and have `buildAutheliaAdvancedConfig` prepend a guarded
-      `location = /` redirect in NPM's `advanced_config` for Vikunja's proxy
-      host. Verify against the real host per the plan before merging to
-      `main`: bare-URL visit with a live Authelia session skips the login
-      page, no session still shows Authelia's real login form, no redirect
-      loop on reload, deep links and `/api/v1/...` unaffected.
+- [ ] **Vikunja silent SSO: confirm a live Authelia session actually skips
+      the login page** — code built and proven at the HTTP level in plan.md
+      §572 (NPM's `location = /` block confirmed rendered; anonymous curl
+      shows the redirect chain lands on Authelia's real login with no loop,
+      and deep links / `/api/v1/...` are unaffected). What's left needs a
+      real logged-in browser: with a live Authelia session, visiting bare
+      `https://vikunja.tx-home-utils.com/` should land straight in the app
+      with no visible login page, and a reload of that same URL shouldn't
+      loop. Confirm before merging to `main`.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),

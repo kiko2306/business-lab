@@ -45,6 +45,9 @@ interface EnsureProxyHostOptions {
   // https://businesslab.example.com), NOT the bare exposure base domain —
   // that's the Home Page's hostname (plan.md §111), a different app.
   dashboardUrl: string;
+  // Only used when autheliaProtected — see oidcClient.autoRedirect (plan.md
+  // §555). Always passed through regardless, same reasoning as dashboardUrl.
+  oidcAutoRedirect: boolean;
 }
 
 // Gates a proxy host behind Authelia's forward-auth — see the snippet files
@@ -92,21 +95,47 @@ const APP_UNAVAILABLE_LOCATION = [
   '}',
 ].join('\n');
 
-function buildAutheliaAdvancedConfig(dashboardUrl: string): string {
+// Shared by both the plain `location /` and the auto-redirect's `location = /`
+// below — kept as one array so a fix to the proxy body can't land in only one
+// of them (the exact class of bug computeAdvancedConfig's own comment warns
+// about).
+const AUTHELIA_PROXY_BODY = [
+  // proxy.conf already sets proxy_http_version 1.1 — do not redeclare it
+  // here, nginx treats a second copy in the same location as a fatal
+  // "duplicate directive" and refuses to reload the whole host.
+  '    include /snippets/proxy.conf;',
+  '    include /snippets/authelia-authrequest.conf;',
+  '    proxy_set_header Upgrade $http_upgrade;',
+  '    proxy_set_header Connection "upgrade";',
+  '    proxy_pass $forward_scheme://$server:$port;',
+  '    error_page 403 = @access_denied;',
+  APP_UNAVAILABLE_ERROR_PAGE,
+];
+
+function buildAutheliaAdvancedConfig(dashboardUrl: string, oidcAutoRedirect: boolean): string {
   return [
     'include /snippets/authelia-location.conf;',
     '',
+    // Vikunja never checks for a live Authelia session on page load — it only
+    // starts its OIDC flow on a login-button click (plan.md §555). This exact
+    // `location = /` match (nginx ignores the query string when matching)
+    // sends a bare `/` visit into Vikunja's own `?redirectToProvider=authelia`
+    // redirect once; the resulting second request carries that query param,
+    // so it matches this same block again but skips the `if` and falls
+    // through to the proxy body instead of looping.
+    ...(oidcAutoRedirect
+      ? [
+          'location = / {',
+          "    if ($arg_redirectToProvider = '') {",
+          '        return 302 $scheme://$host/?redirectToProvider=authelia;',
+          '    }',
+          ...AUTHELIA_PROXY_BODY,
+          '}',
+          '',
+        ]
+      : []),
     'location / {',
-    // proxy.conf already sets proxy_http_version 1.1 — do not redeclare it
-    // here, nginx treats a second copy in the same location as a fatal
-    // "duplicate directive" and refuses to reload the whole host.
-    '    include /snippets/proxy.conf;',
-    '    include /snippets/authelia-authrequest.conf;',
-    '    proxy_set_header Upgrade $http_upgrade;',
-    '    proxy_set_header Connection "upgrade";',
-    '    proxy_pass $forward_scheme://$server:$port;',
-    '    error_page 403 = @access_denied;',
-    APP_UNAVAILABLE_ERROR_PAGE,
+    ...AUTHELIA_PROXY_BODY,
     '}',
     '',
     'location @access_denied {',
@@ -210,12 +239,13 @@ function computeAdvancedConfig(opts: {
   forwardPort: number;
   websocket: boolean;
   dashboardUrl: string;
+  oidcAutoRedirect: boolean;
 }): string {
   if (opts.grpc) {
     return buildGrpcAdvancedConfig(opts.forwardHost, opts.forwardPort);
   }
   if (opts.autheliaProtected) {
-    return buildAutheliaAdvancedConfig(opts.dashboardUrl);
+    return buildAutheliaAdvancedConfig(opts.dashboardUrl, opts.oidcAutoRedirect);
   }
   return buildPlainAdvancedConfig(opts.websocket);
 }
@@ -493,7 +523,15 @@ export async function bootstrapNpmAdminIfDefault(npmApiUrl: string): Promise<{ e
 
 type ProxyHostWriteOptions = Pick<
   EnsureProxyHostOptions,
-  'hostname' | 'forwardScheme' | 'forwardHost' | 'forwardPort' | 'websocket' | 'autheliaProtected' | 'grpc' | 'dashboardUrl'
+  | 'hostname'
+  | 'forwardScheme'
+  | 'forwardHost'
+  | 'forwardPort'
+  | 'websocket'
+  | 'autheliaProtected'
+  | 'grpc'
+  | 'dashboardUrl'
+  | 'oidcAutoRedirect'
 > & {
   // Only set (non-zero) for grpc hosts — see ensureGrpcCertificate. Cloudflare
   // requires the origin to terminate real TLS+HTTP2/ALPN for gRPC to work at
@@ -510,6 +548,7 @@ export function buildProxyHostPayload({
   autheliaProtected,
   grpc,
   dashboardUrl,
+  oidcAutoRedirect,
   certificateId,
 }: ProxyHostWriteOptions) {
   return {
@@ -531,7 +570,15 @@ export function buildProxyHostPayload({
     http2_support: grpc ? true : false,
     hsts_enabled: false,
     hsts_subdomains: false,
-    advanced_config: computeAdvancedConfig({ autheliaProtected, grpc, forwardHost, forwardPort, websocket, dashboardUrl }),
+    advanced_config: computeAdvancedConfig({
+      autheliaProtected,
+      grpc,
+      forwardHost,
+      forwardPort,
+      websocket,
+      dashboardUrl,
+      oidcAutoRedirect,
+    }),
   };
 }
 
@@ -614,6 +661,7 @@ export async function ensureProxyHost({
   autheliaProtected,
   grpc,
   dashboardUrl,
+  oidcAutoRedirect,
 }: EnsureProxyHostOptions): Promise<EnsureProxyHostResult> {
   const baseUrl = npmApiUrl.replace(/\/+$/, '');
   const token = await login(baseUrl, npmEmail, npmPassword);
@@ -629,6 +677,7 @@ export async function ensureProxyHost({
     autheliaProtected,
     grpc,
     dashboardUrl,
+    oidcAutoRedirect,
     certificateId,
   };
 
@@ -668,6 +717,7 @@ export async function ensureProxyHost({
     forwardPort,
     websocket,
     dashboardUrl,
+    oidcAutoRedirect,
   });
   const needsUpdate =
     existing.forward_scheme !== forwardScheme ||

@@ -1235,6 +1235,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       // client_secret_post, the callback fails with `invalid_client` — "the
       // OAuth 2.0 client registration does not allow this method".
       tokenEndpointAuthMethod: 'client_secret_basic',
+      autoRedirect: true,
     },
     // SMTP from the dashboard's global mail settings. Vikunja always attempts
     // STARTTLS; FORCESSL switches it to implicit TLS (465). MAILER_ENABLED

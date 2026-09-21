@@ -328,6 +328,15 @@ export interface ServiceDefinition {
     //   {CLIENT_SECRET} the app's own secretEnvKey value, from its .env
     //   {PUBLIC_URL}    https://<this app's exposed hostname>
     appEnv?: Record<string, string>;
+    // Vikunja never checks for an existing Authelia session on page load —
+    // it only starts the OIDC flow on its own login button click, so a
+    // browser with a live Authelia session still sees Vikunja's login page
+    // every visit. Vikunja supports a `?redirectToProvider=<key>` query
+    // param that skips straight to that redirect (plan.md §555); this flag
+    // has NPM prepend a `location = /` block that 302s a bare `/` visit
+    // (only) to `?redirectToProvider=authelia`, so an existing session lands
+    // the user straight in the app with no visible login page.
+    autoRedirect?: boolean;
   };
 }
 
