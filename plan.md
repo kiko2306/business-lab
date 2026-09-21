@@ -27956,6 +27956,34 @@ they are; only the now-redundant nav entry goes. Trivial, no dead ends behind
 it — matches CLAUDE.md's "small, mechanical item" sizing for its own future
 plan.md record once actually done.
 
+## 558. Plan: declare Nextcloud's OnlyOffice dependency (`requires`)
+
+User asked for Nextcloud to show that it depends on OnlyOffice. This
+codebase already has exactly this mechanism — CLAUDE.md's "Dependencies
+between apps" convention: `requires` is for "what it needs to do its job but
+not to come up... the dashboard lists it and warns when it is down, and
+never blocks a start" (the `dependsOn` tier is reserved for boot-blocking
+needs, which this isn't — Nextcloud boots fine with OnlyOffice down, it just
+can't open documents). Confirmed live: OnlyOffice is already
+`hideFromHomePage: true` per its own doc comment ("exists only to serve
+another app, not a person") and Nextcloud's own compose/description already
+call it out as "the document editor that Nextcloud embeds"
+(`onlyoffice`'s `description` field, `services.ts:1384`) — but Nextcloud's
+registry entry (`services.ts:1050-` onward) currently has no `requires`
+field at all, so the dashboard doesn't actually surface or warn about the
+dependency anywhere.
+
+**Design**: add `requires: ['onlyoffice']` to Nextcloud's entry in
+`backend/src/config/services.ts`, following the existing pattern (e.g. line
+91's `requires: ['tailscale', 'nginx-proxy-manager']` with its doc comment
+explaining why each is needed) — a one-line addition plus a short comment
+("OnlyOffice is what actually opens/edits documents in the browser; Nextcloud
+itself is fully usable without it, files just can't be edited in-browser").
+No test changes expected beyond whatever `services.test.ts` already asserts
+generically about `requires` entries (check before landing it). Small,
+mechanical — no dead ends, no investigation needed beyond what's recorded
+here.
+
 ## 562. Built: drop the redundant "Menu" nav-bar link (§557)
 
 Deleted the `<a routerLink="/home">Menu</a>` from

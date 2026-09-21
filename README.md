@@ -266,6 +266,13 @@ it is done — not ticked off and left behind. Section references point at
       the Cloudflare Zero Trust dashboard, confirm it's unused, and delete it
       there — not something backend code can safely detect-and-remove on its
       own with no `service_exposure` row to key off.
+- [ ] **Nextcloud should declare its OnlyOffice dependency** — planned in
+      plan.md §558. Nextcloud boots and is fully usable without OnlyOffice, it
+      just can't open documents in-browser — exactly what the existing
+      `requires` tier (vs. boot-blocking `dependsOn`) is for. Add
+      `requires: ['onlyoffice']` to Nextcloud's entry in
+      `backend/src/config/services.ts`, following the pattern at line 91.
+      Trivial, mechanical.
 ### Backups
 
 - [ ] **ntfy alert on backup failure** — planned in plan.md §552, not built.
