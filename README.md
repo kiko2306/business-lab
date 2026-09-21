@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.120.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.120.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -266,13 +266,6 @@ it is done — not ticked off and left behind. Section references point at
       the Cloudflare Zero Trust dashboard, confirm it's unused, and delete it
       there — not something backend code can safely detect-and-remove on its
       own with no `service_exposure` row to key off.
-- [ ] **Nextcloud should declare its OnlyOffice dependency** — planned in
-      plan.md §558. Nextcloud boots and is fully usable without OnlyOffice, it
-      just can't open documents in-browser — exactly what the existing
-      `requires` tier (vs. boot-blocking `dependsOn`) is for. Add
-      `requires: ['onlyoffice']` to Nextcloud's entry in
-      `backend/src/config/services.ts`, following the pattern at line 91.
-      Trivial, mechanical.
 - [ ] **ITFlow: auto-hide the billing/accounting module** — planned in
       plan.md §560. ITFlow has no env-var config path for this (same as its
       mail settings) — it's a DB row, `settings.config_module_enable_accounting`,

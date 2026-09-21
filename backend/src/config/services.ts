@@ -1092,7 +1092,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // av_block_unreachable=false a stopped ClamAV just means uploads aren't
     // scanned until the background scan catches up — so `requires`, not
     // `dependsOn`: the dashboard warns when ClamAV is down, never blocks.
-    requires: ['clamav'],
+    // OnlyOffice is the same tier: Nextcloud boots and is fully usable
+    // without it, it just can't open documents in-browser.
+    requires: ['clamav', 'onlyoffice'],
   },
   'immich': {
     backup: { engine: 'postgres', service: 'immich-db' },

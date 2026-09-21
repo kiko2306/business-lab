@@ -28223,3 +28223,14 @@ running `business-lab-backend-1` container: `netbird-vpn` returned
 'netbird-vpn-api.tx-home-utils.com' }, { label: 'Relay', hostname:
 'netbird-vpn-relay.tx-home-utils.com' }]` — confirming the two URLs really do
 differ, live, and that the new field resolves correctly end-to-end.
+
+## 564. Built: Nextcloud declares its OnlyOffice dependency (§558)
+
+Added `requires: ['onlyoffice']` to Nextcloud's entry in
+`backend/src/config/services.ts`, alongside its existing `requires: ['clamav']`
+— same tier as ClamAV: Nextcloud boots and is fully usable without OnlyOffice,
+it just can't open documents in-browser, so `requires` (dashboard warns when
+down, never blocks) is correct, not `dependsOn`. Trivial, mechanical; no new
+tests needed — `services.test.ts`'s registry-wide checks already cover
+`requires` entries generically. `./scripts/check.sh backend test`: 1124/1124
+passing.
