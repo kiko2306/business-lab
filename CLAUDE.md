@@ -39,9 +39,10 @@ model — but is a **separate deployment** with its own domain and its own
 credentials/tokens, and there uptime and client data do matter. The difference
 is the promises, not the exposure.
 
-The verification model is unchanged: this box stays the stack every
-Docker/exposure/networking/backup change is proven against on `beta`, before
-it goes to `main` — that is exactly what a no-guarantees dev/test box is for.
+The verification model is unchanged: this box is what `beta`'s README-listed
+tests run against — the user pulls `beta` onto it via the self-update panel
+and asks for it to be tested — before anything goes to `main`. That is
+exactly what a no-guarantees dev/test box is for.
 
 ## plan.md is the project's memory
 
@@ -106,21 +107,29 @@ page or the 2FA flow.
 The real branch flow has three stages: `dev` → `beta` → `main`. All work
 commits to the rolling `dev` branch — never straight to `beta` or `main`.
 
-`dev` is always safe to commit and push to — that is what it is for. The
-affected workspace's checks (typecheck/test) should pass, but live-stack
-verification against Docker/exposure/networking/backups is **not** a gate for
-`dev`: commit and push as work lands, including work that is not yet proven
-against the real stack. Don't leave finished work sitting uncommitted, and
-don't batch several unrelated changes into one commit: one commit per
-coherent change, pushed as it lands.
+`dev` is always safe to commit and push to — that is what it is for. Every
+change and new feature goes there as it lands, once the affected workspace's
+checks (typecheck/test) pass; live-stack verification is **not** a gate for
+`dev`. Don't leave finished work sitting uncommitted, and don't batch several
+unrelated changes into one commit: one commit per coherent change, pushed as
+it lands. Alongside it, add to README's TODO exactly what still needs to be
+tested on `beta` before the change is trustworthy there (what to check, and
+how) — the same item gets deleted once that test passes, per the TODO
+convention below.
 
-`beta` is where that live-stack verification happens. Merging `dev` into
-`beta` (fast-forward when possible) and pushing is the routine next step, done
-without asking each time — then prove anything touching
-Docker/exposure/networking/backups against the real stack on `beta`.
-`beta` → `main` only happens once that verification has passed, and even then
-only with the user's **explicit go-ahead each time** — never on your own
-initiative, even when `beta` is fully verified.
+Merging `dev` into `beta` is **only** a merge and push (fast-forward when
+possible) — no rebuild, no restart, and no live-stack testing on your own
+initiative. The user pulls that code onto the running box themselves, via the
+dashboard's own self-update panel (Update page, tracking the `beta` branch) —
+that update is theirs to trigger, not yours. Every time a merge to `beta`
+lands, say so plainly and flag that the README's listed tests still need to
+be run there before `main`.
+
+`beta` → `main` happens only when the user explicitly asks for `beta` to be
+tested and that test passes — that request-and-pass is the go-ahead, not a
+separate confirmation on top of it. Run exactly the checks the README items
+describe; if one fails, report what failed and do not merge. Never test
+`beta` or merge to `main` on your own initiative.
 
 Branch off `dev` as much as needed to keep something isolated
 mid-investigation (a spike, a throwaway experiment); merge back into `dev`,
@@ -147,15 +156,18 @@ Every task runs through the same six steps, in order, every time:
    mechanical item (a rename, a one-line config fix, something with no
    dead ends behind it) gets a few lines: what changed and why, no more.
    Padding a trivial item to look like an investigation is exactly the
-   token/session-time cost this convention should avoid.
+   token/session-time cost this convention should avoid. If the change
+   touches Docker/exposure/networking/backups, also add a README TODO item
+   naming exactly what must be tested on `beta` and how — delete it once that
+   test passes.
 5. **Commit and push to `dev` once the affected workspace's checks pass —
-   then merge to `beta` and verify there.** `dev` has no live-stack gate; push
-   as it lands. Merge `dev` into `beta` and push both as the routine next
-   step, then prove anything touching Docker/exposure/networking/backups
-   against the real stack on `beta` — see "Commits go to `dev`" above.
-   `beta` → `main` is a separate step, only after that verification passes,
-   that needs the user's go-ahead each time; don't fold it into this one
-   unasked.
+   then merge to `beta`.** `dev` has no live-stack gate; push as it lands.
+   Merging `dev` into `beta` is only a merge and push, done without asking
+   each time — no rebuild, no live-stack testing here. Say plainly that the
+   merge landed and that the README's listed tests still need to be run on
+   `beta` before `main`. `beta` → `main` is a separate step, triggered only
+   by the user explicitly asking for `beta` to be tested — do that testing,
+   and merge only on a pass; never on your own initiative.
 6. **Back to step 1.** Report, re-read the list, propose again — unless the
    item just finished was part of a pre-approved batch (below), in which case
    move to the next item in that batch without re-proposing.
