@@ -28804,3 +28804,20 @@ pattern needed since none existed to reuse. `./scripts/check.sh backend test`
 this only changes when the existing scheduler fires, not anything
 Docker/exposure/networking/backup-destination related, so nothing to prove
 against `tx-home-utils.com` beyond the tests above.
+
+## 576. Moved: backup destination card from Settings to Backups
+
+The "Backup destination" card (`kind`/path/server/credentials form for Kopia's
+repository) lived on the Settings page even though it is entirely a backup
+concern — Settings otherwise covers stack-wide things (timezone, mail, ntfy,
+networking). Moved the whole card — form, state, and the three methods
+(`loadBackupTarget`/`saveBackupTarget`/`testBackupTarget`) — from
+`settings.component.ts`/`.html` into `backups.component.ts`/`.html`, as a
+second `card` inside the page's existing single `app-panel`, between the
+Schedule card and the archive list. `SettingsService` still owns the HTTP
+calls (`GET/PUT /settings/backup-target`) — the backend route path is a
+routing detail, not a reason to move backend code; only the UI's home moved.
+Updated the two Home-page tile descriptions that mentioned where the
+destination lived. `./scripts/check.sh frontend build` and `test` (74/74)
+pass; no backend change, so no live-stack proof needed — the same form now
+renders on a different page, nothing about how it talks to Kopia changed.

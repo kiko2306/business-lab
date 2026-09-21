@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.127.0] — 2026-09-21
+
+### Backups
+
+- Move the backup destination card from Settings to the Backups page, where the rest of backup configuration lives
+
 ## [0.126.0] — 2026-09-21
 
 ### Backups

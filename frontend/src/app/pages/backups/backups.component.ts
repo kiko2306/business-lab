@@ -1,11 +1,21 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { Subscription, catchError, of, switchMap, timer } from 'rxjs';
+import { FormBuilder, FormsModule, ReactiveFormsModule } from '@angular/forms';
+import { Subscription, catchError, finalize, of, switchMap, timer } from 'rxjs';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
-import { BackupFile, BackupProgress, BackupScheduleConfig, BackupStatusResponse } from '../../core/models';
+import {
+  BackupFile,
+  BackupProgress,
+  BackupScheduleConfig,
+  BackupStatusResponse,
+  BackupTargetInput,
+  BackupTargetKind,
+  BackupTargetSettings,
+  BackupTargetTestResponse,
+} from '../../core/models';
+import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
 
@@ -25,14 +35,36 @@ const PROGRESS_POLL_MS = 500;
 @Component({
   selector: 'app-backups',
   standalone: true,
-  imports: [CommonModule, FormsModule, PanelComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, PanelComponent],
   templateUrl: './backups.component.html',
   styleUrl: './backups.component.css',
 })
 export class BackupsComponent implements OnInit, OnDestroy {
   private readonly operations = inject(OperationsService);
+  private readonly settingsService = inject(SettingsService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
+  private readonly formBuilder = inject(FormBuilder);
+
+  // One form for all destination types; which controls matter depends on
+  // `kind`, and the template shows only the relevant ones. Validation is done
+  // server-side because the rules differ per kind and duplicating them here
+  // would be two places to keep in step.
+  protected readonly backupTargetForm = this.formBuilder.nonNullable.group({
+    kind: ['disk' as BackupTargetKind],
+    path: [''],
+    server: [''],
+    share: [''],
+    username: [''],
+    password: [''],
+    options: [''],
+  });
+  protected backupTarget: BackupTargetSettings | null = null;
+  protected backupTargetLoading = true;
+  protected savingBackupTarget = false;
+  protected testingBackupTarget = false;
+  protected backupTargetFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  protected backupTargetTestResult: BackupTargetTestResponse | null = null;
 
   protected backups: BackupFile[] = [];
   protected schedule: BackupScheduleConfig = {
@@ -57,6 +89,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
     this.loadBackups();
     this.loadSchedule();
     this.loadBackupStatus();
+    this.loadBackupTarget();
   }
 
   ngOnDestroy(): void {
@@ -235,5 +268,82 @@ export class BackupsComponent implements OnInit, OnDestroy {
         this.savingSchedule = false;
       },
     });
+  }
+
+  loadBackupTarget(): void {
+    this.backupTargetLoading = true;
+    this.settingsService
+      .getBackupTarget()
+      .pipe(finalize(() => (this.backupTargetLoading = false)))
+      .subscribe({
+        next: (settings) => {
+          this.backupTarget = settings;
+          this.backupTargetForm.patchValue({
+            kind: settings.kind,
+            path: settings.path ?? '',
+            server: settings.server ?? '',
+            share: settings.share ?? '',
+            username: settings.username ?? '',
+            options: settings.options ?? '',
+          });
+        },
+        error: () =>
+          (this.backupTargetFeedback = { type: 'danger', message: 'Unable to load the backup destination.' }),
+      });
+  }
+
+  saveBackupTarget(): void {
+    const value = this.backupTargetForm.getRawValue();
+    const payload: BackupTargetInput = { kind: value.kind };
+
+    if (value.kind === 'disk') {
+      payload.path = value.path.trim();
+    } else {
+      payload.server = value.server.trim();
+      payload.share = value.share.trim();
+      payload.username = value.username.trim();
+      payload.options = value.options.trim();
+      if (value.password) payload.password = value.password;
+    }
+
+    this.savingBackupTarget = true;
+    this.backupTargetTestResult = null;
+    this.settingsService
+      .saveBackupTarget(payload)
+      .pipe(finalize(() => (this.savingBackupTarget = false)))
+      .subscribe({
+        next: (response) => {
+          this.backupTargetFeedback = { type: 'success', message: response.message };
+          this.backupTargetForm.controls.password.reset('');
+          this.loadBackupTarget();
+        },
+        error: (error) =>
+          (this.backupTargetFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Unable to save the backup destination.'),
+          }),
+      });
+  }
+
+  testBackupTarget(): void {
+    this.testingBackupTarget = true;
+    this.backupTargetTestResult = null;
+    this.settingsService
+      .testBackupTarget()
+      .pipe(finalize(() => (this.testingBackupTarget = false)))
+      .subscribe({
+        next: (result) => {
+          this.backupTargetTestResult = result;
+          this.backupTargetFeedback = {
+            type: result.success ? 'success' : 'danger',
+            message: result.message,
+          };
+        },
+        error: (error) =>
+          (this.backupTargetFeedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, 'Could not test the destination.'),
+          }),
+      });
   }
 }

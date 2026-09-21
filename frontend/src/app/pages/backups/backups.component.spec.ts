@@ -4,14 +4,27 @@ import { Subject, of } from 'rxjs';
 import { BackupsComponent } from './backups.component';
 import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
+import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
-import { BackupProgress, BackupStatusResponse } from '../../core/models';
+import { BackupProgress, BackupStatusResponse, BackupTargetSettings } from '../../core/models';
 
 describe('BackupsComponent', () => {
   let fixture: ComponentFixture<BackupsComponent>;
   let component: BackupsComponent;
   let operations: jasmine.SpyObj<OperationsService>;
+  let settings: jasmine.SpyObj<SettingsService>;
   let toast: jasmine.SpyObj<ToastService>;
+
+  const emptyBackupTarget: BackupTargetSettings = {
+    configured: false,
+    kind: 'disk',
+    path: null,
+    server: null,
+    share: null,
+    username: null,
+    passwordConfigured: false,
+    options: null,
+  };
 
   const emptyStatus: BackupStatusResponse = {
     job: {
@@ -81,6 +94,8 @@ describe('BackupsComponent', () => {
       })
     );
     operations.getBackupStatus.and.returnValue(of(emptyStatus));
+    settings = jasmine.createSpyObj('SettingsService', ['getBackupTarget', 'saveBackupTarget', 'testBackupTarget']);
+    settings.getBackupTarget.and.returnValue(of(emptyBackupTarget));
     toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
     const confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
 
@@ -88,6 +103,7 @@ describe('BackupsComponent', () => {
       imports: [BackupsComponent],
       providers: [
         { provide: OperationsService, useValue: operations },
+        { provide: SettingsService, useValue: settings },
         { provide: ConfirmService, useValue: confirm },
         { provide: ToastService, useValue: toast },
       ],

@@ -57,7 +57,7 @@ export class HomeComponent {
     },
     {
       title: 'Backups & restore',
-      description: 'Backup schedule, on-demand runs, and restoring from a snapshot.',
+      description: 'Backup schedule and destination, on-demand runs, and restoring from a snapshot.',
       link: '/backups',
       capability: 'backups:manage',
       wide: true,
@@ -77,7 +77,7 @@ export class HomeComponent {
     },
     {
       title: 'Settings',
-      description: 'The timezone, ntfy alert pushes, the shared mailbox, and the backup destination.',
+      description: 'The timezone, ntfy alert pushes, and the shared mailbox.',
       link: '/settings',
       capability: 'settings:manage',
     },

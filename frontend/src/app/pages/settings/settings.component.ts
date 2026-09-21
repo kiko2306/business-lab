@@ -7,10 +7,6 @@ import {
   MailSettings,
   MailSettingsInput,
   MailTestResponse,
-  BackupTargetInput,
-  BackupTargetKind,
-  BackupTargetSettings,
-  BackupTargetTestResponse,
   GeneralSettings,
   AlertNotifySettings,
   AlertCategory,
@@ -27,7 +23,7 @@ import { NetworkSettingsComponent } from './network-settings.component';
  * Stack-wide settings on its own route (§131.1): networking (the Cloudflare
  * token + first-start provisioning, `<app-network-settings>`, folded back in
  * from the old `/exposure` route — §331 slice 4), the timezone, ntfy alert
- * pushes, the shared mailbox and the backup destination.
+ * pushes and the shared mailbox.
  */
 @Component({
   selector: 'app-settings',
@@ -63,20 +59,6 @@ export class SettingsComponent implements OnInit {
     imapEncryption: ['ssl'],
   });
 
-  // One form for all destination types; which controls matter depends on
-  // `kind`, and the template shows only the relevant ones. Validation is done
-  // server-side because the rules differ per kind and duplicating them here
-  // would be two places to keep in step.
-  protected readonly backupTargetForm = this.formBuilder.nonNullable.group({
-    kind: ['disk' as BackupTargetKind],
-    path: [''],
-    server: [''],
-    share: [''],
-    username: [''],
-    password: [''],
-    options: [''],
-  });
-
   protected readonly generalForm = this.formBuilder.nonNullable.group({
     timezone: ['', [Validators.required]],
     // Base URL for links the dashboard emails (invites, §158). Blank = use the
@@ -98,12 +80,6 @@ export class SettingsComponent implements OnInit {
   protected testingMail = false;
   protected mailFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected mailTestResult: MailTestResponse | null = null;
-  protected backupTarget: BackupTargetSettings | null = null;
-  protected backupTargetLoading = true;
-  protected savingBackupTarget = false;
-  protected testingBackupTarget = false;
-  protected backupTargetFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
-  protected backupTargetTestResult: BackupTargetTestResponse | null = null;
   protected claudeKey: ClaudeKeySettings | null = null;
   protected claudeKeyLoading = true;
   protected savingClaudeKey = false;
@@ -140,7 +116,6 @@ export class SettingsComponent implements OnInit {
     this.loadDeployment();
     this.loadGeneralSettings();
     this.loadMailSettings();
-    this.loadBackupTarget();
     this.loadAlertSettings();
     this.loadClaudeKey();
   }
@@ -415,83 +390,6 @@ export class SettingsComponent implements OnInit {
     if (standard.includes(control.value)) {
       control.setValue(suggested);
     }
-  }
-
-  loadBackupTarget(): void {
-    this.backupTargetLoading = true;
-    this.settingsService
-      .getBackupTarget()
-      .pipe(finalize(() => (this.backupTargetLoading = false)))
-      .subscribe({
-        next: (settings) => {
-          this.backupTarget = settings;
-          this.backupTargetForm.patchValue({
-            kind: settings.kind,
-            path: settings.path ?? '',
-            server: settings.server ?? '',
-            share: settings.share ?? '',
-            username: settings.username ?? '',
-            options: settings.options ?? '',
-          });
-        },
-        error: () =>
-          (this.backupTargetFeedback = { type: 'danger', message: 'Unable to load the backup destination.' }),
-      });
-  }
-
-  saveBackupTarget(): void {
-    const value = this.backupTargetForm.getRawValue();
-    const payload: BackupTargetInput = { kind: value.kind };
-
-    if (value.kind === 'disk') {
-      payload.path = value.path.trim();
-    } else {
-      payload.server = value.server.trim();
-      payload.share = value.share.trim();
-      payload.username = value.username.trim();
-      payload.options = value.options.trim();
-      if (value.password) payload.password = value.password;
-    }
-
-    this.savingBackupTarget = true;
-    this.backupTargetTestResult = null;
-    this.settingsService
-      .saveBackupTarget(payload)
-      .pipe(finalize(() => (this.savingBackupTarget = false)))
-      .subscribe({
-        next: (response) => {
-          this.backupTargetFeedback = { type: 'success', message: response.message };
-          this.backupTargetForm.controls.password.reset('');
-          this.loadBackupTarget();
-        },
-        error: (error) =>
-          (this.backupTargetFeedback = {
-            type: 'danger',
-            message: extractErrorMessage(error, 'Unable to save the backup destination.'),
-          }),
-      });
-  }
-
-  testBackupTarget(): void {
-    this.testingBackupTarget = true;
-    this.backupTargetTestResult = null;
-    this.settingsService
-      .testBackupTarget()
-      .pipe(finalize(() => (this.testingBackupTarget = false)))
-      .subscribe({
-        next: (result) => {
-          this.backupTargetTestResult = result;
-          this.backupTargetFeedback = {
-            type: result.success ? 'success' : 'danger',
-            message: result.message,
-          };
-        },
-        error: (error) =>
-          (this.backupTargetFeedback = {
-            type: 'danger',
-            message: extractErrorMessage(error, 'Could not test the destination.'),
-          }),
-      });
   }
 
   loadMailSettings(): void {
