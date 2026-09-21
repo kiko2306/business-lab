@@ -27984,6 +27984,29 @@ generically about `requires` entries (check before landing it). Small,
 mechanical — no dead ends, no investigation needed beyond what's recorded
 here.
 
+## 559. Note: ntfy-per-app and Vikunja-Android items already tracked
+
+User asked (as part of a batch): "ntfy alerts for each topic (check what is
+using ntfy and create a topic for each app)" and "vikunja does not work on
+android app." Checked before writing new sections — both are already fully
+covered by existing, not-yet-built plan sections, so nothing new to add:
+
+- **ntfy per-app/category topics**: `publishAlert()`
+  (`backend/src/utils/alertNotify.ts:115`) has exactly three call sites today
+  (`netbirdRoutingPeer.ts:516`, `criticalServiceHealth.ts:228` and `:261`) —
+  there is no finer-grained "per app" alert source in the codebase than the
+  categories §553 already designed: `crowdsec` | `critical-service` |
+  `netbird` | `backup` (the last pending §552). Since every current and
+  planned `publishAlert()` caller maps onto exactly one of those four, "one
+  topic per category" and "one topic per thing that can alert" are the same
+  granularity here — §553's per-category settings UI (collapsed "Per-category
+  channels" section, one optional override each, falling back to the default
+  topic) already is this request. Nothing further to plan; still blocked on
+  the same not-yet-built work.
+- **Vikunja Android app can't connect**: this is §554 verbatim (the
+  `autheliaBypassPaths: ['^/api($|/)']` fix for Vikunja's API surface,
+  already a README TODO item). Not a duplicate to create.
+
 ## 562. Built: drop the redundant "Menu" nav-bar link (§557)
 
 Deleted the `<a routerLink="/home">Menu</a>` from
