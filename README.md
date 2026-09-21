@@ -273,6 +273,18 @@ it is done — not ticked off and left behind. Section references point at
       `requires: ['onlyoffice']` to Nextcloud's entry in
       `backend/src/config/services.ts`, following the pattern at line 91.
       Trivial, mechanical.
+- [ ] **ITFlow: auto-hide the billing/accounting module** — planned in
+      plan.md §560. ITFlow has no env-var config path for this (same as its
+      mail settings) — it's a DB row, `settings.config_module_enable_accounting`,
+      toggled with a plain SQL `UPDATE`. Reuse `itflowDb.ts`'s
+      `runItflowDbScript` (the same mechanism `itflowMailCron.ts` already uses
+      for mail) to flip it off after the setup wizard's `add_company_settings`
+      step, gated behind a new config-panel checkbox (a genuine per-deployment
+      choice, not something to derive automatically). Can only ever **hide**
+      billing, not remove it — no upstream way to strip the module from the
+      image. Verify live that the pinned ITFlow image version actually hides
+      the dashboard widget and client-portal views too, not just the nav
+      link (older versions reportedly left those visible).
 ### Backups
 
 - [ ] **ntfy alert on backup failure** — planned in plan.md §552, not built.

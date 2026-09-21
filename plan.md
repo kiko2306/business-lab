@@ -28007,6 +28007,54 @@ covered by existing, not-yet-built plan sections, so nothing new to add:
   `autheliaBypassPaths: ['^/api($|/)']` fix for Vikunja's API surface,
   already a README TODO item). Not a duplicate to create.
 
+## 560. Plan: ITFlow billing module auto-hide on first start
+
+User asked whether ITFlow's billing module can be auto-removed on first
+start. ITFlow (`apps/itflow/`) has no env-var support for this kind of
+setting at all (same situation as its mail/SMTP config, per the existing
+comment in `services.ts` ~line 148) — everything is a row in its own MySQL
+`settings` table, one per `company_id`. Confirmed directly against upstream
+(`itflow-org/itflow` on GitHub): `db.sql`'s `settings` table has
+`config_module_enable_accounting tinyint(1) DEFAULT 1`, toggled by
+`admin/post/settings_module.php` with nothing more than
+`UPDATE settings SET config_module_enable_accounting = $v WHERE company_id =
+1` — a plain SQL update, no upstream API, no config file.
+
+This repo already has the exact mechanism needed and a proven precedent:
+`itflowDb.ts`'s `runItflowDbScript` runs a one-off PHP/SQL script against
+ITFlow's own DB via `docker compose run --rm --no-deps --entrypoint /bin/sh
+itflow` (deliberately not `docker exec` — the backend only reaches Docker
+through a socket-proxy that blocks exec). `itflowMailCron.ts` already writes
+directly into this same `settings` table on every start, using that
+mechanism, to work around ITFlow having no env-var config path for mail
+either. This is the same shape of fix, not a new mechanism.
+
+**Caveat found in ITFlow's own community**: disabling the module was
+historically UI-only (hid the nav link but left the dashboard's
+invoicing/accounting widget, reports, and the client portal's invoice/quote
+views visible) — the maintainer says this was fixed in commit `dcd5103`, but
+that needs spot-checking live against the pinned `itfloworg/itflow` image
+tag this repo actually runs, not trusted from the changelog. Also: this can
+only ever **hide** billing (the code/tables/routes stay in the container,
+just gated by the settings flag) — there is no upstream way to actually
+remove it, so "auto-remove" really means "auto-hide."
+
+**Design**: extend `itflowMailCron.ts` (or a new sibling step run right after
+it — same ordering constraint: strictly after the setup wizard's
+`add_company_settings` step creates the `company_id = 1` row, per §350's
+landmine history) to run `UPDATE settings SET
+config_module_enable_accounting = 0 WHERE company_id = 1` via
+`runItflowDbScript`, gated behind a new config-panel checkbox on ITFlow's
+card (not unconditional — hiding billing is a genuine per-deployment choice,
+not something the system can derive, so it belongs in the UI per principle 3,
+not hardcoded off for everyone).
+
+**Not yet done**: confirm live, after building, that hiding the module in
+this repo's actual ITFlow image version hides the dashboard widget and
+client-portal views too (not just the nav link) — the whole point of this
+item was avoiding the "billing UI is still half-visible" failure mode the
+ITFlow forum reported against older versions.
+
 ## 562. Built: drop the redundant "Menu" nav-bar link (§557)
 
 Deleted the `<a routerLink="/home">Menu</a>` from
