@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.129.0] — 2026-09-21
+
+### Backups
+
+- Sync Kopia's remote retention policy to the schedule's "keep last" count on every app-data backup
+
 ## [0.128.0] — 2026-09-21
 
 ### Backups

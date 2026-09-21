@@ -248,7 +248,10 @@ async function runAppDataBackupLocked(
   }
 
   setBackupPhase('snapshotting');
-  const run = await snapshotKopiaAppDataNow(password);
+  // Same retention the schedule shows for the local archive, so "keep last N"
+  // means one thing rather than a different number on each copy.
+  const { retentionCount } = await getBackupScheduleConfig();
+  const run = await snapshotKopiaAppDataNow(password, retentionCount);
   logger.info('App-data backup', { started: run.started, detail: run.detail, dumped: report.ok, trigger });
   await writeAuditLog({
     userId: null,

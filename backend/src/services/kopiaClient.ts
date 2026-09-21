@@ -307,6 +307,25 @@ export interface KopiaRetention {
 }
 
 /**
+ * A flat "keep last N" ladder, matching the semantics of the dashboard's own
+ * local archive retention (`pruneOldBackups`) — only the count differs, not
+ * the shape of what "retention" means. The other tiers are zeroed rather than
+ * left at Kopia's generous defaults, or the two retention settings would say
+ * different things ("keep 5" locally, "keep up to 64" remotely) for what the
+ * user experiences as one number.
+ */
+export function retentionFromCount(retentionCount: number): KopiaRetention {
+  return {
+    keepLatest: retentionCount,
+    keepHourly: 0,
+    keepDaily: 0,
+    keepWeekly: 0,
+    keepMonthly: 0,
+    keepAnnual: 0,
+  };
+}
+
+/**
  * Set the repository-wide (global) retention policy. Idempotent. Defaults to
  * the same ladder `apps/kopia/entrypoint.sh` applies on first start, so calling
  * it with no argument re-asserts the intended policy rather than changing it.
@@ -425,16 +444,24 @@ export async function runSnapshotNow(password: string): Promise<{ started: boole
 
 /**
  * The single call the backup scheduler makes: register the managed source if
- * it is not already (idempotent), then snapshot it. Mirrors
- * one call, never throws.
+ * it is not already (idempotent), sync retention to the dashboard's schedule,
+ * then snapshot it. Mirrors one call, never throws.
  *
  * Provisioning here rather than in a separate settings route is deliberate:
  * it is cheap and idempotent, so the first scheduled run sets Kopia up with
- * no extra operator step.
+ * no extra operator step. Re-asserting retention on every run the same way
+ * means a changed "keep last" takes effect on the remote copy without a
+ * second UI action — there is no separate Kopia settings screen to visit.
  */
-export async function snapshotAppData(password: string): Promise<{ started: boolean; detail: string }> {
+export async function snapshotAppData(
+  password: string,
+  retentionCount?: number
+): Promise<{ started: boolean; detail: string }> {
   try {
     await provisionBackupSource(password);
+    if (retentionCount !== undefined) {
+      await setRetentionPolicy(password, retentionFromCount(retentionCount));
+    }
   } catch (error) {
     return { started: false, detail: `could not provision the Kopia backup source: ${(error as Error).message}` };
   }

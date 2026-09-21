@@ -19,7 +19,9 @@ import {
   pingRcloneBridge,
   provisionBackupSource,
   restoreSnapshot,
+  retentionFromCount,
   runSnapshotNow,
+  snapshotAppData,
 } from './kopiaClient';
 
 const readAppEnvValueMock = vi.mocked(readAppEnvValue);
@@ -268,6 +270,70 @@ describe('runSnapshotNow', () => {
     fetchMock.mockRejectedValueOnce(new Error('connect ECONNREFUSED'));
     const result = await runSnapshotNow('pw');
     expect(result).toEqual({ started: false, detail: 'connect ECONNREFUSED' });
+  });
+});
+
+describe('retentionFromCount', () => {
+  it('maps a plain count to keepLatest with every other tier zeroed', () => {
+    expect(retentionFromCount(5)).toEqual({
+      keepLatest: 5,
+      keepHourly: 0,
+      keepDaily: 0,
+      keepWeekly: 0,
+      keepMonthly: 0,
+      keepAnnual: 0,
+    });
+  });
+});
+
+describe('snapshotAppData', () => {
+  it('syncs retention to the given count before snapshotting', async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse()) // provisionBackupSource: openSession
+      .mockResolvedValueOnce(jsonResponse({ connected: true })) // repo/status
+      .mockResolvedValueOnce(jsonResponse(SOURCES_ONE)) // sources (pre-check)
+      .mockResolvedValueOnce(jsonResponse({ snapshotted: false })) // POST /sources
+      .mockResolvedValueOnce(jsonResponse(SOURCES_ONE)) // localSourceId
+      .mockResolvedValueOnce(sessionResponse()) // setRetentionPolicy: openSession
+      .mockResolvedValueOnce(jsonResponse({})) // PUT /policy
+      .mockResolvedValueOnce(sessionResponse()) // runSnapshotNow: openSession
+      .mockResolvedValueOnce(jsonResponse(SOURCES_ONE)) // sources
+      .mockResolvedValueOnce(jsonResponse({ sources: { 'root@kopia:/source/apps': { success: true } } })); // upload
+
+    const result = await snapshotAppData('pw', 5);
+    expect(result.started).toBe(true);
+
+    const policyCallIndex = fetchMock.mock.calls.findIndex((call) => String(call[0]).includes('/api/v1/policy'));
+    expect(policyCallIndex).toBeGreaterThan(-1);
+    const [, policyInit] = fetchMock.mock.calls[policyCallIndex];
+    expect(policyInit.method).toBe('PUT');
+    expect(JSON.parse(policyInit.body)).toEqual({ retention: retentionFromCount(5) });
+  });
+
+  it('skips syncing retention when no count is given', async () => {
+    fetchMock
+      .mockResolvedValueOnce(sessionResponse())
+      .mockResolvedValueOnce(jsonResponse({ connected: true }))
+      .mockResolvedValueOnce(jsonResponse(SOURCES_ONE))
+      .mockResolvedValueOnce(jsonResponse({ snapshotted: false }))
+      .mockResolvedValueOnce(jsonResponse(SOURCES_ONE))
+      .mockResolvedValueOnce(sessionResponse()) // runSnapshotNow: openSession
+      .mockResolvedValueOnce(jsonResponse(SOURCES_ONE))
+      .mockResolvedValueOnce(jsonResponse({ sources: { 'root@kopia:/source/apps': { success: true } } }));
+
+    await snapshotAppData('pw');
+
+    expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/v1/policy'))).toBe(false);
+  });
+
+  it('reports failure without throwing when provisioning fails', async () => {
+    fetchMock.mockResolvedValueOnce(sessionResponse()).mockResolvedValueOnce(jsonResponse({ connected: false }));
+
+    const result = await snapshotAppData('pw', 5);
+    expect(result).toEqual({
+      started: false,
+      detail: expect.stringContaining('could not provision the Kopia backup source'),
+    });
   });
 });
 

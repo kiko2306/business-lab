@@ -28865,3 +28865,51 @@ changes restored afterward, leaving the running containers matching exactly
 what this section commits — the retention-sync work stays out of the live
 stack until it separately gets verified. `./scripts/check.sh backend
 typecheck`/`test` (1155) and `frontend build`/`test` (74/74) all pass.
+
+## 578. Built: sync Kopia's remote retention to the schedule's "keep last"
+
+The local `.tar.gz` archive and Kopia's remote app-data snapshots each had
+their own retention: the local one obeys `schedule.retentionCount`
+(user-set, default 14); the remote one was a hardcoded ladder set once by
+`apps/kopia/entrypoint.sh` at first container start (`--keep-latest 10
+--keep-hourly 24 --keep-daily 14 --keep-weekly 8 --keep-monthly 6
+--keep-annual 2`) and never touched again — `setRetentionPolicy` existed in
+`kopiaClient.ts` but nothing called it (confirmed by grep: dead code).
+Wired it up: `retentionFromCount(n)` maps the schedule's flat "keep last N"
+onto Kopia's policy shape as `{ keepLatest: n, keepHourly: 0, keepDaily: 0,
+keepWeekly: 0, keepMonthly: 0, keepAnnual: 0 }` — a flat count, not a bigger
+ladder, so the two "keep last" numbers the user sees mean the same thing.
+`snapshotAppData(password, retentionCount?)` now calls `setRetentionPolicy`
+right after provisioning the source, before every snapshot — scheduled and
+manual runs both go through it, so a changed "keep last" takes effect on the
+remote copy with no separate settings screen. `backupScheduler.ts`'s
+`runAppDataBackupLocked` reads `getBackupScheduleConfig()` for the count
+right before calling it.
+
+**Note on how this landed**: built together with §577 (remote backups list)
+in the same working tree, but this piece needed the user's go-ahead before
+touching the live box's actual retention policy — pruning older remote
+snapshots outside the new count is a real, if low-stakes, effect on
+`tx-home-utils.com`. While that was pending, §577 was verified by
+`git stash`ing this section's three files out before rebuilding, so only the
+already-approved work reached the running containers. `./scripts/check.sh
+backend test` (1155, including 3 new cases for the hour/retry interaction)
+and `typecheck` pass.
+
+Also corrected `CLAUDE.md`'s branch policy in this session: it previously
+read as requiring live-stack proof before even a `dev` commit, which is not
+the intended flow — `dev` has no verification gate, `beta` is where
+Docker/exposure/networking/backup changes get proven against the real
+stack, and only a `beta` that passed goes to `main` (still with the user's
+go-ahead each time). Fixed `.claude/hooks/require-version-bump.sh` alongside
+it: the guard unioned staged changes with *every* unstaged tracked change in
+the working tree unconditionally, so an unrelated dirty file sitting there
+for its own later commit falsely tripped the backend/frontend check on a
+plain `git commit -m`. Now only unions the unstaged diff for an actual
+`git commit -a`/`-am`/`--all`.
+
+Committed to `dev` under the corrected policy. **Still to prove on `beta`**:
+merge, then confirm live that `setRetentionPolicy` actually changes Kopia's
+policy to keep-last-N (trigger a manual "Back up now", check via Kopia's API
+that the global policy reflects the schedule's count) before this goes to
+`main`.
