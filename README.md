@@ -236,5 +236,15 @@ it is done — not ticked off and left behind. Section references point at
       `backupScheduler.ts`'s three existing failure-audit-log sites: the
       control-plane archive's catch, Kopia-has-no-password, and
       `run.started === false` (the rclone-bridge-timeout case investigated
-      this session). No new topic/settings; extend
-      `backupScheduler.test.ts` with one case per branch.
+      this session). Extend `backupScheduler.test.ts` with one case per
+      branch. Pass `category: 'backup'` once §553 lands; a plain call with
+      no category if it lands first.
+- [ ] **A separate ntfy channel per alert category** — planned in plan.md
+      §553, not built. Extend the `AlertSource` union
+      (`backend/src/services/alertTest.ts`) to `crowdsec` | `critical-service`
+      | `netbird` | `backup`; one optional override settings key per
+      category (`ntfy_topic_<category>`), falling back to the existing
+      `ntfy_alerts_topic` default. `publishAlert()` takes a required
+      `category` arg. Only `crowdsec` (n8n) and `critical-service`
+      (uptime-kuma) need an app restart to apply — the rest read live.
+      Frontend gets a collapsed-by-default "Per-category channels" section.

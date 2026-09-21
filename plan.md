@@ -27702,3 +27702,66 @@ mocked the way `criticalServiceHealth.test.ts` does it, one case per failure
 branch asserting `publishAlert` was called with the right title/message.
 
 Tracked as a README TODO item until built.
+
+## 553. Plan: a separate ntfy channel per alert category
+
+Asked for different ntfy channels per app/alert type — intrusion alerts on
+one channel, backups on another — rather than everything sharing the single
+topic `alertNotify.ts` provisions today. Not implemented yet, planning only;
+folds in §552's still-unbuilt backup alert as one of the categories.
+
+**Current state**: one settings key, `ntfy_alerts_topic`
+(`ALERT_NOTIFY_KEYS.topic`), read by three different call paths:
+1. `n8nWorkflows.ts` — bakes the topic into the CrowdSec relay workflow it
+   generates (webhook → ntfy node) at n8n's next start.
+2. `uptimeKumaCriticalMonitors.ts` — bakes the topic into Kuma's own `ntfy`
+   notification integration at Kuma's next start (used by the critical
+   monitors: Funnel, ntfy itself).
+3. `publishAlert()` (`alertNotify.ts`) — direct backend pushes, reads the
+   topic live on every call (`criticalServiceHealth.ts`'s two auto-restart
+   alerts, `netbirdRoutingPeer.ts`, and §552's planned backup alert).
+
+**Design**: extend the existing `AlertSource` union
+(`backend/src/services/alertTest.ts`, currently just `'crowdsec'`) into the
+shared category list every one of the five call sites above maps to:
+`crowdsec` | `critical-service` | `netbird` | `backup`. Reuse the flat
+key-value `settings` table pattern already in place rather than a JSON blob
+or a new table — one optional override key per category,
+`ntfy_topic_<category>`, validated with the same `TOPIC_PATTERN`. The
+existing `ntfy_alerts_topic` setting stays as-is and becomes the **default**:
+a category with no override still resolves to it, so an existing single-topic
+setup keeps working with no migration step.
+
+`getAlertNotifyConfig()` grows a `topics: Record<AlertCategory, string>` —
+each entry already resolved (override ?? default) — so no caller does its
+own fallback logic. `publishAlert()` takes a new required `category`
+argument and looks up `topics[category]`; each of its three existing callers
+gets a one-line change to pass theirs, and the (still unbuilt) §552 backup
+call passes `'backup'`.
+
+**Restart-on-change stays narrow.** Only the two *baked-in* categories need
+`appsToApplyAlertSettings` to restart anything — `crowdsec` → n8n,
+`critical-service` → uptime-kuma — the same as today. `backup` and `netbird`
+read live on every `publishAlert()` call, so changing those topics needs no
+restart at all; that's a simplification over the current single-topic
+behaviour, not a new special case.
+
+**Frontend** (`settings.component.ts`): keep the current single "Default
+topic" field as the prominent control (matches most installs — one topic is
+enough), and add a collapsed-by-default "Per-category channels" section
+underneath with one optional text input per category, blank = inherits the
+default. Matches the existing card convention (title + subtitle +
+collapsible body). `PUT /api/settings/alerts` extends to accept a `topics`
+map alongside the existing `topic`/`crowdsecEnabled`/`enforceNpm` fields;
+`POST /api/settings/alerts/test` extends `source` to accept any category
+(today it only accepts `'crowdsec'`) so each channel can be verified on its
+own before relying on it.
+
+**Test**: extend `alertNotify.test.ts` for the override/fallback resolution,
+and the existing `publishAlert` call-site tests
+(`criticalServiceHealth.test.ts`, `netbirdRoutingPeer.test.ts`, the planned
+`backupScheduler.test.ts`) to assert the right category is passed.
+
+Tracked as a README TODO item until built; supersedes the plain `topic` field
+§552 assumed `publishAlert()` would use — that call passes `category:
+'backup'` once this lands.
