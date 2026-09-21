@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.122.1] — 2026-09-21
+
+### Exposure
+
+- Bypass Authelia's outer gate on Vikunja's /api path so its mobile/desktop clients can authenticate directly (plan.md §554/§571)
+
 ## [0.122.0] — 2026-09-21
 
 ### Alerts

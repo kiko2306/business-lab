@@ -1216,6 +1216,16 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // redirect for a provider keyed `authelia` is <publicurl>/auth/openid/authelia.
     // Local login stays on until an admin sets VIKUNJA_AUTH_LOCAL_ENABLED=false
     // after a first successful OIDC sign-in (§216/§217).
+    //
+    // Vikunja's mobile/desktop clients call /api/v1/... directly with
+    // Vikunja's own JWT auth and can't follow Authelia's redirect to its
+    // login portal, so they got HTML back instead of JSON and reported "does
+    // not recognize the server" (plan.md §554) — same failure class as
+    // Vaultwarden (§415) and ntfy (§425/§430). Vikunja's own auth still gates
+    // every route under here; this only removes Authelia's redundant outer
+    // gate. `/` (the web UI) deliberately stays out — it keeps requiring an
+    // Authelia session.
+    autheliaBypassPaths: ['^/api($|/)'],
     oidcClient: {
       redirectPaths: ['/auth/openid/authelia'],
       secretEnvKey: 'VIKUNJA_OIDC_CLIENT_SECRET',

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.122.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.122.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -209,18 +209,13 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Vikunja mobile/desktop clients can't connect — needs an Authelia
-      bypass on its API path** — planned in plan.md §554, not built. Browser
-      access works (OIDC login flow); the phone app calls `/api/v1/...`
-      directly with Vikunja's own JWT auth and gets Authelia's HTML login
-      page instead of JSON, same failure class already fixed for Vaultwarden
-      (§415) and ntfy (§425/§430). Add `autheliaBypassPaths: ['^/api($|/)']`
-      to Vikunja's `services.ts` entry (Vikunja's own auth still gates those
-      routes — this only removes Authelia's redundant outer gate), extend
-      `services.test.ts:669`'s allowlist to include `'vikunja'`, then verify
-      against the real host: install/open the Android app against
-      `https://<vikunja-host>/api/v1` and confirm it recognises the server
-      and logs in before merging to `main`.
+- [ ] **Vikunja mobile/desktop clients: confirm a real client against the
+      Authelia bypass** — code built and proven at the HTTP level in plan.md
+      §571 (`autheliaBypassPaths: ['^/api($|/)']`, curl against the live host
+      shows `/api/v1/...` returning Vikunja's own JSON instead of Authelia's
+      HTML login page, `/` still gated). What's left is a real Vikunja
+      Android/desktop client pointed at `https://<vikunja-host>/api/v1` to
+      confirm it recognises the server and logs in, before merging to `main`.
 - [ ] **Vikunja shows its own login page every visit instead of silently
       completing Authelia SSO** — planned in plan.md §555, not built. Vikunja
       only starts its OIDC flow on a button click, even with a live Authelia

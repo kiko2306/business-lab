@@ -665,8 +665,8 @@ describe('memory limits', () => {
 describe('autheliaBypassPaths', () => {
   const withBypass = Object.values(SERVICES).filter((s) => s.autheliaBypassPaths?.length);
 
-  it('is declared by at least the two services that need it', () => {
-    expect(withBypass.map((s) => s.name).sort()).toEqual(['ntfy', 'vaultwarden']);
+  it('is declared by at least the services that need it', () => {
+    expect(withBypass.map((s) => s.name).sort()).toEqual(['ntfy', 'vaultwarden', 'vikunja']);
   });
 
   it('compiles as a regex — a lost backslash makes Authelia refuse to start', () => {
@@ -697,6 +697,10 @@ describe('autheliaBypassPaths', () => {
     expect(matchesAny(vw, '/identity/connect/token')).toBe(true);
     expect(matchesAny(vw, '/api/sync?excludeDomains=true')).toBe(true);
     expect(matchesAny(vw, '/notifications/hub/negotiate')).toBe(true);
+
+    const vikunja = SERVICES.vikunja.autheliaBypassPaths ?? [];
+    expect(matchesAny(vikunja, '/api/v1/login')).toBe(true);
+    expect(matchesAny(vikunja, '/api/v1/tasks/1?filter=done')).toBe(true);
   });
 
   it('does not admit what must stay behind Authelia', () => {
@@ -712,6 +716,10 @@ describe('autheliaBypassPaths', () => {
     expect(matchesAny(vw, '/admin')).toBe(false);
     expect(matchesAny(vw, '/admin/diagnostics')).toBe(false);
     expect(matchesAny(vw, '/')).toBe(false);
+
+    const vikunja = SERVICES.vikunja.autheliaBypassPaths ?? [];
+    // The web UI keeps requiring an Authelia session.
+    expect(matchesAny(vikunja, '/')).toBe(false);
   });
 });
 

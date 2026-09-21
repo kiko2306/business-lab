@@ -28531,3 +28531,42 @@ bouncer was rejected outright — needs host-level config outside the
 dashboard (principle 2) and hands an automated pipeline kill authority over
 host processes, a materially bigger trust boundary this project's threat
 model doesn't call for.
+
+## 571. Built: Authelia bypass for Vikunja's API (§554)
+
+Implemented §554's plan as designed: `autheliaBypassPaths: ['^/api($|/)']`
+added to Vikunja's `services.ts` entry, mirroring Vaultwarden's `^/api($|/)`
+rule. No new plumbing needed — `autheliaAccessControl.ts` already reads this
+field generically for any service. `services.test.ts:669`'s allowlist grew to
+`['ntfy', 'vaultwarden', 'vikunja']`, plus admit/deny cases for
+`/api/v1/login`, `/api/v1/tasks/1?filter=done`, and `/` staying gated.
+`./scripts/check.sh backend test` (110 files, 1133 tests) and `typecheck`
+both pass.
+
+**Verified against the real stack** (this host doubles as `tx-home-utils.com`
+— confirmed by `docker ps` showing the live containers before touching
+anything): rebuilt and restarted the backend
+(`docker compose build backend && docker compose up -d backend`, not a root
+`down`); boot log showed `Authelia access_control (boot): wrote 22 rule(s);
+restarting Authelia to apply`. Authelia came back `healthy` — a malformed
+regex would have made it refuse to boot (the exact failure class
+`services.test.ts` guards against, §425). Confirmed the rendered
+`configuration.yml` carries a `policy: bypass` rule for
+`vikunja.tx-home-utils.com` on `^/api($|/)` ahead of the existing
+`one_factor` rule.
+
+End-to-end against the public hostname:
+- `GET https://vikunja.tx-home-utils.com/` → `302` (still redirects to
+  Authelia — the web UI stays gated, unchanged).
+- `GET https://vikunja.tx-home-utils.com/api/v1/info` → `200` with Vikunja's
+  real JSON body (previously would have been Authelia's HTML login page).
+- `POST https://vikunja.tx-home-utils.com/api/v1/login` with bad credentials
+  → Vikunja's own `{"code":1011,"message":"Wrong username or password."}`,
+  not an HTML page — proves the mobile client's actual request/response shape
+  now works.
+
+**What's still open**: the README item asked for confirmation from an actual
+Vikunja Android/desktop client, not just curl. The curl evidence above proves
+the root cause (Authelia's HTML redirect breaking JSON-expecting clients) is
+fixed, but nobody has pointed a real client at this host yet. Leaving that
+as a narrower README item rather than deleting it outright.
