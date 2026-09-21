@@ -183,6 +183,15 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // Fixed bundled-DB username/database name — see the NPM entry's comment
     // above for why these are hidden without auto-generation.
     hiddenEnvKeys: ['ITFLOW_DB_USER', 'ITFLOW_DB_NAME'],
+    // Hides ITFlow's billing/accounting nav link + dashboard widget. Same
+    // shape as mail below — ITFlow has no env-var path for this setting
+    // either, so this checkbox doesn't configure ITFlow directly;
+    // itflowBillingModule.ts reads it back via readAppEnvValue and translates
+    // it into a direct SQL update against ITFlow's own `settings` table on
+    // every start (plan.md §560/§573). Does NOT block direct URL access to
+    // invoices/quotes/etc. on the pinned image — verified live; same gap as
+    // toggling this in ITFlow's own UI.
+    booleanEnvKeys: ['ITFLOW_HIDE_BILLING'],
     // NOTE: deliberately no mailEnvKeys. ITFlow has no environment-variable
     // support for SMTP or IMAP at all — its mail configuration lives in its
     // own database, entered through its UI. The dashboard's global mail

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.123.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.124.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -269,18 +269,6 @@ it is done — not ticked off and left behind. Section references point at
       the Cloudflare Zero Trust dashboard, confirm it's unused, and delete it
       there — not something backend code can safely detect-and-remove on its
       own with no `service_exposure` row to key off.
-- [ ] **ITFlow: auto-hide the billing/accounting module** — planned in
-      plan.md §560. ITFlow has no env-var config path for this (same as its
-      mail settings) — it's a DB row, `settings.config_module_enable_accounting`,
-      toggled with a plain SQL `UPDATE`. Reuse `itflowDb.ts`'s
-      `runItflowDbScript` (the same mechanism `itflowMailCron.ts` already uses
-      for mail) to flip it off after the setup wizard's `add_company_settings`
-      step, gated behind a new config-panel checkbox (a genuine per-deployment
-      choice, not something to derive automatically). Can only ever **hide**
-      billing, not remove it — no upstream way to strip the module from the
-      image. Verify live that the pinned ITFlow image version actually hides
-      the dashboard widget and client-portal views too, not just the nav
-      link (older versions reportedly left those visible).
 - [ ] **Point Kopia backups at the built-in WebDAV app** — planned in
       plan.md §561. Kopia has a **native** `webdav` repository backend
       (confirmed against kopia.io docs) — unlike the current `ftp`/`sftp`

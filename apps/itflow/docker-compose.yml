@@ -31,6 +31,16 @@ services:
       # (backend/src/services/itflowAdminBootstrap.ts): ITFlow has no SSO that
       # fits here, so the admin still logs in with this. See plan.md §350.
       ITFLOW_ADMIN_PASSWORD: ${ITFLOW_ADMIN_PASSWORD:-}
+      # NOT read by ITFlow either — same carrier trick as ITFLOW_ADMIN_PASSWORD
+      # above, so the dashboard's config panel shows a checkbox. ITFlow has no
+      # env-var path to its own settings table, so the backend translates this
+      # into `UPDATE settings SET config_module_enable_accounting` through
+      # ITFlow's own database on every start
+      # (backend/src/services/itflowBillingModule.ts, plan.md §560/§573).
+      # Hides the nav link + dashboard widget only — verified live that direct
+      # URL access to invoices/quotes/etc. is NOT blocked on this pinned
+      # image, same as toggling the setting by hand in ITFlow's own UI.
+      ITFLOW_HIDE_BILLING: ${ITFLOW_HIDE_BILLING:-false}
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=ITFlow"

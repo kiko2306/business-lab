@@ -105,6 +105,17 @@ Worth knowing: the container's healthcheck only probes the web server, not
 cron. If cron dies the container still reports healthy while every scheduled
 job stops.
 
+**Hiding the billing/accounting nav link + dashboard widget** is a
+config-panel checkbox (`ITFLOW_HIDE_BILLING`) — same "no environment support"
+situation as mail, so the dashboard flips ITFlow's
+`settings.config_module_enable_accounting` row directly on every start
+(`itflowBillingModule.ts`, §560/§573) — the same row ITFlow's own
+**Settings → Modules** toggle uses. Verified live: it removes the nav link
+and dashboard widget, but **does not** block direct URL access to
+`invoices.php`/`quotes.php`/`expenses.php`/`recurring_invoices.php` on the
+pinned image — same gap as flipping the setting by hand in ITFlow's own UI.
+There is no upstream way to remove the module from the image at all.
+
 ### Nextcloud — mail is automatic
 
 Nextcloud has no `mail_smtp*` environment variables either — like ITFlow,

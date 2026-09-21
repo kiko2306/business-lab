@@ -57,6 +57,7 @@ import { ensureCriticalServiceMonitors } from './uptimeKumaCriticalMonitors';
 import { reconcileHomeAssistantFirstAdmin } from './homeAssistantAdminBootstrap';
 import { reconcileItflowFirstAdmin } from './itflowAdminBootstrap';
 import { reconcileItflowMailCron } from './itflowMailCron';
+import { reconcileItflowBillingModule } from './itflowBillingModule';
 import { applyVikunjaConfig } from './vikunjaConfig';
 import { applyN8nWorkflows } from './n8nWorkflows';
 import { ensureNetbirdRoutingPeer } from './netbirdRoutingPeer';
@@ -418,6 +419,10 @@ async function composeUpWithManagedConfig(
   // app-credentials.md. After reconcileItflowFirstAdmin: the `settings` row
   // this writes to only exists once that wizard has run.
   await reconcileItflowMailCron(serviceName);
+  // ITFlow: hide (or restore) the billing/accounting module from the
+  // ITFLOW_HIDE_BILLING config-panel checkbox (§560) — same `settings` row,
+  // same ordering constraint as the mail/cron reconciler above.
+  await reconcileItflowBillingModule(serviceName);
   // CrowdSec: register the dashboard's LAPI machine so Settings can list and
   // lift bans (§540). Throwaway run against its data volume, so after `up`;
   // no-op otherwise.

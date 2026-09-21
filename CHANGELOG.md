@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.124.0] — 2026-09-21
+
+### Apps
+
+- Add a config-panel checkbox to hide ITFlow's billing nav link and dashboard widget (plan.md $560/$573)
+
 ## [0.123.0] — 2026-09-21
 
 ### Exposure

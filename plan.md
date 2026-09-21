@@ -28628,3 +28628,66 @@ shouldn't acquire. Mechanically this is Vikunja's own already-proven OIDC
 path (§555's investigation logged a real successful round trip) triggered
 one 302 earlier than before, so there's no new failure mode introduced, but
 it's not been watched happen. Narrowed the README item to that one check.
+
+## 573. Built: ITFlow billing module auto-hide (§560) — with a real caveat found live
+
+Implemented §560's design: new `ITFLOW_HIDE_BILLING` config-panel checkbox
+(`booleanEnvKeys` on ITFlow's `services.ts` entry, declared in
+`docker-compose.yml`'s environment block the same "carrier" way
+`ITFLOW_ADMIN_PASSWORD` already is — NOT read by ITFlow itself). New
+`backend/src/services/itflowBillingModule.ts`, `reconcileItflowBillingModule`,
+mirrors `nextcloudSaml.ts`'s toggle-read shape exactly:
+`readAppEnvValue('itflow', 'ITFLOW_HIDE_BILLING')` on every start, translated
+into `UPDATE settings SET config_module_enable_accounting = 0|1 WHERE
+company_id = 1` via the existing `itflowDb.ts`'s `runItflowDbScript` (same
+mechanism `itflowMailCron.ts` already uses for mail/cron). Always asserts the
+desired state in both directions, so unchecking the box restores the module.
+Wired into `executor.ts` right after `reconcileItflowMailCron` — same
+ordering constraint (the `settings` row only exists once the setup wizard's
+`add_company_settings` step has run). New `itflowBillingModule.test.ts`
+(script content for hide/restore, no-op for other services/uninstalled
+ITFlow, case-insensitive toggle parsing, never-throws). `./scripts/check.sh
+backend test` (111 files, 1143 tests) and `typecheck` both pass.
+
+**Verified against the real stack**, and this is where the plan's own
+caveat ("disabling the module was historically UI-only... needs
+spot-checking live against the pinned image, not trusted from the
+changelog") turned out to matter: rebuilt/restarted the backend; saved
+`ITFLOW_HIDE_BILLING=true` through the real `saveServiceEnv` code path (not
+a hand-edited `.env`); invoked `reconcileItflowBillingModule('itflow')`
+directly (same function `executor.ts` calls on start) to push it
+immediately. Confirmed `settings.config_module_enable_accounting = 0`
+directly against `itflow-db`. Logged into ITFlow itself as the Authelia
+admin (curl + cookie jar) and compared before/after:
+
+- Sidebar nav: no Billing/Invoicing section — confirmed hidden.
+- `agent/dashboard.php`: no invoice/billing/payment/revenue widget —
+  confirmed hidden.
+- `agent/invoices.php`, `quotes.php`, `expenses.php`,
+  `recurring_invoices.php` hit **directly by URL**: all still `200`, still
+  rendering the full working UI (New Invoice button, live filters, the
+  actual invoices table) — **not gated at all**. The maintainer's claimed
+  fix (commit `dcd5103`) is not present, or not effective, on the
+  `itfloworg/itflow:latest` tag this repo pins as of this check.
+
+This is the exact "billing UI is still half-visible" failure mode the
+original ITFlow forum report described, reproduced live rather than
+trusted from the changelog. **Scoping decision**: this is ITFlow's own
+`config_module_enable_accounting` setting doing exactly what it does when a
+human flips it by hand in ITFlow's own **Settings → Modules** — the
+dashboard automates flipping that one flag, it does not add access control
+ITFlow itself doesn't have. Building a URL-level block would mean patching
+ITFlow's own PHP inside the image, which breaks on every upstream image
+update and is out of scope for what was asked (auto-*hide*, which the
+`.env.example`/docs comments now describe accurately: nav link + dashboard
+widget only, direct URL access unaffected). Restored the toggle to `false`
+(the tested value was left over from verification, not a real request to
+hide this box's own billing) and confirmed the row went back to `1`.
+
+Docs (`app-credentials.md`) and the compose/`.env.example`/`services.ts`
+comments were corrected to state this accurately rather than the plan's
+original (unverified) "hides nav link, dashboard widget, and client-portal
+invoice/quote views" claim — the client-portal side was not separately
+checked (no client-role account exists on this box to test with), but given
+the agent-side direct-URL gap, it should be assumed to have the same gap
+until checked.
