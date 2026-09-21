@@ -20,6 +20,7 @@ import {
   ExposureTestResponse,
   GeneralSettings,
   AlertNotifySettings,
+  AlertCategory,
   CrowdsecBan,
   DeploymentStatus,
 } from './models';
@@ -175,7 +176,12 @@ export class SettingsService {
   }
 
   saveAlertSettings(
-    input: { topic?: string; crowdsecEnabled?: boolean; enforceNpm?: boolean }
+    input: {
+      topic?: string;
+      crowdsecEnabled?: boolean;
+      enforceNpm?: boolean;
+      topics?: Partial<Record<AlertCategory, string>>;
+    }
   ): Observable<AlertNotifySettings & { message: string; applied?: boolean }> {
     return this.http.put<AlertNotifySettings & { message: string; applied?: boolean }>(
       `${API_BASE_URL}/settings/alerts`,

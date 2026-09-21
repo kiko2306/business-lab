@@ -125,6 +125,7 @@ export async function runScheduledBackupCheck(): Promise<void> {
       metadata: { trigger: 'scheduled' },
     });
     await publishAlert({
+      category: 'backup',
       title: 'Backup: control-plane archive failed',
       message: (error as Error).message,
       tags: ['floppy_disk'],
@@ -215,6 +216,7 @@ async function runAppDataBackupLocked(
       metadata: { trigger, dumped: report.ok, failed: report.failed, failures, detail },
     });
     await publishAlert({
+      category: 'backup',
       title: 'Backup: app-data snapshot failed',
       message: `App data was not backed up: ${detail}.`,
       tags: ['floppy_disk'],
@@ -236,6 +238,7 @@ async function runAppDataBackupLocked(
   });
   if (!run.started) {
     await publishAlert({
+      category: 'backup',
       title: 'Backup: app-data snapshot failed',
       message: `App data was not backed up: ${run.detail}.`,
       tags: ['floppy_disk'],

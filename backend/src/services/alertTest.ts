@@ -14,10 +14,11 @@
 import { requestJson } from '../utils/httpJson';
 import { getPublishedUpstreamPort } from '../config/services';
 import { ALERT_TEST_SCENARIO, CROWDSEC_ALERT_WEBHOOK_PATH } from './n8nWorkflows';
+import { publishAlert, AlertSource } from '../utils/alertNotify';
+
+export type { AlertSource };
 
 const N8N_DEFAULT_PORT = 10240;
-
-export type AlertSource = 'crowdsec';
 
 export interface AlertTestResult {
   ok: boolean;
@@ -68,10 +69,34 @@ async function testCrowdsec(): Promise<AlertTestResult> {
   }
 }
 
+/**
+ * 'critical-service', 'netbird' and 'backup' have no simulated-event source
+ * comparable to CrowdSec's n8n relay (§118.3) — they publish straight from
+ * backend code, so a direct publishAlert() call is itself the real path, not
+ * a simulation of it. Confirms the category's resolved topic + the ntfy
+ * subscription, same as the CrowdSec test's purpose.
+ */
+async function testDirectPublish(category: AlertSource): Promise<AlertTestResult> {
+  const ok = await publishAlert({
+    category,
+    title: 'Test alert from the dashboard',
+    message: `Sample "${category}" alert — confirms its ntfy topic and your subscription work.`,
+    tags: ['test_tube'],
+    priority: 3,
+  });
+  return ok
+    ? { ok: true, message: 'Sent — check the ntfy topic on your phone.' }
+    : { ok: false, message: 'Could not publish — is ntfy installed and running?' };
+}
+
 export async function runAlertTest(source: AlertSource): Promise<AlertTestResult> {
   switch (source) {
     case 'crowdsec':
       return testCrowdsec();
+    case 'critical-service':
+    case 'netbird':
+    case 'backup':
+      return testDirectPublish(source);
     default:
       return { ok: false, message: `Unknown alert source "${source}".` };
   }

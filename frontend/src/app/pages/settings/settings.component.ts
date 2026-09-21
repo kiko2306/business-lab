@@ -13,6 +13,7 @@ import {
   BackupTargetTestResponse,
   GeneralSettings,
   AlertNotifySettings,
+  AlertCategory,
   ClaudeKeySettings,
   DeploymentStatus,
 } from '../../core/models';
@@ -120,6 +121,21 @@ export class SettingsComponent implements OnInit {
   protected readonly alertTopicPattern = /^[A-Za-z0-9_-]{1,64}$/;
   protected testingAlertSource: string | null = null;
 
+  // Per-category ntfy channels (§553): one optional topic override per
+  // source, collapsed by default since a single shared topic is enough for
+  // most installs. Empty in the draft means "no override — falls back to
+  // the default topic above", indistinguishable from an override that
+  // happens to equal the default (harmless: the two behave identically).
+  protected readonly alertCategories: { key: AlertCategory; label: string }[] = [
+    { key: 'crowdsec', label: 'CrowdSec intrusion alerts' },
+    { key: 'critical-service', label: 'Critical-service auto-restart' },
+    { key: 'netbird', label: 'NetBird token expiry' },
+    { key: 'backup', label: 'Backup failures' },
+  ];
+  protected perCategoryOpen = false;
+  protected categoryTopicDrafts: Record<AlertCategory, string> = this.emptyCategoryTopics();
+  private categoryTopicSaved: Record<AlertCategory, string> = this.emptyCategoryTopics();
+
   ngOnInit(): void {
     this.loadDeployment();
     this.loadGeneralSettings();
@@ -211,6 +227,8 @@ export class SettingsComponent implements OnInit {
         next: (settings) => {
           this.alertSettings = settings;
           this.alertTopicDraft = settings.topic;
+          this.categoryTopicSaved = this.normalizeCategoryTopics(settings);
+          this.categoryTopicDrafts = { ...this.categoryTopicSaved };
         },
         error: (error) => {
           this.alertsFeedback = {
@@ -219,6 +237,47 @@ export class SettingsComponent implements OnInit {
           };
         },
       });
+  }
+
+  private emptyCategoryTopics(): Record<AlertCategory, string> {
+    return { crowdsec: '', 'critical-service': '', netbird: '', backup: '' };
+  }
+
+  /** A category's resolved topic that equals the default reads as "no override" (blank). */
+  private normalizeCategoryTopics(settings: AlertNotifySettings): Record<AlertCategory, string> {
+    return Object.fromEntries(
+      this.alertCategories.map(({ key }) => [key, settings.topics[key] === settings.topic ? '' : settings.topics[key]])
+    ) as Record<AlertCategory, string>;
+  }
+
+  protected categoryTopicValid(key: AlertCategory): boolean {
+    const value = this.categoryTopicDrafts[key].trim();
+    return value === '' || this.alertTopicPattern.test(value);
+  }
+
+  protected get categoryTopicsDirty(): boolean {
+    return this.alertCategories.some(({ key }) => this.categoryTopicDrafts[key].trim() !== this.categoryTopicSaved[key]);
+  }
+
+  protected get categoryTopicsAllValid(): boolean {
+    return this.alertCategories.every(({ key }) => this.categoryTopicValid(key));
+  }
+
+  saveCategoryTopics(): void {
+    if (!this.categoryTopicsAllValid) {
+      return;
+    }
+    const topics: Partial<Record<AlertCategory, string>> = {};
+    for (const { key } of this.alertCategories) {
+      const draft = this.categoryTopicDrafts[key].trim();
+      if (draft !== this.categoryTopicSaved[key]) {
+        topics[key] = draft;
+      }
+    }
+    if (!Object.keys(topics).length) {
+      return;
+    }
+    this.saveAlertSettings({ topics });
   }
 
   protected get alertTopicDirty(): boolean {
@@ -263,7 +322,12 @@ export class SettingsComponent implements OnInit {
       });
   }
 
-  private saveAlertSettings(input: { topic?: string; crowdsecEnabled?: boolean; enforceNpm?: boolean }): void {
+  private saveAlertSettings(input: {
+    topic?: string;
+    crowdsecEnabled?: boolean;
+    enforceNpm?: boolean;
+    topics?: Partial<Record<AlertCategory, string>>;
+  }): void {
     this.savingAlerts = true;
     this.alertsFeedback = null;
     this.settingsService
@@ -273,10 +337,13 @@ export class SettingsComponent implements OnInit {
         next: (response) => {
           this.alertSettings = {
             topic: response.topic,
+            topics: response.topics,
             crowdsecEnabled: response.crowdsecEnabled,
             enforceNpm: response.enforceNpm,
           };
           this.alertTopicDraft = response.topic;
+          this.categoryTopicSaved = this.normalizeCategoryTopics(response);
+          this.categoryTopicDrafts = { ...this.categoryTopicSaved };
           // Saved either way; `applied: false` means a restart that makes it
           // take effect failed, which is worth more than a green tick (§532).
           this.alertsFeedback = { type: response.applied === false ? 'warning' : 'success', message: response.message };

@@ -419,14 +419,14 @@ export async function ensureCriticalServiceMonitors(serviceName: string): Promis
   const serverUrl = await ntfyServerUrl();
   if (!serverUrl) return; // ntfy not installed on this deployment
 
-  const { topic } = await getAlertNotifyConfig();
+  const { topics } = await getAlertNotifyConfig();
   const notification = {
     name: NOTIFICATION_NAME,
     type: 'ntfy',
     isDefault: true,
     applyExisting: false, // only the monitors this file owns should use it
     ntfyserverurl: serverUrl,
-    ntfytopic: topic,
+    ntfytopic: topics['critical-service'],
     ntfyPriority: 4,
   };
 

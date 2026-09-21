@@ -226,6 +226,7 @@ async function handleProject(project: string, results: ProbeResult[]): Promise<v
       const names = atThreshold.map((r) => r.probe.name).join(', ');
       logger.error(`Critical service auto-restart: restarting ${project} did not restore ${names} — not restarting again until it recovers`);
       await publishAlert({
+        category: 'critical-service',
         title: `${project}: auto-restart didn't help`,
         message: `${names} still failing after restarting ${project}. Auto-restart is paused for it until it recovers — needs a look.`,
         tags: ['rotating_light'],
@@ -259,6 +260,7 @@ async function handleProject(project: string, results: ProbeResult[]): Promise<v
       errors: confirmed.map((r) => r.error),
     });
     await publishAlert({
+      category: 'critical-service',
       title: `${names}: auto-restarted ${project}`,
       message: `Restarted ${project} after ${RESTART_AFTER} consecutive failed external checks against ${names}.`,
       tags: ['arrows_counterclockwise'],

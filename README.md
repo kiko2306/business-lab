@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.121.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.122.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -294,14 +294,3 @@ it is done — not ticked off and left behind. Section references point at
       snapshot / restore round trip against `tx-home-utils.com` before
       merging to `main`.
 
-### Backups
-
-- [ ] **A separate ntfy channel per alert category** — planned in plan.md
-      §553, not built. Extend the `AlertSource` union
-      (`backend/src/services/alertTest.ts`) to `crowdsec` | `critical-service`
-      | `netbird` | `backup`; one optional override settings key per
-      category (`ntfy_topic_<category>`), falling back to the existing
-      `ntfy_alerts_topic` default. `publishAlert()` takes a required
-      `category` arg. Only `crowdsec` (n8n) and `critical-service`
-      (uptime-kuma) need an app restart to apply — the rest read live.
-      Frontend gets a collapsed-by-default "Per-category channels" section.

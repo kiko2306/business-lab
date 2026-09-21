@@ -196,7 +196,7 @@ export async function applyN8nWorkflows(serviceName: string, appDir: string): Pr
     const dir = path.join(appDir, WORKFLOWS_DIR_RELATIVE);
     await fs.mkdir(dir, { recursive: true });
 
-    const { topic, crowdsecEnabled, enforceNpm } = await getAlertNotifyConfig();
+    const { topics, crowdsecEnabled, enforceNpm } = await getAlertNotifyConfig();
     const target = path.join(dir, `${CROWDSEC_ALERT_WORKFLOW_ID}.json`);
 
     // Only ship the relay while CrowdSec alerts are on. Removing the file
@@ -208,7 +208,7 @@ export async function applyN8nWorkflows(serviceName: string, appDir: string): Pr
     }
 
     const workflow = buildCrowdsecAlertWorkflow({
-      topic,
+      topic: topics.crowdsec,
       ntfyUrl: ntfyPublishUrl(),
       enforced: enforceNpm,
     });

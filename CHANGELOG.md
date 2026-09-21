@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.122.0] — 2026-09-21
+
+### Alerts
+
+- Add a per-category ntfy channel override, so CrowdSec, critical-service, NetBird and backup alerts can each use their own topic
+
 ## [0.121.0] — 2026-09-21
 
 ### Backups

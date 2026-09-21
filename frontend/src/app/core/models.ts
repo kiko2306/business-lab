@@ -267,10 +267,15 @@ export interface InvitationInfo {
   email: string;
 }
 
+// Every alert source. Matches backend/src/utils/alertNotify.ts's AlertSource.
+export type AlertCategory = 'crowdsec' | 'critical-service' | 'netbird' | 'backup';
+
 export interface AlertNotifySettings {
-  // The ntfy topic every alert source publishes to. Subscribe to it in an
-  // ntfy client.
+  // The default ntfy topic — a category with no override of its own
+  // publishes here. Subscribe to it in an ntfy client.
   topic: string;
+  // Every category's resolved topic (its own override, or the default).
+  topics: Record<AlertCategory, string>;
   // Per-source flags.
   crowdsecEnabled: boolean;
   // Whether CrowdSec's bans are actually enforced, by the Lua bouncer inside

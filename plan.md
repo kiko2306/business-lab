@@ -28261,3 +28261,92 @@ duplicating their setup — `'records failure when the archive itself throws'`,
 `'records the dump outcome even when the backup engine has no password'`,
 `'records failure when the engine refused to start'`. `./scripts/check.sh
 backend test`: 1124/1124 passing. `backend typecheck`: clean.
+
+## 566. Built: a separate ntfy channel per alert category (§553)
+
+Built the plan from §553. `backend/src/utils/alertNotify.ts` now owns the
+`AlertSource` union (`'crowdsec' | 'critical-service' | 'netbird' | 'backup'`,
+`ALERT_CATEGORIES`) as the source of truth — `alertTest.ts` re-exports the
+type rather than declaring it, since `alertTest.ts` now also imports
+`publishAlert` from `alertNotify.ts` (needed for the new direct-publish test
+path below) and a two-way type-only circular import wasn't worth it.
+
+One optional override settings key per category, `ntfy_topic_<category>`,
+alongside the existing `ntfy_alerts_topic` default. `getAlertNotifyConfig()`
+grows `topics: Record<AlertSource, string>` — each entry already resolved
+(override, or the default) — so no caller does its own fallback logic.
+`setAlertCategoryTopic(category, topic)` treats an empty string as "clear the
+override" (`DELETE FROM settings`), so a category with no row just falls back
+to the default on the next read — no separate unset flag needed.
+`publishAlert()` takes a required `category` arg and looks up
+`topics[category]`; its three existing callers
+(`criticalServiceHealth.ts` ×2, `netbirdRoutingPeer.ts`) plus §552's three
+`backupScheduler.ts` calls each got a one-line `category` addition.
+`n8nWorkflows.ts` and `uptimeKumaCriticalMonitors.ts` (the two *baked-in*
+consumers — they render the topic into a config file/API call rather than
+reading it live) switched from the generic `topic` to `topics.crowdsec` /
+`topics['critical-service']` respectively.
+
+**Restart granularity** (`appsToApplyAlertSettings`): replaced the old single
+`topic: boolean` with `crowdsecTopic`/`criticalServiceTopic` booleans, each
+true when *either* the default topic changed *or* that category's own
+override changed (the default still backs a category with no override, so a
+default-only change still has to re-render both). `netbird`/`backup` read
+`publishAlert()` live on every call — no restart, ever, a simplification over
+the old behaviour where any topic change restarted both n8n and uptime-kuma
+regardless of which category actually needed it.
+
+`PUT /api/settings/alerts` extends the body with an optional `topics` map
+(`{ crowdsec?: string, 'critical-service'?: string, netbird?: string, backup?:
+string }`, empty string clears that category); validates each key is a real
+category and each value is empty-or-`isValidAlertTopic`, then derives the two
+restart booleans from `hasTopic` and which categories were in the map.
+`POST /api/settings/alerts/test` now accepts any category, not just
+`'crowdsec'` — `runAlertTest()` gained `testDirectPublish()`, since
+`critical-service`/`netbird`/`backup` have no simulated-event source
+comparable to CrowdSec's n8n relay (§118.3): a direct `publishAlert()` call
+*is* the real path for them, not a simulation of it.
+
+**Frontend**: `AlertNotifySettings` gained `topics`; a new `AlertCategory`
+type in `models.ts` mirrors the backend union. Settings page's ntfy-alerts
+card gets a collapsed-by-default "Per-category channels" sub-section (plain
+▸/▾ text toggle, not `app-panel`'s SVG-chevron machinery — this is a
+sub-section inside one card, not a page-level panel, so the heavier pattern
+wasn't worth reusing) — one optional topic input + Test button per category,
+a single "Save channels" button that only sends the categories whose draft
+actually changed. A resolved category topic that equals the default renders
+as a blank input ("no override"); this is indistinguishable from a real
+override that happens to equal the default, which is harmless since the two
+behave identically — not worth a separate `hasOverride` flag on the API just
+to disambiguate a cosmetic case.
+
+**Tests**: `alertNotify.test.ts` gained `getAlertNotifyConfig` coverage
+(default-only, one-category-override, nothing-stored) with `./database`'s
+`query` mocked the way `claudeSettings.test.ts` does it, and
+`appsToApplyAlertSettings`'s cases were split into the new two-flag shape.
+`alertTest.test.ts` mocks `publishAlert` and covers all three new
+direct-publish sources plus a delivery-failure case.
+`criticalServiceHealth.test.ts` got `category: 'critical-service'`
+assertions added to its two existing `publishAlert` call-site tests.
+`./scripts/check.sh backend test`: 1133/1133 passing (was 1124).
+`backend typecheck`: clean. `frontend test:ci`: 74/74 passing.
+`frontend build`: clean (pre-existing bundle-size budget warning, unrelated).
+
+**Live verification** (rebuilt + restarted both `backend` and `frontend`
+images with the new code): confirmed `getAlertNotifyConfig()` resolves
+correctly against the real `settings` table (no override → default; a
+`netbird` override → only that category changes); `publishAlert()` delivered
+a real push to ntfy at both the default and an overridden topic; and — the
+part no unit test could reach, since it needs the real n8n workflow file on
+disk — set a live `crowdsec` category override and called
+`applyN8nWorkflows()` directly, confirmed the rendered
+`homelabCrowdsecAlertRelay.json` actually contained the override topic, then
+cleared the override and re-rendered to confirm the file was restored
+byte-for-byte to its original (default-topic) content. All test state was
+cleared afterward — no `service_exposure`/`settings` rows or app config
+files were left changed. Did not restart Uptime Kuma to prove the symmetric
+`topics['critical-service']` swap live — it talks to Kuma over a live
+websocket API rather than rendering a file, harder to cleanly revert than
+the n8n case — but it is the identical one-line code pattern proven correct
+for n8n, plus the resolution logic itself is covered by
+`alertNotify.test.ts`.

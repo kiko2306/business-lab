@@ -215,6 +215,64 @@
       </div>
     </div>
 
+    <div class="col-12">
+      <button
+        type="button"
+        class="btn btn-link p-0 text-decoration-none fw-semibold small"
+        (click)="perCategoryOpen = !perCategoryOpen"
+      >
+        {{ perCategoryOpen ? '▾' : '▸' }} Per-category channels
+      </button>
+      <p class="form-text mb-0 mt-1">
+        Route one alert source to its own ntfy topic instead of the default above. Leave a channel blank to keep it on the default.
+      </p>
+
+      <div *ngIf="perCategoryOpen" class="row g-3 mt-1">
+        <div class="col-12 col-md-6" *ngFor="let category of alertCategories">
+          <label class="form-label small fw-semibold" [for]="'categoryTopic-' + category.key">
+            {{ category.label }}
+          </label>
+          <div class="input-group input-group-sm">
+            <input
+              [id]="'categoryTopic-' + category.key"
+              class="form-control font-monospace"
+              [(ngModel)]="categoryTopicDrafts[category.key]"
+              [ngModelOptions]="{ standalone: true }"
+              maxlength="64"
+              [placeholder]="alertSettings.topic"
+            />
+            <button
+              type="button"
+              class="btn btn-outline-secondary"
+              [disabled]="testingAlertSource === category.key"
+              (click)="testAlertSource(category.key)"
+            >
+              <span
+                *ngIf="testingAlertSource === category.key"
+                class="spinner-border spinner-border-sm"
+                aria-hidden="true"
+              ></span>
+              <ng-container *ngIf="testingAlertSource !== category.key">Test</ng-container>
+            </button>
+          </div>
+          <p class="form-text mb-0 text-danger" *ngIf="categoryTopicDrafts[category.key] && !categoryTopicValid(category.key)">
+            Letters, digits, hyphens and underscores only, up to 64 characters.
+          </p>
+        </div>
+
+        <div class="col-12">
+          <button
+            type="button"
+            class="btn btn-outline-primary btn-sm"
+            [disabled]="savingAlerts || !categoryTopicsDirty || !categoryTopicsAllValid"
+            (click)="saveCategoryTopics()"
+          >
+            Save channels
+          </button>
+        </div>
+      </div>
+    </div>
+
     <div class="col-12" *ngIf="alertsFeedback">
       <span
         class="small"

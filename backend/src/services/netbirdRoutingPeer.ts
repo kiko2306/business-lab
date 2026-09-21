@@ -514,6 +514,7 @@ export async function ensureNetbirdRoutingPeer(serviceName: string): Promise<boo
     // an explicit 401/403 from NetBird alerts.
     if (isRejectedCredential(message)) {
       const published = await publishAlert({
+        category: 'netbird',
         title: 'NetBird token rejected',
         message:
           'NetBird rejected the dashboard\'s Personal Access Token, so VPN auto-provisioning has stopped. ' +

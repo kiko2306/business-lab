@@ -151,6 +151,7 @@ describe('checkCriticalServices', () => {
     await checkCriticalServices();
     expect(restartedProjects().sort()).toEqual(['netbird-vpn', 'tailscale']);
     expect(mockedPublishAlert).toHaveBeenCalledTimes(2);
+    expect(mockedPublishAlert.mock.calls.every(([a]) => a.category === 'critical-service')).toBe(true);
   });
 
   // §543: ts.net's 300 s negative cache made the Funnel name fail to resolve
@@ -185,6 +186,7 @@ describe('checkCriticalServices', () => {
     // One "didn't help" alert per project, not one per pass.
     expect(mockedPublishAlert).toHaveBeenCalledTimes(2);
     expect(mockedPublishAlert.mock.calls.every(([a]) => a.title.includes("didn't help"))).toBe(true);
+    expect(mockedPublishAlert.mock.calls.every(([a]) => a.category === 'critical-service')).toBe(true);
   });
 
   it('re-arms once everything has recovered', async () => {

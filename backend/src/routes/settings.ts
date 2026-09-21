@@ -33,9 +33,12 @@ import {
   setUpdateBranch,
 } from '../utils/generalSettings';
 import {
+  ALERT_CATEGORIES,
+  AlertSource,
   appsToApplyAlertSettings,
   getAlertNotifyConfig,
   isValidAlertTopic,
+  setAlertCategoryTopic,
   setAlertTopic,
   setCrowdsecAlertsEnabled,
   setCrowdsecEnforceNpm,
@@ -45,7 +48,7 @@ import logger from '../utils/logger';
 import { getService } from '../config/services';
 import { applyNpmCrowdsecConfig } from '../services/crowdsecConfig';
 import { CrowdsecUnavailableError, listCrowdsecBans, unbanCrowdsecIp } from '../services/crowdsecBans';
-import { runAlertTest, AlertSource } from '../services/alertTest';
+import { runAlertTest } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
 import { testCloudflareTunnelAccess, countTokenZones } from '../services/cloudflareTunnelClient';
 import { CLAUDE_API_KEY_SETTING, getClaudeApiKey, maskClaudeKey } from '../utils/claudeSettings';
@@ -777,9 +780,14 @@ router.put('/alerts', async (req: Request, res: Response) => {
   const hasTopic = 'topic' in body;
   const hasCrowdsec = 'crowdsecEnabled' in body;
   const hasEnforce = 'enforceNpm' in body;
+  // Per-category overrides (§553): { topics: { crowdsec?: string, 'critical-service'?: string, ... } }.
+  // An empty string clears that category's override back to the default topic.
+  const topicsBody: Record<string, unknown> = typeof body.topics === 'object' && body.topics !== null ? body.topics : {};
+  const changedCategories = Object.keys(topicsBody) as AlertSource[];
+  const hasCategoryTopics = changedCategories.length > 0;
 
-  if (!hasTopic && !hasCrowdsec && !hasEnforce) {
-    return res.status(400).json({ error: 'Provide "topic", "crowdsecEnabled" and/or "enforceNpm".' });
+  if (!hasTopic && !hasCrowdsec && !hasEnforce && !hasCategoryTopics) {
+    return res.status(400).json({ error: 'Provide "topic", "topics", "crowdsecEnabled" and/or "enforceNpm".' });
   }
   if (hasCrowdsec && typeof body.crowdsecEnabled !== 'boolean') {
     return res.status(400).json({ error: 'crowdsecEnabled must be true or false.' });
@@ -792,10 +800,24 @@ router.put('/alerts', async (req: Request, res: Response) => {
       .status(400)
       .json({ error: 'Topic must be 1–64 characters: letters, digits, hyphens and underscores only.' });
   }
+  for (const category of changedCategories) {
+    if (!ALERT_CATEGORIES.includes(category)) {
+      return res.status(400).json({ error: `Unknown alert category "${category}".` });
+    }
+    const value = topicsBody[category];
+    if (value !== '' && !isValidAlertTopic(value)) {
+      return res.status(400).json({
+        error: `"${category}" topic must be empty (to clear it) or 1–64 characters: letters, digits, hyphens and underscores only.`,
+      });
+    }
+  }
 
   try {
     if (hasTopic) {
       await setAlertTopic(body.topic);
+    }
+    for (const category of changedCategories) {
+      await setAlertCategoryTopic(category, topicsBody[category] as string);
     }
     if (hasCrowdsec) {
       await setCrowdsecAlertsEnabled(body.crowdsecEnabled);
@@ -815,6 +837,7 @@ router.put('/alerts', async (req: Request, res: Response) => {
       result: 'success',
       metadata: {
         ...(hasTopic ? { topic: body.topic } : {}),
+        ...(hasCategoryTopics ? { topics: topicsBody } : {}),
         ...(hasCrowdsec ? { crowdsecEnabled: body.crowdsecEnabled } : {}),
         ...(hasEnforce ? { enforceNpm: body.enforceNpm } : {}),
       },
@@ -830,7 +853,16 @@ router.put('/alerts', async (req: Request, res: Response) => {
     const restarted: string[] = [];
     const notRunning: string[] = [];
     const failed: string[] = [];
-    for (const app of appsToApplyAlertSettings({ topic: hasTopic, crowdsec: hasCrowdsec, enforce: hasEnforce })) {
+    const appsToApply = appsToApplyAlertSettings({
+      // The default topic backs every category with no override of its own,
+      // so a default-only change still needs both baked-in consumers to
+      // re-render — only a category-specific override narrows the restart.
+      crowdsecTopic: hasTopic || changedCategories.includes('crowdsec'),
+      criticalServiceTopic: hasTopic || changedCategories.includes('critical-service'),
+      crowdsec: hasCrowdsec,
+      enforce: hasEnforce,
+    });
+    for (const app of appsToApply) {
       const label = getService(app)?.label ?? app;
       try {
         const result = await restartService(app, req.user!.id);
@@ -858,8 +890,8 @@ router.put('/alerts', async (req: Request, res: Response) => {
 // ---------------------------------------------------------------------------
 router.post('/alerts/test', async (req: Request, res: Response) => {
   const source = req.body?.source;
-  if (source !== 'crowdsec') {
-    return res.status(400).json({ error: 'source must be one of: crowdsec.' });
+  if (!ALERT_CATEGORIES.includes(source)) {
+    return res.status(400).json({ error: `source must be one of: ${ALERT_CATEGORIES.join(', ')}.` });
   }
 
   const result = await runAlertTest(source as AlertSource);
