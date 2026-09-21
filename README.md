@@ -255,6 +255,17 @@ it is done — not ticked off and left behind. Section references point at
       WebSocket without WebRTC. Nothing here can be proven from the
       dashboard host alone.
 
+- [ ] **Orphaned `homelab.tx-home-utils.com` in Cloudflare — needs manual
+      cleanup** — investigated in plan.md §556. Not tracked by any
+      `service_exposure` row (confirmed via a direct DB query — 38 rows, none
+      named `homelab`/`businesslab`); the dashboard's own hostname should be
+      `businesslab.tx-home-utils.com` by default (`DEFAULT_DASHBOARD_SUBDOMAIN`,
+      and the live `dashboard_url` setting is empty). Most likely a leftover
+      Cloudflare DNS/Tunnel route from before this project's rename (the
+      working directory is still `homelab-management`). Needs a human to open
+      the Cloudflare Zero Trust dashboard, confirm it's unused, and delete it
+      there — not something backend code can safely detect-and-remove on its
+      own with no `service_exposure` row to key off.
 ### Backups
 
 - [ ] **ntfy alert on backup failure** — planned in plan.md §552, not built.

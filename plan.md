@@ -27886,3 +27886,47 @@ deep task/project link is served normally (only exact `/` is special-cased);
 
 Tracked as a README TODO item until built.
 
+## 556. Investigation: orphaned `homelab.tx-home-utils.com` in Cloudflare
+
+User asked why `https://homelab.tx-home-utils.com/` exists in Cloudflare.
+Queried the live `service_exposure` table directly
+(`docker exec business-lab-database-1 psql -U homelab -d homelab -c "SELECT
+service_name, hostname, enabled, status FROM service_exposure ..."`) — no row
+for any hostname containing "homelab" or "businesslab" among the 38 tracked
+rows. So this codebase's own exposure system (the thing that provisions and
+reconciles every Cloudflare Tunnel + NPM route) does not know about this
+hostname at all — it isn't drift, it's untracked.
+
+Checked the one place a "homelab"-shaped hostname could legitimately come
+from: the dashboard's own public address. `getDashboardBaseUrl()`
+(`backend/src/utils/generalSettings.ts:128-139`) returns a stored
+`dashboard_url` setting if set, else
+`https://<DASHBOARD_SUBDOMAIN or 'businesslab'>.<baseDomain>` —
+`DEFAULT_DASHBOARD_SUBDOMAIN` is `'businesslab'`, not `'homelab'`
+(`generalSettings.ts:25`). The live `settings` table's `dashboard_url` row is
+empty (queried directly), so unless `DASHBOARD_SUBDOMAIN` is overridden in
+the root `.env` (not readable — blocked by this session's guards), the
+dashboard's own hostname should be `businesslab.tx-home-utils.com`, not
+`homelab.tx-home-utils.com`.
+
+**Conclusion (not yet confirmed against the Cloudflare account itself — no
+API access from this session):** `homelab.tx-home-utils.com` is very likely a
+leftover DNS/Tunnel-ingress route in Cloudflare from before this project was
+renamed — the working directory on this host is still `homelab-management`
+even though the product is "Business Lab" (repo `business-lab`), suggesting
+an earlier project identity used "homelab" as the dashboard subdomain (or
+just as a working name) before the rename to `businesslab`. Nothing in this
+codebase created or currently renews it, and nothing here would ever clean it
+up automatically, since cleanup is driven entirely by `service_exposure` rows
+and this hostname has none.
+
+**Not yet done**: this needs a human to actually open the Cloudflare Zero
+Trust dashboard (Tunnels → this tunnel's public hostnames, and/or the DNS
+records for `tx-home-utils.com`) and confirm the route exists and is unused,
+then delete it there — an orphaned hostname isn't something backend code can
+safely detect-and-delete on its own (no accompanying `service_exposure` row
+to key off, and no data in this codebase says *why* a stray Cloudflare route
+exists vs. being deliberately hand-added for some other reason). This is a
+one-time manual Cloudflare cleanup, not a code change — flag it as such
+rather than building automation for a single leftover record.
+
