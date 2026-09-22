@@ -376,7 +376,7 @@
       </div>
     </div>
 
-    <h3 class="h5 mb-2">Local backups</h3>
+    <h3 class="h5 mb-2">Settings Backups</h3>
     <div class="list-group mb-4">
       <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2" *ngFor="let backup of backups">
         <div>
@@ -391,14 +391,14 @@
         </div>
       </div>
       <div class="list-group-item text-body-secondary" *ngIf="!backups.length">
-        No backups found yet.
+        No Settings Backups found yet.
       </div>
     </div>
 
     <!-- What Kopia holds at the configured destination — read-only, since
          restoring one means picking a target path rather than a one-click
          action like the local archives above. -->
-    <h3 class="h5 mb-2">Remote backups</h3>
+    <h3 class="h5 mb-2">Full Backups</h3>
     <div class="list-group">
       <div class="list-group-item text-body-secondary" *ngIf="remoteBackupsLoading">Loading…</div>
       <ng-container *ngIf="!remoteBackupsLoading">
@@ -415,7 +415,7 @@
           </div>
         </div>
         <div class="list-group-item text-body-secondary" *ngIf="!remoteBackups.length">
-          No remote backups found yet.
+          No Full Backups found yet.
         </div>
       </ng-container>
     </div>

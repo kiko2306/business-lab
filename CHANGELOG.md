@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.129.4] — 2026-09-22
+
+### Backups
+
+- Rename the Backups page's two lists to match: "Local backups" is now "Settings Backups", "Remote backups" is now "Full Backups"
+
 ## [0.129.3] — 2026-09-22
 
 ### Backups

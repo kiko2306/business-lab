@@ -29098,3 +29098,18 @@ Found in passing, not fixed here: `docs/recovery-troubleshooting.md`'s
 backup-comparison table still describes Kopia's retention as the old
 hardcoded ladder (10 latest/24 hourly/...) — stale since §578/§581 synced it
 to the schedule's flat "keep last N". README TODO added.
+
+## 583. Renamed the Backups page's two list headings to match §582
+
+Follow-up to §582: the two list headings below the destination form still
+said "Local backups" / "Remote backups", not matching the buttons that fill
+them. "Local backups" (the `.tar.gz` archives from **Backup Settings**) →
+**Settings Backups**; "Remote backups" (what Kopia holds, from **Full
+Backup**) → **Full Backups**, including its empty-state text. Checked for
+other references the same way as §582 — only backend log/error strings
+("Unable to list remote backups") and an unrelated per-app doc comment in
+`services.ts` used the phrase, both left alone: `loadRemoteBackups()` treats
+that failure as best-effort (comment: "no destination configured yet or
+Kopia unreachable both come back as an empty list rather than an error"), so
+the string never reaches the UI. `./scripts/check.sh frontend test`/`build`
+pass (77, same as §582 — no test named the old headings). Bumped to 0.129.4.
