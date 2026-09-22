@@ -26,8 +26,8 @@
  * from HA's own image and volume mounts.
  */
 
-import { exec } from 'child_process';
 import logger from '../utils/logger';
+import { runShell } from '../utils/run';
 import { resolveComposeFile } from '../config/services';
 
 const HACS_DIR = '/config/custom_components/hacs';
@@ -35,18 +35,6 @@ const HACS_DIR = '/config/custom_components/hacs';
 // from within HA and it tracks releases, so seeding it from anything else would
 // leave it permanently "behind" a version it can't reconcile.
 const HACS_ZIP_URL = 'https://github.com/hacs/integration/releases/latest/download/hacs.zip';
-
-function run(command: string, timeoutMs = 180_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(command, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024, env: process.env }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.toString() || error.message));
-        return;
-      }
-      resolve(stdout.toString());
-    });
-  });
-}
 
 /**
  * The /bin/sh script that runs inside the throwaway HA container.
@@ -113,7 +101,9 @@ export async function ensureHomeAssistantHacs(serviceName: string): Promise<void
       `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
       `--entrypoint /bin/sh home-assistant -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
 
-    const output = await run(command);
+    // The install script pulls HACS from GitHub inside the container — slower
+    // than anything else that shells out here, hence the longer-than-default budget.
+    const output = await runShell(command, { timeoutMs: 180_000 });
     logger.info('Home Assistant HACS reconciled', { output: output.trim() || '(no changes)' });
   } catch (error) {
     logger.error('Failed to install HACS for Home Assistant', { error: (error as Error).message });

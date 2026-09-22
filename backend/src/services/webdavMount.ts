@@ -23,12 +23,12 @@
  * caller's own `compose up` (later in the same start) recreates both fresh.
  */
 
-import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { BackupTarget, toMountSpec } from '../utils/backupTarget';
 import { parseEnvFile, writeEnvValues } from '../utils/envFile';
 import logger from '../utils/logger';
+import { runArgv } from '../utils/run';
 
 export const WEBDAV_SERVICE = 'webdav';
 
@@ -36,17 +36,6 @@ export const WEBDAV_SERVICE = 'webdav';
 const VOLUME_NAME = 'webdav_webdav-storage';
 
 export const WEBDAV_LOCAL_DEVICE = './data/files';
-
-function run(command: string, args: string[], timeoutMs = 30_000): Promise<{ code: number; output: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(command, args, { timeout: timeoutMs });
-    let output = '';
-    child.stdout.on('data', (d) => (output += d.toString()));
-    child.stderr.on('data', (d) => (output += d.toString()));
-    child.on('error', (e) => resolve({ code: -1, output: e.message }));
-    child.on('close', (code) => resolve({ code: code ?? -1, output }));
-  });
-}
 
 export interface WebdavNasSettings {
   server: string;
@@ -123,8 +112,8 @@ export async function applyWebdavMount(serviceName: string, appDir: string): Pro
       // prior mount to swap, so `changed` above is only true here if
       // WEBDAV_MOUNT_* was never written before — compose creates the volume
       // fresh either way).
-      await run('docker', [...composeArgs, 'down']);
-      await run('docker', ['volume', 'rm', '-f', VOLUME_NAME]);
+      await runArgv('docker', [...composeArgs, 'down'], 30_000);
+      await runArgv('docker', ['volume', 'rm', '-f', VOLUME_NAME], 30_000);
       logger.info('WebDAV storage location changed — removed the old volume for a clean remount', {
         type: desired.WEBDAV_MOUNT_TYPE,
       });

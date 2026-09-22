@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.130.0] — 2026-09-22
+
+### Changed
+
+- Collapsed nine per-service child-process wrappers into one `utils/run.ts`, fixing a timeout that never fired and a `docker exec` path with no timeout at all
+
 ## [0.129.5] — 2026-09-22
 
 ### Fixed

@@ -8,25 +8,13 @@
  * rollback path rather than drifting apart.
  */
 
-import { exec } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import yaml from 'js-yaml';
 import logger from '../utils/logger';
+import { runShell } from '../utils/run';
 
 export const NPM_SERVICE = 'nginx-proxy-manager';
-
-export function run(command: string): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(command, { maxBuffer: 4 * 1024 * 1024 }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.toString() || error.message));
-        return;
-      }
-      resolve(stdout.toString());
-    });
-  });
-}
 
 export function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -144,7 +132,7 @@ export async function testNpmConfig(appDir: string, composeFile: string): Promis
   const encoded = Buffer.from(script, 'utf8').toString('base64');
 
   try {
-    const output = await run(
+    const output = await runShell(
       `docker run --rm --entrypoint sh ${mounts} ${runtime.image} -c 'echo ${encoded} | base64 -d | sh'`
     );
     if (output.includes(NGINX_CHECK_OK)) {

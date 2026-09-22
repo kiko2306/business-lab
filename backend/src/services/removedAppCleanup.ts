@@ -23,10 +23,10 @@
  * safe set is built from each service's `composePath`, via `getProjectName`.
  */
 
-import { exec } from 'child_process';
 import fs from 'fs/promises';
 import path from 'path';
 import logger from '../utils/logger';
+import { runShell } from '../utils/run';
 import { SERVICES, getAppsDir, getProjectName } from '../config/services';
 import { writeAuditLog } from '../utils/audit';
 
@@ -39,18 +39,6 @@ const PROJECT_NAME = /^[a-z0-9][a-z0-9-]*$/;
 // Minimal image for the root `rm` fallback below. Already on the host as an
 // init-container base; auto-pulled if not.
 const RM_HELPER_IMAGE = 'busybox:latest';
-
-function run(command: string, timeoutMs = 60_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(command, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024, env: process.env }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.toString() || error.message));
-        return;
-      }
-      resolve(stdout.toString());
-    });
-  });
-}
 
 /** Single-quote a shell argument. Our inputs are path/regex-safe already; this
  * is belt-and-braces for the app dir, which comes from an env var. */
@@ -89,7 +77,7 @@ async function removeAppDir(appsDir: string, name: string): Promise<void> {
   }
   // `rm -rf` the dir from inside a root container. The apps dir is bind-mounted
   // at the same absolute path, so `path.join` gives the in-container path too.
-  await run(
+  await runShell(
     `docker run --rm --network none -v ${shq(appsDir)}:${shq(appsDir)} ${RM_HELPER_IMAGE} ` +
       `rm -rf ${shq(dir)}`
   );
@@ -173,7 +161,7 @@ export async function reconcileRemovedAppProjects(): Promise<void> {
     // socket proxy; this is the same call without `-f`. Progress goes to
     // stderr, so an empty stdout here is normal even when it removed things.
     try {
-      const out = await run(`docker compose -p ${name} down --remove-orphans`);
+      const out = await runShell(`docker compose -p ${name} down --remove-orphans`);
       logger.info('Compose down for removed project', { project: name, output: out.trim() || '(no stdout)' });
     } catch (error) {
       logger.warn('Compose down for removed project failed; still removing its directory', {

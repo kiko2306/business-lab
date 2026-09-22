@@ -27,7 +27,6 @@
  *     broken one.
  */
 
-import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import {
@@ -43,29 +42,12 @@ import {
 import { resolveComposeFile } from '../config/services';
 import { parseEnvFile, writeEnvValues } from '../utils/envFile';
 import logger from '../utils/logger';
+import { runArgv } from '../utils/run';
 
 const KOPIA_SERVICE = 'kopia';
 
 /** `docker compose -p kopia` + the volume named in its compose file. */
 const VOLUME_NAME = 'kopia_backup-target';
-
-function run(command: string, args: string[], timeoutMs = 60_000): Promise<{ code: number; output: string }> {
-  return new Promise((resolve) => {
-    const child = spawn(command, args);
-    let output = '';
-    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
-    child.stdout.on('data', (d) => (output += d.toString()));
-    child.stderr.on('data', (d) => (output += d.toString()));
-    child.on('error', (e) => {
-      clearTimeout(timer);
-      resolve({ code: -1, output: e.message });
-    });
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      resolve({ code: code ?? -1, output });
-    });
-  });
-}
 
 /**
  * WebDAV has real directories, unlike S3's flat key namespace — `kopia
@@ -256,7 +238,7 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
   // forcing it would leave the container holding a stale mount. Safe to run
   // even when nothing is up — a no-op, or cleanup of a `Created`-but-never-
   // started container left over from an earlier failed start.
-  const down = await run('docker', [...composeArgs, 'down']);
+  const down = await runArgv('docker', [...composeArgs, 'down'], 60_000);
   if (down.code !== 0) {
     logger.warn('Could not stop Kopia to apply the backup destination', { output: down.output.slice(0, 200) });
   }
@@ -264,7 +246,7 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
   // The step that actually matters — without it the next start (whether
   // right now or a later manual one) silently reuses the previous
   // repository location's stale, immutable mount options.
-  await run('docker', ['volume', 'rm', '-f', VOLUME_NAME], 20_000);
+  await runArgv('docker', ['volume', 'rm', '-f', VOLUME_NAME], 20_000);
 
   // Always bring it back up, regardless of whether it was running before —
   // a saved destination the user has to remember to separately go Start is
@@ -272,7 +254,7 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
   // live: a save while Kopia happened to be stopped mid-diagnosis left the
   // new destination configured but inert until someone noticed and hit
   // Start by hand.
-  const up = await run('docker', [...composeArgs, 'up', '-d']);
+  const up = await runArgv('docker', [...composeArgs, 'up', '-d'], 60_000);
   if (up.code !== 0) {
     return {
       applied: true,

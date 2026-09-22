@@ -9,7 +9,6 @@
  * up until something tries to write, so this does exactly that, then cleans up.
  */
 
-import { spawn } from 'child_process';
 import {
   BackupMountSpec,
   BackupTarget,
@@ -25,38 +24,13 @@ import {
 } from '../utils/backupTarget';
 import { readKopiaRepositoryPassword } from './kopiaTargetApply';
 import logger from '../utils/logger';
+import { runArgv } from '../utils/run';
 
 const PROBE_VOLUME = 'homelab-backup-target-probe';
 const TIMEOUT_MS = 20_000;
 // A repository connect/create round trip over the network needs more room
 // than a local mount+write.
 const S3_TIMEOUT_MS = 30_000;
-
-interface RunResult {
-  code: number;
-  stdout: string;
-  stderr: string;
-}
-
-function run(command: string, args: string[], timeoutMs = TIMEOUT_MS): Promise<RunResult> {
-  return new Promise((resolve) => {
-    const child = spawn(command, args);
-    let stdout = '';
-    let stderr = '';
-    const timer = setTimeout(() => child.kill('SIGKILL'), timeoutMs);
-
-    child.stdout.on('data', (d) => (stdout += d.toString()));
-    child.stderr.on('data', (d) => (stderr += d.toString()));
-    child.on('error', (error) => {
-      clearTimeout(timer);
-      resolve({ code: -1, stdout, stderr: error.message });
-    });
-    child.on('close', (code) => {
-      clearTimeout(timer);
-      resolve({ code: code ?? -1, stdout, stderr });
-    });
-  });
-}
 
 export interface BackupTargetTestResult {
   success: boolean;
@@ -91,16 +65,16 @@ export async function testBackupTarget(target: BackupTarget): Promise<BackupTarg
  * never leaves the real backup volume in a bad state.
  */
 async function testMountTarget(spec: BackupMountSpec): Promise<BackupTargetTestResult> {
-  await run('docker', ['volume', 'rm', '-f', PROBE_VOLUME]);
+  await runArgv('docker', ['volume', 'rm', '-f', PROBE_VOLUME], TIMEOUT_MS);
 
-  const create = await run('docker', [
+  const create = await runArgv('docker', [
     'volume', 'create',
     '--driver', 'local',
     '--opt', `type=${spec.type}`,
     '--opt', `o=${spec.o}`,
     '--opt', `device=${spec.device}`,
     PROBE_VOLUME,
-  ]);
+  ], TIMEOUT_MS);
 
   if (create.code !== 0) {
     return {
@@ -112,12 +86,12 @@ async function testMountTarget(spec: BackupMountSpec): Promise<BackupTargetTestR
 
   // Mounting happens here, not at create time — this is where a wrong password
   // or an unreachable server actually surfaces.
-  const write = await run('docker', [
+  const write = await runArgv('docker', [
     'run', '--rm', '-v', `${PROBE_VOLUME}:/probe`, 'alpine:latest',
     'sh', '-c', 'touch /probe/.homelab-write-test && rm -f /probe/.homelab-write-test && echo WRITE-OK',
-  ]);
+  ], TIMEOUT_MS);
 
-  await run('docker', ['volume', 'rm', '-f', PROBE_VOLUME]);
+  await runArgv('docker', ['volume', 'rm', '-f', PROBE_VOLUME], TIMEOUT_MS);
 
   if (write.code === 0 && write.stdout.includes('WRITE-OK')) {
     return {
@@ -204,7 +178,7 @@ async function testS3Target(s3: S3ConnectArgs): Promise<BackupTargetTestResult> 
   // flags.
   if (s3.extraArgs) args.push(...s3.extraArgs.split(/\s+/).filter(Boolean));
 
-  const result = await run('docker', args, S3_TIMEOUT_MS);
+  const result = await runArgv('docker', args, S3_TIMEOUT_MS);
   const raw = (result.stderr || result.stdout).trim();
 
   if (result.code === 0 || /repository not initialized/i.test(raw)) {
@@ -258,7 +232,7 @@ async function testWebdavTarget(w: WebdavConnectArgs): Promise<BackupTargetTestR
   ];
   if (w.extraArgs) args.push(...w.extraArgs.split(/\s+/).filter(Boolean));
 
-  const result = await run('docker', args, S3_TIMEOUT_MS);
+  const result = await runArgv('docker', args, S3_TIMEOUT_MS);
   const raw = (result.stderr || result.stdout).trim();
 
   if (result.code === 0 || /repository not initialized/i.test(raw)) {
@@ -318,7 +292,7 @@ async function testRcloneTarget(r: RcloneRemoteConfig): Promise<BackupTargetTest
   if (r.type === 'ftp' && r.explicitTls) flags.push('--ftp-explicit-tls');
   if (r.extraArgs) flags.push(...r.extraArgs.split(/\s+/).filter(Boolean));
 
-  const result = await run(
+  const result = await runArgv(
     'docker',
     [
       'run', '--rm', '--entrypoint', 'sh',

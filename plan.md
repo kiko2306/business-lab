@@ -29164,3 +29164,62 @@ test because it wasn't shared): each of the four `$` expansion forms plus a
 plain `$`, replace-in-place vs append, file creation, and the
 don't-rewrite-if-unchanged path. `./scripts/check.sh backend typecheck` and
 `test` (1159 → 1167) pass. Bumped to 0.129.5.
+
+## 586. Nine private `run()` helpers collapsed into one `utils/run.ts`
+
+Found in the same sweep as §585. Nine services had each grown their own
+child-process wrapper: six byte-identical `run(command, timeoutMs):
+Promise<string>` over `exec` (`crowdsecBans`, `ntfyAuthBootstrap`,
+`exposureConfigFiles`, `removedAppCleanup`, `homeAssistantHacs`,
+`npmConfigWriter`) and three near-identical `spawn` ones
+(`kopiaTargetApply`, `webdavMount`, `backupTargetTest`).
+
+The duplication was the visible half. The half that mattered: each copy
+carried its own answer to "what happens on a hang", and they disagreed.
+
+- `npmConfigWriter`'s had **no timeout at all** — a wedged `docker exec`
+  into NPM wedged its caller forever.
+- `webdavMount`'s used `spawn`'s own `timeout` option, which sends SIGTERM;
+  a process that ignores it keeps running. The others used an explicit
+  SIGKILL timer.
+- **And none of them actually bounded the call.** Writing a test for the
+  shared version is what surfaced it: killing the child resolves nothing,
+  because `close` fires when the *pipes* close, not when the child dies — a
+  killed `sh` whose `sleep` grandchild still holds the pipes leaves the
+  caller waiting for the grandchild. Measured: a 200 ms timeout took 5 s.
+  `runArgv` now kills **and** resolves (code -1 with whatever output
+  arrived). Not a regression this refactor introduced; a pre-existing one it
+  made visible by having somewhere to test.
+
+`utils/run.ts` exports two functions, matching the two real shapes rather
+than one configurable everything:
+
+- `runShell(command, { timeoutMs, combineStderr })` — shell string, rejects
+  with stderr on non-zero. `combineStderr` exists because `cscli` and `ntfy
+  access` write part of what their callers parse to stderr, while the other
+  four parse stdout and would only get noise from it. `maxBuffer` is 4 MB
+  flat; the two 1 MB copies had no reason to be smaller.
+- `runArgv(command, args, timeoutMs)` — argv, no shell, never rejects,
+  returns `{ code, stdout, stderr, output }`. `output` is the interleaved
+  pair, which is what `kopiaTargetApply`/`webdavMount` wanted from their own
+  version; `backupTargetTest` reads the split streams. One return type
+  serves all three instead of two.
+
+Two files deliberately stayed out: `appDumps` needs a **Buffer** stdout
+(pg_dump output is binary and must not round-trip through a string) and
+`networkScan` wants `execFile`'s reject-on-non-zero over an argv. One call
+site each — bending `run.ts` into their shape would cost more than it saves.
+
+Timeouts were preserved per call site rather than silently taking the new
+120 s default where that would have been a *reduction*: `homeAssistantHacs`
+keeps its 180 s (the install script pulls HACS from GitHub),
+`backupTargetTest` keeps its 20 s/30 s probe budgets (it backs a UI "Test"
+button, where 120 s is not a timeout, it's a hang). `removedAppCleanup` went
+60 s → 120 s and `npmConfigWriter` ∞ → 120 s, both strictly better.
+
+Net −128 lines across nine services, +96 in one utility. 12 new vitest cases
+(`utils/run.test.ts`) covering both resolve shapes, stderr routing,
+reject-on-non-zero, spawn failure, and both timeout paths — the last of
+which is the one that found the bug above. `./scripts/check.sh backend
+typecheck` and `test` (1167 → 1173) pass. Bumped to 0.130.0 (minor: the
+timeout behaviour of nine code paths changed).

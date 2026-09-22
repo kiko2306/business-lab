@@ -30,8 +30,8 @@
  * nobody can identify.
  */
 
-import { exec } from 'child_process';
 import logger from '../utils/logger';
+import { runShell } from '../utils/run';
 import { resolveComposeFile } from '../config/services';
 import { generateComplexPassword, readAppEnvValue, saveServiceEnv } from './appEnv';
 
@@ -40,18 +40,6 @@ export const NTFY_TOKEN_KEY = 'NTFY_SUBSCRIBE_TOKEN';
 export const NTFY_PASSWORD_KEY = 'NTFY_SUBSCRIBE_PASSWORD';
 /** Also the username to type into the ntfy app. */
 export const SUBSCRIBER_USER = 'subscriber';
-
-function run(command: string, timeoutMs = 120_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(command, { timeout: timeoutMs, maxBuffer: 1024 * 1024, env: process.env }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.toString() || error.message));
-        return;
-      }
-      resolve(`${stdout}\n${stderr}`);
-    });
-  });
-}
 
 /**
  * ntfy prints the new token on a line of its own, e.g.
@@ -122,7 +110,7 @@ export async function ensureNtfySubscriberToken(serviceName: string, force = fal
       `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
       `--entrypoint /bin/sh ${NTFY_SERVICE} -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
 
-    const token = parseToken(await run(command));
+    const token = parseToken(await runShell(command, { combineStderr: true }));
     if (!token) {
       logger.warn('ntfy: minted no subscriber token — `ntfy token add` printed nothing recognisable');
       return;

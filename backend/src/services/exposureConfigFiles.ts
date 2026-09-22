@@ -22,8 +22,8 @@
  * `docker compose run` container using HA's own image + volume mounts.
  */
 
-import { exec } from 'child_process';
 import logger from '../utils/logger';
+import { runShell } from '../utils/run';
 import { getService, resolveComposeFile } from '../config/services';
 import { getServiceExposureRow } from './exposure';
 
@@ -63,18 +63,6 @@ function hasOwnHttpSection(configText: string): boolean {
     ''
   );
   return /^http:\s*($|[#\s])/m.test(withoutOurs);
-}
-
-function run(command: string, timeoutMs = 120_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(command, { timeout: timeoutMs, maxBuffer: 4 * 1024 * 1024, env: process.env }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.toString() || error.message));
-        return;
-      }
-      resolve(stdout.toString());
-    });
-  });
 }
 
 // The reverse-proxy + brute-force-lockout settings HA needs when it's exposed
@@ -185,7 +173,7 @@ async function reconcileHomeAssistantProxyConfig(serviceName: string): Promise<v
     `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
     `--entrypoint /bin/sh home-assistant -c "echo ${scriptB64} | base64 -d | /bin/sh"`;
 
-  const output = await run(command);
+  const output = await runShell(command);
   logger.info('Home Assistant reverse-proxy config reconciled', { output: output.trim() || '(no changes)' });
 }
 

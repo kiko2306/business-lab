@@ -21,10 +21,10 @@
  *    created by the executor).
  */
 
-import { exec } from 'child_process';
 import { hostname } from 'os';
 import { isIP } from 'net';
 import logger from '../utils/logger';
+import { runShell } from '../utils/run';
 import { resolveComposeFile } from '../config/services';
 import { readAppEnvValue } from './appEnv';
 import { getAppVersion } from '../version';
@@ -49,18 +49,6 @@ export interface CrowdsecBan {
 
 export class CrowdsecUnavailableError extends Error {}
 
-function run(command: string, timeoutMs = 120_000): Promise<string> {
-  return new Promise((resolve, reject) => {
-    exec(command, { timeout: timeoutMs, maxBuffer: 1024 * 1024, env: process.env }, (error, stdout, stderr) => {
-      if (error) {
-        reject(new Error(stderr?.toString() || error.message));
-        return;
-      }
-      resolve(`${stdout}\n${stderr}`);
-    });
-  });
-}
-
 function dashboardPassword(): string | null {
   return (readAppEnvValue(CROWDSEC_SERVICE, DASHBOARD_PASSWORD_KEY) ?? '').trim() || null;
 }
@@ -80,7 +68,7 @@ export async function ensureCrowdsecDashboardMachine(serviceName: string): Promi
     `--password '${password}' -f /dev/null --force`;
   const scriptB64 = Buffer.from(script).toString('base64');
   try {
-    await run(
+    await runShell(
       `docker compose -p ${resolved.projectName} ${resolved.composeArgs} run --rm --no-deps -T ` +
         `--entrypoint /bin/sh ${CROWDSEC_SERVICE} -c "echo ${scriptB64} | base64 -d | /bin/sh"`
     );
@@ -94,7 +82,7 @@ export async function ensureCrowdsecDashboardMachine(serviceName: string): Promi
 
 async function joinLapiNetwork(): Promise<void> {
   try {
-    await run(`docker network connect ${LAPI_NETWORK} ${hostname()}`, 15_000);
+    await runShell(`docker network connect ${LAPI_NETWORK} ${hostname()}`, { timeoutMs: 15_000, combineStderr: true });
   } catch (error) {
     // "already exists in network" is the normal case after the first call.
     if (!/already exists/i.test((error as Error).message)) {
