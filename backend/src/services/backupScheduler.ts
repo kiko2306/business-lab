@@ -181,7 +181,7 @@ const MAX_RECORDED_FAILURES = 25;
  * really happened.
  *
  * `trigger` is recorded on the audit row and is the only difference between
- * the scheduled run and the dashboard's "Back up now" button (§74.6). The
+ * the scheduled run and the dashboard's "Full Backup" button (§74.6). The
  * button MUST come through here rather than calling `snapshotKopiaAppDataNow`
  * directly: the dump has to happen first, or Kopia snapshots the *previous*
  * dump and the manual backup is silently a generation stale.

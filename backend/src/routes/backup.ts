@@ -159,7 +159,7 @@ router.post('/dump-apps', async (req: Request, res: Response) => {
  * schedule card's status is where the result lands.
  */
 /**
- * GET /api/backups/run/progress — polled by the "Back up now" modal while a
+ * GET /api/backups/run/progress — polled by the "Full Backup" modal while a
  * POST /run request is in flight, so it can show the step actually running
  * (which app, how many to go) instead of a plain spinner. One global state,
  * not per-user — the dump loop it reports on is already serialised to a

@@ -41,7 +41,7 @@ There are **two** backups, for different jobs:
 |---|---|---|
 | What | The whole `apps/` tree, one encrypted, deduplicated snapshot at your chosen destination (disk / SMB / NFS / S3-compatible bucket) via Kopia | One `.tar.gz` per app, kept locally in `backups/apps/<app>/` (the `backups-data` volume) |
 | For | Disaster recovery — the box is gone, or you need last week's state | A quick rollback point *before* you reconfigure or update an app |
-| Where | Dashboard → **Backups** page (schedule, retention, "Back up now", destination) | Each app's card → **Settings → Backups** (Back up now / Restore / Download / Delete) |
+| Where | Dashboard → **Backups** page (schedule, retention, "Full Backup", destination) | Each app's card → **Settings → Backups** (Back up now / Restore / Download / Delete) |
 | Retention | Kopia's ladder (10 latest, 24 hourly, 14 daily, 8 weekly, 6 monthly, 2 annual) | Last 10 per app |
 
 ### Management-stack backup (the dashboard's own database)
@@ -128,7 +128,7 @@ easily rebuilt:
   upgrade would be stale regardless.
 
 **If you need a clean copy anyway:** stop the app from the dashboard, let one
-scheduled backup (or "Back up now") complete, then start it again — the file is
+scheduled backup (or "Full Backup") complete, then start it again — the file is
 quiescent while Kopia reads it.
 
 ### OnlyOffice keeps no persistent state

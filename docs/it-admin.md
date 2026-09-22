@@ -80,7 +80,7 @@ other app is started from the dashboard.
 
 ## Backups
 
-- **Off-site (disaster recovery)**: schedule, retention, "Back up now" and the
+- **Off-site (disaster recovery)**: schedule, retention, "Full Backup" and the
   destination are all on the **Backups** page. The schedule card shows the last
   run and its outcome, the destination actually in use, and how many versions
   are on it.

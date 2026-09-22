@@ -29070,3 +29070,31 @@ modal at all when `restarted` comes back `false`. `./scripts/check.sh
 backend typecheck`/`test` (1159, unchanged — no new backend tests, only a
 route + a deleted conditional) and `frontend build`/`test` (74 → 77) pass.
 Bumped to 0.129.2.
+
+## 582. Renamed the Backups page buttons: Full Backup / Backup Settings
+
+The two buttons' names ("Back up now" and "Create backup") didn't say what
+they actually did — user asked what the difference was, then asked for
+clearer names. "Back up now" (all managed apps, via Kopia — the fleet-wide
+feature §580/§581 were about) → **Full Backup**; "Create backup" (a `pg_dump`
++ settings/users export of the dashboard's own database, `.tar.gz`
+download) → **Backup Settings**. Text-only change in
+`backups.component.html`, but updated every comment/test/doc string
+referencing the old names too, so a future grep for "Back up now" doesn't
+turn up a misleading trail — except the genuinely separate per-app "Back up
+now" button on each service card (`service-card.component.html`,
+`createAppBackup()`), left alone since it's a different feature entirely (a
+local per-app snapshot, not the fleet-wide one). Updated: `backup.ts`,
+`backupScheduler.ts`/`.test.ts`, `backupProgress.ts`,
+`backups.component.ts`/`.css`, `e2e/tests/live-stack.spec.ts` (a real
+assertion on the button's accessible name, would have failed on `beta`),
+and the `docs/*.md` + `backup-restore-roundtrip.drawio` passages about the
+fleet-wide button specifically (left the per-app mentions in
+`docs/it-admin.md`/`docs/recovery-troubleshooting.md`/`docs/user-guide.md`
+alone). `./scripts/check.sh backend test` (1159) and `frontend test` (77)
+pass. Bumped to 0.129.3.
+
+Found in passing, not fixed here: `docs/recovery-troubleshooting.md`'s
+backup-comparison table still describes Kopia's retention as the old
+hardcoded ladder (10 latest/24 hourly/...) — stale since §578/§581 synced it
+to the schedule's flat "keep last N". README TODO added.

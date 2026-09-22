@@ -12,7 +12,7 @@
     title="Backups"
     subtitle="Create, download, and restore compressed backups"
   >
-    <button panel-actions class="btn btn-sm btn-primary" (click)="createBackup()">Create backup</button>
+    <button panel-actions class="btn btn-sm btn-primary" (click)="createBackup()">Backup Settings</button>
 
     <div class="card mb-4">
       <div class="card-body p-4">
@@ -101,7 +101,7 @@
                  run to check a new destination is never a generation stale.
                  Runs ~20s (the dump is synchronous). -->
             <button class="btn btn-sm btn-outline-secondary" [disabled]="showRunModal" (click)="runAppDataBackup()">
-              Back up now
+              Full Backup
             </button>
             <button class="btn btn-sm btn-outline-primary" [disabled]="savingSchedule" (click)="saveSchedule()">
               Save schedule

@@ -97,7 +97,7 @@ export async function ensureBackupDir(): Promise<void> {
 
 /**
  * Dump the database, a filtered slice of settings, and user metadata into a
- * single .tar.gz under BACKUP_DIR. Shared by the manual "Create backup"
+ * single .tar.gz under BACKUP_DIR. Shared by the manual "Backup Settings"
  * route and the scheduled backup check.
  */
 export async function createBackupArchive(): Promise<string> {

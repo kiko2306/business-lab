@@ -1,6 +1,6 @@
 /**
  * Live progress for the app-data backup (dump-then-snapshot), so the
- * dashboard's "Back up now" button can show a real step (which app, how many
+ * dashboard's "Full Backup" button can show a real step (which app, how many
  * to go) instead of an indeterminate spinner for the ~20s the dump takes.
  *
  * A single in-memory object, not a per-request or per-user thing: the dump

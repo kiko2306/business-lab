@@ -1,5 +1,5 @@
 /* The page is a single <app-panel>; its collapse chrome and anchor offset live
-   in panel.component.css. The "Back up now" progress modal below mirrors
+   in panel.component.css. The "Full Backup" progress modal below mirrors
    confirm-dialog.component.css's backdrop/dialog structure rather than
    pulling in a modal library for this one screen. */
 

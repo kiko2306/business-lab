@@ -91,7 +91,7 @@ test.describe('live stack — Docker-touching flows', () => {
     await expect(page.getByRole('heading', { name: 'Schedule' })).toBeVisible();
     // Present whether or not a run has happened; do NOT click it — a real run
     // is long.
-    await expect(page.getByRole('button', { name: 'Back up now' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Full Backup' })).toBeVisible();
     await expect(page.getByText('Destination:')).toBeVisible();
   });
 

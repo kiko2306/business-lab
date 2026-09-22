@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.129.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.129.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -206,6 +206,15 @@ two — the guarantees are.
 **This list is the single place open work is tracked.** An item is deleted when
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
+
+### Docs
+
+- [ ] **`docs/recovery-troubleshooting.md`'s backup comparison table still
+      describes Kopia's retention as the old hardcoded ladder** (10 latest,
+      24 hourly, 14 daily, 8 weekly, 6 monthly, 2 annual) — stale since
+      plan.md §578/§581 synced the remote retention policy to the schedule's
+      flat "keep last N" instead. Update that row to say retention follows
+      the schedule's count.
 
 ### Exposure and platform
 

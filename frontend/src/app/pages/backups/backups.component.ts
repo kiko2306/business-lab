@@ -20,7 +20,7 @@ import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
 
-/** How often the "Back up now" modal polls GET /backups/run/progress. Each
+/** How often the "Full Backup" modal polls GET /backups/run/progress. Each
  * step (one app's dump) can finish in well under a second, so this needs to
  * be faster than the 3s the self-update panel polls at — that page's steps
  * (pull, build) each run tens of seconds. */
@@ -34,7 +34,7 @@ const KOPIA_STATUS_POLL_MS = 1000;
 
 /**
  * Backups & restore on its own route (§131.1): the schedule, the on-demand
- * "Back up now" run, what Kopia actually holds, and the list of restorable
+ * "Full Backup" run, what Kopia actually holds, and the list of restorable
  * archives. Lifted verbatim from the one-page dashboard — no API change — so
  * that upcoming backups work (per-app backup/restore) has a page to grow on
  * rather than another panel on an already-long dashboard.

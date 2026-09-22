@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.129.3] — 2026-09-22
+
+### Backups
+
+- Rename the Backups page buttons for clarity: "Back up now" is now "Full Backup" (all managed apps, via Kopia) and "Create backup" is now "Backup Settings" (the dashboard's own database/settings/users)
+
 ## [0.129.2] — 2026-09-22
 
 ### Backups

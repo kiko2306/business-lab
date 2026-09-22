@@ -54,7 +54,7 @@
   way the kernel mounts any of the three, so **Test destination** writes to it
   directly.
 - Create backups from the dashboard.
-- "Back up now" on the schedule card runs the app-data backup on demand (dump
+- "Full Backup" on the schedule card runs the app-data backup on demand (dump
   every app database, then a Kopia snapshot) — use it to check a destination
   you have just changed rather than waiting for the next scheduled run.
 - **Per-app snapshot** — on an app's card, open **Settings → Backups** and

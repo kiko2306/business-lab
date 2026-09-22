@@ -280,7 +280,7 @@ describe('runAppDataBackup failure reporting', () => {
   });
 });
 
-describe('runAppDataBackup — the on-demand "Back up now" path (§74.6)', () => {
+describe('runAppDataBackup — the on-demand "Full Backup" path (§74.6)', () => {
   const appDataRow = () =>
     audit.writeAuditLog.mock.calls.map((call) => call[0]).find((options) => options.resource === 'app-data');
 
