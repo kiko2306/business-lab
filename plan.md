@@ -29010,3 +29010,63 @@ minutes (real network transfer, not a hang) and landed on a genuine
 snapshot: `snapshotCount: 1`, `4,619,199,043` bytes, `49,758` files, `0`
 errors. `./scripts/check.sh backend typecheck`/`test` (1159 → 1163) pass.
 Bumped to 0.129.1 (`scripts/bump-version.sh`).
+
+Correction on that count: the actual before/after was 1155 → 1159 (4 new
+`ensureWebdavDirectory` cases) — §580 above mis-typed it as 1159 → 1163.
+Noted here per the citation rule rather than edited in place.
+
+## 581. Closed: a saved backup destination could sit inert if Kopia was stopped
+
+User asked directly: does changing the schedule or the destination need a
+Kopia restart? Schedule — no, it's read fresh from the settings table on
+every run and pushed over Kopia's live API (`setRetentionPolicy`) each time,
+no container involved. Destination — yes, `entrypoint.sh` only reads
+`BACKUP_REPO_KIND`/`BACKUP_WEBDAV_*`/etc. at container start, and
+`applyKopiaTarget()` already handled that automatically — **but only when
+Kopia was already running** at save time; `!wasRunning` returned early with
+"Saved. Start Kopia to use it." instead of starting it. Asked to close that
+gap and show a wait-for-restart modal — exactly what §580 had just been
+diagnosing around: Kopia had been stopped mid-diagnosis, and would have sat
+on the just-fixed destination doing nothing until someone noticed.
+
+Two changes:
+
+1. `kopiaTargetApply.ts`: deleted the `wasRunning` check (and the `docker ps`
+   call backing it) — `applyKopiaTarget` now always runs `compose up -d`
+   after writing config, matching principle 3 (no user step to remember).
+   The volume-cleanup step was never gated on this and is unchanged.
+2. New `GET /api/settings/backup-target/kopia-status` (`settings.ts`) wraps
+   the already-existing `checkKopiaConnection()` (`kopiaClient.ts`, previously
+   only used by the rclone keepalive) — stateless, no new progress-tracking
+   module needed, unlike the dump/snapshot progress `backupProgress.ts` owns:
+   "is Kopia connected right now" is just a fact to ask Kopia's own API for,
+   not a multi-step job this backend drives. `saveBackupTarget()`
+   (`backups.component.ts`) now starts a `timer(0, 1000)` poll against it
+   whenever the save response says `restarted: true`, mirroring the existing
+   "Back up now" progress-poll's `switchMap`/manual-unsubscribe shape
+   (`startProgressPolling`) rather than a new rxjs pattern — up to 60
+   attempts (~1 minute) before giving up and showing Kopia's last-known
+   status as a failure. Modal markup reuses the `.backup-progress-*` CSS
+   classes verbatim (already generic, not content-specific) — no new
+   stylesheet.
+
+Verified live end to end on `beta`: rebuilt and recreated
+`business-lab-backend-1`/`-frontend-1`. Stopped Kopia
+(`apps/kopia`'s own `docker compose down`), then called `getBackupTarget()` +
+`applyKopiaTarget(target)` directly inside the backend container (same code
+the save route runs) against the already-configured webdav destination —
+came back `{"applied":true,"restarted":true,...}` and `docker ps` showed
+`kopia-kopia-1` `Up 29 seconds (healthy)`, started from stopped with no
+separate Start action. Called `checkKopiaConnection()` (the new route's own
+logic) directly after — `{"ok":true,"detail":"Repository in WebDAV:
+https://webdav.tx-home-utils.com/turnkeybox_beta_backup"}`. Hit the actual
+new route with an unauthenticated `fetch` from inside the container to
+confirm it's mounted and gated like every other `/api/settings/*` route —
+`401`, not `404`.
+
+3 new Jasmine specs (`backups.component.spec.ts`): the poll reaching
+`ok:true`, giving up after the full attempt budget, and not opening the
+modal at all when `restarted` comes back `false`. `./scripts/check.sh
+backend typecheck`/`test` (1159, unchanged — no new backend tests, only a
+route + a deleted conditional) and `frontend build`/`test` (74 → 77) pass.
+Bumped to 0.129.2.

@@ -96,7 +96,12 @@ describe('BackupsComponent', () => {
       })
     );
     operations.getBackupStatus.and.returnValue(of(emptyStatus));
-    settings = jasmine.createSpyObj('SettingsService', ['getBackupTarget', 'saveBackupTarget', 'testBackupTarget']);
+    settings = jasmine.createSpyObj('SettingsService', [
+      'getBackupTarget',
+      'saveBackupTarget',
+      'testBackupTarget',
+      'getKopiaStatus',
+    ]);
     settings.getBackupTarget.and.returnValue(of(emptyBackupTarget));
     toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
     const confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
@@ -165,6 +170,66 @@ describe('BackupsComponent', () => {
 
     expect(component['runError']).toContain('App data backup did not start');
     expect(component['progress']?.phase).toBe('done');
+
+    component.ngOnDestroy();
+  }));
+
+  it('waits for Kopia to reconnect after a destination save that restarts it', fakeAsync(() => {
+    settings.saveBackupTarget.and.returnValue(
+      of({ message: 'Saved. Kopia recreated; its repository now lives on the new location.', restarted: true })
+    );
+    let call = 0;
+    const statuses = [
+      { ok: false, detail: 'Kopia is not reachable yet.' },
+      { ok: true, detail: 'connected' },
+    ];
+    settings.getKopiaStatus.and.callFake(() => of(statuses[Math.min(call++, statuses.length - 1)]));
+
+    component.saveBackupTarget();
+    tick(); // flush the save PUT and the poll's immediate first tick
+    fixture.detectChanges();
+    expect(component['showDestinationRestartModal']).toBe(true);
+    expect(component['destinationRestartDone']).toBe(false);
+
+    tick(1000);
+    fixture.detectChanges();
+    expect(component['destinationRestartDone']).toBe(true);
+    expect(component['destinationRestartOk']).toBe(true);
+
+    component.closeDestinationRestartModal();
+    expect(component['showDestinationRestartModal']).toBe(false);
+    component.ngOnDestroy();
+  }));
+
+  it('gives up and reports failure if Kopia never reconnects', fakeAsync(() => {
+    settings.saveBackupTarget.and.returnValue(
+      of({ message: 'Saved. Kopia recreated; its repository now lives on the new location.', restarted: true })
+    );
+    settings.getKopiaStatus.and.returnValue(of({ ok: false, detail: 'connect ECONNREFUSED' }));
+
+    component.saveBackupTarget();
+    tick();
+    tick(60 * 1000); // the full DESTINATION_RESTART_MAX_ATTEMPTS budget
+    fixture.detectChanges();
+
+    expect(component['destinationRestartDone']).toBe(true);
+    expect(component['destinationRestartOk']).toBe(false);
+    expect(component['destinationRestartDetail']).toContain('ECONNREFUSED');
+
+    component.ngOnDestroy();
+  }));
+
+  it('does not open the restart modal when the destination save does not restart Kopia', fakeAsync(() => {
+    settings.saveBackupTarget.and.returnValue(
+      of({ message: 'Saved.', restarted: false })
+    );
+
+    component.saveBackupTarget();
+    tick();
+    fixture.detectChanges();
+
+    expect(component['showDestinationRestartModal']).toBe(false);
+    expect(settings.getKopiaStatus).not.toHaveBeenCalled();
 
     component.ngOnDestroy();
   }));

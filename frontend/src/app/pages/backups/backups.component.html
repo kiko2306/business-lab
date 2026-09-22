@@ -460,4 +460,20 @@
       </div>
     </div>
   </div>
+
+  <div class="backup-progress-backdrop" *ngIf="showDestinationRestartModal">
+    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" aria-label="Restarting Kopia">
+      <div class="backup-progress-body">
+        <h2 class="h5 mb-3">Restarting the backup engine</h2>
+        <p class="mb-2"
+           [class.text-success]="destinationRestartDone && destinationRestartOk"
+           [class.text-danger]="destinationRestartDone && !destinationRestartOk">
+          {{ destinationRestartDetail }}
+        </p>
+      </div>
+      <div class="backup-progress-foot" *ngIf="destinationRestartDone">
+        <button type="button" class="btn btn-primary" (click)="closeDestinationRestartModal()">Close</button>
+      </div>
+    </div>
+  </div>
 </main>

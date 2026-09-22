@@ -669,6 +669,21 @@ export interface BackupTargetTestResponse {
   detail: string;
 }
 
+/** PUT /settings/backup-target. `restarted` is whether Kopia's container was
+ * successfully brought back up against the new destination — the save modal
+ * only starts polling `KopiaStatus` when this is true. */
+export interface BackupTargetSaveResponse {
+  message: string;
+  restarted: boolean;
+}
+
+/** GET /settings/backup-target/kopia-status — polled after a destination
+ * save until Kopia reconnects (or fails) against it. */
+export interface KopiaStatus {
+  ok: boolean;
+  detail: string;
+}
+
 export type SelfUpdateRunState =
   | 'checking'
   | 'pulling'

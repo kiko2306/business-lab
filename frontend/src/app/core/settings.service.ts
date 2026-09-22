@@ -15,8 +15,10 @@ import {
   MailSettingsInput,
   MailTestResponse,
   BackupTargetInput,
+  BackupTargetSaveResponse,
   BackupTargetSettings,
   BackupTargetTestResponse,
+  KopiaStatus,
   ExposureTestResponse,
   GeneralSettings,
   AlertNotifySettings,
@@ -76,12 +78,16 @@ export class SettingsService {
     return this.http.get<BackupTargetSettings>(`${API_BASE_URL}/settings/backup-target`);
   }
 
-  saveBackupTarget(input: BackupTargetInput): Observable<{ message: string }> {
-    return this.http.put<{ message: string }>(`${API_BASE_URL}/settings/backup-target`, input);
+  saveBackupTarget(input: BackupTargetInput): Observable<BackupTargetSaveResponse> {
+    return this.http.put<BackupTargetSaveResponse>(`${API_BASE_URL}/settings/backup-target`, input);
   }
 
   testBackupTarget(): Observable<BackupTargetTestResponse> {
     return this.http.post<BackupTargetTestResponse>(`${API_BASE_URL}/settings/backup-target/test`, {});
+  }
+
+  getKopiaStatus(): Observable<KopiaStatus> {
+    return this.http.get<KopiaStatus>(`${API_BASE_URL}/settings/backup-target/kopia-status`);
   }
 
   loadClaudeKey(): Observable<ClaudeKeySettings> {

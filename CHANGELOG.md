@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.129.2] — 2026-09-22
+
+### Backups
+
+- Auto-start Kopia when a backup destination is saved while it was stopped, and show a modal that waits for it to actually reconnect (or fail) instead of a fire-and-forget save
+
 ## [0.129.1] — 2026-09-22
 
 ### Backups

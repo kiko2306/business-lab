@@ -26,6 +26,12 @@ import { extractErrorMessage } from '../../core/api';
  * (pull, build) each run tens of seconds. */
 const PROGRESS_POLL_MS = 500;
 
+/** How often the destination-save modal polls GET /backup-target/kopia-status
+ * while waiting for Kopia to restart. Kopia's own entrypoint (connect/create,
+ * a network round trip for anything but a local disk) takes longer than a
+ * dump step does, so this is slower than PROGRESS_POLL_MS above. */
+const KOPIA_STATUS_POLL_MS = 1000;
+
 /**
  * Backups & restore on its own route (§131.1): the schedule, the on-demand
  * "Back up now" run, what Kopia actually holds, and the list of restorable
@@ -88,6 +94,18 @@ export class BackupsComponent implements OnInit, OnDestroy {
   protected runError: string | null = null;
   private pollSubscription?: Subscription;
 
+  // Kopia always restarts to pick up a saved destination (§581) — this modal
+  // polls GET /backup-target/kopia-status until it reconnects, since `docker
+  // compose up -d` returns as soon as the container starts, well before its
+  // entrypoint has actually connected (or failed) against the new target.
+  protected showDestinationRestartModal = false;
+  protected destinationRestartDone = false;
+  protected destinationRestartOk = false;
+  protected destinationRestartDetail = '';
+  private destinationPollSubscription?: Subscription;
+  private destinationRestartAttempts = 0;
+  private readonly DESTINATION_RESTART_MAX_ATTEMPTS = 60; // 60 * 1s = 1 minute
+
   ngOnInit(): void {
     this.loadBackups();
     this.loadRemoteBackups();
@@ -97,6 +115,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
   }
 
   ngOnDestroy(): void {
+    this.destinationPollSubscription?.unsubscribe();
     this.pollSubscription?.unsubscribe();
   }
 
@@ -340,6 +359,9 @@ export class BackupsComponent implements OnInit, OnDestroy {
           this.backupTargetFeedback = { type: 'success', message: response.message };
           this.backupTargetForm.controls.password.reset('');
           this.loadBackupTarget();
+          if (response.restarted) {
+            this.startDestinationRestartWait();
+          }
         },
         error: (error) =>
           (this.backupTargetFeedback = {
@@ -347,6 +369,42 @@ export class BackupsComponent implements OnInit, OnDestroy {
             message: extractErrorMessage(error, 'Unable to save the backup destination.'),
           }),
       });
+  }
+
+  /** Polls Kopia's own connection status until it reconnects against the
+   * destination just saved, or the attempt budget above runs out — the save
+   * request itself only proves `docker compose up -d` was issued, not that
+   * the new destination actually works (plan.md §581). */
+  private startDestinationRestartWait(): void {
+    this.destinationPollSubscription?.unsubscribe();
+    this.destinationRestartAttempts = 0;
+    this.destinationRestartDone = false;
+    this.destinationRestartOk = false;
+    this.destinationRestartDetail = 'Waiting for Kopia to restart…';
+    this.showDestinationRestartModal = true;
+
+    this.destinationPollSubscription = timer(0, KOPIA_STATUS_POLL_MS)
+      .pipe(
+        switchMap(() =>
+          this.settingsService
+            .getKopiaStatus()
+            .pipe(catchError(() => of({ ok: false, detail: 'Kopia is not reachable yet.' })))
+        )
+      )
+      .subscribe((status) => {
+        this.destinationRestartAttempts++;
+        this.destinationRestartDetail = status.detail;
+        if (status.ok || this.destinationRestartAttempts >= this.DESTINATION_RESTART_MAX_ATTEMPTS) {
+          this.destinationRestartDone = true;
+          this.destinationRestartOk = status.ok;
+          this.destinationPollSubscription?.unsubscribe();
+        }
+      });
+  }
+
+  closeDestinationRestartModal(): void {
+    this.showDestinationRestartModal = false;
+    this.destinationPollSubscription?.unsubscribe();
   }
 
   testBackupTarget(): void {

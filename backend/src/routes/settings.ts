@@ -15,6 +15,8 @@ import {
 } from '../utils/backupTarget';
 import { testBackupTarget } from '../services/backupTargetTest';
 import { applyKopiaTarget } from '../services/kopiaTargetApply';
+import { checkKopiaConnection } from '../services/kopiaClient';
+import { readAppEnvValue } from '../services/appEnv';
 import { MAIL_SETTINGS_KEYS, defaultPort, getMailConfig } from '../utils/mailSettings';
 import { testMailConnection } from '../services/mailTest';
 import { EXPOSURE_SETTINGS_KEYS, getExposureConfig, getNpmApiUrl } from '../utils/exposureSettings';
@@ -642,6 +644,21 @@ router.put('/backup-target', validateBody(schemas.backupTarget), async (req: Req
   } catch {
     return res.status(500).json({ error: 'Unable to save the backup destination.' });
   }
+});
+
+// ---------------------------------------------------------------------------
+// GET /api/settings/backup-target/kopia-status — polled by the destination
+// save modal after PUT above recreates the container, since `docker compose
+// up -d` returns as soon as the container starts, well before its entrypoint
+// has actually reconnected (or failed to) against the new destination
+// (plan.md §581).
+// ---------------------------------------------------------------------------
+router.get('/backup-target/kopia-status', async (_req: Request, res: Response) => {
+  const password = readAppEnvValue('kopia', 'KOPIA_SERVER_PASSWORD');
+  if (!password) {
+    return res.json({ ok: false, detail: 'Kopia has no password configured yet.' });
+  }
+  return res.json(await checkKopiaConnection(password));
 });
 
 // ---------------------------------------------------------------------------

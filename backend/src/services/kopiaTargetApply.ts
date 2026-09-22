@@ -272,20 +272,6 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
 
   const savedNote = 'Saved.';
 
-  // Whether Kopia was actually serving traffic before this — decides whether
-  // to bring it back up below. The volume cleanup itself must NOT be gated
-  // on this: a stopped-but-still-`docker compose up`'d container (e.g. state
-  // `Created`, never started) still holds a reference to the old volume, so
-  // skipping cleanup here left the volume's baked-in mount options (CIFS
-  // driver_opts are immutable once a volume exists) stale for the *next*
-  // manual Start to silently reuse — found live (plan.md §396): a save from
-  // SMB to ftp while Kopia was stopped, then Start, still tried mounting the
-  // old dead SMB host. Docker volumes don't self-heal on a definition change
-  // (`docker compose up` only warns "doesn't match configuration... Recreate
-  // (data will be lost)?" and, with no TTY to answer, keeps the old one).
-  const running = await run('docker', ['ps', '-q', '-f', 'name=kopia'], 10_000);
-  const wasRunning = Boolean(running.output.trim());
-
   const envFile = path.join(resolved.appDir, '.env');
   const composeArgs = ['compose', '-f', resolved.composeFile, '--env-file', envFile, '-p', KOPIA_SERVICE];
 
@@ -303,10 +289,12 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
   // repository location's stale, immutable mount options.
   await run('docker', ['volume', 'rm', '-f', VOLUME_NAME], 20_000);
 
-  if (!wasRunning) {
-    return { applied: true, restarted: false, detail: `${savedNote} Start Kopia to use it.` };
-  }
-
+  // Always bring it back up, regardless of whether it was running before —
+  // a saved destination the user has to remember to separately go Start is
+  // exactly the "no user step" principle 3 rules out (plan.md §581). Found
+  // live: a save while Kopia happened to be stopped mid-diagnosis left the
+  // new destination configured but inert until someone noticed and hit
+  // Start by hand.
   const up = await run('docker', [...composeArgs, 'up', '-d']);
   if (up.code !== 0) {
     return {
