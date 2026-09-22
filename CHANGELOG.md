@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.129.1] — 2026-09-22
+
+### Backups
+
+- Auto-create the target directory when applying a WebDAV backup destination, so a fresh subpath (the recommended way to keep Kopia's repository out of a general-purpose WebDAV share) doesn't silently fail with PROPFIND 404
+
 ## [0.129.0] — 2026-09-21
 
 ### Backups

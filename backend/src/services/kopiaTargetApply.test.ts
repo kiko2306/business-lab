@@ -8,7 +8,7 @@ vi.mock('../utils/logger', () => ({
 }));
 
 import { BackupTarget } from '../utils/backupTarget';
-import { buildEnvValues, ensureKopiaRepoDir } from './kopiaTargetApply';
+import { buildEnvValues, ensureKopiaRepoDir, ensureWebdavDirectory } from './kopiaTargetApply';
 
 const base: BackupTarget = {
   kind: 'disk', path: '', server: '', share: '', username: '', password: '', options: '',
@@ -143,5 +143,53 @@ describe('ensureKopiaRepoDir', () => {
   it('falls back to the default device when the .env is absent', () => {
     ensureKopiaRepoDir(dir);
     expect(fs.existsSync(path.join(dir, 'data', 'repository'))).toBe(true);
+  });
+});
+
+// PROPFIND on a missing WebDAV directory 404s and kopia gives up rather than
+// creating it — this MKCOLs every path segment first so a fresh subpath just
+// works. Mocks global fetch rather than hitting a real server.
+describe('ensureWebdavDirectory', () => {
+  const target = { url: 'https://webdav.example.com/kopia-backups', username: 'u', password: 'p', extraArgs: '' };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('MKCOLs each path segment from the root down, with basic auth', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 201 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await ensureWebdavDirectory({ ...target, url: 'https://webdav.example.com/a/b' });
+
+    expect(fetchMock).toHaveBeenNthCalledWith(1, 'https://webdav.example.com/a', expect.objectContaining({ method: 'MKCOL' }));
+    expect(fetchMock).toHaveBeenNthCalledWith(2, 'https://webdav.example.com/a/b', expect.objectContaining({ method: 'MKCOL' }));
+    const headers = fetchMock.mock.calls[0][1].headers as Record<string, string>;
+    expect(headers.Authorization).toBe(`Basic ${Buffer.from('u:p').toString('base64')}`);
+  });
+
+  it('treats 405 (already a collection) as success and keeps going', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 405 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await ensureWebdavDirectory(target);
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('stops and warns on a real failure without throwing', async () => {
+    const fetchMock = vi.fn().mockResolvedValue({ ok: false, status: 401 });
+    vi.stubGlobal('fetch', fetchMock);
+
+    await expect(ensureWebdavDirectory(target)).resolves.toBeUndefined();
+  });
+
+  it('does nothing for an unparsable URL', async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal('fetch', fetchMock);
+
+    await ensureWebdavDirectory({ ...target, url: 'not a url' });
+
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 });

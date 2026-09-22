@@ -38,6 +38,7 @@ import {
   toRcloneRemoteConfig,
   toS3ConnectArgs,
   toWebdavConnectArgs,
+  WebdavConnectArgs,
 } from '../utils/backupTarget';
 import { resolveComposeFile } from '../config/services';
 import { parseEnvFile } from '../utils/envFile';
@@ -99,6 +100,53 @@ function writeKopiaEnv(appDir: string, values: Record<string, string>): void {
  * Exported so the executor's pre-start path can call it too, for the case
  * where Kopia is started from the dashboard before any destination is chosen.
  */
+/**
+ * WebDAV has real directories, unlike S3's flat key namespace — `kopia
+ * repository create webdav` PROPFINDs the target path to check it, but never
+ * MKCOLs a missing one; it just gives up ("PROPFIND /: 404"). A destination
+ * pointed at a fresh subpath (the recommended way to keep a repository out of
+ * a general-purpose WebDAV share, rather than dumping blobs in its root) was
+ * silently broken until that subpath happened to already exist. MKCOL each
+ * path segment from the root down — a nested path needs every parent
+ * collection to exist first, and 405 (already a collection) is success, not
+ * an error. Best-effort and never throws: this only smooths the common case,
+ * Kopia's own connect attempt still reports a real problem clearly.
+ */
+export async function ensureWebdavDirectory(target: WebdavConnectArgs): Promise<void> {
+  let url: URL;
+  try {
+    url = new URL(target.url);
+  } catch {
+    return;
+  }
+  const auth = 'Basic ' + Buffer.from(`${target.username}:${target.password}`).toString('base64');
+  const segments = url.pathname.split('/').filter(Boolean);
+  let builtPath = '';
+  for (const segment of segments) {
+    builtPath += `/${segment}`;
+    try {
+      const res = await fetch(`${url.origin}${builtPath}`, {
+        method: 'MKCOL',
+        headers: { Authorization: auth },
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok && res.status !== 405) {
+        logger.warn('Could not create the WebDAV directory for the Kopia backup destination', {
+          path: builtPath,
+          status: res.status,
+        });
+        return;
+      }
+    } catch (error) {
+      logger.warn('Could not reach the WebDAV server to create the Kopia backup directory', {
+        path: builtPath,
+        error: (error as Error).message,
+      });
+      return;
+    }
+  }
+}
+
 export function ensureKopiaRepoDir(appDir: string): void {
   const envPath = path.join(appDir, '.env');
   const env = fs.existsSync(envPath) ? parseEnvFile(envPath) : {};
@@ -216,6 +264,10 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
     ensureKopiaRepoDir(resolved.appDir);
   } catch (error) {
     return { applied: false, restarted: false, detail: `Could not write Kopia's config: ${(error as Error).message}` };
+  }
+
+  if (target.kind === 'webdav') {
+    await ensureWebdavDirectory(toWebdavConnectArgs(target));
   }
 
   const savedNote = 'Saved.';

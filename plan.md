@@ -28950,3 +28950,63 @@ Verification used only already-exported service functions
 (`getBackupScheduleConfig`, `runAppDataBackup`, `setRetentionPolicy`) called
 from a throwaway script inside the container, mirroring §577's pattern — no
 code changed, nothing added to the repo. TODO item deleted.
+
+## 580. Fixed: a fresh WebDAV backup destination silently failed to initialise
+
+Minutes after §579 closed, the live box's own scheduled/manual "Back up now"
+started failing: `could not provision the Kopia backup source: fetch failed`.
+Root-caused live, two layers deep, both real:
+
+1. `kopia-kopia-1` was crash-looping — `kopia repository connect`/`create`
+   against the configured WebDAV destination (`https://webdav.tx-home-utils.com`)
+   got `401` every restart, so it never reached `kopia server start`; the API
+   port was never listening, which is what `fetch failed` actually meant.
+   Compared Kopia's stored destination password against the `webdav` app's
+   own current one (lengths only, via `readAppEnvValue` inside the container —
+   never printed): 10 chars vs. 64. Stale credential, not a code bug — the
+   user re-saved the destination with the current password via the Backups
+   page.
+2. That unblocked the `401`, but connect then hit `cipher: message
+   authentication failed` on every manifest read — a *different* repository
+   already sitting at that URL, encrypted under a different `KOPIA_PASSWORD`
+   than the one live now. Turned out `https://webdav.tx-home-utils.com` is
+   the user's own general-purpose WebDAV file server (real personal files,
+   confirmed with the user directly) — Kopia's webdav backend writes
+   straight to whatever URL it's given, no subpath, so it had been dumping
+   repository blobs into the root of that share. User repointed the
+   destination at a dedicated subpath instead
+   (`.../turnkeybox_beta_backup`) — the right fix, keeps a repository fully
+   out of a share holding real files.
+
+That surfaced a real, generally-applicable bug, not just this one destination:
+`kopia repository create webdav` PROPFINDs the target path to check it but
+never `MKCOL`s a missing one — `apps/kopia/entrypoint.sh` logged `no
+repository at .../turnkeybox_beta_backup yet — creating one` then `unable to
+get repository storage: ... PROPFIND /: 404` and gave up. Any WebDAV
+destination pointed at a not-yet-existing subpath — the very pattern this
+box just needed — was silently broken. Fixed in
+`kopiaTargetApply.ts`: new `ensureWebdavDirectory()` runs inside
+`applyKopiaTarget()` whenever `target.kind === 'webdav'`, `MKCOL`-ing every
+path segment from the root down (a nested path needs each parent collection
+to exist first) using the exact request the entrypoint later relies on;
+405 (already a collection) counts as success, and any real failure only
+warns — Kopia's own connect attempt still surfaces a genuine problem
+clearly, matching `applyKopiaTarget`'s existing never-throws contract. 4 new
+`kopiaTargetApply.test.ts` cases mock `fetch` to cover the segment-by-segment
+MKCOL, the 405 case, a real failure, and an unparsable URL — the pure parts
+of this file are unit-tested per existing convention; `applyKopiaTarget`
+itself stays proven live only.
+
+Verified live end to end on `beta` (already the running commit — see §579):
+rebuilt and recreated `business-lab-backend-1` with the fix, then called
+`getBackupTarget()` + `applyKopiaTarget(target)` directly inside the
+container (same code the Backups page's save route runs) against the
+already-saved subpath destination. `ensureWebdavDirectory` created the
+directory, Kopia came back up `healthy` and connected clean (no more
+password mismatch — nothing was there before it). Triggered
+`runAppDataBackup('manual')` (same path "Back up now" uses) and polled
+`getBackupSourceStatus` — `sourceStatus` sat at `UPLOADING` for about 5
+minutes (real network transfer, not a hang) and landed on a genuine
+snapshot: `snapshotCount: 1`, `4,619,199,043` bytes, `49,758` files, `0`
+errors. `./scripts/check.sh backend typecheck`/`test` (1159 → 1163) pass.
+Bumped to 0.129.1 (`scripts/bump-version.sh`).
