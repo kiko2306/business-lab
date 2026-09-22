@@ -207,15 +207,6 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
-### Docs
-
-- [ ] **`docs/recovery-troubleshooting.md`'s backup comparison table still
-      describes Kopia's retention as the old hardcoded ladder** (10 latest,
-      24 hourly, 14 daily, 8 weekly, 6 monthly, 2 annual) — stale since
-      plan.md §578/§581 synced the remote retention policy to the schedule's
-      flat "keep last N" instead. Update that row to say retention follows
-      the schedule's count.
-
 ### Backups
 
 - [ ] **Full Backup has no restore flow in the dashboard** — `restoreSnapshot`

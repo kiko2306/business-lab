@@ -27455,3 +27455,13 @@ which is the whole reason for running it on both sides.
 
 Plan-only, no version bump. Its own `plan:` commit so the diff is reviewable
 and revertable.
+
+## 589. Fixed the stale Kopia retention row in the recovery docs
+
+`docs/recovery-troubleshooting.md`'s "off-site vs per-app" comparison table
+still described Kopia's retention as the old hardcoded ladder (10 latest, 24
+hourly, 14 daily, 8 weekly, 6 monthly, 2 annual). That stopped being true at
+§578/§581, which made `syncRetention`/`retentionFromCount` derive the global
+policy from the schedule's own retention count — `keepLatest: N` with every
+other tier zeroed — re-asserted before each run. The row now says exactly
+that. Docs-only; no code touched.
