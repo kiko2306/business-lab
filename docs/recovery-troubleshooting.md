@@ -51,6 +51,27 @@ There are **two** backups, for different jobs:
 - Covers the dashboard's Postgres plus a slice of its settings/users. Nothing
   to do with the managed apps.
 
+### Full Backup restore (manual, no dashboard flow yet)
+
+The dashboard only *lists* what Kopia holds (Backups page → "Full Backups") —
+there is no restore button. Restoring a Kopia snapshot needs a target-path
+picker, unlike the local archives' one-click restore, and that UI was
+deliberately never built (`plan.md` §577); `kopiaClient.ts`'s
+`restoreSnapshot`/`getRestoreTaskStatus` exist but aren't wired to any route.
+This is the whole `apps/` tree in one snapshot, so treat it as disaster
+recovery (the box is gone, or you need last week's state across every app) —
+for rolling back one app, use its card's own Restore instead.
+
+1. Open Kopia's own web UI directly — `http://<this-box>:10470` (`docs/ports.md`),
+   separate from the dashboard.
+2. Log in: username `kopia`, password is `KOPIA_SERVER_PASSWORD` — check it on
+   the Kopia app's **Configuration** panel in the dashboard.
+3. Browse to the snapshot you want (by date or retention tag) and use Kopia's
+   own **Restore** action, pointing it at a target path. Restore to a scratch
+   directory first, not straight over the live `apps/` tree.
+4. Stop the affected app(s) — or the whole stack, for a full disaster-recovery
+   restore — copy the restored files into place, then start again.
+
 ### Per-app snapshots
 
 - List: `GET /api/services/:name/backups` · Create: `POST

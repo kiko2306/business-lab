@@ -29113,3 +29113,14 @@ that failure as best-effort (comment: "no destination configured yet or
 Kopia unreachable both come back as an empty list rather than an error"), so
 the string never reaches the UI. `./scripts/check.sh frontend test`/`build`
 pass (77, same as §582 — no test named the old headings). Bumped to 0.129.4.
+
+## 584. Documented the manual Full Backup restore procedure
+
+User asked how to restore a Full Backup; answer had to be derived from code
+(no route wired — §577) and `docs/ports.md`/`docs/app-credentials.md`, since
+`docs/recovery-troubleshooting.md`'s Backup/restore section only ever
+documented the Management-stack and per-app restores, never the off-site
+one. Added a "Full Backup restore (manual, no dashboard flow yet)" section
+there — Kopia's own UI at its published port, `kopia`/`KOPIA_SERVER_PASSWORD`
+login, restore-to-scratch-path via Kopia's own Restore action, then move
+files into place with the app(s) stopped. Docs-only, no version bump.
