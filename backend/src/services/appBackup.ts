@@ -128,7 +128,7 @@ export function resolveAppBackupPath(name: string, file: string): string {
   return resolved;
 }
 
-function manifestPathFor(archivePath: string): string {
+export function manifestPathFor(archivePath: string): string {
   return archivePath.replace(/\.tar\.gz$/, '.manifest.json');
 }
 
@@ -143,7 +143,7 @@ function toDump(o: { target: string; kind: string; bytes?: number; detail: strin
  * directly.
  */
 let backupsVolume: string | null | undefined;
-async function backupsVolumeName(): Promise<string | null> {
+export async function backupsVolumeName(): Promise<string | null> {
   if (backupsVolume !== undefined) {
     return backupsVolume;
   }
@@ -174,7 +174,7 @@ async function backupsVolumeName(): Promise<string | null> {
  * prune succeed; only the archive file lands root:root 0644, which the backend
  * can still stat, serve and unlink from a directory it owns.
  */
-async function writeArchive(name: string, appDir: string, file: string): Promise<void> {
+export async function writeArchive(name: string, appDir: string, file: string): Promise<void> {
   const vol = await backupsVolumeName();
   if (vol) {
     await runCommand(

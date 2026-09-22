@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.130.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.131.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -209,17 +209,17 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Backups
 
-- [ ] **Full Backup restore, step 2: the route** — `POST
-      /api/backups/full/restore { snapshotId, app }`, doing plan.md §590's
-      five steps. Step 1 is settled: plan.md §591 proved the Kopia HTTP API
-      accepts a path-suffixed root, so the app's subtree is just
-      `` `${snapshot.rootId}/${app}` `` passed to the existing
-      `restoreSnapshot` — no new client function, no whole-tree staging. What
-      is left: restore to a staging path, poll `getRestoreTaskStatus`, `tar`
-      **only `data/`** out of the result (§591 — the staged tree also holds
-      the snapshot's `.env` and compose files, and restoring those over live
-      ones would undo any credential rotated since) into
-      `backups/apps/<app>/`, then hand off to the existing `restoreOneApp`.
+- [ ] **Confirm the snapshot restore works live** — plan.md §592 added `POST
+      /api/backups/remote/restore` and a new `./data/restore:/restore` bind
+      on Kopia. Nothing here has run against the real stack. On `beta`, with
+      Kopia's app recreated so the new mount exists: pick a small app (ntfy),
+      call the route with a real snapshot id, and confirm (a) the app comes
+      back up with its data, (b) a `<app>-snapshot-*.tar.gz` appears in that
+      app's own backup list with a readable manifest, (c)
+      `apps/kopia/data/restore/` is empty afterwards, and (d) the app's
+      secrets file is **unchanged** — rotate a credential first, then restore
+      an older snapshot and confirm the rotated value survives. Delete this
+      item once all four pass.
 - [ ] **Full Backup restore, step 3: the UI** — a **Restore** button per
       snapshot on the Backups page, opening a modal that picks exactly one
       app and warns that the app will be stopped and its data replaced. No

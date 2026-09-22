@@ -27567,3 +27567,62 @@ alone — restoring a snapshot's `.env` over a live one would undo any
 credential the dashboard has rotated since. Noted here because it is the
 first real constraint on step 2's shape, and it came out of the spike rather
 than the design.
+
+## 592. Full Backup restore, step 2: the route
+
+§590 set the shape and §591 removed step 1 from it. This is the route, and it
+is small because almost nothing about a restore had to be written.
+
+### What was built
+
+`services/snapshotRestore.ts` — `restoreAppFromSnapshot(snapshotId, app, userId)`:
+
+1. Look the snapshot up by id in `listSnapshots` (404 if retention has since
+   dropped it — checked *before* the app is touched).
+2. `restoreSnapshot(pw, { rootId: `${rootId}/${app}`, targetPath: `/restore/${app}` })`
+   — §591's path-suffixed root, so no browse call and no whole-tree staging.
+3. Poll `getRestoreTaskStatus` to completion. A Kopia failure throws here, so
+   the app is never stopped for a restore that has nothing to put back.
+4. `writeArchive(app, <staged tree>, file)` — the staged tree is
+   `apps/<app>`-shaped, which is exactly what the per-app archive writer
+   already takes as an "appDir", so it is reused verbatim. A manifest sidecar
+   is written beside it so the archive reads as a normal restore point in the
+   app's own backup list afterwards.
+5. `restoreOneApp(app, file, userId)` — the existing, proven stop → replace
+   `data/` → replay the DB dump → start, under its own maintenance lock.
+
+`POST /api/backups/remote/restore { snapshotId, app }` in `routes/backup.ts`,
+behind the router's existing `backups:manage` gate, with an audit log entry
+either way. Three helpers in `appBackup.ts` (`writeArchive`,
+`backupsVolumeName`, `manifestPathFor`) went from private to exported; no
+behaviour there changed.
+
+### Two things that decided the design
+
+**Kopia mounts the apps tree read-only**, and shares no writable volume with
+the backend, so a restore had nowhere to land. `apps/kopia/docker-compose.yml`
+gains one bind, `./data/restore:/restore` — cleared before each restore (a
+half-finished tree from a killed run would otherwise merge into the new one
+and ride along into the archive) and again in a `finally` afterwards. Both
+clears run as root in a throwaway alpine container: the staged files are
+root-owned and the backend user cannot remove them.
+
+**Only `data/` crosses over**, which §591 flagged. The staged tree also holds
+the snapshot's secrets file and compose files, and restoring those would
+silently undo any credential rotated since the snapshot. Nothing special was
+needed to get this right — `writeArchive` only ever archives `data`, which is
+the second reason reusing it beat writing a bespoke tar step.
+
+### Rejected
+
+Refactoring `restoreOneApp` to take a directory instead of an archive. It
+would skip one tar, at the cost of changing the most destructive proven path
+in the codebase for a saving measured in seconds. Tarring the staged tree
+keeps that path untouched and has a real side benefit: the snapshot-derived
+archive stays behind as an ordinary per-app restore point.
+
+A whole-tree restore is still deliberately absent (§590) — that is the "the
+box is gone" case, with no dashboard to click in.
+
+Step 3, the UI, is the remaining piece. Nothing here has run against the live
+stack yet; the README carries what to test on `beta`.

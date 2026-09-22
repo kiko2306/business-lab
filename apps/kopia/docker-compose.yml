@@ -96,6 +96,13 @@ services:
       - ./data/config:/app/config
       - ./data/cache:/app/cache
       - ./data/logs:/app/logs
+      # Staging area for a per-app restore out of a snapshot (plan.md §592).
+      # The apps tree below is mounted read-only, so Kopia has nowhere else it
+      # may write a restored tree; the backend then tars `<app>/data` out of
+      # here into the backups volume and hands it to the normal per-app
+      # restore. Cleared before and after each restore — nothing here is
+      # durable.
+      - ./data/restore:/restore
       # Where the Kopia repository lives when BACKUP_REPO_KIND=filesystem
       # (disk/SMB/NFS — a three-option local-driver volume, translated by
       # services/kopiaTargetApply.ts). Still declared even for an s3 target:

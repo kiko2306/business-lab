@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.131.0] — 2026-09-22
+
+### Backups
+
+- Restore a single app's data from an offsite Kopia snapshot — new POST /api/backups/remote/restore stages the app's subtree out of the snapshot and hands it to the existing per-app restore
+
 ## [0.130.0] — 2026-09-22
 
 ### Changed

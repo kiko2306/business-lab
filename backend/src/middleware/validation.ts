@@ -124,6 +124,13 @@ export const schemas = {
   backupRestore: Joi.object({
     fileName: backupNameSchema.required(),
   }),
+  backupSnapshotRestore: Joi.object({
+    snapshotId: Joi.string()
+      .trim()
+      .pattern(/^[a-f0-9]{8,64}$/)
+      .required(),
+    app: backupNameSchema.required(),
+  }),
   backupDownloadParams: Joi.object({
     fileName: backupNameSchema.required(),
   }),

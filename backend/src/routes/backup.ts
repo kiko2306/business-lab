@@ -21,6 +21,7 @@ import {
   saveBackupScheduleConfig,
 } from '../services/backup';
 import { getBackupSourceStatus, listSnapshots } from '../services/kopiaClient';
+import { restoreAppFromSnapshot } from '../services/snapshotRestore';
 import { runAppDataBackup } from '../services/backupScheduler';
 import { getBackupProgress } from '../services/backupProgress';
 import { readAppEnvValue } from '../services/appEnv';
@@ -88,6 +89,50 @@ router.get('/remote', async (_req: Request, res: Response) => {
   } catch (error) {
     logger.error('Unable to list remote backups', { error: (error as Error).message });
     return res.status(500).json({ error: 'Unable to list remote backups.' });
+  }
+});
+
+/**
+ * Restore ONE app's data out of an offsite snapshot (plan.md §590–§592).
+ * Destructive: the app is stopped and its `data/` replaced. The UI confirms
+ * before calling. Whole-tree restore is deliberately not offered here — that
+ * is the "the box is gone" case, and there is no dashboard to click in then
+ * (docs/recovery-troubleshooting.md carries the manual Kopia procedure).
+ */
+router.post('/remote/restore', validateBody(schemas.backupSnapshotRestore), async (req: Request, res: Response) => {
+  const userId = req.user!.id;
+  const { snapshotId, app } = req.body as { snapshotId: string; app: string };
+  try {
+    const result = await restoreAppFromSnapshot(snapshotId, app, userId);
+    await writeAuditLog({
+      userId,
+      action: 'backup_snapshot_restore',
+      resource: app,
+      result: result.warnings.length ? 'failure' : 'success',
+      metadata: { snapshotId, file: result.file, warnings: result.warnings },
+    });
+    return res.json({
+      success: true,
+      ...result,
+      message: result.warnings.length
+        ? `Restored ${app} from the snapshot with warnings — see the details.`
+        : `Restored ${app} from the snapshot.`,
+    });
+  } catch (error) {
+    const err = error as Error & { statusCode?: number };
+    logger.error('Snapshot restore failed', { userId, app, snapshotId, error: err.message });
+    await writeAuditLog({
+      userId,
+      action: 'backup_snapshot_restore',
+      resource: app,
+      result: 'failure',
+      metadata: { snapshotId, error: err.message },
+    });
+    // A 4xx from the service layer is user-actionable (unknown app, snapshot
+    // gone, Kopia unconfigured) and its message is safe to show as-is.
+    return res.status(err.statusCode ?? 500).json({
+      error: err.statusCode ? err.message : 'Unable to restore that app from the snapshot.',
+    });
   }
 });
 
