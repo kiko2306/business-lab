@@ -27670,3 +27670,73 @@ starts unchosen, the API is not called without an app, the right snapshot id
 and app are sent and the result is surfaced, a warning-carrying restore
 toasts as an error rather than a success, a failure keeps the modal open, and
 an in-flight restore refuses to close.
+
+## 594. Testing the snapshot restore and the collapsed `run()` paths on `beta`
+
+`beta` pulled onto the box and tested at the user's request. The containers
+were rebuilt and recreated by hand this time (the user asked for it directly
+rather than driving the self-update panel); Kopia had to be **recreated**, not
+restarted, for §592's `./data/restore:/restore` bind to exist. Worth noting
+for next time: `GET /version` said `0.132.0` before any of this, because it
+reads the `VERSION` file live out of the bind-mounted checkout — it tracks the
+file, not the compiled code, so it is not evidence that a build is deployed.
+`ls dist/services/<new file>.js` inside the backend container is.
+
+### Snapshot restore (§592/§593) — passed, all four checks
+
+Driven through the compiled `restoreAppFromSnapshot` inside the backend
+container, the same way §591's spike was: no dashboard login needed, and it
+is the same code path the route calls. ntfy, restored from the *older* of the
+two snapshots, with a marker file planted in `apps/ntfy/data/` first so a real
+replacement would be visible.
+
+```
+RESULT { app: ntfy, restoredBytes: 382837, restoredFiles: 8, warnings: [] }   37s end to end
+```
+
+- **(a)** ntfy came back `healthy`, and the planted marker was **gone** — the
+  data really was replaced, not merged over.
+- **(b)** `backups/apps/ntfy/ntfy-snapshot-2026-09-22T14-46-01-193Z.tar.gz`
+  plus a readable manifest sidecar.
+- **(c)** `apps/kopia/data/restore/` empty afterwards.
+- **(d)** proven **structurally**, which is stronger than the check the README
+  asked for. Rotating a credential first was impossible — the `.claude` hooks
+  deny writing `.env`, correctly — so instead: the archive's only top-level
+  entry is `data`, so it *cannot* carry a secrets file, and `apps/ntfy/.env`'s
+  mtime is still `2026-09-12T18:21:34` while `data/` reads `14:46:03` today.
+
+The 37 s was almost all Kopia re-fetching content blocks from the WebDAV
+destination; the local half (tar, stop, start) was ~5 s.
+
+### The nine collapsed `run()` callers (§586) — two of three shapes proven
+
+The first pass "passed" all four probes in ~1 ms each for two of them, which
+was the tell: they had returned early without spawning anything. A caller that
+does no work proves nothing about the helper that runs its child process.
+
+- **`backupTargetTest.testBackupTarget`** — proven. 3.1 s, a real WebDAV round
+  trip: *"Server reachable and credentials accepted. A repository already
+  exists at …"*. That exercises `runArgv` and the 20 s probe budget.
+- **`npmConfigWriter.testNpmConfig`** — proven. 7.4 s, `nginx -t` inside NPM's
+  own container via `runShell`, clean.
+- **`removedAppCleanup.reconcileRemovedAppProjects`** — proven, end to end,
+  after building it a real orphan: a throwaway compose project
+  `zzz-orphan-test` running an alpine container, plus an
+  `apps/zzz-orphan-test/` directory with data and **no** compose file (which
+  is what `selectOrphanAppDirs` keys off). The sweep tore the project down
+  (10.5 s `docker compose down` through `runShell`) and deleted the directory.
+  Both confirmed gone afterwards.
+- **`exposureConfigFiles.applyExposureConfigFiles`** — **not proven.** It is a
+  no-op for every app but `home-assistant` (the only one with an
+  `exposureConfigFile`), and only does work when that app's exposure row is
+  enabled. Home Assistant is installed but not running on this box, so the
+  call returned in 0 ms without reaching `runShell`. Still open.
+
+### Not tested
+
+The `$`-in-a-backup-password item (§585). Proving it live means setting the
+WebDAV destination's password to something containing `a$&b` — which would
+overwrite the live destination password with a test value that cannot be put
+back, since reading the original is denied. Left alone deliberately; the unit
+tests on `writeEnvValues` stand, and the live check needs a throwaway
+destination rather than the working one.

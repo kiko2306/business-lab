@@ -209,30 +209,21 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Backups
 
-- [ ] **Confirm the snapshot restore works live** — plan.md §592 added `POST
-      /api/backups/remote/restore` and a new `./data/restore:/restore` bind
-      on Kopia, and §593 the UI that drives it. Nothing here has run against
-      the real stack. On `beta`, with Kopia's app recreated so the new mount
-      exists: open the Backups page, press **Restore an app** on a snapshot,
-      pick a small app (ntfy), and confirm (a) the app comes back up with its
-      data, (b) a `<app>-snapshot-*.tar.gz` appears in that app's own backup
-      list with a readable manifest, (c)
-      `apps/kopia/data/restore/` is empty afterwards, and (d) the app's
-      secrets file is **unchanged** — rotate a credential first, then restore
-      an older snapshot and confirm the rotated value survives. Delete this
-      item once all four pass.
 
 ### Exposure and platform
 
-- [ ] **Confirm the nine collapsed `run()` call paths still work live** —
-      plan.md §586 replaced nine per-service child-process wrappers with
-      `utils/run.ts`, changing timeout behaviour on all of them. Unit tests
-      cover the helper, not the callers. On `beta`, exercise one path per
-      shape: remove an app from the registry and confirm its leftovers are
-      cleaned up (`removedAppCleanup`), reload NPM config after an exposure
-      change (`exposureConfigFiles`, `npmConfigWriter`), and hit the backup
-      destination **Test** button (`backupTargetTest`, the 20 s probe
-      budget). Delete this item once all three pass.
+- [ ] **Confirm `exposureConfigFiles` still works live** — the last
+      unproven caller of the collapsed `run()` helper (plan.md §586, tested
+      in §594). The other two shapes passed on `beta`: `backupTargetTest`
+      did a real WebDAV probe, `npmConfigWriter` ran a clean `nginx -t`, and
+      `removedAppCleanup` tore down a purpose-built orphan project and
+      deleted its directory. `applyExposureConfigFiles` is a no-op for every
+      app but Home Assistant, and only acts when its exposure row is
+      enabled — HA is installed but not running here, so the call returned
+      in 0 ms without ever reaching `runShell`. Start Home Assistant, confirm
+      it is exposed, then apply an exposure change and check its
+      `configuration.yaml` gets the marked proxy block. Delete this item once
+      that passes.
 - [ ] **Confirm a `$` in a backup-destination password now survives** — the
       `.env` writer used to expand `$&`/`` $` ``/`$'`/`$1` in a value
       (plan.md §585, fixed with `utils/envFile.ts`'s `writeEnvValues`). On
