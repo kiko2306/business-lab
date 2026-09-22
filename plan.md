@@ -27465,3 +27465,65 @@ hourly, 14 daily, 8 weekly, 6 monthly, 2 annual). That stopped being true at
 policy from the schedule's own retention count — `keepLatest: N` with every
 other tier zeroed — re-asserted before each run. The row now says exactly
 that. Docs-only; no code touched.
+
+## 590. Full Backup restore: the shape, and the one unknown
+
+The README has carried "Full Backup has no restore flow in the dashboard"
+since §577 called it "a separate, larger piece of work"; §584 documented a
+manual Kopia-UI procedure as the stopgap. `restoreSnapshot` and
+`getRestoreTaskStatus` have existed in `services/kopiaClient.ts` that whole
+time with no route and no UI calling them. The TODO item asked for the shape
+to be decided before anything was built. This section decides it.
+
+### Whole-snapshot vs per-app: per-app only
+
+A whole-snapshot restore is the disaster case — the box is gone. In that case
+there is no dashboard to click a button in, so a dashboard flow cannot be the
+answer to it; §584's manual Kopia-UI procedure is, and it stays a doc. What
+the dashboard can usefully own is the other case: the box is fine and *one
+app's data is wrong*. That is per-app, and it is the whole scope here.
+
+### Does the dashboard stop/start the app: yes — but none of that is new code
+
+`restoreOneApp()` in `services/appBackup.ts` already does the entire dance,
+under `withMaintenanceLock`: stop the app, replace `data/` as root inside an
+alpine container (preserving live `data/db` for the SQL replay), bring the
+backup service up alone and wait for it healthy, replay the dump, start the
+app again. That is the hard and already-proven half of any restore. A Kopia
+restore must not reinvent it.
+
+### The shape
+
+The only genuinely new work is getting one app's files out of a Kopia
+snapshot and into the shape `restoreOneApp` already accepts — a `.tar.gz` in
+`backups/apps/<name>/`. Then the existing per-app restore runs unchanged:
+
+```
+POST /api/backups/full/restore  { snapshotId, app }
+  1. browse the snapshot root -> child object id for `<app>`   NEW
+  2. restoreSnapshot(oid, targetPath=<staging>/<app>)          exists
+  3. poll getRestoreTaskStatus                                 exists
+  4. tar the result into backups/apps/<app>/<app>-from-snapshot-<ts>.tar.gz
+  5. restoreOneApp(app, thatFile, userId)                      exists
+```
+
+UI: the Backups page already lists snapshots. One **Restore** button per
+snapshot, opening a modal that picks exactly one app, with the "this stops
+the app and replaces its data" warning. No path picker, no multi-select.
+
+### The one unknown — step 1
+
+Whether Kopia's server API exposes a directory listing for a snapshot's root
+object (so the `apps/<name>` child oid can be addressed directly) is not
+established. Snapshots are taken of `/source/apps`, so the root is the whole
+tree and a per-app restore needs the child. If no such listing exists, the
+fallback costs no new API surface: restore the whole root to staging and
+`tar` the one subdirectory out of it — more I/O and more time, same five
+steps. Spiking that against the live Kopia is the first piece of work, before
+any route or UI is written, because the answer changes step 2's argument and
+nothing else.
+
+Deliberately out of scope: whole-tree restore, arbitrary path selection,
+restore to an alternate location. Whole-tree gets revisited when someone
+actually wants to rebuild a live box in place — and §584's manual procedure
+is likely still the right answer then.
