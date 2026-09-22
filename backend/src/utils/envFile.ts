@@ -25,3 +25,36 @@ export function parseEnvFile(envFilePath: string): Record<string, string> {
 
   return values;
 }
+
+/**
+ * Set each given KEY in an `.env` file, replacing the existing line or
+ * appending one, and write the file back only if something actually changed.
+ * Creates the file if it is absent.
+ *
+ * Line-based on purpose. This replaced two identical regex versions (Kopia's
+ * backup destination and WebDAV's storage mount) that built the new line as a
+ * `String.replace` *replacement string* — so a `$&`, `` $` ``, `$'` or `$1`
+ * anywhere in the value expanded instead of being written literally. Every
+ * value these two callers write is a user-entered secret (a WebDAV or S3
+ * password, an SMB `password=` mount option), which is exactly where a `$`
+ * turns up and exactly where a silent corruption is hardest to diagnose: the
+ * `.env` looks plausible and Kopia just fails to connect.
+ */
+export function writeEnvValues(envFilePath: string, values: Record<string, string>): void {
+  const existing = fs.existsSync(envFilePath) ? fs.readFileSync(envFilePath, 'utf8') : '';
+  const lines = existing === '' ? [] : existing.replace(/\n$/, '').split('\n');
+
+  for (const [key, value] of Object.entries(values)) {
+    const index = lines.findIndex((line) => line.startsWith(`${key}=`));
+    if (index >= 0) {
+      lines[index] = `${key}=${value}`;
+    } else {
+      lines.push(`${key}=${value}`);
+    }
+  }
+
+  const updated = lines.length === 0 ? '' : `${lines.join('\n')}\n`;
+  if (updated !== existing) {
+    fs.writeFileSync(envFilePath, updated);
+  }
+}

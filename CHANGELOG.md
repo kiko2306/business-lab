@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.129.5] — 2026-09-22
+
+### Fixed
+
+- A `$` in a WebDAV/S3/SMB backup-destination password was silently corrupted when written to Kopia's `.env`
+
 ## [0.129.4] — 2026-09-22
 
 ### Backups

@@ -27,7 +27,7 @@ import { spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { BackupTarget, toMountSpec } from '../utils/backupTarget';
-import { parseEnvFile } from '../utils/envFile';
+import { parseEnvFile, writeEnvValues } from '../utils/envFile';
 import logger from '../utils/logger';
 
 export const WEBDAV_SERVICE = 'webdav';
@@ -93,20 +93,6 @@ function readRecordedMountEnv(env: Record<string, string>): Record<string, strin
     WEBDAV_MOUNT_OPTIONS: env.WEBDAV_MOUNT_OPTIONS ?? '',
     WEBDAV_MOUNT_DEVICE: env.WEBDAV_MOUNT_DEVICE ?? '',
   };
-}
-
-function writeEnvValues(envPath: string, values: Record<string, string>): void {
-  const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
-  let updated = existing;
-  for (const [key, value] of Object.entries(values)) {
-    const line = `${key}=${value}`;
-    updated = new RegExp(`^${key}=.*$`, 'm').test(updated)
-      ? updated.replace(new RegExp(`^${key}=.*$`, 'm'), line)
-      : `${updated.endsWith('\n') || updated === '' ? updated : `${updated}\n`}${line}\n`;
-  }
-  if (updated !== existing) {
-    fs.writeFileSync(envPath, updated);
-  }
 }
 
 /**

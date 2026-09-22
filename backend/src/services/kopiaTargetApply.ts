@@ -41,7 +41,7 @@ import {
   WebdavConnectArgs,
 } from '../utils/backupTarget';
 import { resolveComposeFile } from '../config/services';
-import { parseEnvFile } from '../utils/envFile';
+import { parseEnvFile, writeEnvValues } from '../utils/envFile';
 import logger from '../utils/logger';
 
 const KOPIA_SERVICE = 'kopia';
@@ -67,39 +67,6 @@ function run(command: string, args: string[], timeoutMs = 60_000): Promise<{ cod
   });
 }
 
-/**
- * Write env vars into Kopia's own `.env`, replacing every key given —
- * including clearing s3 credentials back to empty when switching to a
- * mount-based kind, so a stale secret access key never lingers in a
- * plaintext `.env` after the destination moves on from it.
- */
-function writeKopiaEnv(appDir: string, values: Record<string, string>): void {
-  const envPath = path.join(appDir, '.env');
-
-  const existing = fs.existsSync(envPath) ? fs.readFileSync(envPath, 'utf8') : '';
-  let updated = existing;
-  for (const [key, value] of Object.entries(values)) {
-    const line = `${key}=${value}`;
-    updated = new RegExp(`^${key}=.*$`, 'm').test(updated)
-      ? updated.replace(new RegExp(`^${key}=.*$`, 'm'), line)
-      : `${updated.endsWith('\n') || updated === '' ? updated : updated + '\n'}${line}\n`;
-  }
-  if (updated !== existing) {
-    fs.writeFileSync(envPath, updated);
-  }
-}
-
-/**
- * Create the local repository directory when the mount is a plain bind
- * (`type=none`). A Docker `local`/`o=bind` volume does NOT create its device
- * path — it fails "no such file or directory" — and every app's gitignored
- * data directory is absent on a fresh clone, so this reaches here with nothing
- * on disk. No-op for
- * nfs/cifs: the export/share is expected to already exist on the server.
- *
- * Exported so the executor's pre-start path can call it too, for the case
- * where Kopia is started from the dashboard before any destination is chosen.
- */
 /**
  * WebDAV has real directories, unlike S3's flat key namespace — `kopia
  * repository create webdav` PROPFINDs the target path to check it, but never
@@ -147,6 +114,16 @@ export async function ensureWebdavDirectory(target: WebdavConnectArgs): Promise<
   }
 }
 
+/**
+ * Create the local repository directory when the mount is a plain bind
+ * (`type=none`). A Docker `local`/`o=bind` volume does NOT create its device
+ * path — it fails "no such file or directory" — and every app's gitignored
+ * data directory is absent on a fresh clone, so this reaches here with nothing
+ * on disk. No-op for nfs/cifs: the export/share is expected to already exist on the server.
+ *
+ * Exported so the executor's pre-start path can call it too, for the case
+ * where Kopia is started from the dashboard before any destination is chosen.
+ */
 export function ensureKopiaRepoDir(appDir: string): void {
   const envPath = path.join(appDir, '.env');
   const env = fs.existsSync(envPath) ? parseEnvFile(envPath) : {};
@@ -257,7 +234,7 @@ export async function applyKopiaTarget(target: BackupTarget): Promise<ApplyResul
   }
 
   try {
-    writeKopiaEnv(resolved.appDir, buildEnvValues(target));
+    writeEnvValues(path.join(resolved.appDir, '.env'), buildEnvValues(target));
     // Still needed even for an s3 target: the compose file's backup-target
     // volume always declares a type=none/bind fallback (see buildEnvValues),
     // and Docker does not create a bind mount's device path on its own.

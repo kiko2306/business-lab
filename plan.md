@@ -29124,3 +29124,43 @@ one. Added a "Full Backup restore (manual, no dashboard flow yet)" section
 there — Kopia's own UI at its published port, `kopia`/`KOPIA_SERVER_PASSWORD`
 login, restore-to-scratch-path via Kopia's own Restore action, then move
 files into place with the app(s) stopped. Docs-only, no version bump.
+
+## 585. Fixed: a `$` in a backup-destination password was silently corrupted
+
+Found in a refactoring/bug sweep, not reported from the live host — which is
+the point: this failure never says what it is. `kopiaTargetApply.ts` and
+`webdavMount.ts` each carried their own copy of the same `.env` writer,
+identical apart from the function name:
+
+```ts
+updated.replace(new RegExp(`^${key}=.*$`, 'm'), line)
+```
+
+`line` is a `String.replace` **replacement string**, so `$&`, `` $` ``, `$'`
+and `$1` in it expand rather than being written literally. Everything these
+two write is user-entered: `BACKUP_WEBDAV_PASSWORD`,
+`BACKUP_S3_SECRET_ACCESS_KEY`, `BACKUP_RCLONE_PASS`, and
+`BACKUP_MOUNT_OPTIONS` (which embeds `password=…` for an SMB mount). A
+WebDAV password of `a$&b` was written as `a` + the whole matched line + `b`.
+The `.env` then looks perfectly plausible and Kopia just fails to connect —
+exactly the diagnosis-resistant shape §580 spent a session on for a
+different cause.
+
+Fixed once, in one place: `utils/envFile.ts` gained `writeEnvValues`,
+line-based rather than regex (the same approach `appEnv.ts` already used and
+got right — the two copies were the outliers, not the rule), and both call
+sites now use it. Net −34 lines. The "clear stale s3 credentials back to
+empty when switching kinds" behaviour the old `writeKopiaEnv` doc claimed is
+not in the writer at all and never was — it comes from `buildEnvValues`'
+all-keys-empty baseline, which is where its doc comment already explains it.
+
+Also tidied in passing: §580 inserted `ensureWebdavDirectory`'s doc comment
+*underneath* `ensureKopiaRepoDir`'s, orphaning the latter above the wrong
+function, so the file documented `ensureWebdavDirectory` twice and
+`ensureKopiaRepoDir` not at all. Moved back.
+
+8 new vitest cases (`utils/envFile.test.ts`, a new file — the helper had no
+test because it wasn't shared): each of the four `$` expansion forms plus a
+plain `$`, replace-in-place vs append, file creation, and the
+don't-rewrite-if-unchanged path. `./scripts/check.sh backend typecheck` and
+`test` (1159 → 1167) pass. Bumped to 0.129.5.
