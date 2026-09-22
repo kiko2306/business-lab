@@ -209,21 +209,17 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Backups
 
-- [ ] **Full Backup restore, step 1: can Kopia list a snapshot's children?**
-      — plan.md §590 settled the shape (per-app only, reusing
-      `restoreOneApp`'s stop/replace/replay/start). The one unknown is
-      whether the Kopia server API exposes a directory listing for a
-      snapshot's root object, so `apps/<name>`'s child object id can be
-      restored directly instead of restoring the whole tree to staging and
-      `tar`-ing one subdirectory out. Spike it against the live Kopia before
-      writing the route — the answer changes step 2's argument and nothing
-      else.
 - [ ] **Full Backup restore, step 2: the route** — `POST
       /api/backups/full/restore { snapshotId, app }`, doing plan.md §590's
-      five steps: resolve the app's tree in the snapshot, `restoreSnapshot`
-      to a staging path, poll `getRestoreTaskStatus`, `tar` the result into
+      five steps. Step 1 is settled: plan.md §591 proved the Kopia HTTP API
+      accepts a path-suffixed root, so the app's subtree is just
+      `` `${snapshot.rootId}/${app}` `` passed to the existing
+      `restoreSnapshot` — no new client function, no whole-tree staging. What
+      is left: restore to a staging path, poll `getRestoreTaskStatus`, `tar`
+      **only `data/`** out of the result (§591 — the staged tree also holds
+      the snapshot's `.env` and compose files, and restoring those over live
+      ones would undo any credential rotated since) into
       `backups/apps/<app>/`, then hand off to the existing `restoreOneApp`.
-      Blocked on step 1.
 - [ ] **Full Backup restore, step 3: the UI** — a **Restore** button per
       snapshot on the Backups page, opening a modal that picks exactly one
       app and warns that the app will be stopped and its data replaced. No

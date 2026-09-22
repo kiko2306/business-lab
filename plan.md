@@ -27527,3 +27527,43 @@ Deliberately out of scope: whole-tree restore, arbitrary path selection,
 restore to an alternate location. Whole-tree gets revisited when someone
 actually wants to rebuild a live box in place — and §584's manual procedure
 is likely still the right answer then.
+
+## 591. Spike: Kopia's HTTP restore accepts a path-suffixed root — step 1 is free
+
+§590's one unknown, answered against the live Kopia (`kopia-kopia-1`, repo
+already connected). Two things were checked, in order.
+
+At the CLI, `kopia ls <rootOid>/vikunja` and `<rootOid>/vikunja/data` both
+list correctly, so object ids take a path suffix there. That alone proves
+nothing about the server API, which is what `kopiaClient` speaks — the CLI
+resolves paths in its own process.
+
+So the API was tested directly, from inside the backend container using the
+app's own compiled `restoreSnapshot`/`getRestoreTaskStatus` and
+`readAppEnvValue` (the Kopia password is never read or printed by hand —
+`.claude` denies that, and the spike did not need to):
+
+```
+restoreSnapshot(pw, { rootId: '<rootOid>/ntfy', targetPath: '/tmp/spike-restore' })
+  -> ACCEPTED, taskId 7
+  -> {"status":"SUCCESS","succeeded":true,"restoredBytes":382837,"restoredFiles":8}
+```
+
+`/tmp/spike-restore` inside the Kopia container then held ntfy's real tree —
+`.env`, `.env.example`, both compose files, `data/` — at 396 K, with mtimes
+and ownership preserved. Artefacts removed afterwards on both containers.
+
+**Consequence: step 1 of §590's five needs no new code at all.** There is no
+directory-browse call to add to `kopiaClient` and no whole-tree staging
+fallback. Resolving an app's subtree is string concatenation —
+`` `${snapshot.rootId}/${app}` `` — passed as `rootId`. The 4.6 GB
+restore-everything-then-tar-one-subdirectory fallback §590 budgeted for is
+dead; delete it from the plan rather than keeping it as an option.
+
+That also means the staging restore lands the app directory *as it was*,
+including its `.env` and compose files, not just `data/`. Step 2 must `tar`
+only what `restoreOneApp` expects to replace (`data/`) and leave the rest
+alone — restoring a snapshot's `.env` over a live one would undo any
+credential the dashboard has rotated since. Noted here because it is the
+first real constraint on step 2's shape, and it came out of the spike rather
+than the design.
