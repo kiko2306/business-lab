@@ -15,7 +15,10 @@ import {
   BackupTargetSettings,
   BackupTargetTestResponse,
   RemoteBackupSnapshot,
+  ServiceStatus,
+  SnapshotRestoreResponse,
 } from '../../core/models';
+import { ServiceStateService } from '../../core/service-state.service';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
@@ -49,6 +52,7 @@ const KOPIA_STATUS_POLL_MS = 1000;
 export class BackupsComponent implements OnInit, OnDestroy {
   private readonly operations = inject(OperationsService);
   private readonly settingsService = inject(SettingsService);
+  private readonly serviceState = inject(ServiceStateService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
   private readonly formBuilder = inject(FormBuilder);
@@ -102,6 +106,16 @@ export class BackupsComponent implements OnInit, OnDestroy {
   protected destinationRestartDone = false;
   protected destinationRestartOk = false;
   protected destinationRestartDetail = '';
+  // Snapshot restore (plan.md §592). One app at a time: a whole-tree restore
+  // is the "the box is gone" case, which has no dashboard to click in.
+  protected restoreSnapshotTarget: RemoteBackupSnapshot | null = null;
+  protected restoreSnapshotApp = '';
+  protected restoringSnapshot = false;
+  protected snapshotRestoreResult: SnapshotRestoreResponse | null = null;
+  protected snapshotRestoreError = '';
+  protected restorableApps: ServiceStatus[] = [];
+  private servicesSubscription?: Subscription;
+
   private destinationPollSubscription?: Subscription;
   private destinationRestartAttempts = 0;
   private readonly DESTINATION_RESTART_MAX_ATTEMPTS = 60; // 60 * 1s = 1 minute
@@ -112,9 +126,16 @@ export class BackupsComponent implements OnInit, OnDestroy {
     this.loadSchedule();
     this.loadBackupStatus();
     this.loadBackupTarget();
+    // The picker needs the app list, not live state, so this takes one
+    // snapshot of it rather than starting the shared poller.
+    this.servicesSubscription = this.serviceState.services$.subscribe((services) => {
+      this.restorableApps = [...(services ?? [])].sort((a, b) => a.label.localeCompare(b.label));
+    });
+    this.serviceState.refresh();
   }
 
   ngOnDestroy(): void {
+    this.servicesSubscription?.unsubscribe();
     this.destinationPollSubscription?.unsubscribe();
     this.pollSubscription?.unsubscribe();
   }
@@ -142,6 +163,56 @@ export class BackupsComponent implements OnInit, OnDestroy {
         },
         error: () => {
           this.remoteBackups = [];
+        },
+      });
+  }
+
+  openSnapshotRestore(snapshot: RemoteBackupSnapshot): void {
+    this.restoreSnapshotTarget = snapshot;
+    this.restoreSnapshotApp = '';
+    this.snapshotRestoreResult = null;
+    this.snapshotRestoreError = '';
+  }
+
+  closeSnapshotRestore(): void {
+    if (this.restoringSnapshot) {
+      return; // mid-restore the app is stopped; closing would hide the outcome
+    }
+    this.restoreSnapshotTarget = null;
+    this.snapshotRestoreResult = null;
+    this.snapshotRestoreError = '';
+  }
+
+  /**
+   * The modal states the consequence and the button says Restore, so this is
+   * the confirmation — a second confirm dialog on top of it would just be a
+   * click to dismiss.
+   */
+  confirmSnapshotRestore(): void {
+    const snapshot = this.restoreSnapshotTarget;
+    const app = this.restoreSnapshotApp;
+    if (!snapshot || !app || this.restoringSnapshot) {
+      return;
+    }
+    this.restoringSnapshot = true;
+    this.snapshotRestoreError = '';
+    this.operations
+      .restoreAppFromSnapshot(snapshot.id, app)
+      .pipe(finalize(() => (this.restoringSnapshot = false)))
+      .subscribe({
+        next: (response) => {
+          this.snapshotRestoreResult = response;
+          if (response.warnings.length) {
+            this.toast.error(response.message);
+          } else {
+            this.toast.success(response.message);
+          }
+          // The staged archive is a normal restore point now, and the app was
+          // stopped and started, so both lists are stale.
+          this.serviceState.refresh();
+        },
+        error: (error) => {
+          this.snapshotRestoreError = extractErrorMessage(error, 'Unable to restore that app from the snapshot.');
         },
       });
   }

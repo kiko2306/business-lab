@@ -27626,3 +27626,47 @@ box is gone" case, with no dashboard to click in.
 
 Step 3, the UI, is the remaining piece. Nothing here has run against the live
 stack yet; the README carries what to test on `beta`.
+
+## 593. Full Backup restore, step 3: the UI
+
+The last of §590's three pieces. Each Full Backup in the Backups page's
+snapshot list gains a **Restore an app** button; it opens a modal that picks
+exactly one application and calls §592's route.
+
+No new modal chrome: the page already carries two dialogs built on
+`.backup-progress-backdrop` / `.backup-progress-dialog` (themselves mirroring
+`confirm-dialog.component.css` rather than pulling in a modal library), so
+this is a third one on the same classes. No CSS was added.
+
+### The modal is the confirmation
+
+There is no second confirm step. The modal names the consequence in an
+alert — the application stops, its data is replaced, anything written since
+is lost, and its credentials and settings are left alone — and the button
+says **Restore**. Stacking `ConfirmService` on top would add a click that
+carries no information the user has not just read.
+
+Cancel is disabled while the restore is in flight, and so is closing:
+mid-restore the application is stopped, and letting the modal close would
+hide the only place the outcome appears. On success the modal switches to the
+result — files and bytes restored, any warnings, and the name of the archive
+the snapshot was staged into, which is a normal restore point for that app
+afterwards. A failure keeps the modal open with the reason visible, so a 404
+from retention having dropped the snapshot reads as itself.
+
+### Where the app list comes from
+
+`ServiceStateService.services$` plus one `refresh()`, rather than a new
+endpoint: the page wants the list of applications, not live state, so it takes
+one snapshot of it and does not start the shared poller. `refresh()` is called
+again after a restore, since the application was stopped and started and the
+shell's state is stale. The spec stubs the service down to `services$` +
+`refresh` — injecting the real one drags in `HttpClient`, which this spec does
+not provide (it mocks its collaborators instead), and that is what broke the
+four pre-existing tests until it was stubbed.
+
+Six specs cover the parts that can break silently: the app list is sorted and
+starts unchosen, the API is not called without an app, the right snapshot id
+and app are sent and the result is surfaced, a warning-carrying restore
+toasts as an error rather than a success, a failure keeps the modal open, and
+an in-flight restore refuses to close.

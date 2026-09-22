@@ -1,12 +1,20 @@
 import { HttpErrorResponse } from '@angular/common/http';
 import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
-import { Subject, of } from 'rxjs';
+import { Subject, of, throwError } from 'rxjs';
 import { BackupsComponent } from './backups.component';
 import { OperationsService } from '../../core/operations.service';
 import { ConfirmService } from '../../core/confirm.service';
+import { ServiceStateService } from '../../core/service-state.service';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
-import { BackupProgress, BackupStatusResponse, BackupTargetSettings } from '../../core/models';
+import {
+  BackupProgress,
+  BackupStatusResponse,
+  BackupTargetSettings,
+  RemoteBackupSnapshot,
+  ServiceStatus,
+  SnapshotRestoreResponse,
+} from '../../core/models';
 
 describe('BackupsComponent', () => {
   let fixture: ComponentFixture<BackupsComponent>;
@@ -14,6 +22,20 @@ describe('BackupsComponent', () => {
   let operations: jasmine.SpyObj<OperationsService>;
   let settings: jasmine.SpyObj<SettingsService>;
   let toast: jasmine.SpyObj<ToastService>;
+  let services$: Subject<ServiceStatus[]>;
+  let serviceState: jasmine.SpyObj<ServiceStateService>;
+
+  const snapshot: RemoteBackupSnapshot = {
+    id: 'abc123def456',
+    rootId: 'kdeadbeef',
+    startTime: '2026-09-22T11:48:50.000Z',
+    endTime: '2026-09-22T11:48:56.000Z',
+    sizeBytes: 4619542642,
+    fileCount: 49780,
+    retentionReasons: ['latest-1'],
+  };
+
+  const app = (name: string, label: string) => ({ name, label }) as ServiceStatus;
 
   const emptyBackupTarget: BackupTargetSettings = {
     configured: false,
@@ -105,6 +127,10 @@ describe('BackupsComponent', () => {
     settings.getBackupTarget.and.returnValue(of(emptyBackupTarget));
     toast = jasmine.createSpyObj('ToastService', ['success', 'error']);
     const confirm = jasmine.createSpyObj('ConfirmService', ['ask']);
+    // The page only wants the app list for the restore picker, so the real
+    // poller (websocket + HttpClient) is stubbed down to that.
+    services$ = new Subject<ServiceStatus[]>();
+    serviceState = jasmine.createSpyObj('ServiceStateService', ['refresh'], { services$ });
 
     await TestBed.configureTestingModule({
       imports: [BackupsComponent],
@@ -113,12 +139,109 @@ describe('BackupsComponent', () => {
         { provide: SettingsService, useValue: settings },
         { provide: ConfirmService, useValue: confirm },
         { provide: ToastService, useValue: toast },
+        { provide: ServiceStateService, useValue: serviceState },
       ],
     }).compileComponents();
 
     fixture = TestBed.createComponent(BackupsComponent);
     component = fixture.componentInstance;
     fixture.detectChanges();
+  });
+
+  describe('restoring one app from a snapshot', () => {
+    beforeEach(() => {
+      operations.restoreAppFromSnapshot = jasmine.createSpy('restoreAppFromSnapshot');
+      services$.next([app('ntfy', 'Ntfy'), app('itflow', 'ITFlow')]);
+      fixture.detectChanges();
+    });
+
+    it('offers the apps alphabetically and starts with none chosen', () => {
+      component.openSnapshotRestore(snapshot);
+
+      expect(component['restorableApps'].map((a) => a.name)).toEqual(['itflow', 'ntfy']);
+      expect(component['restoreSnapshotApp']).toBe('');
+    });
+
+    it('will not call the API until an app is chosen', () => {
+      component.openSnapshotRestore(snapshot);
+      component.confirmSnapshotRestore();
+
+      expect(operations.restoreAppFromSnapshot).not.toHaveBeenCalled();
+    });
+
+    it('sends the snapshot id and app, then reports the outcome', () => {
+      operations.restoreAppFromSnapshot.and.returnValue(
+        of({
+          success: true,
+          app: 'ntfy',
+          snapshotId: snapshot.id,
+          file: 'ntfy-snapshot-2026.tar.gz',
+          restoredBytes: 382837,
+          restoredFiles: 8,
+          warnings: [],
+          message: 'Restored ntfy from the snapshot.',
+        })
+      );
+
+      component.openSnapshotRestore(snapshot);
+      component['restoreSnapshotApp'] = 'ntfy';
+      component.confirmSnapshotRestore();
+
+      expect(operations.restoreAppFromSnapshot).toHaveBeenCalledWith('abc123def456', 'ntfy');
+      expect(toast.success).toHaveBeenCalledWith('Restored ntfy from the snapshot.');
+      expect(component['snapshotRestoreResult']?.file).toBe('ntfy-snapshot-2026.tar.gz');
+      expect(component['restoringSnapshot']).toBeFalse();
+      // The app was stopped and started, so the shell's state is stale.
+      expect(serviceState.refresh).toHaveBeenCalled();
+    });
+
+    it('surfaces a warning-carrying restore as an error, not a success', () => {
+      operations.restoreAppFromSnapshot.and.returnValue(
+        of({
+          success: true,
+          app: 'itflow',
+          snapshotId: snapshot.id,
+          file: 'itflow-snapshot.tar.gz',
+          restoredBytes: 1,
+          restoredFiles: 1,
+          warnings: ['Database replay failed: connection refused'],
+          message: 'Restored itflow from the snapshot with warnings — see the details.',
+        })
+      );
+
+      component.openSnapshotRestore(snapshot);
+      component['restoreSnapshotApp'] = 'itflow';
+      component.confirmSnapshotRestore();
+
+      expect(toast.error).toHaveBeenCalled();
+      expect(toast.success).not.toHaveBeenCalled();
+      expect(component['snapshotRestoreResult']?.warnings.length).toBe(1);
+    });
+
+    it('keeps the modal open on failure so the reason is visible', () => {
+      operations.restoreAppFromSnapshot.and.returnValue(
+        throwError(() => new HttpErrorResponse({ status: 404, error: { error: 'That snapshot no longer exists.' } }))
+      );
+
+      component.openSnapshotRestore(snapshot);
+      component['restoreSnapshotApp'] = 'ntfy';
+      component.confirmSnapshotRestore();
+
+      expect(component['snapshotRestoreError']).toContain('no longer exists');
+      expect(component['restoreSnapshotTarget']).toBe(snapshot);
+      expect(component['restoringSnapshot']).toBeFalse();
+    });
+
+    it('refuses to close while the restore is in flight — the app is stopped', () => {
+      operations.restoreAppFromSnapshot.and.returnValue(new Subject<SnapshotRestoreResponse>().asObservable());
+
+      component.openSnapshotRestore(snapshot);
+      component['restoreSnapshotApp'] = 'ntfy';
+      component.confirmSnapshotRestore();
+      component.closeSnapshotRestore();
+
+      expect(component['restoreSnapshotTarget']).toBe(snapshot);
+    });
   });
 
   it('opens the modal and shows each dump step as it polls', fakeAsync(() => {

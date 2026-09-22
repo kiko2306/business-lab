@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.132.0] — 2026-09-22
+
+### Backups
+
+- Backups page: each Full Backup now has a Restore an app button — pick one application and its data is put back from that snapshot
+
 ## [0.131.0] — 2026-09-22
 
 ### Backups

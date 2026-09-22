@@ -395,9 +395,9 @@
       </div>
     </div>
 
-    <!-- What Kopia holds at the configured destination — read-only, since
-         restoring one means picking a target path rather than a one-click
-         action like the local archives above. -->
+    <!-- What Kopia holds at the configured destination. Restore is per-app
+         (plan.md §590): a whole-tree restore is the "the box is gone" case,
+         and there is no dashboard to click in then. -->
     <h3 class="h5 mb-2">Full Backups</h3>
     <div class="list-group">
       <div class="list-group-item text-body-secondary" *ngIf="remoteBackupsLoading">Loading…</div>
@@ -410,8 +410,11 @@
               <ng-container *ngIf="snapshot.sizeBytes !== null"> · {{ formatBytes(snapshot.sizeBytes) }}</ng-container>
             </div>
           </div>
-          <div class="d-flex gap-1 flex-wrap justify-content-end">
+          <div class="d-flex gap-2 flex-wrap justify-content-end align-items-center">
             <span class="badge text-bg-secondary" *ngFor="let reason of snapshot.retentionReasons">{{ reason }}</span>
+            <button type="button" class="btn btn-sm btn-outline-warning" (click)="openSnapshotRestore(snapshot)">
+              Restore an app
+            </button>
           </div>
         </div>
         <div class="list-group-item text-body-secondary" *ngIf="!remoteBackups.length">
@@ -457,6 +460,76 @@
       </div>
       <div class="backup-progress-foot" *ngIf="progress?.phase === 'done' || runError">
         <button type="button" class="btn btn-primary" (click)="closeRunModal()">Close</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="backup-progress-backdrop" *ngIf="restoreSnapshotTarget">
+    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" aria-label="Restore an app from this backup">
+      <div class="backup-progress-body">
+        <h2 class="h5 mb-1">Restore an app</h2>
+        <p class="text-body-secondary small mb-3">
+          From the backup taken {{ restoreSnapshotTarget.startTime | date:'dd/MM/yyyy, HH:mm' }}.
+        </p>
+
+        <ng-container *ngIf="!snapshotRestoreResult">
+          <label class="form-label" for="snapshot-restore-app">Application</label>
+          <select
+            id="snapshot-restore-app"
+            class="form-select mb-3"
+            [(ngModel)]="restoreSnapshotApp"
+            [disabled]="restoringSnapshot"
+          >
+            <option value="">Choose an application&hellip;</option>
+            <option *ngFor="let app of restorableApps" [value]="app.name">{{ app.label }}</option>
+          </select>
+
+          <div class="alert alert-warning small mb-0" role="alert">
+            This <strong>stops the application</strong> and replaces its data with what the backup
+            holds. Anything it has written since is lost. Its credentials and settings are left
+            alone &mdash; only the application's own data is put back.
+          </div>
+
+          <p class="text-body-secondary small mt-2 mb-0" *ngIf="restoringSnapshot">
+            Restoring&hellip; a large application can take several minutes. Leave this open.
+          </p>
+          <p class="text-danger small mt-2 mb-0" *ngIf="snapshotRestoreError">{{ snapshotRestoreError }}</p>
+        </ng-container>
+
+        <ng-container *ngIf="snapshotRestoreResult as result">
+          <p class="mb-2" [class.text-success]="!result.warnings.length" [class.text-danger]="result.warnings.length">
+            {{ result.message }}
+          </p>
+          <p class="text-body-secondary small mb-2" *ngIf="result.restoredFiles !== null">
+            {{ result.restoredFiles }} file{{ result.restoredFiles === 1 ? '' : 's' }} restored<ng-container
+              *ngIf="result.restoredBytes !== null"> &middot; {{ formatBytes(result.restoredBytes) }}</ng-container>.
+          </p>
+          <ul class="small text-danger mb-2 ps-3" *ngIf="result.warnings.length">
+            <li *ngFor="let warning of result.warnings">{{ warning }}</li>
+          </ul>
+          <p class="text-body-secondary small mb-0">
+            Kept as a restore point for this application: <code>{{ result.file }}</code>
+          </p>
+        </ng-container>
+      </div>
+      <div class="backup-progress-foot gap-2">
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          [disabled]="restoringSnapshot"
+          (click)="closeSnapshotRestore()"
+        >
+          {{ snapshotRestoreResult ? 'Close' : 'Cancel' }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-warning"
+          *ngIf="!snapshotRestoreResult"
+          [disabled]="!restoreSnapshotApp || restoringSnapshot"
+          (click)="confirmSnapshotRestore()"
+        >
+          {{ restoringSnapshot ? 'Restoring…' : 'Restore' }}
+        </button>
       </div>
     </div>
   </div>

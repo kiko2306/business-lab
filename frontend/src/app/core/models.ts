@@ -437,6 +437,18 @@ export interface AppBackupCreateResponse {
   message: string;
 }
 
+export interface SnapshotRestoreResponse {
+  success: boolean;
+  app: string;
+  snapshotId: string;
+  /** The per-app archive the snapshot was staged into — a normal restore point afterwards. */
+  file: string;
+  restoredBytes: number | null;
+  restoredFiles: number | null;
+  warnings: string[];
+  message: string;
+}
+
 export interface AppRestoreResponse {
   success: boolean;
   service: string;

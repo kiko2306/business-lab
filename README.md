@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.131.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.132.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -211,19 +211,16 @@ it is done — not ticked off and left behind. Section references point at
 
 - [ ] **Confirm the snapshot restore works live** — plan.md §592 added `POST
       /api/backups/remote/restore` and a new `./data/restore:/restore` bind
-      on Kopia. Nothing here has run against the real stack. On `beta`, with
-      Kopia's app recreated so the new mount exists: pick a small app (ntfy),
-      call the route with a real snapshot id, and confirm (a) the app comes
-      back up with its data, (b) a `<app>-snapshot-*.tar.gz` appears in that
-      app's own backup list with a readable manifest, (c)
+      on Kopia, and §593 the UI that drives it. Nothing here has run against
+      the real stack. On `beta`, with Kopia's app recreated so the new mount
+      exists: open the Backups page, press **Restore an app** on a snapshot,
+      pick a small app (ntfy), and confirm (a) the app comes back up with its
+      data, (b) a `<app>-snapshot-*.tar.gz` appears in that app's own backup
+      list with a readable manifest, (c)
       `apps/kopia/data/restore/` is empty afterwards, and (d) the app's
       secrets file is **unchanged** — rotate a credential first, then restore
       an older snapshot and confirm the rotated value survives. Delete this
       item once all four pass.
-- [ ] **Full Backup restore, step 3: the UI** — a **Restore** button per
-      snapshot on the Backups page, opening a modal that picks exactly one
-      app and warns that the app will be stopped and its data replaced. No
-      path picker, no multi-select (plan.md §590). Blocked on step 2.
 
 ### Exposure and platform
 

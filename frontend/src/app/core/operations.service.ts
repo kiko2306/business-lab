@@ -19,6 +19,7 @@ import {
   BackupScheduleSettings,
   BackupStatusResponse,
   RemoteBackupListResponse,
+  SnapshotRestoreResponse,
   DiscoveredHost,
   HealthStatus,
   ServiceEnvStatus,
@@ -57,6 +58,14 @@ export class OperationsService {
 
   listRemoteBackups(): Observable<RemoteBackupListResponse> {
     return this.http.get<RemoteBackupListResponse>(`${API_BASE_URL}/backups/remote`);
+  }
+
+  /**
+   * Restore ONE app's data out of an offsite snapshot. Destructive — the app
+   * is stopped and its data replaced (plan.md §592).
+   */
+  restoreAppFromSnapshot(snapshotId: string, app: string): Observable<SnapshotRestoreResponse> {
+    return this.http.post<SnapshotRestoreResponse>(`${API_BASE_URL}/backups/remote/restore`, { snapshotId, app });
   }
 
   createBackup(): Observable<{ message: string; fileName: string; downloadUrl: string }> {
