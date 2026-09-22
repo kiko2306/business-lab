@@ -216,8 +216,28 @@ it is done — not ticked off and left behind. Section references point at
       flat "keep last N" instead. Update that row to say retention follows
       the schedule's count.
 
+### Backups
+
+- [ ] **Full Backup has no restore flow in the dashboard** — `restoreSnapshot`
+      exists in `services/kopiaClient.ts` but no route and no UI ever call it
+      (plan.md §577 called it "a separate, larger piece of work"; §584
+      documented a manual Kopia-UI procedure as the stopgap). Restoring means
+      picking a snapshot, picking paths out of it, and putting them back with
+      the owning app stopped — a real design question, not a missing button.
+      Decide the shape before building: whole-snapshot vs. per-app, and
+      whether the dashboard stops/starts the apps around it.
+
 ### Exposure and platform
 
+- [ ] **Confirm the nine collapsed `run()` call paths still work live** —
+      plan.md §586 replaced nine per-service child-process wrappers with
+      `utils/run.ts`, changing timeout behaviour on all of them. Unit tests
+      cover the helper, not the callers. On `beta`, exercise one path per
+      shape: remove an app from the registry and confirm its leftovers are
+      cleaned up (`removedAppCleanup`), reload NPM config after an exposure
+      change (`exposureConfigFiles`, `npmConfigWriter`), and hit the backup
+      destination **Test** button (`backupTargetTest`, the 20 s probe
+      budget). Delete this item once all three pass.
 - [ ] **Confirm a `$` in a backup-destination password now survives** — the
       `.env` writer used to expand `$&`/`` $` ``/`$'`/`$1` in a value
       (plan.md §585, fixed with `utils/envFile.ts`'s `writeEnvValues`). On

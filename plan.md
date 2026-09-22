@@ -25,32 +25,29 @@ If a design can't meet them, it doesn't ship until it can.
    obtain (e.g. a third-party API token, and even then it's entered in the
    UI, once).
 
-## 0.1 URGENT — open bugs (fix before new features)
+## 0.1 Three first-week blockers, all closed (compacted 2026-09-22)
 
-1. ~~**`EACCES` writing app `.env` files**~~ **DONE 2026-08-28** (§23.20).
-   `backend/docker-entrypoint.sh` (runs as root) now `chown appuser:appgroup`s
-   every `apps/<name>/` dir and its `.env` / `.env.example` on boot — not
-   recursively, so `data/` (Postgres et al.) is untouched. Verified: backend
-   can create `apps/nocodb/.env`; nocodb generated its secrets and started.
-2. ~~**Duplicati: default-map `APPS_DIR`**~~ **DONE 2026-08-28** (§23.20).
-   `apps/duplicati/docker-compose.yml` now mounts `${APPS_DIR:-../}:/source/apps:ro`
-   (absolute host path when the dashboard starts it, else this compose's
-   `apps/` parent) — Duplicati has a real backup source out of the box.
-3. ~~**Docker address-pool exhaustion.**~~ **DONE — verified on the live host
-   2026-08-31**: `/etc/docker/daemon.json` carries the widened pool and the
-   host is running **38** docker networks, comfortably past the ~31 default
-   ceiling that used to break new apps. Original text follows.
+Was an "URGENT — open bugs" list at the top of the file. Every item has been
+done since 2026-08-31, and a second list of open work contradicts the rule
+that README.md's TODO section is the only place open work is tracked — so it
+is kept only as the three anchors later sections cite.
 
-   Each managed app is its own compose
-   project with its own bridge network. Docker's default pool fits only
-   ~31 user networks; past that new apps fail to start with
-   `all predefined address pools have been fully subnetted` (hit live with
-   `stirling-pdf`, ~28 networks in use). `start.sh` now writes
-   `/etc/docker/daemon.json` with a wider `default-address-pools` (/24 out of
-   two /16 bases = 512 slots) and restarts docker — **needs `start.sh`
-   re-run (sudo)** on the live host, or the daemon.json added by hand. Longer
-   term: a single shared `homelab-apps` external network instead of one per
-   compose project.
+**§0.1.1** — `EACCES` writing app `.env` files. Fixed 2026-08-28 (§23.20):
+`backend/docker-entrypoint.sh` runs as root and `chown appuser:appgroup`s
+every `apps/<name>/` dir and its `.env`/`.env.example` on boot, **not**
+recursively, so `data/` (Postgres et al.) is untouched.
+
+**§0.1.2** — Duplicati had no default backup source. Fixed 2026-08-28
+(§23.20) by default-mapping `APPS_DIR`. Moot since §196 removed Duplicati.
+
+**§0.1.3** — Docker address-pool exhaustion. Docker's default pool fits only
+~31 user networks and each managed app is its own compose project with its
+own bridge; `stirling-pdf` hit the ceiling live at ~28. Fixed by `start.sh`
+writing `/etc/docker/daemon.json` with a wider `default-address-pools` (/24
+out of two /16 bases = 512 slots) and restarting docker. Verified live
+2026-08-31 at 38 networks. The "one shared `homelab-apps` external network
+instead of one per project" idea was noted as a longer-term alternative and
+never needed.
 
 ## 1. Overview
 This project is a multi-container homelab management system built with an Angular frontend and a Node.js/Express (TypeScript) backend. It provides a dashboard for starting and stopping Docker-based services, viewing logs, and monitoring system resources.
@@ -28367,7 +28364,7 @@ edge bouncer stays off by default (Cloudflare `cfut_`-token auth bug, §23.17).
 There is no CrowdSec Console enrollment anywhere in the repo — no account
 linking, no enroll-key storage, no `cscli console enroll` call.
 
-**567.1 — Collections.** Two more from CrowdSec's hub fit without adding any
+**§567.1 — Collections.** Two more from CrowdSec's hub fit without adding any
 new bouncer or log source, since they consume the same NPM access logs
 already read by `crowdsecurity/nginx`/`http-cve`/`base-http-scenarios` and are
 enforced by the same already-active NPM Lua bouncer:
@@ -28387,7 +28384,7 @@ item, not proposed now.
 Change is a one-line edit to `apps/crowdsec/docker-compose.yml`'s
 `COLLECTIONS` var — no service code, no settings, no secrets.
 
-**567.2 — Plan: CrowdSec Console enrollment.** CrowdSec Console
+**§567.2 — Plan: CrowdSec Console enrollment.** CrowdSec Console
 (app.crowdsec.net) is CrowdSec's own SaaS: account creation (Google SSO or
 email/password) happens entirely on their site, outside this app's reach —
 nothing for the dashboard to build there. What the dashboard *can* and must
@@ -29223,3 +29220,43 @@ reject-on-non-zero, spawn failure, and both timeout paths — the last of
 which is the one that found the bug above. `./scripts/check.sh backend
 typecheck` and `test` (1167 → 1173) pass. Bumped to 0.130.0 (minor: the
 timeout behaviour of nine code paths changed).
+
+## 587. Cross-check of plan.md against the README TODO list
+
+Bookkeeping pass, no code. Three things were out of step.
+
+**One real gap in the TODO list.** Full Backup has no restore flow in the
+dashboard: `restoreSnapshot` exists in `services/kopiaClient.ts` but nothing
+routes to it. §577 noted it as "a separate, larger piece of work" and §584
+documented a manual Kopia-UI procedure as the stopgap, but neither put an
+item on the README list — so the only record that it's open was a sentence
+inside two closed sections. Added, framed as the design question it actually
+is (whole-snapshot vs. per-app, and whether the dashboard stops and starts
+the apps around a restore) rather than a missing button. Also added the
+`beta` check §586 owes.
+
+**A second TODO list at the top of the file.** §0.1 "URGENT — open bugs (fix
+before new features)" — three items, all struck through and DONE since
+2026-08-31, still the second thing anyone opening plan.md reads. That
+directly contradicts "README.md's TODO section is the only place open work
+is tracked". Compacted under the §530 rule rather than deleted, because
+§0.1.1/.2/.3 are cited from §22-era sections: each survives as a labelled
+anchor carrying its conclusion. 27 lines → 21, and it no longer reads as
+open work.
+
+**`plan-citations.py` was mostly reporting noise.** It printed 10 dangling
+targets, 8 of which came from `apps/*/data/` — gitignored app state
+(Nextcloud's vendored JS sourcemaps, a Twenty SQL dump) that happens to
+contain a `§` followed by digits. A tool whose output is 80% false positives
+does not get run, which matters because the compaction rule in CLAUDE.md
+depends on diffing its output before and after a pass. Added
+`--exclude-dir=data` to its grep.
+
+That left 2 real ones: §567's subsections are labelled `**567.1 — …**`
+without the `§`, so the script's anchor pattern never saw them while
+`apps/crowdsec/docker-compose.yml` and §568/§569 cited them. Added the `§`,
+matching every other labelled anchor in the file.
+
+`plan-citations.py` now prints **0 dangling targets** — the first time it
+has, and the clean baseline §588's compaction pass will be diffed against.
+Docs/plan only, no version bump.

@@ -22,8 +22,11 @@ targets = set(re.findall(r'^##+\s+(\d+(?:\.\d+)?)[a-z]?[.\s]', plan, re.M))
 # A label may run on into its text: `**§436.1 — old host retired.**`.
 targets |= set(re.findall(r'\*\*§(\d+(?:\.\d+)?)(?=\*\*|\s)', plan))
 
+# `apps/*/data/` is gitignored app state — vendored JS sourcemaps and SQL
+# dumps that happen to contain a `§` followed by digits. Eight of the ten
+# "dangling" targets this used to print came from there, none of them real.
 hits = subprocess.run(
-    f"grep -rnoE '§[0-9]+(\\.[0-9]+)?' {SOURCES} 2>/dev/null",
+    f"grep -rnoE --exclude-dir=data '§[0-9]+(\\.[0-9]+)?' {SOURCES} 2>/dev/null",
     shell=True, capture_output=True, text=True).stdout.splitlines()
 
 # A compacted section's own heading names the sections it replaced,
