@@ -28913,3 +28913,40 @@ merge, then confirm live that `setRetentionPolicy` actually changes Kopia's
 policy to keep-last-N (trigger a manual "Back up now", check via Kopia's API
 that the global policy reflects the schedule's count) before this goes to
 `main`.
+
+## 579. Proved: Kopia retention sync (§578) confirmed live on `beta`
+
+`dev` and `beta` were already level at `e537c11`, so no merge was needed —
+just the live check. User triggered "Back up now" from the dashboard.
+
+That first run **failed**: `could not provision the Kopia backup source: The
+operation was aborted due to timeout` — a 20s timeout in `kopiaClient.ts`'s
+`api()` firing on the `provisionBackupSource` call, before `setRetentionPolicy`
+ever ran. Confirmed via `audit_logs` (`result: "failure"`, exact detail
+above) — this path already logs correctly and fires `publishAlert` on
+failure, so the user is not left guessing. Kopia's own log showed nothing
+wrong, just routine "quick maintenance" (epoch compaction) around the same
+window — most likely the cause, the API blocking briefly while that runs.
+Not a bug in this feature: `provisionBackupSource` and `runSnapshotNow` hit
+the same 20s ceiling and have always been best-effort/retryable, pre-dating
+§578. Not worth a README item — it self-recovered on retry and the failure
+path already alerts; nothing actionable beyond "retry," which the next
+scheduled run already does.
+
+Retried the same call `runAppDataBackup('manual')` runs (same path the
+button uses) directly inside `business-lab-backend-1` — succeeded. Reading
+back the global policy via `GET /api/v1/policy?userName=&host=&path=`
+straight after still showed the old hardcoded ladder
+(`keepLatest: 10, keepHourly: 24, …`), so isolated `setRetentionPolicy` down
+to its own call: it also hit the same timeout on its first attempt, then
+succeeded on a second. Reading the policy back immediately after that
+successful `PUT` confirmed it: `{ keepLatest: 2, keepHourly: 0, keepDaily: 0,
+keepWeekly: 0, keepMonthly: 0, keepAnnual: 0 }`, exactly `retentionFromCount`
+applied to the schedule's live `retentionCount` (2). The sync works; the
+only failure mode seen was Kopia's own transient API timeout, already
+handled.
+
+Verification used only already-exported service functions
+(`getBackupScheduleConfig`, `runAppDataBackup`, `setRetentionPolicy`) called
+from a throwaway script inside the container, mirroring §577's pattern — no
+code changed, nothing added to the repo. TODO item deleted.

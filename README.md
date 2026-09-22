@@ -207,22 +207,6 @@ two — the guarantees are.
 it is done — not ticked off and left behind. Section references point at
 `plan.md`.
 
-### Backups
-
-- [ ] **Confirm Kopia's retention policy actually syncs to the schedule's
-      "keep last" count** — built in plan.md §578: `retentionFromCount(n)` →
-      `{ keepLatest: n, keepHourly: 0, keepDaily: 0, keepWeekly: 0,
-      keepMonthly: 0, keepAnnual: 0 }`, applied via `setRetentionPolicy` on
-      every `snapshotAppData` call (scheduled and manual), replacing the
-      hardcoded ladder `apps/kopia/entrypoint.sh` set once at first start.
-      Backend tests/typecheck pass, but nothing has been proven against the
-      real stack yet — this changes the live box's actual backup retention
-      policy, which can prune older remote snapshots outside the new count.
-      On `beta`: trigger "Back up now", then confirm via Kopia's own API
-      (`GET /api/v1/policy?userName=&host=&path=`) that the global policy
-      reflects the schedule's `retentionCount`. Confirm before merging to
-      `main`.
-
 ### Exposure and platform
 
 - [ ] **Vikunja mobile/desktop clients: confirm a real client against the
