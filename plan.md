@@ -319,2106 +319,248 @@ built.
 - [x] The frontend, API, and database run in Docker containers.
 - [x] The system is structured for backups and recovery.
 
-## 16. Implemented: First-Start Public Exposure Provisioning
-
-### 16.0 Implementation Status
-Implemented per the plan below:
-- `backend/src/services/executor.ts` — fixed the secrets-validation helper
-  scoping bug that made `ensureServiceSecrets` unreachable (it was nested
-  inside an unrelated `exec()` callback).
-- `service_exposure` table (`database/init.sql`, with a startup migration in
-  `backend/src/utils/database.js` for existing databases).
-- `backend/src/routes/settings.js` — `GET`/`PUT /api/settings/exposure` for
-  base domain, Cloudflare account/zone/tunnel IDs, and Nginx Proxy Manager
-  URL/credentials (reuses the existing Cloudflare API token).
-- `backend/src/routes/services.js` — `GET`/`PUT /api/services/:name/exposure`
-  for per-service opt-in, upstream host/port/scheme, and websocket support.
-- `backend/src/services/npmClient.js` — idempotent Nginx Proxy Manager proxy
-  host client.
-- `backend/src/services/cloudflareTunnelClient.js` — idempotent Cloudflare
-  Tunnel ingress route client.
-- `backend/src/services/exposure.js` — orchestrates provisioning after a
-  successful `docker compose up -d`; never fails the start, records
-  status/errors on `service_exposure`, and audits the outcome.
-- Frontend: an "Exposure provisioning" section in the settings panel for the
-  global config, and a per-service "Exposure settings" panel on each service
-  card for enabling/configuring and viewing provisioning status.
-
-**Not yet done / needs live validation**: this was built and syntax/type
-checked, but not exercised against a real Nginx Proxy Manager or Cloudflare
-account (none were available in this environment). Before relying on it,
-test against a real NPM instance and Cloudflare tunnel, and confirm the
-`nginx-proxy-manager:80` origin URL assumption matches your Docker network
-setup.
-
-### 16.1 Goal
-When a user starts a managed container from the frontend for the first time, the
-backend should automatically expose it through Nginx Proxy Manager and ensure
-Cloudflare Tunnel has a matching public hostname route pointing traffic to
-Nginx.
-
-Because the homelab uses a dynamic public IP, the first implementation should
-use Cloudflare Tunnel public hostnames instead of public `A`/`AAAA` DNS records.
-Service hostnames should be derived as `<service>.<base-domain>`, for example
-`paperless.example.com`.
-
-### 16.2 Current State
-- The Angular dashboard starts services through `ServiceStateService` and
-  `POST /api/services/:name/start`.
-- The backend service route calls `executor.startService(serviceName, userId)`.
-- Services are defined in `backend/src/config/services.ts`.
-- Cloudflare API token storage and verification already exists in
-  `backend/src/routes/settings.js`.
-- Nginx Proxy Manager has a compose stack under `apps/nginx-proxy-manager/`.
-- `cloudflare-tunnel` exists in the backend service registry, but
-  `apps/cloudflare-tunnel/` still needs to be added.
-
-### 16.3 Required Configuration
-- Cloudflare account ID, zone ID, and tunnel ID/name, or permission to discover
-  them from the API token and base domain.
-- Base domain used to derive public hostnames as `<service>.<base-domain>`.
-- Cloudflare Tunnel token stored/configured from the dashboard.
-- Nginx Proxy Manager admin API URL reachable from the backend.
-- Nginx Proxy Manager credentials or API token.
-- Cloudflare Tunnel origin URL for Nginx Proxy Manager, for example
-  `http://nginx-proxy-manager:80` or another URL reachable by `cloudflared`.
-- Per-service upstream scheme, host, port, websocket support, and whether
-  exposure is enabled by default.
-- TLS/certificate preference for Nginx Proxy Manager.
-
-### 16.4 Implementation Plan
-1. Fix and verify service start prerequisites.
-   - Check `backend/src/services/executor.ts` helper scoping before wiring
-     provisioning into service starts.
-   - Preserve current validation, error handling, and audit logging patterns.
-2. Add exposure metadata.
-   - Add a DB-backed or registry-backed exposure config with base domain,
-     derived hostname, upstream scheme/host/port, exposure enabled flag, and
-     optional TLS settings.
-   - Validate hostnames, ports, URLs, and policy fields.
-3. Add the Cloudflare Tunnel app stack and dashboard configuration.
-   - Add `apps/cloudflare-tunnel/compose.yaml` and `.env.example` for running
-     `cloudflared` in Docker using a tunnel token.
-   - Add backend settings endpoints for base domain, account/zone/tunnel
-     identifiers, tunnel token, and Nginx origin URL.
-   - Add dashboard controls to configure, mask, save, and test the tunnel
-     settings.
-4. Add a Nginx Proxy Manager client.
-   - Authenticate to Nginx Proxy Manager.
-   - Idempotently find, create, or update proxy hosts for service hostnames.
-   - Store NPM endpoint and credentials safely in settings.
-5. Add a Cloudflare Tunnel client.
-   - Reuse the stored Cloudflare token.
-   - Discover or use configured account, zone, and tunnel identifiers.
-   - Idempotently ensure Cloudflare Tunnel public hostname routes so
-     `<service>.<base-domain>` routes to the Nginx Proxy Manager origin.
-6. Add provisioning orchestration.
-   - After `docker compose up -d` succeeds, run provisioning once for services
-     with exposure enabled.
-   - Persist provisioning state in Postgres with service name, hostname, NPM
-     object ID, Cloudflare object IDs, status, last error, and timestamps.
-   - Return provisioning details or warnings in the start-service response and
-     audit log the outcome.
-7. Update frontend service feedback.
-   - Show exposure/provisioning status on service cards or in a details panel.
-   - Surface warnings if the container starts but provisioning is incomplete.
-8. Update API and operational documentation.
-   - Document new settings endpoints, service exposure fields, Cloudflare/NPM
-     permissions, and failure modes.
-9. Validate.
-   - Add targeted backend or smoke coverage for provisioning idempotency and
-     validation.
-   - Build the Angular frontend when UI changes are made.
-   - Test against mocked or dry-run external APIs before using live credentials.
-
-### 16.5 Default Behavior
-- Exposure should be opt-in per service.
-- Public hostnames should use `<service>.<base-domain>`.
-- Provisioning should be idempotent and look up existing Nginx Proxy Manager and
-  Cloudflare Tunnel objects by hostname before creating anything.
-- A container start should succeed if Docker starts successfully, even when
-  external provisioning fails. The API should return a warning and store/audit
-  the provisioning failure instead of silently ignoring it.
-- Cloudflare Access and dynamic DNS updates are deferred until after the
-  Cloudflare Tunnel + Nginx Proxy Manager flow is working.
-
-## 17. Session Log — 2026-08-26: Exposure validated live, security fix, one-command setup
-
-### 17.0 Status at start of session
-Section 16 above had been implemented but never exercised against a real NPM
-instance or Cloudflare account. This session validated it end-to-end against
-this deployment's real Nginx Proxy Manager and Cloudflare Tunnel, using
-`paperless` as the proof case, and fixed everything that broke along the way.
-
-**As of this entry, the changes below are uncommitted in the working tree**
-(last commit on `main` is `5e905a7`). Verified in this session:
-`backend`: `tsc --noEmit` clean, `vitest run` passing (6 tests in
-`services.test.ts`). `frontend`: `ng build` succeeds (pre-existing initial
-bundle-size budget warning only, unrelated to this session).
-
-### 17.1 Done this session
-- [x] **Exposure upstream auto-derivation** — removed the manual upstream
-      scheme/host/port/websocket fields from the per-service exposure API and
-      UI. `backend/src/services/exposure.ts` now derives them itself: scheme
-      is fixed `http`, port comes from `getPublishedUpstreamPort()` (parses
-      the app's compose file — see `backend/src/config/services.ts`), host is
-      `getHostGatewayIp()` (`backend/src/utils/network.ts`, resolves
-      `host.docker.internal` to a literal IP once and caches it), websocket
-      upgrade is always allowed. The exposure panel is now an enable toggle
-      plus a read-only "forwarding to..." line.
-- [x] **`exposureEnvKeys` mechanism** — a service can declare env keys in its
-      `services.ts` registry entry (see `paperless`) that get computed from
-      the exposed hostname and injected at every start, without writing to
-      the read-only `apps/` mount. Fixes apps (like Paperless) that need their
-      own public-URL/allowed-hosts env vars to accept traffic through the
-      tunnel.
-- [x] **NPM API bug** — `websocket_upgrade` is not a real Nginx Proxy Manager
-      field; the correct one is `allow_websocket_upgrade`. Silent no-op
-      before this fix.
-- [x] **`host.docker.internal` proxy_pass bug** — nginx's resolver for
-      variable-based `proxy_pass` upstreams is DNS-only and never consults
-      `/etc/hosts`, so the hostname resolved on the host but not from inside
-      nginx. Fixed by resolving to the literal gateway IP once, up front
-      (`getHostGatewayIp`), instead of passing the hostname through.
-- [x] **Health-status default bug** — services in the registry without a
-      configured health check (most of them) were reported as `check failed`
-      instead of `healthy` while their container was running, because the
-      `healthy` flag defaulted to `false` whenever no check was configured.
-      Now defaults to `true` for a running service with no check configured;
-      `check failed` is reserved for a check that actually ran and failed.
-- [x] **Secret leak: `.env.save`** — a file with a live, still-active
-      `JWT_SECRET` was committed to git (introduced in `5cafdfb`). Rotated the
-      secret, deleted the file from disk and tracking, broadened `.gitignore`
-      to `.env.*` (with `.env.example` explicitly re-allowed). The old value
-      is still visible in git history at `5cafdfb` — rotation makes it inert,
-      but scrubbing it fully would need a history rewrite.
-- [x] **Docker socket proxy** — the backend no longer mounts
-      `/var/run/docker.sock` directly. `tecnativa/docker-socket-proxy` now
-      holds the real socket; the backend talks to it over
-      `DOCKER_HOST=tcp://docker-socket-proxy:2375` on the internal network
-      only, scoped to containers/images/networks/volumes + start/stop —
-      `exec`/`build`/`secrets`/`swarm`/`plugins` stay off. Narrows blast
-      radius; does not sandbox what a compose file itself can bind-mount.
-- [x] **Removed `apps/cloudflare-tunnel/` Docker stack** — this deployment
-      runs `cloudflared` via host systemd, not the Docker stack shipped in
-      the repo; that stack had no `.env` and had never been started here. Its
-      registry entry was removed too.
-- [x] **Dropped `service_configs` table** — empty, zero code references
-      (`database/init.sql` and the live DB).
-- [x] **`start.sh`** — one-command bootstrap (`./start.sh`): generates
-      `.env` on first run (random `JWT_SECRET`/`JWT_REFRESH_SECRET`/
-      `POSTGRES_PASSWORD`, auto-detected `APPS_DIR`/`DOCKER_GID`), best-effort
-      `chgrp`/`chmod`s `apps/` so the dashboard can write per-app `.env`
-      files, then `docker compose up -d --build`. Safe to re-run (never
-      overwrites a secret already set).
-- [x] **Per-app `.env` editing moved into the dashboard** —
-      `backend/src/services/appEnv.ts` (new) + `backend/src/utils/envFile.ts`
-      (new, minimal `.env` parser) read/write `apps/<name>/.env` directly.
-      `APPS_DIR` is now mounted read-write (previously read-only) for this.
-      Secret-looking keys (`PASSWORD`/`SECRET`/`TOKEN`/`*_KEY`/`APIKEY`
-      pattern) are write-only in the UI — reported as "configured" or not,
-      never echoed back.
-- [x] Started backend test coverage — `backend/src/config/services.test.ts`
-      (new, 6 tests covering `extractComposeEnvVars`) and `vitest` added as a
-      dev dependency with a `test` script. First test file in the repo.
-
-### 17.1a Continued same session: expanded backend test coverage
-- [x] `services.test.ts` — added 6 tests for `getPublishedUpstreamPort`
-      (literal port, `${VAR:-default}` fallback, `.env` override of the
-      default, no `ports:` mapping, no compose file installed, unknown
-      service name). Uses a temp `APPS_DIR` + a real registry key
-      (`paperless`) so it doesn't depend on the checked-in `apps/` fixtures
-      staying in sync.
-- [x] `npmClient.test.ts` (new, 7 tests) — `buildProxyHostPayload` shape, and
-      `ensureProxyHost` create/update/no-op/ownership-conflict/login-failure
-      paths, with `requestJson` mocked via `vi.mock('../utils/httpJson')`.
-- [x] `cloudflareTunnelClient.test.ts` (new, 5 tests) — `ensureIngressRoute`
-      insert-before-catch-all, no-op when rule+DNS already correct, update
-      when hostname exists pointing elsewhere, DNS-ownership-conflict
-      rejection, and tunnel-config-read failure, same `requestJson` mocking
-      approach.
-- Backend suite is now 23 tests across 3 files; `tsc --noEmit` and
-  `vitest run` both verified clean (via `node:20-alpine` in Docker, since
-  this environment has no local Node/npm — see 17.4).
-- **Not yet covered**: `exposure.ts` itself (the orchestration layer —
-  needs DB mocking, more setup) and the frontend has zero `*.spec.ts` tests.
-  Both remain open in 17.3.
-
-### 17.2 Deployment fact worth remembering
-This deployment's real Cloudflare Tunnel runs as a **host-level systemd
-service**, not the `apps/cloudflare-tunnel/` compose stack (now removed
-anyway). Public hostnames already live: `homelab.tx-home-utils.com` (frontend)
-and `api-homelab.tx-home-utils.com` (backend) — meaning the dashboard itself
-is internet-facing independent of the per-service exposure feature it
-provides. Keep this in mind before assuming anything about the tunnel is
-driven by a Docker stack in this repo.
-
-### 17.3 Outstanding TODO (carried into future sessions)
-
-**Add**
-- [ ] **CI pipeline** — no `.github/workflows/` yet; `smoke-tests.sh`,
-      `docker-e2e-test.sh`, and both `tsc`/`ng build` checks only run
-      manually. **Priority: P1** — **Estimate: M**
-- [ ] **Automated tests, remaining gaps** — `npmClient.ts`,
-      `cloudflareTunnelClient.ts`, and `getPublishedUpstreamPort` now have
-      unit coverage (23 tests, see 17.1a). Still needed: `exposure.ts` itself
-      (the orchestration layer that ties them together — needs DB mocking)
-      and any frontend (`*.spec.ts`) tests at all — zero exist today.
-      **Priority: P1** — **Estimate: M**
-- [ ] **"Test connection" action for exposure settings** — NPM credentials
-      and Cloudflare account/zone/tunnel IDs are only exercised the next time
-      a service starts. A validate-now button in Settings would have caught
-      several of this session's misconfigurations immediately instead of
-      after a failed provisioning attempt. **Priority: P2** — **Estimate: M**
-- [ ] **Exposure drift detection** — nothing notices if NPM's or Cloudflare's
-      live state diverges from `service_exposure` (e.g. someone hand-edits
-      the proxy host in NPM's UI). Add periodic reconciliation, or at least a
-      "re-verify" button. **Priority: P2** — **Estimate: M**
-- [ ] **2FA for admin accounts** — worth prioritizing given the dashboard is
-      already internet-facing via the tunnel (see 17.2), independent of the
-      per-service exposure feature. **Priority: P1** — **Estimate: M**
-- [ ] **Scheduled/automated backups** — confirm whether `POST
-      /backups/create` is manual-trigger only; if so, add a cron-driven
-      schedule with retention. **Priority: P2** — **Estimate: S**
-- [ ] **Extend `exposureEnvKeys` to other apps** — only `paperless` declares
-      one today. Any other app with its own Host-header/CSRF allowlist will
-      hit the same bug class the first time exposure is enabled for it.
-      **Priority: P2** — **Estimate: S per app**
-- [ ] **Health check URLs still assume host ports** — entries use
-      `localhost:<port>`, rewritten via `SERVICE_HEALTH_HOST`. Apps not
-      published to the host, or published on a non-default port, will still
-      misreport `check failed`. Distinct from the no-check-configured default
-      bug fixed this session. **Priority: P2** — **Estimate: M**
-
-**Commit hygiene**
-- [ ] **This session's work is entirely uncommitted** — 32 modified files
-      plus new `backend/src/config/services.test.ts`,
-      `backend/src/services/appEnv.ts`, `backend/src/utils/envFile.ts`,
-      `backend/src/utils/network.ts`, `start.sh`. Review and commit (likely
-      as a few focused commits: security fix / docker-socket-proxy /
-      exposure auto-derivation / start.sh+appEnv / README+plan docs) before
-      starting new work, so it isn't sitting at risk of being lost or
-      tangled with whatever comes next.
-
-**Already done, kept for history**
-- [x] `.env.save` secret leak — removed, rotated, `.gitignore` broadened.
-- [x] `apps/cloudflare-tunnel/` Docker stack — removed (see 17.2).
-- [x] `service_configs` table — dropped.
-- [x] Manual upstream host/port/scheme/websocket exposure fields — removed
-      from API and UI; now auto-derived (see 17.1).
-- [x] Docker socket proxy — direct socket mount replaced.
-
-### 17.4 Environment note for future sessions
-This dev/agent environment has no local `node`/`npm` (only `docker`).
-Backend `typecheck`/`test` and the frontend `ng build` were run/verified via:
-```bash
-docker run --rm -v "$PWD":/app -w /app node:20-alpine sh -c "npm install && npm run typecheck && npm test"
-```
-(swap the command for `npx ng build` in `frontend/`). `node_modules` isn't
-committed and wasn't left installed on disk outside the container — re-run
-`npm install` (in a container or wherever Node is available) before trying
-to run anything directly.
-
-## 18. Session Log — 2026-08-26 (cont.): live health-check fixes, TODO reordered
-
-### 18.1 code-server / bookstack health checks fixed live
-Both were live-deployed bugs, found and fixed against the real running stack
-(this environment has `docker` access to the actual deployment — see §17.2).
-
-- **`code-server`**: `services.ts` and the app's own
-  `apps/code-server/docker-compose.yml` healthcheck both assumed HTTPS with a
-  self-signed cert on 8443 (`curl -fk https://localhost:8443/health`). The
-  running container's own logs said otherwise: `HTTP server listening on
-  http://[::]:8443/` / `Not serving HTTPS` — confirmed live by `curl` failing
-  with `SSL routines::wrong version number` (client sent TLS, server spoke
-  plain HTTP). `/health` also doesn't exist (401); the real endpoint is the
-  public, unauthenticated `/healthz` (returns `{"status":"alive",...}`).
-  Fixed both files to `http://localhost:8443/healthz`. A first fix attempt
-  (switching to `https://` plus `rejectUnauthorized: false` in
-  `backend/src/services/status.ts`) was wrong and was reverted — worth
-  remembering: don't trust an app's own Docker healthcheck definition as
-  ground truth without confirming what the container is actually doing,
-  since that definition itself can be stale/copied-from-a-template.
-- **`bookstack`**: `services.ts` checked `/health` (doesn't exist on this
-  Laravel-based image, 404). Its own container healthcheck already correctly
-  probes `/login`; matched the registry entry to it.
-- Verified live: `code-server-code-server-1`'s own Docker healthcheck flipped
-  from `unhealthy` (`FailingStreak: 22`) to `healthy` after rebuilding
-  `code-server` (compose recreate) and the `homelab-management-backend-1`
-  image (`docker compose up -d --build backend`).
-- Committed as `1c4cffe` (first, wrong https attempt + correction squashed
-  into the session's work — see git log for the actual fix commit once this
-  session's remaining work is committed).
-
-### 18.2 TODO reordered by dependency/logic, not just priority label
-The flat P1/P2 list in §17.3 is superseded by this ordering — same items,
-sequenced so each one's output feeds the next rather than by label alone.
-Numbers below double as the reference used elsewhere in this log (e.g.
-"item 3").
-
-1. [x] **Scheduled/automated backups** — smallest, standalone. Implemented
-   this session — see §18.3 for what shipped.
-2. [x] **CI pipeline** — added `.github/workflows/ci.yml` with two jobs
-   (`backend`: `npm ci` + `typecheck` + `test`; `frontend`: `npm ci` +
-   `build`), triggered on push to `main` and on pull requests. No frontend
-   `ng test` step — zero spec files exist and karma/jasmine aren't even
-   installed (see item 3), so it would only fail. Verified both jobs pass
-   locally via the same `node:20-alpine` commands (see §17.4).
-   **Priority: P1** — **Estimate: M**
-3. [x] **`exposure.ts` + frontend test coverage** — added
-   `backend/src/services/exposure.test.ts` (7 tests, DB/settings/network/
-   npmClient/cloudflareTunnelClient mocked, same pattern as
-   `npmClient.test.ts`/`cloudflareTunnelClient.test.ts`; backend suite now
-   36 tests). Frontend had zero test infrastructure at all — karma/jasmine
-   weren't even in `devDependencies`, so `ng test` only ever failed. Added
-   them plus `frontend/karma.conf.js` (launches Chrome via puppeteer's
-   bundled Chromium as `ChromeHeadlessCI`, `--no-sandbox`, so it doesn't
-   depend on a system Chrome install) and a `test:ci` script, wired into
-   the CI frontend job (commit `22f0a59`). First spec files: `authGuard`,
-   `guestGuard`, `AuthService` (login/session/refresh), `LoginComponent`
-   (validation, success/error submit, paste sanitization) — 14 tests, all
-   verified passing headless via `node:20-slim` + puppeteer deps in this
-   session. **Priority: P1** — **Estimate: M**
-4. [x] **"Test connection" action for exposure settings** — added
-   `npmClient.testNpmConnection` / `cloudflareTunnelClient.
-   testCloudflareTunnelAccess` (read-only login/config/zone checks,
-   nothing created or changed), `POST /api/settings/exposure/test`
-   (tests the currently saved global config, same one a service start
-   uses), and a "Test connection" button in the settings panel showing a
-   pass/fail alert per service (NPM, Cloudflare). 5 new backend tests
-   (46 total); frontend build + full spec suite (14 tests) verified
-   passing. **Priority: P2** — **Estimate: M**
-5. [x] **Exposure drift detection** — added a "re-verify" button rather than
-   periodic reconciliation: `POST /api/services/:name/exposure/verify`
-   re-runs `provisionServiceIfEnabled` on demand, which both detects *and*
-   fixes drift in one call since `ensureProxyHost`/`ensureIngressRoute` are
-   already idempotent — no separate detection logic needed. Service card
-   gained a "Re-verify" button next to Save (shown once a hostname exists).
-   Verified live: both new routes 401 unauthenticated, backend boots clean.
-   **Priority: P2** — **Estimate: M**
-6. [ ] **Extend `exposureEnvKeys` to other apps** — only `paperless`
-   declares one today (see §17.1). Not schedulable as a single task; handle
-   incrementally each time exposure is enabled for a new app, informed by
-   whatever that app actually needs. **Priority: P2** — **Estimate: S per app**
-7. [ ] **Health check host-port assumption cleanup** — deprioritized:
-   §18.1's real failures turned out to be protocol/path mismatches
-   (`http` vs `https`, wrong path), not the `SERVICE_HEALTH_HOST` host-port
-   issue this item originally assumed. Revisit generically only if another
-   service actually exhibits that specific pattern. **Priority: P2** —
-   **Estimate: M**
-8. [ ] **2FA for admin accounts** — labeled M but realistically the largest
-   lift here (TOTP enrollment, backup codes, login-flow changes, UI); do
-   last and with its own dedicated plan rather than folding it into a quick
-   pass. Still worth prioritizing given the dashboard is already
-   internet-facing via the tunnel (see §17.2). **Priority: P1** —
-   **Estimate: M (likely undersized)**
-9. [x] **Organize dashboard apps by type** — the service grid was one flat
-   list of 25+ cards with no grouping. Implemented this session — see §18.4.
-   **Priority: P2** — **Estimate: S**
-10. [x] **Manage Authelia's admin account from the dashboard** — username,
-    display name, email, and password lived only in
-    `apps/authelia/config/users_database.yml`, editable by hand only.
-    Implemented this session — see §18.5. **Priority: P2** — **Estimate: S**
-
-### 18.3 Item 1 (backups) — implementation notes
-Implemented as an opt-in schedule (default off) rather than adding a cron
-library — a `setInterval` poll every hour, comparing "now" against a stored
-last-run timestamp against the configured frequency, is enough to cover the
-two frequencies offered and avoids a new dependency for something this
-small. `POST /backups/create` (manual trigger, pre-existing) was untouched
-in behavior; the new code sits alongside it.
-
-- **`backend/src/services/backup.ts`** (new) — pulled the shared backup
-  mechanics (`BACKUP_DIR`, `createBackupArchive()`, path/exec helpers) out of
-  `routes/backup.ts` so both the route and the new scheduler can call them.
-  Also owns the schedule settings: `BACKUP_SCHEDULE_SETTINGS_KEYS`
-  (`backup_schedule_enabled` / `_frequency` / `_retention_count` /
-  `_last_run_at`, stored as plain rows in the existing `settings`
-  key/value table — no new table needed), `getBackupScheduleConfig()` /
-  `saveBackupScheduleConfig()` / `setBackupScheduleLastRun()`, and
-  `pruneOldBackups(retentionCount)` (deletes oldest `.tar.gz` files beyond
-  the retention count, by mtime).
-- **`backend/src/services/backupScheduler.ts`** (new) — `shouldRunScheduledBackup(now, lastRunAt, frequency)`
-  is a pure function (unit tested, 6 cases in
-  `backupScheduler.test.ts`) so the due/not-due decision doesn't depend on
-  wall-clock timing in tests. `runScheduledBackupCheck()` loads config,
-  no-ops if disabled or not due, otherwise creates a backup, audit-logs it
-  (`userId: null`, `metadata: { trigger: 'scheduled' }` — the existing
-  `writeAuditLog` already supports a null user and the audit UI already
-  renders that as no username), then prunes. `startBackupScheduler()` runs
-  one check immediately at boot (catches up a missed run after a restart)
-  and then every hour.
-- **`backend/src/routes/backup.ts`** — trimmed to routing/HTTP-shape only;
-  added `GET /schedule` and `PUT /schedule` (Joi-validated via new
-  `backupScheduleUpdate` schema in `middleware/validation.ts`). The manual
-  `POST /create` route now also runs `pruneOldBackups()` after a successful
-  create, but only when the schedule is enabled — leaves today's
-  unlimited-accumulation behavior alone for anyone who doesn't opt in.
-- **`backend/src/index.ts`** — calls `startBackupScheduler()` at boot,
-  alongside the other fire-and-forget startup hooks (`dropLegacyRoleColumn`,
-  `ensureServiceExposureTable`).
-- Widened the backup archive's own settings-export filter
-  (`backup.ts` → now `services/backup.ts`) to `... OR key LIKE
-  'backup_schedule_%'` so the schedule config itself round-trips through
-  backup/restore. (Noted but out of scope: the same filter still does *not*
-  capture `exposure_*` settings — a pre-existing gap, not introduced here.)
-- **Frontend**: `operations.service.ts` gained `getBackupSchedule()` /
-  `updateBackupSchedule()`; `models.ts` gained `BackupScheduleConfig`. UI is
-  a small card inside the existing `#backups` section on the dashboard
-  (`dashboard.component.html`) — an "Automatic backups" toggle, a
-  frequency select (Daily/Weekly) and a retention-count number input shown
-  only when enabled, a "Last scheduled backup" timestamp, and a Save button.
-  No new page/route.
-- **Verified**: `tsc --noEmit` and `vitest run` clean (29 tests, up from 23
-  — 6 new for `shouldRunScheduledBackup`); `ng build` clean (same
-  pre-existing bundle-size budget warning as before, unrelated). Deployed
-  live (`docker compose up -d --build backend frontend`): backend booted
-  without error, the scheduler's immediate startup check correctly no-op'd
-  (feature defaults to disabled, confirmed zero `backup_schedule_%` rows in
-  the live `settings` table after boot), and `GET /api/backups/schedule`
-  returns `401` unauthenticated, confirming the route is live and gated
-  correctly. **Not verified**: the authenticated round-trip (toggling the
-  switch in the browser, confirming a scheduled run actually fires) — no
-  admin session was available in this environment to exercise it through
-  the UI. Worth a manual pass next time the dashboard is open.
-
-### 18.4 Item 9 (organize apps by type) — implementation notes
-Added a `category: ServiceCategory` field to the service registry rather than
-inferring grouping client-side from label/description text, so the mapping
-lives in one place (`backend/src/config/services.ts`) and is explicit.
-
-- **`backend/src/types/index.ts`** — new `ServiceCategory` union (7 values:
-  Networking & Security, Monitoring & Management, Media, Backup & Storage,
-  Productivity, Home Automation, Development); `category` added as a
-  required field on `ServiceDefinition` and optional on `ServiceStatusPayload`
-  (optional there so older/partial payloads on the error path still typecheck).
-- **`backend/src/config/services.ts`** — every one of the 25 registered
-  services tagged with a category.
-- **`backend/src/services/status.ts`** — `getServiceStatus` now copies
-  `service.category` onto both the success and error-path response payloads.
-- **`frontend/src/app/core/models.ts`** — mirrored `ServiceCategory` union;
-  `ServiceStatus.category` added as optional (older cached API responses or a
-  service missing from the registry shouldn't break rendering).
-- **`frontend/src/app/pages/dashboard/dashboard.component.ts`** — added a
-  `groupServicesByCategory()` function grouping the flat service list into
-  category buckets, ordered by a fixed `CATEGORY_ORDER` array with an
-  "Other" bucket last as a fallback for anything uncategorized.
-- **`frontend/src/app/pages/dashboard/dashboard.component.html`** — the
-  service grid now iterates category groups, each rendered as its own
-  `<h2>` heading followed by its row of cards, instead of one flat grid.
-  `allServices` passed to `app-service-card` is still the full unfiltered
-  list (needed for its own `dependsOn` lookups across categories), not the
-  per-group slice.
-- **Verified**: backend `tsc --noEmit` and `vitest run` clean (49 tests, up
-  from 46 — no new tests added, but two `exposure.test.ts` mock service
-  objects needed a `category` field added to satisfy the now-required type).
-  Frontend `ng build` clean (same pre-existing bundle-size budget warning as
-  before, unrelated). **Not verified**: the existing Karma/Jasmine frontend
-  spec suite — this environment's apt-installed Chromium version didn't
-  match what Puppeteer expected, an unrelated pre-existing tooling gap (no
-  dashboard/service-card spec files exist yet to cover this change anyway).
-  Not exercised live in a browser against the real deployment.
-
-### 18.5 Item 10 (Authelia admin account panel) — implementation notes
-Authelia's file authentication backend stores its admin account in
-`config/users_database.yml` (YAML, argon2-hashed password) — a different
-file and format from the generic per-app `.env` editor added in §17.1, so
-this needed its own read/write path rather than reusing `appEnv.ts`.
-
-- **Scope, decided with the user up front**: edit the single account tagged
-  `admins` in the file (falls back to the first entry) — not full multi-user
-  CRUD, matching how this and presumably every deployment of this app is
-  actually set up. Saving auto-restarts the Authelia container so the change
-  takes effect immediately (a few seconds of SSO downtime for anything
-  behind it), rather than silently reporting success on a stale container.
-- **Password hashing**: reused `bcryptjs` (already a dependency, via the
-  existing `utils/password.ts` `hashPassword()` used for the dashboard's own
-  accounts) instead of adding a new `argon2` native dependency. Verified
-  compatible with Authelia's file backend empirically against the live
-  `authelia/authelia:latest` image in this environment: generated a bcrypt
-  hash with `authelia crypto hash generate bcrypt` (produces a `$2b$12$...`
-  digest — same prefix bcryptjs produces), then confirmed a bcryptjs
-  digest passes `authelia crypto hash validate`.
-- **`backend/src/services/autheliaUsers.ts`** (new) — `getAutheliaAdminUser()`
-  / `updateAutheliaAdminUser()`. Reads `apps/authelia/config/users_database.yml`
-  via `js-yaml` (new dependency — nothing YAML-capable existed in the
-  codebase before this). Splits the file into the header-comment preamble
-  and the parsed `users:` document so a save preserves the human-written
-  comments at the top instead of clobbering them with a bare re-dump.
-  Renaming the username (a YAML map key) is handled by deleting the old key
-  and inserting the new one. A blank/omitted password keeps the existing
-  hash unchanged, same convention as every other secret field in this app.
-- **`backend/src/services/executor.ts`** — new `restartService()`. No-ops
-  (reports success without running anything) if the service isn't currently
-  running, since there's nothing to restart and the new config applies on
-  next start anyway — avoids erroring out when an admin edits the account
-  while Authelia happens to be stopped.
-- **`backend/src/config/services.ts` / `types/index.ts`** — new
-  `supportsAdminUserManagement` flag on `ServiceDefinition` (set only on
-  `authelia`), surfaced to the frontend as `adminUserManagementSupported` on
-  `ServiceStatusPayload`/`ServiceStatus`, mirroring the existing
-  `setupTokenSupported` pattern — capability-driven, not a hardcoded service
-  name check in the UI.
-- **`backend/src/routes/services.ts`** — `GET`/`PUT /api/services/:name/admin-user`,
-  gated by the new capability flag (404 for any service that doesn't set it).
-  `PUT` calls `updateAutheliaAdminUser()` then `executor.restartService()`,
-  audit-logs the username and whether the password changed (never the
-  password itself).
-- **Frontend**: a collapsible "Admin account" panel on the service card
-  (`service-card.component.ts`/`.html`), shown only when
-  `service.adminUserManagementSupported` is true — username, display name,
-  email, and a password field (blank = keep current), with copy noting the
-  restart/downtime up front before the admin saves.
-- **Verified**: backend `tsc --noEmit` and `vitest run` clean (55 tests, up
-  from 49 — 6 new in `autheliaUsers.test.ts`, covering read, the
-  multi-user "admins"-tag fallback, rename + preamble preservation, bcrypt
-  hashing of a new password, and the 404 path when the file is missing).
-  Frontend `ng build` clean (same pre-existing budget warning, unrelated).
-  Deployed live (`docker compose up -d --build backend frontend`): backend
-  booted without error, `GET /api/services/authelia/admin-user` returns
-  `401` unauthenticated, confirming the route is live and gated correctly.
-  **Deliberately not exercised**: the live `PUT` was never actually called
-  against this deployment's real `users_database.yml` — doing so would have
-  changed this environment's actual Authelia login and forced a real restart
-  of the production Authelia container outside of a deliberate user action.
-  The rename/rehash/restart-skip-when-stopped logic is covered by the unit
-  tests above against a synthetic copy of the real file's exact format
-  instead. Worth a manual pass through the browser next time the dashboard
-  is open, using a throwaway password change to confirm the full
-  save-then-login round trip.
-
-## 19. Session Log — 2026-08-27: Running-apps ports table
-
-### 19.1 Requested
-Add a table to the dashboard, positioned above the existing per-category
-service card list, showing every currently-running app and which host
-port(s) it's published on. Goal is an at-a-glance port map without having
-to open each service card or run `docker ps` by hand.
-
-- [x] Backend: derive live published ports per service from `docker ps`
-      (filtered by the same `com.docker.compose.project` label already
-      used for container state), not from static compose-file parsing —
-      catches every container in a project (e.g. NetBird's dashboard +
-      management containers) and reflects what's actually bound right now.
-      Surface as `ports: ServicePortMapping[]` on `ServiceStatusPayload`.
-- [x] Frontend: new table section in `dashboard.component.html`, placed
-      before the categorized service-card grid, listing app label + host
-      port + container port + protocol for every `running` service that
-      publishes at least one port.
-
-### 19.2 Implementation notes
-- **`backend/src/services/status.ts`** — new `getContainerPorts(projectName)`,
-  same `docker ps --filter label=com.docker.compose.project=...` pattern as
-  the existing `getContainerStatus`, format `{{.Ports}}`. A regex
-  (`PORT_MAPPING_PATTERN`) pulls host port, container port, and protocol out
-  of each comma-separated entry (e.g. `0.0.0.0:8080->80/tcp`), handling port
-  ranges (`80-81->80-81/tcp`) and skipping unpublished container-only ports
-  (no `->`, e.g. `5432/tcp`). Results are deduped by `hostPort/protocol`
-  (IPv4 and IPv6 both list the same port) and sorted numerically. Called
-  from `getServiceStatus()` only when `state === 'running'`.
-- **`backend/src/types/index.ts`** — new `ServicePortMapping` interface,
-  `ports?: ServicePortMapping[]` added to `ServiceStatusPayload`. Mirrored on
-  the frontend in `core/models.ts` (`ServicePortMapping`, `ServiceStatus.ports`).
-- **`frontend/src/app/pages/dashboard/dashboard.component.ts`** — new
-  `getRunningServicePorts()`, flattens all running services' `ports` into
-  one row per port mapping, sorted by app label then host port.
-- **`dashboard.component.html`** — new "Running app ports" table section,
-  placed directly above the categorized service-card grid as requested,
-  bound once via `*ngIf="getRunningServicePorts(services) as portRows"` so
-  the flatten only runs once per template check.
-- **Verified**: backend `tsc --noEmit` and `vitest run` clean (55 tests,
-  unchanged — no new tests added for the port-parsing regex; worth adding
-  if this logic grows more edge cases). Frontend `ng build` clean (same
-  pre-existing budget warning, unrelated). Deployed live
-  (`docker compose up -d --build backend frontend`); called
-  `getAllServiceStatus()` directly inside the running backend container
-  against the real Docker socket-proxy and confirmed correct output for
-  every currently-running app, including NetBird's two-container project
-  (ports 8080 + 8081), nginx-proxy-manager's port range (`80-81`) plus a
-  single port (`443`), and Portainer's two separate ports (9000, 9443).
-  **Not verified**: the rendered table in an actual browser — no browser
-  tool was available in this session and the dashboard's own login
-  credentials weren't on hand. Worth a quick visual pass next time the
-  dashboard is open.
-
-## 21. Session Log — 2026-08-28: Container status fixes + backlog of exposed-app issues
-
-Shipped this session (git `d1977a7`..`7b8e4a4`):
-- `aggregateContainerState` — crash-looping (`restarting`) and
-  created-but-never-started (`created`, e.g. host-port clash) projects now
-  report `error` instead of sitting on `starting` forever; a project with a
-  one-shot init container that exits 0 (beszel) reports `running`, not
-  `starting`.
-- Startup-log popup no longer declares failure from its own poll during a
-  slow start; `docker compose up` timeout raised 60s → 15min, nginx
-  `proxy_read_timeout` → 1200s, exec buffer → 16MB, so large first-run
-  pulls (Immich's four images) actually complete. Popup shows a "still
-  preparing — downloading images" heartbeat while pulling.
-
-### 21.1 Dashboard "running apps" list — wrong / unhelpful links — DONE 2026-08-28
-- [x] **Nginx Proxy Manager** — `exposurePortEnvVar: 'NPM_ADMIN_PORT'` on the
-      registry entry. The compose file publishes the proxy listeners (:80,
-      :443) before the admin UI (:81), so the primary-exposure upstream (and
-      therefore the dashboard link) pointed at :80's default "Congratulations"
-      vhost. `provisionServiceIfEnabled` already passes
-      `serviceDef.exposurePortEnvVar` to `getPublishedUpstreamPort`, so no
-      exposure-code change — just the registry pin.
-- [x] **Pi-hole** — new optional `webPath?: string` on `ServiceDefinition`
-      (leading slash, no trailing slash), surfaced through
-      `ServiceStatusPayload` → the frontend `ServiceStatus` model. The
-      dashboard "open" link (`groupRunningPortsByCategory`) and the
-      service-card hostname badge both append it. `pihole` sets
-      `webPath: '/admin'`. Reserved for a future exposure health check too.
-- [x] **Portainer** — new `POST /api/services/:name/setup-token/reset`
-      (guarded by `requireSetupTokenSupport`): restarts the service — which
-      clears Portainer's "timed out for security purposes" first-run lock and
-      makes it print a fresh `setup_token=` line, resetting the 5-min window —
-      then polls `waitForServiceSetupToken` for the new token and returns it.
-      `getServiceSetupToken` now returns the *last* pattern match, not the
-      first, so a post-restart log with a stale token line above the fresh one
-      resolves correctly. Card's setup-token panel gained a "Restart & get a
-      new token" button (`resetSetupToken()`).
-
-### 21.2 Exposed apps returning HTTP errors (Host / CSRF rejection) — DONE 2026-08-28
-Shared root cause: each app rejects requests whose `Host` header is the
-public exposure hostname because that hostname isn't in the app's
-trusted-hosts / allowed-origins list. Fixed by growing the exposure-override
-mechanism and auditing **every** web app in the registry — not just the
-three that were reported.
-
-**Mechanism changes** (git after `92cf723`):
-- `ServiceExposureEnvKeys` gained `host` (bare hostname, no scheme),
-  `allowedHostsSeparator` (Nextcloud's list is space-separated) and
-  `staticOnExposure` (literal values like `N8N_PROTOCOL=https`).
-- `buildExposureEnvOverrides` extracted to `services/exposureEnv.ts` with a
-  pure `computeExposureEnvOverrides` (unit-tested).
-- New `services/exposureConfigFiles.ts` + `ServiceDefinition.exposureConfigFile`
-  for apps that need a config *file* touched, not just env. Runs from
-  `startService` right before `docker compose up`, same as the env overrides.
-- **All overrides only apply at `docker compose up` time** — after toggling
-  exposure the service must be restarted. `.env.example` files now say so.
-
-**Per-app outcome** (`exposureEnvKeys` unless noted):
-- **home-assistant** — `exposureConfigFile: true`. On start-while-exposed,
-  appends a marker-fenced `http:` block (`use_x_forwarded_for: true` +
-  broad private `trusted_proxies`) to `data/configuration.yaml`; skips if the
-  user already defined `http:`.
-- **homepage** — `allowedHosts: [HOMEPAGE_ALLOWED_HOSTS]` (compose already
-  passed the var).
-- **paperless** — added `PAPERLESS_CSRF_TRUSTED_ORIGINS` to `url` keys +
-  compose; kept `PAPERLESS_URL` / `PAPERLESS_ALLOWED_HOSTS`.
-- **bookstack** — `url: [BOOKSTACK_URL]` (APP_URL).
-- **mealie** — `url: [MEALIE_BASE_URL]`.
-- **vaultwarden** — `url: [VAULTWARDEN_DOMAIN]`.
-- **nextcloud** — `allowedHosts: [NEXTCLOUD_TRUSTED_DOMAINS]` (space sep),
-  `host: [NEXTCLOUD_OVERWRITEHOST]`, `staticOnExposure`
-  `NEXTCLOUD_OVERWRITEPROTOCOL=https` + `NEXTCLOUD_TRUSTED_PROXIES`; compose
-  gained `OVERWRITEHOST` / `OVERWRITEPROTOCOL` / `TRUSTED_PROXIES`.
-- **speedtest** — `url: [SPEEDTEST_APP_URL]`; compose gained `APP_URL` +
-  `APP_TRUSTED_PROXIES=*`.
-- **n8n** — `url: [N8N_WEBHOOK_URL, N8N_EDITOR_BASE_URL]`, `host: [N8N_HOST]`,
-  `staticOnExposure` `N8N_PROTOCOL=https`; compose gained `N8N_EDITOR_BASE_URL`.
-- **duplicati** — compose default for `DUPLICATI__WEBSERVICE_ALLOWEDHOSTNAMES`
-  set to `*` so the 2.x host check passes behind the proxy out of the box.
-- **vikunja** — already handled (`VIKUNJA_PUBLIC_URL`).
-
-**Audited, no change needed** (no Host/allow-list hard-fail behind a proxy at
-root): immich, jellyfin, uptime-kuma, dozzle, filebrowser, code-server,
-portainer, beszel, pihole, nginx-proxy-manager. `IMMICH_APP_URL` /
-Jellyfin "known proxies" / Beszel `APP_URL` only affect generated links and
-can be added later if wanted.
-
-- [ ] **Verify live once exposed** — enable exposure + restart each of the
-      touched apps and confirm the error is gone. Home Assistant in
-      particular: check the appended `trusted_proxies` range actually covers
-      the source address NPM/the tunnel presents (adjust the list in
-      `exposureConfigFiles.ts` if not). **Priority: P1** — **Estimate: S**
-      - Code-inspection pass done 2026-08-28 (see §23.3): the request path is
-        cloudflared → NPM `:80` → `getHostGatewayIp()` (`host.docker.internal`
-        = the Docker bridge gateway) → app's published host port. HA's
-        immediate peer is therefore NPM's container IP or the bridge gateway
-        — both inside the `172.16.0.0/12` entry already in `HA_HTTP_BLOCK`,
-        and `10.0.0.0/8` + `192.168.0.0/16` cover any non-default Docker
-        `default-address-pool` / LAN case. **No `exposureConfigFiles.ts`
-        change needed.** Only the live per-app `curl` remains.
-      - **HA 400 fixed live 2026-08-28** (§23.11): the `trusted_proxies`
-        *content* was right all along — the failure was HA 2026.x's
-        `.storage/http` migration stuck at `pending`/`not_promoted` while HA
-        ran on the default (proxy-less) `stable`. `exposureConfigFiles.ts`
-        now resets that store via a one-off HA container. Verified: proxied
-        request went 400 → 200, "not set-up for reverse proxies" errors
-        stopped.
-- [x] **authelia** — `apps/authelia/config/configuration.yml` already has
-      `session.cookies[0].authelia_url: 'https://authelia.tx-home-utils.com'`
-      (= the `${serviceName}.${baseDomain}` exposure hostname) and cookie
-      `domain: 'tx-home-utils.com'` scoping the session across every
-      `*.tx-home-utils.com` app it protects. `access_control` is just
-      `default_policy: one_factor` — no domain rules to audit. NPM
-      forward-auth snippets reach Authelia at `http://172.17.0.1:9091` and
-      send `X-Original-URL https://$host$request_uri`, consistent with the
-      TLS-terminated-at-the-edge model. No change. (Nit, not blocking:
-      `totp.issuer` is still the `authelia.local` placeholder — cosmetic,
-      shows as the label in authenticator apps.)
-
-### 21.3 NetBird VPN without a router port-forward
-- [x] ~~The §20.10/20.11 plan to bypass the cloudflared gRPC-trailers bug~~
-      **ANSWERED 2026-08-31 — (a) was right, and the real blocker turned out
-      not to be trailers at all.** (a) Relay shipped in §50.3 and signal moved
-      to Tailscale Funnel in §53; (b) rejected — an overlay on the phone means
-      two apps (user's call); (c) re-tested on cloudflared 2026.8.3 in §50.9,
-      still broken. The actual root cause was never the trailers bug: it is
-      that Cloudflare will not flush response headers on a still-open stream
-      (§52.2). Original text follows.
-      assumes a router port-forward + grey-clouded DNS + real Let's Encrypt
-      cert. User wants a path that needs **no** router change. Evaluate:
-      (a) NetBird's embedded **Relay/Signal** components as the enrollment
-      transport instead of the Management API over the tunnel;
-      (b) enrolling peers over an already-working tunnel (Tailscale is
-      installed) and exposing Management only on that private overlay;
-      (c) re-test with a current `cloudflared` release in case the
-      trailers bug (still open as of §20.9) has since been fixed.
-      **Priority: P1** — **Estimate: L**
-
-## 22. Backlog: new apps to add to the registry
-
-Each new app is: an `apps/<name>/` dir with a compose file (+ `.env.example`,
-+ a `data/` dir), plus a `SERVICES` entry in
-`backend/src/config/services.ts` with `label`/`description`/`icon`/`category`
-and a `healthCheck`. **When adding any of these, wire its reverse-proxy
-config up front** per §21.2 — `exposureEnvKeys` (`url` / `host` /
-`allowedHosts` / `staticOnExposure`) for env-configurable apps, or
-`exposureConfigFile` for the file-only ones — and follow the existing
-multi-container DB pattern (immich / paperless / nextcloud) for anything
-that needs Postgres/Redis. Icons: add the emoji to `serviceIcon()` in
-`service-card.component.ts`.
-
-### 22.1 WAHA — WhatsApp HTTP API  (requested)
-- [x] **WAHA** — `devlikeapro/waha`. Added 2026-08-28 (§23.6):
-      `apps/waha/` (`docker-compose.yml` + `.env.example`), host port
-      `${WAHA_PORT:-3009}` → `:3000`, session/media under `./data/{sessions,
-      media}` (repo `.gitignore` covers `apps/*/data/`), `node -e` HTTP probe
-      of `/health` as the container healthcheck (`start_period: 60s` — WEBJS
-      spins up headless Chromium). **Category:** Productivity (kept — no new
-      enum). **Icon:** new `chat` → 💬. **Auth env:** `WAHA_API_KEY`
-      (`X-Api-Key`), `WAHA_DASHBOARD_USERNAME/PASSWORD`,
-      `WAHA_SWAGGER_USERNAME/PASSWORD`. **Exposure:**
-      `exposureEnvKeys.url: ['WAHA_BASE_URL']`. Pairs with **n8n** —
-      order/booking confirmations, delivery alerts, chatbots — and is a
-      notification target for `uptime-kuma`.
-      - If `/health` turns out to sit behind the API-key guard on the running
-        image, switch both healthchecks to `/ping` (always unauthenticated).
-
-### 22.2 Communication & notifications
-- [x] **ntfy** — `binwiederhier/ntfy`. Added 2026-08-28 (§23.4):
-      `apps/ntfy/` (`docker-compose.yml` + `.env.example`), `command: serve`,
-      host port `${NTFY_PORT:-8010}` → `:80`, `NTFY_CACHE_FILE` for message
-      persistence, `wget /v1/health` healthcheck. Registry entry
-      (Monitoring & Management, `bell` icon 🔔),
-      `exposureEnvKeys.url: ['NTFY_BASE_URL']` +
-      `staticOnExposure: { NTFY_BEHIND_PROXY: 'true' }` (only trust
-      X-Forwarded-For when actually proxied). `dead-simple` pub/sub push;
-      `uptime-kuma`, `n8n`, `watchtower` and backup scripts can all post to it.
-- [~] **Stalwart Mail** — **dropped 2026-09-10 (§370)**, not being added.
-      `stalwartlabs/mail-server`. Modern all-in-one mail
-      server (SMTP/IMAP/JMAP + web admin), far less fiddly than Mailcow.
-      Advanced: needs real MX/SPF/DKIM/DMARC/PTR and inbound port 25, which a
-      residential line / the tunnel usually can't do — only worth it with a
-      static IP or a smarthost relay. **Priority: P3** — **Estimate: L**
-
-### 22.3 Business operations
-- [x] **DocuSeal** — `docuseal/docuseal:latest`. Added 2026-09-09 (§340):
-      `apps/docuseal/` (`docker-compose.yml` + `.env.example`), single
-      container on **SQLite** (`./data:/data` — DB, the auto-generated
-      `SECRET_KEY_BASE` and uploads), host port `${DOCUSEAL_PORT:-10150}` →
-      `:3000`, BusyBox-wget `/up` (Rails health) healthcheck. Registry entry
-      (Productivity, new `signature` icon ✍️), `exposureEnvKeys.host:
-      ['DOCUSEAL_HOST', 'DOCUSEAL_FORCE_SSL']` — both bare-hostname, blank
-      until exposed. No OIDC / no way to hide its own form, so Authelia is the
-      outer gate and DocuSeal keeps its first-run admin account
-      (`app-credentials.md` Wizard row). Licence **AGPL-3.0** (community
-      edition, run stock — client-operated, same as Immich/Mealie/NocoDB).
-- [x] **Twenty** — `twentycrm/twenty`. Added 2026-09-10 (§370). Modern open-source CRM (people,
-      companies, opportunities, pipelines). Needs Postgres + Redis;
-      `exposureEnvKeys.url: ['SERVER_URL']`. **Priority: P2** —
-      **Estimate: M**
-- [~] **Invoice Ninja** — **dropped 2026-09-01 (§81.8)**, not being added.
-      `invoiceninja/invoiceninja`. Invoices, quotes,
-      recurring billing, client portal, payment-gateway hooks. Laravel →
-      `exposureEnvKeys` `url: ['APP_URL']` + `staticOnExposure:
-      { REQUIRE_HTTPS: 'true' }`; MySQL. **Priority: P2** — **Estimate: M**
-- [x] **Kimai** — `kimai/kimai2:apache`. Added 2026-09-10 (§355):
-      `apps/kimai/` + `kimai-db` (`mariadb:11.4`, `--innodb-default-row-format=
-      dynamic` + utf8mb4 for the migrations), host port `${KIMAI_PORT:-10500}`
-      → `:8001`, `curl /` healthcheck (`start_period: 90s` — `kimai:install`
-      runs migrations on first boot). Registry entry (Productivity, new `clock`
-      icon ⏱️), `backup: mariadb/kimai-db`, `hiddenGeneratedSecrets:
-      ['KIMAI_DB_PASSWORD']`, `autoGeneratedSecrets: ['KIMAI_ADMIN_PASSWORD']`.
-      `skipAutheliaProtection` (SAML-only, Authelia is OIDC-only → can't hide
-      the form; two logins otherwise — §342); the image's entrypoint seeds the
-      super-admin from `ADMINMAIL`/`ADMINPASS` every boot, `adminSeedEnv.ts`
-      injects `KIMAI_ADMIN_EMAIL` (Authelia admin's). `exposureEnvKeys`:
-      `allowedHosts: ['KIMAI_TRUSTED_HOSTS']` + `staticOnExposure:
-      { KIMAI_TRUSTED_PROXIES: '0.0.0.0/0' }`. No `mailEnvKeys` — Kimai reads a
-      single `MAILER_URL` DSN the per-field injection can't build. Licence
-      **AGPL-3.0**, client-operated (same as Immich/Mealie/NocoDB/DocuSeal).
-- [~] **Cal.com** — **dropped 2026-09-10 (§370)**, not being added. `calcom/cal.com`. Appointment scheduling / booking pages
-      (Calendly alt). Heavier (Next.js + Postgres + SMTP);
-      `exposureEnvKeys.url: ['NEXT_PUBLIC_WEBAPP_URL', 'NEXTAUTH_URL']`.
-      **Priority: P3** — **Estimate: L**
-
-### 22.4 Data, no-code & BI
-- [x] **NocoDB** — `nocodb/nocodb`. Added 2026-08-28 (§23.7):
-      `apps/nocodb/` — app + `nocodb-db` (postgres:16-alpine, `pg_isready`
-      gate, `depends_on … service_healthy`), following the nextcloud
-      multi-container pattern. Host port `${NOCODB_PORT:-8011}` → `:8080`,
-      `NC_DB` pg:// connection string, `wget --spider /api/v1/health`
-      healthcheck, data at `./data/{nocodb,db}`. Registry entry (Productivity,
-      new `table` icon 🗃️), `autoGeneratedSecrets: ['NOCODB_JWT_SECRET']`
-      (→ `NC_AUTH_JWT_SECRET`, pre-filled in the config panel like Vikunja's),
-      `exposureEnvKeys.url: ['NOCODB_PUBLIC_URL']` (→ `NC_PUBLIC_URL`).
-      A clean data source for `n8n`.
-- [x] **Metabase** — `metabase/metabase:latest`. Added 2026-09-06 (§244):
-      `apps/metabase/` (`docker-compose.yml` + `.env.example`), 2 containers
-      (metabase + `metabase-db` postgres:16-alpine on a private
-      `metabase-net`), host port `${METABASE_PORT:-10510}` → `:3000`,
-      `curl /api/health` healthcheck (`start_period: 120s` — JVM + Liquibase
-      migrations take ~70s on first boot). Registry entry (Monitoring &
-      Management, new `chart` icon 📊), `backup: postgres/metabase-db`,
-      `hiddenGeneratedSecrets: ['METABASE_DB_PASSWORD']`,
-      `autoGeneratedSecrets: ['METABASE_ENCRYPTION_KEY']` (visible — it
-      encrypts stored data-source credentials, losing it means re-entering
-      them), `exposureEnvKeys.url: ['METABASE_SITE_URL']`. Setup wizard
-      creates the admin → `app-credentials.md` "Wizard" row. Licence
-      **AGPL-3.0** (OSS edition only). Proven live: migrations clean, health
-      `{"status":"ok"}`, ~1.83 GiB RAM (JVM). Benign `ERROR` on boot —
-      `suggested-prompts-generator` no-ops without an Anthropic key.
-
-### 22.5 Files, documents & PDF
-- [x] **Stirling-PDF** — `stirlingtools/stirling-pdf`. Added 2026-08-28
-      (§23.5): `apps/stirling-pdf/` (`docker-compose.yml` + `.env.example`),
-      host port `${STIRLING_PDF_PORT:-8009}` → `:8080`, `curl
-      /api/v1/info/status | grep UP` healthcheck, bind mounts for tessdata /
-      configs / customFiles / pipeline. Registry entry (Backup & Storage,
-      `pdf` icon 📕). No Host validation → **no `exposureEnvKeys`** (put it
-      behind Authelia rather than the app's own optional login). The natural
-      companion to Paperless.
-- [x] **Syncthing** — `syncthing/syncthing:1`. Added 2026-09-06 (§242):
-      `apps/syncthing/` (`docker-compose.yml` + `.env.example`), GUI
-      `${SYNCTHING_PORT:-10500}` → `:8384`, sync `22000/tcp+udp` +
-      discovery `21027/udp` on fixed numbers (hardcoded so the allocator
-      skips them). Registry entry (Backup & Storage, new `sync` icon 🔃),
-      **no `exposureEnvKeys`** — the Host check the backlog worried about
-      only fires when the GUI binds loopback, and the image binds
-      `0.0.0.0:8384`, so a spoofed `Host:` header returns 200 (proven
-      live). GUI has no login by default → Authelia is the gate. No router
-      forwarding for sync (principle 1): off-LAN peers use Syncthing's
-      public relay pool (confirmed joining a relay live), LAN peers
-      direct. Docs rows in `ports.md` (incl. the fixed-port note),
-      `app-credentials.md`, `licences.md` (MPL-2.0).
-
-### 22.6 Security, network & hardware health
-- [x] **CrowdSec** — `crowdsecurity/crowdsec` + **Cloudflare** bouncer
-      (chosen over the nginx bouncer; the CF integration is now the maintained cloudflare-worker-bouncer, see §23.17: everything ingresses via the tunnel, so
-      a firewall bouncer is blind to real IPs and the nginx bouncer would
-      need a forked NPM image — the CF bouncer blocks at the edge, before the
-      tunnel, and reuses CF creds). Added 2026-08-28 (§23.8):
-      `apps/crowdsec/` — `crowdsec` (agent + LAPI, reads NPM's
-      `../nginx-proxy-manager/data/app/log` read-only via
-      `config/acquis.yaml`, `COLLECTIONS` = nginx + http-cve +
-      base-http-scenarios, `BOUNCER_KEY_cloudflare` auto-registers the
-      bouncer) + `cloudflare-bouncer` (`crowdsecurity/cloudflare-bouncer`,
-      config from gitignored `config/cloudflare-bouncer.yaml`, template
-      committed as `.example`). Registry entry (Networking & Security, new
-      `siren` icon 🚨, `healthCheck.enabled: false`,
-      `autoGeneratedSecrets: ['CROWDSEC_BOUNCER_KEY']`, no ports/exposure).
-      **No hand-editing** (§23.9): on every CrowdSec start
-      `services/crowdsecConfig.ts` renders `config/cloudflare-bouncer.yaml`
-      from the stored Cloudflare account/zone/token + `CROWDSEC_BOUNCER_KEY`,
-      and writes the marker-fenced real-IP block into NPM's
-      `data/app/nginx/custom/http_top.conf` + reloads nginx (best-effort;
-      logs a fallback if it can't write NPM's data dir). The only external
-      requirement is that the Cloudflare API token also carries **Account →
-      Account Filter Lists → Edit** and **Zone → Firewall Services → Edit**
-      (now in the Settings permission hint).
-- [x] **Scrutiny** — `ghcr.io/analogj/scrutiny:v0.9.3-omnibus`. Added
-      2026-09-06 (§240): `apps/scrutiny/` (`docker-compose.yml` +
-      `.env.example`), host port `${SCRUTINY_PORT:-10480}` → `:8080`,
-      config + bundled InfluxDB under `./data/{config,influxdb}`,
-      `curl /api/summary` healthcheck. Registry entry (Monitoring &
-      Management, new `disk` icon 💽), no `exposureEnvKeys` (no Host
-      validation, no own login — Authelia is the only gate, like
-      stirling-pdf). **`privileged: true`** rather than a per-host
-      `devices:` list — principle 2 forbids the hand-edited device
-      enumeration, and the backend is already root-equivalent. Proven live:
-      container healthy in ~12s, collector found both real disks
-      (`/dev/sda` SATA + `/dev/nvme0` NVMe) and published SMART data,
-      `/api/summary` 200. Docs rows in `ports.md`, `app-credentials.md`
-      ("no login of their own"), `licences.md` (MIT; bundled InfluxDB 2 /
-      smartmontools / s6-overlay all clean).
-
-### 22.7 Dev & self-host infra
-- [x] **Forgejo** — `codeberg.org/forgejo/forgejo:16`. Added 2026-09-07
-      (§277): `apps/forgejo/` (`docker-compose.yml` + `.env.example`), HTTP
-      `${FORGEJO_PORT:-10560}` → `:3000`, SSH git `${FORGEJO_SSH_PORT:-10561}`
-      → `:22` (LAN/VPN only — the tunnel is HTTP). SQLite (`INSTALL_LOCK=true`,
-      single container). Registry entry (Development, new `git` icon 🌿),
-      `exposureEnvKeys` `url: ['FORGEJO_ROOT_URL']` + `host: ['FORGEJO_DOMAIN']`
-      (→ `FORGEJO__server__ROOT_URL`/`DOMAIN`),
-      `booleanEnvKeys: ['FORGEJO_DISABLE_REGISTRATION']`. Docs rows in
-      `ports.md`, `app-credentials.md`, `licences.md` (GPL-3.0-or-later, clean
-      for the client-operated model). Proven live: image pulls, container
-      `healthy` in ~10s, `/api/healthz` → `{"status":"pass"}` (cache + db
-      checks pass), web root 200, listening on 3000 + 22.
-      **Removed 2026-09-09 (§315)** — `@mat` call; `apps/forgejo/`, the
-      registry entry, the `git` icon and all docs rows deleted. Ports
-      `10560`/`10561` are free again.
-- [x] **IT-Tools** — `corentinth/it-tools:2024.10.22-7ca5933`. Added
-      2026-09-06 (§241): `apps/it-tools/` (`docker-compose.yml` +
-      `.env.example`), host port `${IT_TOOLS_PORT:-10490}` → `:80`,
-      `curl -fsS /` healthcheck (busybox wget fails — resolves localhost to
-      ::1, nginx is IPv4-only). Registry entry (Development, new `tools`
-      icon 🧰), no `exposureEnvKeys` (static SPA, no backend/Host-check/
-      login — Authelia is the only gate). Docs rows in `ports.md`,
-      `app-credentials.md`, `licences.md` (GPL-3.0, internal use). Proven
-      live: healthy, `/` 200.
-
-### 22.8 Productivity & knowledge
-- [~] **Karakeep** — **dropped 2026-09-10 (§370)**, not being added. `ghcr.io/karakeep-app/karakeep` (ex Hoarder).
-      Bookmarks + read-it-later with automatic tagging and full-text search
-      (Pocket/Raindrop alt). `exposureEnvKeys.url: ['NEXTAUTH_URL']`.
-      **Priority: P3** — **Estimate: M**
-- [x] **Miniflux** — `miniflux/miniflux`. Added 2026-09-06 (§245):
-      `apps/miniflux/` + `miniflux-db` (postgres:16-alpine), host port
-      `${MINIFLUX_PORT:-10520}` → `:8080`, `exposureEnvKeys.url:
-      ['MINIFLUX_BASE_URL']`, `rss` icon 📰. Apache-2.0.
-
-### 22.9a Pantry / stock management (requested, 2026-08-29) — DONE, both paths built
-- [x] **Grocy** — installed as the existing-app candidate. `apps/grocy/`
-      (`lscr.io/linuxserver/grocy`, single container, `./data/config` volume,
-      host port `${GROCY_PORT:-8012}`), registered in `services.ts`
-      (category Productivity, icon `pantry` → 🥫). Covers the full spec
-      natively (stock, expiration, units, consume flow, shopping list) —
-      first-run login is `admin`/`admin`, change it. Exposed publicly at
-      `grocy.tx-home-utils.com` (opt-in, same as any other app).
-- [x] **Pantry** (custom build) — a from-scratch competing app so the two
-      can be compared directly, per explicit request. `apps/pantry/`:
-      single Node/Express container (`apps/pantry/app/`, own `Dockerfile`,
-      no framework) storing items as one JSON file (`/data/items.json`,
-      atomic write via temp-file + rename — deliberately no real database,
-      dataset is small/single-user). Host port `${PANTRY_PORT:-8014}`.
-      REST API: `GET/POST /api/items`, `PUT/DELETE /api/items/:id`,
-      `POST /api/items/:id/use` (deduct stock, floors at 0),
-      `POST /api/items/:id/restock` (add stock), `GET /api/shopping-list`
-      (items at/below `minStock`, with `neededQty`). Frontend is a single
-      static page (`public/`) with three tabs — Stock (add/edit/delete),
-      Use Items (per-item amount + Use button, the required "use item"
-      page), Shopping List (auto-computed, "Mark bought" restocks by the
-      needed amount) — units restricted to exactly Kg/Gr/Lt/Uni as
-      specified. Registered in `services.ts` (icon `fridge` → 🧊).
-      Uses custom in-page confirm/toast popups instead of native
-      `alert()`/`confirm()` (the latter blocks the whole render process,
-      including browser automation — found live while testing delete).
-      Verified live end-to-end in a real browser: add item → use item
-      (deducts correctly) → shopping list picks it up automatically →
-      restock ("Mark bought") clears it → custom delete popup works
-      without freezing.
-- [x] **Kitchen** switcher extended to three tabs — `apps/kitchen-switcher/`
-      (§22.9b below) now also embeds Pantry alongside Mealie/Grocy, so all
-      three are one click apart for comparison.
-      Not done: no data migration/sync between Grocy and Pantry — they're
-      independent, meant to be compared and then one dropped.
-
-### 22.9b Kitchen — Mealie/Grocy/Pantry switcher (requested, 2026-08-29)
-- [x] Standalone static app, not a dashboard feature — `apps/kitchen-switcher/`
-      (`nginx:alpine` + a bind-mounted `./html`, custom `nginx.conf` for
-      correct `manifest.webmanifest`/`sw.js` MIME types). One page, three
-      toggle buttons + an iframe per app; only the active iframe is shown
-      (others stay loaded, not re-fetched on every switch). Host port
-      `${KITCHEN_SWITCHER_PORT:-8013}`.
-      - Target URLs default to `http://<same-host>:9925` (Mealie) / `:8012`
-        (Grocy) / `:8014` (Pantry) — works on the LAN with no config. A ⚙
-        gear icon opens a small settings panel to override each URL
-        (saved to `localStorage`, per-browser) — meant for pointing at
-        public hostnames once exposed instead of LAN ports.
-      - Verified live: Mealie and Grocy both render correctly inside the
-        iframes (no `X-Frame-Options`/CSP blocking, unlike Authelia's own
-        pages) — confirmed by loading `http://<lan-ip>:8013` and toggling
-        both tabs in a real browser.
-      - **Installable as a PWA**: `manifest.webmanifest` + icons
-        (192/512/512-maskable, generated via a one-off `imagemagick`
-        container) + a minimal no-op service worker (exists purely to
-        satisfy installability criteria — this page has nothing worth
-        caching) + the usual `apple-mobile-web-app-*` meta tags for iOS.
-        Real install support (Android's full install prompt) needs a
-        secure context — resolved: exposure was enabled for
-        `kitchen-switcher`, `grocy`, and `pantry` (all now `provisioned` at
-        `<name>.tx-home-utils.com` in `service_exposure`), so
-        `https://kitchen-switcher.tx-home-utils.com` is the URL to install
-        from on mobile, not the LAN `http://` one. **Fixed as a follow-up**:
-        the default iframe URLs were still LAN-port-based even when the
-        switcher itself was loaded from its public hostname — unreachable
-        over mobile data. Now, if `location.hostname` starts with
-        `kitchen-switcher.`, defaults swap that prefix for each sibling
-        app's own hostname (`mealie.<domain>` etc.) instead of a LAN port;
-        LAN-IP access keeps the old port-based defaults. Verified live via
-        forced-resolve `curl` against the Cloudflare edge (local DNS
-        propagation was still catching up at the time) — both
-        `kitchen-switcher` and `pantry` public hostnames return `200`
-        through the tunnel.
-
-### 22.9c Grocery price comparison (requested, 2026-08-29) — DONE
-- [x] **Price Compare** — custom-built (no existing self-hosted tool fit:
-      Changedetection.io-style tools watch one URL for change, not compare
-      the same product across several named stores). `apps/price-compare/`,
-      same single-container Node/Express + JSON-file pattern as `pantry`.
-      Host port `${PRICE_COMPARE_PORT:-8015}`, registered in `services.ts`
-      (icon `cart` → 🛒), **exposed publicly** at
-      `price-compare.tx-home-utils.com` (confirmed live via forced-resolve
-      `curl` — `200` through the tunnel).
-      - **Feasibility checked live against each real store, not assumed**
-        (see the session's own investigation): Continente, Pingo Doce, and
-        Lidl PT all serve their price server-rendered in plain HTTP —
-        Continente and Lidl embed a standard schema.org `Product`/`Offer`
-        JSON-LD block with `price`; Pingo Doce's JSON-LD omits price, but
-        it's in a predictable `<span class="value" content="X.XX">` inside
-        the SFCC-standard `.sales` block. **Mercadona dropped** (Portugal
-        has no online catalog at all, confirmed live — corporate site
-        only). **Recheio and Makro are login-walled B2B** — no page is
-        scrapable without an account, and account credentials are never
-        something this project enters — user will check those manually
-        and use the app's manual-price fields instead.
-      - `apps/price-compare/app/scrapers.js` — per-store scraper functions
-        (`continente`/`pingodoce`/`lidl`), a `detectStore()` that routes a
-        pasted URL by hostname, and `extractJsonLdPrice()` shared between
-        the two JSON-LD stores.
-      - `apps/price-compare/app/server.js` — products stored as one JSON
-        file (`/data/products.json`, same atomic-write pattern as pantry).
-        Each product has a category (see below), a list of scraped URL
-        entries (store auto-detected per URL, price/name/error cached — a
-        failed re-scrape keeps the last known price rather than wiping it),
-        and `manualPrices.{recheio,makro}`. Endpoints: `GET/POST /products`,
-        `PUT/DELETE /products/:id`, `POST /products/:id/refresh` (re-scrape
-        all its URLs), `PUT /products/:id/manual-price`, `GET /categories`.
-      - **Grouped by category, not brand** (explicit correction mid-build):
-        a fixed list of Portuguese grocery categories (Laticínios, Bebidas,
-        Mercearia, Frutas e Vegetais, Talho, Peixaria, Padaria e
-        Pastelaria, Charcutaria e Queijos, Congelados, Limpeza, Higiene,
-        Outros — matching how Continente/Recheio's own sidebars organize
-        products), chosen per product in the add/edit form; the product
-        list renders as one section per category instead of a flat list.
-      - Frontend (`public/`): one page, product cards grouped by category,
-        each row showing store label + `scraped`/`manual` badge + price
-        (cheapest across all rows for that product highlighted green) +
-        an "Open" link (scraped) or "Set" button (manual). Same custom
-        popup pattern as `pantry` (no native `alert()`/`confirm()`).
-      - **Verified live end-to-end**: created a real product ("Leite UHT
-        Meio Gordo") with real URLs from all three scraped stores via the
-        API — Continente returned `6.84`, Pingo Doce `0.83`, Lidl `1.00`,
-        all correct — then confirmed the same result rendering correctly
-        in the browser (category heading, cheapest highlighted), and the
-        manual-price "Set" modal opening correctly for Recheio/Makro. Test
-        product deleted afterward.
-      - **Not done**: no scheduled/automatic re-scraping (refresh is
-        manual, per-product, via the Refresh button) — fine for a
-        low-frequency personal price-check tool; revisit if that becomes
-        annoying. No handling yet for a store changing its markup (would
-        show as a fetch-failed error on that row, not silently wrong data,
-        since the scraper only ever trusts a successfully-parsed price).
-
-### 22.9d Price Compare follow-up (same day): search-by-name instead of pasted URLs, "Add product" bug fixed
-- [x] **Redesigned input model** — the per-store URL fields (added right
-      after 22.9c shipped, so the user could see the 3 stores explicitly)
-      were replaced with a single product-name field per explicit request:
-      typing isn't a URL anymore, it's the *search query*. `scrapers.js`
-      gained `searchAndScrapeStore(store, query)` — fetches each store's
-      search-results page, extracts the first real product-detail link via
-      a per-store `productLinkPattern` regex (verified live against all
-      three), resolves it to an absolute URL, then reuses the existing
-      per-product scraper on that page. `server.js`'s `POST/PUT /products`
-      and `POST /products/:id/refresh` now call this instead of accepting
-      a `urls` array; renaming a product re-runs the search with the new
-      name (old matches may no longer apply). Trade-off accepted by the
-      user: the top search result isn't guaranteed to be the exact product
-      meant, unlike a hand-picked product link.
-      - Search URL patterns/link patterns (all confirmed via live `curl`
-        before coding, not guessed): Continente `/pesquisa/?q=`,
-        `href="(/produto/...\.html)`; Pingo Doce
-        `/on/demandware.store/Sites-pingo-doce-Site/default/Search-Show?q=`,
-        `href="(/home/produtos/...\.html)`; Lidl `/q/search?q=`. Lidl's
-        pattern needed a second pass — it's a client-rendered SPA, so its
-        "static" HTML is really an HTML-entity-escaped JSON hydration blob
-        (`&quot;/p/...&quot;`, not a real `href="..."` attribute); the
-        first regex assumed literal quotes and silently found nothing for
-        Lidl specifically until relaxed to match the bare `/p/<slug>/p<id>`
-        path regardless of quoting. Caught live (`no search results found
-        on Lidl` for a query that worked fine via manual `curl` — the
-        difference was the regex, not the fetch).
-      - **Verified live**: `POST /products {"name":"leite meio gordo"}`
-        returns correct real prices from all three stores in one call, no
-        URL entered anywhere; `/refresh` re-derives the same three.
-- [x] **Real bug fixed**: `urlForStore(product, store)` used
-      `product?.urls.find(...)` — optional chaining only guards the
-      `product?.urls` access, not the `.find()` call after it, so opening
-      "Add product" (`product` is `null`) threw `Cannot read properties of
-      undefined` and the modal silently never opened. Fixed to
-      `product?.urls?.find(...)`. This code path is now moot (the URL
-      fields it populated no longer exist per 22.9d above) but the same
-      optional-chaining mistake is worth watching for elsewhere.
-      **Also moot as a fix target but worth remembering**: a data-loss
-      scare mid-session (both saved products briefly read back as `[]`)
-      turned out to be a stale read during testing, not real loss — nothing
-      in `saveProducts()`'s call paths can zero out the file on its own
-      (every write path appends-to or modifies-in-place a freshly-loaded
-      list); left as encountered, not root-caused further, since the
-      redesign in this entry made the exact repro moot anyway.
-
-### 22.9e Price Compare follow-up (same day): manual stores dropped, collapse, bulk update, pack-vs-unit fix
-- [x] **Recheio and Makro removed entirely** — per explicit request, not
-      just deprioritized. `MANUAL_STORES`, the manual-price endpoint
-      (`PUT /products/:id/manual-price`), the manual-price modal, and
-      `manualPrices` on the product model are all gone; `/api/stores` only
-      lists the 3 scraped stores now.
-- [x] **Per-product collapse** — a ▾/▸ toggle next to the product name
-      hides/shows its price rows (`.product-card-body`). State persists
-      per-browser via `localStorage` (`priceCompare.collapsed`, an array of
-      product ids) so it survives a reload.
-- [x] **Bulk "↻ Update prices" button** in the header —
-      `POST /products/refresh-all` re-runs the search+scrape for every
-      product, sequentially (one product at a time, not all fired in
-      parallel) to cap how many concurrent requests hit the store sites at
-      once; each product's own 3-store search still runs in parallel
-      internally. The existing per-product "Refresh" button is unchanged.
-- [x] **Pack-vs-unit pricing bug fixed** — reported live by the user
-      against real data: a search for "leite meio gordo" had matched a
-      6-pack on Continente (€6.84 total) against single cartons on Pingo
-      Doce/Lidl (€0.83/€1.00), so "cheapest" was comparing a 6-pack's total
-      price to two single units — meaningless. Root-caused live (not
-      guessed): Continente's multi-pack size lives in a dedicated
-      `class="ct-pdp--unit"` element (`emb. 6 x 1 lt`), separate from the
-      JSON-LD `name`; Pingo Doce and Lidl instead put "pack" directly in
-      the URL slug or product name (Lidl: name `"Pack 8x1 L"`) — no single
-      signal covers all three. `scrapers.js` now: (1) extracts *every*
-      product-detail link from a search page, not just the first,
-      (2) each scraper returns the raw HTML alongside its parsed price so
-      the caller can inspect it, (3) `looksLikeMultiPack()` checks the
-      name, URL, and HTML together (name/URL containing "pack";
-      HTML matching `emb.? N x SIZE UNIT`), and
-      `searchAndScrapeStore` walks candidates in order (capped at 5),
-      returning the first non-multi-pack match — falling back to the
-      first successfully-scraped candidate only if every one of them looks
-      like a multi-pack, so a product that's genuinely only sold in packs
-      still gets a price instead of an error.
-      **Verified live**: re-searching "leite meio gordo" on Continente now
-      returns a different product (`.../leite-uht-meio-gordo-mimosa-mimosa-2210946.html`,
-      not the earlier 6-pack) at `€1.00` — in the same ballpark as Pingo
-      Doce (`€1.08`) and Lidl (`€0.99`) for the existing "Leite magro sem
-      lactose" product, instead of the earlier 6x mismatch.
-      **Not done**: no actual price-per-unit normalization (e.g. €/L) —
-      this fix prevents comparing a pack to a single unit by preferring a
-      single-unit match when the search offers one, but doesn't compute or
-      display a normalized unit price for products that are genuinely
-      pack-only (milk sold only in 6-packs at one store, say). Revisit if
-      that turns out to matter in practice.
-
-### 22.9f Price Compare follow-up (same day): price history + chart, Portuguese translation, PWA install
-- [x] **Price history per store per product** — every *successful* scrape
-      now appends `{price, scrapedAt}` to a `history` array on that store's
-      entry (`server.js` `buildStoreEntry`), carried forward from the
-      previous entry so it accumulates across refreshes instead of being
-      overwritten. A failed scrape doesn't add a point but leaves existing
-      history untouched. Old products from before this change just start
-      with `history: []` — no migration needed (`previous?.history ?? []`).
-- [x] **Inline SVG line chart, no charting library or CDN** — a new "📈
-      Histórico" button per product opens a modal
-      (`buildHistoryChart()` in `app.js`) plotting one polyline per store
-      (colour-coded: Continente red, Pingo Doce green, Lidl blue) against
-      price (y) and time (x), with gridlines, price labels, date range, and
-      a legend. Says "not enough history yet" below 2 total points instead
-      of drawing a broken/empty chart. **Verified live**: refreshed a real
-      product twice, opened its history, confirmed a correctly-plotted
-      3-store chart with the right colours/legend/axis values.
-      **Not done**: no history pruning/cap — fine for a personal,
-      infrequently-refreshed tool; revisit if `products.json` growth ever
-      becomes noticeable.
-- [x] **Full Portuguese translation** — all UI strings in `index.html` and
-      `app.js` (buttons, labels, toasts, empty states, the history modal),
-      plus the handful of user-facing error strings that actually reach
-      the page (`scrapers.js`: "price not found in page" →
-      "preço não encontrado na página", the two "no results"/"no scrapable
-      product" messages; `server.js`'s validation errors). Left in English,
-      deliberately: internal code comments, and the `scrapeUrl`/
-      `detectStore` error paths that are no longer reachable from the UI
-      after 22.9d removed URL-pasting (kept for API completeness only).
-- [x] **Installable as a PWA** — same pattern as `apps/kitchen-switcher`
-      (§22.9b): `manifest.webmanifest` (`lang: pt-PT`, name "Comparador de
-      Preços"), 192/512/512-maskable icons (same `imagemagick`-generated
-      approach, "€" glyph on the app's blue accent), a minimal no-op
-      service worker (deliberately no offline caching — this app is
-      nothing without its live API, so an offline shell with stale/no data
-      would be worse than no PWA at all), and the usual
-      `apple-mobile-web-app-*` meta tags. Since this app serves its own
-      static files via `express.static` (no nginx in front, unlike
-      kitchen-switcher), added an explicit
-      `app.get('/manifest.webmanifest', ...)` route setting
-      `application/manifest+json` rather than trusting Express's default
-      mime lookup. Already exposed at `price-compare.tx-home-utils.com`
-      (done in §22.9c) — install works from there. **Verified live**:
-      `curl` confirms `200` + correct content-type for the manifest,
-      service worker, and icons.
-
-### 22.9g Price Compare follow-up (same day): stale-cache bug, root-caused and fixed
-- [x] **"Add product isn't working" reported again after 22.9f shipped —
-      not a repeat of the earlier bug, a caching layer problem.** Compared
-      what a real browser session had loaded against what curl got from
-      the origin: the page was rendering "Refresh"/"Edit"/"Delete" in
-      English, while the deployed `app.js` on disk was confirmed (`curl`
-      against the container directly) to be the current Portuguese
-      version. Root cause, confirmed by comparing headers at each hop:
-      Express's own `Cache-Control: max-age=0` on `app.js` was being
-      overridden somewhere between the origin and the browser — the public
-      hostname served `Cache-Control: public, max-age=14400` (4h) with
-      `cf-cache-status: REVALIDATED` for the same file. Most likely NPM's
-      own default nginx template for static-looking extensions
-      (`.js`/`.css`), not anything this project's exposure code sets
-      (`price-compare` has no custom `advanced_config`) — not fully
-      isolated to NPM specifically vs. Cloudflare's edge also playing a
-      part, but the fix doesn't need to know which: **worked around the
-      caching layer instead of fighting it**. `server.js` now generates
-      `index.html` per-request (`renderIndexHtml()`), appending a
-      `?v=<hash>` query string to `app.js`/`style.css` where the hash is
-      derived from those two files' current mtimes — so every deploy
-      produces genuinely new URLs that no existing cache (browser, NPM, or
-      Cloudflare) has ever seen, regardless of that cache's TTL.
-      `index.html` itself, plus `manifest.webmanifest` and `sw.js`, are now
-      served with an explicit `Cache-Control: no-store` so the page that
-      *points to* the versioned assets is never itself stale.
-      **Verified live**: `curl` against the public hostname shows
-      `cache-control: no-store` / `cf-cache-status: DYNAMIC` for `/` (down
-      from `public, max-age=14400` / `REVALIDATED`) and the correct
-      `app.js?v=<hash>` reference; a real browser session that had
-      previously loaded the stale English bundle immediately picked up the
-      Portuguese one on the very next navigation, and "Adicionar produto"
-      opened correctly on the first real click.
-      **Worth remembering for any future app added here**: this caching
-      behavior likely applies to every app exposed through NPM the same
-      way, not just this one — if a deploy to any of these apps ever
-      "doesn't take effect" for a user despite the container clearly
-      running new code, check response headers for an inflated
-      `Cache-Control`/`cf-cache-status: HIT` before assuming it's a code
-      bug.
-
-### 22.9h Price Compare follow-up (same day): collapsible categories, daily 08:00 update
-- [x] **Category sections collapsible, not just individual products** —
-      the whole category heading (e.g. "LATICÍNIOS (3)") is now clickable,
-      toggling a `▾`/`▸` and hiding/showing every product card in that
-      category at once; item count shown next to the name. State persisted
-      per-browser via a second `localStorage` key
-      (`priceCompare.collapsedCategories`, separate from the existing
-      per-product `priceCompare.collapsed`). **Verified live**: collapsed
-      "Laticínios" — its 3 cards disappeared, "Mercearia" right below
-      stayed expanded and unaffected.
-- [x] **Daily automatic update at 08:00** — same "poll periodically,
-      compare against a stored last-run date" pattern the main dashboard's
-      backup scheduler already uses (plan.md §18.3), not host-level cron
-      (this project avoids host/console config beyond `./start.sh` per
-      §0 principle 2). `server.js` checks every 15 minutes whether it's
-      past 08:00 local time and today's date isn't already recorded in
-      `/data/schedule.json`; if so, runs the same `refreshAllProducts()`
-      the manual "Update prices" button uses, then records today's date.
-      Also runs one check immediately at boot, so a container restart
-      that happens to land after 08:00 still catches the day's update
-      instead of silently skipping it.
-      - **Timezone default changed**: this app now defaults to
-        `TZ=Europe/Lisbon` in its own `docker-compose.yml`, overriding the
-        dashboard-wide default of UTC (confirmed live: host and every
-        other app here run UTC) — "08:00" has to mean 08:00 in Portugal
-        specifically, since every store this app scrapes is Portuguese,
-        regardless of what timezone the host happens to run in. Still
-        overridable via `.env` like any other app.
-      - **Verified live**: `Intl.DateTimeFormat().resolvedOptions().timeZone`
-        inside the container confirms `Europe/Lisbon`; the boot-time catch-up
-        check fired immediately (deployed well after 08:00) and wrote
-        `{"lastRunDate":"2026-08-29"}` to `schedule.json`, confirming it
-        won't re-run again today.
-
-### 22.9i Price Compare: multi-user via standalone Google Sign-In (requested, 2026-08-29)
-- [x] **Google Sign-In, standalone (not via Authelia)** — explicit choice
-      over reusing the existing Authelia SSO, discussed with the user
-      before building: each Google account becomes its own user
-      automatically the moment it completes login, no separate
-      invite/registration step, no shared homelab account. `app/auth.js`
-      (new) implements the OAuth2 authorization-code flow by hand against
-      Google's endpoints with plain `fetch` — no new npm dependency
-      (`google-auth-library` etc. deliberately skipped, matching this
-      app's existing minimal-deps pattern of `express` + `cheerio` only).
-      - `GET /auth/google` redirects to Google (state param = CSRF guard,
-        5 min TTL, single-use); `GET /auth/google/callback` exchanges the
-        code server-to-server (requires `client_secret`, never exposed to
-        the browser) and decodes the returned `id_token` *without*
-        verifying its signature — safe specifically because it came from
-        Google's token endpoint over our own authenticated request, not
-        from the client, so there's nothing for a browser to have forged.
-      - Sessions are an in-memory `Map` (opaque token in an httpOnly,
-        `sameSite=lax` cookie, `secure` when `req.protocol` is https —
-        `trust proxy` enabled so that reflects NPM's `X-Forwarded-Proto`
-        correctly) — **not** persisted to disk, so a container restart
-        logs everyone out. Accepted trade-off for a personal-scale tool;
-        revisit if that becomes annoying in practice.
-      - **Data now multi-user**: every product carries a `userId` (the
-        Google `sub`); `server.js`'s `loadUserProducts`/`saveUserProducts`
-        filter/merge against the single shared `products.json` so one
-        user's write can never touch another's data. All `/api/products*`
-        routes gated behind `auth.requireAuth`; `/api/categories`,
-        `/api/stores`, `/api/health` stay public (no user data in them).
-      - **Existing data migrated automatically, once**: the 5 products
-        already in `products.json` from before this change have no
-        `userId` — `claimLegacyProductsIfNeeded()` assigns all of them to
-        whichever Google account logs in *first* after this ships (tracked
-        via a `legacy-claimed.json` marker so a second/third user later
-        doesn't also inherit them). In practice that'll be the person who
-        already owned this data day-to-day, so it lands correctly without
-        needing a manual admin step.
-      - **Daily scheduler (§22.9h) updated for multi-user**: it now
-        iterates every distinct `userId` found in the file and refreshes
-        each user's products separately, instead of one flat list.
-      - Frontend: a login screen (`Entrar com o Google`) gates the whole
-        app until `GET /api/me` succeeds; the header then shows the
-        signed-in user's name/email and a "Sair" (logout) button. A 401
-        from any API call mid-session (expired/cleared session) drops back
-        to the login screen instead of just toasting a confusing error.
-      - **Needs the user to create Google OAuth credentials themselves** —
-        not something this session can do (requires their own Google
-        account, Cloud Console access, and clicking through Google's own
-        consent-screen setup). `.env.example` now documents the exact
-        steps and the exact `GOOGLE_REDIRECT_URI` to register
-        (`https://price-compare.tx-home-utils.com/auth/google/callback`).
-        The app boots and serves the login screen fine without these set;
-        `/auth/google` just returns a friendly `503` until they are.
-      - **Confirmed with the user, deliberate, not an oversight**: sign-up
-        stays open to *any* Google account, no email allowlist. Flagged
-        explicitly since this app is already publicly exposed (not behind
-        Authelia) — anyone who finds the URL and has a Google account can
-        self-register once credentials are configured, not just the
-        deploying user. User's call, left as-is.
-      - **Verified live** (everything short of an actual Google login,
-        which needs those credentials): `/api/me` and `/api/products`
-        both correctly `401` when logged out, `/auth/google` correctly
-        `503`s pre-configuration instead of crashing, the login screen
-        renders correctly in a real browser, and the 5 pre-existing
-        products are confirmed still intact with `userId: null`, waiting
-        to be claimed on first login.
-      - **Caught and fixed during this build**: the `Dockerfile` only
-        `COPY`'d `scrapers.js server.js` — the new `auth.js` module wasn't
-        in the image at all, so the container crash-looped on
-        `Cannot find module './auth'` on the very first rebuild. Fixed by
-        adding it to the `COPY` line; worth remembering for any future new
-        `.js` file added to this app's `app/` directory.
-
-### 22.9j Price Compare follow-up (same day): light/dark theme toggle
-- [x] **CSS fully converted to custom properties** — every hardcoded colour
-      in `style.css` replaced with `var(--bg)`/`var(--text)`/etc., defined
-      once on `:root` (the existing dark palette, unchanged values) and
-      overridden under `:root[data-theme="light"]` with a new light
-      palette. The dynamically-generated history chart SVG (`app.js`)
-      switched from inline `stroke="#hex"`/`fill="#hex"` presentation
-      attributes (which don't resolve CSS variables) to `style="stroke:var(...)"`
-      declarations, which do — so the chart follows the toggle too, not
-      just the static chrome.
-      - **Not themed**: the three store brand colours in the chart legend
-        (Continente red / Pingo Doce green / Lidl blue) — left as fixed
-        hex, they're brand identity, not UI chrome, and read fine on both
-        backgrounds.
-      - Default is dark unless the user has explicitly chosen light — no
-        `prefers-color-scheme` auto-detection, only the toggle.
-      - No new npm dependency — a `<script>` inline in `index.html`'s
-        `<head>` reads `localStorage` synchronously and sets
-        `documentElement.dataset.theme` before the page paints (avoids a
-        flash of the wrong theme on load); `app.js` owns the toggle
-        button's click handling, icon (🌙/☀️) and `<meta name="theme-color">`
-        sync, and persists the choice back to the same `localStorage` key
-        (`priceCompare.theme`) — per-browser, same pattern as the existing
-        collapse-state persistence.
-      - **Verified live**: toggled dark → light (confirmed visually, full
-        page correctly re-themed including the login screen), reloaded the
-        page and confirmed light persisted with no dark flash, toggled back.
-
-### 22.9 Optional / niche
-- [x] **Navidrome** (`deluan/navidrome`) — added 2026-09-09 (§313):
-      `apps/navidrome/` (compose + `.env.example`), image pinned
-      `deluan/navidrome:0.63.2`, host port `${NAVIDROME_PORT:-10570}` →
-      `:4533`, `./data:/data` + read-only `${NAVIDROME_MUSIC_DIR:-./data/music}
-      :/music`, `wget /ping` container healthcheck. **Category:** Media.
-      **Icon:** new `music` → 🎵. **No exposure env keys** — Navidrome builds
-      its public base URL from NPM's `X-Forwarded-*` headers and does no Host
-      allowlisting, same as Jellyfin (the §22.9 note's `ND_BASEURL` is
-      sub-path only, which the dashboard never uses). First-run: admin
-      created via the web setup screen (no admin env), rowed in
-      `app-credentials.md`. Licence **GPL-3.0** (not AGPL) — clean for the
-      resale model, rowed in `licences.md`.
-- [~] ***arr stack** — **dropped 2026-09-10 (§370)**. (Prowlarr/Sonarr/Radarr + a download client) — media
-      automation for Jellyfin. Big surface; only if that's a real use.
-- [~] **Grafana + Prometheus** — **dropped 2026-09-10 (§370)**. proper metrics/alerting if Beszel +
-      Uptime-Kuma stop being enough. Heavier; a step change in ops
-      complexity.
-
-## 23. Session Log — 2026-08-28 (cont.): PWA + mobile UI, login-probe fix, and the recommended order for what's left
-
-### 23.0 Shipped this session (all committed + pushed, `5b368c2`..`f5222b5`)
-- **`7201364`** — Vaultwarden compose healthcheck used `wget` (absent from
-  `vaultwarden/server`); switched to `curl -fsS`. The container was
-  permanently `unhealthy` while the app served `/alive` fine.
-- **`e8a2c53`** — `booleanEnvKeys` / `managedEnvKeys` / `hiddenGeneratedSecrets`
-  on `ServiceDefinition`, wired through `appEnv.ts` + the service-card config
-  panel; Vaultwarden uses all three (DOMAIN managed, SIGNUPS_ALLOWED toggle,
-  ADMIN_TOKEN hidden-generated). (This was pre-existing working-tree work,
-  committed as its own unit.)
-- **`8b3885b`** — checked in the rest of `apps/home-page/data/` (services,
-  bookmarks, widgets, settings, proxmox, kubernetes, custom CSS/JS).
-- **`1c3a2bb`** — dashboard: "Running apps" table grouped by the same
-  category + fixed order as the full list; category headers in both lists
-  and the Settings / Backups / Health sections are collapse toggles, state
-  namespaced + persisted to `localStorage`; "Running apps" is now a tinted
-  green-accented panel, the full list sits under an "All apps" heading + rule.
-- **`2a46e11`** — PWA: `manifest.webmanifest`, 192/512 + maskable icons
-  (rasterized from `favicon.svg`), 180px `apple-touch-icon`, `index.html`
-  meta (theme-color, apple-mobile-web-app-*), a conservative service worker
-  (`public/sw.js`: network-first navigations, cache-first only for
-  content-hashed assets, never touches `/api`), and nginx serving
-  `.webmanifest` as `application/manifest+json` + `sw.js` `no-cache`.
-- **`6d8b085`** — new public `GET /auth/setup-status` → `{ setupRequired }`
-  (200, own roomy rate limiter). The route guards' setup check hit `GET /api`
-  before, which always 401s (503 pre-setup) on a fresh load — a console
-  error on the login page every visit. Frontend now calls the public endpoint.
-- **`f5222b5`** — mobile: header rebuilt so it no longer forces one
-  horizontal row at every width (brand + Logout on row 1, secondary links
-  as a full-width swipeable strip on row 2 below `lg`); `section[id]`
-  `scroll-margin-top` for the sticky header; Running-apps tables collapse
-  to stacked labelled cards below 768px (`data-label` + `::before`,
-  `thead` visually hidden) so there's no horizontal drag; tighter panel /
-  summary-card spacing on phones.
-
-This delivers most of §13 Milestone 4's "UI polish and mobile refinement".
-
-### 23.1 Recommended implementation order for the outstanding work
-Sequenced by dependency and momentum, not just P-label (same spirit as
-§18.2). Tracks A–C run in order; Track D is genuinely blocked and runs in
-parallel whenever the user unblocks it.
-
-**Track A — visible-bug fixes first (small, self-contained, high-signal)**
-1. ~~**§21.1 "Running apps" links.**~~ **DONE 2026-08-28** — see §21.1 and
-   §23.2. Added the reusable `webPath` registry field (Pi-hole `/admin`),
-   pinned NPM's exposure upstream to `NPM_ADMIN_PORT`, and added
-   `POST /services/:name/setup-token/reset` + a card button that restarts
-   Portainer to clear its first-run lock and reissue the token.
-2. **§21.2 live-verify + Authelia check.** Code-inspection half **DONE
-   2026-08-28** (§23.3): Authelia config already carries
-   `authelia.tx-home-utils.com`; HA's `trusted_proxies` block already covers
-   the cloudflared→NPM→app source address — no code change. **Still
-   outstanding:** the live per-app run — toggle exposure, restart, `curl`
-   each of the ~11 touched apps and confirm the Host/CSRF error is gone.
-   **Do this before Track B** — every new app in §22 is told to "wire
-   reverse-proxy config up front per §21.2", so the mechanism must be
-   proven first.
-
-**Track B — new apps (smallest first, for momentum)**
-3. ~~**ntfy** (§22.2, S)~~ **DONE 2026-08-28** (§23.4) — registry + compose
-   in; not yet started against Docker. Unblocks push notifications for
-   uptime-kuma, watchtower, and the backup scheduler.
-4. ~~**Stirling-PDF** (§22.5, S)~~ **DONE 2026-08-28** (§23.5) — registry +
-   compose in; not yet started against Docker.
-5. ~~**WAHA** (§22.1, M)~~ **DONE 2026-08-28** (§23.6) — registry + compose
-   in; not yet started against Docker (needs `WAHA_API_KEY` etc. set first).
-6. ~~**NocoDB** (§22.4, M)~~ **DONE 2026-08-28** (§23.7) — app + Postgres in;
-   not yet started against Docker. Track B complete.
-
-**Track C — security hardening (higher value, larger, wants a stable base)**
-7. ~~**CrowdSec** (§22.6, M)~~ **DONE 2026-08-28** (§23.8 + §23.9) — agent +
-   Cloudflare bouncer wired; bouncer config + NPM real-IP block are rendered
-   by the backend on start (no hand-editing). Only external step: give the CF
-   token Filter-Lists + Firewall-Services edit. Not started against Docker.
-8. **2FA for admin accounts** (§18.2 item 8) — the dashboard is
-   internet-facing; do this last of the must-dos but don't defer it
-   indefinitely. Give it its own dedicated plan (TOTP enrolment, backup
-   codes, login-flow + UI changes) — the M estimate is undersized.
-
-**Track D — NetBird (blocked on the user, run in parallel, not in sequence)**
-- Resume §20.11 / §21.3 only once the user confirms whether a router
-  port-forward + static IP/DDNS is feasible, or picks the no-router path
-  (NetBird Relay/Signal, enrol over the existing Tailscale overlay, or
-  retest a newer `cloudflared` for the trailers bug). Then: §20.10
-  (DNS-01 cert path in `ensureGrpcCertificate`, a "direct exposure" mode in
-  the exposure config/DB, grey-cloud the DNS record), confirm a real peer
-  enrols, then STUN/TURN. Independent of Tracks A–C.
-
-**Opportunistic / not scheduled**
-- Remaining §22 P2/P3 apps — pull individually when a concrete use appears.
-- §18.2 item 7 (health-check host-port assumption) — only if a service
-  actually exhibits that failure pattern.
-- §13.3 nice-to-haves: service templates, UI theming.
-- ~~**§0 principle 3 sweep**~~ **DONE 2026-08-28** (§23.10) — new
-  `ensureGeneratedSecrets` fills declared blank/placeholder secrets at start;
-  waha / nocodb / nextcloud / paperless / n8n / immich / duplicati / beszel
-  gained `autoGeneratedSecrets` / `hiddenGeneratedSecrets` and their
-  `.env.example` secrets are now blank.
-
-### 23.2 Session Log — 2026-08-28 (cont.): §21.1 "Running apps" links
-
-Track A item 1 shipped. Backend `tsc --noEmit` clean; backend vitest 31/31
-on the touched suites; frontend `ng build` compiles clean (dev config).
-Not yet verified against live containers — needs exposure actually enabled
-(same gate as §21.2 item 1).
-
-- **`webPath` registry field** — optional `webPath?: string` on
-  `ServiceDefinition` (leading slash, no trailing slash) for apps whose web
-  UI isn't at `/`. Flows: `config/services.ts` → `ServiceStatusPayload`
-  (`status.ts`) → frontend `ServiceStatus` model → appended in
-  `dashboard.ts` `groupRunningPortsByCategory` and the `service-card`
-  hostname badge (`https://<host><webPath>`). `pihole` sets `'/admin'`.
-  Intended to also feed a future exposure health check (none exists yet).
-- **NPM link** — `nginx-proxy-manager` gains
-  `exposurePortEnvVar: 'NPM_ADMIN_PORT'`. Its compose publishes :80/:443
-  (proxy listeners) before :81 (admin UI), so "first port in the file" sent
-  the exposure upstream — and the dashboard link — to :80's default
-  "Congratulations" vhost. `provisionServiceIfEnabled` already threads
-  `serviceDef.exposurePortEnvVar` into `getPublishedUpstreamPort`, so this
-  was a one-line registry pin, no exposure-code change.
-- **Portainer lock recovery** — `POST /api/services/:name/setup-token/reset`
-  (new `requireSetupTokenSupport` guard): `executor.restartService` →
-  `waitForServiceSetupToken` (polls `getServiceSetupToken`, 6×1.5s) →
-  `{ token, message }`, audited as `SERVICE_SETUP_TOKEN_RESET`. Restarting
-  Portainer clears its "timed out for security purposes" first-run lock and
-  reprints a fresh `setup_token=`, resetting the 5-min window.
-  `getServiceSetupToken` now takes the **last** regex match, not the first,
-  so a post-restart log (stale token line above the fresh one) resolves to
-  the current token. Card's setup-token panel has a "Restart & get a new
-  token" button → `resetSetupToken()` (`setupTokenResetting` spinner state).
-
-### 23.3 Session Log — 2026-08-28 (cont.): §21.2 code-inspection pass
-
-Track A item 2's no-code half. Both checks came back clean — **nothing to
-change**. What remains is purely live: enable exposure on each of the ~11
-apps §21.2 touched, restart, and `curl` the public hostname to confirm the
-Host/CSRF 400s are gone. That needs the running stack + the exposure toggle,
-so it's the user's to drive.
-
-- **HA `trusted_proxies`** — traced the real request path:
-  `cloudflared → NPM (:80) → getHostGatewayIp()` (which is
-  `host.docker.internal` resolved to the Docker bridge gateway, e.g.
-  `172.17.0.1`) `→ <app>`'s published host port. So the source address HA
-  sees for a proxied request is NPM's own container IP or the destination
-  bridge's gateway — both land inside the `172.16.0.0/12` entry that
-  `HA_HTTP_BLOCK` (`exposureConfigFiles.ts`) already lists, and the block's
-  `10.0.0.0/8` + `192.168.0.0/16` entries cover any custom Docker
-  `default-address-pool` or LAN-origin case. The only thing outside all
-  three is an exotic pool like CGNAT `100.64.0.0/10`, which isn't this
-  setup. **No widening needed.**
-- **Authelia** — `apps/authelia/config/configuration.yml` already has
-  `session.cookies[0].authelia_url: https://authelia.tx-home-utils.com`
-  (exactly the `${serviceName}.${baseDomain}` hostname the exposure system
-  provisions for `authelia`) and cookie `domain: tx-home-utils.com`
-  (session valid across every protected `*.tx-home-utils.com` app).
-  `access_control` has no domain rules (`default_policy: one_factor` only).
-  The NPM forward-auth snippets (`apps/nginx-proxy-manager/snippets/`) call
-  Authelia at `http://172.17.0.1:9091/api/authz/auth-request` and pass
-  `X-Original-URL https://$host$request_uri` — correct for the
-  TLS-terminated-upstream model. **No change.** Nit only: `totp.issuer` is
-  still `authelia.local` (cosmetic — the label shown in authenticator apps).
-
-### 23.4 Session Log — 2026-08-28 (cont.): ntfy added (§22.2, Track B #3)
-
-First of the Track B new apps. Backend `tsc` clean, backend vitest 109/109,
-frontend `ng build` clean. Registry + files only — not yet `compose up`'d
-against Docker, and (per Track A #2) exposure still needs its live pass
-before ntfy's public hostname is verified end to end.
-
-- **`apps/ntfy/`** — `docker-compose.yml` (`binwiederhier/ntfy:latest`,
-  `command: serve`, `${NTFY_PORT:-8010}:80`, `./data:/var/cache/ntfy` with
-  `NTFY_CACHE_FILE` so messages/subscriptions survive a restart,
-  `wget …/v1/health | grep '"healthy":true'` healthcheck) and `.env.example`
-  (`NTFY_PORT`, `NTFY_BASE_URL`, `NTFY_BEHIND_PROXY=false`, `TZ`). No DB.
-  Chose 8010 for the host port — 80 is taken by speedtest, 8080 by pihole.
-- **Registry** — `SERVICES.ntfy`, category Monitoring & Management, new
-  `bell` icon → 🔔 in `serviceIcon()`. `healthCheck` hits
-  `http://localhost:8010/v1/health`.
-- **Exposure** — `exposureEnvKeys.url: ['NTFY_BASE_URL']` (ntfy builds the
-  web app base href + click/attachment links from it) and
-  `staticOnExposure: { NTFY_BEHIND_PROXY: 'true' }` so X-Forwarded-For is
-  only trusted when actually behind NPM/Cloudflare — spoofable otherwise.
-  `.env` default stays `false`. Single published port, so no
-  `exposurePortEnvVar`.
-- **Attachments** — left `NTFY_ATTACHMENT_CACHE_DIR` unset; ntfy refuses to
-  start if it points at a dir that doesn't exist yet, and attachments are
-  opt-in. Add it back (plus `mkdir`) if wanted later.
-
-### 23.5 Session Log — 2026-08-28 (cont.): Stirling-PDF added (§22.5, Track B #4)
-
-Backend `tsc` clean, backend vitest 109/109, frontend `ng build` clean.
-Registry + files only — not yet `compose up`'d.
-
-- **`apps/stirling-pdf/`** — `docker-compose.yml`
-  (`stirlingtools/stirling-pdf:latest`, `${STIRLING_PDF_PORT:-8009}:8080`,
-  `curl -fsS …/api/v1/info/status | grep UP` healthcheck, `start_period: 60s`
-  since the first boot unpacks OCR/LibreOffice bits, bind mounts
-  `./data/{tessdata,configs,customFiles,pipeline}`) and `.env.example`
-  (port, `*_ENABLE_SECURITY`/`*_ENABLE_LOGIN` both `false`, langs/locale, TZ).
-  Host port 8009 — 8010 is ntfy's, 8080 pihole's.
-- **Registry** — `SERVICES['stirling-pdf']`, category Backup & Storage (with
-  Paperless), new `pdf` icon → 📕. `healthCheck` →
-  `http://localhost:8009/api/v1/info/status`.
-- **Exposure** — none. Stirling-PDF does no Host-header / origin validation,
-  so there's nothing to keep in sync; the `.env.example` steers users to
-  Authelia-gate it on exposure rather than enabling the app's own login.
-
-### 23.6 Session Log — 2026-08-28 (cont.): WAHA added (§22.1, Track B #5)
-
-The explicitly-requested one. Backend `tsc` clean, backend vitest 109/109,
-frontend `ng build` clean, all three new compose files parse as YAML.
-Registry + files only — not `compose up`'d, and it won't start usefully
-until `WAHA_API_KEY` / dashboard creds are set in `apps/waha/.env`.
-
-- **`apps/waha/`** — `docker-compose.yml` (`devlikeapro/waha:latest`,
-  `${WAHA_PORT:-3009}:3000` — 3000 is homepage's, 3001 uptime-kuma's;
-  `WHATSAPP_DEFAULT_ENGINE=WEBJS`, `WAHA_PRINT_QR=false`, bind mounts
-  `./data/sessions` → `/app/.sessions` and `./data/media` → `/app/.media`)
-  and `.env.example` (port, engine, `WAHA_API_KEY`, dashboard +
-  swagger basic-auth pairs, `WAHA_BASE_URL`, `TZ`).
-- **Healthcheck** — `node -e "require('http').get('…/health', …)"` rather
-  than curl/wget (WAHA is a Node image; curl presence isn't guaranteed).
-  Same `/health` in the registry `healthCheck`. Fallback if it's
-  auth-gated on the live image: `/ping`.
-- **Registry** — `SERVICES.waha`, category Productivity (next to n8n, its
-  stated pairing — no new `ServiceCategory` enum), new `chat` icon → 💬.
-  `exposureEnvKeys.url: ['WAHA_BASE_URL']`; single published port so no
-  `exposurePortEnvVar`.
-- Data lives under `./data/` (not WAHA's default `./.sessions`) so the
-  existing `apps/*/data/` `.gitignore` rule keeps session/media state out
-  of git.
-
-### 23.7 Session Log — 2026-08-28 (cont.): NocoDB added (§22.4, Track B #6)
-
-Last of Track B. Backend `tsc` clean, backend vitest 109/109, frontend
-`ng build` clean, compose parses (2 services). Registry + files only — not
-`compose up`'d.
-
-- **`apps/nocodb/`** — first new multi-container app since nextcloud; same
-  shape: `nocodb` + `nocodb-db` (`postgres:16-alpine`, `./data/db`,
-  `pg_isready` healthcheck) with `depends_on: { nocodb-db: { condition:
-  service_healthy } }` and a dedicated `nocodb-net` bridge.
-  `${NOCODB_PORT:-8011}:8080` (8009 stirling, 8010 ntfy, 8011 free),
-  `NC_DB="pg://nocodb-db:5432?u=…&p=…&d=…"`, app data `./data/nocodb`,
-  `wget --spider /api/v1/health` healthcheck. `.env.example` warns to keep
-  `NOCODB_DB_PASSWORD` alphanumeric — it goes into the pg:// URL.
-- **Registry** — `SERVICES.nocodb`, category Productivity (data source for
-  n8n; §22.4's "Data/BI" has no enum), new `table` icon → 🗃️.
-  `healthCheck` → `http://localhost:8011/api/v1/health`.
-- **Secrets / exposure** — `autoGeneratedSecrets: ['NOCODB_JWT_SECRET']`
-  (compose maps it to `NC_AUTH_JWT_SECRET`; config panel pre-fills a
-  generated value, same mechanism as Vikunja). `exposureEnvKeys.url:
-  ['NOCODB_PUBLIC_URL']` → `NC_PUBLIC_URL` for invite/share/email links.
-
-### 23.8 Session Log — 2026-08-28 (cont.): CrowdSec added (§22.6, Track C #7)
-
-First Track C item. Enforcement point was a real decision (asked, user chose
-**Cloudflare bouncer**): behind a Cloudflare Tunnel a firewall bouncer never
-sees real client IPs, and the nginx bouncer needs a forked
-`jc21/nginx-proxy-manager` with the CrowdSec Lua module. The CF bouncer
-mirrors bans into a Cloudflare IP List that a zone rule blocks — enforcement
-at the edge, before the tunnel, using the CF creds the stack already holds.
-
-Backend `tsc` clean, backend vitest 109/109, frontend `ng build` clean, all
-YAML parses. Registry + files only — **not** `compose up`'d, and it has two
-manual pre-start steps (below) that the env-only apps don't.
-
-- **`apps/crowdsec/`** — two services on `crowdsec-net`, no host ports:
-  - `crowdsec` (agent + Local API). `config/acquis.yaml` →
-    `/etc/crowdsec/acquis.d/npm.yaml` points at `/var/log/npm/*_access.log`,
-    which is `../nginx-proxy-manager/data/app/log` bind-mounted read-only
-    (NPM's `./data/app` is `/data` in its container, logs at `/data/logs`).
-    `COLLECTIONS="crowdsecurity/nginx crowdsecurity/http-cve
-    crowdsecurity/base-http-scenarios"` (re-installed each boot — no
-    `/etc/crowdsec` persistence, only `./data/crowdsec` →
-    `/var/lib/crowdsec/data` for the decisions DB + registrations).
-    `BOUNCER_KEY_cloudflare=${CROWDSEC_BOUNCER_KEY}` auto-registers the
-    bouncer on startup. Healthcheck `cscli lapi status`.
-  - `cloudflare-bouncer` (`crowdsecurity/cloudflare-bouncer`),
-    `depends_on: crowdsec: service_healthy`, config bind-mounted from
-    `config/cloudflare-bouncer.yaml` — **gitignored**; committed template is
-    `cloudflare-bouncer.yaml.example` (that file is not `${ENV}`-substituted,
-    so values are pasted literally).
-- **Registry** — `SERVICES.crowdsec`, Networking & Security, new `siren`
-  icon → 🚨. `healthCheck.enabled: false` (no unauthenticated HTTP endpoint;
-  container healthcheck + `aggregateContainerState` cover running/error).
-  `autoGeneratedSecrets: ['CROWDSEC_BOUNCER_KEY']`. No `ports:` →
-  `upsertServiceExposureConfig` already refuses to expose it, which is
-  correct (no web UI; LAPI is bouncer-only).
-- **Manual pre-start steps** (documented in §22.6 + both example files):
-  1. `cp config/cloudflare-bouncer.yaml.example config/cloudflare-bouncer.yaml`
-     and fill in a **dedicated** CF API token (Account → Account Filter
-     Lists: Edit; Zone → Firewall Services: Edit), the account/zone IDs, and
-     the bouncer key from `.env`.
-  2. Copy `apps/nginx-proxy-manager/snippets/cloudflare-real-ip.conf` to
-     `apps/nginx-proxy-manager/data/app/nginx/custom/http_top.conf` and
-     restart NPM, so access logs carry `CF-Connecting-IP` as the client
-     address — otherwise CrowdSec parses (and would ban) Cloudflare's edge
-     IPs. Snippet carries the current Cloudflare ranges + `real_ip_header`.
-
-  **Both of those manual steps were removed the same day — see §23.9.**
-
-### 23.9 Session Log — 2026-08-28 (cont.): CrowdSec config made hands-off
-
-Follow-up to §23.8: the two "manual pre-start steps" violated the project
-rule that every config that can be automated must be (§0 principle 3, added
-this session). Both are now done by the backend.
-
-- **`backend/src/services/crowdsecConfig.ts`** (new) —
-  `applyCrowdsecConfigFiles(serviceName, appDir)`, called from
-  `executor.startService` right after `applyExposureConfigFiles`, no-op for
-  every service except `crowdsec`. On a CrowdSec start it:
-  - renders `apps/crowdsec/config/cloudflare-bouncer.yaml` (0600, gitignored)
-    with `yaml.dump` from `getExposureConfig()` (CF account/zone/token — the
-    same values already collected for the tunnel) + `CROWDSEC_BOUNCER_KEY`
-    read from `apps/crowdsec/.env`. If either is missing it still writes a
-    self-describing placeholder file (so the compose bind mount never becomes
-    an auto-created directory) and logs which setting to fill in.
-  - writes the marker-fenced Cloudflare real-IP block into
-    `apps/nginx-proxy-manager/data/app/nginx/custom/http_top.conf` and
-    `docker exec …nginx -s reload`s NPM. Best-effort: NPM's data dir is
-    root-owned by its container, so on `EACCES` it logs the one-line manual
-    fallback (`snippets/cloudflare-real-ip.conf`) instead of failing.
-- **`routes/settings.ts`** — `PERMISSION_EXPLANATION` (shown under the
-  Cloudflare token field in Settings) now also lists Account → Account
-  Filter Lists → Edit and Zone → Firewall Services → Edit "to also run
-  CrowdSec". A broader-scoped token in Cloudflare's own UI is the only
-  external step left; there is no file to edit.
-- Tests: `crowdsecConfig.test.ts` covers the bouncer-config shape / YAML
-  round-trip and the real-IP block's markers + directives. 114 backend
-  tests pass; `tsc` + `ng build` clean.
-
-### 23.10 Session Log — 2026-08-28 (cont.): generated-secret sweep (§0.3)
-
-Every app that shipped a `change-me` secret in `.env.example` now generates
-it with no user step. Backend `tsc` clean, 117 tests pass.
-
-- **`appEnv.ts` — `ensureGeneratedSecrets(serviceName)`** (new, exported):
-  for a service's declared `autoGeneratedSecrets` + `hiddenGeneratedSecrets`,
-  any value that's blank or a known placeholder (`change-me`, `changeme`,
-  `secret`, `password`, …) is replaced with `crypto.randomBytes(32).hex`,
-  writing `.env` (seeded from `.env.example`) via `saveServiceEnv`. Only
-  touches blank/placeholder values — a real secret a running Postgres already
-  initialised with is never rotated. `executor.startService` calls it right
-  before `ensureServiceSecrets`, so an app whose only outstanding config is
-  generatable secrets now starts with zero dashboard interaction.
-- **Registry** — added generatable-secret declarations:
-  - `hiddenGeneratedSecrets` (internal, never shown): `*_DB_PASSWORD` for
-    paperless / n8n / immich / nextcloud / nocodb.
-  - `autoGeneratedSecrets` (shown as a secret field so they can be
-    retrieved / backed up): `PAPERLESS_SECRET_KEY` + `PAPERLESS_ADMIN_PASSWORD`,
-    `N8N_ENCRYPTION_KEY`, `NEXTCLOUD_ADMIN_PASSWORD`,
-    `DUPLICATI_SETTINGS_ENCRYPTION_KEY` + `DUPLICATI_WEB_PASSWORD`,
-    `BESZEL_ADMIN_PASSWORD`, `WAHA_API_KEY` + `WAHA_DASHBOARD_PASSWORD` +
-    `WAHA_SWAGGER_PASSWORD`. (`VIKUNJA_JWT_SECRET`, `NOCODB_JWT_SECRET`,
-    `VAULTWARDEN_ADMIN_TOKEN`, `CROWDSEC_BOUNCER_KEY` were already declared.)
-- **`.env.example`** — the corresponding secret lines are now blank (`KEY=`)
-  with a comment saying the dashboard generates them; covers vaultwarden and
-  vikunja too (their declarations pre-dated this but the examples still had
-  `change-me`).
-- Not applied to **DB usernames / names** (`*_DB_USER`, `*_DB_NAME`) or seed
-  emails — those aren't secrets and their defaults are fine.
-- Tests: `appEnv.test.ts` gains an `ensureGeneratedSecrets` block (fills
-  blank + placeholder, never rotates a set value, no-op without declarations).
-
-### 23.11 Session Log — 2026-08-28 (cont.): three reported issues
-
-Backend `tsc` clean, 117 tests pass; frontend `ng build` clean.
-
-**1. NPM admin URL in "Running apps".** The table only linked apps that were
-publicly exposed. `ServiceStatusPayload` gained `webPort` — the running app's
-web-UI host port from `getPublishedUpstreamPort(name, exposurePortEnvVar)` (so
-NPM resolves to its admin `:81`, not proxy `:80`; Pi-hole to its web port).
-The dashboard now builds `http://<dashboard-host>:<webPort><webPath>` for
-un-exposed running apps and `https://<hostname><webPath>` for exposed ones
-(`buildRunningAppUrl`). The "Not exposed" cell became a plain "—" (most
-running apps now have a link).
-
-**2. Home Assistant 400 Bad Request.** Root cause found on the live box: the
-appended `http:` block + its `trusted_proxies` were correct, but HA 2026.x
-had migrated `http:` into `.storage/http` with our config stuck as
-`pending` / `error: not_promoted` while HA served requests from the default
-`stable` (no `use_x_forwarded_for`) → every proxied request 400'd with
-"not set-up for reverse proxies". The old `resetMigratedHttpStorage` couldn't
-help: it ran only when the yaml marker was absent, and `.storage/http` is
-`root:root 600` — unwritable by the backend's non-root process.
-`exposureConfigFiles.ts` was rewritten: `applyExposureConfigFiles` now runs a
-one-off `docker compose run --rm --no-deps --entrypoint /bin/sh
-home-assistant` container (HA's own image + `/config` mount, HA never boots)
-that ensures the yaml block and — via a `python3` probe of `.storage/http` —
-moves the store aside only when neither `stable` nor a healthy `pending`
-carries `use_x_forwarded_for`, so HA re-migrates the block cleanly on the
-start that follows. **Verified live**: reset the user's stuck store, restarted
-HA, proxied request went 400 → 200, forwarded errors stopped; a second run is
-a no-op ("already carries the reverse-proxy config"). Tests reworked to mock
-`exec` and assert the command shape + embedded payload.
-
-**3. Global timezone (default Europe/Lisbon, UI-changeable).**
-`utils/generalSettings.ts` (`app_timezone` setting, `DEFAULT_TIMEZONE =
-'Europe/Lisbon'`, IANA validation via `Intl.DateTimeFormat`). New
-`GET/PUT /api/settings/general` (returns `Intl.supportedValuesOf('timeZone')`
-for the picker). `executor.startService` injects `TZ=<global>` as a compose-up
-env override unless the app's own `.env` pins a `TZ` (per-app override wins).
-The hardcoded `TZ=Europe/Lisbon` line was removed from all 15 `.env.example`
-files (replaced with a comment). Settings panel gained a "General" section
-with a timezone `<select>`. Applies on each app's next start.
-
-### 23.12 Session Log — 2026-08-28 (cont.): Bitwarden app couldn't reach Vaultwarden
-
-Root cause on the live box: Vaultwarden's `DOMAIN` was still
-`http://localhost:8222` while it was served at
-`https://vaultwarden.tx-home-utils.com`, so `/api/config` advertised
-`http://localhost:8222` as the api/identity/notifications base and the
-Bitwarden client had nowhere to connect. `DOMAIN` is a `managedEnvKeys` /
-`exposureEnvKeys.url` value injected **at `docker compose up`** (never written
-to `.env`), so it only lands via the dashboard's start flow.
-
-The bug: `executor.restartService` ran `docker compose restart`, which never
-re-substitutes `${VAR}` — so "restart to apply" after enabling exposure kept
-the old localhost values (would also hit n8n's `N8N_HOST`, Nextcloud's
-overwrites, etc.). Fixed: extracted `composeUpWithManagedConfig()` (env
-overrides + `applyExposureConfigFiles` + `applyCrowdsecConfigFiles` + global
-`TZ`), shared by start and restart; `restartService` now calls it with
-`up -d --force-recreate` instead of `restart`. `PUT /:name/exposure` message
-changed to "Restart the service to apply it."
-
-Live fix + verification: recreated Vaultwarden with
-`VAULTWARDEN_DOMAIN=https://vaultwarden.tx-home-utils.com`. `/api/config` now
-returns the correct `environment` URLs; `/alive`, `/api/config`,
-`/api/version` = 200 through Cloudflare→NPM; WS `/notifications/hub` returns
-401 (route present, needs the client's token → 101) end to end — confirmed
-with an HTTP/1.1 handshake (an HTTP/2 curl can't carry `Upgrade: websocket`,
-which produced a misleading 404 at first). Backend rebuilt. `tsc` clean,
-117 tests pass.
-
-### 23.13 Session Log — 2026-08-28 (cont.): NPM admin panel exposed via Cloudflare
-
-Requested: the "Running apps" row for Nginx Proxy Manager should show a
-Cloudflare URL for its admin panel. No code change needed — the display
-(`buildRunningAppUrl` → `exposedHostname` branch, §23.11) and the `:81`
-routing (`exposurePortEnvVar: 'NPM_ADMIN_PORT'`, §21.1) were already in place;
-NPM just had no `service_exposure` row. Enabled it via the API
-(`PUT /services/nginx-proxy-manager/exposure {enabled:true,
-autheliaProtected:true}` + provision), so the admin UI is now at
-`https://nginx-proxy-manager.tx-home-utils.com` → NPM `:81`, **gated by
-Authelia** (a public reverse-proxy admin panel unprotected would be reckless;
-the user has an Authelia account). Verified: exposure row `provisioned`
-(`upstream_port 81`, `authelia_protected t`), public GET → 302 to Authelia,
-status API returns `exposedHostname` for NPM so the dashboard row shows the
-Cloudflare URL. First provision attempt hit a transient `ECONNREFUSED
-…:81` because `startService` briefly recreated NPM (it publishes the API
-port NPM-provisioning calls); a `exposure/verify` retry succeeded.
-
-### 23.14 Session Log — 2026-08-28 (cont.): Watchtower crash-loop (old Docker API)
-
-`containrrr/watchtower:latest` (v1.7.1, unmaintained since 2023) ships a
-Docker client pinned to API **1.25**; the host runs Engine 29.7.2 with
-`MinAPIVersion 1.40`, so every call was rejected — *"client version 1.25 is
-too old"* — and the container sat in `Restarting (1)`. Fixed by pinning
-`DOCKER_API_VERSION: ${WATCHTOWER_DOCKER_API_VERSION:-1.44}` in
-`apps/watchtower/docker-compose.yml` (verified: `--run-once` scans all
-containers cleanly with it). Recreated → `RestartCount 0`, "Watchtower 1.7.1
-… Scheduling first run", no errors. Comment + `.env.example` note that a
-future engine bump may need a higher value, or a switch to a maintained fork
-(`ghcr.io/nickfedor/watchtower`).
-
-**Switched to the maintained fork the same day**: image is now
-`ghcr.io/nicholas-fedor/watchtower:latest` (Watchtower **1.21.2**), which
-negotiates the current Docker API on its own — the `DOCKER_API_VERSION` pin
-and its `.env.example` var were removed. Verified with `--run-once --debug`
-that it still honours the legacy `com.centurylinklabs.watchtower.enable`
-label: `homelab-management-{backend,frontend,database}` and
-`docker-socket-proxy` come back `value=false` (excluded), everything else
-watched. Container `Up (healthy)`, `RestartCount 0`. Old
-`containrrr/watchtower` image removed.
-
-### 23.15 Session Log — 2026-08-28 (cont.): Config-panel fixes (TZ prefill, exposure URLs, boolean radios)
-
-Three reported gaps in each app's Configuration panel, all in
-`appEnv.ts` `loadStatus` + the service-card form.
-
-1. **TZ not prefilled.** After §23.11 stripped `TZ=Europe/Lisbon` from the
-   `.env.example` files, the panel's `TZ` field showed blank. `loadStatus`
-   now sets `suggestedValue = getAppTimezone()` for an unset `TZ` key, and
-   the frontend prefills non-secret fields from `suggestedValue` too (not
-   just secrets). `executor.resolveTimezoneOverride` no longer treats a
-   `.env` `TZ` that equals the global as a pin, so prefilling + saving it
-   doesn't sever the "follows Settings → General" link.
-2. **Base-URL fields showed `http://localhost:…` while exposed.** `loadStatus`
-   now calls `buildExposureEnvOverrides(serviceName, appDir)` (the exact
-   values injected at `docker compose up`) and marks any key it returns as
-   `managed` with a new `managedValue` — so `NTFY_BASE_URL`,
-   `VIKUNJA_PUBLIC_URL`, `N8N_HOST`, `NEXTCLOUD_TRUSTED_DOMAINS`,
-   `N8N_PROTOCOL=https`, `NTFY_BEHIND_PROXY=true`, … render read-only at
-   their exposure value when exposure is on, and stay editable when it's off.
-   `managedFieldValue()` now returns `field.managedValue` instead of
-   hard-coding `https://<hostname>` (which was wrong for host/list/protocol
-   keys). Verified live: ntfy `NTFY_BASE_URL` →
-   `https://ntfy.tx-home-utils.com`.
-3. **true/false fields weren't radios.** `booleanEnvKeys` only covered
-   Vaultwarden's `SIGNUPS_ALLOWED`. `loadStatus` now also auto-detects a
-   field as boolean when its current value or compose default is exactly
-   `true`/`false` — so `NTFY_BEHIND_PROXY`, `WAHA_PRINT_QR`,
-   `STIRLING_PDF_ENABLE_*`, `NC_DISABLE_TELE`, … get the existing true/false
-   radio UI with no registry churn.
-
-`ServiceEnvField` gained `managedValue`. Backend `tsc` clean, 121 tests
-(+4 for TZ prefill / boolean auto-detect / exposure-managed url). Frontend
-builds clean. Stack rebuilt.
-
-### 23.16 Session Log — 2026-08-28 (cont.): app errors / failed health checks
-
-Batch of "app shows error / check fail" fixes. Backend `tsc` clean, 121 tests.
-
-- **Health-check port mismatch (false "unhealthy")** — registry
-  `healthCheck.url`s use the *container* port; `resolveHealthTarget` now
-  connects to the service's actual *published* host port
-  (`getPublishedUpstreamPort`) while sending the original
-  `localhost:<containerPort>` as the `Host` header (so gethomepage's Host
-  validation still passes). Fixed Vaultwarden (`:80`→`:8222`) and Homepage
-  reporting healthy off a stale check that was accidentally hitting the
-  backend's own `/health` on host :3000.
-- **Home Assistant** healthcheck `/api/` needs auth → 401 → "unhealthy";
-  switched registry + compose healthcheck to `/manifest.json` (public 200).
-- **Homepage** healthcheck path `/health` (404) → `/api/healthcheck` (200).
-- **speedtest 500** — `SPEEDTEST_APP_KEY=change-me` is not a valid Laravel
-  key. Added `SPEEDTEST_APP_KEY` to `autoGeneratedSecrets`;
-  `ensureGeneratedSecrets` now emits `base64:<32 bytes>` for any `*APP_KEY`
-  (a 64-hex string is the wrong length → 500). Set a real key live.
-- **BookStack** — halts on boot without `APP_KEY` (LSIO image doesn't
-  self-generate). Added `APP_KEY: ${BOOKSTACK_APP_KEY}` to the compose,
-  `autoGeneratedSecrets: ['BOOKSTACK_APP_KEY']`,
-  `hiddenGeneratedSecrets` for the two MariaDB passwords. Also the compose
-  used the old `DB_USER`/`DB_PASS` env names the current image ignores →
-  switched to `DB_USERNAME`/`DB_PASSWORD`. Wiped its (empty) data + restarted
-  via the dashboard so the generated secrets take; migrations ran, `/login`
-  200.
-- **Vikunja / File Browser `error`** — image runs as uid 1000 but the
-  bind-mounted data dirs are Docker-created root-owned → "permission denied"
-  crash loop. Added a one-off `busybox` init service to each compose that
-  `chown -R 1000:1000`s the data dirs before the app starts
-  (`condition: service_completed_successfully`). File Browser also collided
-  with Nextcloud on host port 8084 → moved to 8085. (File Browser upstream
-  is archiving 2026-09-01 — replacement worth planning.)
-- **Portainer** — first-run "timed out for security purposes" lockout;
-  restarted it (fresh `setup_token`, 5-min window). The card's "Restart &
-  get a new token" button is the repeatable path.
-- **CrowdSec** still `error`: `cloudflare-bouncer` crash-loops with Cloudflare
-  "Authentication error (10000)" — the rendered `cloudflare-bouncer.yaml`
-  uses the tunnel token, which lacks **Account → Account Filter Lists → Edit**
-  and **Zone → Firewall Services → Edit**. Needs a broader token or a
-  dedicated one (see §22.6 / §23.9). Not yet resolved.
-
-### 23.17 Session Log — 2026-08-28 (cont.): CrowdSec → Cloudflare Worker bouncer
-
-The IP-list + Firewall-Rules bouncer (`crowdsecurity/cloudflare-bouncer`
-v0.3.0, unmaintained) authenticated fine once the token got
-`Account Filter Lists` + `Firewall Services` edit, but then hit
-`firewallrules.api.maintenance_mode (10020)` — Cloudflare froze the legacy
-Firewall Rules API. Switched to the maintained
-**`crowdsecurity/cloudflare-worker-bouncer`** (v0.0.18), which deploys a
-Cloudflare Worker + KV namespace + zone routes instead.
-
-- `apps/crowdsec/docker-compose.yml` — `cloudflare-bouncer` service replaced
-  with `cloudflare-worker-bouncer`, mounting
-  `config/cloudflare-worker-bouncer.yaml`.
-- `services/crowdsecConfig.ts` — `buildBouncerConfig` now emits the worker
-  schema (`crowdsec_config` / `cloudflare_config.accounts[].zones[]` with
-  `actions: ['ban']`, `default_action: ban`, `routes_to_protect: []`,
-  `turnstile.enabled: false` — no captcha, so no Turnstile setup). Renders to
-  `config/cloudflare-worker-bouncer.yaml` (gitignore glob `*-bouncer.yaml`).
-- `routes/settings.ts` — token permission hint updated: CrowdSec now needs
-  **Account → Workers Scripts → Edit**, **Account → Workers KV Storage →
-  Edit**, **Zone → Workers Routes → Edit** (the Filter-Lists / Firewall
-  scopes are no longer used).
-- `.example` renamed + rewritten; `crowdsecConfig.test.ts` updated. 121
-  tests, `tsc` clean, backend rebuilt.
-- **Blocked on the token**: worker-bouncer starts, renders config, but
-  `Authentication error (10000)` until the three Workers scopes are added.
-  Once they are it recovers on its own (crash-loop re-reads config).
-
-### 23.18 Session Log — 2026-08-28 (cont.): Worker bouncer also blocked — agent only
-
-`crowdsecurity/cloudflare-worker-bouncer` (tried latest / v0.0.18, v0.0.15,
-v0.0.12) crash-loops with `Authentication error (10000)` on its
-"cleaning up existing workers" step — even though the same token, tested with
-raw `curl`, can list **and create+delete** Workers scripts, KV namespaces and
-zone routes. The account's custom API token carries Cloudflare's newer
-`cfut_` prefix; the bouncer's internal `makeRequest` helper appears not to
-handle that token format (the calls that go through the older cloudflare-go
-client succeed — "Using API key auth", script-exists checks — then
-`makeRequest` fails). Not fixable from config; needs a classic 40-char token
-(Cloudflare seems to only issue `cfut_` now) or an upstream fix.
-
-**Decision: run CrowdSec agent-only for now.** `cloudflare-worker-bouncer`
-moved behind a compose `profiles: ["edge-bouncer"]` gate so it doesn't
-auto-start / crash-loop; `crowdsecConfig.ts` still renders its config on every
-start, so `docker compose --profile edge-bouncer up -d` is all it takes once
-the token/upstream situation changes. The agent keeps parsing NPM access
-logs, pulling the community blocklist and exposing metrics — observability +
-shared intel, just no active edge enforcement. `crowdsec` now reports
-`running / healthy` in the dashboard.
-
-### 23.19 Session Log — 2026-08-28 (cont.): n8n crash-loop + healthcheck path
-
-n8n was `Restarting (1)` — `EACCES: permission denied, open
-'/home/node/.n8n/config'` (3rd app after vikunja / file-browser with the same
-root-owned-bind-mount vs uid-1000 image issue). Added the busybox `n8n-init`
-chown service (`condition: service_completed_successfully`). Also its
-healthcheck hit `/health` (404) — n8n's endpoint is `/healthz`; fixed the
-compose healthcheck and the registry `healthCheck.url`. After a live chown +
-recreate: n8n `Up (healthy)`, `/healthz` 200, migrations ran.
-
-Dashboard now: **26 running / all healthy, 0 error**, 4 stopped (not started).
-
-This is the 3rd instance of the root-owned-data-dir class — the systemic fix
-(§0.1) is overdue: the backend should ensure `apps/<name>/data` is writable
-by the container's uid before `docker compose up` (inspect the image's
-configured user, or a generic init), instead of a per-app busybox sidecar.
-
-### 23.20 Session Log — 2026-08-28 (cont.): urgent items (.env EACCES, Duplicati source, address pool)
-
-- **`.env` EACCES (§0.1.1).** `apps/nocodb/` etc. were owned `1000:1000`
-  (the host user), and the backend runs as `appuser` uid 100 — not owner,
-  not in group 1000 → can't create `.env`. `backend/docker-entrypoint.sh`
-  now, as root before dropping to appuser, `chown appuser:appgroup`s each
-  `apps/<name>/` dir + its `.env`/`.env.example` (maxdepth 1 — `data/`
-  untouched so Postgres dir modes stay valid). Rebuilt; verified appuser can
-  write `apps/nocodb/.env`, and `POST /services/nocodb/start` generated
-  `NOCODB_DB_PASSWORD` + `NOCODB_JWT_SECRET` and brought nocodb up healthy.
-- **Duplicati backup source (§0.1.2).** `docker-compose.yml` volume
-  `- ${APPS_DIR:-../}:/source/apps:ro` (was a commented example). The
-  dashboard passes `APPS_DIR` (abs host path) in the compose-up env; a manual
-  `docker compose` falls back to `../` = the repo's `apps/`.
-- **Address-pool exhaustion (§0.1.3).** `stirling-pdf` failed to start:
-  `all predefined address pools have been fully subnetted`. ~28 per-app
-  bridge networks + the default pool's ~31-network ceiling. `start.sh` now
-  drops a `/etc/docker/daemon.json` with a wide `default-address-pools`
-  (10.201.0.0/16 + 172.31.0.0/16, size /24) and restarts docker. Can't be
-  applied from here (no root); **re-run `start.sh` on the host**. After that,
-  start stirling-pdf (+ any other stopped apps) from the dashboard.
-
-### 23.21 Session Log — 2026-08-28 (cont.): daemon.json applied, all apps green
-
-`start.sh`'s `/etc/docker/daemon.json` (`default-address-pools` 10.201.0.0/16
-+ 172.31.0.0/16 size /24) applied on the host + docker restarted. New app
-networks now allocate from 10.201.x. Started the remaining stopped apps
-(duplicati, stirling-pdf) from the dashboard — both `healthy`; stirling-pdf
-public 200; Duplicati's `/source/apps` shows all 30 app dirs (backup source
-working).
-
-WAHA came up `unhealthy` — its `/health` is API-key-gated (401), exactly the
-caveat noted in §22.1 / §23.6. Switched both healthchecks (compose `node -e`
-probe + registry `healthCheck.url`) to `/ping` (always unauthenticated, 200).
-Recreated → healthy.
-
-**Dashboard: 30 / 30 running, all healthy, 0 error, 0 stopped.**
+## 16. The first week, 2026-08-26/28: exposure proven live, the app roster filled out, 30/30 green (former §16–§23, compacted 2026-09-22)
+
+Eight sections and ~2,100 lines covering the project's first three days of
+real work: the public-exposure feature designed, built, then broken and
+fixed against the live stack; the managed-app roster grown from a handful to
+thirty; and the failure classes that turned into standing rules. All of it
+is superseded by code that now exists — §331 replaced the per-app exposure
+toggle with automatic exposure, `services.ts` is the roster, and the shell
+was rebuilt twice since. What survives here is each anchor's conclusion,
+because later sections and code still cite them by number.
+
+Two things from this run outlived everything else in it, and are worth
+reading even if nothing else here is:
+
+- **An app's own Docker healthcheck is not ground truth.** Four separate
+  apps were reported unhealthy because a healthcheck copied from a template
+  probed a path or protocol the running container did not serve. Confirm
+  what the container is actually doing before trusting its own definition.
+- **"It type-checks" proved nothing, repeatedly.** §16 was built complete
+  and entirely untested against a real Cloudflare or NPM; every single
+  external assumption in it was wrong in a different way (below). That is
+  where CLAUDE.md's "never claim something works because it type-checks"
+  comes from.
+
+**§16** — First-start public exposure provisioning, designed and built:
+`service_exposure` table, an idempotent NPM proxy-host client, an idempotent
+Cloudflare Tunnel ingress client, and orchestration that runs after a
+successful `docker compose up -d` and never fails the start — it records the
+provisioning error and audits it instead. Hostnames are
+`<service>.<base-domain>` over Tunnel public hostnames rather than A/AAAA
+records, because the line has a dynamic IP. Shipped **unvalidated**: no real
+NPM or Cloudflare account was available when it was written. §17 is what
+happened when it met one.
+
+**§17** — The same feature validated end to end against the real stack,
+using `paperless` as the proof case. Everything that broke:
+`websocket_upgrade` is not an NPM field (`allow_websocket_upgrade` is —
+silent no-op before); nginx's resolver for a variable `proxy_pass` upstream
+is DNS-only and never reads `/etc/hosts`, so `host.docker.internal`
+resolved on the host and not inside nginx (fixed by resolving to the literal
+gateway IP once, up front — `getHostGatewayIp()`); a service with no health
+check configured reported `check failed` rather than `healthy`. The manual
+upstream scheme/host/port/websocket fields were deleted outright and derived
+instead, which is the shape exposure still has. Also this session: a live
+`JWT_SECRET` was found committed in a `.env.save` file — rotated, deleted,
+`.gitignore` broadened to `.env.*`, and the value is still in git history at
+`5cafdfb` (inert, but there); the backend stopped mounting
+`/var/run/docker.sock` and went behind `tecnativa/docker-socket-proxy`;
+`start.sh` became the one-command bootstrap; per-app `.env` editing moved
+into the dashboard (`appEnv.ts` + `utils/envFile.ts`), with secret-looking
+keys write-only in the UI; and the repo got its first test file.
+
+**§17.2** — This deployment's Cloudflare Tunnel runs as a **host-level
+systemd service**, not a compose stack in this repo (`apps/cloudflare-tunnel/`
+was removed here — it had never been started). The dashboard is therefore
+internet-facing independently of the exposure feature it provides. Assume
+nothing about the tunnel is driven from this repo.
+
+**§18** — Live health-check fixes and the first reordering of the TODO list
+by dependency rather than priority label. `code-server`'s registry entry and
+its own compose healthcheck both assumed HTTPS on 8443 while the container's
+own logs said `Not serving HTTPS`; `/health` is 401 and the real endpoint is
+`/healthz`. A first fix that switched to `https://` with
+`rejectUnauthorized: false` was wrong and reverted. `bookstack` probed a
+`/health` that doesn't exist on a Laravel image. This is the origin of the
+"don't trust an app's own healthcheck definition" rule above. Shipped in the
+same run: the CI pipeline (`.github/workflows/ci.yml`), the first
+`exposure.ts` tests, frontend test infrastructure from nothing (karma +
+jasmine + puppeteer's bundled Chromium as `ChromeHeadlessCI`), a "Test
+connection" button for exposure settings, and drift detection — done as a
+**"Re-verify" button rather than periodic reconciliation**, since
+`ensureProxyHost`/`ensureIngressRoute` are already idempotent and so detect
+and fix drift in the same call.
+
+**§18.3** — Scheduled backups, implemented as a `setInterval` poll every
+hour comparing now against a stored last-run timestamp, **not** a cron
+library: enough for the frequencies offered, and no new dependency. Schedule
+config lives as plain rows in the existing `settings` key/value table, no new
+table. `shouldRunScheduledBackup(now, lastRunAt, frequency)` is a pure
+function so the due/not-due decision is unit-testable without wall-clock
+timing. `apps/price-compare/app/server.js` copies this pattern deliberately
+for its own daily update.
+
+**§19** — The running-apps ports table. Live published ports are derived
+from `docker ps` filtered by `com.docker.compose.project`, **not** from
+parsing compose files — that catches every container in a multi-container
+project and reflects what is actually bound right now.
+
+**§21** — Container-status fixes and the first real backlog of exposed-app
+breakage. `aggregateContainerState` learned that a crash-looping
+(`restarting`) or created-but-never-started (`created`, e.g. a host-port
+clash) project is an `error`, not `starting` forever, while a project whose
+one-shot init container exits 0 is `running`. The `docker compose up`
+timeout went 60 s → 15 min (with nginx `proxy_read_timeout` 1200 s and a
+16 MB exec buffer) because Immich's four images could not finish pulling
+inside a minute.
+
+Its larger half was one shared root cause: **an exposed app rejects requests
+whose `Host` header is the public hostname, because that hostname is not in
+the app's own trusted-hosts or allowed-origins list.** Rather than patch the
+three reported apps, every web app in the registry was audited and the
+override mechanism grown to cover them: `exposureEnvKeys` gained `host`
+(bare hostname), `allowedHostsSeparator` (Nextcloud's list is
+space-separated) and `staticOnExposure` (literal values like
+`N8N_PROTOCOL=https`), plus `exposureConfigFile` for apps that need a config
+*file* touched rather than env. Home Assistant, homepage, paperless,
+bookstack, mealie, vaultwarden, nextcloud, speedtest, n8n, duplicati and
+vikunja were wired; immich, jellyfin, uptime-kuma, dozzle, filebrowser,
+code-server, portainer, beszel, pihole and NPM were audited and needed
+nothing. **All overrides apply at `docker compose up` time only** — the
+service has to be restarted after exposure changes, which §23 later found
+`docker compose restart` does not satisfy.
+
+**§21.3** — NetBird without a router port-forward. Three options were
+weighed: (a) NetBird's own Relay/Signal as the enrolment transport, (b)
+enrolling peers over the existing Tailscale overlay, (c) re-testing a newer
+`cloudflared` for the gRPC-trailers bug. **Answered 2026-08-31: (a) was
+right** — relay shipped in §50.3, signal moved to Tailscale Funnel in §53.
+(b) was rejected because an overlay on the phone means two VPN apps (the
+user's call). (c) was re-tested on cloudflared 2026.8.3 in §50.9 and still
+failed. The trailers bug was never the actual blocker: the real cause is
+that Cloudflare will not flush response headers on a still-open stream
+(§52.2).
+
+**§22** — The backlog of apps to add to the registry, kept as category
+buckets. Every entry has since been either added (each with its own later
+section) or explicitly dropped; the standing instruction attached to it is
+that a new app wires its reverse-proxy config **up front** per §21 rather
+than discovering the Host-header problem after exposure. The buckets, and
+what came of them:
+
+- **§22.2** Communication & notifications — **ntfy** added 2026-08-28
+  (`NTFY_BEHIND_PROXY` only set when actually proxied). **Stalwart Mail**
+  dropped 2026-09-10 (§370): needs real MX/SPF/DKIM/PTR and inbound port 25,
+  which a residential line and the tunnel cannot provide.
+- **§22.3** Business operations — **DocuSeal** (§340), **Twenty** and
+  **Kimai** (§355/§370) added. **Invoice Ninja** dropped 2026-09-01 (§81.8),
+  **Cal.com** dropped 2026-09-10 (§370).
+- **§22.4** Data, no-code & BI — **NocoDB** added 2026-08-28, **Metabase**
+  added 2026-09-06 (§244).
+- **§22.5** Files, documents & PDF — **Stirling-PDF** added 2026-08-28
+  (no Host validation, so no `exposureEnvKeys`; Authelia is its only gate),
+  **Syncthing** added 2026-09-06 (§242), using Syncthing's public relay pool
+  rather than a router forward, per principle 1.
+- **§22.6** Security, network & hardware health — **CrowdSec** added
+  2026-08-28. The Cloudflare bouncer was chosen over the nginx one because
+  everything ingresses through the tunnel, so a firewall bouncer sees no real
+  client IPs and an nginx bouncer would need a forked NPM image; that choice
+  then ran into §23.17. **Scrutiny** added 2026-09-06 (§240), `privileged:
+  true` rather than a hand-enumerated `devices:` list, since principle 2
+  forbids the hand-edit.
+- **§22.7** Dev & self-host infra — **IT-Tools** added 2026-09-06 (§241).
+  **Forgejo** added 2026-09-07 (§277) and removed 2026-09-09 (§315).
+- **§22.8** Productivity & knowledge — **Miniflux** added 2026-09-06 (§245).
+  **Karakeep** dropped 2026-09-10 (§370).
+- **§22.9** Optional / niche — **Navidrome** added 2026-09-09 (§313); it
+  needs no exposure env keys because it builds its base URL from NPM's
+  `X-Forwarded-*` headers, same as Jellyfin. The ***arr** stack and
+  **Grafana + Prometheus** were dropped 2026-09-10 (§370).
+
+**§22.9c** — Grocery price comparison, built rather than adopted: nothing
+self-hosted compares one product across several named stores (that class of
+tool watches a single URL for change). Feasibility was checked **live
+against each real store, not assumed**: Continente and Lidl PT embed a
+schema.org `Product`/`Offer` JSON-LD block with `price`; Pingo Doce's JSON-LD
+omits the price but carries it in a `<span class="value" content="X.XX">`
+inside the SFCC-standard `.sales` block. **Mercadona was dropped** —
+Portugal has no online catalog at all. **Recheio and Makro are login-walled
+B2B**, and this project never enters account credentials, so they get manual
+price fields instead. The deliberate trade-off `scrapers.js` cites: searching
+by name and taking a candidate from the first page of results is less precise
+than a hand-picked product URL, and that imprecision was accepted. The full
+build-out is §25.
+
+**§23** — The longest run of the three days: PWA + mobile UI, then a
+sustained live-debugging session against the running stack. The PWA work
+(manifest, maskable icons, a conservative network-first service worker that
+never touches `/api`) and the mobile header/table rebuild landed first.
+Then, live:
+
+- **Vaultwarden's Bitwarden clients could not connect**, because
+  `DOMAIN` still said `http://localhost:8222`. The real bug underneath:
+  `executor.restartService` ran `docker compose restart`, which never
+  re-substitutes `${VAR}` — so the "restart to apply" that §21's overrides depend on
+  silently did nothing. Fixed by extracting `composeUpWithManagedConfig()`
+  and making restart use `up -d --force-recreate`.
+- **Home Assistant 400'd behind the proxy** — and the `trusted_proxies`
+  content was right all along. HA 2026.x had migrated `http:` into
+  `.storage/http` with our config stuck `pending`/`not_promoted` while HA
+  served from the default `stable`. The store is `root:root 600`, unwritable
+  by the backend, so the fix runs a one-off container from HA's own image to
+  reset it. 400 → 200, verified live.
+- **Three apps crash-looped on root-owned bind mounts** (vikunja, file
+  browser, n8n) because their images run as uid 1000 against
+  Docker-created root-owned directories. Each got a busybox init service;
+  the systemic fix is §0.1.1.
+- **Watchtower crash-looped** on a Docker API pinned to 1.25 against an
+  engine with `MinAPIVersion 1.40`; moved to the maintained
+  `nicholas-fedor` fork, which negotiates the API itself.
+- Plus a batch of health-check path/port corrections, `APP_KEY` generation
+  for Laravel apps (a 64-hex string is the wrong length and 500s — it needs
+  `base64:<32 bytes>`), config-panel fixes, and the global timezone setting.
+
+**§23.9** — CrowdSec made hands-off, the first application of principle 3
+after it was written. `services/crowdsecConfig.ts` renders the bouncer
+config from the Cloudflare credentials already stored for the tunnel, and
+writes the marker-fenced real-IP block into NPM's `http_top.conf` and
+reloads nginx — best-effort, because NPM's data dir is root-owned by its own
+container, so on `EACCES` it logs a fallback rather than failing the start.
+The only remaining external step is widening the Cloudflare token's scope in
+Cloudflare's own UI; there is no file for a human to edit.
+
+**§23.17** — CrowdSec's edge enforcement, and why it is still off. The
+original `crowdsecurity/cloudflare-bouncer` (v0.3.0, unmaintained)
+authenticated once the token had Filter-Lists and Firewall-Services edit,
+then hit `firewallrules.api.maintenance_mode (10020)` — Cloudflare has
+frozen the legacy Firewall Rules API. Switched to the maintained
+`cloudflare-worker-bouncer`, which deploys a Worker + KV namespace + zone
+routes instead, and needs Workers Scripts / Workers KV / Workers Routes
+edit. That one crash-loops with `Authentication error (10000)` on every
+version tried (v0.0.12 through v0.0.18), even though the same token can
+create and delete Workers scripts, KV namespaces and zone routes by raw
+`curl` — its internal `makeRequest` helper appears not to handle
+Cloudflare's newer `cfut_` token prefix, while the calls routed through the
+older cloudflare-go client succeed. **Decision: CrowdSec runs agent-only.**
+The worker bouncer sits behind a `profiles: ["edge-bouncer"]` gate so it
+cannot crash-loop, its config is still rendered on every start, and
+re-enabling it is one `docker compose --profile edge-bouncer up -d` once a
+classic token or an upstream fix exists. The agent keeps parsing NPM's logs
+and pulling the community blocklist; enforcement moved to the NPM Lua
+bouncer in §119/§124.
+
+**§23.20** — The three urgent items of §0.1 closed: the `.env` EACCES
+(`backend/docker-entrypoint.sh` chowns each `apps/<name>/` dir and its
+`.env` as root before dropping privileges, maxdepth 1 so `data/` keeps its
+modes), Duplicati's default backup source, and Docker address-pool
+exhaustion — `start.sh` writes a `/etc/docker/daemon.json` with wide
+`default-address-pools`, since ~28 per-app bridge networks had hit the
+default's ~31-network ceiling. Conclusions carried in §0.1.1–§0.1.3.
+
+The run ends with the dashboard at **30 / 30 running, all healthy, 0 error,
+0 stopped** — the first time the whole roster was green at once.
 
 ## 25. Price Compare — built out over 2026-08-29/30 (former §25–§45, compacted 2026-09-03)
 
@@ -29260,3 +27402,56 @@ matching every other labelled anchor in the file.
 `plan-citations.py` now prints **0 dangling targets** — the first time it
 has, and the clean baseline §588's compaction pass will be diffed against.
 Docs/plan only, no version bump.
+
+## 588. plan.md compaction pass 6 — the first week (§16–§23)
+
+The largest closed run left in the file: §16–§23, eight sections and 2,101
+lines covering 2026-08-26/28. Replaced by one 243-line section under the
+§530 rule. `plan.md` 29,126 → 27,404 lines.
+
+**Why this run.** It is the project's first three days, and every feature it
+describes has been superseded by code that exists now: §331 replaced §16's
+per-app exposure toggle with automatic exposure, `services.ts` is the roster
+§22 was a backlog for, and the dashboard shell has been rebuilt twice since
+§23's PWA/mobile work. What it still had that nothing else does is the
+*conclusions* — why exposure derives its upstream instead of asking, why
+CrowdSec runs agent-only, why an app's own healthcheck isn't ground truth —
+and those are what survived.
+
+**Anchors kept.** A citation census first: of the 70 headings in the run, 22
+are cited from outside it (7 top-level plus §17.2, §18.3, §21.3, §22.2–§22.8,
+§22.9, §22.9c, §23.9, §23.17, §23.20), and 21 sub-anchors were cited only
+from inside the run and went with it. Every one of the 22 survives as a
+labelled `**§N.M**` entry carrying its conclusion, so every existing `§`
+citation still resolves by search and nothing outside `plan.md` changed —
+including `apps/price-compare/app/server.js`'s citation of §18.3's
+scheduler pattern and `scrapers.js`'s two citations of §22.9c's
+live-checked, deliberately-imprecise search heuristic.
+
+**What was deliberately kept in full rather than summarised**, because it is
+the part that keeps mattering: §16 was built complete and entirely untested
+against a real Cloudflare or NPM, and every external assumption in it turned
+out wrong in a different way (a made-up NPM field name, an nginx resolver
+that never reads `/etc/hosts`, a health default inverted). That is the
+origin of CLAUDE.md's "never claim something works because it type-checks",
+and the compacted section says so at the top instead of leaving a reader to
+reconstruct it from eight sections of session log. Same for the
+healthcheck-isn't-ground-truth rule, which four separate apps paid for.
+
+**Rejected approaches kept, per the §530 rule**: §21.3's three NetBird
+options with which won and why the other two lost (and that the trailers bug
+was never the real blocker); §18's drift detection done as a re-verify
+button rather than periodic reconciliation, since the provisioning calls
+were already idempotent; §18.3's `setInterval` poll instead of a cron
+dependency; §22.6's Cloudflare-over-nginx bouncer choice and §23.17's two
+successive dead ends after it; §22.9c's dropped and login-walled stores;
+§18's reverted `https://` + `rejectUnauthorized: false` fix.
+
+`scripts/plan-citations.py` printed **0 dangling targets** before the pass
+(§587 got it there) and 0 after — the pass added no new lines, which is the
+bar CLAUDE.md sets. Its own first draft cited two sub-anchors (21.2 and 23.12, written
+with the section sign) that the pass itself had just dropped; the script caught both before commit,
+which is the whole reason for running it on both sides.
+
+Plan-only, no version bump. Its own `plan:` commit so the diff is reviewable
+and revertable.
