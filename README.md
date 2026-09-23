@@ -296,13 +296,21 @@ it is done — not ticked off and left behind. Section references point at
       the "each app" reading (category-level, not literally per managed
       app, per §559) for confirmation before this is built.
 
-- [ ] **Revive the social-drafts publish path via n8n (not Postiz)** — plan
-      in plan.md §611. `social_drafts` (§254 P2) can generate/edit/delete a
-      draft but nothing publishes it since Postiz was dropped (§301a).
-      Slice 1: a dashboard-rendered n8n workflow (same pattern as the
-      CrowdSec-alert relay, `n8nWorkflows.ts`) that emails a draft via the
-      SMTP settings already in Settings — no new credentials UI. Slice 2
-      (social-platform posting) needs a per-platform token/OAuth setup and
+- [ ] **Revive the social-drafts publish path: mail a draft to a real
+      subscriber list** — plan in plan.md §611/§612. `social_drafts`
+      (§254 P2) can generate/edit/delete a draft but nothing publishes it
+      since Postiz was dropped (§301a). Slice 1: send via
+      `utils/mailSend.ts`'s existing `sendMail()` (already used for invites,
+      §158) — no n8n workflow needed, §611's n8n angle is superseded for
+      plain email. Needs a real recipient list first: a new
+      `advert_subscribers` table (email + unsubscribe token), a public
+      `POST /subscribers` an outside site's `<form>` can submit to (no CORS
+      change needed — plain form POST, not `fetch()`), a public
+      `GET /subscribers/unsubscribe/:token` for the link in every sent
+      email's footer, and an `UnsubscribeComponent` public page
+      (`/unsubscribe/:token`, same pattern as `SetPasswordComponent`)
+      confirming it. Full shape in plan.md §612. Slice 2
+      (social-platform posting) still needs a per-platform token/OAuth setup and
       is scoped only once a specific platform is named.
 
 - [ ] **"Claude API key" → multi-provider "AI API Keys"** — plan in

@@ -28535,3 +28535,69 @@ raw socket step that takes inline params like the ntfy relay does. Decide
 once slice 1 is actually being built.
 
 Not implemented — this section and the README item are the plan.
+
+## 612. Planned: `advert_subscribers` table + public subscribe/unsubscribe endpoints
+
+User wants a real mailing list for the §611 slice-1 email advert: a
+dashboard-DB table of recipient emails, an endpoint an outside website (the
+user's own site, not part of this repo) can call to subscribe, an
+unsubscribe endpoint whose link rides in every sent email's footer, and an
+unsubscribe confirmation page. Checked the existing public-endpoint and
+public-mail precedents before shaping this, since both already exist for a
+different feature.
+
+**This supersedes §611's n8n angle for the send itself.** §611 flagged an
+open question — n8n's `Send Email` node wants a stored n8n credential, no
+`import:credentials` path exists yet — as something to resolve when building.
+It doesn't need resolving: `backend/src/utils/mailSend.ts`'s `sendMail()`
+already sends real mail straight from the backend via `nodemailer`, using
+the same `getMailConfig()` SMTP settings, and is already in production use
+for invite emails (§158) and access-request replies (`routes/accessRequests.ts`).
+Reusing it is a smaller diff than standing up a workflow, and it's the
+ladder rule (already-in-this-codebase beats a new integration). n8n stays
+relevant for §611 slice 2 (social-platform posting) if that's picked up
+later — arbitrary per-platform HTTP/OAuth calls are what it's actually good
+at — just not for plain email.
+
+**Table** — `advert_subscribers`: `id`, `email` (unique), `unsubscribe_token`
+(unique, random — the unsubscribe link keys off this, not the raw email, so
+a link can't be used to unsubscribe someone else by guessing their address),
+`subscribed_at`, `unsubscribed_at` (nullable — soft delete: keeps history,
+and a repeat `subscribe` on a previously-unsubscribed address just clears
+`unsubscribed_at` and keeps the same token instead of erroring).
+
+**New service** (`backend/src/services/advertSubscribers.ts`): `subscribe(email)`
+(upsert, generates the token on first insert only), `unsubscribeByToken(token)`
+(sets `unsubscribed_at`; a re-hit on an already-unsubscribed or unknown token
+still reports success — hitting an old email's link twice must not error),
+`listActiveSubscribers()` for the sender in §611.
+
+**New public router** (`backend/src/routes/subscribers.ts`), mounted with no
+`protectedGate` — same shape as the existing public form,
+`routes/accessRequests.ts` (rate-limited via `express-rate-limit`, `validateBody`
+against a new Joi schema, reachable with no dashboard session because the
+caller has none):
+
+- `POST /subscribers` — `{ email }`. Meant to be called as a plain HTML
+  `<form method="post">` from the external site, not `fetch()` — a bare form
+  submit isn't subject to CORS at all (CORS only gates script-initiated
+  cross-origin requests), so this needs no change to `index.ts`'s
+  same-origin-locked `corsOptionsDelegate` and no new "external site origin"
+  setting. On success, redirect to a caller-supplied `redirect` field if
+  present, else a built-in confirmation.
+- `GET /subscribers/unsubscribe/:token` — the footer link, clicked straight
+  from an email client. Marks unsubscribed, then shows the confirmation page.
+
+**Confirmation page**: reuse the existing public-Angular-page pattern —
+`SetPasswordComponent`/`AccessDeniedComponent` (`app.routes.ts`) already sit
+outside the shell with no guard, reachable signed out. A new
+`UnsubscribeComponent` at `/unsubscribe/:token` calls the backend endpoint
+and renders the result, same shape.
+
+**Footer / link building**: the sender (§611's per-recipient send loop) reads
+`getDashboardBaseUrl()` (`utils/generalSettings.ts`) once and appends
+`{baseUrl}/unsubscribe/{token}` to every message it sends — which also means
+that send has to be one `sendMail()` call per subscriber (their own token in
+the footer), not one blast to a `to` list or BCC.
+
+Not implemented — this section and the README item are the plan.
