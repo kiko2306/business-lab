@@ -29096,3 +29096,98 @@ so what landed here is newer than that remote.
 
 Not analysed yet — §620 is the equivalent write-up for the hotel sample, and
 nothing like it exists for this one.
+
+## 622. How `sample/pbordo` works — analysis ahead of the rebuild
+
+Companion to §620. `pbordo` ("painel de bordo") is a **restaurant/bar POS
+dashboard**: an owner or manager sees live sales, table state and per-waiter
+takings across their shops from a browser. It reads **Wintouch SIR**, the
+restaurant module of the same vendor's product behind the hotel sample.
+
+### Shape — same three tiers, opposite data direction
+
+- `cli-service/` — .NET Framework Windows service `PIWebService`, installed in
+  each shop beside the POS SQL Server.
+- `api/` — Node/Express relay + registry, in the cloud.
+- `cli-frontend/` — Angular 9 SPA.
+
+Where hotel-utils **pushes** to the cloud on a 5-minute timer and keeps a
+mirror in MySQL, pbordo **pulls on demand**: the cloud API holds no business
+data at all and proxies each browser request straight through to the shop's own
+machine, live.
+
+### The flow
+
+1. The shop service reads `pbordo.config` for its port (9191), domain and store
+   name, plus a path to `C:\wintouch\sgw`. It then reads **Wintouch's own
+   `wintouch.config`** for the SQL Server name/user/password/database. Note the
+   contrast with §620: credentials come from the local PMS install, *not* from
+   an unauthenticated cloud endpoint. That part is right.
+2. Every 30 s it asks `https://api.ipify.org` for its public IP and, on a
+   change, POSTs `{ip: "<ip>:9191", store, domain}` to the API's
+   `/store/set_ip`. Hand-rolled dynamic DNS — the shops are on domestic
+   connections with changing IPs.
+3. Manager opens the SPA, picks a domain, logs in at `/cli/:domain`.
+   `POST /login/user` makes the API read `data/<domain>.json` and string-compare
+   username and password.
+4. `GET /store/:domain/:user/list` returns the stores that user may see;
+   picking one calls `GET /store/:domain/:store/overview`, which looks up
+   `store.ip` and `request()`s `http://<ip>:9191/overview`. The shop service
+   runs five SQL queries and returns five serialized `DataTable`s; the API pipes
+   them back verbatim and Angular aggregates in the browser.
+
+### Storage
+
+The API has **no database**. `api/data/<domain>.json` is the whole datastore —
+a domain with a `stores[]` array (uuid, name, `ip`, `isActive`) and a `users[]`
+array (username, password, `access[]` of store uuids). Read-modify-write of the
+entire file per change.
+
+### Findings that should shape the rebuild
+
+- **Each shop's POS data sits on the open internet with no authentication.**
+  A raw `HttpListener` bound to `http://+:9191/`, plaintext HTTP, and the
+  service advertises its own public IP to the cloud. Anyone who reaches
+  `http://<shop-ip>:9191/overview` gets the sales book. `/store/set_ip` is
+  unauthenticated too, so anyone can repoint a store at a server they control.
+  This is the same class of hole as §620's `/api/config`: the on-prem agent has
+  no identity, so nothing can be checked.
+- **No sessions anywhere.** `POST /login/user` returns a bare 200 or 404 — no
+  cookie, no token. The Angular app simply flips a `Subject<boolean>`. Every
+  data route is unauthenticated: a domain name and a store uuid are the only
+  things standing between a stranger and a client's takings.
+- **Passwords are plaintext**, in `data/<domain>.json`, compared with `===`.
+  "Remember me" additionally writes username *and password* into
+  `localStorage`. Those data files had to be stripped from a pushed commit
+  during the import — see §621.
+- `getWsirVndVendas.sql` is `SELECT * FROM wsir_vnd_vendas` with no date filter:
+  the entire sales table crosses the wire on every refresh and is aggregated
+  client-side.
+- The JSON store has no locking. Concurrent `updateDomain` calls read, modify
+  and rewrite the whole file, so writes are silently lost.
+- 20 embedded `.sql` resources exist and `DAO.cs` wraps all of them, but the
+  HTTP switch in `webService.cs` only exposes `/ping`, `/overview`,
+  `/sold_items` and `/tables`. `total_day`, `tables_list`,
+  `clients_present_count`, `total_week_comp` and the rest are unreachable — a
+  richer API that was collapsed to three endpoints, and a good inventory of what
+  the dashboard was once meant to show.
+- The API's own container does not start as shipped: `Dockerfile` runs
+  `nodemon app.js` while the entry point is `index.js`, and
+  `docker-compose.yml` binds `${PORT}:${PORT}` with no `env_file`.
+- Two different API hostnames live in the tree: `pbordo-api.portoinf-dev.space`
+  is **compiled into** the C# service, while the Angular environment points at
+  `api.pbordo.portoinf.com`. Moving the API means rebuilding and reinstalling
+  every shop agent, because that URL is not in `pbordo.config` where the rest of
+  the settings are.
+- Both Angular `environment.ts` and `environment.prod.ts` point at the same
+  production API, so development runs against live client data.
+- Ages: Angular 9 (EOL Aug 2021), the `node:14.20-alpine` base, and `request`
+  (deprecated 2020). The service targets .NET Framework, so it is Windows-only.
+
+### What the two samples have in common
+
+Same vendor integration (Wintouch), same three-tier shape (on-prem .NET agent +
+cloud API + web UI), opposite data direction, and both answer "how does the
+cloud know this agent is who it claims to be?" with nothing at all. A rebuild
+covering both should treat **agent identity and enrolment** as the first
+problem, not a later hardening pass.
