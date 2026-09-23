@@ -3,6 +3,8 @@ import { Component, OnInit, inject } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { OperationsService } from '../../core/operations.service';
+import { Locale, TranslateService } from '../../i18n/translate.service';
+import { TranslatePipe } from '../../i18n/translate.pipe';
 import { ResourceStripComponent } from './resource-strip.component';
 
 /**
@@ -15,13 +17,14 @@ import { ResourceStripComponent } from './resource-strip.component';
 @Component({
   selector: 'app-shell',
   standalone: true,
-  imports: [RouterOutlet, RouterLink, RouterLinkActive, AsyncPipe, NgIf, ResourceStripComponent],
+  imports: [RouterOutlet, RouterLink, RouterLinkActive, AsyncPipe, NgIf, TranslatePipe, ResourceStripComponent],
   templateUrl: './shell.component.html',
   styleUrl: './shell.component.css',
 })
 export class ShellComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly operations = inject(OperationsService);
+  protected readonly translate = inject(TranslateService);
 
   protected readonly user$ = this.authService.user$;
   // The template gates each nav entry on a capability (plan.md §149); a
@@ -41,5 +44,9 @@ export class ShellComponent implements OnInit {
 
   logout(): void {
     this.authService.logout();
+  }
+
+  onLocaleChange(value: string): void {
+    this.translate.setLocale(value as Locale);
   }
 }

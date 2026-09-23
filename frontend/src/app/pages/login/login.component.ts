@@ -8,11 +8,13 @@ import { AuthService } from '../../core/auth.service';
 import { sanitizePastedText } from '../../core/input-sanitize';
 import { isMfaChallenge } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
+import { TranslateService } from '../../i18n/translate.service';
+import { TranslatePipe } from '../../i18n/translate.pipe';
 
 @Component({
   selector: 'app-login',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './login.component.html',
   styleUrl: './login.component.css'
 })
@@ -21,6 +23,7 @@ export class LoginComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toastService = inject(ToastService);
+  protected readonly translate = inject(TranslateService);
 
   protected readonly form = this.formBuilder.nonNullable.group({
     username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
@@ -82,11 +85,11 @@ export class LoginComponent implements OnInit {
             this.useRecoveryCode = false;
             return;
           }
-          this.toastService.success('Signed in successfully.');
+          this.toastService.success(this.translate.t('login.toast.success'));
           void this.router.navigateByUrl('/home');
         },
         error: (error) => {
-          this.errorMessage = extractErrorMessage(error, 'Unable to sign in.');
+          this.errorMessage = extractErrorMessage(error, this.translate.t('login.error.signInFailed'));
         },
       });
   }
@@ -105,11 +108,11 @@ export class LoginComponent implements OnInit {
       .pipe(finalize(() => (this.submitting = false)))
       .subscribe({
         next: () => {
-          this.toastService.success('Signed in successfully.');
+          this.toastService.success(this.translate.t('login.toast.success'));
           void this.router.navigateByUrl('/home');
         },
         error: (error) => {
-          this.errorMessage = extractErrorMessage(error, 'That code was not accepted.');
+          this.errorMessage = extractErrorMessage(error, this.translate.t('login.error.codeRejected'));
         },
       });
   }

@@ -8,31 +8,36 @@
             Business Lab
           </div>
           <div class="small text-body-secondary text-truncate" *ngIf="user$ | async as user">
-            Signed in as {{ user.username }}
+            {{ 'shell.signedInAs' | t:{ username: user.username } }}
           </div>
         </a>
         <app-resource-strip class="app-header__resources"></app-resource-strip>
         <nav class="app-header__actions" *ngIf="caps$ | async as caps">
           <a class="app-nav__link" routerLink="/apps" routerLinkActive="active"
-             *ngIf="caps.has('apps:control')">Apps</a>
+             *ngIf="caps.has('apps:control')">{{ 'shell.nav.apps' | t }}</a>
           <a class="app-nav__link" routerLink="/backups" routerLinkActive="active"
-             *ngIf="caps.has('backups:manage')">Backups</a>
+             *ngIf="caps.has('backups:manage')">{{ 'shell.nav.backups' | t }}</a>
           <a class="app-nav__link" routerLink="/settings" routerLinkActive="active"
-             *ngIf="caps.has('settings:manage') || caps.has('exposure:settings')">Settings</a>
+             *ngIf="caps.has('settings:manage') || caps.has('exposure:settings')">{{ 'shell.nav.settings' | t }}</a>
           <a class="app-nav__link" routerLink="/content" routerLinkActive="active"
-             *ngIf="caps.has('settings:manage')">Content</a>
+             *ngIf="caps.has('settings:manage')">{{ 'shell.nav.content' | t }}</a>
           <a class="app-nav__link" routerLink="/utils" routerLinkActive="active"
-             *ngIf="caps.has('apps:control')">Utils</a>
+             *ngIf="caps.has('apps:control')">{{ 'shell.nav.utils' | t }}</a>
           <a class="app-nav__link" routerLink="/users" routerLinkActive="active"
-             *ngIf="caps.has('users:manage')">Users &amp; roles</a>
+             *ngIf="caps.has('users:manage')">{{ 'shell.nav.users' | t }}</a>
           <a class="app-nav__link" routerLink="/audit-logs" routerLinkActive="active"
-             *ngIf="caps.has('audit:view')">Audit logs</a>
+             *ngIf="caps.has('audit:view')">{{ 'shell.nav.auditLogs' | t }}</a>
           <a class="app-nav__link" routerLink="/updates" routerLinkActive="active"
-             *ngIf="caps.has('system:update')">Updates</a>
-          <a class="app-nav__link" routerLink="/account" routerLinkActive="active">Security</a>
-          <a class="app-nav__link app-nav__link--warning" routerLink="/recovery">Recovery</a>
+             *ngIf="caps.has('system:update')">{{ 'shell.nav.updates' | t }}</a>
+          <a class="app-nav__link" routerLink="/account" routerLinkActive="active">{{ 'shell.nav.security' | t }}</a>
+          <a class="app-nav__link app-nav__link--warning" routerLink="/recovery">{{ 'shell.nav.recovery' | t }}</a>
         </nav>
-        <button type="button" class="btn btn-outline-danger btn-sm app-header__logout" (click)="logout()">Logout</button>
+        <select class="form-select form-select-sm app-header__lang" [attr.aria-label]="'shell.languageLabel' | t"
+                [value]="translate.locale()" (change)="onLocaleChange($any($event.target).value)">
+          <option value="en">EN</option>
+          <option value="pt-PT">PT</option>
+        </select>
+        <button type="button" class="btn btn-outline-danger btn-sm app-header__logout" (click)="logout()">{{ 'shell.logout' | t }}</button>
       </div>
     </div>
   </header>

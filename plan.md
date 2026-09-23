@@ -27888,3 +27888,43 @@ beyond the usual "does it look right" spot-check once each batch is on
 Full detail in the approved plan file from this session:
 `/home/mat/.claude/plans/cryptic-coalescing-willow.md` (session-local, not
 part of the repo — this section is the durable record).
+
+## 598. Multi-language UI: infra + shell + Login page (§597 batch 1)
+
+Built the architecture from §597: `frontend/src/app/i18n/` holds `en.ts` and
+`pt-pt.ts` (flat `Record<string,string>` dictionaries, plain TS modules —
+no boot-time JSON fetch), `translate.service.ts` (`TranslateService`, a
+`locale` signal defaulting from `localStorage` then `navigator.language`,
+`t(key, params?)` with dict → `en` → key-literal fallback, and
+`registerLocaleData()` for `@angular/common/locales/pt` so the `date`/
+`number` pipes can take `translate.locale()` as their locale arg), and
+`translate.pipe.ts` (standalone, impure `t` pipe — impure because a pure
+pipe memoizes on the key string, not on the locale signal, so a language
+switch wouldn't re-render existing bindings otherwise).
+
+Migrated the two first-batch surfaces end to end: `shell.component.html`
+(nav links, "Signed in as …", Logout, and a new plain Bootstrap `<select>`
+next to Logout — EN/PT, no Popper/dropdown dependency) and the Login page
+(both the credentials and MFA stages, including the toast/error-fallback
+strings in `login.component.ts`, which now call `translate.t(...)` instead
+of holding literal English). `extractErrorMessage`'s own fallback strings
+stayed in English deliberately: they're the last-resort text when neither
+the backend nor a thrown `Error` supplies a message, and the login test
+suite already pins two of them (`'Unable to sign in.'`, `'That code was not
+accepted.'`) via `Error.message`, which `extractErrorMessage` returns before
+ever reaching the fallback — those tests needed no changes.
+
+Added `translate.service.spec.ts`: default-locale detection, `{{param}}`
+interpolation, key-literal fallback for a missing translation, `setLocale()`
+persistence to `localStorage` across service instances, and the
+`document.documentElement.lang` side effect.
+
+**Verification.** `./scripts/check.sh frontend build` (clean, pre-existing
+876 kB/1 MB bundle-budget warning is untouched by this change), `./scripts/
+check.sh frontend test` (89/89, including the 6 new specs), and
+`scripts/e2e-tests.sh` (13 passed / 3 skipped live-stack-only specs —
+login, nav, logout, 2FA and Users specs all still pass against the
+translated shell/Login).
+
+Remaining pages/components are tracked as the other README items under
+"Multi-language UI (plan.md §597)" — each is its own batch, same pattern.

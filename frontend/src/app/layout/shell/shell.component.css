@@ -84,6 +84,11 @@
   background-color: rgba(255, 193, 7, 0.12);
 }
 
+.app-header__lang {
+  width: auto;
+  flex: none;
+}
+
 .app-header__logout {
   flex: none;
 }

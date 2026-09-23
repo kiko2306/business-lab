@@ -6,13 +6,13 @@
           <div class="text-center mb-4">
             <img src="favicon.svg" alt="" width="48" height="48" class="mb-2" />
             <span class="auth-kicker d-block">Business Lab</span>
-            <h1 class="h3 mt-2 mb-2">{{ stage === 'mfa' ? 'Two-factor authentication' : 'Sign in' }}</h1>
+            <h1 class="h3 mt-2 mb-2">{{ (stage === 'mfa' ? 'login.title.mfa' : 'login.title.signIn') | t }}</h1>
             <p class="text-body-secondary mb-0">
               <ng-container *ngIf="stage === 'credentials'">
-                Use your administrator credentials to manage services.
+                {{ 'login.subtitle.credentials' | t }}
               </ng-container>
               <ng-container *ngIf="stage === 'mfa'">
-                Enter the {{ useRecoveryCode ? 'recovery code' : '6-digit code from your authenticator app' }}.
+                {{ (useRecoveryCode ? 'login.subtitle.mfaRecovery' : 'login.subtitle.mfaCode') | t }}
               </ng-container>
             </p>
           </div>
@@ -21,7 +21,7 @@
 
           <form *ngIf="stage === 'credentials'" [formGroup]="form" (ngSubmit)="submit()" novalidate>
             <div class="mb-3">
-              <label class="form-label fw-semibold" for="username">Email / username</label>
+              <label class="form-label fw-semibold" for="username">{{ 'login.username.label' | t }}</label>
               <input
                 id="username"
                 type="text"
@@ -32,12 +32,12 @@
                 (paste)="sanitizePaste($event, 'username', 64)"
               />
               <div *ngIf="form.controls.username.touched && form.controls.username.invalid" class="text-danger small mt-1">
-                Username must be 3-64 characters.
+                {{ 'login.username.error' | t }}
               </div>
             </div>
 
             <div class="mb-4">
-              <label class="form-label fw-semibold" for="password">Password</label>
+              <label class="form-label fw-semibold" for="password">{{ 'login.password.label' | t }}</label>
               <input
                 id="password"
                 type="password"
@@ -48,20 +48,20 @@
                 (paste)="sanitizePaste($event, 'password', 128)"
               />
               <div *ngIf="form.controls.password.touched && form.controls.password.invalid" class="text-danger small mt-1">
-                Password is required and must be at most 128 characters.
+                {{ 'login.password.error' | t }}
               </div>
             </div>
 
             <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || form.invalid">
               <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-              Sign in
+              {{ 'login.submit' | t }}
             </button>
           </form>
 
           <form *ngIf="stage === 'mfa'" [formGroup]="mfaForm" (ngSubmit)="submitMfa()" novalidate>
             <div class="mb-3">
               <label class="form-label fw-semibold" for="code">
-                {{ useRecoveryCode ? 'Recovery code' : 'Authentication code' }}
+                {{ (useRecoveryCode ? 'login.mfa.recoveryLabel' : 'login.mfa.codeLabel') | t }}
               </label>
               <input
                 id="code"
@@ -75,28 +75,28 @@
                 autofocus
               />
               <div *ngIf="mfaForm.controls.code.touched && mfaForm.controls.code.invalid" class="text-danger small mt-1">
-                Enter the code from your authenticator app, or a recovery code.
+                {{ 'login.mfa.error' | t }}
               </div>
             </div>
 
             <button type="submit" class="btn btn-primary btn-lg w-100" [disabled]="submitting || mfaForm.invalid">
               <span *ngIf="submitting" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-              Verify
+              {{ 'login.mfa.verify' | t }}
             </button>
 
             <div class="d-flex justify-content-between mt-3 small">
               <button type="button" class="btn btn-link p-0" (click)="toggleRecoveryCode()">
-                {{ useRecoveryCode ? 'Use your authenticator app' : 'Use a recovery code' }}
+                {{ (useRecoveryCode ? 'login.mfa.useAuthenticator' : 'login.mfa.useRecoveryCode') | t }}
               </button>
               <button type="button" class="btn btn-link p-0 text-body-secondary" (click)="backToCredentials()">
-                Start over
+                {{ 'login.mfa.startOver' | t }}
               </button>
             </div>
           </form>
 
           <p *ngIf="stage === 'credentials' && setupRequired" class="text-center text-body-secondary small mt-4 mb-0">
-            First time here?
-            <a routerLink="/setup">Create the initial administrator account</a>.
+            {{ 'login.setup.prompt' | t }}
+            <a routerLink="/setup">{{ 'login.setup.link' | t }}</a>.
           </p>
         </div>
       </section>

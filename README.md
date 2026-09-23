@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.132.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.132.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,11 +212,13 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Multi-language UI (plan.md §597)
 
-- [ ] **Infra + shell + Login page in English/pt-PT** — `TranslateService`,
-      `TranslatePipe`, `i18n/en.ts`+`pt-pt.ts` dictionaries, the top-bar
-      language `<select>`, and full translation of the shell chrome and the
-      Login page. Proves the pattern before it's copied across the rest of
-      the app.
+- [ ] **Confirm the top-bar language selector on `beta`** — code built and
+      proven by `scripts/e2e-tests.sh` (login/nav/logout/2FA all pass with
+      the translated shell + Login page, plan.md §598), but not yet clicked
+      by a human on a live browser. On `beta`: switch the top-bar EN/PT
+      `<select>`, confirm the shell nav + Login page text swaps instantly
+      with no reload, and that a refresh keeps the chosen language
+      (`localStorage`). Delete this item once that passes.
 - [ ] **Translate `apps` + `home` pages**
 - [ ] **Translate `backups` page**
 - [ ] **Translate `users` + `account` + `audit-logs` pages**
