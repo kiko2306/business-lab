@@ -22,6 +22,8 @@ import { ServiceStateService } from '../../core/service-state.service';
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 /** How often the "Full Backup" modal polls GET /backups/run/progress. Each
  * step (one app's dump) can finish in well under a second, so this needs to
@@ -45,7 +47,7 @@ const KOPIA_STATUS_POLL_MS = 1000;
 @Component({
   selector: 'app-backups',
   standalone: true,
-  imports: [CommonModule, FormsModule, ReactiveFormsModule, PanelComponent],
+  imports: [CommonModule, FormsModule, ReactiveFormsModule, PanelComponent, TranslatePipe],
   templateUrl: './backups.component.html',
   styleUrl: './backups.component.css',
 })
@@ -56,6 +58,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
   private readonly formBuilder = inject(FormBuilder);
+  protected readonly translate = inject(TranslateService);
 
   // One form for all destination types; which controls matter depends on
   // `kind`, and the template shows only the relevant ones. Validation is done
@@ -145,7 +148,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
       next: (response) => {
         this.backups = response.items;
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load backups.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('backups.errors.loadBackups'))),
     });
   }
 
@@ -212,7 +215,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
           this.serviceState.refresh();
         },
         error: (error) => {
-          this.snapshotRestoreError = extractErrorMessage(error, 'Unable to restore that app from the snapshot.');
+          this.snapshotRestoreError = extractErrorMessage(error, this.translate.t('backups.errors.restoreSnapshot'));
         },
       });
   }
@@ -223,16 +226,16 @@ export class BackupsComponent implements OnInit, OnDestroy {
         this.toast.success(response.message);
         this.loadBackups();
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to create backup.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('backups.errors.createBackup'))),
     });
   }
 
   restoreBackup(fileName: string): void {
     void this.confirm
       .ask({
-        title: 'Restore backup',
-        message: `Restore backup "${fileName}"?\nThis overwrites the current state.`,
-        confirmText: 'Restore',
+        title: this.translate.t('backups.confirmRestore.title'),
+        message: this.translate.t('backups.confirmRestore.message', { fileName }),
+        confirmText: this.translate.t('backups.confirmRestore.confirmText'),
         danger: true,
       })
       .then((confirmed) => {
@@ -241,7 +244,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
         }
         this.operations.restoreBackup(fileName).subscribe({
           next: (response) => this.toast.success(response.message),
-          error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to restore backup.')),
+          error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('backups.errors.restoreBackup'))),
         });
       });
   }
@@ -256,7 +259,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
         link.click();
         URL.revokeObjectURL(url);
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to download backup.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('backups.errors.downloadBackup'))),
     });
   }
 
@@ -265,7 +268,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
       next: (response) => {
         this.schedule = response;
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load backup schedule.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('backups.errors.loadSchedule'))),
     });
   }
 
@@ -302,7 +305,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
         this.loadRemoteBackups();
       },
       error: (error) => {
-        this.runError = extractErrorMessage(error, 'Unable to run the app data backup.');
+        this.runError = extractErrorMessage(error, this.translate.t('backups.errors.runBackup'));
         this.fetchFinalProgress();
         // Even a run that "did not start" dumped databases and wrote an audit
         // row — refresh the card so any dump failures show.
@@ -378,7 +381,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
         this.loadBackupStatus();
       },
       error: (error) => {
-        this.toast.error(extractErrorMessage(error, 'Unable to update backup schedule.'));
+        this.toast.error(extractErrorMessage(error, this.translate.t('backups.errors.updateSchedule')));
         this.savingSchedule = false;
       },
     });
@@ -402,7 +405,10 @@ export class BackupsComponent implements OnInit, OnDestroy {
           });
         },
         error: () =>
-          (this.backupTargetFeedback = { type: 'danger', message: 'Unable to load the backup destination.' }),
+          (this.backupTargetFeedback = {
+            type: 'danger',
+            message: this.translate.t('backups.errors.loadTarget'),
+          }),
       });
   }
 
@@ -437,7 +443,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
         error: (error) =>
           (this.backupTargetFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Unable to save the backup destination.'),
+            message: extractErrorMessage(error, this.translate.t('backups.errors.saveTarget')),
           }),
       });
   }
@@ -451,7 +457,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
     this.destinationRestartAttempts = 0;
     this.destinationRestartDone = false;
     this.destinationRestartOk = false;
-    this.destinationRestartDetail = 'Waiting for Kopia to restart…';
+    this.destinationRestartDetail = this.translate.t('backups.restartModal.waiting');
     this.showDestinationRestartModal = true;
 
     this.destinationPollSubscription = timer(0, KOPIA_STATUS_POLL_MS)
@@ -459,7 +465,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
         switchMap(() =>
           this.settingsService
             .getKopiaStatus()
-            .pipe(catchError(() => of({ ok: false, detail: 'Kopia is not reachable yet.' })))
+            .pipe(catchError(() => of({ ok: false, detail: this.translate.t('backups.restartModal.unreachable') })))
         )
       )
       .subscribe((status) => {
@@ -495,7 +501,7 @@ export class BackupsComponent implements OnInit, OnDestroy {
         error: (error) =>
           (this.backupTargetFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Could not test the destination.'),
+            message: extractErrorMessage(error, this.translate.t('backups.errors.testTarget')),
           }),
       });
   }

@@ -1,25 +1,24 @@
 <main class="container-fluid py-4">
   <div class="mb-4">
-    <h1 class="h3 mb-1">Backups &amp; restore</h1>
+    <h1 class="h3 mb-1">{{ 'backups.title' | t }}</h1>
     <p class="text-body-secondary mb-0">
-      The backup schedule, on-demand runs, and restoring from a snapshot.
+      {{ 'backups.subtitle' | t }}
     </p>
   </div>
 
   <app-panel
     anchor="backups"
     key="backups"
-    title="Backups"
-    subtitle="Create, download, and restore compressed backups"
+    [title]="'backups.panel.title' | t"
+    [subtitle]="'backups.panel.subtitle' | t"
   >
-    <button panel-actions class="btn btn-sm btn-primary" (click)="createBackup()">Backup Settings</button>
+    <button panel-actions class="btn btn-sm btn-primary" (click)="createBackup()">{{ 'backups.settingsButton' | t }}</button>
 
     <div class="card mb-4">
       <div class="card-body p-4">
-        <h3 class="h5 mb-1">Schedule</h3>
+        <h3 class="h5 mb-1">{{ 'backups.schedule.heading' | t }}</h3>
         <p class="text-body-secondary small mb-3">
-          Backups run automatically on this schedule. Anything past the
-          retention count is deleted, oldest first.
+          {{ 'backups.schedule.description' | t }}
         </p>
         <div class="form-check form-switch mb-3">
           <input
@@ -30,23 +29,23 @@
             [(ngModel)]="schedule.enabled"
             name="backupScheduleEnabled"
           />
-          <label class="form-check-label" for="backupScheduleEnabled">Automatic backups</label>
+          <label class="form-check-label" for="backupScheduleEnabled">{{ 'backups.schedule.enabledLabel' | t }}</label>
         </div>
         <div class="row g-3 align-items-end mb-3" *ngIf="schedule.enabled">
           <div class="col-auto">
-            <label class="form-label small mb-1" for="backupScheduleFrequency">Frequency</label>
+            <label class="form-label small mb-1" for="backupScheduleFrequency">{{ 'backups.schedule.frequencyLabel' | t }}</label>
             <select
               class="form-select form-select-sm"
               id="backupScheduleFrequency"
               [(ngModel)]="schedule.frequency"
               name="backupScheduleFrequency"
             >
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
+              <option value="daily">{{ 'backups.schedule.daily' | t }}</option>
+              <option value="weekly">{{ 'backups.schedule.weekly' | t }}</option>
             </select>
           </div>
           <div class="col-auto">
-            <label class="form-label small mb-1" for="backupScheduleRunAtTime">At</label>
+            <label class="form-label small mb-1" for="backupScheduleRunAtTime">{{ 'backups.schedule.atLabel' | t }}</label>
             <input
               class="form-control form-control-sm"
               type="time"
@@ -56,7 +55,7 @@
             />
           </div>
           <div class="col-auto">
-            <label class="form-label small mb-1" for="backupScheduleRetention">Keep last</label>
+            <label class="form-label small mb-1" for="backupScheduleRetention">{{ 'backups.schedule.keepLastLabel' | t }}</label>
             <div class="d-flex align-items-center gap-2">
               <input
                 class="form-control form-control-sm"
@@ -68,7 +67,7 @@
                 name="backupScheduleRetention"
                 style="width: 6rem"
               />
-              <span class="small text-body-secondary">backups</span>
+              <span class="small text-body-secondary">{{ 'backups.schedule.retentionUnit' | t }}</span>
             </div>
           </div>
         </div>
@@ -79,21 +78,21 @@
           <div class="small" *ngIf="schedule.lastRunAt; else neverRun">
             <span [class.text-body-secondary]="schedule.lastOutcome !== 'failed'"
                   [class.text-danger]="schedule.lastOutcome === 'failed'">
-              Last scheduled backup: {{ schedule.lastRunAt | date:'dd/MM/yyyy, HH:mm' }}
+              {{ 'backups.schedule.lastRun' | t:{ time: (schedule.lastRunAt | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale()) ?? '' } }}
               <ng-container [ngSwitch]="schedule.lastOutcome">
-                <span *ngSwitchCase="'failed'">&mdash; failed</span>
-                <span *ngSwitchCase="'success'">&mdash; succeeded</span>
+                <span *ngSwitchCase="'failed'">&mdash; {{ 'backups.schedule.failedSuffix' | t }}</span>
+                <span *ngSwitchCase="'success'">&mdash; {{ 'backups.schedule.succeededSuffix' | t }}</span>
               </ng-container>
             </span>
             <div class="text-danger" *ngIf="schedule.lastOutcome === 'failed'">
               <ng-container *ngIf="schedule.lastSuccessAt; else neverSucceeded">
-                Last working backup: {{ schedule.lastSuccessAt | date:'dd/MM/yyyy, HH:mm' }}
+                {{ 'backups.schedule.lastWorking' | t:{ time: (schedule.lastSuccessAt | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale()) ?? '' } }}
               </ng-container>
-              <ng-template #neverSucceeded>No scheduled backup has ever succeeded.</ng-template>
+              <ng-template #neverSucceeded>{{ 'backups.schedule.neverSucceeded' | t }}</ng-template>
             </div>
           </div>
           <ng-template #neverRun>
-            <div class="small text-body-secondary">The schedule has never run.</div>
+            <div class="small text-body-secondary">{{ 'backups.schedule.neverRun' | t }}</div>
           </ng-template>
           <div class="d-flex gap-2 ms-auto">
             <!-- §74.6: the only way a backup ran was the scheduler. This
@@ -101,10 +100,10 @@
                  run to check a new destination is never a generation stale.
                  Runs ~20s (the dump is synchronous). -->
             <button class="btn btn-sm btn-outline-secondary" [disabled]="showRunModal" (click)="runAppDataBackup()">
-              Full Backup
+              {{ 'backups.schedule.fullBackupButton' | t }}
             </button>
             <button class="btn btn-sm btn-outline-primary" [disabled]="savingSchedule" (click)="saveSchedule()">
-              Save schedule
+              {{ 'backups.schedule.saveButton' | t }}
             </button>
           </div>
         </div>
@@ -115,35 +114,35 @@
              dump went. -->
         <div class="border-top mt-3 pt-3 small d-flex flex-column gap-1" *ngIf="backupStatus as st">
           <div>
-            <span class="text-body-secondary">Destination:</span>
+            <span class="text-body-secondary">{{ 'backups.status.destinationLabel' | t }}</span>
             <ng-container *ngIf="st.job.configured; else noJob">
-              <code>{{ st.job.repositoryDescription || st.job.storageType || 'unknown' }}</code>
+              <code>{{ st.job.repositoryDescription || st.job.storageType || ('backups.status.unknown' | t) }}</code>
               <span class="text-body-secondary" *ngIf="st.job.snapshotCount !== null">
-                &middot; {{ st.job.snapshotCount }} snapshot{{ st.job.snapshotCount === 1 ? '' : 's' }}</span>
+                &middot; {{ (st.job.snapshotCount === 1 ? 'backups.status.snapshotCount.one' : 'backups.status.snapshotCount.other') | t:{ count: st.job.snapshotCount } }}</span>
               <span class="text-body-secondary" *ngIf="st.job.lastSnapshotSizeBytes">
                 &middot; {{ formatBytes(st.job.lastSnapshotSizeBytes) }}</span>
             </ng-container>
             <ng-template #noJob>
-              <span class="text-body-secondary">{{ st.job.reachable ? 'no backup source has been registered yet' : 'Kopia is unreachable' }}</span>
+              <span class="text-body-secondary">{{ (st.job.reachable ? 'backups.status.noSource' : 'backups.status.unreachable') | t }}</span>
             </ng-template>
           </div>
           <div class="text-danger" *ngIf="st.job.configured && st.job.lastSnapshotErrorCount">
-            Last snapshot at {{ st.job.lastSnapshotAt | date:'dd/MM/yyyy, HH:mm' }} had {{ st.job.lastSnapshotErrorCount }} file error{{ st.job.lastSnapshotErrorCount === 1 ? '' : 's' }}.
+            {{ (st.job.lastSnapshotErrorCount === 1 ? 'backups.status.snapshotError.one' : 'backups.status.snapshotError.other') | t:{ time: (st.job.lastSnapshotAt | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale()) ?? '', count: st.job.lastSnapshotErrorCount } }}
           </div>
           <div>
-            <span class="text-body-secondary">Last app-database dump:</span>
+            <span class="text-body-secondary">{{ 'backups.status.dumpLabel' | t }}</span>
             <ng-container *ngIf="st.lastAppData as dump; else noDump">
               <span [class.text-danger]="dump.result !== 'success'">
-                {{ dump.at | date:'dd/MM/yyyy, HH:mm' }}<ng-container *ngIf="dump.dumped !== null"> &mdash; {{ dump.dumped }} dumped</ng-container><ng-container *ngIf="dump.failed"> , {{ dump.failed }} failed</ng-container>
+                {{ dump.at | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale() }}<ng-container *ngIf="dump.dumped !== null"> &mdash; {{ dump.dumped }} {{ 'backups.status.dumped' | t }}</ng-container><ng-container *ngIf="dump.failed"> , {{ dump.failed }} {{ 'backups.status.failed' | t }}</ng-container>
               </span>
               <ul class="mt-1 mb-0 ps-3 text-danger" *ngIf="dump.failures.length">
                 <li *ngFor="let f of dump.failures">{{ f.app }} ({{ f.kind }}): {{ f.detail }}</li>
               </ul>
               <div class="text-body-secondary" *ngIf="dump.failed && !dump.failures.length">
-                (failure reasons predate this build &mdash; the next run records them)
+                {{ 'backups.status.failureReasonsUnavailable' | t }}
               </div>
             </ng-container>
-            <ng-template #noDump><span class="text-body-secondary">never</span></ng-template>
+            <ng-template #noDump><span class="text-body-secondary">{{ 'backups.status.never' | t }}</span></ng-template>
           </div>
         </div>
       </div>
@@ -151,74 +150,71 @@
 
     <div class="card mb-4">
       <div class="card-body p-4">
-        <h3 class="h5 mb-1">Backup destination</h3>
+        <h3 class="h5 mb-1">{{ 'backups.target.heading' | t }}</h3>
         <p class="text-body-secondary small mb-3">
-          Where Kopia writes backups. Until this is set they stay on this machine's own disk —
-          which survives deleting a file, and nothing else.
+          {{ 'backups.target.description' | t }}
         </p>
 
-        <div *ngIf="backupTargetLoading" class="text-body-secondary small">Loading…</div>
+        <div *ngIf="backupTargetLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
 
         <form *ngIf="!backupTargetLoading" [formGroup]="backupTargetForm" (ngSubmit)="saveBackupTarget()" class="row g-3">
           <div class="col-md-4">
-            <label class="form-label fw-semibold" for="backupKind">Destination</label>
+            <label class="form-label fw-semibold" for="backupKind">{{ 'backups.target.kindLabel' | t }}</label>
             <select id="backupKind" class="form-select" formControlName="kind">
-              <option value="disk">Another disk on this machine</option>
-              <option value="smb">Network drive (SMB / Windows share)</option>
-              <option value="nfs">NAS (NFS export)</option>
-              <option value="s3">S3-compatible bucket (AWS S3, MinIO, B2, Wasabi…)</option>
-              <option value="webdav">WebDAV server</option>
-              <option value="ftp">FTP server</option>
-              <option value="ftps">FTP server with TLS (FTPS)</option>
-              <option value="sftp">SFTP server (over SSH)</option>
+              <option value="disk">{{ 'backups.target.kind.disk' | t }}</option>
+              <option value="smb">{{ 'backups.target.kind.smb' | t }}</option>
+              <option value="nfs">{{ 'backups.target.kind.nfs' | t }}</option>
+              <option value="s3">{{ 'backups.target.kind.s3' | t }}</option>
+              <option value="webdav">{{ 'backups.target.kind.webdav' | t }}</option>
+              <option value="ftp">{{ 'backups.target.kind.ftp' | t }}</option>
+              <option value="ftps">{{ 'backups.target.kind.ftps' | t }}</option>
+              <option value="sftp">{{ 'backups.target.kind.sftp' | t }}</option>
             </select>
           </div>
 
           <!-- Local disk -->
           <div class="col-md-8" *ngIf="backupTargetForm.controls.kind.value === 'disk'">
-            <label class="form-label fw-semibold" for="backupPath">Path</label>
+            <label class="form-label fw-semibold" for="backupPath">{{ 'backups.target.pathLabel' | t }}</label>
             <input id="backupPath" type="text" class="form-control" formControlName="path"
                    placeholder="/mnt/backups" autocomplete="off" />
             <div class="form-text">
-              Must be a separate disk. A path on the system disk is rejected — it would
-              be lost by the same failure it is meant to protect against.
+              {{ 'backups.target.pathHint' | t }}
             </div>
           </div>
 
           <!-- SMB / NFS -->
           <ng-container *ngIf="backupTargetForm.controls.kind.value === 'smb' || backupTargetForm.controls.kind.value === 'nfs'">
             <div class="col-md-4">
-              <label class="form-label fw-semibold" for="backupServer">Server</label>
+              <label class="form-label fw-semibold" for="backupServer">{{ 'backups.target.serverLabel' | t }}</label>
               <input id="backupServer" type="text" class="form-control" formControlName="server"
                      placeholder="192.168.1.50" autocomplete="off" />
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold" for="backupShare">
-                {{ backupTargetForm.controls.kind.value === 'nfs' ? 'Export path' : 'Share name' }}
+                {{ (backupTargetForm.controls.kind.value === 'nfs' ? 'backups.target.exportPathLabel' : 'backups.target.shareNameLabel') | t }}
               </label>
               <input id="backupShare" type="text" class="form-control" formControlName="share"
                      [placeholder]="backupTargetForm.controls.kind.value === 'nfs' ? '/volume1/backup' : 'backup'"
                      autocomplete="off" />
             </div>
             <div class="col-md-6" *ngIf="backupTargetForm.controls.kind.value === 'smb'">
-              <label class="form-label fw-semibold" for="backupUser">Username</label>
+              <label class="form-label fw-semibold" for="backupUser">{{ 'backups.target.usernameLabel' | t }}</label>
               <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
             </div>
             <div class="col-md-6" *ngIf="backupTargetForm.controls.kind.value === 'smb'">
-              <label class="form-label fw-semibold" for="backupPassword">Password</label>
+              <label class="form-label fw-semibold" for="backupPassword">{{ 'backups.target.passwordLabel' | t }}</label>
               <input id="backupPassword" type="password" class="form-control" formControlName="password"
-                     [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+                     [placeholder]="backupTarget?.passwordConfigured ? ('backups.target.passwordConfigured' | t) : ('backups.target.passwordNotSet' | t)"
                      autocomplete="new-password" />
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold" for="backupOptions">
-                Extra mount options <span class="fw-normal text-body-secondary">(optional)</span>
+                {{ 'backups.target.extraMountOptionsLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
               </label>
               <input id="backupOptions" type="text" class="form-control" formControlName="options"
                      placeholder="vers=2.1" autocomplete="off" />
               <div class="form-text">
-                Only needed for unusual setups. SMB defaults to version 3.0 — older
-                NAS boxes may need <code>vers=2.1</code> or <code>vers=1.0</code>.
+                {{ 'backups.target.mountOptionsHint' | t }}
               </div>
             </div>
           </ng-container>
@@ -227,42 +223,37 @@
           <ng-container *ngIf="backupTargetForm.controls.kind.value === 's3'">
             <div class="col-md-4">
               <label class="form-label fw-semibold" for="backupServer">
-                Endpoint <span class="fw-normal text-body-secondary">(optional)</span>
+                {{ 'backups.target.endpointLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
               </label>
               <input id="backupServer" type="text" class="form-control" formControlName="server"
                      placeholder="minio.lan:9000" autocomplete="off" />
               <div class="form-text">
-                Leave blank to connect to AWS S3 itself. For Backblaze B2 use its
-                S3-compatible endpoint (<code>s3.&lt;region&gt;.backblazeb2.com</code>),
-                your key ID as the access key ID and the application key as the
-                secret.
+                {{ 'backups.target.s3EndpointHint' | t }}
               </div>
             </div>
             <div class="col-md-4">
-              <label class="form-label fw-semibold" for="backupShare">Bucket</label>
+              <label class="form-label fw-semibold" for="backupShare">{{ 'backups.target.bucketLabel' | t }}</label>
               <input id="backupShare" type="text" class="form-control" formControlName="share"
                      placeholder="my-backup-bucket" autocomplete="off" />
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold" for="backupUser">Access key ID</label>
+              <label class="form-label fw-semibold" for="backupUser">{{ 'backups.target.accessKeyLabel' | t }}</label>
               <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold" for="backupPassword">Secret access key</label>
+              <label class="form-label fw-semibold" for="backupPassword">{{ 'backups.target.secretKeyLabel' | t }}</label>
               <input id="backupPassword" type="password" class="form-control" formControlName="password"
-                     [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+                     [placeholder]="backupTarget?.passwordConfigured ? ('backups.target.passwordConfigured' | t) : ('backups.target.passwordNotSet' | t)"
                      autocomplete="new-password" />
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold" for="backupOptions">
-                Extra connection flags <span class="fw-normal text-body-secondary">(optional)</span>
+                {{ 'backups.target.extraConnectionFlagsLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
               </label>
               <input id="backupOptions" type="text" class="form-control" formControlName="options"
                      placeholder="--region=us-east-1 --disable-tls" autocomplete="off" />
               <div class="form-text">
-                Passed straight to Kopia's <code>repository connect s3</code>.
-                <code>--disable-tls</code> for a plain-HTTP endpoint (a LAN MinIO,
-                say); <code>--region=…</code> if your endpoint needs one.
+                {{ 'backups.target.s3FlagsHint' | t }}
               </div>
             </div>
           </ng-container>
@@ -270,89 +261,83 @@
           <!-- WebDAV -->
           <ng-container *ngIf="backupTargetForm.controls.kind.value === 'webdav'">
             <div class="col-md-6">
-              <label class="form-label fw-semibold" for="backupServer">URL</label>
+              <label class="form-label fw-semibold" for="backupServer">{{ 'backups.target.urlLabel' | t }}</label>
               <input id="backupServer" type="text" class="form-control" formControlName="server"
                      placeholder="https://webdav.example.com/" autocomplete="off" />
               <div class="form-text">
-                Kopia's own native WebDAV backend — no bridging layer, unlike
-                FTP/SFTP below. Point it at this box's own
-                <code>apps/webdav</code> app or any other WebDAV server.
+                {{ 'backups.target.webdavHint' | t }}
               </div>
             </div>
             <div class="col-md-3">
-              <label class="form-label fw-semibold" for="backupUser">Username</label>
+              <label class="form-label fw-semibold" for="backupUser">{{ 'backups.target.usernameLabel' | t }}</label>
               <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
             </div>
             <div class="col-md-3">
-              <label class="form-label fw-semibold" for="backupPassword">Password</label>
+              <label class="form-label fw-semibold" for="backupPassword">{{ 'backups.target.passwordLabel' | t }}</label>
               <input id="backupPassword" type="password" class="form-control" formControlName="password"
-                     [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+                     [placeholder]="backupTarget?.passwordConfigured ? ('backups.target.passwordConfigured' | t) : ('backups.target.passwordNotSet' | t)"
                      autocomplete="new-password" />
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold" for="backupOptions">
-                Extra connection flags <span class="fw-normal text-body-secondary">(optional)</span>
+                {{ 'backups.target.extraConnectionFlagsLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
               </label>
               <input id="backupOptions" type="text" class="form-control" formControlName="options" autocomplete="off" />
-              <div class="form-text">Passed straight to Kopia's <code>repository create webdav</code>.</div>
+              <div class="form-text">{{ 'backups.target.webdavFlagsHint' | t }}</div>
             </div>
           </ng-container>
 
           <!-- FTP / FTPS / SFTP -->
           <ng-container *ngIf="backupTargetForm.controls.kind.value === 'ftp' || backupTargetForm.controls.kind.value === 'ftps' || backupTargetForm.controls.kind.value === 'sftp'">
             <div class="col-md-4">
-              <label class="form-label fw-semibold" for="backupServer">Server</label>
+              <label class="form-label fw-semibold" for="backupServer">{{ 'backups.target.serverLabel' | t }}</label>
               <input id="backupServer" type="text" class="form-control" formControlName="server"
                      placeholder="192.168.1.50" autocomplete="off" />
               <div class="form-text">
-                Host, or <code>host:port</code> if it is not on
-                {{ backupTargetForm.controls.kind.value === 'sftp' ? '22' : '21' }}.
+                {{ 'backups.target.ftpServerHint' | t:{ port: backupTargetForm.controls.kind.value === 'sftp' ? '22' : '21' } }}
               </div>
             </div>
             <div class="col-md-4">
               <label class="form-label fw-semibold" for="backupShare">
-                Remote directory <span class="fw-normal text-body-secondary">(optional)</span>
+                {{ 'backups.target.remoteDirLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
               </label>
               <input id="backupShare" type="text" class="form-control" formControlName="share"
                      placeholder="/" autocomplete="off" />
-              <div class="form-text">Where the repository lives on the server. Blank or <code>/</code> is the root.</div>
+              <div class="form-text">{{ 'backups.target.remoteDirHint' | t }}</div>
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold" for="backupUser">Username</label>
+              <label class="form-label fw-semibold" for="backupUser">{{ 'backups.target.usernameLabel' | t }}</label>
               <input id="backupUser" type="text" class="form-control" formControlName="username" autocomplete="off" />
             </div>
             <div class="col-md-6">
-              <label class="form-label fw-semibold" for="backupPassword">Password</label>
+              <label class="form-label fw-semibold" for="backupPassword">{{ 'backups.target.passwordLabel' | t }}</label>
               <input id="backupPassword" type="password" class="form-control" formControlName="password"
-                     [placeholder]="backupTarget?.passwordConfigured ? 'configured — leave blank to keep' : 'not set'"
+                     [placeholder]="backupTarget?.passwordConfigured ? ('backups.target.passwordConfigured' | t) : ('backups.target.passwordNotSet' | t)"
                      autocomplete="new-password" />
               <div class="form-text" *ngIf="backupTargetForm.controls.kind.value === 'sftp'">
-                Password auth only. The host key is not verified unless you pass
-                <code>--sftp-known-hosts-file</code> below.
+                {{ 'backups.target.sftpPasswordHint' | t }}
               </div>
             </div>
             <div class="col-12">
               <label class="form-label fw-semibold" for="backupOptions">
-                Extra rclone flags <span class="fw-normal text-body-secondary">(optional)</span>
+                {{ 'backups.target.extraRcloneFlagsLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span>
               </label>
               <input id="backupOptions" type="text" class="form-control" formControlName="options"
                      [placeholder]="backupTargetForm.controls.kind.value === 'sftp' ? '--sftp-known-hosts-file=/path/known_hosts' : '--ftp-disable-epsv'"
                      autocomplete="off" />
               <div class="form-text">
-                Kopia has no FTP or SFTP backend of its own — it drives the bundled
-                <code>rclone</code>. These flags are appended to
-                <code>repository create rclone</code>.
+                {{ 'backups.target.rcloneHint' | t }}
               </div>
             </div>
           </ng-container>
 
           <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
             <button type="submit" class="btn btn-primary" [disabled]="savingBackupTarget">
-              {{ savingBackupTarget ? 'Saving…' : 'Save destination' }}
+              {{ (savingBackupTarget ? 'common.saving' : 'backups.target.saveButton') | t }}
             </button>
             <button type="button" class="btn btn-outline-secondary"
                     [disabled]="testingBackupTarget || !backupTarget?.configured" (click)="testBackupTarget()">
-              {{ testingBackupTarget ? 'Testing…' : 'Test destination' }}
+              {{ (testingBackupTarget ? 'common.testing' : 'backups.target.testButton') | t }}
             </button>
             <span
               *ngIf="backupTargetFeedback"
@@ -376,61 +361,61 @@
       </div>
     </div>
 
-    <h3 class="h5 mb-2">Settings Backups</h3>
+    <h3 class="h5 mb-2">{{ 'backups.settingsBackups.heading' | t }}</h3>
     <div class="list-group mb-4">
       <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2" *ngFor="let backup of backups">
         <div>
           <div class="fw-semibold">{{ backup.name }}</div>
           <div class="small text-body-secondary">
-            {{ backup.createdAt | date:'dd/MM/yyyy, HH:mm' }} · {{ backup.size / 1024 | number:'1.0-0' }} KB
+            {{ backup.createdAt | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale() }} · {{ backup.size / 1024 | number:'1.0-0':translate.locale() }} KB
           </div>
         </div>
         <div class="d-flex gap-2">
-          <button class="btn btn-sm btn-outline-secondary" (click)="downloadBackup(backup.name)">Download</button>
-          <button class="btn btn-sm btn-outline-danger" (click)="restoreBackup(backup.name)">Restore</button>
+          <button class="btn btn-sm btn-outline-secondary" (click)="downloadBackup(backup.name)">{{ 'backups.settingsBackups.download' | t }}</button>
+          <button class="btn btn-sm btn-outline-danger" (click)="restoreBackup(backup.name)">{{ 'backups.settingsBackups.restore' | t }}</button>
         </div>
       </div>
       <div class="list-group-item text-body-secondary" *ngIf="!backups.length">
-        No Settings Backups found yet.
+        {{ 'backups.settingsBackups.empty' | t }}
       </div>
     </div>
 
     <!-- What Kopia holds at the configured destination. Restore is per-app
          (plan.md §590): a whole-tree restore is the "the box is gone" case,
          and there is no dashboard to click in then. -->
-    <h3 class="h5 mb-2">Full Backups</h3>
+    <h3 class="h5 mb-2">{{ 'backups.fullBackups.heading' | t }}</h3>
     <div class="list-group">
-      <div class="list-group-item text-body-secondary" *ngIf="remoteBackupsLoading">Loading…</div>
+      <div class="list-group-item text-body-secondary" *ngIf="remoteBackupsLoading">{{ 'common.loading' | t }}</div>
       <ng-container *ngIf="!remoteBackupsLoading">
         <div class="list-group-item d-flex flex-wrap justify-content-between align-items-center gap-2" *ngFor="let snapshot of remoteBackups">
           <div>
-            <div class="fw-semibold">{{ snapshot.startTime | date:'dd/MM/yyyy, HH:mm' }}</div>
+            <div class="fw-semibold">{{ snapshot.startTime | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale() }}</div>
             <div class="small text-body-secondary">
-              <ng-container *ngIf="snapshot.fileCount !== null">{{ snapshot.fileCount }} files</ng-container>
+              <ng-container *ngIf="snapshot.fileCount !== null">{{ 'backups.fullBackups.fileCount' | t:{ count: snapshot.fileCount } }}</ng-container>
               <ng-container *ngIf="snapshot.sizeBytes !== null"> · {{ formatBytes(snapshot.sizeBytes) }}</ng-container>
             </div>
           </div>
           <div class="d-flex gap-2 flex-wrap justify-content-end align-items-center">
             <span class="badge text-bg-secondary" *ngFor="let reason of snapshot.retentionReasons">{{ reason }}</span>
             <button type="button" class="btn btn-sm btn-outline-warning" (click)="openSnapshotRestore(snapshot)">
-              Restore an app
+              {{ 'backups.fullBackups.restoreButton' | t }}
             </button>
           </div>
         </div>
         <div class="list-group-item text-body-secondary" *ngIf="!remoteBackups.length">
-          No Full Backups found yet.
+          {{ 'backups.fullBackups.empty' | t }}
         </div>
       </ng-container>
     </div>
   </app-panel>
 
   <div class="backup-progress-backdrop" *ngIf="showRunModal">
-    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" aria-label="Backing up app data">
+    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" [attr.aria-label]="'backups.runModal.ariaLabel' | t">
       <div class="backup-progress-body">
-        <h2 class="h5 mb-3">Backing up app data</h2>
+        <h2 class="h5 mb-3">{{ 'backups.runModal.heading' | t }}</h2>
 
         <ng-container [ngSwitch]="progress?.phase">
-          <p class="mb-2" *ngSwitchCase="'snapshotting'">Triggering the backup engine snapshot&hellip;</p>
+          <p class="mb-2" *ngSwitchCase="'snapshotting'">{{ 'backups.runModal.snapshotting' | t }}</p>
           <p class="mb-2"
              *ngSwitchCase="'done'"
              [class.text-success]="progress?.ok === true"
@@ -438,7 +423,7 @@
             {{ progress?.detail }}
           </p>
           <p class="mb-2" *ngSwitchDefault>
-            {{ progress?.label ? ('Dumping ' + progress?.label + '…') : 'Starting…' }}
+            {{ progress?.label ? ('backups.runModal.dumping' | t:{ label: progress?.label ?? '' }) : ('backups.runModal.starting' | t) }}
           </p>
         </ng-container>
 
@@ -453,45 +438,43 @@
           ></div>
         </div>
         <p class="text-body-secondary small mt-1 mb-0" *ngIf="progress && progress.phase === 'dumping' && progress.total > 0">
-          {{ progress.index }} of {{ progress.total }}
+          {{ 'backups.runModal.progressCount' | t:{ index: progress.index, total: progress.total } }}
         </p>
 
         <p class="text-danger small mt-2 mb-0" *ngIf="runError">{{ runError }}</p>
       </div>
       <div class="backup-progress-foot" *ngIf="progress?.phase === 'done' || runError">
-        <button type="button" class="btn btn-primary" (click)="closeRunModal()">Close</button>
+        <button type="button" class="btn btn-primary" (click)="closeRunModal()">{{ 'common.close' | t }}</button>
       </div>
     </div>
   </div>
 
   <div class="backup-progress-backdrop" *ngIf="restoreSnapshotTarget">
-    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" aria-label="Restore an app from this backup">
+    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" [attr.aria-label]="'backups.restoreModal.ariaLabel' | t">
       <div class="backup-progress-body">
-        <h2 class="h5 mb-1">Restore an app</h2>
+        <h2 class="h5 mb-1">{{ 'backups.restoreModal.heading' | t }}</h2>
         <p class="text-body-secondary small mb-3">
-          From the backup taken {{ restoreSnapshotTarget.startTime | date:'dd/MM/yyyy, HH:mm' }}.
+          {{ 'backups.restoreModal.subtitle' | t:{ time: (restoreSnapshotTarget.startTime | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale()) ?? '' } }}
         </p>
 
         <ng-container *ngIf="!snapshotRestoreResult">
-          <label class="form-label" for="snapshot-restore-app">Application</label>
+          <label class="form-label" for="snapshot-restore-app">{{ 'backups.restoreModal.appLabel' | t }}</label>
           <select
             id="snapshot-restore-app"
             class="form-select mb-3"
             [(ngModel)]="restoreSnapshotApp"
             [disabled]="restoringSnapshot"
           >
-            <option value="">Choose an application&hellip;</option>
+            <option value="">{{ 'backups.restoreModal.choosePrompt' | t }}</option>
             <option *ngFor="let app of restorableApps" [value]="app.name">{{ app.label }}</option>
           </select>
 
           <div class="alert alert-warning small mb-0" role="alert">
-            This <strong>stops the application</strong> and replaces its data with what the backup
-            holds. Anything it has written since is lost. Its credentials and settings are left
-            alone &mdash; only the application's own data is put back.
+            {{ 'backups.restoreModal.warning' | t }}
           </div>
 
           <p class="text-body-secondary small mt-2 mb-0" *ngIf="restoringSnapshot">
-            Restoring&hellip; a large application can take several minutes. Leave this open.
+            {{ 'backups.restoreModal.restoringNotice' | t }}
           </p>
           <p class="text-danger small mt-2 mb-0" *ngIf="snapshotRestoreError">{{ snapshotRestoreError }}</p>
         </ng-container>
@@ -501,14 +484,14 @@
             {{ result.message }}
           </p>
           <p class="text-body-secondary small mb-2" *ngIf="result.restoredFiles !== null">
-            {{ result.restoredFiles }} file{{ result.restoredFiles === 1 ? '' : 's' }} restored<ng-container
+            {{ (result.restoredFiles === 1 ? 'backups.restoreModal.filesRestored.one' : 'backups.restoreModal.filesRestored.other') | t:{ count: result.restoredFiles } }}<ng-container
               *ngIf="result.restoredBytes !== null"> &middot; {{ formatBytes(result.restoredBytes) }}</ng-container>.
           </p>
           <ul class="small text-danger mb-2 ps-3" *ngIf="result.warnings.length">
             <li *ngFor="let warning of result.warnings">{{ warning }}</li>
           </ul>
           <p class="text-body-secondary small mb-0">
-            Kept as a restore point for this application: <code>{{ result.file }}</code>
+            {{ 'backups.restoreModal.keptAsRestorePoint' | t }} <code>{{ result.file }}</code>
           </p>
         </ng-container>
       </div>
@@ -519,7 +502,7 @@
           [disabled]="restoringSnapshot"
           (click)="closeSnapshotRestore()"
         >
-          {{ snapshotRestoreResult ? 'Close' : 'Cancel' }}
+          {{ (snapshotRestoreResult ? 'common.close' : 'common.cancel') | t }}
         </button>
         <button
           type="button"
@@ -528,16 +511,16 @@
           [disabled]="!restoreSnapshotApp || restoringSnapshot"
           (click)="confirmSnapshotRestore()"
         >
-          {{ restoringSnapshot ? 'Restoring…' : 'Restore' }}
+          {{ (restoringSnapshot ? 'backups.restoreModal.restoringButton' : 'backups.restoreModal.restoreButton') | t }}
         </button>
       </div>
     </div>
   </div>
 
   <div class="backup-progress-backdrop" *ngIf="showDestinationRestartModal">
-    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" aria-label="Restarting Kopia">
+    <div class="backup-progress-dialog" role="alertdialog" aria-modal="true" [attr.aria-label]="'backups.restartModal.ariaLabel' | t">
       <div class="backup-progress-body">
-        <h2 class="h5 mb-3">Restarting the backup engine</h2>
+        <h2 class="h5 mb-3">{{ 'backups.restartModal.heading' | t }}</h2>
         <p class="mb-2"
            [class.text-success]="destinationRestartDone && destinationRestartOk"
            [class.text-danger]="destinationRestartDone && !destinationRestartOk">
@@ -545,7 +528,7 @@
         </p>
       </div>
       <div class="backup-progress-foot" *ngIf="destinationRestartDone">
-        <button type="button" class="btn btn-primary" (click)="closeDestinationRestartModal()">Close</button>
+        <button type="button" class="btn btn-primary" (click)="closeDestinationRestartModal()">{{ 'common.close' | t }}</button>
       </div>
     </div>
   </div>

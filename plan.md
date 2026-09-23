@@ -27958,3 +27958,46 @@ Two things worth recording:
 number` — added `?? ''`) and `./scripts/check.sh frontend test` (89/89, no
 spec touched this page's strings). No e2e run — this batch doesn't touch
 auth/shell/nav/Users/2FA.
+
+## 600. Multi-language UI: `backups` page (§597 batch 3)
+
+Translated the Backups & restore page in full: schedule card (frequency,
+retention, last-run/last-success status with failed/succeeded suffixes),
+the Kopia status strip (destination, snapshot count, snapshot errors,
+last app-database dump), the backup-destination form for all eight
+destination kinds (disk/SMB/NFS/S3/WebDAV/FTP/FTPS/SFTP) including every
+field label, placeholder-as-hint text, and per-kind help text, the
+Settings Backups and Full Backups lists, and all three modals (run
+progress, per-app snapshot restore, Kopia-restart wait) plus the native
+`confirm.ask()` restore-backup dialog. `~120` new keys under `backups.*`,
+plus a small shared `common.*` bucket (`loading`/`close`/`cancel`/`saving`/
+`testing`/`optional`) for strings repeated verbatim across this page and
+likely the next ones.
+
+Two things worth recording:
+- **First page needing plural forms.** `TranslateService.t()` (§597) has no
+  plural grammar — it never needed one before this page's snapshot/file/
+  error counts. Rather than extend the service, each pair got two keys
+  (`....one` / `....other`) and the call site picks between them with a
+  ternary on the count (`count === 1 ? '....one' : '....other'`), the same
+  pattern §599 already used for the connection-status badge's key
+  concatenation. English only has two plural forms so this is exact for
+  `en`; European Portuguese also only distinguishes singular/plural, so it
+  is exact for `pt-PT` too — a language with more plural categories (Polish,
+  Arabic) would need a real `Intl.PluralRules`-based helper, not yet needed
+  anywhere in this app.
+- **Inline `<code>`/`<strong>` markup in hint text is dropped.** Several
+  destination-kind hints wrapped a token in `<code>` (`vers=2.1`,
+  `--disable-tls`, `repository create rclone`, …) and the snapshot-restore
+  warning bolded "stops the application". `t()` returns a plain string
+  interpolated as a text node, not `[innerHTML]`, so translating these
+  necessarily flattens that formatting — a deliberate, scoped-down choice
+  for this batch (not a bug), matching how §597 scoped `t()` in the first
+  place. Revisit only if a future page needs rich inline formatting badly
+  enough to justify a safe-HTML variant of the pipe.
+
+**Verification.** `./scripts/check.sh frontend build` (clean, same
+pre-existing bundle-size budget warning as every prior build) and
+`./scripts/check.sh frontend test` (89/89, `backups.component.spec.ts`
+untouched by this batch — it doesn't assert on visible strings). No e2e
+run — this batch doesn't touch auth/shell/nav/Users/2FA.
