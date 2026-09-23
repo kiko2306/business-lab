@@ -267,3 +267,16 @@ it is done — not ticked off and left behind. Section references point at
       the Cloudflare Zero Trust dashboard, confirm it's unused, and delete it
       there — not something backend code can safely detect-and-remove on its
       own with no `service_exposure` row to key off.
+
+- [ ] **Host OS timezone should follow Settings > General's timezone** —
+      today changing it only sets the `TZ` env override injected into
+      managed containers (`generalSettings.ts`/`executor.ts`); it never
+      touches the real host clock. Plan in plan.md §608: a small core
+      `pid: host` + `privileged` sidecar (same trust precedent as Scrutiny,
+      §240/§446) polling `app_timezone` and running
+      `nsenter -t 1 -m -u -n -i -- timedatectl set-timezone <tz>` when it
+      drifts from the host's current zone — mirrors
+      `self-update-watchdog`'s polling shape since the backend has no
+      `docker exec` path to trigger it directly. Needs a beta test once
+      built: change the timezone in Settings, confirm `timedatectl status`
+      on the host actually flips.

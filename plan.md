@@ -28282,3 +28282,64 @@ introducing a one-off standard. `./scripts/check.sh backend test`
 `test` (89/89) all pass. Not verified live yet — nothing here touches
 Docker/exposure/networking, just a registry field and a template badge, so
 no README beta-check item.
+
+## 608. Planned: host OS timezone should follow Settings > General's timezone
+
+User asked: changing the timezone in `Settings > General` should also change
+the host's real OS timezone (`sudo timedatectl set-timezone <tz>`). CLAUDE.md
+principle 2 (no console configuration) means the backend has to run this
+itself — the user should never be told to type that command.
+
+Checked what "timezone" already means in this codebase, since it sounded
+like it might already be wired up: `generalSettings.ts`'s `app_timezone`
+(Postgres key/value) only feeds `executor.ts`'s `resolveTimezoneOverride()`,
+which injects a `TZ` env override into every managed app's
+`docker compose up` unless that app's own `.env` pins its own `TZ`. That's
+an app-level env var, not the host clock — grep across `backend/src`,
+`frontend/src`, root `docker-compose.yml` and `start.sh` found zero
+references to `/etc/localtime`, `/etc/timezone`, or `timedatectl` anywhere.
+So this is new territory, not a wiring bug.
+
+**Constraint:** the backend container has no channel to run a host-level
+command today. It talks to Docker only through `docker-socket-proxy`
+(`tcp://docker-socket-proxy:2375`), scoped to
+CONTAINERS/IMAGES/NETWORKS/VOLUMES/POST/BUILD/ALLOW_START/ALLOW_STOP/INFO/
+VERSION/PING/EVENTS — **no EXEC**. No `/var/run/docker.sock` mount, no
+`privileged`, no `/etc/localtime`, `/etc/timezone` or `/var/run/dbus` mounts
+on the backend service in the root `docker-compose.yml`. The one path that
+already reaches the real host filesystem is self-update
+(`selfUpdate.ts`), and only because `REPO_ROOT`/`APPS_DIR` are bind-mounted
+read-write at the *identical* host path — that trick doesn't generalize to
+`timedatectl`, which is a systemd/D-Bus host operation, not a file write.
+
+Two designs considered for actually flipping the host clock:
+
+- **Bind-mount `/etc/localtime`/`/etc/timezone` into the backend and rewrite
+  them directly.** Rejected: Docker's single-*file* bind mounts are a known
+  footgun — `unlink`+`symlink` from inside the container manipulates the
+  container's own mountpoint entry, not reliably the host file underneath.
+  It would also bypass whatever `systemd-timedated` itself tracks (RTC-vs-
+  local-time, NTP interaction) that going through the real `timedatectl` call
+  handles correctly.
+- **A small privileged, `pid: host` core-stack sidecar that runs
+  `nsenter -t 1 -m -u -n -i -- timedatectl set-timezone <tz>` in the host's
+  own namespace.** This is the standard way a container reaches "do a
+  systemd thing on the real host," and it's the same trust level already
+  accepted for Scrutiny's `privileged: true` (§240/§446: "the backend that
+  manages the stack is already root-equivalent on the host, so the real
+  trust boundary doesn't move"). Since the backend has no `docker exec` path
+  to trigger it on demand (EXEC is off in the proxy scope), the sidecar
+  would instead poll `app_timezone` on a short interval and call
+  `timedatectl set-timezone` only when it differs from
+  `timedatectl show --property=Timezone` on the host — the same
+  polling-loop shape `self-update-watchdog` already uses, and a no-op most
+  ticks.
+
+Leaning toward the second option. **Not implemented** — this section and the
+README item are the plan, so the next session can pick it up directly:
+new core compose service (not a managed app, alongside
+`self-update-watchdog`), `pid: host`, `privileged: true`, no exposed ports,
+reads `app_timezone` (either a direct Postgres read or a tiny read-only
+backend endpoint), idempotent apply. If `nsenter`/`util-linux` isn't already
+in whatever base image gets used, check `docs/licences.md` for it — no new
+upstream *project* either way, just a base image.
