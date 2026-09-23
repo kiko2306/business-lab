@@ -28257,3 +28257,28 @@ app's own HTTP client, post-webview), pulling real tasks/projects/labels/
 notifications, no redirect loop, no HTML-instead-of-JSON failure. Confirms
 the root-cause fix from §571 holds for an actual client, not just curl.
 README item deleted.
+
+## 607. Built: Vikunja's client URL shown on its card
+
+§606 confirmed a real Vikunja client needs `<host>/api/v1`, not the bare
+hostname — the user asked for that to be visible on the app card rather than
+something an operator has to go find in the docs. Small, mechanical addition,
+following the exact shape `webPath`/`additionalExposureUrls` already use:
+
+- New optional `clientApiPath` on `ServiceConfig` (`backend/src/types/index.ts`)
+  and `ServiceStatus`, threaded through `status.ts` next to `webPath`.
+- Set on Vikunja's registry entry (`services.ts`): `clientApiPath: '/api/v1'`.
+- New badge on the card (`service-card.component.html`), gated on
+  `exposedHostname && clientApiPath`, same link-badge pattern as the existing
+  "open public URL" and `additionalExposureUrls` badges — labelled "App URL"
+  (`serviceCard.clientApiUrlLabel`/`clientApiUrlTitle`, both locales).
+- `docs/app-credentials.md`'s Vikunja row points at the new badge instead of
+  just describing OIDC login.
+
+No new tests — the sibling `webPath`/`additionalExposureUrls` badges have
+none either, so this stays consistent with existing coverage rather than
+introducing a one-off standard. `./scripts/check.sh backend test`
+(1184/1184) and `typecheck`, `./scripts/check.sh frontend build` (clean) and
+`test` (89/89) all pass. Not verified live yet — nothing here touches
+Docker/exposure/networking, just a registry field and a template badge, so
+no README beta-check item.

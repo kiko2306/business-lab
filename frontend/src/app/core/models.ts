@@ -114,6 +114,10 @@ export interface ServiceStatus {
   // URL path suffix for the app's web UI when it isn't the bare root
   // (e.g. Pi-hole's `/admin`) — appended to the public URL for "open" links.
   webPath?: string;
+  // URL path a native mobile/desktop client should connect to, when it
+  // differs from the browser UI (e.g. Vikunja's apps need `<host>/api/v1`).
+  // Absent when the app has no such client.
+  clientApiPath?: string;
   // Published host port of the app's web UI while running — used for a LAN
   // "open" link when the app isn't publicly exposed.
   webPort?: number | null;

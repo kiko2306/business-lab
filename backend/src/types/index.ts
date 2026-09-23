@@ -243,6 +243,13 @@ export interface ServiceDefinition {
   // `/admin`, so its bare hostname just 403s / redirects. Leading slash, no
   // trailing slash; unset for the common "UI is at /" case.
   webPath?: string;
+  // URL path a native mobile/desktop client should be pointed at — distinct
+  // from `webPath` (a browser UI redirect) because some clients need the API
+  // root spelled out explicitly rather than the bare hostname (e.g. Vikunja's
+  // apps expect `<host>/api/v1`, not `<host>/`). Surfaced on the card so a
+  // user setting up a client doesn't have to go dig it out of the docs.
+  // Unset for apps with no such client, or where the bare hostname is enough.
+  clientApiPath?: string;
   // Keep this app off the public Home Page even when it is running and
   // exposed. For an app whose exposure exists only to serve another app, not
   // a person — OnlyOffice is reachable so the remote browser can load the
@@ -379,6 +386,11 @@ export interface ServiceStatusPayload {
   // URL path suffix for the app's web UI when it isn't at the bare root
   // (e.g. Pi-hole's `/admin`) — the dashboard appends it to the "open" link.
   webPath?: string;
+  // URL path a native mobile/desktop client should connect to, when it
+  // differs from the browser UI (services.ts `clientApiPath`) — e.g.
+  // Vikunja's apps need `<host>/api/v1` spelled out. Absent when the app has
+  // no such client.
+  clientApiPath?: string;
   // Published host port of the app's web UI (the exposurePortEnvVar one when
   // set — e.g. NPM's admin :81, not its proxy :80), while running. Lets the
   // dashboard offer a LAN link even when the app isn't publicly exposed.

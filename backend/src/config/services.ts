@@ -1235,6 +1235,10 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // gate. `/` (the web UI) deliberately stays out — it keeps requiring an
     // Authelia session.
     autheliaBypassPaths: ['^/api($|/)'],
+    // A real Vikunja client needs this exact path, not the bare hostname
+    // (confirmed live, plan.md §606) — surfaced on the card so a user
+    // doesn't have to go find it in the docs.
+    clientApiPath: '/api/v1',
     oidcClient: {
       redirectPaths: ['/auth/openid/authelia'],
       secretEnvKey: 'VIKUNJA_OIDC_CLIENT_SECRET',

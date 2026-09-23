@@ -337,6 +337,7 @@ export async function getServiceStatus(serviceName: string): Promise<ServiceStat
       ports,
       exposedHostname,
       webPath: service.webPath,
+      clientApiPath: service.clientApiPath,
       webPort,
       lanOnly: service.lanOnly,
       overlayOnly: service.overlayOnly,

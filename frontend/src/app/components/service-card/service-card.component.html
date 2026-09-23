@@ -18,6 +18,16 @@
         {{ service.exposedHostname }}{{ service.webPath }}
       </a>
       <a
+        *ngIf="service.exposedHostname && service.clientApiPath"
+        class="badge text-bg-secondary border text-decoration-none"
+        [href]="'https://' + service.exposedHostname + service.clientApiPath"
+        target="_blank"
+        rel="noopener noreferrer"
+        [title]="'serviceCard.clientApiUrlTitle' | t"
+      >
+        {{ 'serviceCard.clientApiUrlLabel' | t }}: {{ service.exposedHostname }}{{ service.clientApiPath }}
+      </a>
+      <a
         *ngFor="let extra of service.additionalExposureUrls"
         class="badge text-bg-secondary border text-decoration-none"
         [href]="'https://' + extra.hostname"

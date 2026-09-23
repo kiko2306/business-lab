@@ -733,6 +733,8 @@ export const ptPT: Record<string, string> = {
   'serviceCard.latestVersion': 'mais recente',
   'serviceCard.openPublicUrlTitle': 'Abrir URL pública',
   'serviceCard.extraUrlTitle': 'URL de {{label}} — para a aplicação de telemóvel/computador, não a ligação do browser acima',
+  'serviceCard.clientApiUrlLabel': 'URL da app',
+  'serviceCard.clientApiUrlTitle': 'URL do servidor para a aplicação de telemóvel/computador, não a ligação do browser acima',
   'serviceCard.openUrlTitle': 'Abrir {{url}}',
   'serviceCard.needsLabel': 'Necessita de',
   'serviceCard.startButton': 'Iniciar',
