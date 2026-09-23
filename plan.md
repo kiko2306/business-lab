@@ -27740,3 +27740,19 @@ overwrite the live destination password with a test value that cannot be put
 back, since reading the original is denied. Left alone deliberately; the unit
 tests on `writeEnvValues` stand, and the live check needs a throwaway
 destination rather than the working one.
+
+## 595. Upstream tracker sweep, 2026-09-23
+
+Both "check periodically" README items are still blocked upstream; nothing to
+delete.
+
+- **netbirdio/android-client#96** (Android client blocks non-NetBird traffic) —
+  `OPEN`, last updated 2025-11-05.
+- **crowdsecurity/cs-cloudflare-worker-bouncer** — latest release is still
+  **v0.0.18** (2026-06-02), the version that crash-loops with "Authentication
+  error (10000)" against `cfut_`-prefixed Cloudflare tokens (§567's #3). No
+  issue in that repo names the 10000 auth error either, so it is not on their
+  radar; a classic (non-`cfut_`) token remains the only way in.
+
+Both README items now carry a `Last checked 2026-09-23` line so the next sweep
+knows how stale the answer is.
