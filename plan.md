@@ -28931,3 +28931,118 @@ was in §618 — an embedded repo lands as a broken gitlink. Worth noting the
 working copy was **dirty** against that history (~20 modified sources), so what
 landed here is newer than anything on the WHotWebService remote; the remote is
 not a complete fallback for this directory.
+
+## 620. How the `sample/hotel` system works — analysis ahead of a rebuild
+
+`sample/hotel` (§618, §619) is to be **rebuilt from scratch**, replacing the
+whole thing. This section records how the existing system works, so the read
+pass does not have to be repeated. Scope of the rebuild is not yet decided —
+the user will define it.
+
+### What it is
+
+"Hotel Utils": a guest-engagement layer bolted onto **Wintouch**, a Portuguese
+on-premise hotel PMS that owns the reservations and runs on the hotel's own
+Windows machine. The system adds two things Wintouch lacks — **online check-in
+by email** and a **post-stay quiz** — and writes the results back into Wintouch.
+
+The three directories are three roles, not three projects:
+
+- `WHotWebService/` — the on-prem agent. .NET Framework 4.8 Windows service
+  `PortoInf.Interop`, hosted by Topshelf, running beside Wintouch.
+- `setup/` — the template. Compose project `hotel-utils`, placeholder ports
+  9201/9202/9104.
+- `trigenius/` — a deployed client instance built from that template. Project
+  `trigenius`, real ports 1100/1101/1102.
+
+`deploy-new-instance.sh` turns the first into the third.
+
+### The sync loop (`ServiceManager.cs`)
+
+Boot: `Config.cs` reads `WHotelWebService.config` for the base URL, then calls
+`GET /api/config` to fetch the Wintouch **username, password and database name
+from the cloud**. `WHotel.cs` boots Wintouch *in-process* —
+`ApplicationsManager.Start("whot")`, `SetCurrentUser`, `SetDatabase`,
+`SwitchContext` for the licence. It loads Wintouch's own assemblies and drives
+them; there is no network protocol between agent and PMS.
+
+Tick: first at 1 s, then every 5 minutes. `GET /api/ping` first — a down server
+skips the tick entirely. Then four jobs, in order:
+
+1. **Units** — `Wintouch.Hotel.Businesstier.Unidades` → `POST /api/units`.
+2. **Guests** — `POST /api/guests`, batches of 100. The watermark is an
+   `exportado` column in Wintouch's own `wgcterceiros` table, set by **direct
+   SQL** through `CommandDirectSQL`. A `firstConnection` flag from the server
+   triggers `SET exportado = 0` on every row — a full re-sync of the guest book.
+3. **Reservations** — two windows per unit: check-ins **today → +7 days**,
+   check-outs **−7 days → +1**, deduped on (unit, number, line), chunked 100,
+   `POST /api/reservations`. Carries primary guest, company, room, occupancy
+   (adults/children/babies), channel and extra occupants.
+4. **Check-ins back** — `GET /api/checkin-complete`, writes each occupant into
+   Wintouch's `ReservasEntidades`, stamps the reservation's `observacoes` with
+   `***** Checkin Online efectuado *****` and sets `AvisarObservacoes` so
+   reception sees it, then `POST /api/checkin/success` or `/checkin/fail`.
+
+Jobs 1–3 push out of Wintouch; job 4 is the **only** write path back in.
+
+### The web side
+
+Laravel 9 on PHP 7.4/Apache, 45 migrations. `fe/` is the Apache document root —
+Laravel's `public/` split into its own directory and bind-mounted over
+`api/public`. Stack: `app`, `db` (MySQL 8), `phpmyadmin`, `mailpit`, `cron`.
+
+A `cron` container runs `schedule:run` every minute, driving:
+
+- `checkin:send` — reservations whose `checkin` is exactly *today + offset*,
+  still `RESERVED`, unit enabled, guest mailable → email containing
+  `/checkin/{uuid}`.
+- The guest opens that link; `CheckinController` renders a form for **every**
+  occupant (`adults + children + babies`), demanding identity-document fields,
+  birth date/place, nationality and a privacy-policy tick. Submit sets
+  `checkin_success = true`, which the agent collects on its next tick.
+- `quiz:send` — past `checkout + offset`, per-unit quiz active → quiz email;
+  responses are stored and graphed on the dashboard.
+- `conn:check` — every 10 min; `last_connection` older than 15 minutes emails
+  the admins that the on-prem agent died. The heartbeat is the
+  `conn.registration` middleware bumping one row on *every* API call.
+
+### Deployment model
+
+`deploy-new-instance.sh` prompts for a client name, creates `../<client>`,
+copies the project, finds the first free block of **3 sequential ports from
+1100**, rewrites `compose.yaml` and `.env`, generates an `APP_KEY`, then calls
+the Cloudflare API to add three ingress rules to one shared tunnel and upsert
+three CNAMEs (`whotutils-`, `phpmyadmin-`, `mail-<client>`).
+`update-clients.sh` rsyncs template changes into live clients while preserving
+each one's `api/.env` and `compose.yaml`.
+
+Same shape as this repo's model — Cloudflare Tunnel, per-client instance,
+sequential port allocation — but executed as bash from a console, which is
+exactly what CLAUDE.md principle 2 exists to replace.
+
+### Findings that should shape the rebuild
+
+- **`GET /api/config` returns the Wintouch credentials in plaintext,
+  unauthenticated.** Public *by design*, because the on-prem agent has no
+  credentials of its own to authenticate with. The SQL dump had those as
+  `admin`/`123`. Any rebuild has to solve agent identity first — this is the
+  root design hole, not a bug.
+- **No authentication anywhere on the API.** `conn.registration` is a
+  heartbeat, not a guard. `GET /api/checkin-complete` is an unauthenticated
+  dump of guest PII (passport numbers, birth dates, addresses);
+  `POST /api/reservations` and `/api/guests` accept anonymous writes. The
+  `auth:sanctum` import sits on one unused `/user` route.
+- **The check-out/payment half is built but switched off** — `CheckOut.UpdateLocal()`
+  and `UpdateRemote()` are commented out of the tick loop, leaving ~485 lines of
+  `CheckOut.cs`, the night-audit run and the invoice/payment DAOs dormant.
+  `UpdateEntityInLines()` is an empty stub. If online payment is wanted, that is
+  where the previous attempt stopped.
+- Smaller: a public `/linkstorage` route calling `symlink()` with
+  `$_SERVER['DOCUMENT_ROOT']`; `CheckinController::edit` using `dd('nao existe')`
+  as an error page; `CheckInResultController::success` dereferencing null on an
+  unknown uuid; `Init()` being `async void` from a constructor, so a failed
+  config load leaves `_timer` null and `Start()` throws; `.Result` called inside
+  async methods throughout. PHP 7.4 and Laravel 9 are both end-of-life.
+- `setup/` and `trigenius/` already differ by **135 entries** — the template has
+  drifted from the instance, which is what `update-clients.sh` exists to fight
+  and an argument against the copy-the-folder model surviving the rebuild.
