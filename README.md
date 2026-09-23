@@ -210,42 +210,7 @@ it is done — not ticked off and left behind. Section references point at
 ### Backups
 
 
-### Multi-language UI (plan.md §597)
-
-- [ ] **Confirm the top-bar language selector on `beta`** — code built and
-      proven by `scripts/e2e-tests.sh` (login/nav/logout/2FA all pass with
-      the translated shell + Login page, plan.md §598), but not yet clicked
-      by a human on a live browser. On `beta`: switch the top-bar EN/PT
-      `<select>`, confirm the shell nav + Login page text swaps instantly
-      with no reload, and that a refresh keeps the chosen language
-      (`localStorage`). Delete this item once that passes.
-
 ### Exposure and platform
-
-- [ ] **Confirm `exposureConfigFiles` still works live** — the last
-      unproven caller of the collapsed `run()` helper (plan.md §586, tested
-      in §594). The other two shapes passed on `beta`: `backupTargetTest`
-      did a real WebDAV probe, `npmConfigWriter` ran a clean `nginx -t`, and
-      `removedAppCleanup` tore down a purpose-built orphan project and
-      deleted its directory. `applyExposureConfigFiles` is a no-op for every
-      app but Home Assistant, and only acts when its exposure row is
-      enabled — HA is installed but not running here, so the call returned
-      in 0 ms without ever reaching `runShell`. Start Home Assistant, confirm
-      it is exposed, then apply an exposure change and check its
-      `configuration.yaml` gets the marked proxy block. Delete this item once
-      that passes.
-- [ ] **Confirm the new `.env` `$`-escaping doesn't break a live save** —
-      every value written to an app `.env` is now escaped `$` → `$$`, because
-      Compose interpolates the values it reads out of a project `.env` and was
-      silently substituting a `$USER`/`${FOO}` inside a password (plan.md
-      §596; proven against real `docker compose config`, and the escaped form
-      proven to reach a container intact). It touches **both** writers, so it
-      affects every app's config save, not just the backup destination. On
-      `beta`: save a per-app config that has no `$` in it at all and confirm
-      the app restarts clean (nothing double-escaped), then set the WebDAV
-      backup destination's password to something containing `a$USER-b` and
-      confirm the destination card reports Kopia reconnected. Delete this item
-      once both pass.
 
 - [ ] **Vikunja mobile/desktop clients: confirm a real client against the
       Authelia bypass** — code built and proven at the HTTP level in plan.md

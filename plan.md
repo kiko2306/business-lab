@@ -28159,3 +28159,65 @@ This closes out the `README.md` multi-language rollout TODO list opened at
 one item that does remain (confirming the top-bar language selector by
 hand on `beta`, plan.md §598) still needs a human click-through and stays
 on the list until that happens.
+
+## 605. Confirmed live on `beta`: language selector, `exposureConfigFiles`, `.env` `$`-escaping
+
+User pulled `dev`→`beta` onto `tx-home-utils.com` via the dashboard's
+self-update panel and ran through three outstanding README checks.
+
+**Language selector (§598).** Switched the top-bar EN/PT `<select>`; shell
+nav + Login page text swapped instantly with no reload, and it held across
+a refresh (`localStorage`). Pass.
+
+**`exposureConfigFiles` / Home Assistant (§586, §594).** User started Home
+Assistant and enabled its exposure. HA's own log showed
+`PermissionError: Missing NET_ADMIN/NET_RAW capabilities for Bluetooth
+management` and a stream of `habluetooth` scanner errors — a red herring:
+HA's Bluetooth integration failing because the compose file grants no
+Bluetooth capabilities, unrelated to exposure config and pre-existing
+(container reported `Up ... (healthy)` throughout). Read
+`apps/home-assistant/data/configuration.yaml` directly on the host after
+the exposure change and found the marked block present and correct:
+
+```yaml
+# >>> homelab-management: reverse-proxy exposure >>>
+http:
+  use_x_forwarded_for: true
+  trusted_proxies:
+    - 127.0.0.1
+    - ::1
+    - 10.0.0.0/8
+    - 172.16.0.0/12
+    - 192.168.0.0/16
+    - fc00::/7
+  ip_ban_enabled: true
+  login_attempts_threshold: 5
+# <<< homelab-management: reverse-proxy exposure <<<
+```
+
+Confirms `applyExposureConfigFiles` reaches `runShell` and writes the block
+correctly once HA is actually running and exposed. Pass — this was the last
+unproven `run()` caller from §586.
+
+**`.env` `$`-escaping (§596).** Two halves. First, a config save with no `$`
+in it: regenerated Pi-hole's `PIHOLE_WEB_PASSWORD` from its Configuration
+panel — restarted clean, admin login worked with the shown password, nothing
+double-escaped. Second, a `$` in the value: set the WebDAV backup
+destination's password to a string containing `a$USER-b` and saved. The
+destination-restart modal's first poll or two showed a raw `fetch failed` —
+traced to `checkKopiaConnection()` (`backend/src/services/kopiaClient.ts:250`)
+surfacing Node's unfiltered `TypeError: fetch failed` when it polls before
+the just-recreated Kopia container is listening yet; expected, and exactly
+why `startDestinationRestartWait()` in `backups.component.ts` polls on an
+interval rather than checking once (`backend/src/routes/settings.ts:649-654`,
+plan.md §581). Confirmed via `docker logs`: backend logged `Applied the
+backup destination and recreated Kopia` with no error, and Kopia's own log
+showed `connected to existing repository` — and the modal itself settled on
+a reconnected/success state before exhausting its retry budget. Pass.
+
+All three close out their README items. Not fixed here, and not worth a
+README item: the raw `fetch failed` string reaching the user during the
+transient polling window is a minor UX rough edge (a friendlier
+"waiting for Kopia to restart…" would read better than a leaked Node error
+message), but it self-resolves within the existing retry budget and every
+case observed ended in the correct final state.
