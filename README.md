@@ -365,6 +365,15 @@ every API route, the SPA's landing page and the agent's config — removing that
 is real design work. Multiplicity *within* a client stays: hotel `units` and
 PBordo `stores` remain ordinary rows.
 
+Remaining decisions were taken in plan.md §629: Authelia is the admin identity,
+the agents read Wintouch over SQL but write through its own assemblies, only
+feedback responses and check-in history migrate (everything else re-syncs), all
+three half-built legacy features are in scope, each app owns its SMTP sender,
+guest text stays per-client editable, and **`tally` is built first** — it is
+smaller and proves agent enrolment and the tunnel WebSocket on a cheap surface.
+App code follows `apps/price-compare/app/`: one source dir per service with its
+own Dockerfile, tests and CI job.
+
 The `sample/` copies stay reference-only. Per-slice scope is still proposed
 before anything is built.
 
@@ -472,13 +481,22 @@ before anything is built.
       `tally` take the theme as-is; `check-in` and `pulse` keep per-client logo
       and colours on guest-facing pages, so the legacy `styles`/logo config
       survives in reduced form for those two only.
-- [ ] **Evaluate the dashboard's `TranslatePipe` against the legacy
-      translations subsystem** — the hotel app carried a `translations` table,
-      a country→language mapping and per-language quiz strings; the dashboard
-      has `i18n/en.ts` + `i18n/pt-pt.ts` and a pipe. Decide which wins before
-      rebuilding either. Guest-facing text is per-client editable in the legacy
-      app, which static i18n files do not cover — that gap is the deciding
-      factor.
+- [ ] **Build the guest-text template store** — plan.md §629. Admin UI uses
+      the dashboard's `TranslatePipe` with static `en`/`pt-pt` files; guest
+      emails and pages keep DB-backed per-client, per-language templates, so
+      the legacy `translations` table survives in reduced form covering only
+      guest-facing strings. Same admin/guest split as the styling decision.
+- [ ] **Give each app its own SMTP config and sender** — plan.md §629. `hotel`
+      and `tally` each hold their own SMTP settings and From address rather
+      than reusing the dashboard's shared mailbox, so guest mail arrives from
+      the hotel. Needs a small config panel per app. Note the dashboard's
+      `sendMail()` is plain-text only and these are HTML messages with an
+      embedded logo, so it is not reusable as-is either way.
+- [ ] **Map Authelia identity to per-unit / per-store access** — plan.md §629.
+      Authelia is the admin identity; the apps keep no accounts of their own
+      and trust its forwarded identity. The legacy `users`, `unit_user` and
+      `user.access[]` tables collapse into one mapping from that identity to
+      the units or stores it may see.
 - [ ] **Index the scheduler's hot queries when the schema is written** —
       plan.md §626. `checkin:send` and `quiz:send` run **every minute** and
       filter reservations on `checkin`+`checkin_sent`+`checkin_success`+`status`
@@ -492,12 +510,28 @@ before anything is built.
       the whole sales table crosses the wire on every refresh and is summed in
       the browser. Aggregate in SQL, bounded by date, and send totals rather
       than rows.
-- [ ] **Confirm whether the dormant check-out/payment half is in scope** —
-      plan.md §626. `CheckOut.cs`, the night-audit run, the invoice/payment
-      DAOs and `UpdateEntityInLines()`'s empty stub are built but switched off
-      in the legacy agent. They are ported only if online payment is actually
-      wanted. Decide explicitly — the default is to drop them, and that should
-      be a recorded decision rather than a silent omission.
+- [ ] **Build the birthday and promo email flows** — plan.md §629 puts them
+      in scope. They are effectively new features, not a port: the legacy has
+      only an enum, per-unit `birthday_is_active` / `promo_is_active` flags and
+      admin translation pages, while `SendEvents` has empty case bodies and is
+      not scheduled at all. There are four guest email flows in total, not the
+      two §620 described.
+- [ ] **Build the check-out / online payment flow** — plan.md §629 puts it in
+      scope, and it is the largest of the three. `CheckOut.cs`, the night-audit
+      run and the invoice/payment DAOs exist in the legacy agent but are
+      commented out of its tick loop. This is the path that most needs the
+      assemblies-for-writes decision, since it calls Wintouch's own account
+      transfer logic.
+- [ ] **Build the agents x86, not AnyCPU/x64** — plan.md §629. The Wintouch
+      assemblies at `C:\wintouch\sgw` are **PE32 (x86)**, so an agent that
+      loads them must target x86 or AnyCPU with `Prefer32Bit`. An x64 build
+      fails at load with a `BadImageFormatException` that does not obviously
+      point at bitness. Verify on the first agent build rather than trusting it.
+- [ ] **Plan the cutover re-send** — plan.md §629. Reservation uuids are not
+      preserved (only feedback responses and check-in history migrate; units,
+      guests and reservations re-sync from Wintouch), so check-in and feedback
+      links already in guests' inboxes stop working at cutover. Decide between
+      a quiet window and a one-off re-send, per client, before the first one.
 - [ ] **Register `apps/hotel/` and `apps/tally/`** — plan.md §628 settles the
       shape: two apps, not five. `apps/hotel/` is one compose project holding
       `hotel-admin` (`10600`), `check-in` (`10601`), `pulse` (`10602`),

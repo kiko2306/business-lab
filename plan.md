@@ -29672,3 +29672,92 @@ Two apps, not five, so `docs/ports.md`, `docs/app-credentials.md` and
 `docs/licences.md` each take two new rows — plus a licence row per base image
 in both compose files, checked against the resale model as the convention
 requires.
+
+## 629. Decisions taken before the migrations start
+
+Everything still open before build work. Taken in one pass so the schema and
+the first slice are not designed against guesses.
+
+### 1. Authelia is the admin identity
+
+`hotel-admin` and `tally` do not keep their own accounts. Authelia gates the
+hostname and the app trusts its forwarded identity; a local table holds only
+**per-unit / per-store access** keyed to that identity. One login, and the
+dashboard's existing user and app-access management covers the rest. The legacy
+`users`, `unit_user` and `user.access[]` tables collapse to that one mapping.
+
+### 2. Wintouch access: assemblies for writes, SQL for reads
+
+Read paths query SQL Server directly — fast, testable, and the approach `tally`
+already takes. The write paths go through Wintouch's own assemblies so the
+vendor's business rules and validation still run. That matters more now that
+payment is in scope (below): the check-out path calls Wintouch's account
+transfer logic, which is not something to reimplement as SQL.
+
+**Verified on this machine** — Wintouch is installed at `C:\wintouch\sgw`,
+reachable from WSL at `/mnt/c/wintouch/sgw`. `Wintouch.Core.dll`,
+`Wintouch.Hotel.Businesstier.dll`, `Wintouch.Manager.Businesstier.dll` and the
+rest of the set the legacy agents reference are all present, and
+`Wintouch.Accounting.Fiscal2026.dll` shows the install is current.
+
+**Constraint found while checking:** the assemblies are **PE32 (x86)**. Any
+agent that loads them must be built x86, or AnyCPU with `Prefer32Bit` — an
+x64 build will fail at load time with a `BadImageFormatException` that does not
+obviously point at bitness.
+
+### 3. Data migration: re-sync, migrate only what is ours
+
+Units, guests and reservations all originate in Wintouch, so the agent rebuilds
+them on its first run. Only genuinely-ours data migrates: feedback responses
+and check-in history. This is much the smaller migration.
+
+**Consequence to design for:** reservation uuids are *not* preserved, so
+check-in and feedback links already sitting in guests' inboxes stop working at
+cutover. A cutover therefore wants a quiet window, or a one-off re-send. Worth
+naming now rather than discovering it from a guest complaint.
+
+### 4. Scope: all three half-built features are in
+
+Birthday emails, promo emails **and** check-out/online payment are in scope.
+
+- Birthday and promo exist only as an enum, per-unit flags and admin
+  translation pages — `SendEvents` has empty case bodies and is not even
+  scheduled (§620 missed this; there are **four** guest email flows, not two).
+  They are effectively new features.
+- Check-out/payment is the largest: `CheckOut.cs`, the night-audit run and the
+  invoice/payment DAOs, all commented out of the legacy tick loop.
+
+This materially expands the hotel side beyond what §623 assumed.
+
+### 5. Email: each app owns its SMTP config and sender
+
+`hotel` and `tally` each hold their own SMTP settings and From address, rather
+than reusing the dashboard's shared mailbox. Guest mail then arrives from the
+hotel, which is consistent with §626's decision that guest-facing pages carry
+the client's branding and not ours. Costs a small config panel per app.
+
+Note the dashboard's `sendMail()` is plain-text only, and these are HTML
+messages with an embedded logo, so it would not have been reusable as-is
+regardless.
+
+### 6. Translations: static for admin, editable for guest text
+
+The admin UI uses the dashboard's `TranslatePipe` with static `en` / `pt-pt`
+files. Guest-facing emails and pages keep DB-backed per-client, per-language
+templates — the same admin/guest split as styling. The legacy `translations`
+table survives in reduced form, covering only guest-facing strings.
+
+### 7. Build order: `tally` first
+
+Much smaller and self-contained, and it exercises the riskiest new plumbing —
+agent enrolment and the outbound WebSocket through the Cloudflare Tunnel — on a
+surface small enough to change cheaply if the tunnel leg does not hold (§627).
+Hotel follows, and is now the larger of the two.
+
+### 8. Where app code lives
+
+Following `apps/price-compare/app/`, which already holds app-owned source in
+this repo: its own `package.json`, `Dockerfile` and `test/`, built by its own
+Dockerfile and covered by its own job in `.github/workflows/ci.yml`. The new
+apps take the same shape, one source directory per service under
+`apps/<name>/`, each with a CI job.
