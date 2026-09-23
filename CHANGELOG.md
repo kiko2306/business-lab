@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.132.5] — 2026-09-23
+
+### Multi-language UI
+
+- Translate the Users, Account and Audit logs pages to English/pt-PT
+
 ## [0.132.4] — 2026-09-23
 
 ### Multi-language UI

@@ -28001,3 +28001,37 @@ pre-existing bundle-size budget warning as every prior build) and
 `./scripts/check.sh frontend test` (89/89, `backups.component.spec.ts`
 untouched by this batch — it doesn't assert on visible strings). No e2e
 run — this batch doesn't touch auth/shell/nav/Users/2FA.
+
+## 601. Multi-language UI: `users` + `account` + `audit-logs` pages (§597 batch 4)
+
+Translated the three remaining admin-oriented pages: Users & roles (add-user
+form including the roles/features/app-access checkbox grids, the accounts
+table with its per-row role/feature editors, password reset, and access
+edit), Account security (TOTP status/enable/disable/enrolment/recovery-codes
+flow, including the downloaded recovery-codes `.txt` body) plus its embedded
+CrowdSec banned-IPs panel, and Audit logs (filters, table, pagination).
+`~140` new keys under `users.*`/`account.*`/`auditLogs.*`.
+
+One thing worth recording:
+- **`ROLE_LABELS`/`CAPABILITY_LABELS` deleted from `core/capabilities.ts`.**
+  These were plain `Record<Role/Capability, string>` maps of English display
+  text, used only by the Users page. Rather than keep them as a second,
+  now-redundant source of the same labels, the template resolves them
+  directly by key concatenation (`('users.role.' + role) | t`,
+  `('users.capability.' + cap) | t` — same pattern as §599's connection-status
+  badge and this batch's own `auditLogs.systemUser` fallback), and the two
+  constants — along with the now-unused `ROLE_LABELS`/`CAPABILITY_LABELS`
+  import — were removed rather than left dead. `capabilitiesFor()` and
+  `ALL_CAPABILITIES` (still used for iteration) are untouched.
+- Audit log row data — `item.action`, `item.resource`, and the `result`
+  badge's raw `success`/`failure` value — stayed English, per the §599
+  backend-sourced-text scope boundary: this is stored audit data, not UI
+  chrome.
+
+**Verification.** `./scripts/check.sh frontend build` (clean) and
+`./scripts/check.sh frontend test` (89/89 — no spec asserts on this batch's
+visible strings). This batch touches the Users page and the 2FA flow
+directly, so `scripts/e2e-tests.sh` was run too: 13 passed / 3 skipped
+(`live-stack.spec.ts`, which needs a real Docker socket, not the disposable
+compose stack) — `two-factor.spec.ts` (enrol, sign in with a code, disable)
+and both `users.spec.ts` cases passed against the translated pages.

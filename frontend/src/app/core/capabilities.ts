@@ -44,23 +44,6 @@ const ROLE_CAPABILITIES: Record<string, Capability[]> = {
   it_admin: ['apps:control', 'apps:config', 'backups:manage', 'settings:manage', 'audit:view'],
 };
 
-export const ROLE_LABELS: Record<Role, string> = {
-  webmaster: 'Webmaster',
-  admin: 'Admin',
-  user: 'SSO user',
-};
-
-export const CAPABILITY_LABELS: Record<Capability, string> = {
-  'apps:control': 'Start / stop apps',
-  'apps:config': 'App configuration',
-  'exposure:settings': 'Exposure settings',
-  'backups:manage': 'Backups',
-  'settings:manage': 'Settings',
-  'audit:view': 'Audit log',
-  'users:manage': 'Users & roles',
-  'system:update': 'Dashboard self-update',
-};
-
 /** Optimistic capability set from roles alone — see the file header. */
 export function capabilitiesFor(roles: readonly Role[] | undefined): Set<Capability> {
   const out = new Set<Capability>();

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.132.4** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.132.5** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -219,7 +219,6 @@ it is done — not ticked off and left behind. Section references point at
       `<select>`, confirm the shell nav + Login page text swaps instantly
       with no reload, and that a refresh keeps the chosen language
       (`localStorage`). Delete this item once that passes.
-- [ ] **Translate `users` + `account` + `audit-logs` pages**
 - [ ] **Translate `settings` + `self-update` + `recovery` + `setup` pages**
 - [ ] **Translate `social` + `utils` + `access-denied` + `set-password` pages**
 - [ ] **Translate shared `components/*`** (service-card, resource-strip,

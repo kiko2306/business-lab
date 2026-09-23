@@ -1,35 +1,34 @@
 <div class="container-fluid py-4">
   <div class="mb-4">
-    <h1 class="h3 mb-1">Users &amp; roles</h1>
+    <h1 class="h3 mb-1">{{ 'users.title' | t }}</h1>
     <p class="text-body-secondary mb-0">
-      Accounts and the named roles they hold. Roles decide what each person can
-      do in the dashboard.
+      {{ 'users.subtitle' | t }}
     </p>
   </div>
 
-  <app-panel key="users:add" title="Add user" subtitle="Username, email, roles, an admin's features, and the apps they can access — the new user gets an email to set their own password">
+  <app-panel key="users:add" [title]="'users.addPanel.title' | t" [subtitle]="'users.addPanel.subtitle' | t">
     <div class="alert alert-warning" *ngIf="mailConfigured === false">
-      New users are invited by email, so the shared mailbox has to be set up first.
-      <a routerLink="/settings">Configure it in Settings</a>.
+      {{ 'users.mailWarning.text' | t }}
+      <a routerLink="/settings">{{ 'users.mailWarning.link' | t }}</a>.
     </div>
     <form class="row g-3 align-items-start" [formGroup]="createForm" (ngSubmit)="createUser()">
       <div class="col-12 col-md-6">
-        <input class="form-control" placeholder="Username" formControlName="username" autocomplete="off" />
+        <input class="form-control" [placeholder]="'users.form.usernamePlaceholder' | t" formControlName="username" autocomplete="off" />
         <div class="form-text text-danger" *ngIf="createForm.controls.username.touched && createForm.controls.username.invalid">
-          Username must be 3-64 characters.
+          {{ 'users.form.usernameError' | t }}
         </div>
       </div>
       <div class="col-12 col-md-6">
-        <input class="form-control" type="email" placeholder="Email" formControlName="email" autocomplete="off" />
+        <input class="form-control" type="email" [placeholder]="'users.form.emailPlaceholder' | t" formControlName="email" autocomplete="off" />
         <div class="form-text" *ngIf="createForm.controls.email.valid || !createForm.controls.email.touched">
-          A set-password link is emailed here; the account stays inactive until it's used.
+          {{ 'users.form.emailHint' | t }}
         </div>
         <div class="form-text text-danger" *ngIf="createForm.controls.email.touched && createForm.controls.email.invalid">
-          Enter a valid email address.
+          {{ 'users.form.emailError' | t }}
         </div>
       </div>
       <div class="col-12">
-        <span class="form-label small fw-semibold d-block mb-1">Roles</span>
+        <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.rolesLabel' | t }}</span>
         <div class="d-flex flex-wrap gap-3">
           <div class="form-check" *ngFor="let role of allRoles">
             <input
@@ -39,16 +38,15 @@
               [(ngModel)]="newRoles[role]"
               [ngModelOptions]="{ standalone: true }"
             />
-            <label class="form-check-label" [for]="'new-role-' + role">{{ roleLabel[role] }}</label>
+            <label class="form-check-label" [for]="'new-role-' + role">{{ ('users.role.' + role) | t }}</label>
           </div>
         </div>
-        <div class="form-text text-danger" *ngIf="!newRolesValid()">Pick at least one role.</div>
+        <div class="form-text text-danger" *ngIf="!newRolesValid()">{{ 'users.form.rolesError' | t }}</div>
       </div>
       <div class="col-12" *ngIf="newCapsShown()">
-        <span class="form-label small fw-semibold d-block mb-1">Features</span>
+        <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
         <p class="form-text mt-0 mb-2">
-          Which parts of the dashboard this admin can use. All on by default; a
-          webmaster always has every feature.
+          {{ 'users.form.featuresHint' | t }}
         </p>
         <div class="d-flex flex-wrap gap-3">
           <div class="form-check" *ngFor="let cap of allCapabilities">
@@ -59,35 +57,34 @@
               [(ngModel)]="newCaps[cap]"
               [ngModelOptions]="{ standalone: true }"
             />
-            <label class="form-check-label" [for]="'new-cap-' + cap">{{ capabilityLabel[cap] }}</label>
+            <label class="form-check-label" [for]="'new-cap-' + cap">{{ ('users.capability.' + cap) | t }}</label>
           </div>
         </div>
-        <div class="form-text text-danger" *ngIf="!newCapsValid()">An admin needs at least one feature.</div>
+        <div class="form-text text-danger" *ngIf="!newCapsValid()">{{ 'users.form.featuresError' | t }}</div>
       </div>
       <div class="col-12" *ngIf="appOptions.length">
         <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1">
           <span class="form-label small fw-semibold mb-0">
-            App access
-            <span class="text-body-secondary fw-normal">· {{ pickedAppCount(newAppAccess) }} of {{ appOptions.length }} selected</span>
+            {{ 'users.form.appAccessLabel' | t }}
+            <span class="text-body-secondary fw-normal">· {{ 'users.appAccess.count' | t:{ picked: pickedAppCount(newAppAccess), total: appOptions.length } }}</span>
           </span>
           <div class="d-flex gap-2">
             <input
               type="search"
               class="form-control form-control-sm"
               style="max-width: 200px"
-              placeholder="Filter apps…"
+              [placeholder]="'users.form.appFilterPlaceholder' | t"
               [(ngModel)]="newAppFilter"
               [ngModelOptions]="{ standalone: true }"
             />
             <div class="btn-group btn-group-sm">
-              <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, true)">Select all</button>
-              <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, false)">Clear</button>
+              <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, true)">{{ 'users.selectAllButton' | t }}</button>
+              <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(newAppAccess, false)">{{ 'users.clearButton' | t }}</button>
             </div>
           </div>
         </div>
         <p class="form-text mt-0 mb-2">
-          Which exposed apps this account may reach through single sign-on.
-          None by default.
+          {{ 'users.form.appAccessHint' | t }}
         </p>
         <div class="app-access-grid">
           <div class="form-check app-access-chip" *ngFor="let option of filterAppOptions(newAppFilter)">
@@ -104,45 +101,45 @@
               <span class="badge text-bg-secondary ms-1" *ngFor="let group of option.requiredGroups">{{ group }}</span>
             </label>
           </div>
-          <p class="form-text mb-0" *ngIf="newAppFilter && !filterAppOptions(newAppFilter).length">No apps match "{{ newAppFilter }}".</p>
+          <p class="form-text mb-0" *ngIf="newAppFilter && !filterAppOptions(newAppFilter).length">{{ 'users.noAppsMatch' | t:{ query: newAppFilter } }}</p>
         </div>
       </div>
       <div class="col-12 col-md-4 d-grid">
         <button class="btn btn-primary" type="submit" [disabled]="creating || mailConfigured === false">
-          {{ creating ? 'Sending invite…' : 'Create user &amp; send invite' }}
+          {{ (creating ? 'users.form.submitting' : 'users.form.submitButton') | t }}
         </button>
       </div>
     </form>
   </app-panel>
 
-  <app-panel key="users:list" title="Accounts" subtitle="Existing users — their email, roles, an admin's features, and the apps they can access">
+  <app-panel key="users:list" [title]="'users.list.title' | t" [subtitle]="'users.list.subtitle' | t">
     <div class="table-responsive table-stack-wrap">
       <table class="table table-sm table-stack align-middle mb-0">
         <thead>
           <tr>
-            <th>Username</th>
-            <th>Email</th>
-            <th>Roles</th>
-            <th>Created</th>
-            <th class="text-end">Actions</th>
+            <th>{{ 'users.table.username' | t }}</th>
+            <th>{{ 'users.table.email' | t }}</th>
+            <th>{{ 'users.table.roles' | t }}</th>
+            <th>{{ 'users.table.created' | t }}</th>
+            <th class="text-end">{{ 'users.table.actions' | t }}</th>
           </tr>
         </thead>
         <tbody>
           <ng-container *ngFor="let user of items">
             <tr>
-              <td data-label="Username">
+              <td [attr.data-label]="'users.table.username' | t">
                 {{ user.username }}
-                <span class="badge text-bg-secondary ms-1" *ngIf="user.id === currentUserId">you</span>
-                <span class="badge text-bg-warning ms-1" *ngIf="user.active === false">Pending invite</span>
+                <span class="badge text-bg-secondary ms-1" *ngIf="user.id === currentUserId">{{ 'users.youBadge' | t }}</span>
+                <span class="badge text-bg-warning ms-1" *ngIf="user.active === false">{{ 'users.pendingInviteBadge' | t }}</span>
               </td>
-              <td data-label="Email">
+              <td [attr.data-label]="'users.table.email' | t">
                 <span *ngIf="user.email">{{ user.email }}</span>
                 <span class="text-body-secondary" *ngIf="!user.email">—</span>
                 <div class="form-text mt-0" *ngIf="user.appAccess?.length">
-                  {{ user.appAccess?.length }} app{{ user.appAccess?.length === 1 ? '' : 's' }}
+                  {{ (user.appAccess?.length === 1 ? 'users.appCount.one' : 'users.appCount.other') | t:{ count: user.appAccess?.length ?? 0 } }}
                 </div>
               </td>
-              <td data-label="Roles">
+              <td [attr.data-label]="'users.table.roles' | t">
                 <div class="d-flex flex-wrap gap-2 align-items-center">
                   <div class="form-check form-check-inline m-0" *ngFor="let role of allRoles">
                     <input
@@ -153,7 +150,7 @@
                       [ngModelOptions]="{ standalone: true }"
                       [disabled]="user.id === currentUserId"
                     />
-                    <label class="form-check-label small" [for]="'role-' + user.id + '-' + role">{{ roleLabel[role] }}</label>
+                    <label class="form-check-label small" [for]="'role-' + user.id + '-' + role">{{ ('users.role.' + role) | t }}</label>
                   </div>
                   <button
                     class="btn btn-sm btn-primary"
@@ -161,13 +158,13 @@
                     [disabled]="savingRolesId === user.id"
                     (click)="saveRoles(user)"
                   >
-                    {{ savingRolesId === user.id ? 'Saving…' : 'Save roles' }}
+                    {{ (savingRolesId === user.id ? 'common.saving' : 'users.saveRolesButton') | t }}
                   </button>
                 </div>
-                <div class="form-text" *ngIf="user.id === currentUserId">You can't change your own roles.</div>
+                <div class="form-text" *ngIf="user.id === currentUserId">{{ 'users.cannotChangeOwnRoles' | t }}</div>
 
                 <div class="mt-2" *ngIf="showFeatures(user)">
-                  <span class="form-label small fw-semibold d-block mb-1">Features</span>
+                  <span class="form-label small fw-semibold d-block mb-1">{{ 'users.form.featuresLabel' | t }}</span>
                   <div class="d-flex flex-wrap gap-2 align-items-center">
                     <div class="form-check form-check-inline m-0" *ngFor="let cap of allCapabilities">
                       <input
@@ -178,7 +175,7 @@
                         [ngModelOptions]="{ standalone: true }"
                         [disabled]="user.id === currentUserId"
                       />
-                      <label class="form-check-label small" [for]="'cap-' + user.id + '-' + cap">{{ capabilityLabel[cap] }}</label>
+                      <label class="form-check-label small" [for]="'cap-' + user.id + '-' + cap">{{ ('users.capability.' + cap) | t }}</label>
                     </div>
                     <button
                       class="btn btn-sm btn-primary"
@@ -186,13 +183,13 @@
                       [disabled]="savingCapsId === user.id"
                       (click)="saveCaps(user)"
                     >
-                      {{ savingCapsId === user.id ? 'Saving…' : 'Save features' }}
+                      {{ (savingCapsId === user.id ? 'common.saving' : 'users.saveFeaturesButton') | t }}
                     </button>
                   </div>
                 </div>
               </td>
-              <td data-label="Created">{{ user.created_at | date:'dd/MM/yyyy' }}</td>
-              <td data-label="Actions" class="text-end">
+              <td [attr.data-label]="'users.table.created' | t">{{ user.created_at | date:'dd/MM/yyyy':undefined:translate.locale() }}</td>
+              <td [attr.data-label]="'users.table.actions' | t" class="text-end">
                 <div class="btn-group btn-group-sm">
                   <button
                     class="btn btn-outline-secondary"
@@ -200,17 +197,17 @@
                     [disabled]="resendingId === user.id"
                     (click)="resendInvite(user)"
                   >
-                    {{ resendingId === user.id ? 'Sending…' : 'Resend invite' }}
+                    {{ (resendingId === user.id ? 'users.resendInvite.sending' : 'users.resendInviteButton') | t }}
                   </button>
-                  <button class="btn btn-outline-secondary" (click)="startAccessEdit(user)">Edit access</button>
-                  <button class="btn btn-outline-secondary" *ngIf="user.active !== false" (click)="startPasswordReset(user.id)">Reset password</button>
+                  <button class="btn btn-outline-secondary" (click)="startAccessEdit(user)">{{ 'users.editAccessButton' | t }}</button>
+                  <button class="btn btn-outline-secondary" *ngIf="user.active !== false" (click)="startPasswordReset(user.id)">{{ 'users.resetPasswordButton' | t }}</button>
                   <button
                     class="btn btn-outline-danger"
                     (click)="deleteUser(user)"
                     [disabled]="user.id === currentUserId"
-                    title="You cannot delete your own account while signed in as it."
+                    [attr.title]="'users.deleteTitleAttr' | t"
                   >
-                    Delete
+                    {{ 'users.deleteButton' | t }}
                   </button>
                 </div>
               </td>
@@ -222,26 +219,26 @@
                     class="form-control form-control-sm"
                     type="password"
                     style="max-width: 240px"
-                    placeholder="New password"
+                    [placeholder]="'users.newPasswordPlaceholder' | t"
                     [(ngModel)]="resetPasswordValue"
                     [ngModelOptions]="{ standalone: true }"
                     autocomplete="new-password"
                   />
-                  <button class="btn btn-sm btn-primary" [disabled]="resetting" (click)="submitPasswordReset()">Save</button>
-                  <button class="btn btn-sm btn-outline-secondary" (click)="cancelPasswordReset()">Cancel</button>
+                  <button class="btn btn-sm btn-primary" [disabled]="resetting" (click)="submitPasswordReset()">{{ 'users.saveButton' | t }}</button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="cancelPasswordReset()">{{ 'common.cancel' | t }}</button>
                 </div>
               </td>
             </tr>
             <tr *ngIf="accessEditId === user.id">
               <td colspan="5">
                 <div class="mb-2">
-                  <label class="form-label small fw-semibold mb-1" [for]="'access-email-' + user.id">Email</label>
+                  <label class="form-label small fw-semibold mb-1" [for]="'access-email-' + user.id">{{ 'users.accessEmailLabel' | t }}</label>
                   <input
                     class="form-control form-control-sm"
                     type="email"
                     style="max-width: 320px"
                     [id]="'access-email-' + user.id"
-                    placeholder="name@example.com"
+                    [placeholder]="'users.accessEmailPlaceholder' | t"
                     [(ngModel)]="accessEmail"
                     [ngModelOptions]="{ standalone: true }"
                     autocomplete="off"
@@ -249,21 +246,21 @@
                 </div>
                 <div class="d-flex flex-wrap align-items-center justify-content-between gap-2 mb-1" *ngIf="appOptions.length">
                   <span class="form-label small fw-semibold mb-0">
-                    App access
-                    <span class="text-body-secondary fw-normal">· {{ pickedAppCount(accessApps) }} of {{ appOptions.length }} selected</span>
+                    {{ 'users.form.appAccessLabel' | t }}
+                    <span class="text-body-secondary fw-normal">· {{ 'users.appAccess.count' | t:{ picked: pickedAppCount(accessApps), total: appOptions.length } }}</span>
                   </span>
                   <div class="d-flex gap-2">
                     <input
                       type="search"
                       class="form-control form-control-sm"
                       style="max-width: 200px"
-                      placeholder="Filter apps…"
+                      [placeholder]="'users.form.appFilterPlaceholder' | t"
                       [(ngModel)]="accessAppFilter"
                       [ngModelOptions]="{ standalone: true }"
                     />
                     <div class="btn-group btn-group-sm">
-                      <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, true)">Select all</button>
-                      <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, false)">Clear</button>
+                      <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, true)">{{ 'users.selectAllButton' | t }}</button>
+                      <button type="button" class="btn btn-outline-secondary" (click)="setAllApps(accessApps, false)">{{ 'users.clearButton' | t }}</button>
                     </div>
                   </div>
                 </div>
@@ -282,22 +279,22 @@
                       <span class="badge text-bg-secondary ms-1" *ngFor="let group of option.requiredGroups">{{ group }}</span>
                     </label>
                   </div>
-                  <p class="form-text mb-0" *ngIf="accessAppFilter && !filterAppOptions(accessAppFilter).length">No apps match "{{ accessAppFilter }}".</p>
+                  <p class="form-text mb-0" *ngIf="accessAppFilter && !filterAppOptions(accessAppFilter).length">{{ 'users.noAppsMatch' | t:{ query: accessAppFilter } }}</p>
                 </div>
                 <ng-template #noAppOptions>
-                  <p class="form-text mt-0">No apps are exposed behind Authelia yet.</p>
+                  <p class="form-text mt-0">{{ 'users.noAppsExposed' | t }}</p>
                 </ng-template>
                 <div class="d-flex gap-2 mt-2">
                   <button class="btn btn-sm btn-primary" [disabled]="savingAccess" (click)="submitAccessEdit()">
-                    {{ savingAccess ? 'Saving…' : 'Save access' }}
+                    {{ (savingAccess ? 'common.saving' : 'users.saveAccessButton') | t }}
                   </button>
-                  <button class="btn btn-sm btn-outline-secondary" (click)="cancelAccessEdit()">Cancel</button>
+                  <button class="btn btn-sm btn-outline-secondary" (click)="cancelAccessEdit()">{{ 'common.cancel' | t }}</button>
                 </div>
               </td>
             </tr>
           </ng-container>
           <tr *ngIf="!items.length && !loading">
-            <td colspan="5" class="text-center text-body-secondary py-4">No users found.</td>
+            <td colspan="5" class="text-center text-body-secondary py-4">{{ 'users.noUsersFound' | t }}</td>
           </tr>
         </tbody>
       </table>

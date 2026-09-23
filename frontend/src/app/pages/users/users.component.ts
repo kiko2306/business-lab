@@ -6,12 +6,14 @@ import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
 import { AdminUser, AppAccessOption, Role } from '../../core/models';
-import { ALL_CAPABILITIES, Capability, CAPABILITY_LABELS, ROLE_LABELS } from '../../core/capabilities';
+import { ALL_CAPABILITIES, Capability } from '../../core/capabilities';
 import { OperationsService } from '../../core/operations.service';
 import { SettingsService } from '../../core/settings.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 const ALL_ROLES: Role[] = ['webmaster', 'admin', 'user'];
 
@@ -32,7 +34,7 @@ function capsRecord(caps: readonly string[] | undefined): Record<Capability, boo
 @Component({
   selector: 'app-users',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, RouterLink, PanelComponent, TranslatePipe],
   templateUrl: './users.component.html',
   styleUrl: './users.component.css'
 })
@@ -43,11 +45,10 @@ export class UsersComponent implements OnInit {
   private readonly auth = inject(AuthService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
+  protected readonly translate = inject(TranslateService);
 
   protected readonly allRoles = ALL_ROLES;
-  protected readonly roleLabel = ROLE_LABELS;
   protected readonly allCapabilities = ALL_CAPABILITIES;
-  protected readonly capabilityLabel = CAPABILITY_LABELS;
 
   protected readonly createForm = this.formBuilder.nonNullable.group({
     username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
@@ -137,7 +138,7 @@ export class UsersComponent implements OnInit {
       },
       error: (error) => {
         this.loading = false;
-        this.toast.error(extractErrorMessage(error, 'Unable to load users.'));
+        this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.load')));
       },
     });
   }
@@ -216,9 +217,9 @@ export class UsersComponent implements OnInit {
     if (this.createForm.invalid || !this.newRolesValid() || !this.newCapsValid()) {
       this.createForm.markAllAsTouched();
       if (!this.newRolesValid()) {
-        this.toast.error('Pick at least one role for the new account.');
+        this.toast.error(this.translate.t('users.validation.pickRole'));
       } else if (!this.newCapsValid()) {
-        this.toast.error('An admin needs at least one feature.');
+        this.toast.error(this.translate.t('users.validation.needFeature'));
       }
       return;
     }
@@ -240,7 +241,7 @@ export class UsersComponent implements OnInit {
           if (response.warning) {
             this.toast.error(response.warning);
           } else {
-            this.toast.success(`Invite sent to ${email.trim()}.`);
+            this.toast.success(this.translate.t('users.toast.inviteSent', { email: email.trim() }));
           }
           this.createForm.reset();
           this.newRoles = { webmaster: false, admin: true, user: false };
@@ -249,7 +250,7 @@ export class UsersComponent implements OnInit {
           this.newAppFilter = '';
           this.load();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to create user.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.create'))),
       });
   }
 
@@ -262,8 +263,8 @@ export class UsersComponent implements OnInit {
         next: (response) =>
           response.warning
             ? this.toast.error(response.warning)
-            : this.toast.success(`Invite re-sent to ${user.username}.`),
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to resend the invite.')),
+            : this.toast.success(this.translate.t('users.toast.inviteResent', { username: user.username })),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.resendInvite'))),
       });
   }
 
@@ -295,7 +296,7 @@ export class UsersComponent implements OnInit {
       return;
     }
     if (!this.emailLooksValid(this.accessEmail)) {
-      this.toast.error('Enter a valid email address.');
+      this.toast.error(this.translate.t('users.validation.validEmail'));
       return;
     }
     this.savingAccess = true;
@@ -304,18 +305,18 @@ export class UsersComponent implements OnInit {
       .pipe(finalize(() => (this.savingAccess = false)))
       .subscribe({
         next: () => {
-          this.toast.success('Access updated.');
+          this.toast.success(this.translate.t('users.toast.accessUpdated'));
           this.cancelAccessEdit();
           this.load();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to update access.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.updateAccess'))),
       });
   }
 
   saveRoles(user: AdminUser): void {
     const roles = this.selected(this.roleDraft[user.id]);
     if (roles.length === 0) {
-      this.toast.error('An account must keep at least one role.');
+      this.toast.error(this.translate.t('users.validation.keepRole'));
       return;
     }
     this.savingRolesId = user.id;
@@ -324,17 +325,17 @@ export class UsersComponent implements OnInit {
       .pipe(finalize(() => (this.savingRolesId = null)))
       .subscribe({
         next: () => {
-          this.toast.success(`Roles updated for ${user.username}.`);
+          this.toast.success(this.translate.t('users.toast.rolesUpdated', { username: user.username }));
           this.load();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to update roles.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.updateRoles'))),
       });
   }
 
   saveCaps(user: AdminUser): void {
     const caps = this.selectedCaps(this.capDraft[user.id] ?? {});
     if (caps.length === 0) {
-      this.toast.error('An admin must keep at least one feature.');
+      this.toast.error(this.translate.t('users.validation.keepFeature'));
       return;
     }
     this.savingCapsId = user.id;
@@ -343,10 +344,10 @@ export class UsersComponent implements OnInit {
       .pipe(finalize(() => (this.savingCapsId = null)))
       .subscribe({
         next: () => {
-          this.toast.success(`Features updated for ${user.username}.`);
+          this.toast.success(this.translate.t('users.toast.featuresUpdated', { username: user.username }));
           this.load();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to update features.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.updateFeatures'))),
       });
   }
 
@@ -362,7 +363,7 @@ export class UsersComponent implements OnInit {
 
   submitPasswordReset(): void {
     if (this.resetPasswordId === null || this.resetPasswordValue.length < 8) {
-      this.toast.error('Password must be at least 8 characters.');
+      this.toast.error(this.translate.t('users.validation.passwordLength'));
       return;
     }
 
@@ -372,19 +373,19 @@ export class UsersComponent implements OnInit {
       .pipe(finalize(() => (this.resetting = false)))
       .subscribe({
         next: () => {
-          this.toast.success('Password updated successfully.');
+          this.toast.success(this.translate.t('users.toast.passwordUpdated'));
           this.cancelPasswordReset();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to update password.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.updatePassword'))),
       });
   }
 
   deleteUser(user: AdminUser): void {
     void this.confirm
       .ask({
-        title: 'Delete user',
-        message: `Delete user "${user.username}"?\nThis cannot be undone.`,
-        confirmText: 'Delete',
+        title: this.translate.t('users.confirmDelete.title'),
+        message: this.translate.t('users.confirmDelete.message', { username: user.username }),
+        confirmText: this.translate.t('users.confirmDelete.confirmText'),
         danger: true,
       })
       .then((confirmed) => {
@@ -393,10 +394,10 @@ export class UsersComponent implements OnInit {
         }
         this.operations.deleteUser(user.id).subscribe({
           next: () => {
-            this.toast.success('User deleted successfully.');
+            this.toast.success(this.translate.t('users.toast.userDeleted'));
             this.load();
           },
-          error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to delete user.')),
+          error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('users.errors.deleteUser'))),
         });
       });
   }

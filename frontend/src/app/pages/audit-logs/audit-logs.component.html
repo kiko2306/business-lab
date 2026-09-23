@@ -1,19 +1,19 @@
 <div class="container-fluid py-4">
   <div class="mb-4">
-    <h1 class="h3 mb-1">Audit logs</h1>
-    <p class="text-body-secondary mb-0">Track user actions and system operations.</p>
+    <h1 class="h3 mb-1">{{ 'auditLogs.title' | t }}</h1>
+    <p class="text-body-secondary mb-0">{{ 'auditLogs.subtitle' | t }}</p>
   </div>
 
-  <app-panel key="audit:filters" title="Filters" subtitle="Narrow the log by action, result, or date range">
+  <app-panel key="audit:filters" [title]="'auditLogs.filters.title' | t" [subtitle]="'auditLogs.filters.subtitle' | t">
     <div class="row g-2">
       <div class="col-12 col-md-3">
-        <input class="form-control" placeholder="Action" [(ngModel)]="action" />
+        <input class="form-control" [placeholder]="'auditLogs.filters.actionPlaceholder' | t" [(ngModel)]="action" />
       </div>
       <div class="col-12 col-md-2">
         <select class="form-select" [(ngModel)]="result">
-          <option value="">All results</option>
-          <option value="success">Success</option>
-          <option value="failure">Failure</option>
+          <option value="">{{ 'auditLogs.filters.allResults' | t }}</option>
+          <option value="success">{{ 'auditLogs.filters.success' | t }}</option>
+          <option value="failure">{{ 'auditLogs.filters.failure' | t }}</option>
         </select>
       </div>
       <div class="col-12 col-md-3">
@@ -23,51 +23,51 @@
         <input class="form-control" type="datetime-local" [(ngModel)]="endDate" />
       </div>
       <div class="col-12 col-md-1 d-grid">
-        <button class="btn btn-primary" (click)="load(1)">Go</button>
+        <button class="btn btn-primary" (click)="load(1)">{{ 'auditLogs.filters.goButton' | t }}</button>
       </div>
     </div>
   </app-panel>
 
-  <app-panel key="audit:log" title="Log entries" subtitle="Most recent first">
-    <button panel-actions class="btn btn-outline-primary btn-sm" (click)="downloadCsv()">Export CSV</button>
+  <app-panel key="audit:log" [title]="'auditLogs.log.title' | t" [subtitle]="'auditLogs.log.subtitle' | t">
+    <button panel-actions class="btn btn-outline-primary btn-sm" (click)="downloadCsv()">{{ 'auditLogs.log.exportCsv' | t }}</button>
 
     <div class="table-responsive table-stack-wrap">
       <table class="table table-sm table-stack align-middle mb-0">
         <thead>
           <tr>
-            <th>Time</th>
-            <th>User</th>
-            <th>IP</th>
-            <th>Action</th>
-            <th>Resource</th>
-            <th>Result</th>
+            <th>{{ 'auditLogs.table.time' | t }}</th>
+            <th>{{ 'auditLogs.table.user' | t }}</th>
+            <th>{{ 'auditLogs.table.ip' | t }}</th>
+            <th>{{ 'auditLogs.table.action' | t }}</th>
+            <th>{{ 'auditLogs.table.resource' | t }}</th>
+            <th>{{ 'auditLogs.table.result' | t }}</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let item of items">
-            <td data-label="Time">{{ item.created_at | date:'dd/MM/yyyy, HH:mm' }}</td>
-            <td data-label="User">{{ item.username || 'system' }}</td>
-            <td data-label="IP">{{ item.ip || '—' }}</td>
-            <td data-label="Action">{{ item.action }}</td>
-            <td data-label="Resource">{{ item.resource || '—' }}</td>
-            <td data-label="Result">
+            <td [attr.data-label]="'auditLogs.table.time' | t">{{ item.created_at | date:'dd/MM/yyyy, HH:mm':undefined:translate.locale() }}</td>
+            <td [attr.data-label]="'auditLogs.table.user' | t">{{ item.username || ('auditLogs.systemUser' | t) }}</td>
+            <td [attr.data-label]="'auditLogs.table.ip' | t">{{ item.ip || '—' }}</td>
+            <td [attr.data-label]="'auditLogs.table.action' | t">{{ item.action }}</td>
+            <td [attr.data-label]="'auditLogs.table.resource' | t">{{ item.resource || '—' }}</td>
+            <td [attr.data-label]="'auditLogs.table.result' | t">
               <span class="badge" [class.text-bg-success]="item.result === 'success'" [class.text-bg-danger]="item.result !== 'success'">
                 {{ item.result }}
               </span>
             </td>
           </tr>
           <tr *ngIf="!items.length && !loading">
-            <td colspan="6" class="text-center text-body-secondary py-4">No audit logs found.</td>
+            <td colspan="6" class="text-center text-body-secondary py-4">{{ 'auditLogs.empty' | t }}</td>
           </tr>
         </tbody>
       </table>
     </div>
 
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mt-3">
-      <div class="small text-body-secondary">Showing {{ items.length }} of {{ total }}</div>
+      <div class="small text-body-secondary">{{ 'auditLogs.showing' | t:{ count: items.length, total: total } }}</div>
       <div class="btn-group">
-        <button class="btn btn-sm btn-outline-secondary" [disabled]="page <= 1" (click)="load(page - 1)">Previous</button>
-        <button class="btn btn-sm btn-outline-secondary" [disabled]="(page * pageSize) >= total" (click)="load(page + 1)">Next</button>
+        <button class="btn btn-sm btn-outline-secondary" [disabled]="page <= 1" (click)="load(page - 1)">{{ 'auditLogs.previous' | t }}</button>
+        <button class="btn btn-sm btn-outline-secondary" [disabled]="(page * pageSize) >= total" (click)="load(page + 1)">{{ 'auditLogs.next' | t }}</button>
       </div>
     </div>
   </app-panel>

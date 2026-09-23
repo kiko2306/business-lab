@@ -10,6 +10,8 @@ import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { AuthService } from '../../core/auth.service';
 import { CrowdsecBansComponent } from './crowdsec-bans.component';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 // Which panel is on screen. 'enrolling' and 'recovery-codes' are transient and
 // only reachable by walking through the flow — never on a fresh load.
@@ -18,7 +20,7 @@ type View = 'loading' | 'status' | 'enrolling' | 'recovery-codes';
 @Component({
   selector: 'app-account',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, PanelComponent, CrowdsecBansComponent],
+  imports: [CommonModule, ReactiveFormsModule, PanelComponent, CrowdsecBansComponent, TranslatePipe],
   templateUrl: './account.component.html',
   styleUrl: './account.component.css',
 })
@@ -27,6 +29,7 @@ export class AccountComponent implements OnInit {
   private readonly toast = inject(ToastService);
   private readonly formBuilder = inject(FormBuilder);
   private readonly sanitizer = inject(DomSanitizer);
+  protected readonly translate = inject(TranslateService);
   // The ban list's API sits behind `settings:manage` (§546).
   protected readonly canManageBans = inject(AuthService).hasCapability('settings:manage');
 
@@ -69,7 +72,7 @@ export class AccountComponent implements OnInit {
         this.view = 'status';
       },
       error: (error) => {
-        this.errorMessage = extractErrorMessage(error, 'Unable to load two-factor status.');
+        this.errorMessage = extractErrorMessage(error, this.translate.t('account.errors.loadStatus'));
         this.view = 'status';
       },
     });
@@ -91,7 +94,7 @@ export class AccountComponent implements OnInit {
           this.activateForm.reset();
           this.view = 'enrolling';
         },
-        error: (error) => (this.errorMessage = extractErrorMessage(error, 'Unable to start enrolment.')),
+        error: (error) => (this.errorMessage = extractErrorMessage(error, this.translate.t('account.errors.startEnrolment'))),
       });
   }
 
@@ -122,9 +125,9 @@ export class AccountComponent implements OnInit {
           this.qrSvg = null;
           this.secret = '';
           this.view = 'recovery-codes';
-          this.toast.success('Two-factor authentication is on.');
+          this.toast.success(this.translate.t('account.toast.enabled'));
         },
-        error: (error) => (this.errorMessage = extractErrorMessage(error, 'That code was not accepted.')),
+        error: (error) => (this.errorMessage = extractErrorMessage(error, this.translate.t('account.errors.codeRejected'))),
       });
   }
 
@@ -135,8 +138,8 @@ export class AccountComponent implements OnInit {
 
   downloadRecoveryCodes(): void {
     const body = [
-      'Business Lab — two-factor recovery codes',
-      'Each code works once. Keep them somewhere safe and offline.',
+      this.translate.t('account.recoveryFile.header'),
+      this.translate.t('account.recoveryFile.instructions'),
       '',
       ...this.recoveryCodes,
       '',
@@ -151,8 +154,8 @@ export class AccountComponent implements OnInit {
 
   copyRecoveryCodes(): void {
     void navigator.clipboard?.writeText(this.recoveryCodes.join('\n')).then(
-      () => this.toast.success('Recovery codes copied.'),
-      () => this.toast.error('Could not copy to the clipboard.'),
+      () => this.toast.success(this.translate.t('account.toast.recoveryCopied')),
+      () => this.toast.error(this.translate.t('account.toast.copyFailed')),
     );
   }
 
@@ -160,7 +163,7 @@ export class AccountComponent implements OnInit {
     const { code, password } = this.disableForm.getRawValue();
     const trimmedCode = code.trim();
     if (!trimmedCode && !password) {
-      this.errorMessage = 'Enter a current 6-digit code or your account password.';
+      this.errorMessage = this.translate.t('account.errors.enterCodeOrPassword');
       return;
     }
 
@@ -173,11 +176,11 @@ export class AccountComponent implements OnInit {
       .subscribe({
         next: () => {
           this.disableForm.reset();
-          this.toast.success('Two-factor authentication is off.');
+          this.toast.success(this.translate.t('account.toast.disabled'));
           this.loadStatus();
         },
         error: (error) =>
-          (this.errorMessage = extractErrorMessage(error, 'Unable to disable two-factor authentication.')),
+          (this.errorMessage = extractErrorMessage(error, this.translate.t('account.errors.disable'))),
       });
   }
 }

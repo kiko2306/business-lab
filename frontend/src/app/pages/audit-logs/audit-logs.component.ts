@@ -6,17 +6,20 @@ import { ToastService } from '../../core/toast.service';
 import { AuditLogEntry } from '../../core/models';
 import { extractErrorMessage } from '../../core/api';
 import { PanelComponent } from '../../components/panel/panel.component';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 @Component({
   selector: 'app-audit-logs',
   standalone: true,
-  imports: [CommonModule, FormsModule, PanelComponent],
+  imports: [CommonModule, FormsModule, PanelComponent, TranslatePipe],
   templateUrl: './audit-logs.component.html',
   styleUrl: './audit-logs.component.css'
 })
 export class AuditLogsComponent implements OnInit {
   private readonly operations = inject(OperationsService);
   private readonly toast = inject(ToastService);
+  protected readonly translate = inject(TranslateService);
 
   protected items: AuditLogEntry[] = [];
   protected action = '';
@@ -52,7 +55,7 @@ export class AuditLogsComponent implements OnInit {
       },
       error: (error) => {
         this.loading = false;
-        this.toast.error(extractErrorMessage(error, 'Unable to load audit logs.'));
+        this.toast.error(extractErrorMessage(error, this.translate.t('auditLogs.errors.load')));
       },
     });
   }
@@ -73,7 +76,7 @@ export class AuditLogsComponent implements OnInit {
         link.click();
         URL.revokeObjectURL(url);
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to export audit logs.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('auditLogs.errors.export'))),
     });
   }
 }

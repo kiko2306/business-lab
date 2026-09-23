@@ -1,23 +1,28 @@
 <app-panel
   key="account:crowdsec-bans"
-  title="Banned IPs"
-  subtitle="Addresses CrowdSec is blocking at Nginx Proxy Manager (this host's detections, not the community blocklist)"
+  [title]="'account.crowdsecBans.title' | t"
+  [subtitle]="'account.crowdsecBans.subtitle' | t"
 >
   <div class="d-flex align-items-center gap-2 mb-2">
     <button type="button" class="btn btn-sm btn-outline-secondary" [disabled]="loading" (click)="load()">
       <span *ngIf="loading" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-      Refresh
+      {{ 'account.crowdsecBans.refreshButton' | t }}
     </button>
   </div>
   <p class="text-body-secondary small mb-2">
-    If your own IP gets caught, unban it here — this page stays reachable over the LAN or
-    Tailscale while the public sites refuse it. Bans get longer for repeat offenders.
+    {{ 'account.crowdsecBans.description' | t }}
   </p>
-  <p *ngIf="bans && !bans.length" class="small text-body-secondary mb-0">No active bans.</p>
+  <p *ngIf="bans && !bans.length" class="small text-body-secondary mb-0">{{ 'account.crowdsecBans.empty' | t }}</p>
   <div *ngIf="bans?.length" class="table-responsive">
     <table class="table table-sm align-middle small mb-0">
       <thead>
-        <tr><th>IP</th><th>Why</th><th>Network</th><th>Expires in</th><th></th></tr>
+        <tr>
+          <th>{{ 'account.crowdsecBans.table.ip' | t }}</th>
+          <th>{{ 'account.crowdsecBans.table.why' | t }}</th>
+          <th>{{ 'account.crowdsecBans.table.network' | t }}</th>
+          <th>{{ 'account.crowdsecBans.table.expiresIn' | t }}</th>
+          <th></th>
+        </tr>
       </thead>
       <tbody>
         <tr *ngFor="let ban of bans">
@@ -33,10 +38,10 @@
               class="btn btn-sm btn-outline-danger"
               [disabled]="unbanningIp !== null"
               (click)="unban(ban.ip)"
-              [attr.aria-label]="'Unban ' + ban.ip"
+              [attr.aria-label]="'account.crowdsecBans.unbanAriaLabel' | t:{ ip: ban.ip }"
             >
               <span *ngIf="unbanningIp === ban.ip" class="spinner-border spinner-border-sm me-1" aria-hidden="true"></span>
-              Unban
+              {{ 'account.crowdsecBans.unbanButton' | t }}
             </button>
           </td>
         </tr>

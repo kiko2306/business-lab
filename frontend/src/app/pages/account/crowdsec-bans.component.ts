@@ -5,6 +5,8 @@ import { extractErrorMessage } from '../../core/api';
 import { CrowdsecBan } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
 import { PanelComponent } from '../../components/panel/panel.component';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 /**
  * CrowdSec's active bans with an Unban action (plan.md §540), on the Security
@@ -15,11 +17,12 @@ import { PanelComponent } from '../../components/panel/panel.component';
 @Component({
   selector: 'app-crowdsec-bans',
   standalone: true,
-  imports: [CommonModule, PanelComponent],
+  imports: [CommonModule, PanelComponent, TranslatePipe],
   templateUrl: './crowdsec-bans.component.html',
 })
 export class CrowdsecBansComponent implements OnInit {
   private readonly settingsService = inject(SettingsService);
+  protected readonly translate = inject(TranslateService);
 
   protected bans: CrowdsecBan[] | null = null;
   protected loading = false;
@@ -39,7 +42,10 @@ export class CrowdsecBansComponent implements OnInit {
       .subscribe({
         next: (res) => (this.bans = res.bans),
         error: (error) => {
-          this.feedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to list CrowdSec bans.') };
+          this.feedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, this.translate.t('account.crowdsecBans.errors.load')),
+          };
         },
       });
   }
@@ -56,7 +62,10 @@ export class CrowdsecBansComponent implements OnInit {
           this.feedback = { type: 'success', message: res.message };
         },
         error: (error) => {
-          this.feedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to unban that IP.') };
+          this.feedback = {
+            type: 'danger',
+            message: extractErrorMessage(error, this.translate.t('account.crowdsecBans.errors.unban')),
+          };
         },
       });
   }
