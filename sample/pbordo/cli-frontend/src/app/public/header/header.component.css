@@ -1,0 +1,13 @@
+.headerMain {
+  display: flex; /* establish flex container */
+  flex-direction: row; /* make main axis vertical */
+  justify-content: center; /* center items vertically, in this case */
+  align-items: center; /* center items horizontally, in this case */
+}
+
+img {
+  width: 2.5rem;
+  height: 40px;
+  margin-right: 6px;
+  margin-bottom: 8px;
+}

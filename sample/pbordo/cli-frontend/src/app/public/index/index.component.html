@@ -1,0 +1,95 @@
+<app-header></app-header>
+
+
+<div class="container">
+  <div class="card p-3 mb-3">
+    <img src="assets/diag_network.png" alt="" width="50%">
+  </div>
+
+  <div class="card p-3 mb-3">
+    <ol>
+      <li>Serviço
+        <ol>
+          <li><a href="#download">Download</a></li>
+          <li><a href="#setup">Setup</a></li>
+          <li><a href="#config">Config</a></li>
+          <li><a href="#router">Router</a></li>
+          <li><a href="#firewall">Firewall</a></li>
+        </ol>
+      </li>
+    </ol>
+  </div>
+
+  <div class="card p-3 mb-3" id="download">
+    <H6>Download</H6>
+    <p>Pode efectuar o download do serviço <a href="assets/PBordoSetup.msi">aqui</a></p>
+  </div>
+
+  <div class="card p-3 mb-3" id="setup">
+    <h6>Setup</h6>
+    <div>
+      <img src="assets/install1.png" alt="">
+      <img src="assets/install2.png" alt="">
+      <img src="assets/install3.png" alt="">
+      <img src="assets/install4.png" alt="">
+    </div>
+  </div>
+
+  <div class="card p-3 mb-3" id="config">
+    <h6>Config</h6>
+    <span class="text-muted mb-3">
+      O ficheiro de configuração pode ser encontrado na diretoria de intalação da aplicação com o seguinte formato
+    </span>
+    <div>
+      <pre><![CDATA[
+        <?xml version="1.0" encoding="utf-8"?>
+        <webService>
+          <!--Porta do serviço-->
+          <port value="9191" />
+          <!--Nome do dominio-->
+          <domain value="TestDomain" />
+          <!--Nome da loja-->
+          <store name="Loja Demo 1" />
+          <wintouchConfig>
+            <!--Caminho para o wintouch.config-->
+            <path value="c:\Program Files (x86)\wintouch\SGW" />
+            <!--Setting a carregar do wintouch.config-->
+            <setting name="" />
+          </wintouchConfig>
+        </webService>]]>
+      </pre>
+    </div>
+
+    <span class="text-muted mb-3">
+      Após a configuração o serviço pode ser iniciado
+    </span>
+
+    <img src="assets/start_service.png" alt="">
+
+  </div>
+
+  <div class="card p-3 mb-3" id="router">
+    <H6>Router</H6>
+    <p>Deve de reencaminhar o trafego do router na porta definida do config para o ip da maquina onde instalou o serviço
+    </p>
+  </div>
+
+  <div class="card p-3 mb-3" id="firewall">
+    <h6>Firewall</h6>
+    <span class="text-muted mb-3">
+      A porta defenida no config deve ser aberta na firewall
+    </span>
+
+    <img src="assets/firewall_in.png" alt="">
+    <img src="assets/firewall_out.png" alt="">
+
+    <span class="text-muted my-3">
+      O acesso ao serviço pode ser testado através do browser (local e remoto)
+    </span>
+
+    <img src="assets/ping.png" alt="" width="429px">
+
+
+  </div>
+
+</div>

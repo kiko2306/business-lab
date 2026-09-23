@@ -1,0 +1,1 @@
+﻿SELECT COUNT(*) as [Mesas com conta pedida] FROM wsir_mst_mesas WHERE estado= 1

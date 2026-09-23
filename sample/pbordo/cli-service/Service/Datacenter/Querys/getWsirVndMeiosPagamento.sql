@@ -1,0 +1,1 @@
+﻿SELECT * FROM wsir_vnd_meiospagamento

@@ -29046,3 +29046,53 @@ exactly what CLAUDE.md principle 2 exists to replace.
 - `setup/` and `trigenius/` already differ by **135 entries** — the template has
   drifted from the instance, which is what `update-clients.sh` exists to fight
   and an argument against the copy-the-folder model surviving the rebuild.
+
+## 621. Imported `sample/pbordo` — a second Wintouch integration as a reference sample
+
+Copied `C:\batcave\pbordo` (via `/mnt/c`) into `sample/pbordo`, on the same
+terms as `sample/hotel` (§618–§620): reference material, not a managed app.
+
+Three components, and the same shape as the hotel sample — **Node/Express API
++ Angular frontend + .NET Windows service agent**:
+
+- `api/` — Express over HTTPS, three routes (`/status`, `/store`, `/login`),
+  Dockerfile and compose of its own.
+- `cli-frontend/` — Angular (the older `angular.json` + `tslint` generation),
+  with `html_layouts/` holding the Bootstrap templates it was built from. Ships
+  `src/assets/PBordoSetup.msi`, so the frontend hands users the agent installer.
+- `cli-service/` — `PBordo.sln`: a `Service` project (`WebServer.cs`,
+  `webService.cs`, `ProjectInstaller`) plus a `Setup` installer project. Its
+  `pbordo.config` sets a comm port (9191), a domain, a store name, and a path to
+  `C:\wintouch\sgw` — so this integrates with **Wintouch** too, the same PMS/ERP
+  behind the hotel sample.
+
+520 MB and 64 457 files at source, **3.0 MB / 159 files tracked**. What was
+dropped and why:
+
+- `cli-frontend/node_modules` (481 MB) and `api/node_modules` were **not
+  copied** — reinstallable from the lockfiles, and 64 k files across the
+  WSL/Windows boundary is slow for nothing. `.vs/` and `Service/{bin,obj}` went
+  the same way. Only these two `bin`/`obj` directories exist outside
+  `node_modules`, so excluding the names was safe; checked before copying.
+- `cli-service/packages/` and `cli-service/Service/packages/` — 26 MB of NuGet
+  restore output, duplicated at solution and project level. Newly ignored via
+  `sample/pbordo/.gitignore`.
+- `api/data/` — the API has **no database**: `data/<domain>.json` *is* its live
+  datastore, and the real files carry client usernames and passwords in
+  plaintext. Newly ignored. Nothing in the tree's filenames signals this, which
+  is why a filename-based secret scan missed it; for a sample like this the
+  check has to read small data files, not just match names.
+- `api/.env` is covered by the project's own `.gitignore`; `cli-frontend/dist`
+  likewise.
+- `api/certs/selfsigned.{key,crt}` — newly ignored. A private key does not go in
+  a public repo, even a self-signed dev one (issuer == subject, `OU=Dev`, valid
+  to 2034). `api/index.js` reads the pair at startup, so the ignore rule carries
+  the `openssl req` line that regenerates it.
+
+Its `.git` (origin `kiko2306/pbordo.git`) was excluded from the copy rather
+than copied and deleted — same outcome, one less step. As with
+`WHotWebService` in §619 the working copy was **dirty** (144 modified files),
+so what landed here is newer than that remote.
+
+Not analysed yet — §620 is the equivalent write-up for the hotel sample, and
+nothing like it exists for this one.

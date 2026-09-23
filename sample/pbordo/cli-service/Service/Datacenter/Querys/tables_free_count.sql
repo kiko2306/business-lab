@@ -1,0 +1,1 @@
+﻿SELECT COUNT(*) as [Mesas Livres] FROM wsir_mst_mesas WHERE estado= 0

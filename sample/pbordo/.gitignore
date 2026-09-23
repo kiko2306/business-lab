@@ -1,0 +1,16 @@
+# api/index.js reads this pair at startup, but a private key does not belong in
+# a public repo. Regenerate the dev pair before running the API:
+#   openssl req -x509 -newkey rsa:2048 -nodes -days 3650 \
+#     -keyout api/certs/selfsigned.key -out api/certs/selfsigned.crt -subj "/CN=localhost"
+api/certs/selfsigned.key
+api/certs/selfsigned.crt
+
+# NuGet restore output, ~26 MB and duplicated at both solution and project
+# level. Regenerate with `nuget restore PBordo.sln` from packages.config.
+cli-service/packages/
+cli-service/Service/packages/
+
+# The API has no database — api/data/<domain>.json IS its live datastore, and
+# the real files carry client usernames and passwords in plaintext. Kept on
+# disk as rebuild reference, never tracked.
+api/data/

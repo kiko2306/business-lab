@@ -1,0 +1,1 @@
+﻿SELECT SUM(numclientes) as [Numero Clientes] FROM wsir_mst_mesas

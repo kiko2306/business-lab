@@ -1,0 +1,1 @@
+﻿select CAST(SUM(total) AS DECIMAL(18,2)) AS total  from wsir_vnd_vendas WHERE tipolinha = 'P' and Anulado = 0

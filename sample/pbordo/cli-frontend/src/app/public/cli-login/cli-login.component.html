@@ -1,0 +1,25 @@
+<app-header></app-header>
+
+<div class="login-card" *ngIf="!userLoggedIn">
+  <h4 class="text-center mb-3">Login</h4>
+  <img class="profile-img-card" src="assets/avatar_2x.png" />
+  <p class="profile-name-card"></p>
+  <div class="form-signin">
+    <span class="reauth-email"></span>
+    <input type="text" class="form-control" id="username" required placeholder="Username" autofocus
+      [(ngModel)]="username" />
+    <input type="password" class="form-control" id="inputPassword" required placeholder="Password"
+      [(ngModel)]="password" />
+    <div class="checkbox">
+      <div class="form-check">
+        <input type="checkbox" class="form-check-input" id="formCheck-1" (change)="saveLogin = !saveLogin;" />
+        <label class="form-check-label" for="formCheck-1">Gravar dados</label>
+      </div>
+    </div>
+    <button class="btn btn-primary btn-block btn-lg btn-signin" type="button" (click)="onLogin()">Login</button>
+  </div>
+</div>
+
+<div class="container" *ngIf="userLoggedIn">
+  <app-panel></app-panel>
+</div>

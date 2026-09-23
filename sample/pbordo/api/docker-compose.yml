@@ -1,0 +1,21 @@
+services:
+  app:
+    container_name: pbordo-access-control
+    build:
+      context: .
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    ports:
+      - "${PORT}:${PORT}"
+    restart: unless-stopped
+    networks:
+      - pbordo-network
+
+volumes:
+  node_modules:
+
+
+networks:
+  pbordo-network:
+    driver: bridge

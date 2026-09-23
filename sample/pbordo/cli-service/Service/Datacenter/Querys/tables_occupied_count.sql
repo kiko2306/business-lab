@@ -1,0 +1,1 @@
+﻿SELECT COUNT(*) as [Mesas Ocupadas] FROM wsir_mst_mesas WHERE estado= 2

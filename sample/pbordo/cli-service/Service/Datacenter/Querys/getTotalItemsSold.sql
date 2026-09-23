@@ -1,0 +1,1 @@
+﻿select CAST(SUM(quantidade) AS INT) AS total  from wsir_vnd_vendas WHERE tipolinha = 'P' and Anulado = 0

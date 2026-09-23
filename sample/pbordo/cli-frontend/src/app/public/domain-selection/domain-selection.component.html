@@ -1,0 +1,31 @@
+<app-header></app-header>
+
+<div class="container">
+  <div class="card">
+    <div class="card-header">
+      <h4 class="text-center">Dominio</h4>
+
+      <p>{{ env }}</p>
+
+      <div class="input-group mb-3">
+        <div class="input-group-prepend">
+          <span class="input-group-text" id="basic-addon3">http://pbordo.portoinf.com/cli/</span>
+        </div>
+        <input type="text" class="form-control" id="basic-url" aria-describedby="basic-addon3" [(ngModel)]="domain">
+        <div class="input-group-append">
+          <button class="btn btn-outline-secondary" type="button" (click)="onRedirect()">Entrar</button>
+        </div>
+      </div>
+
+      <span class="text-muted">Pode encontrar as instruções de instalação
+        <a routerLink="/help">aqui</a>
+        Ver.1.0.1509
+      </span>
+
+      <br>
+
+      <span class="text-muted">{{ env }}</span>
+
+    </div>
+  </div>
+</div>

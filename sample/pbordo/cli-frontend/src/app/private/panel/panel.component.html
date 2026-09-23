@@ -1,0 +1,217 @@
+<app-loader *ngIf="isLoading"></app-loader>
+
+<div class="container" *ngIf="!isLoading">
+
+  <div *ngIf="!selectedStoreName">
+    <div *ngFor="let store of storeList">
+      <button class="btn btn-primary btn-block mt-3" (click)="getData(store.id, store.name);">
+        {{store.name}}
+      </button>
+    </div>
+  </div>
+
+
+  <mat-accordion class="example-headers-align" multi>
+
+    <!-- Geral -->
+    <div class="card p-3" *ngIf="overview">
+      <h6 class="text-center">{{selectedStoreName}}</h6>
+
+      <table>
+        <tr>
+          <td>Total Faturado : </td>
+          <td class="text-right">{{getTotalDone()}} €</td>
+        </tr>
+        <tr>
+          <td>Total Aberto : </td>
+          <td class="text-right">{{getTotalOpen()}} €</td>
+        </tr>
+        <tr>
+          <td>Previsão : </td>
+          <td class="text-right">{{getPreview()}} €</td>
+        </tr>
+      </table>
+    </div>
+    <!-- End -->
+
+    <!-- Artigos vendidos -->
+    <div class="card my-3" *ngIf="overview">
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            Artigos
+          </mat-panel-title>
+          <mat-panel-description>
+            Total: {{getSoldItemsQt()}} <br> Valor: {{getTotalDone()}} €
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+        <!-- hidden -->
+        <span class="text-muted">Lista de artigos vendidos</span>
+        <table style="width: 100%;">
+          <tr *ngFor="let item of getSoldItemsList()">
+            <td>{{item.quantidade}} X </td>
+            <td>{{item.descricao}}</td>
+            <td class="text-right">{{item.total.toFixed(2)}} €</td>
+          </tr>
+        </table>
+
+      </mat-expansion-panel>
+    </div>
+    <!-- End -->
+
+    <!-- Mesas -->
+    <div class="card my-3" *ngIf="overview">
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            Mesas
+          </mat-panel-title>
+          <mat-panel-description>
+            <table style="width: 100%;">
+              <tr>
+                <td class="text-center">Ocup.</td>
+                <td class="text-center">Lives</td>
+                <td class="text-center">Conta</td>
+              </tr>
+              <tr>
+                <td class="text-center">{{getOccupiedTables().length}}</td>
+                <td class="text-center">{{getFreeTablesTotal()}}</td>
+                <td class="text-center">{{getEndTable().length}}</td>
+              </tr>
+            </table>
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+        <!-- hidden -->
+        <span class="text-muted">Mesas com conta pedida</span>
+        <table style="width: 100%;">
+          <ng-container *ngFor="let item of getEndTable()" style="width: 100%;">
+            <tr data-toggle="collapse" data-target="" [attr.data-target]="'#tc' + item.mesa" class="accordion-toggle"
+              style="width: 100%;">
+              <td style="width: 20px;" class="mr-3">
+                <svg viewBox="0 0 24 24" class="showDetailsSVG">
+                  <path
+                    d="M12 9a3 3 0 00-3 3 3 3 0 003 3 3 3 0 003-3 3 3 0 00-3-3m0 8a5 5 0 01-5-5 5 5 0 015-5 5 5 0 015 5 5 5 0 01-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5z" />
+                </svg>
+              </td>
+              <td>{{item.mesa}}</td>
+              <td>{{getEmployeeName(item.funcionario)}}</td>
+              <td class="text-right">{{getTableTotal(item.mesa)}} €</td>
+            </tr>
+            <tr>
+              <td colspan="3" class="hiddenRow">
+                <div class="accordian-body collapse" id="tc{{item.mesa}}">
+                  <table style="width: 100%;">
+                    <tr *ngFor="let item of getTableContent(item.mesa)">
+                      <td>-></td>
+                      <td>{{item.quantidade}} &times; </td>
+                      <td>{{item.descricao}}</td>
+                      <td class="text-rigth">{{item.total.toFixed(2)}} €</td>
+                    </tr>
+                    <tr>
+                      <td colspan="4">
+                        <hr>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+        </table>
+
+        <span class="text-muted">Mesas ocupadas</span>
+        <table style="width: 100%;">
+          <ng-container *ngFor="let item of getOccupiedTables()">
+            <tr data-toggle="collapse" data-target="" [attr.data-target]="'#to' + item.mesa" class="accordion-toggle">
+              <td style="width: 20px;" class="mr-3">
+                <svg viewBox="0 0 24 24" class="showDetailsSVG">
+                  <path
+                    d="M12 9a3 3 0 00-3 3 3 3 0 003 3 3 3 0 003-3 3 3 0 00-3-3m0 8a5 5 0 01-5-5 5 5 0 015-5 5 5 0 015 5 5 5 0 01-5 5m0-12.5C7 4.5 2.73 7.61 1 12c1.73 4.39 6 7.5 11 7.5s9.27-3.11 11-7.5c-1.73-4.39-6-7.5-11-7.5z" />
+                </svg>
+              </td>
+              <td>{{item.mesa}}</td>
+              <td>{{getEmployeeName(item.funcionario)}}</td>
+              <td class="text-right">{{getTableTotal(item.mesa)}} €</td>
+            </tr>
+            <tr>
+              <td colspan="3" class="hiddenRow">
+                <div class="accordian-body collapse" id="to{{item.mesa}}">
+                  <table style="width: 100%;">
+                    <tr *ngFor="let item of getTableContent(item.mesa)">
+                      <td>-></td>
+                      <td>{{item.quantidade}} &times; </td>
+                      <td>{{item.descricao}}</td>
+                      <td class="text-rigth">{{item.total.toFixed(2)}} €</td>
+                    </tr>
+                    <tr>
+                      <td colspan="4">
+                        <hr>
+                      </td>
+                    </tr>
+                  </table>
+                </div>
+              </td>
+            </tr>
+          </ng-container>
+        </table>
+      </mat-expansion-panel>
+    </div>
+    <!-- End -->
+
+    <!-- Meios pagamento -->
+    <div class="card my-3" *ngIf="overview">
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            Pagamentos
+          </mat-panel-title>
+          <mat-panel-description>
+            <br>
+            <br>
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+        <!-- hidden -->
+        <table style="width: 100%;">
+          <tr *ngFor="let item of getDistinctMeioPag()">
+            <td> {{ item.meiospagamento }} </td>
+            <td class="text-right">{{ getTotalByMeioPag(item.meiospagamento) }} €</td>
+            <!-- <td>{{item.total.toFixed(2)}} €</td> -->
+          </tr>
+        </table>
+
+      </mat-expansion-panel>
+    </div>
+    <!-- End -->
+
+    <!-- Funcionarios -->
+    <div class="card my-3" *ngIf="overview">
+      <mat-expansion-panel>
+        <mat-expansion-panel-header>
+          <mat-panel-title>
+            Funcionarios
+          </mat-panel-title>
+          <mat-panel-description>
+            <br>
+            <br>
+          </mat-panel-description>
+        </mat-expansion-panel-header>
+        <!-- hidden -->
+        <table style="width: 100%;">
+          <tr *ngFor="let item of getDistinctFunc()">
+            <td> {{ item.nome }} </td>
+            <td class="text-right">{{getFuncValue(item.codigo) }} €</td>
+            <!-- <td>{{item.total.toFixed(2)}} €</td> -->
+          </tr>
+        </table>
+
+      </mat-expansion-panel>
+    </div>
+    <!-- End -->
+
+  </mat-accordion>
+
+  <div *ngIf="selectedStoreName">
+    <button class="btn btn-primary btn-block" (click)="back()">Voltar</button>
+  </div>
+
+</div>
