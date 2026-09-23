@@ -410,16 +410,34 @@ before anything is built.
       (there are none today), hashed passwords, a store for the domain/user
       data that isn't a lock-free JSON file, and a per-shop agent URL that
       isn't compiled into the binary.
-- [ ] **Decide the shared agent-identity and enrolment model** — blocks both
-      migrations above and should be settled first. Both samples answer "how
-      does the cloud know this agent is who it claims to be?" with nothing:
-      Hotel Utils gives the PMS credentials to any caller of `/api/config`,
-      PBordo never checks who is calling. §623 narrows it usefully — each
-      agent now talks to exactly one endpoint (`hotel-core`, or `tally`'s
-      API), so one enrolment mechanism serves both. Must cover enrolment with
-      no console step on the host (CLAUDE.md principle 2), so the credential
-      is issued from the dashboard UI and the agent installer carries only
-      what a human can paste once.
+- [ ] **Build agent enrolment: code → long-lived token** — designed in
+      plan.md §627. An admin adds the unit/store in the UI and gets a
+      short-lived single-use enrolment code; the installer asks only for the
+      API URL and that code; the agent exchanges it on first start for a
+      non-expiring token bound to that unit/store and stores it with Windows
+      DPAPI (`ProtectedData`, machine scope) under `ProgramData`, not in
+      plaintext beside the executable. Needs: the code/token tables and
+      exchange endpoint in `hotel-core` and `tally`, the issue-and-revoke UI,
+      per-agent last-seen replacing the legacy single-row `conn_logs`, and
+      revocation proven to 401 a running agent.
+- [ ] **Make the agents outbound-only** — plan.md §627. No agent listens.
+      This is what removes the open inbound port at every shop, the 30-second
+      `api.ipify.org` → `set_ip` loop, the `store.ip` column and the
+      "is the shop online" ping hack — and means the client never touches
+      their router. The hotel agent uses outbound HTTPS with a bearer token;
+      `tally`'s uses one persistent outbound WebSocket authenticated with the
+      same token at handshake, with the API keeping a registry of connected
+      agents by store. Confirm WebSockets survive the Cloudflare Tunnel hop
+      on a real deployment before committing to it — that is the one leg of
+      this design that cannot be proven locally.
+- [ ] **Remove `GET /api/config` and get Wintouch credentials locally** —
+      plan.md §627. No credential travels cloud → agent. The hotel agent reads
+      them from the local Wintouch install the way `tally` already does
+      (§622); where it needs a Wintouch *application* user rather than the SQL
+      login, that is one install-time prompt, entered locally and never
+      transmitted. Also drop `<domain>` and `<store name>` from the agent
+      config — the enrolment code binds the agent to its store, so both are
+      derived — and stop compiling the API URL into the binary (§622).
 - [ ] **Decide how the guest and agent paths escape the Authelia gate** —
       exposure is automatic and everything lands behind Authelia (plan.md
       §331), but three of these must not be: the guest check-in and quiz links
@@ -428,7 +446,10 @@ before anything is built.
       between per-path bypasses (the established pattern here) and
       `skipAutheliaProtection` with the service's own auth, and write it into
       each app's `services.ts` entry when it is added. Getting this wrong
-      turns a working guest link into a login redirect.
+      turns a working guest link into a login redirect. The agent half is
+      settled by plan.md §627 — those endpoints authenticate themselves with
+      an agent token, so bypassing Authelia on them is safe; what is left to
+      decide is the guest paths.
 - [ ] **Confirm the database engine for the rebuilds** — §623 proposes
       **Postgres**, matching the rest of this repo, rather than carrying the
       legacy MySQL over. Affects the shared hotel database container and

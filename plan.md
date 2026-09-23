@@ -29476,3 +29476,100 @@ aspiration:
 
 Each of these is a decision to record when the slice is planned, not a
 licence to drop behaviour silently.
+
+## 627. Planned: agent identity and enrolment
+
+The blocker from §623. Both legacy systems answer "how does the cloud know this
+agent is who it claims to be?" with nothing — Hotel Utils hands the Wintouch
+credentials to any caller of `GET /api/config` (§620), `tally` never checks who
+is calling and leaves each shop's POS data on an unauthenticated plaintext port
+on its public IP (§622). One mechanism serves both, because §623 already
+narrowed each agent to exactly one endpoint.
+
+### The shape
+
+**Agents dial out. They never listen.** This is the decision the rest follows
+from. It removes, in one move: the open inbound port at every shop, the
+30-second `api.ipify.org` → `set_ip` loop, the `store.ip` column, the
+"is the shop online" ping hack, and any need for the client to touch their
+router — the same promise CLAUDE.md principle 1 makes about our own box, now
+extended to theirs.
+
+**Enrolment code → long-lived agent token.**
+
+1. An admin adds the unit (hotel) or store (`tally`) in the UI and asks for an
+   enrolment code. It is short, single-use and **does** expire — minutes.
+2. The installer asks for two things and nothing else: the API URL and that
+   code. One paste, once, by a human, in a UI — which is exactly what
+   CLAUDE.md principle 2 allows and principle 3 says to minimise.
+3. On first start the agent exchanges the code for a **long-lived,
+   non-expiring agent token** bound to that unit/store, and the code is burned.
+4. The token is stored with Windows DPAPI (`ProtectedData`, machine scope) under
+   `ProgramData` — not in plaintext beside the executable, which is what the
+   legacy config files did with everything.
+5. Every later call carries that token.
+
+The split matters: the *enrolment code* expires because a one-time code should;
+the *agent token* does not, because an expiring agent credential silently
+defeats the automation it exists to serve.
+
+### What this kills
+
+- **`GET /api/config` disappears.** No credential travels cloud → agent, ever.
+  The hotel agent obtains its Wintouch credentials locally, the way `tally`
+  already does (§622 — it reads Wintouch's own `wintouch.config` from the local
+  install). Where the hotel agent needs a Wintouch *application* user rather
+  than the SQL login, that is one more install-time prompt, entered locally and
+  never transmitted.
+- **`<domain>` and `<store name>` leave the agent config.** The enrolment code
+  already binds the agent to its store, so both are derived, not configured.
+  `pbordo.config` reduces to the API URL alone — and that URL stops being
+  compiled into the binary, which §622 flagged as making the API immovable.
+- **`conn_logs` is replaced.** One global "last connection" row becomes
+  last-seen per enrolled agent, which is what a deployment with several shops
+  actually needs.
+
+### Transport
+
+Auth is shared; transport differs because the needs genuinely differ.
+
+- **Hotel agent — outbound HTTPS with a bearer token.** It is already a push
+  model on a timer (§620) and check-in write-back tolerates minutes.
+- **`tally` agent — one persistent outbound WebSocket**, authenticated with the
+  same token at handshake. The API keeps a registry of connected agents by
+  store; a browser request finds that socket, sends a request frame, and
+  returns the reply. No connected socket means the shop is genuinely offline,
+  which is a real answer rather than the legacy ping guess.
+
+Both reach the box through the Cloudflare Tunnel at the client's own hostname.
+These endpoints must bypass Authelia — safely, because the service now
+authenticates itself, which closes the open question in the README's
+Authelia item.
+
+**Rejected: agent pushes an overview snapshot on a timer, API serves a cache.**
+Much simpler — no socket, no connection registry, both agents on plain HTTPS —
+but it makes the floor dashboard up to a polling interval stale and has the
+agent working when nobody is looking. §623 records pull-on-demand as behaviour
+the `tally` migration must carry over, so the socket earns its complexity. If
+that requirement is ever relaxed, this is the cheaper design and should be
+revisited.
+
+**Rejected: mutual TLS client certificates.** Stronger in principle, but it
+needs a CA, a distribution path and a renewal path, and cert expiry reintroduces
+exactly the silent-breakage problem the non-expiring token avoids. Client certs
+through the Cloudflare Tunnel also need mTLS passthrough, adding moving parts
+to the one path that must not be fragile.
+
+**Rejected: one pre-shared secret baked into the installer.** No per-agent
+revocation — a single compromised shop cannot be cut off without re-installing
+every other one.
+
+### Properties worth stating
+
+- The agent authenticates to the cloud; the cloud never authenticates to the
+  agent, because there is no inbound path to authenticate on.
+- A token is scoped to one unit/store, so a compromised shop agent cannot read
+  another shop's data — which the legacy design could not prevent, since
+  knowing a domain and store uuid was sufficient (§622).
+- Revocation is deleting one row. The agent's next call gets a 401 and it stops;
+  re-enrolment is a fresh code.
