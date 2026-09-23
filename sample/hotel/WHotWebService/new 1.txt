@@ -1,0 +1,13 @@
+Root App: interop.demo.app
+Domain : interop.portoinf.com
+
+database: 	portoin1_interop.demo
+user: 		portoin1_interopdemo
+password: 	interop.demo@PortoInf
+
+
+menuquintadofrances.com
+
+database : portoin1_menuquintadofrances
+user : portoin1_webmaster
+password : webmaster@PortoInf

@@ -28907,3 +28907,27 @@ and it stays reachable from the WHotWeb remote.
 
 Copied with `tar` over ssh rather than rsync — no dependency to check on either
 end, and it preserves modes and timestamps.
+
+## 619. Added `sample/hotel/WHotWebService` — the .NET side of the same sample
+
+Copied `C:\batcave\WHotWebService` (via `/mnt/c`) into `sample/hotel` alongside
+the Laravel copies from §618. Same terms: reference material for a new
+development, not a managed app.
+
+A .NET Framework 4.8 Windows service — `ServiceManager.cs` plus a `DAO/`
+layer of hotel-domain types (CheckIn, CheckOut, Guest, Invoice, Reservation,
+Room, Unit, Ping). `WHotelWebService.config` points it at
+`https://demo-whotelweb.portoinf-server.com`, so this is the on-premise agent
+that talks to the web app in `trigenius/`.
+
+4.9 MB on disk, **0.5 MB / 30 files tracked**: the project's own `.gitignore`
+already excludes `bin/`, `obj/` and `.vs/`. No credentials to exclude — the
+three `.config` files hold only a runtime version and that URL, and a grep for
+hardcoded passwords/connection strings/API keys across the sources returned
+nothing.
+
+Its `.git` (origin `kiko2306/WHotWebService.git`) was deleted, as `setup/`'s
+was in §618 — an embedded repo lands as a broken gitlink. Worth noting the
+working copy was **dirty** against that history (~20 modified sources), so what
+landed here is newer than anything on the WHotWebService remote; the remote is
+not a complete fallback for this directory.
