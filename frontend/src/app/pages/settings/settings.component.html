@@ -121,108 +121,21 @@
   <div *ngIf="alertsLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
 
   <div *ngIf="!alertsLoading && alertSettings" class="row g-3">
-    <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="alertTopic">{{ 'settings.ntfy.topicLabel' | t }}</label>
-      <div class="input-group">
-        <input
-          id="alertTopic"
-          class="form-control font-monospace"
-          [(ngModel)]="alertTopicDraft"
-          [ngModelOptions]="{ standalone: true }"
-          maxlength="64"
-          placeholder="homelab-alerts"
-        />
-        <button
-          type="button"
-          class="btn btn-outline-primary"
-          [disabled]="savingAlerts || !alertTopicDirty || !alertTopicValid"
-          (click)="saveAlertTopic()"
-        >
-          {{ 'settings.ntfy.saveTopicButton' | t }}
-        </button>
-      </div>
-      <p class="form-text mb-0" [class.text-danger]="alertTopicDraft && !alertTopicValid">
-        <ng-container *ngIf="alertTopicDraft && !alertTopicValid; else topicHint">
-          {{ 'settings.ntfy.topicInvalidHint' | t }}
-        </ng-container>
-        <ng-template #topicHint>
-          {{ 'settings.ntfy.topicHint' | t }}
-        </ng-template>
-      </p>
-    </div>
-
-    <div class="col-12">
-      <label class="form-label fw-semibold mb-2">{{ 'settings.ntfy.sourcesLabel' | t }}</label>
+    <div class="col-12" *ngFor="let category of alertCategories">
       <div class="d-flex align-items-start gap-3">
-        <div class="form-check form-switch flex-grow-1">
+        <div class="form-check form-switch flex-shrink-0 pt-1">
           <input
             class="form-check-input"
             type="checkbox"
             role="switch"
-            id="crowdsecAlertsEnabled"
-            [checked]="alertSettings.crowdsecEnabled"
+            [id]="'categoryEnabled-' + category.key"
+            [checked]="alertSettings.enabled[category.key]"
             [disabled]="savingAlerts"
-            (change)="toggleCrowdsecAlerts($any($event.target).checked)"
+            (change)="toggleCategoryEnabled(category.key, $any($event.target).checked)"
           />
-          <label class="form-check-label" for="crowdsecAlertsEnabled">
-            <span class="fw-semibold">{{ 'settings.ntfy.crowdsecAlerts.label' | t }}</span>
-            <span class="d-block text-body-secondary small">
-              {{ 'settings.ntfy.crowdsecAlerts.description' | t }}
-            </span>
-          </label>
         </div>
-        <button
-          type="button"
-          class="btn btn-outline-secondary btn-sm flex-shrink-0"
-          [disabled]="!alertSettings.crowdsecEnabled || testingAlertSource === 'crowdsec'"
-          (click)="testAlertSource('crowdsec')"
-        >
-          <span
-            *ngIf="testingAlertSource === 'crowdsec'"
-            class="spinner-border spinner-border-sm me-1"
-            aria-hidden="true"
-          ></span>
-          {{ 'settings.ntfy.testButton' | t }}
-        </button>
-      </div>
-    </div>
-
-    <div class="col-12">
-      <label class="form-label fw-semibold mb-2">{{ 'settings.ntfy.enforcementLabel' | t }}</label>
-      <div class="form-check form-switch">
-        <input
-          class="form-check-input"
-          type="checkbox"
-          role="switch"
-          id="crowdsecEnforceNpm"
-          [checked]="alertSettings.enforceNpm"
-          [disabled]="savingAlerts"
-          (change)="toggleCrowdsecEnforcement($any($event.target).checked)"
-        />
-        <label class="form-check-label" for="crowdsecEnforceNpm">
-          <span class="fw-semibold">{{ 'settings.ntfy.enforceNpm.label' | t }}</span>
-          <span class="d-block text-body-secondary small">
-            {{ 'settings.ntfy.enforceNpm.description' | t }}
-          </span>
-        </label>
-      </div>
-    </div>
-
-    <div class="col-12">
-      <button
-        type="button"
-        class="btn btn-link p-0 text-decoration-none fw-semibold small"
-        (click)="perCategoryOpen = !perCategoryOpen"
-      >
-        {{ perCategoryOpen ? '▾' : '▸' }} {{ 'settings.ntfy.perCategoryToggle' | t }}
-      </button>
-      <p class="form-text mb-0 mt-1">
-        {{ 'settings.ntfy.perCategoryHint' | t }}
-      </p>
-
-      <div *ngIf="perCategoryOpen" class="row g-3 mt-1">
-        <div class="col-12 col-md-6" *ngFor="let category of alertCategories">
-          <label class="form-label small fw-semibold" [for]="'categoryTopic-' + category.key">
+        <div class="flex-grow-1">
+          <label class="form-label fw-semibold mb-1" [for]="'categoryTopic-' + category.key">
             {{ ('settings.alertCategory.' + category.key) | t }}
           </label>
           <div class="input-group input-group-sm">
@@ -232,12 +145,12 @@
               [(ngModel)]="categoryTopicDrafts[category.key]"
               [ngModelOptions]="{ standalone: true }"
               maxlength="64"
-              [placeholder]="alertSettings.topic"
+              placeholder="homelab-alerts"
             />
             <button
               type="button"
               class="btn btn-outline-secondary"
-              [disabled]="testingAlertSource === category.key"
+              [disabled]="!alertSettings.enabled[category.key] || testingAlertSource === category.key"
               (click)="testAlertSource(category.key)"
             >
               <span
@@ -248,22 +161,25 @@
               <ng-container *ngIf="testingAlertSource !== category.key">{{ 'settings.ntfy.testButton' | t }}</ng-container>
             </button>
           </div>
-          <p class="form-text mb-0 text-danger" *ngIf="categoryTopicDrafts[category.key] && !categoryTopicValid(category.key)">
-            {{ 'settings.ntfy.topicInvalidHint' | t }}
+          <p class="form-text mb-0" [class.text-danger]="!categoryTopicValid(category.key)">
+            <ng-container *ngIf="!categoryTopicValid(category.key); else categoryHint">
+              {{ 'settings.ntfy.topicInvalidHint' | t }}
+            </ng-container>
+            <ng-template #categoryHint>{{ 'settings.ntfy.topicHint' | t }}</ng-template>
           </p>
         </div>
-
-        <div class="col-12">
-          <button
-            type="button"
-            class="btn btn-outline-primary btn-sm"
-            [disabled]="savingAlerts || !categoryTopicsDirty || !categoryTopicsAllValid"
-            (click)="saveCategoryTopics()"
-          >
-            {{ 'settings.ntfy.saveChannelsButton' | t }}
-          </button>
-        </div>
       </div>
+    </div>
+
+    <div class="col-12">
+      <button
+        type="button"
+        class="btn btn-outline-primary btn-sm"
+        [disabled]="savingAlerts || !categoryTopicsDirty || !categoryTopicsAllValid"
+        (click)="saveCategoryTopics()"
+      >
+        {{ 'settings.ntfy.saveChannelsButton' | t }}
+      </button>
     </div>
 
     <div class="col-12" *ngIf="alertsFeedback">

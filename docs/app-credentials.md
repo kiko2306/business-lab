@@ -204,6 +204,13 @@ bouncer inside Nginx Proxy Manager, kept separate so either can be revoked
 on its own (`cscli bouncers delete nginx`). Both are generated on first
 start and baked into the right config file; neither is ever typed.
 
+Enforcement — banned IPs actually getting a 403 at Nginx Proxy Manager,
+rather than CrowdSec only watching and alerting — is always on (plan.md
+§609 removed the Settings switch that used to gate it, matching the
+"derived automatically, no per-app toggle" shape the exposure system
+already uses). It takes effect as soon as `CROWDSEC_NGINX_BOUNCER_KEY`
+above exists, i.e. once CrowdSec has started at least once.
+
 **Tailscale** and **NetBird's routing peer** both follow the same
 two-tier pattern: a plain hand-typed credential works on its own, and
 pasting in one extra genuinely-third-party credential hands the whole

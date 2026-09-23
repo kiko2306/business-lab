@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.132.10** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.133.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -281,20 +281,16 @@ it is done — not ticked off and left behind. Section references point at
       built: change the timezone in Settings, confirm `timedatectl status`
       on the host actually flips.
 
-- [ ] **ntfy panel: group each source's topic+toggle, drop the global
-      default, always-on Enforcement** — plan in plan.md §609. Today
-      `crowdsec`/`critical-service`/`netbird`/`backup` each have their own
-      topic override but only `crowdsec` has an enable switch, all four fall
-      back to one global default topic, and Enforcement (the NPM Lua
-      bouncer actually blocking banned IPs, not a notification setting) is a
-      separate manual switch — the UI splits a category's toggle and its
-      topic input into two different sections. Plan: one grouped row per
-      category (switch + topic + Test), no global default (migrate any
-      category still relying on it into its own explicit topic first, and
-      default the three new switches to enabled, so nothing goes silently
-      quiet), and Enforcement always on with the switch removed. §609 flags
-      the "each app" reading (category-level, not literally per managed
-      app, per §559) for confirmation before this is built.
+- [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — one grouped row
+      per category (switch + topic + Test) replaced the old shared-default-topic
+      + single CrowdSec switch + separate Enforcement switch. On `beta`: open
+      Settings → ntfy alerts and confirm all four rows show a real topic (the
+      one-time migration should have backfilled any category that was
+      relying on the old shared default, not silently reset it to
+      `homelab-alerts`); toggle a switch and confirm Test greys out when off;
+      confirm CrowdSec bans are still enforced at Nginx Proxy Manager (a
+      banned IP still gets a 403) even though its switch is gone from
+      Settings.
 
 - [ ] **Revive the social-drafts publish path: mail a draft to a real
       subscriber list** — plan in plan.md §611/§612. `social_drafts`

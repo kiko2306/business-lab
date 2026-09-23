@@ -183,10 +183,8 @@ export class SettingsService {
 
   saveAlertSettings(
     input: {
-      topic?: string;
-      crowdsecEnabled?: boolean;
-      enforceNpm?: boolean;
       topics?: Partial<Record<AlertCategory, string>>;
+      enabled?: Partial<Record<AlertCategory, boolean>>;
     }
   ): Observable<AlertNotifySettings & { message: string; applied?: boolean }> {
     return this.http.put<AlertNotifySettings & { message: string; applied?: boolean }>(

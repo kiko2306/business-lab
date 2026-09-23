@@ -1,13 +1,13 @@
 /**
- * ntfy alerts: a single ntfy topic that alerts raised anywhere in the stack
- * are published to, plus a per-source on/off flag. Today the only source is
- * CrowdSec — its `notification-http` plugin POSTs every alert (batched) as raw
- * `models.Alert` JSON (§118.1); a later step routes that through an n8n
- * webhook that dedupes/formats before ntfy (§118.4). Future alert sources
- * reuse the same topic and add their own flag here.
+ * ntfy alerts: one ntfy topic per alert category, each with its own on/off
+ * flag (plan.md §609). CrowdSec's `notification-http` plugin POSTs every
+ * alert (batched) as raw `models.Alert` JSON (§118.1) straight to a category
+ * topic; a later step routes that through an n8n webhook that dedupes/
+ * formats before ntfy (§118.4). `critical-service`, `netbird` and `backup`
+ * publish straight from backend code via publishAlert().
  *
  * Stored per-key in `settings`, alongside the exposure / mail / timezone
- * config. The topic is a plain editable string with a readable default; note
+ * config. Topics are plain editable strings with a readable default; note
  * that ntfy topics are publish-by-name and this instance is internet-facing,
  * so a guessable name means anyone who knows it can read the alert stream
  * (which carries attacker IPs) or post noise to it.
@@ -16,19 +16,6 @@
 import { query } from './database';
 import { getPublishedUpstreamPort } from '../config/services';
 import { getHostGatewayIp } from './network';
-
-export const ALERT_NOTIFY_KEYS = {
-  /** The default ntfy topic — every category with no override of its own publishes here. */
-  topic: 'ntfy_alerts_topic',
-  /** Per-source flag: CrowdSec intrusion alerts. */
-  crowdsecEnabled: 'crowdsec_alerts_enabled',
-  /**
-   * Whether CrowdSec bans are actually enforced (the NPM lua bouncer, §119).
-   * Set by that feature's toggle. The n8n relay reads it so the push says
-   * "banned 4h" only when the ban is real — detection-only until then (§117).
-   */
-  enforceNpm: 'crowdsec_enforce_npm',
-} as const;
 
 export const DEFAULT_ALERT_TOPIC = 'homelab-alerts';
 
@@ -44,6 +31,27 @@ function categoryTopicKey(category: AlertSource): string {
   return `ntfy_topic_${category}`;
 }
 
+const CATEGORY_ENABLED_KEY: Record<AlertSource, string> = {
+  crowdsec: 'crowdsec_alerts_enabled',
+  'critical-service': 'critical_service_alerts_enabled',
+  netbird: 'netbird_alerts_enabled',
+  backup: 'backup_alerts_enabled',
+};
+
+/**
+ * crowdsec alerting is a real opt-in (it wires a relay workflow + a
+ * CrowdSec notification plugin that don't exist until asked for), so it
+ * defaults off. The other three fired unconditionally before they had a
+ * switch at all — defaulting them off would be a silent behaviour change on
+ * upgrade, so they default on (§609).
+ */
+const CATEGORY_ENABLED_DEFAULT: Record<AlertSource, boolean> = {
+  crowdsec: false,
+  'critical-service': true,
+  netbird: true,
+  backup: true,
+};
+
 const NTFY_SERVICE = 'ntfy';
 const ALERT_PUBLISH_TIMEOUT_MS = 8000;
 
@@ -55,14 +63,10 @@ export function isValidAlertTopic(value: unknown): value is string {
 }
 
 export interface AlertNotifyConfig {
-  /** The default ntfy topic — a category with no override resolves to this. */
-  topic: string;
-  /** Every category's resolved topic (its own override, or the default). */
+  /** Every category's resolved topic. */
   topics: Record<AlertSource, string>;
-  /** Whether CrowdSec intrusion alerts are sent. */
-  crowdsecEnabled: boolean;
-  /** Whether CrowdSec bans are enforced at NPM (§119) — affects push wording. */
-  enforceNpm: boolean;
+  /** Every category's on/off flag. */
+  enabled: Record<AlertSource, boolean>;
 }
 
 async function readSetting(key: string): Promise<string | null> {
@@ -84,44 +88,30 @@ async function writeSetting(key: string, value: string): Promise<void> {
 }
 
 export async function getAlertNotifyConfig(): Promise<AlertNotifyConfig> {
-  const [topicRaw, crowdsecRaw, enforceRaw, ...overrides] = await Promise.all([
-    readSetting(ALERT_NOTIFY_KEYS.topic),
-    readSetting(ALERT_NOTIFY_KEYS.crowdsecEnabled),
-    readSetting(ALERT_NOTIFY_KEYS.enforceNpm),
-    ...ALERT_CATEGORIES.map((category) => readSetting(categoryTopicKey(category))),
-  ]);
+  const rows = await Promise.all(
+    ALERT_CATEGORIES.flatMap((category) => [readSetting(categoryTopicKey(category)), readSetting(CATEGORY_ENABLED_KEY[category])])
+  );
 
-  const topic = isValidAlertTopic(topicRaw) ? topicRaw : DEFAULT_ALERT_TOPIC;
-  const topics = Object.fromEntries(
-    ALERT_CATEGORIES.map((category, i) => [category, isValidAlertTopic(overrides[i]) ? overrides[i] : topic])
-  ) as Record<AlertSource, string>;
+  const topics = {} as Record<AlertSource, string>;
+  const enabled = {} as Record<AlertSource, boolean>;
+  ALERT_CATEGORIES.forEach((category, i) => {
+    const topicRaw = rows[i * 2];
+    const enabledRaw = rows[i * 2 + 1];
+    topics[category] = isValidAlertTopic(topicRaw) ? topicRaw : DEFAULT_ALERT_TOPIC;
+    enabled[category] = enabledRaw === null ? CATEGORY_ENABLED_DEFAULT[category] : enabledRaw === 'true';
+  });
 
-  return {
-    topic,
-    topics,
-    crowdsecEnabled: crowdsecRaw === 'true',
-    enforceNpm: enforceRaw === 'true',
-  };
+  return { topics, enabled };
 }
 
-export async function setCrowdsecAlertsEnabled(enabled: boolean): Promise<void> {
-  await writeSetting(ALERT_NOTIFY_KEYS.crowdsecEnabled, enabled ? 'true' : 'false');
-}
-
-/** Set by the §119 NPM-enforcement toggle. */
-export async function setCrowdsecEnforceNpm(enabled: boolean): Promise<void> {
-  await writeSetting(ALERT_NOTIFY_KEYS.enforceNpm, enabled ? 'true' : 'false');
-}
-
-/** Caller must validate with isValidAlertTopic first. */
-export async function setAlertTopic(topic: string): Promise<void> {
-  await writeSetting(ALERT_NOTIFY_KEYS.topic, topic);
+export async function setAlertCategoryEnabled(category: AlertSource, value: boolean): Promise<void> {
+  await writeSetting(CATEGORY_ENABLED_KEY[category], value ? 'true' : 'false');
 }
 
 /**
  * Set (or, with an empty string, clear) one category's topic override.
- * A cleared category has no settings row, so it falls back to the default
- * topic on the next read — no separate "unset" flag needed.
+ * A cleared category has no settings row, so it falls back to
+ * DEFAULT_ALERT_TOPIC on the next read — no separate "unset" flag needed.
  * Caller must validate a non-empty value with isValidAlertTopic first.
  */
 export async function setAlertCategoryTopic(category: AlertSource, topic: string): Promise<void> {
@@ -133,7 +123,27 @@ export async function setAlertCategoryTopic(category: AlertSource, topic: string
 }
 
 /**
- * Publish one alert to the shared ntfy topic, straight from backend code
+ * Backfill an explicit `ntfy_topic_<category>` row for every category still
+ * relying on the shared default topic that plan.md §609 removed
+ * (`ntfy_alerts_topic`) — without this, a database from before that change
+ * would silently start resolving to the hardcoded DEFAULT_ALERT_TOPIC
+ * instead of whatever custom default the operator had actually set. No-op
+ * once every category has its own row (true for a fresh install — init.sql
+ * never wrote `ntfy_alerts_topic`).
+ */
+export async function ensureAlertCategoryTopics(): Promise<void> {
+  const legacyDefaultRaw = await readSetting('ntfy_alerts_topic');
+  const seed = isValidAlertTopic(legacyDefaultRaw) ? legacyDefaultRaw : DEFAULT_ALERT_TOPIC;
+  for (const category of ALERT_CATEGORIES) {
+    const existing = await readSetting(categoryTopicKey(category));
+    if (!isValidAlertTopic(existing)) {
+      await writeSetting(categoryTopicKey(category), seed);
+    }
+  }
+}
+
+/**
+ * Publish one alert to its category's ntfy topic, straight from backend code
  * (plan.md §424).
  *
  * Everything that alerted before this went CrowdSec → n8n → ntfy, which is
@@ -145,7 +155,9 @@ export async function setAlertCategoryTopic(category: AlertSource, topic: string
  *
  * Never throws and never blocks: an alert that cannot be delivered must not
  * turn a warning into a failed start. Returns whether it was published, for
- * callers that want to log the difference.
+ * callers that want to log the difference. A category the operator has
+ * switched off is silently skipped, same as a delivery failure — the Test
+ * button is what confirms the topic/subscription, not this path.
  */
 export async function publishAlert(alert: {
   category: AlertSource;
@@ -158,7 +170,8 @@ export async function publishAlert(alert: {
   try {
     const port = getPublishedUpstreamPort(NTFY_SERVICE);
     if (!port) return false; // ntfy not installed on this deployment
-    const { topics } = await getAlertNotifyConfig();
+    const { topics, enabled } = await getAlertNotifyConfig();
+    if (!enabled[alert.category]) return false;
     const topic = topics[alert.category];
 
     const response = await fetch(`http://${await getHostGatewayIp()}:${port}/`, {
@@ -183,27 +196,28 @@ export async function publishAlert(alert: {
  * Which running apps must restart for a change to these settings to take
  * effect, in the order to restart them (§532). Each setting is rendered into
  * its app's config only when that app starts, so saving without this left
- * the whole alert and ban path silently off for days (§531):
- *   - CrowdSec alerts → n8n's relay workflow + CrowdSec's profiles.yaml
- *   - crowdsecTopic (the default, or a 'crowdsec' override) → n8n's relay workflow
- *   - criticalServiceTopic (the default, or a 'critical-service' override) → Uptime Kuma's critical-monitor push
- *   - enforcement → CrowdSec (renders NPM's bouncer block) + NPM (loads it)
- * n8n first, so the webhook exists before CrowdSec can post to it; CrowdSec
- * before NPM, because CrowdSec's start renders the block NPM then loads.
+ * the whole alert path silently off for days (§531):
+ *   - crowdsec (its enabled flag) → n8n's relay workflow + CrowdSec's profiles.yaml
+ *   - crowdsecTopic (the 'crowdsec' category topic) → n8n's relay workflow
+ *   - criticalServiceTopic (the 'critical-service' category topic) → Uptime Kuma's critical-monitor push
+ * n8n first, so the webhook exists before CrowdSec can post to it.
  *
- * 'netbird' and 'backup' topics are read live on every publishAlert() call
- * (§553) — no baked-in config, so no restart is needed for either.
+ * 'critical-service', 'netbird' and 'backup' publish straight from backend
+ * code and read their topic + enabled flag live on every publishAlert() call
+ * — no baked-in config, so toggling or re-topicing any of them needs no
+ * restart. Only 'critical-service' has a baked-in consumer (Uptime Kuma's
+ * notification), and only its *topic* is baked in — its enabled flag isn't
+ * wired into Uptime Kuma's own down-monitor alerts, which are a separate,
+ * broader platform-health watchdog (§443), not this category's switch.
  */
 export function appsToApplyAlertSettings(changed: {
   crowdsecTopic: boolean;
   criticalServiceTopic: boolean;
   crowdsec: boolean;
-  enforce: boolean;
 }): string[] {
   const apps = new Set<string>();
   if (changed.crowdsec || changed.crowdsecTopic) apps.add('n8n');
   if (changed.criticalServiceTopic) apps.add('uptime-kuma');
-  if (changed.crowdsec || changed.enforce) apps.add('crowdsec');
-  if (changed.enforce) apps.add('nginx-proxy-manager');
-  return ['n8n', 'uptime-kuma', 'crowdsec', 'nginx-proxy-manager'].filter((app) => apps.has(app));
+  if (changed.crowdsec) apps.add('crowdsec');
+  return ['n8n', 'uptime-kuma', 'crowdsec'].filter((app) => apps.has(app));
 }

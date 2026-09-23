@@ -28625,3 +28625,110 @@ no-op-on-fresh-install pattern as `ensureTotpSchema`/`ensureServiceExposureTable
 called from `index.ts` at startup, so the existing `tx-home-utils.com` database
 picks it up on next backend restart without a manual `psql` step. Backend
 typecheck and the full test suite (1184 tests) pass. README item deleted.
+
+## 615. Implemented: per-category ntfy topic+toggle grouping, Enforcement always on
+
+Built §609's plan, confirmed with the user first (category-level reading,
+not literally per managed app — matches §559).
+
+**Backend (`utils/alertNotify.ts`)**: `AlertNotifyConfig` dropped the shared
+`topic` field and `enforceNpm`, and gained `enabled: Record<AlertSource,
+boolean>` alongside the existing `topics: Record<AlertSource, string>` —
+symmetric shape the new grouped-row UI iterates directly, instead of four
+near-duplicate named fields (`crowdsecEnabled`, a `criticalServiceEnabled`
+etc. never existed until now). `crowdsec` keeps its historical off-by-default
+(it's a real opt-in — its relay workflow + CrowdSec notification plugin
+don't exist until asked for); the three new switches
+(`critical_service_alerts_enabled`, `netbird_alerts_enabled`,
+`backup_alerts_enabled`) default **on** with no stored row, since all three
+fired unconditionally before they had a switch at all — defaulting them off
+would have been a silent behaviour change on upgrade.
+
+**Gating point**: `publishAlert()` itself now checks the category's enabled
+flag before sending — one choke point, since `critical-service` (its direct
+auto-restart-alert calls), `netbird` and `backup` all publish only through
+this function (grep confirmed no other caller). CrowdSec doesn't call
+`publishAlert()` at all (its own `notification-http` plugin → n8n relay →
+ntfy), so its switch keeps its existing gate: `writeCrowdsecAlertConfig()`
+omits the notification line from `profiles.yaml` and `applyN8nWorkflows()`
+removes the relay workflow file when off — unchanged, just re-read off
+`enabled.crowdsec` instead of a `crowdsecEnabled` field.
+
+**Scope decision — Uptime Kuma's own down-monitor pushes are NOT gated by
+the `critical-service` switch.** `uptimeKumaCriticalMonitors.ts` (§443) wires
+one shared ntfy notification onto monitors for NPM, Authelia, Tailscale
+Funnel, NetBird management/relay, CrowdSec and n8n's own health — reusing the
+`critical-service` topic for convenience, but it predates the AlertSource
+categorisation and covers far more than "critical-service" alerts in any
+category sense; those monitors don't call `publishAlert()`. Wiring the switch
+into it would mean touching the hand-rolled Uptime Kuma Socket.IO transport
+(`monitor add` has no server-side dedupe at all per that file's own header —
+a wrong edit risks duplicate monitors on every restart) for a change §609
+never asked for. Left alone; documented in the `appsToApplyAlertSettings`
+doc comment so the gap is visible in code, not just here. Turning
+`critical-service` off silences the backend's own auto-restart alerts; Uptime
+Kuma's broader platform-health pushes keep going regardless.
+
+**Enforcement always on**: `applyNpmCrowdsecConfig()` dropped the
+`enforceNpm` read entirely — `enforce` is now just `Boolean(apiKey)` (was
+`enforceNpm && Boolean(apiKey)`). The Settings route no longer calls it at
+all (there's nothing left to toggle); it still runs on every CrowdSec
+(re)start via the existing `applyCrowdsecConfigFiles()` path, so a freshly
+generated bouncer key still gets picked up automatically — same "derived
+automatically, no per-app toggle" shape as exposure (CLAUDE.md). The n8n
+relay workflow's `enforced` flag (only changes push wording — "banned Xh" vs
+not) needed the same "is the key actually generated yet" check, not a
+hardcoded `true`; rather than import `crowdsecConfig.ts`'s local
+`readEnvSecret()` (which would make a real *circular* module import, since
+`crowdsecConfig.ts` already imports `CROWDSEC_ALERT_WEBHOOK_PATH` from
+`n8nWorkflows.ts` — today's one-directional cycle works because the import is
+only used inside a function body, but a second, opposite-direction cycle
+wasn't worth the fragility for one boolean), added a 4-line
+`isNpmBouncerKeyReady()` in `n8nWorkflows.ts` using the already-shared
+`services/appEnv.ts:readAppEnvValue()` plus the same `'change-me'` placeholder
+filter `crowdsecConfig.ts` uses.
+
+**Removing the shared default topic needed a real migration**, not just a
+UI change: an operator who'd customised `ntfy_alerts_topic` away from
+`homelab-alerts` would otherwise have every un-overridden category silently
+start resolving to the hardcoded `DEFAULT_ALERT_TOPIC` instead of their
+chosen value the moment the default-topic field disappeared. Added
+`ensureAlertCategoryTopics()` (same fire-and-forget `ensure*`-at-startup
+shape `utils/database.ts` already uses, called from `index.ts`): reads the
+old `ntfy_alerts_topic` row once, and for every category with no explicit
+`ntfy_topic_<category>` row of its own, writes one seeded from that old
+default (or `DEFAULT_ALERT_TOPIC` if there never was one). No-op on a fresh
+install or one that already has every category set. The stale
+`ntfy_alerts_topic` row itself is left in place, unused — deleting it bought
+nothing.
+
+**Frontend**: `settings.component.html`'s ntfy panel collapsed from
+shared-topic-field + Sources block + Enforcement block + a collapsed
+"per-category channels" accordion down to one row per category (switch +
+topic input + Test), plus one shared "Save topics" button for whichever rows
+changed — "no collapsed section (nothing left to hide once every row is
+substantive)," per §609. `AlertCategory`'s per-row topic field is now always
+required (no more "blank means fall back to the default above," since
+there's no default to show); Test is disabled while that row's switch is
+off, matching the one precedent (CrowdSec's) the old UI already set. i18n:
+dropped `topicLabel`/`saveTopicButton`/`sourcesLabel`/`crowdsecAlerts.*`/
+`enforcementLabel`/`enforceNpm.*`/`perCategoryToggle`/`perCategoryHint` in
+both `en.ts` and `pt-pt.ts`; reworded `title`/`subtitle`/`description` for
+the new shape.
+
+**Tests**: `alertNotify.test.ts` rewritten for the new `enabled` shape,
+`appsToApplyAlertSettings`'s dropped `enforce` param, and two new
+`ensureAlertCategoryTopics()` cases (seeds from the old default; seeds
+`DEFAULT_ALERT_TOPIC` when there never was one). Every other caller
+(`criticalServiceHealth.test.ts`, `backupScheduler.test.ts`,
+`alertTest.test.ts`) already mocks `publishAlert()` at the module level, so
+the new enabled-gate inside it needed no test-file changes there.
+`crowdsecConfig.test.ts`/`n8nWorkflows.test.ts` only exercise pure builder
+functions via `__test`, untouched by this. Backend typecheck + all 1184
+tests pass; frontend build + all 89 karma tests pass.
+
+README TODO item replaced with a beta-test item (no Docker/NPM/CrowdSec
+available in this sandbox to verify enforcement live): confirm all four rows
+show a real (non-blank) topic after the migration runs on the existing host
+database, confirm Test greys out when a row's switch is off, and confirm a
+banned IP still gets a 403 at NPM with the Enforcement switch gone.

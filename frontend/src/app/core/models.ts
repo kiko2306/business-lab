@@ -275,17 +275,12 @@ export interface InvitationInfo {
 export type AlertCategory = 'crowdsec' | 'critical-service' | 'netbird' | 'backup';
 
 export interface AlertNotifySettings {
-  // The default ntfy topic — a category with no override of its own
-  // publishes here. Subscribe to it in an ntfy client.
-  topic: string;
-  // Every category's resolved topic (its own override, or the default).
+  // Every category's resolved ntfy topic. Subscribe to it in an ntfy client.
   topics: Record<AlertCategory, string>;
-  // Per-source flags.
-  crowdsecEnabled: boolean;
-  // Whether CrowdSec's bans are actually enforced, by the Lua bouncer inside
-  // Nginx Proxy Manager. Detection-only when off — and the alert wording
-  // follows it, so a push only says "banned" when the ban is real.
-  enforceNpm: boolean;
+  // Every category's on/off flag (plan.md §609 — no more shared default
+  // topic, no separate Enforcement switch; CrowdSec bans are always
+  // enforced at Nginx Proxy Manager now).
+  enabled: Record<AlertCategory, boolean>;
 }
 
 // One banned IP from CrowdSec's own detections (not the community

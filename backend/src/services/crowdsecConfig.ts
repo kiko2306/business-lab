@@ -470,21 +470,25 @@ function applyNpmBouncerConfig(enforce: boolean, apiKey: string | null): void {
 }
 
 /**
- * Both NPM-side pieces, in the order they have to happen. Exported so the
- * dashboard toggle applies immediately — a config that nginx would reject is
- * worth finding out about while the operator is still looking at the switch,
- * not at NPM's next restart.
+ * Both NPM-side pieces, in the order they have to happen. Exported so a
+ * CrowdSec (re)start applies it immediately — a config that nginx would
+ * reject is worth finding out about right away, not at NPM's next restart.
+ *
+ * Enforcement (the Lua bouncer actually blocking banned IPs at NPM, rather
+ * than CrowdSec only watching/logging) is always on — it was a manual
+ * switch in Settings until plan.md §609 removed it, matching the "derived
+ * automatically, no per-app toggle" shape CLAUDE.md's exposure system
+ * already uses. See docs/app-credentials.md's CrowdSec section.
  */
 export async function applyNpmCrowdsecConfig(): Promise<void> {
   const crowdsec = resolveComposeFile('crowdsec');
-  const { enforceNpm } = await getAlertNotifyConfig();
   const apiKey = crowdsec?.appDir ? readEnvSecret(crowdsec.appDir, NPM_BOUNCER_KEY_ENV) : null;
 
-  if (enforceNpm && !apiKey) {
+  if (!apiKey) {
     logger.warn('CrowdSec: enforcement is on but CROWDSEC_NGINX_BOUNCER_KEY is unset — start CrowdSec once to generate it');
   }
 
-  const enforce = enforceNpm && Boolean(apiKey);
+  const enforce = Boolean(apiKey);
   applyNpmBouncerConfig(enforce, apiKey);
   await applyNpmHttpTopConfig(enforce);
 }
@@ -588,7 +592,8 @@ function resolveAlertTarget(): string {
  * whether profiles.yaml references the notification.
  */
 async function writeCrowdsecAlertConfig(appDir: string): Promise<void> {
-  const { crowdsecEnabled } = await getAlertNotifyConfig();
+  const { enabled } = await getAlertNotifyConfig();
+  const crowdsecEnabled = enabled.crowdsec;
   const target = resolveAlertTarget();
 
   const profilesChanged = writeIfChanged(

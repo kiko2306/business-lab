@@ -40,15 +40,12 @@ import {
   appsToApplyAlertSettings,
   getAlertNotifyConfig,
   isValidAlertTopic,
+  setAlertCategoryEnabled,
   setAlertCategoryTopic,
-  setAlertTopic,
-  setCrowdsecAlertsEnabled,
-  setCrowdsecEnforceNpm,
 } from '../utils/alertNotify';
 import { restartService } from '../services/executor';
 import logger from '../utils/logger';
 import { getService } from '../config/services';
-import { applyNpmCrowdsecConfig } from '../services/crowdsecConfig';
 import { CrowdsecUnavailableError, listCrowdsecBans, unbanCrowdsecIp } from '../services/crowdsecBans';
 import { runAlertTest } from '../services/alertTest';
 import { testNpmConnection } from '../services/npmClient';
@@ -788,36 +785,25 @@ router.get('/alerts', async (_req: Request, res: Response) => {
 });
 
 // ---------------------------------------------------------------------------
-// PUT /api/settings/alerts — set the ntfy topic and/or a source flag.
+// PUT /api/settings/alerts — set a category's topic and/or enabled flag
+// (§609: no more shared default topic, no separate Enforcement switch).
 // A CrowdSec change takes effect on the next CrowdSec (re)start:
 // services/crowdsecConfig.ts re-renders profiles.yaml + notifications/http.yaml.
 // ---------------------------------------------------------------------------
 router.put('/alerts', async (req: Request, res: Response) => {
   const body = req.body ?? {};
-  const hasTopic = 'topic' in body;
-  const hasCrowdsec = 'crowdsecEnabled' in body;
-  const hasEnforce = 'enforceNpm' in body;
-  // Per-category overrides (§553): { topics: { crowdsec?: string, 'critical-service'?: string, ... } }.
-  // An empty string clears that category's override back to the default topic.
+  // { topics: { crowdsec?: string, 'critical-service'?: string, ... } }.
+  // An empty string clears that category's override back to DEFAULT_ALERT_TOPIC.
   const topicsBody: Record<string, unknown> = typeof body.topics === 'object' && body.topics !== null ? body.topics : {};
-  const changedCategories = Object.keys(topicsBody) as AlertSource[];
-  const hasCategoryTopics = changedCategories.length > 0;
+  const changedTopics = Object.keys(topicsBody) as AlertSource[];
+  // { enabled: { crowdsec?: boolean, ... } }.
+  const enabledBody: Record<string, unknown> = typeof body.enabled === 'object' && body.enabled !== null ? body.enabled : {};
+  const changedEnabled = Object.keys(enabledBody) as AlertSource[];
 
-  if (!hasTopic && !hasCrowdsec && !hasEnforce && !hasCategoryTopics) {
-    return res.status(400).json({ error: 'Provide "topic", "topics", "crowdsecEnabled" and/or "enforceNpm".' });
+  if (!changedTopics.length && !changedEnabled.length) {
+    return res.status(400).json({ error: 'Provide "topics" and/or "enabled".' });
   }
-  if (hasCrowdsec && typeof body.crowdsecEnabled !== 'boolean') {
-    return res.status(400).json({ error: 'crowdsecEnabled must be true or false.' });
-  }
-  if (hasEnforce && typeof body.enforceNpm !== 'boolean') {
-    return res.status(400).json({ error: 'enforceNpm must be true or false.' });
-  }
-  if (hasTopic && !isValidAlertTopic(body.topic)) {
-    return res
-      .status(400)
-      .json({ error: 'Topic must be 1–64 characters: letters, digits, hyphens and underscores only.' });
-  }
-  for (const category of changedCategories) {
+  for (const category of changedTopics) {
     if (!ALERT_CATEGORIES.includes(category)) {
       return res.status(400).json({ error: `Unknown alert category "${category}".` });
     }
@@ -828,24 +814,21 @@ router.put('/alerts', async (req: Request, res: Response) => {
       });
     }
   }
+  for (const category of changedEnabled) {
+    if (!ALERT_CATEGORIES.includes(category)) {
+      return res.status(400).json({ error: `Unknown alert category "${category}".` });
+    }
+    if (typeof enabledBody[category] !== 'boolean') {
+      return res.status(400).json({ error: `"${category}" enabled must be true or false.` });
+    }
+  }
 
   try {
-    if (hasTopic) {
-      await setAlertTopic(body.topic);
-    }
-    for (const category of changedCategories) {
+    for (const category of changedTopics) {
       await setAlertCategoryTopic(category, topicsBody[category] as string);
     }
-    if (hasCrowdsec) {
-      await setCrowdsecAlertsEnabled(body.crowdsecEnabled);
-    }
-    if (hasEnforce) {
-      await setCrowdsecEnforceNpm(body.enforceNpm);
-      // Render NPM's bouncer config + http_top.conf block now rather than at
-      // the next CrowdSec start: nginx runs the bouncer's init while parsing
-      // its config, so a problem with it is a problem worth surfacing while
-      // the operator is still looking at the switch (§119.4).
-      await applyNpmCrowdsecConfig();
+    for (const category of changedEnabled) {
+      await setAlertCategoryEnabled(category, enabledBody[category] as boolean);
     }
     await writeAuditLog({
       userId: req.user?.id ?? null,
@@ -853,10 +836,8 @@ router.put('/alerts', async (req: Request, res: Response) => {
       resource: 'ntfy_alerts',
       result: 'success',
       metadata: {
-        ...(hasTopic ? { topic: body.topic } : {}),
-        ...(hasCategoryTopics ? { topics: topicsBody } : {}),
-        ...(hasCrowdsec ? { crowdsecEnabled: body.crowdsecEnabled } : {}),
-        ...(hasEnforce ? { enforceNpm: body.enforceNpm } : {}),
+        ...(changedTopics.length ? { topics: topicsBody } : {}),
+        ...(changedEnabled.length ? { enabled: enabledBody } : {}),
       },
     });
 
@@ -864,20 +845,16 @@ router.put('/alerts', async (req: Request, res: Response) => {
     // rendered into its app's config only when that app starts, and saving
     // used to stop at "Restart CrowdSec to apply" (n8n wasn't even
     // mentioned). The next restart was a host reboot, which re-uses the stale
-    // files, so alerts and bans stayed off for days (§531). restartService
-    // re-renders and recreates, and leaves an app that isn't running alone:
-    // its next start renders the same config.
+    // files, so alerts stayed off for days (§531). restartService re-renders
+    // and recreates, and leaves an app that isn't running alone: its next
+    // start renders the same config.
     const restarted: string[] = [];
     const notRunning: string[] = [];
     const failed: string[] = [];
     const appsToApply = appsToApplyAlertSettings({
-      // The default topic backs every category with no override of its own,
-      // so a default-only change still needs both baked-in consumers to
-      // re-render — only a category-specific override narrows the restart.
-      crowdsecTopic: hasTopic || changedCategories.includes('crowdsec'),
-      criticalServiceTopic: hasTopic || changedCategories.includes('critical-service'),
-      crowdsec: hasCrowdsec,
-      enforce: hasEnforce,
+      crowdsecTopic: changedTopics.includes('crowdsec'),
+      criticalServiceTopic: changedTopics.includes('critical-service'),
+      crowdsec: changedEnabled.includes('crowdsec'),
     });
     for (const app of appsToApply) {
       const label = getService(app)?.label ?? app;
@@ -895,7 +872,9 @@ router.put('/alerts', async (req: Request, res: Response) => {
     if (restarted.length) parts.push(`Applied: restarted ${restarted.join(', ')}.`);
     if (notRunning.length) parts.push(`${notRunning.join(', ')} not running; applies when started.`);
     if (failed.length) parts.push(`Could not restart ${failed.join(', ')}; restart it from Apps to apply.`);
-    if (saved.crowdsecEnabled && hasCrowdsec) parts.push('Subscribe to the topic in ntfy to receive pushes.');
+    if (saved.enabled.crowdsec && changedEnabled.includes('crowdsec')) {
+      parts.push('Subscribe to the topic in ntfy to receive pushes.');
+    }
     return res.json({ ...saved, applied: failed.length === 0, message: parts.join(' ') });
   } catch {
     return res.status(500).json({ error: 'Unable to save alert settings.' });

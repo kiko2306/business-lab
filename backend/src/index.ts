@@ -29,6 +29,7 @@ import {
   ensureTotpSchema,
   ensureAuditLogsIndex,
 } from './utils/database';
+import { ensureAlertCategoryTopics } from './utils/alertNotify';
 import authMiddleware from './middleware/auth';
 import setupModeMiddleware from './middleware/setupMode';
 import { requireCapability } from './middleware/requireCapability';
@@ -245,6 +246,9 @@ dropServiceImageUpdatesTable().catch((err: Error) => {
 });
 ensureAuditLogsIndex().catch((err: Error) => {
   console.error('Unable to ensure audit_logs index:', err.message);
+});
+ensureAlertCategoryTopics().catch((err: Error) => {
+  console.error('Unable to ensure alert category topics:', err.message);
 });
 ensureSocialDraftsTable().catch((err: Error) => {
   console.error('Unable to ensure social_drafts table:', err.message);

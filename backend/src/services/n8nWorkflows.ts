@@ -18,6 +18,7 @@ import path from 'path';
 import logger from '../utils/logger';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getAlertNotifyConfig } from '../utils/alertNotify';
+import { readAppEnvValue } from './appEnv';
 
 export const N8N_SERVICE = 'n8n';
 const WORKFLOWS_DIR_RELATIVE = 'workflows';
@@ -184,6 +185,17 @@ function ntfyPublishUrl(): string {
 }
 
 /**
+ * Same "is CROWDSEC_NGINX_BOUNCER_KEY generated yet" check
+ * applyNpmCrowdsecConfig() uses to decide whether NPM's Lua bouncer is
+ * actually live — CrowdSec generates it on its own first start, so a fresh
+ * install has enforcement pending until then.
+ */
+function isNpmBouncerKeyReady(): boolean {
+  const value = readAppEnvValue('crowdsec', 'CROWDSEC_NGINX_BOUNCER_KEY')?.trim();
+  return Boolean(value && value !== 'change-me');
+}
+
+/**
  * Render the managed workflow files for n8n. No-op for every other service.
  * Never throws — a failure here must not block the container start.
  */
@@ -196,13 +208,13 @@ export async function applyN8nWorkflows(serviceName: string, appDir: string): Pr
     const dir = path.join(appDir, WORKFLOWS_DIR_RELATIVE);
     await fs.mkdir(dir, { recursive: true });
 
-    const { topics, crowdsecEnabled, enforceNpm } = await getAlertNotifyConfig();
+    const { topics, enabled } = await getAlertNotifyConfig();
     const target = path.join(dir, `${CROWDSEC_ALERT_WORKFLOW_ID}.json`);
 
     // Only ship the relay while CrowdSec alerts are on. Removing the file
     // stops it being re-imported; an already-imported copy is left in place
     // (n8n has no clean CLI delete, and a stale inactive workflow is inert).
-    if (!crowdsecEnabled) {
+    if (!enabled.crowdsec) {
       await fs.rm(target, { force: true });
       return;
     }
@@ -210,7 +222,11 @@ export async function applyN8nWorkflows(serviceName: string, appDir: string): Pr
     const workflow = buildCrowdsecAlertWorkflow({
       topic: topics.crowdsec,
       ntfyUrl: ntfyPublishUrl(),
-      enforced: enforceNpm,
+      // Enforcement (§119) is always on (§609 removed its switch) but only
+      // takes effect once CrowdSec has generated its NPM bouncer key —
+      // same "is the key ready" check applyNpmCrowdsecConfig uses, so the
+      // relay's "banned Xh" wording matches whether NPM is actually enforcing.
+      enforced: isNpmBouncerKeyReady(),
     });
     await fs.writeFile(target, `${JSON.stringify(workflow, null, 2)}\n`, 'utf8');
     logger.info('n8n: rendered managed workflow', { id: CROWDSEC_ALERT_WORKFLOW_ID });
