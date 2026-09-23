@@ -280,3 +280,18 @@ it is done — not ticked off and left behind. Section references point at
       `docker exec` path to trigger it directly. Needs a beta test once
       built: change the timezone in Settings, confirm `timedatectl status`
       on the host actually flips.
+
+- [ ] **ntfy panel: group each source's topic+toggle, drop the global
+      default, always-on Enforcement** — plan in plan.md §609. Today
+      `crowdsec`/`critical-service`/`netbird`/`backup` each have their own
+      topic override but only `crowdsec` has an enable switch, all four fall
+      back to one global default topic, and Enforcement (the NPM Lua
+      bouncer actually blocking banned IPs, not a notification setting) is a
+      separate manual switch — the UI splits a category's toggle and its
+      topic input into two different sections. Plan: one grouped row per
+      category (switch + topic + Test), no global default (migrate any
+      category still relying on it into its own explicit topic first, and
+      default the three new switches to enabled, so nothing goes silently
+      quiet), and Enforcement always on with the switch removed. §609 flags
+      the "each app" reading (category-level, not literally per managed
+      app, per §559) for confirmation before this is built.

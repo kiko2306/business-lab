@@ -28343,3 +28343,72 @@ reads `app_timezone` (either a direct Postgres read or a tiny read-only
 backend endpoint), idempotent apply. If `nsenter`/`util-linux` isn't already
 in whatever base image gets used, check `docs/licences.md` for it — no new
 upstream *project* either way, just a base image.
+
+## 609. Planned: per-source ntfy topic+toggle grouping, Enforcement always on
+
+User asked for three changes to the Settings > ntfy panel
+(`settings.component.html:112-283`, `alertNotify.ts`): drop the single
+global default topic ("each app must have their own topic"), give every
+notification source an on/off switch like CrowdSec's, and always-on
+Enforcement with the switch removed. Checked the current shape before
+agreeing this maps cleanly, since "each app" doesn't quite match what
+exists.
+
+**What's actually there today**, four `AlertSource` categories
+(`alertNotify.ts:39-41`): `crowdsec`, `critical-service`, `netbird`,
+`backup` (§553/§559 already decided per-*category*, not per-individual-app,
+covers the need — `critical-service` and `backup` are each one bucket for
+several underlying apps). Each category has its own topic override
+(`ntfy_topic_<category>`) that falls back to one global default topic
+(`ntfy_alerts_topic`, `DEFAULT_ALERT_TOPIC = 'homelab-alerts'`) when unset.
+Only **`crowdsec`** has an enable/disable flag (`crowdsec_alerts_enabled`) —
+`critical-service`/`netbird`/`backup` fire unconditionally whenever their
+topic resolves. **Enforcement** (`crowdsec_enforce_npm`) is a separate,
+unrelated switch — not a notification toggle at all, it's whether the NPM
+Lua bouncer actually blocks banned IPs (§119) vs. CrowdSec only
+watching/logging; toggling it restarts both CrowdSec and NPM
+(`alertNotify.ts:190-207`). The UI splits related controls apart: the
+default-topic field sits at the top (`settings.component.html:124-152`),
+CrowdSec's enable switch sits alone in a "sources" block (154-188),
+Enforcement sits in its own block (190-209), and every category's *topic*
+input lives in a separate collapsed "per-category channels" section further
+down (211-267) — so a category's on/off state and its topic name are never
+visually together, which is the concrete thing making "group them" true.
+
+**Sanity check before building** (flagging back, this is the plan, not yet
+agreed in detail):
+
+- "Each app" reads best as "each of the four existing categories," not a
+  literal per-managed-app topic — splitting `critical-service` into one
+  topic per individual watched service, or `backup` into one per backed-up
+  app, would multiply the UI for no request behind it and reopen §559's
+  already-settled call. Building the category-level version unless told
+  otherwise.
+- Dropping the global default topic removes the fallback net: a category
+  with no topic of its own would go from "silently uses `homelab-alerts`"
+  to "silently sends nothing" — needs a one-time migration that backfills
+  any category currently relying on the default into its own explicit
+  `ntfy_topic_<category>` row, so existing behaviour doesn't go quiet on
+  upgrade.
+- The three categories gaining a new enable switch
+  (`critical_service_alerts_enabled`, `netbird_alerts_enabled`,
+  `backup_alerts_enabled`, same naming convention as `crowdsecEnabled`) need
+  to **default to enabled** for the same reason — they fire unconditionally
+  today, so a default of `false` would be a silent behaviour change, not a
+  neutral new option.
+- Removing Enforcement's switch and hardcoding it on
+  (`applyNpmBouncerConfig`/`applyNpmHttpTopConfig` called unconditionally,
+  same "derived automatically, no per-app toggle" shape CLAUDE.md's
+  exposure system already uses) is a real one-time CrowdSec+NPM restart on
+  whatever host is running when this ships, for any install that had it off
+  — acceptable on the no-guarantees dev/test box per CLAUDE.md, worth
+  knowing going in.
+
+**Planned shape**: one row per category (`crowdsec`, `critical-service`,
+`netbird`, `backup`) — enable switch + topic input + Test button grouped
+together, no default-topic field, no separate Enforcement block, no
+collapsed section (nothing left to hide once every row is substantive).
+Enforcement's own text/description moves onto the CrowdSec card in
+`docs/app-credentials.md`/wherever it's explained, since it's no longer a
+setting to find. Not implemented — this section and the README item are the
+plan.
