@@ -29573,3 +29573,102 @@ every other one.
   knowing a domain and store uuid was sufficient (§622).
 - Revocation is deleting one row. The agent's next call gets a 401 and it stops;
   re-enrolment is a fresh code.
+
+## 628. Planned: Authelia guest paths, database engine, and ports
+
+Three independent decisions from the README list, planned together. Researching
+the first one surfaced a structural conflict that decides the other two, so
+they are recorded in that order.
+
+### The conflict: Authelia policy is per-app, shared secrets are per-app
+
+`check-in` and `pulse` must be reachable with no login; `hotel-admin` must not
+be. Authelia policy in this repo is a **per-app** property —
+`skipAutheliaProtection` and `autheliaBypassPaths` live on the
+`ServiceDefinition`, and `renderAccessControl` applies an app's bypass paths to
+every hostname it owns. So one app cannot hold both a public and a gated
+hostname today.
+
+The obvious answer — four separate apps — hits the opposite wall. §623 requires
+one shared database so the data is not duplicated, and a generated database
+password is written per app by `appEnv.ts`. Four compose projects sharing one
+database needs an external Docker network *and* a secret shared across four
+`.env` files, neither of which this platform does.
+
+**Resolution: one `apps/hotel/` app, plus a per-exposure Authelia policy.**
+The four containers are one deployable product — they share a database, start
+and stop together, and back up together — so one compose project is the honest
+modelling. The missing piece is small: `additionalExposures` already carries
+per-entry `suffix`, `label`, `portEnvVar`, `grpc` and `apex`, and each entry
+already gets its own `service_exposure` row and its own hostname. Adding an
+optional per-entry Authelia policy is one field plus a few lines in
+`renderAccessControl`, against four compose projects needing platform features
+that do not exist.
+
+### 1. Authelia
+
+`buildExposureHostname` stems additional hostnames as
+`<subdomain>-<suffix>.<base-domain>`, so:
+
+| Hostname | Serves | Policy |
+|---|---|---|
+| `hotel.<domain>` | `hotel-admin` | **Gated** — default, no flag. |
+| `hotel-checkin.<domain>` | `check-in` | **Public** — guest link, recipient has no account. |
+| `hotel-pulse.<domain>` | `pulse` | **Public** — same. |
+| `hotel-core.<domain>` | `hotel-core` | **Gated**, plus `autheliaBypassPaths: ['^/agent($|/)']` for the agent. |
+| `tally.<domain>` | `tally` | **Gated**, plus the same agent bypass for its WebSocket. |
+
+Bypass rules are emitted *before* the `one_factor` rule because Authelia takes
+the first match — that ordering is already handled and must not be disturbed.
+
+**The guest pages are capability URLs**: the uuid in `/checkin/:uuid` *is* the
+authorisation, which is why those hostnames can be wholly public. That only
+holds if the uuid is unguessable, and the legacy code is not uniformly safe
+here — `tally`'s `storeClass.js` uses **uuid v1**, which encodes a timestamp
+and MAC address and is partially predictable. Every capability identifier in
+the rebuilds is random (v4), and that is a correctness requirement, not a
+preference.
+
+Agent endpoints bypass Authelia safely because §627 gives them their own token
+auth — the bypass hands the request to a service that authenticates it, rather
+than to nothing.
+
+### 2. Database engine: Postgres
+
+Confirmed, with precedent rather than preference: the dashboard itself runs
+Postgres, and managed apps already bundle their own — `n8n` declares
+`backup: { engine: 'postgres', service: 'n8n-db' }`, `twenty` generates its
+database password through `hiddenGeneratedSecrets`. Both new apps follow that
+shape:
+
+- `apps/hotel/` — one `hotel-db` service, shared by `hotel-core`, `check-in`
+  and `pulse`, with `backup: { engine: 'postgres', service: 'hotel-db' }`.
+- `apps/tally/` — its own `tally-db`, same declaration.
+
+Neither database container publishes a host port; they are reachable only on
+the compose network. The generated password is a `hiddenGeneratedSecrets`
+entry, so it never needs to be seen or typed.
+
+This also settles §626's naming rule: Postgres conventions — `snake_case`,
+plural tables, `timestamptz`, `<singular>_id`.
+
+### 3. Ports
+
+`docs/ports.md` allocates managed apps from `10100` in steps of ten, and a
+multi-service app takes a block inside its ten — `netbird` already holds
+`10250`–`10253`. New apps append at the tail, and `10600`+ is free:
+
+| Port | Env var | Service |
+|---|---|---|
+| `10600` | `HOTEL_ADMIN_PORT` | `hotel-admin` (primary exposure) |
+| `10601` | `HOTEL_CHECKIN_PORT` | `check-in` |
+| `10602` | `HOTEL_PULSE_PORT` | `pulse` |
+| `10603` | `HOTEL_CORE_PORT` | `hotel-core` |
+| — | — | `hotel-db` — no host port |
+| `10610` | `TALLY_PORT` | `tally` |
+| — | — | `tally-db` — no host port |
+
+Two apps, not five, so `docs/ports.md`, `docs/app-credentials.md` and
+`docs/licences.md` each take two new rows — plus a licence row per base image
+in both compose files, checked against the resale model as the convention
+requires.

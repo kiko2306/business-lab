@@ -438,27 +438,33 @@ before anything is built.
       transmitted. Also drop `<domain>` and `<store name>` from the agent
       config — the enrolment code binds the agent to its store, so both are
       derived — and stop compiling the API URL into the binary (§622).
-- [ ] **Decide how the guest and agent paths escape the Authelia gate** —
-      exposure is automatic and everything lands behind Authelia (plan.md
-      §331), but three of these must not be: the guest check-in and quiz links
-      (`/checkin/:uuid`, `/quiz/:uuid` — the recipient has no account) and the
-      agent's API calls. `hotel-admin` should stay gated. Decide per app
-      between per-path bypasses (the established pattern here) and
-      `skipAutheliaProtection` with the service's own auth, and write it into
-      each app's `services.ts` entry when it is added. Getting this wrong
-      turns a working guest link into a login redirect. The agent half is
-      settled by plan.md §627 — those endpoints authenticate themselves with
-      an agent token, so bypassing Authelia on them is safe; what is left to
-      decide is the guest paths.
-- [ ] **Confirm the database engine for the rebuilds** — §623 proposes
-      **Postgres**, matching the rest of this repo, rather than carrying the
-      legacy MySQL over. Affects the shared hotel database container and
-      `tally`'s. Cheap to decide now, expensive after the schema exists.
-- [ ] **Set up the shared frontend theme all five apps build against** —
+- [ ] **Add a per-exposure Authelia policy to `additionalExposures`** —
+      plan.md §628. Authelia policy is a per-app property today
+      (`skipAutheliaProtection` / `autheliaBypassPaths` on the
+      `ServiceDefinition`, applied by `renderAccessControl` to every hostname
+      the app owns), so one app cannot hold both a public and a gated
+      hostname. `apps/hotel/` needs exactly that: `hotel.<domain>` gated,
+      `hotel-checkin.<domain>` and `hotel-pulse.<domain>` public. Add an
+      optional per-entry policy field to `additionalExposures` — which already
+      carries `suffix`, `label`, `portEnvVar`, `grpc` and `apex`, and already
+      gets its own `service_exposure` row and hostname — and honour it in
+      `renderAccessControl`. Keep bypass rules emitted before the
+      `one_factor` rule; Authelia takes the first match. Backend change to the
+      dashboard itself, so it needs `services.test.ts` and
+      `autheliaAccessControl.test.ts` coverage and a version bump.
+- [ ] **Use random (v4) identifiers for every capability URL** — plan.md §628.
+      The guest check-in and feedback pages are wholly public, so the uuid in
+      `/checkin/:uuid` *is* the authorisation. That only holds if it cannot be
+      guessed, and the legacy code is not uniformly safe: `tally`'s
+      `storeClass.js` uses **uuid v1**, which encodes a timestamp and MAC
+      address. Every capability identifier in the rebuilds is random — a
+      correctness requirement, not a preference.
+- [ ] **Set up the shared frontend theme every app builds against** —
       plan.md §626. `frontend/src/styles.css` (Bootstrap 5.3, `data-bs-theme`
       dark mode, the `--app-canvas`/`--app-surface`/`--app-surface-raised`
       tokens and the `.table-stack` responsive-table pattern) becomes a single
-      shared source every app's build references — **not** a copy per app,
+      shared source every app's build references — `hotel-admin`, `check-in`,
+      `pulse` and `tally` — **not** a copy per app,
       which is the drift that put 135 entries between `setup/` and
       `trigenius/`. Decide the mechanism (relative path from each app's
       `angular.json`, or a workspace package) and confirm a theme change lands
@@ -492,12 +498,15 @@ before anything is built.
       in the legacy agent. They are ported only if online payment is actually
       wanted. Decide explicitly — the default is to drop them, and that should
       be a recorded decision rather than a silent omission.
-- [ ] **Allocate ports and registry entries for the five new apps** — per
-      `docs/ports.md`, new apps append at the tail; `10600`+ is free.
-      `check-in`, `hotel-admin`, `hotel-core`, `pulse` and `tally` need a
-      host port each, the shared hotel database container none. Each also
-      needs a `services.ts` entry, mandatory `homepage.*` compose labels, and
-      rows in `docs/ports.md`, `docs/app-credentials.md` and
-      `docs/licences.md` — the licence rows are trivial here (our own
-      software) but still required, and every base/sidecar image in each
-      compose file needs checking against the resale model.
+- [ ] **Register `apps/hotel/` and `apps/tally/`** — plan.md §628 settles the
+      shape: two apps, not five. `apps/hotel/` is one compose project holding
+      `hotel-admin` (`10600`), `check-in` (`10601`), `pulse` (`10602`),
+      `hotel-core` (`10603`) and a shared `hotel-db` with no host port;
+      `apps/tally/` is `tally` (`10610`) plus its own `tally-db`. Both declare
+      `backup: { engine: 'postgres', service: '<db>' }` and generate their
+      database password through `hiddenGeneratedSecrets`, following `n8n` and
+      `twenty`. Each needs a `services.ts` entry with its
+      `additionalExposures`, mandatory `homepage.*` compose labels, and rows in
+      `docs/ports.md`, `docs/app-credentials.md` and `docs/licences.md` — a
+      licence row per app **and per base image**, checked against the resale
+      model.
