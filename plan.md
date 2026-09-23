@@ -29276,3 +29276,72 @@ layer disappears, and users and store access become ordinary rows.
    database container publishing none.
 5. **Data migration** from the live legacy deployments — out of scope until the
    schema exists; the existing migration TODO items cover what has to survive.
+
+## 624. The multi-client surface to remove in the rebuilds (sharpens §623)
+
+§623 framed "one box, one client" as something that *kills the legacy
+deployment machinery" — as a side effect. That is the wrong framing. It is a
+**requirement**: every multi-client construct built into these projects is
+removed, and this section is the inventory rather than the phrase.
+
+The two projects are opposites, which decides how much work each removal is.
+
+### Hotel Utils — multi-client lives *outside* the application
+
+The Laravel app has **no tenant concept at all**: no `tenant`/`client_id`
+column anywhere in the models or the 45 migrations, and no client parameter on
+any route. It was already one-client-per-instance. Everything multi-client is
+the machinery wrapped *around* it:
+
+- `deploy-new-instance.sh` — client-name prompt, `../<client>` folder creation,
+  first-free-block-of-3-ports hunting from 1100, `compose.yaml` project-name and
+  port rewriting, `APP_KEY` generation, Cloudflare tunnel ingress + three CNAME
+  upserts per client.
+- `update-clients.sh` — `--all` / `--client` rsync of the template into live
+  client folders, preserving each one's `api/.env` and `compose.yaml`.
+- The `setup/` vs instance split itself, and the placeholders the script
+  rewrites (`name: hotel-utils`, ports `9201`/`9202`/`9104`).
+- `.cloudflare.env`, `.cloudflare.env.example`, `how-to-cloudflre-access.md`,
+  `.deploy-new-instance.lock`.
+- The per-client Cloudflare hostname scheme
+  (`whotutils-<client>`, `phpmyadmin-<client>`, `mail-<client>`).
+
+Removal here costs nothing: none of it gets ported. The dashboard's existing
+start/stop/expose/update path is the replacement, and the `setup/`-drifts-from-
+`trigenius/` problem (135 entries) disappears with the template.
+
+### PBordo — multi-client is threaded *through* the application
+
+Here removal is a real design change, because the `domain` layer is in every
+tier:
+
+- **Store**: `api/data/<domain>.json` as the unit of storage, and `Domain`
+  (`domainClass.js`) as the aggregate holding `stores[]` and `users[]`.
+  `addDomain`, `removeDomain`, `getDomain`, `updateDomain`, `isNew`.
+- **API**: a `:domain` segment or body field on effectively every route —
+  `/store/:domain/:store/overview`, `/store/:domain/:user/list`,
+  `/store/:domain/:store/sold_items`, `/store/:domain/:store/tables`,
+  `/store/set_ip`, `/login/user` — plus `POST /login/domain`, a whole
+  domain-password gate that exists only to pick a tenant.
+- **Frontend**: `DomainSelectionComponent` as the app's landing route, the
+  `/cli/:domain` login route, `domain.service.ts` holding the selection, and
+  the `domain` threaded through `cli-login.service.ts`, `overview.service.ts`
+  and `shop.service.ts`.
+- **Agent**: `<domain value="..."/>` in `pbordo.config`, read by `Config.cs` and
+  sent on every `set_ip` post.
+
+All of it goes. The deployment identifies the client, so the API becomes
+`/stores/:store/overview` and the SPA opens straight on login.
+
+### What is *not* multi-client, and stays
+
+The distinction that matters: **client** multiplicity is removed, multiplicity
+*within* a client is not.
+
+- Hotel `units` — one client can be a group with several properties. Keeps its
+  per-unit flags (`checkin_is_active`, `checkout_quiz_id`,
+  `checkout_quiz_is_active`) and the `unit_user` access table.
+- PBordo `stores` — one restaurant group runs several shops. Keeps per-store
+  records and each user's `access[]` list of permitted stores.
+
+Both survive as ordinary rows. Only the layer above them — the tenant — is cut.

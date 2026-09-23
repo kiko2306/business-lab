@@ -351,9 +351,15 @@ on-premise agents only. Hotel Utils becomes `hotel-core` (owns units, guests
 and reservations, and is the only service its agent talks to), `hotel-checkin`,
 `hotel-quiz`, one `hotel-admin` Angular shell over all three, and a shared
 database container. PBordo becomes an agent plus a single API + frontend. All
-of them land as dashboard-managed apps under `apps/`, which removes the legacy
-per-client cloning scripts entirely — a client deployment *is* a business-lab
-deployment.
+of them land as dashboard-managed apps under `apps/`.
+
+**One box, one client is a requirement, not a side effect.** Every multi-client
+construct in these projects is removed; plan.md §624 is the inventory. Hotel
+Utils has no tenancy inside the app at all, so removal there is simply not
+porting the deploy scripts. PBordo threads a `domain` layer through its store,
+every API route, the SPA's landing page and the agent's config — removing that
+is real design work. Multiplicity *within* a client stays: hotel `units` and
+PBordo `stores` remain ordinary rows.
 
 The `sample/` copies stay reference-only. Per-slice scope is still proposed
 before anything is built.
@@ -374,6 +380,17 @@ before anything is built.
       asks. The dormant check-out/payment half (`CheckOut.cs`, night audit,
       invoice/payment DAOs) is in-scope only if online payment is wanted —
       confirm either way rather than porting it by default.
+- [ ] **Strip PBordo's `domain` tenant layer** — inventory in plan.md §624.
+      One box serves one client, so the domain layer goes: `data/<domain>.json`
+      and the `Domain` aggregate, the `:domain` segment on every store route,
+      `POST /login/domain` and its domain-password gate,
+      `DomainSelectionComponent` as the landing route, `/cli/:domain`,
+      `domain.service.ts` and the `domain` threaded through the other three
+      Angular services, and `<domain>` in the agent's `pbordo.config`. The API
+      becomes `/stores/:store/overview` and the SPA opens on login. Keep
+      `stores` and each user's `access[]` — those are multiplicity within one
+      client, not tenancy. Do this as part of the PBordo migration below, not
+      as a port-then-strip.
 - [ ] **Migrate PBordo (`sample/pbordo`) off the legacy stack** — how the
       existing system works is in plan.md §622. The migration has to carry
       over: the pull-on-demand model (the cloud holds no business data and
