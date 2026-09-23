@@ -28782,3 +28782,93 @@ No spec added for `UnsubscribeComponent` — neither sibling public page
 (`AccessDeniedComponent`, `SetPasswordComponent`) has one. Backend
 typecheck + all 115 test files (1188 tests) pass; frontend build + all 89
 karma tests pass.
+
+## 617. Planned: richer self-update progress detail — which image, which app, a real "checking" phase
+
+User asked whether the Update page's per-phase progress line (e.g.
+"Building the images that changed…") could say more — which container is
+building, or whether a check is actually in flight. Read the whole
+pull→build→apps→restart sequence (`services/selfUpdate.ts`) and its
+frontend (`self-update.component.ts/html`) before shaping this — the
+progress line today is one flat i18n string keyed only by
+`SelfUpdateRunState` (`selfUpdate.progress.<state>`), and `self_update_runs`
+carries no sub-state at all.
+
+**What's coarse today, concretely**:
+
+- **`building`**: `runSelfUpdateSequence` runs one
+  `docker compose build ...buildTargets` call for however many of
+  `frontend`/`backend` changed (`classifyDeploy`'s `BACKEND_BUILD_RE` /
+  `FRONTEND_BUILD_RE`). Whichever one docker is actually compiling right
+  now is invisible — the row just says `state = 'building'` until both are
+  done.
+- **`updating_apps`**: `executor.updateAllInstalledApps` already iterates
+  installed apps one at a time (`pullAndRecreateService`, with a
+  `BETWEEN_APPS_MS` pause between each) — the loop has exactly the
+  granularity to report, it's just never written anywhere the panel can
+  read.
+- **The pre-trigger check**: `triggerSelfUpdate` calls `checkForUpdate()`
+  (a `git fetch` against the remote, up to a 30s timeout) and *awaits it
+  before creating the run row* — so a slow/unreachable remote stalls the
+  `POST /self-update/trigger` response itself with **no row and no visible
+  state at all**, and a fetch failure there throws straight to a toast
+  (`selfUpdate.errors.startFailed`) instead of landing in the run history
+  like every other failure mode. The `checking` state that *does* exist in
+  `SelfUpdateRunState` is therefore near-instantaneous today — inserted
+  already past the real check, immediately overwritten to `pulling`.
+
+**Shape of the fix, one column + three touch points**:
+
+- Add a nullable `self_update_runs.detail TEXT` column
+  (`ensureSelfUpdateTable`'s `CREATE TABLE IF NOT EXISTS`, plus an
+  `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for existing databases, same
+  idiom as `ensureTotpSchema`). `updateRun()` gains a `detail` field
+  (`COALESCE` pattern like the others); `rowFromDb`/`SelfUpdateRunRow`
+  (backend) and `SelfUpdateRun` (frontend `models.ts`) both grow
+  `detail: string | null`. Backend writes an already-human-readable
+  fragment; the frontend just appends it — no new formatting logic on that
+  side, matching the ladder (reuse the flat-string approach already there
+  rather than inventing a structured sub-state type for one column's worth
+  of data).
+- **Building**: replace the single multi-target `docker compose build`
+  call with a loop over `buildTargets`, one `updateRun(runId, { detail:
+  target })` before each target's own `docker compose build <target>` —
+  same total work (classic builder's on-disk cache is unaffected by being
+  invoked once per service instead of once for all), just visible between
+  steps. `pruneDockerCruft('building')` still runs once, after the loop.
+- **Updating apps**: `updateAllInstalledApps` gains an optional
+  `onProgress?: (label: string) => Promise<void>` callback, called with
+  e.g. `"Paperless (3/7)"` before each `pullAndRecreateService`.
+  `executor.ts` stays decoupled from `self_update_runs` (it already knows
+  nothing about that table) — `runSelfUpdateSequence` supplies the callback
+  and is the only thing that calls `updateRun`.
+- **A real checking phase**: split `triggerSelfUpdate` so the row is
+  inserted *before* the network fetch, not after. `fromCommit` at insert
+  time comes from a plain local `git rev-parse HEAD` (no network, near
+  instant) rather than `checkForUpdate()`'s result. `runSelfUpdateSequence`
+  itself then calls `checkForUpdate()` as its first step, with the run
+  already sitting in `state = 'checking'` for however long the fetch
+  actually takes; a fetch failure there now becomes `state = 'error'` with
+  the git error as `errorMessage`, landing in run history like every other
+  failure instead of a one-off toast with no row. `checkNow()`'s own
+  standalone endpoint (the panel's "Check now" button, unrelated to a
+  triggered run) is untouched — this only changes the check that already
+  happens as the first real step of an update.
+
+**Rejected for now**: streaming raw `docker compose build`/`pull` output
+(actual layer-by-layer progress) — a much bigger surface (log parsing
+across the classic builder's output format, a transport for streaming it to
+the panel) for detail past what was actually asked for (which container,
+whether a check is running). If finer detail than "which image" /
+"which app" is wanted later, revisit then.
+
+**Tests to add when built**: `selfUpdate.test.ts` — `detail` set/cleared
+correctly across the building loop and the app-update callback;
+`triggerSelfUpdate` creating a `checking` row before any network call
+(mock `checkForUpdate` to hang, assert the row already exists); a fetch
+failure inside the sequence landing as an `error` row rather than a thrown
+rejection. Frontend: no new spec needed beyond what
+`self-update.component.spec.ts` already covers, since the change is just
+one more interpolated string in the existing progress alert.
+
+Not implemented — this section and the README item are the plan.
