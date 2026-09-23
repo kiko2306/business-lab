@@ -29191,3 +29191,88 @@ cloud API + web UI), opposite data direction, and both answer "how does the
 cloud know this agent is who it claims to be?" with nothing at all. A rebuild
 covering both should treat **agent identity and enrolment** as the first
 problem, not a later hardening pass.
+
+## 623. Planned: target architecture for the Wintouch rebuilds
+
+Planning pass only — nothing is built. Decides the shape of the rebuilds
+analysed in §620 (Hotel Utils) and §622 (PBordo). Scope per slice still gets
+proposed before any of it starts.
+
+### Decided
+
+**Stack.** Angular frontends, Node/TypeScript/Express APIs — everything except
+the on-premise agents, which stay **.NET Windows services**. They have no
+choice: both load or query Wintouch on the hotel/shop's own Windows box.
+
+**Hotel Utils** becomes, under `apps/`:
+
+| Piece | What it is |
+|---|---|
+| Windows service | On-prem agent, replacing `WHotWebService`. Talks to **one** endpoint. |
+| `hotel-core` | Express API owning the shared tables — units, guests, reservations. The only service the agent speaks to. |
+| `hotel-checkin` | Express API + guest-facing frontend for online check-in. |
+| `hotel-quiz` | Express API + guest-facing frontend for the post-stay quiz. |
+| `hotel-admin` | One Angular shell for administration, calling all three APIs. |
+| shared database | Its own container, no host port. |
+
+**PBordo** becomes a Windows service plus a single API + frontend
+(`apps/pbordo`), with its own database.
+
+**Why the core service exists.** §622's check of the legacy schema found that
+one `reservations` row carries *both* flows' state — `checkin_sent`,
+`checkin_success`, `quiz_sent`, `quiz_response` on the same row — and `units`
+holds `checkin_is_active` beside `checkout_quiz_id`/`checkout_quiz_is_active`,
+with `quiz_responses` keyed on `reservation_id`. A shared database is therefore
+right, but it means two services writing the same rows. `hotel-core` owns
+ingest and the shared columns; check-in and quiz read them and write only their
+own. It also gives the agent a single place to authenticate.
+
+Worth stating plainly: this is **three backends plus an admin frontend and a
+database**, not the two containers first described. That was chosen knowingly;
+recording it so the count is not a surprise later.
+
+**Home: `apps/`, dashboard-managed.** Both products become managed apps in this
+repo — `apps/<name>/` with compose and `.env.example`, entries in
+`services.ts`, ports per `docs/ports.md`, rows in `docs/ports.md`,
+`docs/app-credentials.md` and `docs/licences.md`, and mandatory `homepage.*`
+labels.
+
+### What that decision kills
+
+A per-client deployment **is** a business-lab deployment (CLAUDE.md: production
+is a separate deployment with its own domain and credentials). So one client =
+one box = one instance of these apps. That removes the legacy
+`deploy-new-instance.sh` / `update-clients.sh` machinery entirely — no folder
+cloning, no port-block hunting, no rsyncing a template into live clients, and
+no `setup/` drifting 135 entries from `trigenius/`. The dashboard's existing
+start/stop/expose/update path replaces all of it.
+
+The same collapse applies to PBordo's multi-tenancy. Legacy PBordo ran one
+cloud API across many domains (`capa`, `cufra`, `flow`, `lacopa`), each with
+its own stores and users. If a restaurant group's deployment is its own box,
+`data/<domain>.json` reduces to "the stores in *this* deployment" — the domain
+layer disappears, and users and store access become ordinary rows.
+
+### Open, in the order they block things
+
+1. **Agent identity and enrolment** — already a README item, still the first
+   problem. Now narrower: each agent talks to exactly one endpoint
+   (`hotel-core`, or the PBordo API), so one enrolment mechanism serves both.
+   Nothing else can be designed around until it is chosen.
+2. **Exposure vs Authelia.** Exposure here is automatic and everything lands
+   behind Authelia (§331). Three of these must not be: the guest check-in and
+   quiz links (`/checkin/:uuid`, `/quiz/:uuid` — the recipient has no account),
+   and the agent's API calls. `hotel-admin` *should* stay gated. So this needs
+   either per-path Authelia bypasses (the established pattern here) or
+   `skipAutheliaProtection` with the service's own auth, decided per app. This
+   has bitten before — an exposure gate turning a working path into a login
+   redirect.
+3. **Database engine** — proposed: **Postgres**, matching the rest of this
+   repo, rather than carrying MySQL over from the legacy stack. Not yet
+   confirmed.
+4. **Ports.** In practice new apps append at the tail rather than slotting in
+   alphabetically. Free from `10600`: `hotel-admin`, `hotel-checkin`,
+   `hotel-core`, `hotel-quiz`, `pbordo` — five host ports, with the shared
+   database container publishing none.
+5. **Data migration** from the live legacy deployments — out of scope until the
+   schema exists; the existing migration TODO items cover what has to survive.

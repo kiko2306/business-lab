@@ -345,9 +345,18 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Wintouch sample rebuilds
 
-Both samples live under `sample/` as reference only — no `apps/` entry, no
-`services.ts` row, no exposure. Scope of each rebuild is **not yet agreed**;
-these items track the migration work, not a decision to start it.
+Target architecture is agreed and recorded in plan.md §623: Angular
+frontends, Node/TypeScript/Express APIs, and .NET Windows services for the
+on-premise agents only. Hotel Utils becomes `hotel-core` (owns units, guests
+and reservations, and is the only service its agent talks to), `hotel-checkin`,
+`hotel-quiz`, one `hotel-admin` Angular shell over all three, and a shared
+database container. PBordo becomes an agent plus a single API + frontend. All
+of them land as dashboard-managed apps under `apps/`, which removes the legacy
+per-client cloning scripts entirely — a client deployment *is* a business-lab
+deployment.
+
+The `sample/` copies stay reference-only. Per-slice scope is still proposed
+before anything is built.
 
 - [ ] **Migrate Hotel Utils (`sample/hotel`) off the legacy stack** — how the
       existing system works is in plan.md §620. The migration has to carry
@@ -384,6 +393,31 @@ these items track the migration work, not a decision to start it.
       migrations above and should be settled first. Both samples answer "how
       does the cloud know this agent is who it claims to be?" with nothing:
       Hotel Utils gives the PMS credentials to any caller of `/api/config`,
-      PBordo never checks who is calling. Same vendor, same three tiers, so
-      one enrolment mechanism should serve both. Nothing else in either
-      migration is safe to design around until this is chosen.
+      PBordo never checks who is calling. §623 narrows it usefully — each
+      agent now talks to exactly one endpoint (`hotel-core`, or the PBordo
+      API), so one enrolment mechanism serves both. Must cover enrolment with
+      no console step on the host (CLAUDE.md principle 2), so the credential
+      is issued from the dashboard UI and the agent installer carries only
+      what a human can paste once.
+- [ ] **Decide how the guest and agent paths escape the Authelia gate** —
+      exposure is automatic and everything lands behind Authelia (plan.md
+      §331), but three of these must not be: the guest check-in and quiz links
+      (`/checkin/:uuid`, `/quiz/:uuid` — the recipient has no account) and the
+      agent's API calls. `hotel-admin` should stay gated. Decide per app
+      between per-path bypasses (the established pattern here) and
+      `skipAutheliaProtection` with the service's own auth, and write it into
+      each app's `services.ts` entry when it is added. Getting this wrong
+      turns a working guest link into a login redirect.
+- [ ] **Confirm the database engine for the rebuilds** — §623 proposes
+      **Postgres**, matching the rest of this repo, rather than carrying the
+      legacy MySQL over. Affects the shared hotel database container and
+      PBordo's. Cheap to decide now, expensive after the schema exists.
+- [ ] **Allocate ports and registry entries for the five new apps** — per
+      `docs/ports.md`, new apps append at the tail; `10600`+ is free.
+      `hotel-admin`, `hotel-checkin`, `hotel-core`, `hotel-quiz` and `pbordo`
+      need a host port each, the shared database container none. Each also
+      needs a `services.ts` entry, mandatory `homepage.*` compose labels, and
+      rows in `docs/ports.md`, `docs/app-credentials.md` and
+      `docs/licences.md` — the licence rows are trivial here (our own
+      software) but still required, and every base/sidecar image in each
+      compose file needs checking against the resale model.
