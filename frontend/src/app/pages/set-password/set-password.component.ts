@@ -7,6 +7,8 @@ import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
 import { sanitizePastedText } from '../../core/input-sanitize';
 import { ToastService } from '../../core/toast.service';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 /**
  * Public landing for a `/set-password?token=…` invite link (plan.md §158).
@@ -16,7 +18,7 @@ import { ToastService } from '../../core/toast.service';
 @Component({
   selector: 'app-set-password',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './set-password.component.html',
   styleUrl: './set-password.component.css',
 })
@@ -26,6 +28,7 @@ export class SetPasswordComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   protected readonly form = this.formBuilder.nonNullable.group({
     password: ['', [Validators.required, Validators.minLength(8), Validators.maxLength(128)]],
@@ -43,7 +46,7 @@ export class SetPasswordComponent implements OnInit {
     this.token = (this.route.snapshot.queryParamMap.get('token') ?? '').trim();
     if (!this.token) {
       this.loading = false;
-      this.linkError = 'This link is missing its token. Ask whoever invited you to resend it.';
+      this.linkError = this.translate.t('setPassword.errors.missingToken');
       return;
     }
     this.auth
@@ -52,10 +55,7 @@ export class SetPasswordComponent implements OnInit {
       .subscribe({
         next: (invite) => (this.invite = invite),
         error: (error) =>
-          (this.linkError = extractErrorMessage(
-            error,
-            'This invitation link is no longer valid. Ask for a new one.'
-          )),
+          (this.linkError = extractErrorMessage(error, this.translate.t('setPassword.errors.invalidLink'))),
       });
   }
 
@@ -82,13 +82,11 @@ export class SetPasswordComponent implements OnInit {
       .pipe(finalize(() => (this.submitting = false)))
       .subscribe({
         next: () => {
-          this.toast.success('Password set — you are signed in.');
+          this.toast.success(this.translate.t('setPassword.toast.success'));
           void this.router.navigateByUrl('/home');
         },
         error: (error) =>
-          this.toast.error(
-            extractErrorMessage(error, 'Could not set the password. The link may have just expired.')
-          ),
+          this.toast.error(extractErrorMessage(error, this.translate.t('setPassword.errors.setFailed'))),
       });
   }
 }

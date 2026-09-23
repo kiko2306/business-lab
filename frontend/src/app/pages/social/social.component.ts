@@ -7,6 +7,8 @@ import { SocialDraft } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { ConfirmService } from '../../core/confirm.service';
 import { extractErrorMessage } from '../../core/api';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 /**
  * Content generation (plan.md §254 P2): a prompt in, a stored draft out.
@@ -15,7 +17,7 @@ import { extractErrorMessage } from '../../core/api';
 @Component({
   selector: 'app-social',
   standalone: true,
-  imports: [CommonModule, FormsModule, PanelComponent],
+  imports: [CommonModule, FormsModule, PanelComponent, TranslatePipe],
   templateUrl: './social.component.html',
   styleUrl: './social.component.css',
 })
@@ -23,6 +25,7 @@ export class SocialComponent implements OnInit {
   private readonly social = inject(SocialService);
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
+  protected readonly translate = inject(TranslateService);
 
   protected prompt = '';
   protected generating = false;
@@ -42,7 +45,7 @@ export class SocialComponent implements OnInit {
         this.drafts = drafts;
         this.edits = Object.fromEntries(drafts.map((d) => [d.id, d.content]));
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load drafts.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.loadDrafts'))),
     });
   }
 
@@ -58,10 +61,10 @@ export class SocialComponent implements OnInit {
         this.edits[draft.id] = draft.content;
         this.prompt = '';
         this.generating = false;
-        this.toast.success('Draft generated.');
+        this.toast.success(this.translate.t('social.toast.generated'));
       },
       error: (error) => {
-        this.toast.error(extractErrorMessage(error, 'Generation failed.'));
+        this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.generate')));
         this.generating = false;
       },
     });
@@ -81,10 +84,10 @@ export class SocialComponent implements OnInit {
         this.drafts = (this.drafts ?? []).map((d) => (d.id === updated.id ? updated : d));
         this.edits[updated.id] = updated.content;
         this.savingId = null;
-        this.toast.success('Draft saved.');
+        this.toast.success(this.translate.t('social.toast.saved'));
       },
       error: (error) => {
-        this.toast.error(extractErrorMessage(error, 'Unable to save the draft.'));
+        this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.save')));
         this.savingId = null;
       },
     });
@@ -92,9 +95,9 @@ export class SocialComponent implements OnInit {
 
   async remove(draft: SocialDraft): Promise<void> {
     const ok = await this.confirm.ask({
-      title: 'Delete draft',
-      message: 'This removes the generated draft for good.',
-      confirmText: 'Delete',
+      title: this.translate.t('social.confirmDelete.title'),
+      message: this.translate.t('social.confirmDelete.message'),
+      confirmText: this.translate.t('social.confirmDelete.confirmText'),
       danger: true,
     });
     if (!ok) {
@@ -108,7 +111,7 @@ export class SocialComponent implements OnInit {
         this.deletingId = null;
       },
       error: (error) => {
-        this.toast.error(extractErrorMessage(error, 'Unable to delete the draft.'));
+        this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.delete')));
         this.deletingId = null;
       },
     });

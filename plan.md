@@ -28079,3 +28079,37 @@ this batch, but `generalSettings.defaultUpdateBranch` is
 call needed `?? ''` (same shape of fix as §599). `./scripts/check.sh
 frontend test` (89/89, no spec asserts on this batch's visible strings). No
 e2e run — this batch doesn't touch auth/shell/nav/Users/2FA.
+
+## 603. Multi-language UI: `social` + `utils` + `access-denied` + `set-password` pages (§597 batch 6)
+
+Translated the last four standalone pages before the shared-components pass:
+Content (social-draft generation and editing), Utils (health-check card and
+the LAN network-scan tool), and the two public/signed-out pages — Access
+denied (the request-access form a locked-out app redirects to) and Set
+password (the invite-link landing page). `~85` new keys under
+`social.*`/`utils.*`/`accessDenied.*`/`setPassword.*`.
+
+One thing worth recording:
+- **`utils.component.ts`'s `diskLabel()`/`metricLabel()`/`degradedReason()`
+  build sentences from data, not just return a static label** — same shape
+  of problem as §601/§602's deleted label-Record constants, but here the
+  method itself does real work (`disk:<name>` prefix stripping, picking a
+  switch case) so it stayed a method rather than becoming a template key
+  concatenation. Each now calls `this.translate.t(...)` internally instead
+  of returning a literal, and `degradedReason()`'s per-alert sentence
+  (`"{{metric}} is {{value}}, over its {{threshold}} threshold"`) is built
+  with `t()` per alert and joined with `'; '` — the join character and
+  trailing period are structural, not language, so they stay outside the
+  translated string, same reasoning as §600's plural-count and §602's
+  interpolated hints.
+- `health.status` ('ok'/'degraded') and `health.database` ('ok'/'error')
+  are literal backend enum values, not prose — left untranslated per the
+  §599 backend-sourced-text scope boundary, same call as audit-log
+  action/resource/result in §601.
+
+**Verification.** `./scripts/check.sh frontend build` (clean) and
+`./scripts/check.sh frontend test` (89/89, no spec asserts on this batch's
+visible strings). No e2e run — none of these four pages have Playwright
+coverage (`e2e/tests/` has no spec for Content, Utils, Access denied or Set
+password), and this batch doesn't touch the shell/nav/Users/2FA paths the
+existing specs do cover.

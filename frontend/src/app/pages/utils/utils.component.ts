@@ -6,6 +6,8 @@ import { OperationsService } from '../../core/operations.service';
 import { DiscoveredHost, DiskUsage, HealthStatus } from '../../core/models';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 /**
  * Utils on its own route (§131.1 slice 6, §145) — the last areas to leave the
@@ -17,13 +19,14 @@ import { extractErrorMessage } from '../../core/api';
 @Component({
   selector: 'app-utils',
   standalone: true,
-  imports: [CommonModule, FormsModule, PanelComponent],
+  imports: [CommonModule, FormsModule, PanelComponent, TranslatePipe],
   templateUrl: './utils.component.html',
   styleUrl: './utils.component.css'
 })
 export class UtilsComponent implements OnInit {
   private readonly operations = inject(OperationsService);
   private readonly toast = inject(ToastService);
+  protected readonly translate = inject(TranslateService);
 
   protected health: HealthStatus | null = null;
   protected discoveredHosts: DiscoveredHost[] | null = null;
@@ -38,7 +41,7 @@ export class UtilsComponent implements OnInit {
       next: (response) => {
         this.health = response;
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load health checks.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('utils.errors.loadHealth'))),
     });
   }
 
@@ -52,7 +55,7 @@ export class UtilsComponent implements OnInit {
         this.scanningNetwork = false;
       },
       error: (error) => {
-        this.toast.error(extractErrorMessage(error, 'Unable to scan the network.'));
+        this.toast.error(extractErrorMessage(error, this.translate.t('utils.errors.scanNetwork')));
         this.scanningNetwork = false;
       },
     });
@@ -81,20 +84,20 @@ export class UtilsComponent implements OnInit {
 
   /** "docker" -> "Docker storage", for the disk rows and their alerts. */
   protected diskLabel(name: string): string {
-    return name === 'docker' ? 'Docker storage' : 'System root';
+    return this.translate.t(name === 'docker' ? 'utils.health.dockerStorage' : 'utils.health.systemRoot');
   }
 
   protected metricLabel(metric: string): string {
     if (metric.startsWith('disk:')) {
-      return `${this.diskLabel(metric.slice('disk:'.length))} usage`;
+      return `${this.diskLabel(metric.slice('disk:'.length))} ${this.translate.t('utils.health.usageSuffix')}`;
     }
     switch (metric) {
       case 'disk':
-        return 'Disk usage';
+        return this.translate.t('utils.health.diskUsageLabel');
       case 'memory':
-        return 'Memory usage';
+        return this.translate.t('utils.health.memoryUsageLabel');
       case 'load':
-        return 'Load per CPU';
+        return this.translate.t('utils.health.loadPerCpuLabel');
       default:
         return metric;
     }
@@ -116,12 +119,14 @@ export class UtilsComponent implements OnInit {
    */
   protected degradedReason(health: HealthStatus): string {
     if (!health.alerts.length) {
-      return 'A monitored metric is above its threshold.';
+      return this.translate.t('utils.health.noAlertsReason');
     }
-    const parts = health.alerts.map(
-      (alert) =>
-        `${this.metricLabel(alert.metric).toLowerCase()} is ${this.formatMetric(alert.metric, alert.value)}, ` +
-        `over its ${this.formatMetric(alert.metric, alert.threshold)} threshold`
+    const parts = health.alerts.map((alert) =>
+      this.translate.t('utils.health.alertReason', {
+        metric: this.metricLabel(alert.metric).toLowerCase(),
+        value: this.formatMetric(alert.metric, alert.value),
+        threshold: this.formatMetric(alert.metric, alert.threshold),
+      })
     );
     return `${parts.join('; ')}.`;
   }

@@ -1,18 +1,18 @@
 <main class="container-fluid py-4">
   <div class="mb-4">
-    <h1 class="h3 mb-1">Utils</h1>
+    <h1 class="h3 mb-1">{{ 'utils.title' | t }}</h1>
     <p class="text-body-secondary mb-0">
-      Stack health checks and one-off tools that aren't tied to a specific app.
+      {{ 'utils.subtitle' | t }}
     </p>
   </div>
 
   <app-panel
     anchor="health"
     key="health"
-    title="Health checks"
-    subtitle="Database, disk, memory, and system load"
+    [title]="'utils.health.panelTitle' | t"
+    [subtitle]="'utils.health.panelSubtitle' | t"
   >
-    <button panel-actions class="btn btn-sm btn-outline-primary" (click)="loadHealth()">Refresh health</button>
+    <button panel-actions class="btn btn-sm btn-outline-primary" (click)="loadHealth()">{{ 'utils.health.refreshButton' | t }}</button>
 
     <ng-container *ngIf="health; else healthLoading">
       <div class="mb-3 d-flex align-items-start flex-wrap gap-2">
@@ -20,82 +20,82 @@
           {{ health.status }}
         </span>
         <span class="small text-body-secondary" *ngIf="health.status === 'ok'">
-          Every monitored metric is below its threshold.
+          {{ 'utils.health.allBelowThreshold' | t }}
         </span>
         <span class="small" *ngIf="health.status !== 'ok'">
           {{ degradedReason(health) }}
         </span>
       </div>
-      <div class="small">Database: {{ health.database }}</div>
+      <div class="small">{{ 'utils.health.databaseLabel' | t }} {{ health.database }}</div>
       <div class="small" *ngFor="let disk of health.disks" [class.fw-semibold]="isAlertingDisk(health, disk)">
         <!-- Two rows only once Docker's storage lives on its own
              filesystem; until then both names describe the same one and
              the API sends a single entry. -->
-        {{ health.disks.length > 1 ? diskLabel(disk.name) : 'Disk usage' }}:
-        {{ disk.percentUsed }}% of {{ formatBytes(disk.totalBytes) }}
+        {{ health.disks.length > 1 ? diskLabel(disk.name) : ('utils.health.diskUsageLabel' | t) }}:
+        {{ 'utils.health.percentOf' | t:{ percent: disk.percentUsed, total: formatBytes(disk.totalBytes) } }}
         <span class="text-body-secondary">
-          ({{ formatBytes(disk.availableBytes) }} free · alerts at {{ health.thresholds.diskPercent }}%)
+          ({{ 'utils.health.diskFreeNote' | t:{ free: formatBytes(disk.availableBytes), threshold: health.thresholds.diskPercent } }})
         </span>
       </div>
       <div class="small" [class.fw-semibold]="isAlerting(health, 'memory')">
-        Memory usage: {{ health.memory.percentUsed }}% of {{ formatBytes(health.memory.totalBytes) }}
+        {{ 'utils.health.memoryUsageLabel' | t }}: {{ 'utils.health.percentOf' | t:{ percent: health.memory.percentUsed, total: formatBytes(health.memory.totalBytes) } }}
         <span class="text-body-secondary">
-          ({{ formatBytes(health.memory.usedBytes) }} in use · alerts at {{ health.thresholds.memoryPercent }}%)
+          ({{ 'utils.health.memoryInUseNote' | t:{ used: formatBytes(health.memory.usedBytes), threshold: health.thresholds.memoryPercent } }})
         </span>
       </div>
       <div class="small" [class.fw-semibold]="isAlerting(health, 'load')">
-        Load per CPU: {{ health.load.loadPerCpu | number:'1.2-2' }}
+        {{ 'utils.health.loadPerCpuLabel' | t }}: {{ health.load.loadPerCpu | number:'1.2-2':translate.locale() }}
         <span class="text-body-secondary">
-          (alerts at {{ health.thresholds.loadPerCpu | number:'1.2-2' }})
+          ({{ 'utils.health.loadAlertsAt' | t:{ threshold: (health.thresholds.loadPerCpu | number:'1.2-2':translate.locale()) ?? '' } }})
         </span>
       </div>
     </ng-container>
     <ng-template #healthLoading>
-      <p class="text-body-secondary mb-0">Loading health checks…</p>
+      <p class="text-body-secondary mb-0">{{ 'utils.health.loading' | t }}</p>
     </ng-template>
   </app-panel>
 
   <app-panel
     anchor="utils"
     key="utils"
-    title="Utils"
-    subtitle="One-off tools that aren't tied to a specific app"
+    [title]="'utils.toolsPanel.title' | t"
+    [subtitle]="'utils.toolsPanel.subtitle' | t"
   >
     <div class="d-flex flex-wrap justify-content-between align-items-center gap-2 mb-3">
       <div>
-        <h3 class="h6 mb-1">Network scan</h3>
+        <h3 class="h6 mb-1">{{ 'utils.networkScan.heading' | t }}</h3>
         <p class="text-body-secondary small mb-0">
-          Sweeps your LAN for devices that answer to a ping and lists their hostname, MAC vendor, and IP.
+          {{ 'utils.networkScan.description' | t }}
         </p>
       </div>
       <button class="btn btn-outline-primary" (click)="scanNetwork()" [disabled]="scanningNetwork">
         <span class="spinner-border spinner-border-sm me-1" *ngIf="scanningNetwork" aria-hidden="true"></span>
-        {{ scanningNetwork ? 'Scanning…' : 'Scan network' }}
+        {{ (scanningNetwork ? 'utils.networkScan.scanning' : 'utils.networkScan.scanButton') | t }}
       </button>
     </div>
     <div class="table-responsive table-stack-wrap" *ngIf="discoveredHosts && discoveredHosts.length">
       <table class="table table-sm table-stack align-middle mb-0">
         <thead>
           <tr>
-            <th scope="col">Hostname</th>
-            <th scope="col">Type</th>
-            <th scope="col">IP</th>
+            <th scope="col">{{ 'utils.networkScan.table.hostname' | t }}</th>
+            <th scope="col">{{ 'utils.networkScan.table.type' | t }}</th>
+            <th scope="col">{{ 'utils.networkScan.table.ip' | t }}</th>
           </tr>
         </thead>
         <tbody>
           <tr *ngFor="let host of discoveredHosts">
-            <td data-label="Hostname">{{ host.hostname ?? '—' }}</td>
-            <td data-label="Type">{{ host.type ?? '—' }}</td>
-            <td data-label="IP">{{ host.ip }}</td>
+            <td [attr.data-label]="'utils.networkScan.table.hostname' | t">{{ host.hostname ?? '—' }}</td>
+            <td [attr.data-label]="'utils.networkScan.table.type' | t">{{ host.type ?? '—' }}</td>
+            <td [attr.data-label]="'utils.networkScan.table.ip' | t">{{ host.ip }}</td>
           </tr>
         </tbody>
       </table>
     </div>
     <p class="text-body-secondary small mb-0" *ngIf="discoveredHosts && !discoveredHosts.length">
-      No devices responded.
+      {{ 'utils.networkScan.noneResponded' | t }}
     </p>
     <p class="text-body-secondary small mb-0" *ngIf="!discoveredHosts && !scanningNetwork">
-      Run a scan to list devices on the network.
+      {{ 'utils.networkScan.prompt' | t }}
     </p>
   </app-panel>
 </main>

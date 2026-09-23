@@ -5,6 +5,8 @@ import { ActivatedRoute, RouterLink } from '@angular/router';
 import { finalize } from 'rxjs';
 import { extractErrorMessage } from '../../core/api';
 import { OperationsService } from '../../core/operations.service';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 /**
  * Public landing for a locked-out app (plan.md §463): nginx's Authelia
@@ -16,7 +18,7 @@ import { OperationsService } from '../../core/operations.service';
 @Component({
   selector: 'app-access-denied',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './access-denied.component.html',
   styleUrl: './access-denied.component.css',
 })
@@ -24,6 +26,7 @@ export class AccessDeniedComponent {
   private readonly formBuilder = inject(FormBuilder);
   private readonly operations = inject(OperationsService);
   private readonly route = inject(ActivatedRoute);
+  private readonly translate = inject(TranslateService);
 
   protected readonly hostname = (this.route.snapshot.queryParamMap.get('host') ?? '').trim();
 
@@ -49,7 +52,7 @@ export class AccessDeniedComponent {
       .pipe(finalize(() => (this.submitting = false)))
       .subscribe({
         next: () => (this.sent = true),
-        error: (err) => (this.error = extractErrorMessage(err, 'Could not send the request. Try again later.')),
+        error: (err) => (this.error = extractErrorMessage(err, this.translate.t('accessDenied.errors.submitFailed'))),
       });
   }
 }
