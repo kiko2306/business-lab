@@ -27808,3 +27808,83 @@ and the affected values are the ones a user re-enters anyway.
 This supersedes §594's open `$`-in-a-backup-password item: the live check no
 longer needs the working destination clobbered, because the real behaviour was
 proven directly against Compose.
+
+## 597. Multi-language UI: English + Portuguese (pt-PT) — plan
+
+User asked for the dashboard to become multi-language, starting with English
+and pt-PT, with a language selector in the top bar. Planned before any code
+landed, per the working-loop planning pass for multi-piece work.
+
+**Survey.** No i18n exists today. A background scan of `frontend/src/app`
+sized the effort: ~21 templates (~3,100 lines), ~95 `ToastService`/
+`ConfirmService` call sites carrying literal/template-literal strings, 8
+ad-hoc English-only plural ternaries (`count === 1 ? '' : 's'`), and 19
+`date`/`number` pipe usages with no locale threaded through. Order of
+magnitude: **300-500 distinct strings**, not thousands.
+
+**Scope, confirmed with the user:**
+- **UI chrome only.** `extractErrorMessage()` output, `response.message`
+  toasts, and `service.label`/`service.description` from
+  `backend/src/config/services.ts` are backend-authored and stay English —
+  translating those needs backend-side i18n (Accept-Language handling,
+  translated response strings), a separate, larger project.
+- **Browser-only persistence** via `localStorage`, falling back to
+  `navigator.language`. No DB/account column, no API endpoint — that's a
+  real scope increase (cross-device sync) not needed for a 2-language v1.
+
+**Architecture — no new npm dependency.** At 2 languages with simple
+placeholder interpolation and binary singular/plural (no ICU pluralization,
+no gendered agreement), a hand-rolled signal-based service plus one pipe is
+a few hundred lines and avoids `ngx-translate`'s weight for what it would
+actually be asked to do:
+- `frontend/src/app/i18n/en.ts` / `pt-pt.ts` — flat `Record<string,string>`
+  dictionaries as plain TS modules (not JSON-over-HTTP — no boot-time fetch
+  race, no asset path to manage).
+- `frontend/src/app/i18n/translate.service.ts` — `TranslateService`
+  (`providedIn: 'root'`): `locale = signal<'en'|'pt-PT'>`, `t(key, params?)`
+  with dict → `en` fallback → key-as-last-resort (never a blank UI),
+  `setLocale()` writing `localStorage` + `document.documentElement.lang`.
+  Registers `@angular/common/locales/pt` via `registerLocaleData()`
+  (framework-shipped, not a new dependency) for the `date`/`number` pipes.
+- `frontend/src/app/i18n/translate.pipe.ts` — standalone, **impure**
+  `TranslatePipe` (`name: 't'`). Impure because Angular's pure-pipe memo
+  keys on the pipe's own args (the key string), not on the locale signal —
+  without `pure: false` a language switch wouldn't re-render existing
+  `{{ 'x.y' | t }}` bindings. App scale (~15 pages) makes the always-check
+  cost a non-issue.
+- `ToastService`/`ConfirmService` keep their existing plain-`string` API —
+  callers switch from a literal to `this.translate.t('key', params)`, no
+  service reshaping.
+- `date`/`number` pipes gain an explicit locale arg sourced from
+  `translate.locale()` — pipe-arg changes are what naturally retrigger pure
+  pipes, no impure hack needed there. `service-card.component.ts`'s two
+  unlocaled `toLocaleString()` calls move to the template's `date` pipe.
+- The 8 plural ternaries become two full translation keys chosen by
+  `count === 1` (`'…one'` / `'…other'`) — pt-PT plurals aren't always
+  English's word order, so each language's two strings are independent,
+  human-authored sentences, not a shared suffix helper.
+- Top bar: a plain Bootstrap `<select>` in `shell.component.html` next to
+  Logout — native control, no dropdown/Popper dependency.
+- `frontend/src/index.html`'s hardcoded `lang="en"` is dropped in favour of
+  `TranslateService` setting `document.documentElement.lang` at init.
+
+**Rollout — staged, not one commit.** ~25 files total (21 templates + shell
++ a few `.ts`-only call sites):
+1. Infra (`i18n/` module) + shell + Login page, in one commit — proves the
+   pattern end-to-end (Login is the first thing a pt-PT visitor sees,
+   unauthenticated) before it's copied 20 more times. Adds
+   `translate.service.spec.ts` covering `t()` fallback and `setLocale()`
+   persistence. Runs `scripts/e2e-tests.sh` (shell/nav touched).
+2. Remaining pages + shared components in small independent batches —
+   `apps`+`home`; `backups`; `users`+`account`+`audit-logs`;
+   `settings`+`self-update`+`recovery`+`setup`;
+   `social`+`utils`+`access-denied`+`set-password`; shared `components/*`.
+   Each batch is its own `plan.md` section + `dev` commit.
+
+Nothing here touches Docker/exposure/networking, so no `beta`-only test item
+beyond the usual "does it look right" spot-check once each batch is on
+`beta`.
+
+Full detail in the approved plan file from this session:
+`/home/mat/.claude/plans/cryptic-coalescing-willow.md` (session-local, not
+part of the repo — this section is the durable record).

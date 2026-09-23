@@ -210,6 +210,21 @@ it is done — not ticked off and left behind. Section references point at
 ### Backups
 
 
+### Multi-language UI (plan.md §597)
+
+- [ ] **Infra + shell + Login page in English/pt-PT** — `TranslateService`,
+      `TranslatePipe`, `i18n/en.ts`+`pt-pt.ts` dictionaries, the top-bar
+      language `<select>`, and full translation of the shell chrome and the
+      Login page. Proves the pattern before it's copied across the rest of
+      the app.
+- [ ] **Translate `apps` + `home` pages**
+- [ ] **Translate `backups` page**
+- [ ] **Translate `users` + `account` + `audit-logs` pages**
+- [ ] **Translate `settings` + `self-update` + `recovery` + `setup` pages**
+- [ ] **Translate `social` + `utils` + `access-denied` + `set-password` pages**
+- [ ] **Translate shared `components/*`** (service-card, resource-strip,
+      toast-container, confirm-dialog, and any others still English-only)
+
 ### Exposure and platform
 
 - [ ] **Confirm `exposureConfigFiles` still works live** — the last
