@@ -29826,3 +29826,90 @@ non-idempotent statement on the second boot rather than the first. Unique and
 cascade behaviour asserted. Backend suite: 1188 passing. A `tally` CI job with
 a postgres service runs the same thing, following `price-compare`'s
 app-owned-code job.
+
+## 631. Implemented: `tally`'s store CRUD and agent enrolment
+
+Second slice (§630 was the schema). The admin side of stores and the whole
+enrolment path from §627, end to end.
+
+### Endpoints
+
+Admin, behind Authelia (`/api/…`): list stores, create, rename/deactivate,
+delete, list/grant/revoke per-identity access, issue an enrolment code, revoke
+a store's agent.
+
+Agent, bypassing Authelia (`/agent/…`): `POST /agent/enrol` exchanges a
+single-use code for a token, `GET /agent/me` reports which store the token
+belongs to.
+
+`GET /agent/me` is how §627's promise holds that the agent's config carries
+only a URL: **the store is derived from the token**, never configured. The
+legacy `<domain>` and `<store name>` have nothing to replace them because
+nothing needs them.
+
+### Decisions worth keeping
+
+- **SHA-256, not bcrypt**, for both the code and the token. Slow KDFs exist to
+  make *low-entropy human passwords* expensive to guess; these are CSPRNG
+  output, so there is nothing to brute force, and a fast hash keeps the agent's
+  auth a single indexed lookup instead of a per-request KDF.
+- **Every enrolment failure returns the same message.** Separating "no such
+  code" from "expired" from "already used" would tell someone probing codes
+  which guesses were real.
+- **Claim-and-validate in one `UPDATE`.** The statement matches only an unused,
+  unexpired code and sets `used_at` in the same breath, so two agents racing
+  with the same code cannot both succeed — no `SELECT` then `UPDATE` window.
+- **Issuing a code supersedes the store's outstanding one.** Otherwise an admin
+  re-issuing after a mistype leaves a second live code nobody is tracking.
+- **Enrolling replaces any active agent for that store.** The rebuilt-machine
+  case: an admin issues a fresh code without thinking to revoke first, and the
+  old token must stop working at that moment regardless.
+- **Revocation keeps the row** with `revoked_at` set, so what was enrolled
+  stays visible; `requireAgent` filters on it, so the agent's next call 401s
+  with no restart or cache to wait for.
+
+### Two bugs caught while building
+
+**The schema was wrong.** `agents.store_id` was a plain `UNIQUE`, which works
+until the first revocation — the dead row then blocks the store from ever being
+re-enrolled. It is now a partial unique index on `store_id WHERE revoked_at IS
+NULL`: one *active* agent per store, history preserved. `001_init.sql` was
+amended rather than superseded, since the app has never run anywhere; the first
+migration to land after a real deployment is the one that needs §630's
+`schema_migrations` table.
+
+**The code alphabet contradicted itself.** It dropped `O`/`0`, `I`/`1` and
+`U`/`V` but kept `L`, which is exactly as confusable — the test asserting the
+property failed on `8F2EKLKR`. 29 symbols now. The generator uses rejection
+sampling rather than `% length`, since 256 is not a multiple of 29 and the
+modulo would quietly bias the low end of the alphabet; the test checks the
+distribution rather than trusting the comment.
+
+### Express 5, deliberately
+
+Express 5 awaits async handlers and forwards a rejection to the error handler.
+On 4 an async throw becomes an unhandled rejection and the request hangs until
+the client gives up — which is why every Express 4 codebase grows an
+`asyncHandler` wrapper around every route. Taking 5 removes that wrapper
+entirely. Its one cost is that `req.params` types as `string | string[]`
+(wildcards can repeat), handled by one narrowing helper rather than casts
+scattered through the handlers.
+
+### The trust boundary, stated
+
+Admin identity comes from Authelia's forwarded `Remote-User` / `Remote-Groups`.
+That trust is bounded by the deployment, not by this code: the app publishes a
+host port, so anyone already on the host or LAN could set those headers and
+skip Authelia. This is true of every Authelia-only app on the box and is an
+accepted property of the model — the gate is the network, and the tunnel is the
+only way in from outside. It is written into `auth.ts` so the next reader does
+not have to work it out.
+
+### Verification
+
+22 tests against a real `postgres:17-alpine`: authz (unauthenticated, viewer
+vs admin — including that a viewer cannot mint a code, which would let them
+enrol an agent of their own), store CRUD with partial updates and name
+conflicts, viewers seeing only granted *active* stores while admins still see
+deactivated ones, the full enrol → call → revoke → re-enrol cycle, code reuse,
+expiry, supersession, and cascade on store delete. The Docker image builds.

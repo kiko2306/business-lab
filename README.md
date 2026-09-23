@@ -419,8 +419,9 @@ before anything is built.
       (there are none today), hashed passwords, a store for the domain/user
       data that isn't a lock-free JSON file, and a per-shop agent URL that
       isn't compiled into the binary.
-- [ ] **Build agent enrolment: code → long-lived token** — designed in
-      plan.md §627. An admin adds the unit/store in the UI and gets a
+- [ ] **Build agent enrolment in `hotel-core`** — designed in plan.md §627;
+      `tally`'s equivalent is built and tested (§631) and is the worked
+      example. What it has to cover: An admin adds the unit/store in the UI and gets a
       short-lived single-use enrolment code; the installer asks only for the
       API URL and that code; the agent exchanges it on first start for a
       non-expiring token bound to that unit/store and stores it with Windows
@@ -429,6 +430,12 @@ before anything is built.
       exchange endpoint in `hotel-core` and `tally`, the issue-and-revoke UI,
       per-agent last-seen replacing the legacy single-row `conn_logs`, and
       revocation proven to 401 a running agent.
+- [ ] **Build the `tally` admin UI for stores, access and enrolment** — the API
+      is done (plan.md §631): store CRUD, per-identity access grants, issue an
+      enrolment code, revoke an agent. Nothing drives it yet. Angular against
+      the shared theme, and note the enrolment code is returned **once** on
+      issue and cannot be read back, so the UI must present it as a
+      copy-it-now value rather than a field it can re-fetch.
 - [ ] **Make the agents outbound-only** — plan.md §627. No agent listens.
       This is what removes the open inbound port at every shop, the 30-second
       `api.ipify.org` → `set_ip` loop, the `store.ip` column and the
@@ -548,4 +555,7 @@ before anything is built.
       dashboard, `TALLY_DB_PASSWORD` is generated into `apps/tally/.env` on
       first start, `/api/health` returns ok through its own hostname, the
       Authelia gate holds on admin paths while `/agent` bypasses it, and the
-      scheduled `pg_dump` picks `tally-db` up.
+      scheduled `pg_dump` picks `tally-db` up. Now also: that Authelia's
+      forwarded `Remote-User` / `Remote-Groups` headers actually arrive at the
+      app through NPM — every admin route depends on them (plan.md §631), and
+      nothing off the live stack can prove they are forwarded.

@@ -25,15 +25,14 @@ CREATE TABLE IF NOT EXISTS store_access (
   PRIMARY KEY (identity, store_id)
 );
 
--- The enrolled agent for a store. One per store (a shop has one POS server),
--- enforced by the UNIQUE on store_id.
+-- The enrolled agent for a store.
 --
 -- `token_hash` holds a hash, never the token: the agent keeps the only copy,
 -- so a dump of this table does not let anyone impersonate a shop. Revoking is
 -- setting `revoked_at`; the agent's next call then 401s (§627).
 CREATE TABLE IF NOT EXISTS agents (
   id           uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  store_id     uuid NOT NULL UNIQUE REFERENCES stores(id) ON DELETE CASCADE,
+  store_id     uuid NOT NULL REFERENCES stores(id) ON DELETE CASCADE,
   token_hash   text NOT NULL UNIQUE,
   enrolled_at  timestamptz NOT NULL DEFAULT now(),
   -- Replaces the legacy single-row conn_logs heartbeat, which could only say
@@ -41,6 +40,14 @@ CREATE TABLE IF NOT EXISTS agents (
   last_seen_at timestamptz,
   revoked_at   timestamptz
 );
+
+-- One *active* agent per store (a shop has one POS server) — partial, not a
+-- plain UNIQUE on store_id. Revoking keeps the row for history, so a plain
+-- unique would make a store unenrollable for ever after its first revocation:
+-- re-enrolling the replacement machine would collide with the dead row.
+CREATE UNIQUE INDEX IF NOT EXISTS agents_one_active_per_store_idx
+  ON agents (store_id)
+  WHERE revoked_at IS NULL;
 
 -- Single-use enrolment codes, exchanged once for a long-lived agent token.
 -- The code expires (minutes) even though the token it yields does not — a
