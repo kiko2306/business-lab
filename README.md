@@ -393,32 +393,6 @@ before anything is built.
       asks. The dormant check-out/payment half (`CheckOut.cs`, night audit,
       invoice/payment DAOs) is in-scope only if online payment is wanted —
       confirm either way rather than porting it by default.
-- [ ] **Strip `tally`'s inherited `domain` tenant layer** — inventory in plan.md §624.
-      One box serves one client, so the domain layer goes: `data/<domain>.json`
-      and the `Domain` aggregate, the `:domain` segment on every store route,
-      `POST /login/domain` and its domain-password gate,
-      `DomainSelectionComponent` as the landing route, `/cli/:domain`,
-      `domain.service.ts` and the `domain` threaded through the other three
-      Angular services, and `<domain>` in the agent's `pbordo.config`. The API
-      becomes `/stores/:store/overview` and the SPA opens on login. Keep
-      `stores` and each user's `access[]` — those are multiplicity within one
-      client, not tenancy. Do this as part of the `tally` build below, not
-      as a port-then-strip.
-- [ ] **Build `tally` (migrate `sample/pbordo`)** — how the
-      existing system works is in plan.md §622. The migration has to carry
-      over: the pull-on-demand model (the cloud holds no business data and
-      proxies live to each shop), per-user store access lists, and the
-      dashboard's actual figures — note `DAO.cs` wraps 20 SQL queries while
-      only four endpoints are reachable, so `total_day`, `tables_list`,
-      `clients_present_count` and `total_week_comp` are an inventory of what
-      the panel was once meant to show and worth confirming against what is
-      wanted now. Decide before building: what replaces each shop exposing an
-      unauthenticated plaintext HTTP port on its public IP, and what replaces
-      the 30-second ipify/`set_ip` dynamic-DNS loop — an outbound tunnel from
-      the shop would remove both problems at once. Also: real sessions
-      (there are none today), hashed passwords, a store for the domain/user
-      data that isn't a lock-free JSON file, and a per-shop agent URL that
-      isn't compiled into the binary.
 - [ ] **Build agent enrolment in `hotel-core`** — designed in plan.md §627;
       `tally`'s equivalent is built and tested (§631) and is the worked
       example. What it has to cover: An admin adds the unit/store in the UI and gets a
@@ -467,13 +441,13 @@ before anything is built.
       `one_factor` rule; Authelia takes the first match. Backend change to the
       dashboard itself, so it needs `services.test.ts` and
       `autheliaAccessControl.test.ts` coverage and a version bump.
-- [ ] **Use random (v4) identifiers for every capability URL** — plan.md §628.
-      The guest check-in and feedback pages are wholly public, so the uuid in
-      `/checkin/:uuid` *is* the authorisation. That only holds if it cannot be
-      guessed, and the legacy code is not uniformly safe: `tally`'s
-      `storeClass.js` uses **uuid v1**, which encodes a timestamp and MAC
-      address. Every capability identifier in the rebuilds is random — a
-      correctness requirement, not a preference.
+- [ ] **Use random (v4) identifiers for `check-in` and `pulse` links** —
+      plan.md §628. Those guest pages are wholly public, so the uuid in
+      `/checkin/:uuid` *is* the authorisation, and it only holds if it cannot
+      be guessed. `tally` is done (`gen_random_uuid()`, asserted in its tests);
+      this is the hotel side, where the legacy used Laravel uuids and
+      `tally`'s own `storeClass.js` used **uuid v1** — a timestamp plus a MAC
+      address.
 - [ ] **Sync the shared theme into `hotel`'s frontends when they exist** —
       the mechanism is built and proven for `tally` (plan.md §633):
       `scripts/sync-app-theme.sh` copies `frontend/src/styles.css` into each
@@ -494,11 +468,11 @@ before anything is built.
       the hotel. Needs a small config panel per app. Note the dashboard's
       `sendMail()` is plain-text only and these are HTML messages with an
       embedded logo, so it is not reusable as-is either way.
-- [ ] **Map Authelia identity to per-unit / per-store access** — plan.md §629.
+- [ ] **Map Authelia identity to per-unit access in `hotel`** — plan.md §629.
       Authelia is the admin identity; the apps keep no accounts of their own
       and trust its forwarded identity. The legacy `users`, `unit_user` and
-      `user.access[]` tables collapse into one mapping from that identity to
-      the units or stores it may see.
+      `user.access[]` tables collapse into one mapping. `tally`'s
+      `store_access` is the worked example (§631).
 - [ ] **Index the scheduler's hot queries when the schema is written** —
       plan.md §626. `checkin:send` and `quiz:send` run **every minute** and
       filter reservations on `checkin`+`checkin_sent`+`checkin_success`+`status`
@@ -532,11 +506,12 @@ before anything is built.
       commented out of its tick loop. This is the path that most needs the
       assemblies-for-writes decision, since it calls Wintouch's own account
       transfer logic.
-- [ ] **Build the agents x86, not AnyCPU/x64** — plan.md §629. The Wintouch
-      assemblies at `C:\wintouch\sgw` are **PE32 (x86)**, so an agent that
-      loads them must target x86 or AnyCPU with `Prefer32Bit`. An x64 build
-      fails at load with a `BadImageFormatException` that does not obviously
-      point at bitness. Verify on the first agent build rather than trusting it.
+- [ ] **Build the `hotel` agent x86, not AnyCPU/x64** — plan.md §629, §636.
+      The Wintouch assemblies at `C:\wintouch\sgw` are **PE32 (x86)**, so an
+      agent that loads them must target x86 or AnyCPU with `Prefer32Bit`; an
+      x64 build fails at load with a `BadImageFormatException` that does not
+      point at bitness. Applies to the hotel agent only — `tally`'s never
+      loads them, which is why it is plain `net8.0` (§636).
 - [ ] **Plan the cutover re-send** — plan.md §629. Reservation uuids are not
       preserved (only feedback responses and check-in history migrate; units,
       guests and reservations re-sync from Wintouch), so check-in and feedback
