@@ -1,0 +1,115 @@
+name: trigenius
+
+services:
+  app:
+    build:
+      context: ./api
+    image: trigenius-app:local
+    init: true
+    env_file:
+      - ./api/.env
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      APP_UID: "${APP_UID:-1000}"
+      APP_GID: "${APP_GID:-1000}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "1100:80"
+    volumes:
+      - ./api:/var/www/api
+      - ./fe:/var/www/fe
+      - ./fe:/var/www/api/public
+      - ./api/storage/app/public:/var/www/fe/storage
+      - composer-vendor:/var/www/api/vendor
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test:
+        - CMD
+        - php
+        - -r
+        - 'exit(@fsockopen("127.0.0.1", 80) ? 0 : 1);'
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 300s
+
+  db:
+    image: mysql:8.0
+    env_file:
+      - ./api/.env
+    entrypoint:
+      - /bin/sh
+      - -c
+      - |
+        export MYSQL_DATABASE="$$DB_DATABASE"
+        export MYSQL_USER="$$DB_USERNAME"
+        export MYSQL_PASSWORD="$$DB_PASSWORD"
+        export MYSQL_ROOT_PASSWORD="$$DB_PASSWORD"
+        exec /usr/local/bin/docker-entrypoint.sh "$$@"
+      - --
+    command:
+      - --default-authentication-plugin=mysql_native_password
+      - --character-set-server=utf8mb4
+      - --collation-server=utf8mb4_unicode_ci
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - 'mysqladmin ping -h 127.0.0.1 -u "$${DB_USERNAME}" -p"$${DB_PASSWORD}" --silent'
+      interval: 5s
+      timeout: 5s
+      retries: 20
+      start_period: 180s
+
+  phpmyadmin:
+    image: phpmyadmin:5.2.2
+    environment:
+      PMA_HOST: db
+      PMA_PORT: "3306"
+      UPLOAD_LIMIT: 64M
+    ports:
+      - "1101:80"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  mailpit:
+    image: axllent/mailpit:latest
+    ports:
+      - "1102:8025"
+
+  cron:
+    image: trigenius-app:local
+    entrypoint:
+      - hotel-utils-cron-entrypoint
+    env_file:
+      - ./api/.env
+    environment:
+      DB_HOST: db
+      DB_PORT: "3306"
+      MAIL_HOST: mailpit
+      MAIL_PORT: "1025"
+      APP_UID: "${APP_UID:-1000}"
+      APP_GID: "${APP_GID:-1000}"
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./api:/var/www/api
+      - ./fe:/var/www/api/public
+      - ./api/storage/app/public:/var/www/api/public/storage
+      - ./cron:/etc/hotel-utils/cron:ro
+      - composer-vendor:/var/www/api/vendor
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  composer-vendor:
+  mysql-data:

@@ -28872,3 +28872,38 @@ rejection. Frontend: no new spec needed beyond what
 one more interpolated string in the existing progress alert.
 
 Not implemented — this section and the README item are the plan.
+
+## 618. Imported `sample/hotel` — a Laravel hotel-utils app as a reference sample
+
+Copied `mat@portoinf-server.com:~/cli/hotel-utils` into `sample/hotel` as a
+read-only reference for a new development. It is **not** a managed app: no
+`apps/<name>/` entry, no `services.ts` row, no ports, no exposure. Nothing in
+the dashboard touches it.
+
+Two near-identical Laravel 9 + vanilla-JS copies of the same app (135 differing
+entries): `trigenius/` is the deployed one (has `public/`, uploads, built
+bootstrap caches), `setup/` the cleaner base. Both carry `.cloudflare.env`
+files, so it was fronted by a Cloudflare Tunnel the same way this repo does it.
+
+232 MB on disk, **19.6 MB tracked**. The repo is public, so what is excluded
+matters more than what landed:
+
+- `trigenius/api/.env`, `.env.save` and both `.cloudflare.env` files are
+  already covered by rules in the imported projects' own `.gitignore`s
+  (`.env`, `.env.*`, `.cloudflare.env`) — each was verified individually with
+  `git check-ignore -v`, not assumed.
+- 173 MB of `trigenius/api/storage/logs` falls under the root `.gitignore`'s
+  `logs/`.
+- `database/testing.sql` (14 MB, in both copies) is **newly** ignored via
+  `sample/hotel/.gitignore`. Its rows are synthetic ("Bruno Silva", "Rua das
+  Demonstrações 001"), but `hu_users` carries real staff addresses with bcrypt
+  hashes and Laravel remember-tokens, and `hu_configurations` holds
+  `WINTOUCH_USER`/`WINTOUCH_PASSWORD`. Kept on disk, never in the public repo.
+
+`setup/` arrived with its own `.git` (origin `kiko2306/WHotWeb.git`), which
+`git add` records as a broken gitlink — a clone gets an empty directory. It was
+deleted rather than wired up as a submodule: nothing here needs that history,
+and it stays reachable from the WHotWeb remote.
+
+Copied with `tar` over ssh rather than rsync — no dependency to check on either
+end, and it preserves modes and timestamps.

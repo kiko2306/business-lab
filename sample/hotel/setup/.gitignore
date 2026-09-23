@@ -1,0 +1,36 @@
+# Environment files
+.env
+.env.*
+!.env.example
+!**/.env.example
+.cloudflare.env
+
+# Dependencies
+**/vendor/
+**/node_modules/
+
+# Laravel runtime files
+api/bootstrap/cache/*.php
+api/bootstrap/cache/*.tmp
+api/storage/**/*.log
+api/storage/framework/cache/**
+api/storage/framework/sessions/**
+api/storage/framework/testing/**
+api/storage/framework/views/**
+api/storage/debugbar/**
+api/storage/app/livewire-tmp/**
+api/.phpunit.result.cache
+
+# Front-end build artifacts
+api/public/hot
+api/public/storage
+api/public/mix-manifest.json
+
+# IDE and operating-system files
+.idea/
+.vscode/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
+

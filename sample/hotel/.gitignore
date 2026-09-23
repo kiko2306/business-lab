@@ -1,0 +1,3 @@
+# Seed dumps carry real staff emails, bcrypt hashes and stored WINTOUCH
+# credentials — this repo is public, so they stay on disk only.
+**/database/testing.sql
