@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/tally/app
+        working-directory: apps/tally/api
     services:
       postgres:
         image: postgres:17-alpine
@@ -82,7 +82,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: apps/tally/app/package-lock.json
+          cache-dependency-path: apps/tally/api/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build

@@ -29913,3 +29913,30 @@ enrol an agent of their own), store CRUD with partial updates and name
 conflicts, viewers seeing only granted *active* stores while admins still see
 deactivated ones, the full enrol → call → revoke → re-enrol cycle, code reuse,
 expiry, supersession, and cascade on store delete. The Docker image builds.
+
+## 632. `apps/tally/` laid out for a frontend: `api/` + `web/`, one image
+
+The frontend has not been built — §630 and §631 are the API and schema only.
+`app/` was copied from `apps/price-compare/app/`, which is a single Node
+service with plain static files, so the name stopped fitting the moment a
+second source tree was coming.
+
+`§628` gave `tally` one hostname and one host port (`10610`). The dashboard
+runs nginx in front of a separate backend because *it* has two of each
+(`10000`/`10001`); `tally` has neither, so a second container would need
+another port or an nginx proxy hop that buys nothing. One image: Express
+serves the built Angular bundle beside its own routes, so there is no CORS
+boundary and no nginx config.
+
+    apps/tally/
+      docker-compose.yml   build: .
+      Dockerfile           builds web/ then api/ into one runtime image
+      .env.example
+      api/                 was app/
+      web/                 Angular, to come
+
+The Dockerfile moved up from `api/` because a build context of `./api` cannot
+reach a sibling `web/`. Done now, before `web/` exists, while it is a `git mv`
+plus one line each in `docker-compose.yml` and the CI job. The `web` build
+stage is added with the frontend slice rather than now, so the image keeps
+building in the meantime.

@@ -430,7 +430,9 @@ before anything is built.
       exchange endpoint in `hotel-core` and `tally`, the issue-and-revoke UI,
       per-agent last-seen replacing the legacy single-row `conn_logs`, and
       revocation proven to 401 a running agent.
-- [ ] **Build the `tally` admin UI for stores, access and enrolment** — the API
+- [ ] **Build the `tally` admin UI for stores, access and enrolment** — goes in
+      `apps/tally/web/`, served by the API from one image (plan.md §632); add
+      the `web` build stage to `apps/tally/Dockerfile` with it. The API
       is done (plan.md §631): store CRUD, per-identity access grants, issue an
       enrolment code, revoke an agent. Nothing drives it yet. Angular against
       the shared theme, and note the enrolment code is returned **once** on
