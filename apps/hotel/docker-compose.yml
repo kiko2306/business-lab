@@ -1,0 +1,63 @@
+# Last checked for a newer image: 2026-09-23 - bump this date (even with
+# no other change) to force a re-pull on every machine that pulls this
+# commit; self-update only recreates an app whose apps/<name>/** changed
+# since its last deploy, so this is what moves a `latest`-tagged image
+# forward without a version-tag bump to diff against (§449).
+services:
+  # Owns units, guests and reservations, and is the only service the property
+  # agent talks to (plan.md §623). check-in, pulse and the admin shell join
+  # this project as they are built — one compose project because they share
+  # one database, which is why hotel-core exists at all (§628).
+  hotel-core:
+    mem_limit: 256m
+    mem_reservation: 64m
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${HOTEL_CORE_PORT:-10603}:3000"
+    depends_on:
+      hotel-db:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Europe/Lisbon}
+      DATABASE_URL: postgres://${HOTEL_DB_USER:-hotel}:${HOTEL_DB_PASSWORD}@hotel-db:5432/${HOTEL_DB_NAME:-hotel}
+    networks:
+      - hotel-net
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=Hotel"
+      - "homepage.icon=calendar"
+      - "homepage.href=http://localhost:${HOTEL_CORE_PORT:-10603}"
+      - "homepage.description=Online check-in, guest feedback and property administration"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  hotel-db:
+    mem_limit: 256m
+    mem_reservation: 64m
+    # Stock postgres, not pgautoupgrade: this schema is new, so there is no
+    # older cluster on disk to upgrade in place (contrast n8n, §118.3).
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${HOTEL_DB_NAME:-hotel}
+      POSTGRES_USER: ${HOTEL_DB_USER:-hotel}
+      POSTGRES_PASSWORD: ${HOTEL_DB_PASSWORD}
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    # No host port: reachable only on this compose network (§628). The
+    # scheduled pg_dump reaches it through the service, not a published port.
+    networks:
+      - hotel-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${HOTEL_DB_USER:-hotel}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  hotel-net:

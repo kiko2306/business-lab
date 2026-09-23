@@ -703,7 +703,7 @@ describe('autheliaBypassPaths', () => {
   const withBypass = Object.values(SERVICES).filter((s) => s.autheliaBypassPaths?.length);
 
   it('is declared by at least the services that need it', () => {
-    expect(withBypass.map((s) => s.name).sort()).toEqual(['ntfy', 'tally', 'vaultwarden', 'vikunja']);
+    expect(withBypass.map((s) => s.name).sort()).toEqual(['hotel', 'ntfy', 'tally', 'vaultwarden', 'vikunja']);
   });
 
   it('compiles as a regex — a lost backslash makes Authelia refuse to start', () => {
@@ -729,6 +729,14 @@ describe('autheliaBypassPaths', () => {
     expect(matchesAny(ntfy, '/homelab-alerts/json?poll=1&since=cFdmck')).toBe(true);
     expect(matchesAny(ntfy, '/homelab-alerts/ws')).toBe(true);
     expect(matchesAny(ntfy, '/v1/health')).toBe(true);
+
+    // hotel's property agent, same shape as tally's below.
+    const hotel = SERVICES.hotel.autheliaBypassPaths ?? [];
+    expect(matchesAny(hotel, '/agent/enrol')).toBe(true);
+    expect(matchesAny(hotel, '/agent/units?since=2026-01-01')).toBe(true);
+    // The admin API stays gated — a bypass swallowing it would publish every
+    // guest's passport details.
+    expect(matchesAny(hotel, '/api/units')).toBe(false);
 
     // tally's shop agents: they carry an enrolment-issued token, so they can
     // never follow a redirect to Authelia's login form (§627). The query-string

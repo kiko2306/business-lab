@@ -30280,3 +30280,76 @@ Still unproven off the live stack: that NPM actually renders forward-auth for a
 secondary host and Authelia accepts the enlarged block. That is a README item —
 this repo's history is full of Authelia config that passed tests and took the
 gate down on the host (§423, §425).
+
+## 638. Implemented: `apps/hotel/` registered, with `hotel-core`'s schema
+
+The hotel side starts. One compose project holding `hotel-core` and a shared
+`hotel-db`; `check-in`, `pulse` and the admin shell join it as they are built,
+which is the whole reason it is one project (§628 — they share a database).
+
+### The schema is the deliverable
+
+Seven tables: `units`, `unit_access`, `guests`, `reservations`,
+`guest_extras`, `agents`, `enrolment_codes`. English `snake_case`, Postgres
+conventions, no `hu_` prefix — that existed so several installs could share a
+database, which one-box-one-client removes (§624, §626). Wintouch's own
+Portuguese schema is *not* renamed; the agent maps at the boundary, the only
+place those names appear.
+
+Two things the schema encodes that are easy to lose:
+
+- **One `reservations` row carries both flows** — `checkin_sent`,
+  `checkin_success`, `quiz_sent`, `quiz_answered` on the same row, keyed
+  `(unit_id, number, line)` the way Wintouch identifies a reservation. This is
+  what §628 found in the legacy schema, and it is the reason `hotel-core`
+  exists rather than check-in and pulse each keeping their own store.
+- **Four guest flows, not two.** `units` carries `checkin_is_active`,
+  `quiz_is_active`, `birthday_is_active` and `promo_is_active`, because §629
+  put birthday and promo in scope and the legacy had them only as an enum and
+  an empty `switch` case.
+
+**§626's index work landed here**, since this is where those queries live.
+`checkin:send` and `quiz:send` run every minute and the legacy had no index
+for either; both are now **partial** indexes, matching only rows whose "sent"
+flag is false. That matters more than it sounds: the matching set shrinks as a
+season accumulates, so the partial index stays small while the table does not.
+A test asserts both exist *and* are partial, because a plain index would look
+correct and quietly index everything.
+
+`reservations.token` is `gen_random_uuid()` — v4, per §628, since it is the
+capability that makes a guest link work.
+
+### One agent per deployment, not per site
+
+Enrolment is tally's proven design (§631), with one difference: the hotel
+agent iterates every unit itself (§620), so there is one agent for the whole
+deployment rather than one per site. Enforced by a partial unique index on
+`(true) WHERE revoked_at IS NULL` — a deliberately odd-looking expression
+index, which is how Postgres spells "at most one live row in this table".
+
+`GET /agent/units` tells the agent which properties to sync and which flows are
+on. The agent is *told*, not configured — the same principle that let §627
+delete `<domain>` and `<store name>` from tally's config, so the installer
+still needs only a URL and a code.
+
+### An exposure decision to confirm
+
+§628 allocated four hostnames, with `hotel.<domain>` serving a separate
+`hotel-admin` container. Registering it raised a simpler option: **`hotel-core`
+serves the admin bundle itself**, the way tally's API serves its own (§632).
+That removes a container and a port, and avoids the admin shell calling
+`hotel-core` cross-origin. For now the primary hostname is `hotel-core`'s, and
+`check-in` and `pulse` will join as public `additionalExposures` (§637 added
+the flag that lets one app hold both gated and public hostnames). Recorded
+rather than decided — if the admin shell does become its own container, the
+primary hostname moves and that is a rename.
+
+### Verification
+
+13 tests against a real `postgres:17-alpine`: the schema applies twice, the
+partial indexes exist, a reservation token is v4, the composite key rejects a
+duplicate, a viewer sees only granted active units while an admin sees all,
+each of the four flags toggles independently without a partial update nulling
+its siblings, and the full enrol → list units → revoke → re-enrol cycle
+including code reuse, expiry and supersession. Backend suite 1191. The image
+builds, and a `hotel-core` CI job runs the same against a postgres service.

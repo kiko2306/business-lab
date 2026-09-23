@@ -793,6 +793,37 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       staticOnExposure: { KIMAI_TRUSTED_PROXIES: '0.0.0.0/0' },
     },
   },
+  'hotel': {
+    // Bundled Postgres, shared by every service in this project — without a
+    // backup entry the scheduled dump skips it and the file backup copies
+    // live data files raw (registry-wide test in services.test.ts).
+    backup: { engine: 'postgres', service: 'hotel-db' },
+    name: 'hotel',
+    label: 'Hotel',
+    description: 'Online check-in, guest feedback and property administration',
+    icon: 'calendar',
+    category: 'Productivity',
+    composePath: 'apps/hotel/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:3000/api/health',
+      interval: 30000,
+      timeout: 5000,
+    },
+    hiddenGeneratedSecrets: ['HOTEL_DB_PASSWORD'],
+    hiddenEnvKeys: ['HOTEL_DB_USER', 'HOTEL_DB_NAME'],
+    // The property agent authenticates itself with an enrolment-issued token
+    // (plan.md §627), so these paths must not be sent to Authelia's login — a
+    // service cannot follow a redirect to a browser form. `[/?]` not `/`:
+    // Authelia matches resources against the path *plus* query string (§425).
+    // Everything else on the hostname stays gated, which is what admins reach.
+    autheliaBypassPaths: ['^/agent($|[/?])'],
+    // check-in and pulse join as additionalExposures when they are built —
+    // public ones, since a guest following an emailed link has no account.
+    // hotel-core's own hostname stays gated; §637 added the flag that lets
+    // one app hold both.
+  },
   'tally': {
     // Its own bundled Postgres, so the scheduled dump has to know about it —
     // without this the file backup copies live data files raw and can restore

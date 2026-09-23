@@ -92,6 +92,44 @@ jobs:
         env:
           DATABASE_URL: postgres://tally:test@localhost:5432/tally
 
+  hotel-core:
+    # Same shape as the tally job: the deliverable of this slice is a schema,
+    # so the check that matters is that it applies to a real server — and
+    # applies twice, since every boot re-runs every migration file.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/hotel/api
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: hotel
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: hotel
+        ports:
+          - 5433:5432
+        options: >-
+          --health-cmd "pg_isready -U hotel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/hotel/api/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      # tsc does not copy .sql; the Dockerfile does the same thing.
+      - run: cp -r src/migrations dist/migrations
+      - run: npm test
+        env:
+          DATABASE_URL: postgres://hotel:test@localhost:5433/hotel
+
   tally-web:
     # The Angular admin UI. Its theme is a generated copy of the dashboard's
     # (scripts/sync-app-theme.sh) because an app image builds from its own

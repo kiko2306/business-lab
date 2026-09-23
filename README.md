@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.136.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.137.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -393,17 +393,6 @@ before anything is built.
       asks. The dormant check-out/payment half (`CheckOut.cs`, night audit,
       invoice/payment DAOs) is in-scope only if online payment is wanted —
       confirm either way rather than porting it by default.
-- [ ] **Build agent enrolment in `hotel-core`** — designed in plan.md §627;
-      `tally`'s equivalent is built and tested (§631) and is the worked
-      example. What it has to cover: An admin adds the unit/store in the UI and gets a
-      short-lived single-use enrolment code; the installer asks only for the
-      API URL and that code; the agent exchanges it on first start for a
-      non-expiring token bound to that unit/store and stores it with Windows
-      DPAPI (`ProtectedData`, machine scope) under `ProgramData`, not in
-      plaintext beside the executable. Needs: the code/token tables and
-      exchange endpoint in `hotel-core` and `tally`, the issue-and-revoke UI,
-      per-agent last-seen replacing the legacy single-row `conn_logs`, and
-      revocation proven to 401 a running agent.
 - [ ] **Prove the agent WebSocket survives the Cloudflare Tunnel** — the
       server side is built and works end to end through real containers
       (plan.md §634): an agent dials out to `/agent/connect`, authenticates
@@ -464,19 +453,6 @@ before anything is built.
       the hotel. Needs a small config panel per app. Note the dashboard's
       `sendMail()` is plain-text only and these are HTML messages with an
       embedded logo, so it is not reusable as-is either way.
-- [ ] **Map Authelia identity to per-unit access in `hotel`** — plan.md §629.
-      Authelia is the admin identity; the apps keep no accounts of their own
-      and trust its forwarded identity. The legacy `users`, `unit_user` and
-      `user.access[]` tables collapse into one mapping. `tally`'s
-      `store_access` is the worked example (§631).
-- [ ] **Index the scheduler's hot queries when the schema is written** —
-      plan.md §626. `checkin:send` and `quiz:send` run **every minute** and
-      filter reservations on `checkin`+`checkin_sent`+`checkin_success`+`status`
-      and `status`+`checkout`+`quiz_sent` respectively; the legacy migrations
-      have no index for either. Both want a composite, and both are partial-index
-      candidates since they only match rows whose "sent" flag is false. Also
-      cover `uuid` lookups for guest links and `quiz_responses.reservation_id`.
-      Same class of fix as the recent `audit_logs.created_at` index.
 - [ ] **Package the agent as an installer** — the agent is built and proven
       (plan.md §636) but is installed by hand today: copy the files, edit
       `tally.config`, run `Tally.Agent.exe enrol <CODE>`, then `sc.exe create`.
@@ -513,16 +489,14 @@ before anything is built.
       guests and reservations re-sync from Wintouch), so check-in and feedback
       links already in guests' inboxes stop working at cutover. Decide between
       a quiet window and a one-off re-send, per client, before the first one.
-- [ ] **Register `apps/hotel/`** — plan.md §628. One compose project holding
-      `hotel-admin` (`10600`), `check-in` (`10601`), `pulse` (`10602`),
-      `hotel-core` (`10603`) and a shared `hotel-db` with no host port.
-      Declares `backup: { engine: 'postgres', service: 'hotel-db' }` and
-      generates its database password through `hiddenGeneratedSecrets`.
-      Needs a `services.ts` entry with its `additionalExposures` (which depends
-      on the per-exposure Authelia item above), mandatory `homepage.*` labels,
-      and rows in `docs/ports.md`, `docs/app-credentials.md` and
-      `docs/licences.md` — a licence row per app **and per base image**.
-      `apps/tally/` is done (plan.md §630) and is the worked example.
+- [ ] **Decide whether the admin shell is its own container** — plan.md §638.
+      §628 allocated `hotel-admin` on `10600` as a separate container on the
+      primary hostname; registering the app raised the simpler option of
+      `hotel-core` serving the admin bundle itself, the way tally's API serves
+      its own (§632) — one container fewer, one port fewer, and no cross-origin
+      call from the shell to `hotel-core`. Decide before building the shell:
+      if it does become its own container, the primary hostname moves and that
+      is a rename of a live exposure.
 - [ ] **Verify `tally` starts on the live stack** — plan.md §630 registered the
       app and proved the schema against a real `postgres:17-alpine` in CI, but
       nothing has run it on `beta` yet. Check: the app starts from the
