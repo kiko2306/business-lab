@@ -29345,3 +29345,38 @@ The distinction that matters: **client** multiplicity is removed, multiplicity
   records and each user's `access[]` list of permitted stores.
 
 Both survive as ordinary rows. Only the layer above them — the tenant — is cut.
+
+## 625. Names for the rebuilds: `check-in`, `pulse`, `tally`
+
+The rebuilt products are named. These become the `apps/<name>/` directory, the
+`services.ts` `name`, the default hostname, and the row key in
+`docs/ports.md`, `docs/app-credentials.md` and `docs/licences.md` — so they are
+settled before anything is built rather than renamed across five places later.
+
+| Legacy | New | What it is |
+|---|---|---|
+| Hotel Utils check-in flow | **`check-in`** | Guest-facing online check-in. |
+| Hotel Utils quiz flow | **`pulse`** | Post-stay guest feedback. Named for the moment, not the mechanism — "quiz" described the form, not the job. |
+| PBordo | **`tally`** | Invoices, employees and payments control. |
+
+`tally` confirms what §622 inferred: the dashboard's tables are `vendas`
+(invoices), `vendedores` (employees) and `meiospagamento` (payment methods),
+so "invoices / employees / payments control" is exactly PBordo's job described
+from the client's side rather than the POS's.
+
+Supporting pieces keep a descriptive prefix rather than a product name, since
+they are infrastructure and neither `check-in` nor `pulse` carries the word
+hotel any more:
+
+- **`hotel-core`** — owns units, guests and reservations; the only service the
+  hotel agent talks to (§623).
+- **`hotel-admin`** — the single Angular shell over `hotel-core`, `check-in`
+  and `pulse`.
+
+Alphabetically at the tail of `docs/ports.md` (`10600`+): `check-in`,
+`hotel-admin`, `hotel-core`, `pulse`, `tally` — five host ports, with the
+shared hotel database container publishing none.
+
+The `sample/hotel` and `sample/pbordo` copies keep their legacy names. They are
+the historical reference for §620/§622 and renaming them would only break the
+citations.

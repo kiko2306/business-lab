@@ -343,15 +343,19 @@ it is done — not ticked off and left behind. Section references point at
       per-request provider picker — confirm that's the intent before
       building.
 
-### Wintouch sample rebuilds
+### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 
-Target architecture is agreed and recorded in plan.md §623: Angular
-frontends, Node/TypeScript/Express APIs, and .NET Windows services for the
-on-premise agents only. Hotel Utils becomes `hotel-core` (owns units, guests
-and reservations, and is the only service its agent talks to), `hotel-checkin`,
-`hotel-quiz`, one `hotel-admin` Angular shell over all three, and a shared
-database container. PBordo becomes an agent plus a single API + frontend. All
-of them land as dashboard-managed apps under `apps/`.
+Names are settled (plan.md §625): **`check-in`** (guest online check-in),
+**`pulse`** (post-stay guest feedback, the old "quiz"), and **`tally`**
+(invoices, employees and payments control, the old PBordo).
+
+Target architecture is agreed and recorded in plan.md §623: Angular frontends,
+Node/TypeScript/Express APIs, and .NET Windows services for the on-premise
+agents only. The hotel side is `hotel-core` (owns units, guests and
+reservations, and is the only service its agent talks to), `check-in`, `pulse`,
+one `hotel-admin` Angular shell over all three, and a shared database
+container. `tally` is an agent plus a single API + frontend. All of them land
+as dashboard-managed apps under `apps/`.
 
 **One box, one client is a requirement, not a side effect.** Every multi-client
 construct in these projects is removed; plan.md §624 is the inventory. Hotel
@@ -364,7 +368,7 @@ PBordo `stores` remain ordinary rows.
 The `sample/` copies stay reference-only. Per-slice scope is still proposed
 before anything is built.
 
-- [ ] **Migrate Hotel Utils (`sample/hotel`) off the legacy stack** — how the
+- [ ] **Build `check-in` + `pulse` + `hotel-core` (migrate `sample/hotel`)** — how the
       existing system works is in plan.md §620. The migration has to carry
       over: the four sync jobs and their direction (units, guests and
       reservations push out of Wintouch; completed check-ins are the only
@@ -380,7 +384,7 @@ before anything is built.
       asks. The dormant check-out/payment half (`CheckOut.cs`, night audit,
       invoice/payment DAOs) is in-scope only if online payment is wanted —
       confirm either way rather than porting it by default.
-- [ ] **Strip PBordo's `domain` tenant layer** — inventory in plan.md §624.
+- [ ] **Strip `tally`'s inherited `domain` tenant layer** — inventory in plan.md §624.
       One box serves one client, so the domain layer goes: `data/<domain>.json`
       and the `Domain` aggregate, the `:domain` segment on every store route,
       `POST /login/domain` and its domain-password gate,
@@ -389,9 +393,9 @@ before anything is built.
       Angular services, and `<domain>` in the agent's `pbordo.config`. The API
       becomes `/stores/:store/overview` and the SPA opens on login. Keep
       `stores` and each user's `access[]` — those are multiplicity within one
-      client, not tenancy. Do this as part of the PBordo migration below, not
+      client, not tenancy. Do this as part of the `tally` build below, not
       as a port-then-strip.
-- [ ] **Migrate PBordo (`sample/pbordo`) off the legacy stack** — how the
+- [ ] **Build `tally` (migrate `sample/pbordo`)** — how the
       existing system works is in plan.md §622. The migration has to carry
       over: the pull-on-demand model (the cloud holds no business data and
       proxies live to each shop), per-user store access lists, and the
@@ -411,7 +415,7 @@ before anything is built.
       does the cloud know this agent is who it claims to be?" with nothing:
       Hotel Utils gives the PMS credentials to any caller of `/api/config`,
       PBordo never checks who is calling. §623 narrows it usefully — each
-      agent now talks to exactly one endpoint (`hotel-core`, or the PBordo
+      agent now talks to exactly one endpoint (`hotel-core`, or `tally`'s
       API), so one enrolment mechanism serves both. Must cover enrolment with
       no console step on the host (CLAUDE.md principle 2), so the credential
       is issued from the dashboard UI and the agent installer carries only
@@ -428,11 +432,11 @@ before anything is built.
 - [ ] **Confirm the database engine for the rebuilds** — §623 proposes
       **Postgres**, matching the rest of this repo, rather than carrying the
       legacy MySQL over. Affects the shared hotel database container and
-      PBordo's. Cheap to decide now, expensive after the schema exists.
+      `tally`'s. Cheap to decide now, expensive after the schema exists.
 - [ ] **Allocate ports and registry entries for the five new apps** — per
       `docs/ports.md`, new apps append at the tail; `10600`+ is free.
-      `hotel-admin`, `hotel-checkin`, `hotel-core`, `hotel-quiz` and `pbordo`
-      need a host port each, the shared database container none. Each also
+      `check-in`, `hotel-admin`, `hotel-core`, `pulse` and `tally` need a
+      host port each, the shared hotel database container none. Each also
       needs a `services.ts` entry, mandatory `homepage.*` compose labels, and
       rows in `docs/ports.md`, `docs/app-credentials.md` and
       `docs/licences.md` — the licence rows are trivial here (our own
