@@ -27928,3 +27928,33 @@ translated shell/Login).
 
 Remaining pages/components are tracked as the other README items under
 "Multi-language UI (plan.md §597)" — each is its own batch, same pattern.
+
+## 599. Multi-language UI: `apps` + `home` pages (§597 batch 2)
+
+Translated the Apps page (summary counts, connection-status badge, the
+running-apps and all-apps panels, table headers, search box, loading/empty
+states) and the Home menu (title/subtitle, all nine tile titles/
+descriptions, the "Opens in Apps" pending badge).
+
+Two things worth recording:
+- `service.category` (the group headers on both the running-apps table and
+  the all-apps list) and `service.label`/`service.description` are backend-
+  sourced (`backend/src/config/services.ts`) — left English per §597's scope
+  boundary, not missed.
+- The connection-status badge (`serviceState.connectionStatus$`, one of
+  `connecting`/`disconnected`/`connected`/`sse`/`polling`) is frontend
+  state, not backend text, so it got real keys — `sse` (a push-update
+  connection) became the label "Live"/"Ao vivo" rather than a literal
+  transliteration, the one wording call in this batch.
+- `home.component.ts`'s `MenuTile` interface changed from literal
+  `title`/`description` strings to `titleKey`/`descriptionKey`, resolved by
+  the `t` pipe in the template — a plain string built once in the field
+  initializer wouldn't re-render on a language switch, but a pipe call in
+  the template does (same reasoning as the impure pipe itself, plan.md
+  §598).
+
+**Verification.** `./scripts/check.sh frontend build` (one fix needed: the
+`date` pipe types as `string | null`, and `t()`'s params are `string |
+number` — added `?? ''`) and `./scripts/check.sh frontend test` (89/89, no
+spec touched this page's strings). No e2e run — this batch doesn't touch
+auth/shell/nav/Users/2FA.

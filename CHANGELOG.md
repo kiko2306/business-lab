@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.132.3] — 2026-09-23
+
+### Frontend
+
+- Translate the Apps and Home menu pages to English/pt-PT
+
 ## [0.132.2] — 2026-09-23
 
 ### Frontend

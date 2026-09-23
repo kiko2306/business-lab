@@ -6,6 +6,8 @@ import { ServiceCardComponent } from '../../components/service-card/service-card
 import { PanelComponent } from '../../components/panel/panel.component';
 import { SectionCollapseService } from '../../core/section-collapse.service';
 import { ServiceAction, ServiceCategory, ServiceStatus } from '../../core/models';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 // Fixed display order; anything without a recognized category (or an older
 // cached API response predating this field) falls back to "Other" at the end.
@@ -132,13 +134,14 @@ function groupServicesByCategory(services: ServiceStatus[]): ServiceGroup[] {
 @Component({
   selector: 'app-apps',
   standalone: true,
-  imports: [CommonModule, AsyncPipe, FormsModule, ServiceCardComponent, PanelComponent],
+  imports: [CommonModule, AsyncPipe, FormsModule, ServiceCardComponent, PanelComponent, TranslatePipe],
   templateUrl: './apps.component.html',
   styleUrl: './apps.component.css',
 })
 export class AppsComponent implements OnInit, OnDestroy {
   protected readonly serviceState = inject(ServiceStateService);
   protected readonly collapse = inject(SectionCollapseService);
+  protected readonly translate = inject(TranslateService);
 
   protected readonly groupServicesByCategory = groupServicesByCategory;
   protected readonly groupRunningPortsByCategory = groupRunningPortsByCategory;

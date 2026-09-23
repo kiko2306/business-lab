@@ -3,10 +3,12 @@ import { Component, inject } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { Capability } from '../../core/capabilities';
+import { TranslatePipe } from '../../i18n/translate.pipe';
 
 interface MenuTile {
-  title: string;
-  description: string;
+  /** Translation keys, not literal text — resolved by the `t` pipe in the template so a language switch re-renders the tile. */
+  titleKey: string;
+  descriptionKey: string;
   /** Router path the tile links to. */
   link: string;
   /** Hidden unless the signed-in user's role grants this (plan.md §149). */
@@ -34,7 +36,7 @@ interface MenuTile {
 @Component({
   selector: 'app-home',
   standalone: true,
-  imports: [NgFor, NgIf, RouterLink],
+  imports: [NgFor, NgIf, RouterLink, TranslatePipe],
   templateUrl: './home.component.html',
   styleUrl: './home.component.css',
 })
@@ -43,59 +45,59 @@ export class HomeComponent {
 
   private readonly tiles: MenuTile[] = [
     {
-      title: 'Apps',
-      description: 'The service registry — start, stop, and configure every managed app.',
+      titleKey: 'home.tiles.apps.title',
+      descriptionKey: 'home.tiles.apps.description',
       link: '/apps',
       capability: 'apps:control',
       wide: true,
     },
     {
-      title: 'Networking',
-      description: 'The Cloudflare Tunnel token and first-start provisioning — now on the Settings page.',
+      titleKey: 'home.tiles.networking.title',
+      descriptionKey: 'home.tiles.networking.description',
       link: '/settings',
       capability: 'exposure:settings',
     },
     {
-      title: 'Backups & restore',
-      description: 'Backup schedule and destination, on-demand runs, and restoring from a snapshot.',
+      titleKey: 'home.tiles.backups.title',
+      descriptionKey: 'home.tiles.backups.description',
       link: '/backups',
       capability: 'backups:manage',
       wide: true,
     },
     {
-      title: 'Updates & version control',
-      description: 'Per-app image updates and the deployed Business Lab version.',
+      titleKey: 'home.tiles.updates.title',
+      descriptionKey: 'home.tiles.updates.description',
       link: '/apps',
       capability: 'apps:control',
       pending: true,
     },
     {
-      title: 'Users & roles',
-      description: 'Accounts, the roles they hold, and per-app access.',
+      titleKey: 'home.tiles.users.title',
+      descriptionKey: 'home.tiles.users.description',
       link: '/users',
       capability: 'users:manage',
     },
     {
-      title: 'Settings',
-      description: 'The timezone, ntfy alert pushes, and the shared mailbox.',
+      titleKey: 'home.tiles.settings.title',
+      descriptionKey: 'home.tiles.settings.description',
       link: '/settings',
       capability: 'settings:manage',
     },
     {
-      title: 'Utils',
-      description: 'Stack health checks and one-off tools such as the LAN device scan.',
+      titleKey: 'home.tiles.utils.title',
+      descriptionKey: 'home.tiles.utils.description',
       link: '/utils',
       capability: 'apps:control',
     },
     {
-      title: 'Audit logs',
-      description: 'A record of user actions and system operations, exportable as CSV.',
+      titleKey: 'home.tiles.auditLogs.title',
+      descriptionKey: 'home.tiles.auditLogs.description',
       link: '/audit-logs',
       capability: 'audit:view',
     },
     {
-      title: 'Account security',
-      description: 'Two-factor authentication for your own sign-in.',
+      titleKey: 'home.tiles.account.title',
+      descriptionKey: 'home.tiles.account.description',
       link: '/account',
       wide: true,
     },
