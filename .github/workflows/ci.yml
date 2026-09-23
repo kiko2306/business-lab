@@ -53,6 +53,45 @@ jobs:
       - run: npm ci
       - run: npm test
 
+  tally:
+    # Its own job, like price-compare: app-owned code with its own lockfile.
+    # The postgres service is the point — the deliverable of this slice is the
+    # schema, and the check that matters is that it applies to a real server
+    # (and applies twice, since every boot re-runs every migration file).
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/tally/app
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: tally
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: tally
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U tally"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/tally/app/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      # tsc does not copy .sql; the Dockerfile does the same thing.
+      - run: cp -r src/migrations dist/migrations
+      - run: npm test
+        env:
+          DATABASE_URL: postgres://tally:test@localhost:5432/tally
+
   e2e:
     # Browser E2E: brings up docker-compose.test.yml and drives the real
     # dashboard with Playwright (login, navigation, invite-gated Users page,

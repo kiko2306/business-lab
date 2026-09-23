@@ -793,6 +793,38 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       staticOnExposure: { KIMAI_TRUSTED_PROXIES: '0.0.0.0/0' },
     },
   },
+  'tally': {
+    // Its own bundled Postgres, so the scheduled dump has to know about it —
+    // without this the file backup copies live data files raw and can restore
+    // corrupt (see the registry-wide test in services.test.ts).
+    backup: { engine: 'postgres', service: 'tally-db' },
+    name: 'tally',
+    label: 'Tally',
+    description: 'Invoices, employees and payments control',
+    icon: 'chart',
+    category: 'Productivity',
+    composePath: 'apps/tally/docker-compose.yml',
+    healthCheck: {
+      enabled: true,
+      type: 'http',
+      url: 'http://localhost:3000/api/health',
+      interval: 30000,
+      timeout: 5000,
+    },
+    // Generated on first start; nothing has to read or type it.
+    hiddenGeneratedSecrets: ['TALLY_DB_PASSWORD'],
+    // Fixed bundled-DB username/database name — same reasoning as the NPM and
+    // Twenty entries: hidden, but not auto-generated.
+    hiddenEnvKeys: ['TALLY_DB_USER', 'TALLY_DB_NAME'],
+    // The shop agents authenticate themselves with an enrolment-issued token
+    // (plan.md §627), so these paths must not be sent to Authelia's login —
+    // an agent cannot follow a redirect to a browser form. Everything else on
+    // the hostname stays gated, which is what admins reach (§628).
+    // `[/?]` not `/`: Authelia matches `resources` against the path *plus*
+    // query string (§425), so `^/agent($|/)` would miss `/agent?token=…` —
+    // the exact shape of a WebSocket handshake.
+    autheliaBypassPaths: ['^/agent($|[/?])'],
+  },
   'twenty': {
     // A future major image bump runs Twenty's own DB migrations in place with
     // no downgrade — the scheduled pg_dump is the fallback.

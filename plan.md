@@ -29761,3 +29761,68 @@ this repo: its own `package.json`, `Dockerfile` and `test/`, built by its own
 Dockerfile and covered by its own job in `.github/workflows/ci.yml`. The new
 apps take the same shape, one source directory per service under
 `apps/<name>/`, each with a CI job.
+
+## 630. Implemented: `tally`'s schema and `apps/tally/` registration
+
+First build slice of the rebuild (§629 put `tally` first). Registers the app
+and lands its schema; no business endpoints yet.
+
+### The schema is small, and that is the finding
+
+`tally` stores **no business data at all**. Sales, tables and staff takings are
+read live from each shop's agent on demand (§622), so there is nothing to
+mirror from the POS. Four tables, all of them about *who and where*:
+
+- `stores` — one per shop. **No `ip` column**: the legacy had each shop publish
+  its public IP every 30 seconds so the cloud could call in; agents now dial out
+  and hold the connection (§627), so there is no address to record.
+- `store_access` — `(identity, store_id)`. Authelia is the identity (§629), so
+  this replaces the legacy `users` table and its `access[]` array outright —
+  no passwords, no accounts, just the mapping.
+- `agents` — one per store (`UNIQUE` on `store_id`; a shop has one POS server).
+  Holds a **hash** of the token, never the token: the agent keeps the only
+  copy, so a dump of this table cannot impersonate a shop. `last_seen_at`
+  replaces the legacy single-row `conn_logs`, which could only report whether
+  *something* had called recently.
+- `enrolment_codes` — single-use, with a partial index on `expires_at` where
+  `used_at IS NULL`, since only unused codes are ever swept.
+
+§626's index work does not apply here: `tally` has no scheduler and no hot
+periodic query. That belongs to the hotel side.
+
+`gen_random_uuid()` gives v4 ids, which satisfies §628's requirement after the
+legacy `storeClass.js` used uuid v1 (timestamp + MAC). The test asserts the
+v4 shape rather than trusting the default.
+
+### Migrations
+
+Every `.sql` file in `migrations/` is applied in filename order on boot, each
+in its own transaction, and each written idempotently so re-running on every
+start is a no-op. There is deliberately **no `schema_migrations` table** yet —
+marked with a `ponytail:` comment naming when it becomes necessary: the first
+destructive change (a `DROP`, a rename, a backfill) cannot be written
+idempotently and does need to run exactly once.
+
+### Registration
+
+`services.ts` entry with `backup: { engine: 'postgres', service: 'tally-db' }`
+(the registry-wide test requires it for any app running a database, or the file
+backup copies live data files raw and can restore corrupt),
+`hiddenGeneratedSecrets: ['TALLY_DB_PASSWORD']`, and port `10610`. The database
+container publishes no host port.
+
+**§425's trap caught this one.** The first bypass pattern was
+`'^/agent($|/)'`, which looks right and is wrong: Authelia matches `resources`
+against the path *plus query string*, so it would miss `/agent?token=…` — the
+exact shape of a WebSocket handshake. It is `'^/agent($|[/?])'`, and
+`services.test.ts` now asserts the query-string case, plus that admin routes
+are **not** swallowed by the bypass.
+
+### Verification
+
+Typecheck, build and tests run against a real `postgres:17-alpine` — the
+schema applies, and applies **twice**, which is the case that catches a
+non-idempotent statement on the second boot rather than the first. Unique and
+cascade behaviour asserted. Backend suite: 1188 passing. A `tally` CI job with
+a postgres service runs the same thing, following `price-compare`'s
+app-owned-code job.

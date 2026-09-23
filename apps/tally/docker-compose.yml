@@ -1,0 +1,61 @@
+# Last checked for a newer image: 2026-09-23 - bump this date (even with
+# no other change) to force a re-pull on every machine that pulls this
+# commit; self-update only recreates an app whose apps/<name>/** changed
+# since its last deploy, so this is what moves a `latest`-tagged image
+# forward without a version-tag bump to diff against (§449).
+services:
+  tally:
+    mem_limit: 256m
+    mem_reservation: 64m
+    build: ./app
+    restart: unless-stopped
+    ports:
+      - "${TALLY_PORT:-10610}:3000"
+    depends_on:
+      tally-db:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ:-Europe/Lisbon}
+      DATABASE_URL: postgres://${TALLY_DB_USER:-tally}:${TALLY_DB_PASSWORD}@tally-db:5432/${TALLY_DB_NAME:-tally}
+    networks:
+      - tally-net
+    labels:
+      - "homepage.group=Productivity"
+      - "homepage.name=Tally"
+      - "homepage.icon=chart"
+      - "homepage.href=http://localhost:${TALLY_PORT:-10610}"
+      - "homepage.description=Invoices, employees and payments control"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  tally-db:
+    mem_limit: 256m
+    mem_reservation: 64m
+    # Stock postgres, not pgautoupgrade: this schema is new, so there is no
+    # older cluster on disk to upgrade in place the way n8n and Paperless had
+    # (§118.3, §182). Revisit only if the pinned major ever needs to move.
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${TALLY_DB_NAME:-tally}
+      POSTGRES_USER: ${TALLY_DB_USER:-tally}
+      POSTGRES_PASSWORD: ${TALLY_DB_PASSWORD}
+    volumes:
+      - ./data/db:/var/lib/postgresql/data
+    # No host port: the database is reachable only on this compose network
+    # (plan.md §628). The dashboard's scheduled pg_dump reaches it through
+    # the service, not a published port.
+    networks:
+      - tally-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${TALLY_DB_USER:-tally}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+networks:
+  tally-net:

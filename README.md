@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.134.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.135.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -532,15 +532,20 @@ before anything is built.
       guests and reservations re-sync from Wintouch), so check-in and feedback
       links already in guests' inboxes stop working at cutover. Decide between
       a quiet window and a one-off re-send, per client, before the first one.
-- [ ] **Register `apps/hotel/` and `apps/tally/`** — plan.md §628 settles the
-      shape: two apps, not five. `apps/hotel/` is one compose project holding
+- [ ] **Register `apps/hotel/`** — plan.md §628. One compose project holding
       `hotel-admin` (`10600`), `check-in` (`10601`), `pulse` (`10602`),
-      `hotel-core` (`10603`) and a shared `hotel-db` with no host port;
-      `apps/tally/` is `tally` (`10610`) plus its own `tally-db`. Both declare
-      `backup: { engine: 'postgres', service: '<db>' }` and generate their
-      database password through `hiddenGeneratedSecrets`, following `n8n` and
-      `twenty`. Each needs a `services.ts` entry with its
-      `additionalExposures`, mandatory `homepage.*` compose labels, and rows in
-      `docs/ports.md`, `docs/app-credentials.md` and `docs/licences.md` — a
-      licence row per app **and per base image**, checked against the resale
-      model.
+      `hotel-core` (`10603`) and a shared `hotel-db` with no host port.
+      Declares `backup: { engine: 'postgres', service: 'hotel-db' }` and
+      generates its database password through `hiddenGeneratedSecrets`.
+      Needs a `services.ts` entry with its `additionalExposures` (which depends
+      on the per-exposure Authelia item above), mandatory `homepage.*` labels,
+      and rows in `docs/ports.md`, `docs/app-credentials.md` and
+      `docs/licences.md` — a licence row per app **and per base image**.
+      `apps/tally/` is done (plan.md §630) and is the worked example.
+- [ ] **Verify `tally` starts on the live stack** — plan.md §630 registered the
+      app and proved the schema against a real `postgres:17-alpine` in CI, but
+      nothing has run it on `beta` yet. Check: the app starts from the
+      dashboard, `TALLY_DB_PASSWORD` is generated into `apps/tally/.env` on
+      first start, `/api/health` returns ok through its own hostname, the
+      Authelia gate holds on admin paths while `/agent` bypasses it, and the
+      scheduled `pg_dump` picks `tally-db` up.

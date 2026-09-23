@@ -73,6 +73,8 @@ operate within, listed again at the end.
 | Paperless-ngx | GPL-3.0 | ✅ Clean | |
 | Pi-hole | EUPL-1.2 | ✅ Clean | weak copyleft, commercial use permitted |
 | Price Compare | *ours* — no LICENSE file | ⚠️ Decide | |
+| Tally | *ours* — no LICENSE file | ⚠️ Decide | rebuild of the legacy PBordo (plan.md §622). Ours to licence; same open question as Price Compare. Bundled `tally-db` is `postgres:17-alpine` (PostgreSQL License, already rowed below) |
+| node:22-alpine (Tally) | **MIT** (Node.js) + Alpine base (MIT/BSD) | ✅ Clean | build and runtime base for our own app code; no redistribution of Node itself |
 | Samba (`dockurr/samba`) | GPL-3.0 (Samba); MIT (image wrapper) | ✅ Clean | stock unmodified Samba for internal LAN file sharing — GPL-3.0 places no restriction on running it; not modified, not redistributed |
 | Scrutiny (`ghcr.io/analogj/scrutiny`, omnibus) | **MIT** | ✅ Clean | stock unmodified. The omnibus image bundles InfluxDB 2 OSS (MIT), smartmontools (GPL-2.0+) and s6-overlay (ISC) — all clean for internal use, none redistributed as software |
 | Speedtest (speedtest-tracker) | MIT | ⚠️ Condition | wraps **Ookla Speedtest CLI**, which has its own EULA the operator must accept (free, but not FOSS and not for "commercial" measurement without Ookla's OK). Swap for LibreSpeed if that matters. |

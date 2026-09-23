@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.135.0] — 2026-09-23
+
+### Added
+
+- Tally app: registry entry, compose with bundled Postgres, and its schema (plan.md §630)
+
 ## [0.134.0] — 2026-09-23
 
 ### Feature
