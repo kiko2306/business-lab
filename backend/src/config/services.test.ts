@@ -566,6 +566,43 @@ describe('compose comments never spell out a literal variable-substitution examp
   });
 });
 
+describe('a gated additionalExposure', () => {
+  // plan.md §637. A secondary hostname is public by default — provisioned with
+  // autheliaProtected: false and excluded from the access_control rules — so
+  // opting one into the gate is the new case, not opting one out.
+  const gatedExtras = Object.values(SERVICES).flatMap((service) =>
+    (service.additionalExposures ?? [])
+      .filter((extra) => extra.autheliaProtected)
+      .map((extra) => ({ service, extra }))
+  );
+
+  it("belongs to an app that is itself Authelia-protected", () => {
+    for (const { service } of gatedExtras) {
+      // The rule admits the app's own group, and autheliaSync only creates
+      // that group for an app in getAppAccessOptions. On a skipAuthelia app
+      // the rule would name a group that never exists, quietly admitting
+      // nobody but admins — a gate that looks configured and is not.
+      expect(
+        isAutheliaProtectionRequired(service.name),
+        `${service.name} has a gated additionalExposure but is not itself Authelia-protected`
+      ).toBe(true);
+    }
+  });
+
+  it('is off by default, so existing secondary hostnames stay public', () => {
+    // NetBird's management API and relay are reached by native clients that
+    // cannot follow a login redirect; flipping the default would break them.
+    const netbird = SERVICES['netbird-vpn'].additionalExposures ?? [];
+    expect(netbird.length).toBeGreaterThan(0);
+    for (const extra of netbird) {
+      expect(extra.autheliaProtected, `netbird ${extra.suffix} must stay public`).toBeFalsy();
+    }
+    // The Home Page's apex is the public front door (§111).
+    const apex = (SERVICES['homepage'].additionalExposures ?? []).find((e) => e.apex);
+    expect(apex?.autheliaProtected).toBeFalsy();
+  });
+});
+
 describe('Home Page discovery labels', () => {
   // homepageConfig.ts generates the Home Page's services.yaml from these
   // labels (name/group/icon/description) — a tile per running, exposed app

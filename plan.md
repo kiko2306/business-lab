@@ -30219,3 +30219,64 @@ container, even with `--network host`**. Windows, however, reaches the
 container-published API on `127.0.0.1` (not `localhost`). So the working
 arrangement is agent-on-Windows, stack-in-Docker — which is also the real
 deployment shape.
+
+## 637. Implemented: a secondary hostname can opt into the Authelia gate
+
+§628 planned this as "let an additional exposure be public". Reading the code
+first showed that is **backwards**: secondary hostnames are already public, and
+always have been. `exposure.ts` provisions every one with a hardcoded
+`autheliaProtected: false`, and `getAppAccessOptions` excludes them from the
+rules outright (`service_name NOT LIKE '%:%'`), because the first ones existed
+for native clients that cannot follow a login redirect — NetBird's management
+API and relay, and the Home Page's apex.
+
+So the gap is the opposite one: **a secondary hostname cannot be gated**, and
+`apps/hotel/` needs exactly that — one app owning `hotel-checkin` and
+`hotel-pulse` (public, guest links) alongside `hotel` and `hotel-core`
+(gated). Had §628 been built as written, the guest hostnames would have worked
+by accident and `hotel-core` would have been silently public.
+
+### The change
+
+- `ServiceAdditionalExposure.autheliaProtected?: boolean`, defaulting to false
+  so every existing secondary keeps its current behaviour.
+- `exposure.ts` passes it to `provisionHostname` instead of a literal `false`,
+  so NPM renders the forward-auth config for that host.
+- `autheliaAccessControl.ts` gains `getGatedSecondaryExposures()`, collecting
+  the opted-in `<service>:<suffix>` rows that `getAppAccessOptions` filters
+  out, and appending them to the rules.
+
+A gated secondary admits the **app's own group**, not one of its own: access is
+granted per app, and a per-hostname group would need its own entry in the Users
+picker for something nobody can meaningfully be granted separately. The app's
+`autheliaBypassPaths` ride along, which is what keeps `/agent` reachable on a
+gated `hotel-core`.
+
+### The pairing that has to hold
+
+`autheliaSync` only creates a group for an app in `getAppAccessOptions`, so a
+gated secondary on a `skipAutheliaProtection` app would emit a rule naming a
+group that never exists — admitting nobody but admins, while looking
+configured. Guarded twice: `services.test.ts` rejects the pairing in the
+registry, and `getGatedSecondaryExposures` skips such a row at runtime.
+
+### A fragile test found on the way
+
+The two `syncAutheliaAccessControl` tests mocked `query` with a positional
+`mockResolvedValueOnce` chain, while the code runs its lookups under
+`Promise.all` — so the order they depended on was never guaranteed, and adding
+a third query broke both. They now dispatch on the SQL text, which is both
+robust to another query appearing and clearer about which lookup is being
+stubbed.
+
+### Verification
+
+1191 backend tests pass. The new behaviour test drives the real generator with
+an `apps/hotel`-shaped registry entry and asserts the opted-in hostname is
+gated with the app's group, its bypass path survives, and the guest hostname
+gets no rule at all.
+
+Still unproven off the live stack: that NPM actually renders forward-auth for a
+secondary host and Authelia accepts the enlarged block. That is a README item —
+this repo's history is full of Authelia config that passed tests and took the
+gate down on the host (§423, §425).

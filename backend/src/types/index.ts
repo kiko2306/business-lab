@@ -69,6 +69,20 @@ export interface ServiceAdditionalExposure {
   // plain proxy_pass doesn't provide. See buildGrpcAdvancedConfig in
   // npmClient.ts. Defaults to false (plain HTTP/1.1 proxying).
   grpc?: boolean;
+  // Put this secondary hostname behind Authelia, like a primary exposure.
+  //
+  // Secondary hostnames are public by default and always were: they are
+  // provisioned with `autheliaProtected: false` and excluded from the
+  // access_control rules (`service_name NOT LIKE '%:%'`), because the first
+  // ones existed for native clients that cannot follow a login redirect.
+  // That default is right for a guest-facing page and wrong for an admin API
+  // sharing an app with one, which is what `apps/hotel/` needs (plan.md §637).
+  //
+  // A gated secondary admits the *app's* own group — access is granted per
+  // app, not per hostname — so the app itself must be Authelia-protected, or
+  // that group is never created and only admins get in. services.test.ts
+  // checks that pairing.
+  autheliaProtected?: boolean;
 }
 
 // Groups services on the dashboard so the grid reads by function instead of

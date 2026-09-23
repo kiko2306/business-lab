@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.136.0] — 2026-09-23
+
+### Added
+
+- Per-exposure Authelia policy: a secondary hostname can opt into the gate (plan.md §637)
+
 ## [0.135.0] — 2026-09-23
 
 ### Added

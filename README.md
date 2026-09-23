@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.135.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.136.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -427,20 +427,16 @@ before anything is built.
       transmitted. Also drop `<domain>` and `<store name>` from the agent
       config — the enrolment code binds the agent to its store, so both are
       derived — and stop compiling the API URL into the binary (§622).
-- [ ] **Add a per-exposure Authelia policy to `additionalExposures`** —
-      plan.md §628. Authelia policy is a per-app property today
-      (`skipAutheliaProtection` / `autheliaBypassPaths` on the
-      `ServiceDefinition`, applied by `renderAccessControl` to every hostname
-      the app owns), so one app cannot hold both a public and a gated
-      hostname. `apps/hotel/` needs exactly that: `hotel.<domain>` gated,
-      `hotel-checkin.<domain>` and `hotel-pulse.<domain>` public. Add an
-      optional per-entry policy field to `additionalExposures` — which already
-      carries `suffix`, `label`, `portEnvVar`, `grpc` and `apex`, and already
-      gets its own `service_exposure` row and hostname — and honour it in
-      `renderAccessControl`. Keep bypass rules emitted before the
-      `one_factor` rule; Authelia takes the first match. Backend change to the
-      dashboard itself, so it needs `services.test.ts` and
-      `autheliaAccessControl.test.ts` coverage and a version bump.
+- [ ] **Verify a gated secondary hostname on the live stack** — built in
+      plan.md §637: an `additionalExposures` entry can now set
+      `autheliaProtected: true`, and the rule generator emits it with the
+      app's own group and bypass paths. What tests cannot show is whether NPM
+      actually renders forward-auth for a secondary host and Authelia accepts
+      the enlarged block — and this repo's history has Authelia config that
+      passed tests and took the gate down on the host (§423, §425). Check on
+      `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
+      the public ones do not, the app's bypass path still answers
+      unauthenticated, and Authelia restarts cleanly rather than crash-looping.
 - [ ] **Use random (v4) identifiers for `check-in` and `pulse` links** —
       plan.md §628. Those guest pages are wholly public, so the uuid in
       `/checkin/:uuid` *is* the authorisation, and it only holds if it cannot

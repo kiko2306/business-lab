@@ -21,7 +21,7 @@ import fs from 'fs';
 import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
-import { getService, resolveComposeFile } from '../config/services';
+import { getService, isAutheliaProtectionRequired, resolveComposeFile } from '../config/services';
 import { EXPOSURE_SETTINGS_KEYS } from '../utils/exposureSettings';
 import { getAppAccessOptions } from './userAppAccess';
 import { appGroupName } from './autheliaSync';
@@ -81,13 +81,54 @@ export function renderAccessControl(portalDomain: string | null, gated: GatedApp
 /** The gated apps, as `{ hostname, group }`, from the live exposure rows. */
 async function getGatedApps(): Promise<GatedApp[]> {
   const options = await getAppAccessOptions();
-  return options
+  const primaries = options
     .filter((o) => o.hostname)
     .map((o) => ({
       hostname: o.hostname as string,
       group: appGroupName(o.serviceName),
       bypassPaths: getService(o.serviceName)?.autheliaBypassPaths,
     }));
+  return [...primaries, ...(await getGatedSecondaryExposures())];
+}
+
+/**
+ * Secondary hostnames that opted into the gate (plan.md §637).
+ *
+ * `getAppAccessOptions` deliberately excludes every `<service>:<suffix>` row,
+ * so these are collected separately. They admit the *app's* group rather than
+ * one of their own: access is granted per app, and a per-hostname group would
+ * need its own entry in the Users picker for something a user cannot
+ * meaningfully be granted separately.
+ *
+ * A secondary whose app is not itself Authelia-protected is skipped rather
+ * than emitted: `autheliaSync` only creates a group for an app in
+ * `getAppAccessOptions`, so the rule would name a group that never exists and
+ * silently admit nobody but admins. `services.test.ts` rejects that pairing in
+ * the registry, and this is the runtime half of the same guard.
+ */
+async function getGatedSecondaryExposures(): Promise<GatedApp[]> {
+  const result = await query<{ service_name: string; hostname: string | null }>(
+    `SELECT service_name, hostname
+     FROM service_exposure
+     WHERE enabled = TRUE AND service_name LIKE '%:%' AND hostname IS NOT NULL`
+  );
+
+  const gated: GatedApp[] = [];
+  for (const row of result.rows) {
+    const [serviceName, suffix] = row.service_name.split(':');
+    const service = getService(serviceName);
+    if (!service || !isAutheliaProtectionRequired(serviceName)) continue;
+
+    const extra = service.additionalExposures?.find((e) => (e.apex ? 'apex' : e.suffix) === suffix);
+    if (!extra?.autheliaProtected) continue;
+
+    gated.push({
+      hostname: row.hostname as string,
+      group: appGroupName(serviceName),
+      bypassPaths: service.autheliaBypassPaths,
+    });
+  }
+  return gated;
 }
 
 async function getPortalDomain(): Promise<string | null> {

@@ -691,7 +691,10 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
       hostname: extraHostname,
       upstreamPort: getPublishedUpstreamPort(serviceName, extra.portEnvVar),
       existingNpmHostId: extraRow.npm_host_id,
-      autheliaProtected: false,
+      // Secondary hostnames are public unless the entry opts in: the original
+      // ones serve native clients that cannot follow a login redirect
+      // (plan.md §637).
+      autheliaProtected: Boolean(extra.autheliaProtected),
       grpc,
       oidcAutoRedirect: false,
       globalConfig,

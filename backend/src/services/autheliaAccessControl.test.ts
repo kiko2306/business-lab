@@ -10,7 +10,11 @@ vi.mock('../utils/logger', () => ({ default: { info: vi.fn(), warn: vi.fn(), err
 vi.mock('./userAppAccess', () => ({ getAppAccessOptions: vi.fn() }));
 vi.mock('./autheliaSync', () => ({ appGroupName: (n: string) => `app-${n}` }));
 vi.mock('./autheliaUsers', () => ({ getUsersDatabasePath: vi.fn() }));
-vi.mock('../config/services', () => ({ resolveComposeFile: vi.fn(), getService: vi.fn() }));
+vi.mock('../config/services', () => ({
+  resolveComposeFile: vi.fn(),
+  getService: vi.fn(),
+  isAutheliaProtectionRequired: vi.fn(),
+}));
 // The real one shells out to `docker compose run authelia validate-config`;
 // its own behaviour is covered in autheliaValidate.test.ts. `false` = "does
 // not reject", i.e. the write proceeds.
@@ -27,7 +31,7 @@ import fs from 'fs';
 import { query } from '../utils/database';
 import { getAppAccessOptions } from './userAppAccess';
 import { getUsersDatabasePath } from './autheliaUsers';
-import { resolveComposeFile } from '../config/services';
+import { getService, isAutheliaProtectionRequired, resolveComposeFile } from '../config/services';
 import { renderAccessControl, spliceAccessControl, syncAutheliaAccessControl } from './autheliaAccessControl';
 
 const mockedQuery = vi.mocked(query);
@@ -37,6 +41,23 @@ const mockedWriteFileSync = vi.mocked(fs.writeFileSync);
 const mockedGetAppAccessOptions = vi.mocked(getAppAccessOptions);
 const mockedGetUsersDatabasePath = vi.mocked(getUsersDatabasePath);
 const mockedResolveComposeFile = vi.mocked(resolveComposeFile);
+
+/**
+ * Dispatch the query mock on the SQL rather than on call order.
+ *
+ * `syncAutheliaAccessControl` runs its lookups under `Promise.all`, so a
+ * positional `mockResolvedValueOnce` chain depends on an ordering the code is
+ * free to change — and did, the moment gated secondary exposures added a third
+ * query (plan.md §637).
+ */
+function mockQueries(responses: { exposure?: unknown[]; settings?: unknown[]; secondary?: unknown[] }): void {
+  mockedQuery.mockImplementation((async (sql: string) => {
+    if (sql.includes("LIKE '%:%'")) return { rows: responses.secondary ?? [] };
+    if (sql.includes('service_exposure')) return { rows: responses.exposure ?? [] };
+    if (sql.includes('settings')) return { rows: responses.settings ?? [] };
+    throw new Error(`unexpected query in test: ${sql}`);
+  }) as never);
+}
 
 describe('renderAccessControl', () => {
   it('emits default deny, a bypass for the portal, and one one_factor rule per app', () => {
@@ -86,9 +107,7 @@ describe('syncAutheliaAccessControl', () => {
     // Authelia's own service_exposure row has no hostname yet, and the base
     // domain isn't resolvable either — the exact state hit on a fresh
     // deploy's first exposure enable, before NPM's admin was bootstrapped.
-    mockedQuery
-      .mockResolvedValueOnce({ rows: [{ hostname: null }] } as never) // service_exposure lookup
-      .mockResolvedValueOnce({ rows: [] } as never); // settings lookup: base domain not set
+    mockQueries({ exposure: [{ hostname: null }], settings: [] });
 
     const result = await syncAutheliaAccessControl('exposure_change');
 
@@ -96,10 +115,48 @@ describe('syncAutheliaAccessControl', () => {
     expect(mockedWriteFileSync).not.toHaveBeenCalled();
   });
 
+  it('gates a secondary hostname that opted in, and leaves the rest public (§637)', async () => {
+    // A secondary exposure is public by default and excluded from the rules;
+    // this is the opt-in case apps/hotel needs — one app owning both a gated
+    // admin hostname and public guest ones.
+    vi.mocked(getService).mockImplementation(((name: string) =>
+      name === 'hotel'
+        ? {
+            name: 'hotel',
+            autheliaBypassPaths: ['^/agent($|[/?])'],
+            additionalExposures: [
+              { suffix: 'core', label: 'Core API', portEnvVar: 'HOTEL_CORE_PORT', autheliaProtected: true },
+              { suffix: 'checkin', label: 'Check-in', portEnvVar: 'HOTEL_CHECKIN_PORT' },
+            ],
+          }
+        : undefined) as never);
+    vi.mocked(isAutheliaProtectionRequired).mockImplementation(((name: string) => name === 'hotel') as never);
+
+    mockQueries({
+      exposure: [{ hostname: 'authelia.example.com' }],
+      settings: [{ value: 'example.com' }],
+      secondary: [
+        { service_name: 'hotel:core', hostname: 'hotel-core.example.com' },
+        { service_name: 'hotel:checkin', hostname: 'hotel-checkin.example.com' },
+      ],
+    });
+    mockedReadFileSync.mockReturnValue('theme: light\n');
+
+    await syncAutheliaAccessControl('exposure_change');
+    const [, written] = mockedWriteFileSync.mock.calls[0] as [unknown, string];
+
+    // The opted-in one is gated, admitting the app's own group.
+    expect(written).toContain("domain: 'hotel-core.example.com'");
+    expect(written).toContain("group:app-hotel");
+    // Its bypass rides along, so the shop agent still reaches /agent.
+    expect(written).toContain("^/agent($|[/?])");
+    // The guest hostname gets no rule at all — it is never sent to Authelia,
+    // so a rule here would be dead weight at best and a login wall at worst.
+    expect(written).not.toContain('hotel-checkin.example.com');
+  });
+
   it('writes and restarts once the base domain resolves, even with no gated apps yet', async () => {
-    mockedQuery
-      .mockResolvedValueOnce({ rows: [{ hostname: null }] } as never) // service_exposure lookup
-      .mockResolvedValueOnce({ rows: [{ value: 'example.com' }] } as never); // settings lookup
+    mockQueries({ exposure: [{ hostname: null }], settings: [{ value: 'example.com' }] });
     mockedReadFileSync.mockReturnValue('theme: light\n');
 
     const result = await syncAutheliaAccessControl('exposure_change');
