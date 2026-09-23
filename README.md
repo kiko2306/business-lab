@@ -342,3 +342,48 @@ it is done — not ticked off and left behind. Section references point at
       active-provider-per-feature choice in Settings rather than adding a
       per-request provider picker — confirm that's the intent before
       building.
+
+### Wintouch sample rebuilds
+
+Both samples live under `sample/` as reference only — no `apps/` entry, no
+`services.ts` row, no exposure. Scope of each rebuild is **not yet agreed**;
+these items track the migration work, not a decision to start it.
+
+- [ ] **Migrate Hotel Utils (`sample/hotel`) off the legacy stack** — how the
+      existing system works is in plan.md §620. The migration has to carry
+      over: the four sync jobs and their direction (units, guests and
+      reservations push out of Wintouch; completed check-ins are the only
+      write back in, including the `observacoes` stamp reception reads), the
+      `exportado` watermark on `wgcterceiros` that makes the guest sync
+      incremental, the check-in and quiz email schedules with their per-unit
+      offsets and active flags, the guest-facing check-in form covering every
+      occupant, and the 15-minute agent-down alert. Decide before building:
+      whether to keep the per-client-instance model at all (`setup/` and
+      `trigenius/` have already drifted 135 entries apart, which is what
+      `update-clients.sh` exists to fight), and what replaces
+      `GET /api/config` handing out the Wintouch credentials to anyone who
+      asks. The dormant check-out/payment half (`CheckOut.cs`, night audit,
+      invoice/payment DAOs) is in-scope only if online payment is wanted —
+      confirm either way rather than porting it by default.
+- [ ] **Migrate PBordo (`sample/pbordo`) off the legacy stack** — how the
+      existing system works is in plan.md §622. The migration has to carry
+      over: the pull-on-demand model (the cloud holds no business data and
+      proxies live to each shop), per-user store access lists, and the
+      dashboard's actual figures — note `DAO.cs` wraps 20 SQL queries while
+      only four endpoints are reachable, so `total_day`, `tables_list`,
+      `clients_present_count` and `total_week_comp` are an inventory of what
+      the panel was once meant to show and worth confirming against what is
+      wanted now. Decide before building: what replaces each shop exposing an
+      unauthenticated plaintext HTTP port on its public IP, and what replaces
+      the 30-second ipify/`set_ip` dynamic-DNS loop — an outbound tunnel from
+      the shop would remove both problems at once. Also: real sessions
+      (there are none today), hashed passwords, a store for the domain/user
+      data that isn't a lock-free JSON file, and a per-shop agent URL that
+      isn't compiled into the binary.
+- [ ] **Decide the shared agent-identity and enrolment model** — blocks both
+      migrations above and should be settled first. Both samples answer "how
+      does the cloud know this agent is who it claims to be?" with nothing:
+      Hotel Utils gives the PMS credentials to any caller of `/api/config`,
+      PBordo never checks who is calling. Same vendor, same three tiers, so
+      one enrolment mechanism should serve both. Nothing else in either
+      migration is safe to design around until this is chosen.
