@@ -28601,3 +28601,17 @@ that send has to be one `sendMail()` call per subscriber (their own token in
 the footer), not one blast to a `to` list or BCC.
 
 Not implemented — this section and the README item are the plan.
+
+## 613. Planned: index `audit_logs.created_at`
+
+Checked whether `audit_logs`' size/weight was a problem: retention already
+caps it (30-day purge every 6h, `utils/audit.ts`) and writes are all
+real-action-bound, not loop-bound, so no growth problem. But the table
+(`database/init.sql:118`) has no index beyond its PK, while
+`routes/audit.ts` runs `ORDER BY created_at DESC LIMIT/OFFSET` **and** a
+separate `COUNT(*)` on every Audit Logs page load, plus a `LIMIT 100000`
+scan on CSV export — all full table scans/sorts. Harmless at today's row
+counts, but a one-line fix (`CREATE INDEX audit_logs_created_at_idx ON
+audit_logs (created_at DESC)` in `database/init.sql`) removes the gap
+before it matters. Not implemented — this section and the README item are
+the plan.

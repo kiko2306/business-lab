@@ -313,6 +313,13 @@ it is done — not ticked off and left behind. Section references point at
       (social-platform posting) still needs a per-platform token/OAuth setup and
       is scoped only once a specific platform is named.
 
+- [ ] **Index `audit_logs.created_at`** — plan in plan.md §613. The table
+      has no index beyond its PK; the Audit Logs page's list query, its
+      `COUNT(*)`, and the CSV export all full-scan/sort it. Not a problem at
+      today's row counts (30-day retention already caps growth), but a
+      one-line `CREATE INDEX audit_logs_created_at_idx ON audit_logs
+      (created_at DESC)` in `database/init.sql` closes the gap.
+
 - [ ] **"Claude API key" → multi-provider "AI API Keys"** — plan in
       plan.md §610. Today it's one Anthropic-only key
       (`claudeSettings.ts`) used by social-post generation
