@@ -1,6 +1,27 @@
 import fs from 'fs';
 
 /**
+ * Compose interpolates the values it reads out of a project `.env` — `$USER`
+ * in a value becomes the host's username, `${FOO}` becomes whatever `FOO` is,
+ * and an undefined name becomes empty. No app here uses `env_file:` (which
+ * would pass values through untouched); every compose file consumes its `.env`
+ * as `KEY: ${KEY:-}`, so every value written here is interpolated before the
+ * container ever sees it. `$$` is Compose's escape for a literal `$`, so that
+ * is what a `$` has to be written as — and read back as, to stay symmetric for
+ * the callers that compare a stored value against the desired one.
+ *
+ * Values written before this escaping existed are still raw on disk; a single
+ * `$` reads back unchanged, and rewriting the value fixes it for Compose.
+ */
+export function escapeEnvValue(value: string): string {
+  return value.replace(/\$/g, '$$$$');
+}
+
+function unescapeEnvValue(value: string): string {
+  return value.replace(/\$\$/g, '$');
+}
+
+/**
  * Minimal .env parser: KEY=value pairs, ignoring blank lines and comments.
  * Does not attempt shell-style quoting/escaping.
  */
@@ -20,7 +41,7 @@ export function parseEnvFile(envFilePath: string): Record<string, string> {
     }
     const key = trimmed.slice(0, eqIndex).trim();
     const value = trimmed.slice(eqIndex + 1).trim();
-    values[key] = value;
+    values[key] = unescapeEnvValue(value);
   }
 
   return values;
@@ -45,11 +66,12 @@ export function writeEnvValues(envFilePath: string, values: Record<string, strin
   const lines = existing === '' ? [] : existing.replace(/\n$/, '').split('\n');
 
   for (const [key, value] of Object.entries(values)) {
+    const escaped = escapeEnvValue(value);
     const index = lines.findIndex((line) => line.startsWith(`${key}=`));
     if (index >= 0) {
-      lines[index] = `${key}=${value}`;
+      lines[index] = `${key}=${escaped}`;
     } else {
-      lines.push(`${key}=${value}`);
+      lines.push(`${key}=${escaped}`);
     }
   }
 

@@ -30,6 +30,23 @@ describe('writeEnvValues', () => {
     },
   );
 
+  // Compose interpolates a project `.env`'s own values, so a `$` has to reach
+  // disk as `$$` — proven against real `docker compose config` in plan.md §596.
+  it.each(['pass$USER', 'pass${HOME}word', 'a$b$c'])(
+    'escapes the $ in %s on disk and reads it back intact',
+    (password) => {
+      const file = tmpEnv();
+      writeEnvValues(file, { PW: password });
+      expect(fs.readFileSync(file, 'utf8')).toBe(`PW=${password.replace(/\$/g, '$$$$')}\n`);
+      expect(parseEnvFile(file).PW).toBe(password);
+    },
+  );
+
+  it('reads a legacy raw single $ back unchanged', () => {
+    const file = tmpEnv('PW=old$value\n');
+    expect(parseEnvFile(file).PW).toBe('old$value');
+  });
+
   it('replaces in place and appends what is missing, leaving other keys alone', () => {
     const file = tmpEnv('KEEP=1\nA=old\n');
     writeEnvValues(file, { A: 'new', B: '2' });

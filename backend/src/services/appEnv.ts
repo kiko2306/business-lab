@@ -8,7 +8,7 @@ import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { extractComposeEnvVars, getService, resolveComposeFile } from '../config/services';
-import { parseEnvFile } from '../utils/envFile';
+import { escapeEnvValue, parseEnvFile } from '../utils/envFile';
 import { getPortsInUseByOtherServices, isPortKey, nextFreePort } from './ports';
 import { buildExposureEnvOverrides } from './exposureEnv';
 import { getAppTimezone } from '../utils/generalSettings';
@@ -356,14 +356,14 @@ export async function saveServiceEnv(
       changedKeys.push(key);
       const value = pendingUpdates.get(key)!;
       pendingUpdates.delete(key);
-      return `${key}=${value}`;
+      return `${key}=${escapeEnvValue(value)}`;
     }
     return line;
   });
 
   for (const [key, value] of pendingUpdates) {
     changedKeys.push(key);
-    updatedLines.push(`${key}=${value}`);
+    updatedLines.push(`${key}=${escapeEnvValue(value)}`);
   }
 
   const finalContent = updatedLines.join('\n').replace(/\n*$/, '\n');

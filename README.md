@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.132.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.132.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -224,13 +224,18 @@ it is done — not ticked off and left behind. Section references point at
       it is exposed, then apply an exposure change and check its
       `configuration.yaml` gets the marked proxy block. Delete this item once
       that passes.
-- [ ] **Confirm a `$` in a backup-destination password now survives** — the
-      `.env` writer used to expand `$&`/`` $` ``/`$'`/`$1` in a value
-      (plan.md §585, fixed with `utils/envFile.ts`'s `writeEnvValues`). On
-      `beta`: set the WebDAV backup destination's password to something
-      containing `a$&b`, save, and confirm the destination card reports Kopia
-      reconnected — and that `apps/kopia/.env`'s `BACKUP_WEBDAV_PASSWORD`
-      holds the literal string. Delete this item once that passes.
+- [ ] **Confirm the new `.env` `$`-escaping doesn't break a live save** —
+      every value written to an app `.env` is now escaped `$` → `$$`, because
+      Compose interpolates the values it reads out of a project `.env` and was
+      silently substituting a `$USER`/`${FOO}` inside a password (plan.md
+      §596; proven against real `docker compose config`, and the escaped form
+      proven to reach a container intact). It touches **both** writers, so it
+      affects every app's config save, not just the backup destination. On
+      `beta`: save a per-app config that has no `$` in it at all and confirm
+      the app restarts clean (nothing double-escaped), then set the WebDAV
+      backup destination's password to something containing `a$USER-b` and
+      confirm the destination card reports Kopia reconnected. Delete this item
+      once both pass.
 
 - [ ] **Vikunja mobile/desktop clients: confirm a real client against the
       Authelia bypass** — code built and proven at the HTTP level in plan.md

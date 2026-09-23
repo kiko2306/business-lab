@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.132.1] — 2026-09-23
+
+### Fixed
+
+- A `$` in an app credential or backup password is no longer eaten by Compose's `.env` interpolation
+
 ## [0.132.0] — 2026-09-22
 
 ### Backups

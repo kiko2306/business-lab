@@ -27756,3 +27756,55 @@ delete.
 
 Both README items now carry a `Last checked 2026-09-23` line so the next sweep
 knows how stale the answer is.
+
+## 596. The `$`-in-a-secret bug was bigger than §585: Compose interpolates `.env` too
+
+§585 fixed the `.env` *writer* (a `String.replace` replacement string expanded
+`$&`/`` $` ``/`$'`/`$1`), and §594 left the live proof open because proving it
+meant overwriting the one live WebDAV destination password with a test value
+that could not be read back and restored.
+
+Picking that up, the interesting question turned out to be a different one:
+what does Compose do with the value after we write it? The compose files
+consume their `.env` as `BACKUP_WEBDAV_PASSWORD: ${BACKUP_WEBDAV_PASSWORD:-}`,
+and Compose interpolates the values it reads out of a project `.env`. A
+throwaway project proved it:
+
+```
+.env:                  PW=a$&b-$USER-x$$y
+docker compose config: PW: a$$&b-mat-x$$y      # $USER became the host user
+```
+
+So `$&` survived by luck (`&` is not a variable character), `$$` is Compose's
+escape for a literal `$`, and **`$USER` / `${FOO}` in a password is silently
+substituted** — the exact silent corruption §585 was written to stop, one
+layer further down. No unit test could have caught it: it is Compose's
+behaviour, not ours.
+
+### The fix
+
+`escapeEnvValue()` in `utils/envFile.ts` writes every `$` as `$$`, and
+`parseEnvFile` unescapes symmetrically so the callers that compare a stored
+value against the desired one (`webdavMount`, `kopiaTargetApply`) and the ones
+that serve a value back to the UI (`appEnv`) still see the real secret.
+
+It is applied in **both** writers, not just the backup one: `appEnv.ts` writes
+user-entered per-app config the same raw way, so any app credential containing
+a `$` had the same bug. Checked first that no app uses `env_file:` (which
+passes values through untouched and would make `$$` wrong) — none does; every
+compose file here interpolates.
+
+Proven end to end against real Compose, not just in unit tests: `PW=pass$$USER-a$$&b`
+on disk, and the container's environment holds `pass$USER-a$&b`.
+
+### Legacy values
+
+Values written before this are still raw on disk. A single `$` reads back
+unchanged (only `$$` is unescaped), so nothing breaks on read; Compose still
+mangles a `$word` in such a value until it is next written, at which point it
+gets escaped. Not worth a migration sweep — rewriting the value is the fix,
+and the affected values are the ones a user re-enters anyway.
+
+This supersedes §594's open `$`-in-a-backup-password item: the live check no
+longer needs the working destination clobbered, because the real behaviour was
+proven directly against Compose.
