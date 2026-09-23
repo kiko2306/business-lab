@@ -7,7 +7,7 @@
     class="confirm-dialog"
     role="alertdialog"
     aria-modal="true"
-    [attr.aria-label]="req.title || 'Confirmation required'"
+    [attr.aria-label]="req.title || ('confirmDialog.defaultAriaLabel' | t)"
   >
     <div class="confirm-body">
       <h2 class="h5 mb-2" *ngIf="req.title">{{ req.title }}</h2>
@@ -15,7 +15,7 @@
     </div>
     <div class="confirm-foot">
       <button type="button" class="btn btn-outline-secondary" (click)="respond(false)">
-        {{ req.cancelText || 'Cancel' }}
+        {{ req.cancelText || ('common.cancel' | t) }}
       </button>
       <button
         type="button"
@@ -25,7 +25,7 @@
         (click)="respond(true)"
         autofocus
       >
-        {{ req.confirmText || 'Confirm' }}
+        {{ req.confirmText || ('confirmDialog.defaultConfirmText' | t) }}
       </button>
     </div>
   </div>

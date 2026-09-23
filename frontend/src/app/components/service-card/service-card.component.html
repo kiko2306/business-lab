@@ -6,14 +6,14 @@
       <span class="service-name">{{ service.label }}</span>
       <span class="badge text-bg-{{ stateBadge(service.state) }}">{{ service.state }}</span>
       <span class="badge bg-body-tertiary border" [ngClass]="healthClass()">{{ healthLabel() }}</span>
-      <span class="badge bg-body-tertiary border" [title]="'Installed: ' + installedVersion()">ⓥ</span>
+      <span class="badge bg-body-tertiary border" [title]="'serviceCard.installedLabel' | t:{ version: installedVersion() }">ⓥ</span>
       <a
         *ngIf="service.exposedHostname"
         class="badge text-bg-secondary border text-decoration-none"
         [href]="'https://' + service.exposedHostname + (service.webPath || '')"
         target="_blank"
         rel="noopener noreferrer"
-        title="Open public URL"
+        [title]="'serviceCard.openPublicUrlTitle' | t"
       >
         {{ service.exposedHostname }}{{ service.webPath }}
       </a>
@@ -23,7 +23,7 @@
         [href]="'https://' + extra.hostname"
         target="_blank"
         rel="noopener noreferrer"
-        [title]="extra.label + ' URL — for the phone/desktop app, not the browser link above'"
+        [title]="'serviceCard.extraUrlTitle' | t:{ label: extra.label }"
       >
         {{ extra.label }}: {{ extra.hostname }}
       </a>
@@ -33,7 +33,7 @@
         [href]="lanAccessUrl()"
         target="_blank"
         rel="noopener noreferrer"
-        [title]="'Open ' + lanAccessUrl()"
+        [title]="'serviceCard.openUrlTitle' | t:{ url: lanAccessUrl() ?? '' }"
       >
         {{ service.lanOnly ? 'lanOnly' : 'overlayOnly' }}
       </a>
@@ -52,7 +52,7 @@
     <!-- Always listed, not only when something is missing: knowing an app needs
          Authelia is as useful when it is up as when it is down. -->
     <div class="service-row-deps" *ngIf="dependencies().length">
-      <span class="deps-label">Needs</span>
+      <span class="deps-label">{{ 'serviceCard.needsLabel' | t }}</span>
       <span
         class="dep"
         *ngFor="let dep of dependencies()"
@@ -74,7 +74,7 @@
       (click)="requestAction('start')"
     >
       <span *ngIf="loadingAction === 'start'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      <span *ngIf="loadingAction !== 'start'">Start</span>
+      <span *ngIf="loadingAction !== 'start'">{{ 'serviceCard.startButton' | t }}</span>
     </button>
     <button
       type="button"
@@ -83,15 +83,15 @@
       (click)="requestAction('stop')"
     >
       <span *ngIf="loadingAction === 'stop'" class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-      <span *ngIf="loadingAction !== 'stop'">Stop</span>
+      <span *ngIf="loadingAction !== 'stop'">{{ 'serviceCard.stopButton' | t }}</span>
     </button>
     <button
       type="button"
       class="btn btn-outline-secondary btn-sm"
-      title="Configuration & exposure settings"
+      [title]="'serviceCard.settingsTitle' | t"
       (click)="openSettings()"
     >
-      Settings
+      {{ 'serviceCard.settingsButton' | t }}
     </button>
   </div>
 </article>
@@ -101,27 +101,27 @@
   <div class="settings-dialog" (click)="$event.stopPropagation()" role="dialog" aria-modal="true">
     <div class="settings-head">
       <span class="service-icon service-icon-sm">{{ serviceIcon(service.icon) }}</span>
-      <span class="fw-semibold">{{ service.label }} settings</span>
-      <button type="button" class="btn-close ms-auto" aria-label="Close" (click)="closeSettings()"></button>
+      <span class="fw-semibold">{{ 'serviceCard.settingsModalTitle' | t:{ label: service.label } }}</span>
+      <button type="button" class="btn-close ms-auto" [attr.aria-label]="'common.close' | t" (click)="closeSettings()"></button>
     </div>
 
     <div class="settings-body">
       <!-- Configuration -->
       <section class="settings-section">
-        <h3 class="settings-section-title">Configuration</h3>
+        <h3 class="settings-section-title">{{ 'serviceCard.configuration.title' | t }}</h3>
 
         <div *ngIf="envLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
           <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-          Loading…
+          {{ 'common.loading' | t }}
         </div>
 
         <ng-container *ngIf="!envLoading && env">
           <div *ngIf="!env.fields.length" class="small text-body-secondary mb-2">
-            This app has no configurable settings — it starts as-is.
+            {{ 'serviceCard.configuration.noSettings' | t }}
           </div>
 
           <div *ngIf="missingRequiredCount() > 0" class="alert alert-warning py-1 px-2 small mb-2">
-            {{ missingRequiredCount() }} required value(s) not set yet — this service won't start until they are.
+            {{ (missingRequiredCount() === 1 ? 'serviceCard.configuration.missingRequired.one' : 'serviceCard.configuration.missingRequired.other') | t:{ count: missingRequiredCount() } }}
           </div>
 
           <ng-container *ngFor="let field of env.fields">
@@ -184,9 +184,9 @@
             />
 
             <div *ngIf="field.managed" class="form-text small">
-              {{ field.managedValue
-                ? 'Set automatically from this service\'s exposure settings.'
-                : 'Set automatically — follows this service\'s public URL once exposure is enabled.' }}
+              {{ (field.managedValue
+                ? 'serviceCard.configuration.managedFromExposure'
+                : 'serviceCard.configuration.managedFollowsUrl') | t }}
             </div>
 
             <!-- Fixed protocol port (NPM 80/443, Pi-hole 53) — read-only.
@@ -221,21 +221,21 @@
               class="form-control form-control-sm"
               [id]="'env-' + service.name + '-' + field.key"
               [(ngModel)]="envValues[field.key]"
-              [placeholder]="field.isSet ? 'configured — leave blank to keep' : 'not set'"
+              [placeholder]="field.isSet ? ('serviceCard.configuration.passwordConfigured' | t) : ('serviceCard.configuration.passwordNotSet' | t)"
               autocomplete="new-password"
             />
             <div *ngIf="!field.managed && !field.boolean && field.secret && field.suggestedValue" class="form-text small">
-              Auto-generated — click Save configuration to apply.
+              {{ 'serviceCard.configuration.autoGenerated' | t }}
             </div>
             <div *ngIf="portConflict(field)" class="form-text small text-danger d-flex align-items-center gap-2 mt-1">
-              <span>Port in use by another service.</span>
+              <span>{{ 'serviceCard.configuration.portInUse' | t }}</span>
               <button
                 *ngIf="field.suggestedPort != null"
                 type="button"
                 class="btn btn-outline-secondary btn-sm py-0"
                 (click)="useSuggestedPort(field)"
               >
-                Use {{ field.suggestedPort }}
+                {{ 'serviceCard.configuration.usePortButton' | t:{ port: field.suggestedPort } }}
               </button>
             </div>
            </div>
@@ -248,17 +248,16 @@
             (click)="saveEnv()"
           >
             <span *ngIf="envSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            Save configuration
+            {{ 'serviceCard.configuration.saveButton' | t }}
           </button>
         </ng-container>
       </section>
 
       <!-- Backups -->
       <section class="settings-section">
-        <h3 class="settings-section-title">Backups</h3>
+        <h3 class="settings-section-title">{{ 'serviceCard.backups.title' | t }}</h3>
         <p class="small text-body-secondary mb-2">
-          A local snapshot of this app's data and database — a quick rollback point,
-          kept separate from the scheduled off-site backup.
+          {{ 'serviceCard.backups.description' | t }}
         </p>
 
         <button
@@ -268,16 +267,16 @@
           (click)="createAppBackup()"
         >
           <span *ngIf="backupsCreating" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-          Back up now
+          {{ 'serviceCard.backups.backUpNowButton' | t }}
         </button>
 
         <div *ngIf="backupsLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
           <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-          Loading…
+          {{ 'common.loading' | t }}
         </div>
 
         <ng-container *ngIf="!backupsLoading">
-          <div *ngIf="!appBackups.length" class="small text-body-secondary">No snapshots yet.</div>
+          <div *ngIf="!appBackups.length" class="small text-body-secondary">{{ 'serviceCard.backups.noSnapshots' | t }}</div>
 
           <ul *ngIf="appBackups.length" class="list-unstyled d-flex flex-column gap-2 mb-0">
             <li
@@ -285,7 +284,7 @@
               class="d-flex flex-wrap align-items-center gap-2 p-2 border rounded bg-body-tertiary"
             >
               <div class="app-backup-meta d-flex flex-column">
-                <span class="fw-semibold small">{{ b.createdAt | date: 'medium' }}</span>
+                <span class="fw-semibold small">{{ b.createdAt | date: 'medium':undefined:translate.locale() }}</span>
                 <span class="small text-body-secondary">{{ appBackupDetail(b) }}</span>
               </div>
               <div class="d-flex flex-wrap align-items-center gap-1 ms-auto">
@@ -300,7 +299,7 @@
                   [disabled]="backupBusyFile !== null"
                   (click)="downloadAppBackup(b)"
                 >
-                  Download
+                  {{ 'serviceCard.backups.downloadButton' | t }}
                 </button>
                 <button
                   type="button"
@@ -308,7 +307,7 @@
                   [disabled]="backupBusyFile !== null || backupsCreating"
                   (click)="restoreAppBackup(b)"
                 >
-                  Restore
+                  {{ 'serviceCard.backups.restoreButton' | t }}
                 </button>
                 <button
                   type="button"
@@ -316,7 +315,7 @@
                   [disabled]="backupBusyFile !== null"
                   (click)="deleteAppBackup(b)"
                 >
-                  Delete
+                  {{ 'serviceCard.backups.deleteButton' | t }}
                 </button>
               </div>
             </li>
@@ -326,43 +325,43 @@
 
       <!-- Admin account -->
       <section class="settings-section" *ngIf="service.adminUserManagementSupported">
-        <h3 class="settings-section-title">Admin account</h3>
+        <h3 class="settings-section-title">{{ 'serviceCard.adminAccount.title' | t }}</h3>
 
         <div *ngIf="adminUserLoading" class="d-flex align-items-center gap-2 text-body-secondary small">
           <span class="spinner-border spinner-border-sm" aria-hidden="true"></span>
-          Loading…
+          {{ 'common.loading' | t }}
         </div>
 
         <ng-container *ngIf="!adminUserLoading && adminUser">
           <div class="mb-2">
-            <label class="form-label small mb-1" [for]="'admin-username-' + service.name">Username</label>
+            <label class="form-label small mb-1" [for]="'admin-username-' + service.name">{{ 'serviceCard.adminAccount.usernameLabel' | t }}</label>
             <input class="form-control form-control-sm" [id]="'admin-username-' + service.name" [(ngModel)]="adminUserForm.username" />
           </div>
           <div class="mb-2">
-            <label class="form-label small mb-1" [for]="'admin-displayname-' + service.name">Display name</label>
+            <label class="form-label small mb-1" [for]="'admin-displayname-' + service.name">{{ 'serviceCard.adminAccount.displayNameLabel' | t }}</label>
             <input class="form-control form-control-sm" [id]="'admin-displayname-' + service.name" [(ngModel)]="adminUserForm.displayName" />
           </div>
           <div class="mb-2">
-            <label class="form-label small mb-1" [for]="'admin-email-' + service.name">Email</label>
+            <label class="form-label small mb-1" [for]="'admin-email-' + service.name">{{ 'serviceCard.adminAccount.emailLabel' | t }}</label>
             <input type="email" class="form-control form-control-sm" [id]="'admin-email-' + service.name" [(ngModel)]="adminUserForm.email" />
           </div>
           <div class="mb-2">
-            <label class="form-label small mb-1" [for]="'admin-password-' + service.name">New password</label>
+            <label class="form-label small mb-1" [for]="'admin-password-' + service.name">{{ 'serviceCard.adminAccount.newPasswordLabel' | t }}</label>
             <input
               type="password"
               class="form-control form-control-sm"
               [id]="'admin-password-' + service.name"
               [(ngModel)]="adminUserForm.password"
-              placeholder="leave blank to keep current password"
+              [placeholder]="'serviceCard.adminAccount.passwordPlaceholder' | t"
               autocomplete="new-password"
             />
           </div>
           <div class="small text-body-secondary mb-2">
-            Saving restarts {{ service.label }} to apply the change (briefly interrupts single sign-on for anything behind it).
+            {{ 'serviceCard.adminAccount.savingRestartsNote' | t:{ label: service.label } }}
           </div>
           <button type="button" class="btn btn-outline-primary btn-sm" [disabled]="adminUserSaving" (click)="saveAdminUser()">
             <span *ngIf="adminUserSaving" class="spinner-border spinner-border-sm me-2" aria-hidden="true"></span>
-            Save admin account
+            {{ 'serviceCard.adminAccount.saveButton' | t }}
           </button>
         </ng-container>
       </section>
@@ -378,19 +377,19 @@
         class="spinner-border spinner-border-sm text-light"
         aria-hidden="true"
       ></span>
-      <span class="fw-semibold">Starting {{ service.label }}</span>
+      <span class="fw-semibold">{{ 'serviceCard.startupLogs.startingHeading' | t:{ label: service.label } }}</span>
       <span class="badge" [ngClass]="startupPhaseBadgeClass()">{{ startupPhaseLabel() }}</span>
       <button
         type="button"
         class="btn-close btn-close-white ms-auto"
-        aria-label="Close startup logs"
+        [attr.aria-label]="'serviceCard.startupLogs.closeAriaLabel' | t"
         (click)="closeStartupLogs()"
       ></button>
     </div>
     <pre #startupLogBody class="startup-logs-body">{{ startupLogText() }}</pre>
     <div class="startup-logs-foot">
       <span class="small">{{ startupFootNote() }}</span>
-      <button type="button" class="btn btn-sm btn-secondary ms-auto" (click)="closeStartupLogs()">Close</button>
+      <button type="button" class="btn btn-sm btn-secondary ms-auto" (click)="closeStartupLogs()">{{ 'common.close' | t }}</button>
     </div>
   </div>
 </div>

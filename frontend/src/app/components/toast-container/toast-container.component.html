@@ -6,9 +6,9 @@
     role="alert"
   >
     <div class="d-flex align-items-start gap-3">
-      <span class="fw-semibold">{{ labels[toast.variant] }}</span>
+      <span class="fw-semibold">{{ ('toast.variant.' + toast.variant) | t }}</span>
       <span class="flex-grow-1">{{ toast.text }}</span>
-      <button type="button" class="btn-close" aria-label="Close" (click)="dismiss(toast.id)"></button>
+      <button type="button" class="btn-close" [attr.aria-label]="'common.close' | t" (click)="dismiss(toast.id)"></button>
     </div>
   </div>
 </div>

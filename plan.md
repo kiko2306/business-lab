@@ -28113,3 +28113,49 @@ visible strings). No e2e run — none of these four pages have Playwright
 coverage (`e2e/tests/` has no spec for Content, Utils, Access denied or Set
 password), and this batch doesn't touch the shell/nav/Users/2FA paths the
 existing specs do cover.
+
+## 604. Multi-language UI: shared `components/*` — rollout complete (§597 batch 7, final)
+
+Translated the last English-only surfaces: `ServiceCardComponent` (by far
+the largest single component in the app — the per-app row on the Apps
+page, its Configuration/Backups/Admin-account settings modal, and the
+startup-logs modal), `ToastContainerComponent`, `ConfirmDialogComponent`,
+and `ResourceStripComponent` (the shell header's CPU/memory/disk meters).
+`~100` new keys, mostly under `serviceCard.*`. This closes every item on
+the multi-language UI TODO list opened at §597 — every page and every
+shared component now resolves its UI text through `TranslateService`.
+
+Two things worth recording:
+- **`ResourceStripComponent` builds its label/title strings in `toMeters()`,
+  not the template** — same shape as §603's `utils.component.ts` helpers.
+  It had no prior `| t` usage at all (unlike every other component in this
+  rollout), so this is the one component that needed `TranslateService`
+  injected without also needing `TranslatePipe`, since nothing in its
+  template calls the pipe directly.
+- **Literal values stay English, same boundary as every prior batch**:
+  `service.state`/`service.healthy`-derived CSS-class strings, the raw
+  `true`/`false` radio labels for boolean env vars (they represent literal
+  stored values, not prose), and the `lanOnly`/`overlayOnly` badge text
+  (service-flag identifiers). `ConfirmDialogComponent`'s three defaults
+  (`aria-label`, cancel text, confirm text) were translated even though no
+  current caller relies on the cancel/confirm fallbacks — `cancelText` is
+  never passed anywhere in the app today, and every `confirmText` caller
+  already supplies one — but the component's own default should not read
+  as untranslated dead code the day a caller does omit it.
+
+**Verification.** `./scripts/check.sh frontend build` (clean) and
+`./scripts/check.sh frontend test` (89/89, `service-card.component.spec.ts`
+included). Also ran `scripts/e2e-tests.sh` in full despite this batch
+touching no single page in the CLAUDE.md auth/shell/nav/Users/2FA list
+directly — `ToastContainerComponent` and `ConfirmDialogComponent` are
+mounted globally (used by the Login toast and the Users-page delete
+confirm) and `ServiceCardComponent` renders on the Apps page nav.spec.ts
+loads, so the safer call was to run the full suite: 13 passed / 3 skipped
+(the Docker-socket-only `live-stack.spec.ts` cases), including
+`two-factor.spec.ts` and both `users.spec.ts` cases.
+
+This closes out the `README.md` multi-language rollout TODO list opened at
+§597 — no more per-page/per-component translation items remain there. The
+one item that does remain (confirming the top-bar language selector by
+hand on `beta`, plan.md §598) still needs a human click-through and stays
+on the list until that happens.

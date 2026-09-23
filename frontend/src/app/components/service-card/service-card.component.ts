@@ -28,6 +28,8 @@ import { ConfirmService } from '../../core/confirm.service';
 import { OperationsService } from '../../core/operations.service';
 import { ServiceStateService } from '../../core/service-state.service';
 import { ToastService } from '../../core/toast.service';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 type StartupPhase = 'streaming' | 'running' | 'error' | 'timeout';
 
@@ -44,7 +46,7 @@ interface DependencyState {
 @Component({
   selector: 'app-service-card',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, TranslatePipe],
   templateUrl: './service-card.component.html',
   styleUrl: './service-card.component.css'
 })
@@ -54,6 +56,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   private readonly toast = inject(ToastService);
   private readonly confirm = inject(ConfirmService);
   private readonly zone = inject(NgZone);
+  protected readonly translate = inject(TranslateService);
 
   @Input({ required: true }) service!: ServiceStatus;
   @Input() allServices: ServiceStatus[] = [];
@@ -120,7 +123,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     if (this.service.versionPinned?.length) {
       return this.service.versionPinned.join(', ');
     }
-    return 'latest';
+    return this.translate.t('serviceCard.latestVersion');
   }
 
   /**
@@ -196,7 +199,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
     const url = await this.serviceState.createStartupLogUrl(this.service.name);
     if (!url) {
-      this.pushStartupLine('Unable to open the log stream — try reloading the dashboard.');
+      this.pushStartupLine(this.translate.t('serviceCard.startupLogs.unableToOpen'));
       this.startupPhase = 'error';
       return;
     }
@@ -245,7 +248,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
     source.onerror = () => {
       if (this.startupPhase === 'streaming') {
-        this.pushStartupLine('— log stream disconnected —');
+        this.pushStartupLine(this.translate.t('serviceCard.startupLogs.disconnected'));
       }
       source.close();
       this.startupLogSource = undefined;
@@ -265,7 +268,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
         this.pushStartupLine(line);
       }
     }
-    this.pushStartupLine('— docker compose could not start this service —');
+    this.pushStartupLine(this.translate.t('serviceCard.startupLogs.couldNotStart'));
     this.startupPhase = 'error';
     this.startupLogSource?.close();
     this.startupLogSource = undefined;
@@ -324,16 +327,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   }
 
   protected startupPhaseLabel(): string {
-    switch (this.startupPhase) {
-      case 'streaming':
-        return 'starting…';
-      case 'running':
-        return 'running';
-      case 'error':
-        return 'failed';
-      case 'timeout':
-        return 'still starting';
-    }
+    return this.translate.t(`serviceCard.startupLogs.phase.${this.startupPhase}`);
   }
 
   protected startupPhaseBadgeClass(): Record<string, boolean> {
@@ -346,20 +340,14 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   }
 
   protected startupFootNote(): string {
-    switch (this.startupPhase) {
-      case 'streaming':
-        return 'Streaming container logs until the service is running and healthy…';
-      case 'running':
-        return `${this.service.label} is up and healthy.`;
-      case 'error':
-        return `${this.service.label} did not come up — check the log above for the error.`;
-      case 'timeout':
-        return 'Still starting after a few minutes — leaving the logs here so you can keep watching.';
+    if (this.startupPhase === 'running' || this.startupPhase === 'error') {
+      return this.translate.t(`serviceCard.startupLogs.footNote.${this.startupPhase}`, { label: this.service.label });
     }
+    return this.translate.t(`serviceCard.startupLogs.footNote.${this.startupPhase}`);
   }
 
   protected startupLogText(): string {
-    return this.startupLogLines.length ? this.startupLogLines.join('\n') : 'Waiting for output…';
+    return this.startupLogLines.length ? this.startupLogLines.join('\n') : this.translate.t('serviceCard.startupLogs.waitingForOutput');
   }
 
   /**
@@ -407,7 +395,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
         label: proxy?.label ?? 'Nginx Proxy Manager',
         running: proxy?.state === 'running',
         blocking: false,
-        note: `${this.service.exposedHostname} is served through it — the app itself keeps working without it.`,
+        note: this.translate.t('serviceCard.dependency.proxyNote', { hostname: this.service.exposedHostname ?? '' }),
       },
     ];
   }
@@ -424,7 +412,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     const notRunning = this.dependencyStates()
       .filter((d) => !d.running)
       .map((d) => d.label);
-    return notRunning.length ? `Start ${notRunning.join(', ')} first` : '';
+    return notRunning.length ? this.translate.t('serviceCard.startBlocked', { names: notRunning.join(', ') }) : '';
   }
 
   /**
@@ -439,17 +427,18 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   degradedTitle(): string {
     const down = this.degradedBy();
-    return down.length ? `Runs, but needs ${down.join(' and ')} to work properly` : '';
+    return down.length ? this.translate.t('serviceCard.degraded', { names: down.join(' and ') }) : '';
   }
 
   dependencyTitle(dep: DependencyState): string {
-    const state = dep.running ? 'running' : 'not running';
+    const state = this.translate.t(dep.running ? 'serviceCard.dependency.running' : 'serviceCard.dependency.notRunning');
     if (dep.note) {
-      return `${dep.label} — ${state}. ${dep.note}`;
+      return this.translate.t('serviceCard.dependency.titleWithNote', { label: dep.label, state, note: dep.note });
     }
-    return dep.blocking
-      ? `${dep.label} — ${state}. Required to start.`
-      : `${dep.label} — ${state}. Needed for this app to work, not to start.`;
+    return this.translate.t(
+      dep.blocking ? 'serviceCard.dependency.titleRequired' : 'serviceCard.dependency.titleNeeded',
+      { label: dep.label, state }
+    );
   }
 
 
@@ -484,7 +473,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
             }
           }
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load configuration.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.loadConfig'))),
       });
   }
 
@@ -535,7 +524,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
           this.toast.success(response.message);
           this.loadEnv();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save configuration.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.saveConfig'))),
       });
   }
 
@@ -549,7 +538,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
           this.adminUser = user;
           this.adminUserForm = { username: user.username, displayName: user.displayName, email: user.email, password: '' };
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load admin account.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.loadAdminAccount'))),
       });
   }
 
@@ -570,7 +559,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
           this.adminUserForm.password = '';
           this.loadAdminUser();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to save admin account.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.saveAdminAccount'))),
       });
   }
 
@@ -581,7 +570,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
       .pipe(finalize(() => (this.backupsLoading = false)))
       .subscribe({
         next: (response) => (this.appBackups = response.items),
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load this app\'s backups.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.loadBackups'))),
       });
   }
 
@@ -599,19 +588,16 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
           }
           this.loadAppBackups();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, `Unable to back up ${this.service.label}.`)),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.backupFailed', { label: this.service.label }))),
       });
   }
 
   async restoreAppBackup(entry: AppBackupEntry): Promise<void> {
     const when = new Date(entry.createdAt).toLocaleString();
     const confirmed = await this.confirm.ask({
-      title: `Restore ${this.service.label}`,
-      message:
-        `Restore from the snapshot taken ${when}?\n` +
-        `This stops ${this.service.label}, replaces its data with the snapshot, ` +
-        `and starts it again. Anything changed since then is lost.`,
-      confirmText: 'Restore',
+      title: this.translate.t('serviceCard.confirmRestore.title', { label: this.service.label }),
+      message: this.translate.t('serviceCard.confirmRestore.message', { when, label: this.service.label }),
+      confirmText: this.translate.t('serviceCard.confirmRestore.confirmText'),
       danger: true,
     });
     if (!confirmed) {
@@ -634,16 +620,16 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
           this.serviceState.refresh();
           this.loadAppBackups();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, `Unable to restore ${this.service.label}.`)),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.restoreFailed', { label: this.service.label }))),
       });
   }
 
   async deleteAppBackup(entry: AppBackupEntry): Promise<void> {
     const when = new Date(entry.createdAt).toLocaleString();
     const confirmed = await this.confirm.ask({
-      title: 'Delete snapshot',
-      message: `Delete the ${this.service.label} snapshot from ${when}? This can't be undone.`,
-      confirmText: 'Delete',
+      title: this.translate.t('serviceCard.confirmDeleteSnapshot.title'),
+      message: this.translate.t('serviceCard.confirmDeleteSnapshot.message', { label: this.service.label, when }),
+      confirmText: this.translate.t('serviceCard.confirmDeleteSnapshot.confirmText'),
       danger: true,
     });
     if (!confirmed) {
@@ -658,7 +644,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
           this.toast.success(response.message);
           this.loadAppBackups();
         },
-        error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to delete the snapshot.')),
+        error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.deleteSnapshot'))),
       });
   }
 
@@ -672,7 +658,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
         link.click();
         URL.revokeObjectURL(url);
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to download the snapshot.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('serviceCard.errors.downloadSnapshot'))),
     });
   }
 
@@ -681,14 +667,19 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
     const parts = [`${(entry.bytes / 1024).toFixed(0)} KB`];
     const m = entry.manifest;
     if (!m) {
-      parts.push('details unavailable');
+      parts.push(this.translate.t('serviceCard.backups.detailsUnavailable'));
       return parts.join(' · ');
     }
     if (m.engine) {
       parts.push(m.engine);
     }
     if (m.dumpFailures.length) {
-      parts.push(`${m.dumpFailures.length} dump${m.dumpFailures.length === 1 ? '' : 's'} failed`);
+      parts.push(
+        this.translate.t(
+          m.dumpFailures.length === 1 ? 'serviceCard.backups.dumpFailed.one' : 'serviceCard.backups.dumpFailed.other',
+          { count: m.dumpFailures.length }
+        )
+      );
     }
     return parts.join(' · ');
   }
@@ -757,10 +748,10 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
 
   healthLabel(): string {
     if (this.service.state !== 'running') {
-      return 'inactive';
+      return this.translate.t('serviceCard.health.inactive');
     }
 
-    return this.service.healthy ? 'healthy' : 'check failed';
+    return this.translate.t(this.service.healthy ? 'serviceCard.health.healthy' : 'serviceCard.health.checkFailed');
   }
 
   healthClass(): string {

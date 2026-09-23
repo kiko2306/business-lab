@@ -4,6 +4,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { switchMap, timer } from 'rxjs';
 import { DiskUsage, HealthStatus } from '../../core/models';
 import { OperationsService } from '../../core/operations.service';
+import { TranslateService } from '../../i18n/translate.service';
 
 interface Meter {
   key: 'cpu' | 'memory' | 'disk';
@@ -59,6 +60,7 @@ function worstDisk(disks: DiskUsage[]): DiskUsage | null {
 export class ResourceStripComponent implements OnInit {
   private readonly operations = inject(OperationsService);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly translate = inject(TranslateService);
 
   protected meters: Meter[] | null = null;
 
@@ -89,8 +91,8 @@ export class ResourceStripComponent implements OnInit {
       {
         key: 'cpu',
         primary: `${cpuPercent}%`,
-        label: 'CPU',
-        title: `CPU ${cpuPercent}%`,
+        label: this.translate.t('resourceStrip.cpuLabel'),
+        title: this.translate.t('resourceStrip.cpuTitle', { percent: cpuPercent }),
         percent: cpuPercent,
         warn: 75,
         crit: 90,
@@ -98,8 +100,8 @@ export class ResourceStripComponent implements OnInit {
       {
         key: 'memory',
         primary: formatGiB(memoryFreeBytes),
-        label: 'Free',
-        title: `Memory ${memoryPercent}% used, ${formatGiB(memoryFreeBytes)} free`,
+        label: this.translate.t('resourceStrip.freeLabel'),
+        title: this.translate.t('resourceStrip.memoryTitle', { percent: memoryPercent, free: formatGiB(memoryFreeBytes) }),
         percent: memoryPercent,
         warn: Math.max(0, health.thresholds.memoryPercent - 15),
         crit: health.thresholds.memoryPercent,
@@ -107,8 +109,10 @@ export class ResourceStripComponent implements OnInit {
       {
         key: 'disk',
         primary: disk ? formatGB(disk.availableBytes) : '—',
-        label: 'Free',
-        title: disk ? `Disk ${diskPercent}% used, ${formatGB(disk.availableBytes)} free` : 'Disk usage unavailable',
+        label: this.translate.t('resourceStrip.freeLabel'),
+        title: disk
+          ? this.translate.t('resourceStrip.diskTitle', { percent: diskPercent, free: formatGB(disk.availableBytes) })
+          : this.translate.t('resourceStrip.diskUnavailable'),
         percent: diskPercent,
         warn: Math.max(0, health.thresholds.diskPercent - 15),
         crit: health.thresholds.diskPercent,

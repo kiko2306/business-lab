@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, HostListener, inject } from '@angular/core';
 import { ConfirmService } from '../../core/confirm.service';
+import { TranslatePipe } from '../../i18n/translate.pipe';
 
 /**
  * The single confirm modal for the whole app (mounted in AppComponent, beside
@@ -10,7 +11,7 @@ import { ConfirmService } from '../../core/confirm.service';
 @Component({
   selector: 'app-confirm-dialog',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TranslatePipe],
   templateUrl: './confirm-dialog.component.html',
   styleUrl: './confirm-dialog.component.css',
 })
