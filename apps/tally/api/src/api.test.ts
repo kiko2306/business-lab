@@ -4,6 +4,7 @@ import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
 import path from 'path';
 import { Pool } from 'pg';
+import { AgentHub } from './agentHub';
 import { createApp } from './app';
 import { migrate } from './migrate';
 
@@ -42,7 +43,9 @@ before(async () => {
   if (skip) return;
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
   await migrate(pool, path.join(__dirname, 'migrations'));
-  server = createApp(pool).listen(0);
+  // No hub.attach here: these tests never open a socket, and the store list
+  // only asks it whether one is connected.
+  server = createApp(pool, new AgentHub(pool)).listen(0);
   await new Promise((r) => server.once('listening', r));
   base = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
 });

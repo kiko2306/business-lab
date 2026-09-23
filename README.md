@@ -430,16 +430,21 @@ before anything is built.
       exchange endpoint in `hotel-core` and `tally`, the issue-and-revoke UI,
       per-agent last-seen replacing the legacy single-row `conn_logs`, and
       revocation proven to 401 a running agent.
-- [ ] **Make the agents outbound-only** — plan.md §627. No agent listens.
-      This is what removes the open inbound port at every shop, the 30-second
-      `api.ipify.org` → `set_ip` loop, the `store.ip` column and the
-      "is the shop online" ping hack — and means the client never touches
-      their router. The hotel agent uses outbound HTTPS with a bearer token;
-      `tally`'s uses one persistent outbound WebSocket authenticated with the
-      same token at handshake, with the API keeping a registry of connected
-      agents by store. Confirm WebSockets survive the Cloudflare Tunnel hop
-      on a real deployment before committing to it — that is the one leg of
-      this design that cannot be proven locally.
+- [ ] **Prove the agent WebSocket survives the Cloudflare Tunnel** — the
+      server side is built and works end to end through real containers
+      (plan.md §634): an agent dials out to `/agent/connect`, authenticates
+      with its enrolment token, and browser reads relay to it live. What is
+      **not** proven is the one hop that cannot be tested here — a long-lived
+      WebSocket through Cloudflare Tunnel → NPM → the container. Check on
+      `beta`: the socket establishes through the public hostname, survives
+      longer than the tunnel's idle timeout (the 30 s ping/pong should carry
+      it), and reconnects by itself after the tunnel restarts. If it does not
+      hold, §627 records the fallback — timer-pushed snapshots with a cached
+      API — and that is a design change, not a patch.
+- [ ] **Build the `hotel` agent's outbound transport** — §627 gives it plain
+      outbound HTTPS with a bearer token rather than a socket, since its push
+      model tolerates minutes. `tally`'s hub (§634) is the worked example for
+      the auth half.
 - [ ] **Remove `GET /api/config` and get Wintouch credentials locally** —
       plan.md §627. No credential travels cloud → agent. The hotel agent reads
       them from the local Wintouch install the way `tally` already does

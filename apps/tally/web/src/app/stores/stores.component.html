@@ -52,10 +52,14 @@
               }
             </td>
             <td data-label="Agent">
-              @if (store.agentEnrolled) {
-                <span class="badge text-bg-success">Enrolled</span>
-              } @else {
+              @if (!store.agentEnrolled) {
                 <span class="badge text-bg-warning">Not enrolled</span>
+              } @else if (store.connected) {
+                <span class="badge text-bg-success">Online</span>
+              } @else {
+                <!-- Enrolled but not on the socket: the shop's machine is off,
+                     or its network is down. Distinct from never enrolled. -->
+                <span class="badge text-bg-danger">Offline</span>
               }
             </td>
             <td data-label="Last seen">
@@ -117,8 +121,10 @@
                     <h3 class="h6">Agent</h3>
                     @if (store.agentEnrolled) {
                       <p class="text-secondary small">
-                        An agent is enrolled. Issuing a new code replaces it — the machine currently reporting
-                        stops on its next call.
+                        An agent is enrolled and is
+                        <strong>{{ store.connected ? 'connected now' : 'not connected' }}</strong>.
+                        Issuing a new code replaces it — the machine currently reporting stops on its
+                        next call.
                       </p>
                     } @else {
                       <p class="text-secondary small">

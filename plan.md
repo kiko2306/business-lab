@@ -30005,3 +30005,79 @@ assets loading. Then the whole flow end to end through the container — create 
 shop, issue a code, enrol an agent carrying **no Authelia headers at all**, ask
 `/agent/me` which shop it serves, and see the shop turn to enrolled with a
 `lastSeenAt`. A `tally-web` CI job builds the bundle and runs the theme diff.
+
+## 634. Implemented: the agent WebSocket, server side
+
+§627's riskiest piece, and the reason `tally` went first. Server side and wire
+protocol only — the .NET agent needs Windows and the x86 Wintouch assemblies
+(§629), so a Node client stands in for it in the tests. It is the same protocol
+either client speaks.
+
+### Direction is the whole point
+
+The agent dials out and holds the connection; the cloud asks questions down a
+socket it never opened. That removes, together: the unauthenticated POS port on
+each shop's public IP, the 30-second `ipify` → `set_ip` loop, the `store.ip`
+column, and any router change at the client's premises.
+
+`AgentHub` owns the live connections, keyed by store — one per shop, matching
+the schema's partial unique index (§631).
+
+### Protocol
+
+Upgrade at `/agent/connect` (inside the Authelia-bypassed `/agent` prefix,
+§628), authenticated by the enrolment token in an `Authorization: Bearer`
+header — a header rather than a query string, which lands in proxy logs.
+
+The upgrade is handled manually rather than by `WebSocketServer({ server })`
+so a bad token is refused with a plain **401 before the handshake completes**:
+the agent sees an HTTP failure it can log, not a socket that opens and closes
+for no stated reason.
+
+Requests carry an id the agent echoes, so one socket serves concurrent
+browsers without a queue — proven by a test whose agent answers out of order.
+
+### Decisions
+
+- **A reconnect replaces the existing socket rather than being refused.** A
+  shop that loses its network leaves a socket that still looks healthy here;
+  without replacement the shop would be permanently unreachable behind a
+  zombie. The `close` handler only clears the slot if it is still its own, so a
+  replaced connection cannot evict its replacement.
+- **Heartbeat, because a tunnel or NAT drops an idle connection silently** and
+  leaves a socket that looks open from this end. Liveness is proven by
+  ping/pong every 30 s, not assumed; a connection still unacknowledged at the
+  next sweep is terminated. Pong also refreshes `last_seen_at` — one write per
+  shop per interval.
+- **Offline is a 503 that says so, not an empty 200.** A floor dashboard
+  showing zeroes that look like real takings is worse than one admitting the
+  shop is offline. Timeout is 504, an error reported *by* the agent is 502.
+- **A viewer asking for a shop they were not granted gets 404, not 403.** A 403
+  confirms the shop exists and lets a viewer enumerate shops by id.
+- **A malformed frame does not drop the connection** — it is the agent's bug,
+  and every in-flight request would fail with it.
+
+The store list now reports `connected` separately from `agentEnrolled`, and the
+UI shows Not enrolled / Online / Offline as three distinct states: an enrolled
+shop that is dark is exactly what an operator needs to see.
+
+### A test-harness bug worth recording
+
+Adding a second suite made seventeen tests fail, including ones that had
+passed. Both suites share one database and truncate in `beforeEach`, and
+`node --test` runs files in parallel — so they were deleting each other's rows
+and failing in ways that read like logic bugs. `package.json` now runs them
+with `--test-concurrency=1`, noted at the top of the suite.
+
+### Verification
+
+32 tests against a real Postgres, and then the whole loop through real
+containers: a standalone agent process dialling **out** into the running image,
+`/api/stores` turning `connected: true`, a browser request relaying to that
+agent and returning its data, the agent's own log showing it was asked for
+`overview` and `tables`, and then — on killing the agent — `connected: false`
+and a 503 on the next read.
+
+**Still unproven, and the one thing that cannot be proven here:** that this
+survives the Cloudflare Tunnel hop. That is a README item, and if it fails,
+§627 already records the fallback — timer-pushed snapshots with a cached API.

@@ -4,6 +4,8 @@ export interface Store {
   isActive: boolean;
   /** Whether an agent is enrolled — never anything about its token. */
   agentEnrolled: boolean;
+  /** Whether that agent is on its socket right now (plan.md §634). */
+  connected: boolean;
   lastSeenAt: string | null;
 }
 

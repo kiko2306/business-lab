@@ -2,14 +2,16 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import fs from 'fs';
 import path from 'path';
 import type { Pool } from 'pg';
+import type { AgentHub } from './agentHub';
 import { agentRoutes } from './routes/agent';
+import { shopRoutes } from './routes/shop';
 import { storeRoutes } from './routes/stores';
 
 /**
  * Split from index.ts so tests can build an app against their own pool without
  * starting a listener or running migrations.
  */
-export function createApp(pool: Pool): Express {
+export function createApp(pool: Pool, hub: AgentHub): Express {
   const app = express();
   app.use(express.json());
 
@@ -28,7 +30,8 @@ export function createApp(pool: Pool): Express {
   // Authelia bypasses /agent (plan.md §628); everything under /api is gated by
   // it and additionally checks the forwarded identity here.
   app.use('/agent', agentRoutes(pool));
-  app.use('/api', storeRoutes(pool));
+  app.use('/api', storeRoutes(pool, hub));
+  app.use('/api', shopRoutes(pool, hub));
 
   // The built Angular bundle, served by this same process on this same origin
   // (plan.md §632) — one image, one port, one hostname, so no CORS boundary.

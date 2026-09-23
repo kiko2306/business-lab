@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
+import type { AgentHub } from '../agentHub';
 import { requireAdmin, requireIdentity } from '../auth';
 import { CODE_TTL_MINUTES, generateEnrolmentCode, hash } from '../tokens';
 
@@ -19,7 +20,7 @@ function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
 }
 
-export function storeRoutes(pool: Pool): Router {
+export function storeRoutes(pool: Pool, hub: AgentHub): Router {
   const router = Router();
 
   /**
@@ -54,6 +55,10 @@ export function storeRoutes(pool: Pool): Router {
         isActive: r.is_active,
         // Whether an agent is enrolled, never anything about its token.
         agentEnrolled: r.agent_id !== null,
+        // Enrolled says an agent exists; connected says it is on the socket
+        // right now. A shop can be enrolled and offline, which is exactly what
+        // an operator needs to see (plan.md §634).
+        connected: hub.isConnected(r.id),
         lastSeenAt: r.last_seen_at,
       }))
     );
