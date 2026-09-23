@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.133.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.134.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -292,22 +292,26 @@ it is done — not ticked off and left behind. Section references point at
       banned IP still gets a 403) even though its switch is gone from
       Settings.
 
-- [ ] **Revive the social-drafts publish path: mail a draft to a real
-      subscriber list** — plan in plan.md §611/§612. `social_drafts`
-      (§254 P2) can generate/edit/delete a draft but nothing publishes it
-      since Postiz was dropped (§301a). Slice 1: send via
-      `utils/mailSend.ts`'s existing `sendMail()` (already used for invites,
-      §158) — no n8n workflow needed, §611's n8n angle is superseded for
-      plain email. Needs a real recipient list first: a new
-      `advert_subscribers` table (email + unsubscribe token), a public
-      `POST /subscribers` an outside site's `<form>` can submit to (no CORS
-      change needed — plain form POST, not `fetch()`), a public
-      `GET /subscribers/unsubscribe/:token` for the link in every sent
-      email's footer, and an `UnsubscribeComponent` public page
-      (`/unsubscribe/:token`, same pattern as `SetPasswordComponent`)
-      confirming it. Full shape in plan.md §612. Slice 2
-      (social-platform posting) still needs a per-platform token/OAuth setup and
-      is scoped only once a specific platform is named.
+- [ ] **Beta-test the new subscriber list endpoints (plan.md §616)** — on
+      `beta`: submit a real email to `POST /api/subscribers` (a plain form
+      POST, e.g. via curl `-d`) and confirm a row lands in
+      `advert_subscribers` with a token; confirm a `redirect` field bounces
+      the response there, and its absence serves the built-in confirmation
+      HTML; open `/unsubscribe/<that token>` in a browser and confirm it
+      shows success and the row's `unsubscribed_at` is set; hit the same
+      link again and confirm it still succeeds instead of erroring.
+
+- [ ] **Wire the social-drafts publish path to the new subscriber list** —
+      the recipient-list prerequisite (`advert_subscribers` table, public
+      subscribe/unsubscribe endpoints, `UnsubscribeComponent`) is built
+      (plan.md §616). Still open: `POST /api/social/drafts/:id/publish`
+      reading a draft and sending it via `utils/mailSend.ts`'s `sendMail()`
+      (already used for invites, §158) — one message per row from
+      `listActiveSubscribers()`, each with `{baseUrl}/unsubscribe/{token}`
+      in its footer. No n8n workflow needed — §611's n8n angle is
+      superseded for plain email. Slice 2 (social-platform posting) still
+      needs a per-platform token/OAuth setup and is scoped only once a
+      specific platform is named.
 
 - [ ] **"Claude API key" → multi-provider "AI API Keys"** — plan in
       plan.md §610. Today it's one Anthropic-only key

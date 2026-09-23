@@ -688,6 +688,13 @@ export const en: Record<string, string> = {
   'accessDenied.signInLink': 'Go to sign in',
   'accessDenied.errors.submitFailed': 'Could not send the request. Try again later.',
 
+  'unsubscribe.title': 'Unsubscribe',
+  'unsubscribe.working': 'Unsubscribing…',
+  'unsubscribe.done': 'You’ve been unsubscribed. You won’t receive further emails.',
+  'unsubscribe.signInLink': 'Go to sign in',
+  'unsubscribe.errors.missingToken': 'This unsubscribe link is missing its token.',
+  'unsubscribe.errors.failed': 'Could not process this request. Try again later.',
+
   'setPassword.kicker': 'Welcome',
   'setPassword.title': 'Set your password',
   'setPassword.choosePasswordFor': 'Choose a password for',

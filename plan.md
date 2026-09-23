@@ -28732,3 +28732,53 @@ available in this sandbox to verify enforcement live): confirm all four rows
 show a real (non-blank) topic after the migration runs on the existing host
 database, confirm Test greys out when a row's switch is off, and confirm a
 banned IP still gets a 403 at NPM with the Enforcement switch gone.
+
+## 616. Implemented: `advert_subscribers` table + public subscribe/unsubscribe endpoints
+
+Built exactly what §612 planned — the recipient-list prerequisite for the
+§611 slice-1 email advert, not the advert-sending wiring itself (still
+open, see below).
+
+**Backend**: `services/advertSubscribers.ts` — `advert_subscribers` table
+(`email` UNIQUE, `unsubscribe_token` UNIQUE, `subscribed_at`,
+nullable `unsubscribed_at`), created by `ensureAdvertSubscribersTable()`
+alongside the other startup `ensure*` calls in `index.ts`. `subscribe(email)`
+upserts on `email`, generating a `crypto.randomBytes(32)` token that's only
+used on first insert — `ON CONFLICT (email) DO UPDATE SET unsubscribed_at =
+NULL` leaves an existing row's token untouched, so a resubscribe doesn't
+mint a second one. `unsubscribeByToken(token)` always resolves with no
+error, matching/unmatching alike — a repeat hit on an old email's link must
+not fail. `listActiveSubscribers()` is there per §612's plan for the §611
+sender, unused until that lands.
+
+**Routes** (`routes/subscribers.ts`, mounted with no `protectedGate` at both
+`/subscribers` and `/api/subscribers`, same shape as `accessRequests.ts`):
+`POST /subscribers` (`{ email, redirect? }`, `subscribersLimiter` at
+20/15min) — meant for a plain external `<form method="post">`, not
+`fetch()`, so no CORS change; redirects 303 to the caller's `redirect` on
+success (validated `http`/`https` only, via Joi's `uri()` scheme
+restriction, so a crafted form can't land a visitor on a `javascript:` URI),
+else serves a minimal built-in HTML confirmation. `GET
+/subscribers/unsubscribe/:token` performs the unsubscribe itself and returns
+204 — not a separate verify-then-confirm pair like `/auth/invitation/:token`,
+since a repeat unsubscribe is harmless and the plan called for one endpoint.
+
+**Frontend**: `UnsubscribeComponent` at `/unsubscribe/:token` (`app.routes.ts`,
+outside the shell, no guard — same pattern as `AccessDeniedComponent` /
+`SetPasswordComponent`). Calls `OperationsService.confirmUnsubscribe(token)`
+on load and renders success/error. i18n keys added to both `en.ts` and
+`pt-pt.ts`.
+
+**Not built here — still the open piece of §611 slice 1**: the actual
+`POST /api/social/drafts/:id/publish` that reads a draft and sends it via
+`mailSend.ts`'s `sendMail()` to every `listActiveSubscribers()` row, one
+message per recipient with `{baseUrl}/unsubscribe/{token}` in the footer
+(`getDashboardBaseUrl()`). README item rephrased to describe just that
+remaining piece.
+
+**Tests**: `services/advertSubscribers.test.ts` (new, `query()` mocked —
+upsert SQL/params, idempotent unsubscribe, active-subscriber row mapping).
+No spec added for `UnsubscribeComponent` — neither sibling public page
+(`AccessDeniedComponent`, `SetPasswordComponent`) has one. Backend
+typecheck + all 115 test files (1188 tests) pass; frontend build + all 89
+karma tests pass.

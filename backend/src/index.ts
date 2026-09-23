@@ -17,6 +17,7 @@ import networkRouter from './routes/network';
 import selfUpdateRouter from './routes/selfUpdate';
 import socialRouter from './routes/social';
 import accessRequestsRouter from './routes/accessRequests';
+import subscribersRouter from './routes/subscribers';
 import { getAppVersion } from './version';
 import {
   ensureUserRolesTable,
@@ -48,6 +49,7 @@ import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateC
 import { startAuditLogPurgeSweeper } from './utils/audit';
 import { startHostLanIpRefresh } from './services/networkScan';
 import { ensureSocialDraftsTable } from './services/socialDrafts';
+import { ensureAdvertSubscribersTable } from './services/advertSubscribers';
 
 const apiLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
@@ -184,6 +186,8 @@ for (const prefix of ROUTE_PREFIXES) {
   app.use(`${prefix}/recovery`, recoveryRouter);
   // Public, same reasoning as recovery above — see accessRequests.ts.
   app.use(`${prefix}/access-requests`, accessRequestsRouter);
+  // Public, same reasoning — see subscribers.ts.
+  app.use(`${prefix}/subscribers`, subscribersRouter);
   // The SSE stream authenticates via a short-lived ticket, so it must be
   // registered before the JWT gate below.
   app.get(`${prefix}/services/stream`, streamLimiter, sseHandler);
@@ -252,6 +256,9 @@ ensureAlertCategoryTopics().catch((err: Error) => {
 });
 ensureSocialDraftsTable().catch((err: Error) => {
   console.error('Unable to ensure social_drafts table:', err.message);
+});
+ensureAdvertSubscribersTable().catch((err: Error) => {
+  console.error('Unable to ensure advert_subscribers table:', err.message);
 });
 ensureSelfUpdateTable()
   .then(() => reconcileDanglingSelfUpdateRun())

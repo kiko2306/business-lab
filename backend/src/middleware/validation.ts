@@ -252,6 +252,18 @@ export const schemas = {
     username: usernameSchema.required(),
     password: passwordSchema.required(),
   }),
+  // Public mailing-list subscribe form (plan.md §612): an outside site's
+  // plain <form method="post">, not fetch() — redirect is where to bounce
+  // the browser back to on success, restricted to http(s) so a crafted form
+  // can't land a visitor on a javascript: URI.
+  subscriberSubscribe: Joi.object({
+    email: emailSchema.required(),
+    redirect: Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(2000).optional(),
+  }),
+  // The unsubscribe-link token (plan.md §612) — same shape as invitationToken.
+  subscriberToken: Joi.object({
+    token: Joi.string().trim().pattern(/^[A-Za-z0-9_-]{20,256}$/).required(),
+  }),
   auditQuery: Joi.object({
     page: Joi.number().integer().min(1).max(100000).optional(),
     pageSize: Joi.number().integer().min(1).max(100).optional(),

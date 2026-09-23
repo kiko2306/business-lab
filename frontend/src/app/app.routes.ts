@@ -15,6 +15,7 @@ import { UsersComponent } from './pages/users/users.component';
 import { SelfUpdateComponent } from './pages/self-update/self-update.component';
 import { RecoveryComponent } from './pages/recovery/recovery.component';
 import { AccessDeniedComponent } from './pages/access-denied/access-denied.component';
+import { UnsubscribeComponent } from './pages/unsubscribe/unsubscribe.component';
 import { authGuard } from './guards/auth.guard';
 import { guestGuard } from './guards/guest.guard';
 import { requireCapability, requireAnyCapability } from './guards/capability.guard';
@@ -45,6 +46,12 @@ export const routes: Routes = [
     // reachable signed out, no guard.
     path: 'access-denied',
     component: AccessDeniedComponent,
+  },
+  {
+    // The unsubscribe link riding in every sent advert email's footer
+    // (plan.md §612): reachable signed out, no guard.
+    path: 'unsubscribe/:token',
+    component: UnsubscribeComponent,
   },
   {
     // The authenticated shell: one header/footer around every signed-in page.

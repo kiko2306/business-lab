@@ -688,6 +688,13 @@ export const ptPT: Record<string, string> = {
   'accessDenied.signInLink': 'Iniciar sessão',
   'accessDenied.errors.submitFailed': 'Não foi possível enviar o pedido. Tente novamente mais tarde.',
 
+  'unsubscribe.title': 'Cancelar subscrição',
+  'unsubscribe.working': 'A cancelar a subscrição…',
+  'unsubscribe.done': 'A sua subscrição foi cancelada. Não receberá mais emails.',
+  'unsubscribe.signInLink': 'Iniciar sessão',
+  'unsubscribe.errors.missingToken': 'Este link de cancelamento não tem token.',
+  'unsubscribe.errors.failed': 'Não foi possível processar o pedido. Tente novamente mais tarde.',
+
   'setPassword.kicker': 'Bem-vindo',
   'setPassword.title': 'Defina a sua palavra-passe',
   'setPassword.choosePasswordFor': 'Escolha uma palavra-passe para',

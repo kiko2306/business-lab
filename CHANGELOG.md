@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.134.0] — 2026-09-23
+
+### Feature
+
+- Add advert_subscribers table plus public subscribe/unsubscribe endpoints and an unsubscribe page
+
 ## [0.133.0] — 2026-09-23
 
 ### Changed

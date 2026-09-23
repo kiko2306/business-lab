@@ -214,6 +214,14 @@ export class OperationsService {
     );
   }
 
+  /** What the public /unsubscribe/:token page calls (plan.md §612) — reachable signed out. */
+  confirmUnsubscribe(token: string): Observable<void> {
+    return this.http.get<void>(
+      `${API_BASE_URL}/subscribers/unsubscribe/${encodeURIComponent(token)}`,
+      { context: new HttpContext().set(SKIP_AUTH, true).set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
   listUsers(): Observable<AdminUserListResponse> {
     return this.http.get<AdminUserListResponse>(`${API_BASE_URL}/users`);
   }
