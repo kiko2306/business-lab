@@ -296,6 +296,15 @@ it is done — not ticked off and left behind. Section references point at
       the "each app" reading (category-level, not literally per managed
       app, per §559) for confirmation before this is built.
 
+- [ ] **Revive the social-drafts publish path via n8n (not Postiz)** — plan
+      in plan.md §611. `social_drafts` (§254 P2) can generate/edit/delete a
+      draft but nothing publishes it since Postiz was dropped (§301a).
+      Slice 1: a dashboard-rendered n8n workflow (same pattern as the
+      CrowdSec-alert relay, `n8nWorkflows.ts`) that emails a draft via the
+      SMTP settings already in Settings — no new credentials UI. Slice 2
+      (social-platform posting) needs a per-platform token/OAuth setup and
+      is scoped only once a specific platform is named.
+
 - [ ] **"Claude API key" → multi-provider "AI API Keys"** — plan in
       plan.md §610. Today it's one Anthropic-only key
       (`claudeSettings.ts`) used by social-post generation

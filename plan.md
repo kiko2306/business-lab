@@ -28477,3 +28477,61 @@ matches how the Cloudflare-token-style single-purpose settings panels work
 elsewhere in this codebase. Say if per-request provider choice was actually
 wanted instead. Not implemented — this section and the README item are the
 plan.
+
+## 611. Planned: revive the social-drafts publish path via n8n, not Postiz
+
+§301a dropped Postiz (the §84 P3 "publish drafts" app) for being the
+heaviest stack on the host (~1.7 GiB, AGPL-3.0) with its glue
+(`postizClient.ts`) never built. User asked whether to pick the replacement
+back up, lightweight, for social-media or email posts. Checked what already
+exists before scoping.
+
+**What's there today**: `social_drafts` (prompt + generated content, via
+`claudeGenerate.ts` / §254 P2) is dead-end storage — `social.component.ts`
+only generates, edits and deletes a draft, no publish action exists
+anywhere in frontend or backend.
+
+**Why n8n instead of a new app**: n8n (`apps/n8n/`) is already in the
+roster, already has a dashboard-owned integration pattern to extend rather
+than invent — `n8nWorkflows.ts` renders workflow JSON into
+`apps/n8n/workflows/` on every start, the `n8n-workflows-init` container
+imports it, and n8n registers the webhook on boot (§118.3). The existing
+`homelabCrowdsecAlertRelay` workflow (Webhook → Code → ntfy HTTP POST) is
+the exact shape a publish workflow needs: bake config at render time
+(`buildCrowdsecAlertWorkflow()` takes `topic`/`ntfyUrl`/`enforced` as
+arguments, no n8n-UI setup), backend POSTs to the webhook
+(`alertTest.ts`'s pattern: `getPublishedUpstreamPort('n8n')` +
+`CROWDSEC_ALERT_WEBHOOK_PATH`), n8n is `overlayOnly` so only host-internal
+callers (the backend) can reach it — matches "no console configuration"
+without a new credentials UI in n8n itself.
+
+**Two-slice shape, email first**:
+
+- **Slice 1 — email advert.** Fully automatable with zero new user input:
+  global SMTP settings already exist (`utils/mailSettings.ts`'s
+  `getMailConfig()`, the same source `mailEnv.ts` feeds into every mail-aware
+  app's env, n8n's own transactional mail included). A new
+  `homelabSocialPublishRelay` workflow, rendered the same way as the
+  CrowdSec relay, takes a webhook `{ subject, body }` and sends it via SMTP.
+  Backend route: `POST /api/social/drafts/:id/publish` → reads the draft,
+  POSTs to the webhook, no new Settings panel.
+- **Slice 2 — social-platform posting.** Genuinely needs a per-platform
+  token/OAuth app the dashboard cannot derive (principle 3: prompt only for
+  what it can't obtain) — same shape as the parked §610 "AI API Keys"
+  provider registry, one row per platform. Scope only once slice 1 is live
+  and a specific platform is named; "any social API" is not a today
+  decision.
+
+**Open question to resolve during the build, not now**: n8n's built-in
+`Send Email` node wants a *stored n8n credential*, not inline SMTP params —
+unlike the CrowdSec relay's plain HTTP POST to ntfy (no auth), baking SMTP
+host/user/password straight into node parameters may not be how that node
+works. `n8n-workflows-init` only runs `import:workflow` today (no
+`import:credentials`); options to check when building: (a) extend the init
+container to also `import:credentials` from a backend-rendered file (same
+"authoritative, re-rendered every start" pattern as workflows), or (b) skip
+the `Send Email` node and do the SMTP conversation from an HTTP Request /
+raw socket step that takes inline params like the ntfy relay does. Decide
+once slice 1 is actually being built.
+
+Not implemented — this section and the README item are the plan.
