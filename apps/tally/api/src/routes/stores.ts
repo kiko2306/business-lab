@@ -24,6 +24,18 @@ export function storeRoutes(pool: Pool, hub: AgentHub): Router {
   const router = Router();
 
   /**
+   * Who the caller is, as Authelia reported them (plan.md §629).
+   *
+   * The UI needs it to decide whether to render the administration controls at
+   * all: without it a viewer sees buttons that only fail with a 403 when
+   * pressed. The server still enforces every one of them — this is what to
+   * *show*, never what to *allow*.
+   */
+  router.get('/me', requireIdentity, (req, res) => {
+    res.json({ user: req.identity!.user, isAdmin: req.identity!.isAdmin });
+  });
+
+  /**
    * The stores the caller may see. An admin sees every store; anyone else sees
    * only what `store_access` grants them — the mapping that replaced the legacy
    * `users.access[]` array (plan.md §629).

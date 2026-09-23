@@ -1,5 +1,6 @@
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
   <h2 class="h4 mb-0">Shops</h2>
+  @if (isAdmin) {
   <form class="d-flex gap-2" (ngSubmit)="create()">
     <input
       class="form-control"
@@ -12,6 +13,7 @@
       Add shop
     </button>
   </form>
+  }
 </div>
 
 @if (error) {
@@ -40,9 +42,9 @@
         @for (store of stores; track store.id) {
           <tr>
             <td data-label="Shop">
-              <button class="btn btn-link p-0 text-start" type="button" (click)="toggleOpen(store)">
+              <a class="fw-semibold text-decoration-none" [routerLink]="['/shops', store.id]">
                 {{ store.name }}
-              </button>
+              </a>
             </td>
             <td data-label="Status">
               @if (store.isActive) {
@@ -67,6 +69,8 @@
             </td>
             <td data-label="Actions" class="text-end">
               <div class="btn-group btn-group-sm">
+                <a class="btn btn-outline-primary" [routerLink]="['/shops', store.id]">Open</a>
+                @if (isAdmin) {
                 <button class="btn btn-outline-secondary" type="button" (click)="toggleOpen(store)">
                   {{ openId === store.id ? 'Close' : 'Manage' }}
                 </button>
@@ -75,11 +79,12 @@
                   {{ store.isActive ? 'Deactivate' : 'Activate' }}
                 </button>
                 <button class="btn btn-outline-danger" type="button" (click)="remove(store)">Delete</button>
+                }
               </div>
             </td>
           </tr>
 
-          @if (openId === store.id) {
+          @if (openId === store.id && isAdmin) {
             <tr>
               <td colspan="5" class="bg-body-tertiary">
                 <div class="row g-4 py-2">

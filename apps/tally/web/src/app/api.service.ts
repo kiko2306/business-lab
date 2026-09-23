@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { EnrolmentCode, Store } from './models';
+import { EnrolmentCode, Identity, Overview, SoldItemsView, Store, TablesView } from './models';
 
 /**
  * Same-origin throughout: the API serves this bundle (plan.md §632), so there
@@ -12,6 +12,10 @@ import { EnrolmentCode, Store } from './models';
 @Injectable({ providedIn: 'root' })
 export class ApiService {
   private http = inject(HttpClient);
+
+  me(): Observable<Identity> {
+    return this.http.get<Identity>('/api/me');
+  }
 
   listStores(): Observable<Store[]> {
     return this.http.get<Store[]>('/api/stores');
@@ -47,5 +51,18 @@ export class ApiService {
 
   revokeAgent(id: string): Observable<void> {
     return this.http.delete<void>(`/api/stores/${id}/agent`);
+  }
+
+  /** Relayed live to the shop's own agent — nothing here is stored (§634). */
+  overview(id: string): Observable<Overview> {
+    return this.http.get<Overview>(`/api/stores/${id}/overview`);
+  }
+
+  tables(id: string): Observable<TablesView> {
+    return this.http.get<TablesView>(`/api/stores/${id}/tables`);
+  }
+
+  soldItems(id: string): Observable<SoldItemsView> {
+    return this.http.get<SoldItemsView>(`/api/stores/${id}/sold-items`);
   }
 }

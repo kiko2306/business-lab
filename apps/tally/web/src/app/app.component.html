@@ -1,10 +1,10 @@
 <nav class="navbar border-bottom mb-4">
   <div class="container-xl">
-    <span class="navbar-brand mb-0 h1">Tally</span>
+    <a class="navbar-brand mb-0 h1 text-decoration-none" routerLink="/">Tally</a>
     <span class="text-secondary small d-none d-sm-inline">Invoices, employees and payments control</span>
   </div>
 </nav>
 
 <main class="container-xl pb-5">
-  <app-stores></app-stores>
+  <router-outlet></router-outlet>
 </main>

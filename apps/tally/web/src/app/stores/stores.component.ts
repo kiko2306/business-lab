@@ -1,14 +1,15 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../api.service';
-import { EnrolmentCode, Store } from '../models';
+import { EnrolmentCode, Identity, Store } from '../models';
 
 @Component({
   selector: 'app-stores',
   standalone: true,
-  imports: [CommonModule, FormsModule],
+  imports: [CommonModule, FormsModule, RouterLink],
   templateUrl: './stores.component.html',
   styleUrl: './stores.component.css',
 })
@@ -16,6 +17,12 @@ export class StoresComponent implements OnInit {
   private api = inject(ApiService);
 
   stores: Store[] = [];
+  /**
+   * Whether to render the administration controls at all. A viewer without it
+   * would see buttons that only fail with a 403 when pressed. The server
+   * enforces every one of them regardless — this decides what to *show*.
+   */
+  identity: Identity | null = null;
   loading = true;
   error = '';
 
@@ -37,7 +44,15 @@ export class StoresComponent implements OnInit {
   copied = false;
 
   ngOnInit(): void {
+    this.api.me().subscribe({
+      next: (identity) => (this.identity = identity),
+      error: () => undefined,
+    });
     this.load();
+  }
+
+  get isAdmin(): boolean {
+    return this.identity?.isAdmin === true;
   }
 
   load(): void {
@@ -176,9 +191,19 @@ export class StoresComponent implements OnInit {
     // 401 means the Authelia session lapsed — a reload goes back through the
     // gate rather than leaving a dead page with a confusing message.
     if (err.status === 401) {
-      location.reload();
+      // The Authelia session lapsed: a reload goes back through the gate and
+      // returns here signed in. Guarded, because if the identity headers are
+      // missing entirely — a proxy misconfiguration rather than an expiry —
+      // reloading would loop forever instead of showing anything.
+      if (!sessionStorage.getItem('tally-reauth')) {
+        sessionStorage.setItem('tally-reauth', '1');
+        location.reload();
+        return;
+      }
+      this.error = 'Not signed in, and reloading did not help. The proxy may not be forwarding identity headers.';
       return;
     }
+    sessionStorage.removeItem('tally-reauth');
     this.error = err.error?.error ?? `Request failed (${err.status})`;
   }
 }

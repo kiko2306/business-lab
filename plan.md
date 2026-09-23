@@ -30081,3 +30081,77 @@ and a 503 on the next read.
 **Still unproven, and the one thing that cannot be proven here:** that this
 survives the Cloudflare Tunnel hop. That is a README item, and if it fails,
 §627 already records the fallback — timer-pushed snapshots with a cached API.
+
+## 635. Implemented: the shop-floor dashboard, with charts
+
+The view the whole of `tally` exists to serve. Routing added (`/` shops,
+`/shops/:id` dashboard), `GET /api/me` so the UI knows whether to render the
+administration controls at all, and the floor dashboard itself.
+
+### The agent's contract is aggregated, not raw
+
+The payloads the dashboard consumes are the contract the .NET agent
+implements, and they are **aggregated shop-side**. The legacy sent five raw
+`DataTable`s and summed them in the browser — including the entire sales table
+with no date filter (§622) — which is what the README's "move `tally`'s
+aggregation into SQL" item is about. Totals and counts now arrive already
+computed; only genuinely per-row detail (a table's order lines, an item's
+quantity) crosses the wire.
+
+### Form before colour
+
+Headline figures are **stat tiles, not charts**: the data's job is current
+magnitude with no series and no time axis, and a figure reads faster than any
+plot of one number.
+
+Three charts earn their place, all single-series, so one colour and no legend —
+the heading names the series, and colour carries no identity:
+
+- **Takings by hour** — the one genuine time series, and the one place shape
+  beats a number: where the lunch and dinner peaks fall, and whether the
+  current hour is tracking. Columns, because hours are discrete buckets.
+- **Taken by staff** and **by payment method** — horizontal bars, because the
+  categories are names of arbitrary length that vertical columns would clip.
+- **Top items by quantity**, capped at ten; the exact-values table stays below
+  it, so length and colour are never the only way to read the data.
+
+Colour was computed, not chosen: blue `#2a78d6` light / `#3987e5` dark, run
+through the palette validator against **this app's own surfaces** (`#ffffff`
+and `#26303f`, not the reference ones). All checks pass in both modes. Bars are
+rounded at the data end and square at the baseline, with a 2 px gap between
+columns; state badges carry a word, never colour alone.
+
+No chart library. Bars are rectangles; a dependency for that would be larger
+than the component.
+
+### Two bugs that only rendering it caught
+
+**The app never booted.** `angular.json` had no `polyfills` entry, so `zone.js`
+was absent and Angular could not bootstrap. The build succeeded, the bundle
+was served, and the page was blank — nothing short of opening it would have
+found this. The dashboard's own `angular.json` has `"polyfills": ["zone.js"]`;
+`tally`'s now does too.
+
+**The hourly chart lied at a glance.** Each column sat in a full-height grey
+track, and the tracks read as bars — so a dead afternoon looked as busy as the
+dinner peak until you noticed which rectangle was which. Columns now sit on a
+single baseline rule with no track behind them.
+
+Both were found by step 7 of the visualisation procedure — render it and look
+at it — after the build was green and the tests passed.
+
+### Also fixed while here
+
+A 401 handler called `location.reload()` unconditionally. Behind Authelia that
+is right: the session lapsed, and the reload returns signed in. But if the
+identity headers are missing entirely — a proxy misconfiguration rather than an
+expiry — it loops forever. It now reloads at most once and then says what is
+wrong.
+
+### Verification
+
+33 API tests pass. The image was built and run against a real Postgres with an
+agent connected over its socket returning the aggregated payloads, and both
+pages screenshotted in **both themes**: stat tiles, all three charts, the
+tables view with its expandable order lines, `/api/me` distinguishing admin
+from viewer, and a viewer still getting 404 for an ungranted shop.

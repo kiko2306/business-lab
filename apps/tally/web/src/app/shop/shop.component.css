@@ -1,0 +1,23 @@
+/* A hero number: the figure is the content, so it carries the weight and the
+   label recedes. Text keeps text tokens — colour is not doing any of the work. */
+.stat-value {
+  font-size: clamp(1.5rem, 4vw, 2.25rem);
+  font-weight: 600;
+  line-height: 1.1;
+  font-variant-numeric: tabular-nums;
+}
+
+.stat-label {
+  font-size: 0.8125rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.stat-card {
+  background: var(--app-surface);
+}
+
+/* Money and counts line up column-wise when they are tabular. */
+.num {
+  font-variant-numeric: tabular-nums;
+}

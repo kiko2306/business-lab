@@ -1,0 +1,54 @@
+/* Grid, not a table: label / track / value, with the tracks all starting at
+   the same x so bar lengths are comparable by eye. */
+.bar-chart {
+  display: grid;
+  grid-template-columns: minmax(6rem, 10rem) 1fr auto;
+  gap: 0.5rem 0.75rem;
+  align-items: center;
+}
+
+.bar-row {
+  display: contents;
+}
+
+.bar-label {
+  font-size: 0.875rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bar-track {
+  /* Recessive: the track is context, the fill is the data. */
+  background: var(--bs-secondary-bg);
+  border-radius: 4px;
+  height: 0.75rem;
+  display: block;
+  width: 100%;
+}
+
+.bar-fill {
+  display: block;
+  height: 100%;
+  /* Validated against both this app's surfaces — see plan.md §635. */
+  background: #2a78d6;
+  /* Rounded at the data end only; the baseline end stays square so bars all
+     start from the same hard edge. */
+  border-radius: 0 4px 4px 0;
+  min-width: 2px;
+}
+
+:root[data-bs-theme='dark'] .bar-fill {
+  background: #3987e5;
+}
+
+.bar-value {
+  font-size: 0.875rem;
+  white-space: nowrap;
+}
+
+@media (max-width: 575.98px) {
+  .bar-chart {
+    grid-template-columns: minmax(5rem, 8rem) 1fr auto;
+  }
+}

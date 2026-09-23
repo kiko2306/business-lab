@@ -67,6 +67,14 @@ test('unauthenticated callers get nothing', { skip }, async () => {
   assert.equal((await call('POST', '/api/stores', { body: { name: 'x' } })).status, 401);
 });
 
+test('/api/me reports who you are and whether you administer', { skip }, async () => {
+  // The UI uses this to decide what to render; the server still enforces every
+  // admin route, so this is only ever about what to show.
+  assert.equal((await call('GET', '/api/me')).status, 401);
+  assert.deepEqual((await call('GET', '/api/me', { headers: ADMIN })).body, { user: 'alice', isAdmin: true });
+  assert.deepEqual((await call('GET', '/api/me', { headers: VIEWER })).body, { user: 'bob', isAdmin: false });
+});
+
 test('a viewer cannot administer', { skip }, async () => {
   // The important one: a viewer who could mint an enrolment code could enrol
   // an agent of their own and read a shop they were never granted.

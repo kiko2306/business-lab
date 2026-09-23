@@ -507,11 +507,14 @@ before anything is built.
       candidates since they only match rows whose "sent" flag is false. Also
       cover `uuid` lookups for guest links and `quiz_responses.reservation_id`.
       Same class of fix as the recent `audit_logs.created_at` index.
-- [ ] **Move `tally`'s aggregation into SQL** — it inherits
-      `SELECT * FROM wsir_vnd_vendas` with no date filter (plan.md §622), so
-      the whole sales table crosses the wire on every refresh and is summed in
-      the browser. Aggregate in SQL, bounded by date, and send totals rather
-      than rows.
+- [ ] **Implement the aggregated agent contract in the .NET agent** — the
+      dashboard defines it (plan.md §635) and a Node stand-in proves it:
+      `overview` (totals, table counts, guests, per-staff, per-payment-method,
+      takings by hour), `tables` (per-table state, staff, guests, total and
+      order lines) and `sold_items`. Every total and count is computed
+      **shop-side in SQL** — the legacy sent five raw DataTables and summed
+      them in the browser, including the whole sales table with no date filter
+      (§622, §626). Only per-row detail crosses the wire.
 - [ ] **Build the birthday and promo email flows** — plan.md §629 puts them
       in scope. They are effectively new features, not a port: the legacy has
       only an enum, per-unit `birthday_is_active` / `promo_is_active` flags and
