@@ -112,6 +112,20 @@ jobs:
       - run: npm run build
         working-directory: apps/tally/web
 
+  tally-agent:
+    # Builds on Linux because the tally agent is plain net8.0: it only reads
+    # Wintouch over SQL, so it never loads their x86 assemblies (plan.md §636).
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/tally/agent
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '8.0.x'
+      - run: dotnet build -warnaserror
+
   e2e:
     # Browser E2E: brings up docker-compose.test.yml and drives the real
     # dashboard with Playwright (login, navigation, invite-gated Users page,

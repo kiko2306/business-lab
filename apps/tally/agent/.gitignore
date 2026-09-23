@@ -1,0 +1,4 @@
+bin/
+obj/
+# The real one is per-install and names the site and Wintouch path.
+tally.config

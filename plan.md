@@ -30155,3 +30155,67 @@ agent connected over its socket returning the aggregated payloads, and both
 pages screenshotted in **both themes**: stat tiles, all three charts, the
 tables view with its expandable order lines, `/api/me` distinguishing admin
 from viewer, and a viewer still getting 404 for an ungranted shop.
+
+## 636. Implemented: the .NET shop agent, proven against a real Wintouch
+
+`apps/tally/agent/` — the piece that runs on the shop's own machine. Verified
+end to end against the **real Wintouch `vallado` database** on this host's SQL
+Server Express, not against fixtures.
+
+### Plain `net8.0`, not x86, and no Wintouch assemblies
+
+§629 chose assemblies-for-writes, SQL-for-reads. `tally` only reads, so this
+agent never loads Wintouch's own DLLs — and therefore is not pinned to x86 by
+their PE32 build. That constraint belongs to the hotel agent alone. The
+practical gain is that this one builds and runs on Linux, so CI can build it.
+
+Credentials come from the local `wintouch.config` (§627): read on the shop's
+own machine, never sent anywhere, never fetched from the server the way the
+hotel system's `GET /api/config` handed them to any caller (§620).
+
+### Schema confirmed rather than assumed
+
+Every table and column was checked against the live database before the queries
+were written. Two things the legacy got wrong or left implicit:
+
+- **`wsir_mst_mesas.estado` is 0 free, 1 awaiting payment, 2 occupied.** The
+  legacy Angular read 1 as occupied and 2 as "end table" — the reverse of the
+  labels on its own SQL files. The labels and the live data agree (161 rows at
+  0, 4 at 2), so they win.
+- **`EntryDate` dates a sale.** The legacy had *no date filter at all*, relying
+  on Wintouch rolling these tables per session. That holds on the installs seen
+  so far, but an install that does not roll would silently report all time as
+  "today", so the filter is explicit and parameterised here.
+
+### Three bugs found by running it, not by building it
+
+1. **`InvariantGlobalization` breaks `Microsoft.Data.SqlClient`** — it throws
+   "Globalization Invariant Mode is not supported" at connect. Removed.
+2. **The agent inherited Wintouch's 120 s connect timeout**, while the
+   dashboard gives up on an agent at 20 s (§634). A database problem could
+   therefore *never* surface as a reportable error — only as a silent timeout
+   with nothing said about why. Capped at 8 s, and the difference was immediate:
+   the next failure came back as a precise SQL Server message instead of
+   "did not answer in time".
+3. `File.SetUnixFileMode` needed its platform guard restated inside the method;
+   the analyser cannot see a caller's check.
+
+### Verification
+
+Enrolled natively on Windows — token written DPAPI-encrypted to
+`C:\ProgramData\Tally`, which is the production path, not the Linux fallback.
+Connected outbound to the running stack and served live reads: **161 free
+tables, 4 occupied, 8 guests, €261.50 in open tabs**, matching the database
+directly queried. `invoiced`, `staff` and `hourly` came back empty *because the
+date filter works* — the demo data is 2026-07-27 and the run was 2026-09-23 —
+and each of those queries was then confirmed against the demo date: €9,640.16
+invoiced, real per-staff totals, and trade spread across 10:00–17:00.
+
+### A note on testing environment, for next time
+
+The agent could not reach SQL from inside a container: WSL's mirrored
+networking exposes Windows listeners on WSL's loopback but **not inside a
+container, even with `--network host`**. Windows, however, reaches the
+container-published API on `127.0.0.1` (not `localhost`). So the working
+arrangement is agent-on-Windows, stack-in-Docker — which is also the real
+deployment shape.

@@ -1,0 +1,203 @@
+using System.Net.WebSockets;
+using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Logging;
+
+namespace Tally.Agent;
+
+/// <summary>
+/// Enrolment and the outbound connection (plan.md §627, §634).
+///
+/// The agent dials out and holds the socket; nothing at the shop listens, and
+/// no router change is needed. The legacy did the reverse — an unauthenticated
+/// HTTP listener on the shop's public IP, whose address it re-published every
+/// thirty seconds (§622).
+/// </summary>
+public sealed class AgentClient(
+    AgentOptions options,
+    TokenStore tokens,
+    ShopReader reader,
+    ILogger<AgentClient> logger)
+{
+    private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
+
+    /// <summary>
+    /// Exchanges a single-use enrolment code for the long-lived token, once.
+    /// The server hands the token over exactly once and keeps only its hash, so
+    /// this is the only chance to store it.
+    /// </summary>
+    public async Task<bool> EnrolAsync(string code, CancellationToken ct)
+    {
+        using var http = new HttpClient();
+        var body = new StringContent(
+            JsonSerializer.Serialize(new { code }, Json), Encoding.UTF8, "application/json");
+
+        var response = await http.PostAsync(options.EnrolUri, body, ct);
+        var text = await response.Content.ReadAsStringAsync(ct);
+        if (!response.IsSuccessStatusCode)
+        {
+            // The server deliberately gives one message for every failure, so
+            // that a wrong code cannot be told from an expired or used one.
+            logger.LogError("Enrolment refused: {Status} {Body}", (int)response.StatusCode, text);
+            return false;
+        }
+
+        var result = JsonSerializer.Deserialize<EnrolResponse>(text, Json);
+        if (result?.Token is null)
+        {
+            logger.LogError("Enrolment returned no token");
+            return false;
+        }
+
+        tokens.Write(result.Token);
+        logger.LogInformation("Enrolled as {Shop}; token stored at {Path}", result.Store?.Name, tokens.Path);
+        return true;
+    }
+
+    /// <summary>
+    /// Connects and serves requests until cancelled, reconnecting on its own.
+    ///
+    /// Backoff is capped: a shop whose network is out for an hour should not
+    /// end up retrying once a day, and a server restart should be picked up in
+    /// seconds rather than left waiting.
+    /// </summary>
+    public async Task RunAsync(CancellationToken ct)
+    {
+        var delay = TimeSpan.FromSeconds(2);
+        var maxDelay = TimeSpan.FromSeconds(60);
+
+        while (!ct.IsCancellationRequested)
+        {
+            var token = tokens.Read();
+            if (token is null)
+            {
+                logger.LogError("Not enrolled. Run: Tally.Agent enrol <CODE>");
+                return;
+            }
+
+            try
+            {
+                await ServeAsync(token, ct);
+                // A clean close is the server going away, not a failure: retry
+                // promptly rather than treating it as an outage.
+                delay = TimeSpan.FromSeconds(2);
+            }
+            catch (OperationCanceledException) when (ct.IsCancellationRequested)
+            {
+                return;
+            }
+            catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
+            {
+                // The handshake was refused before upgrading — a 401 from a
+                // revoked or unknown token (§634). Retrying faster will not fix
+                // it, and it needs a human, so say exactly that.
+                logger.LogError(ex, "Connection refused. The token may have been revoked; re-enrol with a new code");
+                delay = maxDelay;
+            }
+            catch (Exception ex)
+            {
+                logger.LogWarning(ex, "Connection lost; retrying in {Delay}", delay);
+            }
+
+            try
+            {
+                await Task.Delay(delay, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            delay = TimeSpan.FromSeconds(Math.Min(delay.TotalSeconds * 2, maxDelay.TotalSeconds));
+        }
+    }
+
+    private async Task ServeAsync(string token, CancellationToken ct)
+    {
+        using var socket = new ClientWebSocket();
+        socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
+        // The server pings every 30s to prove liveness through tunnels and NAT
+        // (§634); answering is automatic, but this keeps the other direction
+        // alive through a proxy that only watches one way.
+        socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
+
+        await socket.ConnectAsync(options.SocketUri, ct);
+        logger.LogInformation("Connected to {Uri}", options.SocketUri);
+
+        var buffer = new byte[64 * 1024];
+        while (socket.State == WebSocketState.Open && !ct.IsCancellationRequested)
+        {
+            using var message = new MemoryStream();
+            WebSocketReceiveResult result;
+            do
+            {
+                result = await socket.ReceiveAsync(new ArraySegment<byte>(buffer), ct);
+                if (result.MessageType == WebSocketMessageType.Close)
+                {
+                    logger.LogInformation("Server closed the connection");
+                    return;
+                }
+                message.Write(buffer, 0, result.Count);
+            }
+            while (!result.EndOfMessage);
+
+            // Deliberately not awaited: a slow query must not stall the socket,
+            // or one report would delay every other request on it. Replies
+            // carry the request id, so they can return in any order (§634).
+            _ = HandleAsync(socket, Encoding.UTF8.GetString(message.ToArray()), ct);
+        }
+    }
+
+    private async Task HandleAsync(WebSocket socket, string raw, CancellationToken ct)
+    {
+        string? id = null;
+        try
+        {
+            var request = JsonSerializer.Deserialize<AgentRequest>(raw, Json);
+            id = request?.Id;
+            if (id is null) return;
+
+            object data = request!.Method switch
+            {
+                "overview" => await reader.ReadOverviewAsync(ct),
+                "tables" => await reader.ReadTablesAsync(ct),
+                "sold_items" => await reader.ReadSoldItemsAsync(ct),
+                _ => throw new InvalidOperationException($"unknown method \"{request.Method}\""),
+            };
+
+            await SendAsync(socket, new { id, ok = true, data }, ct);
+        }
+        catch (Exception ex) when (id is not null)
+        {
+            logger.LogError(ex, "Request {Id} failed", id);
+            // Reported back rather than dropped, so the dashboard can say the
+            // shop errored instead of silently timing out (§634 turns this into
+            // a 502).
+            await SendAsync(socket, new { id, ok = false, error = ex.Message }, ct);
+        }
+    }
+
+    private static readonly SemaphoreSlim SendLock = new(1, 1);
+
+    private static async Task SendAsync(WebSocket socket, object frame, CancellationToken ct)
+    {
+        var bytes = JsonSerializer.SerializeToUtf8Bytes(frame, Json);
+        // One writer at a time: concurrent handlers share the socket, and
+        // interleaved frames would corrupt the stream.
+        await SendLock.WaitAsync(ct);
+        try
+        {
+            if (socket.State != WebSocketState.Open) return;
+            await socket.SendAsync(bytes, WebSocketMessageType.Text, endOfMessage: true, ct);
+        }
+        finally
+        {
+            SendLock.Release();
+        }
+    }
+
+    private sealed record AgentRequest(string? Id, string Method);
+
+    private sealed record EnrolResponse(string? AgentId, string? Token, EnrolStore? Store);
+
+    private sealed record EnrolStore(string? Id, string? Name);
+}

@@ -507,14 +507,19 @@ before anything is built.
       candidates since they only match rows whose "sent" flag is false. Also
       cover `uuid` lookups for guest links and `quiz_responses.reservation_id`.
       Same class of fix as the recent `audit_logs.created_at` index.
-- [ ] **Implement the aggregated agent contract in the .NET agent** — the
-      dashboard defines it (plan.md §635) and a Node stand-in proves it:
-      `overview` (totals, table counts, guests, per-staff, per-payment-method,
-      takings by hour), `tables` (per-table state, staff, guests, total and
-      order lines) and `sold_items`. Every total and count is computed
-      **shop-side in SQL** — the legacy sent five raw DataTables and summed
-      them in the browser, including the whole sales table with no date filter
-      (§622, §626). Only per-row detail crosses the wire.
+- [ ] **Package the agent as an installer** — the agent is built and proven
+      (plan.md §636) but is installed by hand today: copy the files, edit
+      `tally.config`, run `Tally.Agent.exe enrol <CODE>`, then `sc.exe create`.
+      A shop needs one installer that prompts for the site URL and the code and
+      registers the service itself. Until then `apps/tally/agent/README.md` is
+      the runbook.
+- [ ] **Confirm `estado` semantics with a second Wintouch install** — §636
+      reads `wsir_mst_mesas.estado` as 0 free, 1 awaiting payment, 2 occupied,
+      from the labels on the legacy SQL files plus the live `vallado` data
+      (161 at 0, 4 at 2). The legacy Angular read it the other way round. No
+      row with `estado = 1` has been seen yet, so the awaiting-payment case is
+      inferred rather than observed — worth confirming on a shop that has a
+      table with the bill requested.
 - [ ] **Build the birthday and promo email flows** — plan.md §629 puts them
       in scope. They are effectively new features, not a port: the legacy has
       only an enum, per-unit `birthday_is_active` / `promo_is_active` flags and

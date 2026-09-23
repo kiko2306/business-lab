@@ -1,0 +1,36 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <!-- Plain net8.0, not net8.0-windows and not x86. The tally agent only
+         *reads* Wintouch, over SQL, so it never loads Wintouch's own
+         assemblies — which are PE32 and would pin it (plan.md §629). That
+         constraint belongs to the hotel agent, which writes check-ins back
+         through their API. Keeping this cross-platform means it builds and
+         its tests run on Linux CI. -->
+    <TargetFramework>net8.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <RootNamespace>Tally.Agent</RootNamespace>
+    <AssemblyName>Tally.Agent</AssemblyName>
+    <UserSecretsId>tally-agent</UserSecretsId>
+    <!-- Globalization stays on: Microsoft.Data.SqlClient throws
+         "Globalization Invariant Mode is not supported" at connect time if it
+         is disabled, and the shop's collation is not invariant either. -->
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="5.2.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.1" />
+    <!-- Lets the same binary run as a Windows Service; a no-op elsewhere, so
+         it still runs as a console app on Linux for development. -->
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="8.0.1" />
+    <!-- DPAPI. Windows-only at runtime, guarded by OperatingSystem.IsWindows(). -->
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="8.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Update="tally.config.example" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
+</Project>

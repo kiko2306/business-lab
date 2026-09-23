@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copy to tally.config beside the executable. These two values are everything
+  the agent is configured with (plan.md §627): there is no domain, no store
+  name and no port, because the enrolment code already binds this agent to its
+  shop, and the agent dials out rather than listening.
+-->
+<tallyAgent>
+  <!-- The Tally site this shop reports to. -->
+  <url value="https://tally.example.com" />
+  <!-- Folder holding Wintouch's own wintouch.config, which is where the SQL
+       Server credentials are read from. They are never sent over the network
+       and never fetched from the server (§627 removed that). -->
+  <wintouchConfig path="C:\wintouch\sgw" />
+</tallyAgent>
