@@ -295,3 +295,19 @@ it is done — not ticked off and left behind. Section references point at
       quiet), and Enforcement always on with the switch removed. §609 flags
       the "each app" reading (category-level, not literally per managed
       app, per §559) for confirmation before this is built.
+
+- [ ] **"Claude API key" → multi-provider "AI API Keys"** — plan in
+      plan.md §610. Today it's one Anthropic-only key
+      (`claudeSettings.ts`) used by social-post generation
+      (`claudeGenerate.ts`, native Anthropic SDK) and Mealie's AI recipe
+      parser (`mealieAiSync.ts`, already via Anthropic's OpenAI-compatible
+      endpoint). Plan: a small provider registry seeded with Anthropic,
+      Google Gemini and Groq (both real free tiers, both OpenAI-compatible
+      endpoints), one settings row per provider
+      (`ai_api_key_<provider>`, migrated from `claude_api_key`), a grouped
+      key+Test row per provider in the renamed panel, and a shared
+      OpenAI-compat call helper used by both consumers instead of
+      Anthropic-specific code. §610 flags that this keeps one
+      active-provider-per-feature choice in Settings rather than adding a
+      per-request provider picker — confirm that's the intent before
+      building.

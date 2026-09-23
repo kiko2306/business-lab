@@ -28412,3 +28412,68 @@ Enforcement's own text/description moves onto the CrowdSec card in
 `docs/app-credentials.md`/wherever it's explained, since it's no longer a
 setting to find. Not implemented — this section and the README item are the
 plan.
+
+## 610. Planned: generalize "Claude API key" into multi-provider "AI API Keys"
+
+User asked for the single "Claude API key" Settings panel to become "AI API
+Key(s)," letting Claude sit alongside other providers — free-to-use ones
+preferred (named Google as an example). Checked what's there before
+scoping this, since the current feature is entirely Anthropic-specific top
+to bottom.
+
+**What's there today**: one setting, `claude_api_key`
+(`claudeSettings.ts:13`), plain text in `settings`, masked on the way out,
+verified with a free `GET /v1/models` call (`claudeKeyTest.ts`). Two
+consumers, both hardcoded to Anthropic:
+
+- `claudeGenerate.ts` — social-post drafts, via `@anthropic-ai/sdk`'s native
+  `Messages.create` on `claude-opus-5` (§256).
+- `mealieAiSync.ts` — points Mealie's own AI recipe-parser at Anthropic's
+  **OpenAI-compatible** endpoint (`https://api.anthropic.com/v1/`,
+  `claude-haiku-4-5`) with the same key (§262).
+
+No `AiProvider` abstraction exists — each call site talks to Anthropic
+directly in its own way.
+
+**Why the OpenAI-compat angle matters for "free APIs"**: the free-tier
+providers worth adding — Google's Gemini API and Groq — both publish an
+OpenAI-compatible chat-completions endpoint
+(`generativelanguage.googleapis.com/v1beta/openai/` for Gemini,
+`api.groq.com/openai/v1` for Groq), the same shape `mealieAiSync.ts`
+*already* speaks to reach Anthropic. So the lazy, DRY move isn't "add an
+Anthropic SDK, a Google SDK, a Groq SDK" — it's one small generic
+"call an OpenAI-compatible chat completion" helper (base URL + key + model
+in, text out), reused by both `mealieAiSync.ts` (drop the Anthropic-only
+base URL, take it from whichever provider is selected) and `claudeGenerate.ts`
+(swap the native Anthropic SDK call for the same generic helper, since
+Anthropic's own OpenAI-compat endpoint covers exactly what it needs). One
+call path instead of one-SDK-per-provider.
+
+**Planned shape**:
+
+- A small, plain provider registry (id, label, key-setting name, verify
+  endpoint, OpenAI-compat base URL, a default model) — not a plugin system,
+  just an array to append to when another provider is worth adding later.
+  Seeded with `anthropic` (existing), `google` (Gemini, real free tier),
+  `groq` (real free tier). "Any free API you can find" beyond that is a
+  registry entry, not a redesign.
+- Storage: one settings row per provider, `ai_api_key_<provider>`, same
+  shape as ntfy's `ntfy_topic_<category>` (§553) — not a new table.
+  One-time migration: `claude_api_key` → `ai_api_key_anthropic`, so an
+  existing key isn't silently dropped.
+- UI: panel renamed "AI API Keys," one grouped row per provider (key input
+  + masked display + Test button), same layout lesson as §609 — each row
+  self-contained rather than one field with everything else implied.
+- `claudeGenerate.ts` and `mealieAiSync.ts` both take a provider id (new
+  setting: which configured provider powers each feature, defaulting to
+  `anthropic` if present) and call the shared OpenAI-compat helper instead
+  of each other's separate code paths.
+
+**Flagging before building**: this reads "Claude API key" → "AI API Keys"
+as *this app's* stored-credentials panel growing multi-provider, not as
+adding a provider-picker UI mid-generation (i.e., still one active provider
+per feature, chosen in Settings, not chosen per-request) — cheaper and
+matches how the Cloudflare-token-style single-purpose settings panels work
+elsewhere in this codebase. Say if per-request provider choice was actually
+wanted instead. Not implemented — this section and the README item are the
+plan.
