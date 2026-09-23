@@ -29380,3 +29380,99 @@ shared hotel database container publishing none.
 The `sample/hotel` and `sample/pbordo` copies keep their legacy names. They are
 the historical reference for §620/§622 and renaming them would only break the
 citations.
+
+## 626. Cross-cutting requirements for the rebuilds: styling, schema, naming, footprint
+
+Four requirements that apply to `check-in`, `pulse`, `tally`, `hotel-core` and
+`hotel-admin` alike, rather than to any one of them.
+
+### 1. Styling follows the dashboard
+
+The dashboard's system is small and specific, so "match it" means these
+things concretely (`frontend/src/styles.css`, 185 lines):
+
+- Bootstrap **5.3**, with dark mode driven by `data-bs-theme` on `<html>` —
+  Bootstrap recolours itself from that.
+- Three semantic tokens — `--app-canvas` (page behind the cards),
+  `--app-surface`, `--app-surface-raised` — layered over overridden `--bs-*`
+  variables. Light and dark definitions are kept in step; that rule carries over.
+- `.table-stack` / `.table-stack-wrap`: below the md breakpoint a table becomes
+  one card per row, each `<td>` labelled from its `data-label`. Any table in a
+  new app uses it rather than sideways scroll.
+- Standalone components with `styleUrl:` (singular, Angular 17+), one CSS file
+  per component; no global component styles.
+- Reuse rather than reimplement: `components/panel`, `confirm-dialog`,
+  `toast-container`, `service-card`, the `layout/shell`, and the `TranslatePipe`
+  with `i18n/en.ts` + `i18n/pt-pt.ts`. The legacy hotel app carried a whole
+  translations subsystem (a `translations` table, country→language mapping,
+  per-language quiz strings); the dashboard's pipe is the replacement to
+  evaluate against it before rebuilding that.
+
+**Admin matches exactly; guest pages stay brandable.** `hotel-admin` and
+`tally` take the dashboard theme as-is. `check-in` and `pulse` use the same
+Bootstrap base, tokens and components, but keep per-client logo and colours —
+the check-in form is the *hotel's* guest touchpoint carrying the hotel's name,
+not ours. So the legacy `styles` table / logo upload / "personal page" config
+survives in reduced form for those two apps only.
+
+**One shared theme file, not a copy per app.** `styles.css` lives in one place
+in this repo and every app's build references it. Copying it per app is exactly
+the drift that put 135 differing entries between `setup/` and `trigenius/`
+(§624) — a theme fix has to land everywhere at once.
+
+### 2. Schema reviewed for performance, not ported
+
+The legacy schema is carried over only where it earns it. What the analyses
+already show needs attention:
+
+- The scheduler runs `checkin:send` and `quiz:send` **every minute** (§620).
+  `checkin:send` filters `reservations` on `checkin` + `checkin_sent` +
+  `checkin_success` + `status`; `quiz:send` on `status` + `checkout` +
+  `quiz_sent`. Neither has a supporting index in the legacy migrations — only
+  `unique(unit_id, number, line)`, `unique(uuid)` and a late unique on
+  `guests.code` exist. Both queries want a composite index, and both are
+  partial-index candidates since they only ever match rows where the "sent"
+  flag is false.
+- Guest links resolve by `uuid`; `quiz_responses` is read by `reservation_id`.
+- `tally` inherits `SELECT * FROM wsir_vnd_vendas` with no date filter (§622) —
+  the whole sales table crossing the wire every refresh and being aggregated in
+  the browser. Aggregation moves into SQL, bounded by date.
+- Precedent in this repo: the `audit_logs.created_at` index added recently for
+  the same class of problem.
+
+### 3. Naming: English, database conventions
+
+Table and column names are ours to choose and change. Convention, assuming
+Postgres (still to be confirmed): `snake_case`, plural table names, `id` as
+primary key, `created_at` / `updated_at` as `timestamptz`, foreign keys as
+`<singular>_id`, booleans read as predicates (`is_active`, `has_changes`). The
+legacy `hu_` table prefix is dropped — it exists to share a database, which
+one-box-one-client removes.
+
+**Wintouch's own schema is not ours to rename.** `wgcterceiros`,
+`wsir_vnd_vendas`, `observacoes`, `unidade` and the rest are the vendor's,
+read-only to us (§620, §622). They stay exactly as they are and are mapped to
+English names at the agent boundary — that mapping is the *only* place the
+Portuguese vendor names appear.
+
+### 4. Logic refactored for footprint
+
+Concrete removals the analyses already identify, rather than a general
+aspiration:
+
+- The dormant check-out/payment half of the hotel agent — `CheckOut.cs`, the
+  night-audit run, the invoice/payment DAOs, `UpdateEntityInLines()`'s empty
+  stub (§620). Ported only if online payment is actually wanted; confirmed
+  either way, not carried by default.
+- `tally`'s 20 embedded SQL resources behind 4 reachable endpoints (§622).
+  Build what the UI shows, and treat the unreachable ones as a list of
+  candidate features rather than code to port.
+- The whole Laravel admin scaffolding, the `setup/`-vs-instance duplication,
+  and the per-client deploy scripts (§624).
+- The 30-second ipify → `set_ip` loop: whatever the agent-enrolment decision
+  produces should remove the need for a shop to publish its public IP at all.
+  An outbound connection from the agent removes that and the open inbound port
+  together.
+
+Each of these is a decision to record when the slice is planned, not a
+licence to drop behaviour silently.

@@ -433,6 +433,44 @@ before anything is built.
       **Postgres**, matching the rest of this repo, rather than carrying the
       legacy MySQL over. Affects the shared hotel database container and
       `tally`'s. Cheap to decide now, expensive after the schema exists.
+- [ ] **Set up the shared frontend theme all five apps build against** —
+      plan.md §626. `frontend/src/styles.css` (Bootstrap 5.3, `data-bs-theme`
+      dark mode, the `--app-canvas`/`--app-surface`/`--app-surface-raised`
+      tokens and the `.table-stack` responsive-table pattern) becomes a single
+      shared source every app's build references — **not** a copy per app,
+      which is the drift that put 135 entries between `setup/` and
+      `trigenius/`. Decide the mechanism (relative path from each app's
+      `angular.json`, or a workspace package) and confirm a theme change lands
+      in every app without touching them individually. `hotel-admin` and
+      `tally` take the theme as-is; `check-in` and `pulse` keep per-client logo
+      and colours on guest-facing pages, so the legacy `styles`/logo config
+      survives in reduced form for those two only.
+- [ ] **Evaluate the dashboard's `TranslatePipe` against the legacy
+      translations subsystem** — the hotel app carried a `translations` table,
+      a country→language mapping and per-language quiz strings; the dashboard
+      has `i18n/en.ts` + `i18n/pt-pt.ts` and a pipe. Decide which wins before
+      rebuilding either. Guest-facing text is per-client editable in the legacy
+      app, which static i18n files do not cover — that gap is the deciding
+      factor.
+- [ ] **Index the scheduler's hot queries when the schema is written** —
+      plan.md §626. `checkin:send` and `quiz:send` run **every minute** and
+      filter reservations on `checkin`+`checkin_sent`+`checkin_success`+`status`
+      and `status`+`checkout`+`quiz_sent` respectively; the legacy migrations
+      have no index for either. Both want a composite, and both are partial-index
+      candidates since they only match rows whose "sent" flag is false. Also
+      cover `uuid` lookups for guest links and `quiz_responses.reservation_id`.
+      Same class of fix as the recent `audit_logs.created_at` index.
+- [ ] **Move `tally`'s aggregation into SQL** — it inherits
+      `SELECT * FROM wsir_vnd_vendas` with no date filter (plan.md §622), so
+      the whole sales table crosses the wire on every refresh and is summed in
+      the browser. Aggregate in SQL, bounded by date, and send totals rather
+      than rows.
+- [ ] **Confirm whether the dormant check-out/payment half is in scope** —
+      plan.md §626. `CheckOut.cs`, the night-audit run, the invoice/payment
+      DAOs and `UpdateEntityInLines()`'s empty stub are built but switched off
+      in the legacy agent. They are ported only if online payment is actually
+      wanted. Decide explicitly — the default is to drop them, and that should
+      be a recorded decision rather than a silent omission.
 - [ ] **Allocate ports and registry entries for the five new apps** — per
       `docs/ports.md`, new apps append at the tail; `10600`+ is free.
       `check-in`, `hotel-admin`, `hotel-core`, `pulse` and `tally` need a
