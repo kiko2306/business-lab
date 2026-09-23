@@ -29940,3 +29940,68 @@ reach a sibling `web/`. Done now, before `web/` exists, while it is a `git mv`
 plus one line each in `docker-compose.yml` and the CI job. The `web` build
 stage is added with the frontend slice rather than now, so the image keeps
 building in the meantime.
+
+## 633. Implemented: `tally`'s admin UI, and what the shared theme really costs
+
+Angular admin UI in `apps/tally/web/` — shops, who may see them, and their
+agents. One page: a `.table-stack` table of shops, each expanding to an access
+list and an agent panel. No router, because there is nowhere else to go yet.
+
+### §626's "one shared theme file" does not survive Docker
+
+§626 decided one shared `styles.css` every app references, explicitly rejecting
+a copy per app as the drift that put 135 entries between `setup/` and
+`trigenius/`. Building it proved that impossible as stated: an app image builds
+from its own `apps/<name>/` context and **cannot reach `frontend/src/`**.
+Widening the context to the repo root would ship the whole tree to the daemon
+on every build, and the root `.dockerignore` is shared with other builds.
+
+So the mechanism is one source of truth, a **generated** copy, and CI diffing
+the two: `scripts/sync-app-theme.sh` writes `frontend/src/styles.css` into each
+app's `web/src/theme.css`, and the `tally-web` job fails if they differ. Drift
+is *caught* rather than prevented — weaker than §626 wanted, and the honest
+limit of per-app build contexts. Changing the dashboard theme now means running
+the script and committing what it writes.
+
+`src/styles.css` beside it holds only what is genuinely tally's: the enrolment
+code display.
+
+### The code is shown once, and the UI says so
+
+The API returns an enrolment code once and stores only its hash (§631), so
+there is nothing to re-fetch. The panel states that in words, shows the code
+spaced and monospaced for reading aloud, offers a copy button, and shows the
+expiry. The copy button failing is not surfaced as an error — clipboard access
+needs a secure context and a gesture, and the code is on screen to read anyway.
+
+Issuing against a store that already has an agent warns that it *replaces* the
+current one, which is what §631's enrol path does.
+
+### Serving
+
+`app.ts` serves the built bundle from the same process and origin, so there is
+no CORS boundary and no base URL to configure. The client-side-routing fallback
+is written as middleware rather than `app.get('*')`: **Express 5 replaced the
+bare `'*'` path with named wildcards and rejects the old form outright** — a
+second Express 5 difference after §631's `req.params` typing.
+
+### An Angular 18 lockfile trap
+
+`npm ci` failed in the image build: `@angular/compiler-cli` wants
+`chokidar@^4` while `@angular-devkit/core` wants `^3.5.2`, and npm hoisted 4 to
+the top level, which makes the lockfile self-inconsistent. The dashboard's own
+lock has 3.6.0 hoisted with 4.0.3 nested under `compiler-cli`, which is the
+tree that works. Pinning `chokidar: ^3.6.0` as a direct devDependency
+reproduces it deterministically. Worth knowing before the next Angular app
+here hits the same thing — it only shows up under `npm ci`, so a local
+`npm install` looks fine.
+
+### Verification
+
+The image builds and was run against a real Postgres: `/api/health` ok, the UI
+served at `/`, a deep link falling back to `index.html`, `/api/stores` still
+401 without Authelia headers and returning data with them, and hashed bundle
+assets loading. Then the whole flow end to end through the container — create a
+shop, issue a code, enrol an agent carrying **no Authelia headers at all**, ask
+`/agent/me` which shop it serves, and see the shop turn to enrolled with a
+`lastSeenAt`. A `tally-web` CI job builds the bundle and runs the theme diff.

@@ -1,4 +1,6 @@
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
+import fs from 'fs';
+import path from 'path';
 import type { Pool } from 'pg';
 import { agentRoutes } from './routes/agent';
 import { storeRoutes } from './routes/stores';
@@ -27,6 +29,25 @@ export function createApp(pool: Pool): Express {
   // it and additionally checks the forwarded identity here.
   app.use('/agent', agentRoutes(pool));
   app.use('/api', storeRoutes(pool));
+
+  // The built Angular bundle, served by this same process on this same origin
+  // (plan.md §632) — one image, one port, one hostname, so no CORS boundary.
+  // Absent in tests and in `ng serve` development, where only the API matters.
+  const webRoot = process.env.WEB_ROOT ?? path.join(__dirname, 'web');
+  if (fs.existsSync(webRoot)) {
+    app.use(express.static(webRoot));
+    // Client-side routing: any other GET returns index.html so a deep link
+    // survives a refresh. Middleware rather than `app.get('*')`, because
+    // Express 5 replaced the bare '*' path with named wildcards and rejects
+    // the old form outright.
+    app.use((req, res, next) => {
+      if (req.method !== 'GET' || req.path.startsWith('/api') || req.path.startsWith('/agent')) {
+        next();
+        return;
+      }
+      res.sendFile(path.join(webRoot, 'index.html'));
+    });
+  }
 
   // Express 5, not 4, specifically for this: it awaits async handlers and
   // forwards a rejection here. On 4 an async throw becomes an unhandled

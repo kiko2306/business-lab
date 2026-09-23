@@ -1,0 +1,8 @@
+/* The expanded panel is a full-width row, so it must not be turned into a
+   labelled card cell by .table-stack on phones — it has no column of its own. */
+@media (max-width: 767.98px) {
+  .table-stack td[colspan] {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}

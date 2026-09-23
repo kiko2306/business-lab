@@ -430,14 +430,6 @@ before anything is built.
       exchange endpoint in `hotel-core` and `tally`, the issue-and-revoke UI,
       per-agent last-seen replacing the legacy single-row `conn_logs`, and
       revocation proven to 401 a running agent.
-- [ ] **Build the `tally` admin UI for stores, access and enrolment** — goes in
-      `apps/tally/web/`, served by the API from one image (plan.md §632); add
-      the `web` build stage to `apps/tally/Dockerfile` with it. The API
-      is done (plan.md §631): store CRUD, per-identity access grants, issue an
-      enrolment code, revoke an agent. Nothing drives it yet. Angular against
-      the shared theme, and note the enrolment code is returned **once** on
-      issue and cannot be read back, so the UI must present it as a
-      copy-it-now value rather than a field it can re-fetch.
 - [ ] **Make the agents outbound-only** — plan.md §627. No agent listens.
       This is what removes the open inbound port at every shop, the 30-second
       `api.ipify.org` → `set_ip` loop, the `store.ip` column and the
@@ -477,19 +469,15 @@ before anything is built.
       `storeClass.js` uses **uuid v1**, which encodes a timestamp and MAC
       address. Every capability identifier in the rebuilds is random — a
       correctness requirement, not a preference.
-- [ ] **Set up the shared frontend theme every app builds against** —
-      plan.md §626. `frontend/src/styles.css` (Bootstrap 5.3, `data-bs-theme`
-      dark mode, the `--app-canvas`/`--app-surface`/`--app-surface-raised`
-      tokens and the `.table-stack` responsive-table pattern) becomes a single
-      shared source every app's build references — `hotel-admin`, `check-in`,
-      `pulse` and `tally` — **not** a copy per app,
-      which is the drift that put 135 entries between `setup/` and
-      `trigenius/`. Decide the mechanism (relative path from each app's
-      `angular.json`, or a workspace package) and confirm a theme change lands
-      in every app without touching them individually. `hotel-admin` and
-      `tally` take the theme as-is; `check-in` and `pulse` keep per-client logo
-      and colours on guest-facing pages, so the legacy `styles`/logo config
-      survives in reduced form for those two only.
+- [ ] **Sync the shared theme into `hotel`'s frontends when they exist** —
+      the mechanism is built and proven for `tally` (plan.md §633):
+      `scripts/sync-app-theme.sh` copies `frontend/src/styles.css` into each
+      app's `web/src/theme.css`, and a CI step diffs them. §626 wanted no copy
+      at all, but an app image builds from its own `apps/<name>/` context and
+      cannot reach `frontend/src/`, so drift is caught rather than prevented.
+      Add each new app's path to the script's `targets`, and a matching diff
+      step to its CI job. Remember to re-run the script after any dashboard
+      theme change and commit what it writes.
 - [ ] **Build the guest-text template store** — plan.md §629. Admin UI uses
       the dashboard's `TranslatePipe` with static `en`/`pt-pt` files; guest
       emails and pages keep DB-backed per-client, per-language templates, so

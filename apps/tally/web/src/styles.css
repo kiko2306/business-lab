@@ -1,0 +1,14 @@
+/* Tally's own styles. The shared dashboard theme is src/theme.css, generated
+   by scripts/sync-app-theme.sh — edit frontend/src/styles.css and re-run it,
+   never this file's counterpart (plan.md §632). Keep anything here to what is
+   genuinely specific to tally. */
+
+/* The code is shown once on issue and cannot be read back, so it is meant to
+   be read aloud or copied — spaced and monospaced so O/0-style confusions
+   don't survive the trip, even though the alphabet already excludes them. */
+.enrolment-code {
+  font-family: var(--bs-font-monospace);
+  font-size: 1.75rem;
+  letter-spacing: 0.35rem;
+  word-break: break-all;
+}
