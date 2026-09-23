@@ -1,60 +1,59 @@
 <main class="container-fluid py-4">
   <div class="mb-4">
-    <h1 class="h3 mb-1">Updates</h1>
+    <h1 class="h3 mb-1">{{ 'selfUpdate.title' | t }}</h1>
     <p class="text-body-secondary mb-0">
-      Check for and apply updates to Business Lab — this is also the only way
-      managed apps' images update, so the whole stack moves together.
+      {{ 'selfUpdate.subtitle' | t }}
     </p>
   </div>
 
   <app-panel
     anchor="self-update"
     key="self-update"
-    title="Business Lab"
-    [subtitle]="'Pull the latest code from ' + (status?.check?.branch ?? 'main') + ', rebuild the dashboard, pull and recreate every managed app on its pinned images, then restart'"
+    [title]="'selfUpdate.panel.title' | t"
+    [subtitle]="'selfUpdate.panel.subtitle' | t:{ branch: status?.check?.branch ?? 'main' }"
   >
     <div class="card mb-3" *ngIf="status as s">
       <div class="card-body p-4">
         <dl class="row mb-0 small">
-          <dt class="col-sm-4 text-body-secondary">Running version</dt>
+          <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.runningVersion' | t }}</dt>
           <dd class="col-sm-8 font-monospace">v{{ s.appVersion }}</dd>
 
           <ng-container *ngIf="s.check as check">
-            <dt class="col-sm-4 text-body-secondary">Current commit</dt>
+            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.currentCommit' | t }}</dt>
             <dd class="col-sm-8 font-monospace">{{ check.currentCommit.slice(0, 12) }}</dd>
 
-            <dt class="col-sm-4 text-body-secondary">Latest on {{ check.branch }}</dt>
+            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.latestOn' | t:{ branch: check.branch } }}</dt>
             <dd class="col-sm-8 font-monospace">{{ check.remoteCommit.slice(0, 12) }}</dd>
 
-            <dt class="col-sm-4 text-body-secondary">Status</dt>
+            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.statusLabel' | t }}</dt>
             <dd class="col-sm-8">
-              <span *ngIf="check.commitsBehind === 0" class="badge text-bg-success">Up to date</span>
+              <span *ngIf="check.commitsBehind === 0" class="badge text-bg-success">{{ 'selfUpdate.upToDate' | t }}</span>
               <span *ngIf="check.commitsBehind > 0" class="badge text-bg-warning">
-                {{ check.commitsBehind }} commit{{ check.commitsBehind === 1 ? '' : 's' }} behind
+                {{ (check.commitsBehind === 1 ? 'selfUpdate.commitsBehind.one' : 'selfUpdate.commitsBehind.other') | t:{ count: check.commitsBehind } }}
               </span>
             </dd>
 
-            <dt class="col-sm-4 text-body-secondary">Last checked</dt>
+            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.lastChecked' | t }}</dt>
             <dd class="col-sm-8">
-              {{ check.checkedAt | date: 'medium' }}
-              <span *ngIf="checkIsStale" class="badge text-bg-warning ms-1">stale</span>
+              {{ check.checkedAt | date: 'medium':undefined:translate.locale() }}
+              <span *ngIf="checkIsStale" class="badge text-bg-warning ms-1">{{ 'selfUpdate.stale' | t }}</span>
             </dd>
           </ng-container>
           <ng-container *ngIf="!s.check">
-            <dt class="col-sm-4 text-body-secondary">Status</dt>
-            <dd class="col-sm-8 text-body-secondary">Not checked yet.</dd>
+            <dt class="col-sm-4 text-body-secondary">{{ 'selfUpdate.statusLabel' | t }}</dt>
+            <dd class="col-sm-8 text-body-secondary">{{ 'selfUpdate.notCheckedYet' | t }}</dd>
           </ng-container>
         </dl>
 
         <div class="alert alert-warning small mt-3 mb-0" *ngIf="s.lastCheckError as err">
-          Last update check failed ({{ err.at | date: 'medium' }}) — the status above may be out of date.
+          {{ 'selfUpdate.lastCheckFailed' | t:{ time: (err.at | date: 'medium':undefined:translate.locale()) ?? '' } }}
           <span class="font-monospace d-block mt-1">{{ err.message }}</span>
         </div>
         <div class="alert alert-info small mt-3 mb-0" *ngIf="runInProgress && s.latestRun as run">
-          {{ progressLabels[run.state] }}
+          {{ ('selfUpdate.progress.' + run.state) | t }}
         </div>
         <div class="alert alert-danger small mt-3 mb-0" *ngIf="!runInProgress && s.latestRun?.state === 'error'">
-          Last update failed: {{ s.latestRun?.errorMessage }}
+          {{ 'selfUpdate.lastUpdateFailed' | t:{ message: s.latestRun?.errorMessage ?? '' } }}
         </div>
 
         <div class="d-flex gap-2 mt-3">
@@ -64,7 +63,7 @@
             [disabled]="checking || runInProgress"
             (click)="checkNow()"
           >
-            {{ checking ? 'Checking…' : 'Check now' }}
+            {{ (checking ? 'selfUpdate.checking' : 'selfUpdate.checkNowButton') | t }}
           </button>
           <button
             type="button"
@@ -72,7 +71,7 @@
             [disabled]="checking || triggering || runInProgress"
             (click)="updateNow()"
           >
-            {{ triggering || runInProgress ? 'Updating…' : checking ? 'Checking…' : 'Update now' }}
+            {{ (triggering || runInProgress ? 'selfUpdate.updating' : checking ? 'selfUpdate.checking' : 'selfUpdate.updateNowButton') | t }}
           </button>
         </div>
       </div>

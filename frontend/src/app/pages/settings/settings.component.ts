@@ -18,6 +18,8 @@ import { ToastService } from '../../core/toast.service';
 import { AuthService } from '../../core/auth.service';
 import { PanelComponent } from '../../components/panel/panel.component';
 import { NetworkSettingsComponent } from './network-settings.component';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 /**
  * Stack-wide settings on its own route (§131.1): networking (the Cloudflare
@@ -28,7 +30,7 @@ import { NetworkSettingsComponent } from './network-settings.component';
 @Component({
   selector: 'app-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent, NetworkSettingsComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent, NetworkSettingsComponent, TranslatePipe],
   templateUrl: './settings.component.html',
   styleUrl: './settings.component.css'
 })
@@ -36,6 +38,7 @@ export class SettingsComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly settingsService = inject(SettingsService);
   private readonly toastService = inject(ToastService);
+  protected readonly translate = inject(TranslateService);
 
   // Networking (Cloudflare token + tunnel provisioning) is the webmaster's
   // remit — `exposure:settings`, distinct from the `settings:manage` that
@@ -102,11 +105,11 @@ export class SettingsComponent implements OnInit {
   // most installs. Empty in the draft means "no override — falls back to
   // the default topic above", indistinguishable from an override that
   // happens to equal the default (harmless: the two behave identically).
-  protected readonly alertCategories: { key: AlertCategory; label: string }[] = [
-    { key: 'crowdsec', label: 'CrowdSec intrusion alerts' },
-    { key: 'critical-service', label: 'Critical-service auto-restart' },
-    { key: 'netbird', label: 'NetBird token expiry' },
-    { key: 'backup', label: 'Backup failures' },
+  protected readonly alertCategories: { key: AlertCategory }[] = [
+    { key: 'crowdsec' },
+    { key: 'critical-service' },
+    { key: 'netbird' },
+    { key: 'backup' },
   ];
   protected perCategoryOpen = false;
   protected categoryTopicDrafts: Record<AlertCategory, string> = this.emptyCategoryTopics();
@@ -142,7 +145,7 @@ export class SettingsComponent implements OnInit {
         error: (error) =>
           (this.claudeKeyFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Unable to load the Claude API key.'),
+            message: extractErrorMessage(error, this.translate.t('settings.errors.loadClaudeKey')),
           }),
       });
   }
@@ -150,7 +153,7 @@ export class SettingsComponent implements OnInit {
   saveClaudeKey(): void {
     const key = this.claudeKeyDraft.trim();
     if (!key) {
-      this.claudeKeyFeedback = { type: 'info', message: 'Enter a key to save.' };
+      this.claudeKeyFeedback = { type: 'info', message: this.translate.t('settings.validation.enterKeyToSave') };
       return;
     }
     this.savingClaudeKey = true;
@@ -161,13 +164,13 @@ export class SettingsComponent implements OnInit {
         next: (settings) => {
           this.claudeKey = settings;
           this.claudeKeyDraft = '';
-          this.claudeKeyFeedback = { type: 'success', message: settings.message ?? 'Claude API key saved.' };
-          this.toastService.success('Claude API key saved.');
+          this.claudeKeyFeedback = { type: 'success', message: settings.message ?? this.translate.t('settings.toast.claudeKeySaved') };
+          this.toastService.success(this.translate.t('settings.toast.claudeKeySaved'));
         },
         error: (error) =>
           (this.claudeKeyFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Unable to save the Claude API key.'),
+            message: extractErrorMessage(error, this.translate.t('settings.errors.saveClaudeKey')),
           }),
       });
   }
@@ -175,7 +178,7 @@ export class SettingsComponent implements OnInit {
   testClaudeKey(): void {
     const key = this.claudeKeyDraft.trim();
     if (!key && !this.claudeKey?.configured) {
-      this.claudeKeyFeedback = { type: 'info', message: 'Save a key first, or enter one to test.' };
+      this.claudeKeyFeedback = { type: 'info', message: this.translate.t('settings.validation.saveKeyFirstOrEnter') };
       return;
     }
     this.testingClaudeKey = true;
@@ -188,7 +191,7 @@ export class SettingsComponent implements OnInit {
         error: (error) =>
           (this.claudeKeyFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Unable to test the Claude API key.'),
+            message: extractErrorMessage(error, this.translate.t('settings.errors.testClaudeKey')),
           }),
       });
   }
@@ -208,7 +211,7 @@ export class SettingsComponent implements OnInit {
         error: (error) => {
           this.alertsFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Unable to load alert settings.'),
+            message: extractErrorMessage(error, this.translate.t('settings.errors.loadAlerts')),
           };
         },
       });
@@ -291,7 +294,7 @@ export class SettingsComponent implements OnInit {
         error: (error) => {
           this.alertsFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Test failed.'),
+            message: extractErrorMessage(error, this.translate.t('settings.errors.testFailed')),
           };
         },
       });
@@ -326,7 +329,7 @@ export class SettingsComponent implements OnInit {
         error: (error) => {
           this.alertsFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, 'Unable to save alert settings.'),
+            message: extractErrorMessage(error, this.translate.t('settings.errors.saveAlerts')),
           };
         },
       });
@@ -345,7 +348,7 @@ export class SettingsComponent implements OnInit {
           this.generalForm.controls.updateBranch.setValue(settings.updateBranch ?? '');
         },
         error: (error) => {
-          this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to load general settings.') };
+          this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('settings.errors.loadGeneral')) };
         },
       });
   }
@@ -366,11 +369,11 @@ export class SettingsComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.generalFeedback = { type: 'success', message: response.message };
-          this.toastService.success('Settings saved.');
+          this.toastService.success(this.translate.t('settings.toast.settingsSaved'));
           this.loadGeneralSettings();
         },
         error: (error) => {
-          this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save timezone.') };
+          this.generalFeedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('settings.errors.saveTimezone')) };
         },
       });
   }
@@ -413,14 +416,14 @@ export class SettingsComponent implements OnInit {
             imapEncryption: settings.imapEncryption,
           });
         },
-        error: () => (this.mailFeedback = { type: 'danger', message: 'Unable to load mail settings.' }),
+        error: () => (this.mailFeedback = { type: 'danger', message: this.translate.t('settings.errors.loadMail') }),
       });
   }
 
   saveMail(): void {
     if (this.mailForm.invalid) {
       this.mailForm.markAllAsTouched();
-      this.mailFeedback = { type: 'info', message: 'Fill in the sending fields with valid values before saving.' };
+      this.mailFeedback = { type: 'info', message: this.translate.t('settings.validation.fillSendingFields') };
       return;
     }
 
@@ -430,7 +433,7 @@ export class SettingsComponent implements OnInit {
     if (value.smtpUser && !value.smtpPassword && !this.mailSettings?.smtpPasswordConfigured) {
       this.mailForm.controls.smtpPassword.setErrors({ required: true });
       this.mailForm.controls.smtpPassword.markAsTouched();
-      this.mailFeedback = { type: 'info', message: 'Enter the mailbox password.' };
+      this.mailFeedback = { type: 'info', message: this.translate.t('settings.validation.enterMailboxPassword') };
       return;
     }
 
@@ -462,7 +465,7 @@ export class SettingsComponent implements OnInit {
           this.mailForm.controls.imapPassword.reset('');
           this.loadMailSettings();
         },
-        error: (error) => (this.mailFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save mail settings.') }),
+        error: (error) => (this.mailFeedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('settings.errors.saveMail')) }),
       });
   }
 
@@ -478,7 +481,7 @@ export class SettingsComponent implements OnInit {
           this.mailFeedback = { type: result.success ? 'success' : 'danger', message: result.message };
         },
         error: (error) => {
-          this.mailFeedback = { type: 'danger', message: extractErrorMessage(error, 'Mail test failed.') };
+          this.mailFeedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('settings.errors.mailTestFailed')) };
         },
       });
   }

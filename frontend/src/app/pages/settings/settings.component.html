@@ -1,34 +1,33 @@
 <main class="container-fluid py-4">
   <div class="mb-4">
-    <h1 class="h3 mb-1">Settings</h1>
+    <h1 class="h3 mb-1">{{ 'settings.title' | t }}</h1>
     <p class="text-body-secondary mb-0">
-      Stack-wide settings: networking, the timezone, ntfy alert pushes, the
-      shared mailbox, and where backups are sent.
+      {{ 'settings.subtitle' | t }}
     </p>
   </div>
 
 <!-- P9a (§357): read-only provisioning checklist — what a new client box still needs set. -->
 <app-panel
   key="settings:deployment"
-  title="Deployment checklist"
+  [title]="'settings.deployment.title' | t"
   [subtitle]="deployment
-    ? (deployment.outstanding === 0 ? 'This box is fully provisioned' : deployment.outstanding + ' item(s) still need setting')
-    : 'Per-client provisioning status'"
+    ? (deployment.outstanding === 0 ? ('settings.deployment.subtitleDone' | t) : ('settings.deployment.subtitleOutstanding' | t:{ count: deployment.outstanding }))
+    : ('settings.deployment.subtitleDefault' | t)"
 >
-  <p *ngIf="deploymentLoading" class="text-body-secondary mb-0">Loading…</p>
+  <p *ngIf="deploymentLoading" class="text-body-secondary mb-0">{{ 'common.loading' | t }}</p>
   <p *ngIf="!deploymentLoading && !deployment" class="text-body-secondary mb-0">
-    Unable to load the checklist.
+    {{ 'settings.deployment.unableToLoad' | t }}
   </p>
   <ul *ngIf="deployment" class="list-group list-group-flush">
     <li *ngFor="let c of deployment.checks" class="list-group-item d-flex gap-3 px-0">
       <span class="badge align-self-start" [class.text-bg-success]="c.done" [class.text-bg-warning]="!c.done">
-        {{ c.done ? 'Set' : 'To do' }}
+        {{ (c.done ? 'settings.deployment.setBadge' : 'settings.deployment.todoBadge') | t }}
       </span>
       <span class="flex-grow-1">
         <span class="fw-medium">{{ c.label }}</span>
         <br />
         <span class="text-body-secondary small">{{ c.detail }}</span>
-        <span *ngIf="!c.done" class="text-body-secondary small"> · set it in <em>{{ c.fixIn }}</em></span>
+        <span *ngIf="!c.done" class="text-body-secondary small"> · {{ 'settings.deployment.fixInPrefix' | t }} <em>{{ c.fixIn }}</em></span>
       </span>
     </li>
   </ul>
@@ -38,25 +37,25 @@
 
 <app-panel
   key="settings:general"
-  title="General"
-  subtitle="The timezone applied to every managed app that reads TZ"
+  [title]="'settings.general.title' | t"
+  [subtitle]="'settings.general.subtitle' | t"
 >
   <p class="text-body-secondary mb-3">
-    Unless an app pins its own in its Configuration panel. Takes effect the next time each app is started.
+    {{ 'settings.general.description' | t }}
   </p>
 
-  <div *ngIf="generalLoading" class="text-body-secondary small">Loading…</div>
+  <div *ngIf="generalLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
 
   <form *ngIf="!generalLoading && generalSettings" [formGroup]="generalForm" (ngSubmit)="saveGeneral()" class="row g-3">
     <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="timezone">Timezone</label>
+      <label class="form-label fw-semibold" for="timezone">{{ 'settings.general.timezoneLabel' | t }}</label>
       <select id="timezone" class="form-select" formControlName="timezone">
         <option *ngFor="let tz of generalSettings.timezones" [value]="tz">{{ tz }}</option>
       </select>
-      <p class="form-text mb-0">Default: {{ generalSettings.defaultTimezone }}</p>
+      <p class="form-text mb-0">{{ 'settings.general.defaultPrefix' | t:{ value: generalSettings.defaultTimezone } }}</p>
     </div>
     <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="dashboardUrl">Dashboard URL</label>
+      <label class="form-label fw-semibold" for="dashboardUrl">{{ 'settings.general.dashboardUrlLabel' | t }}</label>
       <input
         id="dashboardUrl"
         type="url"
@@ -65,18 +64,18 @@
         placeholder="https://dashboard.example.com"
       />
       <p class="form-text mb-0">
-        Used for the set-password links emailed to new users.
+        {{ 'settings.general.dashboardUrlHintUsed' | t }}
         <ng-container *ngIf="generalSettings.dashboardUrlEffective">
-          Currently: <code>{{ generalSettings.dashboardUrlEffective }}</code>.
+          {{ 'settings.general.dashboardUrlCurrently' | t:{ url: generalSettings.dashboardUrlEffective } }}
         </ng-container>
-        Leave blank to use that guess.
+        {{ 'settings.general.dashboardUrlBlank' | t }}
       </p>
       <div class="form-text text-danger" *ngIf="generalForm.controls.dashboardUrl.touched && generalForm.controls.dashboardUrl.invalid">
-        Enter a full http(s):// address with no path.
+        {{ 'settings.general.dashboardUrlError' | t }}
       </div>
     </div>
     <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="updateBranch">Update branch</label>
+      <label class="form-label fw-semibold" for="updateBranch">{{ 'settings.general.updateBranchLabel' | t }}</label>
       <input
         id="updateBranch"
         type="text"
@@ -85,16 +84,15 @@
         placeholder="main"
       />
       <p class="form-text mb-0">
-        Branch the Update page checks and pulls from. Leave blank for
-        <code>{{ generalSettings.defaultUpdateBranch }}</code>.
+        {{ 'settings.general.updateBranchHint' | t:{ branch: generalSettings.defaultUpdateBranch ?? '' } }}
       </p>
       <div class="form-text text-danger" *ngIf="generalForm.controls.updateBranch.touched && generalForm.controls.updateBranch.invalid">
-        Enter a plain branch name (letters, digits, <code>. _ / -</code>).
+        {{ 'settings.general.updateBranchError' | t }}
       </div>
     </div>
     <div class="col-12 d-flex align-items-center gap-2">
       <button type="submit" class="btn btn-primary" [disabled]="savingGeneral || generalForm.invalid">
-        {{ savingGeneral ? 'Saving…' : 'Save' }}
+        {{ (savingGeneral ? 'common.saving' : 'settings.general.saveButton') | t }}
       </button>
       <span
         *ngIf="generalFeedback"
@@ -113,18 +111,18 @@
 
 <app-panel
   key="settings:ntfy"
-  title="ntfy alerts"
-  subtitle="One ntfy topic every alert this dashboard raises is published to"
+  [title]="'settings.ntfy.title' | t"
+  [subtitle]="'settings.ntfy.subtitle' | t"
 >
   <p class="text-body-secondary mb-3">
-    Subscribe to it in the ntfy app to get them on your phone. Turn individual sources on below.
+    {{ 'settings.ntfy.description' | t }}
   </p>
 
-  <div *ngIf="alertsLoading" class="text-body-secondary small">Loading…</div>
+  <div *ngIf="alertsLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
 
   <div *ngIf="!alertsLoading && alertSettings" class="row g-3">
     <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="alertTopic">ntfy topic</label>
+      <label class="form-label fw-semibold" for="alertTopic">{{ 'settings.ntfy.topicLabel' | t }}</label>
       <div class="input-group">
         <input
           id="alertTopic"
@@ -140,22 +138,21 @@
           [disabled]="savingAlerts || !alertTopicDirty || !alertTopicValid"
           (click)="saveAlertTopic()"
         >
-          Save topic
+          {{ 'settings.ntfy.saveTopicButton' | t }}
         </button>
       </div>
       <p class="form-text mb-0" [class.text-danger]="alertTopicDraft && !alertTopicValid">
         <ng-container *ngIf="alertTopicDraft && !alertTopicValid; else topicHint">
-          Letters, digits, hyphens and underscores only, up to 64 characters.
+          {{ 'settings.ntfy.topicInvalidHint' | t }}
         </ng-container>
         <ng-template #topicHint>
-          ntfy topics are open by name, so anyone who knows it can read the alert stream (which
-          includes attacker IPs) — keep it non-obvious.
+          {{ 'settings.ntfy.topicHint' | t }}
         </ng-template>
       </p>
     </div>
 
     <div class="col-12">
-      <label class="form-label fw-semibold mb-2">Sources</label>
+      <label class="form-label fw-semibold mb-2">{{ 'settings.ntfy.sourcesLabel' | t }}</label>
       <div class="d-flex align-items-start gap-3">
         <div class="form-check form-switch flex-grow-1">
           <input
@@ -168,9 +165,9 @@
             (change)="toggleCrowdsecAlerts($any($event.target).checked)"
           />
           <label class="form-check-label" for="crowdsecAlertsEnabled">
-            <span class="fw-semibold">CrowdSec intrusion alerts</span>
+            <span class="fw-semibold">{{ 'settings.ntfy.crowdsecAlerts.label' | t }}</span>
             <span class="d-block text-body-secondary small">
-              A push whenever CrowdSec flags an IP. Applies when saved: CrowdSec and n8n restart if running.
+              {{ 'settings.ntfy.crowdsecAlerts.description' | t }}
             </span>
           </label>
         </div>
@@ -185,13 +182,13 @@
             class="spinner-border spinner-border-sm me-1"
             aria-hidden="true"
           ></span>
-          Test
+          {{ 'settings.ntfy.testButton' | t }}
         </button>
       </div>
     </div>
 
     <div class="col-12">
-      <label class="form-label fw-semibold mb-2">Enforcement</label>
+      <label class="form-label fw-semibold mb-2">{{ 'settings.ntfy.enforcementLabel' | t }}</label>
       <div class="form-check form-switch">
         <input
           class="form-check-input"
@@ -203,13 +200,9 @@
           (change)="toggleCrowdsecEnforcement($any($event.target).checked)"
         />
         <label class="form-check-label" for="crowdsecEnforceNpm">
-          <span class="fw-semibold">Enforce CrowdSec bans at Nginx Proxy Manager</span>
+          <span class="fw-semibold">{{ 'settings.ntfy.enforceNpm.label' | t }}</span>
           <span class="d-block text-body-secondary small">
-            Off, CrowdSec only watches and alerts. On, every proxied request has its
-            client IP checked against CrowdSec's decision list and banned IPs get a
-            403 — and the alerts start saying so. Applies when saved: CrowdSec and
-            Nginx Proxy Manager restart if running (a few seconds' blip on every
-            public site).
+            {{ 'settings.ntfy.enforceNpm.description' | t }}
           </span>
         </label>
       </div>
@@ -221,16 +214,16 @@
         class="btn btn-link p-0 text-decoration-none fw-semibold small"
         (click)="perCategoryOpen = !perCategoryOpen"
       >
-        {{ perCategoryOpen ? '▾' : '▸' }} Per-category channels
+        {{ perCategoryOpen ? '▾' : '▸' }} {{ 'settings.ntfy.perCategoryToggle' | t }}
       </button>
       <p class="form-text mb-0 mt-1">
-        Route one alert source to its own ntfy topic instead of the default above. Leave a channel blank to keep it on the default.
+        {{ 'settings.ntfy.perCategoryHint' | t }}
       </p>
 
       <div *ngIf="perCategoryOpen" class="row g-3 mt-1">
         <div class="col-12 col-md-6" *ngFor="let category of alertCategories">
           <label class="form-label small fw-semibold" [for]="'categoryTopic-' + category.key">
-            {{ category.label }}
+            {{ ('settings.alertCategory.' + category.key) | t }}
           </label>
           <div class="input-group input-group-sm">
             <input
@@ -252,11 +245,11 @@
                 class="spinner-border spinner-border-sm"
                 aria-hidden="true"
               ></span>
-              <ng-container *ngIf="testingAlertSource !== category.key">Test</ng-container>
+              <ng-container *ngIf="testingAlertSource !== category.key">{{ 'settings.ntfy.testButton' | t }}</ng-container>
             </button>
           </div>
           <p class="form-text mb-0 text-danger" *ngIf="categoryTopicDrafts[category.key] && !categoryTopicValid(category.key)">
-            Letters, digits, hyphens and underscores only, up to 64 characters.
+            {{ 'settings.ntfy.topicInvalidHint' | t }}
           </p>
         </div>
 
@@ -267,7 +260,7 @@
             [disabled]="savingAlerts || !categoryTopicsDirty || !categoryTopicsAllValid"
             (click)="saveCategoryTopics()"
           >
-            Save channels
+            {{ 'settings.ntfy.saveChannelsButton' | t }}
           </button>
         </div>
       </div>
@@ -291,107 +284,105 @@
 
 <app-panel
   key="settings:email"
-  title="Email"
-  subtitle="One mailbox, shared by every app that sends or receives email"
+  [title]="'settings.email.title' | t"
+  [subtitle]="'settings.email.subtitle' | t"
 >
   <p class="text-body-secondary small mb-3">
-    Configured once here instead of pasted into each app — changing the password later is
-    a single edit. Apps pick it up when they next start.
+    {{ 'settings.email.description' | t }}
   </p>
 
-  <div *ngIf="mailLoading" class="text-body-secondary small">Loading…</div>
+  <div *ngIf="mailLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
 
   <form *ngIf="!mailLoading" [formGroup]="mailForm" (ngSubmit)="saveMail()" class="row g-3">
     <div class="col-12">
-      <h3 class="h6 mb-0">Sending</h3>
+      <h3 class="h6 mb-0">{{ 'settings.email.sendingHeading' | t }}</h3>
     </div>
 
     <div class="col-md-6">
-      <label class="form-label fw-semibold" for="smtpHost">SMTP server</label>
+      <label class="form-label fw-semibold" for="smtpHost">{{ 'settings.email.smtpServerLabel' | t }}</label>
       <input id="smtpHost" type="text" class="form-control" formControlName="smtpHost"
              placeholder="smtp.example.com" autocomplete="off" />
     </div>
     <div class="col-md-3">
-      <label class="form-label fw-semibold" for="smtpEncryption">Encryption</label>
+      <label class="form-label fw-semibold" for="smtpEncryption">{{ 'settings.email.encryptionLabel' | t }}</label>
       <select id="smtpEncryption" class="form-select" formControlName="smtpEncryption"
               (change)="onMailEncryptionChange('smtp')">
-        <option value="tls">STARTTLS</option>
-        <option value="ssl">SSL/TLS</option>
-        <option value="none">None</option>
+        <option value="tls">{{ 'settings.email.encryption.starttls' | t }}</option>
+        <option value="ssl">{{ 'settings.email.encryption.ssl' | t }}</option>
+        <option value="none">{{ 'settings.email.encryption.none' | t }}</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label fw-semibold" for="smtpPort">Port</label>
+      <label class="form-label fw-semibold" for="smtpPort">{{ 'settings.email.portLabel' | t }}</label>
       <input id="smtpPort" type="number" inputmode="numeric" class="form-control" formControlName="smtpPort" />
     </div>
 
     <div class="col-md-6">
-      <label class="form-label fw-semibold" for="smtpUser">Username</label>
+      <label class="form-label fw-semibold" for="smtpUser">{{ 'settings.email.usernameLabel' | t }}</label>
       <input id="smtpUser" type="text" class="form-control" formControlName="smtpUser"
              placeholder="you@example.com" autocomplete="off" />
     </div>
     <div class="col-md-6">
-      <label class="form-label fw-semibold" for="smtpPassword">Password</label>
+      <label class="form-label fw-semibold" for="smtpPassword">{{ 'settings.email.passwordLabel' | t }}</label>
       <input id="smtpPassword" type="password" class="form-control" formControlName="smtpPassword"
-             [placeholder]="mailSettings?.smtpPasswordConfigured ? 'configured — leave blank to keep' : 'not set'"
+             [placeholder]="mailSettings?.smtpPasswordConfigured ? ('settings.email.passwordConfigured' | t) : ('settings.email.passwordNotSet' | t)"
              autocomplete="new-password" />
     </div>
 
     <div class="col-md-6">
-      <label class="form-label fw-semibold" for="fromAddress">From address</label>
+      <label class="form-label fw-semibold" for="fromAddress">{{ 'settings.email.fromAddressLabel' | t }}</label>
       <input id="fromAddress" type="email" class="form-control" formControlName="fromAddress"
              placeholder="homelab@example.com" autocomplete="off" />
     </div>
     <div class="col-md-6">
-      <label class="form-label fw-semibold" for="fromName">From name <span class="fw-normal text-body-secondary">(optional)</span></label>
+      <label class="form-label fw-semibold" for="fromName">{{ 'settings.email.fromNameLabel' | t }} <span class="fw-normal text-body-secondary">{{ 'common.optional' | t }}</span></label>
       <input id="fromName" type="text" class="form-control" formControlName="fromName" placeholder="Homelab" />
     </div>
 
     <div class="col-12 mt-4">
-      <h3 class="h6 mb-1">Receiving <span class="fw-normal text-body-secondary small">(optional)</span></h3>
+      <h3 class="h6 mb-1">{{ 'settings.email.receivingHeading' | t }} <span class="fw-normal text-body-secondary small">{{ 'common.optional' | t }}</span></h3>
       <p class="form-text mt-0">
-        Only needed by apps that turn incoming mail into records — ticketing
-        from an inbox, for example. Leave the server blank to turn it off.
+        {{ 'settings.email.receivingDescription' | t }}
       </p>
     </div>
 
     <div class="col-md-6">
-      <label class="form-label fw-semibold" for="imapHost">IMAP server</label>
+      <label class="form-label fw-semibold" for="imapHost">{{ 'settings.email.imapServerLabel' | t }}</label>
       <input id="imapHost" type="text" class="form-control" formControlName="imapHost"
              placeholder="imap.example.com" autocomplete="off" />
     </div>
     <div class="col-md-3">
-      <label class="form-label fw-semibold" for="imapEncryption">Encryption</label>
+      <label class="form-label fw-semibold" for="imapEncryption">{{ 'settings.email.encryptionLabel' | t }}</label>
       <select id="imapEncryption" class="form-select" formControlName="imapEncryption"
               (change)="onMailEncryptionChange('imap')">
-        <option value="ssl">SSL/TLS</option>
-        <option value="tls">STARTTLS</option>
-        <option value="none">None</option>
+        <option value="ssl">{{ 'settings.email.encryption.ssl' | t }}</option>
+        <option value="tls">{{ 'settings.email.encryption.starttls' | t }}</option>
+        <option value="none">{{ 'settings.email.encryption.none' | t }}</option>
       </select>
     </div>
     <div class="col-md-3">
-      <label class="form-label fw-semibold" for="imapPort">Port</label>
+      <label class="form-label fw-semibold" for="imapPort">{{ 'settings.email.portLabel' | t }}</label>
       <input id="imapPort" type="number" inputmode="numeric" class="form-control" formControlName="imapPort" />
     </div>
 
     <div class="col-md-6">
-      <label class="form-label fw-semibold" for="imapUser">Username</label>
+      <label class="form-label fw-semibold" for="imapUser">{{ 'settings.email.usernameLabel' | t }}</label>
       <input id="imapUser" type="text" class="form-control" formControlName="imapUser" autocomplete="off" />
     </div>
     <div class="col-md-6">
-      <label class="form-label fw-semibold" for="imapPassword">Password</label>
+      <label class="form-label fw-semibold" for="imapPassword">{{ 'settings.email.passwordLabel' | t }}</label>
       <input id="imapPassword" type="password" class="form-control" formControlName="imapPassword"
-             [placeholder]="mailSettings?.imapPasswordConfigured ? 'configured — leave blank to keep' : 'not set'"
+             [placeholder]="mailSettings?.imapPasswordConfigured ? ('settings.email.passwordConfigured' | t) : ('settings.email.passwordNotSet' | t)"
              autocomplete="new-password" />
     </div>
 
     <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
       <button type="submit" class="btn btn-primary" [disabled]="savingMail">
-        {{ savingMail ? 'Saving…' : 'Save email settings' }}
+        {{ (savingMail ? 'common.saving' : 'settings.email.saveButton') | t }}
       </button>
       <button type="button" class="btn btn-outline-secondary"
               [disabled]="testingMail || !mailSettings?.configured" (click)="testMail()">
-        {{ testingMail ? 'Testing…' : 'Test connection' }}
+        {{ (testingMail ? 'common.testing' : 'settings.email.testButton') | t }}
       </button>
       <span
         *ngIf="mailFeedback"
@@ -411,10 +402,10 @@
     <div *ngIf="mailTestResult" class="col-12">
       <ul class="list-unstyled small mb-0">
         <li [ngClass]="mailTestResult.smtp.ok ? 'text-success' : 'text-danger'">
-          <strong>Sending:</strong> {{ mailTestResult.smtp.detail }}
+          <strong>{{ 'settings.email.sendingResultLabel' | t }}</strong> {{ mailTestResult.smtp.detail }}
         </li>
         <li *ngIf="mailTestResult.imap" [ngClass]="mailTestResult.imap.ok ? 'text-success' : 'text-danger'">
-          <strong>Receiving:</strong> {{ mailTestResult.imap.detail }}
+          <strong>{{ 'settings.email.receivingResultLabel' | t }}</strong> {{ mailTestResult.imap.detail }}
         </li>
       </ul>
     </div>
@@ -423,21 +414,19 @@
 
 <app-panel
   key="settings:claude-key"
-  title="Claude API key"
-  subtitle="One Anthropic key, used by content generation and AI recipe parsing"
+  [title]="'settings.claudeKey.title' | t"
+  [subtitle]="'settings.claudeKey.subtitle' | t"
 >
   <p class="text-body-secondary small mb-3">
-    Get a key from
-    <span class="text-body">console.anthropic.com → API keys</span>. It is stored
-    once here and never shown again — only which key is set. Leave the field
-    blank to keep the current key.
+    {{ 'settings.claudeKey.descriptionPrefix' | t }}
+    <span class="text-body">console.anthropic.com → API keys</span>{{ 'settings.claudeKey.descriptionSuffix' | t }}
   </p>
 
-  <div *ngIf="claudeKeyLoading" class="text-body-secondary small">Loading…</div>
+  <div *ngIf="claudeKeyLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
 
   <form *ngIf="!claudeKeyLoading" (ngSubmit)="saveClaudeKey()" class="row g-3">
     <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="claudeApiKey">API key</label>
+      <label class="form-label fw-semibold" for="claudeApiKey">{{ 'settings.claudeKey.apiKeyLabel' | t }}</label>
       <input
         id="claudeApiKey"
         type="password"
@@ -445,13 +434,13 @@
         autocomplete="off"
         [(ngModel)]="claudeKeyDraft"
         [ngModelOptions]="{ standalone: true }"
-        [placeholder]="claudeKey?.configured ? (claudeKey?.keyMasked ?? 'configured — leave blank to keep') : 'sk-ant-…'"
+        [placeholder]="claudeKey?.configured ? (claudeKey?.keyMasked ?? ('settings.claudeKey.placeholderConfigured' | t)) : 'sk-ant-…'"
       />
     </div>
 
     <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
       <button type="submit" class="btn btn-primary" [disabled]="savingClaudeKey || !claudeKeyDraft.trim()">
-        {{ savingClaudeKey ? 'Saving…' : 'Save key' }}
+        {{ (savingClaudeKey ? 'common.saving' : 'settings.claudeKey.saveButton') | t }}
       </button>
       <button
         type="button"
@@ -459,7 +448,7 @@
         [disabled]="testingClaudeKey || (!claudeKeyDraft.trim() && !claudeKey?.configured)"
         (click)="testClaudeKey()"
       >
-        {{ testingClaudeKey ? 'Testing…' : 'Test key' }}
+        {{ (testingClaudeKey ? 'common.testing' : 'settings.claudeKey.testButton') | t }}
       </button>
       <span
         *ngIf="claudeKeyFeedback"

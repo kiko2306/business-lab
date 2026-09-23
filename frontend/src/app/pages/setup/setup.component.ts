@@ -7,11 +7,13 @@ import { extractErrorMessage } from '../../core/api';
 import { AuthService } from '../../core/auth.service';
 import { sanitizePastedText } from '../../core/input-sanitize';
 import { ToastService } from '../../core/toast.service';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 @Component({
   selector: 'app-setup',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, RouterLink],
+  imports: [CommonModule, ReactiveFormsModule, RouterLink, TranslatePipe],
   templateUrl: './setup.component.html',
   styleUrl: './setup.component.css'
 })
@@ -20,6 +22,7 @@ export class SetupComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly toastService = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   protected readonly form = this.formBuilder.nonNullable.group({
     username: ['', [Validators.required, Validators.minLength(3), Validators.maxLength(64)]],
@@ -51,7 +54,7 @@ export class SetupComponent {
 
     const { username, email, password, confirmPassword } = this.form.getRawValue();
     if (password !== confirmPassword) {
-      this.errorMessage = 'Passwords do not match.';
+      this.errorMessage = this.translate.t('setup.errors.passwordMismatch');
       return;
     }
 
@@ -63,11 +66,11 @@ export class SetupComponent {
       .pipe(finalize(() => (this.submitting = false)))
       .subscribe({
         next: () => {
-          this.toastService.success('Administrator account created.');
+          this.toastService.success(this.translate.t('setup.toast.created'));
           void this.router.navigateByUrl('/home');
         },
         error: (error) => {
-          this.errorMessage = extractErrorMessage(error, 'Unable to complete setup.');
+          this.errorMessage = extractErrorMessage(error, this.translate.t('setup.errors.setupFailed'));
         },
       });
   }

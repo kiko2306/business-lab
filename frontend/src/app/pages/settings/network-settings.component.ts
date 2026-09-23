@@ -14,6 +14,8 @@ import {
 import { SettingsService } from '../../core/settings.service';
 import { ToastService } from '../../core/toast.service';
 import { PanelComponent } from '../../components/panel/panel.component';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 /**
  * Networking settings — the Cloudflare Tunnel token and the first-start
@@ -26,7 +28,7 @@ import { PanelComponent } from '../../components/panel/panel.component';
 @Component({
   selector: 'app-network-settings',
   standalone: true,
-  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent],
+  imports: [CommonModule, ReactiveFormsModule, FormsModule, PanelComponent, TranslatePipe],
   templateUrl: './network-settings.component.html',
   styleUrl: './network-settings.component.css',
 })
@@ -34,6 +36,7 @@ export class NetworkSettingsComponent implements OnInit {
   private readonly formBuilder = inject(FormBuilder);
   private readonly settingsService = inject(SettingsService);
   private readonly toastService = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   protected readonly form = this.formBuilder.nonNullable.group({
     token: ['', [Validators.minLength(20), Validators.maxLength(4096)]],
@@ -85,7 +88,7 @@ export class NetworkSettingsComponent implements OnInit {
           this.configuredSettings = settings;
         },
         error: (error) => {
-          this.feedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to load settings.') };
+          this.feedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('networkSettings.errors.loadSettings')) };
         },
       });
   }
@@ -95,7 +98,7 @@ export class NetworkSettingsComponent implements OnInit {
 
     if (!token) {
       this.form.controls.token.setErrors({ required: true });
-      this.feedback = { type: 'info', message: 'Enter a new token to replace the saved value.' };
+      this.feedback = { type: 'info', message: this.translate.t('networkSettings.info.enterTokenToReplace') };
       return;
     }
 
@@ -111,12 +114,12 @@ export class NetworkSettingsComponent implements OnInit {
       .subscribe({
         next: (settings) => {
           this.configuredSettings = settings;
-          this.feedback = { type: 'success', message: settings.message ?? 'Cloudflare token saved successfully.' };
+          this.feedback = { type: 'success', message: settings.message ?? this.translate.t('networkSettings.toast.tokenSaved') };
           this.form.reset();
-          this.toastService.success('Cloudflare token updated.');
+          this.toastService.success(this.translate.t('networkSettings.toast.tokenUpdated'));
         },
         error: (error) => {
-          this.feedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save token.') };
+          this.feedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('networkSettings.errors.saveToken')) };
         },
       });
   }
@@ -125,7 +128,7 @@ export class NetworkSettingsComponent implements OnInit {
     const token = this.form.controls.token.value.trim();
 
     if (!token && !this.configuredSettings?.configured) {
-      this.feedback = { type: 'info', message: 'Enter a token first so the connection can be tested.' };
+      this.feedback = { type: 'info', message: this.translate.t('networkSettings.info.enterTokenToTest') };
       return;
     }
 
@@ -143,7 +146,7 @@ export class NetworkSettingsComponent implements OnInit {
           this.toastService.success(response.message);
         },
         error: (error) => {
-          this.feedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to test token.') };
+          this.feedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('networkSettings.errors.testToken')) };
         },
       });
   }
@@ -164,7 +167,7 @@ export class NetworkSettingsComponent implements OnInit {
           this.toastService.success(response.message);
         },
         error: (error) => {
-          this.feedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save the account model.') };
+          this.feedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('networkSettings.errors.saveAccountModel')) };
         },
       });
   }
@@ -173,14 +176,14 @@ export class NetworkSettingsComponent implements OnInit {
     const control = this.form.controls.token;
 
     if (control.hasError('required')) {
-      return 'A token is required to save changes.';
+      return this.translate.t('networkSettings.validation.tokenRequired');
     }
 
     if (control.hasError('minlength')) {
-      return 'Use the full Cloudflare API token.';
+      return this.translate.t('networkSettings.validation.tokenTooShort');
     }
     if (control.hasError('maxlength')) {
-      return 'Token is too long.';
+      return this.translate.t('networkSettings.validation.tokenTooLong');
     }
 
     return null;
@@ -191,7 +194,7 @@ export class NetworkSettingsComponent implements OnInit {
       this.exposureForm.markAllAsTouched();
       this.exposureFeedback = {
         type: 'info',
-        message: 'Complete all required exposure settings with valid values before saving.',
+        message: this.translate.t('networkSettings.info.completeExposureFields'),
       };
       return;
     }
@@ -200,7 +203,7 @@ export class NetworkSettingsComponent implements OnInit {
     if (!value.npmPassword && !this.exposureSettings?.npmPasswordConfigured) {
       this.exposureForm.controls.npmPassword.setErrors({ required: true });
       this.exposureForm.controls.npmPassword.markAsTouched();
-      this.exposureFeedback = { type: 'info', message: 'Enter the Nginx Proxy Manager admin password.' };
+      this.exposureFeedback = { type: 'info', message: this.translate.t('networkSettings.info.enterNpmPassword') };
       return;
     }
 
@@ -222,20 +225,20 @@ export class NetworkSettingsComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.exposureFeedback = { type: 'success', message: response.message };
-          this.toastService.success('Exposure settings saved.');
+          this.toastService.success(this.translate.t('networkSettings.toast.exposureSaved'));
           this.exposureForm.controls.npmPassword.reset('');
           this.exposureTestResult = null;
           this.loadExposureSettings();
         },
         error: (error) => {
-          this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to save exposure settings.') };
+          this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('networkSettings.errors.saveExposure')) };
         },
       });
   }
 
   testExposureConnection(): void {
     if (!this.exposureSettings?.configured) {
-      this.exposureFeedback = { type: 'info', message: 'Save exposure settings before testing the connection.' };
+      this.exposureFeedback = { type: 'info', message: this.translate.t('networkSettings.testExposureTitleDisabled') };
       return;
     }
 
@@ -248,11 +251,11 @@ export class NetworkSettingsComponent implements OnInit {
         next: (result) => {
           this.exposureTestResult = result;
           if (result.success) {
-            this.toastService.success('Nginx Proxy Manager and Cloudflare are both reachable.');
+            this.toastService.success(this.translate.t('networkSettings.toast.bothReachable'));
           }
         },
         error: (error) => {
-          this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to test exposure connection.') };
+          this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('networkSettings.errors.testExposure')) };
         },
       });
   }
@@ -274,7 +277,7 @@ export class NetworkSettingsComponent implements OnInit {
           });
         },
         error: (error) => {
-          this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, 'Unable to load exposure settings.') };
+          this.exposureFeedback = { type: 'danger', message: extractErrorMessage(error, this.translate.t('networkSettings.errors.loadExposure')) };
         },
       });
   }
@@ -290,15 +293,15 @@ export class NetworkSettingsComponent implements OnInit {
     }
 
     if (control.hasError('required')) {
-      return `${fieldName} is required.`;
+      return this.translate.t('networkSettings.validation.required', { field: fieldName });
     }
     if (control.hasError('email')) {
-      return 'Enter a valid email address.';
+      return this.translate.t('networkSettings.validation.email');
     }
     if (control.hasError('maxlength')) {
-      return `${fieldName} is too long.`;
+      return this.translate.t('networkSettings.validation.tooLong', { field: fieldName });
     }
 
-    return `Enter a valid ${fieldName.toLowerCase()}.`;
+    return this.translate.t('networkSettings.validation.invalid', { field: fieldName.toLowerCase() });
   }
 }

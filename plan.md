@@ -28035,3 +28035,47 @@ directly, so `scripts/e2e-tests.sh` was run too: 13 passed / 3 skipped
 (`live-stack.spec.ts`, which needs a real Docker socket, not the disposable
 compose stack) — `two-factor.spec.ts` (enrol, sign in with a code, disable)
 and both `users.spec.ts` cases passed against the translated pages.
+
+## 602. Multi-language UI: `settings` + `self-update` + `recovery` + `setup` pages (§597 batch 5)
+
+Translated the last four admin/auth-adjacent pages: Settings (deployment
+checklist, embedded `<app-network-settings>` Cloudflare token + exposure
+provisioning form, General/timezone, ntfy alerts including per-category
+channels, Email send/receive, Claude API key), Updates (self-update status
+card and progress modal text), Recovery mode, and the first-admin Setup
+page. `~190` new keys under `settings.*`/`networkSettings.*`/
+`selfUpdate.*`/`recovery.*`/`setup.*` — the largest single batch of the
+rollout so far.
+
+Two things worth recording:
+- **`PROGRESS_LABELS` in `self-update.component.ts` deleted**, same call as
+  §601's `ROLE_LABELS`/`CAPABILITY_LABELS`: a `Record<SelfUpdateRunState,
+  string>` of English text, used in exactly one place, replaced by
+  `('selfUpdate.progress.' + run.state) | t` in the template. Same for
+  `settings.component.ts`'s `alertCategories` array, which carried a
+  `label: string` field alongside each `key` — the field is gone and the
+  template resolves `('settings.alertCategory.' + category.key) | t`
+  instead.
+- **`network-settings.component.ts`'s `exposureValidationMessage()`** builds
+  messages like `"${fieldName} is required."` from a `fieldName` the
+  template passes in as a literal string per field ('Base domain',
+  'Cloudflare Tunnel ID', …). Translating the field names at the call site
+  (`exposureValidationMessage('baseDomain', 'networkSettings.field.baseDomain'
+  | t)`) meant the function itself only needed its three English sentence
+  templates translated (`networkSettings.validation.required/tooLong/invalid`,
+  the last two `{{field}}`-interpolated) — no restructuring of the
+  validation logic itself.
+
+Inline `<code>`/`<em>` markup inside a couple of hint strings (SMTP/IMAP
+port hints, the deployment checklist's `<em>{{fixIn}}</em>`) is handled the
+same way as §600: the dynamic value stays outside the translated string and
+keeps its tag, only the surrounding static English words are translated
+plain text (`settings.deployment.fixInPrefix`).
+
+**Verification.** `./scripts/check.sh frontend build` — one fix needed: the
+`date` pipe's `undefined`-vs-`string` mismatch was fine everywhere else in
+this batch, but `generalSettings.defaultUpdateBranch` is
+`string | undefined` and `t()`'s params are `string | number`, so that one
+call needed `?? ''` (same shape of fix as §599). `./scripts/check.sh
+frontend test` (89/89, no spec asserts on this batch's visible strings). No
+e2e run — this batch doesn't touch auth/shell/nav/Users/2FA.

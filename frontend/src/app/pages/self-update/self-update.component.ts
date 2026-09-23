@@ -7,17 +7,8 @@ import { ConfirmService } from '../../core/confirm.service';
 import { ToastService } from '../../core/toast.service';
 import { extractErrorMessage } from '../../core/api';
 import { SelfUpdateRunState, SelfUpdateStatus } from '../../core/models';
-
-const PROGRESS_LABELS: Record<SelfUpdateRunState, string> = {
-  checking: 'Checking for updates…',
-  pulling: 'Pulling the latest code…',
-  building: 'Building the images that changed…',
-  updating_apps: 'Pulling and recreating the apps that changed…',
-  restarting_frontend: 'Restarting the frontend…',
-  restarting_backend: 'Restarting the backend — the dashboard will reconnect on its own…',
-  done: 'Up to date.',
-  error: 'The last update failed.',
-};
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 // The sweeper re-checks every 6h; flag the cached result as stale once it's
 // meaningfully older than that, so a silently-failing sweep can't keep reading
@@ -42,18 +33,18 @@ const IN_PROGRESS_STATES: SelfUpdateRunState[] = [
 @Component({
   selector: 'app-self-update',
   standalone: true,
-  imports: [CommonModule, PanelComponent],
+  imports: [CommonModule, PanelComponent, TranslatePipe],
   templateUrl: './self-update.component.html',
 })
 export class SelfUpdateComponent implements OnInit, OnDestroy {
   private readonly operations = inject(OperationsService);
   private readonly confirm = inject(ConfirmService);
   private readonly toast = inject(ToastService);
+  protected readonly translate = inject(TranslateService);
 
   protected status: SelfUpdateStatus | null = null;
   protected checking = false;
   protected triggering = false;
-  protected readonly progressLabels = PROGRESS_LABELS;
 
   private pollSubscription?: Subscription;
 
@@ -87,7 +78,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
           this.startPolling();
         }
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load the self-update status.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('selfUpdate.errors.loadStatus'))),
     });
   }
 
@@ -102,7 +93,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
       },
       error: (error) => {
         this.checking = false;
-        this.toast.error(extractErrorMessage(error, 'Unable to check for updates.'));
+        this.toast.error(extractErrorMessage(error, this.translate.t('selfUpdate.errors.checkFailed')));
       },
     });
   }
@@ -119,14 +110,14 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
           this.status = { ...this.status, check };
         }
         if (check.commitsBehind === 0) {
-          this.toast.success('Already up to date — nothing to pull.');
+          this.toast.success(this.translate.t('selfUpdate.toast.alreadyUpToDate'));
           return;
         }
         this.confirmAndTrigger(check.commitsBehind);
       },
       error: (error) => {
         this.checking = false;
-        this.toast.error(extractErrorMessage(error, 'Unable to check for updates.'));
+        this.toast.error(extractErrorMessage(error, this.translate.t('selfUpdate.errors.checkFailed')));
       },
     });
   }
@@ -134,11 +125,12 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
   private confirmAndTrigger(commitsBehind: number): void {
     void this.confirm
       .ask({
-        title: 'Update Business Lab',
-        message:
-          `Pull ${commitsBehind} commit${commitsBehind === 1 ? '' : 's'} and rebuild + restart the dashboard now?` +
-          '\nIt will be briefly unavailable while the backend restarts.',
-        confirmText: 'Update',
+        title: this.translate.t('selfUpdate.confirmUpdate.title'),
+        message: this.translate.t(
+          commitsBehind === 1 ? 'selfUpdate.confirmUpdate.message.one' : 'selfUpdate.confirmUpdate.message.other',
+          { count: commitsBehind }
+        ),
+        confirmText: this.translate.t('selfUpdate.confirmUpdate.confirmText'),
         danger: true,
       })
       .then((confirmed) => {
@@ -156,7 +148,7 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
           },
           error: (error) => {
             this.triggering = false;
-            this.toast.error(extractErrorMessage(error, 'Unable to start the update.'));
+            this.toast.error(extractErrorMessage(error, this.translate.t('selfUpdate.errors.startFailed')));
           },
         });
       });
@@ -180,9 +172,9 @@ export class SelfUpdateComponent implements OnInit, OnDestroy {
         if (!this.runInProgress) {
           this.pollSubscription?.unsubscribe();
           if (status.latestRun?.state === 'done') {
-            this.toast.success('Business Lab is up to date.');
+            this.toast.success(this.translate.t('selfUpdate.toast.upToDate'));
           } else if (status.latestRun?.state === 'error') {
-            this.toast.error(status.latestRun.errorMessage || 'The update failed.');
+            this.toast.error(status.latestRun.errorMessage || this.translate.t('selfUpdate.toast.updateFailed'));
           }
         }
       });

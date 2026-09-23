@@ -5,17 +5,20 @@ import { RouterLink } from '@angular/router';
 import { extractErrorMessage } from '../../core/api';
 import { OperationsService } from '../../core/operations.service';
 import { ToastService } from '../../core/toast.service';
+import { TranslatePipe } from '../../i18n/translate.pipe';
+import { TranslateService } from '../../i18n/translate.service';
 
 @Component({
   selector: 'app-recovery',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, TranslatePipe],
   templateUrl: './recovery.component.html',
   styleUrl: './recovery.component.css'
 })
 export class RecoveryComponent implements OnInit {
   private readonly operations = inject(OperationsService);
   private readonly toast = inject(ToastService);
+  private readonly translate = inject(TranslateService);
 
   protected enabled = false;
   protected username = '';
@@ -28,7 +31,7 @@ export class RecoveryComponent implements OnInit {
   loadStatus(): void {
     this.operations.getRecoveryStatus().subscribe({
       next: (response) => (this.enabled = response.enabled),
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to load recovery status.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('recovery.errors.loadStatus'))),
     });
   }
 
@@ -38,7 +41,7 @@ export class RecoveryComponent implements OnInit {
         this.enabled = response.enabled;
         this.toast.success(response.message);
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to enable recovery mode.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('recovery.errors.enable'))),
     });
   }
 
@@ -48,7 +51,7 @@ export class RecoveryComponent implements OnInit {
         this.enabled = response.enabled;
         this.toast.success(response.message);
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to disable recovery mode.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('recovery.errors.disable'))),
     });
   }
 
@@ -58,7 +61,7 @@ export class RecoveryComponent implements OnInit {
         this.password = '';
         this.toast.success(response.message);
       },
-      error: (error) => this.toast.error(extractErrorMessage(error, 'Unable to reset password.')),
+      error: (error) => this.toast.error(extractErrorMessage(error, this.translate.t('recovery.errors.resetPassword'))),
     });
   }
 }
