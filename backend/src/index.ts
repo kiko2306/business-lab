@@ -27,6 +27,7 @@ import {
   dropServiceExposureAutheliaColumn,
   dropServiceImageUpdatesTable,
   ensureTotpSchema,
+  ensureAuditLogsIndex,
 } from './utils/database';
 import authMiddleware from './middleware/auth';
 import setupModeMiddleware from './middleware/setupMode';
@@ -241,6 +242,9 @@ ensureTotpSchema().catch((err: Error) => {
 });
 dropServiceImageUpdatesTable().catch((err: Error) => {
   console.error('Unable to drop service_image_updates:', err.message);
+});
+ensureAuditLogsIndex().catch((err: Error) => {
+  console.error('Unable to ensure audit_logs index:', err.message);
 });
 ensureSocialDraftsTable().catch((err: Error) => {
   console.error('Unable to ensure social_drafts table:', err.message);

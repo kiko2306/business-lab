@@ -28615,3 +28615,13 @@ counts, but a one-line fix (`CREATE INDEX audit_logs_created_at_idx ON
 audit_logs (created_at DESC)` in `database/init.sql`) removes the gap
 before it matters. Not implemented — this section and the README item are
 the plan.
+
+## 614. Implemented: index `audit_logs.created_at`
+
+Built §613's plan as-is: `CREATE INDEX IF NOT EXISTS audit_logs_created_at_idx
+ON audit_logs (created_at DESC)` added to `database/init.sql` right after the
+table, plus a matching `ensureAuditLogsIndex()` in `utils/database.ts` (same
+no-op-on-fresh-install pattern as `ensureTotpSchema`/`ensureServiceExposureTable`)
+called from `index.ts` at startup, so the existing `tx-home-utils.com` database
+picks it up on next backend restart without a manual `psql` step. Backend
+typecheck and the full test suite (1184 tests) pass. README item deleted.

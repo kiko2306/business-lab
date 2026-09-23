@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.132.10] — 2026-09-23
+
+### Added
+
+- Index audit_logs.created_at so the Audit Logs page and CSV export stop full-scanning the table
+
 ## [0.132.9] — 2026-09-23
 
 ### Apps

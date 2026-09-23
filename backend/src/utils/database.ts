@@ -277,3 +277,12 @@ export async function dropServiceExposureAutheliaColumn(): Promise<void> {
 export async function dropServiceImageUpdatesTable(): Promise<void> {
   await query(`DROP TABLE IF EXISTS service_image_updates`);
 }
+
+/**
+ * Add the `audit_logs.created_at` index on databases created before it (plan.md
+ * §613) — `routes/audit.ts` sorts/paginates/counts on it on every page load. No-op
+ * on fresh installs, since init.sql already creates it.
+ */
+export async function ensureAuditLogsIndex(): Promise<void> {
+  await query('CREATE INDEX IF NOT EXISTS audit_logs_created_at_idx ON audit_logs (created_at DESC)');
+}

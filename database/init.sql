@@ -124,3 +124,7 @@ CREATE TABLE IF NOT EXISTS audit_logs (
     metadata   JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
+
+-- routes/audit.ts sorts/paginates and counts on created_at on every page load, plus a
+-- LIMIT 100000 scan on CSV export — all full scans/sorts without this (plan.md §613).
+CREATE INDEX IF NOT EXISTS audit_logs_created_at_idx ON audit_logs (created_at DESC);
