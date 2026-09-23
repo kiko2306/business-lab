@@ -212,13 +212,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Vikunja mobile/desktop clients: confirm a real client against the
-      Authelia bypass** — code built and proven at the HTTP level in plan.md
-      §571 (`autheliaBypassPaths: ['^/api($|/)']`, curl against the live host
-      shows `/api/v1/...` returning Vikunja's own JSON instead of Authelia's
-      HTML login page, `/` still gated). What's left is a real Vikunja
-      Android/desktop client pointed at `https://<vikunja-host>/api/v1` to
-      confirm it recognises the server and logs in, before merging to `main`.
 - [ ] **Vikunja silent SSO: confirm a live Authelia session actually skips
       the login page** — code built and proven at the HTTP level in plan.md
       §572 (NPM's `location = /` block confirmed rendered; anonymous curl

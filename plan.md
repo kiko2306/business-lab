@@ -28221,3 +28221,39 @@ transient polling window is a minor UX rough edge (a friendlier
 "waiting for Kopia to restart…" would read better than a leaked Node error
 message), but it self-resolves within the existing retry budget and every
 case observed ended in the correct final state.
+
+## 606. Confirmed live on `beta`: real Vikunja mobile client against the Authelia bypass (§571)
+
+Closes the README item §571 left open — curl proved the HTTP-level fix
+(`autheliaBypassPaths: ['^/api($|/)']`), but nobody had pointed a real
+Vikunja client at the host. User installed the official Vikunja Android app
+(Flutter build) and connected it to `https://vikunja.tx-home-utils.com`.
+
+Read `nginx-proxy-manager-nginx-proxy-manager-1`'s `proxy-host-27_access.log`
+(the vikunja host) to see exactly what the client did, since the user's own
+description ("logged in with Authelia, Vikunja's login didn't show") sounded
+at first like it might be describing the wrong test (§572's silent-SSO
+item). It wasn't: the log explained it. The Flutter app doesn't POST
+`/api/v1/login`; it opens an embedded webview to Vikunja's **own frontend**
+OAuth authorize page (`/oauth/authorize?...&client_id=vikunja-flutter&
+redirect_uri=vikunja-flutter://callback&code_challenge=...`, PKCE) — a
+non-`/api` route, so it's gated by Authelia's normal `one_factor` policy
+like the rest of the web UI, same as any browser tab. That's the "Authelia
+login" the user saw; Vikunja's own separate login form was never going to
+show because the OAuth authorize flow doesn't use one. Once through that
+one-time Authelia gate, the exchange completed against the bypassed API
+with the real client:
+
+```
+POST /api/v1/oauth/token          200
+GET  /api/v1/user                 200
+GET  /api/v1/tasks?...            200
+GET  /api/v1/projects?...         200 (x2)
+GET  /api/v1/ws                   101  — live websocket, stayed open
+```
+
+All logged with `User-Agent: Vikunja Mobile App` (not a browser UA — the
+app's own HTTP client, post-webview), pulling real tasks/projects/labels/
+notifications, no redirect loop, no HTML-instead-of-JSON failure. Confirms
+the root-cause fix from §571 holds for an actual client, not just curl.
+README item deleted.
