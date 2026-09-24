@@ -247,6 +247,45 @@ services:
     # Not published to the host — only reachable from other containers on
     # business-lab-net, by service name.
 
+  # Makes Settings > General's timezone apply to the real host clock, not
+  # just the `TZ` env override executor.ts already injects into managed app
+  # containers (plan.md §608). CLAUDE.md principle 2 (no console
+  # configuration) means this has to happen without a human ever typing
+  # `timedatectl` — and the backend's own Docker access has no EXEC
+  # (docker-socket-proxy's scope above), so there is no way for it to shell
+  # into the host on demand. This polls `app_timezone` instead (same shape
+  # self-update-watchdog.sh already uses) and calls the host's real
+  # `timedatectl` via `nsenter` into PID 1's namespaces — the standard way a
+  # container reaches "do a systemd thing on the real host," and the same
+  # trust level already accepted for Scrutiny's `privileged: true`
+  # (§240/§446): the backend managing this stack is already root-equivalent
+  # on the host, so this doesn't move the real trust boundary. Reads
+  # `app_timezone` with `psql` (already in the reused backend image, for
+  # pg_dump/pg_restore) rather than a new backend HTTP endpoint or a second
+  # DB client dependency. See scripts/host-timezone-sync.sh.
+  host-timezone-sync:
+    mem_limit: 32m
+    image: business-lab-backend
+    # Skips docker-entrypoint.sh entirely (empty entrypoint): that script's
+    # whole job is dropping to the non-root appuser before running its
+    # command, but `nsenter`-ing into the host's namespaces needs real root
+    # even inside a privileged container, and none of the entrypoint's
+    # chown/git-safe.directory fixups apply to this service.
+    entrypoint: []
+    command: ["/bin/sh", "${REPO_ROOT}/scripts/host-timezone-sync.sh"]
+    pid: host
+    privileged: true
+    environment:
+      DATABASE_URL: ${DATABASE_URL:-postgresql://${POSTGRES_USER:-homelab}:${POSTGRES_PASSWORD}@database:5432/${POSTGRES_DB:-homelab}}
+    volumes:
+      - ${REPO_ROOT:?REPO_ROOT must be set to an absolute path in .env}:${REPO_ROOT}:ro
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - business-lab-net
+    restart: unless-stopped
+
 volumes:
   # Pinned to their existing literal Docker volume names (the project-name
   # prefix these got under the old "homelab-management" project) rather than

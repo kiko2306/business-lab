@@ -31627,3 +31627,58 @@ README's open-piece item replaced with a beta-test item: nothing here can
 prove a real SMTP send lands a working unsubscribe link, or that a
 misconfigured mailbox/Dashboard URL is refused with a clear error, without
 the live stack.
+
+## 661. Implemented: the host OS timezone sidecar (closes §608)
+
+Built exactly the design §608 landed on: a new core-stack `host-timezone-sync`
+service in the root `docker-compose.yml`, `pid: host` + `privileged: true`,
+reusing the `business-lab-backend` image (no new Dockerfile) with an empty
+`entrypoint: []` and `command: ["/bin/sh", "${REPO_ROOT}/scripts/host-timezone-sync.sh"]`.
+The script (`scripts/host-timezone-sync.sh`) polls the `settings` table every
+60s via `psql "$DATABASE_URL"` (already in the image for `pg_dump`/
+`pg_restore` — no new dependency, no new backend HTTP endpoint) and, when
+`app_timezone` differs from `nsenter -t 1 -m -u -n -i -- timedatectl show
+--property=Timezone --value`, applies it with the same `nsenter` prefix
+against `timedatectl set-timezone`, matching `self-update-watchdog.sh`'s
+polling-loop shape.
+
+**The one thing §608 left open — direct Postgres read vs. a backend
+endpoint — resolved itself once `docker-entrypoint.sh` was read closely.**
+`postgresql16-client` (hence `psql`) is already baked into the image; `curl`
+is deliberately `apk del`eted after downloading the Compose plugin at build
+time, so it isn't available for a `wget`/`curl`-based HTTP poll without
+adding a package back. `psql` needed nothing extra — ladder rung 5,
+already-installed dependency wins over inventing a new unauthenticated
+`/internal/timezone` route for one string.
+
+**Why `entrypoint: []` instead of reusing `docker-entrypoint.sh` like
+`self-update-watchdog` does**: that script's entire job is fixing up a few
+volume ownerships as root and then `su-exec appuser "$@"` — dropping to a
+non-root user before running the command. `nsenter`-ing into another
+process's mount/net/uts/ipc namespaces needs real root even inside a
+`privileged: true` container (privileged widens what root can do in the
+container; it does not hand a non-root UID root's capabilities). Since none
+of the entrypoint's chown/git-safe.directory fixups apply to this service
+anyway, skipping it entirely is both correct and simpler than adding an
+appuser exemption to a script three other services also share.
+
+No new README beta-test item was skipped — the opposite: nothing here can
+prove `nsenter -t 1` actually reaches the *host's* PID 1 (not some
+intermediate container's) from inside a container sharing its PID
+namespace, or that `timedatectl set-timezone` (a systemd/D-Bus call) is
+reachable that way. Confirmed instead by direct experiment: a throwaway
+`docker run --rm node:20-alpine sh -c 'which nsenter'` found `nsenter`
+already present in the base image (some other package pulls it in
+transitively — no explicit `apk add util-linux` needed), and
+`docker compose -f docker-compose.yml config` (with dummy env) renders the
+new service's `pid`, `privileged`, `entrypoint`, and the `${REPO_ROOT}`
+bind mount exactly as intended. The script's own branch logic (apply on
+mismatch, silent when already correct, skip entirely with no row yet) was
+smoke-tested against fake `psql`/`nsenter` shims on `$PATH` rather than the
+real host tools — proves the shell logic, not the systemd call underneath
+it, which is exactly the part the new README item asks `beta` to confirm.
+
+No `docs/licences.md` row: no new image, `business-lab-backend` is already
+covered. No test file: this is the same category as
+`self-update-watchdog.sh` — a Docker/host-orchestration shell script, not
+parsing/derivation logic `*.test.ts` conventions apply to.
