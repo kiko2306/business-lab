@@ -31383,3 +31383,50 @@ New README item: verify the whole loop on the real Windows/Wintouch machine
 account) — folded into the existing "first real build and a live run of the
 hotel agent" item rather than a second one, since both need the same
 machine and the same first build.
+
+## 657. Decided: the cutover re-send is already handled by the scheduler's own catch-up design
+
+Closes the "plan the cutover re-send" README item (§629's third decision)
+— resolved as a decision, no code, since it turns out the mechanism that
+solves it was already built for an unrelated reason.
+
+### Why a special re-send mechanism isn't needed
+
+Reservation uuids are not preserved at cutover — units, guests and
+reservations all re-sync fresh from Wintouch (§629), which means every
+migrated reservation starts with `checkin_sent`/`quiz_sent` both `false` in
+hotel-core's schema, regardless of what already happened under the legacy
+system. Combined with §651's due-query design — `checkin_on <= today +
+offset`, not an exact-day match, built so a scheduler outage of even a day
+doesn't silently skip a guest forever — this means a guest who received a
+check-in or feedback email under the legacy system but has **not yet acted
+on it** gets picked up by the very next scheduler tick after cutover and is
+mailed a fresh, working link automatically. Their old link is dead, but
+they never have to notice: no quiet window, no one-off batch job, no
+special cutover code path. This is the same self-healing property §651
+built for a transient outage, applying for free to a much longer one.
+
+### The real risk is the other direction
+
+A guest who **already completed** check-in (or already answered the quiz)
+under the legacy system is not automatically protected — if their
+reservation resyncs with `checkin_success`/`quiz_answered` still `false`,
+the same catch-up mechanism mails them a redundant "please check in" email
+for something they already did. That is a worse first impression of the new
+system than a guest never being bothered at all.
+
+**Decision, for whoever builds the legacy data import (new README item
+below):** the one-time import of feedback responses and check-in history
+must set `checkin_success` / `checkin_sent` and `quiz_answered` / `quiz_sent`
+**true** on any reservation already completed under the legacy system, and
+must leave them **false** on anything not yet done — never migrate a
+"sent" flag on its own without the matching "done" flag, or a completed
+guest gets re-asked while an incomplete one's link quietly works again.
+That is the whole requirement; nothing else about the scheduler needs to
+change for cutover.
+
+### New README item
+
+"Build the one-time legacy data import (feedback responses + check-in
+history)" — the actual import script does not exist yet; this section only
+decided what correctness it has to satisfy once it does.
