@@ -25,11 +25,11 @@ write path has to go through their API (plan.md §629).
 3. From an elevated PowerShell, in that folder:
 
    ```powershell
-   .\install.ps1 -Url https://tally.example.com -Code ABCD2345
+   .\install.ps1
    ```
 
-   Run it with no arguments to be prompted for the URL and code instead.
-   Installs into `%ProgramFiles%\Tally`, enrols, and registers + starts the
+   It prompts for the site URL and the enrolment code (deliberately not
+   parameters). Installs into `%ProgramFiles%\Tally`, enrols, and registers + starts the
    service in one pass — the four manual steps below, done for you.
 
 Re-enrolling (re-running `install.ps1` with a fresh code) replaces the

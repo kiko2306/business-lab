@@ -15,16 +15,12 @@
   own clear error beats a confusing permission-denied partway through.
 
 .EXAMPLE
-  .\install.ps1 -Url https://tally.example.com -Code ABCD2345
-
-.EXAMPLE
   .\install.ps1
-  # Prompts for the site URL and enrolment code interactively.
+  # Always prompts for the site URL and enrolment code — they are not
+  # parameters, so a code never lands in shell history or a shared command line.
 #>
 [CmdletBinding()]
 param(
-    [string]$Url,
-    [string]$Code,
     [string]$InstallDir = "$Env:ProgramFiles\Tally",
     # Matches this repo's own dev machine and every install seen so far
     # (plan.md §629) — overridable for a shop whose Wintouch lives elsewhere.
@@ -39,8 +35,8 @@ if (-not (Test-Path (Join-Path $sourceDir $exeName))) {
     throw "$exeName not found next to install.ps1. Run this from the published output folder (dotnet publish), not the source tree."
 }
 
-if (-not $Url) { $Url = Read-Host 'Tally site URL (e.g. https://tally.example.com)' }
-if (-not $Code) { $Code = Read-Host 'Enrolment code (from Tally: issue one, then paste it here)' }
+$Url = Read-Host 'Tally site URL (e.g. https://tally.example.com)'
+$Code = Read-Host 'Enrolment code (from Tally: issue one, then paste it here)'
 if (-not $Url -or -not $Code) { throw 'Both the site URL and the enrolment code are required.' }
 if (-not (Test-Path (Join-Path $WintouchDir 'wintouch.config'))) {
     throw "No wintouch.config under $WintouchDir. Pass -WintouchDir if Wintouch isn't installed there."

@@ -32057,3 +32057,10 @@ Build note: Windows `dotnet.exe` cannot write under `\\wsl.localhost` (NuGet
 published from there. Not yet proven: the re-run-with-fresh-code path
 (`Restart-Service` branch), and the WebSocket surviving the tunnel idle
 timeout / a tunnel restart (README item left open).
+
+### §669 follow-up: URL and code are prompts only
+
+`install.ps1` lost its `-Url`/`-Code` parameters: it always prompts. Passing an
+enrolment code on the command line put it in shell history; the operator wants
+the installer to ask. `-InstallDir`/`-WintouchDir` stay as parameters (paths,
+not secrets). README updated; syntax-checked with the PowerShell parser.
