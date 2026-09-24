@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.149.0] — 2026-09-24
+
+### Added
+
+- Outline (team wiki) as a new app, signing in through Authelia OIDC
+
 ## [0.148.2] — 2026-09-24
 
 ### Fixed

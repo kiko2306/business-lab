@@ -69,12 +69,14 @@ operate within, listed again at the end.
 | NocoDB | **AGPL-3.0** | ✅ Clean | unmodified |
 | ntfy | Apache-2.0 / GPL-2.0 | ✅ Clean | |
 | **OnlyOffice** Docs | **AGPL-3.0** + branding terms | ⚠️ Condition | must keep the ONLYOFFICE name and the "ONLYOFFICE is the original developer" About notice — **no white-labeling the editor**. Historical 20 simultaneous-connection cap (removed in Docs 9.4; irrelevant at ≤15 seats). Fine unmodified. |
+| Outline (`outlinewiki/outline`) | **BSL 1.1** (Business Source License; source-available, not OSI) → Apache-2.0 on 2030-09-09 | ⚠️ Condition | the only carve-out is a commercial "Document Service": offering third parties (anyone other than the licensee's employees and contractors) the ability to create their own teams and documents. A client running it on their own box for their own staff is allowed — same shape as n8n: keep it one-box-one-client. Business Lab hosting one shared Outline for many client companies on infrastructure it operates would be a Document Service and needs a commercial licence from Outline. Run stock; the paid Outline Cloud tiers are a separate hosted product. Bundled `outline-db` (`pgautoupgrade:16-alpine`) and `outline-redis` (`valkey:9-alpine`) rowed below. |
 | Pantry | *ours* — no LICENSE file | ⚠️ Decide | |
 | Paperless-ngx | GPL-3.0 | ✅ Clean | |
 | Pi-hole | EUPL-1.2 | ✅ Clean | weak copyleft, commercial use permitted |
 | Price Compare | *ours* — no LICENSE file | ⚠️ Decide | |
 | Hotel | *ours* — no LICENSE file | ⚠️ Decide | rebuild of the legacy Hotel Utils (plan.md §620). Ours to licence; same open question as Price Compare. Bundled `hotel-db` is `postgres:17-alpine` (PostgreSQL License, already rowed below); runtime base is `node:22-alpine` (already rowed); `hotel-admin`, `hotel-checkin` (plan.md §641) and `hotel-pulse` (plan.md §644) serve their Angular bundles from `nginx:1.27-alpine` (already rowed below) |
 | Tally | *ours* — no LICENSE file | ⚠️ Decide | rebuild of the legacy PBordo (plan.md §622). Ours to licence; same open question as Price Compare. Bundled `tally-db` is `postgres:17-alpine` (PostgreSQL License, already rowed below) |
+| node:slim (Outline's base image, `outlinewiki/outline`) | **MIT** (Node.js) + Debian base (mixed DFSG-free licences) | ✅ Clean | runtime base of the upstream image, not ours; internal use, no redistribution |
 | node:22-alpine (Tally) | **MIT** (Node.js) + Alpine base (MIT/BSD) | ✅ Clean | build and runtime base for our own app code; no redistribution of Node itself |
 | nginx:1.27-alpine (Hotel) | **BSD-2-Clause** (nginx) + Alpine base (MIT/BSD) | ✅ Clean | stock, unmodified — serves our own static Angular bundle (`hotel-admin`, `hotel-checkin`, `hotel-pulse`); no redistribution of nginx itself |
 | Samba (`dockurr/samba`) | GPL-3.0 (Samba); MIT (image wrapper) | ✅ Clean | stock unmodified Samba for internal LAN file sharing — GPL-3.0 places no restriction on running it; not modified, not redistributed |
@@ -94,10 +96,10 @@ operate within, listed again at the end.
 | Image | Licence | Status | Note |
 |---|---|---|---|
 | postgres:14/15/16/17-alpine | PostgreSQL License (BSD-like) | ✅ Clean | the internal database for several apps; the PostgreSQL License places no restriction on internal use |
-| pgautoupgrade/pgautoupgrade:16/17-alpine (n8n, Paperless, Twenty) | **MIT** ("Docker PostgreSQL Authors") | ✅ Clean | drop-in for `postgres:NN-alpine` that runs `pg_upgrade` in place on a major bump; bundled PostgreSQL keeps the PostgreSQL License. n8n needs PG ≥ 16 (§118.3); Paperless moved off `postgres:15-alpine` for the same deprecation notice (§182); Twenty pins 16 to match upstream. |
+| pgautoupgrade/pgautoupgrade:16/17-alpine (n8n, Outline, Paperless, Twenty) | **MIT** ("Docker PostgreSQL Authors") | ✅ Clean | drop-in for `postgres:NN-alpine` that runs `pg_upgrade` in place on a major bump; bundled PostgreSQL keeps the PostgreSQL License. n8n needs PG ≥ 16 (§118.3); Paperless moved off `postgres:15-alpine` for the same deprecation notice (§182); Twenty pins 16 to match upstream. |
 | mariadb:latest (ITFlow), mariadb:11.4 (Kimai), lscr.io/linuxserver/mariadb:latest (BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | not standardisable on MariaDB — its JSON column type breaks NPM's own migrations (§210.1) |
-| valkey:9-alpine (Immich, Paperless, Twenty) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL). |
+| valkey:9-alpine (Immich, Outline, Paperless, Twenty) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL). |
 | ruby:4.0.5-alpine (DocuSeal) | Ruby License / BSD-2-Clause (dual); OpenSSL-linked | ✅ Clean | language runtime base; permissive, no restriction on internal use. Alpine base rowed below |
 | alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |

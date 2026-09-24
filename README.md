@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.148.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.149.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,18 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Beta-test the new Outline app (plan.md §666)** — on `beta`, after
+      pulling, start Outline from the Apps page (it needs Authelia running
+      and the app exposed — Outline has no local login). Confirm: the
+      `outline-init` chown runs and `outline` reaches healthy (first boot
+      runs all DB migrations, ~2 min); a browser sign-in at
+      `outline.<domain>` completes through Authelia with no
+      `invalid_client` at `/auth/oidc.callback` (if it does, switch
+      `tokenEndpointAuthMethod` to `client_secret_basic`, as §665); the first
+      user lands as workspace admin; uploading an image to a doc persists
+      (proves the storage chown); and **a second Authelia user can sign in**
+      — if Outline demands an invite, open a follow-up to invite users
+      automatically (principle 3).
 - [ ] **Beta-test the BookStack OIDC login fix (plan.md §665)** — on `beta`,
       after pulling the fix, restart the backend (the fix only re-renders on
       a boot/exposure/reconciler sync, not a plain app restart) and confirm a
