@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.144.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.145.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,20 +212,16 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Self-update panel: richer progress detail — which image, which app,
-      a real "checking" phase** — plan in plan.md §617. Today's progress
-      line is one flat phrase per `SelfUpdateRunState` (e.g. "Building the
-      images that changed…") with no sub-state. Add a nullable
-      `self_update_runs.detail` column and: report which target
-      (`frontend`/`backend`) is building, one `docker compose build
-      <target>` call at a time instead of one combined call; report which
-      app (name + index/total) `updateAllInstalledApps` is currently
-      pulling/recreating, via a new `onProgress` callback; and make the
-      pre-trigger `git fetch` (`checkForUpdate()` inside
-      `triggerSelfUpdate`) run *after* the run row is inserted, so a
-      slow/unreachable remote shows as a real, visible `checking` state
-      (and lands as an `error` row on failure) instead of stalling the
-      trigger request with no row and no visible state at all.
+- [ ] **Beta-test the self-update panel's richer progress detail (plan.md
+      §659)** — on `beta`, trigger a real self-update while a commit is
+      pending and confirm: the progress alert shows a `detail` suffix naming
+      which image is building (`frontend`/`backend`) one at a time rather
+      than a single flat "Building…" line; while apps are updating, the
+      detail shows `<app> (n/total)` and advances as each app is pulled and
+      recreated; and if `origin` is briefly unreachable when a run starts,
+      the run shows `checking` for the duration of that fetch and lands as
+      an `error` row (visible in run history) rather than the trigger
+      request hanging with no row at all.
 - [ ] **Vikunja silent SSO: confirm a live Authelia session actually skips
       the login page** — code built and proven at the HTTP level in plan.md
       §572 (NPM's `location = /` block confirmed rendered; anonymous curl

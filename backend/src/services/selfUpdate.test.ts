@@ -21,13 +21,14 @@ const db = vi.hoisted(() => {
     from_commit: string | null;
     to_commit: string | null;
     error_message: string | null;
+    detail: string | null;
     started_at: Date;
     finished_at: Date | null;
   }
   const rows: Row[] = [];
   let nextId = 1;
   const query = vi.fn(async (sql: string, params: unknown[] = []) => {
-    if (sql.includes('CREATE TABLE')) return { rows: [] };
+    if (sql.includes('CREATE TABLE') || sql.includes('ALTER TABLE')) return { rows: [] };
     if (sql.startsWith('INSERT')) {
       const row: Row = {
         id: nextId++,
@@ -35,6 +36,7 @@ const db = vi.hoisted(() => {
         from_commit: (params[1] as string | null) ?? null,
         to_commit: null,
         error_message: null,
+        detail: null,
         started_at: new Date(),
         finished_at: null,
       };
@@ -42,12 +44,21 @@ const db = vi.hoisted(() => {
       return { rows: [row] };
     }
     if (sql.startsWith('UPDATE')) {
-      const [id, state, toCommit, errorMessage, finished] = params as [number, string | null, string | null, string | null, boolean];
+      const [id, state, toCommit, errorMessage, detailFlag, detailValue, finished] = params as [
+        number,
+        string | null,
+        string | null,
+        string | null,
+        boolean,
+        string | null,
+        boolean,
+      ];
       const row = rows.find((r) => r.id === id);
       if (row) {
         if (state) row.state = state;
         if (toCommit) row.to_commit = toCommit;
         if (errorMessage) row.error_message = errorMessage;
+        if (detailFlag) row.detail = detailValue;
         if (finished) row.finished_at = new Date();
       }
       return { rows: [] };
@@ -58,7 +69,7 @@ const db = vi.hoisted(() => {
     }
     return { rows: [] };
   });
-  return { query, rows, reset: () => { rows.length = 0; nextId = 1; } };
+  return { query, rows, reset: () => { rows.length = 0; nextId = 1; query.mockClear(); } };
 });
 
 const spawnMock = vi.hoisted(() => vi.fn((_cmd: string, _args: string[], _opts: unknown) => ({ unref: vi.fn() })));
@@ -80,7 +91,15 @@ interface AppUpdateResult {
   message?: string;
   error?: string;
 }
-const executor = vi.hoisted(() => ({ updateAllInstalledApps: vi.fn(async (): Promise<AppUpdateResult[]> => []) }));
+const executor = vi.hoisted(() => ({
+  updateAllInstalledApps: vi.fn(
+    async (
+      _userId: number | null,
+      _only?: ReadonlySet<string> | null,
+      _onProgress?: (label: string) => Promise<void> | void
+    ): Promise<AppUpdateResult[]> => []
+  ),
+}));
 vi.mock('./executor', () => executor);
 
 import {
@@ -206,7 +225,7 @@ describe('triggerSelfUpdate', () => {
     );
     // The managed-app update batch ran as part of the same sequence (§209).
     // `null` scope = "diff unavailable, recreate everything" (§343 C).
-    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7, null);
+    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7, null, expect.any(Function));
     // Never a `down` — every compose call is `up -d`, `build`, or a prune.
     const composeCalls = backup.runCommand.mock.calls.filter(([cmd]) => cmd === 'docker');
     expect(composeCalls.length).toBeGreaterThan(0);
@@ -310,7 +329,7 @@ describe('triggerSelfUpdate', () => {
 
     const status = await getSelfUpdateStatus();
     expect(status.latestRun).toMatchObject({ state: 'done', toCommit: 'new222' });
-    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7, new Set(['mealie']));
+    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7, new Set(['mealie']), expect.any(Function));
     expect(spawnMock).not.toHaveBeenCalled();
     const built = backup.runCommand.mock.calls.some(([cmd, a]) => cmd === 'docker' && (a as string[]).includes('build'));
     expect(built).toBe(false);
@@ -384,7 +403,7 @@ describe('triggerSelfUpdate', () => {
     expect(kinds).toContain('builder prune -f');
     // Runs after `build` and again after the app-update batch, both times
     // strictly before the frontend/backend restart that follows.
-    const buildIdx = kinds.findIndex((k) => k === 'build frontend backend');
+    const buildIdx = kinds.findIndex((k) => k.startsWith('compose -f') && k.includes('build'));
     const firstPruneIdx = kinds.findIndex((k) => k === 'image prune -f');
     const restartFrontendIdx = kinds.findIndex((k) => k.includes('up -d') && k.includes('frontend'));
     expect(firstPruneIdx).toBeGreaterThan(buildIdx);
@@ -407,6 +426,52 @@ describe('triggerSelfUpdate', () => {
 
     const status = await getSelfUpdateStatus();
     expect(status.latestRun).toMatchObject({ state: 'restarting_backend' });
+  });
+
+  it('reports which image is building and which app is recreating via `detail`, clearing it after each phase', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1);
+    executor.updateAllInstalledApps.mockImplementation(async (_userId, _only, onProgress) => {
+      await onProgress?.('mealie (1/2)');
+      await onProgress?.('paperless (2/2)');
+      return [];
+    });
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const detailUpdates = db.query.mock.calls
+      .filter(([sql, params]) => (sql as string).startsWith('UPDATE') && (params as unknown[])[4])
+      .map(([, params]) => (params as unknown[])[5] as string | null);
+    expect(detailUpdates).toEqual(['frontend', 'backend', null, 'mealie (1/2)', 'paperless (2/2)', null]);
+  });
+
+  it('creates a `checking` row before any network call, so a slow/unreachable remote is visible instead of stalling the trigger', async () => {
+    backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args.includes('fetch')) return new Promise(() => {}); // never resolves
+      if (args.includes('rev-parse') && args.includes('HEAD')) return 'abc123\n';
+      return '';
+    });
+
+    const run = await triggerSelfUpdate(7);
+
+    expect(run).toMatchObject({ state: 'checking', fromCommit: 'abc123' });
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun).toMatchObject({ state: 'checking', fromCommit: 'abc123' });
+  });
+
+  it('lands a fetch failure inside the sequence as an `error` row, not a thrown rejection', async () => {
+    backup.runCommand.mockImplementation(async (_cmd: string, args: string[]) => {
+      if (args.includes('rev-parse') && args.includes('HEAD')) return 'abc123\n';
+      if (args.includes('fetch')) throw new Error('could not resolve host');
+      return '';
+    });
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const status = await getSelfUpdateStatus();
+    expect(status.latestRun).toMatchObject({ state: 'error' });
+    expect(status.latestRun?.errorMessage).toContain('could not resolve host');
   });
 
   it('refuses to start a second run while one is still in progress', async () => {

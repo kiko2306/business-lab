@@ -712,6 +712,7 @@ export interface SelfUpdateRun {
   fromCommit: string | null;
   toCommit: string | null;
   errorMessage: string | null;
+  detail: string | null;
   startedAt: string;
   finishedAt: string | null;
 }

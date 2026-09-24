@@ -804,16 +804,17 @@ export interface AppUpdateResult {
  */
 export async function updateAllInstalledApps(
   userId: number | null,
-  only?: ReadonlySet<string> | null
+  only?: ReadonlySet<string> | null,
+  onProgress?: (label: string) => Promise<void> | void
 ): Promise<AppUpdateResult[]> {
   const results: AppUpdateResult[] = [];
+  const targets = getAllServices().filter(
+    (service) => (!only || only.has(service.name)) && resolveComposeFile(service.name)?.composeFile
+  );
 
-  for (const service of getAllServices()) {
-    if (only && !only.has(service.name)) {
-      continue;
-    }
-    if (!resolveComposeFile(service.name)?.composeFile) {
-      continue;
+  for (const [index, service] of targets.entries()) {
+    if (onProgress) {
+      await onProgress(`${service.name} (${index + 1}/${targets.length})`);
     }
     try {
       const result = await pullAndRecreateService(service.name, userId);

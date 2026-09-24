@@ -31511,3 +31511,70 @@ one-time legacy data import" item outright, since a first real cutover
 (whenever the first client migrates) is the only remaining way to prove it
 against real data, and that isn't a standing open task the way a live-stack
 check is.
+
+## 659. Implemented: richer self-update progress detail (closes §617)
+
+Built exactly the shape §617 already spec'd — a nullable `self_update_runs
+.detail TEXT` column (`ensureSelfUpdateTable`'s `CREATE TABLE` +
+an `ALTER TABLE ... ADD COLUMN IF NOT EXISTS` for existing databases),
+`updateRun()` gaining a `detail` field (explicit `null` clears it, `undefined`
+leaves it alone — needed its own `CASE WHEN` rather than `COALESCE`, since
+`COALESCE` can't distinguish "clear this" from "don't touch this"),
+`SelfUpdateRunRow`/`SelfUpdateRun` (backend and frontend) both gaining
+`detail: string | null`, and the progress alert in
+`self-update.component.html` appending it: `{{ ('selfUpdate.progress.' +
+run.state) | t }}<span *ngIf="run.detail">: {{ run.detail }}</span>`.
+
+Three touch points, as planned: the `building` phase now loops
+`buildTargets` one at a time (`docker compose build <target>`, not the old
+combined multi-target call), setting `detail` to the target before each and
+clearing it after the loop. `updateAllInstalledApps` (`executor.ts`) gained
+an optional `onProgress?: (label: string) => Promise<void> | void`, called
+with `"<service> (n/total)"` before each app's pull+recreate — `total` comes
+from pre-filtering `getAllServices()` to the actual target set once, rather
+than recomputing it per iteration. `triggerSelfUpdate` now inserts the run
+row from a local `git rev-parse HEAD` (no network) *before* anything else;
+`runSelfUpdateSequence` calls `checkForUpdate()` itself as its first real
+step, with the row already sitting in `checking`, and a fetch failure there
+now lands as an `error` row with the git error as `errorMessage` instead of
+throwing past the row entirely.
+
+One deviation from the plan text: `onProgress`'s label uses the service's
+registry `name` (e.g. `paperless-ngx`), not a prose display name — there is
+no display-name field on `ServiceDefinition` to reuse, and inventing one for
+a single log-line label would be exactly the kind of unrequested
+abstraction the ladder rules out.
+
+### Tests
+
+`selfUpdate.test.ts`: a new case walks a full run and asserts the exact
+`detail` sequence written to the DB (`frontend`, `backend`, `null`,
+`<app> (1/2)`, `<app> (2/2)`, `null`) by reading back `db.query.mock.calls`
+rather than re-deriving state — the in-memory table fixture only keeps
+current values, not history, so the assertion has to look at what was
+*written*, in order. That meant `db.reset()` also needed to `mockClear()`
+the query spy itself; without it, calls from the *previous* test's `flush()`
+bled into this one's captured history (30-some stray entries, not the clean
+7). A second case makes the `git fetch` hang forever and asserts
+`triggerSelfUpdate` still resolves immediately with a `checking` row and a
+locally-known `fromCommit` — proving the trigger request itself never
+touches the network. A third makes `fetch` throw and asserts the run lands
+as `error` with the git message, not an unhandled rejection. The three
+existing tests asserting `updateAllInstalledApps`'s call args needed
+`expect.any(Function)` added for the new third parameter; the "prunes
+after building" test's assertion of a single combined `build frontend
+backend` call became `k.startsWith('compose -f') && k.includes('build')`,
+since building is now one call per target.
+
+`self-update.component.spec.ts`: `runningRun`'s fixture gained `detail:
+null` (now required by the type), and a new case confirms a set `detail`
+renders in the progress alert — same `openPanel()` pattern the existing
+stale-check test uses, since the panel starts collapsed.
+
+Backend (1195 tests) and frontend (90 tests) suites both pass; `ng build`
+clean (the one warning is the pre-existing bundle-size budget, unrelated).
+
+No README beta-test item was skipped: added one, since this changes real
+`docker compose build`/`up` call timing and ordering in the self-update
+sequence — a part of the codebase with a documented history (§354, §356) of
+passing tests while breaking on the live host.

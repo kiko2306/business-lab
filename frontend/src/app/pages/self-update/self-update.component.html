@@ -50,7 +50,7 @@
           <span class="font-monospace d-block mt-1">{{ err.message }}</span>
         </div>
         <div class="alert alert-info small mt-3 mb-0" *ngIf="runInProgress && s.latestRun as run">
-          {{ ('selfUpdate.progress.' + run.state) | t }}
+          {{ ('selfUpdate.progress.' + run.state) | t }}<span *ngIf="run.detail">: {{ run.detail }}</span>
         </div>
         <div class="alert alert-danger small mt-3 mb-0" *ngIf="!runInProgress && s.latestRun?.state === 'error'">
           {{ 'selfUpdate.lastUpdateFailed' | t:{ message: s.latestRun?.errorMessage ?? '' } }}

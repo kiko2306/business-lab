@@ -31,6 +31,7 @@ describe('SelfUpdateComponent', () => {
     fromCommit: 'old111old111',
     toCommit: null,
     errorMessage: null,
+    detail: null,
     startedAt: '2026-09-04T10:01:00.000Z',
     finishedAt: null,
   };
@@ -169,4 +170,12 @@ describe('SelfUpdateComponent', () => {
 
     component.ngOnDestroy();
   }));
+
+  it('appends the run detail to the progress line when present', () => {
+    operations.getSelfUpdateStatus.and.returnValue(of({ ...behindStatus, latestRun: { ...runningRun, detail: 'backend' } }));
+    fixture.detectChanges();
+    openPanel();
+
+    expect(fixture.nativeElement.textContent).toContain('backend');
+  });
 });

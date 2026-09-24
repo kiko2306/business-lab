@@ -116,6 +116,7 @@ export interface SelfUpdateRunRow {
   fromCommit: string | null;
   toCommit: string | null;
   errorMessage: string | null;
+  detail: string | null;
   startedAt: string;
   finishedAt: string | null;
 }
@@ -148,10 +149,12 @@ export async function ensureSelfUpdateTable(): Promise<void> {
       from_commit VARCHAR(40),
       to_commit VARCHAR(40),
       error_message TEXT,
+      detail TEXT,
       started_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
       finished_at TIMESTAMPTZ
     )
   `);
+  await query(`ALTER TABLE self_update_runs ADD COLUMN IF NOT EXISTS detail TEXT`);
 }
 
 function requireRepoRoot(): string {
@@ -162,49 +165,37 @@ function requireRepoRoot(): string {
   return repoRoot;
 }
 
-function rowFromDb(row: {
+interface SelfUpdateRunDbRow {
   id: number;
   state: string;
   from_commit: string | null;
   to_commit: string | null;
   error_message: string | null;
+  detail: string | null;
   started_at: Date;
   finished_at: Date | null;
-}): SelfUpdateRunRow {
+}
+
+function rowFromDb(row: SelfUpdateRunDbRow): SelfUpdateRunRow {
   return {
     id: row.id,
     state: row.state as SelfUpdateRunState,
     fromCommit: row.from_commit,
     toCommit: row.to_commit,
     errorMessage: row.error_message,
+    detail: row.detail,
     startedAt: row.started_at.toISOString(),
     finishedAt: row.finished_at ? row.finished_at.toISOString() : null,
   };
 }
 
 async function getLatestRun(): Promise<SelfUpdateRunRow | null> {
-  const result = await query<{
-    id: number;
-    state: string;
-    from_commit: string | null;
-    to_commit: string | null;
-    error_message: string | null;
-    started_at: Date;
-    finished_at: Date | null;
-  }>('SELECT * FROM self_update_runs ORDER BY id DESC LIMIT 1');
+  const result = await query<SelfUpdateRunDbRow>('SELECT * FROM self_update_runs ORDER BY id DESC LIMIT 1');
   return result.rows[0] ? rowFromDb(result.rows[0]) : null;
 }
 
 async function insertRun(state: SelfUpdateRunState, fromCommit: string | null): Promise<SelfUpdateRunRow> {
-  const result = await query<{
-    id: number;
-    state: string;
-    from_commit: string | null;
-    to_commit: string | null;
-    error_message: string | null;
-    started_at: Date;
-    finished_at: Date | null;
-  }>(
+  const result = await query<SelfUpdateRunDbRow>(
     `INSERT INTO self_update_runs (state, from_commit) VALUES ($1, $2) RETURNING *`,
     [state, fromCommit]
   );
@@ -213,16 +204,25 @@ async function insertRun(state: SelfUpdateRunState, fromCommit: string | null): 
 
 async function updateRun(
   id: number,
-  fields: { state?: SelfUpdateRunState; toCommit?: string; errorMessage?: string; finished?: boolean }
+  fields: { state?: SelfUpdateRunState; toCommit?: string; errorMessage?: string; detail?: string | null; finished?: boolean }
 ): Promise<void> {
   await query(
     `UPDATE self_update_runs
      SET state = COALESCE($2, state),
          to_commit = COALESCE($3, to_commit),
          error_message = COALESCE($4, error_message),
-         finished_at = CASE WHEN $5 THEN NOW() ELSE finished_at END
+         detail = CASE WHEN $5 THEN $6 ELSE detail END,
+         finished_at = CASE WHEN $7 THEN NOW() ELSE finished_at END
      WHERE id = $1`,
-    [id, fields.state ?? null, fields.toCommit ?? null, fields.errorMessage ?? null, fields.finished ?? false]
+    [
+      id,
+      fields.state ?? null,
+      fields.toCommit ?? null,
+      fields.errorMessage ?? null,
+      fields.detail !== undefined,
+      fields.detail ?? null,
+      fields.finished ?? false,
+    ]
   );
 }
 
@@ -303,10 +303,14 @@ export async function triggerSelfUpdate(userId: number | null): Promise<SelfUpda
   }
 
   const repoRoot = requireRepoRoot();
-  const check = await checkForUpdate();
-  const run = await insertRun('checking', check.currentCommit);
+  // No network here — a slow/unreachable remote must not stall the trigger
+  // request itself. The row exists in `checking` before the fetch that
+  // `runSelfUpdateSequence` runs as its own first step, so a slow check is a
+  // real, visible state instead of the response hanging with no row at all.
+  const fromCommit = (await runGit(['-C', repoRoot, 'rev-parse', 'HEAD'], { timeout: 10_000 })).trim();
+  const run = await insertRun('checking', fromCommit);
 
-  void runSelfUpdateSequence(run.id, repoRoot, check, userId).catch((error: Error) => {
+  void runSelfUpdateSequence(run.id, repoRoot, userId).catch((error: Error) => {
     logger.error('Self-update sequence failed unexpectedly', { error: error.message, runId: run.id });
   });
 
@@ -399,9 +403,21 @@ async function classifyDeploy(repoRoot: string, fromCommit: string | null, toCom
 async function runSelfUpdateSequence(
   runId: number,
   repoRoot: string,
-  check: SelfUpdateCheck,
   userId: number | null
 ): Promise<void> {
+  let check: SelfUpdateCheck;
+  try {
+    // The run row already sits in `checking` (inserted before this was
+    // called) for however long this actually takes, instead of the fetch
+    // stalling the trigger response with no row visible at all.
+    check = await checkForUpdate();
+  } catch (error) {
+    const message = (error as Error).message || 'Checking for an update failed.';
+    await updateRun(runId, { state: 'error', errorMessage: message, finished: true });
+    logger.error('Self-update: checking for an update failed', { runId, error: message });
+    return;
+  }
+
   if (check.commitsBehind === 0) {
     await updateRun(runId, { state: 'done', toCommit: check.currentCommit, finished: true });
     return;
@@ -475,11 +491,18 @@ async function runSelfUpdateSequence(
 
     if (buildTargets.length) {
       await updateRun(runId, { state: 'building' });
-      await runCommand(
-        'docker',
-        ['compose', '-f', composeFilePath(repoRoot), 'build', ...buildTargets],
-        { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
-      );
+      // One target at a time (rather than a single multi-target call) so
+      // `detail` can say which image is compiling right now — the classic
+      // builder's on-disk cache makes this no slower than one combined call.
+      for (const target of buildTargets) {
+        await updateRun(runId, { detail: target });
+        await runCommand(
+          'docker',
+          ['compose', '-f', composeFilePath(repoRoot), 'build', target],
+          { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
+        );
+      }
+      await updateRun(runId, { detail: null });
       await pruneDockerCruft('building');
     }
 
@@ -489,7 +512,8 @@ async function runSelfUpdateSequence(
     let appResults: Awaited<ReturnType<typeof updateAllInstalledApps>> = [];
     if (willTouchApps) {
       await updateRun(runId, { state: 'updating_apps' });
-      appResults = await updateAllInstalledApps(userId, scope.apps);
+      appResults = await updateAllInstalledApps(userId, scope.apps, (label) => updateRun(runId, { detail: label }));
+      await updateRun(runId, { detail: null });
       const appsFailed = appResults.filter((r) => !r.ok);
       if (appsFailed.length) {
         logger.warn(`Self-update: ${appsFailed.length}/${appResults.length} app(s) failed to update`, {
