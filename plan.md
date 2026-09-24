@@ -32300,3 +32300,14 @@ Added a **Version** column (with an "update" badge for admins when the packaged
 version differs, §670); the Manage row's `colspan` follows. Angular build passes;
 not looked at in a browser (headless-Chrome check of the live page was attempted
 and abandoned: the test image has no puppeteer for this workspace).
+
+### §672 follow-up: version coloured green when current, red when out of date
+
+The agent's version in the shops list, the shop page and the Manage panel is now
+green when it equals the packaged build (§670) and red when it differs (with the
+latest named in the tooltip / Manage text). To colour a viewer's list too,
+`GET /api/agent-package` (the version only) is now open to any signed-in user;
+`/download` stays webmaster-only, as does the Download card. No colour when the
+current version is unknown (development builds, or before the request returns).
+39 API tests (the old "viewer gets 403 on the version" assertion inverted) and
+the Angular build pass; not looked at in a browser.

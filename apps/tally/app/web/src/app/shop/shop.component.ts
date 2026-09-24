@@ -5,7 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../api.service';
 import { BarChartComponent, BarDatum } from '../charts/bar-chart.component';
 import { HourlyChartComponent } from '../charts/hourly-chart.component';
-import { Overview, ShopTable, SoldItemsView, Store, TablesView } from '../models';
+import { AgentPackage, Overview, ShopTable, SoldItemsView, Store, TablesView } from '../models';
 
 type Tab = 'tables' | 'items';
 
@@ -22,6 +22,8 @@ export class ShopComponent implements OnInit, OnDestroy {
 
   storeId = '';
   store: Store | null = null;
+  /** What the current agent build is, so the shown version can be coloured against it (§670). */
+  agentPackage: AgentPackage | null = null;
 
   overview: Overview | null = null;
   tables: TablesView | null = null;
@@ -42,6 +44,7 @@ export class ShopComponent implements OnInit, OnDestroy {
       next: (stores) => (this.store = stores.find((s) => s.id === this.storeId) ?? null),
       error: () => undefined,
     });
+    this.api.agentPackage().subscribe({ next: (pkg) => (this.agentPackage = pkg), error: () => undefined });
     this.refresh();
     // A floor dashboard is left open on a screen, so it refreshes itself. The
     // figures are read live from the shop on every call — there is no cache to

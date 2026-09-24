@@ -155,10 +155,12 @@
             </td>
             <td data-label="Version">
               @if (store.agentVersion) {
-                <code>{{ store.agentVersion }}</code>
-                @if (agentPackage && agentPackage.version !== store.agentVersion) {
-                  <span class="badge text-bg-warning ms-1" title="Latest: {{ agentPackage.version }}">update</span>
-                }
+                <code
+                  [class.text-success]="agentPackage && agentPackage.version === store.agentVersion"
+                  [class.text-danger]="agentPackage && agentPackage.version !== store.agentVersion"
+                  [title]="agentPackage && agentPackage.version !== store.agentVersion ? 'Out of date — latest is ' + agentPackage.version : 'Current version'"
+                  >{{ store.agentVersion }}</code
+                >
               } @else {
                 —
               }
@@ -228,9 +230,14 @@
                         An agent is enrolled and is
                         <strong>{{ store.connected ? 'connected now' : 'not connected' }}</strong>.
                         @if (store.agentVersion) {
-                          Version <code>{{ store.agentVersion }}</code>
+                          Version
+                          <code
+                            [class.text-success]="agentPackage && agentPackage.version === store.agentVersion"
+                            [class.text-danger]="agentPackage && agentPackage.version !== store.agentVersion"
+                            >{{ store.agentVersion }}</code
+                          >
                           @if (agentPackage && agentPackage.version !== store.agentVersion) {
-                            — the latest is <code>{{ agentPackage.version }}</code>, download it above.
+                            — out of date; the latest is <code>{{ agentPackage.version }}</code>, download it above.
                           }
                         }
                         Issuing a new code replaces it — the machine currently reporting stops on its

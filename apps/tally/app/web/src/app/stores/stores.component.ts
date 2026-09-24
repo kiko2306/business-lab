@@ -57,13 +57,12 @@ export class StoresComponent implements OnInit {
     this.api.me().subscribe({
       next: (identity) => {
         this.identity = identity;
-        if (identity.isAdmin) {
-          this.loadSmtp();
-          this.api.agentPackage().subscribe({ next: (pkg) => (this.agentPackage = pkg), error: () => undefined });
-        }
+        if (identity.isAdmin) this.loadSmtp();
       },
       error: () => undefined,
     });
+    // Every user: the list colours each shop's version against it.
+    this.api.agentPackage().subscribe({ next: (pkg) => (this.agentPackage = pkg), error: () => undefined });
     this.load();
   }
 

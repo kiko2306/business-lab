@@ -295,9 +295,10 @@ test('testing an unconfigured SMTP sender fails without dialing anywhere', { ski
   assert.equal(result.status, 400);
 });
 
-test('the agent package is admin-only and downloads the built setup exe', { skip }, async () => {
+test('the agent package version is for any user, the download is admin-only', { skip }, async () => {
   assert.equal((await call('GET', '/api/agent-package')).status, 401);
-  assert.equal((await call('GET', '/api/agent-package', { headers: VIEWER })).status, 403);
+  // The version alone is for every signed-in user (the list colours against it); the file is not.
+  assert.equal((await call('GET', '/api/agent-package', { headers: VIEWER })).body.version, '1.0.0-abcd1234');
   assert.equal((await call('GET', '/api/agent-package/download', { headers: VIEWER })).status, 403);
 
   const meta = await call('GET', '/api/agent-package', { headers: ADMIN });

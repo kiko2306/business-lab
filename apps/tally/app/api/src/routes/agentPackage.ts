@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import fs from 'fs';
 import path from 'path';
-import { requireAdmin } from '../auth';
+import { requireAdmin, requireIdentity } from '../auth';
 
 /**
  * Serves the shop agent's Windows setup, one exe built at image-build time
@@ -9,8 +9,10 @@ import { requireAdmin } from '../auth';
  * beside it, so the version shown here is the version of the very file that is
  * downloaded — there is no second place for them to drift apart.
  *
- * Admin-only, like enrolment codes: installing an agent is an admin task, and
- * the exe itself holds nothing secret (no token, no URL).
+ * The download is admin-only, like enrolment codes: installing an agent is an
+ * admin task (the exe itself holds nothing secret — no token, no URL). The
+ * *version* is readable by any signed-in user, because the shops list colours
+ * each shop's agent against it and a viewer sees that list too.
  */
 export function agentPackageRoutes(dir: string): Router {
   const router = Router();
@@ -25,7 +27,7 @@ export function agentPackageRoutes(dir: string): Router {
     }
   };
 
-  router.get('/agent-package', requireAdmin, (_req, res) => {
+  router.get('/agent-package', requireIdentity, (_req, res) => {
     const meta = read();
     if (!meta) {
       res.status(404).json({ error: 'no agent package in this build' });
