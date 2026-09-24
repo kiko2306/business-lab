@@ -32062,5 +32062,5 @@ timeout / a tunnel restart (README item left open).
 
 `install.ps1` lost its `-Url`/`-Code`/`-WintouchDir` parameters: it always prompts (the Wintouch folder defaults to `C:\wintouch\sgw` on Enter). Passing an
 enrolment code on the command line put it in shell history; the operator wants
-the installer to ask. `-InstallDir`/`-WintouchDir` stay as parameters (paths,
+the installer to ask. Only `-InstallDir` stays a parameter (a path,
 not secrets). README updated; syntax-checked with the PowerShell parser.
