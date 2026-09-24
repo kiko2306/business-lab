@@ -811,6 +811,23 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       interval: 30000,
       timeout: 5000,
     },
+    // The primary hostname is the admin UI — what a person opens. A
+    // multi-container app publishes more than one port, so "first port in the
+    // file" cannot tell them apart.
+    exposurePortEnvVar: 'HOTEL_ADMIN_PORT',
+    // hotel-core gets its own hostname because the property agent reaches it
+    // directly: proxying the agent through the admin container would stop the
+    // sync — the critical path — whenever a frontend was down (plan.md §640).
+    // Gated, which is what §637 added the flag for: this app holds a gated
+    // secondary today and public ones (check-in, pulse) once they are built.
+    additionalExposures: [
+      {
+        suffix: 'core',
+        label: 'Core API',
+        portEnvVar: 'HOTEL_CORE_PORT',
+        autheliaProtected: true,
+      },
+    ],
     hiddenGeneratedSecrets: ['HOTEL_DB_PASSWORD'],
     hiddenEnvKeys: ['HOTEL_DB_USER', 'HOTEL_DB_NAME'],
     // The property agent authenticates itself with an enrolment-issued token

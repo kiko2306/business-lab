@@ -5,9 +5,9 @@
 # forward without a version-tag bump to diff against (§449).
 services:
   # Owns units, guests and reservations, and is the only service the property
-  # agent talks to (plan.md §623). check-in, pulse and the admin shell join
-  # this project as they are built — one compose project because they share
-  # one database, which is why hotel-core exists at all (§628).
+  # agent talks to (plan.md §623). check-in and pulse join this project as
+  # they are built — one compose project because they share one database,
+  # which is why hotel-core exists at all (§628).
   hotel-core:
     mem_limit: 256m
     mem_reservation: 64m
@@ -23,14 +23,42 @@ services:
       DATABASE_URL: postgres://${HOTEL_DB_USER:-hotel}:${HOTEL_DB_PASSWORD}@hotel-db:5432/${HOTEL_DB_NAME:-hotel}
     networks:
       - hotel-net
+    # Deliberately no homepage.* labels. The generator scans the whole compose
+    # file and the last occurrence of each key wins, so labels here would be
+    # silently overridden by hotel-admin's below — and the tile must open the
+    # UI, not the API. Leaving them off makes that explicit rather than
+    # dependent on service order.
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # The administration UI. Its own container rather than static files served
+  # by hotel-core, so the two deploy independently — and its nginx proxies
+  # /api through to hotel-core, which keeps the browser same-origin with no
+  # CORS (plan.md §640). /agent is deliberately not proxied: the agent uses
+  # hotel-core's own hostname, so the sync does not stop when this is down.
+  hotel-admin:
+    mem_limit: 128m
+    mem_reservation: 32m
+    build: ./admin
+    restart: unless-stopped
+    ports:
+      - "${HOTEL_ADMIN_PORT:-10600}:80"
+    depends_on:
+      - hotel-core
+    networks:
+      - hotel-net
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=Hotel"
       - "homepage.icon=calendar"
-      - "homepage.href=http://localhost:${HOTEL_CORE_PORT:-10603}"
+      - "homepage.href=http://localhost:${HOTEL_ADMIN_PORT:-10600}"
       - "homepage.description=Online check-in, guest feedback and property administration"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5

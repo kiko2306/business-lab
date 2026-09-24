@@ -30413,3 +30413,62 @@ production.
 must-not-reset cases, the pending-edit skip, the unknown-unit path, the
 placeholder date, and the full completed-check-in round trip with both a
 successful and a failed acknowledgement.
+
+## 640. Implemented: `hotel-admin` as its own container
+
+The admin shell is its own container, decided rather than inferred. §638 had
+raised the alternative — `hotel-core` serving the bundle, the way tally's API
+serves its own (§632) — and this closes it.
+
+### The topology that follows
+
+| Hostname | Port | Serves | Policy |
+|---|---|---|---|
+| `hotel.<domain>` | `10600` | `hotel-admin` (nginx) | Gated |
+| `hotel-core.<domain>` | `10603` | `hotel-core` | Gated, `/agent` bypassed |
+| `hotel-db` | — | Postgres | No host port |
+
+`hotel-admin` became the **primary** exposure and `hotel-core` moved to a
+`core` secondary. That is a rename of a live exposure, which is why §638
+flagged it as costly to defer — done now it costs nothing, because the app has
+never started anywhere.
+
+This is the first user of §637: the app holds a **gated secondary**, and will
+hold public ones too once check-in and pulse land.
+
+### Two decisions inside the nginx config
+
+**`/api` is proxied, `/agent` is not.** Proxying `/api` keeps the browser
+same-origin even though the API is a different container — no CORS to
+configure, and no question about whether the Authelia session cookie travels.
+The agent, though, reaches `hotel-core` on its own hostname: routing the sync
+through a *frontend* container would stop it whenever that container was down,
+and the sync is the critical path while the admin UI is not.
+
+**A request to `/agent` on the admin host returns a 404 that says so.** Found
+by testing rather than by reading: the SPA fallback was swallowing it and
+returning `index.html` with a **200**, so an agent pointed at the wrong
+hostname would have read that as success and sat there doing nothing, with the
+dashboard reporting it as simply never having called.
+
+### A compose file nearly corrupted by a substring
+
+Inserting the new service anchored on `"  hotel-db:"`, which also matches
+inside `depends_on:\n      hotel-db:` — six spaces contain two. The insert
+landed in the middle of `hotel-core`. Caught by `docker compose config`
+immediately, but worth recording as the failure mode of anchoring a patch on
+indentation.
+
+`hotel-core` also lost its `homepage.*` labels: the generator scans the whole
+compose file and the **last** occurrence of each key wins, so leaving them
+would have made the tile depend on service order. `hotel-admin` carries them —
+the tile must open the UI, not the API.
+
+### Verification
+
+Full stack up on a real network: the bundle served, `/api/me` proxied through
+to `hotel-core` with Authelia's forwarded identity intact, an unauthenticated
+request still 401 through the proxy, `/agent` answering with its explicit 404,
+and units listed through the proxy. Screenshotted in both themes. 1191 backend
+tests; both images build; a `hotel-admin` CI job builds the bundle and diffs
+the theme against the dashboard's.

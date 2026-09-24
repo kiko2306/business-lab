@@ -82,7 +82,7 @@ hand edit can leave its copy disagreeing with the app's.
 `10460` onlyoffice · `10470` kopia (server UI on container `51515`) ·
 `10480` scrutiny · `10490` it-tools · `10500` kimai ·
 `10510` meshcentral · `10520` miniflux · `10570` navidrome · `10580` twenty ·
-`10590` webdav · `10603` hotel-core (bundled `hotel-db` publishes none; `10600`–`10602` are reserved for the admin shell, check-in and pulse) · `10610` tally (bundled `tally-db` publishes none)
+`10590` webdav · `10600` hotel (admin UI, the app's primary hostname) · `10603` hotel-core (its own gated hostname, reached by the property agent; bundled `hotel-db` publishes none; `10601`–`10602` reserved for check-in and pulse) · `10610` tally (bundled `tally-db` publishes none)
 
 These are the defaults. The allocator may have moved one on your host if
 something else already held the port — check the app's `.env` for the truth.

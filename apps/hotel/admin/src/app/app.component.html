@@ -1,0 +1,166 @@
+<nav class="navbar border-bottom mb-4">
+  <div class="container-xl">
+    <span class="navbar-brand mb-0 h1">Hotel</span>
+    <span class="text-secondary small d-none d-sm-inline">Check-in, feedback and property administration</span>
+  </div>
+</nav>
+
+<main class="container-xl pb-5">
+  @if (error) {
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+  }
+
+  @if (isAdmin) {
+    <div class="card mb-4">
+      <div class="card-body">
+        <h2 class="h6">Property agent</h2>
+        @if (agent?.enrolled) {
+          <p class="text-secondary small mb-3">
+            Enrolled, last seen
+            {{ agent?.last_seen_at ? (agent?.last_seen_at | date: 'short') : 'never' }}. Issuing a new code
+            replaces it — the machine currently syncing stops on its next call.
+          </p>
+        } @else {
+          <p class="text-secondary small mb-3">
+            No agent yet. Issue a code and enter it in the installer on the property's Wintouch machine,
+            along with this site's address.
+          </p>
+        }
+
+        <div class="d-flex flex-wrap gap-2">
+          <button class="btn btn-sm btn-primary" type="button" (click)="issueCode()">
+            Issue enrolment code
+          </button>
+          @if (agent?.enrolled) {
+            <button class="btn btn-sm btn-outline-danger" type="button" (click)="revokeAgent()">
+              Revoke agent
+            </button>
+          }
+        </div>
+
+        @if (issued) {
+          <div class="alert alert-warning mt-3 mb-0">
+            <p class="fw-semibold mb-1">Copy this now — it is shown once.</p>
+            <p class="small mb-2">
+              Only a hash is stored, so it cannot be shown again. If it is lost, issue another.
+            </p>
+            <p class="enrolment-code mb-2">{{ issued.code }}</p>
+            <div class="d-flex flex-wrap gap-2 align-items-center">
+              <button class="btn btn-sm btn-outline-secondary" type="button" (click)="copyCode()">
+                {{ copied ? 'Copied' : 'Copy' }}
+              </button>
+              <span class="small text-secondary">Expires {{ issued.expiresAt | date: 'short' }}</span>
+            </div>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  <h2 class="h4 mb-3">Properties</h2>
+
+  @if (loading) {
+    <p class="text-secondary">Loading…</p>
+  } @else if (!units.length) {
+    <div class="alert alert-info mb-0">
+      No properties yet. They arrive from Wintouch once the agent is enrolled and has run its first sync.
+    </div>
+  } @else {
+    <div class="table-responsive table-stack-wrap">
+      <table class="table table-stack align-middle">
+        <thead>
+          <tr>
+            <th scope="col">Property</th>
+            <th scope="col">Status</th>
+            <th scope="col">Guest flows</th>
+            <th scope="col" class="text-end">Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          @for (unit of units; track unit.id) {
+            <tr>
+              <td data-label="Property">
+                <span class="fw-semibold">{{ unit.name }}</span>
+                <span class="text-secondary small d-block">{{ unit.code }}</span>
+              </td>
+              <td data-label="Status">
+                @if (unit.isActive) {
+                  <span class="badge text-bg-success">Active</span>
+                } @else {
+                  <span class="badge text-bg-secondary">Inactive</span>
+                }
+              </td>
+              <td data-label="Guest flows">
+                <div class="d-flex flex-wrap gap-3">
+                  @for (flow of flows; track flow.key) {
+                    <div class="form-check form-switch mb-0">
+                      <input
+                        class="form-check-input"
+                        type="checkbox"
+                        role="switch"
+                        [id]="unit.id + flow.key"
+                        [checked]="unit[flow.key]"
+                        [disabled]="!isAdmin"
+                        (change)="toggleFlow(unit, flow.key)" />
+                      <label class="form-check-label small" [for]="unit.id + flow.key">{{ flow.label }}</label>
+                    </div>
+                  }
+                </div>
+              </td>
+              <td data-label="Actions" class="text-end">
+                @if (isAdmin) {
+                  <div class="btn-group btn-group-sm">
+                    <button class="btn btn-outline-secondary" type="button" (click)="toggleOpen(unit)">
+                      {{ openId === unit.id ? 'Close' : 'Access' }}
+                    </button>
+                    <button class="btn btn-outline-secondary" type="button" (click)="toggleActive(unit)">
+                      {{ unit.isActive ? 'Deactivate' : 'Activate' }}
+                    </button>
+                  </div>
+                }
+              </td>
+            </tr>
+
+            @if (openId === unit.id && isAdmin) {
+              <tr>
+                <td colspan="4" class="bg-body-tertiary">
+                  <div class="py-2">
+                    <h3 class="h6">Who can see {{ unit.name }}</h3>
+                    <p class="text-secondary small">
+                      Authelia usernames. Anyone listed sees this property; administrators see every one
+                      regardless.
+                    </p>
+                    @if (!access.length) {
+                      <p class="text-secondary small mb-2">Nobody yet — only administrators can see it.</p>
+                    } @else {
+                      <ul class="list-group list-group-flush mb-2">
+                        @for (identity of access; track identity) {
+                          <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
+                            <span>{{ identity }}</span>
+                            <button class="btn btn-sm btn-outline-danger" type="button" (click)="revoke(unit, identity)">
+                              Remove
+                            </button>
+                          </li>
+                        }
+                      </ul>
+                    }
+                    <form class="d-flex gap-2" (ngSubmit)="grant(unit)">
+                      <input
+                        class="form-control form-control-sm"
+                        name="newIdentity"
+                        placeholder="Authelia username"
+                        [(ngModel)]="newIdentity" />
+                      <button class="btn btn-sm btn-primary text-nowrap" type="submit" [disabled]="!newIdentity.trim()">
+                        Grant
+                      </button>
+                    </form>
+                  </div>
+                </td>
+              </tr>
+            }
+          }
+        </tbody>
+      </table>
+    </div>
+  }
+</main>

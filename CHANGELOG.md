@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.138.0] — 2026-09-24
+
+### Added
+
+- Hotel admin UI as its own container, proxying /api to hotel-core (plan.md §640)
+
 ## [0.137.0] — 2026-09-24
 
 ### Added

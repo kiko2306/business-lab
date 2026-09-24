@@ -130,6 +130,26 @@ jobs:
         env:
           DATABASE_URL: postgres://hotel:test@localhost:5433/hotel
 
+  hotel-admin:
+    # The Angular admin shell. Its theme is a generated copy of the
+    # dashboard's (scripts/sync-app-theme.sh) because an app image builds from
+    # its own apps/<name>/ context and cannot reach frontend/src — so the diff
+    # below is what catches the two drifting apart (plan.md §633).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Theme copy is in step with the dashboard's
+        run: diff frontend/src/styles.css apps/hotel/admin/src/theme.css
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/hotel/admin/package-lock.json
+      - run: npm ci
+        working-directory: apps/hotel/admin
+      - run: npm run build
+        working-directory: apps/hotel/admin
+
   tally-web:
     # The Angular admin UI. Its theme is a generated copy of the dashboard's
     # (scripts/sync-app-theme.sh) because an app image builds from its own

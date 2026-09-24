@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.137.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.138.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -433,7 +433,7 @@ before anything is built.
       this is the hotel side, where the legacy used Laravel uuids and
       `tally`'s own `storeClass.js` used **uuid v1** — a timestamp plus a MAC
       address.
-- [ ] **Sync the shared theme into `hotel`'s frontends when they exist** —
+- [ ] **Sync the shared theme into `check-in` and `pulse` when they exist** —
       the mechanism is built and proven for `tally` (plan.md §633):
       `scripts/sync-app-theme.sh` copies `frontend/src/styles.css` into each
       app's `web/src/theme.css`, and a CI step diffs them. §626 wanted no copy
@@ -496,14 +496,6 @@ before anything is built.
       finding, tracked separately). `apps/tally/agent/` is the worked example
       for config, enrolment, DPAPI token storage and the reconnect loop; the
       transport here is plain outbound HTTPS rather than a socket (§627).
-- [ ] **Decide whether the admin shell is its own container** — plan.md §638.
-      §628 allocated `hotel-admin` on `10600` as a separate container on the
-      primary hostname; registering the app raised the simpler option of
-      `hotel-core` serving the admin bundle itself, the way tally's API serves
-      its own (§632) — one container fewer, one port fewer, and no cross-origin
-      call from the shell to `hotel-core`. Decide before building the shell:
-      if it does become its own container, the primary hostname moves and that
-      is a rename of a live exposure.
 - [ ] **Verify `tally` starts on the live stack** — plan.md §630 registered the
       app and proved the schema against a real `postgres:17-alpine` in CI, but
       nothing has run it on `beta` yet. Check: the app starts from the
