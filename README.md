@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.148.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.148.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,12 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Beta-test the BookStack OIDC login fix (plan.md §665)** — on `beta`,
+      after pulling the fix, restart the backend (the fix only re-renders on
+      a boot/exposure/reconciler sync, not a plain app restart) and confirm a
+      full browser sign-in at `bookstack.<domain>` completes end to end (no
+      `invalid_client` at `/oidc/callback`, lands in BookStack logged in as
+      the Authelia user, admin-group mapping intact).
 - [ ] **Beta-test the self-update panel's richer progress detail (plan.md
       §659)** — on `beta`, trigger a real self-update while a commit is
       pending and confirm: the progress alert shows a `detail` suffix naming

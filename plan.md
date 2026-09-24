@@ -31904,3 +31904,46 @@ needed to touch.
 
 No version-relevant behavior changed beyond the glyphs themselves — same
 version bump policy as any other `frontend/src` change.
+
+## 665. Fixed: BookStack OIDC login — `invalid_client` on callback (client_secret_basic vs post)
+
+Live regression report from the browser: signing into `bookstack.<domain>`
+bounced through Authelia fine but landed on BookStack's generic "An unknown
+error occurred" at `/oidc/callback`. §345 (2026-09-09) had called BookStack's
+OIDC "verified" but only as far as the redirect to Authelia's login page —
+the actual token exchange was never browser-tested end to end, so this bug
+had been live since the app's OIDC client was added and nobody had hit it.
+
+**Diagnosis (on `tx-home-utils.com`, read-only):** `docker exec
+bookstack-bookstack-1 tail /config/log/bookstack/laravel.log` showed
+`League\OAuth2\Client\Provider\Exception\IdentityProviderException(code:
+401): invalid_client` from `OidcOAuthProvider::checkResponse`. That alone
+doesn't say *why* Authelia rejected it — checked `docker logs
+authelia-authelia-1` for the same window and got the exact reason: "the
+request was determined to be using `token_endpoint_auth_method` method
+`client_secret_basic`, however the registered client with id `bookstack` is
+configured to only support ... `client_secret_post`." Ruled out a stale
+secret first (compared `apps/bookstack/.env`'s mtime, unchanged since
+2026-09-09, against `apps/authelia/config/configuration.yml`'s, last written
+2026-09-24 09:17 by a routine `auto_exposure` resync — so the registered
+digest already matched the current secret; the failure was the auth method,
+not the value) — did **not** print or diff the actual secret value anywhere,
+per the repo's credential-materialization guard.
+
+This is the identical failure Mealie and Vikunja already hit and fixed
+(§274/§279): their OAuth2 client libraries authenticate to the token
+endpoint with HTTP Basic and have no knob to send `client_secret_post`
+instead — `pbkdf2ClientSecretDigest`'s caller already supports a per-app
+`tokenEndpointAuthMethod` override for exactly this. BookStack's `league/
+oauth2-client`-based provider turns out to be the third. Fix: one line,
+`tokenEndpointAuthMethod: 'client_secret_basic'` on BookStack's `oidcClient`
+in `services.ts` (backend/src/config/services.ts:318) — no compose/env
+changes, no hand-edited Authelia config. Existing test suite (1225 tests)
+passes unchanged; no test pinned BookStack's OIDC config specifically before
+this.
+
+Rollout: the fix only changes what `syncAutheliaOidcClients` renders, which
+only re-runs on boot, an exposure change, or the ~6h reconciler sweep — a
+plain BookStack restart would **not** have picked it up. Backend restart
+(forces the `boot` sync) is the way to apply it once this reaches the box;
+that's a live-stack action for the user's Update-page pull, not done here.

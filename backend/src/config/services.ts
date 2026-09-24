@@ -319,6 +319,12 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       redirectPaths: ['/oidc/callback'],
       secretEnvKey: 'BOOKSTACK_OIDC_CLIENT_SECRET',
       scopes: ['openid', 'profile', 'email', 'groups'],
+      // BookStack's league/oauth2-client provider authenticates to the token
+      // endpoint with HTTP Basic, same as Vikunja/Mealie (§279) — with the
+      // default client_secret_post, Authelia's token endpoint 401s
+      // `invalid_client` (live-verified 2026-09-24: full round-trip login
+      // was never actually exercised when §345 called this "working").
+      tokenEndpointAuthMethod: 'client_secret_basic',
       appEnv: {
         BOOKSTACK_AUTH_METHOD: 'oidc',
         BOOKSTACK_AUTH_AUTO_INITIATE: 'true',

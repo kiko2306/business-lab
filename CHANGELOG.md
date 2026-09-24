@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.148.2] — 2026-09-24
+
+### Fixed
+
+- BookStack OIDC login: token endpoint now uses client_secret_basic, matching what its league/oauth2-client provider actually sends (Authelia was rejecting the callback with invalid_client)
+
 ## [0.148.1] — 2026-09-24
 
 ### Fixed
