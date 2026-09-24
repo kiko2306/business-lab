@@ -32256,3 +32256,35 @@ build` for tally succeeds with an unreadable `data/db` planted beside the
 context (it failed identically before); both images also build from their new
 contexts and tally's carries `/app/dist/agent` with the versioned setup exe.
 Not verified: the run on the box itself (README TODO).
+
+## 675. Fixed: CrowdSec banned the operator over Vikunja's expired-session retries
+
+Report: "crowdsec is blocking me, a lot of alerts were sent during these tests".
+Not Tally — the agent never appears in the ban log. From `cscli alerts` and NPM's
+access log on `beta`: 13 alerts on the operator's IPv6 between 16:49 and 17:06
+UTC. The first (`http-generic-401-bf`, #317) was a Vikunja browser tab whose
+session had lapsed: its SPA retried `POST /api/v1|v2/user/token/refresh` a dozen
+times inside one second, every one a 401. That banned the address at NPM; the
+next twelve (`http-generic-403-bf`) were the operator's other clients — NetBird's
+`ManagementService/GetServerKey` on `netbird-vpn-api` — retrying while banned and
+being answered with the ban's own 403, each one re-arming the scenario and raising
+another alert. So one benign 401 burst became a self-sustaining ban with an alert
+every minute or two. No decision was active by the time it was looked at; the
+last alert was 17:06.
+
+Fix, the §539 way: `apps/crowdsec/config/parsers/vikunja-refresh-whitelist.yaml`
+(checked in, mounted into `s02-enrich`) drops requests to exactly the two refresh
+paths on the `vikunja.` host. Proven with `cscli explain` on the real log line in a
+throwaway CrowdSec with the same collections: the refresh line is "ignored by
+whitelist"; the same line on `/user/token/login` (a real login guess) still
+reaches `http-generic-401-bf`; and a `../../etc/passwd` variant of the refresh
+path still reaches `http-path-traversal-probing`. Rejected: allowlisting the
+operator's IP (no static address, §539); whitelisting the NetBird 403s (they are
+a symptom of the ban, and the same path from anyone else is worth counting).
+
+Left open, as a README item: a *banned* client's own retries re-arming the 403
+scenario is generic — any ban can now prolong itself. And noticed in passing:
+`2.82.103.227` (the box/home address) gets a 401 on
+`netbird-vpn-api…/api/networks` about every 30 s from Uptime-Kuma and the
+dashboard backend, i.e. a NetBird API credential is being rejected on a timer —
+harmless to CrowdSec so far, but it is the same shape as tonight's ban.

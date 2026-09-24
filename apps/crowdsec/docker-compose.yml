@@ -48,6 +48,7 @@ services:
       - ./config/acquis.yaml:/etc/crowdsec/acquis.d/npm.yaml:ro
       # Operator false-positive whitelist (plan.md §538). Checked in.
       - ./config/parsers/onlyoffice-whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/homelab-onlyoffice-whitelist.yaml:ro
+      - ./config/parsers/vikunja-refresh-whitelist.yaml:/etc/crowdsec/parsers/s02-enrich/homelab-vikunja-whitelist.yaml:ro
       # profiles.yaml (alert -> decision, plus the alert notification) and the
       # notification-http config, both rendered by the dashboard backend
       # (services/crowdsecConfig.ts) from the "CrowdSec alerts" setting on each

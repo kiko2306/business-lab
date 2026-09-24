@@ -1,0 +1,22 @@
+# Mounted into /etc/crowdsec/parsers/s02-enrich/ (plan.md §675). Static, so
+# checked in rather than rendered.
+#
+# When a Vikunja session expires, its SPA retries POST
+# /api/v1/user/token/refresh and /api/v2/user/token/refresh and gets a 401 each
+# time — a dozen inside one second from a browser tab someone forgot open.
+# That tripped http-generic-401-bf and banned the operator at NPM, whose 403s
+# then re-fed http-generic-403-bf (every retry by any of that person's clients,
+# NetBird's included, extended the ban and raised another alert: 13 in 17
+# minutes). "Your login lapsed" is not a brute force.
+#
+# Drops only the two exact refresh paths on the vikunja host; `..` or
+# percent-encoding stays visible, and every other Vikunja 401 (a real login
+# guess) still counts.
+name: homelab/vikunja-refresh-whitelist
+description: "Vikunja's token-refresh retries after a session expires are not a brute force"
+whitelist:
+  reason: "Vikunja token refresh after session expiry"
+  expression:
+    - >-
+      evt.Parsed.target_fqdn startsWith 'vikunja.' &&
+      evt.Parsed.request matches '^/api/v[12]/user/token/refresh$'

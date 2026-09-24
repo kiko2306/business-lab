@@ -467,6 +467,20 @@ before anything is built.
       (`apps/tally/app`, `apps/hotel/api`) so the unreadable `data/db` is no
       longer inside them — if `hotel` is installed, its update must rebuild
       `hotel-core` too rather than fail with "can't stat".
+- [ ] **Beta-test the Vikunja refresh whitelist (plan.md §675)** — after the
+      update recreates `crowdsec`, `cscli parsers list` should list
+      `homelab/vikunja-refresh-whitelist`. Then let a Vikunja session lapse
+      (leave a tab open past expiry, or clear its cookies and reload) — its
+      401 refresh retries must no longer raise an alert or a ban
+      (`cscli alerts list` stays empty for your address).
+- [ ] **Stop a banned client's retries from re-arming CrowdSec (plan.md §675)**
+      — during the ban, NetBird's 403-answered retries raised 12 more alerts and
+      extended it. Decide how to keep a ban from feeding itself (the scenario
+      counts the bouncer's own 403s) without hiding real 403 brute force.
+- [ ] **Find out why NetBird's API rejects the box's own polling (plan.md
+      §675)** — `netbird-vpn-api.…/api/networks` returns 401 to Uptime-Kuma and
+      the dashboard backend about every 30 s. A stale or missing NetBird API token
+      somewhere; the dashboard should mint/refresh it itself (principle 3).
 - [ ] **Run the single-file Tally setup for real, elevated** — plan.md §670.
       Its prompts, `install.config` presets and validation were tested
       un-elevated, and the Docker build of the exe on Linux; the elevated part
