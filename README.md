@@ -489,6 +489,13 @@ before anything is built.
       guests and reservations re-sync from Wintouch), so check-in and feedback
       links already in guests' inboxes stop working at cutover. Decide between
       a quiet window and a one-off re-send, per client, before the first one.
+- [ ] **Build the `hotel` agent** — the Windows service that drives the sync
+      endpoints built in plan.md §639. Unlike `tally`'s it must **write** as
+      well as read, so per §629 it reads Wintouch over SQL but writes check-ins
+      back through Wintouch's own assemblies — which pins it to x86 (§636's
+      finding, tracked separately). `apps/tally/agent/` is the worked example
+      for config, enrolment, DPAPI token storage and the reconnect loop; the
+      transport here is plain outbound HTTPS rather than a socket (§627).
 - [ ] **Decide whether the admin shell is its own container** — plan.md §638.
       §628 allocated `hotel-admin` on `10600` as a separate container on the
       primary hostname; registering the app raised the simpler option of

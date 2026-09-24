@@ -233,3 +233,144 @@ test('only one agent is active at a time', { skip }, async () => {
     /duplicate key/
   );
 });
+
+// ---------------------------------------------------------------------------
+// The sync: units, guests and reservations in, completed check-ins back out.
+// ---------------------------------------------------------------------------
+
+/** Enrols an agent and returns its token. */
+async function enrolAgent(): Promise<string> {
+  const issued = await call('POST', '/api/agent/enrolment-code', { headers: ADMIN });
+  const enrolled = await call('POST', '/agent/enrol', { body: { code: issued.body.code } });
+  return enrolled.body.token;
+}
+
+test('the sync is refused without an agent token', { skip }, async () => {
+  assert.equal((await call('POST', '/agent/units', { body: [] })).status, 401);
+  assert.equal((await call('GET', '/agent/checkins/pending')).status, 401);
+});
+
+test('units sync by code, and a sync never resets the flow switches', { skip }, async () => {
+  const token = await enrolAgent();
+  await call('POST', '/agent/units', { token, body: [{ code: 'A', name: 'Alpha' }] });
+
+  const [unit] = (await call('GET', '/api/units', { headers: ADMIN })).body;
+  await call('PATCH', `/api/units/${unit.id}`, { headers: ADMIN, body: { checkinActive: true } });
+
+  // The switches are an admin's decision here, not Wintouch's — a re-sync
+  // that reset them would silently stop every check-in email.
+  await call('POST', '/agent/units', { token, body: [{ code: 'A', name: 'Alpha renamed' }] });
+  const [after] = (await call('GET', '/api/units', { headers: ADMIN })).body;
+  assert.equal(after.name, 'Alpha renamed');
+  assert.equal(after.checkinActive, true);
+});
+
+test('a guest with pending edits is skipped, not overwritten', { skip }, async () => {
+  // The legacy bug: its guest sync was a blind updateOrCreate and ran *before*
+  // the check-in write-back, so a guest who corrected their details online had
+  // them replaced with the stale Wintouch values on the next tick — and the
+  // stale values were then written back. Silent data loss.
+  const token = await enrolAgent();
+  await call('POST', '/agent/guests', { token, body: [{ code: 'G1', firstName: 'Ana', lastName: 'Old' }] });
+  await pool.query(`UPDATE guests SET last_name = 'Corrected', has_changes = true WHERE code = 'G1'`);
+
+  const result = await call('POST', '/agent/guests', {
+    token,
+    body: [{ code: 'G1', firstName: 'Ana', lastName: 'Old' }],
+  });
+  assert.deepEqual(result.body, { saved: 0, skipped: 1 });
+  const { rows } = await pool.query(`SELECT last_name FROM guests WHERE code = 'G1'`);
+  assert.equal(rows[0].last_name, 'Corrected');
+});
+
+test('reservations sync without resetting what this side owns', { skip }, async () => {
+  const token = await enrolAgent();
+  await call('POST', '/agent/units', { token, body: [{ code: 'A', name: 'Alpha' }] });
+  await call('POST', '/agent/guests', { token, body: [{ code: 'G1', firstName: 'Ana' }] });
+
+  const body = [{
+    unitCode: 'A', number: '100', line: 1, guestCode: 'G1',
+    roomCode: '12', roomName: 'Twin', adults: 2, children: 1, babies: 0,
+    checkin: '2026-03-01', checkout: '2026-03-04', status: 'RESERVED', channel: 'direct',
+    extras: [{ code: 'E1', firstName: 'Bruno', ageGroup: 1 }],
+  }];
+  assert.deepEqual((await call('POST', '/agent/reservations', { token, body })).body,
+    { saved: 1, unknownUnits: [] });
+
+  // A check-in email has gone out; the next tick must not un-send it.
+  await pool.query(`UPDATE reservations SET checkin_sent = true`);
+  await call('POST', '/agent/reservations', { token, body });
+  const { rows } = await pool.query(`SELECT checkin_sent, room_name FROM reservations`);
+  assert.equal(rows.length, 1, 'the upsert must not duplicate on re-sync');
+  assert.equal(rows[0].checkin_sent, true);
+  assert.equal(rows[0].room_name, 'Twin');
+});
+
+test('a reservation for an unknown unit is reported, not fatal', { skip }, async () => {
+  // The units sync runs first, so a brand new property simply arrives on the
+  // next tick — failing the whole batch over it would stall every other one.
+  const token = await enrolAgent();
+  const res = await call('POST', '/agent/reservations', {
+    token,
+    body: [{ unitCode: 'NOPE', number: '1', line: 1, checkin: '2026-03-01', checkout: '2026-03-02' }],
+  });
+  assert.deepEqual(res.body, { saved: 0, unknownUnits: ['NOPE'] });
+});
+
+test("Wintouch's 1900-01-01 placeholder is stored as unknown", { skip }, async () => {
+  const token = await enrolAgent();
+  await call('POST', '/agent/guests', { token, body: [{ code: 'G1', birthDate: '1900-01-01' }] });
+  const { rows } = await pool.query(`SELECT birth_date FROM guests WHERE code = 'G1'`);
+  // Storing it as a real date would claim knowledge the PMS does not have.
+  assert.equal(rows[0].birth_date, null);
+});
+
+test('a completed check-in goes back once, then reopens the guest to syncing', { skip }, async () => {
+  const token = await enrolAgent();
+  await call('POST', '/agent/units', { token, body: [{ code: 'A', name: 'Alpha' }] });
+  await call('POST', '/agent/guests', { token, body: [{ code: 'G1', firstName: 'Ana' }] });
+  await call('POST', '/agent/reservations', {
+    token,
+    body: [{ unitCode: 'A', number: '100', line: 1, guestCode: 'G1', checkin: '2026-03-01', checkout: '2026-03-04' }],
+  });
+
+  // The guest completes check-in online.
+  await pool.query(`UPDATE reservations SET checkin_success = true`);
+  await pool.query(`UPDATE guests SET has_changes = true, last_name = 'Corrected' WHERE code = 'G1'`);
+
+  const pending = await call('GET', '/agent/checkins/pending', { token });
+  assert.equal(pending.body.length, 1);
+  assert.equal(pending.body[0].guest.lastName, 'Corrected');
+
+  const ack = await call('POST', `/agent/checkins/${pending.body[0].token}/ack`, { token, body: { ok: true } });
+  assert.equal(ack.body.acknowledged, true);
+
+  // Written back, so it stops appearing and the guest resumes syncing.
+  assert.equal((await call('GET', '/agent/checkins/pending', { token })).body.length, 0);
+  const { rows } = await pool.query(`SELECT has_changes FROM guests WHERE code = 'G1'`);
+  assert.equal(rows[0].has_changes, false);
+});
+
+test('a failed write-back leaves the check-in to be retried', { skip }, async () => {
+  const token = await enrolAgent();
+  await call('POST', '/agent/units', { token, body: [{ code: 'A', name: 'Alpha' }] });
+  await call('POST', '/agent/reservations', {
+    token,
+    body: [{ unitCode: 'A', number: '100', line: 1, checkin: '2026-03-01', checkout: '2026-03-04' }],
+  });
+  await pool.query(`UPDATE reservations SET checkin_success = true`);
+
+  const pending = await call('GET', '/agent/checkins/pending', { token });
+  await call('POST', `/agent/checkins/${pending.body[0].token}/ack`, { token, body: { ok: false } });
+
+  // Still pending: a transient Wintouch error must self-heal on the next tick
+  // rather than silently dropping a guest's check-in.
+  assert.equal((await call('GET', '/agent/checkins/pending', { token })).body.length, 1);
+});
+
+test('an oversized batch is refused rather than absorbed', { skip }, async () => {
+  const token = await enrolAgent();
+  const huge = Array.from({ length: 1001 }, (_, i) => ({ code: `U${i}`, name: 'x' }));
+  assert.equal((await call('POST', '/agent/units', { token, body: huge })).status, 400);
+  assert.equal((await call('POST', '/agent/units', { token, body: { not: 'an array' } })).status, 400);
+});

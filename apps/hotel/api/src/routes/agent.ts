@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
 import { requireAgent } from '../auth';
+import { ingestRoutes } from './ingest';
 import { generateAgentToken, hash, normaliseCode } from '../tokens';
 
 /**
@@ -88,6 +89,10 @@ export function agentRoutes(pool: Pool): Router {
       }))
     );
   });
+
+  // The sync itself — units, guests and reservations in; completed check-ins
+  // back out. Same /agent prefix, same token auth.
+  router.use(ingestRoutes(pool));
 
   return router;
 }

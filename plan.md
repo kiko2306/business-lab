@@ -30353,3 +30353,63 @@ each of the four flags toggles independently without a partial update nulling
 its siblings, and the full enrol → list units → revoke → re-enrol cycle
 including code reuse, expiry and supersession. Backend suite 1191. The image
 builds, and a `hotel-core` CI job runs the same against a postgres service.
+
+## 639. Implemented: the hotel agent's sync endpoints
+
+What the property agent pushes in and pulls back out (§620's four jobs, minus
+the transport). Units, guests and reservations flow **out of** Wintouch and are
+mirrored here; completed check-ins are the only thing that flows back.
+
+Every endpoint is an upsert and safe to repeat — the agent re-sends the same
+window on every tick, and a batch retried after a dropped connection must not
+double anything.
+
+### A data-loss bug in the legacy, fixed here
+
+The legacy's guest sync is a blind `Guest::updateOrCreate`, and the agent's
+tick order is units → guests → reservations → check-in write-back (§620). So a
+guest who corrected their passport number during online check-in had it
+**overwritten with the stale Wintouch value** on the next tick — and that stale
+value was then written back into Wintouch as though it were their answer. The
+correction disappeared with nothing logged, which is the worst way to lose it.
+
+Here the guest upsert carries `WHERE guests.has_changes = false`, so a row with
+edits still waiting is skipped and counted (`{ saved, skipped }`) rather than
+clobbered. Acknowledging the write-back clears `has_changes` in the same
+statement that marks the check-in notified, reopening the row to syncing at
+exactly the moment Wintouch holds what the guest typed.
+
+### What each upsert deliberately does not touch
+
+- **Units**: only the name is refreshed. `checkin_is_active` and its three
+  siblings are an admin's decision in this app, not Wintouch's — a sync that
+  reset them would silently stop every check-in email.
+- **Reservations**: `checkin_sent`, `checkin_success`, `quiz_sent` and
+  `quiz_answered` are omitted from the `DO UPDATE`. Listing them would reset
+  them every tick, re-sending every check-in email every five minutes for ever.
+
+Both are asserted, because both are invisible until they are wrong in
+production.
+
+### Smaller decisions
+
+- A reservation for an unknown unit is **counted and skipped**, not fatal: the
+  units sync runs first, so a new property arrives on the next tick, and
+  failing the batch over it would stall every other reservation.
+- Extras are replaced wholesale per reservation rather than diffed — Wintouch
+  is the source until the guest checks in, and a diff would leave a removed
+  occupant behind.
+- `1900-01-01` is stored as NULL. Wintouch uses it as "unknown"; keeping it as
+  a real date claims knowledge the PMS does not have, and it would be the
+  oldest birthday in any report built on this.
+- A failed write-back marks **nothing**, so the check-in reappears next tick. A
+  transient Wintouch error self-heals instead of silently dropping a guest's
+  check-in.
+- Batches are capped at 1000, so one malformed request cannot exhaust memory.
+
+### Verification
+
+22 tests against a real `postgres:17-alpine`, including the two
+must-not-reset cases, the pending-edit skip, the unknown-unit path, the
+placeholder date, and the full completed-check-in round trip with both a
+successful and a failed acknowledgement.
