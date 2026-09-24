@@ -31250,3 +31250,17 @@ adds (replacing the four it closes).
 
 Build-only, against the real vendor assemblies (above) — no automated test
 suite, and no CI job (see above). No live run.
+
+## 654. Fixed: stale "migrate sample/hotel" README item deleted (§620–§653)
+
+The umbrella item from §620 ("Build `check-in` + `pulse` + `hotel-core`")
+listed six things to carry over and one decision to take before building.
+All seven are done: the four sync jobs and the `exportado` watermark
+(§653), the check-in/quiz email schedules (§651), the guest-facing
+check-in form (§642), the 15-minute agent-down alert (§651), the
+per-client-instance decision (one box, one client — §624, §629), and what
+replaces `GET /api/config` (§653, credentials read locally). The one open
+decision it flagged — whether check-out/payment is in scope — was already
+answered in §629 ("all three half-built features are in") and has had its
+own, more specific README item since. Nothing left for this item to cover
+that isn't either done or tracked elsewhere.

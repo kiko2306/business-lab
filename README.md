@@ -377,22 +377,6 @@ own Dockerfile, tests and CI job.
 The `sample/` copies stay reference-only. Per-slice scope is still proposed
 before anything is built.
 
-- [ ] **Build `check-in` + `pulse` + `hotel-core` (migrate `sample/hotel`)** — how the
-      existing system works is in plan.md §620. The migration has to carry
-      over: the four sync jobs and their direction (units, guests and
-      reservations push out of Wintouch; completed check-ins are the only
-      write back in, including the `observacoes` stamp reception reads), the
-      `exportado` watermark on `wgcterceiros` that makes the guest sync
-      incremental, the check-in and quiz email schedules with their per-unit
-      offsets and active flags, the guest-facing check-in form covering every
-      occupant, and the 15-minute agent-down alert. Decide before building:
-      whether to keep the per-client-instance model at all (`setup/` and
-      `trigenius/` have already drifted 135 entries apart, which is what
-      `update-clients.sh` exists to fight), and what replaces
-      `GET /api/config` handing out the Wintouch credentials to anyone who
-      asks. The dormant check-out/payment half (`CheckOut.cs`, night audit,
-      invoice/payment DAOs) is in-scope only if online payment is wanted —
-      confirm either way rather than porting it by default.
 - [ ] **Prove the agent WebSocket survives the Cloudflare Tunnel** — the
       server side is built and works end to end through real containers
       (plan.md §634): an agent dials out to `/agent/connect`, authenticates
