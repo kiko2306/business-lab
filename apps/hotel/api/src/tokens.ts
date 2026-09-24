@@ -3,7 +3,7 @@ import crypto from 'crypto';
 /**
  * Enrolment codes and agent tokens (plan.md §627).
  *
- * ponytail: a copy of apps/tally/api/src/tokens.ts, not a shared module. Each
+ * ponytail: a copy of apps/tally/app/api/src/tokens.ts, not a shared module. Each
  * app image builds from its own context and cannot reach a sibling, the same
  * wall the theme hit (§633) — and a package mechanism for ~50 lines of crypto
  * costs more than it saves. If a third app needs these, share them properly

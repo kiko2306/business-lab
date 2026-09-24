@@ -1,7 +1,9 @@
-# Sits at apps/tally/ rather than inside api/ so it can reach both source
-# trees: the Angular bundle in web/ is built here and served by the API
-# process, so tally is one image on one port behind one hostname (§628, §632).
-# A build context of ./api could not see a sibling web/.
+# Sits at apps/tally/app/ rather than inside api/ so it can reach all three
+# source trees: the Angular bundle in web/ is built here and served by the API
+# process, so tally is one image on one port behind one hostname (§628, §632),
+# and the shop agent in agent/ is published into it (§670). A build context of
+# ./api could not see the siblings. The context is app/, not apps/tally/, so
+# it never includes data/ (§674).
 
 FROM node:22-alpine AS web-build
 WORKDIR /web

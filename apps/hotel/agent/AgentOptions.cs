@@ -12,7 +12,7 @@ namespace Hotel.Agent
     /// tally, which is one agent per shop), so there is nothing to bind.
     ///
     /// The Wintouch *application* user is asked for here rather than derived,
-    /// unlike tally's SQL Server login (AgentOptions in apps/tally/agent):
+    /// unlike tally's SQL Server login (AgentOptions in apps/tally/app/agent):
     /// `SetCurrentUser` needs a Wintouch operator account, which has no
     /// equivalent sitting in Wintouch's own config for this code to read.
     /// Still entered once, locally, and never transmitted (§627) — this

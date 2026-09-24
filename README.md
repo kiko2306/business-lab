@@ -456,14 +456,17 @@ before anything is built.
       should be Running again under a new PID and reconnect in the dashboard.
       Also try it while the agent is unenrolled or the server is unreachable:
       it should stay Running and retry, not exit.
-- [ ] **Beta-test that an update rebuilds apps built from source (plan.md §673)**
+- [ ] **Beta-test that an update rebuilds apps built from source (plan.md §673, §674)**
       — on `beta`, after pulling this version, run the Update page and watch
       `tally`: its image should be rebuilt (`docker images tally-tally` shows a
       new timestamp; the update result names `tally-tally:latest`), not just
       recreated. The first build is slow (SDK image pull, `npm ci`, `ng build`,
       .NET publish) and runs under the classic builder — if it fails with a
       buildx/403 error, that is §290 again. Then the Tally page's **Download
-      setup** card must appear for an admin.
+      setup** card must appear for an admin. Tally's and hotel's build contexts moved
+      (`apps/tally/app`, `apps/hotel/api`) so the unreadable `data/db` is no
+      longer inside them — if `hotel` is installed, its update must rebuild
+      `hotel-core` too rather than fail with "can't stat".
 - [ ] **Run the single-file Tally setup for real, elevated** — plan.md §670.
       Its prompts, `install.config` presets and validation were tested
       un-elevated, and the Docker build of the exe on Linux; the elevated part

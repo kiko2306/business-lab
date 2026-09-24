@@ -61,7 +61,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/tally/api
+        working-directory: apps/tally/app/api
     services:
       postgres:
         image: postgres:17-alpine
@@ -82,7 +82,7 @@ jobs:
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: apps/tally/api/package-lock.json
+          cache-dependency-path: apps/tally/app/api/package-lock.json
       - run: npm ci
       - run: npm run typecheck
       - run: npm run build
@@ -246,16 +246,16 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Theme copy is in step with the dashboard's
-        run: diff frontend/src/styles.css apps/tally/web/src/theme.css
+        run: diff frontend/src/styles.css apps/tally/app/web/src/theme.css
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
           cache: npm
-          cache-dependency-path: apps/tally/web/package-lock.json
+          cache-dependency-path: apps/tally/app/web/package-lock.json
       - run: npm ci
-        working-directory: apps/tally/web
+        working-directory: apps/tally/app/web
       - run: npm run build
-        working-directory: apps/tally/web
+        working-directory: apps/tally/app/web
 
   tally-agent:
     # Builds on Linux because the tally agent is plain net8.0: it only reads
@@ -263,7 +263,7 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: apps/tally/agent
+        working-directory: apps/tally/app/agent
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4

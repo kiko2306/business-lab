@@ -7,7 +7,11 @@ services:
   tally:
     mem_limit: 256m
     mem_reservation: 64m
-    build: .
+    # ./app, not . — the build context must not contain data/: tally-db's data
+    # directory there is mode 0700 for postgres, and the classic builder the
+    # dashboard uses (§290) refuses a context it cannot read, whatever
+    # .dockerignore says (§674). price-compare and pantry do the same.
+    build: ./app
     restart: unless-stopped
     ports:
       - "${TALLY_PORT:-10610}:3000"

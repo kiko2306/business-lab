@@ -32223,3 +32223,36 @@ Also confirmed the "webmaster only" requirement is already met, no code change:
 Authelia's `admins` group is given only to a webmaster (`autheliaSync.ts`), and
 tally's `requireAdmin`/`isAdmin` keys on it, on both the API route and the UI
 card. Said so in a comment on `readIdentity` so it does not read as "any admin".
+
+## 674. Fixed: the rebuild-on-update failed on the box — build contexts must not contain `data/`
+
+§673's rebuild ran on `beta` and failed: `checking context: can't stat
+'.../apps/tally/data/db'`. Tally's compose had `build: .`, so the context was
+`apps/tally/`, which contains `data/db` — postgres's data directory, mode 0700
+for uid 999, unreadable to the backend container's user. The classic builder the
+dashboard uses (§290) walks the whole context *before* it applies
+`.dockerignore`, and fails on any directory it cannot read.
+
+**Rejected: `.dockerignore`.** The obvious fix, and it does not work: reproduced
+locally with a mode-000 `data/` and every pattern (`data`, `/data`, `data/`,
+`data/**`, `**/data`) — the legacy validator's Go `filepath.Walk` hands the
+readdir error to its callback before the exclusion check runs. (BuildKit would
+honour the ignore, but it needs the buildx container's EXEC, which the socket
+proxy withholds — §290.)
+
+**Fix, the layout `price-compare` and `pantry` already use:** the build context
+is a subdirectory that never contains `data/`.
+- `apps/tally/`: `agent/ api/ web/ Dockerfile .dockerignore` moved to
+  `apps/tally/app/`; compose says `build: ./app`. CI paths, the theme-sync
+  script and code comments updated to `apps/tally/app/...`. (Older plan sections
+  still cite the old paths — they describe what was true then.)
+- `apps/hotel/`: same trap for `hotel-core` (`build: .`, `data/db` beside it).
+  The Dockerfile only ever needed `api/`, so it moved to `apps/hotel/api/` and
+  the compose says `build: ./api`. The three frontends already had their own
+  contexts.
+
+Verified with the dashboard's exact recipe: `DOCKER_BUILDKIT=0 docker compose
+build` for tally succeeds with an unreadable `data/db` planted beside the
+context (it failed identically before); both images also build from their new
+contexts and tally's carries `/app/dist/agent` with the versioned setup exe.
+Not verified: the run on the box itself (README TODO).

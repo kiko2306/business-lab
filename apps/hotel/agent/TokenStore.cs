@@ -7,7 +7,7 @@ namespace Hotel.Agent
 {
     /// <summary>
     /// Where the agent's long-lived token lives (plan.md §627), same shape as
-    /// tally's (apps/tally/agent/TokenStore.cs): DPAPI-encrypted at machine
+    /// tally's (apps/tally/app/agent/TokenStore.cs): DPAPI-encrypted at machine
     /// scope under %ProgramData%, never plaintext beside the executable the
     /// way the legacy's config files held every secret they had (§622).
     ///
