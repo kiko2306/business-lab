@@ -401,7 +401,7 @@ before anything is built.
       with its enrolment token, and browser reads relay to it live. What is
       **not** proven is the one hop that cannot be tested here — a long-lived
       WebSocket through Cloudflare Tunnel → NPM → the container. Check on
-      `beta`: the socket establishes through the public hostname, survives
+      `beta`: the socket establishes through the public hostname (the Windows agent from §669 did), survives
       longer than the tunnel's idle timeout (the 30 s ping/pong should carry
       it), and reconnects by itself after the tunnel restarts. If it does not
       hold, §627 records the fallback — timer-pushed snapshots with a cached
@@ -440,6 +440,14 @@ before anything is built.
       `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
       the public ones do not, the app's bypass path still answers
       unauthenticated, and Authelia restarts cleanly rather than crash-looping.
+- [ ] **Confirm the installed Tally agent serves live Wintouch reads** —
+      plan.md §669 proved install + enrolment, not the data. Open the shop's
+      dashboard on `https://tally.tx-home-utils.com/`: it should show live
+      tables, guests and open tabs (not an offline/error state), and one
+      number (free tables or open tabs) should match Wintouch itself.
+      Invoiced/staff/hourly are empty unless the date has sales (demo data
+      is 2026-07-27, §636). If it misbehaves, stop the service and run
+      `Tally.Agent.exe` from an elevated console to see its log.
 - [ ] **Re-run `install.ps1` against an installed agent** — plan.md §669
       proved the first install on a real machine. Still to confirm: re-running
       with a fresh enrolment code takes the `Restart-Service` branch rather
