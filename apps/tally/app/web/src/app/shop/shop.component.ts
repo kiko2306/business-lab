@@ -30,6 +30,14 @@ export class ShopComponent implements OnInit, OnDestroy {
   soldItems: SoldItemsView | null = null;
 
   tab: Tab = 'tables';
+  /**
+   * The day being looked at, yyyy-MM-dd. Empty means the running day — the one
+   * Wintouch has open — which is what a floor screen wants and refreshes on its
+   * own. Any other day is read from Wintouch's archive of closed days (§682).
+   */
+  date = '';
+  /** The running day, learned from the first response for it; also the latest day the picker allows. */
+  runningDate: string | null = null;
   loading = true;
   /** Set when the shop's agent is not connected — a distinct state from an error. */
   offline = false;
@@ -49,7 +57,8 @@ export class ShopComponent implements OnInit, OnDestroy {
     // A floor dashboard is left open on a screen, so it refreshes itself. The
     // figures are read live from the shop on every call — there is no cache to
     // go stale, only this interval.
-    this.timer = setInterval(() => this.refresh(true), 30_000);
+    // A closed day cannot change, so only the running day is re-read.
+    this.timer = setInterval(() => { if (!this.date) this.refresh(true); }, 30_000);
   }
 
   ngOnDestroy(): void {
@@ -65,12 +74,28 @@ export class ShopComponent implements OnInit, OnDestroy {
     this.openTable = this.openTable === table ? null : table;
   }
 
+  /** A closed day: the live-only panels and the Tables tab have nothing to say about it. */
+  get viewingArchive(): boolean {
+    return !!this.date;
+  }
+
+  /** Picking the running day itself is not "another day" — it goes back to the live view. */
+  pickDate(value: string): void {
+    this.date = !value || value === this.runningDate ? '' : value;
+    // Open tables are the running moment; a closed day has none to show.
+    if (this.date && this.tab === 'tables') this.tab = 'items';
+    this.overview = null;
+    this.soldItems = null;
+    this.refresh();
+  }
+
   /** `quiet` keeps the current figures on screen while re-fetching. */
   refresh(quiet = false): void {
     if (!quiet) this.loading = true;
-    this.api.overview(this.storeId).subscribe({
+    this.api.overview(this.storeId, this.date || undefined).subscribe({
       next: (overview) => {
         this.overview = overview;
+        if (!overview.archive && overview.businessDate) this.runningDate = overview.businessDate;
         this.offline = false;
         this.error = '';
         this.loading = false;
@@ -78,13 +103,13 @@ export class ShopComponent implements OnInit, OnDestroy {
       error: (err) => this.fail(err),
     });
 
-    if (this.tab === 'tables') {
+    if (this.tab === 'tables' && !this.date) {
       this.api.tables(this.storeId).subscribe({
         next: (tables) => (this.tables = tables),
         error: (err) => this.fail(err),
       });
     } else {
-      this.api.soldItems(this.storeId).subscribe({
+      this.api.soldItems(this.storeId, this.date || undefined).subscribe({
         next: (items) => (this.soldItems = items),
         error: (err) => this.fail(err),
       });

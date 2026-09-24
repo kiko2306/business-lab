@@ -488,12 +488,18 @@ before anything is built.
       **Items sold** tab with 107 items / 434 units, each with its article code
       and family (top: Cerveja Barona Lagger P0316 ×33), and no "Pode Sair Mesa" — not
       empty (§678).
-- [ ] **Add older days to Tally from Wintouch's archive (plan.md §677)** — a date
-      picker reading `wgcdoccab` / `wgcdoclinhas` / `wgcpagamentos` for any day
-      before the running one. Read `wgcpagamentos`' columns, take line values
-      from the line's own value/discount columns (not qty × price), and
-      reconcile per-day totals with the headers before showing money. Check what
-      day close does with the boundary day. Second priority to the running day.
+- [ ] **Look at older days from the new agent (plan.md §682)** — after installing
+      the new setup exe, the shop page has a **Day** picker. Pick 03/06/2026: the
+      header must read "Closed day 03/06/2026", invoiced €9,494.45, staff led by
+      Philipe Santos, payments Cartao €7,950.53 / Dinheiro €1,154.92 / On Line
+      €500.00 (sales only — no refunds), the items table topped by Couvert, and no
+      open-tabs/tables/guests cards or Tables tab. **Running day** must return to
+      27/07/2026 with €9,640.16 and the live panels. Also try a day with a group
+      menu priced on its header (14/05/2026: "Menu Grupo 50" ×16 = €960.00).
+- [ ] **Decide whether Tally should show refunds (plan.md §682)** — devolutions are
+      now left out of every figure as "not a sale". If the operator wants them
+      visible, a separate "Refunds" figure per day (they are stored positive) is the
+      addition; not built.
 - [ ] **Confirm the agent comes back within seconds of a dashboard update
       (plan.md §679)** — with the new setup exe installed, run an Update that
       rebuilds Tally. The shop should show Offline only while the container is

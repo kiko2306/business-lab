@@ -54,12 +54,12 @@ async function enrolledStore(name: string): Promise<{ id: string; token: string 
  */
 async function connectAgent(
   token: string,
-  reply: (method: string) => { ok: boolean; data?: unknown; error?: string }
+  reply: (method: string, params?: unknown) => { ok: boolean; data?: unknown; error?: string }
 ): Promise<WebSocket> {
   const ws = new WebSocket(`${wsBase}/agent/connect`, { headers: { Authorization: `Bearer ${token}` } });
   ws.on('message', (raw) => {
     const frame = JSON.parse(raw.toString());
-    const answer = reply(frame.method);
+    const answer = reply(frame.method, frame.params);
     ws.send(JSON.stringify({ id: frame.id, ...answer }));
   });
   await new Promise<void>((resolve, reject) => {
@@ -275,4 +275,33 @@ test('the agent version it reports on connect is shown, and kept when it drops o
   // An agent that sends no header (an older build) must not blank it.
   await connectAgent(store.token, () => ({ ok: true, data: {} }));
   assert.equal((await call('GET', '/api/stores', { headers: ADMIN })).body[0].agentVersion, '1.0.0-abcd1234');
+});
+
+test('overview and sold-items pass an optional ?date= to the agent; nothing else does', { skip }, async () => {
+  const store = await enrolledStore('Baixa');
+  const seen: Array<{ method: string; params: unknown }> = [];
+  await connectAgent(store.token, (method, params) => {
+    seen.push({ method, params });
+    return { ok: true, data: {} };
+  });
+
+  // No date: the running day, and no params on the wire at all.
+  await call('GET', `/api/stores/${store.id}/overview`, { headers: ADMIN });
+  assert.deepEqual(seen.pop(), { method: 'overview', params: undefined });
+
+  await call('GET', `/api/stores/${store.id}/overview?date=2026-06-03`, { headers: ADMIN });
+  assert.deepEqual(seen.pop(), { method: 'overview', params: { date: '2026-06-03' } });
+  await call('GET', `/api/stores/${store.id}/sold-items?date=2019-08-15`, { headers: ADMIN });
+  assert.deepEqual(seen.pop(), { method: 'sold_items', params: { date: '2019-08-15' } });
+
+  // A live-state method ignores a date rather than pretending it means something.
+  await call('GET', `/api/stores/${store.id}/tables?date=2026-06-03`, { headers: ADMIN });
+  assert.deepEqual(seen.pop(), { method: 'tables', params: undefined });
+
+  // Anything that is not a real calendar day never reaches the shop.
+  for (const bad of ['yesterday', '2026-6-3', '2026-13-01', '2026-02-30', '2026-06-03T10:00']) {
+    const res = await call('GET', `/api/stores/${store.id}/overview?date=${encodeURIComponent(bad)}`, { headers: ADMIN });
+    assert.equal(res.status, 400, bad);
+  }
+  assert.equal(seen.length, 0);
 });

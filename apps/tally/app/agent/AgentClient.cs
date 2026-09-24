@@ -195,9 +195,9 @@ public sealed class AgentClient(
 
             object data = request!.Method switch
             {
-                "overview" => await reader.ReadOverviewAsync(ct),
+                "overview" => await reader.ReadOverviewAsync(RequestedDate(request.Params), ct),
                 "tables" => await reader.ReadTablesAsync(ct),
-                "sold_items" => await reader.ReadSoldItemsAsync(ct),
+                "sold_items" => await reader.ReadSoldItemsAsync(RequestedDate(request.Params), ct),
                 _ => throw new InvalidOperationException($"unknown method \"{request.Method}\""),
             };
 
@@ -244,7 +244,25 @@ public sealed class AgentClient(
 
     private sealed class TokenRefusedException() : Exception("the server refused the token (401)");
 
-    private sealed record AgentRequest(string? Id, string Method);
+    private sealed record AgentRequest(string? Id, string Method, JsonElement? Params = null);
+
+    /// <summary>
+    /// The trading day a request asks for (`{"date":"yyyy-MM-dd"}`), or null for
+    /// the running day. An unreadable date is an error, not a silent fallback to
+    /// today — showing the wrong day's figures as the requested one is worse than
+    /// saying so.
+    /// </summary>
+    private static DateTime? RequestedDate(JsonElement? parameters)
+    {
+        if (parameters is not { ValueKind: JsonValueKind.Object } p || !p.TryGetProperty("date", out var value)
+            || value.ValueKind == JsonValueKind.Null)
+            return null;
+        if (value.ValueKind == JsonValueKind.String
+            && DateTime.TryParseExact(value.GetString(), "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture,
+                System.Globalization.DateTimeStyles.None, out var date))
+            return date;
+        throw new InvalidOperationException("date must be yyyy-MM-dd");
+    }
 
     private sealed record EnrolResponse(string? AgentId, string? Token, EnrolStore? Store);
 

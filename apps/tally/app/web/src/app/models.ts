@@ -41,6 +41,8 @@ export interface Overview {
   hourly: { hour: number; total: number }[];
   /** The trading day these figures are for, yyyy-MM-dd — the running day, not always today (§677). Absent from an older agent. */
   businessDate?: string;
+  /** True for a closed day read from Wintouch's archive: no open tabs, tables or guests (§682). */
+  archive?: boolean;
 }
 
 export interface TableLine {
@@ -73,6 +75,7 @@ export interface SoldItemsView {
   totalValue: number;
   items: { code?: string; description: string; family?: string; quantity: number; total: number }[];
   businessDate?: string;
+  archive?: boolean;
 }
 
 /** The agent setup exe built into this image (plan.md §670). */

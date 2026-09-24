@@ -20,6 +20,12 @@ namespace Tally.Agent;
 ///    other way round from the labels on its own SQL files; the labels and the
 ///    live data agree, so they win.
 ///  - `wgctiposdocumentos.tipo = 'F'` is an invoice (factura).
+///  - A devolution (refund — DEVFTFO-*, DEVFAT-*, …) is also tipo 'F' but is
+///    flagged `wgctiposdocumentos.devolucao = 1`, and is stored with POSITIVE
+///    amounts and payments. Summed with the sales it *adds* to the takings, so
+///    every figure here counts `tipo = 'F' AND devolucao = 0`: sales only. On
+///    2026-06-03 that is 9,494.45 of sales; the 111.00 of refunds that day was
+///    being counted as takings (§682).
 /// </summary>
 public sealed class ShopReader(string connectionString)
 {
@@ -49,17 +55,23 @@ public sealed class ShopReader(string connectionString)
         return await command.ExecuteScalarAsync(ct) is DateTime latest ? latest : DateTime.Today;
     }
 
-    public async Task<Overview> ReadOverviewAsync(CancellationToken ct)
+    /// <summary>
+    /// The running day when <paramref name="date"/> is null or is that day;
+    /// otherwise a closed day from Wintouch's archive (§682).
+    /// </summary>
+    public async Task<Overview> ReadOverviewAsync(DateTime? date, CancellationToken ct)
     {
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(ct);
         var day = await ResolveDayAsync(connection, ct);
+        if (date is { } requested && requested.Date != day.Date)
+            return await ReadArchiveOverviewAsync(connection, requested.Date, ct);
 
         var invoiced = await ScalarAsync(connection, day, """
             SELECT ISNULL(SUM(CAST(v.total AS DECIMAL(18,2))), 0)
               FROM wsir_vnd_vendas v
               JOIN wgctiposdocumentos d ON v.documento = d.codigo
-             WHERE d.tipo = 'F' AND v.Anulado = 0
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0
                AND CAST(v.EntryDate AS date) = @businessDate
             """, ct);
 
@@ -84,7 +96,7 @@ public sealed class ShopReader(string connectionString)
               FROM wsir_vnd_vendas v
               LEFT JOIN wgcvendedores e ON e.codigo = v.funcionario
               JOIN wgctiposdocumentos d ON v.documento = d.codigo
-             WHERE d.tipo = 'F' AND v.Anulado = 0
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0
                AND CAST(v.EntryDate AS date) = @businessDate
              GROUP BY v.funcionario, e.nome
              HAVING SUM(CAST(v.total AS DECIMAL(18,2))) <> 0
@@ -101,8 +113,9 @@ public sealed class ShopReader(string connectionString)
               LEFT JOIN wgcmeiospagamento m ON m.codigo = p.meiospagamento
              WHERE EXISTS (
                      SELECT 1 FROM wsir_vnd_vendas v
+                       JOIN wgctiposdocumentos d ON d.codigo = v.documento
                       WHERE v.documento = p.documento AND v.numdoc = p.numdoc
-                        AND v.Anulado = 0
+                        AND d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0
                         AND CAST(v.EntryDate AS date) = @businessDate)
              GROUP BY m.descricao, p.meiospagamento
              HAVING SUM(CAST(p.total AS DECIMAL(18,2))) <> 0
@@ -114,7 +127,7 @@ public sealed class ShopReader(string connectionString)
                    SUM(CAST(v.total AS DECIMAL(18,2))) AS total
               FROM wsir_vnd_vendas v
               JOIN wgctiposdocumentos d ON v.documento = d.codigo
-             WHERE d.tipo = 'F' AND v.Anulado = 0
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0
                AND CAST(v.EntryDate AS date) = @businessDate
              GROUP BY DATEPART(hour, v.EntryDate)
             """, r => new HourlyTotal(Convert.ToInt32(r["hour"]), (decimal)r["total"]), ct);
@@ -130,7 +143,8 @@ public sealed class ShopReader(string connectionString)
             staff,
             payments,
             FillHours(hourlyRows),
-            day.ToString("yyyy-MM-dd"));
+            day.ToString("yyyy-MM-dd"),
+            Archive: false);
     }
 
     public async Task<TablesView> ReadTablesAsync(CancellationToken ct)
@@ -199,11 +213,13 @@ public sealed class ShopReader(string connectionString)
             Tables: tables);
     }
 
-    public async Task<SoldItemsView> ReadSoldItemsAsync(CancellationToken ct)
+    public async Task<SoldItemsView> ReadSoldItemsAsync(DateTime? date, CancellationToken ct)
     {
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(ct);
         var day = await ResolveDayAsync(connection, ct);
+        if (date is { } requested && requested.Date != day.Date)
+            return await ReadArchiveSoldItemsAsync(connection, requested.Date, ct);
 
         // tipolinha 'P' is a product line — the rest are discounts, notes and
         // totals, which would double-count if summed as items.
@@ -216,6 +232,14 @@ public sealed class ShopReader(string connectionString)
         // and cannot be matched back reliably. An article missing from the master
         // falls back to the line's own text.
         //
+        // Invoices only (wgctiposdocumentos.tipo = 'F'), the same documents the
+        // invoiced total counts. The rest of the running day's lines belong to
+        // type-K documents that are not sales: `TAL` "Consumo Hotel" (room
+        // charges, which the hotel side bills as its own invoices — counting them
+        // here would count them twice), and the CI_* / CONS* internal-consumption,
+        // offer and tasting documents. Before this, items and payments summed to
+        // 9,694.60 against 9,640.16 invoiced (§682).
+        //
         // Comment articles (family COMENTARIOS — "--- Pode Sair Mesa", a kitchen
         // instruction rung at 0.00) are also 'P' lines but are not things sold;
         // unfiltered, one of them was a day's busiest "item".
@@ -226,8 +250,9 @@ public sealed class ShopReader(string connectionString)
                    SUM(CAST(v.quantidade AS DECIMAL(18,2))) AS quantity,
                    SUM(CAST(v.total AS DECIMAL(18,2))) AS total
               FROM wsir_vnd_vendas v
+              JOIN wgctiposdocumentos d ON d.codigo = v.documento
               LEFT JOIN wgcartigos a ON a.codigo = v.codpedido
-             WHERE v.tipolinha = 'P' AND v.Anulado = 0
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.tipolinha = 'P' AND v.Anulado = 0
                AND CAST(v.EntryDate AS date) = @businessDate
                AND ISNULL(a.familia, '') <> 'COMENTARIOS'
              GROUP BY v.codpedido, ISNULL(a.nome, LTRIM(RTRIM(v.descricao))), ISNULL(a.familia, '')
@@ -236,7 +261,139 @@ public sealed class ShopReader(string connectionString)
                 (string)r["code"], (string)r["description"], (string)r["family"],
                 (decimal)r["quantity"], (decimal)r["total"]), ct);
 
-        return new SoldItemsView(Now(), items.Sum(i => i.Quantity), items.Sum(i => i.Total), items, day.ToString("yyyy-MM-dd"));
+        return new SoldItemsView(Now(), items.Sum(i => i.Quantity), items.Sum(i => i.Total), items, day.ToString("yyyy-MM-dd"), Archive: false);
+    }
+
+    // ---- Closed days (§682) --------------------------------------------------
+    //
+    // Once a day is closed Wintouch moves it out of the wsir_* day tables into
+    // the general document tables: wgcdoccab (headers), wgcdoclinhas (lines) and
+    // wgcpagamentos (payments). Reconciled against the real database before any
+    // of this was written — for invoice (tipo 'F') documents on four closed
+    // days, the headers' base + VAT equals the sum of the lines' `merc - desclin`
+    // (VAT-inclusive, `desclin` being the line discount) to within a cent, and
+    // wgcpagamentos sums to the same figure; on 2026-06-03 that is 9,605.45 from
+    // all three. `qtddoc * precounit` does NOT reconcile — it ignores discounts.
+    //
+    // These tables are shared by every Wintouch module, so each query is limited
+    // to the restaurant's own documents: `wgcdoccab.AppID` is 'WSIR' (older) or
+    // 'WSIR.448', against 'WHOT*' for the hotel and 'WGES*' for back office. Lines
+    // and payments have no such column and inherit it through the header join.
+
+    private async Task<Overview> ReadArchiveOverviewAsync(SqlConnection connection, DateTime day, CancellationToken ct)
+    {
+        // A header's VAT-inclusive total. Summed per document rather than from
+        // the lines, so a rounding cent on a line cannot move a day's figure.
+        const string Total = "CAST(c.base1 + c.base2 + c.base3 + c.base4 + c.iva1 + c.iva2 + c.iva3 + c.iva4 AS DECIMAL(18,2))";
+
+        var invoiced = await ScalarAsync(connection, day, $"""
+            SELECT ISNULL(SUM({Total}), 0)
+              FROM wgcdoccab c
+              JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+               AND CAST(c.datadoc AS date) = @businessDate
+            """, ct);
+
+        var staff = await QueryAsync(connection, day, $"""
+            SELECT c.funcionario AS code,
+                   ISNULL(e.nome, c.funcionario) AS name,
+                   SUM({Total}) AS total
+              FROM wgcdoccab c
+              JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
+              LEFT JOIN wgcvendedores e ON e.codigo = c.funcionario
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+               AND CAST(c.datadoc AS date) = @businessDate
+             GROUP BY c.funcionario, e.nome
+             HAVING SUM({Total}) <> 0
+             ORDER BY total DESC
+            """, r => new StaffTotal((string)r["code"], (string)r["name"], (decimal)r["total"]), ct);
+
+        var payments = await QueryAsync(connection, day, """
+            SELECT ISNULL(m.descricao, p.meiopagamento) AS method,
+                   SUM(CAST(p.total AS DECIMAL(18,2))) AS total
+              FROM wgcpagamentos p
+              JOIN wgcdoccab c ON c.tipodoc = p.tipodoc AND c.serie = p.serie AND c.numdoc = p.numdoc
+              JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
+              LEFT JOIN wgcmeiospagamento m ON m.codigo = p.meiopagamento
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+               AND CAST(c.datadoc AS date) = @businessDate
+             GROUP BY m.descricao, p.meiopagamento
+             HAVING SUM(CAST(p.total AS DECIMAL(18,2))) <> 0
+             ORDER BY total DESC
+            """, r => new PaymentTotal((string)r["method"], (decimal)r["total"]), ct);
+
+        // `entrydate` is when the document was created — the counterpart of the
+        // running day's EntryDate. (`Hora` is a minute-precision text that can lag
+        // it, and `HoraI` is when the table was opened, not when the sale was.)
+        var hourlyRows = await QueryAsync(connection, day, $"""
+            SELECT DATEPART(hour, c.entrydate) AS hour,
+                   SUM({Total}) AS total
+              FROM wgcdoccab c
+              JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+               AND CAST(c.datadoc AS date) = @businessDate
+               AND c.entrydate IS NOT NULL
+             GROUP BY DATEPART(hour, c.entrydate)
+            """, r => new HourlyTotal(Convert.ToInt32(r["hour"]), (decimal)r["total"]), ct);
+
+        // Open tabs, tables and guests are the running moment; a closed day has
+        // none of them, so they are reported as zero and flagged Archive.
+        return new Overview(
+            Now(),
+            new Totals(invoiced, 0),
+            new TableCounts(0, 0, 0),
+            new Clients(0),
+            staff,
+            payments,
+            FillHours(hourlyRows),
+            day.ToString("yyyy-MM-dd"),
+            Archive: true);
+    }
+
+    private async Task<SoldItemsView> ReadArchiveSoldItemsAsync(SqlConnection connection, DateTime day, CancellationToken ct)
+    {
+        // Same definition as the running day's list: product lines ('P') of
+        // invoices only (wgctiposdocumentos.tipo = 'F'). Type-K documents are not
+        // sales: `TAL` "Consumo Hotel" is billed later as a hotel invoice, and
+        // CI_* / CONS* are internal consumption, offers and tastings. Checked on
+        // 2019-08-15: the F lines alone reproduce that day's invoiced 4,692.14 to
+        // the cent, where all lines gave 6,754.80. `artigo` is the article code,
+        // so the join to the master is exact.
+        //
+        // Line types: 'P' a product. A group menu ("Menu Grupo 45") is an 'M'
+        // header followed by 'I' lines for its dishes, and the price sits on
+        // whichever the operator set it on: on the 'I' dishes (2026-06-03,
+        // 17 × Raviolis at 30.00, header 0.00) or on the 'M' header (2026-05-14,
+        // 16 × "Menu Grupo 50" = 960.00, dishes 0.00). So 'I' and 'M' lines count
+        // when they carry value and not otherwise — a 0.00 header or component is
+        // not a sale. With that, P + I + M equals the document total on every day
+        // checked (8 days, to within a cent of rounding); with P alone, or P + I,
+        // menus vanished from the list. The blank and '(' recipe-component lines
+        // are always 0.00. Group bills are apportioned, so a quantity can be
+        // fractional (1.87 desserts); the values are exact.
+        // The running day has no 'I' lines — its table keeps menu dishes as 'P'.
+        var items = await QueryAsync(connection, day, """
+            SELECT l.artigo AS code,
+                   ISNULL(a.nome, LTRIM(RTRIM(l.descricao))) AS description,
+                   ISNULL(a.familia, '') AS family,
+                   SUM(CAST(l.qtddoc AS DECIMAL(18,2))) AS quantity,
+                   SUM(CAST(l.merc - l.desclin AS DECIMAL(18,2))) AS total
+              FROM wgcdoclinhas l
+              JOIN wgcdoccab c ON c.tipodoc = l.tipodoc AND c.serie = l.serie AND c.numdoc = l.numdoc
+              JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
+              LEFT JOIN wgcartigos a ON a.codigo = l.artigo
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+               AND (l.TipoLinha = 'P'
+                    OR (l.TipoLinha IN ('I', 'M') AND l.merc - l.desclin <> 0))
+               AND CAST(c.datadoc AS date) = @businessDate
+               AND ISNULL(a.familia, '') <> 'COMENTARIOS'
+             GROUP BY l.artigo, ISNULL(a.nome, LTRIM(RTRIM(l.descricao))), ISNULL(a.familia, '')
+             ORDER BY quantity DESC
+            """, r => new SoldItem(
+                (string)r["code"], (string)r["description"], (string)r["family"],
+                (decimal)r["quantity"], (decimal)r["total"]), ct);
+
+        return new SoldItemsView(Now(), items.Sum(i => i.Quantity), items.Sum(i => i.Total), items, day.ToString("yyyy-MM-dd"), Archive: true);
     }
 
     /// <summary>

@@ -33,7 +33,20 @@ export function shopRoutes(pool: Pool, hub: AgentHub): Router {
     return rows.length > 0;
   }
 
-  function relay(method: string) {
+  /**
+   * A trading day, `yyyy-MM-dd`. Checked here as well as by the agent: a value
+   * that is not a real calendar date is a 400 from us, not a round trip to the
+   * shop to be told so.
+   */
+  function readDate(raw: unknown): { date?: string } | null {
+    if (raw === undefined) return {};
+    if (typeof raw !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(raw)) return null;
+    const parsed = new Date(`${raw}T00:00:00Z`);
+    return Number.isNaN(parsed.getTime()) || parsed.toISOString().slice(0, 10) !== raw ? null : { date: raw };
+  }
+
+  /** `dated` methods take an optional `?date=` (§682); the rest are the live moment. */
+  function relay(method: string, { dated = false } = {}) {
     return async (req: Parameters<typeof requireIdentity>[0], res: Parameters<typeof requireIdentity>[1]) => {
       const storeId = param(req.params['id']);
       if (!UUID.test(storeId)) {
@@ -47,8 +60,17 @@ export function shopRoutes(pool: Pool, hub: AgentHub): Router {
         res.status(404).json({ error: 'no such shop' });
         return;
       }
+      let params: { date: string } | undefined;
+      if (dated) {
+        const day = readDate(req.query['date']);
+        if (!day) {
+          res.status(400).json({ error: 'date must be a real day, yyyy-MM-dd' });
+          return;
+        }
+        if (day.date) params = { date: day.date };
+      }
       try {
-        res.json(await hub.ask(storeId, method));
+        res.json(await hub.ask(storeId, method, params));
       } catch (err) {
         if (err instanceof AgentOfflineError) {
           // 503 with a reason, not an empty 200: a floor dashboard showing
@@ -70,8 +92,8 @@ export function shopRoutes(pool: Pool, hub: AgentHub): Router {
     };
   }
 
-  router.get('/stores/:id/overview', requireIdentity, relay('overview'));
-  router.get('/stores/:id/sold-items', requireIdentity, relay('sold_items'));
+  router.get('/stores/:id/overview', requireIdentity, relay('overview', { dated: true }));
+  router.get('/stores/:id/sold-items', requireIdentity, relay('sold_items', { dated: true }));
   router.get('/stores/:id/tables', requireIdentity, relay('tables'));
 
   return router;

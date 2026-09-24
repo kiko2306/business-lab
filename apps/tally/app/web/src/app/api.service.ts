@@ -54,16 +54,17 @@ export class ApiService {
   }
 
   /** Relayed live to the shop's own agent — nothing here is stored (§634). */
-  overview(id: string): Observable<Overview> {
-    return this.http.get<Overview>(`/api/stores/${id}/overview`);
+  /** `date` is yyyy-MM-dd; omitted means the running day. */
+  overview(id: string, date?: string): Observable<Overview> {
+    return this.http.get<Overview>(`/api/stores/${id}/overview`, { params: date ? { date } : {} });
   }
 
   tables(id: string): Observable<TablesView> {
     return this.http.get<TablesView>(`/api/stores/${id}/tables`);
   }
 
-  soldItems(id: string): Observable<SoldItemsView> {
-    return this.http.get<SoldItemsView>(`/api/stores/${id}/sold-items`);
+  soldItems(id: string, date?: string): Observable<SoldItemsView> {
+    return this.http.get<SoldItemsView>(`/api/stores/${id}/sold-items`, { params: date ? { date } : {} });
   }
 
   agentPackage(): Observable<AgentPackage> {

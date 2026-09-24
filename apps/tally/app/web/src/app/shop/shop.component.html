@@ -15,10 +15,23 @@
     @if (overview) {
       <span class="small text-secondary">
         @if (overview.businessDate) {
-          Business day <strong>{{ overview.businessDate | date: 'dd/MM/yyyy' }}</strong> ·
+          {{ overview.archive ? 'Closed day' : 'Business day' }}
+          <strong>{{ overview.businessDate | date: 'dd/MM/yyyy' }}</strong> ·
         }
         As of {{ overview.asOf | date: 'HH:mm:ss' }}
       </span>
+    }
+    <label class="d-flex align-items-center gap-2 small text-secondary mb-0">
+      Day
+      <input
+        type="date"
+        class="form-control form-control-sm"
+        [value]="date || runningDate || ''"
+        [max]="runningDate ?? ''"
+        (change)="pickDate($any($event.target).value)" />
+    </label>
+    @if (date) {
+      <button class="btn btn-sm btn-outline-primary" type="button" (click)="pickDate('')">Running day</button>
     }
     <button class="btn btn-sm btn-outline-secondary" type="button" (click)="refresh()">Refresh</button>
   </div>
@@ -51,6 +64,8 @@
         </div>
       </div>
     </div>
+    <!-- Open tabs, tables and guests are the running moment: a closed day has none. -->
+    @if (!overview.archive) {
     <div class="col-6 col-lg-3">
       <div class="card stat-card h-100">
         <div class="card-body">
@@ -79,6 +94,7 @@
         </div>
       </div>
     </div>
+    }
   </div>
 
   <div class="card stat-card mb-4">
@@ -102,9 +118,11 @@
 
   <ul class="nav nav-tabs mb-3">
     <li class="nav-item">
-      <button class="nav-link" [class.active]="tab === 'tables'" type="button" (click)="setTab('tables')">
-        Tables
-      </button>
+      @if (!viewingArchive) {
+        <button class="nav-link" [class.active]="tab === 'tables'" type="button" (click)="setTab('tables')">
+          Tables
+        </button>
+      }
     </li>
     <li class="nav-item">
       <button class="nav-link" [class.active]="tab === 'items'" type="button" (click)="setTab('items')">
@@ -180,7 +198,7 @@
       <p class="text-secondary">Loading…</p>
     } @else {
       <p class="text-secondary small">
-        {{ soldItems.totalQuantity }} items, {{ soldItems.totalValue | currency: 'EUR' }}.
+        {{ soldItems.totalQuantity | number: '1.0-2' }} items, {{ soldItems.totalValue | currency: 'EUR' }}.
       </p>
       <div class="mb-4">
         <h3 class="h6 mb-3">Top items by quantity</h3>
@@ -212,7 +230,7 @@
                   }
                 </td>
                 <td data-label="Family" class="text-secondary">{{ item.family }}</td>
-                <td data-label="Quantity" class="text-end num">{{ item.quantity }}</td>
+                <td data-label="Quantity" class="text-end num">{{ item.quantity | number: '1.0-2' }}</td>
                 <td data-label="Total" class="text-end num">{{ item.total | currency: 'EUR' }}</td>
               </tr>
             }

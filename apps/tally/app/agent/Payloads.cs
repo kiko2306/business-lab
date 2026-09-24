@@ -18,7 +18,10 @@ public sealed record Overview(
     IReadOnlyList<HourlyTotal> Hourly,
     // The trading day these figures are for (yyyy-MM-dd) — the running day, which
     // is not always the calendar date (§677).
-    string BusinessDate);
+    string BusinessDate,
+    // True when the figures come from Wintouch's archive of closed days rather
+    // than the running day's tables — so no open tabs, tables or guests (§682).
+    bool Archive);
 
 public sealed record Totals(decimal Invoiced, decimal Open);
 
@@ -55,6 +58,7 @@ public sealed record SoldItemsView(
     decimal TotalQuantity,
     decimal TotalValue,
     IReadOnlyList<SoldItem> Items,
-    string BusinessDate);
+    string BusinessDate,
+    bool Archive);
 
 public sealed record SoldItem(string Code, string Description, string Family, decimal Quantity, decimal Total);

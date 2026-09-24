@@ -32463,3 +32463,72 @@ C:\wintouch\sgw, already enrolled." and no prompt, stopping at the administrator
 check with the service untouched; with `install.config` pointing at another site
 it asks for a code. The elevated update itself (stop, replace, start) is the
 README TODO.
+
+## 682. Older days: a date picker reading Wintouch's archive — and the rules that make it agree with the running day
+
+Asked for: a date picker to look at older days; the running day stays the priority
+(§677). Wintouch keeps only the open business day in the `wsir_*` tables and rolls it
+into shared general-purpose document tables at close, so a closed day is a different
+set of queries. Everything below was found by probing the real `vallado` database
+read-only and reconciling, not assumed; the operator supplied the pointers.
+
+**Where a closed day lives.** `wgcdoccab` (headers, 301 k), `wgcdoclinhas` (lines,
+1.28 M), `wgcpagamentos` (payments, 261 k). They are shared by every module, so
+each query is limited to the restaurant with `wgcdoccab.AppID LIKE 'WSIR%'`
+(`WSIR` older, `WSIR.448` newer; `WHOT*` is the hotel, `WGES*` back office). Lines and
+payments have no such column and inherit it through the header join.
+
+**What counts as a sale — the operator's rules, each checked:**
+- Only `wgctiposdocumentos.tipo = 'F'` (invoices). Type `K` is not a sale: `TAL`
+  is "Consumo Hotel" (room charges, billed later as hotel invoices — counting them
+  would count them twice) and the `CI_*` / `CONS*` documents are internal
+  consumption, offers and tastings. Other tipos (`1` "Devolução de venda a
+  dinheiro", `6`, `5`, …) are not invoices either.
+- `AND devolucao = 0`. A devolution (DEVFTFO-*, DEVFAT-*, …) is `tipo 'F'` too but
+  flagged `devolucao = 1`, and is stored with **positive** amounts and payments —
+  so it was being *added* to the takings. On 2026-06-03 €111.00 of refunds was
+  counted as sales. This affects the running-day queries as well; all figures are
+  now sales only (the running day had no devolutions, so it did not move).
+
+**Money.** A line's VAT-inclusive value is `merc − desclin`; `qtddoc × precounit`
+does not reconcile (it ignores discounts). A document's total is the header's
+`base1..4 + iva1..4`. Invoiced, per-staff and per-hour totals come from headers
+(`funcionario`, and the hour of `entrydate` — the counterpart of the running day's
+`EntryDate`, not the minute-precision `Hora`); payments from `wgcpagamentos` joined
+to the header, named by `wgcmeiospagamento`.
+
+**Items.** Product lines `P`, plus `I` and `M` lines *when they carry value*. A
+group menu is an `M` header followed by `I` dishes, and the price sits on either:
+on the dishes (2026-06-03: 17 × Raviolis at 30.00, header 0.00) or on the header
+(2026-05-14: 16 × "Menu Grupo 50" = 960.00, dishes 0.00). With `P` alone, or `P + I`,
+menus vanished. Blank and `(` lines are recipe components at 0.00. Comment articles
+(family `COMENTARIOS`) are dropped; items join `wgcartigos` on `artigo` (the archive's
+name for the code the running day calls `codpedido`, §678). Group bills are
+apportioned, so a quantity can be fractional (1.87); the page shows up to two decimals.
+
+**Proof.** Run through the real `ShopReader` on 32 days (7 chosen, 25 random from 2022
+to mid-2026): items value equals invoiced sales on all 31 trading days (worst gap
+€0.01), and payments, staff and hourly sums equal invoiced too. 2019-08-15 (`WSIR`,
+pre-`.448`) works. Each call takes well under a second. The running day is unchanged
+(9,640.16 everywhere) apart from items and payments, which used to include the
+type-K documents and are now 9,640.16 too (they were 9,694.60).
+
+**Plumbing.** `GET …/overview` and `…/sold-items` take an optional `?date=yyyy-MM-dd`
+(validated as a real calendar day, 400 otherwise, never forwarded); the hub passes it as
+`params`; the agent's `AgentRequest` reads it. A date equal to the running day, or none,
+takes the live path; any other date reads the archive; a future date returns empties.
+Responses carry `businessDate` and `archive`. The shop page has a **Day** picker (max =
+the running day), a **Running day** button, "Closed day dd/MM/yyyy", and hides open tabs,
+tables in use, guests and the Tables tab for a closed day; only the running day
+auto-refreshes.
+
+Verified: 36 API tests including the date-relay one; `dotnet build -warnaserror`; and
+the page rendered in headless Chrome against the reader's real output for the running
+day and for 2026-06-03 (picker, closed-day view, back to live, no console errors).
+Not run: the new agent on the shop machine end to end — README TODO.
+
+**Rejected:** a name-based join for the archive (the codes are there); counting all
+document kinds like the old running-day list (double-counts room charges, includes
+offers); netting devolutions against sales (the operator's rule is that they are not
+sales — a separate "refunds" figure is a possible later addition); `Hora` for the
+hourly view.
