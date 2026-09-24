@@ -30670,3 +30670,63 @@ verification left on disk.
 
 - `pulse`'s guest-facing frontend + exposure (mirrors §642's `check-in` app).
 - An admin editor for question content, now that there is content to edit.
+
+## 645. Implemented: `pulse`'s guest frontend, exposed publicly
+
+`apps/hotel/pulse/`: the same shape as `hotel-checkin` (§642) — its own
+Angular shell (no router, token read off `location.pathname`), own nginx
+container proxying `/api/<token>` to hotel-core's `/pulse/<token>`, `npm ci
+&& npm run build` in CI, the shared theme synced in by
+`scripts/sync-app-theme.sh`. Registered as hotel's third `additionalExposures`
+entry (`services.ts`), public like `checkin` (`autheliaProtected` omitted).
+`HOTEL_PULSE_PORT` (`10602`, already reserved in `docs/ports.md` and
+`.env.example` since §628/§641) is the new compose-visible port — no port
+still waits on anything now that all three of hotel's hostnames are wired.
+
+The form differs from check-in's in shape, not structure: a `rating` question
+renders as five toggle buttons (1-5), a `text` one as a textarea, both bound
+through one `answers: Record<questionId, string>` map seeded from whatever
+`toFeedback` already returned for that reservation. Skips a blank answer on
+submit rather than sending it — consistent with the backend's own
+overwrite-on-resubmit semantics (§644): an unanswered question just doesn't
+appear in the next submission's `DELETE`-then-`INSERT`.
+
+**A real bug caught by testing against real containers, not just `ng
+build`.** The first version stored every answer as a string in the
+`answers` map (`rate()` did `String(value)`) and sent it that way in the
+submit payload. hotel-core's `int()` util (`util.ts`) only accepts a value
+already `Number.isInteger` — a JSON string `"5"` fails that check and the
+route silently drops the rating (§644's loop does `if (n === null) continue`)
+while still saving the text answer and returning 200. `ng build` and the
+backend's own tests both stayed green through this, because neither one
+sends a cross-container HTTP request with a real body. Caught by seeding a
+throwaway `hotel-db` + `hotel-core` + `hotel-pulse` stack and posting a
+rating through curl: the response came back with that question's `answer:
+null` instead of `"5"`. Fixed by casting per-question at submit time —
+`Number(raw)` when `question.type === 'rating'`, the raw string otherwise —
+since the type needed to make that call only exists in `feedback.questions`,
+not in the flat `answers` map.
+
+### Verification
+
+Same throwaway-stack method as §642: `hotel-db`, `hotel-core` and
+`hotel-pulse` wired on one Docker network with a `hotel-core` alias, a unit
+(`quiz_is_active = true`) and reservation seeded directly over `psql`.
+`GET`/`POST /<token>` through pulse's own port round-tripped correctly
+(rating and text both saved, `submitted: true`), a resubmission overwrote
+rather than erred, the SPA fallback served the bundle for a bare `/<token>`
+path, and an unknown token 404'd — this is what surfaced the rating bug
+above, fixed, and reverified with a real JSON number. `docker build` for the
+image is clean (no `ng build` warnings once a stray `?? 0` was reworded to
+`|| 0` to quiet an NG8102 about `Record<string,string>`'s index type always
+including `string`). 1191 backend tests and backend typecheck still pass
+(`services.ts`'s new `additionalExposures` entry touched no logic). Not run
+through Cloudflare/NPM/Authelia on `beta` — already covered by the existing
+"Verify a gated secondary hostname on the live stack" README item, the same
+call §642 made for `checkin`.
+
+### Follow-ups added to the README
+
+None new — the two follow-ups §644 already listed (an admin editor for
+question content, and pulse's own guest frontend) are covered: this section
+closes the second, the admin editor is still open.

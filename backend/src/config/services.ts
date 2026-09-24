@@ -819,8 +819,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // directly: proxying the agent through the admin container would stop the
     // sync — the critical path — whenever a frontend was down (plan.md §640).
     // Gated, which is what §637 added the flag for: this app holds a gated
-    // secondary (`core`) alongside a public one (`checkin`) — pulse joins the
-    // same way once it exists.
+    // secondary (`core`) alongside two public ones (`checkin`, `pulse`).
     additionalExposures: [
       {
         suffix: 'core',
@@ -835,6 +834,13 @@ export const SERVICES: Record<string, ServiceDefinition> = {
         suffix: 'checkin',
         label: 'Check-in',
         portEnvVar: 'HOTEL_CHECKIN_PORT',
+      },
+      {
+        // Same reasoning as `checkin`: a guest following an emailed
+        // feedback link has no account (plan.md §644).
+        suffix: 'pulse',
+        label: 'Feedback',
+        portEnvVar: 'HOTEL_PULSE_PORT',
       },
     ],
     hiddenGeneratedSecrets: ['HOTEL_DB_PASSWORD'],

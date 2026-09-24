@@ -88,6 +88,28 @@ services:
       retries: 5
       start_period: 10s
 
+  # The guest-facing feedback app. Same shape as hotel-checkin: own container,
+  # nginx proxies `/api/` through to hotel-core's `/pulse` routes, public
+  # hostname — a guest follows an emailed link with no account, so no
+  # Authelia gate (plan.md §644).
+  hotel-pulse:
+    mem_limit: 128m
+    mem_reservation: 32m
+    build: ./pulse
+    restart: unless-stopped
+    ports:
+      - "${HOTEL_PULSE_PORT:-10602}:80"
+    depends_on:
+      - hotel-core
+    networks:
+      - hotel-net
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
   hotel-db:
     mem_limit: 256m
     mem_reservation: 64m

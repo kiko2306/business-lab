@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.139.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.140.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -426,14 +426,6 @@ before anything is built.
       `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
       the public ones do not, the app's bypass path still answers
       unauthenticated, and Authelia restarts cleanly rather than crash-looping.
-- [ ] **Build `pulse`'s guest-facing frontend + exposure** — hotel-core's side
-      (`GET`/`POST /pulse/:token`) is built and tested in plan.md §644, the
-      same shape as `check-in`'s own guest endpoints (§641). What's left
-      mirrors §642 exactly: its own Angular shell app (no router, reads the
-      token from the URL path), its own container proxying `/api/` to
-      `hotel-core`'s `/pulse` routes, a `hotel-pulse` compose service, and a
-      public `additionalExposures` entry (`HOTEL_PULSE_PORT`, port `10602`
-      per `docs/ports.md`).
 - [ ] **Build an admin editor for `pulse`'s question content** — §644 seeded
       `pulse_questions` with four defaults (rating + free-text) so the guest
       form has something to ask, but nothing edits them: no endpoint changes

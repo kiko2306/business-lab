@@ -168,6 +168,24 @@ jobs:
       - run: npm run build
         working-directory: apps/hotel/checkin
 
+  hotel-pulse:
+    # The guest-facing feedback app — same shape as hotel-checkin's job, and
+    # the same theme-drift reasoning (plan.md §644).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Theme copy is in step with the dashboard's
+        run: diff frontend/src/styles.css apps/hotel/pulse/src/theme.css
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/hotel/pulse/package-lock.json
+      - run: npm ci
+        working-directory: apps/hotel/pulse
+      - run: npm run build
+        working-directory: apps/hotel/pulse
+
   tally-web:
     # The Angular admin UI. Its theme is a generated copy of the dashboard's
     # (scripts/sync-app-theme.sh) because an app image builds from its own

@@ -1,0 +1,63 @@
+<nav class="navbar border-bottom mb-4">
+  <div class="container-xl">
+    <span class="navbar-brand mb-0 h1">Feedback</span>
+  </div>
+</nav>
+
+<main class="container-xl pb-5" style="max-width: 640px">
+  @if (loading) {
+    <p class="text-secondary">Loading…</p>
+  } @else if (error && !feedback) {
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+  } @else if (feedback) {
+    <h2 class="h4">{{ feedback.unit }}</h2>
+    <p class="text-secondary">
+      {{ feedback.checkinOn | date: 'mediumDate' }} – {{ feedback.checkoutOn | date: 'mediumDate' }}
+      @if (feedback.roomName) { · {{ feedback.roomName }} }
+    </p>
+
+    @if (saved) {
+      <div class="alert alert-success" role="alert">
+        Thanks — you can come back and update your answers any time.
+      </div>
+    }
+    @if (error) {
+      <div class="alert alert-danger" role="alert">{{ error }}</div>
+    }
+
+    <form (ngSubmit)="submit()">
+      @for (question of feedback.questions; track question.id) {
+        <div class="card mb-3">
+          <div class="card-body">
+            <h3 class="h6">{{ question.text }}</h3>
+            @if (question.type === 'rating') {
+              <div class="d-flex gap-2">
+                @for (star of stars; track star) {
+                  <button
+                    type="button"
+                    class="btn"
+                    [class.btn-primary]="+(answers[question.id] || 0) >= star"
+                    [class.btn-outline-secondary]="+(answers[question.id] || 0) < star"
+                    (click)="rate(question.id, star)"
+                  >{{ star }}</button>
+                }
+              </div>
+            } @else {
+              <textarea
+                class="form-control"
+                rows="3"
+                [name]="'q' + question.id"
+                [ngModel]="answers[question.id]"
+                (ngModelChange)="answers[question.id] = $event"
+              ></textarea>
+            }
+          </div>
+        </div>
+      }
+
+      <button class="btn btn-primary" type="submit" [disabled]="saving">
+        {{ saving ? 'Saving…' : (feedback.submitted ? 'Update feedback' : 'Send feedback') }}
+      </button>
+    </form>
+  }
+</main>
