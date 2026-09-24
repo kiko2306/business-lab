@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.142.1] — 2026-09-24
+
+### Tally
+
+- Add install.ps1 for the tally shop agent, collapsing the four manual install steps into one prompt-driven script
+
 ## [0.142.0] — 2026-09-24
 
 ### Hotel

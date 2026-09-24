@@ -31264,3 +31264,35 @@ decision it flagged — whether check-out/payment is in scope — was already
 answered in §629 ("all three half-built features are in") and has had its
 own, more specific README item since. Nothing left for this item to cover
 that isn't either done or tracked elsewhere.
+
+## 655. Implemented: `install.ps1` for the tally shop agent
+
+Closes the README item: the four manual install steps (§636's runbook — copy
+files, edit `tally.config`, `enrol`, `sc.exe create`/`start`) collapse into
+one elevated PowerShell script, prompting for the site URL and enrolment
+code when not passed as arguments.
+
+**A script, not an MSI/WiX package.** The agent is a single internal tool
+installed by hand on a handful of shop machines, not shrink-wrapped
+software — pulling in a real installer framework for that would be the kind
+of dependency this repo's own conventions warn against adding for what a
+few lines already do. `install.ps1` does exactly the four steps the README
+already documented, in order, with one addition: re-running it against an
+already-registered service restarts it instead of failing on `sc.exe
+create`, since re-enrolling already replaces the token the server
+associates with this machine (README.md's own existing note).
+
+**Verified by parsing, not running.** `PSScriptAnalyzer`-style syntax
+checking isn't installed here, but
+`[System.Management.Automation.Language.Parser]::ParseFile` (via a
+`mcr.microsoft.com/powershell` container) confirms it's syntactically valid
+PowerShell with no errors — real verification of the one thing this
+environment *can* check, not a claim beyond it. Nothing here can run it: it
+needs Windows, an elevated shell, and a real shop's Wintouch install. Added
+to the README as the new open item in its place.
+
+### Verification
+
+`dotnet build -warnaserror` on `apps/tally/agent/` still succeeds (the new
+file is a script alongside the project, not a build input). PowerShell
+syntax parses clean. Not run.

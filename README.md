@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.142.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.142.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -415,12 +415,14 @@ before anything is built.
       `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
       the public ones do not, the app's bypass path still answers
       unauthenticated, and Authelia restarts cleanly rather than crash-looping.
-- [ ] **Package the agent as an installer** — the agent is built and proven
-      (plan.md §636) but is installed by hand today: copy the files, edit
-      `tally.config`, run `Tally.Agent.exe enrol <CODE>`, then `sc.exe create`.
-      A shop needs one installer that prompts for the site URL and the code and
-      registers the service itself. Until then `apps/tally/agent/README.md` is
-      the runbook.
+- [ ] **Run `install.ps1` for real, on a shop machine** — plan.md §655
+      collapses the tally agent's four manual install steps into one
+      elevated PowerShell script, but nothing off a real Windows machine
+      could run it (only parsed for syntax). Confirm: it copies itself into
+      `%ProgramFiles%\Tally`, writes a correct `tally.config`, enrols
+      successfully, registers and starts the `Tally.Agent` service, and
+      that re-running it against an already-installed agent with a fresh
+      code restarts the service rather than failing on `sc.exe create`.
 - [ ] **Confirm `estado` semantics with a second Wintouch install** — §636
       reads `wsir_mst_mesas.estado` as 0 free, 1 awaiting payment, 2 occupied,
       from the labels on the legacy SQL files plus the live `vallado` data
