@@ -2,6 +2,8 @@ import assert from 'node:assert/strict';
 import test, { after, before, beforeEach } from 'node:test';
 import type { AddressInfo } from 'node:net';
 import type { Server } from 'node:http';
+import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import { Pool } from 'pg';
 import { AgentHub } from './agentHub';
@@ -43,6 +45,11 @@ before(async () => {
   if (skip) return;
   pool = new Pool({ connectionString: process.env.DATABASE_URL });
   await migrate(pool, path.join(__dirname, 'migrations'));
+  // A stand-in for the setup exe the Dockerfile builds into the image (plan.md §670).
+  const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tally-agent-'));
+  fs.writeFileSync(path.join(agentDir, 'Tally.Agent-Setup-1.0.0-abcd1234.exe'), 'MZ-fake');
+  fs.writeFileSync(path.join(agentDir, 'agent.json'), JSON.stringify({ version: '1.0.0-abcd1234', file: 'Tally.Agent-Setup-1.0.0-abcd1234.exe' }));
+  process.env.AGENT_DIST = agentDir;
   // No hub.attach here: these tests never open a socket, and the store list
   // only asks it whether one is connected.
   server = createApp(pool, new AgentHub(pool)).listen(0);
@@ -286,4 +293,18 @@ test('SMTP settings reject a missing host or from address', { skip }, async () =
 test('testing an unconfigured SMTP sender fails without dialing anywhere', { skip }, async () => {
   const result = await call('POST', '/api/smtp/test', { headers: ADMIN });
   assert.equal(result.status, 400);
+});
+
+test('the agent package is admin-only and downloads the built setup exe', { skip }, async () => {
+  assert.equal((await call('GET', '/api/agent-package')).status, 401);
+  assert.equal((await call('GET', '/api/agent-package', { headers: VIEWER })).status, 403);
+  assert.equal((await call('GET', '/api/agent-package/download', { headers: VIEWER })).status, 403);
+
+  const meta = await call('GET', '/api/agent-package', { headers: ADMIN });
+  assert.equal(meta.body.version, '1.0.0-abcd1234');
+
+  const res = await fetch(`${base}/api/agent-package/download`, { headers: ADMIN });
+  assert.equal(res.status, 200);
+  assert.match(res.headers.get('content-disposition') ?? '', /Tally\.Agent-Setup-1\.0\.0-abcd1234\.exe/);
+  assert.equal(await res.text(), 'MZ-fake');
 });

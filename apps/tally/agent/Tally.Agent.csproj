@@ -14,6 +14,9 @@
     <RootNamespace>Tally.Agent</RootNamespace>
     <AssemblyName>Tally.Agent</AssemblyName>
     <UserSecretsId>tally-agent</UserSecretsId>
+    <!-- Opening the setup exe asks for administrator rights up front: it writes
+         to Program Files and registers a service (plan.md §670). -->
+    <ApplicationManifest>app.manifest</ApplicationManifest>
     <!-- Globalization stays on: Microsoft.Data.SqlClient throws
          "Globalization Invariant Mode is not supported" at connect time if it
          is disabled, and the shop's collation is not invariant either. -->
@@ -31,11 +34,6 @@
 
   <ItemGroup>
     <None Update="tally.config.example" CopyToOutputDirectory="PreserveNewest" />
-    <!-- README's install flow runs this from the publish folder; without it the
-         folder has no installer and install.ps1's own "run from the published
-         output" check can never pass. -->
-    <None Update="install.ps1" CopyToOutputDirectory="PreserveNewest" />
-    <None Update="install.config" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

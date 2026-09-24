@@ -19,6 +19,13 @@ public sealed class AgentClient(
     ShopReader reader,
     ILogger<AgentClient> logger)
 {
+    /// <summary>Stamped at build time as "1.0.0-&lt;source hash&gt;" (see the Dockerfile).</summary>
+    private static readonly string AgentVersion =
+        typeof(AgentClient).Assembly
+            .GetCustomAttributes(typeof(System.Reflection.AssemblyInformationalVersionAttribute), false)
+            .Cast<System.Reflection.AssemblyInformationalVersionAttribute>()
+            .FirstOrDefault()?.InformationalVersion ?? "unknown";
+
     private static readonly JsonSerializerOptions Json = new(JsonSerializerDefaults.Web);
 
     /// <summary>
@@ -128,7 +135,7 @@ public sealed class AgentClient(
         socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
 
         await socket.ConnectAsync(options.SocketUri, ct);
-        logger.LogInformation("Connected to {Uri}", options.SocketUri);
+        logger.LogInformation("Connected to {Uri} (agent {Version})", options.SocketUri, AgentVersion);
 
         var buffer = new byte[64 * 1024];
         while (socket.State == WebSocketState.Open && !ct.IsCancellationRequested)

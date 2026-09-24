@@ -4,10 +4,18 @@ using Microsoft.Extensions.Hosting.WindowsServices;
 using Microsoft.Extensions.Logging;
 using Tally.Agent;
 
-// Two ways in: `enrol <CODE>` runs once and exits, everything else runs the
-// service. Enrolment is a separate verb because it is a one-time human act —
+// Three ways in: `install` (or opening the exe) is the setup, `enrol <CODE>`
+// runs once and exits, everything else runs the agent. Enrolment is a separate verb because it is a one-time human act —
 // an installer prompt or an operator at a console — while the service must
 // start unattended on every boot (plan.md §627).
+
+// The setup runs before any config exists — it is what writes it — so it has
+// to come ahead of the config check below.
+if (args.FirstOrDefault()?.ToLowerInvariant() == "install"
+    || (args.Length == 0 && Environment.UserInteractive))
+{
+    return await Installer.RunAsync();
+}
 
 var configPath = Environment.GetEnvironmentVariable("TALLY_CONFIG")
     ?? Path.Combine(AppContext.BaseDirectory, "tally.config");

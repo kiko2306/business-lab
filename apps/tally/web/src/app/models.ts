@@ -81,3 +81,9 @@ export interface SoldItemsView {
   totalValue: number;
   items: { description: string; quantity: number; total: number }[];
 }
+
+/** The agent setup exe built into this image (plan.md §670). */
+export interface AgentPackage {
+  version: string;
+  file: string;
+}

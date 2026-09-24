@@ -32090,3 +32090,57 @@ retries at the 60 s cap, `HandleAsync` catches everything, `Program` returns
 `failureflag 1` so a non-zero exit counts. Builds clean and the script parses;
 the recovery itself is not yet exercised (needs an elevated shell to kill the
 process) — README TODO.
+
+## 670. Implemented: the Tally agent as one self-contained setup exe, built into the image and served from the Tally page
+
+Asked for: the version must change on every rebuild of the agent, and the build
+must be served for download on the Tally page — first as a zip, then (same
+session) "can it be 1 setup file instead". The final shape:
+
+- **One file.** `Tally.Agent-Setup-<version>.exe`: a single-file, self-contained,
+  compressed `win-x64` publish (~39 MB; no .NET runtime needed at the shop). The
+  exe is its own installer — `Installer.cs`, run when the exe is opened with no
+  arguments while interactive, or as `install`. It prompts for URL / enrolment
+  code / Wintouch folder (skipping any pre-filled in `install.config` beside it;
+  `install.config.example` is the template), copies itself to
+  `%ProgramFiles%\Tally`, writes `tally.config`, enrols through the installed
+  copy, registers the service and sets the restart-on-failure recovery of §669.
+  An `app.manifest` makes opening it raise UAC. Running the agent in a console
+  for diagnostics is now the explicit `run` verb, since no-arguments means setup.
+  `install.ps1` is deleted — its job moved into the exe.
+- **Fixed along the way:** the PowerShell installer copied over a *running*
+  `Tally.Agent.exe` on a re-run, which Windows refuses. The new setup stops the
+  service first, waits, replaces, and starts it again.
+- **Version.** `apps/tally/agent/VERSION` (`1.0.0`) is the human base; the
+  Dockerfile appends an 8-char hash of every file in the agent folder
+  (`1.0.0-<hash>`), so any rebuild that changed the agent changes the version and
+  an unchanged agent keeps it (Docker's layer cache agrees). It is stamped as the
+  assembly `InformationalVersion`, logged on connect, put in the file name and in
+  `agent.json`.
+- **Built where the site is built.** A `dotnet/sdk:8.0` stage in
+  `apps/tally/Dockerfile` publishes the exe and writes `agent.json`; the final
+  image carries only those two files under `dist/agent/`. So the download always
+  matches the source of the very commit that is running — no separate release
+  step. `.dockerignore` keeps local `agent/bin` and `obj` out of the hash.
+- **Served.** `GET /api/agent-package` (metadata) and
+  `/api/agent-package/download`, admin-only like enrolment codes; a **Download
+  setup** card on the Tally page shows the version. Under `/api`, so still behind
+  Authelia; `/agent/*` (the bypassed paths) is untouched.
+
+Verified: `Tally.Agent.exe install` on Windows, un-elevated
+(`__COMPAT_LAYER=RunAsInvoker` to get past the manifest), piped input — all three
+prompts, Enter for the Wintouch default, a bad Wintouch folder refused, an
+`install.config` skipping two prompts, and refusal at the administrator check
+before any change (the running service was untouched). The image stage was built
+with `docker build --target agent-build` (correct file name, `agent.json`,
+deterministic hash); `dotnet build -warnaserror` on Linux is clean (CI's
+`tally-agent` job); API typecheck + all 38 tests pass including the new download
+test; the Angular build passes. **Not run:** the elevated install itself, and the
+whole `docker compose` image — README TODO.
+
+Rejected: a zip (the request, then withdrawn); a PowerShell script bundled beside
+the exe (two files again, and it needed the .NET runtime); an MSI/Inno Setup
+wrapper (a new toolchain for what one C# file does); a build timestamp as the
+version (busts the Docker cache on every build, so nothing is ever reused).
+Requiring the version bump by hand alone was rejected because a forgotten bump
+is the failure being asked to prevent.

@@ -6,7 +6,7 @@ and no router change is needed (plan.md §627).
 
 ## What it needs
 
-- .NET 8 runtime (or publish self-contained).
+- Nothing to install first: the setup exe is self-contained (it bundles the .NET runtime).
 - Read access to Wintouch's SQL Server. Credentials are read from the local
   `wintouch.config` — they are never sent anywhere and never fetched from the
   server.
@@ -17,32 +17,36 @@ write path has to go through their API (plan.md §629).
 
 ## Install
 
-1. `dotnet publish -c Release -r win-x64 --self-contained false` and copy the
-   output folder onto the shop's machine (it needs the .NET 8 runtime, and
-   `install.ps1` is copied along with everything else — it's part of the
-   build output, not this source tree).
-2. In Tally, open the shop and choose **Issue enrolment code**.
-3. From an elevated PowerShell, in that folder:
+The agent is **one file**: `Tally.Agent-Setup-<version>.exe`, self-contained (no
+.NET runtime to install), downloaded from the Tally page (admins see a
+**Download setup** card). Every image build publishes it from this source
+tree (plan.md §670), so the file always matches the running site.
 
-   ```powershell
-   .\install.ps1
-   ```
+1. In Tally, open the shop and choose **Issue enrolment code**.
+2. On the shop's machine, open the setup exe. It asks for administrator rights,
+   then prompts for the site URL, the enrolment code and the Wintouch folder
+   (Enter accepts `C:\wintouch\sgw`). It copies itself to
+   `%ProgramFiles%\Tally`, writes `tally.config`, enrols, and registers and
+   starts the service with restart-on-failure — the manual steps below, done
+   for you.
 
-   It prompts for the site URL, the enrolment code and the Wintouch folder
-   (Enter accepts `C:\wintouch\sgw`); none are parameters. To skip a prompt,
-   fill that value in `install.config` beside the script — anything left empty
-   is still asked. Installs into `%ProgramFiles%\Tally`, enrols, and registers + starts the
-   service in one pass — the four manual steps below, done for you.
+To skip a prompt, save `install.config.example` as `install.config` next to the
+setup exe and fill that value in; anything left empty is still asked.
 
-Re-enrolling (re-running `install.ps1` with a fresh code) replaces the
-machine currently reporting, so a rebuilt POS needs no clean-up on the
-server — it just restarts the existing service once the new token is stored.
+**Versions.** `VERSION` here is the base (`1.0.0`); the build appends a hash of
+every file in this folder, so the version shown on the Tally page and logged on
+connect (`1.0.0-<hash>`) changes on any rebuild that changed the agent. Bump
+`VERSION` by hand for a change worth naming.
+
+Re-running the setup with a fresh code replaces the machine currently
+reporting, so a rebuilt POS needs no clean-up on the server — the setup stops
+the running service, replaces the exe, and starts it again on the new token.
 
 <details>
 <summary>What the installer actually does (for a manual install, or to
 understand a failure)</summary>
 
-1. Copy `tally.config.example` to `tally.config` beside the executable and set
+1. Copy the exe to `%ProgramFiles%\Tally`, and `tally.config.example` to `tally.config` beside it and set
    the site URL and the Wintouch folder.
 2. Run once, with the enrolment code:
 
@@ -63,5 +67,5 @@ understand a failure)</summary>
 
 ## Diagnostics
 
-Run it from a console — the same binary — and it logs to the terminal instead
-of the event log. `TALLY_CONFIG` overrides the config path.
+Run `Tally.Agent.exe run` from a console — the same binary — and it logs to the
+terminal instead of the event log. (With no arguments the exe is the setup.) `TALLY_CONFIG` overrides the config path.

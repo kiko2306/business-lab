@@ -3,6 +3,7 @@ import fs from 'fs';
 import path from 'path';
 import type { Pool } from 'pg';
 import type { AgentHub } from './agentHub';
+import { agentPackageRoutes } from './routes/agentPackage';
 import { agentRoutes } from './routes/agent';
 import { shopRoutes } from './routes/shop';
 import { smtpRoutes } from './routes/smtp';
@@ -34,6 +35,7 @@ export function createApp(pool: Pool, hub: AgentHub): Express {
   app.use('/api', storeRoutes(pool, hub));
   app.use('/api', shopRoutes(pool, hub));
   app.use('/api', smtpRoutes(pool));
+  app.use('/api', agentPackageRoutes(process.env.AGENT_DIST ?? path.join(__dirname, 'agent')));
 
   // The built Angular bundle, served by this same process on this same origin
   // (plan.md §632) — one image, one port, one hostname, so no CORS boundary.

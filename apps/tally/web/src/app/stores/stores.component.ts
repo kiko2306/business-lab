@@ -4,7 +4,7 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../api.service';
-import { EnrolmentCode, Identity, SmtpSettings, Store } from '../models';
+import { AgentPackage, EnrolmentCode, Identity, SmtpSettings, Store } from '../models';
 
 @Component({
   selector: 'app-stores',
@@ -43,6 +43,9 @@ export class StoresComponent implements OnInit {
   issued: { storeId: string; code: EnrolmentCode } | null = null;
   copied = false;
 
+  /** Null when this build carries no agent setup (development), which hides the card. */
+  agentPackage: AgentPackage | null = null;
+
   smtp: SmtpSettings | null = null;
   smtpForm = { host: '', port: 587, encryption: 'tls' as SmtpSettings['encryption'], username: '', password: '', fromAddress: '', fromName: '' };
   savingSmtp = false;
@@ -54,7 +57,10 @@ export class StoresComponent implements OnInit {
     this.api.me().subscribe({
       next: (identity) => {
         this.identity = identity;
-        if (identity.isAdmin) this.loadSmtp();
+        if (identity.isAdmin) {
+          this.loadSmtp();
+          this.api.agentPackage().subscribe({ next: (pkg) => (this.agentPackage = pkg), error: () => undefined });
+        }
       },
       error: () => undefined,
     });
