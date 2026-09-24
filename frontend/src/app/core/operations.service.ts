@@ -94,7 +94,11 @@ export class OperationsService {
   }
 
   getSelfUpdateStatus(): Observable<SelfUpdateStatus> {
-    return this.http.get<SelfUpdateStatus>(`${API_BASE_URL}/self-update/status`);
+    // Polled through the backend's own restart, where it fails until the new
+    // container is up; every caller handles errors itself, so no global toast.
+    return this.http.get<SelfUpdateStatus>(`${API_BASE_URL}/self-update/status`, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   checkForSelfUpdate(): Observable<SelfUpdateCheck> {
@@ -168,7 +172,11 @@ export class OperationsService {
   }
 
   getHealth(): Observable<HealthStatus> {
-    return this.http.get<HealthStatus>(`${API_BASE_URL}/health/system`);
+    // Polled every 5s by the resource strip, which also runs through a backend
+    // restart; callers handle errors themselves, so no global toast.
+    return this.http.get<HealthStatus>(`${API_BASE_URL}/health/system`, {
+      context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
+    });
   }
 
   /** Public: the running backend's version, shown in the dashboard footer. */

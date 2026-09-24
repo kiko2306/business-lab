@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.150.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.150.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,11 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Beta-test the restart-noise fix (plan.md §668)** — on `beta`, trigger
+      an update from the Update page and watch through "Restarting the
+      backend": no red "Something went wrong" / "Unable to reach the backend"
+      toasts should appear (from the status poll or the resource strip), and
+      the panel should end on the "up to date" success toast.
 - [ ] **Beta-test BookStack's removal (plan.md §667)** — on `beta`, after
       pulling and restarting the backend, confirm no `bookstack-*` containers
       remain (`docker ps -a`), `apps/bookstack/` is gone, its NPM proxy host

@@ -32026,3 +32026,16 @@ Teardown on a deployed box is automatic (`removedAppCleanup.ts` +
 Cloudflare host go on the next backend boot. Its data goes with them — fine
 on the dev/test box; a per-client deployment that used BookStack would need
 its pages exported first, which nothing here does. Backend tests pass.
+
+## 668. Fixed: "Something went wrong" toast while the backend restarts on Update
+
+The self-update panel polls `/self-update/status` every 3 s and the shell's
+resource strip polls `/health/system` every 5 s. Both callers already handle
+failure themselves (the poll swallows it "for exactly that reason"; the strip
+keeps what's on screen), but neither request set `SKIP_GLOBAL_ERROR_HANDLING`,
+so `apiErrorInterceptor` toasted the generic fallback on every 5xx while the
+backend container was coming back. Fix: both `OperationsService` getters
+(`getSelfUpdateStatus`, `getHealth`) now skip the global handler. Their other
+callers (`loadStatus`, the Utils page) toast on their own, so a genuine
+failure there is still reported — and no longer twice. Frontend tests pass;
+not run against a live restart.
