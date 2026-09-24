@@ -104,6 +104,13 @@ export class AgentHub {
           return;
         }
         wss.handleUpgrade(req, socket, head, (ws) => this.register(ws, agent));
+      }).catch((err) => {
+        // A database error while authenticating must end this one handshake,
+        // not leave the agent hanging on a socket nobody will answer — or, as
+        // an unhandled rejection, take the whole process down with it.
+        console.error('tally: agent handshake failed', err);
+        socket.write('HTTP/1.1 503 Service Unavailable\r\nConnection: close\r\n\r\n');
+        socket.destroy();
       });
     });
 
@@ -124,11 +131,14 @@ export class AgentHub {
     if (!token) return null;
     // Same query as the HTTP middleware: revoked agents are refused here too,
     // so revocation drops a *connecting* agent as well as a calling one.
+    // Absent from an agent older than this header: keep whatever is recorded
+    // rather than blanking it. Capped, since it is stored and shown to admins.
+    const version = String(req.headers['x-agent-version'] ?? '').trim().slice(0, 64) || null;
     const { rows } = await this.pool.query(
-      `UPDATE agents SET last_seen_at = now()
+      `UPDATE agents SET last_seen_at = now(), version = COALESCE($2, version)
         WHERE token_hash = $1 AND revoked_at IS NULL
         RETURNING id, store_id`,
-      [hash(token)]
+      [hash(token), version]
     );
     return rows.length ? { agentId: rows[0].id, storeId: rows[0].store_id } : null;
   }

@@ -7,6 +7,8 @@ export interface Store {
   /** Whether that agent is on its socket right now (plan.md §634). */
   connected: boolean;
   lastSeenAt: string | null;
+  /** What the agent last reported on connecting (plan.md §672); null before its first connect. */
+  agentVersion: string | null;
 }
 
 export interface EnrolmentCode {

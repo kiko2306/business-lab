@@ -32158,3 +32158,26 @@ against one shop. Re-checked: the Docker stage names the file correctly, `dotnet
 build -warnaserror` is clean, 38 API tests pass, the renamed exe's un-elevated
 prompts still work. The legacy-removal path itself needs the elevated run in the
 README TODO (this machine has the old service, so it is a real test).
+
+## 672. Implemented: the agent's version is shown on the shop page
+
+The agent sends `X-Agent-Version` (its stamped `1.0.0-<hash>`, §670) as a header
+on the WebSocket handshake; `agentHub.authenticate` stores it in the new
+`agents.version` column (migration 003, `COALESCE` so an older agent that sends
+none does not blank it, capped at 64 chars). `GET /api/stores` returns
+`agentVersion`; the shop page shows "Agent version …" under the shop name, and
+the admin Manage → Agent panel shows it and says when the latest packaged
+version (§670) differs. Persisted rather than kept on the live connection so it
+still shows while the shop is offline — when someone asks what is installed.
+
+Found while testing: `AgentHub.attach` had no `.catch` on the async
+authenticate, so a database error during a handshake left the agent hanging and,
+as an unhandled rejection on Node 22, could crash the process. It now answers
+503 and closes that one socket. (The hang looked like a stuck test run: the
+local `dist/migrations` was stale and lacked migration 003 — the test setup reads
+migrations from `dist/`, so a local run needs them copied after `tsc`.)
+
+Verified: 39 API tests including the new one (version shown, kept after
+disconnect, not blanked by a header-less agent), Angular build, `dotnet build
+-warnaserror`. Not run: a real agent reporting it — needs the new build
+installed (README TODO).

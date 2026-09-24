@@ -251,3 +251,28 @@ test('the store list reports connected separately from enrolled', { skip }, asyn
   list = (await call('GET', '/api/stores', { headers: ADMIN })).body;
   assert.equal(list[0].connected, true);
 });
+
+test('the agent version it reports on connect is shown, and kept when it drops off', { skip }, async () => {
+  const store = await enrolledStore('Baixa');
+  assert.equal((await call('GET', '/api/stores', { headers: ADMIN })).body[0].agentVersion, null);
+
+  const ws = new WebSocket(`${wsBase}/agent/connect`, {
+    headers: { Authorization: `Bearer ${store.token}`, 'X-Agent-Version': '1.0.0-abcd1234' },
+  });
+  await new Promise<void>((resolve, reject) => {
+    ws.once('open', () => resolve());
+    ws.once('error', reject);
+  });
+  assert.equal((await call('GET', '/api/stores', { headers: ADMIN })).body[0].agentVersion, '1.0.0-abcd1234');
+
+  // An offline shop is exactly when an operator asks what is installed there.
+  ws.close();
+  for (let i = 0; i < 100 && hub.isConnected(store.id); i++) await new Promise((r) => setTimeout(r, 10));
+  const list = (await call('GET', '/api/stores', { headers: ADMIN })).body;
+  assert.equal(list[0].connected, false);
+  assert.equal(list[0].agentVersion, '1.0.0-abcd1234');
+
+  // An agent that sends no header (an older build) must not blank it.
+  await connectAgent(store.token, () => ({ ok: true, data: {} }));
+  assert.equal((await call('GET', '/api/stores', { headers: ADMIN })).body[0].agentVersion, '1.0.0-abcd1234');
+});

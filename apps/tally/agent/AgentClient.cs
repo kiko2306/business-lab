@@ -129,6 +129,8 @@ public sealed class AgentClient(
     {
         using var socket = new ClientWebSocket();
         socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
+        // So the Tally page can show what is installed at each shop (plan.md §672).
+        socket.Options.SetRequestHeader("X-Agent-Version", AgentVersion);
         // The server pings every 30s to prove liveness through tunnels and NAT
         // (§634); answering is automatic, but this keeps the other direction
         // alive through a proxy that only watches one way.

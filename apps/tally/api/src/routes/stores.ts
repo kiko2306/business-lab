@@ -47,12 +47,12 @@ export function storeRoutes(pool: Pool, hub: AgentHub): Router {
     const identity = req.identity!;
     const { rows } = identity.isAdmin
       ? await pool.query(
-          `SELECT s.id, s.name, s.is_active, a.id AS agent_id, a.last_seen_at
+          `SELECT s.id, s.name, s.is_active, a.id AS agent_id, a.last_seen_at, a.version AS agent_version
              FROM stores s LEFT JOIN agents a ON a.store_id = s.id AND a.revoked_at IS NULL
             ORDER BY s.name`
         )
       : await pool.query(
-          `SELECT s.id, s.name, s.is_active, a.id AS agent_id, a.last_seen_at
+          `SELECT s.id, s.name, s.is_active, a.id AS agent_id, a.last_seen_at, a.version AS agent_version
              FROM stores s
              JOIN store_access sa ON sa.store_id = s.id AND sa.identity = $1
              LEFT JOIN agents a ON a.store_id = s.id AND a.revoked_at IS NULL
@@ -72,6 +72,9 @@ export function storeRoutes(pool: Pool, hub: AgentHub): Router {
         // an operator needs to see (plan.md §634).
         connected: hub.isConnected(r.id),
         lastSeenAt: r.last_seen_at,
+        // What the agent last reported on connecting (plan.md §672); null
+        // until it has connected once.
+        agentVersion: r.agent_version,
       }))
     );
   });

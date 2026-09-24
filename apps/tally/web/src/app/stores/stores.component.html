@@ -216,6 +216,12 @@
                       <p class="text-secondary small">
                         An agent is enrolled and is
                         <strong>{{ store.connected ? 'connected now' : 'not connected' }}</strong>.
+                        @if (store.agentVersion) {
+                          Version <code>{{ store.agentVersion }}</code>
+                          @if (agentPackage && agentPackage.version !== store.agentVersion) {
+                            — the latest is <code>{{ agentPackage.version }}</code>, download it above.
+                          }
+                        }
                         Issuing a new code replaces it — the machine currently reporting stops on its
                         next call.
                       </p>

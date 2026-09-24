@@ -468,6 +468,9 @@ before anything is built.
       replace the exe, start it on the new token and reconnect — not fail on
       the locked exe or on `sc.exe create`. Finally rebuild after touching any
       agent file and confirm the page shows a different version hash.
+      Once the new agent is connected, the shop's page (and Manage → Agent) must
+      show its version, still show it after stopping the service, and the
+      Manage panel should flag a mismatch with the downloadable version (§672).
 - [ ] **Confirm `estado` semantics with a second Wintouch install** — §636
       reads `wsir_mst_mesas.estado` as 0 free, 1 awaiting payment, 2 occupied,
       from the labels on the legacy SQL files plus the live `vallado` data
