@@ -122,6 +122,7 @@
           <th scope="col">Shop</th>
           <th scope="col">Status</th>
           <th scope="col">Agent</th>
+          <th scope="col">Version</th>
           <th scope="col">Last seen</th>
           <th scope="col" class="text-end">Actions</th>
         </tr>
@@ -152,6 +153,16 @@
                 <span class="badge text-bg-danger">Offline</span>
               }
             </td>
+            <td data-label="Version">
+              @if (store.agentVersion) {
+                <code>{{ store.agentVersion }}</code>
+                @if (agentPackage && agentPackage.version !== store.agentVersion) {
+                  <span class="badge text-bg-warning ms-1" title="Latest: {{ agentPackage.version }}">update</span>
+                }
+              } @else {
+                —
+              }
+            </td>
             <td data-label="Last seen">
               {{ store.lastSeenAt ? (store.lastSeenAt | date: 'short') : '—' }}
             </td>
@@ -174,7 +185,7 @@
 
           @if (openId === store.id && isAdmin) {
             <tr>
-              <td colspan="5" class="bg-body-tertiary">
+              <td colspan="6" class="bg-body-tertiary">
                 <div class="row g-4 py-2">
                   <div class="col-12 col-lg-6">
                     <h3 class="h6">Who can see this shop</h3>

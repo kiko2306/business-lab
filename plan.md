@@ -32288,3 +32288,15 @@ scenario is generic — any ban can now prolong itself. And noticed in passing:
 `netbird-vpn-api…/api/networks` about every 30 s from Uptime-Kuma and the
 dashboard backend, i.e. a NetBird API credential is being rejected on a timer —
 harmless to CrowdSec so far, but it is the same shape as tonight's ban.
+
+### §672 follow-up: a Version column in the shops list
+
+Reported "still don't see the agent version" with a screenshot of the shops
+table. Checked end to end first: the DB held `1.0.0-fb22a5c3` for the connected
+agent, `/api/stores` returned it, and the served bundle contained the code — the
+data path was fine; I had only put the version on the shop page and the Manage →
+Agent panel, and the list the operator actually looks at had no place for it.
+Added a **Version** column (with an "update" badge for admins when the packaged
+version differs, §670); the Manage row's `colspan` follows. Angular build passes;
+not looked at in a browser (headless-Chrome check of the live page was attempted
+and abandoned: the test image has no puppeteer for this workspace).
