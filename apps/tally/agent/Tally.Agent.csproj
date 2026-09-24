@@ -31,6 +31,10 @@
 
   <ItemGroup>
     <None Update="tally.config.example" CopyToOutputDirectory="PreserveNewest" />
+    <!-- README's install flow runs this from the publish folder; without it the
+         folder has no installer and install.ps1's own "run from the published
+         output" check can never pass. -->
+    <None Update="install.ps1" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>

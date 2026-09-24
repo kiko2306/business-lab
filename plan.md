@@ -32039,3 +32039,21 @@ backend container was coming back. Fix: both `OperationsService` getters
 callers (`loadStatus`, the Utils page) toast on their own, so a genuine
 failure there is still reported — and no longer twice. Frontend tests pass;
 not run against a live restart.
+
+## 669. Verified: `install.ps1` on a real Windows machine; publish output was missing it
+
+Ran the Tally agent install on this WSL host's Windows side, enrolling against
+`https://tally.tx-home-utils.com/` (the beta box, through the tunnel). Result:
+`Tally.Agent` registered as an Automatic service, Running; `tally.config` under
+`%ProgramFiles%\Tally` correct; `agent.token` (DPAPI) written to
+`C:\ProgramData\Tally`; the dashboard showed the agent connected.
+
+One bug found by doing it: `Tally.Agent.csproj` never copied `install.ps1` into
+the publish output, although README and the script's own guard both assume it
+is there. Added `<None Update="install.ps1" CopyToOutputDirectory=...>`.
+
+Build note: Windows `dotnet.exe` cannot write under `\\wsl.localhost` (NuGet
+`obj` tmp access denied), so the source is rsynced to a Windows path and
+published from there. Not yet proven: the re-run-with-fresh-code path
+(`Restart-Service` branch), and the WebSocket surviving the tunnel idle
+timeout / a tunnel restart (README item left open).

@@ -440,14 +440,10 @@ before anything is built.
       `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
       the public ones do not, the app's bypass path still answers
       unauthenticated, and Authelia restarts cleanly rather than crash-looping.
-- [ ] **Run `install.ps1` for real, on a shop machine** — plan.md §655
-      collapses the tally agent's four manual install steps into one
-      elevated PowerShell script, but nothing off a real Windows machine
-      could run it (only parsed for syntax). Confirm: it copies itself into
-      `%ProgramFiles%\Tally`, writes a correct `tally.config`, enrols
-      successfully, registers and starts the `Tally.Agent` service, and
-      that re-running it against an already-installed agent with a fresh
-      code restarts the service rather than failing on `sc.exe create`.
+- [ ] **Re-run `install.ps1` against an installed agent** — plan.md §669
+      proved the first install on a real machine. Still to confirm: re-running
+      with a fresh enrolment code takes the `Restart-Service` branch rather
+      than failing on `sc.exe create`, and the agent reconnects.
 - [ ] **Confirm `estado` semantics with a second Wintouch install** — §636
       reads `wsir_mst_mesas.estado` as 0 free, 1 awaiting payment, 2 occupied,
       from the labels on the legacy SQL files plus the live `vallado` data
