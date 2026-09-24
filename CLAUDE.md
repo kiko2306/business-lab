@@ -117,13 +117,23 @@ tested on `beta` before the change is trustworthy there (what to check, and
 how) — the same item gets deleted once that test passes, per the TODO
 convention below.
 
-Merging `dev` into `beta` is **only** a merge and push (fast-forward when
-possible) — no rebuild, no restart, and no live-stack testing on your own
-initiative. The user pulls that code onto the running box themselves, via the
-dashboard's own self-update panel (Update page, tracking the `beta` branch) —
-that update is theirs to trigger, not yours. Every time a merge to `beta`
-lands, say so plainly and flag that the README's listed tests still need to
-be run there before `main`.
+Merge `dev` into `beta` only when a commit actually gives the user something
+new to test there — it touches Docker/exposure/networking/backups, or
+otherwise completes a slice that is now reachable/usable end-to-end. A
+docs/plan-only fix, or a backend-only slice nothing yet exposes (e.g. an API
+endpoint built before the frontend or exposure that reaches it), stays on
+`dev` and waits — merge it into `beta` together with, or right after, the
+change that actually makes it reachable. This is a judgment call each time,
+not a fixed list of file paths.
+
+When a commit does clear that bar, merging is **only** a merge and push
+(fast-forward when possible) — no rebuild, no restart, no live-stack testing
+on your own initiative, and no need to ask permission first (the judgment
+call above is the only gate). The user pulls that code onto the running box
+themselves, via the dashboard's own self-update panel (Update page, tracking
+the `beta` branch) — that update is theirs to trigger, not yours. Every time
+a merge to `beta` lands, say so plainly and flag that the README's listed
+tests still need to be run there before `main`.
 
 `beta` → `main` happens only when the user explicitly asks for `beta` to be
 tested and that test passes — that request-and-pass is the go-ahead, not a
@@ -160,14 +170,19 @@ Every task runs through the same six steps, in order, every time:
    touches Docker/exposure/networking/backups, also add a README TODO item
    naming exactly what must be tested on `beta` and how — delete it once that
    test passes.
-5. **Commit and push to `dev` once the affected workspace's checks pass —
-   then merge to `beta`.** `dev` has no live-stack gate; push as it lands.
-   Merging `dev` into `beta` is only a merge and push, done without asking
-   each time — no rebuild, no live-stack testing here. Say plainly that the
-   merge landed and that the README's listed tests still need to be run on
-   `beta` before `main`. `beta` → `main` is a separate step, triggered only
-   by the user explicitly asking for `beta` to be tested — do that testing,
-   and merge only on a pass; never on your own initiative.
+5. **Commit and push to `dev` once the affected workspace's checks pass.**
+   `dev` has no live-stack gate; push as it lands. Then merge into `beta`
+   only if this commit actually gives the user something new to test there
+   (touches Docker/exposure/networking/backups, or completes a slice that is
+   now reachable/usable end-to-end) — a docs/plan-only fix or a backend-only
+   slice nothing yet exposes stays on `dev` and waits for the change that
+   makes it reachable. When it does clear that bar, merging is only a merge
+   and push, done without asking each time — no rebuild, no live-stack
+   testing here. Say plainly that the merge landed and that the README's
+   listed tests still need to be run on `beta` before `main`; if you held a
+   commit back from `beta`, say that too. `beta` → `main` is a separate step,
+   triggered only by the user explicitly asking for `beta` to be tested — do
+   that testing, and merge only on a pass; never on your own initiative.
 6. **Back to step 1.** Report, re-read the list, propose again — unless the
    item just finished was part of a pre-approved batch (below), in which case
    move to the next item in that batch without re-proposing.
