@@ -30589,3 +30589,12 @@ Not yet run through Cloudflare/NPM/Authelia on `beta` — already covered by
 the existing "Verify a gated secondary hostname on the live stack" README
 item, which was written to check both `core` (gated) and the public
 secondaries once they existed; no new item needed.
+
+## 643. Fixed: stale theme-sync README item after §642
+
+The README's "Sync the shared theme into `check-in` and `pulse` when they
+exist" item was already half-done: §642 added `check-in`'s `theme.css` to
+`sync-app-theme.sh`'s `targets` and its own CI diff step in the same commit
+that built the app, but didn't correct this item to say so. Trimmed the item
+to name only `pulse`, and pointed its "proven for" reference at both `tally`
+and `hotel-checkin`. No code change, no plan needed beyond this line.

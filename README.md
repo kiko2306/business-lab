@@ -426,15 +426,15 @@ before anything is built.
       `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
       the public ones do not, the app's bypass path still answers
       unauthenticated, and Authelia restarts cleanly rather than crash-looping.
-- [ ] **Sync the shared theme into `check-in` and `pulse` when they exist** —
-      the mechanism is built and proven for `tally` (plan.md §633):
+- [ ] **Sync the shared theme into `pulse` when it exists** — the mechanism is
+      built and proven for `tally` and `hotel-checkin` (plan.md §633/§642):
       `scripts/sync-app-theme.sh` copies `frontend/src/styles.css` into each
-      app's `web/src/theme.css`, and a CI step diffs them. §626 wanted no copy
-      at all, but an app image builds from its own `apps/<name>/` context and
-      cannot reach `frontend/src/`, so drift is caught rather than prevented.
-      Add each new app's path to the script's `targets`, and a matching diff
-      step to its CI job. Remember to re-run the script after any dashboard
-      theme change and commit what it writes.
+      app's `theme.css`, and a CI step diffs them. §626 wanted no copy at all,
+      but an app image builds from its own `apps/<name>/` context and cannot
+      reach `frontend/src/`, so drift is caught rather than prevented. Add
+      `pulse`'s path to the script's `targets`, and a matching diff step to
+      its CI job. Remember to re-run the script after any dashboard theme
+      change and commit what it writes.
 - [ ] **Build the guest-text template store** — plan.md §629. Admin UI uses
       the dashboard's `TranslatePipe` with static `en`/`pt-pt` files; guest
       emails and pages keep DB-backed per-client, per-language templates, so
