@@ -32395,3 +32395,33 @@ QV0002 (17); no comment article listed; one item had no master row. `dotnet
 build -warnaserror` and the Angular build pass. Needs the new setup exe on the
 shop machine. The archive (`wgcdoclinhas.artigo`) already carries the same code,
 which will make the older-days view (README item) a straight join.
+
+## 679. Fixed: the agent took a minute to come back after every dashboard update
+
+Report: "agent is offline after dashboard update, it's not reconnecting". It did
+reconnect (API `connected: true`, `lastSeenAt` a couple of minutes after the
+rebuild) but the Windows event log showed why it looked stuck — two faults in
+`AgentClient.RunAsync`:
+
+1. **The backoff never reset after a good connection.** `delay` went back to 2 s
+   only when the server closed *cleanly*; a dropped connection (a Tally rebuild,
+   a tunnel restart — the ordinary case) took the exception path and left `delay`
+   at whatever the last outage had grown it to. After one earlier long outage
+   every later reconnect waited the 60 s cap ("retrying in 00:01:00").
+2. **A 503 was reported as a revoked token.** During the rebuild the proxy answers
+   the WebSocket handshake with 503; the agent matched any `NotAWebSocket`
+   handshake failure, logged "the token may have been revoked; re-enrol", and
+   pinned the wait to the maximum. Only a 401 means that.
+
+Fix: `ServeAsync` calls back when the socket is up and the backoff restarts from
+2 s; the handshake status is read (`CollectHttpResponseDetails` — without that
+option `HttpStatusCode` stays empty in .NET 8, found by the first test run) and
+only a 401 raises `TokenRefusedException` (logged, 60 s wait); 502/503/504 fall
+through to the ordinary backoff.
+
+Proven, not assumed: the real agent on Linux against a scripted fake server —
+handshake 503 → retry after 2 s; accepted then dropped abruptly → retry after 2 s,
+twice (before the fix it grew); 503 → 2 s then 4 s; 401 → "Connection refused
+(401)" and exactly 60 s (15.3 s → 75.4 s) before the next attempt, which then
+connected. `dotnet build -warnaserror` clean. Needs the new setup exe on the shop
+machine like the other agent changes.

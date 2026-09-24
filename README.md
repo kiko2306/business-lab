@@ -494,6 +494,12 @@ before anything is built.
       from the line's own value/discount columns (not qty × price), and
       reconcile per-day totals with the headers before showing money. Check what
       day close does with the boundary day. Second priority to the running day.
+- [ ] **Confirm the agent comes back within seconds of a dashboard update
+      (plan.md §679)** — with the new setup exe installed, run an Update that
+      rebuilds Tally. The shop should show Offline only while the container is
+      down and return to Online within ~10 s of it being healthy, and the
+      Windows event log should show short retries ("retrying in 00:00:02/04/08"),
+      never "token may have been revoked" for a 503.
 - [ ] **Run the single-file Tally setup for real, elevated** — plan.md §670.
       Its prompts, `install.config` presets and validation were tested
       un-elevated, and the Docker build of the exe on Linux; the elevated part

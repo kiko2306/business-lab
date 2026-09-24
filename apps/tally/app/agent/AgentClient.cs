@@ -90,7 +90,12 @@ public sealed class AgentClient(
                 }
                 else
                 {
-                    await ServeAsync(token, ct);
+                    // The backoff restarts from the shortest wait once a connection is
+                    // actually up: it exists to slow a run of *failed* attempts, and a
+                    // link that held for hours and then dropped (a Tally rebuild, a
+                    // tunnel restart) should be back in seconds, not left at whatever
+                    // the last outage's delay had grown to.
+                    await ServeAsync(token, () => delay = TimeSpan.FromSeconds(2), ct);
                     // A clean close is the server going away, not a failure: retry
                     // promptly rather than treating it as an outage.
                     delay = TimeSpan.FromSeconds(2);
@@ -100,12 +105,12 @@ public sealed class AgentClient(
             {
                 return;
             }
-            catch (WebSocketException ex) when (ex.WebSocketErrorCode == WebSocketError.NotAWebSocket)
+            catch (TokenRefusedException ex)
             {
-                // The handshake was refused before upgrading — a 401 from a
-                // revoked or unknown token (§634). Retrying faster will not fix
-                // it, and it needs a human, so say exactly that.
-                logger.LogError(ex, "Connection refused. The token may have been revoked; re-enrol with a new code");
+                // A 401 on the handshake: a revoked or unknown token (§634).
+                // Retrying faster will not fix it, and it needs a human, so say
+                // exactly that.
+                logger.LogError(ex, "Connection refused (401). The token may have been revoked; re-enrol with a new code");
                 delay = maxDelay;
             }
             catch (Exception ex)
@@ -125,10 +130,13 @@ public sealed class AgentClient(
         }
     }
 
-    private async Task ServeAsync(string token, CancellationToken ct)
+    private async Task ServeAsync(string token, Action onConnected, CancellationToken ct)
     {
         using var socket = new ClientWebSocket();
         socket.Options.SetRequestHeader("Authorization", $"Bearer {token}");
+        // Without this, HttpStatusCode stays empty after a refused handshake and a
+        // 401 cannot be told from a 503 (found by running it against a fake server).
+        socket.Options.CollectHttpResponseDetails = true;
         // So the Tally page can show what is installed at each shop (plan.md §672).
         socket.Options.SetRequestHeader("X-Agent-Version", AgentVersion);
         // The server pings every 30s to prove liveness through tunnels and NAT
@@ -136,7 +144,20 @@ public sealed class AgentClient(
         // alive through a proxy that only watches one way.
         socket.Options.KeepAliveInterval = TimeSpan.FromSeconds(20);
 
-        await socket.ConnectAsync(options.SocketUri, ct);
+        try
+        {
+            await socket.ConnectAsync(options.SocketUri, ct);
+        }
+        catch (WebSocketException) when (socket.HttpStatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            throw new TokenRefusedException();
+        }
+        // Any other refusal — a 502/503/504 from the proxy while Tally is being
+        // rebuilt, most often — is the server being unavailable, not the token
+        // being wrong, and falls through to the ordinary backoff. It used to be
+        // reported as a revoked token and pinned to the longest wait, so every
+        // dashboard update read as "re-enrol" and cost a minute (§679).
+        onConnected();
         logger.LogInformation("Connected to {Uri} (agent {Version})", options.SocketUri, AgentVersion);
 
         var buffer = new byte[64 * 1024];
@@ -220,6 +241,8 @@ public sealed class AgentClient(
             SendLock.Release();
         }
     }
+
+    private sealed class TokenRefusedException() : Exception("the server refused the token (401)");
 
     private sealed record AgentRequest(string? Id, string Method);
 
