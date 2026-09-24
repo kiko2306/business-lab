@@ -81,6 +81,8 @@ test('the schema applies, twice, and creates what is expected', { skip }, async 
     'enrolment_codes',
     'guest_extras',
     'guests',
+    'pulse_questions',
+    'pulse_responses',
     'reservations',
     'unit_access',
     'units',
@@ -491,4 +493,79 @@ test('a Wintouch re-sync after check-in does not wipe the occupants the guest en
   const after = await call('GET', `/checkin/${token}`);
   assert.equal(after.body.extras.length, 1);
   assert.equal(after.body.extras[0].firstName, 'Bruno');
+});
+
+/** A unit with feedback switched on and a reservation for a guest. */
+async function seedPulseReservation(opts: { quizActive?: boolean } = {}) {
+  const unitId = await seedUnit('A', 'Alpha');
+  if (opts.quizActive !== false) {
+    await pool.query(`UPDATE units SET quiz_is_active = true WHERE id = $1`, [unitId]);
+  }
+  const reservation = await pool.query(
+    `INSERT INTO reservations (unit_id, number, line, checkin_on, checkout_on, status)
+     VALUES ($1, '1', 1, '2026-01-01', '2026-01-03', 'RESERVED') RETURNING id, token`,
+    [unitId]
+  );
+  return { reservationId: reservation.rows[0].id, token: reservation.rows[0].token };
+}
+
+test('a feedback link 404s for a bad token, and for a unit with the flow off', { skip }, async () => {
+  assert.equal((await call('GET', '/pulse/not-a-token')).status, 404);
+
+  const { token } = await seedPulseReservation({ quizActive: false });
+  assert.equal((await call('GET', `/pulse/${token}`)).status, 404);
+});
+
+test('a feedback link shows the seeded questions, unanswered', { skip }, async () => {
+  const { token } = await seedPulseReservation();
+  const res = await call('GET', `/pulse/${token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.submitted, false);
+  assert.equal(res.body.questions.length, 4);
+  assert.ok(res.body.questions.every((q: { answer: unknown }) => q.answer === null));
+});
+
+test('submitting feedback stores valid answers and drops the rest', { skip }, async () => {
+  const { token, reservationId } = await seedPulseReservation();
+  const questions = (await call('GET', `/pulse/${token}`)).body.questions as { id: string; type: string }[];
+  const rating = questions.find((q) => q.type === 'rating')!;
+  const freeText = questions.find((q) => q.type === 'text')!;
+
+  const submit = await call('POST', `/pulse/${token}`, {
+    body: {
+      responses: [
+        { questionId: rating.id, answer: 5 },
+        { questionId: rating.id, answer: 9 }, // out of range, dropped below
+        { questionId: freeText.id, answer: 'Lovely stay' },
+        { questionId: 'not-a-real-question', answer: 'ignored' },
+      ],
+    },
+  });
+  assert.equal(submit.status, 200);
+  assert.equal(submit.body.submitted, true);
+
+  const { rows } = await pool.query(
+    `SELECT question_id, answer FROM pulse_responses WHERE reservation_id = $1`,
+    [reservationId]
+  );
+  // Only the last response per question survives — a duplicate questionId in
+  // one submission is a client bug, not two answers to store.
+  assert.equal(rows.length, 2);
+  const byQuestion = new Map(rows.map((r) => [r.question_id, r.answer]));
+  assert.equal(byQuestion.get(freeText.id), 'Lovely stay');
+});
+
+test('resubmitting feedback overwrites the previous answers', { skip }, async () => {
+  const { token, reservationId } = await seedPulseReservation();
+  const questions = (await call('GET', `/pulse/${token}`)).body.questions as { id: string; type: string }[];
+  const rating = questions.find((q) => q.type === 'rating')!;
+
+  await call('POST', `/pulse/${token}`, { body: { responses: [{ questionId: rating.id, answer: 2 }] } });
+  await call('POST', `/pulse/${token}`, { body: { responses: [{ questionId: rating.id, answer: 4 }] } });
+
+  const { rows } = await pool.query(
+    `SELECT answer FROM pulse_responses WHERE reservation_id = $1`,
+    [reservationId]
+  );
+  assert.deepEqual(rows.map((r) => r.answer), ['4']);
 });

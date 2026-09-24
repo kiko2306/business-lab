@@ -30598,3 +30598,75 @@ exist" item was already half-done: §642 added `check-in`'s `theme.css` to
 that built the app, but didn't correct this item to say so. Trimmed the item
 to name only `pulse`, and pointed its "proven for" reference at both `tally`
 and `hotel-checkin`. No code change, no plan needed beyond this line.
+
+## 644. Implemented: hotel-core's feedback (`pulse`) endpoints
+
+First slice of `pulse` (plan.md §625/§629), scoped the same way §641 scoped
+`check-in`: hotel-core's guest-facing read/write endpoints only, nothing
+admin- or frontend-side yet.
+
+### Scope cut from the legacy quiz system
+
+The legacy (`sample/hotel`, §620) supports several selectable quizzes, each
+with grouped section headers, and a per-unit `checkout_quiz_id` choosing
+which quiz applies. hotel-core's existing schema (`001_init.sql`, written
+during §629) had already simplified that down to one bare `quiz_is_active`
+boolean per unit — no quiz-selection column. So the questions themselves are
+one flat, ordered list shared by the whole deployment; there is nothing left
+to select between. Two question types survive: `rating` (the legacy's 1-5
+star `VALUE` type) and `text` (free-form comment).
+
+### What was built
+
+- `002_pulse.sql`: `pulse_questions` (text, type, `is_active`, `sort_order`)
+  seeded once with four defaults — a guest form needs *something* to ask
+  before an admin editor exists to replace them — and `pulse_responses`
+  (reservation_id, question_id, answer), `UNIQUE (reservation_id,
+  question_id)` so a resubmission can overwrite cleanly. `is_active` is
+  soft-disable-only: no delete endpoint exists (nothing edits question
+  content yet — see the new README item below), so the column only matters
+  once one does, but writing it in now avoids a later migration to add it
+  under existing rows.
+  A second migration file, still no `schema_migrations` table: `migrate.ts`'s
+  own ponytail comment reserves that for a destructive change that cannot be
+  idempotent, and this one is purely additive (`CREATE TABLE IF NOT EXISTS`,
+  a guarded seed insert).
+- `routes/pulse.ts`: `GET /:token` / `POST /:token`, same shape as
+  `checkin.ts` — 404 on a bad token or `quiz_is_active = false`, so a
+  disabled flow cannot be told apart from a wrong link. No `requireIdentity`;
+  the token is the authorisation.
+  `POST` accepts `{ responses: [{ questionId, answer }] }`, drops anything
+  that doesn't match a currently-active question, clamps a `rating` answer to
+  1-5, and collapses to a `Map<questionId, answer>` before inserting — a
+  first draft used an array and would have thrown a `23505` unique-violation
+  (crashing the request with a 500) had a client submitted the same
+  `questionId` twice with two *valid* answers; caught by a test that does
+  exactly that, fixed by making the last one win. Resubmission (like
+  check-in) overwrites rather than 409s — a guest correcting a rating needs
+  no separate edit path.
+  Sets `reservations.quiz_answered = true` on submit. No `quiz_sent` check
+  and no 409 case: unlike check-in there is no "reservation has no guest"
+  precondition to enforce, and the send schedule that would set `quiz_sent`
+  doesn't exist yet either (a separate README item already covers it).
+- `app.ts`: mounted at `/pulse`, ungated, alongside `/checkin`.
+- Already usable end-to-end with no further admin work: the per-unit
+  `quiz_is_active` toggle in hotel-admin's Properties table (built in §629,
+  before pulse existed) already flips the flag this reads.
+
+### Verification
+
+Docker: throwaway `postgres:17-alpine`, then `node:22` running `npm run
+typecheck && npm run build && cp -r src/migrations dist/migrations && npm
+test` against it. First run failed with `relation "pulse_questions" does not
+exist` — a stale `dist/migrations/` directory left over from an earlier
+session's build meant `cp -r src/migrations dist/migrations` nested a copy
+inside it (`dist/migrations/migrations/002_pulse.sql`) instead of replacing
+it, so `migrate.ts` only ever found the old `001_init.sql`. Removed `dist/`
+and rebuilt clean; all 32 tests passed (28 pre-existing + 4 new). Cleaned up
+the throwaway container, network, and the `dist`/`node_modules` the
+verification left on disk.
+
+### Follow-ups added to the README
+
+- `pulse`'s guest-facing frontend + exposure (mirrors §642's `check-in` app).
+- An admin editor for question content, now that there is content to edit.
