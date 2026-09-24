@@ -31876,3 +31876,31 @@ have dedicated specs either.
 Backend (1225 tests) and frontend (90 tests) both pass; `ng build` clean.
 No Docker/exposure/networking/backups touched, so no README beta-test item
 — this is a small, fully working, immediately end-to-end change.
+
+## 664. Fixed: §663's emoji badges swapped for real Android/Apple glyphs
+
+User asked for the actual platform icons rather than the 🤖/🍎 emoji §663
+shipped. `frontend/public/` already has a hand-authored inline-SVG
+convention (`favicon.svg`), so the fix followed it: fetched the exact
+`Android`/`Apple` path data from the [simple-icons](https://simple-icons.org)
+project (CC0 — public domain, free to embed with no attribution
+requirement) via `curl` against its GitHub repo, rather than
+hand-approximating brand-mark bezier curves from memory, and inlined both
+as `fill="currentColor"` `<svg>`s directly in `service-card.component.html`
+— no new npm dependency, no external CDN reference at runtime (this is a
+self-hosted dashboard; the fetch was a one-time authoring step, not
+something the page loads from). `currentColor` means both follow whatever
+text color the badge already resolves to under the app's permanent dark
+theme (`data-bs-theme="dark"`), with no separate light/dark handling
+needed.
+
+Sizing went in the template (`width="12" height="12"` on each `<svg>`,
+`display:inline-flex` as an inline `style` on the badge `<span>`) rather
+than a new CSS rule in the component stylesheet — a first attempt using a
+`.mobile-app-badge` class pushed `service-card.component.css` about 50–100
+bytes past Angular's 4kB per-component style budget (`angular.json`'s
+`anyComponentStyle` warning), a threshold nothing else in this change
+needed to touch.
+
+No version-relevant behavior changed beyond the glyphs themselves — same
+version bump policy as any other `frontend/src` change.
