@@ -4,11 +4,12 @@ import type { GuestTextLocale } from './guestText';
 import { getSmtpConfig } from './smtpSettings';
 
 /**
- * The two per-minute guest-email jobs (plan.md §620, §651) — the rebuild's
- * `checkin:send` / `quiz:send` — plus the agent-down alert the legacy ran on
- * the same cadence (`conn:check`). Runs entirely off what's already built:
- * the SMTP sender (§649), the guest-text template store (§650), and the
- * per-unit offset columns and `alert_email` column §651 itself adds.
+ * The four per-minute guest-email jobs (plan.md §620, §651, §652) — the
+ * rebuild's `checkin:send` / `quiz:send` plus birthday and promo, which the
+ * legacy never got past an enum and an empty `switch` case — plus the
+ * agent-down alert the legacy ran on the same cadence (`conn:check`). Runs
+ * entirely off what's already built: the SMTP sender (§649), the guest-text
+ * template store (§650), and the per-unit offset/flag columns.
  *
  * ponytail: every guest gets the pt-pt templates — there is no per-guest
  * locale column yet, and check-in/pulse's own guest UI is English-only
@@ -69,6 +70,49 @@ export async function loadDueQuiz(pool: Pool): Promise<DueReservation[]> {
   return rows;
 }
 
+/**
+ * Due for the birthday email: the guest is staying (`checkin_on <= today <=
+ * checkout_on`) and today matches their birthday's month/day. Reservation-
+ * scoped, not guest-scoped (006_birthday_promo.sql) — a check-in-desk
+ * surprise for a guest staying over their birthday, not an annual mailshot.
+ */
+export async function loadDueBirthday(pool: Pool): Promise<DueReservation[]> {
+  const { rows } = await pool.query<DueReservation>(
+    `SELECT r.id, r.token::text AS token, g.first_name, g.last_name, g.email, u.name AS unit_name
+       FROM reservations r
+       JOIN units u ON u.id = r.unit_id
+       JOIN guests g ON g.id = r.guest_id
+      WHERE r.birthday_sent = false
+        AND u.is_active AND u.birthday_is_active
+        AND g.birth_date IS NOT NULL
+        AND CURRENT_DATE BETWEEN r.checkin_on AND r.checkout_on
+        AND to_char(g.birth_date, 'MM-DD') = to_char(CURRENT_DATE, 'MM-DD')
+        AND g.email IS NOT NULL AND g.email <> ''
+      ORDER BY r.checkin_on
+      LIMIT $1`,
+    [BATCH_LIMIT]
+  );
+  return rows;
+}
+
+/** Due for the promo email: once a reservation's stay has begun — no offset column, since there's nothing to port an offset default from (§629, §652). */
+export async function loadDuePromo(pool: Pool): Promise<DueReservation[]> {
+  const { rows } = await pool.query<DueReservation>(
+    `SELECT r.id, r.token::text AS token, g.first_name, g.last_name, g.email, u.name AS unit_name
+       FROM reservations r
+       JOIN units u ON u.id = r.unit_id
+       JOIN guests g ON g.id = r.guest_id
+      WHERE r.promo_sent = false
+        AND u.is_active AND u.promo_is_active
+        AND r.checkin_on <= CURRENT_DATE
+        AND g.email IS NOT NULL AND g.email <> ''
+      ORDER BY r.checkin_on
+      LIMIT $1`,
+    [BATCH_LIMIT]
+  );
+  return rows;
+}
+
 function guestName(r: DueReservation): string {
   return [r.first_name, r.last_name].filter(Boolean).join(' ').trim() || r.email;
 }
@@ -85,14 +129,19 @@ async function loadTemplates(pool: Pool, keys: string[]): Promise<Record<string,
   return Object.fromEntries(rows.map((r) => [r.key, r.value]));
 }
 
+/**
+ * `linkBase` is `null` for birthday/promo — they're informational, with no
+ * guest-facing page and hence no `_MAIL_BUTTON` template row (004_guest_text.sql
+ * seeds none for either), so no link is built and none is appended.
+ */
 async function sendFlowEmails(
   pool: Pool,
   transporter: nodemailer.Transporter,
   from: string,
-  flow: 'checkin' | 'quiz',
-  linkBase: string,
+  flow: 'checkin' | 'quiz' | 'birthday' | 'promo',
+  linkBase: string | null,
   due: DueReservation[],
-  sentColumn: 'checkin_sent' | 'quiz_sent'
+  sentColumn: 'checkin_sent' | 'quiz_sent' | 'birthday_sent' | 'promo_sent'
 ): Promise<number> {
   if (due.length === 0) return 0;
   const prefix = flow.toUpperCase();
@@ -103,14 +152,15 @@ async function sendFlowEmails(
 
   let sent = 0;
   for (const r of due) {
-    const link = guestUrl(linkBase, r.token);
+    const link = linkBase ? guestUrl(linkBase, r.token) : null;
     const body = text.replace(/\$guest\b/g, guestName(r));
+    const cta = link && button ? `<p><a href="${link}">${button}</a></p>` : '';
     try {
       await transporter.sendMail({
         from,
         to: r.email,
         subject,
-        html: `${body}<p><a href="${link}">${button}</a></p>`,
+        html: `${body}${cta}`,
       });
     } catch (err) {
       console.error(`hotel-core: ${flow} email failed for reservation ${r.id}`, err);
@@ -172,6 +222,9 @@ export async function runEmailSchedule(pool: Pool): Promise<void> {
       if (pulseBase) {
         await sendFlowEmails(pool, transporter, from, 'quiz', pulseBase, await loadDueQuiz(pool), 'quiz_sent');
       }
+      // No guest page for either, so no exposed hostname to wait on.
+      await sendFlowEmails(pool, transporter, from, 'birthday', null, await loadDueBirthday(pool), 'birthday_sent');
+      await sendFlowEmails(pool, transporter, from, 'promo', null, await loadDuePromo(pool), 'promo_sent');
       await sendAgentDownAlert(pool, transporter, from, smtp.alertEmail);
     } finally {
       transporter.close();

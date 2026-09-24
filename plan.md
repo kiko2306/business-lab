@@ -31044,3 +31044,76 @@ exposed `HOTEL_CHECKIN_URL`/`HOTEL_PULSE_URL`, the agent-down alert). The
 birthday/promo flows and the check-out/online-payment flow remain their own
 separate, still-open README items — this section only closes the
 check-in/quiz mail piece.
+
+## 652. Implemented: hotel-core's birthday and promo guest emails
+
+The last two of §629's four guest flows. Both are effectively new features,
+not a port — the legacy has only `units.birthday_is_active` /
+`promo_is_active`, admin translation pages, and an empty `switch` case in
+`SendEvents.php` (confirmed by reading it: `case EventKeysEnum::BIRTHDAY:
+// code...`). No scheduling behaviour to match, so this section records the
+design taken rather than a port.
+
+**Reservation-scoped, not guest-scoped.** `checkin_sent`/`quiz_sent` already
+live on `reservations`, not `guests` — `006_birthday_promo.sql` adds
+`birthday_sent`/`promo_sent` the same way, with the same partial-index shape
+(`reservations_birthday_due_idx`, `reservations_promo_due_idx`, both `WHERE
+… = false`, per §626's finding that a plain index on a minute-cadence query
+would quietly index the whole table). The alternative — a guest-level "sent
+this year" column — was rejected: a guest isn't tied to a single unit
+(only reservations are), so a global per-guest flag can't say which unit's
+`birthday_is_active` gated the send, and a returning guest's next
+reservation is a fresh row that fires again with zero extra bookkeeping the
+guest-scoped version would need (a year counter, a reset).
+
+**What "due" means, since neither existed in the legacy.**
+
+- Birthday: `CURRENT_DATE BETWEEN checkin_on AND checkout_on` and
+  `to_char(birth_date, 'MM-DD') = to_char(CURRENT_DATE, 'MM-DD')` — a
+  check-in-desk surprise for a guest staying over their own birthday, not an
+  annual mailshot to everyone who ever stayed. `birth_date IS NULL` (the
+  Wintouch "unknown" sentinel, §639) never matches.
+- Promo: `checkin_on <= CURRENT_DATE`, once per reservation — fires once the
+  stay begins. No offset column, unlike checkin/quiz: the legacy never had
+  one to port a default from, and adding one speculatively would be a knob
+  nobody asked for.
+
+**No link, no button.** Both are informational — `guest_text_templates`
+seeds `BIRTHDAY_MAIL_SUBJECT`/`_MAIL_TEXT` and `PROMO_MAIL_SUBJECT`/`_MAIL_TEXT`
+only, no `_MAIL_BUTTON` row for either (004_guest_text.sql, already seeded
+ahead of this). `sendFlowEmails` (§651) took `linkBase: string` as a required
+param; it's now `string | null`, and the CTA paragraph is only built when a
+link *and* a button both exist — birthday/promo pass `null` and get a bare
+templated body. This also means neither needs `HOTEL_CHECKIN_URL`/
+`HOTEL_PULSE_URL` to be set: unlike checkin/quiz, they run on every tick
+regardless of whether check-in/pulse are exposed yet.
+
+**Nothing else to build.** The per-unit toggle route (`PATCH /units/:id`)
+already looped over all four flows generically (`FLOWS = ['checkin', 'quiz',
+'birthday', 'promo']`, units.ts), the admin UI's toggle table already listed
+all four (`models.ts`'s `FLOW_FIELDS`), and the guest-text editor is
+data-driven off `GUEST_TEXT_KEYS`, which already included the birthday/promo
+rows. All three were built ahead of the sender that would use them (§647,
+§649, §650), so this section is scheduler-and-tests only — no frontend, no
+migration to the toggle/editor UI.
+
+### Verification
+
+`apps/hotel/api`: `npm run typecheck`, `npm run build`, `npm test` against a
+real `postgres:17-alpine` — 50 tests passing (2 new): `loadDueBirthday`
+respects the active flag, the sent flag, a guest actually staying today, and
+a birthday that doesn't match today's date; `loadDuePromo` respects the
+active flag, the sent flag, and the stay-has-begun cutoff. The existing
+"scheduler indexes exist and are partial" test (§638) now asserts all four
+index names. Not run against a live SMTP server — no test in this file does
+that for any flow (checkin/quiz's own tests stop at "the due query is
+right" and "a failed send leaves the flag false"); this matches that
+existing depth rather than adding new test infrastructure for one flow.
+
+### Follow-ups added to the README
+
+None beyond the existing "verify hotel-core's guest-email scheduler on the
+live stack" item (§651), which already covers "the guest-email work…
+actually sends" generally — extending it to also check a real birthday/promo
+send once a real stay/birthday lines up on `beta`, rather than opening a
+second item for the same underlying gap.

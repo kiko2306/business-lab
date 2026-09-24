@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.141.1] — 2026-09-24
+
+### Hotel
+
+- Birthday and post-checkin-begin promo guest emails send on the same per-unit flags as check-in/quiz
+
 ## [0.141.0] — 2026-09-24
 
 ### Added

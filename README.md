@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.141.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.141.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -439,12 +439,6 @@ before anything is built.
       row with `estado = 1` has been seen yet, so the awaiting-payment case is
       inferred rather than observed — worth confirming on a shop that has a
       table with the bill requested.
-- [ ] **Build the birthday and promo email flows** — plan.md §629 puts them
-      in scope. They are effectively new features, not a port: the legacy has
-      only an enum, per-unit `birthday_is_active` / `promo_is_active` flags and
-      admin translation pages, while `SendEvents` has empty case bodies and is
-      not scheduled at all. There are four guest email flows in total, not the
-      two §620 described.
 - [ ] **Build the check-out / online payment flow** — plan.md §629 puts it in
       scope, and it is the largest of the three. `CheckOut.cs`, the night-audit
       run and the invoice/payment DAOs exist in the legacy agent but are
@@ -470,7 +464,7 @@ before anything is built.
       for config, enrolment, DPAPI token storage and the reconnect loop; the
       transport here is plain outbound HTTPS rather than a socket (§627).
 - [ ] **Verify `hotel-core`'s guest-email scheduler on the live stack** —
-      plan.md §651. Everything is proven against a real database in CI:
+      plan.md §651, §652. Everything is proven against a real database in CI:
       the offset math, the flow/active-flag gating, and "a failed send
       leaves the row unmarked so the next tick retries" — but nothing off
       the live stack can prove the one piece that only exists when the app
@@ -483,7 +477,11 @@ before anything is built.
       to sync) a reservation whose check-in date is within the offset, and
       confirm the email arrives with a working `https://hotel-checkin.…`
       link — then the same for a post-checkout quiz email and the
-      15-minute agent-down alert.
+      15-minute agent-down alert. Also confirm the birthday and promo
+      flows (§652, no guest link/page, so no exposure dependency): flip a
+      unit's `birthday_is_active` + `promo_is_active` on, seed a reservation
+      spanning today with a guest whose `birth_date` matches today, and
+      confirm both the birthday email and the promo email arrive.
 - [ ] **Verify `tally` starts on the live stack** — plan.md §630 registered the
       app and proved the schema against a real `postgres:17-alpine` in CI, but
       nothing has run it on `beta` yet. Check: the app starts from the

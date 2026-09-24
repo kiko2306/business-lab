@@ -5,7 +5,7 @@ import type { Server } from 'node:http';
 import path from 'path';
 import { Pool } from 'pg';
 import { createApp } from './app';
-import { loadDueCheckins, loadDueQuiz, runEmailSchedule } from './emailSchedule';
+import { loadDueBirthday, loadDueCheckins, loadDuePromo, loadDueQuiz, runEmailSchedule } from './emailSchedule';
 import { migrate } from './migrate';
 
 // NOTE: shares one database with any sibling suite and truncates between
@@ -53,6 +53,14 @@ function isoDate(offsetDays: number): string {
   return d.toISOString().slice(0, 10);
 }
 
+/** A birth date whose month/day is `offsetDays` from today, `yearsAgo` years back — for the birthday-email tests. */
+function birthdayOn(offsetDays: number, yearsAgo = 30): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  d.setUTCFullYear(d.getUTCFullYear() - yearsAgo);
+  return d.toISOString().slice(0, 10);
+}
+
 /** A reservation with a real guest email, for the email-schedule tests. `email: null` omits the guest entirely. */
 async function seedReservation(opts: {
   unitId: string;
@@ -60,12 +68,13 @@ async function seedReservation(opts: {
   checkoutOn: string;
   number?: string;
   email?: string | null;
+  birthDate?: string | null;
 }) {
   let guestId: string | null = null;
   if (opts.email !== null) {
     const guest = await pool.query(
-      `INSERT INTO guests (code, first_name, last_name, email) VALUES ($1, 'Ana', 'Silva', $2) RETURNING id`,
-      [`G-${opts.number ?? '1'}-${opts.unitId}`, opts.email ?? 'ana@example.com']
+      `INSERT INTO guests (code, first_name, last_name, email, birth_date) VALUES ($1, 'Ana', 'Silva', $2, $3) RETURNING id`,
+      [`G-${opts.number ?? '1'}-${opts.unitId}`, opts.email ?? 'ana@example.com', opts.birthDate ?? null]
     );
     guestId = guest.rows[0].id;
   }
@@ -125,13 +134,15 @@ test('the schema applies, twice, and creates what is expected', { skip }, async 
 });
 
 test('the scheduler indexes exist and are partial (§626)', { skip }, async () => {
-  // Both schedulers run every minute and the legacy had no index for either.
+  // All four schedulers run every minute and the legacy had no index for any.
   const { rows } = await pool.query(
     `SELECT indexname, indexdef FROM pg_indexes
       WHERE tablename = 'reservations' AND indexname LIKE '%_due_idx' ORDER BY indexname`
   );
   assert.deepEqual(rows.map((r) => r.indexname), [
+    'reservations_birthday_due_idx',
     'reservations_checkin_due_idx',
+    'reservations_promo_due_idx',
     'reservations_quiz_due_idx',
   ]);
   // Partial, or they would index the whole table as a season accumulates.
@@ -761,6 +772,56 @@ test('due quiz emails respect the per-unit offset past check-out', { skip }, asy
   await seedReservation({ unitId, checkinOn: isoDate(-4), checkoutOn: isoDate(-1), number: '2' });
 
   const dueRows = await loadDueQuiz(pool);
+  assert.deepEqual(dueRows.map((r) => r.id), [due.id]);
+});
+
+test('due birthday emails match a guest staying over their own birthday, respecting the active and sent flags', { skip }, async () => {
+  const unitId = await seedUnit('A', 'Alpha');
+  await pool.query(`UPDATE units SET birthday_is_active = true WHERE id = $1`, [unitId]);
+
+  // Due: staying today, and today is their birthday.
+  const due = await seedReservation({
+    unitId, checkinOn: isoDate(-1), checkoutOn: isoDate(2), number: '1', birthDate: birthdayOn(0),
+  });
+  // Not due: staying today, but a different birthday.
+  await seedReservation({
+    unitId, checkinOn: isoDate(-1), checkoutOn: isoDate(2), number: '2', birthDate: birthdayOn(5),
+  });
+  // Not due: today is their birthday, but the stay hasn't started yet.
+  await seedReservation({
+    unitId, checkinOn: isoDate(3), checkoutOn: isoDate(6), number: '3', birthDate: birthdayOn(0),
+  });
+  // Already sent.
+  const alreadySent = await seedReservation({
+    unitId, checkinOn: isoDate(-1), checkoutOn: isoDate(2), number: '4', birthDate: birthdayOn(0),
+  });
+  await pool.query(`UPDATE reservations SET birthday_sent = true WHERE id = $1`, [alreadySent.id]);
+  // Flow switched off on a second unit.
+  const offUnit = await seedUnit('B', 'Beta');
+  await seedReservation({
+    unitId: offUnit, checkinOn: isoDate(-1), checkoutOn: isoDate(2), number: '1', birthDate: birthdayOn(0),
+  });
+
+  const dueRows = await loadDueBirthday(pool);
+  assert.deepEqual(dueRows.map((r) => r.id), [due.id]);
+});
+
+test('due promo emails fire once a stay begins, respecting the active and sent flags', { skip }, async () => {
+  const unitId = await seedUnit('A', 'Alpha');
+  await pool.query(`UPDATE units SET promo_is_active = true WHERE id = $1`, [unitId]);
+
+  // Due: check-in is today.
+  const due = await seedReservation({ unitId, checkinOn: isoDate(0), checkoutOn: isoDate(3), number: '1' });
+  // Not yet due: check-in is in the future.
+  await seedReservation({ unitId, checkinOn: isoDate(1), checkoutOn: isoDate(4), number: '2' });
+  // Already sent.
+  const alreadySent = await seedReservation({ unitId, checkinOn: isoDate(-2), checkoutOn: isoDate(1), number: '3' });
+  await pool.query(`UPDATE reservations SET promo_sent = true WHERE id = $1`, [alreadySent.id]);
+  // Flow switched off on a second unit.
+  const offUnit = await seedUnit('B', 'Beta');
+  await seedReservation({ unitId: offUnit, checkinOn: isoDate(0), checkoutOn: isoDate(2), number: '1' });
+
+  const dueRows = await loadDuePromo(pool);
   assert.deepEqual(dueRows.map((r) => r.id), [due.id]);
 });
 
