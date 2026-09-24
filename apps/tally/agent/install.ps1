@@ -16,15 +16,12 @@
 
 .EXAMPLE
   .\install.ps1
-  # Always prompts for the site URL and enrolment code — they are not
+  # Always prompts for the site URL, enrolment code and Wintouch folder — they are not
   # parameters, so a code never lands in shell history or a shared command line.
 #>
 [CmdletBinding()]
 param(
-    [string]$InstallDir = "$Env:ProgramFiles\Tally",
-    # Matches this repo's own dev machine and every install seen so far
-    # (plan.md §629) — overridable for a shop whose Wintouch lives elsewhere.
-    [string]$WintouchDir = "C:\wintouch\sgw"
+    [string]$InstallDir = "$Env:ProgramFiles\Tally"
 )
 
 $ErrorActionPreference = 'Stop'
@@ -37,9 +34,14 @@ if (-not (Test-Path (Join-Path $sourceDir $exeName))) {
 
 $Url = Read-Host 'Tally site URL (e.g. https://tally.example.com)'
 $Code = Read-Host 'Enrolment code (from Tally: issue one, then paste it here)'
+# The default matches this repo's own dev machine and every install seen so far
+# (plan.md §629); Enter accepts it, a shop whose Wintouch lives elsewhere types
+# its own folder.
+$WintouchDir = Read-Host 'Wintouch folder (the one holding wintouch.config) [C:\wintouch\sgw]'
+if (-not $WintouchDir) { $WintouchDir = 'C:\wintouch\sgw' }
 if (-not $Url -or -not $Code) { throw 'Both the site URL and the enrolment code are required.' }
 if (-not (Test-Path (Join-Path $WintouchDir 'wintouch.config'))) {
-    throw "No wintouch.config under $WintouchDir. Pass -WintouchDir if Wintouch isn't installed there."
+    throw "No wintouch.config under $WintouchDir. Re-run and enter the folder Wintouch is installed in."
 }
 
 Write-Host "Installing into $InstallDir..."

@@ -28,8 +28,8 @@ write path has to go through their API (plan.md §629).
    .\install.ps1
    ```
 
-   It prompts for the site URL and the enrolment code (deliberately not
-   parameters). Installs into `%ProgramFiles%\Tally`, enrols, and registers + starts the
+   It prompts for the site URL, the enrolment code and the Wintouch folder
+   (Enter accepts `C:\wintouch\sgw`); none are parameters. Installs into `%ProgramFiles%\Tally`, enrols, and registers + starts the
    service in one pass — the four manual steps below, done for you.
 
 Re-enrolling (re-running `install.ps1` with a fresh code) replaces the
