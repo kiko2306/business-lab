@@ -72,6 +72,8 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Netbird VPN',
     description: 'Zero-trust VPN and network access',
     icon: 'vpn',
+    // Official NetBird apps — the whole point of the client-side of a mesh VPN.
+    mobileApps: { android: true, ios: true },
     category: 'Networking & Security',
     composePath: 'apps/netbird-vpn/docker-compose.yml',
     healthCheck: {
@@ -204,6 +206,8 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Home Assistant',
     description: 'Home automation platform',
     icon: 'home',
+    // Official Home Assistant Companion apps.
+    mobileApps: { android: true, ios: true },
     category: 'Home Automation',
     composePath: 'apps/home-assistant/docker-compose.yml',
     // Runs with `network_mode: host` so zeroconf/SSDP/DHCP discovery can see
@@ -546,6 +550,8 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Tailscale',
     description: 'Mesh VPN service',
     icon: 'vpn',
+    // Official Tailscale apps.
+    mobileApps: { android: true, ios: true },
     category: 'Networking & Security',
     composePath: 'apps/tailscale/docker-compose.yml',
     healthCheck: {
@@ -597,6 +603,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'MeshCentral',
     description: 'Remote management for endpoints outside the overlay',
     icon: 'remote',
+    // Official MeshCentral Agent (Android) and Mesh Mobile/Mesh Agent (iOS)
+    // apps, published by the project itself.
+    mobileApps: { android: true, ios: true },
     category: 'Networking & Security',
     composePath: 'apps/meshcentral/docker-compose.yml',
     healthCheck: {
@@ -964,6 +973,8 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Mealie',
     description: 'Recipe manager and meal planner',
     icon: 'food',
+    // Official Mealie apps — Android joined iOS in 2026.
+    mobileApps: { android: true, ios: true },
     category: 'Productivity',
     composePath: 'apps/mealie/docker-compose.yml',
     healthCheck: {
@@ -1025,6 +1036,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Vaultwarden',
     description: 'Self-hosted password manager (Bitwarden-compatible)',
     icon: 'lock',
+    // The official Bitwarden apps — Bitwarden itself documents pointing them
+    // at a self-hosted/Vaultwarden server's URL instead of its own cloud.
+    mobileApps: { android: true, ios: true },
     category: 'Networking & Security',
     composePath: 'apps/vaultwarden/docker-compose.yml',
     // Bitwarden's own apps (mobile, desktop, browser extension) authenticate
@@ -1156,6 +1170,8 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Nextcloud',
     description: 'File sync, calendar, and contacts',
     icon: 'cloud',
+    // Official Nextcloud Files apps.
+    mobileApps: { android: true, ios: true },
     category: 'Backup & Storage',
     composePath: 'apps/nextcloud/docker-compose.yml',
     healthCheck: {
@@ -1205,6 +1221,9 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Immich',
     description: 'Photo and video backup with mobile auto-upload',
     icon: 'photo',
+    // Official Immich apps — the mobile auto-upload in the description above
+    // is these apps' whole reason to exist.
+    mobileApps: { android: true, ios: true },
     category: 'Media',
     composePath: 'apps/immich/docker-compose.yml',
     healthCheck: {
@@ -1252,6 +1271,8 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Jellyfin',
     description: 'Home media server',
     icon: 'media',
+    // Official "Jellyfin Mobile" apps, published by the Jellyfin project.
+    mobileApps: { android: true, ios: true },
     category: 'Media',
     composePath: 'apps/jellyfin/docker-compose.yml',
     healthCheck: {
@@ -1295,6 +1316,8 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Vikunja',
     description: 'Task and project management',
     icon: 'tasks',
+    // Official Vikunja apps — see clientApiPath below for the API root they connect to.
+    mobileApps: { android: true, ios: true },
     category: 'Productivity',
     composePath: 'apps/vikunja/docker-compose.yml',
     healthCheck: {
@@ -1366,6 +1389,8 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'ntfy',
     description: 'Push notifications to phone and desktop',
     icon: 'bell',
+    // Official ntfy apps, both maintained by the ntfy project itself.
+    mobileApps: { android: true, ios: true },
     category: 'Monitoring & Management',
     composePath: 'apps/ntfy/docker-compose.yml',
     // Both are generated for the human to copy into the ntfy phone app, so

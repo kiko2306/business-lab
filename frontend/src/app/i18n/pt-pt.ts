@@ -748,6 +748,8 @@ export const ptPT: Record<string, string> = {
   'serviceCard.clientApiUrlLabel': 'URL da app',
   'serviceCard.clientApiUrlTitle': 'URL do servidor para a aplicação de telemóvel/computador, não a ligação do browser acima',
   'serviceCard.openUrlTitle': 'Abrir {{url}}',
+  'serviceCard.androidAppTitle': 'Tem aplicação para Android',
+  'serviceCard.iosAppTitle': 'Tem aplicação para iPhone/iPad',
   'serviceCard.needsLabel': 'Necessita de',
   'serviceCard.startButton': 'Iniciar',
   'serviceCard.stopButton': 'Parar',

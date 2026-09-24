@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.148.0] — 2026-09-24
+
+### Added
+
+- Android/iPhone mobile-app badges on the Apps page, for the 11 registered apps that actually publish one
+
 ## [0.147.0] — 2026-09-24
 
 ### Changed

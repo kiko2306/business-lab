@@ -119,6 +119,9 @@ export interface ServiceStatus {
   // differs from the browser UI (e.g. Vikunja's apps need `<host>/api/v1`).
   // Absent when the app has no such client.
   clientApiPath?: string;
+  // A real, dedicated first-party mobile app exists for this service
+  // (services.ts `mobileApps`) — shown as a small platform badge.
+  mobileApps?: { android?: boolean; ios?: boolean };
   // Published host port of the app's web UI while running — used for a LAN
   // "open" link when the app isn't publicly exposed.
   webPort?: number | null;

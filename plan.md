@@ -31792,3 +31792,87 @@ needs `beta`, since nothing here has live provider keys to test against
 
 Backend (1224 tests, up from 1195) and frontend (90 tests) both pass;
 `ng build` clean.
+
+## 663. Implemented: mobile-app platform badges on the Apps page
+
+User asked to check which of the ~44 registered apps have real mobile apps
+and add an Android/iPhone logo on the ones that do.
+
+### Where the bar was set
+
+Nearly every self-hosted app in this space has *some* third-party mobile
+client, since the community loves building companion apps — treating that
+as "has a mobile app" would badge almost the whole registry and make the
+badge meaningless (and, for a business whose whole model is a paid
+maintenance service to a real client, showing what looks like an endorsed
+app next to a service it doesn't actually publish is a real accuracy risk,
+not just clutter). The bar: a **dedicated, first-party app the project
+itself publishes** — not a generic protocol client (WebDAV in any file
+manager, a Subsonic client, an RSS reader), and not a third-party
+community app, however good. Vaultwarden is the one deliberate exception:
+it has no app of its own by design (it's a Bitwarden-server reimplementation),
+and Bitwarden's own official apps document pointing them at a self-hosted
+server's URL.
+
+### Researched app-by-app, via web search — not assumed
+
+Checked every registered app rather than trusting memory (training-data
+cutoff, and this ecosystem moves fast — Mealie's Android app, for one,
+only shipped in 2026 after iOS launched alone). 11 came back with a real
+first-party app on both platforms: `netbird-vpn`, `home-assistant`,
+`tailscale`, `vaultwarden`, `nextcloud`, `immich`, `vikunja`, `ntfy`,
+`jellyfin`, `mealie`, `meshcentral`.
+
+**Checked and excluded, with why** — the point of writing these down is so
+a later session doesn't have to re-research a "surely X has an app"
+instinct: `paperless-ngx` (Swift Paperless, Paperless Mobile, PaperNext —
+all third-party), `navidrome` (its own docs explicitly recommend
+third-party Subsonic/OpenSubsonic clients rather than shipping one),
+`kimai` (Kimai Mobile is a paid app by Cloudrizon GmbH, not the Kimai
+project), `uptime-kuma`, `pi-hole` and `n8n` (each explicitly has no
+official app per its own community/docs, only third-party monitor/manager
+apps), `bookstack` (its Android app is third-party; the iOS "BookStax" app
+is a separately-branded product, not clearly the BookStack team's own),
+`twenty` (TwentyMobile is third-party, not built by twentyhq), `onlyoffice`
+— ONLYOFFICE's own Documents apps are genuinely official, but this
+registry's instance is Document Server only, embedded inside Nextcloud's
+editor and `hideFromHomePage: true` ("nobody opens OnlyOffice directly") —
+the mobile apps connect to a full Workspace/cloud account or WebDAV
+storage, not this bare Document Server, so badging it here would be
+misleading regardless of the apps' own legitimacy. Every other registered
+app (`nginx-proxy-manager`, `wetty`, `itflow`, `clamav`, `code-server`,
+`homepage`, `pihole`, `samba`, `speedtest`, `guacamole`, `dozzle`,
+`scrutiny`, `it-tools`, `docuseal`, `authelia`, `kopia`, `crowdsec`,
+`nocodb`, `stirling-pdf`, `webdav`, `hotel`, `tally`, `pantry`,
+`price-compare`) is an admin/infra tool or one of this repo's own custom
+apps with no consumer-facing mobile client at all — not individually
+searched, close to certain.
+
+### Shape
+
+`ServiceDefinition.mobileApps?: { android?: boolean; ios?: boolean }`
+(`types/index.ts`), set on the 11 apps above in `services.ts`, carried
+through unchanged to `ServiceStatusPayload` (`status.ts`) and the frontend
+`ServiceStatus` model — same three-hop shape `clientApiPath` already
+established for "native client" metadata. `service-card.component.html`
+renders it as two small badges next to the existing state/health/version
+badges, `*ngIf`-gated per platform, using 🤖/🍎 — plain Unicode emoji,
+matching `serviceIcon()`'s existing all-emoji icon set (`service-card
+.component.ts`) rather than pulling in an icon font (Bootstrap Icons, etc.)
+for two glyphs when the codebase already has a zero-dependency convention
+for exactly this.
+
+### Test
+
+A registry-wide regression test (`services.test.ts`) pins the expected
+`mobileApps` value (or its absence) for every app by name — catches a typo
+silently dropping or wrongly adding a badge, the same shape the file's
+other registry-wide checks (Home Page labels, backup coverage, memory
+limits) already use. No frontend test added: the template binding is a
+plain `*ngIf` on a boolean with no computed logic behind it, the same
+category as the existing hostname/version badges next to it, none of which
+have dedicated specs either.
+
+Backend (1225 tests) and frontend (90 tests) both pass; `ng build` clean.
+No Docker/exposure/networking/backups touched, so no README beta-test item
+— this is a small, fully working, immediately end-to-end change.

@@ -748,6 +748,8 @@ export const en: Record<string, string> = {
   'serviceCard.clientApiUrlLabel': 'App URL',
   'serviceCard.clientApiUrlTitle': 'Server URL for the phone/desktop app, not the browser link above',
   'serviceCard.openUrlTitle': 'Open {{url}}',
+  'serviceCard.androidAppTitle': 'Has an Android app',
+  'serviceCard.iosAppTitle': 'Has an iPhone/iPad app',
   'serviceCard.needsLabel': 'Needs',
   'serviceCard.startButton': 'Start',
   'serviceCard.stopButton': 'Stop',

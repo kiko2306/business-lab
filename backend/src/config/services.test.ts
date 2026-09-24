@@ -629,6 +629,32 @@ describe('Home Page discovery labels', () => {
   });
 });
 
+describe('mobileApps (plan.md §663)', () => {
+  // Curated, not derived — a real dedicated first-party app exists for each
+  // of these and no others, researched app-by-app rather than assumed from
+  // "self-hosted app therefore has a companion app" (most don't). Regression
+  // test: a typo here silently drops or wrongly adds a platform badge.
+  const EXPECTED: Record<string, { android?: boolean; ios?: boolean }> = {
+    'netbird-vpn': { android: true, ios: true },
+    'home-assistant': { android: true, ios: true },
+    tailscale: { android: true, ios: true },
+    vaultwarden: { android: true, ios: true },
+    nextcloud: { android: true, ios: true },
+    immich: { android: true, ios: true },
+    vikunja: { android: true, ios: true },
+    ntfy: { android: true, ios: true },
+    jellyfin: { android: true, ios: true },
+    mealie: { android: true, ios: true },
+    meshcentral: { android: true, ios: true },
+  };
+
+  it('is set only on the researched apps, with the researched platforms', () => {
+    for (const [name, service] of Object.entries(SERVICES)) {
+      expect(service.mobileApps, `${name}.mobileApps`).toEqual(EXPECTED[name]);
+    }
+  });
+});
+
 describe('database backup coverage', () => {
   // An app whose compose file runs a database server needs a `backup:` entry,
   // or the scheduled dump skips it and the file backup copies its live data

@@ -7,6 +7,8 @@
       <span class="badge text-bg-{{ stateBadge(service.state) }}">{{ service.state }}</span>
       <span class="badge bg-body-tertiary border" [ngClass]="healthClass()">{{ healthLabel() }}</span>
       <span class="badge bg-body-tertiary border" [title]="'serviceCard.installedLabel' | t:{ version: installedVersion() }">ⓥ</span>
+      <span *ngIf="service.mobileApps?.android" class="badge bg-body-tertiary border" [title]="'serviceCard.androidAppTitle' | t">🤖</span>
+      <span *ngIf="service.mobileApps?.ios" class="badge bg-body-tertiary border" [title]="'serviceCard.iosAppTitle' | t">🍎</span>
       <a
         *ngIf="service.exposedHostname"
         class="badge text-bg-secondary border text-decoration-none"

@@ -271,6 +271,17 @@ export interface ServiceDefinition {
   // user setting up a client doesn't have to go dig it out of the docs.
   // Unset for apps with no such client, or where the bare hostname is enough.
   clientApiPath?: string;
+  // A real, dedicated first-party mobile app exists for this service — shown
+  // on the card as a small platform badge so an operator knows there's
+  // something to hand a user besides the browser. Deliberately narrow:
+  // published/maintained by the same project (or, for Vaultwarden, the
+  // Bitwarden apps it's explicitly compatible with), not any third-party
+  // community client a generic protocol (WebDAV, Subsonic, RSS) happens to
+  // support — see plan.md §663 for the app-by-app research and the apps this
+  // excluded on that basis (Pi-hole, Navidrome, Paperless-ngx, BookStack,
+  // Kimai, Uptime Kuma, n8n, Twenty, OnlyOffice here). Omit both, or the
+  // whole field, for an app with no such app.
+  mobileApps?: { android?: boolean; ios?: boolean };
   // Keep this app off the public Home Page even when it is running and
   // exposed. For an app whose exposure exists only to serve another app, not
   // a person — OnlyOffice is reachable so the remote browser can load the
@@ -412,6 +423,9 @@ export interface ServiceStatusPayload {
   // Vikunja's apps need `<host>/api/v1` spelled out. Absent when the app has
   // no such client.
   clientApiPath?: string;
+  // A dedicated first-party mobile app exists for this service (services.ts
+  // `mobileApps`) — surfaced as a small platform badge.
+  mobileApps?: { android?: boolean; ios?: boolean };
   // Published host port of the app's web UI (the exposurePortEnvVar one when
   // set — e.g. NPM's admin :81, not its proxy :80), while running. Lets the
   // dashboard offer a LAN link even when the app isn't publicly exposed.
