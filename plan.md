@@ -32532,3 +32532,37 @@ document kinds like the old running-day list (double-counts room charges, includ
 offers); netting devolutions against sales (the operator's rule is that they are not
 sales — a separate "refunds" figure is a possible later addition); `Hora` for the
 hourly view.
+
+## 683. Wintouch's day counters on the shop page: transactions, average ticket, customers, discounts, consumptions, occupancy, forecast
+
+Operator compared the page with Wintouch's own dashboard for the running day
+(27/07/2026) and asked for the figures we did not show. Everything already shown
+matched to the cent (invoiced 9,640.16, items 9,640.16, open 261.50, previsto
+9,901.66, the four payment methods, staff, 161/4/0 tables). The extras, each
+reproduced against Wintouch on the real database before being built:
+
+- **Transações 101** — distinct sales documents (`tipo 'F'`, `devolucao 0`, not annulled).
+- **Talão médio 95.45** — invoiced ÷ transactions (computed on the page).
+- **Descontos 305.50** — Σ(`valororiginal − total`) on the sale lines. The `desconto`
+  column is text and empty here, so it is not the source.
+- **Consumos 54.44** — the type-K documents (room charges, internal consumption,
+  offers, tastings): what §682 leaves out of every sale figure, now shown on its own.
+- **Clientes 219** — `numclientes` once per document (it repeats per line; summing the
+  lines gives 840), over F *and* K documents. Sales alone give 218: the one extra guest
+  is on an offer document. Distinct from "Guests in" (8, seated now).
+- **Ocupação 2 %** — occupied ÷ all tables (4/165), from the counts already returned.
+- **Previsto 9,901.66** — invoiced + open tabs, shown as "Forecast" under Open tabs.
+
+Closed days get the first five from the archive, by the same identities as §682:
+transactions = sales headers; discounts = Σ`desclin` (a line's `merc` is qty × unit
+price and `merc − desclin` is what the headers total, so `desclin` is list minus charged);
+consumptions = K headers; customers = Σ`NumClientes` over F + K headers. Occupancy, open
+tabs, tables and guests stay running-day only. New `stats` object on the overview
+(`{transactions, discounts, consumptions, customers}`); the cards are hidden for an agent
+that does not send it.
+
+Verified: `dotnet build -warnaserror`; the page rendered in headless Chrome against the
+reader's real output — running-day cards read exactly like Wintouch's screen; the
+03/06/2026 view shows the closed-day set with no console errors. **Not verified:** the
+closed-day discounts / consumptions / customers against Wintouch itself — only the running
+day has a Wintouch screen so far; the operator offered to supply other days (README).

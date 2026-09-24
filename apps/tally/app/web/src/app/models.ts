@@ -43,6 +43,8 @@ export interface Overview {
   businessDate?: string;
   /** True for a closed day read from Wintouch's archive: no open tabs, tables or guests (§682). */
   archive?: boolean;
+  /** Wintouch's own day counters (§683). Absent from an agent older than that. */
+  stats?: { transactions: number; discounts: number; consumptions: number; customers: number };
 }
 
 export interface TableLine {

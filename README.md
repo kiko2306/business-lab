@@ -496,6 +496,14 @@ before anything is built.
       open-tabs/tables/guests cards or Tables tab. **Running day** must return to
       27/07/2026 with €9,640.16 and the live panels. Also try a day with a group
       menu priced on its header (14/05/2026: "Menu Grupo 50" ×16 = €960.00).
+- [ ] **Compare Tally's closed-day counters with Wintouch's own screen (plan.md §683)**
+      — the running day matches Wintouch exactly; the archive rules for discounts,
+      consumptions and customers were derived from identities, not checked against
+      Wintouch. Give Wintouch's dashboard values for a few past days and compare with
+      the shop page's Transactions / Average ticket / Customers / Discounts /
+      Consumptions / payments for the same day (ours so far: 03/06/2026 → 132 / €71.93 /
+      249 / €243.40 / €732.84; 14/05/2026 → 158 / €94.71 / 284 / €6.00 / €977.52; 20/07/2026
+      → 142 / €83.57 / 249 / €37.90 / €629.13). Fix whatever differs before trusting them.
 - [ ] **Decide whether Tally should show refunds (plan.md §682)** — devolutions are
       now left out of every figure as "not a sale". If the operator wants them
       visible, a separate "Refunds" figure per day (they are stored positive) is the

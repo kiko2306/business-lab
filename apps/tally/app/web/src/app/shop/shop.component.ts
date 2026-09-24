@@ -129,6 +129,24 @@ export class ShopComponent implements OnInit, OnDestroy {
       .sort((a, b) => b.value - a.value);
   }
 
+  /** Takings per invoice — Wintouch's "talão médio". */
+  get averageTicket(): number {
+    const n = this.overview?.stats?.transactions ?? 0;
+    return n ? (this.overview?.totals.invoiced ?? 0) / n : 0;
+  }
+
+  /** Invoiced plus what is still open on tables — Wintouch's "previsto". */
+  get forecast(): number {
+    return (this.overview?.totals.invoiced ?? 0) + (this.overview?.totals.open ?? 0);
+  }
+
+  /** Share of tables occupied right now; only meaningful for the running day. */
+  get occupancy(): number {
+    const t = this.overview?.tables;
+    const total = t ? t.occupied + t.free + t.awaitingPayment : 0;
+    return total ? (100 * (t?.occupied ?? 0)) / total : 0;
+  }
+
   /** Top ten only — a long tail of one-offs buries the items that matter. */
   get itemBars(): BarDatum[] {
     return (this.soldItems?.items ?? [])

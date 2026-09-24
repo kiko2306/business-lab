@@ -21,7 +21,11 @@ public sealed record Overview(
     string BusinessDate,
     // True when the figures come from Wintouch's archive of closed days rather
     // than the running day's tables — so no open tabs, tables or guests (§682).
-    bool Archive);
+    bool Archive,
+    // The day's counters — what Wintouch's own dashboard shows beside the takings (§683).
+    DayStats Stats);
+
+public sealed record DayStats(int Transactions, decimal Discounts, decimal Consumptions, int Customers);
 
 public sealed record Totals(decimal Invoiced, decimal Open);
 

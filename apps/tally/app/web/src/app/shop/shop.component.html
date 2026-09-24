@@ -71,6 +71,7 @@
         <div class="card-body">
           <p class="stat-label text-secondary mb-1">Open tabs</p>
           <p class="stat-value mb-0">{{ overview.totals.open | currency: 'EUR' }}</p>
+          <p class="small text-secondary mb-0">Forecast {{ forecast | currency: 'EUR' }}</p>
         </div>
       </div>
     </div>
@@ -96,6 +97,65 @@
     </div>
     }
   </div>
+
+  <!-- Wintouch's own day counters, beside the takings. Each was reproduced against
+       Wintouch's dashboard on the running day (§683). Hidden for an agent that
+       does not send them yet. -->
+  @if (overview.stats) {
+    <div class="row g-3 mb-4">
+      <div class="col-6 col-lg-2">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">Transactions</p>
+            <p class="stat-value mb-0">{{ overview.stats.transactions }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">Average ticket</p>
+            <p class="stat-value mb-0">{{ averageTicket | currency: 'EUR' }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">Customers</p>
+            <p class="stat-value mb-0">{{ overview.stats.customers }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">Discounts</p>
+            <p class="stat-value mb-0">{{ overview.stats.discounts | currency: 'EUR' }}</p>
+          </div>
+        </div>
+      </div>
+      <div class="col-6 col-lg-2">
+        <div class="card stat-card h-100">
+          <div class="card-body">
+            <p class="stat-label text-secondary mb-1">Consumptions</p>
+            <p class="stat-value mb-0">{{ overview.stats.consumptions | currency: 'EUR' }}</p>
+            <p class="small text-secondary mb-0">Rooms, offers, internal use</p>
+          </div>
+        </div>
+      </div>
+      @if (!overview.archive) {
+        <div class="col-6 col-lg-2">
+          <div class="card stat-card h-100">
+            <div class="card-body">
+              <p class="stat-label text-secondary mb-1">Occupancy</p>
+              <p class="stat-value mb-0">{{ occupancy | number: '1.0-0' }}<span class="fs-6 text-secondary"> %</span></p>
+            </div>
+          </div>
+        </div>
+      }
+    </div>
+  }
 
   <div class="card stat-card mb-4">
     <div class="card-body">

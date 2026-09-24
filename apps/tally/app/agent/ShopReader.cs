@@ -132,6 +132,54 @@ public sealed class ShopReader(string connectionString)
              GROUP BY DATEPART(hour, v.EntryDate)
             """, r => new HourlyTotal(Convert.ToInt32(r["hour"]), (decimal)r["total"]), ct);
 
+        // The counters on Wintouch's own dashboard, each reproduced against it on
+        // the real database (§683): 101 transactions, 305.50 discounts, 54.44
+        // consumptions, 219 customers on 2026-07-27.
+        var transactions = await ScalarAsync(connection, day, """
+            SELECT COUNT(*) FROM (
+                SELECT DISTINCT v.documento, v.numdoc
+                  FROM wsir_vnd_vendas v
+                  JOIN wgctiposdocumentos d ON d.codigo = v.documento
+                 WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0
+                   AND CAST(v.EntryDate AS date) = @businessDate) x
+            """, ct);
+
+        // What the list price would have taken minus what was charged, on the
+        // sale lines. (The `desconto` column itself is text and empty here.)
+        var discounts = await ScalarAsync(connection, day, """
+            SELECT ISNULL(SUM(CAST(v.valororiginal AS DECIMAL(18,2)) - CAST(v.total AS DECIMAL(18,2))), 0)
+              FROM wsir_vnd_vendas v
+              JOIN wgctiposdocumentos d ON d.codigo = v.documento
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0 AND v.tipolinha = 'P'
+               AND CAST(v.EntryDate AS date) = @businessDate
+            """, ct);
+
+        // Type-K documents — room charges and internal consumption, offers and
+        // tastings. Not sales (they are left out of everything above), but the
+        // operator wants to see how much went out this way.
+        var consumptions = await ScalarAsync(connection, day, """
+            SELECT ISNULL(SUM(CAST(v.total AS DECIMAL(18,2))), 0)
+              FROM wsir_vnd_vendas v
+              JOIN wgctiposdocumentos d ON d.codigo = v.documento
+             WHERE d.tipo = 'K' AND v.Anulado = 0 AND v.tipolinha = 'P'
+               AND CAST(v.EntryDate AS date) = @businessDate
+            """, ct);
+
+        // Guests served today, once per document (`numclientes` repeats on every
+        // line). Counts the type-K documents too — Wintouch's 219 includes one
+        // guest on an offer document; sales alone would be 218 — because those
+        // guests were served all the same. Not the same as `Clients.Present`,
+        // who are seated right now.
+        var customers = await ScalarAsync(connection, day, """
+            SELECT ISNULL(SUM(nc), 0) FROM (
+                SELECT v.documento, v.numdoc, MAX(CAST(v.numclientes AS int)) AS nc
+                  FROM wsir_vnd_vendas v
+                  JOIN wgctiposdocumentos d ON d.codigo = v.documento
+                 WHERE d.tipo IN ('F', 'K') AND d.devolucao = 0 AND v.Anulado = 0
+                   AND CAST(v.EntryDate AS date) = @businessDate
+                 GROUP BY v.documento, v.numdoc) x
+            """, ct);
+
         return new Overview(
             Now(),
             new Totals(invoiced, open),
@@ -144,7 +192,8 @@ public sealed class ShopReader(string connectionString)
             payments,
             FillHours(hourlyRows),
             day.ToString("yyyy-MM-dd"),
-            Archive: false);
+            Archive: false,
+            new DayStats((int)transactions, discounts, consumptions, (int)customers));
     }
 
     public async Task<TablesView> ReadTablesAsync(CancellationToken ct)
@@ -336,6 +385,44 @@ public sealed class ShopReader(string connectionString)
              GROUP BY DATEPART(hour, c.entrydate)
             """, r => new HourlyTotal(Convert.ToInt32(r["hour"]), (decimal)r["total"]), ct);
 
+        var transactions = await ScalarAsync(connection, day, """
+            SELECT COUNT(*)
+              FROM wgcdoccab c
+              JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+               AND CAST(c.datadoc AS date) = @businessDate
+            """, ct);
+
+        // The line discount. A line's `merc` is quantity × unit price (checked on
+        // 2026-06-03: 9,848.85 both ways) and `merc - desclin` is what the header
+        // totals add up to, so `desclin` is exactly list price minus charged — the
+        // same quantity the running day gets from valororiginal - total.
+        var discounts = await ScalarAsync(connection, day, """
+            SELECT ISNULL(SUM(CAST(l.desclin AS DECIMAL(18,2))), 0)
+              FROM wgcdoclinhas l
+              JOIN wgcdoccab c ON c.tipodoc = l.tipodoc AND c.serie = l.serie AND c.numdoc = l.numdoc
+              JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
+             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+               AND l.TipoLinha IN ('P', 'I', 'M')
+               AND CAST(c.datadoc AS date) = @businessDate
+            """, ct);
+
+        var consumptions = await ScalarAsync(connection, day, $"""
+            SELECT ISNULL(SUM({Total}), 0)
+              FROM wgcdoccab c
+              JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
+             WHERE d.tipo = 'K' AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+               AND CAST(c.datadoc AS date) = @businessDate
+            """, ct);
+
+        var customers = await ScalarAsync(connection, day, """
+            SELECT ISNULL(SUM(CAST(c.NumClientes AS int)), 0)
+              FROM wgcdoccab c
+              JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
+             WHERE d.tipo IN ('F', 'K') AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+               AND CAST(c.datadoc AS date) = @businessDate
+            """, ct);
+
         // Open tabs, tables and guests are the running moment; a closed day has
         // none of them, so they are reported as zero and flagged Archive.
         return new Overview(
@@ -347,7 +434,8 @@ public sealed class ShopReader(string connectionString)
             payments,
             FillHours(hourlyRows),
             day.ToString("yyyy-MM-dd"),
-            Archive: true);
+            Archive: true,
+            new DayStats((int)transactions, discounts, consumptions, (int)customers));
     }
 
     private async Task<SoldItemsView> ReadArchiveSoldItemsAsync(SqlConnection connection, DateTime day, CancellationToken ct)
