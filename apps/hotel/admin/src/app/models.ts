@@ -37,3 +37,12 @@ export interface EnrolmentCode {
   code: string;
   expiresAt: string;
 }
+
+/** A pulse question. `isActive` is the only retirement path — see §646. */
+export interface Question {
+  id: string;
+  text: string;
+  type: 'rating' | 'text';
+  isActive: boolean;
+  sortOrder: number;
+}

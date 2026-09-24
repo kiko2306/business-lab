@@ -569,3 +569,48 @@ test('resubmitting feedback overwrites the previous answers', { skip }, async ()
   );
   assert.deepEqual(rows.map((r) => r.answer), ['4']);
 });
+
+test('a viewer cannot see or administer pulse questions', { skip }, async () => {
+  assert.equal((await call('GET', '/api/questions')).status, 401);
+  assert.equal((await call('GET', '/api/questions', { headers: VIEWER })).status, 403);
+  assert.equal(
+    (await call('POST', '/api/questions', { headers: VIEWER, body: { text: 'x', type: 'text' } })).status,
+    403
+  );
+});
+
+test('an admin creates, edits, reorders and retires a question', { skip }, async () => {
+  const created = await call('POST', '/api/questions', {
+    headers: ADMIN,
+    body: { text: 'How was the parking?', type: 'rating' },
+  });
+  assert.equal(created.status, 201);
+  assert.equal(created.body.isActive, true);
+  const id = created.body.id as string;
+
+  try {
+    // New questions land at the end, after the four seeded ones.
+    const listed = (await call('GET', '/api/questions', { headers: ADMIN })).body as { id: string }[];
+    assert.equal(listed.at(-1)!.id, id);
+
+    const edited = await call('PATCH', `/api/questions/${id}`, {
+      headers: ADMIN,
+      body: { text: 'How was parking?', type: 'text' },
+    });
+    assert.equal(edited.body.text, 'How was parking?');
+    assert.equal(edited.body.type, 'text');
+
+    const reordered = await call('PATCH', `/api/questions/${id}`, { headers: ADMIN, body: { sortOrder: 1 } });
+    assert.equal(reordered.body.sortOrder, 1);
+
+    const retired = await call('PATCH', `/api/questions/${id}`, { headers: ADMIN, body: { isActive: false } });
+    assert.equal(retired.body.isActive, false);
+
+    // Retired means it drops out of a guest's form, not that it is gone.
+    const { token } = await seedPulseReservation();
+    const guestView = await call('GET', `/pulse/${token}`);
+    assert.ok(!guestView.body.questions.some((q: { id: string }) => q.id === id));
+  } finally {
+    await pool.query('DELETE FROM pulse_questions WHERE id = $1', [id]);
+  }
+});

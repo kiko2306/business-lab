@@ -426,13 +426,6 @@ before anything is built.
       `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
       the public ones do not, the app's bypass path still answers
       unauthenticated, and Authelia restarts cleanly rather than crash-looping.
-- [ ] **Build an admin editor for `pulse`'s question content** — §644 seeded
-      `pulse_questions` with four defaults (rating + free-text) so the guest
-      form has something to ask, but nothing edits them: no endpoint changes
-      a question's text/type/order, and `is_active` is a column with no way
-      to set it false. Needs a small CRUD surface in hotel-core plus a page
-      in hotel-admin, the same shape as the Properties table's existing
-      per-unit flow toggles.
 - [ ] **Build the guest-text template store** — plan.md §629. Admin UI uses
       the dashboard's `TranslatePipe` with static `en`/`pt-pt` files; guest
       emails and pages keep DB-backed per-client, per-language templates, so

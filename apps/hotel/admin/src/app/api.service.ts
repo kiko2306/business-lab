@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AgentStatus, EnrolmentCode, FlowKey, Identity, Unit } from './models';
+import { AgentStatus, EnrolmentCode, FlowKey, Identity, Question, Unit } from './models';
 
 /**
  * Same-origin: this bundle is served by nginx, which proxies `/api` through to
@@ -51,5 +51,17 @@ export class ApiService {
 
   revokeAgent(): Observable<void> {
     return this.http.delete<void>('/api/agent');
+  }
+
+  listQuestions(): Observable<Question[]> {
+    return this.http.get<Question[]>('/api/questions');
+  }
+
+  createQuestion(text: string, type: Question['type']): Observable<Question> {
+    return this.http.post<Question>('/api/questions', { text, type });
+  }
+
+  updateQuestion(id: string, patch: Partial<Pick<Question, 'text' | 'type' | 'isActive' | 'sortOrder'>>): Observable<Question> {
+    return this.http.patch<Question>(`/api/questions/${id}`, patch);
   }
 }

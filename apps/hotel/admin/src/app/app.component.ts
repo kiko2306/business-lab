@@ -3,7 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from './api.service';
-import { AgentStatus, EnrolmentCode, FLOWS, FlowKey, Identity, Unit } from './models';
+import { AgentStatus, EnrolmentCode, FLOWS, FlowKey, Identity, Question, Unit } from './models';
 
 /**
  * One page: the properties, who may see them, and the agent. No router —
@@ -27,6 +27,10 @@ export class AppComponent implements OnInit {
   loading = true;
   error = '';
 
+  questions: Question[] = [];
+  newQuestionText = '';
+  newQuestionType: Question['type'] = 'rating';
+
   openId: string | null = null;
   access: string[] = [];
   newIdentity = '';
@@ -46,9 +50,13 @@ export class AppComponent implements OnInit {
     this.api.me().subscribe({
       next: (identity) => {
         this.identity = identity;
-        // Only an admin can read the agent's status, so asking as a viewer
-        // would just log a 403 for something they cannot act on anyway.
-        if (identity.isAdmin) this.loadAgent();
+        // Only an admin can read the agent's status or the questions, so
+        // asking as a viewer would just log a 403 for something they cannot
+        // act on anyway.
+        if (identity.isAdmin) {
+          this.loadAgent();
+          this.loadQuestions();
+        }
       },
       error: (err) => this.fail(err),
     });
@@ -146,6 +154,70 @@ export class AppComponent implements OnInit {
       next: () => {
         this.issued = null;
         this.loadAgent();
+      },
+      error: (err) => this.fail(err),
+    });
+  }
+
+  private loadQuestions(): void {
+    this.api.listQuestions().subscribe({
+      next: (questions) => (this.questions = questions),
+      error: (err) => this.fail(err),
+    });
+  }
+
+  addQuestion(): void {
+    const value = this.newQuestionText.trim();
+    if (!value) return;
+    this.api.createQuestion(value, this.newQuestionType).subscribe({
+      next: (question) => {
+        this.questions.push(question);
+        this.newQuestionText = '';
+      },
+      error: (err) => this.fail(err),
+    });
+  }
+
+  saveQuestionText(question: Question, value: string): void {
+    const trimmed = value.trim();
+    if (!trimmed || trimmed === question.text) return;
+    this.api.updateQuestion(question.id, { text: trimmed }).subscribe({
+      next: (updated) => Object.assign(question, updated),
+      error: (err) => this.fail(err),
+    });
+  }
+
+  setQuestionType(question: Question, type: Question['type']): void {
+    this.api.updateQuestion(question.id, { type }).subscribe({
+      next: (updated) => Object.assign(question, updated),
+      error: (err) => this.fail(err),
+    });
+  }
+
+  toggleQuestionActive(question: Question): void {
+    this.api.updateQuestion(question.id, { isActive: !question.isActive }).subscribe({
+      next: (updated) => Object.assign(question, updated),
+      error: (err) => this.fail(err),
+    });
+  }
+
+  /**
+   * Order swaps with a neighbour rather than a typed number: two PATCH calls
+   * against the already-known adjacent sortOrder, no separate move endpoint.
+   */
+  moveQuestion(question: Question, direction: -1 | 1): void {
+    const index = this.questions.indexOf(question);
+    const neighbour = this.questions[index + direction];
+    if (!neighbour) return;
+    const [a, b] = [question.sortOrder, neighbour.sortOrder];
+    this.api.updateQuestion(question.id, { sortOrder: b }).subscribe({
+      next: (updated) => Object.assign(question, updated),
+      error: (err) => this.fail(err),
+    });
+    this.api.updateQuestion(neighbour.id, { sortOrder: a }).subscribe({
+      next: (updated) => {
+        Object.assign(neighbour, updated);
+        this.questions.sort((x, y) => x.sortOrder - y.sortOrder);
       },
       error: (err) => this.fail(err),
     });

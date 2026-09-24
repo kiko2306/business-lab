@@ -30737,3 +30737,48 @@ closes the second, the admin editor is still open.
 the matching CI diff step) as part of building its guest frontend, but the
 README item asking for that work was left behind instead of being deleted
 with the rest of §645's follow-ups. Deleted it.
+
+## 647. Implemented: an admin editor for `pulse`'s question content
+
+§644 seeded `pulse_questions` with four defaults so the guest form had
+something to ask, but nothing could edit them afterwards. Closes that
+follow-up.
+
+`apps/hotel/api/src/routes/questions.ts`: admin-only CRUD (`requireAdmin`,
+same as `units.ts`) mounted at `/api` alongside `unitRoutes`. `GET /questions`
+lists every row, active or not, ordered by `sort_order` — the guest-facing
+`GET /pulse/:token` in `pulse.ts` already filtered to `is_active` and is
+untouched. `POST /questions` appends a new one (`sort_order` = current max +
+1). `PATCH /questions/:id` takes any of `text`/`type`/`isActive`/`sortOrder`
+in one dynamic `SET`, the same shape `units.ts`'s `PATCH /units/:id` already
+uses for its flow flags — no separate move/reorder endpoint: the frontend
+reorders by issuing two `PATCH`es that swap `sortOrder` with a neighbour, so
+there was nothing new to design there. No `DELETE`: `pulse_responses`
+references a question, and `002_pulse.sql`'s own comment already flagged
+`is_active` as the intended retirement path rather than a real delete.
+
+`apps/hotel/admin/`: a new "Feedback questions" card on the single admin
+page, above Properties, admin-only (a viewer's `GET /api/questions` 403s, so
+it is never fetched for one). A table with inline-editable text (`<input>`,
+saved on blur/change), a type `<select>`, an active toggle switch matching
+the Properties table's flow switches, and up/down buttons per row for
+reordering. An "add question" form at the bottom. `models.ts` gained
+`Question`; `api.service.ts` gained `listQuestions`/`createQuestion`/
+`updateQuestion`.
+
+### Verification
+
+`apps/hotel/api`: `npm run typecheck` and `npm run build` clean; `npm test`
+against a throwaway `postgres:17-alpine` (same shape as the CI job) — 34
+tests, two new: a viewer gets 401/403 off every `/api/questions` route, and
+an admin's create → edit text/type → reorder → retire round-trip, confirming
+a retired question actually drops off a guest's `GET /pulse/:token` list
+(their answer history stays in `pulse_responses`, untouched). `apps/hotel/admin`:
+`npm run build` clean (one pre-existing Bootstrap CSS selector warning,
+unrelated). Not run against a live Authelia-gated hotel-admin on `beta` —
+already covered by the existing "Verify a gated secondary hostname on the
+live stack" README item.
+
+### Follow-ups added to the README
+
+None — this closes the one open follow-up from §644.
