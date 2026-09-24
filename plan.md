@@ -31117,3 +31117,136 @@ live stack" item (§651), which already covers "the guest-email work…
 actually sends" generally — extending it to also check a real birthday/promo
 send once a real stay/birthday lines up on `beta`, rather than opening a
 second item for the same underlying gap.
+
+## 653. Implemented: the hotel property agent (`apps/hotel/agent/`)
+
+The .NET Windows service that drives the sync endpoints built in §639 —
+units, guests and reservations out of Wintouch, completed check-ins back in.
+Closes four README items at once: the agent itself, its outbound transport
+(§627), sourcing Wintouch credentials locally instead of `GET /api/config`
+(§627), and building x86 rather than AnyCPU/x64 (§629, §636).
+
+### §629's "reads via SQL" sketch didn't survive contact with the legacy source
+
+§629 assumed the hotel agent would read like tally's — a SQL Server
+connection string, no assembly loading except for the check-in write-back.
+Reading `sample/hotel/WHotWebService/DAO/{Unit,Guest,Reservation}.cs`
+directly shows that isn't how the legacy agent works at all: every read
+*and* write goes through Wintouch's own in-process business-tier API
+(`Wintouch.Hotel.Businesstier.Unidades/Terceiros/Reservas/ReservasEntidades`),
+including the guest `exportado` watermark, which runs through Wintouch's own
+`CommandDirectSQL` rather than a plain `SqlConnection` — there is no direct
+SQL path in the legacy at all, for reads or writes.
+
+Building a fresh raw-SQL read path instead would need the real hotel schema
+(table and column names for reservations, units — nothing here as solid as
+`wgcterceiros`, confirmed by a literal `UPDATE wgcterceiros SET exportado =
+1` in the legacy source). The only way to get that confidently is live
+exploration against the real Wintouch database, and this environment's own
+safety rails correctly refused that attempt (a `sqlcmd` connection to the
+real `vallado` database was blocked as a production-data read) — rightly:
+that database holds a real hotel's real guest data. Porting calls the legacy
+already runs successfully in production is the lower-risk path by a wide
+margin, so that's what `apps/hotel/agent/HotelSync.cs` does, field for field,
+against the legacy source rather than against any live query. Whether SQL
+reads could have worked is now moot rather than rejected on the merits — it
+was never actually tried, because trying it safely wasn't possible from here.
+
+This also means the whole agent is x86/net48-pinned, not just the write
+path as §629 assumed — reads need the same assemblies writes do, so there's
+no assembly-free slice to keep on net8.0 the way tally's agent is.
+
+### What was ported, and what changed on the way
+
+Ported near-verbatim, checked call-by-call against the legacy source (not
+inferred): the four-job tick order (units → guests → reservations →
+check-in write-back), the two reservation windows (check-in
+today..+7, check-out -7..+1, deduped on unit+number+line), the
+`ReservasEntidades` filter shape for extras (`tipo=0`,
+`ishospedeprincipal=0` outbound; `tipo=0` only for the write-back lookup, so
+it matches both the primary guest and extras there), the `observacoes`
+stamp format, and `AvisarObservacoes = 1`. One lookup was corrected mid-port
+by checking rather than assuming: room names come from
+`Wintouch.Hotel.Businesstier.Alojamento.GetAlojamentoInfo`, not a guessed
+`Quartos.GetItem` — caught because the real call is in `Room.cs`, which was
+read before committing to the API surface rather than after.
+
+Three deliberate departures from the legacy, each because a "safe to retry"
+guarantee already holds everywhere else in this rebuild (§639):
+
+- **A guest is marked `exportado = 1` only after a successful push**, not
+  before. The legacy marks first (`Guest.cs`'s `SetGestExported`, called
+  while building the list, ahead of the HTTP call) — a network blip after
+  that point drops the guest silently, forever, since nothing re-checks a
+  guest already marked exported. Marking after also lets one `UPDATE ...
+  WHERE codigo IN (...)` replace a `CommandDirectSQL` call per guest.
+- **`ExecuteDirectSql` re-throws** instead of the legacy's catch-log-continue.
+  Swallowing it here would leave a batch's `exportado` flag at 0 after
+  a *successful* push, and the same guests would come back on the very next
+  page query — an infinite loop within one tick, not just a retry next tick.
+- **The first-ever full guest resync is tracked locally** (a sentinel file
+  next to the DPAPI token store) rather than server-side. §627 already moved
+  the model to "the agent is told nothing it does not need to be" — the
+  legacy's `firstConnection` flag lived in the same remote config `GET
+  /api/config` this whole design removes.
+
+Two full-project field surfaces were deliberately narrowed to match what
+hotel-core's schema and API actually carry, not the legacy's fuller `Guest`
+class: the outbound guest push has no document/gender/birth-place fields at
+all (`guests` table only gets those from the guest's own check-in
+submission, never from the Wintouch sync — confirmed by reading `ingest.ts`'s
+`/guests` route, which only ever inserts the plain-contact-detail columns);
+and the write-back only ever sets what `checkin.ts`'s guest form actually
+collects, which is itself a subset of `Guest`'s legacy fields, by that
+route's own comment ("collecting more would sit unread"). Extras during
+write-back get a *new* Wintouch `Terceiro` via `GetProximoTerceiro(true)`
+when they have no code yet — matching `Guest.SaveOrUpdate`'s blank-code
+branch, since the check-in form collects them fresh and Wintouch has never
+seen them.
+
+Checkout/online payment is explicitly out of scope (a separate, larger
+README item) — `CheckOut.cs` and the invoice/payment DAOs were already
+dormant in the legacy's own tick loop and are not ported.
+
+### Why there is no CI job, unlike tally-agent's
+
+`tally-agent`'s CI job (`dotnet build` on Linux) works because tally's agent
+never loads a Wintouch assembly — plain `net8.0`, SQL only. This agent
+always does, for both reads and writes, and those DLLs are proprietary,
+per-install files that can never be vendored into this **public** repo or
+fetched by CI. There is no build-verification path for this project the
+normal way.
+
+### What was actually verified, and what wasn't
+
+Not nothing, though: every `Wintouch.*` call in this project — every
+business-tier method, every `DsX.xRow` type name and column property, every
+namespace's exact casing (`Businesstier` vs `BusinessTier` differs between
+`Wintouch.Hotel.*` and `Wintouch.Manager.*` in the vendor's own code, and
+both had to match exactly) — was checked by actually compiling against the
+**real** `Wintouch.Core`, `Wintouch.Core.Data`, `Wintouch.Hotel.Businesstier`,
+`Wintouch.Hotel.Datatier`, `Wintouch.Manager.Businesstier` and
+`Wintouch.Manager.Datatier` DLLs on this machine (`/mnt/c/wintouch/sgw` from
+WSL) — a scratch copy of the project outside the repo, `HintPath`s pointed
+at the WSL mount instead of `C:\wintouch\sgw`, built with the `dotnet/sdk:8.0`
+container. That's a real check of the assembly's public API surface (reading
+DLL metadata, not any business data) — it caught the wrong `Quartos` guess
+above and a handful of missing net48 references (`System.Net.Http`,
+`System.Data.DataSetExtensions`, `Wintouch.Manager.Datatier`, and the
+`System.Security.Cryptography.ProtectedData` package net8.0 ships in-box but
+net48 does not) before they ever reached a commit. It builds clean now,
+x86/net48, against the real DLLs.
+
+What that check *cannot* prove: that `SetCurrentUser`/`SetDatabase`/
+`SwitchContext` actually succeed at runtime (licensing, the real operator
+account, whatever state Wintouch itself needs), that the business-tier calls
+behave the way their signatures promise against real data, or that the
+service installs and runs at all as a real Windows Service. Nothing in this
+session can exercise any of that — it needs a real run on the Windows
+machine with Wintouch installed, which is the new README item this section
+adds (replacing the four it closes).
+
+### Verification
+
+Build-only, against the real vendor assemblies (above) — no automated test
+suite, and no CI job (see above). No live run.

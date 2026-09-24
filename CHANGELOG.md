@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.142.0] — 2026-09-24
+
+### Hotel
+
+- Add the hotel property agent (apps/hotel/agent/): syncs units, guests and reservations out of Wintouch, writes completed online check-ins back in
+
 ## [0.141.1] — 2026-09-24
 
 ### Hotel

@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Copy to hotel.config beside the executable, which must be installed into
+  Wintouch's own folder (C:\wintouch\sgw) so its assemblies are on the
+  search path at runtime. Everything here is entered once, locally, and
+  never transmitted anywhere (plan.md §627): no credential travels
+  cloud -> agent, which is what the legacy's GET /api/config did.
+-->
+<hotelAgent>
+  <!-- The hotel-core site this property reports to. -->
+  <url value="https://hotel.example.com" />
+  <!-- Folder holding Wintouch's own Wintouch.config, read only for the
+       database name (SetDatabase) - never the SQL Server login, which this
+       agent has no use for: it talks to Wintouch through its own in-process
+       API, not a SQL connection. -->
+  <wintouchConfig path="C:\wintouch\sgw" />
+  <!-- A Wintouch *application* user (SetCurrentUser) - an operator login,
+       not the SQL Server "sa" account in Wintouch.config. Ask an admin for
+       one dedicated to this agent rather than reusing a person's own login. -->
+  <wintouchUser value="" password="" />
+</hotelAgent>

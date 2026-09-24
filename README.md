@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.141.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.142.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -404,18 +404,23 @@ before anything is built.
       it), and reconnects by itself after the tunnel restarts. If it does not
       hold, §627 records the fallback — timer-pushed snapshots with a cached
       API — and that is a design change, not a patch.
-- [ ] **Build the `hotel` agent's outbound transport** — §627 gives it plain
-      outbound HTTPS with a bearer token rather than a socket, since its push
-      model tolerates minutes. `tally`'s hub (§634) is the worked example for
-      the auth half.
-- [ ] **Remove `GET /api/config` and get Wintouch credentials locally** —
-      plan.md §627. No credential travels cloud → agent. The hotel agent reads
-      them from the local Wintouch install the way `tally` already does
-      (§622); where it needs a Wintouch *application* user rather than the SQL
-      login, that is one install-time prompt, entered locally and never
-      transmitted. Also drop `<domain>` and `<store name>` from the agent
-      config — the enrolment code binds the agent to its store, so both are
-      derived — and stop compiling the API URL into the binary (§622).
+- [ ] **First real build and a live run of the hotel agent, on the Windows
+      machine with Wintouch installed** — `apps/hotel/agent/` (plan.md §653)
+      is a close, call-by-call port of the legacy's own DAO classes, and it
+      builds clean against the real Wintouch assemblies (checked from WSL by
+      pointing the project's `HintPath`s at the mounted DLLs and building
+      with `dotnet build`) — but nothing in that session could run it. There
+      is no CI job for this project either (unlike `tally-agent`'s): the
+      Wintouch DLLs it references are proprietary and per-install, so they
+      can never be vendored into this public repo or fetched by CI. On the
+      real machine: build it (`dotnet build -c Release`, into
+      `C:\wintouch\sgw` so the assemblies are on the search path), issue an
+      enrolment code from hotel-core, run `Hotel.Agent.exe enrol <CODE>`,
+      install the service, and confirm a tick actually completes —
+      `SetCurrentUser`/`SetDatabase`/`SwitchContext` succeed, units/guests/
+      reservations land in hotel-core, and a real online check-in writes
+      back into Wintouch (the `observacoes` stamp shows up on the
+      reservation, and `AvisarObservacoes` flags it for reception).
 - [ ] **Verify a gated secondary hostname on the live stack** — built in
       plan.md §637: an `additionalExposures` entry can now set
       `autheliaProtected: true`, and the rule generator emits it with the
@@ -445,24 +450,11 @@ before anything is built.
       commented out of its tick loop. This is the path that most needs the
       assemblies-for-writes decision, since it calls Wintouch's own account
       transfer logic.
-- [ ] **Build the `hotel` agent x86, not AnyCPU/x64** — plan.md §629, §636.
-      The Wintouch assemblies at `C:\wintouch\sgw` are **PE32 (x86)**, so an
-      agent that loads them must target x86 or AnyCPU with `Prefer32Bit`; an
-      x64 build fails at load with a `BadImageFormatException` that does not
-      point at bitness. Applies to the hotel agent only — `tally`'s never
-      loads them, which is why it is plain `net8.0` (§636).
 - [ ] **Plan the cutover re-send** — plan.md §629. Reservation uuids are not
       preserved (only feedback responses and check-in history migrate; units,
       guests and reservations re-sync from Wintouch), so check-in and feedback
       links already in guests' inboxes stop working at cutover. Decide between
       a quiet window and a one-off re-send, per client, before the first one.
-- [ ] **Build the `hotel` agent** — the Windows service that drives the sync
-      endpoints built in plan.md §639. Unlike `tally`'s it must **write** as
-      well as read, so per §629 it reads Wintouch over SQL but writes check-ins
-      back through Wintouch's own assemblies — which pins it to x86 (§636's
-      finding, tracked separately). `apps/tally/agent/` is the worked example
-      for config, enrolment, DPAPI token storage and the reconnect loop; the
-      transport here is plain outbound HTTPS rather than a socket (§627).
 - [ ] **Verify `hotel-core`'s guest-email scheduler on the live stack** —
       plan.md §651, §652. Everything is proven against a real database in CI:
       the offset math, the flow/active-flag gating, and "a failed send

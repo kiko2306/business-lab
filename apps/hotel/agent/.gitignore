@@ -1,0 +1,4 @@
+bin/
+obj/
+# The real one is per-install and holds a Wintouch operator password.
+hotel.config
