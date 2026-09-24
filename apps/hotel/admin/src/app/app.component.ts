@@ -5,6 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from './api.service';
 import {
   AgentStatus,
+  Checkout,
   EnrolmentCode,
   FLOWS,
   FlowKey,
@@ -52,6 +53,8 @@ export class AppComponent implements OnInit {
 
   guestText: GuestTextTemplate[] = [];
 
+  checkouts: Checkout[] = [];
+
   openId: string | null = null;
   access: string[] = [];
   newIdentity = '';
@@ -79,6 +82,7 @@ export class AppComponent implements OnInit {
           this.loadQuestions();
           this.loadSmtp();
           this.loadGuestText();
+          this.loadCheckouts();
         }
       },
       error: (err) => this.fail(err),
@@ -122,6 +126,13 @@ export class AppComponent implements OnInit {
 
   toggleActive(unit: Unit): void {
     this.api.setActive(unit.id, !unit.isActive).subscribe({
+      next: (updated) => Object.assign(unit, updated),
+      error: (err) => this.fail(err),
+    });
+  }
+
+  toggleCheckoutActive(unit: Unit): void {
+    this.api.setCheckoutActive(unit.id, !unit.checkoutActive).subscribe({
       next: (updated) => Object.assign(unit, updated),
       error: (err) => this.fail(err),
     });
@@ -323,6 +334,21 @@ export class AppComponent implements OnInit {
         if (existing) Object.assign(existing, updated);
         else this.guestText.push(updated);
       },
+      error: (err) => this.fail(err),
+    });
+  }
+
+  private loadCheckouts(): void {
+    this.api.listCheckouts().subscribe({
+      next: (checkouts) => (this.checkouts = checkouts),
+      error: (err) => this.fail(err),
+    });
+  }
+
+  /** Blank `entityCodeInput` bills the reservation's own guest — checkout.ts's default. */
+  settleCheckout(checkout: Checkout, entityCodeInput: string): void {
+    this.api.settleCheckout(checkout.id, entityCodeInput.trim()).subscribe({
+      next: () => (this.checkouts = this.checkouts.filter((c) => c.id !== checkout.id)),
       error: (err) => this.fail(err),
     });
   }

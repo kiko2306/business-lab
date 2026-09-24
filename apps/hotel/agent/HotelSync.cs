@@ -7,12 +7,13 @@ using System.Threading.Tasks;
 namespace Hotel.Agent
 {
     /// <summary>
-    /// The four sync jobs (plan.md §620, §627, §639), ported from the
-    /// legacy's Unit/Guest/Reservation DAOs (sample/hotel/WHotWebService/DAO)
-    /// onto hotel-core's API instead of the legacy's own. Units, guests and
-    /// reservations flow *out* of Wintouch; completed check-ins are the only
-    /// thing that flows back — same direction, same order, as the legacy's
-    /// own tick (ServiceManager.ExecuteEvent).
+    /// The sync jobs (plan.md §620, §627, §639, §656), ported from the
+    /// legacy's Unit/Guest/Reservation/CheckOut DAOs
+    /// (sample/hotel/WHotWebService/DAO) onto hotel-core's API instead of the
+    /// legacy's own. Units, guests and reservations flow *out* of Wintouch;
+    /// completed check-ins and settled check-out bills are what flows back —
+    /// same direction, same order, as the legacy's own tick
+    /// (ServiceManager.ExecuteEvent).
     ///
     /// Every call here goes through Wintouch's own business-tier API
     /// (Wintouch.Hotel.Businesstier.*), the same as the legacy — not a SQL
@@ -385,6 +386,131 @@ namespace Hotel.Agent
                 + Environment.NewLine + Environment.NewLine + previous;
             reservation.AvisarObservacoes = 1;
             Wintouch.Hotel.Businesstier.Reservas.Save(ref reservation);
+        }
+
+        /// <summary>
+        /// Computes a bill for each checked-out reservation hotel-core has
+        /// flagged as due, from Wintouch's own `NightAudit` + `Contas` — the
+        /// same real, uncommented calls the legacy's `CheckOut.NightAudit()`
+        /// makes (plan.md §656). Only the bill is computed here; nothing is
+        /// written to Wintouch until an admin settles it
+        /// (ProcessSettledCheckoutsAsync below).
+        /// </summary>
+        public async Task ComputeCheckoutBillsAsync()
+        {
+            var due = await _api.GetDueCheckoutsAsync().ConfigureAwait(false);
+            if (due.Count == 0) return;
+
+            var bills = new List<CheckoutBill>();
+            foreach (var r in due)
+            {
+                Wintouch.Hotel.Businesstier.Settings.ChangeUnidade(r.UnitCode);
+                var reservation = Wintouch.Hotel.Businesstier.Reservas.GetItem(r.Number, r.Line, r.UnitCode);
+
+                Wintouch.Hotel.Businesstier.NightAudit.ProcessaNightAudit(
+                    reservation.codigo, reservation.linhareserva, reservation.checkin, reservation.checkout,
+                    true, Wintouch.Hotel.Businesstier.ContasLinhas.NightAuditEnum.NightAuditEspecial);
+
+                var accountLines = Wintouch.Hotel.Businesstier.Contas.GetListLinhasByReserva(reservation.codigo, reservation.linhareserva);
+
+                decimal total = 0;
+                var lines = new List<CheckoutBillLine>();
+                foreach (Wintouch.Hotel.DataTier.DsContasLinhas.whotcontaslinhasRow item in accountLines.whotcontaslinhas.Rows)
+                {
+                    // Net of any already-invoiced quantity — the legacy's own
+                    // running-total formula (CheckOut.cs's NightAudit()).
+                    total += item.valorlinha - (item.qtdfacturada * item.valorunitario);
+
+                    // Cancelled/zero-value rows are excluded from the
+                    // itemised bill the same way the legacy's Invoice was
+                    // built — they'd otherwise show as spurious free lines.
+                    if (item.valorunitario > 0 && item.motivoanulacao == string.Empty)
+                    {
+                        lines.Add(new CheckoutBillLine
+                        {
+                            Line = item.linha,
+                            ItemName = !string.IsNullOrEmpty(item.package)
+                                ? $"{item.quarto} {item.data:yyyy-MM-dd}"
+                                : item.encargo,
+                            Quantity = item.qtd,
+                            UnitPrice = item.valorunitario,
+                        });
+                    }
+                }
+
+                bills.Add(new CheckoutBill { Token = r.Token, Total = total, Lines = lines });
+            }
+
+            var result = await _api.PushCheckoutBillsAsync(bills).ConfigureAwait(false);
+            Writer.Write($"Checkout bills: {result.Saved} computed");
+        }
+
+        /// <summary>
+        /// Reservations an admin has settled (checkout.ts) — moves the
+        /// reservation's Wintouch account to the chosen entity, the same
+        /// real `Contas`/`ContasLinhas` calls as the legacy's
+        /// `Reservation.ChangeInvoiceAccount` (uncommented, unlike the
+        /// fiscal-document half that never got finished — see §656). No
+        /// fiscal document is created here; that stays a manual step in
+        /// Wintouch's own POS.
+        /// </summary>
+        public async Task ProcessSettledCheckoutsAsync()
+        {
+            var settled = await _api.GetSettledCheckoutsAsync().ConfigureAwait(false);
+            foreach (var s in settled)
+            {
+                try
+                {
+                    TransferCheckoutAccount(s);
+                    await _api.AckCheckoutAsync(s.Token, ok: true).ConfigureAwait(false);
+                }
+                catch (Exception ex)
+                {
+                    Writer.Write($"Checkout transfer failed for {s.UnitCode}/{s.Number}/{s.Line}: {ex.Message}");
+                    await _api.AckCheckoutAsync(s.Token, ok: false).ConfigureAwait(false);
+                }
+            }
+        }
+
+        private static void TransferCheckoutAccount(SettledCheckout s)
+        {
+            Wintouch.Hotel.Businesstier.Settings.ChangeUnidade(s.UnitCode);
+
+            var dsContas = Wintouch.Hotel.Businesstier.Contas.GetListContasAbertas(DateTime.Now, s.Number, s.Line);
+            var account = dsContas.whotcontas.FirstOrDefault(item => item.entidade == s.EntityCode);
+            if (account == null)
+            {
+                // No open account for this entity yet — same fallback as the
+                // legacy: point the reservation at it and create one.
+                var reservation = Wintouch.Hotel.Businesstier.Reservas.GetItem(s.Number, s.Line, s.UnitCode);
+                reservation.codigoempresa = s.EntityCode;
+                Wintouch.Hotel.Businesstier.Reservas.Save(ref reservation);
+
+                Wintouch.Hotel.Businesstier.Contas.CriaConta(s.EntityCode, s.Number, s.Line);
+                dsContas = Wintouch.Hotel.Businesstier.Contas.GetListContasAbertas(DateTime.Now, s.Number, s.Line);
+                account = dsContas.whotcontas.FirstOrDefault(item => item.entidade == s.EntityCode);
+                if (account == null)
+                {
+                    throw new InvalidOperationException($"Wintouch did not open an account for {s.EntityCode}");
+                }
+            }
+
+            var accountLines = Wintouch.Hotel.Businesstier.Contas.GetListLinhasByReserva(s.Number, s.Line);
+            var destinations = new List<Wintouch.Hotel.Businesstier.ContasLinhas.DestinoTransferencia>
+            {
+                new Wintouch.Hotel.Businesstier.ContasLinhas.DestinoTransferencia
+                {
+                    DestinyReservationCode = s.Number,
+                    DestinyReservationLine = s.Line,
+                    HotelUnit = s.UnitCode,
+                    TipoDoc = account.tipodoc,
+                    NumDoc = account.numdoc,
+                    Serie = account.linhareserva,
+                    Percentagem = 100,
+                },
+            };
+
+            Wintouch.Hotel.Businesstier.ContasLinhas.TransfereLinhas(accountLines, "hotel-agent checkout", destinations);
         }
 
         /// <summary>

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.143.0] — 2026-09-24
+
+### Hotel
+
+- Add check-out billing-account assignment: hotel-core computes a bill from Wintouch on check-out, an admin settles it, and the agent moves the reservation's account to the chosen entity
+
 ## [0.142.1] — 2026-09-24
 
 ### Tally

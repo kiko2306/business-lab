@@ -13,6 +13,8 @@ export interface Unit {
   quizActive: boolean;
   birthdayActive: boolean;
   promoActive: boolean;
+  /** Not a guest flow like the four above — an admin/back-office automation, so it's outside FLOWS (plan.md §656). */
+  checkoutActive: boolean;
   /** Days before check-in / after check-out the guest email goes out (plan.md §651). */
   checkinOffsetDays: number;
   quizOffsetDays: number;
@@ -62,6 +64,30 @@ export interface SmtpSettings {
   fromName: string;
   /** Recipient for the 15-minute agent-down alert (plan.md §651). Blank skips sending it. */
   alertEmail: string;
+}
+
+/**
+ * A checked-out reservation with a bill computed from Wintouch, awaiting a
+ * staff decision on who to bill it to (plan.md §656). No online payment and
+ * no fiscal document here — settling one just tells Wintouch which account
+ * the charges belong on; reception still invoices in Wintouch's own POS.
+ */
+export interface CheckoutLine {
+  line: number;
+  itemName: string;
+  quantity: string;
+  unitPrice: string;
+}
+
+export interface Checkout {
+  id: string;
+  number: string;
+  line: number;
+  checkoutOn: string;
+  total: string;
+  unit: string;
+  guest: { code: string; firstName: string | null; lastName: string | null } | null;
+  lines: CheckoutLine[];
 }
 
 /** One guest-text template row (plan.md §649.1). Fixed key set, no add/delete. */

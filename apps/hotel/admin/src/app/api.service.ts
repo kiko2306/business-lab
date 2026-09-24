@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AgentStatus, EnrolmentCode, FlowKey, GuestTextTemplate, Identity, Question, SmtpSettings, Unit } from './models';
+import { AgentStatus, Checkout, EnrolmentCode, FlowKey, GuestTextTemplate, Identity, Question, SmtpSettings, Unit } from './models';
 
 /**
  * Same-origin: this bundle is served by nginx, which proxies `/api` through to
@@ -31,6 +31,19 @@ export class ApiService {
 
   setOffset(id: string, key: 'checkinOffsetDays' | 'quizOffsetDays', days: number): Observable<Unit> {
     return this.http.patch<Unit>(`/api/units/${id}`, { [key]: days });
+  }
+
+  setCheckoutActive(id: string, value: boolean): Observable<Unit> {
+    return this.http.patch<Unit>(`/api/units/${id}`, { checkoutActive: value });
+  }
+
+  listCheckouts(): Observable<Checkout[]> {
+    return this.http.get<Checkout[]>('/api/checkouts');
+  }
+
+  /** `entityCode` blank means "the reservation's own guest" — checkout.ts's own default. */
+  settleCheckout(id: string, entityCode: string): Observable<{ id: string; entityCode: string }> {
+    return this.http.patch<{ id: string; entityCode: string }>(`/api/checkouts/${id}`, entityCode ? { entityCode } : {});
   }
 
   listAccess(id: string): Observable<string[]> {

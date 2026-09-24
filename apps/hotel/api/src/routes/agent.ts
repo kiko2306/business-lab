@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { Pool } from 'pg';
 import { requireAgent } from '../auth';
+import { checkoutAgentRoutes } from './checkoutAgent';
 import { ingestRoutes } from './ingest';
 import { generateAgentToken, hash, normaliseCode } from '../tokens';
 
@@ -93,6 +94,9 @@ export function agentRoutes(pool: Pool): Router {
   // The sync itself — units, guests and reservations in; completed check-ins
   // back out. Same /agent prefix, same token auth.
   router.use(ingestRoutes(pool));
+  // Check-out billing-account assignment (§656): a computed bill out, a
+  // settled reservation's billing entity back in.
+  router.use(checkoutAgentRoutes(pool));
 
   return router;
 }

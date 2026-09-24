@@ -60,6 +60,75 @@
   @if (isAdmin) {
     <div class="card mb-4">
       <div class="card-body">
+        <h2 class="h6">Check-outs awaiting settlement</h2>
+        <p class="text-secondary small mb-3">
+          Computed from Wintouch once a reservation checks out (properties with check-out billing switched on
+          below). Settling one tells Wintouch which account to bill the charges to — it does not charge anyone
+          or create an invoice; reception still does that in Wintouch's own POS.
+        </p>
+
+        @if (!checkouts.length) {
+          <p class="text-secondary small mb-0">Nothing awaiting settlement.</p>
+        } @else {
+          <div class="table-responsive table-stack-wrap">
+            <table class="table table-stack align-middle">
+              <thead>
+                <tr>
+                  <th scope="col">Reservation</th>
+                  <th scope="col">Charges</th>
+                  <th scope="col">Total</th>
+                  <th scope="col">Bill to</th>
+                  <th scope="col" class="text-end">Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (checkout of checkouts; track checkout.id) {
+                  <tr>
+                    <td data-label="Reservation">
+                      <span class="fw-semibold">{{ checkout.unit }} — {{ checkout.number }}/{{ checkout.line }}</span>
+                      <span class="text-secondary small d-block">
+                        Checked out {{ checkout.checkoutOn | date: 'mediumDate' }}
+                        @if (checkout.guest) {
+                          · {{ checkout.guest.firstName }} {{ checkout.guest.lastName }} ({{ checkout.guest.code }})
+                        }
+                      </span>
+                    </td>
+                    <td data-label="Charges">
+                      <ul class="small text-secondary mb-0 ps-3">
+                        @for (line of checkout.lines; track line.line) {
+                          <li>{{ line.itemName }} × {{ line.quantity }} (&#64;{{ line.unitPrice }})</li>
+                        }
+                      </ul>
+                    </td>
+                    <td data-label="Total">{{ checkout.total }}</td>
+                    <td data-label="Bill to">
+                      <input
+                        #entityCode
+                        class="form-control form-control-sm"
+                        style="width: 9rem"
+                        [placeholder]="checkout.guest?.code ?? 'guest code'" />
+                    </td>
+                    <td data-label="Actions" class="text-end">
+                      <button
+                        class="btn btn-sm btn-primary"
+                        type="button"
+                        (click)="settleCheckout(checkout, entityCode.value)">
+                        Mark settled
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </div>
+    </div>
+  }
+
+  @if (isAdmin) {
+    <div class="card mb-4">
+      <div class="card-body">
         <h2 class="h6">Feedback questions</h2>
         <p class="text-secondary small mb-3">
           Shared by every property's post-stay feedback form. Turning one off keeps its past answers but stops
@@ -293,6 +362,7 @@
             <th scope="col">Property</th>
             <th scope="col">Status</th>
             <th scope="col">Guest flows</th>
+            <th scope="col">Check-out billing</th>
             <th scope="col">Send timing</th>
             <th scope="col" class="text-end">Actions</th>
           </tr>
@@ -326,6 +396,18 @@
                       <label class="form-check-label small" [for]="unit.id + flow.key">{{ flow.label }}</label>
                     </div>
                   }
+                </div>
+              </td>
+              <td data-label="Check-out billing">
+                <div class="form-check form-switch mb-0">
+                  <input
+                    class="form-check-input"
+                    type="checkbox"
+                    role="switch"
+                    [id]="unit.id + 'checkoutActive'"
+                    [checked]="unit.checkoutActive"
+                    [disabled]="!isAdmin"
+                    (change)="toggleCheckoutActive(unit)" />
                 </div>
               </td>
               <td data-label="Send timing">

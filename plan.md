@@ -31296,3 +31296,90 @@ to the README as the new open item in its place.
 `dotnet build -warnaserror` on `apps/tally/agent/` still succeeds (the new
 file is a script alongside the project, not a build input). PowerShell
 syntax parses clean. Not run.
+
+## 656. Implemented: check-out billing-account assignment, scoped down from the full legacy feature
+
+The README's "Build the check-out / online payment flow" item, closed to a
+deliberately narrower slice than its own description assumed.
+
+### The legacy source changed the picture before any code was written
+
+Reading `CheckOut.cs` and its DAOs directly (not just the README's summary
+of them) split "check-out/payment" into three genuinely different pieces,
+with three different risk profiles:
+
+1. **Billing-account assignment** — `Reservation.ChangeInvoiceAccount`:
+   real, uncommented Wintouch calls (`NightAudit.ProcessaNightAudit`,
+   `Contas.GetListContasAbertas`/`CriaConta`/`GetListLinhasByReserva`,
+   `ContasLinhas.TransfereLinhas`) that find-or-create the right guest/
+   company account and move a reservation's charges onto it. Proven the
+   same way check-in's write-back was: real code, real calls, just never
+   wired into the legacy's live timer tick.
+2. **Fiscal invoice/receipt generation** — `CheckOut.GetPending()`'s
+   `DocCab.CriaDocumentoFacturacao` / `Wintouch.Comercial.BusinessTier.
+   DocumentStandard` calls. **Never finished, even as a prototype** — every
+   line that would create a real document is commented out, ending in a
+   stray `Console.WriteLine`. There is no working call sequence to port.
+3. **Payment collection** — not in this codebase at all, at any stage of
+   completeness. `PaymentHeader`'s `PaymentMethod`/`PaymentDateTime`/`Amount`
+   fields arrive *already filled in*, meaning some external gateway was
+   always assumed to have charged the guest before the agent gets involved.
+   No gateway was ever named, chosen, or integrated anywhere in this repo.
+
+§629's "it calls Wintouch's own account transfer logic" was right about
+(1) but read as covering the whole feature; it doesn't — (2) and (3) are
+real, separate, unstarted work. Brought back to the user rather than guessed
+at, since both are decisions with real consequences (a malformed real fiscal
+document; a new paid external dependency) that only they can make. Answers:
+skip fiscal document generation for now (reception keeps invoicing by hand
+in Wintouch's own POS), and no payment gateway (settling is a staff
+decision — cash/card/bank transfer at the desk — not an online charge).
+
+### What was built
+
+**hotel-core** (`007_checkout.sql`): `reservations` gains `checkout_total`,
+`checkout_computed_at`, `checkout_entity_code`, `checkout_settled_at`,
+`checkout_settled_by`, `checkout_integrated(_at)`; a new `checkout_lines`
+table holds the itemised bill (an admin confirming "paid" should see what
+they're confirming, same reasoning as §650's real mail bodies over a bare
+toggle); `units.checkout_is_active` is a fifth per-unit switch, outside
+`FLOWS` since it isn't a guest-text-driven flow. Two routers: `checkoutAgent.ts`
+(agent-facing, `/agent/checkout/due` → `POST /checkout/bills` →
+`/agent/checkout/settled` → `POST /checkout/:token/ack`, same upsert-safe-to-
+repeat shape as every other agent endpoint) and `checkout.ts` (admin-facing,
+`GET/PATCH /api/checkouts` — list what's awaiting settlement, settle one to
+a chosen entity or default to the reservation's own guest).
+
+**`apps/hotel/agent`**: `ComputeCheckoutBillsAsync` ports `CheckOut.
+NightAudit()`'s real formula (net of already-invoiced quantity, cancelled
+lines excluded) field-for-field; `ProcessSettledCheckoutsAsync` ports
+`ChangeInvoiceAccount` the same way, with one change — `TransfereLinhas`'s
+free-text reason argument was `"teste"` in the legacy (a debug leftover, not
+a real value), replaced with a real description.
+
+**`apps/hotel/admin`**: a "Check-outs awaiting settlement" card (itemised
+lines, an entity-code override input defaulting to the guest on file, a
+settle button) and a fifth per-unit toggle in the Properties table.
+
+### Verified
+
+`apps/hotel/api`: `npm run typecheck`, `npm run build`, `npm test` — 54
+tests passing (4 new): due-bill computation respects the per-unit switch
+and is idempotent against a retried push, admin list/settle access control
+and defaulting, settling to a different entity than the guest on file, and
+the settled-but-not-yet-integrated state surviving a failed ack. `apps/hotel/
+admin`: `ng build` clean. `apps/hotel/agent`: same real-assembly build
+check as §653 (HintPaths pointed at the WSL-mounted DLLs) — every new call
+here (`NightAudit`, `Contas`, `ContasLinhas`, `DestinoTransferencia`,
+`DsContasLinhas` and its row fields) compiles against the real vendor
+assemblies. Not run: no CI job is possible for the agent (§653), and
+nothing here can prove `TransfereLinhas` actually moves a real account in a
+live Wintouch install.
+
+### Follow-up
+
+New README item: verify the whole loop on the real Windows/Wintouch machine
+(bill computed on check-out, settle in hotel-admin, agent transfers the
+account) — folded into the existing "first real build and a live run of the
+hotel agent" item rather than a second one, since both need the same
+machine and the same first build.

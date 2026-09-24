@@ -128,4 +128,36 @@ namespace Hotel.Agent
     {
         public bool Acknowledged { get; set; }
     }
+
+    public sealed class DueCheckout
+    {
+        public string Token { get; set; } = "";
+        public string UnitCode { get; set; } = "";
+        public string Number { get; set; } = "";
+        public int Line { get; set; }
+    }
+
+    public sealed class CheckoutBillLine
+    {
+        public int Line { get; set; }
+        public string ItemName { get; set; } = "";
+        public decimal Quantity { get; set; }
+        public decimal UnitPrice { get; set; }
+    }
+
+    public sealed class CheckoutBill
+    {
+        public string Token { get; set; } = "";
+        public decimal Total { get; set; }
+        public List<CheckoutBillLine> Lines { get; set; } = new List<CheckoutBillLine>();
+    }
+
+    public sealed class SettledCheckout
+    {
+        public string Token { get; set; } = "";
+        public string UnitCode { get; set; } = "";
+        public string Number { get; set; } = "";
+        public int Line { get; set; }
+        public string EntityCode { get; set; } = "";
+    }
 }

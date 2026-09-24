@@ -47,6 +47,8 @@ namespace Hotel.Agent
                 await _sync.SyncGuestsAsync().ConfigureAwait(false);
                 await _sync.SyncReservationsAsync().ConfigureAwait(false);
                 await _sync.ProcessPendingCheckinsAsync().ConfigureAwait(false);
+                await _sync.ComputeCheckoutBillsAsync().ConfigureAwait(false);
+                await _sync.ProcessSettledCheckoutsAsync().ConfigureAwait(false);
                 Writer.Write("---- tick end ----");
             }
             catch (Exception ex)

@@ -68,6 +68,12 @@ export function unitRoutes(pool: Pool): Router {
       values.push(req.body.isActive);
       sets.push(`is_active = $${values.length}`);
     }
+    // Check-out billing-account assignment (§656) — an admin/back-office
+    // automation, not a guest-text-driven flow, so it isn't in FLOWS above.
+    if (typeof req.body?.checkoutActive === 'boolean') {
+      values.push(req.body.checkoutActive);
+      sets.push(`checkout_is_active = $${values.length}`);
+    }
     // Days before check-in / after check-out the guest email goes out
     // (plan.md §651). 0-60 covers every plausible stay; anything outside
     // that is almost certainly a typo, so it's dropped rather than stored.
@@ -208,6 +214,7 @@ function toUnit(r: Record<string, unknown>) {
     quizActive: r.quiz_is_active,
     birthdayActive: r.birthday_is_active,
     promoActive: r.promo_is_active,
+    checkoutActive: r.checkout_is_active,
     checkinOffsetDays: r.checkin_offset_days,
     quizOffsetDays: r.quiz_offset_days,
   };

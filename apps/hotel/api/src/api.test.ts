@@ -120,6 +120,7 @@ test('the schema applies, twice, and creates what is expected', { skip }, async 
   );
   assert.deepEqual(tables.rows.map((r) => r.table_name), [
     'agents',
+    'checkout_lines',
     'enrolment_codes',
     'guest_extras',
     'guest_text_templates',
@@ -142,6 +143,8 @@ test('the scheduler indexes exist and are partial (§626)', { skip }, async () =
   assert.deepEqual(rows.map((r) => r.indexname), [
     'reservations_birthday_due_idx',
     'reservations_checkin_due_idx',
+    'reservations_checkout_bill_due_idx',
+    'reservations_checkout_settle_due_idx',
     'reservations_promo_due_idx',
     'reservations_quiz_due_idx',
   ]);
@@ -913,4 +916,115 @@ test('guest-text rejects an unknown key/locale or a blank value', { skip }, asyn
       .status,
     400
   );
+});
+
+/** A checked-out reservation, with a guest, on a unit with the checkout automation on unless told otherwise. */
+async function seedCheckoutReservation(opts: { checkoutActive?: boolean; unitCode?: string; guestCode?: string } = {}) {
+  const unitCode = opts.unitCode ?? 'A';
+  const guestCode = opts.guestCode ?? 'G1';
+  const unitId = await seedUnit(unitCode, 'Alpha');
+  if (opts.checkoutActive !== false) {
+    await pool.query(`UPDATE units SET checkout_is_active = true WHERE id = $1`, [unitId]);
+  }
+  const guest = await pool.query(
+    `INSERT INTO guests (code, first_name, last_name) VALUES ($1, 'Ana', 'Silva') RETURNING id`,
+    [guestCode]
+  );
+  const reservation = await pool.query(
+    `INSERT INTO reservations (unit_id, number, line, guest_id, checkin_on, checkout_on, status)
+     VALUES ($1, '1', 1, $2, '2026-01-01', '2026-01-03', 'RESERVED') RETURNING id, token`,
+    [unitId, guest.rows[0].id]
+  );
+  return { reservationId: reservation.rows[0].id, token: reservation.rows[0].token, guestId: guest.rows[0].id };
+}
+
+test('a checked-out reservation is due for a bill only once, and only on an opted-in unit', { skip }, async () => {
+  const token = await enrolAgent();
+  const due = await seedCheckoutReservation({ unitCode: 'A', guestCode: 'G1' });
+  await seedCheckoutReservation({ checkoutActive: false, unitCode: 'B', guestCode: 'G2' }); // Flow off — never due.
+
+  const dueList = await call('GET', '/agent/checkout/due', { token });
+  assert.deepEqual(dueList.body.map((r: { token: string }) => r.token), [due.token]);
+
+  await call('POST', '/agent/checkout/bills', {
+    token,
+    body: [{ token: due.token, total: 150.5, lines: [{ line: 1, itemName: 'Room', quantity: 2, unitPrice: 75.25 }] }],
+  });
+
+  // Computed now — no longer due, and a retried push must not double the lines.
+  assert.equal((await call('GET', '/agent/checkout/due', { token })).body.length, 0);
+  const before = await pool.query('SELECT count(*) FROM checkout_lines');
+  await call('POST', '/agent/checkout/bills', {
+    token,
+    body: [{ token: due.token, total: 999, lines: [{ line: 1, itemName: 'Room', quantity: 2, unitPrice: 75.25 }] }],
+  });
+  const after = await pool.query('SELECT count(*) FROM checkout_lines');
+  assert.equal(before.rows[0].count, after.rows[0].count);
+  const { rows } = await pool.query('SELECT checkout_total FROM reservations WHERE id = $1', [due.reservationId]);
+  assert.equal(rows[0].checkout_total, '150.50');
+});
+
+test('a viewer cannot see or settle checkouts; an admin can list and settle one', { skip }, async () => {
+  const { reservationId } = await seedCheckoutReservation();
+  await pool.query(
+    `UPDATE reservations SET checkout_total = 100, checkout_computed_at = now() WHERE id = $1`,
+    [reservationId]
+  );
+  await pool.query(
+    `INSERT INTO checkout_lines (reservation_id, line, item_name, quantity, unit_price) VALUES ($1, 1, 'Room', 2, 50)`,
+    [reservationId]
+  );
+
+  assert.equal((await call('GET', '/api/checkouts')).status, 401);
+  assert.equal((await call('GET', '/api/checkouts', { headers: VIEWER })).status, 403);
+  assert.equal((await call('PATCH', `/api/checkouts/${reservationId}`, { headers: VIEWER, body: {} })).status, 403);
+
+  const listed = await call('GET', '/api/checkouts', { headers: ADMIN });
+  assert.equal(listed.status, 200);
+  assert.equal(listed.body.length, 1);
+  assert.equal(listed.body[0].total, '100.00');
+  assert.equal(listed.body[0].lines.length, 1);
+  assert.equal(listed.body[0].guest.code, 'G1');
+
+  // No override — defaults to the reservation's own guest.
+  const settled = await call('PATCH', `/api/checkouts/${reservationId}`, { headers: ADMIN, body: {} });
+  assert.equal(settled.status, 200);
+  assert.equal(settled.body.entityCode, 'G1');
+  assert.equal((await call('GET', '/api/checkouts', { headers: ADMIN })).body.length, 0);
+
+  // Already settled — a second attempt has nothing left to act on.
+  assert.equal((await call('PATCH', `/api/checkouts/${reservationId}`, { headers: ADMIN, body: {} })).status, 404);
+});
+
+test('an admin can bill a checkout to a different entity than the guest on file', { skip }, async () => {
+  const { reservationId } = await seedCheckoutReservation();
+  await pool.query(
+    `UPDATE reservations SET checkout_total = 100, checkout_computed_at = now() WHERE id = $1`,
+    [reservationId]
+  );
+  const settled = await call('PATCH', `/api/checkouts/${reservationId}`, {
+    headers: ADMIN,
+    body: { entityCode: 'COMPANY1' },
+  });
+  assert.equal(settled.body.entityCode, 'COMPANY1');
+});
+
+test('a settled checkout is due for integration until the agent acknowledges it', { skip }, async () => {
+  const agentToken = await enrolAgent();
+  const { reservationId, token } = await seedCheckoutReservation();
+  await pool.query(
+    `UPDATE reservations SET checkout_total = 100, checkout_computed_at = now() WHERE id = $1`,
+    [reservationId]
+  );
+  await call('PATCH', `/api/checkouts/${reservationId}`, { headers: ADMIN, body: {} });
+
+  const settledList = await call('GET', '/agent/checkout/settled', { token: agentToken });
+  assert.deepEqual(settledList.body, [{ token, unitCode: 'A', number: '1', line: 1, entityCode: 'G1' }]);
+
+  // A failed transfer leaves it pending, so it reappears next tick.
+  await call('POST', `/agent/checkout/${token}/ack`, { token: agentToken, body: { ok: false } });
+  assert.equal((await call('GET', '/agent/checkout/settled', { token: agentToken })).body.length, 1);
+
+  await call('POST', `/agent/checkout/${token}/ack`, { token: agentToken, body: { ok: true } });
+  assert.equal((await call('GET', '/agent/checkout/settled', { token: agentToken })).body.length, 0);
 });

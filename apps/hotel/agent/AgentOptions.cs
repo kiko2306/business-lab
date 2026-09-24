@@ -40,6 +40,10 @@ namespace Hotel.Agent
         public Uri PushReservationsUri => new Uri(new Uri(BaseUrl), "/agent/reservations");
         public Uri PendingCheckinsUri => new Uri(new Uri(BaseUrl), "/agent/checkins/pending");
         public Uri AckCheckinUri(string token) => new Uri(new Uri(BaseUrl), $"/agent/checkins/{token}/ack");
+        public Uri DueCheckoutsUri => new Uri(new Uri(BaseUrl), "/agent/checkout/due");
+        public Uri CheckoutBillsUri => new Uri(new Uri(BaseUrl), "/agent/checkout/bills");
+        public Uri SettledCheckoutsUri => new Uri(new Uri(BaseUrl), "/agent/checkout/settled");
+        public Uri AckCheckoutUri(string token) => new Uri(new Uri(BaseUrl), $"/agent/checkout/{token}/ack");
 
         public static AgentOptions Load(string configPath)
         {

@@ -114,6 +114,35 @@ namespace Hotel.Agent
             }
         }
 
+        public async Task<List<DueCheckout>> GetDueCheckoutsAsync()
+        {
+            var response = await _http.SendAsync(Request(HttpMethod.Get, _options.DueCheckoutsUri)).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            return JsonSerializer.Deserialize<List<DueCheckout>>(text, Json) ?? new List<DueCheckout>();
+        }
+
+        public Task<PushResult> PushCheckoutBillsAsync(List<CheckoutBill> bills) => PostAsync<PushResult>(_options.CheckoutBillsUri, bills);
+
+        public async Task<List<SettledCheckout>> GetSettledCheckoutsAsync()
+        {
+            var response = await _http.SendAsync(Request(HttpMethod.Get, _options.SettledCheckoutsUri)).ConfigureAwait(false);
+            response.EnsureSuccessStatusCode();
+            var text = await response.Content.ReadAsStringAsync().ConfigureAwait(false);
+            return JsonSerializer.Deserialize<List<SettledCheckout>>(text, Json) ?? new List<SettledCheckout>();
+        }
+
+        public async Task AckCheckoutAsync(string token, bool ok)
+        {
+            var request = Request(HttpMethod.Post, _options.AckCheckoutUri(token));
+            request.Content = new StringContent(JsonSerializer.Serialize(new { ok }, Json), Encoding.UTF8, "application/json");
+            var response = await _http.SendAsync(request).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode && response.StatusCode != System.Net.HttpStatusCode.NotFound)
+            {
+                response.EnsureSuccessStatusCode();
+            }
+        }
+
         private async Task<T> PostAsync<T>(Uri uri, object body)
         {
             var request = Request(HttpMethod.Post, uri);

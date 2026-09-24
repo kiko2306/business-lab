@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.142.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.143.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -404,7 +404,14 @@ before anything is built.
       `SetCurrentUser`/`SetDatabase`/`SwitchContext` succeed, units/guests/
       reservations land in hotel-core, and a real online check-in writes
       back into Wintouch (the `observacoes` stamp shows up on the
-      reservation, and `AvisarObservacoes` flags it for reception).
+      reservation, and `AvisarObservacoes` flags it for reception). Also
+      confirm check-out billing (plan.md §656) on the same machine: flip a
+      unit's check-out billing switch on, let a reservation check out so the
+      agent computes its bill, settle it in hotel-admin (to the guest on
+      file, and separately to an overridden entity code), and confirm the
+      agent's next tick actually moves the reservation's Wintouch account —
+      `Contas.GetListContasAbertas` shows the charges under the chosen
+      entity, not the guest's own account, when an override was used.
 - [ ] **Verify a gated secondary hostname on the live stack** — built in
       plan.md §637: an `additionalExposures` entry can now set
       `autheliaProtected: true`, and the rule generator emits it with the
@@ -430,12 +437,6 @@ before anything is built.
       row with `estado = 1` has been seen yet, so the awaiting-payment case is
       inferred rather than observed — worth confirming on a shop that has a
       table with the bill requested.
-- [ ] **Build the check-out / online payment flow** — plan.md §629 puts it in
-      scope, and it is the largest of the three. `CheckOut.cs`, the night-audit
-      run and the invoice/payment DAOs exist in the legacy agent but are
-      commented out of its tick loop. This is the path that most needs the
-      assemblies-for-writes decision, since it calls Wintouch's own account
-      transfer logic.
 - [ ] **Plan the cutover re-send** — plan.md §629. Reservation uuids are not
       preserved (only feedback responses and check-in history migrate; units,
       guests and reservations re-sync from Wintouch), so check-in and feedback
