@@ -32566,3 +32566,42 @@ reader's real output — running-day cards read exactly like Wintouch's screen; 
 03/06/2026 view shows the closed-day set with no console errors. **Not verified:** the
 closed-day discounts / consumptions / customers against Wintouch itself — only the running
 day has a Wintouch screen so far; the operator offered to supply other days (README).
+
+## 684. Refunds are subtracted from sales — checked against Wintouch's own June report
+
+Reverses part of §682. The operator supplied Wintouch's daily sales report for June
+2026 (Vendas, Vendas Liq., Custo, Margem, 29 days) to compare. On 03/06/2026 it prints
+**9,383.45** where we showed 9,494.45 — exactly the €111.00 of that day's refunds.
+Tested over all 29 days with the real database: "sales − devolutions" reproduces
+Wintouch's *Vendas* on 27 days (22 exact, 5 within two cents of rounding); "sales
+only" (§682: refunds left out) matched on just 20. §682 had said "devolutions are not
+sales" and dropped them; Wintouch's convention is to subtract them, so that is what
+the money figures now do.
+
+**Rule.** For invoiced, per-staff, per-hour, payments and items, a devolution
+(`wgctiposdocumentos.devolucao = 1`, tipo F) counts as a **negative** amount —
+`-ABS(x)` rather than a bare minus, because the archive stores a refund as positive and
+the running day's table convention is unknown (no refund has been on a running day
+yet; README). A refund's payment is subtracted from its method; item quantities and
+values net off the same way, so "items sold" still equals the takings. Transactions,
+discounts and customers stay sales-documents-only. Applied to the running-day queries
+and the archive ones alike; the running day itself is unchanged (9,640.16 everywhere,
+101 transactions).
+
+**The two June days that still differ, both understood or flagged:**
+- **11/06 (ours +€40.00):** a `DEVFAT-LP` devolution issued from the back-office app
+  (`AppID WGES.448`, user ARBOL) — Wintouch's report counts it; the operator's rule is
+  the restaurant app only (`AppID LIKE 'WSIR%'`), so we do not. Kept as asked.
+- **23/06 (ours −€100.00):** unexplained. Headers, lines and payments all agree at
+  4,582.18 for the restaurant's documents that day, no other-app documents exist that
+  day, and the one €100.00 document (`FAC2-S 18104`, serie 6) is already in the total.
+  (A first look suggested a duplicate number across series — that was my own probe
+  joining without `serie`; the two are separate documents.) Left open.
+**Data facts found, not bugs:** on 16/06 the archive holds *no payment rows at all* for
+the whole day, so the payment-method panel is empty for it; on 19/06 one invoice
+(`FAC-NP 484`, 659.50) is paid only 560.58, so payments fall €98.92 short of sales.
+"Vendas Liq." (before VAT) matches within 0.22 on 26 of 29 days — the small gaps are
+VAT rounding per line vs per document; not shown by Tally, so not pursued.
+
+`dotnet build -warnaserror` clean; the reader re-run over all 29 days against the
+screenshot, and against the running day.

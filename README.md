@@ -496,18 +496,20 @@ before anything is built.
       open-tabs/tables/guests cards or Tables tab. **Running day** must return to
       27/07/2026 with €9,640.16 and the live panels. Also try a day with a group
       menu priced on its header (14/05/2026: "Menu Grupo 50" ×16 = €960.00).
-- [ ] **Compare Tally's closed-day counters with Wintouch's own screen (plan.md §683)**
-      — the running day matches Wintouch exactly; the archive rules for discounts,
-      consumptions and customers were derived from identities, not checked against
-      Wintouch. Give Wintouch's dashboard values for a few past days and compare with
-      the shop page's Transactions / Average ticket / Customers / Discounts /
-      Consumptions / payments for the same day (ours so far: 03/06/2026 → 132 / €71.93 /
-      249 / €243.40 / €732.84; 14/05/2026 → 158 / €94.71 / 284 / €6.00 / €977.52; 20/07/2026
-      → 142 / €83.57 / 249 / €37.90 / €629.13). Fix whatever differs before trusting them.
-- [ ] **Decide whether Tally should show refunds (plan.md §682)** — devolutions are
-      now left out of every figure as "not a sale". If the operator wants them
-      visible, a separate "Refunds" figure per day (they are stored positive) is the
-      addition; not built.
+- [ ] **Explain Wintouch's extra €100.00 on 23/06/2026 (plan.md §684)** — Wintouch's
+      report shows Vendas 4,682.18 for that day; the restaurant's documents total
+      4,582.18 in headers, lines and payments alike. Ask what document or
+      adjustment carries the €100.00 (a manual entry? another series?) in Wintouch's
+      own screen for the day, then decide whether it belongs in Tally.
+- [ ] **Check refunds on a running day (plan.md §684)** — devolutions are subtracted
+      with `-ABS(x)`, which is right whichever sign the live `wsir_vnd_vendas` table
+      uses, but no refund has been on a running day yet. The next time one is issued,
+      confirm invoiced, the staff line, the payment method and the item all drop by
+      the refund, and match Wintouch's own dashboard.
+- [ ] **Compare the closed-day counters with Wintouch (plan.md §683, §684)** — money
+      now matches Wintouch's June report; Transactions, Customers, Discounts and
+      Consumptions for closed days are still derived, not compared. Send Wintouch's
+      dashboard for a past day and compare with the shop page's cards.
 - [ ] **Confirm the agent comes back within seconds of a dashboard update
       (plan.md §679)** — with the new setup exe installed, run an Update that
       rebuilds Tally. The shop should show Offline only while the container is

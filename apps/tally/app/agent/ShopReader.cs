@@ -22,10 +22,12 @@ namespace Tally.Agent;
 ///  - `wgctiposdocumentos.tipo = 'F'` is an invoice (factura).
 ///  - A devolution (refund — DEVFTFO-*, DEVFAT-*, …) is also tipo 'F' but is
 ///    flagged `wgctiposdocumentos.devolucao = 1`, and is stored with POSITIVE
-///    amounts and payments. Summed with the sales it *adds* to the takings, so
-///    every figure here counts `tipo = 'F' AND devolucao = 0`: sales only. On
-///    2026-06-03 that is 9,494.45 of sales; the 111.00 of refunds that day was
-///    being counted as takings (§682).
+///    amounts and payments. Wintouch's own daily-sales report SUBTRACTS it: on
+///    2026-06-03, 9,494.45 of sales − 111.00 of refunds = the 9,383.45 it prints
+///    (27 of 29 June days agree to the cent; "sales only" agrees on 20). So the
+///    money figures — invoiced, per-staff, per-hour, payments, items — carry a
+///    devolution as a negative amount (§684). Transactions, discounts and
+///    customers count sales documents only (`devolucao = 0`).
 /// </summary>
 public sealed class ShopReader(string connectionString)
 {
@@ -34,6 +36,16 @@ public sealed class ShopReader(string connectionString)
     /// Normally left null, and the day is whatever the day tables hold.
     /// </summary>
     public DateTime? BusinessDate { get; init; }
+
+    // A running-day line's VAT-inclusive value / quantity, NEGATIVE on a devolution
+    // (refund). Wintouch subtracts refunds from sales — its June 2026 report
+    // matches "sales − devolutions" on 27 of 29 days and "sales only" on 20 (§684).
+    // -ABS rather than a bare minus: the archive stores a refund as a positive
+    // amount and this table's convention is unknown, so this is right either way.
+    private const string LiveTotal =
+        "CASE WHEN d.devolucao = 1 THEN -ABS(CAST(v.total AS DECIMAL(18,2))) ELSE CAST(v.total AS DECIMAL(18,2)) END";
+    private const string LiveQuantity =
+        "CASE WHEN d.devolucao = 1 THEN -ABS(CAST(v.quantidade AS DECIMAL(18,2))) ELSE CAST(v.quantidade AS DECIMAL(18,2)) END";
 
     /// <summary>
     /// The running trading day: the date of the newest line in the day table.
@@ -67,11 +79,11 @@ public sealed class ShopReader(string connectionString)
         if (date is { } requested && requested.Date != day.Date)
             return await ReadArchiveOverviewAsync(connection, requested.Date, ct);
 
-        var invoiced = await ScalarAsync(connection, day, """
-            SELECT ISNULL(SUM(CAST(v.total AS DECIMAL(18,2))), 0)
+        var invoiced = await ScalarAsync(connection, day, $"""
+            SELECT ISNULL(SUM({LiveTotal}), 0)
               FROM wsir_vnd_vendas v
               JOIN wgctiposdocumentos d ON v.documento = d.codigo
-             WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0
+             WHERE d.tipo = 'F' AND v.Anulado = 0
                AND CAST(v.EntryDate AS date) = @businessDate
             """, ct);
 
@@ -89,45 +101,49 @@ public sealed class ShopReader(string connectionString)
             SELECT ISNULL(SUM(CAST(numclientes AS int)), 0) FROM wsir_mst_mesas WHERE estado <> 0
             """, ct);
 
-        var staff = await QueryAsync(connection, day, """
+        var staff = await QueryAsync(connection, day, $"""
             SELECT v.funcionario AS code,
                    ISNULL(e.nome, v.funcionario) AS name,
-                   SUM(CAST(v.total AS DECIMAL(18,2))) AS total
+                   SUM({LiveTotal}) AS total
               FROM wsir_vnd_vendas v
               LEFT JOIN wgcvendedores e ON e.codigo = v.funcionario
               JOIN wgctiposdocumentos d ON v.documento = d.codigo
-             WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0
+             WHERE d.tipo = 'F' AND v.Anulado = 0
                AND CAST(v.EntryDate AS date) = @businessDate
              GROUP BY v.funcionario, e.nome
-             HAVING SUM(CAST(v.total AS DECIMAL(18,2))) <> 0
+             HAVING SUM({LiveTotal}) <> 0
              ORDER BY total DESC
             """, r => new StaffTotal((string)r["code"], (string)r["name"], (decimal)r["total"]), ct);
 
         // Payments carry no date of their own, so they are dated by the sale
         // they settle — which is also what stops a payment being counted
         // against a document that was voided.
+        // A refund's payment is money going back out, so it is subtracted from its
+        // method (the devolution flag comes from the document it settles).
         var payments = await QueryAsync(connection, day, """
             SELECT ISNULL(m.descricao, p.meiospagamento) AS method,
-                   SUM(CAST(p.total AS DECIMAL(18,2))) AS total
+                   SUM(CASE WHEN s.devolucao = 1 THEN -ABS(CAST(p.total AS DECIMAL(18,2)))
+                            ELSE CAST(p.total AS DECIMAL(18,2)) END) AS total
               FROM wsir_vnd_meiospagamento p
+              JOIN (SELECT DISTINCT v.documento, v.numdoc, d.devolucao
+                      FROM wsir_vnd_vendas v
+                      JOIN wgctiposdocumentos d ON d.codigo = v.documento
+                     WHERE d.tipo = 'F' AND v.Anulado = 0
+                       AND CAST(v.EntryDate AS date) = @businessDate) s
+                ON s.documento = p.documento AND s.numdoc = p.numdoc
               LEFT JOIN wgcmeiospagamento m ON m.codigo = p.meiospagamento
-             WHERE EXISTS (
-                     SELECT 1 FROM wsir_vnd_vendas v
-                       JOIN wgctiposdocumentos d ON d.codigo = v.documento
-                      WHERE v.documento = p.documento AND v.numdoc = p.numdoc
-                        AND d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0
-                        AND CAST(v.EntryDate AS date) = @businessDate)
              GROUP BY m.descricao, p.meiospagamento
-             HAVING SUM(CAST(p.total AS DECIMAL(18,2))) <> 0
+             HAVING SUM(CASE WHEN s.devolucao = 1 THEN -ABS(CAST(p.total AS DECIMAL(18,2)))
+                             ELSE CAST(p.total AS DECIMAL(18,2)) END) <> 0
              ORDER BY total DESC
             """, r => new PaymentTotal((string)r["method"], (decimal)r["total"]), ct);
 
-        var hourlyRows = await QueryAsync(connection, day, """
+        var hourlyRows = await QueryAsync(connection, day, $"""
             SELECT DATEPART(hour, v.EntryDate) AS hour,
-                   SUM(CAST(v.total AS DECIMAL(18,2))) AS total
+                   SUM({LiveTotal}) AS total
               FROM wsir_vnd_vendas v
               JOIN wgctiposdocumentos d ON v.documento = d.codigo
-             WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.Anulado = 0
+             WHERE d.tipo = 'F' AND v.Anulado = 0
                AND CAST(v.EntryDate AS date) = @businessDate
              GROUP BY DATEPART(hour, v.EntryDate)
             """, r => new HourlyTotal(Convert.ToInt32(r["hour"]), (decimal)r["total"]), ct);
@@ -292,16 +308,16 @@ public sealed class ShopReader(string connectionString)
         // Comment articles (family COMENTARIOS — "--- Pode Sair Mesa", a kitchen
         // instruction rung at 0.00) are also 'P' lines but are not things sold;
         // unfiltered, one of them was a day's busiest "item".
-        var items = await QueryAsync(connection, day, """
+        var items = await QueryAsync(connection, day, $"""
             SELECT v.codpedido AS code,
                    ISNULL(a.nome, LTRIM(RTRIM(v.descricao))) AS description,
                    ISNULL(a.familia, '') AS family,
-                   SUM(CAST(v.quantidade AS DECIMAL(18,2))) AS quantity,
-                   SUM(CAST(v.total AS DECIMAL(18,2))) AS total
+                   SUM({LiveQuantity}) AS quantity,
+                   SUM({LiveTotal}) AS total
               FROM wsir_vnd_vendas v
               JOIN wgctiposdocumentos d ON d.codigo = v.documento
               LEFT JOIN wgcartigos a ON a.codigo = v.codpedido
-             WHERE d.tipo = 'F' AND d.devolucao = 0 AND v.tipolinha = 'P' AND v.Anulado = 0
+             WHERE d.tipo = 'F' AND v.tipolinha = 'P' AND v.Anulado = 0
                AND CAST(v.EntryDate AS date) = @businessDate
                AND ISNULL(a.familia, '') <> 'COMENTARIOS'
              GROUP BY v.codpedido, ISNULL(a.nome, LTRIM(RTRIM(v.descricao))), ISNULL(a.familia, '')
@@ -334,40 +350,44 @@ public sealed class ShopReader(string connectionString)
         // A header's VAT-inclusive total. Summed per document rather than from
         // the lines, so a rounding cent on a line cannot move a day's figure.
         const string Total = "CAST(c.base1 + c.base2 + c.base3 + c.base4 + c.iva1 + c.iva2 + c.iva3 + c.iva4 AS DECIMAL(18,2))";
+        // Signed: a devolution is stored positive and is subtracted from sales.
+        const string Signed = $"CASE WHEN d.devolucao = 1 THEN -ABS({Total}) ELSE {Total} END";
 
         var invoiced = await ScalarAsync(connection, day, $"""
-            SELECT ISNULL(SUM({Total}), 0)
+            SELECT ISNULL(SUM({Signed}), 0)
               FROM wgcdoccab c
               JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
-             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+             WHERE d.tipo = 'F' AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
                AND CAST(c.datadoc AS date) = @businessDate
             """, ct);
 
         var staff = await QueryAsync(connection, day, $"""
             SELECT c.funcionario AS code,
                    ISNULL(e.nome, c.funcionario) AS name,
-                   SUM({Total}) AS total
+                   SUM({Signed}) AS total
               FROM wgcdoccab c
               JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
               LEFT JOIN wgcvendedores e ON e.codigo = c.funcionario
-             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+             WHERE d.tipo = 'F' AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
                AND CAST(c.datadoc AS date) = @businessDate
              GROUP BY c.funcionario, e.nome
-             HAVING SUM({Total}) <> 0
+             HAVING SUM({Signed}) <> 0
              ORDER BY total DESC
             """, r => new StaffTotal((string)r["code"], (string)r["name"], (decimal)r["total"]), ct);
 
         var payments = await QueryAsync(connection, day, """
             SELECT ISNULL(m.descricao, p.meiopagamento) AS method,
-                   SUM(CAST(p.total AS DECIMAL(18,2))) AS total
+                   SUM(CASE WHEN d.devolucao = 1 THEN -ABS(CAST(p.total AS DECIMAL(18,2)))
+                            ELSE CAST(p.total AS DECIMAL(18,2)) END) AS total
               FROM wgcpagamentos p
               JOIN wgcdoccab c ON c.tipodoc = p.tipodoc AND c.serie = p.serie AND c.numdoc = p.numdoc
               JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
               LEFT JOIN wgcmeiospagamento m ON m.codigo = p.meiopagamento
-             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+             WHERE d.tipo = 'F' AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
                AND CAST(c.datadoc AS date) = @businessDate
              GROUP BY m.descricao, p.meiopagamento
-             HAVING SUM(CAST(p.total AS DECIMAL(18,2))) <> 0
+             HAVING SUM(CASE WHEN d.devolucao = 1 THEN -ABS(CAST(p.total AS DECIMAL(18,2)))
+                             ELSE CAST(p.total AS DECIMAL(18,2)) END) <> 0
              ORDER BY total DESC
             """, r => new PaymentTotal((string)r["method"], (decimal)r["total"]), ct);
 
@@ -376,10 +396,10 @@ public sealed class ShopReader(string connectionString)
         // it, and `HoraI` is when the table was opened, not when the sale was.)
         var hourlyRows = await QueryAsync(connection, day, $"""
             SELECT DATEPART(hour, c.entrydate) AS hour,
-                   SUM({Total}) AS total
+                   SUM({Signed}) AS total
               FROM wgcdoccab c
               JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
-             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+             WHERE d.tipo = 'F' AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
                AND CAST(c.datadoc AS date) = @businessDate
                AND c.entrydate IS NOT NULL
              GROUP BY DATEPART(hour, c.entrydate)
@@ -464,13 +484,15 @@ public sealed class ShopReader(string connectionString)
             SELECT l.artigo AS code,
                    ISNULL(a.nome, LTRIM(RTRIM(l.descricao))) AS description,
                    ISNULL(a.familia, '') AS family,
-                   SUM(CAST(l.qtddoc AS DECIMAL(18,2))) AS quantity,
-                   SUM(CAST(l.merc - l.desclin AS DECIMAL(18,2))) AS total
+                   SUM(CASE WHEN d.devolucao = 1 THEN -ABS(CAST(l.qtddoc AS DECIMAL(18,2)))
+                            ELSE CAST(l.qtddoc AS DECIMAL(18,2)) END) AS quantity,
+                   SUM(CASE WHEN d.devolucao = 1 THEN -ABS(CAST(l.merc - l.desclin AS DECIMAL(18,2)))
+                            ELSE CAST(l.merc - l.desclin AS DECIMAL(18,2)) END) AS total
               FROM wgcdoclinhas l
               JOIN wgcdoccab c ON c.tipodoc = l.tipodoc AND c.serie = l.serie AND c.numdoc = l.numdoc
               JOIN wgctiposdocumentos d ON d.codigo = c.tipodoc
               LEFT JOIN wgcartigos a ON a.codigo = l.artigo
-             WHERE d.tipo = 'F' AND d.devolucao = 0 AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
+             WHERE d.tipo = 'F' AND c.anulado = 0 AND c.AppID LIKE 'WSIR%'
                AND (l.TipoLinha = 'P'
                     OR (l.TipoLinha IN ('I', 'M') AND l.merc - l.desclin <> 0))
                AND CAST(c.datadoc AS date) = @businessDate
