@@ -32075,3 +32075,18 @@ Checked by running the parse block on Windows with a partly-filled file (filled
 keys read, empty stayed empty) and the full script through the PowerShell
 parser; the whole installer was not re-run. Deliberately not deleting the code
 after use: it is single-use and expires in minutes.
+
+### §669 follow-up: the agent restarts itself and does not end on an error
+
+Read `AgentClient`/`Program` for ways the service could stop doing its job:
+`tokens.Read()` sat outside the reconnect `try` (a DPAPI/file error would end
+the worker); "not enrolled" `return`ed, leaving a process that shows Running
+but does nothing; the unawaited `HandleAsync` could throw from its own error
+reply; and `Program` returned 0 even after a faulted host, hiding the failure
+from the service manager. Fixed: token read inside the retry loop, not-enrolled
+retries at the 60 s cap, `HandleAsync` catches everything, `Program` returns
+`Environment.ExitCode`. And `install.ps1` now sets SCM recovery on every run —
+`sc failure` restart after 5 s / 5 s / 60 s, reset after a day, plus
+`failureflag 1` so a non-zero exit counts. Builds clean and the script parses;
+the recovery itself is not yet exercised (needs an elevated shell to kill the
+process) — README TODO.

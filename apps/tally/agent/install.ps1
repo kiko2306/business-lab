@@ -101,4 +101,11 @@ else {
     sc.exe start $serviceName | Out-Null
 }
 
+# Recovery, applied on every run so an install made before this existed also
+# gets it: restart after 5 s, 5 s, then 60 s on later failures, and forget the
+# failure count after a day. /failureflag makes a non-zero exit (not just a
+# kill) count as a failure, since an unhandled crash in .NET exits that way.
+sc.exe failure $serviceName reset= 86400 actions= restart/5000/restart/5000/restart/60000 | Out-Null
+sc.exe failureflag $serviceName 1 | Out-Null
+
 Write-Host "Done. $serviceName is installed and running from $InstallDir."

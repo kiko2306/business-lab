@@ -448,6 +448,14 @@ before anything is built.
       Invoiced/staff/hourly are empty unless the date has sales (demo data
       is 2026-07-27, §636). If it misbehaves, stop the service and run
       `Tally.Agent.exe` from an elevated console to see its log.
+- [ ] **Prove the Tally agent restarts itself after a crash** — plan.md §669.
+      Re-run `install.ps1` (that also applies the recovery settings to the
+      existing service), check `sc.exe qfailure Tally.Agent` lists restart
+      actions, then from an elevated PowerShell kill it:
+      `Stop-Process -Name Tally.Agent -Force`. Within ~5 s the service
+      should be Running again under a new PID and reconnect in the dashboard.
+      Also try it while the agent is unenrolled or the server is unreachable:
+      it should stay Running and retry, not exit.
 - [ ] **Re-run `install.ps1` against an installed agent** — plan.md §669
       proved the first install on a real machine. Still to confirm: re-running
       with a fresh enrolment code takes the `Restart-Service` branch rather

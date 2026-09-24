@@ -68,19 +68,26 @@ public sealed class AgentClient(
 
         while (!ct.IsCancellationRequested)
         {
-            var token = tokens.Read();
-            if (token is null)
-            {
-                logger.LogError("Not enrolled. Run: Tally.Agent enrol <CODE>");
-                return;
-            }
-
             try
             {
-                await ServeAsync(token, ct);
-                // A clean close is the server going away, not a failure: retry
-                // promptly rather than treating it as an outage.
-                delay = TimeSpan.FromSeconds(2);
+                // Read inside the try: a DPAPI or file error must be retried
+                // like any other failure, not escape and end the service.
+                var token = tokens.Read();
+                if (token is null)
+                {
+                    // Keep the service alive and retry rather than returning:
+                    // a process that has quietly stopped working looks
+                    // "Running" to the service manager and is never restarted.
+                    logger.LogError("Not enrolled. Run: Tally.Agent enrol <CODE>");
+                    delay = maxDelay;
+                }
+                else
+                {
+                    await ServeAsync(token, ct);
+                    // A clean close is the server going away, not a failure: retry
+                    // promptly rather than treating it as an outage.
+                    delay = TimeSpan.FromSeconds(2);
+                }
             }
             catch (OperationCanceledException) when (ct.IsCancellationRequested)
             {
@@ -166,13 +173,23 @@ public sealed class AgentClient(
 
             await SendAsync(socket, new { id, ok = true, data }, ct);
         }
-        catch (Exception ex) when (id is not null)
+        catch (Exception ex)
         {
             logger.LogError(ex, "Request {Id} failed", id);
+            if (id is null) return;
             // Reported back rather than dropped, so the dashboard can say the
             // shop errored instead of silently timing out (§634 turns this into
             // a 502).
-            await SendAsync(socket, new { id, ok = false, error = ex.Message }, ct);
+            try
+            {
+                await SendAsync(socket, new { id, ok = false, error = ex.Message }, ct);
+            }
+            catch (Exception sendEx)
+            {
+                // The socket went away mid-reply. This runs unawaited, so
+                // letting it throw would only become an unobserved task fault.
+                logger.LogWarning(sendEx, "Could not report request {Id} failure", id);
+            }
         }
     }
 

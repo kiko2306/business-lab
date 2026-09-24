@@ -59,7 +59,9 @@ if (!OperatingSystem.IsWindows())
 }
 
 await host.RunAsync();
-return 0;
+// Not a literal 0: if the worker faults the host stops and sets ExitCode to 1,
+// and returning 0 would hide that from the service manager's recovery actions.
+return Environment.ExitCode;
 
 /// <summary>Holds the outbound connection for the lifetime of the service.</summary>
 internal sealed class AgentWorker(AgentClient client) : BackgroundService
