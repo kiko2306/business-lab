@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.150.0] — 2026-09-24
+
+### Removed
+
+- BookStack — Outline is the wiki now
+
 ## [0.149.0] — 2026-09-24
 
 ### Added

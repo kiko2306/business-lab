@@ -159,26 +159,6 @@ describe('mail wiring for the registry apps (§75.6 retrofit)', () => {
     return SERVICES[name].mailEnvKeys;
   }
 
-  it('BookStack: every var BookStack reads, ssl collapsed onto tls', async () => {
-    mockedGetService.mockReturnValue({ mailEnvKeys: await realKeysFor('bookstack') } as never);
-
-    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'ssl' });
-    expect(await buildMailEnvOverrides('bookstack')).toEqual({
-      BOOKSTACK_MAIL_DRIVER: 'smtp',
-      BOOKSTACK_MAIL_HOST: 'smtp.example.com',
-      BOOKSTACK_MAIL_PORT: '587',
-      BOOKSTACK_MAIL_USERNAME: 'bot@example.com',
-      BOOKSTACK_MAIL_PASSWORD: 'hunter2',
-      // Symfony mailer only knows tls/null; port 465 implies implicit TLS.
-      BOOKSTACK_MAIL_ENCRYPTION: 'tls',
-      BOOKSTACK_MAIL_FROM: 'bot@example.com',
-      BOOKSTACK_MAIL_FROM_NAME: 'Homelab',
-    });
-
-    mockedGetMailConfig.mockResolvedValue({ ...fullConfig, smtpEncryption: 'none' });
-    expect((await buildMailEnvOverrides('bookstack')).BOOKSTACK_MAIL_ENCRYPTION).toBe('null');
-  });
-
   it('n8n: turns the mode on and sets both encryption booleans explicitly', async () => {
     mockedGetService.mockReturnValue({ mailEnvKeys: await realKeysFor('n8n') } as never);
 
@@ -233,9 +213,9 @@ describe('mail wiring for the registry apps (§75.6 retrofit)', () => {
     expect((await buildMailEnvOverrides('vikunja')).VIKUNJA_MAILER_FORCESSL).toBe('true');
   });
 
-  it('all four fall back to nothing when mail is unconfigured', async () => {
+  it('all three fall back to nothing when mail is unconfigured', async () => {
     mockedGetMailConfig.mockResolvedValue(null);
-    for (const name of ['bookstack', 'n8n', 'paperless', 'vikunja']) {
+    for (const name of ['n8n', 'paperless', 'vikunja']) {
       mockedGetService.mockReturnValue({ mailEnvKeys: await realKeysFor(name) } as never);
       expect(await buildMailEnvOverrides(name)).toEqual({});
     }

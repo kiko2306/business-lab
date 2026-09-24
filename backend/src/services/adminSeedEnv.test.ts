@@ -12,7 +12,7 @@ beforeEach(() => {
 
 describe('buildAdminSeedEnvOverrides', () => {
   it('is empty for a service with no env-seeded admin', async () => {
-    expect(await buildAdminSeedEnvOverrides('bookstack')).toEqual({});
+    expect(await buildAdminSeedEnvOverrides('outline')).toEqual({});
   });
 
   it('supplies NocoDB the Authelia admin email', async () => {

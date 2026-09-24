@@ -44,7 +44,6 @@ operate within, listed again at the end.
 | App | Upstream licence | Status | Note |
 |---|---|---|---|
 | Authelia | Apache-2.0 | ✅ Clean | |
-| BookStack | MIT (LinuxServer image scripts GPL-3.0) | ✅ Clean | |
 | ClamAV | GPL-2.0 | ✅ Clean | internal use |
 | Code Server | MIT | ✅ Clean | VS Code OSS build |
 | CrowdSec | MIT | ✅ Clean | Cloudflare bouncer MIT; NPM Lua bouncer MIT, see vendored code below |
@@ -97,13 +96,13 @@ operate within, listed again at the end.
 |---|---|---|---|
 | postgres:14/15/16/17-alpine | PostgreSQL License (BSD-like) | ✅ Clean | the internal database for several apps; the PostgreSQL License places no restriction on internal use |
 | pgautoupgrade/pgautoupgrade:16/17-alpine (n8n, Outline, Paperless, Twenty) | **MIT** ("Docker PostgreSQL Authors") | ✅ Clean | drop-in for `postgres:NN-alpine` that runs `pg_upgrade` in place on a major bump; bundled PostgreSQL keeps the PostgreSQL License. n8n needs PG ≥ 16 (§118.3); Paperless moved off `postgres:15-alpine` for the same deprecation notice (§182); Twenty pins 16 to match upstream. |
-| mariadb:latest (ITFlow), mariadb:11.4 (Kimai), lscr.io/linuxserver/mariadb:latest (BookStack) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
+| mariadb:latest (ITFlow), mariadb:11.4 (Kimai) | GPL-2.0 (server) | ✅ Clean | internal use / mere aggregation |
 | mysql:8.0 (NPM) | GPL-2.0 + FOSS exception | ✅ Clean | not standardisable on MariaDB — its JSON column type breaks NPM's own migrations (§210.1) |
 | valkey:9-alpine (Immich, Outline, Paperless, Twenty) | BSD-3-Clause | ✅ Clean | BSD-3 community fork of Redis 7.2; wire-compatible. Paperless moved here from `redis:7-alpine` (RSALv2/SSPL). |
 | ruby:4.0.5-alpine (DocuSeal) | Ruby License / BSD-2-Clause (dual); OpenSSL-linked | ✅ Clean | language runtime base; permissive, no restriction on internal use. Alpine base rowed below |
 | alpine | MIT | ✅ Clean | base of several images incl. `dockurr/samba` (`alpine:edge`); bundled `tini` MIT |
 | busybox (init containers) | GPL-2.0 | ✅ Clean | unmodified |
-| LinuxServer.io images (BookStack, Code Server, MariaDB, Speedtest) | image build scripts GPL-3.0; bundled apps keep their own licence | ✅ Clean | GPL applies to the packaging scripts, adds no restriction on running the app |
+| LinuxServer.io images (Code Server, MariaDB, Speedtest) | image build scripts GPL-3.0; bundled apps keep their own licence | ✅ Clean | GPL applies to the packaging scripts, adds no restriction on running the app |
 
 ## Vendored source
 

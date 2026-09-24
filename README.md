@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.149.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.150.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,11 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Beta-test BookStack's removal (plan.md §667)** — on `beta`, after
+      pulling and restarting the backend, confirm no `bookstack-*` containers
+      remain (`docker ps -a`), `apps/bookstack/` is gone, its NPM proxy host
+      and Cloudflare hostname are dropped, and no BookStack card appears on
+      the Apps page or Home Page.
 - [ ] **Beta-test the new Outline app (plan.md §666)** — on `beta`, after
       pulling, start Outline from the Apps page (it needs Authelia running
       and the app exposed — Outline has no local login). Confirm: the
@@ -224,12 +229,6 @@ it is done — not ticked off and left behind. Section references point at
       (proves the storage chown); and **a second Authelia user can sign in**
       — if Outline demands an invite, open a follow-up to invite users
       automatically (principle 3).
-- [ ] **Beta-test the BookStack OIDC login fix (plan.md §665)** — on `beta`,
-      after pulling the fix, restart the backend (the fix only re-renders on
-      a boot/exposure/reconciler sync, not a plain app restart) and confirm a
-      full browser sign-in at `bookstack.<domain>` completes end to end (no
-      `invalid_client` at `/oidc/callback`, lands in BookStack logged in as
-      the Authelia user, admin-group mapping intact).
 - [ ] **Beta-test the self-update panel's richer progress detail (plan.md
       §659)** — on `beta`, trigger a real self-update while a commit is
       pending and confirm: the progress alert shows a `detail` suffix naming

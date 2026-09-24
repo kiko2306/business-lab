@@ -21,7 +21,7 @@ export interface ServiceHealthCheck {
 
 export interface ServiceExposureEnvKeys {
   // Compose env var(s) that should receive the service's public URL, scheme
-  // included — `https://<host>` (e.g. PAPERLESS_URL, BOOKSTACK_URL).
+  // included — `https://<host>` (e.g. PAPERLESS_URL, OUTLINE_URL).
   url?: string[];
   // Compose env var(s) that should receive the bare public hostname, no
   // scheme (e.g. N8N_HOST, NEXTCLOUD_OVERWRITEHOST).

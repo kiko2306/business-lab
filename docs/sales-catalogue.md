@@ -18,7 +18,7 @@ replaces.
 | App | What it does | Stands in for |
 |---|---|---|
 | ITFlow | IT documentation, ticketing and client billing (PSA) | ConnectWise Manage, Autotask, Syncro |
-| BookStack | Wiki and knowledge base | Confluence, Notion (wiki use) |
+| Outline | Wiki and knowledge base | Confluence, Notion (wiki use) |
 | Vikunja | Task and project management — kanban/list/Gantt views | Asana, Trello, Monday.com |
 | NocoDB | Airtable-style spreadsheet database over Postgres | Airtable, Baserow |
 | n8n | Visual workflow automation connecting other apps and APIs | Zapier, Make (Integromat) |

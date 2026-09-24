@@ -126,7 +126,7 @@ Verified against each image's registry manifest on 2026-08-31.
 | App | arm64 | armv7 (32-bit) | Notes |
 |---|---|---|---|
 | authelia, dozzle, ntfy, crowdsec, netbird-vpn, nocodb, pihole, tailscale, uptime-kuma, vaultwarden, vikunja | yes | yes | |
-| bookstack, code-server, grocy, speedtest (`linuxserver/*`) | yes | **no** | arm64-only images |
+| code-server, grocy, speedtest (`linuxserver/*`) | yes | **no** | arm64-only images |
 | paperless, mealie, home-page, home-assistant, n8n, stirling-pdf, nginx-proxy-manager | yes | **no** | arm64-only images |
 | jellyfin | yes | **no** | no hardware transcoding configured (no `/dev/dri` in the compose) — transcoding is CPU-only and will struggle |
 | immich | yes | **no** | `immich-machine-learning` is not run by default (§300 B5); if re-enabled it is heavy — expect slow face/object indexing |

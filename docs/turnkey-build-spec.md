@@ -80,7 +80,7 @@ engagement:
 | **DocuSeal** | E-signatures (DocuSign) |
 | **Twenty** | A simple CRM |
 | **Kimai** | Time tracking/billing |
-| **BookStack** | An internal wiki/knowledge base |
+| **Outline** | An internal wiki/knowledge base |
 | **NocoDB** | A shared spreadsheet-as-database (Airtable) |
 | **n8n** | Workflow automation (Zapier) |
 | **Guacamole** | Remote access to the office's Windows machines |

@@ -75,9 +75,7 @@ services:
 
   # No pinned-major reason found (§210.1 survey): ITFlow's own install docs
   # just say "MariaDB, not MySQL" with no version floor/ceiling, and 10.11
-  # predates a real requirement being written down here. Floats on :latest,
-  # matching bookstack-db (lscr.io/linuxserver/mariadb:latest) elsewhere in
-  # this repo.
+  # predates a real requirement being written down here. Floats on :latest.
   itflow-db:
     mem_limit: 256m
     mem_reservation: 96m
