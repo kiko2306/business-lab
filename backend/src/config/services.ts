@@ -819,13 +819,22 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // directly: proxying the agent through the admin container would stop the
     // sync — the critical path — whenever a frontend was down (plan.md §640).
     // Gated, which is what §637 added the flag for: this app holds a gated
-    // secondary today and public ones (check-in, pulse) once they are built.
+    // secondary (`core`) alongside a public one (`checkin`) — pulse joins the
+    // same way once it exists.
     additionalExposures: [
       {
         suffix: 'core',
         label: 'Core API',
         portEnvVar: 'HOTEL_CORE_PORT',
         autheliaProtected: true,
+      },
+      {
+        // Public by default (autheliaProtected omitted): a guest following an
+        // emailed link has no account, and no Authelia session to forward
+        // (plan.md §641).
+        suffix: 'checkin',
+        label: 'Check-in',
+        portEnvVar: 'HOTEL_CHECKIN_PORT',
       },
     ],
     hiddenGeneratedSecrets: ['HOTEL_DB_PASSWORD'],
@@ -836,10 +845,6 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // Authelia matches resources against the path *plus* query string (§425).
     // Everything else on the hostname stays gated, which is what admins reach.
     autheliaBypassPaths: ['^/agent($|[/?])'],
-    // check-in and pulse join as additionalExposures when they are built —
-    // public ones, since a guest following an emailed link has no account.
-    // hotel-core's own hostname stays gated; §637 added the flag that lets
-    // one app hold both.
   },
   'tally': {
     // Its own bundled Postgres, so the scheduled dump has to know about it —

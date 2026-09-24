@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.139.0] — 2026-09-24
+
+### Added
+
+- Hotel's check-in app gets a public secondary exposure
+
 ## [0.138.0] — 2026-09-24
 
 ### Added

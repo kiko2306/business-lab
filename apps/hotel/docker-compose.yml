@@ -5,9 +5,10 @@
 # forward without a version-tag bump to diff against (§449).
 services:
   # Owns units, guests and reservations, and is the only service the property
-  # agent talks to (plan.md §623). check-in and pulse join this project as
-  # they are built — one compose project because they share one database,
-  # which is why hotel-core exists at all (§628).
+  # agent talks to (plan.md §623). check-in has joined this project below
+  # (§641); pulse joins the same way once it is built — one compose project
+  # because they share one database, which is why hotel-core exists at all
+  # (§628).
   hotel-core:
     mem_limit: 256m
     mem_reservation: 64m
@@ -57,6 +58,29 @@ services:
       - "homepage.icon=calendar"
       - "homepage.href=http://localhost:${HOTEL_ADMIN_PORT:-10600}"
       - "homepage.description=Online check-in, guest feedback and property administration"
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ >/dev/null || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  # The guest-facing check-in app. Own container for the same reason as
+  # hotel-admin: independent deploys, and its nginx proxies `/api/` through to
+  # hotel-core's `/checkin` routes, same-origin (plan.md §641). Public: a
+  # guest follows an emailed link with no account, so this hostname carries no
+  # Authelia gate at all (unlike hotel-core's `core` secondary).
+  hotel-checkin:
+    mem_limit: 128m
+    mem_reservation: 32m
+    build: ./checkin
+    restart: unless-stopped
+    ports:
+      - "${HOTEL_CHECKIN_PORT:-10601}:80"
+    depends_on:
+      - hotel-core
+    networks:
+      - hotel-net
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:80/ >/dev/null || exit 1"]
       interval: 30s

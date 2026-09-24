@@ -30533,3 +30533,59 @@ tokens to v4 uuids — `reservations.token uuid ... DEFAULT gen_random_uuid()`
 already landed with the schema in §638, and a test (`a reservation token is a
 random v4, not a guessable id`) has asserted it since. The item pre-dated the
 schema build and was never removed once it shipped.
+
+## 642. Implemented: `check-in`'s guest frontend, exposed publicly
+
+`apps/hotel/checkin/`: an Angular shell, same shape as `hotel-admin` (§640) —
+its own container, its own nginx, `npm ci && npm run build` in CI, the shared
+theme synced in by `scripts/sync-app-theme.sh`. No `@angular/router`: like
+`hotel-admin`, there is exactly one page, and here the one "route" it would
+carry — the token — is read straight off `location.pathname` instead, since a
+router earns its place only once there is a second place to go.
+
+**No session, so no proxy trick to hide it.** `hotel-admin`'s nginx forwards
+Authelia's identity headers because the browser's session cookie is what
+authenticates the admin. A guest has neither — the capability is the token in
+the URL — so `hotel-checkin`'s `location /api/` proxies to hotel-core with no
+identity headers, and rewrites the prefix: `/api/<token>` in the browser
+becomes `/checkin/<token>` on hotel-core, since that is where §641 mounted the
+guest routes (kept off `/api` deliberately, to keep it out of the same
+gated-namespace habit as `hotel-admin`'s calls).
+
+**Registered as hotel's second `additionalExposures` entry** (`services.ts`),
+alongside the existing gated `core` one — `autheliaProtected` omitted, which
+defaults false (public), exactly the case that flag exists to *not* need
+setting. `HOTEL_CHECKIN_PORT` (`10601`, already reserved in `docs/ports.md`
+since §628) is the new compose-visible port; `10602` still waits for pulse.
+Home Page tile logic only ever looks at a service's *primary* exposure
+(`homepageConfig.ts`), so this secondary needed no `hideFromHomePage` decision
+— it simply gets no tile of its own, the same as `core` already doesn't.
+
+**Field choices deferred to the API layer, not repeated here.** The form
+collects exactly the guest/extra fields §641 scoped to what the write-back
+path reads; document-type is a `ponytail:`-flagged placeholder select
+(`models.ts`) until a real Wintouch install's own codes are confirmed — the
+hotel agent's write-back (still unbuilt) is what will need the exact mapping,
+not this form.
+
+**An existing gap closed in passing**: `hotel-admin` has used
+`nginx:1.27-alpine` since §640 but `docs/licences.md`'s Hotel row never rowed
+it — only `node:22-alpine` and `postgres:17-alpine` were. Adding a second
+nginx-based container made the gap worth closing rather than repeating;
+nginx's BSD-2-Clause is unmodified-and-clean the same way IT Tools' is.
+
+### Verification
+
+A full throwaway stack — `hotel-db`, `hotel-core` and `hotel-checkin`, wired
+with a `hotel-core` network alias the way compose does it — with a unit,
+guest and reservation seeded directly over `psql`. `GET`/`POST
+/<token>` through the check-in container's own port round-tripped correctly
+to hotel-core and back (guest corrected, occupant stored, `submitted: true`),
+and the SPA fallback served the bundle for a bare `/<token>` path. `docker
+compose config` validated the edited compose file (mindful of §640's
+indentation trap — anchored this edit on a larger, unique block on the first
+try). 1191 backend tests still pass; `ng build` succeeds for the new app.
+Not yet run through Cloudflare/NPM/Authelia on `beta` — already covered by
+the existing "Verify a gated secondary hostname on the live stack" README
+item, which was written to check both `core` (gated) and the public
+secondaries once they existed; no new item needed.

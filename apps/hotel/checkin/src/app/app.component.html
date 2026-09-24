@@ -1,0 +1,125 @@
+<nav class="navbar border-bottom mb-4">
+  <div class="container-xl">
+    <span class="navbar-brand mb-0 h1">Check-in</span>
+  </div>
+</nav>
+
+<main class="container-xl pb-5" style="max-width: 640px">
+  @if (loading) {
+    <p class="text-secondary">Loading…</p>
+  } @else if (error && !checkin) {
+    <div class="alert alert-danger" role="alert">{{ error }}</div>
+  } @else if (checkin) {
+    <h2 class="h4">{{ checkin.unit }}</h2>
+    <p class="text-secondary">
+      {{ checkin.checkinOn | date: 'mediumDate' }} – {{ checkin.checkoutOn | date: 'mediumDate' }}
+      @if (checkin.roomName) { · {{ checkin.roomName }} }
+    </p>
+
+    @if (saved) {
+      <div class="alert alert-success" role="alert">
+        Saved — you can come back and update these details any time before arrival.
+      </div>
+    }
+    @if (error) {
+      <div class="alert alert-danger" role="alert">{{ error }}</div>
+    }
+
+    <form (ngSubmit)="submit()">
+      <div class="card mb-3">
+        <div class="card-body">
+          <h3 class="h6">Your details</h3>
+          <div class="row g-2">
+            <div class="col-sm-6">
+              <label class="form-label small">First name</label>
+              <input class="form-control" name="firstName" required [(ngModel)]="guest.firstName" />
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">Last name</label>
+              <input class="form-control" name="lastName" required [(ngModel)]="guest.lastName" />
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">Email</label>
+              <input class="form-control" type="email" name="email" [(ngModel)]="guest.email" />
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">Nationality</label>
+              <input class="form-control" name="nationality" [(ngModel)]="guest.nationality" />
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">Date of birth</label>
+              <input class="form-control" type="date" name="birthDate" [(ngModel)]="guest.birthDate" />
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">Document type</label>
+              <select class="form-select" name="documentType" [(ngModel)]="guest.documentType">
+                <option [ngValue]="null">Select…</option>
+                @for (type of documentTypes; track type.value) {
+                  <option [ngValue]="type.value">{{ type.label }}</option>
+                }
+              </select>
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">Document number</label>
+              <input class="form-control" name="documentNumber" [(ngModel)]="guest.documentNumber" />
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">Document issuing country</label>
+              <input class="form-control" name="documentCountry" [(ngModel)]="guest.documentCountry" />
+            </div>
+            <div class="col-sm-6">
+              <label class="form-label small">Address</label>
+              <input class="form-control" name="addressLine1" [(ngModel)]="guest.addressLine1" />
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small">City</label>
+              <input class="form-control" name="city" [(ngModel)]="guest.city" />
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small">Postal code</label>
+              <input class="form-control" name="postalCode" [(ngModel)]="guest.postalCode" />
+            </div>
+            <div class="col-sm-4">
+              <label class="form-label small">Country</label>
+              <input class="form-control" name="country" [(ngModel)]="guest.country" />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      @for (extra of extras; track $index) {
+        <div class="card mb-3">
+          <div class="card-body">
+            <h3 class="h6">Guest {{ $index + 2 }}</h3>
+            <div class="row g-2">
+              <div class="col-sm-4">
+                <label class="form-label small">First name</label>
+                <input class="form-control" [name]="'extraFirst' + $index" [(ngModel)]="extra.firstName" />
+              </div>
+              <div class="col-sm-4">
+                <label class="form-label small">Last name</label>
+                <input class="form-control" [name]="'extraLast' + $index" [(ngModel)]="extra.lastName" />
+              </div>
+              <div class="col-sm-2">
+                <label class="form-label small">Age group</label>
+                <select class="form-select" [name]="'extraAge' + $index" [(ngModel)]="extra.ageGroup">
+                  @for (group of ageGroups; track group.value) {
+                    <option [ngValue]="group.value">{{ group.label }}</option>
+                  }
+                </select>
+              </div>
+              <div class="col-sm-2">
+                <label class="form-label small">Document #</label>
+                <input class="form-control" [name]="'extraDoc' + $index" [(ngModel)]="extra.documentNumber" />
+              </div>
+            </div>
+          </div>
+        </div>
+      }
+
+      <button class="btn btn-primary" type="submit" [disabled]="saving">
+        {{ saving ? 'Saving…' : (checkin.submitted ? 'Update check-in' : 'Complete check-in') }}
+      </button>
+    </form>
+  }
+</main>

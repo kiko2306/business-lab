@@ -19,6 +19,7 @@ source_file="$root/frontend/src/styles.css"
 targets=(
   "$root/apps/tally/web/src/theme.css"
   "$root/apps/hotel/admin/src/theme.css"
+  "$root/apps/hotel/checkin/src/theme.css"
 )
 
 for target in "${targets[@]}"; do
