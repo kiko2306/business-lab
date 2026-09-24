@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeUpdate, parseComposeImages } from './executor';
+import { describeUpdate, parseComposeImages, servicesWithBuild } from './executor';
 
 describe('describeUpdate', () => {
   // The message is the only feedback an update gives when nothing goes wrong,
@@ -44,3 +44,22 @@ describe('parseComposeImages', () => {
   });
 });
 
+
+describe('servicesWithBuild', () => {
+  // The update path rebuilds only when this is non-empty, so a miss here means
+  // an app's new code is deployed but never built.
+  it('finds the services that build from source and not the stock images', () => {
+    const config = JSON.stringify({
+      services: {
+        tally: { build: { context: '.' } },
+        'tally-db': { image: 'postgres:17-alpine' },
+      },
+    });
+    expect(servicesWithBuild(config)).toEqual(['tally']);
+  });
+
+  it('is empty for an app with only pulled images, and for unreadable output', () => {
+    expect(servicesWithBuild(JSON.stringify({ services: { a: { image: 'x' } } }))).toEqual([]);
+    expect(servicesWithBuild('not json')).toEqual([]);
+  });
+});

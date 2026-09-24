@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.150.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.150.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -456,6 +456,14 @@ before anything is built.
       should be Running again under a new PID and reconnect in the dashboard.
       Also try it while the agent is unenrolled or the server is unreachable:
       it should stay Running and retry, not exit.
+- [ ] **Beta-test that an update rebuilds apps built from source (plan.md §673)**
+      — on `beta`, after pulling this version, run the Update page and watch
+      `tally`: its image should be rebuilt (`docker images tally-tally` shows a
+      new timestamp; the update result names `tally-tally:latest`), not just
+      recreated. The first build is slow (SDK image pull, `npm ci`, `ng build`,
+      .NET publish) and runs under the classic builder — if it fails with a
+      buildx/403 error, that is §290 again. Then the Tally page's **Download
+      setup** card must appear for an admin.
 - [ ] **Run the single-file Tally setup for real, elevated** — plan.md §670.
       Its prompts, `install.config` presets and validation were tested
       un-elevated, and the Docker build of the exe on Linux; the elevated part

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.150.2] — 2026-09-24
+
+### Fixed
+
+- Updating an app now rebuilds images built from source (tally, hotel, ...): the update only pulled and recreated, so their new code was deployed but never built
+
 ## [0.150.1] — 2026-09-24
 
 ### Fixed

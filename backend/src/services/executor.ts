@@ -104,6 +104,8 @@ interface CommandResult {
 // multi-image app (Immich, Jellyfin, …) is minutes, not seconds. `compose
 // down` / `restart` don't pull, so they keep the short default.
 const COMPOSE_UP_TIMEOUT_MS = 15 * 60_000;
+// A local build (npm ci + ng build, or a .NET publish) is slower than a pull.
+const BUILD_TIMEOUT_MS = 30 * 60_000;
 // A full pull streams a lot of progress text to stdout; the default 1MB
 // exec buffer overflows and kills the command mid-pull.
 const COMMAND_MAX_BUFFER = 16 * 1024 * 1024;
@@ -698,6 +700,22 @@ export async function pullAndRecreateService(serviceName: string, userId: number
       clearImagePins(appDir);
       await executeCommand(`docker compose -p ${projectName} ${baseArgs} pull`, COMPOSE_UP_TIMEOUT_MS);
 
+      // `pull` skips an image built from source and `up` only builds one that is
+      // missing, so without this an app with a `build:` (tally, hotel, …) keeps
+      // running the image from its first start however much its code changes —
+      // a self-update would deploy the new source and never build it (§673).
+      // Classic builder for the same reason selfUpdate.ts uses it: buildx needs
+      // EXEC on the socket proxy, which is deliberately not granted (§290).
+      const { stdout: composeConfig } = await executeCommand(
+        `docker compose -p ${projectName} ${baseArgs} config --format json`,
+        30_000
+      );
+      if (servicesWithBuild(composeConfig).length) {
+        await executeCommand(`docker compose -p ${projectName} ${baseArgs} build`, BUILD_TIMEOUT_MS, {
+          DOCKER_BUILDKIT: '0',
+        });
+      }
+
       // forceRecreate: `up -d` alone leaves a running container on its old image
       // when the compose config has not changed, so the pull would look like it
       // did nothing.
@@ -832,6 +850,18 @@ export async function updateAllInstalledApps(
     failed: failed.map((r) => r.serviceName),
   });
   return results;
+}
+
+/** Compose services that build from source, i.e. the ones `pull` cannot refresh. */
+export function servicesWithBuild(composeConfigJson: string): string[] {
+  try {
+    const config = JSON.parse(composeConfigJson) as { services?: Record<string, { build?: unknown }> };
+    return Object.entries(config.services ?? {})
+      .filter(([, def]) => def?.build)
+      .map(([name]) => name);
+  } catch {
+    return [];
+  }
 }
 
 export function describeUpdate(updated: string[] | null): string {

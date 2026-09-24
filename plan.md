@@ -32181,3 +32181,29 @@ Verified: 39 API tests including the new one (version shown, kept after
 disconnect, not blanked by a header-less agent), Angular build, `dotnet build
 -warnaserror`. Not run: a real agent reporting it — needs the new build
 installed (README TODO).
+
+## 673. Fixed: a self-update never rebuilt apps built from source
+
+Symptom: after updating `beta`, the Tally page had no **Download setup** card
+(§670). Diagnosis on the box: `tally-tally-1` was recreated a minute earlier,
+but from the image built at 09:20 that morning — `/app/dist/agent` absent, only
+migration 001 in `dist/migrations`. Root cause is in the platform, not the card:
+`pullAndRecreateService` ran `compose pull` (which skips a service with `build:`)
+then `up -d --force-recreate` (which only builds an image that does not exist).
+So any app that builds from its own source — tally, hotel, price-compare —
+deployed new code to disk and kept running the old image; the only way it ever
+moved was someone building by hand, which is exactly what CLAUDE.md's "a hand
+fix is a diagnostic, never a fix" rules out.
+
+Fix: after the pull, if `docker compose config` shows any service with `build`
+(`servicesWithBuild`, unit-tested), run `docker compose build` with
+`DOCKER_BUILDKIT=0` (classic builder — the socket proxy grants no EXEC for
+buildx, §290; same reason `selfUpdate.ts` does it) and a 30-minute timeout. A
+failed build fails that app's update visibly instead of silently redeploying the
+old image. The before/after image-ID comparison already wraps this, so the
+result message names the rebuilt image.
+
+Verified: backend typecheck and all 1226 tests. **Not verified on the box:** the
+classic builder against `apps/tally/Dockerfile` (multi-stage, .NET SDK stage) —
+README TODO. Expect the first rebuild to take several minutes (SDK image pull +
+`ng build`).
