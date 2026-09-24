@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.144.0] — 2026-09-24
+
+### Hotel
+
+- Add the one-time legacy data import (apps/hotel/import/): check-in history and feedback responses, matched by Wintouch code and exact question text
+
 ## [0.143.0] — 2026-09-24
 
 ### Hotel

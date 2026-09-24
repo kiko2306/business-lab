@@ -130,6 +130,57 @@ jobs:
         env:
           DATABASE_URL: postgres://hotel:test@localhost:5433/hotel
 
+  hotel-import:
+    # The one-time cutover import (plan.md §658). Two real ephemeral
+    # databases rather than one: a MySQL fixture shaped like the legacy
+    # Laravel schema, and a Postgres one built from hotel-core's own
+    # migration files (read from ../api/src/migrations at test time) so this
+    # can never drift from the schema it actually imports into.
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/hotel/import
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_USER: hotel
+          POSTGRES_PASSWORD: test
+          POSTGRES_DB: hotel
+        ports:
+          - 5436:5432
+        options: >-
+          --health-cmd "pg_isready -U hotel"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      mysql:
+        image: mysql:8
+        env:
+          MYSQL_ALLOW_EMPTY_PASSWORD: yes
+          MYSQL_DATABASE: legacy
+        ports:
+          - 3307:3306
+        options: >-
+          --health-cmd "mysqladmin ping -h 127.0.0.1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: apps/hotel/import/package-lock.json
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run build
+      - run: npm test
+        env:
+          DATABASE_URL: postgres://hotel:test@localhost:5436/hotel
+          MYSQL_URL: mysql://root@127.0.0.1:3307/legacy
+
   hotel-admin:
     # The Angular admin shell. Its theme is a generated copy of the
     # dashboard's (scripts/sync-app-theme.sh) because an app image builds from

@@ -1,0 +1,22 @@
+{
+  "name": "hotel-legacy-import",
+  "version": "1.0.0",
+  "private": true,
+  "description": "One-time cutover import: legacy Laravel/MySQL check-in history and feedback into hotel-core (plan.md §658)",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "test": "node --test --test-concurrency=1 dist/*.test.js",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "mysql2": "^3.11.5",
+    "pg": "^8.13.1"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.2",
+    "@types/pg": "^8.11.10",
+    "typescript": "^5.7.2"
+  }
+}

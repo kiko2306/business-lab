@@ -31430,3 +31430,84 @@ change for cutover.
 "Build the one-time legacy data import (feedback responses + check-in
 history)" — the actual import script does not exist yet; this section only
 decided what correctness it has to satisfy once it does.
+
+## 658. Implemented: the one-time legacy data import (`apps/hotel/import/`)
+
+Closes the README item §657 opened: pulling check-in history and feedback
+responses out of the legacy Laravel/MySQL database into hotel-core.
+
+### A second mapping problem, found the same way the checkout one was
+
+Reading the legacy's actual migrations
+(`sample/hotel/setup/api/database/migrations`) rather than assuming the
+schema turned up a second case like §656's fiscal-document one: the
+legacy's feedback structure is `quizzes → quiz_headers → quiz_questions →
+quiz_responses`, each admin-configurable per client, with no id anywhere in
+common with hotel-core's `pulse_questions` — which were seeded fresh with
+four new placeholder questions and new UUIDs (§644) and have been
+admin-editable ever since (§647). There is no reliable key to carry a
+`quiz_responses` row across except the question's own text, and that only
+works if an admin has already set hotel-core's questions up to match. Asked
+rather than guessed at a fuzzy-match heuristic; the answer was to match on
+exact text and report what doesn't match rather than force it.
+
+Reservations and guests have no such problem — both key cleanly off
+Wintouch's own codes (`units.code`, `guests.code`, `reservations.(unit,
+number, line)`), which the legacy schema carries in exactly the same shape
+hotel-core's freshly-synced copies do.
+
+### A real schema bug, found because this needed the column to actually work
+
+`guests.birth_place` was typed `date` in `001_init.sql` (§638) — a
+copy-paste slip next to the genuinely-a-date `birth_date` beside it. It
+holds a place name (the legacy's `birth_local`, e.g. "Lisboa"), and nothing
+had ever written to it before this import needed to. Fixed in
+`008_fix_birth_place_type.sql` — `ALTER COLUMN ... TYPE text`, bundled into
+this change because the import cannot function correctly without it, not a
+drive-by fix.
+
+### What was built, and where it lives
+
+`apps/hotel/import/` — its own small Node/TypeScript project, not a Docker-
+managed app and not part of hotel-core's server: a one-time CLI a human runs
+during a client's cutover (`MYSQL_URL=... DATABASE_URL=... node dist/index.js`),
+same shape as `apps/tally/agent/` being its own project outside the compose
+stack. Three passes, each an idempotent `UPDATE`/`ON CONFLICT DO NOTHING`
+so a re-run never duplicates anything: guest check-in details (only the
+fields the check-in form itself collects — document number/type/dates/
+place, birth place — never the ordinary contact fields the agent's own sync
+already keeps current, which this must not clobber with a stale legacy
+copy); reservation completion (`checkin_success`/`checkin_sent` and
+`quiz_answered`/`quiz_sent`, set together per §657's decision); feedback
+responses (matched by exact question text, unmatched ones counted and named
+in the run's summary rather than dropped silently).
+
+### Verified against two real ephemeral databases, not fixtures in memory
+
+A MySQL 8 container, schema hand-built from the legacy's own migration
+files (not assumed), and a Postgres container with hotel-core's **real**
+migrations applied by reading them from `../api/src/migrations` at test
+time — so the test schema can never drift from what the import actually
+writes into. `0000-00-00` (MySQL's own "unset date" sentinel, distinct from
+Wintouch's `1900-01-01` one) needed `SET SESSION sql_mode = ''` to even
+insert under MySQL 8's default strict mode, which is itself informative:
+a legacy install would need permissive settings for that sentinel to reach
+the import at all. 5/5 tests passing: guest document fields import by code
+and skip an unmatched one, an unset MySQL date imports as null rather than
+a bogus one, the completion-flag pairing (§657), exact-text feedback
+matching with unmatched questions counted and named, and re-running the
+whole import twice produces no duplicate `pulse_responses` row. A new
+`hotel-import` CI job runs the same, with real `postgres` and `mysql`
+service containers.
+
+Not verified: against an actual client's legacy database, which does not
+exist in this environment — only a schema built from the real Laravel
+migration files, not sample data.
+
+### Follow-up
+
+No new README item beyond what already exists: this closes the "build the
+one-time legacy data import" item outright, since a first real cutover
+(whenever the first client migrates) is the only remaining way to prove it
+against real data, and that isn't a standing open task the way a live-stack
+check is.

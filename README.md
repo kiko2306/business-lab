@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.143.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.144.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -437,19 +437,6 @@ before anything is built.
       row with `estado = 1` has been seen yet, so the awaiting-payment case is
       inferred rather than observed — worth confirming on a shop that has a
       table with the bill requested.
-- [ ] **Build the one-time legacy data import (feedback responses +
-      check-in history)** — plan.md §629 decided only these two migrate;
-      everything else (units, guests, reservations) re-syncs fresh from
-      Wintouch through the agent instead. Nothing pulls the legacy Laravel/
-      MySQL data (`sample/hotel`'s `hu_*` tables) into hotel-core's schema
-      yet. §657 sets one hard requirement this script must satisfy: it has
-      to set `checkin_success`/`checkin_sent` and `quiz_answered`/`quiz_sent`
-      **together**, true for anything already completed under the legacy
-      system and false for anything not yet done — never one flag without
-      its matching pair, or a completed guest gets a redundant "please
-      check in" email while an incomplete one's dead legacy link quietly
-      starts working again (the scheduler's own catch-up re-sends it, no
-      separate cutover mechanism needed).
 - [ ] **Verify `hotel-core`'s guest-email scheduler on the live stack** —
       plan.md §651, §652. Everything is proven against a real database in CI:
       the offset math, the flow/active-flag gating, and "a failed send
