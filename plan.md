@@ -30472,3 +30472,64 @@ request still 401 through the proxy, `/agent` answering with its explicit 404,
 and units listed through the proxy. Screenshotted in both themes. 1191 backend
 tests; both images build; a `hotel-admin` CI job builds the bundle and diffs
 the theme against the dashboard's.
+
+## 641. Implemented: `hotel-core`'s guest check-in endpoints
+
+The next slice of the `check-in` build: `GET /checkin/:token` and
+`POST /checkin/:token`, unauthenticated by design — the guest's own
+unguessable `reservations.token` (already a v4 uuid, §638) *is* the
+authorisation, the same as `/agent`'s bearer token is for the property agent.
+Not reachable from outside the container yet: no hostname proxies to them,
+since that is the `check-in` app itself, still to be built (services.ts
+already earmarks it as a public `additionalExposures` entry once it exists).
+A wrong token and a right token for a unit with check-in switched off return
+the identical 404, so a disabled flow cannot be distinguished from a bad link.
+
+**Field scope was cut to what the write-back path actually reads**, not the
+full `guests`/`guest_extras` schema. `ingest.ts`'s `toPendingCheckin` only
+ever forwards `firstName`, `lastName`, `email`, `documentType`,
+`documentNumber`, `documentCountry`, `nationality`, `birthDate`,
+`addressLine1`, `postalCode`, `city`, `country` for the guest, and `firstName`,
+`lastName`, `documentNumber`, `ageGroup` for each extra — collecting
+`documentCheck`/`documentIssued`/`documentExpires`/`documentPlace`/
+`documentIssuer`/`gender`/`birthPlace`/`taxNumber`/`phone` from the guest form
+would sit in Postgres forever with nothing downstream ever reading it. Extras
+are capped server-side at `adults + children + babies - 1` (the primary guest
+fills one adult slot) — an occupant count the guest cannot inflate, since it
+comes from the reservation Wintouch sent, not from the request body.
+
+**A bug found while wiring this up, not by inspection**: `/agent/reservations`
+already deleted and re-inserted every reservation's `guest_extras` on *every*
+sync tick, with no guard at all — the comment above it even says "Wintouch is
+the source while the guest has not checked in," but nothing enforced that.
+Once this endpoint could write real occupants, the very next agent tick would
+have wiped them, silently, the identical failure mode §620 found in the
+legacy's guest sync (fixed there with the `has_changes` guard) but never
+ported to the extras path. Fixed the same way: the reservation upsert now
+returns `checkin_success`, and the wholesale replace is skipped once it is
+true. Covered by a regression test that runs a real `/agent/reservations`
+sync after a check-in submission and asserts the guest's occupant survives.
+
+Submitting always sets `checkin_notified = false` alongside
+`checkin_success = true`, regardless of prior state — a correction made after
+the agent already wrote the first submission to Wintouch must go back out
+again, not silently stay stale.
+
+Three small helpers (`text`/`int`/`date`, and `inTransaction`) moved out of
+`ingest.ts` into a new `util.ts` so this route could reuse them rather than
+copy them a second time; `units.ts`'s `UUID` regex and `param()` helper moved
+the same way.
+
+### Verification
+
+28 backend tests (7 new, one of them the extras-survives-resync regression)
+against a real `postgres:17-alpine` via a throwaway `docker run` — this
+package has no CI-independent way to run its tests, since there is no Node on
+the host. `npm run typecheck` and `npm run build` also pass. Not yet run on
+`beta`: there is nothing to reach it with until the `check-in` app exists.
+
+Also deleted the now-stale README item asking to move hotel's reservation
+tokens to v4 uuids — `reservations.token uuid ... DEFAULT gen_random_uuid()`
+already landed with the schema in §638, and a test (`a reservation token is a
+random v4, not a guessable id`) has asserted it since. The item pre-dated the
+schema build and was never removed once it shipped.

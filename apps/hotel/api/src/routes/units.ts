@@ -2,12 +2,12 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { requireAdmin, requireIdentity } from '../auth';
 import { CODE_TTL_MINUTES, generateEnrolmentCode, hash } from '../tokens';
+import { UUID } from '../util';
 
-const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const UNIQUE_VIOLATION = '23505';
 
 /** Express 5 types every param as `string | string[]`; none of these repeat. */
-function param(value: string | string[] | undefined): string {
+export function param(value: string | string[] | undefined): string {
   return Array.isArray(value) ? (value[0] ?? '') : (value ?? '');
 }
 

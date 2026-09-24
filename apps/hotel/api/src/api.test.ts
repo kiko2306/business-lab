@@ -63,6 +63,7 @@ after(async () => {
 beforeEach(async () => {
   if (skip) return;
   await pool.query('DELETE FROM units');
+  await pool.query('DELETE FROM guests');
   await pool.query('DELETE FROM agents');
   await pool.query('DELETE FROM enrolment_codes');
 });
@@ -373,4 +374,121 @@ test('an oversized batch is refused rather than absorbed', { skip }, async () =>
   const huge = Array.from({ length: 1001 }, (_, i) => ({ code: `U${i}`, name: 'x' }));
   assert.equal((await call('POST', '/agent/units', { token, body: huge })).status, 400);
   assert.equal((await call('POST', '/agent/units', { token, body: { not: 'an array' } })).status, 400);
+});
+
+/** A unit with check-in switched on, a guest, and a reservation for them. */
+async function seedCheckinReservation(opts: { checkinActive?: boolean; guest?: boolean } = {}) {
+  const unitId = await seedUnit('A', 'Alpha');
+  if (opts.checkinActive !== false) {
+    await pool.query(`UPDATE units SET checkin_is_active = true WHERE id = $1`, [unitId]);
+  }
+  let guestId: string | null = null;
+  if (opts.guest !== false) {
+    const guest = await pool.query(
+      `INSERT INTO guests (code, first_name, last_name) VALUES ('G1', 'Ana', 'Old') RETURNING id`
+    );
+    guestId = guest.rows[0].id;
+  }
+  const reservation = await pool.query(
+    `INSERT INTO reservations (unit_id, number, line, guest_id, adults, children, babies, checkin_on, checkout_on, status)
+     VALUES ($1, '1', 1, $2, 2, 1, 0, '2026-01-01', '2026-01-03', 'RESERVED') RETURNING id, token`,
+    [unitId, guestId]
+  );
+  return { reservationId: reservation.rows[0].id, token: reservation.rows[0].token, guestId };
+}
+
+test('a check-in link 404s for a bad token, and for a unit with the flow off', { skip }, async () => {
+  assert.equal((await call('GET', '/checkin/not-a-token')).status, 404);
+
+  const { token } = await seedCheckinReservation({ checkinActive: false });
+  assert.equal((await call('GET', `/checkin/${token}`)).status, 404);
+});
+
+test('a check-in link shows the reservation, prefilled with the guest on file', { skip }, async () => {
+  const { token } = await seedCheckinReservation();
+  const res = await call('GET', `/checkin/${token}`);
+  assert.equal(res.status, 200);
+  assert.equal(res.body.occupants.adults, 2);
+  assert.equal(res.body.guest.firstName, 'Ana');
+  assert.equal(res.body.submitted, false);
+});
+
+test('submitting a check-in updates the guest, stores occupants, and reopens the write-back', { skip }, async () => {
+  const { token, guestId, reservationId } = await seedCheckinReservation();
+
+  const submit = await call('POST', `/checkin/${token}`, {
+    body: {
+      guest: { firstName: 'Ana', lastName: 'Corrected', documentType: 1, documentNumber: 'X123' },
+      extras: [
+        { firstName: 'Bruno', lastName: 'Child', ageGroup: 1 },
+        { firstName: 'Extra', lastName: 'Ignored', ageGroup: 1 },
+      ],
+    },
+  });
+  assert.equal(submit.status, 200);
+  assert.equal(submit.body.submitted, true);
+  // adults(2) + children(1) + babies(0) - 1 for the primary guest = 2 slots,
+  // so the second extra is kept and only a third would be dropped.
+  assert.equal(submit.body.extras.length, 2);
+
+  const { rows } = await pool.query(`SELECT last_name, has_changes FROM guests WHERE id = $1`, [guestId]);
+  assert.equal(rows[0].last_name, 'Corrected');
+  assert.equal(rows[0].has_changes, true);
+  const res = await pool.query(
+    `SELECT checkin_success, checkin_notified FROM reservations WHERE id = $1`,
+    [reservationId]
+  );
+  assert.deepEqual(res.rows[0], { checkin_success: true, checkin_notified: false });
+});
+
+test('a check-in submission is refused when the reservation has no guest yet', { skip }, async () => {
+  const { token } = await seedCheckinReservation({ guest: false });
+  const res = await call('POST', `/checkin/${token}`, { body: { guest: {}, extras: [] } });
+  assert.equal(res.status, 409);
+});
+
+test('resubmitting after the agent already wrote back reopens the write-back', { skip }, async () => {
+  const { token, reservationId } = await seedCheckinReservation();
+  const agentToken = await enrolAgent();
+
+  await call('POST', `/checkin/${token}`, { body: { guest: { firstName: 'Ana' }, extras: [] } });
+  const pending = await call('GET', '/agent/checkins/pending', { token: agentToken });
+  await call('POST', `/agent/checkins/${pending.body[0].token}/ack`, { token: agentToken, body: { ok: true } });
+  assert.equal(
+    (await pool.query(`SELECT checkin_notified FROM reservations WHERE id = $1`, [reservationId])).rows[0]
+      .checkin_notified,
+    true
+  );
+
+  await call('POST', `/checkin/${token}`, { body: { guest: { firstName: 'Ana', lastName: 'Fixed' }, extras: [] } });
+  assert.equal(
+    (await pool.query(`SELECT checkin_notified FROM reservations WHERE id = $1`, [reservationId])).rows[0]
+      .checkin_notified,
+    false
+  );
+});
+
+test('a Wintouch re-sync after check-in does not wipe the occupants the guest entered', { skip }, async () => {
+  // The bug this closes: /agent/reservations replaced guest_extras wholesale
+  // on every tick with no regard for checkin_success, so a completed
+  // check-in's occupants were deleted by the agent's own next sync.
+  const { token } = await seedCheckinReservation();
+  await call('POST', `/checkin/${token}`, {
+    body: { guest: { firstName: 'Ana' }, extras: [{ firstName: 'Bruno', ageGroup: 1 }] },
+  });
+
+  const agentToken = await enrolAgent();
+  await call('POST', '/agent/units', { token: agentToken, body: [{ code: 'A', name: 'Alpha' }] });
+  await call('POST', '/agent/reservations', {
+    token: agentToken,
+    body: [{
+      unitCode: 'A', number: '1', line: 1, adults: 2, children: 1, babies: 0,
+      checkin: '2026-01-01', checkout: '2026-01-03', status: 'RESERVED',
+      extras: [{ code: 'STALE', firstName: 'Wintouch', ageGroup: 0 }],
+    }],
+  });
+
+  const after = await call('GET', `/checkin/${token}`);
+  assert.equal(after.body.extras.length, 1);
+  assert.equal(after.body.extras[0].firstName, 'Bruno');
 });

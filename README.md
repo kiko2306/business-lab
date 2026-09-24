@@ -426,13 +426,6 @@ before anything is built.
       `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
       the public ones do not, the app's bypass path still answers
       unauthenticated, and Authelia restarts cleanly rather than crash-looping.
-- [ ] **Use random (v4) identifiers for `check-in` and `pulse` links** —
-      plan.md §628. Those guest pages are wholly public, so the uuid in
-      `/checkin/:uuid` *is* the authorisation, and it only holds if it cannot
-      be guessed. `tally` is done (`gen_random_uuid()`, asserted in its tests);
-      this is the hotel side, where the legacy used Laravel uuids and
-      `tally`'s own `storeClass.js` used **uuid v1** — a timestamp plus a MAC
-      address.
 - [ ] **Sync the shared theme into `check-in` and `pulse` when they exist** —
       the mechanism is built and proven for `tally` (plan.md §633):
       `scripts/sync-app-theme.sh` copies `frontend/src/styles.css` into each

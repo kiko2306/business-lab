@@ -1,6 +1,7 @@
 import { Router } from 'express';
-import type { Pool, PoolClient } from 'pg';
+import type { Pool } from 'pg';
 import { requireAgent } from '../auth';
+import { date, inTransaction, int, text } from '../util';
 
 /**
  * What the property agent pushes in, and pulls back out (plan.md §620, §627).
@@ -166,7 +167,7 @@ export function ingestRoutes(pool: Pool): Router {
              status = EXCLUDED.status,
              channel = EXCLUDED.channel,
              updated_at = now()
-           RETURNING id`,
+           RETURNING id, checkin_success`,
           [
             unit.rows[0].id, number, line, guest?.rows[0]?.id ?? null,
             text(r.roomCode), text(r.roomName),
@@ -178,8 +179,10 @@ export function ingestRoutes(pool: Pool): Router {
 
         // Extras are replaced wholesale for this reservation: Wintouch is the
         // source while the guest has not checked in, and a diff would leave a
-        // removed occupant behind.
-        if (Array.isArray(r.extras)) {
+        // removed occupant behind. Once checked in, the guest's own submission
+        // is the source instead — the same has_changes guard as guests above,
+        // just not caught until the check-in endpoint made it observable.
+        if (Array.isArray(r.extras) && !saved_.rows[0].checkin_success) {
           await client.query(`DELETE FROM guest_extras WHERE reservation_id = $1`, [saved_.rows[0].id]);
           for (const e of r.extras as Record<string, unknown>[]) {
             await client.query(
@@ -264,30 +267,6 @@ export function ingestRoutes(pool: Pool): Router {
 
   return router;
 }
-
-async function inTransaction(pool: Pool, work: (client: PoolClient) => Promise<void>): Promise<void> {
-  const client = await pool.connect();
-  try {
-    await client.query('BEGIN');
-    await work(client);
-    await client.query('COMMIT');
-  } catch (err) {
-    await client.query('ROLLBACK');
-    throw err;
-  } finally {
-    client.release();
-  }
-}
-
-const text = (v: unknown): string | null => (typeof v === 'string' && v.trim() !== '' ? v.trim() : null);
-const int = (v: unknown): number | null => (Number.isInteger(v) ? (v as number) : null);
-/** Wintouch sends 1900-01-01 for "unknown"; storing it as a real date implies knowledge. */
-const date = (v: unknown): string | null => {
-  const s = text(v);
-  if (!s) return null;
-  const iso = s.slice(0, 10);
-  return /^\d{4}-\d{2}-\d{2}$/.test(iso) && iso !== '1900-01-01' ? iso : null;
-};
 
 function toPendingCheckin(r: Record<string, unknown>) {
   return {

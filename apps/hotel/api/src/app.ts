@@ -1,6 +1,7 @@
 import express, { type Express, type NextFunction, type Request, type Response } from 'express';
 import type { Pool } from 'pg';
 import { agentRoutes } from './routes/agent';
+import { checkinRoutes } from './routes/checkin';
 import { unitRoutes } from './routes/units';
 
 /** Split from index.ts so tests build an app without starting a listener. */
@@ -20,9 +21,12 @@ export function createApp(pool: Pool): Express {
   });
 
   // Authelia bypasses /agent (§628, §637); /api is gated by it and checks the
-  // forwarded identity here as well.
+  // forwarded identity here as well. /checkin has no gate at all — it is the
+  // guest's own unguessable link, not something Authelia is ever asked about
+  // (mounted here ahead of the `check-in` app that will proxy to it).
   app.use('/agent', agentRoutes(pool));
   app.use('/api', unitRoutes(pool));
+  app.use('/checkin', checkinRoutes(pool));
 
   // Express 5 awaits async handlers and forwards rejections here. On 4 an
   // async throw becomes an unhandled rejection and the request hangs.
