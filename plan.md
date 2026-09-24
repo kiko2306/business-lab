@@ -32207,3 +32207,19 @@ Verified: backend typecheck and all 1226 tests. **Not verified on the box:** the
 classic builder against `apps/tally/Dockerfile` (multi-stage, .NET SDK stage) —
 README TODO. Expect the first rebuild to take several minutes (SDK image pull +
 `ng build`).
+
+### §673 follow-up: the fix was deployed but tally was not in the update
+
+On `beta` after pulling 0.150.2, tally was still on the 09:20 image. Self-update
+only recreates apps whose `apps/<name>/**` changed since the last deploy
+(§449), and 0.150.2 touched only the backend — so the rebuild step was never
+reached for tally. (The earlier update that *did* change tally ran on the old
+backend, which could not build; and a manual stop/start does not build either.)
+Forced the normal way, per the compose file's own convention: bumped the
+"last checked" date in `apps/tally/docker-compose.yml`, so tally is in the next
+update's diff and gets the rebuild.
+
+Also confirmed the "webmaster only" requirement is already met, no code change:
+Authelia's `admins` group is given only to a webmaster (`autheliaSync.ts`), and
+tally's `requireAdmin`/`isAdmin` keys on it, on both the API route and the UI
+card. Said so in a comment on `readIdentity` so it does not read as "any admin".

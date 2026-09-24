@@ -44,6 +44,10 @@ export function readIdentity(req: Request): Identity | null {
     .split(',')
     .map((g) => g.trim())
     .filter(Boolean);
+  // Authelia's `admins` group is given only to a dashboard webmaster
+  // (autheliaSync.ts) — dashboard "admin" accounts do not get it — so "admin"
+  // here means webmaster: Tally's administration, including the agent
+  // download (§670), is webmaster-only.
   return { user, groups, isAdmin: groups.includes('admins') };
 }
 
