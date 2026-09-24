@@ -463,7 +463,8 @@ before anything is built.
       recreated. The first build is slow (SDK image pull, `npm ci`, `ng build`,
       .NET publish) and runs under the classic builder — if it fails with a
       buildx/403 error, that is §290 again. Then the Tally page's **Download
-      setup** card must appear for an admin. Tally's and hotel's build contexts moved
+      setup** card must appear for an admin. The shops page must no longer show "Email
+      settings" (§676), and `tally-db` must have no `smtp_settings` table. Tally's and hotel's build contexts moved
       (`apps/tally/app`, `apps/hotel/api`) so the unreadable `data/db` is no
       longer inside them — if `hotel` is installed, its update must rebuild
       `hotel-core` too rather than fail with "can't stat".

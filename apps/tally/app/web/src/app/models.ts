@@ -21,18 +21,6 @@ export interface Identity {
   isAdmin: boolean;
 }
 
-/** Tally's own SMTP sender (plan.md §648). The password is never returned. */
-export interface SmtpSettings {
-  configured: boolean;
-  host: string;
-  port: number;
-  encryption: 'tls' | 'ssl' | 'none';
-  username: string;
-  passwordConfigured: boolean;
-  fromAddress: string;
-  fromName: string;
-}
-
 /**
  * The shop-floor payloads.
  *

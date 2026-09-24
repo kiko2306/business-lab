@@ -6,7 +6,6 @@ import type { AgentHub } from './agentHub';
 import { agentPackageRoutes } from './routes/agentPackage';
 import { agentRoutes } from './routes/agent';
 import { shopRoutes } from './routes/shop';
-import { smtpRoutes } from './routes/smtp';
 import { storeRoutes } from './routes/stores';
 
 /**
@@ -34,7 +33,6 @@ export function createApp(pool: Pool, hub: AgentHub): Express {
   app.use('/agent', agentRoutes(pool));
   app.use('/api', storeRoutes(pool, hub));
   app.use('/api', shopRoutes(pool, hub));
-  app.use('/api', smtpRoutes(pool));
   app.use('/api', agentPackageRoutes(process.env.AGENT_DIST ?? path.join(__dirname, 'agent')));
 
   // The built Angular bundle, served by this same process on this same origin

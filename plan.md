@@ -32311,3 +32311,20 @@ latest named in the tooltip / Manage text). To colour a viewer's list too,
 current version is unknown (development builds, or before the request returns).
 39 API tests (the old "viewer gets 403 on the version" assertion inverted) and
 the Angular build pass; not looked at in a browser.
+
+## 676. Removed: Tally's email settings (§648) — it sends no email
+
+Tally will send no mail, so its own SMTP sender is gone: the **Email settings**
+card, `GET|PUT /api/smtp` and `/api/smtp/test`, `smtpSettings.ts`, the frontend
+service/model bits, the `nodemailer` and `@types/nodemailer` dependencies (and
+their lockfile entries) and the tests. The schema goes the same way: `002_smtp.sql`
+is deleted (a fresh database never creates the table) and `004_drop_smtp.sql`
+runs `DROP TABLE IF EXISTS smtp_settings` so an existing database also loses the
+table and the SMTP password stored in it. (Migrations re-run on every boot, so
+the drop is idempotent and 002 must not still exist to re-create what 004
+drops.) Hotel's own mailer is a separate app and untouched.
+
+Verified: 35 API tests against a real Postgres that *already had* an
+`smtp_settings` row — the table is gone after `migrate`, and the schema test's
+table list no longer contains it; Angular build passes. Not looked at in a
+browser.

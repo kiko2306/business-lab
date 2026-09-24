@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AgentPackage, EnrolmentCode, Identity, Overview, SmtpSettings, SoldItemsView, Store, TablesView } from './models';
+import { AgentPackage, EnrolmentCode, Identity, Overview, SoldItemsView, Store, TablesView } from './models';
 
 /**
  * Same-origin throughout: the API serves this bundle (plan.md §632), so there
@@ -68,17 +68,5 @@ export class ApiService {
 
   agentPackage(): Observable<AgentPackage> {
     return this.http.get<AgentPackage>('/api/agent-package');
-  }
-
-  getSmtp(): Observable<SmtpSettings> {
-    return this.http.get<SmtpSettings>('/api/smtp');
-  }
-
-  saveSmtp(settings: Omit<SmtpSettings, 'configured' | 'passwordConfigured'> & { password?: string }): Observable<SmtpSettings> {
-    return this.http.put<SmtpSettings>('/api/smtp', settings);
-  }
-
-  testSmtp(): Observable<{ success: boolean; message: string }> {
-    return this.http.post<{ success: boolean; message: string }>('/api/smtp/test', {});
   }
 }
