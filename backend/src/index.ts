@@ -31,6 +31,7 @@ import {
   ensureAuditLogsIndex,
 } from './utils/database';
 import { ensureAlertCategoryTopics } from './utils/alertNotify';
+import { ensureAiApiKeyMigration } from './utils/aiSettings';
 import authMiddleware from './middleware/auth';
 import setupModeMiddleware from './middleware/setupMode';
 import { requireCapability } from './middleware/requireCapability';
@@ -253,6 +254,9 @@ ensureAuditLogsIndex().catch((err: Error) => {
 });
 ensureAlertCategoryTopics().catch((err: Error) => {
   console.error('Unable to ensure alert category topics:', err.message);
+});
+ensureAiApiKeyMigration().catch((err: Error) => {
+  console.error('Unable to ensure AI API key migration:', err.message);
 });
 ensureSocialDraftsTable().catch((err: Error) => {
   console.error('Unable to ensure social_drafts table:', err.message);

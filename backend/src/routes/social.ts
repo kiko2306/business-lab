@@ -1,13 +1,13 @@
 /**
  * Social-media content generation (plan.md §84.3 / §254 P2). Generate a post
- * draft from a prompt with the stored Claude key, then list / edit / delete
- * the drafts. Publishing is a later phase (P3).
+ * draft from a prompt with the AI provider configured for it in Settings,
+ * then list / edit / delete the drafts. Publishing is a later phase (P3).
  */
 
 import { Router, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { schemas, validateBody, validateParams } from '../middleware/validation';
-import { generateSocialPost, ClaudeKeyMissingError } from '../services/claudeGenerate';
+import { generateSocialPost, AiKeyMissingError } from '../services/claudeGenerate';
 import { listDrafts, createDraft, updateDraftContent, deleteDraft } from '../services/socialDrafts';
 import {
   publishDraft,
@@ -19,8 +19,9 @@ import logger from '../utils/logger';
 
 const router = Router();
 
-// Each generate call spends Anthropic tokens, so throttle it — an operator
-// iterating on a prompt clicks a handful of times, not hundreds.
+// Each generate call spends tokens on whichever provider is configured, so
+// throttle it — an operator iterating on a prompt clicks a handful of times,
+// not hundreds.
 const generateLimiter = rateLimit({
   windowMs: 60 * 1000,
   max: 20,
@@ -44,11 +45,11 @@ router.post('/drafts', generateLimiter, validateBody(schemas.socialDraftCreate),
     const draft = await createDraft(req.body.prompt.trim(), content);
     return res.status(201).json({ draft });
   } catch (error) {
-    if (error instanceof ClaudeKeyMissingError) {
+    if (error instanceof AiKeyMissingError) {
       return res.status(400).json({ error: error.message });
     }
     logger.error('Generating a social draft failed', { error: error instanceof Error ? error.message : error });
-    return res.status(502).json({ error: 'Generation failed — check the Claude API key and try again.' });
+    return res.status(502).json({ error: 'Generation failed — check the AI provider key and try again.' });
   }
 });
 

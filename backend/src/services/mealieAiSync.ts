@@ -1,9 +1,11 @@
 /**
- * Wires Mealie's AI recipe parsing to the dashboard's one Claude API key
- * (§123.1 / §238). When importing a recipe from a URL that `recipe-scrapers`
- * can't read cleanly, Mealie falls back to an OpenAI-compatible model; this
- * points that at Anthropic's OpenAI-compat endpoint with the stored key, so
- * the operator never touches Mealie's own settings (§0.2, §0.3).
+ * Wires Mealie's AI recipe parsing to whichever AI provider is configured
+ * for the "mealie_parse" feature in Settings > AI API Keys (§123.1 / §238,
+ * generalized to multi-provider in §610). When importing a recipe from a URL
+ * that `recipe-scrapers` can't read cleanly, Mealie falls back to an
+ * OpenAI-compatible model; this points that at the active provider's
+ * OpenAI-compat endpoint with its stored key, so the operator never touches
+ * Mealie's own settings (§0.2, §0.3).
  *
  * Shape: autheliaSync.ts — resolve Mealie's cross-project
  * base URL, log in as an admin whose password this process owns, drive the
@@ -19,13 +21,14 @@
  *    (`hiddenGeneratedSecrets`, services.ts) the first time it logs in, the
  *    same trick as guacamoleAdminRotate.ts.
  *
- * 2. Anthropic's OpenAI-compat layer ignores `response_format`, and Mealie
- *    calls `chat.completions.parse()` with a schema. Claude usually still
- *    returns schema-shaped JSON because Mealie's prompts spell the schema
- *    out, but a messy page can still fail to parse. That's a known ceiling of
- *    the compat endpoint (Anthropic documents it as test-only), acceptable
- *    on this box; the native API isn't OpenAI-shaped and a real shim is a
- *    bigger lift than the feature is worth here.
+ * 2. Mealie calls `chat.completions.parse()` with a schema, but the
+ *    OpenAI-compat layer of at least one provider (Anthropic, confirmed)
+ *    ignores `response_format`. It usually still returns schema-shaped JSON
+ *    because Mealie's prompts spell the schema out, but a messy page can
+ *    still fail to parse. That's a known ceiling of going through any
+ *    provider's compat endpoint rather than its native API, acceptable on
+ *    this box; a per-provider native-API shim is a bigger lift than the
+ *    feature is worth here.
  *    ponytail: compat endpoint, swap for a native-API shim only if parse
  *    failures actually bite.
  */
@@ -34,7 +37,7 @@ import logger from '../utils/logger';
 import { writeAuditLog } from '../utils/audit';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getHostGatewayIp } from '../utils/network';
-import { getClaudeApiKey } from '../utils/claudeSettings';
+import { getActiveProviderKey, getProviderDefinition } from '../utils/aiSettings';
 import { readAppEnvValue } from './appEnv';
 import {
   mealieChangePassword,
@@ -67,14 +70,12 @@ const SEED_ADMIN_USERNAME = 'admin';
 const RENAMED_SEED_ADMIN_USERNAME = 'mealie-local-admin';
 
 // Name of the provider row this sync owns in Mealie. Matched on to decide
-// create-vs-update; anything else in the group is left alone.
-const MANAGED_PROVIDER_NAME = 'Claude (dashboard-managed)';
-// Recipe parsing is a plain extraction task — Haiku is plenty and ~5x cheaper
-// than Opus per import, which §123.1 flagged as the concern.
-const MEALIE_AI_MODEL = 'claude-haiku-4-5';
-// Anthropic's OpenAI-compatible endpoint. Mealie's OpenAI client appends
-// `/chat/completions`; the trailing slash matches Anthropic's own docs.
-const ANTHROPIC_OPENAI_BASE_URL = 'https://api.anthropic.com/v1/';
+// create-vs-update; anything else in the group is left alone. Fixed
+// regardless of which AI provider actually backs it — switching the
+// "mealie_parse" provider in Settings just overwrites this same row's
+// base_url/api_key/model, rather than juggling one Mealie provider row per
+// provider this feature could ever be pointed at.
+const MANAGED_PROVIDER_NAME = 'AI Provider (dashboard-managed)';
 
 // Compose always sets ${MEALIE_PORT:-10230}; this only covers a parse miss.
 const FALLBACK_PORT = 10230;
@@ -159,11 +160,11 @@ async function freeSeedAdminUsername(baseUrl: string, token: string): Promise<vo
 }
 
 /**
- * Reconcile the managed AI provider against the stored Claude key. No key →
- * turn AI off and drop the provider. Key set → upsert the provider (always a
- * full write: Mealie never echoes `api_key` back, so there's nothing to
- * diff) and make it the group default. No-op for every other service; never
- * throws.
+ * Reconcile the managed AI provider against the "mealie_parse" feature's
+ * active provider/key. No key → turn AI off and drop the provider. Key set →
+ * upsert the provider (always a full write: Mealie never echoes `api_key`
+ * back, so there's nothing to diff) and make it the group default. No-op for
+ * every other service; never throws.
  */
 export async function syncMealieAiProvider(serviceName: string): Promise<void> {
   if (serviceName !== MEALIE_SERVICE) {
@@ -182,17 +183,17 @@ export async function syncMealieAiProvider(serviceName: string): Promise<void> {
 
     await freeSeedAdminUsername(baseUrl, token);
 
-    const key = await getClaudeApiKey();
+    const active = await getActiveProviderKey('mealie_parse');
     const settings = await mealieGetAiSettings(baseUrl, token);
     const existing = settings.providers.find((p) => p.name === MANAGED_PROVIDER_NAME);
 
-    if (!key) {
+    if (!active) {
       if (existing) {
         if (settings.defaultProviderId === existing.id) {
           await mealieSetAiSettings(baseUrl, token, null);
         }
         await mealieDeleteAiProvider(baseUrl, token, existing.id);
-        logger.info('Mealie AI sync: Claude key cleared — disabled AI parsing and removed the managed provider');
+        logger.info('Mealie AI sync: AI provider key cleared — disabled AI parsing and removed the managed provider');
         await writeAuditLog({
           userId: null,
           action: 'settings_change',
@@ -203,11 +204,12 @@ export async function syncMealieAiProvider(serviceName: string): Promise<void> {
       return;
     }
 
+    const definition = getProviderDefinition(active.provider);
     const body: MealieAiProviderInput = {
       name: MANAGED_PROVIDER_NAME,
-      base_url: ANTHROPIC_OPENAI_BASE_URL,
-      api_key: key,
-      model: MEALIE_AI_MODEL,
+      base_url: definition.openAiCompatBaseUrl,
+      api_key: active.key,
+      model: definition.parseModel,
     };
 
     let providerId: string;
@@ -221,7 +223,7 @@ export async function syncMealieAiProvider(serviceName: string): Promise<void> {
     if (settings.defaultProviderId !== providerId) {
       await mealieSetAiSettings(baseUrl, token, providerId);
     }
-    logger.info('Mealie AI sync: managed Claude provider is in place and set as the group default');
+    logger.info(`Mealie AI sync: managed ${definition.label} provider is in place and set as the group default`);
     await writeAuditLog({
       userId: null,
       action: 'settings_change',

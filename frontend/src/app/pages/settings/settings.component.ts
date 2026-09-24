@@ -10,7 +10,9 @@ import {
   GeneralSettings,
   AlertNotifySettings,
   AlertCategory,
-  ClaudeKeySettings,
+  AiFeature,
+  AiKeysSettings,
+  AiProviderId,
   DeploymentStatus,
 } from '../../core/models';
 import { SettingsService } from '../../core/settings.service';
@@ -83,14 +85,17 @@ export class SettingsComponent implements OnInit {
   protected testingMail = false;
   protected mailFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
   protected mailTestResult: MailTestResponse | null = null;
-  protected claudeKey: ClaudeKeySettings | null = null;
-  protected claudeKeyLoading = true;
-  protected savingClaudeKey = false;
-  protected testingClaudeKey = false;
-  // Editable copy of the key; only sent on Save, and never populated from the
-  // server (which only ever returns a mask).
-  protected claudeKeyDraft = '';
-  protected claudeKeyFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  protected aiKeys: AiKeysSettings | null = null;
+  protected aiKeysLoading = true;
+  protected savingAiKeyProvider: AiProviderId | null = null;
+  protected testingAiKeyProvider: AiProviderId | null = null;
+  protected savingFeatureProvider: AiFeature | null = null;
+  // Editable copy of each provider's key; only sent on Save, and never
+  // populated from the server (which only ever returns a mask).
+  protected aiKeyDrafts: Partial<Record<AiProviderId, string>> = {};
+  protected aiKeyRowFeedback: Partial<Record<AiProviderId, { type: 'success' | 'danger' | 'info'; message: string }>> = {};
+  protected aiKeysFeedback: { type: 'success' | 'danger' | 'info'; message: string } | null = null;
+  protected readonly aiFeatures: { key: AiFeature }[] = [{ key: 'social_generate' }, { key: 'mealie_parse' }];
   protected alertSettings: AlertNotifySettings | null = null;
   protected alertsLoading = true;
   protected savingAlerts = false;
@@ -114,7 +119,7 @@ export class SettingsComponent implements OnInit {
     this.loadGeneralSettings();
     this.loadMailSettings();
     this.loadAlertSettings();
-    this.loadClaudeKey();
+    this.loadAiKeys();
   }
 
   private loadDeployment(): void {
@@ -129,64 +134,95 @@ export class SettingsComponent implements OnInit {
       });
   }
 
-  private loadClaudeKey(): void {
-    this.claudeKeyLoading = true;
+  private loadAiKeys(): void {
+    this.aiKeysLoading = true;
     this.settingsService
-      .loadClaudeKey()
-      .pipe(finalize(() => (this.claudeKeyLoading = false)))
+      .loadAiKeys()
+      .pipe(finalize(() => (this.aiKeysLoading = false)))
       .subscribe({
-        next: (settings) => (this.claudeKey = settings),
+        next: (settings) => (this.aiKeys = settings),
         error: (error) =>
-          (this.claudeKeyFeedback = {
+          (this.aiKeysFeedback = {
             type: 'danger',
-            message: extractErrorMessage(error, this.translate.t('settings.errors.loadClaudeKey')),
+            message: extractErrorMessage(error, this.translate.t('settings.errors.loadAiKeys')),
           }),
       });
   }
 
-  saveClaudeKey(): void {
-    const key = this.claudeKeyDraft.trim();
+  protected providerState(provider: AiProviderId) {
+    return this.aiKeys?.providers.find((p) => p.provider === provider);
+  }
+
+  saveAiKey(provider: AiProviderId): void {
+    const key = (this.aiKeyDrafts[provider] ?? '').trim();
     if (!key) {
-      this.claudeKeyFeedback = { type: 'info', message: this.translate.t('settings.validation.enterKeyToSave') };
+      this.aiKeyRowFeedback[provider] = { type: 'info', message: this.translate.t('settings.validation.enterKeyToSave') };
       return;
     }
-    this.savingClaudeKey = true;
+    this.savingAiKeyProvider = provider;
     this.settingsService
-      .saveClaudeKey(key)
-      .pipe(finalize(() => (this.savingClaudeKey = false)))
+      .saveAiKey(provider, key)
+      .pipe(finalize(() => (this.savingAiKeyProvider = null)))
       .subscribe({
-        next: (settings) => {
-          this.claudeKey = settings;
-          this.claudeKeyDraft = '';
-          this.claudeKeyFeedback = { type: 'success', message: settings.message ?? this.translate.t('settings.toast.claudeKeySaved') };
-          this.toastService.success(this.translate.t('settings.toast.claudeKeySaved'));
+        next: (result) => {
+          if (this.aiKeys) {
+            this.aiKeys = {
+              ...this.aiKeys,
+              providers: this.aiKeys.providers.map((p) =>
+                p.provider === provider ? { ...p, configured: result.configured, keyMasked: result.keyMasked } : p
+              ),
+            };
+          }
+          this.aiKeyDrafts[provider] = '';
+          this.aiKeyRowFeedback[provider] = {
+            type: 'success',
+            message: result.message ?? this.translate.t('settings.toast.aiKeySaved'),
+          };
+          this.toastService.success(this.translate.t('settings.toast.aiKeySaved'));
         },
         error: (error) =>
-          (this.claudeKeyFeedback = {
+          (this.aiKeyRowFeedback[provider] = {
             type: 'danger',
-            message: extractErrorMessage(error, this.translate.t('settings.errors.saveClaudeKey')),
+            message: extractErrorMessage(error, this.translate.t('settings.errors.saveAiKey')),
           }),
       });
   }
 
-  testClaudeKey(): void {
-    const key = this.claudeKeyDraft.trim();
-    if (!key && !this.claudeKey?.configured) {
-      this.claudeKeyFeedback = { type: 'info', message: this.translate.t('settings.validation.saveKeyFirstOrEnter') };
+  testAiKey(provider: AiProviderId): void {
+    const key = (this.aiKeyDrafts[provider] ?? '').trim();
+    if (!key && !this.providerState(provider)?.configured) {
+      this.aiKeyRowFeedback[provider] = { type: 'info', message: this.translate.t('settings.validation.saveKeyFirstOrEnter') };
       return;
     }
-    this.testingClaudeKey = true;
+    this.testingAiKeyProvider = provider;
     this.settingsService
-      .testClaudeKey(key || undefined)
-      .pipe(finalize(() => (this.testingClaudeKey = false)))
+      .testAiKey(provider, key || undefined)
+      .pipe(finalize(() => (this.testingAiKeyProvider = null)))
       .subscribe({
         next: (result) =>
-          (this.claudeKeyFeedback = { type: result.success ? 'success' : 'danger', message: result.message }),
+          (this.aiKeyRowFeedback[provider] = { type: result.success ? 'success' : 'danger', message: result.message }),
         error: (error) =>
-          (this.claudeKeyFeedback = {
+          (this.aiKeyRowFeedback[provider] = {
             type: 'danger',
-            message: extractErrorMessage(error, this.translate.t('settings.errors.testClaudeKey')),
+            message: extractErrorMessage(error, this.translate.t('settings.errors.testAiKey')),
           }),
+      });
+  }
+
+  saveFeatureProvider(feature: AiFeature, provider: AiProviderId): void {
+    this.savingFeatureProvider = feature;
+    this.settingsService
+      .saveAiFeatureProvider(feature, provider)
+      .pipe(finalize(() => (this.savingFeatureProvider = null)))
+      .subscribe({
+        next: () => {
+          if (this.aiKeys) {
+            this.aiKeys = { ...this.aiKeys, features: { ...this.aiKeys.features, [feature]: provider } };
+          }
+          this.toastService.success(this.translate.t('settings.toast.aiFeatureProviderSaved'));
+        },
+        error: (error) =>
+          this.toastService.error(extractErrorMessage(error, this.translate.t('settings.errors.saveAiFeatureProvider'))),
       });
   }
 

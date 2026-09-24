@@ -329,56 +329,99 @@
 </app-panel>
 
 <app-panel
-  key="settings:claude-key"
-  [title]="'settings.claudeKey.title' | t"
-  [subtitle]="'settings.claudeKey.subtitle' | t"
+  key="settings:ai-keys"
+  [title]="'settings.aiKeys.title' | t"
+  [subtitle]="'settings.aiKeys.subtitle' | t"
 >
   <p class="text-body-secondary small mb-3">
-    {{ 'settings.claudeKey.descriptionPrefix' | t }}
-    <span class="text-body">console.anthropic.com → API keys</span>{{ 'settings.claudeKey.descriptionSuffix' | t }}
+    {{ 'settings.aiKeys.description' | t }}
   </p>
 
-  <div *ngIf="claudeKeyLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
+  <div *ngIf="aiKeysLoading" class="text-body-secondary small">{{ 'common.loading' | t }}</div>
 
-  <form *ngIf="!claudeKeyLoading" (ngSubmit)="saveClaudeKey()" class="row g-3">
-    <div class="col-12 col-md-8">
-      <label class="form-label fw-semibold" for="claudeApiKey">{{ 'settings.claudeKey.apiKeyLabel' | t }}</label>
-      <input
-        id="claudeApiKey"
-        type="password"
-        class="form-control"
-        autocomplete="off"
-        [(ngModel)]="claudeKeyDraft"
-        [ngModelOptions]="{ standalone: true }"
-        [placeholder]="claudeKey?.configured ? (claudeKey?.keyMasked ?? ('settings.claudeKey.placeholderConfigured' | t)) : 'sk-ant-…'"
-      />
+  <div *ngIf="!aiKeysLoading && aiKeys" class="row g-3">
+    <div class="col-12" *ngFor="let providerState of aiKeys.providers">
+      <label class="form-label fw-semibold mb-1" [for]="'aiKey-' + providerState.provider">
+        {{ ('settings.aiKeys.provider.' + providerState.provider) | t }}
+      </label>
+      <div class="input-group">
+        <input
+          [id]="'aiKey-' + providerState.provider"
+          type="password"
+          class="form-control"
+          autocomplete="off"
+          [ngModel]="aiKeyDrafts[providerState.provider] ?? ''"
+          (ngModelChange)="aiKeyDrafts[providerState.provider] = $event"
+          [ngModelOptions]="{ standalone: true }"
+          [placeholder]="providerState.configured ? (providerState.keyMasked ?? ('settings.aiKeys.placeholderConfigured' | t)) : ''"
+        />
+        <button
+          type="button"
+          class="btn btn-primary"
+          [disabled]="savingAiKeyProvider === providerState.provider || !(aiKeyDrafts[providerState.provider] ?? '').trim()"
+          (click)="saveAiKey(providerState.provider)"
+        >
+          {{ (savingAiKeyProvider === providerState.provider ? 'common.saving' : 'settings.aiKeys.saveButton') | t }}
+        </button>
+        <button
+          type="button"
+          class="btn btn-outline-secondary"
+          [disabled]="testingAiKeyProvider === providerState.provider || (!(aiKeyDrafts[providerState.provider] ?? '').trim() && !providerState.configured)"
+          (click)="testAiKey(providerState.provider)"
+        >
+          {{ (testingAiKeyProvider === providerState.provider ? 'common.testing' : 'settings.aiKeys.testButton') | t }}
+        </button>
+      </div>
+      <p class="form-text mb-0" *ngIf="aiKeyRowFeedback[providerState.provider] as feedback">
+        <span
+          class="small"
+          [ngClass]="{
+            'text-success': feedback.type === 'success',
+            'text-danger': feedback.type === 'danger',
+            'text-body-secondary': feedback.type === 'info'
+          }"
+        >
+          {{ feedback.message }}
+        </span>
+      </p>
     </div>
 
-    <div class="col-12 d-flex align-items-center gap-2 flex-wrap">
-      <button type="submit" class="btn btn-primary" [disabled]="savingClaudeKey || !claudeKeyDraft.trim()">
-        {{ (savingClaudeKey ? 'common.saving' : 'settings.claudeKey.saveButton') | t }}
-      </button>
-      <button
-        type="button"
-        class="btn btn-outline-secondary"
-        [disabled]="testingClaudeKey || (!claudeKeyDraft.trim() && !claudeKey?.configured)"
-        (click)="testClaudeKey()"
-      >
-        {{ (testingClaudeKey ? 'common.testing' : 'settings.claudeKey.testButton') | t }}
-      </button>
+    <div class="col-12 mt-4">
+      <h3 class="h6 mb-2">{{ 'settings.aiKeys.featuresHeading' | t }}</h3>
+      <div class="row g-2">
+        <div class="col-12 col-md-6" *ngFor="let feature of aiFeatures">
+          <label class="form-label small mb-1" [for]="'aiFeature-' + feature.key">
+            {{ ('settings.aiKeys.feature.' + feature.key) | t }}
+          </label>
+          <select
+            [id]="'aiFeature-' + feature.key"
+            class="form-select form-select-sm"
+            [disabled]="savingFeatureProvider === feature.key"
+            [ngModel]="aiKeys.features[feature.key]"
+            (ngModelChange)="saveFeatureProvider(feature.key, $event)"
+            [ngModelOptions]="{ standalone: true }"
+          >
+            <option *ngFor="let providerState of aiKeys.providers" [value]="providerState.provider">
+              {{ ('settings.aiKeys.provider.' + providerState.provider) | t }}
+            </option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="col-12" *ngIf="aiKeysFeedback">
       <span
-        *ngIf="claudeKeyFeedback"
         class="small"
         [ngClass]="{
-          'text-success': claudeKeyFeedback.type === 'success',
-          'text-danger': claudeKeyFeedback.type === 'danger',
-          'text-body-secondary': claudeKeyFeedback.type === 'info'
+          'text-success': aiKeysFeedback.type === 'success',
+          'text-danger': aiKeysFeedback.type === 'danger',
+          'text-body-secondary': aiKeysFeedback.type === 'info'
         }"
       >
-        {{ claudeKeyFeedback.message }}
+        {{ aiKeysFeedback.message }}
       </span>
     </div>
-  </form>
+  </div>
 </app-panel>
 
 </main>

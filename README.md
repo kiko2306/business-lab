@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.146.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.147.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -322,21 +322,22 @@ it is done — not ticked off and left behind. Section references point at
       token/OAuth setup and is scoped only once a specific platform is
       named.
 
-- [ ] **"Claude API key" → multi-provider "AI API Keys"** — plan in
-      plan.md §610. Today it's one Anthropic-only key
-      (`claudeSettings.ts`) used by social-post generation
-      (`claudeGenerate.ts`, native Anthropic SDK) and Mealie's AI recipe
-      parser (`mealieAiSync.ts`, already via Anthropic's OpenAI-compatible
-      endpoint). Plan: a small provider registry seeded with Anthropic,
-      Google Gemini and Groq (both real free tiers, both OpenAI-compatible
-      endpoints), one settings row per provider
-      (`ai_api_key_<provider>`, migrated from `claude_api_key`), a grouped
-      key+Test row per provider in the renamed panel, and a shared
-      OpenAI-compat call helper used by both consumers instead of
-      Anthropic-specific code. §610 flags that this keeps one
-      active-provider-per-feature choice in Settings rather than adding a
-      per-request provider picker — confirm that's the intent before
-      building.
+- [ ] **Beta-test the multi-provider AI API Keys panel (plan.md §662)** —
+      built: Settings → AI API Keys now has one grouped key+Test row each
+      for Anthropic, Google Gemini and Groq, plus which provider powers
+      social-post generation and Mealie AI recipe parsing. Nothing off a
+      dev checkout can prove a real key against each provider's live API,
+      or that Mealie's own AI-provider row actually gets re-pointed there.
+      On `beta`: save a real key for at least one non-Anthropic provider
+      (Gemini or Groq — both have real free tiers) and confirm Test
+      succeeds; switch social-post generation to it and generate a real
+      draft on the Content page; switch Mealie AI recipe parsing to it and
+      confirm Mealie's own AI settings page shows the "AI Provider
+      (dashboard-managed)" row pointed at that provider's endpoint; import
+      a recipe by URL and confirm it still parses. Also confirm an
+      existing Anthropic key from before this change (the old `claude_api_key`
+      row) came through as the Anthropic row's already-configured key with
+      no re-entry needed.
 
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 

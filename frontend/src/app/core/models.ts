@@ -193,14 +193,32 @@ export interface CloudflareTestResponse {
   warning?: string;
 }
 
-/** GET/PUT /settings/claude-key. The key itself is never sent back. */
-export interface ClaudeKeySettings {
+/** One row of GET /settings/ai-keys. The key itself is never sent back. */
+export type AiProviderId = 'anthropic' | 'google' | 'groq';
+
+export interface AiProviderKeyState {
+  provider: AiProviderId;
+  label: string;
+  configured: boolean;
+  keyMasked: string | null;
+}
+
+export type AiFeature = 'social_generate' | 'mealie_parse';
+
+/** GET /settings/ai-keys. */
+export interface AiKeysSettings {
+  providers: AiProviderKeyState[];
+  features: Record<AiFeature, AiProviderId>;
+}
+
+/** PUT /settings/ai-keys/:provider response. */
+export interface AiKeyUpdateResponse {
   configured: boolean;
   keyMasked: string | null;
   message?: string;
 }
 
-export interface ClaudeKeyTestResponse {
+export interface AiKeyTestResponse {
   success: boolean;
   message: string;
 }

@@ -1,43 +1,52 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { generateSocialPost, ClaudeKeyMissingError } from './claudeGenerate';
-import { getClaudeApiKey } from '../utils/claudeSettings';
+import { generateSocialPost, AiKeyMissingError } from './claudeGenerate';
+import { getActiveProviderKey } from '../utils/aiSettings';
+import { callOpenAiCompatChat } from './aiChatCompletion';
 
-vi.mock('../utils/claudeSettings', () => ({ getClaudeApiKey: vi.fn() }));
-
-const createMock = vi.fn();
-vi.mock('@anthropic-ai/sdk', () => ({
-  default: class {
-    messages = { create: createMock };
-  },
+vi.mock('../utils/aiSettings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/aiSettings')>()),
+  getActiveProviderKey: vi.fn(),
 }));
+vi.mock('./aiChatCompletion', () => ({ callOpenAiCompatChat: vi.fn() }));
 
-const mockedGetKey = vi.mocked(getClaudeApiKey);
+const mockedGetKey = vi.mocked(getActiveProviderKey);
+const mockedCallChat = vi.mocked(callOpenAiCompatChat);
 
 beforeEach(() => {
   vi.clearAllMocks();
-  mockedGetKey.mockResolvedValue('sk-ant-test');
+  mockedGetKey.mockResolvedValue({ provider: 'anthropic', key: 'sk-ant-test' });
 });
 
 describe('generateSocialPost', () => {
-  it('throws ClaudeKeyMissingError when no key is stored', async () => {
+  it('throws AiKeyMissingError when the social_generate feature has no active provider key', async () => {
     mockedGetKey.mockResolvedValue(null);
-    await expect(generateSocialPost('hi')).rejects.toBeInstanceOf(ClaudeKeyMissingError);
-    expect(createMock).not.toHaveBeenCalled();
+    await expect(generateSocialPost('hi')).rejects.toBeInstanceOf(AiKeyMissingError);
+    expect(mockedCallChat).not.toHaveBeenCalled();
   });
 
-  it('joins text blocks and trims, ignoring non-text blocks', async () => {
-    createMock.mockResolvedValue({
-      content: [
-        { type: 'thinking', thinking: 'hmm' },
-        { type: 'text', text: '  Ship it. ' },
-        { type: 'text', text: '#launch' },
-      ],
-    });
-    expect(await generateSocialPost('announce the launch')).toBe('Ship it. #launch');
+  it('calls the shared chat-completion helper with the active provider\'s base URL, key and generate model', async () => {
+    mockedCallChat.mockResolvedValue('Ship it. #launch');
+    const text = await generateSocialPost('announce the launch');
+
+    expect(text).toBe('Ship it. #launch');
+    expect(mockedCallChat).toHaveBeenCalledWith(
+      expect.objectContaining({
+        baseUrl: 'https://api.anthropic.com/v1/',
+        apiKey: 'sk-ant-test',
+        model: 'claude-opus-5',
+        userPrompt: 'announce the launch',
+      })
+    );
   });
 
-  it('throws when the response has no text', async () => {
-    createMock.mockResolvedValue({ content: [{ type: 'thinking', thinking: 'x' }] });
-    await expect(generateSocialPost('x')).rejects.toThrow('empty response');
+  it('uses whichever provider the feature is actually configured for', async () => {
+    mockedGetKey.mockResolvedValue({ provider: 'groq', key: 'gsk_test' });
+    mockedCallChat.mockResolvedValue('post');
+
+    await generateSocialPost('x');
+
+    expect(mockedCallChat).toHaveBeenCalledWith(
+      expect.objectContaining({ baseUrl: 'https://api.groq.com/openai/v1/', apiKey: 'gsk_test', model: 'llama-3.3-70b-versatile' })
+    );
   });
 });

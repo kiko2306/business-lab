@@ -2,6 +2,7 @@ import { NextFunction, Request, Response } from 'express';
 import Joi, { ObjectSchema, ValidationError } from 'joi';
 import { CAPABILITIES, ROLES } from '../auth/capabilities';
 import { BACKUP_TARGET_KINDS } from '../utils/backupTarget';
+import { AI_FEATURES, AI_PROVIDER_IDS } from '../utils/aiSettings';
 
 // At least one role, each a known name, no duplicates (plan.md §149).
 const rolesSchema = Joi.array()
@@ -102,15 +103,21 @@ export const schemas = {
   cloudflareAccountModel: Joi.object({
     model: Joi.string().valid('self-controlled', 'contracted').required(),
   }),
-  // Anthropic keys are `sk-ant-…`, ~100+ chars. Bound loosely (like the
-  // Cloudflare token) rather than pattern-matched, so a future key format
-  // isn't rejected by the dashboard.
-  claudeKeyUpdate: Joi.object({
+  // AI provider keys vary in shape across providers (Anthropic's `sk-ant-…`,
+  // Google's, Groq's), so this stays bound loosely, like the Cloudflare
+  // token, rather than pattern-matched to one provider's format.
+  aiProviderIdParam: Joi.object({
+    provider: Joi.string().valid(...AI_PROVIDER_IDS).required(),
+  }),
+  aiKeyUpdate: Joi.object({
     apiKey: Joi.string().trim().min(20).max(4096).required(),
   }),
-
-  claudeKeyTest: Joi.object({
+  aiKeyTest: Joi.object({
     apiKey: Joi.string().trim().min(20).max(4096).allow('').optional(),
+  }),
+  aiFeatureProviderUpdate: Joi.object({
+    feature: Joi.string().valid(...AI_FEATURES).required(),
+    provider: Joi.string().valid(...AI_PROVIDER_IDS).required(),
   }),
   socialDraftCreate: Joi.object({
     prompt: Joi.string().trim().min(1).max(4000).required(),

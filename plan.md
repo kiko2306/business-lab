@@ -31682,3 +31682,113 @@ No `docs/licences.md` row: no new image, `business-lab-backend` is already
 covered. No test file: this is the same category as
 `self-update-watchdog.sh` — a Docker/host-orchestration shell script, not
 parsing/derivation logic `*.test.ts` conventions apply to.
+
+## 662. Implemented: multi-provider "AI API Keys" (closes §610)
+
+Built the design §610 landed on, after confirming the open question with
+the user first: one active provider chosen per feature in Settings, no
+per-request provider picker.
+
+### What moved
+
+`backend/src/utils/claudeSettings.ts` is gone, replaced by
+`backend/src/utils/aiSettings.ts` — a plain `AI_PROVIDERS` registry
+(`anthropic`, `google`, `groq`; each entry: label, OpenAI-compat base URL,
+a `generateModel` and a `parseModel`, since the two features want different
+cost/quality tradeoffs even on the same provider), per-provider key
+get/set/mask keyed `ai_api_key_<provider>`, and two feature-provider
+settings (`ai_provider_social_generate`, `ai_provider_mealie_parse`,
+falling back to `anthropic`). `ensureAiApiKeyMigration()` backfills
+`ai_api_key_anthropic` from the old `claude_api_key` row once, same shape
+as `alertNotify.ts`'s `ensureAlertCategoryTopics` (§609) — wired into
+`index.ts` next to it.
+
+`claudeKeyTest.ts` is gone, replaced by `aiProviderTest.ts`, which
+dispatches per provider rather than pretending they're uniform: Anthropic
+verifies via `x-api-key`/`anthropic-version` headers (unchanged), Google
+Gemini takes the key as a `?key=` query param (its models-list endpoint has
+no header-based auth), Groq is a plain bearer token — all three hit a free
+"list models" call, at no token cost.
+
+New `aiChatCompletion.ts` is the one generic piece the plan called for: a
+single `callOpenAiCompatChat()` posting to `<baseUrl>chat/completions` with
+a bearer token, reused by both consumers. Every provider registered here
+happens to accept a bearer token even on its "native" OpenAI-compat
+endpoint (confirmed for Anthropic by the fact the old Mealie integration
+already worked that way), so there was nothing provider-specific left in
+the actual call once base URL/key/model are known.
+
+`claudeGenerate.ts` (kept its filename — the plan's own text did too, and
+renaming ~5 files for one credential-panel rename isn't what was asked)
+dropped the native `@anthropic-ai/sdk` call for `getActiveProviderKey('social_generate')`
++ `callOpenAiCompatChat()`. `ClaudeKeyMissingError` → `AiKeyMissingError`
+(propagated through `routes/social.ts`). `mealieAiSync.ts` dropped its
+hardcoded `ANTHROPIC_OPENAI_BASE_URL`/`MEALIE_AI_MODEL` for the same two
+calls, keyed off `mealie_parse` instead. The Mealie-side provider row it
+manages is named `AI Provider (dashboard-managed)` now, not
+`Claude (dashboard-managed)` — fixed regardless of which provider actually
+backs it, since switching providers in Settings just overwrites the same
+row's `base_url`/`api_key`/`model` rather than needing one Mealie provider
+row per provider this feature could ever point at.
+
+### Dead dependency removed, not left behind
+
+`@anthropic-ai/sdk` had exactly one caller (`claudeGenerate.ts`'s old
+`messages.create`), now gone. Removed from `backend/package.json` and the
+lockfile regenerated via `docker run --rm -v "$(pwd)":/app -w /app node:20-alpine
+npm install --package-lock-only` (there's no Node on this host — same
+constraint `scripts/check.sh` works around) — 72 lines out, no other
+package touched.
+
+### Routes
+
+`PUT/POST /api/settings/claude-key(/test)` → `PUT/POST
+/api/settings/ai-keys/:provider(/test)`, `:provider` validated against the
+registry via a new `aiProviderIdParam` Joi schema (`validateParams`, not
+previously used in `settings.ts`). New `PUT /api/settings/ai-feature-provider`
+sets which provider backs `social_generate` or `mealie_parse`, and — like
+every key save — fires `syncMealieAiProvider('mealie')` detached when the
+change could affect Mealie's own row. `GET /api/settings/ai-keys` returns
+every provider's `{configured, keyMasked}` plus the two feature selections
+in one call, the same shape `GET /api/settings/alerts` already uses for
+ntfy's four categories.
+
+### Frontend
+
+`ClaudeKeySettings`/`ClaudeKeyTestResponse` → `AiProviderKeyState` (one per
+provider) / `AiKeysSettings` (the array plus the feature map) /
+`AiKeyUpdateResponse` / `AiKeyTestResponse` in `models.ts`.
+`settings.service.ts`'s three Claude methods became four provider-
+parametrized ones. `settings.component.ts`/`.html`: the single Claude-key
+form became a grouped-row list (`*ngFor` over `aiKeys.providers`, one
+key input + Save + Test + per-row feedback each — same layout lesson §609
+already established for ntfy's categories) plus two `<select>`s under
+"Which provider powers each feature," saved individually on change. i18n:
+`settings.claudeKey.*` → `settings.aiKeys.*` in both `en.ts` and `pt-pt.ts`,
+checked for 1:1 key parity between the two files (a Node one-liner diffing
+the key sets — no existing test does this, and writing one for a single
+rename didn't clear the bar).
+
+### Tests
+
+New `aiSettings.test.ts` (registry lookups, migration backfill and its two
+no-op cases, `getActiveProviderKey`'s null-vs-configured branches),
+`aiChatCompletion.test.ts` (request shape, error-detail extraction, empty-
+response and network-failure cases, via a stubbed global `fetch`), and
+`aiProviderTest.test.ts` (all three providers' distinct auth shapes, a
+rejected key, a non-JSON error body) — this last one had no precedent
+either way, since `claudeKeyTest.ts` was never unit tested; mocked `https`
+with a hand-rolled `EventEmitter` standing in for `ClientRequest`/
+`IncomingMessage` rather than reaching for a new dependency for one file's
+worth of raw-https tests. `claudeGenerate.test.ts` and
+`mealieAiSync.test.ts` updated in place (mock `getActiveProviderKey`
+instead of `getClaudeApiKey`), each gaining a case that swaps in a non-
+Anthropic provider and asserts the derived base URL/model actually change.
+No frontend spec existed for `settings.component.ts` before this (still
+none — `ng build` plus the full Karma suite, unaffected, are what verified
+the template compiles and nothing else broke) — a real click-through
+needs `beta`, since nothing here has live provider keys to test against
+(the new README item).
+
+Backend (1224 tests, up from 1195) and frontend (90 tests) both pass;
+`ng build` clean.

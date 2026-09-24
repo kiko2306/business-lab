@@ -15,8 +15,11 @@ vi.mock('../utils/network', () => ({ getHostGatewayIp: vi.fn().mockResolvedValue
 const { readAppEnvValue } = vi.hoisted(() => ({ readAppEnvValue: vi.fn() }));
 vi.mock('./appEnv', () => ({ readAppEnvValue }));
 
-const { getClaudeApiKey } = vi.hoisted(() => ({ getClaudeApiKey: vi.fn() }));
-vi.mock('../utils/claudeSettings', () => ({ getClaudeApiKey }));
+const { getActiveProviderKey } = vi.hoisted(() => ({ getActiveProviderKey: vi.fn() }));
+vi.mock('../utils/aiSettings', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('../utils/aiSettings')>()),
+  getActiveProviderKey,
+}));
 
 const client = vi.hoisted(() => ({
   mealieLogin: vi.fn(),
@@ -66,7 +69,7 @@ describe('syncMealieAiProvider', () => {
   });
 
   it('creates the managed provider and sets it as default when a key is stored', async () => {
-    getClaudeApiKey.mockResolvedValue('sk-ant-abc123');
+    getActiveProviderKey.mockResolvedValue({ provider: 'anthropic', key: 'sk-ant-abc123' });
     await syncMealieAiProvider('mealie');
 
     expect(client.mealieCreateAiProvider).toHaveBeenCalledWith(
@@ -81,11 +84,27 @@ describe('syncMealieAiProvider', () => {
     expect(client.mealieSetAiSettings).toHaveBeenCalledWith('http://10.201.0.1:10230', 'tok', 'new-id');
   });
 
+  it('derives base_url and model from whichever provider the mealie_parse feature is actually configured for', async () => {
+    getActiveProviderKey.mockResolvedValue({ provider: 'groq', key: 'gsk_test' });
+    await syncMealieAiProvider('mealie');
+
+    expect(client.mealieCreateAiProvider).toHaveBeenCalledWith(
+      'http://10.201.0.1:10230',
+      'tok',
+      expect.objectContaining({
+        name: 'AI Provider (dashboard-managed)',
+        base_url: 'https://api.groq.com/openai/v1/',
+        api_key: 'gsk_test',
+        model: 'llama-3.1-8b-instant',
+      })
+    );
+  });
+
   it('updates the existing managed provider and skips the settings write when it is already default', async () => {
-    getClaudeApiKey.mockResolvedValue('sk-ant-abc123');
+    getActiveProviderKey.mockResolvedValue({ provider: 'anthropic', key: 'sk-ant-abc123' });
     client.mealieGetAiSettings.mockResolvedValue({
       defaultProviderId: 'p1',
-      providers: [{ id: 'p1', name: 'Claude (dashboard-managed)' }],
+      providers: [{ id: 'p1', name: 'AI Provider (dashboard-managed)' }],
     });
 
     await syncMealieAiProvider('mealie');
@@ -101,10 +120,10 @@ describe('syncMealieAiProvider', () => {
   });
 
   it('disables AI and removes the managed provider when the key is gone', async () => {
-    getClaudeApiKey.mockResolvedValue(null);
+    getActiveProviderKey.mockResolvedValue(null);
     client.mealieGetAiSettings.mockResolvedValue({
       defaultProviderId: 'p1',
-      providers: [{ id: 'p1', name: 'Claude (dashboard-managed)' }],
+      providers: [{ id: 'p1', name: 'AI Provider (dashboard-managed)' }],
     });
 
     await syncMealieAiProvider('mealie');
@@ -114,7 +133,7 @@ describe('syncMealieAiProvider', () => {
   });
 
   it('rotates the shipped default password when the generated one is not accepted yet', async () => {
-    getClaudeApiKey.mockResolvedValue('sk-ant-abc123');
+    getActiveProviderKey.mockResolvedValue({ provider: 'anthropic', key: 'sk-ant-abc123' });
     // generated pw rejected, shipped default accepted, then generated works after the change
     client.mealieLogin
       .mockResolvedValueOnce(null)
@@ -134,7 +153,7 @@ describe('syncMealieAiProvider', () => {
   });
 
   it("renames the seed admin off 'admin' so an OIDC user of that name can't collide", async () => {
-    getClaudeApiKey.mockResolvedValue('sk-ant-abc123');
+    getActiveProviderKey.mockResolvedValue({ provider: 'anthropic', key: 'sk-ant-abc123' });
     const seed = { id: 'u1', username: 'admin', email: 'changeme@example.com', fullName: 'Change Me' };
     client.mealieGetSelf.mockResolvedValue(seed);
 
@@ -149,7 +168,7 @@ describe('syncMealieAiProvider', () => {
   });
 
   it('leaves the seed admin alone once it has already been renamed', async () => {
-    getClaudeApiKey.mockResolvedValue('sk-ant-abc123');
+    getActiveProviderKey.mockResolvedValue({ provider: 'anthropic', key: 'sk-ant-abc123' });
     client.mealieGetSelf.mockResolvedValue({ id: 'u1', username: 'mealie-local-admin' });
 
     await syncMealieAiProvider('mealie');

@@ -7,8 +7,11 @@ import {
   CloudflareAccountModel,
   CloudflareSettings,
   CloudflareTestResponse,
-  ClaudeKeySettings,
-  ClaudeKeyTestResponse,
+  AiFeature,
+  AiKeysSettings,
+  AiKeyTestResponse,
+  AiKeyUpdateResponse,
+  AiProviderId,
   ExposureSettings,
   ExposureSettingsInput,
   MailSettings,
@@ -90,27 +93,35 @@ export class SettingsService {
     return this.http.get<KopiaStatus>(`${API_BASE_URL}/settings/backup-target/kopia-status`);
   }
 
-  loadClaudeKey(): Observable<ClaudeKeySettings> {
+  loadAiKeys(): Observable<AiKeysSettings> {
     return this.http
-      .get<ClaudeKeySettings>(`${API_BASE_URL}/settings/claude-key`, {
+      .get<AiKeysSettings>(`${API_BASE_URL}/settings/ai-keys`, {
         context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true),
       })
       .pipe(retry({ count: 1, delay: 400 }));
   }
 
-  saveClaudeKey(apiKey: string): Observable<ClaudeKeySettings> {
-    return this.http.put<ClaudeKeySettings>(
-      `${API_BASE_URL}/settings/claude-key`,
+  saveAiKey(provider: AiProviderId, apiKey: string): Observable<AiKeyUpdateResponse> {
+    return this.http.put<AiKeyUpdateResponse>(
+      `${API_BASE_URL}/settings/ai-keys/${provider}`,
       { apiKey: apiKey.trim() },
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }
 
-  testClaudeKey(apiKey?: string): Observable<ClaudeKeyTestResponse> {
+  testAiKey(provider: AiProviderId, apiKey?: string): Observable<AiKeyTestResponse> {
     const payload = apiKey?.trim() ? { apiKey: apiKey.trim() } : {};
-    return this.http.post<ClaudeKeyTestResponse>(
-      `${API_BASE_URL}/settings/claude-key/test`,
+    return this.http.post<AiKeyTestResponse>(
+      `${API_BASE_URL}/settings/ai-keys/${provider}/test`,
       payload,
+      { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+    );
+  }
+
+  saveAiFeatureProvider(feature: AiFeature, provider: AiProviderId): Observable<{ feature: AiFeature; provider: AiProviderId }> {
+    return this.http.put<{ feature: AiFeature; provider: AiProviderId }>(
+      `${API_BASE_URL}/settings/ai-feature-provider`,
+      { feature, provider },
       { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
     );
   }
