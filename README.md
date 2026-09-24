@@ -510,7 +510,8 @@ before anything is built.
       is Running and the shop shows connected. Then issue a fresh code and
       open it again over the installed agent: it should stop the service,
       replace the exe, start it on the new token and reconnect — not fail on
-      the locked exe or on `sc.exe create`. Finally rebuild after touching any
+      the locked exe or on `sc.exe create`. It must not ask for the URL, the
+      Wintouch folder or a code (§681) — only "Keeping the installed settings…". Finally rebuild after touching any
       agent file and confirm the page shows a different version hash.
       Once the new agent is connected, the shops list (Version column), the shop's page and Manage → Agent must
       show its version, still show it after stopping the service, and the

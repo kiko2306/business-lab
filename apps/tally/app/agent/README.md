@@ -38,6 +38,11 @@ every file in this folder, so the version shown on the Tally page and logged on
 connect (`1.0.0-<hash>`) changes on any rebuild that changed the agent. Bump
 `VERSION` by hand for a change worth naming.
 
+**Updating** is just running the new setup: it keeps the installed URL and
+Wintouch folder and, on an already-enrolled machine, asks for nothing — it stops
+the service, replaces the exe and starts it again. A code (in `install.config`,
+or asked for when you point it at a different site) re-enrols instead.
+
 Re-running the setup with a fresh code replaces the machine currently
 reporting, so a rebuilt POS needs no clean-up on the server — the setup stops
 the running service, replaces the exe, and starts it again on the new token.

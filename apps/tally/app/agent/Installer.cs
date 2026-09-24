@@ -55,15 +55,36 @@ internal static class Installer
         // install.config beside the setup pre-answers any question; an empty or
         // missing value falls through to the prompt.
         var preset = ReadPresets(Path.Combine(Path.GetDirectoryName(self)!, "install.config"));
-        var url = preset("url") ?? Ask("Tally site URL (e.g. https://tally.example.com)");
-        var enrolCode = preset("code") ?? Ask("Enrolment code (from Tally: issue one, then paste it here)");
+
+        // An update keeps what is already installed and does not ask again
+        // (§679): the URL and Wintouch folder come from the installed
+        // tally.config — or the pre-rename one — and an enrolled machine already
+        // holds its token, so it needs no new code. Read before anything is
+        // changed, since the legacy install is removed further down.
+        var existing = ReadInstalledSettings();
+        var enrolled = File.Exists(TokenPath);
+
+        var url = preset("url") ?? existing?.Url ?? Ask("Tally site URL (e.g. https://tally.example.com)");
         // The default matches this repo's own dev machine and every install
         // seen so far (plan.md §629); Enter accepts it.
-        var wintouchDir = preset("wintouchDir")
+        var wintouchDir = preset("wintouchDir") ?? existing?.WintouchDir
             ?? Ask($"Wintouch folder (the one holding wintouch.config) [{DefaultWintouchDir}]", DefaultWintouchDir);
 
-        if (url.Length == 0 || enrolCode.Length == 0)
-            return Fail("Both the site URL and the enrolment code are required.");
+        // A code is asked for only when there is nothing to keep: a code in
+        // install.config always re-enrols (a new shop, or a revoked agent), and
+        // so does pointing at a different site — the stored token belongs to
+        // the old one.
+        var siteChanged = existing is not null && !string.Equals(existing.Url, url, StringComparison.OrdinalIgnoreCase);
+        var enrolCode = preset("code");
+        if (enrolCode is null && (!enrolled || siteChanged))
+            enrolCode = Ask("Enrolment code (from Tally: issue one, then paste it here)");
+
+        if (existing is not null && !siteChanged)
+            Console.WriteLine($"Keeping the installed settings: {url}, Wintouch in {wintouchDir}"
+                + (enrolCode is null ? ", already enrolled." : "."));
+
+        if (url.Length == 0 || (enrolCode is not null && enrolCode.Length == 0))
+            return Fail("The site URL and, for a new enrolment, the enrolment code are required.");
         if (!File.Exists(Path.Combine(wintouchDir, "wintouch.config")))
             return Fail($"No wintouch.config under {wintouchDir}. Run the setup again and enter the folder Wintouch is installed in.");
 
@@ -100,13 +121,16 @@ internal static class Installer
             new XElement("wintouchConfig", new XAttribute("path", wintouchDir))))
             .Save(Path.Combine(installDir, "tally.config"));
 
-        Console.WriteLine("Enrolling...");
-        // The installed copy enrols, so it reads the tally.config just written
-        // and stores the token where the service will look for it.
-        var enrol = Process.Start(new ProcessStartInfo(installed) { ArgumentList = { "enrol", enrolCode }, UseShellExecute = false })!;
-        await enrol.WaitForExitAsync();
-        if (enrol.ExitCode != 0)
-            return Fail("Enrolment failed. Check the code is current (it expires in minutes) and the URL is reachable, then run the setup again.");
+        if (enrolCode is not null)
+        {
+            Console.WriteLine("Enrolling...");
+            // The installed copy enrols, so it reads the tally.config just written
+            // and stores the token where the service will look for it.
+            var enrol = Process.Start(new ProcessStartInfo(installed) { ArgumentList = { "enrol", enrolCode }, UseShellExecute = false })!;
+            await enrol.WaitForExitAsync();
+            if (enrol.ExitCode != 0)
+                return Fail("Enrolment failed. Check the code is current (it expires in minutes) and the URL is reachable, then run the setup again.");
+        }
 
         if (!registered)
         {
@@ -148,6 +172,39 @@ internal static class Installer
         }
         var oldDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Tally");
         if (Directory.Exists(oldDir)) Directory.Delete(oldDir, recursive: true);
+    }
+
+    private sealed record InstalledSettings(string Url, string WintouchDir);
+
+    /// <summary>Where TokenStore keeps the token on Windows — ProgramData, so it outlives a reinstall.</summary>
+    private static string TokenPath => Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData), "Tally", "agent.token");
+
+    /// <summary>
+    /// The URL and Wintouch folder of an existing install, preferring the
+    /// current folder and falling back to the pre-rename one. Null when there
+    /// is nothing usable, in which case the setup asks as it always did.
+    /// </summary>
+    private static InstalledSettings? ReadInstalledSettings()
+    {
+        var programFiles = Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles);
+        foreach (var dir in new[] { "Wintouch.Tally.Agent", "Tally" })
+        {
+            var path = Path.Combine(programFiles, dir, "tally.config");
+            if (!File.Exists(path)) continue;
+            try
+            {
+                var root = XDocument.Load(path).Root;
+                var url = root?.Element("url")?.Attribute("value")?.Value.Trim();
+                var wintouch = root?.Element("wintouchConfig")?.Attribute("path")?.Value.Trim();
+                if (!string.IsNullOrEmpty(url) && !string.IsNullOrEmpty(wintouch)) return new InstalledSettings(url, wintouch);
+            }
+            catch (System.Xml.XmlException)
+            {
+                // A damaged config is no reason to fail the update: ask again.
+            }
+        }
+        return null;
     }
 
     /// <summary>A missing service makes ServiceController throw on any read.</summary>

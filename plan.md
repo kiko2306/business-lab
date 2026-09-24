@@ -32443,3 +32443,23 @@ the 107 items with code and family.
 Lesson for this app: `ng build` proves nothing about a template that runs behind
 a tab or an `@if` — the fixes since §672 were each verified by building only,
 and this one shipped broken for that reason. Rendering the page is the check.
+
+## 681. Updating the Tally agent keeps its settings and asks for nothing
+
+Running the setup over an installed agent used to ask for the URL, the Wintouch
+folder and a new enrolment code again. Now `Installer` reads the installed
+`tally.config` (or the pre-rename one, read before the legacy install is removed)
+for the URL and Wintouch folder, and checks for the stored token in
+`%ProgramData%\Tally`: an enrolled machine needs no code, so an update just stops
+the service, replaces the exe and starts it. A code is asked for only when there
+is nothing to keep — not enrolled, or `install.config` names a different site (the
+stored token belongs to the old one) — and a code in `install.config` always
+re-enrols (a new shop, or a revoked agent). Precedence stays `install.config`
+over installed settings over prompt.
+
+Verified on this machine (installed and enrolled), un-elevated with empty input:
+"Keeping the installed settings: https://tally.tx-home-utils.com, Wintouch in
+C:\wintouch\sgw, already enrolled." and no prompt, stopping at the administrator
+check with the service untouched; with `install.config` pointing at another site
+it asks for a code. The elevated update itself (stop, replace, start) is the
+README TODO.
