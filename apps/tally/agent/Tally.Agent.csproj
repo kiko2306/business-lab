@@ -12,7 +12,7 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
     <RootNamespace>Tally.Agent</RootNamespace>
-    <AssemblyName>Tally.Agent</AssemblyName>
+    <AssemblyName>Wintouch.Tally.Agent</AssemblyName>
     <UserSecretsId>tally-agent</UserSecretsId>
     <!-- Opening the setup exe asks for administrator rights up front: it writes
          to Program Files and registers a service (plan.md §670). -->

@@ -40,7 +40,7 @@ catch (Exception ex)
 var builder = Host.CreateApplicationBuilder(args);
 // A no-op when not launched by the service control manager, so the same binary
 // runs as a console app for development and diagnostics.
-builder.Services.AddWindowsService(o => o.ServiceName = "Tally.Agent");
+builder.Services.AddWindowsService(o => o.ServiceName = "Wintouch.Tally.Agent");
 builder.Services.AddSingleton(options);
 builder.Services.AddSingleton<TokenStore>(_ => new TokenStore());
 builder.Services.AddSingleton(_ => new ShopReader(options.SqlConnectionString));
@@ -53,7 +53,7 @@ if (args.Length >= 1 && args[0].Equals("enrol", StringComparison.OrdinalIgnoreCa
 {
     if (args.Length < 2)
     {
-        Console.Error.WriteLine("Usage: Tally.Agent enrol <CODE>");
+        Console.Error.WriteLine("Usage: Wintouch.Tally.Agent enrol <CODE>");
         return 1;
     }
     var client = host.Services.GetRequiredService<AgentClient>();

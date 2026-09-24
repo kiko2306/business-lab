@@ -85,7 +85,7 @@ public sealed class AgentClient(
                     // Keep the service alive and retry rather than returning:
                     // a process that has quietly stopped working looks
                     // "Running" to the service manager and is never restarted.
-                    logger.LogError("Not enrolled. Run: Tally.Agent enrol <CODE>");
+                    logger.LogError("Not enrolled. Run: Wintouch.Tally.Agent enrol <CODE>");
                     delay = maxDelay;
                 }
                 else

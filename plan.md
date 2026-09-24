@@ -32144,3 +32144,17 @@ wrapper (a new toolchain for what one C# file does); a build timestamp as the
 version (busts the Docker cache on every build, so nothing is ever reused).
 Requiring the version bump by hand alone was rejected because a forgotten bump
 is the failure being asked to prevent.
+
+## 671. Renamed: the Tally agent is `Wintouch.Tally.Agent`
+
+Service name, exe, install folder (`%ProgramFiles%\Wintouch.Tally.Agent`) and the
+download (`Wintouch.Tally.Agent-Setup-<version>.exe`) all use the new name; the
+csproj file name and the C# namespace stay `Tally.Agent`. **Kept on purpose:**
+`%ProgramData%\Tally` and the DPAPI entropy string in `TokenStore` — renaming
+either would orphan an existing token for no benefit. The setup now removes a
+pre-rename `Tally.Agent` service and `%ProgramFiles%\Tally` if it finds them
+(after the administrator check), otherwise the machine would run two agents
+against one shop. Re-checked: the Docker stage names the file correctly, `dotnet
+build -warnaserror` is clean, 38 API tests pass, the renamed exe's un-elevated
+prompts still work. The legacy-removal path itself needs the elevated run in the
+README TODO (this machine has the old service, so it is a real test).

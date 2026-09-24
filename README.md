@@ -447,12 +447,12 @@ before anything is built.
       number (free tables or open tabs) should match Wintouch itself.
       Invoiced/staff/hourly are empty unless the date has sales (demo data
       is 2026-07-27, §636). If it misbehaves, stop the service and run
-      `Tally.Agent.exe run` from an elevated console to see its log.
+      `Wintouch.Tally.Agent.exe run` from an elevated console to see its log.
 - [ ] **Prove the Tally agent restarts itself after a crash** — plan.md §669.
       Run the new setup exe (that also applies the recovery settings to the
-      existing service), check `sc.exe qfailure Tally.Agent` lists restart
+      existing service), check `sc.exe qfailure Wintouch.Tally.Agent` lists restart
       actions, then from an elevated PowerShell kill it:
-      `Stop-Process -Name Tally.Agent -Force`. Within ~5 s the service
+      `Stop-Process -Name Wintouch.Tally.Agent -Force`. Within ~5 s the service
       should be Running again under a new PID and reconnect in the dashboard.
       Also try it while the agent is unenrolled or the server is unreachable:
       it should stay Running and retry, not exit.
@@ -461,7 +461,7 @@ before anything is built.
       un-elevated, and the Docker build of the exe on Linux; the elevated part
       (copying into Program Files, `sc.exe create`/`failure`, starting the
       service) has not run. On `beta`: as an admin, click **Download setup**
-      on the Tally page (file named `Tally.Agent-Setup-1.0.0-<hash>.exe`),
+      on the Tally page (file named `Wintouch.Tally.Agent-Setup-1.0.0-<hash>.exe`),
       open it (UAC prompt appears), answer the prompts and confirm the service
       is Running and the shop shows connected. Then issue a fresh code and
       open it again over the installed agent: it should stop the service,

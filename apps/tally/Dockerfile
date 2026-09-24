@@ -34,8 +34,8 @@ RUN set -e; \
       -p:IncludeNativeLibrariesForSelfExtract=true \
       -p:Version="$VERSION" -p:InformationalVersion="$FULL" -o /out; \
     mkdir /agent; \
-    cp /out/Tally.Agent.exe "/agent/Tally.Agent-Setup-$FULL.exe"; \
-    printf '{"version":"%s","file":"Tally.Agent-Setup-%s.exe"}' "$FULL" "$FULL" > /agent/agent.json
+    cp /out/Wintouch.Tally.Agent.exe "/agent/Wintouch.Tally.Agent-Setup-$FULL.exe"; \
+    printf '{"version":"%s","file":"Wintouch.Tally.Agent-Setup-%s.exe"}' "$FULL" "$FULL" > /agent/agent.json
 
 FROM node:22-alpine
 WORKDIR /app

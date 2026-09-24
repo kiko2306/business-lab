@@ -47,8 +47,8 @@ before(async () => {
   await migrate(pool, path.join(__dirname, 'migrations'));
   // A stand-in for the setup exe the Dockerfile builds into the image (plan.md §670).
   const agentDir = fs.mkdtempSync(path.join(os.tmpdir(), 'tally-agent-'));
-  fs.writeFileSync(path.join(agentDir, 'Tally.Agent-Setup-1.0.0-abcd1234.exe'), 'MZ-fake');
-  fs.writeFileSync(path.join(agentDir, 'agent.json'), JSON.stringify({ version: '1.0.0-abcd1234', file: 'Tally.Agent-Setup-1.0.0-abcd1234.exe' }));
+  fs.writeFileSync(path.join(agentDir, 'Wintouch.Tally.Agent-Setup-1.0.0-abcd1234.exe'), 'MZ-fake');
+  fs.writeFileSync(path.join(agentDir, 'agent.json'), JSON.stringify({ version: '1.0.0-abcd1234', file: 'Wintouch.Tally.Agent-Setup-1.0.0-abcd1234.exe' }));
   process.env.AGENT_DIST = agentDir;
   // No hub.attach here: these tests never open a socket, and the store list
   // only asks it whether one is connected.
@@ -305,6 +305,6 @@ test('the agent package is admin-only and downloads the built setup exe', { skip
 
   const res = await fetch(`${base}/api/agent-package/download`, { headers: ADMIN });
   assert.equal(res.status, 200);
-  assert.match(res.headers.get('content-disposition') ?? '', /Tally\.Agent-Setup-1\.0\.0-abcd1234\.exe/);
+  assert.match(res.headers.get('content-disposition') ?? '', /Wintouch\.Tally\.Agent-Setup-1\.0\.0-abcd1234\.exe/);
   assert.equal(await res.text(), 'MZ-fake');
 });

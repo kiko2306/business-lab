@@ -18,7 +18,9 @@ namespace Tally.Agent;
 /// </summary>
 internal static class Installer
 {
-    private const string ServiceName = "Tally.Agent";
+    private const string ServiceName = "Wintouch.Tally.Agent";
+    // What the first release registered, before the rename (plan.md §671).
+    private const string LegacyServiceName = "Tally.Agent";
     private const string DefaultWintouchDir = @"C:\wintouch\sgw";
 
     public static async Task<int> RunAsync()
@@ -70,8 +72,10 @@ internal static class Installer
         if (!new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
             return Fail("Run the setup as administrator (right-click, Run as administrator).");
 
-        var installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Tally");
-        var installed = Path.Combine(installDir, "Tally.Agent.exe");
+        var installDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Wintouch.Tally.Agent");
+        var installed = Path.Combine(installDir, "Wintouch.Tally.Agent.exe");
+
+        RemoveLegacyInstall();
 
         using var service = new ServiceController(ServiceName);
         var registered = Exists(service);
@@ -122,6 +126,28 @@ internal static class Installer
         service.Start();
         Console.WriteLine($"Done. {ServiceName} is installed and running from {installDir}.");
         return 0;
+    }
+
+    /// <summary>
+    /// The pre-rename service and folder would otherwise keep running beside the
+    /// new one — two agents on one shop, both holding a socket to the same site.
+    /// </summary>
+    [SupportedOSPlatform("windows")]
+    private static void RemoveLegacyInstall()
+    {
+        using var legacy = new ServiceController(LegacyServiceName);
+        if (Exists(legacy))
+        {
+            Console.WriteLine($"Removing the old {LegacyServiceName} service...");
+            if (legacy.Status != ServiceControllerStatus.Stopped)
+            {
+                legacy.Stop();
+                legacy.WaitForStatus(ServiceControllerStatus.Stopped, TimeSpan.FromSeconds(30));
+            }
+            Sc($"delete {LegacyServiceName}");
+        }
+        var oldDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "Tally");
+        if (Directory.Exists(oldDir)) Directory.Delete(oldDir, recursive: true);
     }
 
     /// <summary>A missing service makes ServiceController throw on any read.</summary>

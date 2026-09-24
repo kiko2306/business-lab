@@ -17,7 +17,7 @@ write path has to go through their API (plan.md §629).
 
 ## Install
 
-The agent is **one file**: `Tally.Agent-Setup-<version>.exe`, self-contained (no
+The agent is **one file**: `Wintouch.Tally.Agent-Setup-<version>.exe`, self-contained (no
 .NET runtime to install), downloaded from the Tally page (admins see a
 **Download setup** card). Every image build publishes it from this source
 tree (plan.md §670), so the file always matches the running site.
@@ -26,7 +26,7 @@ tree (plan.md §670), so the file always matches the running site.
 2. On the shop's machine, open the setup exe. It asks for administrator rights,
    then prompts for the site URL, the enrolment code and the Wintouch folder
    (Enter accepts `C:\wintouch\sgw`). It copies itself to
-   `%ProgramFiles%\Tally`, writes `tally.config`, enrols, and registers and
+   `%ProgramFiles%\Wintouch.Tally.Agent`, writes `tally.config`, enrols, and registers and
    starts the service with restart-on-failure — the manual steps below, done
    for you.
 
@@ -46,12 +46,12 @@ the running service, replaces the exe, and starts it again on the new token.
 <summary>What the installer actually does (for a manual install, or to
 understand a failure)</summary>
 
-1. Copy the exe to `%ProgramFiles%\Tally`, and `tally.config.example` to `tally.config` beside it and set
+1. Copy the exe to `%ProgramFiles%\Wintouch.Tally.Agent`, and `tally.config.example` to `tally.config` beside it and set
    the site URL and the Wintouch folder.
 2. Run once, with the enrolment code:
 
    ```
-   Tally.Agent.exe enrol ABCD2345
+   Wintouch.Tally.Agent.exe enrol ABCD2345
    ```
 
    The code is single-use and expires in minutes. The token it returns is
@@ -59,13 +59,13 @@ understand a failure)</summary>
 3. Install and start the service:
 
    ```
-   sc.exe create Tally.Agent binPath= "C:\Program Files\Tally\Tally.Agent.exe" start= auto
-   sc.exe start Tally.Agent
+   sc.exe create Wintouch.Tally.Agent binPath= "C:\Program Files\Wintouch.Tally.Agent\Wintouch.Tally.Agent.exe" start= auto
+   sc.exe start Wintouch.Tally.Agent
    ```
 
 </details>
 
 ## Diagnostics
 
-Run `Tally.Agent.exe run` from a console — the same binary — and it logs to the
+Run `Wintouch.Tally.Agent.exe run` from a console — the same binary — and it logs to the
 terminal instead of the event log. (With no arguments the exe is the setup.) `TALLY_CONFIG` overrides the config path.
