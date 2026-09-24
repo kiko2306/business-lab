@@ -16,8 +16,9 @@
 
 .EXAMPLE
   .\install.ps1
-  # Always prompts for the site URL, enrolment code and Wintouch folder — they are not
-  # parameters, so a code never lands in shell history or a shared command line.
+  # Asks for the site URL, enrolment code and Wintouch folder — unless filled in
+  # install.config beside the script. They are not parameters, so a code never
+  # lands in shell history or a shared command line.
 #>
 [CmdletBinding()]
 param(
@@ -32,12 +33,27 @@ if (-not (Test-Path (Join-Path $sourceDir $exeName))) {
     throw "$exeName not found next to install.ps1. Run this from the published output folder (dotnet publish), not the source tree."
 }
 
-$Url = Read-Host 'Tally site URL (e.g. https://tally.example.com)'
-$Code = Read-Host 'Enrolment code (from Tally: issue one, then paste it here)'
+# install.config (beside this script) pre-answers any of the three questions;
+# an empty or missing value falls through to the prompt.
+$answers = @{ url = ''; code = ''; wintouchDir = '' }
+$answersPath = Join-Path $sourceDir 'install.config'
+if (Test-Path $answersPath) {
+    $xml = [xml](Get-Content -Path $answersPath -Raw)
+    foreach ($key in @($answers.Keys)) {
+        $node = $xml.tallyInstall.$key
+        if ($node -and $node.value) { $answers[$key] = $node.value.Trim() }
+    }
+}
+
+$Url = $answers.url
+if (-not $Url) { $Url = Read-Host 'Tally site URL (e.g. https://tally.example.com)' }
+$Code = $answers.code
+if (-not $Code) { $Code = Read-Host 'Enrolment code (from Tally: issue one, then paste it here)' }
 # The default matches this repo's own dev machine and every install seen so far
 # (plan.md §629); Enter accepts it, a shop whose Wintouch lives elsewhere types
 # its own folder.
-$WintouchDir = Read-Host 'Wintouch folder (the one holding wintouch.config) [C:\wintouch\sgw]'
+$WintouchDir = $answers.wintouchDir
+if (-not $WintouchDir) { $WintouchDir = Read-Host 'Wintouch folder (the one holding wintouch.config) [C:\wintouch\sgw]' }
 if (-not $WintouchDir) { $WintouchDir = 'C:\wintouch\sgw' }
 if (-not $Url -or -not $Code) { throw 'Both the site URL and the enrolment code are required.' }
 if (-not (Test-Path (Join-Path $WintouchDir 'wintouch.config'))) {

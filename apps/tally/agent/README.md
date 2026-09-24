@@ -29,7 +29,9 @@ write path has to go through their API (plan.md §629).
    ```
 
    It prompts for the site URL, the enrolment code and the Wintouch folder
-   (Enter accepts `C:\wintouch\sgw`); none are parameters. Installs into `%ProgramFiles%\Tally`, enrols, and registers + starts the
+   (Enter accepts `C:\wintouch\sgw`); none are parameters. To skip a prompt,
+   fill that value in `install.config` beside the script — anything left empty
+   is still asked. Installs into `%ProgramFiles%\Tally`, enrols, and registers + starts the
    service in one pass — the four manual steps below, done for you.
 
 Re-enrolling (re-running `install.ps1` with a fresh code) replaces the

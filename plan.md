@@ -32064,3 +32064,14 @@ timeout / a tunnel restart (README item left open).
 enrolment code on the command line put it in shell history; the operator wants
 the installer to ask. Only `-InstallDir` stays a parameter (a path,
 not secrets). README updated; syntax-checked with the PowerShell parser.
+
+### §669 follow-up: `install.config` pre-answers the prompts
+
+`apps/tally/agent/install.config` (shipped in the publish output beside
+`install.ps1`) holds `url`, `code` and `wintouchDir`, all empty by default. A
+filled value is used without asking; an empty or missing one still prompts, so
+the no-config path is unchanged. XML like `tally.config`, parsed with `[xml]`.
+Checked by running the parse block on Windows with a partly-filled file (filled
+keys read, empty stayed empty) and the full script through the PowerShell
+parser; the whole installer was not re-run. Deliberately not deleting the code
+after use: it is single-use and expires in minutes.

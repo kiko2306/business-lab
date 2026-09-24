@@ -35,6 +35,7 @@
          folder has no installer and install.ps1's own "run from the published
          output" check can never pass. -->
     <None Update="install.ps1" CopyToOutputDirectory="PreserveNewest" />
+    <None Update="install.config" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
 </Project>
