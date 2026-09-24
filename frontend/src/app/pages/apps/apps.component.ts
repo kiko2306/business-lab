@@ -19,6 +19,7 @@ const CATEGORY_ORDER: ServiceCategory[] = [
   'Productivity',
   'Home Automation',
   'Development',
+  'Wintouch Interop',
 ];
 
 // Fixed display order for both the running-apps table and the full apps

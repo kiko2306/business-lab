@@ -94,7 +94,8 @@ export type ServiceCategory =
   | 'Backup & Storage'
   | 'Productivity'
   | 'Home Automation'
-  | 'Development';
+  | 'Development'
+  | 'Wintouch Interop';
 
 export interface ServiceMailEnvKeys {
   smtpHost?: string[];

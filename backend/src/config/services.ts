@@ -802,7 +802,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Hotel',
     description: 'Online check-in, guest feedback and property administration',
     icon: 'calendar',
-    category: 'Productivity',
+    category: 'Wintouch Interop',
     composePath: 'apps/hotel/docker-compose.yml',
     healthCheck: {
       enabled: true,
@@ -861,7 +861,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     label: 'Tally',
     description: 'Invoices, employees and payments control',
     icon: 'chart',
-    category: 'Productivity',
+    category: 'Wintouch Interop',
     composePath: 'apps/tally/docker-compose.yml',
     healthCheck: {
       enabled: true,

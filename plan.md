@@ -30782,3 +30782,17 @@ live stack" README item.
 ### Follow-ups added to the README
 
 None — this closes the one open follow-up from §644.
+
+## 648. Fixed: `hotel` and `tally` grouped under a new "Wintouch Interop" category
+
+Both were filed under the generic `Productivity` category since registration
+(§630, §638). User asked for them to carry their own category on the Apps
+page instead. Added `'Wintouch Interop'` to the `ServiceCategory` union
+(`backend/src/types/index.ts`, mirrored in `frontend/src/app/core/models.ts`),
+added it to the fixed `CATEGORY_ORDER` in
+`frontend/src/app/pages/apps/apps.component.ts`, and switched both registry
+entries' `category` in `backend/src/config/services.ts`. Left the Home
+Page's `homepage.group=Productivity` compose label untouched — that is a
+separate, public-facing grouping the request didn't mention. Backend
+typecheck/tests (1191) and frontend tests (89) pass; no live-stack
+verification needed, this only reorders a display grouping.
