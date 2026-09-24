@@ -30866,3 +30866,73 @@ None. Deleted the §629 SMTP README item this closes. The actual HTML-mail
 send path (embedded logo, `sendMail()`-equivalent) is not built yet — it
 lands with whichever consumer needs it first (the check-in/quiz email
 schedules or the birthday/promo flows, both still open, separate items).
+
+## 650. Implemented: the guest-text template store
+
+Closes the README item from §629 decision #6. `hotel-core`'s guest-facing
+email and page content — check-in and quiz mail subjects/bodies, page intro
+and thank-you text, the birthday and promo mail templates, and the check-in
+form's legal declarations (data protection, privacy policy, the two
+accuracy/terms-read lines) — becomes admin-editable in two languages, rather
+than staying hardcoded strings future email-sending code would need to touch
+to change a word.
+
+**Scope cut from the legacy `hu_translations` table.** That table also held a
+long tail of plain UI field labels (`NAME`, `ADDRESS`, `COUNTRY`,
+`GENDER_MALE`, ...) — around 100 rows once the full dump is read, versus the
+20 real content keys. Those labels are ordinary guest-app UI chrome, not
+something a hotel meaningfully customizes the wording of, so they are left
+out: they belong with whatever static per-language i18n `check-in`'s and
+`pulse`'s own guest UI eventually gets (neither has any yet — both are
+English-only today), the same admin/guest split §626 already draws for
+styling, not in an admin-editable table. Confirmed by checking `hu_languages`
+in `sample/hotel/setup/api/database/testing.sql`: the 20 content keys only
+ever had a Portuguese (`PT`, id 131) row seeded, no English original, so the
+English defaults below are freshly written from the Portuguese meaning, not
+carried over.
+
+**Schema**: `guest_text_templates` (`apps/hotel/api/src/migrations/004_guest_text.sql`)
+— `(key, locale)` primary key, `value text`, `locale` constrained to `en` /
+`pt-pt` (§626's two-locale convention, not the legacy's full language table).
+Seeded once, same empty-table guard as `pulse_questions` (§644): 20 keys ×
+2 locales = 40 rows, placeholder copy an admin overwrites through the editor.
+`GUEST_TEXT_KEYS` (`apps/hotel/api/src/guestText.ts`) is the fixed list both
+the seed and the route validate against — no admin-facing add/remove, only
+editing a value, since the keys are wired to specific template slots in code
+that does not exist yet.
+
+**Routes**: `routes/guestText.ts` — `GET /api/guest-text` (all 40 rows) and
+`PUT /api/guest-text/:key/:locale` (one value), both `requireAdmin`, same
+shape as `smtp.ts`'s single row but keyed on `(key, locale)` instead of a
+fixed `id`. 404 on an unknown key or locale, 400 on a blank value.
+
+**Frontend**: a "Guest text" card in `hotel-admin`, admin-only, between
+"Email settings" and "Properties" — grouped by flow (check-in, feedback,
+birthday, promotions, legal declarations) with an EN/PT-PT textarea pair per
+key, saved on blur (`change`), same interaction as `saveQuestionText` (§647).
+`GUEST_TEXT_GROUPS` in `models.ts` duplicates the key list with display
+labels — duplicated rather than shared with the backend's `guestText.ts`,
+per §629 decision #8 (no package the two app sides already share code
+through, same reasoning as `FLOWS` already being duplicated between them).
+
+### Verification
+
+`apps/hotel/api`: `npm run typecheck` and `npm run build` clean; `npm test`
+against a throwaway `postgres:17-alpine` (port 5433, same shape as the CI
+job) — 42 tests passing, including the four new ones: a viewer 401s/403s on
+both routes, an admin's `GET` lists all 40 seeded rows in both locales, an
+admin's `PUT` round-trips a value (and the test restores the seed value it
+overwrote so a re-run sees the original), and an unknown key/locale 404s
+while a blank value 400s. `apps/hotel/admin`: `ng build` clean (the one
+pre-existing Bootstrap CSS selector warning noted in §647, unrelated). Not
+run against Authelia or the live SMTP-sending path on `beta` — the actual
+consumer of these templates (the check-in/quiz email schedules, or the
+birthday/promo flows) is still unbuilt, so there is nothing yet to prove
+end-to-end.
+
+### Follow-ups added to the README
+
+None. Deleted the §629 guest-text-template-store README item this closes.
+The check-in/quiz email schedules and the birthday/promo flows, both still
+open, are what will actually read these templates and send mail through
+§649's SMTP settings.

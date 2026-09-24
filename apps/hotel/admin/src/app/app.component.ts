@@ -3,7 +3,18 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from './api.service';
-import { AgentStatus, EnrolmentCode, FLOWS, FlowKey, Identity, Question, SmtpSettings, Unit } from './models';
+import {
+  AgentStatus,
+  EnrolmentCode,
+  FLOWS,
+  FlowKey,
+  GUEST_TEXT_GROUPS,
+  GuestTextTemplate,
+  Identity,
+  Question,
+  SmtpSettings,
+  Unit,
+} from './models';
 
 /**
  * One page: the properties, who may see them, and the agent. No router —
@@ -20,6 +31,7 @@ export class AppComponent implements OnInit {
   private api = inject(ApiService);
 
   readonly flows = FLOWS;
+  readonly guestTextGroups = GUEST_TEXT_GROUPS;
 
   identity: Identity | null = null;
   units: Unit[] = [];
@@ -37,6 +49,8 @@ export class AppComponent implements OnInit {
   testingSmtp = false;
   smtpFeedback = '';
   smtpTestResult: { success: boolean; message: string } | null = null;
+
+  guestText: GuestTextTemplate[] = [];
 
   openId: string | null = null;
   access: string[] = [];
@@ -64,6 +78,7 @@ export class AppComponent implements OnInit {
           this.loadAgent();
           this.loadQuestions();
           this.loadSmtp();
+          this.loadGuestText();
         }
       },
       error: (err) => this.fail(err),
@@ -274,6 +289,31 @@ export class AppComponent implements OnInit {
         this.testingSmtp = false;
         this.smtpTestResult = err.error ?? { success: false, message: `Request failed (${err.status})` };
       },
+    });
+  }
+
+  private loadGuestText(): void {
+    this.api.listGuestText().subscribe({
+      next: (templates) => (this.guestText = templates),
+      error: (err) => this.fail(err),
+    });
+  }
+
+  guestTextValue(key: string, locale: 'en' | 'pt-pt'): string {
+    return this.guestText.find((t) => t.key === key && t.locale === locale)?.value ?? '';
+  }
+
+  saveGuestTextValue(key: string, locale: 'en' | 'pt-pt', value: string): void {
+    const trimmed = value.trim();
+    if (!trimmed) return;
+    const existing = this.guestText.find((t) => t.key === key && t.locale === locale);
+    if (existing && trimmed === existing.value) return;
+    this.api.saveGuestText(key, locale, trimmed).subscribe({
+      next: (updated) => {
+        if (existing) Object.assign(existing, updated);
+        else this.guestText.push(updated);
+      },
+      error: (err) => this.fail(err),
     });
   }
 

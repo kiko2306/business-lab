@@ -225,6 +225,45 @@
     </div>
   }
 
+  @if (isAdmin) {
+    <div class="card mb-4">
+      <div class="card-body">
+        <h2 class="h6">Guest text</h2>
+        <p class="text-secondary small mb-3">
+          The wording guests see in check-in and feedback emails and pages, in each language. Saved per field as
+          you leave it.
+        </p>
+
+        @for (group of guestTextGroups; track group.label) {
+          <h3 class="small text-uppercase text-secondary fw-semibold mb-2">{{ group.label }}</h3>
+          @for (item of group.keys; track item.key) {
+            <div class="row g-2 mb-3">
+              <div class="col-12">
+                <label class="form-label small fw-semibold mb-1">{{ item.label }}</label>
+              </div>
+              <div class="col-md-6">
+                <textarea
+                  class="form-control form-control-sm"
+                  rows="2"
+                  placeholder="English"
+                  [value]="guestTextValue(item.key, 'en')"
+                  (change)="saveGuestTextValue(item.key, 'en', $any($event.target).value)"></textarea>
+              </div>
+              <div class="col-md-6">
+                <textarea
+                  class="form-control form-control-sm"
+                  rows="2"
+                  placeholder="Português"
+                  [value]="guestTextValue(item.key, 'pt-pt')"
+                  (change)="saveGuestTextValue(item.key, 'pt-pt', $any($event.target).value)"></textarea>
+              </div>
+            </div>
+          }
+        }
+      </div>
+    </div>
+  }
+
   <h2 class="h4 mb-3">Properties</h2>
 
   @if (loading) {

@@ -2,6 +2,7 @@ import express, { type Express, type NextFunction, type Request, type Response }
 import type { Pool } from 'pg';
 import { agentRoutes } from './routes/agent';
 import { checkinRoutes } from './routes/checkin';
+import { guestTextRoutes } from './routes/guestText';
 import { pulseRoutes } from './routes/pulse';
 import { questionRoutes } from './routes/questions';
 import { smtpRoutes } from './routes/smtp';
@@ -32,6 +33,7 @@ export function createApp(pool: Pool): Express {
   app.use('/api', unitRoutes(pool));
   app.use('/api', questionRoutes(pool));
   app.use('/api', smtpRoutes(pool));
+  app.use('/api', guestTextRoutes(pool));
   app.use('/checkin', checkinRoutes(pool));
   app.use('/pulse', pulseRoutes(pool));
 

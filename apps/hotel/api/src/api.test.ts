@@ -81,6 +81,7 @@ test('the schema applies, twice, and creates what is expected', { skip }, async 
     'agents',
     'enrolment_codes',
     'guest_extras',
+    'guest_text_templates',
     'guests',
     'pulse_questions',
     'pulse_responses',
@@ -659,4 +660,60 @@ test('SMTP settings reject a missing host or from address', { skip }, async () =
 test('testing an unconfigured SMTP sender fails without dialing anywhere', { skip }, async () => {
   const result = await call('POST', '/api/smtp/test', { headers: ADMIN });
   assert.equal(result.status, 400);
+});
+
+test('a viewer cannot see or change guest-text templates', { skip }, async () => {
+  assert.equal((await call('GET', '/api/guest-text')).status, 401);
+  assert.equal((await call('GET', '/api/guest-text', { headers: VIEWER })).status, 403);
+  assert.equal(
+    (
+      await call('PUT', '/api/guest-text/CHECKIN_MAIL_SUBJECT/en', {
+        headers: VIEWER,
+        body: { value: 'x' },
+      })
+    ).status,
+    403
+  );
+});
+
+test('an admin lists the seeded guest-text templates, in both locales', { skip }, async () => {
+  const listed = await call('GET', '/api/guest-text', { headers: ADMIN });
+  assert.equal(listed.status, 200);
+  const rows = listed.body as { key: string; locale: string; value: string }[];
+  // 20 keys, seeded en + pt-pt each (004_guest_text.sql).
+  assert.equal(rows.length, 40);
+  const subject = rows.find((r) => r.key === 'CHECKIN_MAIL_SUBJECT' && r.locale === 'pt-pt');
+  assert.equal(subject?.value, 'Checkin Online');
+});
+
+test('an admin edits a guest-text template', { skip }, async () => {
+  const updated = await call('PUT', '/api/guest-text/BIRTHDAY_MAIL_SUBJECT/en', {
+    headers: ADMIN,
+    body: { value: 'Happy birthday from the team!' },
+  });
+  assert.equal(updated.status, 200);
+  assert.equal(updated.body.value, 'Happy birthday from the team!');
+
+  // Restore the seed value so later tests (and re-runs) see the original.
+  await pool.query(
+    `UPDATE guest_text_templates SET value = 'Happy birthday!'
+      WHERE key = 'BIRTHDAY_MAIL_SUBJECT' AND locale = 'en'`
+  );
+});
+
+test('guest-text rejects an unknown key/locale or a blank value', { skip }, async () => {
+  assert.equal(
+    (await call('PUT', '/api/guest-text/NOT_A_KEY/en', { headers: ADMIN, body: { value: 'x' } })).status,
+    404
+  );
+  assert.equal(
+    (await call('PUT', '/api/guest-text/CHECKIN_MAIL_SUBJECT/fr', { headers: ADMIN, body: { value: 'x' } }))
+      .status,
+    404
+  );
+  assert.equal(
+    (await call('PUT', '/api/guest-text/CHECKIN_MAIL_SUBJECT/en', { headers: ADMIN, body: { value: '' } }))
+      .status,
+    400
+  );
 });

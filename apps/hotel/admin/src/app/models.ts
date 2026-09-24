@@ -58,3 +58,65 @@ export interface SmtpSettings {
   fromAddress: string;
   fromName: string;
 }
+
+/** One guest-text template row (plan.md §649.1). Fixed key set, no add/delete. */
+export interface GuestTextTemplate {
+  key: string;
+  locale: 'en' | 'pt-pt';
+  value: string;
+  updatedAt: string;
+}
+
+/**
+ * Grouped for the editor UI. Keys mirror the backend's fixed list
+ * (`guestText.ts`) — duplicated rather than shared, same as `FLOWS` above and
+ * per §629 decision #8 (no package the two app sides already share code
+ * through).
+ */
+export const GUEST_TEXT_GROUPS = [
+  {
+    label: 'Online check-in',
+    keys: [
+      { key: 'CHECKIN_MAIL_SUBJECT', label: 'Email subject' },
+      { key: 'CHECKIN_MAIL_TEXT', label: 'Email body' },
+      { key: 'CHECKIN_MAIL_BUTTON', label: 'Email button text' },
+      { key: 'CHECKIN_PAGE_TEXT', label: 'Page intro' },
+      { key: 'CHECKIN_PAGE_SUBMISSION_TEXT', label: 'Page thank-you' },
+    ],
+  },
+  {
+    label: 'Post-stay feedback',
+    keys: [
+      { key: 'QUIZ_MAIL_SUBJECT', label: 'Email subject' },
+      { key: 'QUIZ_MAIL_TEXT', label: 'Email body' },
+      { key: 'QUIZ_MAIL_BUTTON', label: 'Email button text' },
+      { key: 'QUIZ_PAGE_TEXT', label: 'Page intro' },
+      { key: 'QUIZ_PAGE_SUBMISSION_TEXT', label: 'Page thank-you' },
+    ],
+  },
+  {
+    label: 'Birthday',
+    keys: [
+      { key: 'BIRTHDAY_MAIL_SUBJECT', label: 'Email subject' },
+      { key: 'BIRTHDAY_MAIL_TEXT', label: 'Email body' },
+    ],
+  },
+  {
+    label: 'Promotions',
+    keys: [
+      { key: 'PROMO_MAIL_SUBJECT', label: 'Email subject' },
+      { key: 'PROMO_MAIL_TEXT', label: 'Email body' },
+    ],
+  },
+  {
+    label: 'Legal declarations (check-in form)',
+    keys: [
+      { key: 'DATA_PROTECTION_TITLE', label: 'Data protection — title' },
+      { key: 'DATA_PROTECTION_TEXT', label: 'Data protection — text' },
+      { key: 'PRIVACY_POLICY_TITLE', label: 'Privacy policy — title' },
+      { key: 'PRIVACY_POLICY_TEXT', label: 'Privacy policy — text' },
+      { key: 'DECLARE_TRUE_DATA', label: 'Declaration of accuracy' },
+      { key: 'DECLARE_TERMS_READ', label: 'Terms-read declaration' },
+    ],
+  },
+] as const;

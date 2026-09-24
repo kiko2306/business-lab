@@ -426,11 +426,6 @@ before anything is built.
       `beta` once `apps/hotel/` exists: the gated secondary asks for a login,
       the public ones do not, the app's bypass path still answers
       unauthenticated, and Authelia restarts cleanly rather than crash-looping.
-- [ ] **Build the guest-text template store** — plan.md §629. Admin UI uses
-      the dashboard's `TranslatePipe` with static `en`/`pt-pt` files; guest
-      emails and pages keep DB-backed per-client, per-language templates, so
-      the legacy `translations` table survives in reduced form covering only
-      guest-facing strings. Same admin/guest split as the styling decision.
 - [ ] **Package the agent as an installer** — the agent is built and proven
       (plan.md §636) but is installed by hand today: copy the files, edit
       `tally.config`, run `Tally.Agent.exe enrol <CODE>`, then `sc.exe create`.

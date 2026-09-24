@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AgentStatus, EnrolmentCode, FlowKey, Identity, Question, SmtpSettings, Unit } from './models';
+import { AgentStatus, EnrolmentCode, FlowKey, GuestTextTemplate, Identity, Question, SmtpSettings, Unit } from './models';
 
 /**
  * Same-origin: this bundle is served by nginx, which proxies `/api` through to
@@ -75,5 +75,13 @@ export class ApiService {
 
   testSmtp(): Observable<{ success: boolean; message: string }> {
     return this.http.post<{ success: boolean; message: string }>('/api/smtp/test', {});
+  }
+
+  listGuestText(): Observable<GuestTextTemplate[]> {
+    return this.http.get<GuestTextTemplate[]>('/api/guest-text');
+  }
+
+  saveGuestText(key: string, locale: string, value: string): Observable<GuestTextTemplate> {
+    return this.http.put<GuestTextTemplate>(`/api/guest-text/${key}/${locale}`, { value });
   }
 }
