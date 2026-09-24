@@ -85,8 +85,11 @@ export function requireAgent(pool: Pool) {
       res.status(401).json({ error: 'missing agent token' });
       return;
     }
+    // Clearing down_alert_sent_at here, not just bumping last_seen_at, is what
+    // lets the agent-down alert (emailSchedule.ts) fire again on the *next*
+    // outage rather than staying silent forever after the first one.
     const { rows } = await pool.query(
-      `UPDATE agents SET last_seen_at = now()
+      `UPDATE agents SET last_seen_at = now(), down_alert_sent_at = NULL
         WHERE token_hash = $1 AND revoked_at IS NULL
         RETURNING id`,
       [hash(token)]

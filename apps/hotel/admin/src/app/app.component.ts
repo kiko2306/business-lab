@@ -44,7 +44,7 @@ export class AppComponent implements OnInit {
   newQuestionType: Question['type'] = 'rating';
 
   smtp: SmtpSettings | null = null;
-  smtpForm = { host: '', port: 587, encryption: 'tls' as SmtpSettings['encryption'], username: '', password: '', fromAddress: '', fromName: '' };
+  smtpForm = { host: '', port: 587, encryption: 'tls' as SmtpSettings['encryption'], username: '', password: '', fromAddress: '', fromName: '', alertEmail: '' };
   savingSmtp = false;
   testingSmtp = false;
   smtpFeedback = '';
@@ -105,6 +105,16 @@ export class AppComponent implements OnInit {
 
   toggleFlow(unit: Unit, flow: FlowKey): void {
     this.api.setFlow(unit.id, flow, !unit[flow]).subscribe({
+      next: (updated) => Object.assign(unit, updated),
+      error: (err) => this.fail(err),
+    });
+  }
+
+  /** Blurring a changed offset field patches it; an unchanged one is left alone. */
+  setOffset(unit: Unit, key: 'checkinOffsetDays' | 'quizOffsetDays', value: string): void {
+    const days = Number(value);
+    if (!Number.isInteger(days) || days < 0 || days > 60 || days === unit[key]) return;
+    this.api.setOffset(unit.id, key, days).subscribe({
       next: (updated) => Object.assign(unit, updated),
       error: (err) => this.fail(err),
     });

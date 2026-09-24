@@ -830,10 +830,12 @@ export const SERVICES: Record<string, ServiceDefinition> = {
       {
         // Public by default (autheliaProtected omitted): a guest following an
         // emailed link has no account, and no Authelia session to forward
-        // (plan.md §641).
+        // (plan.md §641). urlEnvKey hands hotel-core this hostname so its
+        // guest-email scheduler can build a real link (plan.md §651).
         suffix: 'checkin',
         label: 'Check-in',
         portEnvVar: 'HOTEL_CHECKIN_PORT',
+        urlEnvKey: 'HOTEL_CHECKIN_URL',
       },
       {
         // Same reasoning as `checkin`: a guest following an emailed
@@ -841,6 +843,7 @@ export const SERVICES: Record<string, ServiceDefinition> = {
         suffix: 'pulse',
         label: 'Feedback',
         portEnvVar: 'HOTEL_PULSE_PORT',
+        urlEnvKey: 'HOTEL_PULSE_URL',
       },
     ],
     hiddenGeneratedSecrets: ['HOTEL_DB_PASSWORD'],

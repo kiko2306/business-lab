@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.140.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.141.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -469,6 +469,21 @@ before anything is built.
       finding, tracked separately). `apps/tally/agent/` is the worked example
       for config, enrolment, DPAPI token storage and the reconnect loop; the
       transport here is plain outbound HTTPS rather than a socket (§627).
+- [ ] **Verify `hotel-core`'s guest-email scheduler on the live stack** —
+      plan.md §651. Everything is proven against a real database in CI:
+      the offset math, the flow/active-flag gating, and "a failed send
+      leaves the row unmarked so the next tick retries" — but nothing off
+      the live stack can prove the one piece that only exists when the app
+      is actually exposed: that `HOTEL_CHECKIN_URL` / `HOTEL_PULSE_URL`
+      resolve to the real `hotel-checkin`/`hotel-pulse` hostnames (the new
+      `additionalExposures.urlEnvKey` mechanism) rather than the
+      `localhost:<port>` compose default, and that a real SMTP send through
+      them lands a usable link in an inbox. Check on `beta`: set a unit's
+      `checkin_is_active` + a real SMTP sender, seed (or wait for the agent
+      to sync) a reservation whose check-in date is within the offset, and
+      confirm the email arrives with a working `https://hotel-checkin.…`
+      link — then the same for a post-checkout quiz email and the
+      15-minute agent-down alert.
 - [ ] **Verify `tally` starts on the live stack** — plan.md §630 registered the
       app and proved the schema against a real `postgres:17-alpine` in CI, but
       nothing has run it on `beta` yet. Check: the app starts from the

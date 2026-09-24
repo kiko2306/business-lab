@@ -5,6 +5,7 @@ import type { Server } from 'node:http';
 import path from 'path';
 import { Pool } from 'pg';
 import { createApp } from './app';
+import { loadDueCheckins, loadDueQuiz, runEmailSchedule } from './emailSchedule';
 import { migrate } from './migrate';
 
 // NOTE: shares one database with any sibling suite and truncates between
@@ -43,6 +44,37 @@ async function seedUnit(code: string, name: string): Promise<string> {
     [code, name]
   );
   return rows[0].id;
+}
+
+/** Today +/- offsetDays, in UTC to match Postgres's own CURRENT_DATE in a fresh container. */
+function isoDate(offsetDays: number): string {
+  const d = new Date();
+  d.setUTCDate(d.getUTCDate() + offsetDays);
+  return d.toISOString().slice(0, 10);
+}
+
+/** A reservation with a real guest email, for the email-schedule tests. `email: null` omits the guest entirely. */
+async function seedReservation(opts: {
+  unitId: string;
+  checkinOn: string;
+  checkoutOn: string;
+  number?: string;
+  email?: string | null;
+}) {
+  let guestId: string | null = null;
+  if (opts.email !== null) {
+    const guest = await pool.query(
+      `INSERT INTO guests (code, first_name, last_name, email) VALUES ($1, 'Ana', 'Silva', $2) RETURNING id`,
+      [`G-${opts.number ?? '1'}-${opts.unitId}`, opts.email ?? 'ana@example.com']
+    );
+    guestId = guest.rows[0].id;
+  }
+  const { rows } = await pool.query(
+    `INSERT INTO reservations (unit_id, number, line, guest_id, checkin_on, checkout_on, status)
+     VALUES ($1, $2, 1, $3, $4, $5, 'RESERVED') RETURNING id, token`,
+    [opts.unitId, opts.number ?? '1', guestId, opts.checkinOn, opts.checkoutOn]
+  );
+  return rows[0] as { id: string; token: string };
 }
 
 before(async () => {
@@ -182,6 +214,28 @@ test('each of the four guest flows switches independently', { skip }, async () =
   assert.equal(updated.body.quizActive, false);
   assert.equal(updated.body.birthdayActive, false);
   assert.equal(updated.body.isActive, true);
+});
+
+test('a unit defaults to a one-day send offset for both flows, and each is independently editable', { skip }, async () => {
+  const unitId = await seedUnit('A', 'Alpha');
+  const fresh = await call('GET', '/api/units', { headers: ADMIN });
+  const unit = fresh.body.find((u: { id: string }) => u.id === unitId);
+  assert.equal(unit.checkinOffsetDays, 1);
+  assert.equal(unit.quizOffsetDays, 1);
+
+  const updated = await call('PATCH', `/api/units/${unitId}`, {
+    headers: ADMIN,
+    body: { checkinOffsetDays: 3 },
+  });
+  assert.equal(updated.body.checkinOffsetDays, 3);
+  // Untouched offset stays put, same as the flow switches above.
+  assert.equal(updated.body.quizOffsetDays, 1);
+
+  // Out of the plausible 0-60 range is a typo, not a setting — dropped.
+  assert.equal(
+    (await call('PATCH', `/api/units/${unitId}`, { headers: ADMIN, body: { quizOffsetDays: 61 } })).status,
+    400
+  );
 });
 
 test('an agent enrols, learns its units, and is revoked', { skip }, async () => {
@@ -660,6 +714,88 @@ test('SMTP settings reject a missing host or from address', { skip }, async () =
 test('testing an unconfigured SMTP sender fails without dialing anywhere', { skip }, async () => {
   const result = await call('POST', '/api/smtp/test', { headers: ADMIN });
   assert.equal(result.status, 400);
+});
+
+test('the SMTP sender also carries the agent-down alert recipient', { skip }, async () => {
+  const saved = await call('PUT', '/api/smtp', {
+    headers: ADMIN,
+    body: { host: 'smtp.example.com', fromAddress: 'stay@example.com', alertEmail: 'ops@example.com' },
+  });
+  assert.equal(saved.body.alertEmail, 'ops@example.com');
+  // Blank is a valid choice too — it's how an admin turns the alert back off.
+  const cleared = await call('PUT', '/api/smtp', {
+    headers: ADMIN,
+    body: { host: 'smtp.example.com', fromAddress: 'stay@example.com', alertEmail: '' },
+  });
+  assert.equal(cleared.body.alertEmail, '');
+});
+
+test('due check-ins respect the per-unit offset, the active flags, the sent flag and a real guest email', { skip }, async () => {
+  const unitId = await seedUnit('A', 'Alpha');
+  await pool.query(`UPDATE units SET checkin_is_active = true, checkin_offset_days = 2 WHERE id = $1`, [unitId]);
+
+  // Due: check-in is exactly the offset away.
+  const due = await seedReservation({ unitId, checkinOn: isoDate(2), checkoutOn: isoDate(5), number: '1' });
+  // Not yet due: one day further out than the offset allows.
+  await seedReservation({ unitId, checkinOn: isoDate(3), checkoutOn: isoDate(6), number: '2' });
+  // Already sent.
+  const alreadySent = await seedReservation({ unitId, checkinOn: isoDate(1), checkoutOn: isoDate(4), number: '3' });
+  await pool.query(`UPDATE reservations SET checkin_sent = true WHERE id = $1`, [alreadySent.id]);
+  // No guest on file at all.
+  await seedReservation({ unitId, checkinOn: isoDate(0), checkoutOn: isoDate(3), number: '4', email: null });
+  // Flow switched off on a second unit.
+  const offUnit = await seedUnit('B', 'Beta');
+  await seedReservation({ unitId: offUnit, checkinOn: isoDate(0), checkoutOn: isoDate(2), number: '1' });
+
+  const dueRows = await loadDueCheckins(pool);
+  assert.deepEqual(dueRows.map((r) => r.id), [due.id]);
+});
+
+test('due quiz emails respect the per-unit offset past check-out', { skip }, async () => {
+  const unitId = await seedUnit('A', 'Alpha');
+  await pool.query(`UPDATE units SET quiz_is_active = true, quiz_offset_days = 2 WHERE id = $1`, [unitId]);
+
+  // Due: checked out exactly the offset ago.
+  const due = await seedReservation({ unitId, checkinOn: isoDate(-5), checkoutOn: isoDate(-2), number: '1' });
+  // Not yet due: checked out only a day ago, the offset wants two.
+  await seedReservation({ unitId, checkinOn: isoDate(-4), checkoutOn: isoDate(-1), number: '2' });
+
+  const dueRows = await loadDueQuiz(pool);
+  assert.deepEqual(dueRows.map((r) => r.id), [due.id]);
+});
+
+test('the email schedule no-ops with SMTP unconfigured, leaving reservations untouched', { skip }, async () => {
+  const unitId = await seedUnit('A', 'Alpha');
+  await pool.query(`UPDATE units SET checkin_is_active = true WHERE id = $1`, [unitId]);
+  const due = await seedReservation({ unitId, checkinOn: isoDate(0), checkoutOn: isoDate(3), number: '1' });
+
+  await runEmailSchedule(pool);
+
+  const { rows } = await pool.query(`SELECT checkin_sent FROM reservations WHERE id = $1`, [due.id]);
+  assert.equal(rows[0].checkin_sent, false);
+});
+
+test('a send that fails leaves checkin_sent false, so the next tick retries', { skip }, async () => {
+  await call('PUT', '/api/smtp', {
+    headers: ADMIN,
+    // Nothing listens on 127.0.0.1:1 — an immediate, fast connection refusal.
+    body: { host: '127.0.0.1', port: 1, username: 'x', password: 'x', fromAddress: 'stay@example.com' },
+  });
+  const unitId = await seedUnit('A', 'Alpha');
+  await pool.query(`UPDATE units SET checkin_is_active = true WHERE id = $1`, [unitId]);
+  const due = await seedReservation({ unitId, checkinOn: isoDate(0), checkoutOn: isoDate(3), number: '1' });
+
+  const originalUrl = process.env.HOTEL_CHECKIN_URL;
+  process.env.HOTEL_CHECKIN_URL = 'http://localhost:10601';
+  try {
+    await runEmailSchedule(pool);
+  } finally {
+    if (originalUrl === undefined) delete process.env.HOTEL_CHECKIN_URL;
+    else process.env.HOTEL_CHECKIN_URL = originalUrl;
+  }
+
+  const { rows } = await pool.query(`SELECT checkin_sent FROM reservations WHERE id = $1`, [due.id]);
+  assert.equal(rows[0].checkin_sent, false);
 });
 
 test('a viewer cannot see or change guest-text templates', { skip }, async () => {

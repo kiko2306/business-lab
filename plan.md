@@ -30936,3 +30936,111 @@ None. Deleted the §629 guest-text-template-store README item this closes.
 The check-in/quiz email schedules and the birthday/promo flows, both still
 open, are what will actually read these templates and send mail through
 §649's SMTP settings.
+
+## 651. Implemented: hotel-core's check-in/quiz guest email scheduler
+
+The next open consumer §650 flagged: a per-minute job that finds due
+reservations and actually sends the check-in invite and post-stay quiz
+emails, using the SMTP sender (§649) and guest-text templates (§650) that
+were already built with nothing yet reading them.
+
+**Per-unit offsets.** The legacy's `checkin:send`/`quiz:send` semantics
+(§620) are per-unit "days before check-in" / "days after check-out". Neither
+existed in the schema yet — only the on/off flags did — so
+`005_email_schedule.sql` adds `units.checkin_offset_days` /
+`quiz_offset_days` (smallint, default 1), admin-editable through
+`PATCH /api/units/:id` the same way the flow switches are, clamped to 0-60
+(anything past that is almost certainly a typo and is silently dropped, same
+as an invalid flow value already was).
+
+**Due query, not exact-day match.** The legacy matched `checkin` exactly
+`today + offset`; a scheduler outage of even a day would then never catch
+that guest, since nothing re-checks a day it already passed. `<=` instead —
+`checkin_on <= today + offset` for check-in, `checkout_on <= today - offset`
+for quiz — so a missed day is picked up on the next run, and the existing
+`checkin_sent`/`quiz_sent` flags (already indexed for this, per the
+`reservations_checkin_due_idx`/`reservations_quiz_due_idx` comment sitting
+in `001_init.sql` since the schema was first written) are what stop a
+repeat. `apps/hotel/api/src/emailSchedule.ts` exports the two queries
+(`loadDueCheckins`/`loadDueQuiz`) separately from the send/mark loop, so the
+offset arithmetic and flag gating are tested directly against a real
+database rather than only through a full send.
+
+**Guest link hostname — the one piece with no precedent.** hotel-core has
+to build a link into the `checkin`/`pulse` **secondary** hostnames it shares
+a compose project with, not its own. The existing `exposureEnvKeys`
+mechanism (`exposureEnv.ts`) only ever wrote the *primary* exposure's
+hostname into env vars — nothing before this needed a service to learn one
+of its own `additionalExposures`' hostnames. Rather than build a new
+cross-app wiring mechanism (the Nextcloud/OnlyOffice `occ`-script shape
+would be overkill for "just tell me a hostname"), `ServiceAdditionalExposure`
+gained one new optional field, `urlEnvKey`: `buildExposureEnvOverrides` now
+also loops `additionalExposures` and, for each with `urlEnvKey` set, writes
+`https://<suffix hostname>` to that env var. `hotel`'s `checkin`/`pulse`
+entries in `services.ts` set `HOTEL_CHECKIN_URL`/`HOTEL_PULSE_URL`;
+`apps/hotel/docker-compose.yml` gives `hotel-core` those two vars with a
+`http://localhost:<port>` fallback for the unexposed/dev case (matching
+plain HTTP, since there's no TLS to be mismatched with there). Guarded the
+same way every other exposure override is: no-ops when the app isn't
+exposed, so an admin sees `HOTEL_CHECKIN_URL` unset and the scheduler simply
+skips that flow's sends until it is (`if (checkinBase) …` in
+`runEmailSchedule`) rather than mailing a dead `localhost` link to a real
+guest.
+
+**Locale.** Guests have no locale column, and neither guest app has real
+i18n yet (§650's note) — every guest gets the `pt-pt` templates. Marked
+`ponytail:` in `emailSchedule.ts` rather than left silent, since it's a
+real, deliberate corner: add guest-level locale if that's ever wanted.
+
+**Mail rendering.** Legacy templates use a literal `$guest` placeholder
+inside `*_MAIL_TEXT` (confirmed straight from the `004_guest_text.sql` seed
+values, e.g. `'<p>Hello $guest,<br>...`), replaced with the guest's
+`first_name last_name` (falling back to their email if both are blank) —
+then the `*_MAIL_BUTTON` text becomes a plain `<a href>` appended after the
+body, pointed at `<linkBase>/<reservation token>`.
+
+**Agent-down alert**, the third scheduled job the legacy ran on the same
+cadence (`conn:check`). No new polling: `auth.ts`'s `requireAgent` already
+bumps `last_seen_at` on every authenticated call, so `agents` gained one
+column, `down_alert_sent_at`, set when the alert fires and cleared by that
+same heartbeat — one alert per outage rather than one every minute for as
+long as the agent stays down. Recipient is a new `smtp_settings.alert_email`
+column (blank skips sending it, same "fail fast on nothing configured"
+shape as the sender itself), editable in the same admin card as the SMTP
+settings.
+
+**Never throws out of the scheduler.** `runEmailSchedule` catches at the
+top level, and a single failed send is caught per-guest inside
+`sendFlowEmails` and logged rather than aborting the batch — one bad
+address must not block every other due guest. The nodemailer transport gets
+explicit 10 s connection/greeting/socket timeouts; its own default is two
+minutes, which would otherwise let one unreachable SMTP host stall a
+minute-cadence job for four ticks running.
+
+### Verification
+
+`apps/hotel/api`: `npm run typecheck`, `npm run build`, and `npm test`
+against a throwaway `postgres:17-alpine` (port 5433) — 48 tests passing (9
+new): the offset default and independent PATCH-editing (plus the 0-60
+clamp), `alertEmail` round-tripping through the SMTP settings route,
+`loadDueCheckins`/`loadDueQuiz` each exercised against five seeded
+reservations covering offset-boundary, wrong-unit-flow, already-sent and
+no-guest-email cases, the scheduler no-op'ing with SMTP unconfigured, and a
+send that fails (host `127.0.0.1:1`, nothing listens — fast `ECONNREFUSED`)
+leaving `checkin_sent` false. `backend`: `npm run typecheck` and `npm test`
+— 1192 tests passing, including a new `exposureEnv.test.ts` case that
+`buildExposureEnvOverrides('hotel', …)` resolves `HOTEL_CHECKIN_URL`/
+`HOTEL_PULSE_URL` to `https://hotel-checkin.example.com` /
+`https://hotel-pulse.example.com`. `apps/hotel/admin`: `ng build` clean
+(same pre-existing Bootstrap selector warning as §647). `docker compose
+config` on `apps/hotel/docker-compose.yml` confirms the new env vars
+resolve. Not run against a live SMTP server or the real exposed hostnames —
+that needs `beta`, and is the new README item this section adds.
+
+### Follow-ups added to the README
+
+One: verify the scheduler end-to-end on `beta` (real SMTP send, real
+exposed `HOTEL_CHECKIN_URL`/`HOTEL_PULSE_URL`, the agent-down alert). The
+birthday/promo flows and the check-out/online-payment flow remain their own
+separate, still-open README items — this section only closes the
+check-in/quiz mail piece.

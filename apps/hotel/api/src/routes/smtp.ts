@@ -26,6 +26,7 @@ export function smtpRoutes(pool: Pool): Router {
       passwordConfigured: Boolean(row?.password),
       fromAddress: row?.from_address ?? '',
       fromName: row?.from_name ?? '',
+      alertEmail: row?.alert_email ?? '',
     });
   });
 
@@ -45,14 +46,24 @@ export function smtpRoutes(pool: Pool): Router {
     const password = text(req.body?.password) ?? existing?.password ?? '';
 
     const { rows } = await pool.query(
-      `INSERT INTO smtp_settings (id, host, port, encryption, username, password, from_address, from_name, updated_at)
-       VALUES (1, $1, $2, $3, $4, $5, $6, $7, now())
+      `INSERT INTO smtp_settings (id, host, port, encryption, username, password, from_address, from_name, alert_email, updated_at)
+       VALUES (1, $1, $2, $3, $4, $5, $6, $7, $8, now())
        ON CONFLICT (id) DO UPDATE SET
          host = EXCLUDED.host, port = EXCLUDED.port, encryption = EXCLUDED.encryption,
          username = EXCLUDED.username, password = EXCLUDED.password,
-         from_address = EXCLUDED.from_address, from_name = EXCLUDED.from_name, updated_at = now()
+         from_address = EXCLUDED.from_address, from_name = EXCLUDED.from_name,
+         alert_email = EXCLUDED.alert_email, updated_at = now()
        RETURNING *`,
-      [host, port, encryption, text(req.body?.username) ?? '', password, fromAddress, text(req.body?.fromName) ?? '']
+      [
+        host,
+        port,
+        encryption,
+        text(req.body?.username) ?? '',
+        password,
+        fromAddress,
+        text(req.body?.fromName) ?? '',
+        text(req.body?.alertEmail) ?? '',
+      ]
     );
     const row = rows[0];
     res.json({
@@ -64,6 +75,7 @@ export function smtpRoutes(pool: Pool): Router {
       passwordConfigured: Boolean(row.password),
       fromAddress: row.from_address,
       fromName: row.from_name,
+      alertEmail: row.alert_email,
     });
   });
 

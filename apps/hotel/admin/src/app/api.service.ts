@@ -29,6 +29,10 @@ export class ApiService {
     return this.http.patch<Unit>(`/api/units/${id}`, { isActive });
   }
 
+  setOffset(id: string, key: 'checkinOffsetDays' | 'quizOffsetDays', days: number): Observable<Unit> {
+    return this.http.patch<Unit>(`/api/units/${id}`, { [key]: days });
+  }
+
   listAccess(id: string): Observable<string[]> {
     return this.http.get<string[]>(`/api/units/${id}/access`);
   }

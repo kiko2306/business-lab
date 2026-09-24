@@ -200,6 +200,19 @@
             <label class="form-label fw-semibold" for="smtpFromName">From name <span class="fw-normal text-secondary">(optional)</span></label>
             <input id="smtpFromName" class="form-control" name="smtpFromName" [(ngModel)]="smtpForm.fromName" />
           </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="smtpAlertEmail">
+              Agent-down alert <span class="fw-normal text-secondary">(optional)</span>
+            </label>
+            <input
+              id="smtpAlertEmail"
+              type="email"
+              class="form-control"
+              name="smtpAlertEmail"
+              placeholder="Blank skips this alert"
+              [(ngModel)]="smtpForm.alertEmail" />
+            <div class="form-text">Emailed once if the property agent stops reporting in for 15 minutes.</div>
+          </div>
           <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
             <button type="submit" class="btn btn-sm btn-primary" [disabled]="savingSmtp">
               {{ savingSmtp ? 'Saving…' : 'Save' }}
@@ -280,6 +293,7 @@
             <th scope="col">Property</th>
             <th scope="col">Status</th>
             <th scope="col">Guest flows</th>
+            <th scope="col">Send timing</th>
             <th scope="col" class="text-end">Actions</th>
           </tr>
         </thead>
@@ -314,6 +328,36 @@
                   }
                 </div>
               </td>
+              <td data-label="Send timing">
+                <div class="d-flex flex-column gap-2">
+                  <div class="d-flex align-items-center gap-2">
+                    <label class="small text-secondary mb-0" [for]="unit.id + 'checkinOffset'">Check-in, days before</label>
+                    <input
+                      class="form-control form-control-sm"
+                      style="width: 4.5rem"
+                      type="number"
+                      min="0"
+                      max="60"
+                      [id]="unit.id + 'checkinOffset'"
+                      [value]="unit.checkinOffsetDays"
+                      [disabled]="!isAdmin"
+                      (change)="setOffset(unit, 'checkinOffsetDays', $any($event.target).value)" />
+                  </div>
+                  <div class="d-flex align-items-center gap-2">
+                    <label class="small text-secondary mb-0" [for]="unit.id + 'quizOffset'">Feedback, days after</label>
+                    <input
+                      class="form-control form-control-sm"
+                      style="width: 4.5rem"
+                      type="number"
+                      min="0"
+                      max="60"
+                      [id]="unit.id + 'quizOffset'"
+                      [value]="unit.quizOffsetDays"
+                      [disabled]="!isAdmin"
+                      (change)="setOffset(unit, 'quizOffsetDays', $any($event.target).value)" />
+                  </div>
+                </div>
+              </td>
               <td data-label="Actions" class="text-end">
                 @if (isAdmin) {
                   <div class="btn-group btn-group-sm">
@@ -330,7 +374,7 @@
 
             @if (openId === unit.id && isAdmin) {
               <tr>
-                <td colspan="4" class="bg-body-tertiary">
+                <td colspan="5" class="bg-body-tertiary">
                   <div class="py-2">
                     <h3 class="h6">Who can see {{ unit.name }}</h3>
                     <p class="text-secondary small">

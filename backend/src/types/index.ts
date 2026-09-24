@@ -83,6 +83,12 @@ export interface ServiceAdditionalExposure {
   // that group is never created and only admins get in. services.test.ts
   // checks that pairing.
   autheliaProtected?: boolean;
+  // Compose env var to receive this secondary hostname's own public
+  // `https://` URL, for a sibling container in the same compose project that
+  // needs to build a link to it — e.g. hotel-core emailing a guest a link to
+  // the `checkin`/`pulse` secondaries it shares a project with (plan.md
+  // §651). Unset for the common case where nothing else needs to know.
+  urlEnvKey?: string;
 }
 
 // Groups services on the dashboard so the grid reads by function instead of

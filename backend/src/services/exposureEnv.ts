@@ -97,7 +97,8 @@ export async function buildExposureEnvOverrides(
   const service = getService(serviceName);
   const exposureEnvKeys = service?.exposureEnvKeys;
   const oidcAppEnv = service?.oidcClient?.appEnv;
-  if (!exposureEnvKeys && !oidcAppEnv) {
+  const hasUrlEnvKeys = (service?.additionalExposures ?? []).some((extra) => extra.urlEnvKey);
+  if (!exposureEnvKeys && !oidcAppEnv && !hasUrlEnvKeys) {
     return {};
   }
 
@@ -166,6 +167,14 @@ export async function buildExposureEnvOverrides(
   const overrides = exposureEnvKeys
     ? computeExposureEnvOverrides(exposureEnvKeys, hostname, existingValues, extraHosts, gatewayIp)
     : {};
+
+  // A secondary exposure that declares urlEnvKey wants its own public URL
+  // handed to a sibling container in the same compose project (plan.md §651).
+  for (const extra of getService(serviceName)?.additionalExposures ?? []) {
+    if (extra.urlEnvKey) {
+      overrides[extra.urlEnvKey] = `https://${buildExposureHostname(serviceName, globalConfig.baseDomain, extra.suffix, { apex: extra.apex })}`;
+    }
+  }
 
   // An app that authenticates against Authelia's own OIDC provider (plan.md
   // §270) gets its client config injected here too — derived from the

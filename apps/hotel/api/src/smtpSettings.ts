@@ -18,6 +18,7 @@ export interface SmtpConfig {
   password: string;
   fromAddress: string;
   fromName: string;
+  alertEmail: string;
 }
 
 interface SmtpRow {
@@ -28,6 +29,7 @@ interface SmtpRow {
   password: string;
   from_address: string;
   from_name: string;
+  alert_email: string;
 }
 
 /** Sensible default port for the chosen encryption, same reasoning as the dashboard's. */
@@ -57,6 +59,7 @@ export async function getSmtpConfig(pool: Pool): Promise<SmtpConfig | null> {
     password: row.password,
     fromAddress: row.from_address,
     fromName: row.from_name,
+    alertEmail: row.alert_email,
   };
 }
 

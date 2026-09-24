@@ -191,4 +191,18 @@ describe('buildExposureEnvOverrides — compose default fallback', () => {
     const { buildExposureEnvOverrides } = await import('./exposureEnv');
     expect(await buildExposureEnvOverrides('vikunja', appDir)).toEqual({});
   });
+
+  it('hands an additionalExposures.urlEnvKey its own suffixed hostname (hotel-core → checkin/pulse, §651)', async () => {
+    const appDir = path.join(tmpDir, 'hotel');
+    fs.mkdirSync(appDir);
+    fs.writeFileSync(path.join(appDir, 'docker-compose.yml'), 'services:\n  hotel-core:\n    image: x\n');
+
+    const { buildExposureEnvOverrides } = await import('./exposureEnv');
+    const out = await buildExposureEnvOverrides('hotel', appDir);
+
+    // hotel-core needs these to build guest-email links to its own siblings
+    // (emailSchedule.ts), not to the primary (admin UI) hostname.
+    expect(out.HOTEL_CHECKIN_URL).toBe('https://hotel-checkin.example.com');
+    expect(out.HOTEL_PULSE_URL).toBe('https://hotel-pulse.example.com');
+  });
 });

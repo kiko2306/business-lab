@@ -22,6 +22,11 @@ services:
     environment:
       TZ: ${TZ:-Europe/Lisbon}
       DATABASE_URL: postgres://${HOTEL_DB_USER:-hotel}:${HOTEL_DB_PASSWORD}@hotel-db:5432/${HOTEL_DB_NAME:-hotel}
+      # Overridden to the real https:// hostname on exposure (urlEnvKey,
+      # plan.md §651) — the guest-email scheduler's link target. The
+      # plain-http localhost fallback is only ever reached unexposed.
+      HOTEL_CHECKIN_URL: ${HOTEL_CHECKIN_URL:-http://localhost:${HOTEL_CHECKIN_PORT:-10601}}
+      HOTEL_PULSE_URL: ${HOTEL_PULSE_URL:-http://localhost:${HOTEL_PULSE_PORT:-10602}}
     networks:
       - hotel-net
     # Deliberately no homepage.* labels. The generator scans the whole compose

@@ -13,6 +13,9 @@ export interface Unit {
   quizActive: boolean;
   birthdayActive: boolean;
   promoActive: boolean;
+  /** Days before check-in / after check-out the guest email goes out (plan.md §651). */
+  checkinOffsetDays: number;
+  quizOffsetDays: number;
 }
 
 /** The four guest flows, each switchable per unit (plan.md §629). */
@@ -57,6 +60,8 @@ export interface SmtpSettings {
   passwordConfigured: boolean;
   fromAddress: string;
   fromName: string;
+  /** Recipient for the 15-minute agent-down alert (plan.md §651). Blank skips sending it. */
+  alertEmail: string;
 }
 
 /** One guest-text template row (plan.md §649.1). Fixed key set, no add/delete. */

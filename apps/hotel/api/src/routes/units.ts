@@ -2,7 +2,7 @@ import { Router } from 'express';
 import type { Pool } from 'pg';
 import { requireAdmin, requireIdentity } from '../auth';
 import { CODE_TTL_MINUTES, generateEnrolmentCode, hash } from '../tokens';
-import { UUID } from '../util';
+import { int, UUID } from '../util';
 
 const UNIQUE_VIOLATION = '23505';
 
@@ -67,6 +67,19 @@ export function unitRoutes(pool: Pool): Router {
     if (typeof req.body?.isActive === 'boolean') {
       values.push(req.body.isActive);
       sets.push(`is_active = $${values.length}`);
+    }
+    // Days before check-in / after check-out the guest email goes out
+    // (plan.md §651). 0-60 covers every plausible stay; anything outside
+    // that is almost certainly a typo, so it's dropped rather than stored.
+    for (const [key, column] of [
+      ['checkinOffsetDays', 'checkin_offset_days'],
+      ['quizOffsetDays', 'quiz_offset_days'],
+    ] as const) {
+      const value = int(req.body?.[key]);
+      if (value !== null && value >= 0 && value <= 60) {
+        values.push(value);
+        sets.push(`${column} = $${values.length}`);
+      }
     }
     if (sets.length === 0) {
       res.status(400).json({ error: 'nothing to update' });
@@ -195,5 +208,7 @@ function toUnit(r: Record<string, unknown>) {
     quizActive: r.quiz_is_active,
     birthdayActive: r.birthday_is_active,
     promoActive: r.promo_is_active,
+    checkinOffsetDays: r.checkin_offset_days,
+    quizOffsetDays: r.quiz_offset_days,
   };
 }
