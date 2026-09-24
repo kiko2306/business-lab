@@ -54,6 +54,14 @@
         </button>
         <button
           type="button"
+          class="btn btn-sm btn-outline-primary"
+          [disabled]="publishingId === draft.id"
+          (click)="publish(draft)"
+        >
+          {{ (publishingId === draft.id ? 'social.publishing' : 'social.publishButton') | t }}
+        </button>
+        <button
+          type="button"
           class="btn btn-sm btn-outline-danger"
           [disabled]="deletingId === draft.id"
           (click)="remove(draft)"

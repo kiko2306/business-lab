@@ -30,4 +30,12 @@ export class SocialService {
   deleteDraft(id: number): Observable<void> {
     return this.http.delete<void>(`${API_BASE_URL}/social/drafts/${id}`, this.opts);
   }
+
+  publish(id: number): Observable<{ total: number; sent: number; failed: number }> {
+    return this.http.post<{ total: number; sent: number; failed: number }>(
+      `${API_BASE_URL}/social/drafts/${id}/publish`,
+      {},
+      this.opts
+    );
+  }
 }

@@ -9,6 +9,12 @@ import rateLimit from 'express-rate-limit';
 import { schemas, validateBody, validateParams } from '../middleware/validation';
 import { generateSocialPost, ClaudeKeyMissingError } from '../services/claudeGenerate';
 import { listDrafts, createDraft, updateDraftContent, deleteDraft } from '../services/socialDrafts';
+import {
+  publishDraft,
+  DraftNotFoundError,
+  MailNotConfiguredError,
+  DashboardUrlMissingError,
+} from '../services/socialPublish';
 import logger from '../utils/logger';
 
 const router = Router();
@@ -61,6 +67,25 @@ router.patch(
     }
   }
 );
+
+// Sends the draft as an email advert to every active subscriber (plan.md
+// §611/§612 slice 1). One message per recipient, each with its own
+// unsubscribe link — see services/socialPublish.ts.
+router.post('/drafts/:id/publish', validateParams(schemas.socialDraftIdParam), async (req: Request, res: Response) => {
+  try {
+    const result = await publishDraft(Number(req.params.id));
+    return res.json(result);
+  } catch (error) {
+    if (error instanceof DraftNotFoundError) {
+      return res.status(404).json({ error: error.message });
+    }
+    if (error instanceof MailNotConfiguredError || error instanceof DashboardUrlMissingError) {
+      return res.status(400).json({ error: error.message });
+    }
+    logger.error('Publishing a social draft failed', { error: error instanceof Error ? error.message : error });
+    return res.status(500).json({ error: 'Unable to publish the draft.' });
+  }
+});
 
 router.delete('/drafts/:id', validateParams(schemas.socialDraftIdParam), async (req: Request, res: Response) => {
   try {

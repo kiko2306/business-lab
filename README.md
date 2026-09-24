@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.145.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.146.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -311,17 +311,17 @@ it is done — not ticked off and left behind. Section references point at
       shows success and the row's `unsubscribed_at` is set; hit the same
       link again and confirm it still succeeds instead of erroring.
 
-- [ ] **Wire the social-drafts publish path to the new subscriber list** —
-      the recipient-list prerequisite (`advert_subscribers` table, public
-      subscribe/unsubscribe endpoints, `UnsubscribeComponent`) is built
-      (plan.md §616). Still open: `POST /api/social/drafts/:id/publish`
-      reading a draft and sending it via `utils/mailSend.ts`'s `sendMail()`
-      (already used for invites, §158) — one message per row from
-      `listActiveSubscribers()`, each with `{baseUrl}/unsubscribe/{token}`
-      in its footer. No n8n workflow needed — §611's n8n angle is
-      superseded for plain email. Slice 2 (social-platform posting) still
-      needs a per-platform token/OAuth setup and is scoped only once a
-      specific platform is named.
+- [ ] **Beta-test the social-drafts publish path (plan.md §660)** — on
+      `beta`: configure the shared mailbox and Dashboard URL in Settings,
+      subscribe a real address via `POST /api/subscribers`, generate a
+      draft on the Content page, click Publish, and confirm a real email
+      arrives with the draft's content and a working
+      `{baseUrl}/unsubscribe/{token}` link; confirm Publish is blocked with
+      a clear error when the mailbox or Dashboard URL isn't set yet, and
+      that an unsubscribed address stops receiving further publishes.
+      Slice 2 (social-platform posting) still needs a per-platform
+      token/OAuth setup and is scoped only once a specific platform is
+      named.
 
 - [ ] **"Claude API key" → multi-provider "AI API Keys"** — plan in
       plan.md §610. Today it's one Anthropic-only key

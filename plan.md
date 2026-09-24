@@ -31578,3 +31578,52 @@ No README beta-test item was skipped: added one, since this changes real
 `docker compose build`/`up` call timing and ordering in the self-update
 sequence — a part of the codebase with a documented history (§354, §356) of
 passing tests while breaking on the live host.
+
+## 660. Implemented: the social-drafts publish path (closes the open half of §611/§612/§616)
+
+Built the piece §616 left open — §612's recipient-list prerequisite
+(`advert_subscribers`, public subscribe/unsubscribe endpoints,
+`UnsubscribeComponent`) already existed; this is the actual send.
+
+**New service (`backend/src/services/socialPublish.ts`)**: `publishDraft(id)`
+reads the draft (`socialDrafts.ts` gained `getDraftById`), checks
+`mailIsConfigured()` and `getDashboardBaseUrl()` up front (same shape as
+`routes/users.ts`'s invite flow), then sends one `sendMail()` per row from
+`listActiveSubscribers()` — each with that subscriber's own
+`{baseUrl}/unsubscribe/{token}` in the footer, since the link has to key off
+their token, not a shared one. Best-effort per recipient: one SMTP failure
+is caught and counted, not thrown, so it doesn't stop the rest of the list.
+Subject line: the draft has no separate title field (`socialDrafts.ts`'s
+`prompt` is the generation brief, not copy), so the subject is the
+content's own first non-blank line, capped at 200 chars, falling back to
+"Update" if the content is somehow blank.
+
+Three typed errors (`DraftNotFoundError`, `MailNotConfiguredError`,
+`DashboardUrlMissingError`) — same pattern as `claudeGenerate.ts`'s
+`ClaudeKeyMissingError` — let the thin route (`POST
+/api/social/drafts/:id/publish`) map each to the right status code (404,
+400, 400) without the service importing Express.
+
+**No n8n workflow** — confirmed §611's n8n angle stays superseded for plain
+email; `mailSend.ts`'s `sendMail()` already does the job.
+
+**Frontend**: `SocialService.publish(id)` + a Publish button per draft on
+the Content page, gated behind a `ConfirmService` dialog (irreversible —
+real email to real subscribers) since there's no other page action that
+sends live external mail on a single click. Toasts distinguish full success,
+partial failure (some sends bounced), and the zero-subscribers case. i18n
+keys added to both `en.ts` and `pt-pt.ts`; the page subtitle updated since
+"publishing comes later" was no longer true.
+
+**Tests**: `socialPublish.test.ts` (new) covers the three guard errors, the
+per-recipient send with each subscriber's own token in the link, a partial
+failure not stopping the list, zero-subscriber no-op, and the blank-content
+subject fallback — all against mocked `sendMail`/`listActiveSubscribers`/
+`getDashboardBaseUrl`. No frontend spec added — the page's other actions
+(save/delete) don't have one either. Backend typecheck + all 1202 tests
+pass; frontend build + all 90 karma tests pass.
+
+README's open-piece item replaced with a beta-test item: nothing here can
+prove a real SMTP send lands a working unsubscribe link, or that a
+misconfigured mailbox/Dashboard URL is refused with a clear error, without
+the live stack.

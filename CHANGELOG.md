@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.146.0] — 2026-09-24
+
+### Added
+
+- Social-drafts publish path: sends the draft as an email advert to every active subscriber
+
 ## [0.145.0] — 2026-09-24
 
 ### Added

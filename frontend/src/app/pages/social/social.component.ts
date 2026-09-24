@@ -11,8 +11,10 @@ import { TranslatePipe } from '../../i18n/translate.pipe';
 import { TranslateService } from '../../i18n/translate.service';
 
 /**
- * Content generation (plan.md §254 P2): a prompt in, a stored draft out.
- * Publishing and scheduling are later phases — this page only writes copy.
+ * Content generation (plan.md §254 P2) plus the email-advert publish path
+ * (plan.md §611/§612 slice 1): a prompt in, a stored draft out, and a
+ * Publish button that sends it to every active subscriber. Scheduling and
+ * social-platform posting (slice 2) are still later phases.
  */
 @Component({
   selector: 'app-social',
@@ -34,6 +36,7 @@ export class SocialComponent implements OnInit {
   protected edits: Record<number, string> = {};
   protected savingId: number | null = null;
   protected deletingId: number | null = null;
+  protected publishingId: number | null = null;
 
   ngOnInit(): void {
     this.loadDrafts();
@@ -113,6 +116,37 @@ export class SocialComponent implements OnInit {
       error: (error) => {
         this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.delete')));
         this.deletingId = null;
+      },
+    });
+  }
+
+  async publish(draft: SocialDraft): Promise<void> {
+    const ok = await this.confirm.ask({
+      title: this.translate.t('social.confirmPublish.title'),
+      message: this.translate.t('social.confirmPublish.message'),
+      confirmText: this.translate.t('social.confirmPublish.confirmText'),
+      danger: true,
+    });
+    if (!ok) {
+      return;
+    }
+    this.publishingId = draft.id;
+    this.social.publish(draft.id).subscribe({
+      next: ({ sent, failed, total }) => {
+        this.publishingId = null;
+        if (total === 0) {
+          this.toast.error(this.translate.t('social.errors.noSubscribers'));
+          return;
+        }
+        if (failed > 0) {
+          this.toast.error(this.translate.t('social.toast.publishedPartial', { sent, total }));
+          return;
+        }
+        this.toast.success(this.translate.t('social.toast.published', { sent }));
+      },
+      error: (error) => {
+        this.toast.error(extractErrorMessage(error, this.translate.t('social.errors.publish')));
+        this.publishingId = null;
       },
     });
   }

@@ -49,6 +49,11 @@ export async function listDrafts(): Promise<SocialDraft[]> {
   return result.rows.map(toDraft);
 }
 
+export async function getDraftById(id: number): Promise<SocialDraft | null> {
+  const result = await query<Row>('SELECT * FROM social_drafts WHERE id = $1', [id]);
+  return result.rows[0] ? toDraft(result.rows[0]) : null;
+}
+
 export async function createDraft(prompt: string, content: string): Promise<SocialDraft> {
   const result = await query<Row>(
     'INSERT INTO social_drafts (prompt, content) VALUES ($1, $2) RETURNING *',
