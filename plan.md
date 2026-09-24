@@ -32425,3 +32425,21 @@ twice (before the fix it grew); 503 → 2 s then 4 s; 401 → "Connection refuse
 (401)" and exactly 60 s (15.3 s → 75.4 s) before the next attempt, which then
 connected. `dotnet build -warnaserror` clean. Needs the new setup exe on the shop
 machine like the other agent changes.
+
+## 680. Fixed: the Items sold tab threw at runtime and drew nothing
+
+Report: "still no items sold" — with the new agent installed (`1.0.0-8cac51b0`), the
+API already returned the day's items (434 units, codes and families, checked on
+the box), so the fault was in the page. Rendered the live page in headless Chrome
+(the frontend-test image plus `puppeteer-core`, page served from a fresh build
+and proxied to the box's API): clicking **Items sold** logged `ReferenceError:
+tmp_50_0 is not defined` and drew nothing. Cause is my §678 template change —
+`@for (item of soldItems.items; track item.code ?? item.description)`: Angular 18
+compiles a `??` inside `track` to a temp variable it never declares. The build and
+type-check stayed green because it only fails when the tab renders. Fix: `track
+$index`. Re-rendered: no console errors, the top-items chart and the table show
+the 107 items with code and family.
+
+Lesson for this app: `ng build` proves nothing about a template that runs behind
+a tab or an `@if` — the fixes since §672 were each verified by building only,
+and this one shipped broken for that reason. Rendering the page is the check.

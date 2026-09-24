@@ -200,7 +200,10 @@
             </tr>
           </thead>
           <tbody>
-            @for (item of soldItems.items; track item.code ?? item.description) {
+            <!-- track $index, not `item.code ?? item.description`: Angular 18 compiles a
+           `??` inside `track` to a temp variable it never declares, so the whole
+           tab threw ReferenceError at runtime while the build stayed green (§680). -->
+            @for (item of soldItems.items; track $index) {
               <tr>
                 <td data-label="Item">
                   {{ item.description }}
