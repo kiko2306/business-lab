@@ -24,22 +24,38 @@ namespace Tally.Agent;
 public sealed class ShopReader(string connectionString)
 {
     /// <summary>
-    /// The trading day to report on. Defaults to today; a caller passes another
-    /// date only to check the queries against historical data.
-    ///
-    /// The legacy had no date filter at all, relying on Wintouch rolling these
-    /// tables per session (§622). That is true of the installs seen so far, but
-    /// it means a table that is *not* rolled silently reports all time as
-    /// "today", so the filter is explicit here.
+    /// Pins the trading day, for checking the queries against a known date.
+    /// Normally left null, and the day is whatever the day tables hold.
     /// </summary>
-    public DateTime BusinessDate { get; init; } = DateTime.Today;
+    public DateTime? BusinessDate { get; init; }
+
+    /// <summary>
+    /// The running trading day: the date of the newest line in the day table.
+    ///
+    /// Not `DateTime.Today`. Wintouch keeps the *open* business day in
+    /// `wsir_vnd_vendas` and rolls it into the archive at day close (§622), so
+    /// that table is by definition the running day — which is not the calendar
+    /// date after midnight in a bar that trades late, nor on a shop whose day
+    /// has not been closed yet. Pinning to today made every "today" figure
+    /// empty whenever the two disagreed (§677). Still an explicit date filter
+    /// rather than none, so a table that was not rolled reports its latest day
+    /// and not all time (the §622 worry). Falls back to today for an empty
+    /// table, where there is nothing to disagree with.
+    /// </summary>
+    private async Task<DateTime> ResolveDayAsync(SqlConnection connection, CancellationToken ct)
+    {
+        if (BusinessDate is { } pinned) return pinned.Date;
+        await using var command = new SqlCommand("SELECT MAX(CAST(EntryDate AS date)) FROM wsir_vnd_vendas", connection);
+        return await command.ExecuteScalarAsync(ct) is DateTime latest ? latest : DateTime.Today;
+    }
 
     public async Task<Overview> ReadOverviewAsync(CancellationToken ct)
     {
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(ct);
+        var day = await ResolveDayAsync(connection, ct);
 
-        var invoiced = await ScalarAsync(connection, """
+        var invoiced = await ScalarAsync(connection, day, """
             SELECT ISNULL(SUM(CAST(v.total AS DECIMAL(18,2))), 0)
               FROM wsir_vnd_vendas v
               JOIN wgctiposdocumentos d ON v.documento = d.codigo
@@ -49,19 +65,19 @@ public sealed class ShopReader(string connectionString)
 
         // Open tabs are current by definition — there is no closed-day concept
         // for an order that has not been paid for yet.
-        var open = await ScalarAsync(connection, """
+        var open = await ScalarAsync(connection, day, """
             SELECT ISNULL(SUM(CAST(total AS DECIMAL(18,2))), 0) FROM wsir_vnd_pedidos
             """, ct);
 
-        var counts = await QueryAsync(connection, """
+        var counts = await QueryAsync(connection, day, """
             SELECT estado, COUNT(*) AS n FROM wsir_mst_mesas GROUP BY estado
             """, r => (Estado: Convert.ToInt32(r["estado"]), N: Convert.ToInt32(r["n"])), ct);
 
-        var present = await ScalarAsync(connection, """
+        var present = await ScalarAsync(connection, day, """
             SELECT ISNULL(SUM(CAST(numclientes AS int)), 0) FROM wsir_mst_mesas WHERE estado <> 0
             """, ct);
 
-        var staff = await QueryAsync(connection, """
+        var staff = await QueryAsync(connection, day, """
             SELECT v.funcionario AS code,
                    ISNULL(e.nome, v.funcionario) AS name,
                    SUM(CAST(v.total AS DECIMAL(18,2))) AS total
@@ -78,7 +94,7 @@ public sealed class ShopReader(string connectionString)
         // Payments carry no date of their own, so they are dated by the sale
         // they settle — which is also what stops a payment being counted
         // against a document that was voided.
-        var payments = await QueryAsync(connection, """
+        var payments = await QueryAsync(connection, day, """
             SELECT ISNULL(m.descricao, p.meiospagamento) AS method,
                    SUM(CAST(p.total AS DECIMAL(18,2))) AS total
               FROM wsir_vnd_meiospagamento p
@@ -93,7 +109,7 @@ public sealed class ShopReader(string connectionString)
              ORDER BY total DESC
             """, r => new PaymentTotal((string)r["method"], (decimal)r["total"]), ct);
 
-        var hourlyRows = await QueryAsync(connection, """
+        var hourlyRows = await QueryAsync(connection, day, """
             SELECT DATEPART(hour, v.EntryDate) AS hour,
                    SUM(CAST(v.total AS DECIMAL(18,2))) AS total
               FROM wsir_vnd_vendas v
@@ -113,19 +129,22 @@ public sealed class ShopReader(string connectionString)
             new Clients((int)present),
             staff,
             payments,
-            FillHours(hourlyRows));
+            FillHours(hourlyRows),
+            day.ToString("yyyy-MM-dd"));
     }
 
     public async Task<TablesView> ReadTablesAsync(CancellationToken ct)
     {
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(ct);
+        // Tables and open orders are live state; none of these queries has a date.
+        var day = DateTime.Today;
 
-        var counts = await QueryAsync(connection, """
+        var counts = await QueryAsync(connection, day, """
             SELECT estado, COUNT(*) AS n FROM wsir_mst_mesas GROUP BY estado
             """, r => (Estado: Convert.ToInt32(r["estado"]), N: Convert.ToInt32(r["n"])), ct);
 
-        var open = await QueryAsync(connection, """
+        var open = await QueryAsync(connection, day, """
             SELECT m.mesa AS tableNumber,
                    m.estado AS estado,
                    ISNULL(e.nome, '') AS staff,
@@ -148,7 +167,7 @@ public sealed class ShopReader(string connectionString)
         // One query for every open table's lines, then grouped in memory: a
         // per-table round trip would be one query per occupied table on every
         // refresh, and a busy shop has dozens.
-        var lines = await QueryAsync(connection, """
+        var lines = await QueryAsync(connection, day, """
             SELECT CAST(mesa AS int) AS tableNumber,
                    SUM(CAST(quantidade AS DECIMAL(18,2))) AS quantity,
                    descricao AS description,
@@ -184,10 +203,11 @@ public sealed class ShopReader(string connectionString)
     {
         await using var connection = new SqlConnection(connectionString);
         await connection.OpenAsync(ct);
+        var day = await ResolveDayAsync(connection, ct);
 
         // tipolinha 'P' is a product line — the rest are discounts, notes and
         // totals, which would double-count if summed as items.
-        var items = await QueryAsync(connection, """
+        var items = await QueryAsync(connection, day, """
             SELECT descricao AS description,
                    SUM(CAST(quantidade AS DECIMAL(18,2))) AS quantity,
                    SUM(CAST(total AS DECIMAL(18,2))) AS total
@@ -198,7 +218,7 @@ public sealed class ShopReader(string connectionString)
              ORDER BY quantity DESC
             """, r => new SoldItem((string)r["description"], (decimal)r["quantity"], (decimal)r["total"]), ct);
 
-        return new SoldItemsView(Now(), items.Sum(i => i.Quantity), items.Sum(i => i.Total), items);
+        return new SoldItemsView(Now(), items.Sum(i => i.Quantity), items.Sum(i => i.Total), items, day.ToString("yyyy-MM-dd"));
     }
 
     /// <summary>
@@ -219,29 +239,29 @@ public sealed class ShopReader(string connectionString)
 
     private static string Now() => DateTime.UtcNow.ToString("o");
 
-    private async Task<decimal> ScalarAsync(SqlConnection connection, string sql, CancellationToken ct)
+    private async Task<decimal> ScalarAsync(SqlConnection connection, DateTime day, string sql, CancellationToken ct)
     {
-        await using var command = Command(connection, sql);
+        await using var command = Command(connection, day, sql);
         var value = await command.ExecuteScalarAsync(ct);
         return value is null or DBNull ? 0m : Convert.ToDecimal(value);
     }
 
     private async Task<List<T>> QueryAsync<T>(
-        SqlConnection connection, string sql, Func<IDataRecord, T> map, CancellationToken ct)
+        SqlConnection connection, DateTime day, string sql, Func<IDataRecord, T> map, CancellationToken ct)
     {
-        await using var command = Command(connection, sql);
+        await using var command = Command(connection, day, sql);
         await using var reader = await command.ExecuteReaderAsync(ct);
         var results = new List<T>();
         while (await reader.ReadAsync(ct)) results.Add(map(reader));
         return results;
     }
 
-    private SqlCommand Command(SqlConnection connection, string sql)
+    private static SqlCommand Command(SqlConnection connection, DateTime day, string sql)
     {
         var command = new SqlCommand(sql, connection);
         // Added unconditionally: an unused parameter is harmless, and this way
         // no query can forget the date filter by forgetting the parameter.
-        command.Parameters.Add("@businessDate", SqlDbType.Date).Value = BusinessDate;
+        command.Parameters.Add("@businessDate", SqlDbType.Date).Value = day;
         return command;
     }
 }

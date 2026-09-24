@@ -32328,3 +32328,41 @@ Verified: 35 API tests against a real Postgres that *already had* an
 `smtp_settings` row — the table is gone after `migrate`, and the schema test's
 table list no longer contains it; Angular build passes. Not looked at in a
 browser.
+
+## 677. Fixed: Tally showed nothing for the running day — the date filter was the calendar date
+
+Report: the shop's "items sold" is empty though the data is there. The agent
+filtered the day tables with `CAST(EntryDate AS date) = DateTime.Today`
+(§636). Wintouch keeps the *open* business day in `wsir_vnd_vendas` and rolls it
+into the archive at day close, so that table already is the running day — which
+is not the calendar date after midnight in a bar that trades late, or before a
+day is closed. On this machine the day tables hold 2026-07-27, so every
+"today" figure was empty on 24/09.
+
+Fix: the business day is now `MAX(CAST(EntryDate AS date))` of `wsir_vnd_vendas`
+(`ResolveDayAsync`), falling back to today only for an empty table; still an
+explicit date filter, so a table that was never rolled reports its latest day and
+not all time. `BusinessDate` stays as an optional pin. Overview and sold-items
+now return `businessDate`, and the shop page says "Business day dd/MM/yyyy"
+and drops the word "today" from its labels. Tables and open orders never had a
+date and are unchanged.
+
+Proven on the real `vallado` database on this machine by running the changed
+`ShopReader` directly: day 2026-07-27, invoiced €9,640.16 (the §636 figure),
+103 sold items / 495 units. `dotnet build -warnaserror` clean, Angular build
+passes. Not proven end to end: the installed agent is the old build, so this needs
+the new setup exe (README TODO).
+
+### Older days: where the data lives (not built)
+
+Findings for a later slice, probed read-only on the same database. History is in
+`wgcdoccab` (301,404 document headers, 21/11/2016–27/07/2026, with `Mesa`,
+`anulado`, `datadoc`), `wgcdoclinhas` (1.28 M lines: `artigo`, `descricao`,
+`qtddoc`, `precounit`, `merc`, `iva`, discount columns) and `wgcpagamentos`
+(payments — columns not yet read). Caveat found: a line's value is not
+`qtddoc × precounit` — for invoices on 2026-06-03 that gives 9,848.85 against
+the headers' net 8,488.46, so discounts must come from the line's own value
+columns and be reconciled with the headers before any money is shown. The same
+day (27/07) is partly in both places (82 archived lines against 365 in the day
+table), so the day-close boundary needs checking too. The operator's priority is
+the running day; history is wanted but second.

@@ -15,7 +15,10 @@ public sealed record Overview(
     Clients Clients,
     IReadOnlyList<StaffTotal> Staff,
     IReadOnlyList<PaymentTotal> Payments,
-    IReadOnlyList<HourlyTotal> Hourly);
+    IReadOnlyList<HourlyTotal> Hourly,
+    // The trading day these figures are for (yyyy-MM-dd) — the running day, which
+    // is not always the calendar date (§677).
+    string BusinessDate);
 
 public sealed record Totals(decimal Invoiced, decimal Open);
 
@@ -51,6 +54,7 @@ public sealed record SoldItemsView(
     string AsOf,
     decimal TotalQuantity,
     decimal TotalValue,
-    IReadOnlyList<SoldItem> Items);
+    IReadOnlyList<SoldItem> Items,
+    string BusinessDate);
 
 public sealed record SoldItem(string Description, decimal Quantity, decimal Total);

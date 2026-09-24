@@ -39,6 +39,8 @@ export interface Overview {
   payments: { method: string; total: number }[];
   /** Takings per hour of the current trading day, empty hours included. */
   hourly: { hour: number; total: number }[];
+  /** The trading day these figures are for, yyyy-MM-dd — the running day, not always today (§677). Absent from an older agent. */
+  businessDate?: string;
 }
 
 export interface TableLine {
@@ -70,6 +72,7 @@ export interface SoldItemsView {
   totalQuantity: number;
   totalValue: number;
   items: { description: string; quantity: number; total: number }[];
+  businessDate?: string;
 }
 
 /** The agent setup exe built into this image (plan.md §670). */

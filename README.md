@@ -482,6 +482,16 @@ before anything is built.
       §675)** — `netbird-vpn-api.…/api/networks` returns 401 to Uptime-Kuma and
       the dashboard backend about every 30 s. A stale or missing NetBird API token
       somewhere; the dashboard should mint/refresh it itself (principle 3).
+- [ ] **Show the running day's figures from the new agent (plan.md §677)** —
+      after installing the new setup exe, the shop page must say "Business day
+      27/07/2026" (this box's demo day) and show invoiced €9,640.16 and the
+      **Items sold** tab with ~103 items / 495 units — not empty.
+- [ ] **Add older days to Tally from Wintouch's archive (plan.md §677)** — a date
+      picker reading `wgcdoccab` / `wgcdoclinhas` / `wgcpagamentos` for any day
+      before the running one. Read `wgcpagamentos`' columns, take line values
+      from the line's own value/discount columns (not qty × price), and
+      reconcile per-day totals with the headers before showing money. Check what
+      day close does with the boundary day. Second priority to the running day.
 - [ ] **Run the single-file Tally setup for real, elevated** — plan.md §670.
       Its prompts, `install.config` presets and validation were tested
       un-elevated, and the Docker build of the exe on Linux; the elevated part
