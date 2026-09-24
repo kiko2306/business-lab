@@ -433,15 +433,6 @@ before anything is built.
       to set it false. Needs a small CRUD surface in hotel-core plus a page
       in hotel-admin, the same shape as the Properties table's existing
       per-unit flow toggles.
-- [ ] **Sync the shared theme into `pulse` when it exists** — the mechanism is
-      built and proven for `tally` and `hotel-checkin` (plan.md §633/§642):
-      `scripts/sync-app-theme.sh` copies `frontend/src/styles.css` into each
-      app's `theme.css`, and a CI step diffs them. §626 wanted no copy at all,
-      but an app image builds from its own `apps/<name>/` context and cannot
-      reach `frontend/src/`, so drift is caught rather than prevented. Add
-      `pulse`'s path to the script's `targets`, and a matching diff step to
-      its CI job. Remember to re-run the script after any dashboard theme
-      change and commit what it writes.
 - [ ] **Build the guest-text template store** — plan.md §629. Admin UI uses
       the dashboard's `TranslatePipe` with static `en`/`pt-pt` files; guest
       emails and pages keep DB-backed per-client, per-language templates, so

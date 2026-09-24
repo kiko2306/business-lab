@@ -30730,3 +30730,10 @@ call §642 made for `checkin`.
 None new — the two follow-ups §644 already listed (an admin editor for
 question content, and pulse's own guest frontend) are covered: this section
 closes the second, the admin editor is still open.
+
+## 646. Fixed: stale "sync pulse's theme" README item after §645
+
+§645 already synced `pulse`'s theme (`scripts/sync-app-theme.sh` targets and
+the matching CI diff step) as part of building its guest frontend, but the
+README item asking for that work was left behind instead of being deleted
+with the rest of §645's follow-ups. Deleted it.
