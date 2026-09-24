@@ -30796,3 +30796,73 @@ Page's `homepage.group=Productivity` compose label untouched — that is a
 separate, public-facing grouping the request didn't mention. Backend
 typecheck/tests (1191) and frontend tests (89) pass; no live-stack
 verification needed, this only reorders a display grouping.
+
+## 649. Implemented: `hotel` and `tally` each get their own SMTP settings
+
+Closes the README item from §629's decision #5: guest mail must carry the
+hotel's own address, not the dashboard's shared mailbox, so each app needs
+its own sender rather than reusing `backend/src/utils/mailSend.ts`.
+
+Explored first whether the dashboard's generic per-app env panel
+(`appEnv.ts`, already how `HOTEL_DB_PASSWORD`/`TALLY_DB_PASSWORD` reach
+`apps/*/.env`) was the right surface. Rejected: that panel edits `.env`
+through the dashboard's own Settings/Apps UI, one level removed from the app
+that uses the value, whereas `units.ts`/`questions.ts` already established
+the pattern for *this app's own* admin-editable settings — a table in the
+app's own database, guarded by the app's own `requireAdmin`, edited from the
+app's own admin frontend. SMTP settings are exactly that shape (§647 is the
+closest precedent, minus the list — there is only ever one sender), so this
+follows it instead.
+
+**Schema**: `smtp_settings`, one fixed row (`id = 1`) — host, port,
+encryption, username, password, from address, from name — added as
+`apps/hotel/api/src/migrations/003_smtp.sql` and
+`apps/tally/api/src/migrations/002_smtp.sql`. Both apps get their own
+`smtpSettings.ts` (config type, `defaultPort()`, and a masked-password
+loader) — duplicated rather than shared, matching §629 decision #8's
+one-source-directory-per-service shape; there is no package the two app
+repos already share code through.
+
+**Routes**: `routes/smtp.ts` in each — `GET/PUT /api/smtp` (password only
+overwrites when the PUT body actually supplies one, same convention as the
+dashboard's own `PUT /api/settings/mail`) and `POST /api/smtp/test`, all
+`requireAdmin`. The test route uses `nodemailer`'s `transport.verify()`
+rather than reimplementing the dashboard's raw-socket connection check
+(`backend/src/services/mailTest.ts`) — that file deliberately avoids the
+dependency because verifying is *all* it ever needs to do, but both hotel and
+tally will need the full `nodemailer` client anyway once the still-open
+guest-email work (check-in/quiz schedules, birthday/promo) actually sends
+HTML mail with an embedded logo, so pulling it in now for `verify()` avoids
+throwing away a raw-socket implementation later. Added `nodemailer` +
+`@types/nodemailer` to both `apps/hotel/api` and `apps/tally/api`
+(`package.json`/`package-lock.json`), pinned to the same `^6.9.14` the
+dashboard already uses.
+
+**Frontend**: an "Email settings" card, admin-only, in `hotel-admin`
+(`app.component.html`, above "Properties") and `tally-web`
+(`stores.component.html`, above "Shops") — a plain `ngModel` form matching
+each app's existing style (neither uses reactive forms or i18n), with a
+Save and a Test button and the same "leave blank to keep the stored
+password" placeholder text as the dashboard's own mail form.
+
+### Verification
+
+`apps/hotel/api` and `apps/tally/api`: `npm run typecheck` clean in both;
+`npm test` against a throwaway `postgres:17-alpine` each (same shape as the
+CI jobs, ports 5433/5434) — 38 and 37 tests respectively, all passing,
+including the new ones: a viewer 401s/403s on every `/api/smtp` route, an
+admin's save round-trips and a blank password on re-save keeps the stored
+one (checked directly against the row, not just the masked response), a
+missing host/fromAddress 400s, and testing an unconfigured sender 400s
+without ever calling `nodemailer`. `apps/hotel/admin` and `apps/tally/web`:
+`ng build` clean in both (the one pre-existing Bootstrap CSS selector
+warning noted in §647, unrelated). Not run against a live SMTP server or
+through Authelia on `beta` — already covered by the existing "Verify a gated
+secondary hostname on the live stack" README item, the same call §647 made.
+
+### Follow-ups added to the README
+
+None. Deleted the §629 SMTP README item this closes. The actual HTML-mail
+send path (embedded logo, `sendMail()`-equivalent) is not built yet — it
+lands with whichever consumer needs it first (the check-in/quiz email
+schedules or the birthday/promo flows, both still open, separate items).

@@ -4,6 +4,7 @@ import { agentRoutes } from './routes/agent';
 import { checkinRoutes } from './routes/checkin';
 import { pulseRoutes } from './routes/pulse';
 import { questionRoutes } from './routes/questions';
+import { smtpRoutes } from './routes/smtp';
 import { unitRoutes } from './routes/units';
 
 /** Split from index.ts so tests build an app without starting a listener. */
@@ -30,6 +31,7 @@ export function createApp(pool: Pool): Express {
   app.use('/agent', agentRoutes(pool));
   app.use('/api', unitRoutes(pool));
   app.use('/api', questionRoutes(pool));
+  app.use('/api', smtpRoutes(pool));
   app.use('/checkin', checkinRoutes(pool));
   app.use('/pulse', pulseRoutes(pool));
 

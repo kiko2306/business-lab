@@ -66,6 +66,7 @@ beforeEach(async () => {
   await pool.query('DELETE FROM guests');
   await pool.query('DELETE FROM agents');
   await pool.query('DELETE FROM enrolment_codes');
+  await pool.query('DELETE FROM smtp_settings');
 });
 
 test('the schema applies, twice, and creates what is expected', { skip }, async () => {
@@ -84,6 +85,7 @@ test('the schema applies, twice, and creates what is expected', { skip }, async 
     'pulse_questions',
     'pulse_responses',
     'reservations',
+    'smtp_settings',
     'unit_access',
     'units',
   ]);
@@ -613,4 +615,48 @@ test('an admin creates, edits, reorders and retires a question', { skip }, async
   } finally {
     await pool.query('DELETE FROM pulse_questions WHERE id = $1', [id]);
   }
+});
+
+test('a viewer cannot see or change the SMTP sender', { skip }, async () => {
+  assert.equal((await call('GET', '/api/smtp')).status, 401);
+  assert.equal((await call('GET', '/api/smtp', { headers: VIEWER })).status, 403);
+  assert.equal(
+    (await call('PUT', '/api/smtp', { headers: VIEWER, body: { host: 'x', fromAddress: 'a@b.c' } })).status,
+    403
+  );
+});
+
+test('an admin saves the SMTP sender, and a blank password keeps the stored one', { skip }, async () => {
+  const unset = await call('GET', '/api/smtp', { headers: ADMIN });
+  assert.equal(unset.body.configured, false);
+
+  const saved = await call('PUT', '/api/smtp', {
+    headers: ADMIN,
+    body: { host: 'smtp.example.com', username: 'stay', password: 'secret', fromAddress: 'stay@example.com' },
+  });
+  assert.equal(saved.status, 200);
+  assert.equal(saved.body.configured, true);
+  assert.equal(saved.body.passwordConfigured, true);
+  assert.equal(saved.body.port, 587);
+  assert.equal(saved.body.encryption, 'tls');
+
+  // Re-saving without a password must not blank out the one already stored.
+  const resaved = await call('PUT', '/api/smtp', {
+    headers: ADMIN,
+    body: { host: 'smtp.example.com', username: 'stay', fromAddress: 'stay@example.com', fromName: 'The Stay' },
+  });
+  assert.equal(resaved.body.passwordConfigured, true);
+  assert.equal(resaved.body.fromName, 'The Stay');
+  const { rows } = await pool.query('SELECT password FROM smtp_settings WHERE id = 1');
+  assert.equal(rows[0].password, 'secret');
+});
+
+test('SMTP settings reject a missing host or from address', { skip }, async () => {
+  assert.equal((await call('PUT', '/api/smtp', { headers: ADMIN, body: { fromAddress: 'a@b.c' } })).status, 400);
+  assert.equal((await call('PUT', '/api/smtp', { headers: ADMIN, body: { host: 'smtp.example.com' } })).status, 400);
+});
+
+test('testing an unconfigured SMTP sender fails without dialing anywhere', { skip }, async () => {
+  const result = await call('POST', '/api/smtp/test', { headers: ADMIN });
+  assert.equal(result.status, 400);
 });

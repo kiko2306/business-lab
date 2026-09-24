@@ -151,6 +151,80 @@
     </div>
   }
 
+  @if (isAdmin) {
+    <div class="card mb-4">
+      <div class="card-body">
+        <h2 class="h6">Email settings</h2>
+        <p class="text-secondary small mb-3">
+          The hotel's own SMTP sender. Guest mail (check-in and feedback links) goes out from this address, not
+          the dashboard's shared mailbox.
+        </p>
+
+        <form class="row g-3" (ngSubmit)="saveSmtp()">
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="smtpHost">SMTP server</label>
+            <input id="smtpHost" class="form-control" name="smtpHost" placeholder="smtp.example.com" [(ngModel)]="smtpForm.host" />
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold" for="smtpEncryption">Encryption</label>
+            <select id="smtpEncryption" class="form-select" name="smtpEncryption" [(ngModel)]="smtpForm.encryption">
+              <option value="tls">STARTTLS</option>
+              <option value="ssl">SSL/TLS</option>
+              <option value="none">None</option>
+            </select>
+          </div>
+          <div class="col-md-3">
+            <label class="form-label fw-semibold" for="smtpPort">Port</label>
+            <input id="smtpPort" type="number" class="form-control" name="smtpPort" [(ngModel)]="smtpForm.port" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="smtpUsername">Username</label>
+            <input id="smtpUsername" class="form-control" name="smtpUsername" autocomplete="off" [(ngModel)]="smtpForm.username" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="smtpPassword">Password</label>
+            <input
+              id="smtpPassword"
+              type="password"
+              class="form-control"
+              name="smtpPassword"
+              autocomplete="new-password"
+              [placeholder]="smtp?.passwordConfigured ? 'Configured — leave blank to keep it' : 'Not set'"
+              [(ngModel)]="smtpForm.password" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="smtpFromAddress">From address</label>
+            <input id="smtpFromAddress" type="email" class="form-control" name="smtpFromAddress" [(ngModel)]="smtpForm.fromAddress" />
+          </div>
+          <div class="col-md-6">
+            <label class="form-label fw-semibold" for="smtpFromName">From name <span class="fw-normal text-secondary">(optional)</span></label>
+            <input id="smtpFromName" class="form-control" name="smtpFromName" [(ngModel)]="smtpForm.fromName" />
+          </div>
+          <div class="col-12 d-flex flex-wrap gap-2 align-items-center">
+            <button type="submit" class="btn btn-sm btn-primary" [disabled]="savingSmtp">
+              {{ savingSmtp ? 'Saving…' : 'Save' }}
+            </button>
+            <button
+              type="button"
+              class="btn btn-sm btn-outline-secondary"
+              [disabled]="testingSmtp || !smtp?.configured"
+              (click)="testSmtp()">
+              {{ testingSmtp ? 'Testing…' : 'Test' }}
+            </button>
+            @if (smtpFeedback) {
+              <span class="small text-success">{{ smtpFeedback }}</span>
+            }
+            @if (smtpTestResult) {
+              <span class="small" [class.text-success]="smtpTestResult.success" [class.text-danger]="!smtpTestResult.success">
+                {{ smtpTestResult.message }}
+              </span>
+            }
+          </div>
+        </form>
+      </div>
+    </div>
+  }
+
   <h2 class="h4 mb-3">Properties</h2>
 
   @if (loading) {

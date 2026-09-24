@@ -431,12 +431,6 @@ before anything is built.
       emails and pages keep DB-backed per-client, per-language templates, so
       the legacy `translations` table survives in reduced form covering only
       guest-facing strings. Same admin/guest split as the styling decision.
-- [ ] **Give each app its own SMTP config and sender** — plan.md §629. `hotel`
-      and `tally` each hold their own SMTP settings and From address rather
-      than reusing the dashboard's shared mailbox, so guest mail arrives from
-      the hotel. Needs a small config panel per app. Note the dashboard's
-      `sendMail()` is plain-text only and these are HTML messages with an
-      embedded logo, so it is not reusable as-is either way.
 - [ ] **Package the agent as an installer** — the agent is built and proven
       (plan.md §636) but is installed by hand today: copy the files, edit
       `tally.config`, run `Tally.Agent.exe enrol <CODE>`, then `sc.exe create`.

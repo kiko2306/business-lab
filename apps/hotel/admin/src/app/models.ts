@@ -46,3 +46,15 @@ export interface Question {
   isActive: boolean;
   sortOrder: number;
 }
+
+/** The hotel's own SMTP sender (plan.md §648). The password is never returned. */
+export interface SmtpSettings {
+  configured: boolean;
+  host: string;
+  port: number;
+  encryption: 'tls' | 'ssl' | 'none';
+  username: string;
+  passwordConfigured: boolean;
+  fromAddress: string;
+  fromName: string;
+}

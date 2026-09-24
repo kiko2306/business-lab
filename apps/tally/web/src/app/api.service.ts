@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { EnrolmentCode, Identity, Overview, SoldItemsView, Store, TablesView } from './models';
+import { EnrolmentCode, Identity, Overview, SmtpSettings, SoldItemsView, Store, TablesView } from './models';
 
 /**
  * Same-origin throughout: the API serves this bundle (plan.md §632), so there
@@ -64,5 +64,17 @@ export class ApiService {
 
   soldItems(id: string): Observable<SoldItemsView> {
     return this.http.get<SoldItemsView>(`/api/stores/${id}/sold-items`);
+  }
+
+  getSmtp(): Observable<SmtpSettings> {
+    return this.http.get<SmtpSettings>('/api/smtp');
+  }
+
+  saveSmtp(settings: Omit<SmtpSettings, 'configured' | 'passwordConfigured'> & { password?: string }): Observable<SmtpSettings> {
+    return this.http.put<SmtpSettings>('/api/smtp', settings);
+  }
+
+  testSmtp(): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>('/api/smtp/test', {});
   }
 }

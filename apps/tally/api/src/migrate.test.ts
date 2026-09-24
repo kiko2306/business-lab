@@ -33,7 +33,7 @@ test('001_init.sql applies and creates the expected schema', { skip: !process.en
     );
     assert.deepEqual(
       tables.rows.map((r) => r.table_name),
-      ['agents', 'enrolment_codes', 'store_access', 'stores']
+      ['agents', 'enrolment_codes', 'smtp_settings', 'store_access', 'stores']
     );
 
     const idx = await pool.query(

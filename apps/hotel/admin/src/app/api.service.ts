@@ -1,7 +1,7 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
 import { Observable } from 'rxjs';
-import { AgentStatus, EnrolmentCode, FlowKey, Identity, Question, Unit } from './models';
+import { AgentStatus, EnrolmentCode, FlowKey, Identity, Question, SmtpSettings, Unit } from './models';
 
 /**
  * Same-origin: this bundle is served by nginx, which proxies `/api` through to
@@ -63,5 +63,17 @@ export class ApiService {
 
   updateQuestion(id: string, patch: Partial<Pick<Question, 'text' | 'type' | 'isActive' | 'sortOrder'>>): Observable<Question> {
     return this.http.patch<Question>(`/api/questions/${id}`, patch);
+  }
+
+  getSmtp(): Observable<SmtpSettings> {
+    return this.http.get<SmtpSettings>('/api/smtp');
+  }
+
+  saveSmtp(settings: Omit<SmtpSettings, 'configured' | 'passwordConfigured'> & { password?: string }): Observable<SmtpSettings> {
+    return this.http.put<SmtpSettings>('/api/smtp', settings);
+  }
+
+  testSmtp(): Observable<{ success: boolean; message: string }> {
+    return this.http.post<{ success: boolean; message: string }>('/api/smtp/test', {});
   }
 }

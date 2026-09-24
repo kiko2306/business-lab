@@ -3,7 +3,7 @@ import { Component, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from './api.service';
-import { AgentStatus, EnrolmentCode, FLOWS, FlowKey, Identity, Question, Unit } from './models';
+import { AgentStatus, EnrolmentCode, FLOWS, FlowKey, Identity, Question, SmtpSettings, Unit } from './models';
 
 /**
  * One page: the properties, who may see them, and the agent. No router —
@@ -31,6 +31,13 @@ export class AppComponent implements OnInit {
   newQuestionText = '';
   newQuestionType: Question['type'] = 'rating';
 
+  smtp: SmtpSettings | null = null;
+  smtpForm = { host: '', port: 587, encryption: 'tls' as SmtpSettings['encryption'], username: '', password: '', fromAddress: '', fromName: '' };
+  savingSmtp = false;
+  testingSmtp = false;
+  smtpFeedback = '';
+  smtpTestResult: { success: boolean; message: string } | null = null;
+
   openId: string | null = null;
   access: string[] = [];
   newIdentity = '';
@@ -56,6 +63,7 @@ export class AppComponent implements OnInit {
         if (identity.isAdmin) {
           this.loadAgent();
           this.loadQuestions();
+          this.loadSmtp();
         }
       },
       error: (err) => this.fail(err),
@@ -220,6 +228,52 @@ export class AppComponent implements OnInit {
         this.questions.sort((x, y) => x.sortOrder - y.sortOrder);
       },
       error: (err) => this.fail(err),
+    });
+  }
+
+  private loadSmtp(): void {
+    this.api.getSmtp().subscribe({
+      next: (smtp) => {
+        this.smtp = smtp;
+        // The password never comes back from the server, so the field is
+        // left blank — typing something is how it gets changed.
+        this.smtpForm = { ...smtp, password: '' };
+      },
+      error: (err) => this.fail(err),
+    });
+  }
+
+  saveSmtp(): void {
+    this.savingSmtp = true;
+    this.smtpFeedback = '';
+    this.smtpTestResult = null;
+    const body = { ...this.smtpForm, password: this.smtpForm.password || undefined };
+    this.api.saveSmtp(body).subscribe({
+      next: (smtp) => {
+        this.smtp = smtp;
+        this.smtpForm = { ...smtp, password: '' };
+        this.savingSmtp = false;
+        this.smtpFeedback = 'Saved.';
+      },
+      error: (err) => {
+        this.savingSmtp = false;
+        this.fail(err);
+      },
+    });
+  }
+
+  testSmtp(): void {
+    this.testingSmtp = true;
+    this.smtpTestResult = null;
+    this.api.testSmtp().subscribe({
+      next: (result) => {
+        this.testingSmtp = false;
+        this.smtpTestResult = result;
+      },
+      error: (err: HttpErrorResponse) => {
+        this.testingSmtp = false;
+        this.smtpTestResult = err.error ?? { success: false, message: `Request failed (${err.status})` };
+      },
     });
   }
 
