@@ -194,14 +194,21 @@
           <thead>
             <tr>
               <th scope="col">Item</th>
+              <th scope="col">Family</th>
               <th scope="col" class="text-end">Quantity</th>
               <th scope="col" class="text-end">Total</th>
             </tr>
           </thead>
           <tbody>
-            @for (item of soldItems.items; track item.description) {
+            @for (item of soldItems.items; track item.code ?? item.description) {
               <tr>
-                <td data-label="Item">{{ item.description }}</td>
+                <td data-label="Item">
+                  {{ item.description }}
+                  @if (item.code) {
+                    <span class="text-secondary small ms-1">{{ item.code }}</span>
+                  }
+                </td>
+                <td data-label="Family" class="text-secondary">{{ item.family }}</td>
                 <td data-label="Quantity" class="text-end num">{{ item.quantity }}</td>
                 <td data-label="Total" class="text-end num">{{ item.total | currency: 'EUR' }}</td>
               </tr>

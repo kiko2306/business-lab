@@ -32366,3 +32366,32 @@ columns and be reconciled with the headers before any money is shown. The same
 day (27/07) is partly in both places (82 archived lines against 365 in the day
 table), so the day-close boundary needs checking too. The operator's priority is
 the running day; history is wanted but second.
+
+## 678. Items sold are joined to the article master on `codpedido`
+
+Follow-up to §677 (the running day). The sold-items list was built from
+`descricao` alone, and was wrong in three ways found on the real `vallado`
+database: the line text is a 30-character truncation of the article name
+("Qta ValladoTawny 20 Anos 50cl"), only 79 of the day's 103 distinct texts equal an
+article `nome` (the rest match a print/abbreviation column or differ), and 74
+article names occur more than once — so any join by name either misses or
+double-counts. `--- Pode Sair Mesa`, a kitchen instruction rung at 0.00 (a
+`COMENTARIOS`-family article), was the day's busiest "item" at 61.
+
+Operator: the items are `wgcartigos`, and the item code on a sale line is
+`codpedido`. Checked, not assumed: `wsir_vnd_vendas` has no `codigo`/`artigo`
+column, but `codpedido` equals a `wgcartigos.codigo` on **641 of 641** product
+lines (the 75 `armazem` and 18 `descricao` hits are coincidences). So the query
+now joins `LEFT JOIN wgcartigos ON codigo = codpedido`, groups by code, names
+each item from the master (`nome`), returns its `familia`, drops the
+`COMENTARIOS` family, and falls back to the line text for an article missing from
+the master. The page shows the code and family beside each item.
+
+Real-data result for the running day (2026-07-27): 107 items (was 103 by text,
+102 once comments were dropped — same-name articles no longer merge), total
+434 units / €9,694.60 unchanged, so no line was lost or added; top items are
+Cerveja Barona Lagger P0316 (33), Agua 75 cl P0306 (26), Visita e Prova Standard
+QV0002 (17); no comment article listed; one item had no master row. `dotnet
+build -warnaserror` and the Angular build pass. Needs the new setup exe on the
+shop machine. The archive (`wgcdoclinhas.artigo`) already carries the same code,
+which will make the older-days view (README item) a straight join.

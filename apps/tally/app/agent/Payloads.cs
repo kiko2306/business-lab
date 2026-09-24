@@ -57,4 +57,4 @@ public sealed record SoldItemsView(
     IReadOnlyList<SoldItem> Items,
     string BusinessDate);
 
-public sealed record SoldItem(string Description, decimal Quantity, decimal Total);
+public sealed record SoldItem(string Code, string Description, string Family, decimal Quantity, decimal Total);

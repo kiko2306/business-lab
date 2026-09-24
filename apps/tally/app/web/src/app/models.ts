@@ -71,7 +71,7 @@ export interface SoldItemsView {
   asOf: string;
   totalQuantity: number;
   totalValue: number;
-  items: { description: string; quantity: number; total: number }[];
+  items: { code?: string; description: string; family?: string; quantity: number; total: number }[];
   businessDate?: string;
 }
 

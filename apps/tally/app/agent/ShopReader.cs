@@ -207,16 +207,34 @@ public sealed class ShopReader(string connectionString)
 
         // tipolinha 'P' is a product line — the rest are discounts, notes and
         // totals, which would double-count if summed as items.
+        //
+        // `codpedido` is the article code (odd name; it matches wgcartigos.codigo
+        // on every product line of the running day, checked against the real
+        // database — §678), so items are joined on it and named from the article
+        // master. Sale lines otherwise carry only `descricao`, cut to 30
+        // characters and editable per sale, which split one article across names
+        // and cannot be matched back reliably. An article missing from the master
+        // falls back to the line's own text.
+        //
+        // Comment articles (family COMENTARIOS — "--- Pode Sair Mesa", a kitchen
+        // instruction rung at 0.00) are also 'P' lines but are not things sold;
+        // unfiltered, one of them was a day's busiest "item".
         var items = await QueryAsync(connection, day, """
-            SELECT descricao AS description,
-                   SUM(CAST(quantidade AS DECIMAL(18,2))) AS quantity,
-                   SUM(CAST(total AS DECIMAL(18,2))) AS total
-              FROM wsir_vnd_vendas
-             WHERE tipolinha = 'P' AND Anulado = 0
-               AND CAST(EntryDate AS date) = @businessDate
-             GROUP BY descricao
+            SELECT v.codpedido AS code,
+                   ISNULL(a.nome, LTRIM(RTRIM(v.descricao))) AS description,
+                   ISNULL(a.familia, '') AS family,
+                   SUM(CAST(v.quantidade AS DECIMAL(18,2))) AS quantity,
+                   SUM(CAST(v.total AS DECIMAL(18,2))) AS total
+              FROM wsir_vnd_vendas v
+              LEFT JOIN wgcartigos a ON a.codigo = v.codpedido
+             WHERE v.tipolinha = 'P' AND v.Anulado = 0
+               AND CAST(v.EntryDate AS date) = @businessDate
+               AND ISNULL(a.familia, '') <> 'COMENTARIOS'
+             GROUP BY v.codpedido, ISNULL(a.nome, LTRIM(RTRIM(v.descricao))), ISNULL(a.familia, '')
              ORDER BY quantity DESC
-            """, r => new SoldItem((string)r["description"], (decimal)r["quantity"], (decimal)r["total"]), ct);
+            """, r => new SoldItem(
+                (string)r["code"], (string)r["description"], (string)r["family"],
+                (decimal)r["quantity"], (decimal)r["total"]), ct);
 
         return new SoldItemsView(Now(), items.Sum(i => i.Quantity), items.Sum(i => i.Total), items, day.ToString("yyyy-MM-dd"));
     }

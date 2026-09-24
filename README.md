@@ -485,7 +485,9 @@ before anything is built.
 - [ ] **Show the running day's figures from the new agent (plan.md §677)** —
       after installing the new setup exe, the shop page must say "Business day
       27/07/2026" (this box's demo day) and show invoiced €9,640.16 and the
-      **Items sold** tab with ~103 items / 495 units — not empty.
+      **Items sold** tab with 107 items / 434 units, each with its article code
+      and family (top: Cerveja Barona Lagger P0316 ×33), and no "Pode Sair Mesa" — not
+      empty (§678).
 - [ ] **Add older days to Tally from Wintouch's archive (plan.md §677)** — a date
       picker reading `wgcdoccab` / `wgcdoclinhas` / `wgcpagamentos` for any day
       before the running one. Read `wgcpagamentos`' columns, take line values
