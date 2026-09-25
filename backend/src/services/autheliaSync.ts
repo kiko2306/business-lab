@@ -27,6 +27,8 @@ import { query } from '../utils/database';
 import { writeAuditLog } from '../utils/audit';
 import logger from '../utils/logger';
 import { getAppAccessOptions } from './userAppAccess';
+import { reconcilePaperlessUsers } from './paperlessUsers';
+import { getServiceStatus } from './status';
 import { getUsersDatabasePath, readUsersDatabase, RawAutheliaUser } from './autheliaUsers';
 
 export interface AutheliaSyncResult {
@@ -135,6 +137,12 @@ export async function syncAutheliaUsersSafe(trigger: string, userId: number | nu
   try {
     const result = await syncAutheliaUsers(trigger);
     if (result.synced) {
+      // Paperless makes a permissionless account for any user it hasn't seen
+      // (§692), so a user added while it runs has to be provisioned now, not
+      // at the next start. Fire-and-forget: the one-off container takes seconds.
+      void getServiceStatus('paperless')
+        .then((status) => (status.state === 'running' ? reconcilePaperlessUsers('paperless') : undefined))
+        .catch(() => undefined);
       return null;
     }
     if (result.reason === 'authelia-not-installed') {

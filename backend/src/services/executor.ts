@@ -33,7 +33,7 @@ import { reconcileGuacamoleAdminPassword } from './guacamoleAdminRotate';
 import { syncMealieAiProvider } from './mealieAiSync';
 import { reconcilePaperlessClamav, managedComposeFragmentPath } from './paperlessClamav';
 import { ensurePaperlessDropbox } from './paperlessDropbox';
-import { reconcilePaperlessAdmin } from './paperlessAdmin';
+import { reconcilePaperlessUsers } from './paperlessUsers';
 import { ensureTwentyStorage } from './twentyStorage';
 import { applyCrowdsecConfigFiles } from './crowdsecConfig';
 import { applyNpmSecurityHeaders } from './npmSecurityHeaders';
@@ -364,7 +364,7 @@ async function composeUpWithManagedConfig(
   await reconcileDocusealFirstAdmin(serviceName);
   // Paperless: promote the Authelia admin, or the header-trusted login lands
   // on a permissionless account and the UI 403s (§247 follow-up). After `up`.
-  await reconcilePaperlessAdmin(serviceName);
+  await reconcilePaperlessUsers(serviceName);
   // Kimai: re-sync its admin's email/password when they've drifted from the
   // config-panel/Authelia values since first boot (§501) — the entrypoint
   // that seeds the account only ever creates it, never updates it. DB write

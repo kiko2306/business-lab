@@ -32805,3 +32805,27 @@ signups, not the Remote-User backend.
 
 **Open:** non-admin Authelia users still get the permissionless account. What
 they should be allowed to see is a policy call, not addressed here.
+
+## 693. Paperless: default permissions for the non-admin Authelia users (§692 open item)
+
+§692 fixed the Authelia admin only; any other Authelia user still landed on a
+permissionless account and the same 403. `services/paperlessAdmin.ts` became
+`paperlessUsers.ts`: the same one-off `manage.py shell` now also (a) creates an
+"Authelia users" group holding every `documents` permission except workflows,
+plus the UI-settings ones (56 perms — proven on the box), and (b) pre-creates
+each other Authelia user with an unusable password and adds them to it.
+Ownership stays Paperless's own: a user sees their own and unowned documents.
+Not granted: workflows, mail accounts/rules, app config, users/groups — those
+stay admin-only.
+
+**Timing.** Users are created lazily at first login, so provisioning has to run
+before then: on every Paperless start, and — new here — after every successful
+Authelia user sync (`autheliaSync.ts`, fire-and-forget, only if Paperless is
+running). Rejected: hooking the app-access grant path (four routes, and the
+group doesn't depend on grants); provisioning at login via a Django signal
+(needs injected code in the image); `PAPERLESS_ACCOUNT_DEFAULT_GROUPS` (allauth
+signups only — confirmed in `paperless/adapter.py`).
+
+**Open:** the permission set is a judgment call (documents CRUD, no admin
+surfaces); adjust `SCRIPT` if operators want less/more. A user's *removal* from
+Authelia leaves the Paperless account — harmless, Authelia gates entry.

@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.150.6] — 2026-09-25
+
+### Fixed
+
+- Paperless: non-admin Authelia users get a usable account (an "Authelia users" group with ordinary document permissions), provisioned on start and after each user sync
+
 ## [0.150.5] — 2026-09-25
 
 ### Fixed
