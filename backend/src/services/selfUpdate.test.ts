@@ -254,6 +254,22 @@ describe('triggerSelfUpdate', () => {
     );
   });
 
+  it('creates missing core sidecars after the build, and a failure there does not fail the run', async () => {
+    mockAnUpdateFrom('old111', 'new222', 1);
+    const base = backup.runCommand.getMockImplementation()!;
+    backup.runCommand.mockImplementation(async (cmd, args) => {
+      if (args.includes('host-timezone-sync')) throw new Error('boom');
+      return base(cmd, args);
+    });
+
+    await triggerSelfUpdate(7);
+    await flush();
+
+    const sidecarUp = backup.runCommand.mock.calls.find(([, a]) => (a as string[]).includes('host-timezone-sync'));
+    expect(sidecarUp?.[1]).toEqual(expect.arrayContaining(['up', '-d', '--no-deps', '--no-build']));
+    expect((await getSelfUpdateStatus()).latestRun?.state).toBe('restarting_backend');
+  });
+
   it('refreshes status.check to "up to date" right after the pull, not just latestRun (§551)', async () => {
     mockAnUpdateFrom('old111', 'new222', 1);
 

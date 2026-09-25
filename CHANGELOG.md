@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.1] — 2026-09-25
+
+### Fixed
+
+- The Update page now creates missing core sidecars (host-timezone-sync) itself: only start.sh did, so a service added after first install never existed
+
 ## [0.151.0] — 2026-09-25
 
 ### Added

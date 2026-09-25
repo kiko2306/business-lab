@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.1** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -341,15 +341,9 @@ it is done — not ticked off and left behind. Section references point at
       and confirm `timedatectl status` on the host itself actually flips to
       the new zone; check `docker compose logs host-timezone-sync` shows the
       apply and no repeated failures.
-
-- [ ] **`host-timezone-sync` is never created by a self-update** — found
-      testing `beta` 2026-09-25 (host on 9bb901d, `app_timezone` set to
-      `Europe/Lisbon`): no `host-timezone-sync` container exists, because the
-      Update page only runs `up -d` on `backend`/`frontend` (`selfUpdate.ts`),
-      and `start.sh` — the only thing that brings up the whole core stack — is
-      not part of it. Any core service added after first install has the same
-      gap. Fix in code (backend ensures missing core services after an update),
-      then re-run the timezone test above.
+      First (plan.md §698): after pulling, the `host-timezone-sync` container
+      must exist on its own (created by the backend on boot / the update run —
+      the first `beta` test found none); if not, that fix failed.
 
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — one grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic

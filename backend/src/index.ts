@@ -46,7 +46,7 @@ import { reconcileRemovedAppProjects } from './services/removedAppCleanup';
 import { startExposureReconciler } from './services/exposureReconciler';
 import { startCriticalServiceHealthMonitor } from './services/criticalServiceHealth';
 import { regenerateHomepageServices } from './services/homepageConfig';
-import { ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
+import { ensureCoreSidecars, ensureSelfUpdateTable, reconcileDanglingSelfUpdateRun, startSelfUpdateCheckSweeper } from './services/selfUpdate';
 import { startAuditLogPurgeSweeper } from './utils/audit';
 import { startHostLanIpRefresh } from './services/networkScan';
 import { ensureSocialDraftsTable } from './services/socialDrafts';
@@ -269,6 +269,11 @@ ensureSelfUpdateTable()
   .catch((err: Error) => {
     console.error('Unable to ensure self-update schema:', err.message);
   });
+// Also on boot, not just after an update: a host that already pulled the commit
+// adding a core sidecar (and only ever ran the Update page) has none yet.
+ensureCoreSidecars().catch((err: Error) => {
+  console.error('Unable to ensure core sidecars:', err.message);
+});
 startBackupScheduler();
 startKopiaRcloneKeepalive();
 // An app dropped from the registry keeps its NPM proxy host and Cloudflare

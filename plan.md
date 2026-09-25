@@ -32884,3 +32884,21 @@ The script is duplicated per app for the §633 reason (separate build contexts).
 No hard-coded colours in any of the three, so nothing else needed touching.
 Verified: all three bundles build and emit `theme-init.js`; not viewed in a
 browser.
+
+## 698. Core sidecars are created by the backend, not only by start.sh
+
+Beta test of §661 found no `host-timezone-sync` container on the live host:
+the Update page only runs `up -d` on `backend`/`frontend`, and `start.sh` (the
+only thing that brings up the whole root stack) is not part of it, so a core
+service added after first install never existed. Fix: `ensureCoreSidecars()` in
+`selfUpdate.ts` runs `docker compose up -d --no-deps --no-build` on an explicit
+list (`host-timezone-sync`) — after the image builds in an update run (so a
+sidecar adopts the rebuilt backend image; a failure is logged, never fails the
+run) and once on backend boot (covers a host that already pulled the commit).
+`up -d` is idempotent, so it is a no-op when the container is current.
+Considered and rejected: deriving the list from `compose config --services` —
+would also touch backend/frontend/database, which have their own careful
+`--no-deps --force-recreate` handling. Ceiling: a new core sidecar must be added
+to the list. Verified: backend typecheck + tests (new test covers the call and
+the failure-doesn't-fail-run case); **not** run against the real stack, see the
+README beta item.

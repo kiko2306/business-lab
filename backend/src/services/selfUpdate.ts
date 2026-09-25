@@ -400,6 +400,25 @@ async function classifyDeploy(repoRoot: string, fromCommit: string | null, toCom
   return { frontend, backend, apps };
 }
 
+// Core services the Update page's `up -d` of backend/frontend never creates:
+// only `start.sh` brings up the whole root stack, so a sidecar added to
+// docker-compose.yml after first install simply never existed on the host
+// (found live: no `host-timezone-sync` container after pulling the commit that
+// added it). `up -d` here is idempotent — a no-op when the container is already
+// current, a recreate when its image or config moved. `--no-deps` for the
+// same reason as backend/frontend: never bounce Postgres as a side effect.
+// ponytail: explicit list, so a new core sidecar must be added here — derive it
+// from `compose config --services` if that turns into a habit.
+const CORE_SIDECARS = ['host-timezone-sync'];
+
+export async function ensureCoreSidecars(): Promise<void> {
+  await runCommand(
+    'docker',
+    ['compose', '-f', composeFilePath(requireRepoRoot()), 'up', '-d', '--no-deps', '--no-build', ...CORE_SIDECARS],
+    { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
+  );
+}
+
 async function runSelfUpdateSequence(
   runId: number,
   repoRoot: string,
@@ -540,6 +559,12 @@ async function runSelfUpdateSequence(
         { timeout: BUILD_TIMEOUT_MS, maxBuffer: COMMAND_MAX_BUFFER, env: BUILD_ENV }
       );
     }
+
+    // After the images are rebuilt, so a recreated sidecar adopts the new
+    // backend image. A failure here must not fail an update that already landed.
+    await ensureCoreSidecars().catch((error: Error) =>
+      logger.error('Self-update: ensuring core sidecars failed', { runId, error: error.message })
+    );
 
     await writeAuditLog({
       userId,
