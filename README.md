@@ -503,12 +503,16 @@ before anything is built.
       the refund, and match Wintouch's own dashboard.
 - [ ] **Compare the closed-day counters with Wintouch (plan.md §683, §684)** — money
       now matches Wintouch's June report; Transactions, Customers, Discounts and
-      Consumptions for closed days are still derived, not compared. Send Wintouch's
-      dashboard for a past day and compare with the shop page's cards. One day
-      is already known from §685's per-document PDF: **23/06/2026** should show
+      Consumptions for closed days are still derived, not compared. Wintouch's
+      dashboard only exists for the current working day, so a past day cannot be
+      checked against it. Instead: at the end of a working day, note Wintouch's
+      dashboard (or Tally's own running-day cards, already matched to it), and the
+      next day open that date on the Day picker — the archive's Transactions,
+      Customers, Discounts and Consumptions should equal the running-day ones.
+      Known already, from §685's per-document PDF: **23/06/2026** should show
       **Transactions 36** and **Discounts 364.42** (the 354.00 fully-discounted
-      `FAC-SP 14518` + 7.22 + 3.20) on the Day picker; the struck-through `TALP`
-      documents must not be counted. Customers/Consumptions still need a dashboard.
+      `FAC-SP 14518` + 7.22 + 3.20); the struck-through `TALP` documents must not
+      be counted.
 - [ ] **Confirm the agent comes back within seconds of a dashboard update
       (plan.md §679)** — with the new setup exe installed, run an Update that
       rebuilds Tally. The shop should show Offline only while the container is
