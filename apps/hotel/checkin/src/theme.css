@@ -3,7 +3,9 @@
 /* ---------------------------------------------------------------------------
    Theme tokens.
 
-   The app runs Bootstrap 5.3's dark mode (`data-bs-theme="dark"` on <html>).
+   The app runs Bootstrap 5.3's colour modes (`data-bs-theme` on <html>, set
+   before first paint by theme-init.js: saved choice, else the OS preference;
+   dark is the fallback written into index.html).
    Bootstrap recolours its own components from that; the blocks below (a) point
    its theme variables at our palette rather than its stock greys, and (b) add
    two semantic tokens — `--app-canvas` (the page behind the cards) and
@@ -15,6 +17,11 @@
   --app-canvas: #f4f7fb;
   --app-surface: #ffffff;
   --app-surface-raised: #ffffff;
+  /* Multiplies the alpha of the card shadows: they are tuned for the dark
+     canvas and read as dirty smudges on white, so light mode turns them down. */
+  --app-shadow-k: 0.3;
+  /* A token, not inline in service-card.component.css, which is at its size budget. */
+  --app-shadow-service-card: 0 3px 8px rgba(2, 6, 23, 0.07), 0 18px 34px -18px rgba(2, 6, 23, 0.18);
 }
 
 [data-bs-theme='dark'] {
@@ -28,6 +35,8 @@
   --app-canvas: #1e293b;
   --app-surface: #26303f;
   --app-surface-raised: #26303f;
+  --app-shadow-k: 1;
+  --app-shadow-service-card: 0 3px 8px rgba(2, 6, 23, 0.22), 0 18px 34px -18px rgba(2, 6, 23, 0.6);
 
   --bs-body-bg: #1e293b;
   --bs-body-color: #e2e8f0;
@@ -68,9 +77,10 @@ a {
 .card {
   border-radius: 1rem;
   /* A close contact shadow plus a soft wide one — cards sit above the page
-     rather than being drawn flat on it. Tuned dark; `rgba(0,0,0,…)` reads on
-     both the light and the dark canvas. */
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3), 0 22px 45px -22px rgba(0, 0, 0, 0.65);
+     rather than being drawn flat on it. Alpha is scaled by
+     `--app-shadow-k` so light mode is subtler. */
+  box-shadow: 0 2px 6px rgba(0, 0, 0, calc(0.3 * var(--app-shadow-k))),
+    0 22px 45px -22px rgba(0, 0, 0, calc(0.65 * var(--app-shadow-k)));
 }
 
 .auth-page {

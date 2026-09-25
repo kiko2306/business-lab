@@ -17,13 +17,13 @@
   border: 1px solid var(--bs-border-color);
   border-radius: 0.9rem;
   background: var(--app-surface);
-  box-shadow: 0 3px 8px rgba(2, 6, 23, 0.2), 0 24px 44px -22px rgba(2, 6, 23, 0.6);
+  box-shadow: 0 3px 8px rgba(2, 6, 23, calc(0.2 * var(--app-shadow-k, 1))), 0 24px 44px -22px rgba(2, 6, 23, calc(0.6 * var(--app-shadow-k, 1)));
   transition: transform 0.14s ease, box-shadow 0.14s ease;
 }
 
 .summary-card:hover {
   transform: translateY(-2px);
-  box-shadow: 0 6px 14px rgba(2, 6, 23, 0.26), 0 32px 56px -20px rgba(2, 6, 23, 0.68);
+  box-shadow: 0 6px 14px rgba(2, 6, 23, calc(0.26 * var(--app-shadow-k, 1))), 0 32px 56px -20px rgba(2, 6, 23, calc(0.68 * var(--app-shadow-k, 1)));
 }
 
 .summary-card strong {

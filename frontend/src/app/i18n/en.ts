@@ -17,6 +17,7 @@ export const en: Record<string, string> = {
   'shell.signedInAs': 'Signed in as {{username}}',
   'shell.logout': 'Logout',
   'shell.languageLabel': 'Language',
+  'shell.themeLabel': 'Switch light/dark theme',
 
   'login.title.signIn': 'Sign in',
   'login.title.mfa': 'Two-factor authentication',

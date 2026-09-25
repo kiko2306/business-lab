@@ -1,5 +1,5 @@
 import { AsyncPipe, NgIf } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
 import { AuthService } from '../../core/auth.service';
 import { OperationsService } from '../../core/operations.service';
@@ -31,6 +31,10 @@ export class ShellComponent implements OnInit {
   // webmaster sees only Settings + Security, a bare `user` only Security.
   protected readonly caps$ = this.authService.capabilities$;
 
+  // The initial value comes from public/theme-init.js, which set the attribute
+  // before first paint (saved choice, else the OS preference).
+  protected readonly theme = signal(document.documentElement.getAttribute('data-bs-theme') ?? 'dark');
+
   // Shown in the footer. Empty until the probe resolves so nothing flashes;
   // a failure just leaves it blank (the footer text is conditional on it).
   protected appVersion = '';
@@ -44,6 +48,17 @@ export class ShellComponent implements OnInit {
 
   logout(): void {
     this.authService.logout();
+  }
+
+  toggleTheme(): void {
+    const next = this.theme() === 'dark' ? 'light' : 'dark';
+    this.theme.set(next);
+    document.documentElement.setAttribute('data-bs-theme', next);
+    try {
+      localStorage.setItem('theme', next);
+    } catch {
+      // Blocked storage: the choice applies to this page only.
+    }
   }
 
   onLocaleChange(value: string): void {

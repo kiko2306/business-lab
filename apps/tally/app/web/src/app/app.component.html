@@ -10,6 +10,8 @@
       <option value="en">English</option>
       <option value="pt-PT">Português</option>
     </select>
+    <button type="button" class="btn btn-outline-secondary btn-sm ms-2" (click)="toggleTheme()"
+            [attr.aria-label]="'Switch light/dark theme' | t" [title]="'Switch light/dark theme' | t">{{ theme() === 'dark' ? '☀' : '☾' }}</button>
   </div>
 </nav>
 

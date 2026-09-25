@@ -37,6 +37,8 @@
           <option value="en">EN</option>
           <option value="pt-PT">PT</option>
         </select>
+        <button type="button" class="btn btn-outline-secondary btn-sm app-header__theme" (click)="toggleTheme()"
+                [attr.aria-label]="'shell.themeLabel' | t" [title]="'shell.themeLabel' | t">{{ theme() === 'dark' ? '☀' : '☾' }}</button>
         <button type="button" class="btn btn-outline-danger btn-sm app-header__logout" (click)="logout()">{{ 'shell.logout' | t }}</button>
       </div>
     </div>

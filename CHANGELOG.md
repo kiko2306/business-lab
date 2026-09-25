@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.0] — 2026-09-25
+
+### Added
+
+- Light and dark mode for the dashboard and Tally: follows the OS by default, with a header/navbar toggle that remembers the choice
+
 ## [0.150.7] — 2026-09-25
 
 ### Fixed

@@ -40,6 +40,7 @@ export function setLang(next: Lang): void {
 
 const PT: Record<string, string> = {
   'Language': 'Idioma',
+  'Switch light/dark theme': 'Alternar tema claro/escuro',
   'Invoices, employees and payments control': 'Controlo de faturas, funcionários e pagamentos',
 
   // Shop list

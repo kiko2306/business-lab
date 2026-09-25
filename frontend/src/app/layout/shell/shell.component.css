@@ -89,6 +89,7 @@
   flex: none;
 }
 
+.app-header__theme,
 .app-header__logout {
   flex: none;
 }

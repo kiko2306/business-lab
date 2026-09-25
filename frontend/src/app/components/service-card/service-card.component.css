@@ -11,7 +11,7 @@
   background: var(--app-surface);
   border: 1px solid var(--bs-border-color, #dee2e6);
   border-radius: 0.6rem;
-  box-shadow: 0 3px 8px rgba(2, 6, 23, 0.22), 0 18px 34px -18px rgba(2, 6, 23, 0.6);
+  box-shadow: var(--app-shadow-service-card);
 }
 
 .service-row.row-error {

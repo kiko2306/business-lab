@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.150.7** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -212,6 +212,15 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Beta-test light/dark mode (plan.md §696)** — on `beta`, after pulling
+      (dashboard and Tally rebuild), open the dashboard and `tally.<domain>`
+      with the OS set to light: both should load light with no dark flash, and
+      with the OS set to dark, dark. The ☀/☾ button in the header/navbar should
+      flip the page and the choice should survive a reload. Walk Home, Apps
+      (open a service card and its logs), Backups, Settings and Tally's shop
+      page in light: look for unreadable text, dark-on-dark panels and shadows
+      that look muddy. The strict-CSP e2e (`csp.spec.ts`) covers the external
+      `theme-init.js` loading.
 - [ ] **Beta-test Tally's language switch (plan.md §688)** — on `beta`, after
       pulling (Tally rebuilds), open `tally.<domain>`: the navbar select should
       switch English ⇄ Português, the choice should survive a reload, and in

@@ -17,6 +17,7 @@ export const ptPT: Record<string, string> = {
   'shell.signedInAs': 'Sessão iniciada como {{username}}',
   'shell.logout': 'Terminar sessão',
   'shell.languageLabel': 'Idioma',
+  'shell.themeLabel': 'Alternar tema claro/escuro',
 
   'login.title.signIn': 'Iniciar sessão',
   'login.title.mfa': 'Autenticação de dois fatores',

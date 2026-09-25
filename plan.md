@@ -32845,3 +32845,31 @@ re-read by the generator on the next sweep/start; no code change.
 Set `webPath: '/admin/login'` on the `speedtest` registry entry; the Home Page
 generator (§111) and the dashboard link both already append `webPath`, so no
 code change beyond the registry value.
+
+## 696. Light and dark mode for the dashboard and Tally
+
+Both were dark-only: `data-bs-theme="dark"` hard-wired in `index.html`. Bootstrap
+5.3 already ships the light palette and `styles.css` already had light values
+for `--app-canvas`/`--app-surface`, so the work was picking the mode, not
+designing a second theme.
+
+- `theme-init.js` (dashboard `public/`, Tally `src/pwa/`) runs from `<head>`
+  before first paint: saved choice in `localStorage['theme']`, else
+  `prefers-color-scheme`. It is an **external file, not an inline script**,
+  because the dashboard CSP is `script-src 'self'` (§522) — an inline snippet
+  would be blocked and light-mode users would get a dark flash on every load.
+  The `dark` attribute in `index.html` stays as the no-JS fallback.
+- A ☀/☾ button in the dashboard header and the Tally navbar flips and saves it.
+  OS changes are not followed live (needs a reload) — not worth a listener.
+- Card shadows are tuned for the dark canvas and looked like smudges on white,
+  so their alpha is scaled by `--app-shadow-k` (1 dark, 0.3 light).
+  `service-card.component.css` is at its size budget, so its shadow moved to a
+  `--app-shadow-service-card` token in `styles.css` rather than growing.
+- `theme.css` copies re-synced (Hotel apps get the new tokens but keep their
+  hard-wired dark; they were not asked for).
+
+Tried/rejected: the two apps sharing the toggle code — they build in separate
+contexts (§633), so ~10 lines are duplicated rather than a package created.
+
+Verified: dashboard build + 90 unit tests, Tally build. **Not** looked at in a
+real browser in light mode — see the README beta item.
