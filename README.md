@@ -496,11 +496,6 @@ before anything is built.
       open-tabs/tables/guests cards or Tables tab. **Running day** must return to
       27/07/2026 with €9,640.16 and the live panels. Also try a day with a group
       menu priced on its header (14/05/2026: "Menu Grupo 50" ×16 = €960.00).
-- [ ] **Explain Wintouch's extra €100.00 on 23/06/2026 (plan.md §684)** — Wintouch's
-      report shows Vendas 4,682.18 for that day; the restaurant's documents total
-      4,582.18 in headers, lines and payments alike. Ask what document or
-      adjustment carries the €100.00 (a manual entry? another series?) in Wintouch's
-      own screen for the day, then decide whether it belongs in Tally.
 - [ ] **Check refunds on a running day (plan.md §684)** — devolutions are subtracted
       with `-ABS(x)`, which is right whichever sign the live `wsir_vnd_vendas` table
       uses, but no refund has been on a running day yet. The next time one is issued,

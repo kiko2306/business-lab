@@ -32605,3 +32605,22 @@ VAT rounding per line vs per document; not shown by Tally, so not pursued.
 
 `dotnet build -warnaserror` clean; the reader re-run over all 29 days against the
 screenshot, and against the running day.
+
+## 685. 23/06's missing €100.00 is not in Wintouch's per-document report either
+
+Closes the open thread of §684. The operator exported Wintouch's *Vendas Discriminadas*
+for 23/06/2026 (`wgcExpVndCmpDiscrimHoriz`, one line per document). Its **Totais** row is
+Mercadoria 4,287.53 + Desc./Acerto 364.42 + IVA 659.07 = **4,582.18** — exactly what
+Tally shows and what headers, lines and payments gave in §684. So Wintouch's own
+document-level report agrees with us; the €100.00 (4,682.18) appears only in the June
+*daily-summary* report, i.e. it is a difference between two Wintouch reports, not a
+document Tally is missing. Not chased further: the one €100.00 document that day
+(`FAC2-S 18104`, 81.30 + 18.70 IVA) is listed once here, so a double count in the
+summary is the likeliest cause, but that is inside Wintouch.
+
+What the PDF also shows: the five `TALP` documents 15305–15309 are printed struck
+through and are not in the total, and `FAC-SP 14518` is a 354.00 invoice fully discounted
+(Total 0.00). Both already reconcile with our 4,582.18; whether Tally's transaction and
+discount counters treat them the way Wintouch does is still the open §683 comparison.
+
+Nothing changes in Tally. README item deleted.
