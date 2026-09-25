@@ -32624,3 +32624,15 @@ through and are not in the total, and `FAC-SP 14518` is a 354.00 invoice fully d
 discount counters treat them the way Wintouch does is still the open §683 comparison.
 
 Nothing changes in Tally. README item deleted.
+
+## 686. Closed-day counters checked for 23/06/2026 against Wintouch's per-document report
+
+The operator opened 23/06/2026 on the Day picker. Against §685's PDF (the only
+Wintouch source for a past day — its dashboard is current-day only):
+**Invoiced 4,582.18** ✓ (PDF Totais 4,582.18), **Transactions 36** ✓ (36 non-struck
+documents), **Average ticket 127.28** ✓ (4,582.18 ÷ 36), **Discounts 364.43** vs the
+PDF's 364.42 — one cent. §683 sums `desclin` per *line*; Wintouch's Desc./Acerto is
+rounded per *document* — the same per-line-vs-per-document rounding seen in §684's
+"Vendas Liq." gap. Left as is: a cent of rounding is not worth a second discount
+definition. **Not checkable:** Customers 52 and Consumptions 363.51 — no Wintouch
+figure exists for a past day; README item narrowed to the end-of-day comparison.
