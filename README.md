@@ -212,6 +212,15 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Beta-test Tally as a phone app (plan.md §687)** — on `beta`, after
+      pulling (Tally rebuilds), open `tally.<domain>` on a real phone signed in
+      through Authelia: Chrome/Android should offer "Install app" (or Add to Home
+      screen) and the installed icon should open Tally standalone with no browser
+      bar; on iOS Safari, Share → Add to Home Screen should use the bar icon.
+      Then open a shop: no sideways scroll, "Invoiced" on one line, hourly axis
+      readable. If install is never offered, check the manifest request in
+      Chrome's DevTools (Application → Manifest) — a login redirect there means
+      the `use-credentials` fetch is being refused.
 - [ ] **Beta-test the restart-noise fix (plan.md §668)** — on `beta`, trigger
       an update from the Update page and watch through "Restarting the
       backend": no red "Something went wrong" / "Unable to reach the backend"

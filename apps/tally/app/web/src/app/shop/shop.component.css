@@ -21,3 +21,12 @@
 .num {
   font-variant-numeric: tabular-nums;
 }
+
+/* Two cards per row on a phone leaves ~140px for the figure: at the desktop
+   floor size "€4,582.18" wrapped mid-number. Smaller, and never broken. */
+@media (max-width: 575.98px) {
+  .stat-value {
+    font-size: 1.25rem;
+    white-space: nowrap;
+  }
+}

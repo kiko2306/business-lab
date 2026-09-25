@@ -43,4 +43,10 @@
   font-variant-numeric: tabular-nums;
   padding-top: 0.25rem;
   min-height: 1.1rem;
+  /* A column is ~13px on a phone, narrower than its two-digit label, which
+     wrapped one digit per line. Flex-centred, the label overflows evenly into
+     the blank neighbour instead. */
+  display: flex;
+  justify-content: center;
+  white-space: nowrap;
 }

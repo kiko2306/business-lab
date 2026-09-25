@@ -32636,3 +32636,29 @@ rounded per *document* — the same per-line-vs-per-document rounding seen in §
 "Vendas Liq." gap. Left as is: a cent of rounding is not worth a second discount
 definition. **Not checkable:** Customers 52 and Consumptions 363.51 — no Wintouch
 figure exists for a past day; README item narrowed to the end-of-day comparison.
+
+## 687. Tally installs as a phone app, and its shop page fits a phone
+
+Added `manifest.webmanifest`, 192/512 maskable icons, an apple-touch-icon and a
+`sw.js` under `apps/tally/app/web/src/pwa/` (copied to the site root by
+`angular.json` `assets`, so `/sw.js` scopes the whole origin). `display: standalone`,
+`theme_color` the dashboard surface.
+
+- **Manifest is behind Authelia**, and a plain `<link rel="manifest">` is fetched
+  *without* cookies even same-origin, so it would get the login redirect and the
+  browser would never offer install. `crossorigin="use-credentials"` on the link.
+- **The service worker does nothing** (empty `fetch` handler). Rejected caching
+  or `@angular/service-worker`: every figure is live and gated, and a cached
+  response would show stale or signed-out data as current. It exists only
+  because some Android Chrome versions want a fetch handler before "Install".
+- **Layout**: §633's `.table-stack` and two-up stat cards already fitted; what a
+  375px render showed broken was the shop page — "€4,582.18" wrapping mid-number
+  in a stat card, the hourly axis labels wrapping one digit per line (13px
+  columns), and the state badge stretched full-width in a stacked row. Fixed in
+  the component CSS; header controls now wrap; `viewport-fit=cover` plus
+  safe-area padding for the notch when installed; `-sm` inputs are 16px on
+  phones so iOS doesn't zoom on focus. Verified by rendering the built bundle
+  in headless Chrome at 375px (no horizontal scroll) — installability itself
+  can only be proved on a real device against the live host.
+- Icons are drawn (three rising bars) by a throwaway script, not kept: the PNGs
+  are the source.
