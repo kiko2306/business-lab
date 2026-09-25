@@ -330,20 +330,6 @@ it is done — not ticked off and left behind. Section references point at
       there — not something backend code can safely detect-and-remove on its
       own with no `service_exposure` row to key off.
 
-- [ ] **Beta-test the host OS timezone sidecar (plan.md §661)** — built: a
-      `host-timezone-sync` core service (`pid: host`, `privileged`, no
-      `docker-entrypoint.sh`) polls `app_timezone` every 60s via `psql` and
-      applies it with `nsenter -t 1 -m -u -n -i -- timedatectl set-timezone
-      <tz>` when it differs from the host's own zone. Nothing off a real
-      host can prove `nsenter` actually reaches PID 1's namespaces and that
-      `timedatectl` (a systemd/D-Bus call) succeeds through it. On `beta`:
-      change the timezone in Settings > General, wait a poll cycle (~60s),
-      and confirm `timedatectl status` on the host itself actually flips to
-      the new zone; check `docker compose logs host-timezone-sync` shows the
-      apply and no repeated failures.
-      First (plan.md §698): after pulling, the `host-timezone-sync` container
-      must exist on its own (created by the backend on boot / the update run —
-      the first `beta` test found none); if not, that fix failed.
 
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — one grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic

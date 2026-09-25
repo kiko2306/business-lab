@@ -32902,3 +32902,12 @@ would also touch backend/frontend/database, which have their own careful
 to the list. Verified: backend typecheck + tests (new test covers the call and
 the failure-doesn't-fail-run case); **not** run against the real stack, see the
 README beta item.
+
+## 699. Host timezone sidecar verified on beta (§661, §698)
+
+Passed on home-srv-01 at 5ba79fe: after pulling, the backend created
+`business-lab-host-timezone-sync-1` on its own (§698); changing the timezone in
+Settings flipped `timedatectl` Lisbon → Berlin → Lisbon within one 60s poll each
+way, and the sidecar log shows each apply with no failures. This proves
+`nsenter -t 1 ... timedatectl set-timezone` reaches the host through a
+`pid: host` privileged container. README item deleted.
