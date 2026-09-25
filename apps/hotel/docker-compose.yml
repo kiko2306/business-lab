@@ -60,7 +60,7 @@ services:
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=Hotel"
-      - "homepage.icon=calendar"
+      - "homepage.icon=mdi-bed"
       - "homepage.href=http://localhost:${HOTEL_ADMIN_PORT:-10600}"
       - "homepage.description=Online check-in, guest feedback and property administration"
     healthcheck:

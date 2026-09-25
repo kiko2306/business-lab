@@ -32829,3 +32829,13 @@ signups only — confirmed in `paperless/adapter.py`).
 **Open:** the permission set is a judgment call (documents CRUD, no admin
 surfaces); adjust `SCRIPT` if operators want less/more. A user's *removal* from
 Authelia leaves the Paperless account — harmless, Authelia gates entry.
+
+## 694. Fixed: Home Page tiles for Hotel, ITFlow and Tally had no icon
+
+`homepage.icon` values `calendar` and `chart` aren't dashboard-icons names, and
+`itflow.png` doesn't exist upstream (all 404 on the icon CDN) — Homepage
+renders a blank tile. Switched to built-in Material Design names, which
+Homepage fetches itself: `mdi-bed`, `mdi-lifebuoy`, `mdi-chart-line`. Rejected:
+shipping custom SVGs in `apps/home-page/data/icons/` (§131.1) — needs a file per
+app and a Homepage restart, for no visual gain over an mdi glyph. Labels are
+re-read by the generator on the next sweep/start; no code change.

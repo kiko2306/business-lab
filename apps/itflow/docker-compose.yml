@@ -44,7 +44,7 @@ services:
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=ITFlow"
-      - "homepage.icon=itflow.png"
+      - "homepage.icon=mdi-lifebuoy"
       - "homepage.href=http://localhost:${ITFLOW_PORT:-10420}"
       - "homepage.description=IT documentation, tickets and billing"
     volumes:

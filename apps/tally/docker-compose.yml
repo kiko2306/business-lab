@@ -26,7 +26,7 @@ services:
     labels:
       - "homepage.group=Productivity"
       - "homepage.name=Tally"
-      - "homepage.icon=chart"
+      - "homepage.icon=mdi-chart-line"
       - "homepage.href=http://localhost:${TALLY_PORT:-10610}"
       - "homepage.description=Invoices, employees and payments control"
     healthcheck:
