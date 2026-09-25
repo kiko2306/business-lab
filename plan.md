@@ -32724,3 +32724,17 @@ Rejected: minting a NetBird token for the probe (a credential to maintain for
 a check that needs none); keeping `/api/networks` and whitelisting it in CrowdSec
 (hides a symptom, and the same path from anyone else is worth counting).
 The other §675 item — a ban's own 403 retries re-arming the scenario — stays open.
+
+### §690 follow-up: the beta check found the monitor still on the old URL
+
+Checked on the box after the update (backend at 62fe909, up 10 min): `/api/instance`
+answered 200, but Kuma's "NetBird management (public)" monitor still held
+`…/api/networks`. `ensureCriticalServiceMonitors` runs only from the executor
+after the dashboard *starts* Uptime Kuma, and a self-update restarts the backend,
+not Kuma — so `reconciledRow`'s new URL repoint had no trigger, and would not
+have had one until someone restarted Kuma. Fix: the exposure sweep (boot + ~6 h,
+which already re-asserts Authelia and the Home Page) now also calls
+`ensureCriticalServiceMonitors('uptime-kuma')` when Kuma is running; test added.
+Lesson: a "reconcile" only heals what something calls — I proved the function and
+missed its callers, which is what the live check is for.
+

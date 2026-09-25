@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.150.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.150.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -486,7 +486,8 @@ before anything is built.
       extended it. Decide how to keep a ban from feeding itself (the scenario
       counts the bouncer's own 403s) without hiding real 403 brute force.
 - [ ] **Beta-test the NetBird management probe (plan.md §690)** — on `beta`,
-      after pulling and restarting the backend: Uptime Kuma's "NetBird
+      after pulling and restarting the backend (the exposure sweep repoints the
+      monitor a minute or so after boot, §690 follow-up): Uptime Kuma's "NetBird
       management (public)" monitor should now point at `…/api/instance` and stay
       UP, `curl -s https://netbird-vpn-api.<domain>/api/instance` should return
       `{"setup_required":false}`, and NPM's access log for `netbird-vpn-api`

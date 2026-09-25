@@ -29,6 +29,7 @@ import { regenerateHomepageServices } from './homepageConfig';
 import { getServiceStatus } from './status';
 import { syncAutheliaAccessControlSafe } from './autheliaAccessControl';
 import { syncAutheliaOidcClientsSafe } from './autheliaOidcClients';
+import { ensureCriticalServiceMonitors } from './uptimeKumaCriticalMonitors';
 import logger from '../utils/logger';
 
 // Exposure drifts only when NPM/Cloudflare is hand-edited or a token rotates,
@@ -118,6 +119,14 @@ export async function reconcileExposureDrift(): Promise<ExposureReconcileSummary
   // Re-provisioning can flip a hostname from failed to provisioned, which is
   // the point its Home Page tile becomes linkable.
   await regenerateHomepageServices().catch(() => {});
+
+  // Uptime Kuma's monitors are otherwise reconciled only when the dashboard
+  // starts Kuma, so a changed probe URL (§690) would never reach a Kuma that
+  // has been up for days — and criticalServiceHealth reads its metrics by URL.
+  // Never throws; skipped when Kuma is down so it doesn't warn every pass.
+  if ((await getServiceStatus('uptime-kuma')).state === 'running') {
+    await ensureCriticalServiceMonitors('uptime-kuma');
+  }
 
   await query(
     `INSERT INTO settings (key, value, updated_at) VALUES ($1, $2, NOW())

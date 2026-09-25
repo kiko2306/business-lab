@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.150.4] — 2026-09-25
+
+### Fixed
+
+- Uptime Kuma's critical monitors are re-asserted by the periodic exposure sweep, so a changed probe URL reaches a Kuma that was not restarted
+
 ## [0.150.3] — 2026-09-25
 
 ### Fixed

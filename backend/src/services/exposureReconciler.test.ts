@@ -13,6 +13,7 @@ const authelia = vi.hoisted(() => ({
   syncAutheliaAccessControlSafe: vi.fn(async () => null),
   syncAutheliaOidcClientsSafe: vi.fn(async () => null),
 }));
+const kumaMonitors = vi.hoisted(() => ({ ensureCriticalServiceMonitors: vi.fn(async () => {}) }));
 const registry = vi.hoisted(() => ({ SERVICES: {} as Record<string, unknown> }));
 const status = vi.hoisted(() => ({ getServiceStatus: vi.fn(async (name: string) => ({ name, state: 'running' })) }));
 
@@ -23,6 +24,7 @@ vi.mock('./exposure', () => exposure);
 vi.mock('./homepageConfig', () => homepage);
 vi.mock('./autheliaAccessControl', () => ({ syncAutheliaAccessControlSafe: authelia.syncAutheliaAccessControlSafe }));
 vi.mock('./autheliaOidcClients', () => ({ syncAutheliaOidcClientsSafe: authelia.syncAutheliaOidcClientsSafe }));
+vi.mock('./uptimeKumaCriticalMonitors', () => kumaMonitors);
 vi.mock('../config/services', () => registry);
 vi.mock('./status', () => status);
 vi.mock('../utils/logger', () => ({
@@ -93,6 +95,16 @@ describe('reconcileExposureDrift', () => {
     expect(summary).toEqual({ checked: 2, reconciled: 2, failed: [], notRunning: [] });
     expect(audit.writeAuditLog).not.toHaveBeenCalled();
     expect(homepage.regenerateHomepageServices).toHaveBeenCalledOnce();
+  });
+
+  it('re-asserts Uptime Kuma\'s monitors each pass, but only while Kuma is running', async () => {
+    await reconcileExposureDrift();
+    expect(kumaMonitors.ensureCriticalServiceMonitors).toHaveBeenCalledWith('uptime-kuma');
+
+    kumaMonitors.ensureCriticalServiceMonitors.mockClear();
+    status.getServiceStatus.mockImplementation(async (name: string) => ({ name, state: 'stopped' }));
+    await reconcileExposureDrift();
+    expect(kumaMonitors.ensureCriticalServiceMonitors).not.toHaveBeenCalled();
   });
 
   it('records the heartbeat setting after a pass', async () => {
