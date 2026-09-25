@@ -32738,3 +32738,13 @@ which already re-asserts Authelia and the Home Page) now also calls
 Lesson: a "reconcile" only heals what something calls — I proved the function and
 missed its callers, which is what the live check is for.
 
+### §690 verified on `beta`
+
+After the update to f52e5d8 (backend restarted 10:29 UTC): the exposure sweep ran
+at ~10:40 and repointed the Kuma monitor to `…/api/instance`; its latest heartbeat
+is UP. NPM's `netbird-vpn-api` access log shows the last 401 on `/api/networks`
+at 10:39:55 and only 200s on `/api/instance` after that (Kuma, and the backend's
+own health check). `curl …/api/instance` returns `{"setup_required":false}`.
+README item deleted. Note for next time: NPM's log line is
+`GET https <host> "<path>"`, so grep the quoted path, not `GET /path`.
+
