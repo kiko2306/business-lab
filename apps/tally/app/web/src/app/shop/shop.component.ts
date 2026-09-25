@@ -5,6 +5,7 @@ import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../api.service';
 import { BarChartComponent, BarDatum } from '../charts/bar-chart.component';
 import { HourlyChartComponent } from '../charts/hourly-chart.component';
+import { TPipe, t } from '../i18n';
 import { AgentPackage, Overview, ShopTable, SoldItemsView, Store, TablesView } from '../models';
 
 type Tab = 'tables' | 'items';
@@ -12,7 +13,7 @@ type Tab = 'tables' | 'items';
 @Component({
   selector: 'app-shop',
   standalone: true,
-  imports: [CommonModule, RouterLink, BarChartComponent, HourlyChartComponent],
+  imports: [CommonModule, RouterLink, BarChartComponent, HourlyChartComponent, TPipe],
   templateUrl: './shop.component.html',
   styleUrl: './shop.component.css',
 })
@@ -171,7 +172,7 @@ export class ShopComponent implements OnInit, OnDestroy {
         location.reload();
         return;
       }
-      this.error = 'Not signed in, and reloading did not help. The proxy may not be forwarding identity headers.';
+      this.error = t('Not signed in, and reloading did not help. The proxy may not be forwarding identity headers.');
       return;
     }
     sessionStorage.removeItem('tally-reauth');
@@ -187,6 +188,6 @@ export class ShopComponent implements OnInit, OnDestroy {
       return;
     }
     this.offline = false;
-    this.error = err.error?.error ?? `Could not reach the shop (${err.status})`;
+    this.error = err.error?.error ?? t('Could not reach the shop ({status})', { status: err.status });
   }
 }

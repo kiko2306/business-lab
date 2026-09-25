@@ -4,12 +4,13 @@ import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from '../api.service';
+import { TPipe, t } from '../i18n';
 import { AgentPackage, EnrolmentCode, Identity, Store } from '../models';
 
 @Component({
   selector: 'app-stores',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink],
+  imports: [CommonModule, FormsModule, RouterLink, TPipe],
   templateUrl: './stores.component.html',
   styleUrl: './stores.component.css',
 })
@@ -92,7 +93,7 @@ export class StoresComponent implements OnInit {
   }
 
   rename(store: Store): void {
-    const name = prompt('New name', store.name)?.trim();
+    const name = prompt(t('New name'), store.name)?.trim();
     if (!name || name === store.name) return;
     this.api.updateStore(store.id, { name }).subscribe({
       next: () => this.load(),
@@ -110,7 +111,7 @@ export class StoresComponent implements OnInit {
   remove(store: Store): void {
     // Deleting cascades to the store's access grants and its agent, so say so
     // rather than letting it be a surprise.
-    if (!confirm(`Delete "${store.name}"? Its access grants and enrolled agent go with it.`)) return;
+    if (!confirm(t('Delete "{name}"? Its access grants and enrolled agent go with it.', { name: store.name }))) return;
     this.api.deleteStore(store.id).subscribe({
       next: () => {
         if (this.openId === store.id) this.openId = null;
@@ -186,7 +187,7 @@ export class StoresComponent implements OnInit {
   }
 
   revokeAgent(store: Store): void {
-    if (!confirm(`Revoke the agent for "${store.name}"? It stops reporting on its next call.`)) return;
+    if (!confirm(t('Revoke the agent for "{name}"? It stops reporting on its next call.', { name: store.name }))) return;
     this.api.revokeAgent(store.id).subscribe({
       next: () => this.load(),
       error: (err) => this.fail(err),
@@ -207,10 +208,10 @@ export class StoresComponent implements OnInit {
         location.reload();
         return;
       }
-      this.error = 'Not signed in, and reloading did not help. The proxy may not be forwarding identity headers.';
+      this.error = t('Not signed in, and reloading did not help. The proxy may not be forwarding identity headers.');
       return;
     }
     sessionStorage.removeItem('tally-reauth');
-    this.error = err.error?.error ?? `Request failed (${err.status})`;
+    this.error = err.error?.error ?? t('Request failed ({status})', { status: err.status });
   }
 }

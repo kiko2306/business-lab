@@ -1,7 +1,15 @@
 <nav class="navbar border-bottom mb-4">
   <div class="container-xl">
     <a class="navbar-brand mb-0 h1 text-decoration-none" routerLink="/">Tally</a>
-    <span class="text-secondary small d-none d-sm-inline">Invoices, employees and payments control</span>
+    <span class="text-secondary small d-none d-sm-inline">{{ 'Invoices, employees and payments control' | t }}</span>
+    <select
+      class="form-select form-select-sm w-auto ms-auto"
+      [attr.aria-label]="'Language' | t"
+      [value]="lang"
+      (change)="setLang($any($event.target).value)">
+      <option value="en">English</option>
+      <option value="pt-PT">Português</option>
+    </select>
   </div>
 </nav>
 

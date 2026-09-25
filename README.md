@@ -212,6 +212,13 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Beta-test Tally's language switch (plan.md §688)** — on `beta`, after
+      pulling (Tally rebuilds), open `tally.<domain>`: the navbar select should
+      switch English ⇄ Português, the choice should survive a reload, and in
+      Português the Shops list, a shop page (stat cards, chart, Tables and Items
+      sold tabs, dates as dd/MM, money as `4 582,18 €`) and the Manage panel
+      (access list, Issue enrolment code) should have no English left except
+      shop/staff/item names from Wintouch.
 - [ ] **Beta-test Tally as a phone app (plan.md §687)** — on `beta`, after
       pulling (Tally rebuilds), open `tally.<domain>` on a real phone signed in
       through Authelia: Chrome/Android should offer "Install app" (or Add to Home

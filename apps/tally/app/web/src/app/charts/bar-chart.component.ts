@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
+import { numberLocale, t } from '../i18n';
 
 export interface BarDatum {
   label: string;
@@ -49,7 +50,7 @@ export interface BarDatum {
 })
 export class BarChartComponent {
   @Input() data: BarDatum[] = [];
-  @Input() emptyText = 'Nothing to show yet.';
+  @Input() emptyText = t('Nothing to show yet.');
   /** Rendered as money unless told otherwise — most of these are totals. */
   @Input() unit: 'currency' | 'count' = 'currency';
 
@@ -68,7 +69,7 @@ export class BarChartComponent {
 
   format(value: number): string {
     return this.unit === 'currency'
-      ? new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(value)
-      : new Intl.NumberFormat().format(value);
+      ? new Intl.NumberFormat(numberLocale, { style: 'currency', currency: 'EUR' }).format(value)
+      : new Intl.NumberFormat(numberLocale).format(value);
   }
 }

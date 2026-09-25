@@ -32662,3 +32662,31 @@ Added `manifest.webmanifest`, 192/512 maskable icons, an apple-touch-icon and a
   can only be proved on a real device against the live host.
 - Icons are drawn (three rising bars) by a throwaway script, not kept: the PNGs
   are the source.
+
+## 688. Tally's web app in English and European Portuguese
+
+`src/app/i18n.ts`: a `t()` function and `| t` pipe over one `PT` dictionary,
+**keyed by the English text** so templates stay readable and an untranslated
+string shows in English instead of as a raw key. `{name}` placeholders take
+caller values (`'No tables open. {n} free.' | t: {n: …}`). A language `<select>`
+sits in the navbar. Scope is the web app only; the Windows agent's setup exe is
+not translated (asked; not requested).
+
+- **Default** is the stored choice (`localStorage`), else the browser's language
+  (`pt*` → pt-PT, anything else English).
+- **Switching reloads the page.** Angular takes `LOCALE_ID` once at bootstrap,
+  and dates/currency (`4 582,18 €` vs `€4,582.18`) must change with the words,
+  so a reactive language signal would have been half-translated. Also feeds
+  `Intl.NumberFormat` in the charts and `<html lang>`.
+- Rejected `@angular/localize`/`ng extract-i18n`: one built bundle *per
+  language* and per-locale routing for ~100 strings, on an app served from a
+  single static root. Rejected a runtime library (ngx-translate): a dependency
+  larger than the dictionary.
+- Sentences with a `<code>` in the middle (the out-of-date agent hint) are split
+  around it, so the word order there is fixed; fine for these two languages.
+- Not translated: text the API returns (its `error` messages) and data from
+  Wintouch (item, staff and payment-method names).
+- Checked: every `| t` / `t()` key in the source has a dictionary entry (script,
+  one-off), and the built bundle rendered in pt-PT and English at 375px.
+  Nothing enforces that going forward: a new string without an entry is English
+  in Portuguese, not an error.

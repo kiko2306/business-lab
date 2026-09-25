@@ -1,5 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input } from '@angular/core';
+import { TPipe, numberLocale } from '../i18n';
 
 export interface HourlyDatum {
   hour: number;
@@ -20,10 +21,10 @@ export interface HourlyDatum {
 @Component({
   selector: 'app-hourly-chart',
   standalone: true,
-  imports: [CommonModule],
+  imports: [CommonModule, TPipe],
   template: `
     @if (!data.length) {
-      <p class="text-secondary small mb-0">No takings yet today.</p>
+      <p class="text-secondary small mb-0">{{ 'No takings yet today.' | t }}</p>
     } @else {
       <div class="hourly">
         @for (d of data; track d.hour) {
@@ -39,7 +40,7 @@ export interface HourlyDatum {
         }
       </div>
       <p class="small text-secondary mt-2 mb-0">
-        Peak {{ format(peak) }} at {{ pad(peakHour) }}:00
+        {{ 'Peak {v} at {h}:00' | t: { v: format(peak), h: pad(peakHour) } }}
       </p>
     }
   `,
@@ -67,7 +68,7 @@ export class HourlyChartComponent {
   }
 
   format(total: number): string {
-    return new Intl.NumberFormat('en-IE', { style: 'currency', currency: 'EUR' }).format(total);
+    return new Intl.NumberFormat(numberLocale, { style: 'currency', currency: 'EUR' }).format(total);
   }
 
   label(d: HourlyDatum): string {

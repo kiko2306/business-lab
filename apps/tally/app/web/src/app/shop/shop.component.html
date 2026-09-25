@@ -1,9 +1,9 @@
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
   <div>
-    <a routerLink="/" class="small text-decoration-none">&larr; All shops</a>
+    <a routerLink="/" class="small text-decoration-none">&larr; {{ 'All shops' | t }}</a>
     <h2 class="h4 mb-0">{{ store?.name ?? 'Shop' }}</h2>
     @if (store?.agentVersion) {
-      <span class="small text-secondary">Agent version
+      <span class="small text-secondary">{{ 'Agent version' | t }}
         <code
           [class.text-success]="agentPackage && agentPackage.version === store?.agentVersion"
           [class.text-danger]="agentPackage && agentPackage.version !== store?.agentVersion"
@@ -15,14 +15,14 @@
     @if (overview) {
       <span class="small text-secondary">
         @if (overview.businessDate) {
-          {{ overview.archive ? 'Closed day' : 'Business day' }}
+          {{ (overview.archive ? 'Closed day' : 'Business day') | t }}
           <strong>{{ overview.businessDate | date: 'dd/MM/yyyy' }}</strong> ·
         }
-        As of {{ overview.asOf | date: 'HH:mm:ss' }}
+        {{ 'As of' | t }} {{ overview.asOf | date: 'HH:mm:ss' }}
       </span>
     }
     <label class="d-flex align-items-center gap-2 small text-secondary mb-0">
-      Day
+      {{ 'Day' | t }}
       <input
         type="date"
         class="form-control form-control-sm"
@@ -31,9 +31,9 @@
         (change)="pickDate($any($event.target).value)" />
     </label>
     @if (date) {
-      <button class="btn btn-sm btn-outline-primary" type="button" (click)="pickDate('')">Running day</button>
+      <button class="btn btn-sm btn-outline-primary" type="button" (click)="pickDate('')">{{ 'Running day' | t }}</button>
     }
-    <button class="btn btn-sm btn-outline-secondary" type="button" (click)="refresh()">Refresh</button>
+    <button class="btn btn-sm btn-outline-secondary" type="button" (click)="refresh()">{{ 'Refresh' | t }}</button>
   </div>
 </div>
 
@@ -43,15 +43,13 @@
 
 @if (offline) {
   <div class="alert alert-warning" role="alert">
-    <p class="fw-semibold mb-1">This shop is offline.</p>
+    <p class="fw-semibold mb-1">{{ 'This shop is offline.' | t }}</p>
     <p class="mb-0 small">
-      Its agent is not connected, so there are no live figures to show. Nothing is displayed rather than
-      showing the last known numbers as though they were current. It reconnects by itself once the shop's
-      machine and network are back.
+      {{ 'Its agent is not connected, so there are no live figures to show. Nothing is displayed rather than showing the last known numbers as though they were current. It reconnects by itself once the shop\'s machine and network are back.' | t }}
     </p>
   </div>
 } @else if (loading && !overview) {
-  <p class="text-secondary">Loading…</p>
+  <p class="text-secondary">{{ 'Loading…' | t }}</p>
 } @else if (overview) {
   <!-- Current magnitude, so a figure rather than a chart: there is no series
        and no time axis to plot. -->
@@ -59,7 +57,7 @@
     <div class="col-6 col-lg-3">
       <div class="card stat-card h-100">
         <div class="card-body">
-          <p class="stat-label text-secondary mb-1">Invoiced</p>
+          <p class="stat-label text-secondary mb-1">{{ 'Invoiced' | t }}</p>
           <p class="stat-value mb-0">{{ overview.totals.invoiced | currency: 'EUR' }}</p>
         </div>
       </div>
@@ -69,28 +67,28 @@
     <div class="col-6 col-lg-3">
       <div class="card stat-card h-100">
         <div class="card-body">
-          <p class="stat-label text-secondary mb-1">Open tabs</p>
+          <p class="stat-label text-secondary mb-1">{{ 'Open tabs' | t }}</p>
           <p class="stat-value mb-0">{{ overview.totals.open | currency: 'EUR' }}</p>
-          <p class="small text-secondary mb-0">Forecast {{ forecast | currency: 'EUR' }}</p>
+          <p class="small text-secondary mb-0">{{ 'Forecast' | t }} {{ forecast | currency: 'EUR' }}</p>
         </div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="card stat-card h-100">
         <div class="card-body">
-          <p class="stat-label text-secondary mb-1">Tables in use</p>
+          <p class="stat-label text-secondary mb-1">{{ 'Tables in use' | t }}</p>
           <p class="stat-value mb-0">
             {{ overview.tables.occupied }}<span class="fs-6 text-secondary">
               / {{ overview.tables.occupied + overview.tables.free + overview.tables.awaitingPayment }}</span>
           </p>
-          <p class="small text-secondary mb-0">{{ overview.tables.awaitingPayment }} awaiting payment</p>
+          <p class="small text-secondary mb-0">{{ overview.tables.awaitingPayment }} {{ 'awaiting payment' | t }}</p>
         </div>
       </div>
     </div>
     <div class="col-6 col-lg-3">
       <div class="card stat-card h-100">
         <div class="card-body">
-          <p class="stat-label text-secondary mb-1">Guests in</p>
+          <p class="stat-label text-secondary mb-1">{{ 'Guests in' | t }}</p>
           <p class="stat-value mb-0">{{ overview.clients.present }}</p>
         </div>
       </div>
@@ -106,7 +104,7 @@
       <div class="col-6 col-lg-2">
         <div class="card stat-card h-100">
           <div class="card-body">
-            <p class="stat-label text-secondary mb-1">Transactions</p>
+            <p class="stat-label text-secondary mb-1">{{ 'Transactions' | t }}</p>
             <p class="stat-value mb-0">{{ overview.stats.transactions }}</p>
           </div>
         </div>
@@ -114,7 +112,7 @@
       <div class="col-6 col-lg-2">
         <div class="card stat-card h-100">
           <div class="card-body">
-            <p class="stat-label text-secondary mb-1">Average ticket</p>
+            <p class="stat-label text-secondary mb-1">{{ 'Average ticket' | t }}</p>
             <p class="stat-value mb-0">{{ averageTicket | currency: 'EUR' }}</p>
           </div>
         </div>
@@ -122,7 +120,7 @@
       <div class="col-6 col-lg-2">
         <div class="card stat-card h-100">
           <div class="card-body">
-            <p class="stat-label text-secondary mb-1">Customers</p>
+            <p class="stat-label text-secondary mb-1">{{ 'Customers' | t }}</p>
             <p class="stat-value mb-0">{{ overview.stats.customers }}</p>
           </div>
         </div>
@@ -130,7 +128,7 @@
       <div class="col-6 col-lg-2">
         <div class="card stat-card h-100">
           <div class="card-body">
-            <p class="stat-label text-secondary mb-1">Discounts</p>
+            <p class="stat-label text-secondary mb-1">{{ 'Discounts' | t }}</p>
             <p class="stat-value mb-0">{{ overview.stats.discounts | currency: 'EUR' }}</p>
           </div>
         </div>
@@ -138,9 +136,9 @@
       <div class="col-6 col-lg-2">
         <div class="card stat-card h-100">
           <div class="card-body">
-            <p class="stat-label text-secondary mb-1">Consumptions</p>
+            <p class="stat-label text-secondary mb-1">{{ 'Consumptions' | t }}</p>
             <p class="stat-value mb-0">{{ overview.stats.consumptions | currency: 'EUR' }}</p>
-            <p class="small text-secondary mb-0">Rooms, offers, internal use</p>
+            <p class="small text-secondary mb-0">{{ 'Rooms, offers, internal use' | t }}</p>
           </div>
         </div>
       </div>
@@ -148,7 +146,7 @@
         <div class="col-6 col-lg-2">
           <div class="card stat-card h-100">
             <div class="card-body">
-              <p class="stat-label text-secondary mb-1">Occupancy</p>
+              <p class="stat-label text-secondary mb-1">{{ 'Occupancy' | t }}</p>
               <p class="stat-value mb-0">{{ occupancy | number: '1.0-0' }}<span class="fs-6 text-secondary"> %</span></p>
             </div>
           </div>
@@ -159,20 +157,20 @@
 
   <div class="card stat-card mb-4">
     <div class="card-body">
-      <h3 class="h6 mb-3">Takings by hour</h3>
+      <h3 class="h6 mb-3">{{ 'Takings by hour' | t }}</h3>
       <app-hourly-chart [data]="overview.hourly"></app-hourly-chart>
     </div>
   </div>
 
   <div class="row g-4 mb-4">
     <div class="col-12 col-lg-6">
-      <h3 class="h6 mb-3">Taken by staff</h3>
-      <app-bar-chart [data]="staffBars" emptyText="Nothing taken yet."></app-bar-chart>
+      <h3 class="h6 mb-3">{{ 'Taken by staff' | t }}</h3>
+      <app-bar-chart [data]="staffBars" [emptyText]="'Nothing taken yet.' | t"></app-bar-chart>
     </div>
 
     <div class="col-12 col-lg-6">
-      <h3 class="h6 mb-3">By payment method</h3>
-      <app-bar-chart [data]="paymentBars" emptyText="No payments yet."></app-bar-chart>
+      <h3 class="h6 mb-3">{{ 'By payment method' | t }}</h3>
+      <app-bar-chart [data]="paymentBars" [emptyText]="'No payments yet.' | t"></app-bar-chart>
     </div>
   </div>
 
@@ -180,58 +178,58 @@
     <li class="nav-item">
       @if (!viewingArchive) {
         <button class="nav-link" [class.active]="tab === 'tables'" type="button" (click)="setTab('tables')">
-          Tables
+          {{ 'Tables' | t }}
         </button>
       }
     </li>
     <li class="nav-item">
       <button class="nav-link" [class.active]="tab === 'items'" type="button" (click)="setTab('items')">
-        Items sold
+        {{ 'Items sold' | t }}
       </button>
     </li>
   </ul>
 
   @if (tab === 'tables') {
     @if (!tables) {
-      <p class="text-secondary">Loading…</p>
+      <p class="text-secondary">{{ 'Loading…' | t }}</p>
     } @else if (!tables.tables.length) {
-      <p class="text-secondary mb-0">No tables open. {{ tables.free }} free.</p>
+      <p class="text-secondary mb-0">{{ 'No tables open. {n} free.' | t: { n: tables.free } }}</p>
     } @else {
       <div class="table-responsive table-stack-wrap">
         <table class="table table-stack align-middle">
           <thead>
             <tr>
-              <th scope="col">Table</th>
-              <th scope="col">State</th>
-              <th scope="col">Staff</th>
-              <th scope="col">Guests</th>
-              <th scope="col">Opened</th>
-              <th scope="col" class="text-end">Total</th>
+              <th scope="col">{{ 'Table' | t }}</th>
+              <th scope="col">{{ 'State' | t }}</th>
+              <th scope="col">{{ 'Staff' | t }}</th>
+              <th scope="col">{{ 'Guests' | t }}</th>
+              <th scope="col">{{ 'Opened' | t }}</th>
+              <th scope="col" class="text-end">{{ 'Total' | t }}</th>
             </tr>
           </thead>
           <tbody>
             @for (t of tables.tables; track t.table) {
               <tr role="button" (click)="toggleTable(t.table)">
-                <td data-label="Table">{{ t.table }}</td>
-                <td data-label="State">
+                <td [attr.data-label]="'Table' | t">{{ t.table }}</td>
+                <td [attr.data-label]="'State' | t">
                   <!-- Badge carries a word, not just a colour: state must not be
                        conveyed by colour alone. -->
                   @if (t.state === 'occupied') {
-                    <span class="badge text-bg-primary">Occupied</span>
+                    <span class="badge text-bg-primary">{{ 'Occupied' | t }}</span>
                   } @else {
-                    <span class="badge text-bg-warning">Awaiting payment</span>
+                    <span class="badge text-bg-warning">{{ 'Awaiting payment' | t }}</span>
                   }
                 </td>
-                <td data-label="Staff">{{ t.staff }}</td>
-                <td data-label="Guests" class="num">{{ t.guests }}</td>
-                <td data-label="Opened">{{ t.openedAt ? (t.openedAt | date: 'HH:mm') : '—' }}</td>
-                <td data-label="Total" class="text-end num">{{ t.total | currency: 'EUR' }}</td>
+                <td [attr.data-label]="'Staff' | t">{{ t.staff }}</td>
+                <td [attr.data-label]="'Guests' | t" class="num">{{ t.guests }}</td>
+                <td [attr.data-label]="'Opened' | t">{{ t.openedAt ? (t.openedAt | date: 'HH:mm') : '—' }}</td>
+                <td [attr.data-label]="'Total' | t" class="text-end num">{{ t.total | currency: 'EUR' }}</td>
               </tr>
               @if (openTable === t.table) {
                 <tr>
                   <td colspan="6" class="bg-body-tertiary">
                     @if (!t.lines.length) {
-                      <p class="small text-secondary mb-0">Nothing ordered yet.</p>
+                      <p class="small text-secondary mb-0">{{ 'Nothing ordered yet.' | t }}</p>
                     } @else {
                       <table class="table table-sm mb-0">
                         <tbody>
@@ -255,14 +253,14 @@
     }
   } @else {
     @if (!soldItems) {
-      <p class="text-secondary">Loading…</p>
+      <p class="text-secondary">{{ 'Loading…' | t }}</p>
     } @else {
       <p class="text-secondary small">
-        {{ soldItems.totalQuantity | number: '1.0-2' }} items, {{ soldItems.totalValue | currency: 'EUR' }}.
+        {{ '{q} items, {v}.' | t: { q: (soldItems.totalQuantity | number: '1.0-2'), v: (soldItems.totalValue | currency: 'EUR') } }}
       </p>
       <div class="mb-4">
-        <h3 class="h6 mb-3">Top items by quantity</h3>
-        <app-bar-chart [data]="itemBars" unit="count" emptyText="Nothing sold yet."></app-bar-chart>
+        <h3 class="h6 mb-3">{{ 'Top items by quantity' | t }}</h3>
+        <app-bar-chart [data]="itemBars" unit="count" [emptyText]="'Nothing sold yet.' | t"></app-bar-chart>
       </div>
       <!-- The table stays below the chart: it is the exact-values view, and
            the accessibility pass wants one present rather than colour and
@@ -271,10 +269,10 @@
         <table class="table table-stack align-middle">
           <thead>
             <tr>
-              <th scope="col">Item</th>
-              <th scope="col">Family</th>
-              <th scope="col" class="text-end">Quantity</th>
-              <th scope="col" class="text-end">Total</th>
+              <th scope="col">{{ 'Item' | t }}</th>
+              <th scope="col">{{ 'Family' | t }}</th>
+              <th scope="col" class="text-end">{{ 'Quantity' | t }}</th>
+              <th scope="col" class="text-end">{{ 'Total' | t }}</th>
             </tr>
           </thead>
           <tbody>
@@ -283,15 +281,15 @@
            tab threw ReferenceError at runtime while the build stayed green (§680). -->
             @for (item of soldItems.items; track $index) {
               <tr>
-                <td data-label="Item">
+                <td [attr.data-label]="'Item' | t">
                   {{ item.description }}
                   @if (item.code) {
                     <span class="text-secondary small ms-1">{{ item.code }}</span>
                   }
                 </td>
-                <td data-label="Family" class="text-secondary">{{ item.family }}</td>
-                <td data-label="Quantity" class="text-end num">{{ item.quantity | number: '1.0-2' }}</td>
-                <td data-label="Total" class="text-end num">{{ item.total | currency: 'EUR' }}</td>
+                <td [attr.data-label]="'Family' | t" class="text-secondary">{{ item.family }}</td>
+                <td [attr.data-label]="'Quantity' | t" class="text-end num">{{ item.quantity | number: '1.0-2' }}</td>
+                <td [attr.data-label]="'Total' | t" class="text-end num">{{ item.total | currency: 'EUR' }}</td>
               </tr>
             }
           </tbody>

@@ -1,16 +1,16 @@
 <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-3">
-  <h2 class="h4 mb-0">Shops</h2>
+  <h2 class="h4 mb-0">{{ 'Shops' | t }}</h2>
   @if (isAdmin) {
   <form class="d-flex gap-2" (ngSubmit)="create()">
     <input
       class="form-control"
       name="newName"
-      placeholder="New shop name"
+      [placeholder]="'New shop name' | t"
       [(ngModel)]="newName"
       [disabled]="creating"
       required />
     <button class="btn btn-primary text-nowrap" type="submit" [disabled]="creating || !newName.trim()">
-      Add shop
+      {{ 'Add shop' | t }}
     </button>
   </form>
   }
@@ -24,89 +24,88 @@
   <div class="card mb-4">
     <div class="card-body d-flex flex-wrap gap-3 justify-content-between align-items-center">
       <div>
-        <h2 class="h6 mb-1">Shop agent for Windows</h2>
+        <h2 class="h6 mb-1">{{ 'Shop agent for Windows' | t }}</h2>
         <p class="text-secondary small mb-0">
-          Version <code>{{ agentPackage.version }}</code>. Run the setup on the shop's machine
-          (it asks for administrator rights), then paste the enrolment code from a shop below.
+          {{ 'Version' | t }} <code>{{ agentPackage.version }}</code>. {{ 'Run the setup on the shop\'s machine (it asks for administrator rights), then paste the enrolment code from a shop below.' | t }}
         </p>
       </div>
-      <a class="btn btn-primary text-nowrap" href="/api/agent-package/download" download>Download setup</a>
+      <a class="btn btn-primary text-nowrap" href="/api/agent-package/download" download>{{ 'Download setup' | t }}</a>
     </div>
   </div>
 }
 
 @if (loading) {
-  <p class="text-secondary">Loading…</p>
+  <p class="text-secondary">{{ 'Loading…' | t }}</p>
 } @else if (!stores.length) {
   <div class="alert alert-info mb-0">
-    No shops yet. Add one above, then issue it an enrolment code to connect its agent.
+    {{ 'No shops yet. Add one above, then issue it an enrolment code to connect its agent.' | t }}
   </div>
 } @else {
   <div class="table-responsive table-stack-wrap">
     <table class="table table-stack align-middle">
       <thead>
         <tr>
-          <th scope="col">Shop</th>
-          <th scope="col">Status</th>
-          <th scope="col">Agent</th>
-          <th scope="col">Version</th>
-          <th scope="col">Last seen</th>
-          <th scope="col" class="text-end">Actions</th>
+          <th scope="col">{{ 'Shop' | t }}</th>
+          <th scope="col">{{ 'Status' | t }}</th>
+          <th scope="col">{{ 'Agent' | t }}</th>
+          <th scope="col">{{ 'Version' | t }}</th>
+          <th scope="col">{{ 'Last seen' | t }}</th>
+          <th scope="col" class="text-end">{{ 'Actions' | t }}</th>
         </tr>
       </thead>
       <tbody>
         @for (store of stores; track store.id) {
           <tr>
-            <td data-label="Shop">
+            <td [attr.data-label]="'Shop' | t">
               <a class="fw-semibold text-decoration-none" [routerLink]="['/shops', store.id]">
                 {{ store.name }}
               </a>
             </td>
-            <td data-label="Status">
+            <td [attr.data-label]="'Status' | t">
               @if (store.isActive) {
-                <span class="badge text-bg-success">Active</span>
+                <span class="badge text-bg-success">{{ 'Active' | t }}</span>
               } @else {
-                <span class="badge text-bg-secondary">Inactive</span>
+                <span class="badge text-bg-secondary">{{ 'Inactive' | t }}</span>
               }
             </td>
-            <td data-label="Agent">
+            <td [attr.data-label]="'Agent' | t">
               @if (!store.agentEnrolled) {
-                <span class="badge text-bg-warning">Not enrolled</span>
+                <span class="badge text-bg-warning">{{ 'Not enrolled' | t }}</span>
               } @else if (store.connected) {
-                <span class="badge text-bg-success">Online</span>
+                <span class="badge text-bg-success">{{ 'Online' | t }}</span>
               } @else {
                 <!-- Enrolled but not on the socket: the shop's machine is off,
                      or its network is down. Distinct from never enrolled. -->
-                <span class="badge text-bg-danger">Offline</span>
+                <span class="badge text-bg-danger">{{ 'Offline' | t }}</span>
               }
             </td>
-            <td data-label="Version">
+            <td [attr.data-label]="'Version' | t">
               @if (store.agentVersion) {
                 <code
                   [class.text-success]="agentPackage && agentPackage.version === store.agentVersion"
                   [class.text-danger]="agentPackage && agentPackage.version !== store.agentVersion"
-                  [title]="agentPackage && agentPackage.version !== store.agentVersion ? 'Out of date — latest is ' + agentPackage.version : 'Current version'"
+                  [title]="agentPackage && agentPackage.version !== store.agentVersion ? ('Out of date — latest is {v}' | t: { v: agentPackage.version }) : ('Current version' | t)"
                   >{{ store.agentVersion }}</code
                 >
               } @else {
                 —
               }
             </td>
-            <td data-label="Last seen">
+            <td [attr.data-label]="'Last seen' | t">
               {{ store.lastSeenAt ? (store.lastSeenAt | date: 'short') : '—' }}
             </td>
-            <td data-label="Actions" class="text-end">
+            <td [attr.data-label]="'Actions' | t" class="text-end">
               <div class="btn-group btn-group-sm">
-                <a class="btn btn-outline-primary" [routerLink]="['/shops', store.id]">Open</a>
+                <a class="btn btn-outline-primary" [routerLink]="['/shops', store.id]">{{ 'Open' | t }}</a>
                 @if (isAdmin) {
                 <button class="btn btn-outline-secondary" type="button" (click)="toggleOpen(store)">
-                  {{ openId === store.id ? 'Close' : 'Manage' }}
+                  {{ (openId === store.id ? 'Close' : 'Manage') | t }}
                 </button>
-                <button class="btn btn-outline-secondary" type="button" (click)="rename(store)">Rename</button>
+                <button class="btn btn-outline-secondary" type="button" (click)="rename(store)">{{ 'Rename' | t }}</button>
                 <button class="btn btn-outline-secondary" type="button" (click)="toggleActive(store)">
-                  {{ store.isActive ? 'Deactivate' : 'Activate' }}
+                  {{ (store.isActive ? 'Deactivate' : 'Activate') | t }}
                 </button>
-                <button class="btn btn-outline-danger" type="button" (click)="remove(store)">Delete</button>
+                <button class="btn btn-outline-danger" type="button" (click)="remove(store)">{{ 'Delete' | t }}</button>
                 }
               </div>
             </td>
@@ -117,22 +116,21 @@
               <td colspan="6" class="bg-body-tertiary">
                 <div class="row g-4 py-2">
                   <div class="col-12 col-lg-6">
-                    <h3 class="h6">Who can see this shop</h3>
+                    <h3 class="h6">{{ 'Who can see this shop' | t }}</h3>
                     <p class="text-secondary small">
-                      Authelia usernames. Anyone listed here sees this shop; administrators see every shop
-                      regardless.
+                      {{ 'Authelia usernames. Anyone listed here sees this shop; administrators see every shop regardless.' | t }}
                     </p>
                     @if (accessLoading) {
-                      <p class="text-secondary small mb-2">Loading…</p>
+                      <p class="text-secondary small mb-2">{{ 'Loading…' | t }}</p>
                     } @else if (!access.length) {
-                      <p class="text-secondary small mb-2">Nobody yet — only administrators can see it.</p>
+                      <p class="text-secondary small mb-2">{{ 'Nobody yet — only administrators can see it.' | t }}</p>
                     } @else {
                       <ul class="list-group list-group-flush mb-2">
                         @for (identity of access; track identity) {
                           <li class="list-group-item d-flex justify-content-between align-items-center px-0 bg-transparent">
                             <span>{{ identity }}</span>
                             <button class="btn btn-sm btn-outline-danger" type="button" (click)="revoke(store, identity)">
-                              Remove
+                              {{ 'Remove' | t }}
                             </button>
                           </li>
                         }
@@ -142,66 +140,63 @@
                       <input
                         class="form-control form-control-sm"
                         name="newIdentity"
-                        placeholder="Authelia username"
+                        [placeholder]="'Authelia username' | t"
                         [(ngModel)]="newIdentity" />
                       <button class="btn btn-sm btn-primary text-nowrap" type="submit" [disabled]="!newIdentity.trim()">
-                        Grant
+                        {{ 'Grant' | t }}
                       </button>
                     </form>
                   </div>
 
                   <div class="col-12 col-lg-6">
-                    <h3 class="h6">Agent</h3>
+                    <h3 class="h6">{{ 'Agent' | t }}</h3>
                     @if (store.agentEnrolled) {
                       <p class="text-secondary small">
-                        An agent is enrolled and is
-                        <strong>{{ store.connected ? 'connected now' : 'not connected' }}</strong>.
+                        {{ 'An agent is enrolled and is' | t }}
+                        <strong>{{ (store.connected ? 'connected now' : 'not connected') | t }}</strong>.
                         @if (store.agentVersion) {
-                          Version
+                          {{ 'Version' | t }}
                           <code
                             [class.text-success]="agentPackage && agentPackage.version === store.agentVersion"
                             [class.text-danger]="agentPackage && agentPackage.version !== store.agentVersion"
                             >{{ store.agentVersion }}</code
                           >
                           @if (agentPackage && agentPackage.version !== store.agentVersion) {
-                            — out of date; the latest is <code>{{ agentPackage.version }}</code>, download it above.
+                            {{ '— out of date; the latest is' | t }} <code>{{ agentPackage.version }}</code>{{ ', download it above.' | t }}
                           }
                         }
-                        Issuing a new code replaces it — the machine currently reporting stops on its
-                        next call.
+                        {{ 'Issuing a new code replaces it — the machine currently reporting stops on its next call.' | t }}
                       </p>
                     } @else {
                       <p class="text-secondary small">
-                        No agent yet. Issue a code and enter it in the installer on the shop's POS machine,
-                        along with this site's address.
+                        {{ 'No agent yet. Issue a code and enter it in the installer on the shop\'s POS machine, along with this site\'s address.' | t }}
                       </p>
                     }
 
                     <div class="d-flex flex-wrap gap-2 mb-3">
                       <button class="btn btn-sm btn-primary" type="button" (click)="issueCode(store)">
-                        Issue enrolment code
+                        {{ 'Issue enrolment code' | t }}
                       </button>
                       @if (store.agentEnrolled) {
                         <button class="btn btn-sm btn-outline-danger" type="button" (click)="revokeAgent(store)">
-                          Revoke agent
+                          {{ 'Revoke agent' | t }}
                         </button>
                       }
                     </div>
 
                     @if (issued && issued.storeId === store.id) {
                       <div class="alert alert-warning mb-0">
-                        <p class="fw-semibold mb-1">Copy this now — it is shown once.</p>
+                        <p class="fw-semibold mb-1">{{ 'Copy this now — it is shown once.' | t }}</p>
                         <p class="small mb-2">
-                          It is not stored anywhere readable, so it cannot be shown again. If it is lost,
-                          issue another.
+                          {{ 'It is not stored anywhere readable, so it cannot be shown again. If it is lost, issue another.' | t }}
                         </p>
                         <p class="enrolment-code mb-2">{{ issued.code.code }}</p>
                         <div class="d-flex flex-wrap gap-2 align-items-center">
                           <button class="btn btn-sm btn-outline-secondary" type="button" (click)="copyCode()">
-                            {{ copied ? 'Copied' : 'Copy' }}
+                            {{ (copied ? 'Copied' : 'Copy') | t }}
                           </button>
                           <span class="small text-secondary">
-                            Expires {{ issued.code.expiresAt | date: 'short' }}
+                            {{ 'Expires' | t }} {{ issued.code.expiresAt | date: 'short' }}
                           </span>
                         </div>
                       </div>
