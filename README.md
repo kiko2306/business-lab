@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.150.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.150.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -485,10 +485,12 @@ before anything is built.
       — during the ban, NetBird's 403-answered retries raised 12 more alerts and
       extended it. Decide how to keep a ban from feeding itself (the scenario
       counts the bouncer's own 403s) without hiding real 403 brute force.
-- [ ] **Find out why NetBird's API rejects the box's own polling (plan.md
-      §675)** — `netbird-vpn-api.…/api/networks` returns 401 to Uptime-Kuma and
-      the dashboard backend about every 30 s. A stale or missing NetBird API token
-      somewhere; the dashboard should mint/refresh it itself (principle 3).
+- [ ] **Beta-test the NetBird management probe (plan.md §690)** — on `beta`,
+      after pulling and restarting the backend: Uptime Kuma's "NetBird
+      management (public)" monitor should now point at `…/api/instance` and stay
+      UP, `curl -s https://netbird-vpn-api.<domain>/api/instance` should return
+      `{"setup_required":false}`, and NPM's access log for `netbird-vpn-api`
+      should stop showing a 401 every ~30 s from the box's address.
 - [ ] **Show the running day's figures from the new agent (plan.md §677)** —
       after installing the new setup exe, the shop page must say "Business day
       27/07/2026" (this box's demo day) and show invoiced €9,640.16 and the

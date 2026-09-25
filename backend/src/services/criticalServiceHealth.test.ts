@@ -43,7 +43,7 @@ function stubFetch({ probesUp, kuma, dns = false }: { probesUp: boolean; kuma: n
     vi.fn(async (url: string) => {
       if (url === KUMA_METRICS) {
         if (kuma === null) throw new Error('ECONNREFUSED');
-        const urls = [FUNNEL_URL, 'https://netbird-vpn-api.example.com/api/networks', 'https://netbird-vpn-relay.example.com/'];
+        const urls = [FUNNEL_URL, 'https://netbird-vpn-api.example.com/api/instance', 'https://netbird-vpn-relay.example.com/'];
         const text = urls.map((u) => kumaLine(u, kuma)).join('\n');
         return { ok: true, status: 200, text: async () => text } as unknown as Response;
       }

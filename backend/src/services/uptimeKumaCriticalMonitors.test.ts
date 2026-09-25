@@ -6,7 +6,7 @@ describe('defaultMonitor', () => {
   // HTTP response (NetBird's 401/404, Tailscale's 405) must not trip the
   // monitor, or every one of these would falsely alert as soon as it existed.
   it('accepts any HTTP status code, not just 2xx', () => {
-    const monitor = defaultMonitor('NetBird management (public)', 'https://netbird-vpn-api.example.com/api/networks', [3]);
+    const monitor = defaultMonitor('NetBird management (public)', 'https://netbird-vpn-api.example.com/api/instance', [3]);
     expect(monitor.accepted_statuscodes).toEqual(['100-199', '200-299', '300-399', '400-499', '500-599']);
   });
 
@@ -94,6 +94,12 @@ describe('reconciledRow', () => {
   it('strips the applyExisting email notification when the ids must be exact', () => {
     expect(reconciledRow({ ...row, maxretries: 7 }, 7, [2])).toEqual({ ...row, maxretries: 7, notificationIDList: { '2': true } });
     expect(reconciledRow({ ...row, maxretries: 7, notificationIDList: { '2': true, '1': false } }, 7, [2])).toBeNull();
+  });
+
+  it('repoints a monitor whose probe URL changed, and leaves a matching one alone', () => {
+    expect(reconciledRow({ ...row, maxretries: 7 }, 7, [1, 2], 'https://y/')).toEqual({ ...row, maxretries: 7, url: 'https://y/' });
+    expect(reconciledRow({ ...row, maxretries: 7 }, 7, [1, 2], row.url)).toBeNull();
+    expect(reconciledRow({ ...row, maxretries: 7 }, 7, [1, 2], null)).toBeNull();
   });
 
   it('passes the retry count through to a new monitor', () => {

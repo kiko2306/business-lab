@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.150.3] — 2026-09-25
+
+### Fixed
+
+- NetBird management health probe now uses the unauthenticated /api/instance instead of /api/networks, which answered 401 every 30 s
+
 ## [0.150.2] — 2026-09-24
 
 ### Fixed

@@ -166,17 +166,24 @@ export function findExistingMonitorNames(monitorList: Record<string, KumaMonitor
 export function reconciledRow(
   row: Record<string, unknown> & KumaMonitorRow,
   minRetries: number | undefined,
-  exactIds: number[]
+  exactIds: number[],
+  url?: string | null
 ): Record<string, unknown> | null {
   if (typeof row.id !== 'number') return null;
   const edited: Record<string, unknown> = { ...row };
+  // A probe URL that changed (§690: NetBird's /api/networks → /api/instance)
+  // must reach monitors created earlier, or they keep polling the old one
+  // and criticalServiceHealth, which matches Kuma's metrics by URL, goes blind.
+  if (url && row.url !== url) edited.url = url;
   if (minRetries !== undefined && (row.maxretries ?? 0) < minRetries) edited.maxretries = minRetries;
   const current = Object.keys(row.notificationIDList ?? {}).filter((id) => row.notificationIDList?.[id]);
   if (current.sort().join() !== exactIds.map(String).sort().join()) {
     // editMonitor replaces the monitor's notification rows wholesale.
     edited.notificationIDList = Object.fromEntries(exactIds.map((id) => [String(id), true]));
   }
-  return edited.maxretries === row.maxretries && edited.notificationIDList === row.notificationIDList ? null : edited;
+  return edited.maxretries === row.maxretries && edited.notificationIDList === row.notificationIDList && edited.url === row.url
+    ? null
+    : edited;
 }
 
 async function desiredMonitors(): Promise<DesiredMonitor[]> {
@@ -214,7 +221,7 @@ async function desiredMonitors(): Promise<DesiredMonitor[]> {
       name: 'NetBird management (public)',
       url: async () => {
         const config = await getExposureConfig();
-        return config ? `https://netbird-vpn-api.${config.baseDomain}/api/networks` : null;
+        return config ? `https://netbird-vpn-api.${config.baseDomain}/api/instance` : null;
       },
       notify: 'ntfy',
     },
@@ -350,7 +357,7 @@ export function runSession(baseWsUrl: string, notification: Record<string, unkno
           // `applyExisting` (uptimeKumaMailNotification.ts) and re-attaches
           // itself to every monitor on each Kuma start (§549/§550).
           const exactIds = notificationIdsFor(monitor.notify, notificationId, emailId);
-          const edited = reconciledRow(row, monitor.maxretries, exactIds);
+          const edited = reconciledRow(row, monitor.maxretries, exactIds, await monitor.url());
           if (edited && !isAckOk(await call('editMonitor', edited))) {
             logger.warn(`Uptime Kuma critical monitors: failed to reconcile "${monitor.name}"`);
           }

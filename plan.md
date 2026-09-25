@@ -32697,3 +32697,30 @@ Tested on real devices against the live host: the Android install offer, iOS
 Add to Home Screen, and the shop page on a phone screen all worked. That closes
 §687's README item; the `use-credentials` manifest fetch behind Authelia is
 confirmed, not just reasoned about.
+
+## 690. Fixed: NetBird's "rejected API poll" was the liveness probe expecting a 401
+
+§675 noticed `netbird-vpn-api…/api/networks` answering 401 about every 30 s to
+Uptime-Kuma and the dashboard backend and guessed at a stale NetBird API token.
+There is no credential involved: both callers (`uptimeKumaCriticalMonitors.ts`,
+`criticalServiceHealth.ts`) send no `Authorization` at all — the URL was picked
+only because it is a route management always answers, and the monitors accept
+any HTTP status (401 = "up"). So nothing was rejected; the box was
+deliberately asking an authenticated route a question and getting the expected
+refusal. The cost was real anyway: a 401 per probe is exactly what
+`http-generic-401-bf` counts, and during §675's ban the same probe was answered
+with the ban's 403.
+
+Fix: probe `GET /api/instance` instead — unauthenticated, 200
+`{"setup_required":false}` (checked against the live box; `/api/instance/version`
+is 401, so not that one). Both probe lists changed. Because
+`criticalServiceHealth` matches Kuma's `/metrics` lines by URL, the URL also has
+to reach monitors that already exist: `reconciledRow` now takes the desired URL
+and repoints a monitor whose URL differs (test added), otherwise the old
+monitor would keep polling `/api/networks` and the health check would find no
+metrics line for the new URL.
+
+Rejected: minting a NetBird token for the probe (a credential to maintain for
+a check that needs none); keeping `/api/networks` and whitelisting it in CrowdSec
+(hides a symptom, and the same path from anyone else is worth counting).
+The other §675 item — a ban's own 403 retries re-arming the scenario — stays open.

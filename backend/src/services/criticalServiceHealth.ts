@@ -175,7 +175,7 @@ const PROBES: Probe[] = [
     restartService: 'netbird-vpn',
     url: async () => {
       const config = await getExposureConfig();
-      return config ? `https://netbird-vpn-api.${config.baseDomain}/api/networks` : null;
+      return config ? `https://netbird-vpn-api.${config.baseDomain}/api/instance` : null;
     },
   },
   {
