@@ -32690,3 +32690,10 @@ not translated (asked; not requested).
   one-off), and the built bundle rendered in pt-PT and English at 375px.
   Nothing enforces that going forward: a new string without an entry is English
   in Portuguese, not an error.
+
+## 689. §687 verified on `beta`
+
+Tested on real devices against the live host: the Android install offer, iOS
+Add to Home Screen, and the shop page on a phone screen all worked. That closes
+§687's README item; the `use-credentials` manifest fetch behind Authelia is
+confirmed, not just reasoned about.
