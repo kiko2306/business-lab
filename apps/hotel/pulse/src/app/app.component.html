@@ -1,6 +1,8 @@
 <nav class="navbar border-bottom mb-4">
   <div class="container-xl">
     <span class="navbar-brand mb-0 h1">Feedback</span>
+    <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" (click)="toggleTheme()"
+            aria-label="Switch light/dark theme" title="Switch light/dark theme">{{ theme() === 'dark' ? '☀' : '☾' }}</button>
   </div>
 </nav>
 

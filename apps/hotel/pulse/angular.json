@@ -16,7 +16,7 @@
             "index": "src/index.html",
             "browser": "src/main.ts",
             "tsConfig": "tsconfig.app.json",
-            "assets": [],
+            "assets": [{ "glob": "theme-init.js", "input": "src" }],
             "styles": [
               "src/theme.css",
               "src/styles.css"

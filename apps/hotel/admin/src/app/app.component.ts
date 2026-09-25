@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnInit, inject } from '@angular/core';
+import { Component, OnInit, inject, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { HttpErrorResponse } from '@angular/common/http';
 import { ApiService } from './api.service';
@@ -30,6 +30,20 @@ import {
 })
 export class AppComponent implements OnInit {
   private api = inject(ApiService);
+
+  // Set before first paint by theme-init.js: saved choice, else the OS preference.
+  theme = signal(document.documentElement.getAttribute('data-bs-theme') ?? 'dark');
+
+  toggleTheme(): void {
+    const next = this.theme() === 'dark' ? 'light' : 'dark';
+    this.theme.set(next);
+    document.documentElement.setAttribute('data-bs-theme', next);
+    try {
+      localStorage.setItem('theme', next);
+    } catch {
+      // Blocked storage: the choice applies to this page only.
+    }
+  }
 
   readonly flows = FLOWS;
   readonly guestTextGroups = GUEST_TEXT_GROUPS;

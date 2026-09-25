@@ -221,6 +221,8 @@ it is done — not ticked off and left behind. Section references point at
       page in light: look for unreadable text, dark-on-dark panels and shadows
       that look muddy. The strict-CSP e2e (`csp.spec.ts`) covers the external
       `theme-init.js` loading.
+      Also check the Hotel admin, check-in and feedback (pulse) pages the same
+      way (plan.md §697) — a guest link on a phone is the one that matters.
 - [ ] **Beta-test Tally's language switch (plan.md §688)** — on `beta`, after
       pulling (Tally rebuilds), open `tally.<domain>`: the navbar select should
       switch English ⇄ Português, the choice should survive a reload, and in

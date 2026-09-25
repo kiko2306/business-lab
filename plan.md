@@ -32873,3 +32873,14 @@ contexts (§633), so ~10 lines are duplicated rather than a package created.
 
 Verified: dashboard build + 90 unit tests, Tally build. **Not** looked at in a
 real browser in light mode — see the README beta item.
+
+## 697. Light and dark mode for the Hotel apps (§696 follow-up)
+
+Hotel admin, check-in and pulse get the same `theme-init.js` and ☀/☾ navbar
+toggle as the dashboard and Tally (§696) — they already shared the synced
+`theme.css`, so only the mode selection was missing. They have no `public/`
+assets folder, so `angular.json` copies `src/theme-init.js` to the bundle root.
+The script is duplicated per app for the §633 reason (separate build contexts).
+No hard-coded colours in any of the three, so nothing else needed touching.
+Verified: all three bundles build and emit `theme-init.js`; not viewed in a
+browser.

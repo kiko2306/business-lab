@@ -2,6 +2,8 @@
   <div class="container-xl">
     <span class="navbar-brand mb-0 h1">Hotel</span>
     <span class="text-secondary small d-none d-sm-inline">Check-in, feedback and property administration</span>
+    <button type="button" class="btn btn-outline-secondary btn-sm ms-auto" (click)="toggleTheme()"
+            aria-label="Switch light/dark theme" title="Switch light/dark theme">{{ theme() === 'dark' ? '☀' : '☾' }}</button>
   </div>
 </nav>
 
