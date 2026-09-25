@@ -342,6 +342,15 @@ it is done — not ticked off and left behind. Section references point at
       the new zone; check `docker compose logs host-timezone-sync` shows the
       apply and no repeated failures.
 
+- [ ] **`host-timezone-sync` is never created by a self-update** — found
+      testing `beta` 2026-09-25 (host on 9bb901d, `app_timezone` set to
+      `Europe/Lisbon`): no `host-timezone-sync` container exists, because the
+      Update page only runs `up -d` on `backend`/`frontend` (`selfUpdate.ts`),
+      and `start.sh` — the only thing that brings up the whole core stack — is
+      not part of it. Any core service added after first install has the same
+      gap. Fix in code (backend ensures missing core services after an update),
+      then re-run the timezone test above.
+
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — one grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic
       + single CrowdSec switch + separate Enforcement switch. On `beta`: open
