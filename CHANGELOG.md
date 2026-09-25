@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.150.5] — 2026-09-25
+
+### Fixed
+
+- Paperless behind Authelia no longer 403s the signed-in admin: the Authelia admin is made a Paperless superuser on every start
+
 ## [0.150.4] — 2026-09-25
 
 ### Fixed

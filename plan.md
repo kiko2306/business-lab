@@ -32780,3 +32780,28 @@ template changes; whitelisting by source IP (no static address, §539); raising 
 scenario's own `filter` (it lives in a hub-installed file we do not own, unlike a
 mounted parser).
 
+
+## 692. Fixed: Paperless behind Authelia 403'd every API call for the signed-in user
+
+Report: the Paperless page showed `403 … /api/ui_settings/ — You do not have
+permission to perform this action`. On the test box `auth_user` had `admin`
+(superuser, from `PAPERLESS_ADMIN_USER`) and `mat` — the Authelia admin,
+auto-created by §247's `Remote-User` trust with `is_superuser=false`, no
+groups, no permissions. The Angular shell loads for any authenticated user,
+then `ui_settings`/`saved_views` need model permissions `mat` never got.
+
+§247's docs said "auto-created non-staff" and treated that as fine; it isn't —
+a permissionless Paperless user can't use the UI at all.
+
+**Fix** (`services/paperlessAdmin.ts`, called from `executor.ts` after `up`):
+`docker compose run … manage.py shell` get-or-creates the Authelia admin's
+username and sets `is_superuser`/`is_staff`; idempotent, username via `-e`.
+Script proven by hand on the box first (`mat` → superuser).
+
+**Rejected:** `PAPERLESS_ADMIN_USER` = Authelia admin — `manage_superuser`
+skips when any superuser exists (the generated `admin`), so it can't fix an
+existing install. `PAPERLESS_ACCOUNT_DEFAULT_GROUPS` — applies to allauth/SSO
+signups, not the Remote-User backend.
+
+**Open:** non-admin Authelia users still get the permissionless account. What
+they should be allowed to see is a policy call, not addressed here.

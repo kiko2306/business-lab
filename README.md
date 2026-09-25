@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.150.4** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.150.5** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -219,6 +219,14 @@ it is done — not ticked off and left behind. Section references point at
       sold tabs, dates as dd/MM, money as `4 582,18 €`) and the Manage panel
       (access list, Issue enrolment code) should have no English left except
       shop/staff/item names from Wintouch.
+- [ ] **Beta-test the Paperless admin promotion (plan.md §692)** — on `beta`,
+      after pulling, restart Paperless from the dashboard, then open
+      `paperless.<domain>` signed in as the Authelia admin: the app should load
+      documents/dashboard with no "You do not have permission" toast, and the
+      backend log should show either "promoted the Authelia admin" or nothing
+      (already superuser). For a fresh-clone check, stop Paperless, delete the
+      Authelia admin's row from its `auth_user` (or wipe `apps/paperless/data`)
+      and start again — the login must come back as a superuser.
 - [ ] **Beta-test the restart-noise fix (plan.md §668)** — on `beta`, trigger
       an update from the Update page and watch through "Restarting the
       backend": no red "Something went wrong" / "Unable to reach the backend"
