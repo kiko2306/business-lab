@@ -32911,3 +32911,26 @@ Settings flipped `timedatectl` Lisbon → Berlin → Lisbon within one 60s poll 
 way, and the sidecar log shows each apply with no failures. This proves
 `nsenter -t 1 ... timedatectl set-timezone` reaches the host through a
 `pid: host` privileged container. README item deleted.
+
+## 700. Installed phone app kept launching an old dashboard build
+
+Symptom: the PWA on a phone did not pick up new deploys. `sw.js` navigates
+network-first, but `fetch()` inside a service worker still goes through the HTTP
+cache, and nginx sent `index.html` with only `Last-Modified`/`ETag` — no
+`Cache-Control` — so browsers cached it heuristically (~10% of its age) and kept
+naming the old hashed bundles. Fix: `location = /index.html { expires -1; }` in
+`frontend/nginx.conf` (same trick as `/sw.js`, no `add_header` so the security
+headers survive); `try_files`' fallback re-enters location matching, so `/` and
+every SPA route are covered. Checked with a throwaway nginx: `/`, `/index.html`
+and a deep route all return `Cache-Control: no-cache` plus the security headers.
+
+Same root cause class as §673/§674, found while there: `FRONTEND_BUILD_RE`
+did not list `frontend/nginx.conf`, the entrypoint script or `frontend/public/`
+(sw.js, manifest, theme-init.js), all COPYed into the image — an update touching
+only those would have skipped the rebuild, i.e. this very fix would not have
+deployed. Added, with a test.
+
+Not done: an installed app resumed from the background (never re-navigated)
+still shows the old build until it is closed. Cheapest fix if wanted: reload on
+`visibilitychange` after N minutes hidden. Rejected for now — reloads lose
+in-page state and nobody has asked.

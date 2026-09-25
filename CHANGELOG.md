@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.2] — 2026-09-25
+
+### Fixed
+
+- The installed phone app now picks up new dashboard builds: index.html is served no-cache, and an update touching only nginx.conf or frontend/public now rebuilds the frontend
+
 ## [0.151.1] — 2026-09-25
 
 ### Fixed

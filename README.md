@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.1** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.2** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -330,6 +330,15 @@ it is done — not ticked off and left behind. Section references point at
       there — not something backend code can safely detect-and-remove on its
       own with no `service_exposure` row to key off.
 
+
+- [ ] **Beta-test that the installed phone app picks up an update (plan.md §700)** —
+      on `beta`, pull via the Update page (this is a frontend rebuild: `nginx.conf`
+      changed). Then `curl -sI https://<dashboard host>/` and `/index.html`: both
+      must carry `Cache-Control: no-cache`. On the phone, with the app installed
+      to the home screen, push any visible frontend change, pull it, fully close
+      and reopen the app: it should show the new build without clearing site
+      data. Known gap (not fixed): an app merely resumed from the background
+      does not reload itself.
 
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — one grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic

@@ -366,6 +366,21 @@ describe('triggerSelfUpdate', () => {
     expect(frontendUp).toBe(true);
   });
 
+  it.each(['frontend/nginx.conf', 'frontend/public/sw.js', 'frontend/40-real-ip-from-gateway.sh'])(
+    'a change to only %s (COPYed into the image) still rebuilds the frontend',
+    async (file) => {
+      mockAnUpdateFrom('old111', 'new222', 1, [file]);
+
+      await triggerSelfUpdate(7);
+      await flush();
+
+      const built = backup.runCommand.mock.calls.some(
+        ([cmd, a]) => cmd === 'docker' && (a as string[]).includes('build') && (a as string[]).includes('frontend')
+      );
+      expect(built).toBe(true);
+    }
+  );
+
   it('continues past a failed app update and records the summary in the audit metadata', async () => {
     mockAnUpdateFrom('old111', 'new222', 1);
     executor.updateAllInstalledApps.mockResolvedValue([
