@@ -32839,3 +32839,9 @@ Homepage fetches itself: `mdi-bed`, `mdi-lifebuoy`, `mdi-chart-line`. Rejected:
 shipping custom SVGs in `apps/home-page/data/icons/` (§131.1) — needs a file per
 app and a Homepage restart, for no visual gain over an mdi glyph. Labels are
 re-read by the generator on the next sweep/start; no code change.
+
+## 695. Speedtest tile links to /admin/login
+
+Set `webPath: '/admin/login'` on the `speedtest` registry entry; the Home Page
+generator (§111) and the dashboard link both already append `webPath`, so no
+code change beyond the registry value.

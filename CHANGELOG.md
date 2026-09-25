@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.150.7] — 2026-09-25
+
+### Fixed
+
+- Home Page and dashboard link for Speedtest now open /admin/login instead of the public results page
+
 ## [0.150.6] — 2026-09-25
 
 ### Fixed
