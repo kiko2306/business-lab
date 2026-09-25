@@ -290,7 +290,7 @@ it is done — not ticked off and left behind. Section references point at
       resources, no exit node), so this is the mobile app itself, not this
       repo's config. Check that issue periodically; delete this item once it's
       closed upstream (or once an app update fixes it for us, whichever comes
-      first). Last checked 2026-09-23: still open.
+      first). Last checked 2026-09-25: still open.
 - [ ] **Re-enable the CrowdSec Cloudflare Worker bouncer once its token bug is
       fixed** — the edge-level bouncer (`cloudflare-worker-bouncer` in
       `apps/crowdsec/docker-compose.yml`, behind the `edge-bouncer` compose
@@ -304,7 +304,7 @@ it is done — not ticked off and left behind. Section references point at
       `docker compose --profile edge-bouncer up -d` once a classic token
       works or upstream fixes the auth path. Check periodically; delete this
       item once it's fixed and the bouncer is confirmed enforcing live. Last
-      checked 2026-09-23: latest release is still v0.0.18, and no upstream
+      checked 2026-09-25: latest release is still v0.0.18, and no upstream
       issue names the 10000 auth error.
 - [ ] **MeshCentral: prove real agent enrolment through the public tunnel**
       — the app is up, reachable at its own hostname with no Authelia gate,
