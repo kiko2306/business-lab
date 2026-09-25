@@ -32748,3 +32748,35 @@ own health check). `curl …/api/instance` returns `{"setup_required":false}`.
 README item deleted. Note for next time: NPM's log line is
 `GET https <host> "<path>"`, so grep the quoted path, not `GET /path`.
 
+## 691. Fixed: a ban no longer feeds itself through the bouncer's own 403s
+
+Closes the second half of §675. During the ban, every retry by any of the
+operator's clients was answered by NPM's Lua bouncer with a 403, logged, parsed,
+and counted by `LePresidente/http-generic-403-bf` (POST + status 403,
+capacity 5 / 10 s) — 13 alerts in 17 minutes from one benign 401 burst
+(#320–#329 were still in `cscli alerts` on the box).
+
+The bouncer answers *without contacting the app*, and NPM's log records that:
+the upstream-status column is `-` (`- - 403 -`), against `- 403 403 -` when an app
+really returned 403. Across the box's logs that separates 1064 bouncer lines from
+one genuine upstream 403 (a real Vikunja login). CrowdSec's nginx parser already
+exposes it as `evt.Parsed.upstream_status`.
+
+Fix, the §539/§675 way: `apps/crowdsec/config/parsers/banned-client-whitelist.yaml`
+(mounted into `s02-enrich`) whitelists `status == '403' && upstream_status == '-'`.
+Proven with `cscli explain` in a throwaway CrowdSec (same image, collections and
+the box's `http-generic-bf.yaml`): the bouncer-style line is "ignored by
+whitelist"; a real upstream 403 POST still reaches `http-generic-403-bf`; a 401
+login guess still reaches `http-generic-401-bf`. The ban is untouched and expires
+on its own; the whitelist only stops it being re-armed.
+
+Known trade-off, recorded in the file: an Authelia 403 (signed in, not allowed) is
+also answered with no upstream and is no longer counted. Unauthenticated visitors
+get 401/302 from Authelia, and those still count.
+
+Rejected: matching the bouncer page's body length (1053) — breaks the day its
+template changes; whitelisting by source IP (no static address, §539); raising the
+403 scenario's capacity (blunts real brute-force detection for everyone); the
+scenario's own `filter` (it lives in a hub-installed file we do not own, unlike a
+mounted parser).
+

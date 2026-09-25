@@ -1,0 +1,23 @@
+# Mounted into /etc/crowdsec/parsers/s02-enrich/ (plan.md §691). Static, so
+# checked in rather than rendered.
+#
+# NPM's CrowdSec Lua bouncer answers a banned address with its own 403 page and
+# never contacts the app, so NPM logs the request with no upstream status
+# (`- - 403`, versus `- 403 403` for an app that really said 403). Those 403s
+# were fed straight back into LePresidente/http-generic-403-bf: every retry by
+# any of a banned person's clients raised another alert and extended the ban —
+# 13 alerts in 17 minutes in §675, from one benign 401 burst.
+#
+# Drops only 403s that were answered without reaching an upstream. A real 403
+# from an app (upstream_status 403) still counts, so brute-forcing a login that
+# answers 403 is still caught. The ban itself is untouched and expires on its
+# own. Side effect: an Authelia 403 (signed in, not allowed) is also answered
+# without an upstream and is no longer counted; unauthenticated visitors get
+# 401/302 from Authelia, which still count.
+name: homelab/banned-client-whitelist
+description: "The bouncer's own 403 for an already-banned client is not new evidence"
+whitelist:
+  reason: "403 served by the bouncer/proxy without reaching an upstream"
+  expression:
+    - >-
+      evt.Parsed.status == '403' && evt.Parsed.upstream_status == '-'

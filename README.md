@@ -481,10 +481,12 @@ before anything is built.
       (leave a tab open past expiry, or clear its cookies and reload) — its
       401 refresh retries must no longer raise an alert or a ban
       (`cscli alerts list` stays empty for your address).
-- [ ] **Stop a banned client's retries from re-arming CrowdSec (plan.md §675)**
-      — during the ban, NetBird's 403-answered retries raised 12 more alerts and
-      extended it. Decide how to keep a ban from feeding itself (the scenario
-      counts the bouncer's own 403s) without hiding real 403 brute force.
+- [ ] **Beta-test the banned-client whitelist (plan.md §691)** — on `beta`, after
+      pulling (CrowdSec is recreated): `docker exec crowdsec-crowdsec-1 cscli
+      parsers list` shows `homelab/banned-client-whitelist`, and `cscli explain
+      --type nginx --log '<a "- - 403" line from an NPM access log>'` ends with
+      "ignored by whitelist". Then the real thing: the next real ban should stop
+      raising an `http-generic-403-bf` alert every minute or two.
 - [ ] **Show the running day's figures from the new agent (plan.md §677)** —
       after installing the new setup exe, the shop page must say "Business day
       27/07/2026" (this box's demo day) and show invoiced €9,640.16 and the
