@@ -32934,3 +32934,19 @@ Not done: an installed app resumed from the background (never re-navigated)
 still shows the old build until it is closed. Cheapest fix if wanted: reload on
 `visibilitychange` after N minutes hidden. Rejected for now — reloads lose
 in-page state and nobody has asked.
+
+## 701. Other built apps checked for the stale-index.html bug (§700)
+
+Audited every app we build. **Dashboard** fixed in §700. **Hotel admin, check-in
+and pulse** (nginx, `try_files` → `index.html`, no Cache-Control) had the same
+heuristic-caching problem — no service worker, so milder than the PWA, but a
+guest link kept opening an old build after a deploy; each nginx.conf gets the
+`location = /index.html { expires -1; }` block (all three checked with a
+throwaway nginx: `/` and a deep route return `no-cache`, no emerg). **Tally**:
+Express static sends `Cache-Control: public, max-age=0` (revalidates every
+time; confirmed live on :10610) and its `sw.js` is a no-op fetch handler that
+caches nothing — fine, untouched. **price-compare**: index, manifest and sw.js
+are explicitly `no-store` — fine. **Pantry**: plain `express.static`, no
+service worker — fine. Hotel is not running on the test host, so not proven
+live; README item added. Stays on `dev` — nothing on `beta` to test until Hotel
+is started.

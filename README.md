@@ -331,14 +331,12 @@ it is done — not ticked off and left behind. Section references point at
       own with no `service_exposure` row to key off.
 
 
-- [ ] **Beta-test that the installed phone app picks up an update (plan.md §700)** —
-      on `beta`, pull via the Update page (this is a frontend rebuild: `nginx.conf`
-      changed). Then `curl -sI https://<dashboard host>/` and `/index.html`: both
-      must carry `Cache-Control: no-cache`. On the phone, with the app installed
-      to the home screen, push any visible frontend change, pull it, fully close
-      and reopen the app: it should show the new build without clearing site
-      data. Known gap (not fixed): an app merely resumed from the background
-      does not reload itself.
+
+- [ ] **Beta-test the Hotel apps' no-cache index.html (plan.md §701)** — when
+      Hotel is next started on `beta` (it rebuilds admin, check-in and pulse),
+      `curl -sI` each app's `/` and a deep link (e.g. a check-in `/<token>`):
+      `Cache-Control: no-cache`. Then push a visible change and confirm a phone
+      that already opened the guest link shows it on the next open.
 
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — one grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic
