@@ -33288,3 +33288,67 @@ normal path for a `latest`-tagged image. README item added: confirm
 Nextcloud lands on 35 cleanly (no maintenance-mode stall) next time it's
 started on `beta`, and spot-check the OnlyOffice-in-Nextcloud editor still
 opens a document afterward.
+
+## 712. Vikunja silent SSO (§555/§572, README item): traced the remaining gap to Vikunja's own frontend, closing the item
+
+User reported the README item's exact symptom on a real browser: a cold visit
+to `https://vikunja.tx-home-utils.com/` still showed Vikunja's own
+username/password login screen, not a silent landing in the app. Re-ran
+§572's curl checks first — all still pass unchanged: bare `/` → `302` to
+`?redirectToProvider=authelia`; that URL, anonymous, → `302` to Authelia's
+real login (`rd=` pointing back at it); `/api/v1/info` unaffected. So the
+NPM/nginx side built in §571/§572 is not the problem.
+
+Went one level deeper than curl can reach: pulled Vikunja's actual served
+frontend straight off the running container (`curl localhost:10390`,
+bypassing NPM/Authelia) — the main entry HTML, its `sw.js` precache
+manifest (179 JS chunks), then every one of those chunks — and grepped for
+`redirectToProvider`. It exists in exactly one chunk, `router-*.js`:
+
+```js
+function sa(){
+  let {auth: e} = he(), t = new URLSearchParams(window.location.search);
+  if (t.has('redirectToProvider')) {
+    let n = t.get('redirectToProvider');
+    e.openidConnect.providers?.length===1 && (path is /login or /) &&
+      (n===null||n==='true'||n==='1') && ra(e.openidConnect.providers[0]);
+    let r = e.openidConnect.providers?.find(e=>e.key===n);
+    r && ra(r);
+  }
+}
+```
+
+`sa()` is invoked from Vikunja's own `checkAuth`, which runs whenever no
+valid Vikunja JWT is already in `localStorage` — i.e. on exactly the cold
+visit the README item describes. The second branch (`find by key`) is the
+one our `?redirectToProvider=authelia` is meant to hit, since Vikunja's own
+provider key is literally `authelia`. But it reads
+`auth.openidConnect.providers` from the frontend's Pinia store, which is
+only populated once `/api/v1/info` resolves — and nothing in this code
+path waits for that fetch before running. On a cold load there's no
+guarantee `checkAuth` (and therefore `sa()`) runs after that response lands;
+if it runs first, `providers` is empty, neither branch matches, and it
+falls through to the ordinary login screen with nothing visible to the user
+(only a `console.warn` in devtools, never surfaced in the UI).
+
+This reproduces the exact reported symptom and is consistent with it being
+intermittent-by-network-timing rather than always-broken (§555 itself
+logged a real successful OIDC round trip previously, e.g. when the button
+was clicked manually after the page had already settled).
+
+**Conclusion**: this is a race condition inside Vikunja's own bundled
+frontend, not anything wired up in this repo. `vikunja/vikunja:latest` ships
+a prebuilt, minified bundle with no source in this repo to patch, and
+rewriting vendor JS via an nginx `sub_filter` (the only lever this repo has
+over it) to work around a third-party startup race is the wrong shape of
+fix for what it buys: worst case, the user clicks the existing (and
+already-proven-working, §555) "Login with Authelia" button once per cold
+visit instead of it happening silently. Not chasing this further.
+
+**What's proven and stays true**: the NPM-level redirect (§571/§572) is
+correct and unaffected — deep links, `/api/v1/...`, and the anonymous
+redirect chain to Authelia's real login all still behave exactly as
+designed. Narrowed and closed the README item on that basis; if Vikunja
+fixes the client-side race upstream (or the "redirectToProvider" contract
+changes) a future version bump might make the cold-load case fully silent
+for free, but there's no code in this repo waiting on that.

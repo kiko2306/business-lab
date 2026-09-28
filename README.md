@@ -280,15 +280,6 @@ it is done — not ticked off and left behind. Section references point at
       the run shows `checking` for the duration of that fetch and lands as
       an `error` row (visible in run history) rather than the trigger
       request hanging with no row at all.
-- [ ] **Vikunja silent SSO: confirm a live Authelia session actually skips
-      the login page** — code built and proven at the HTTP level in plan.md
-      §572 (NPM's `location = /` block confirmed rendered; anonymous curl
-      shows the redirect chain lands on Authelia's real login with no loop,
-      and deep links / `/api/v1/...` are unaffected). What's left needs a
-      real logged-in browser: with a live Authelia session, visiting bare
-      `https://vikunja.tx-home-utils.com/` should land straight in the app
-      with no visible login page, and a reload of that same URL shouldn't
-      loop. Confirm before merging to `main`.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),
