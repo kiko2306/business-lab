@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.13** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.14** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -379,22 +379,19 @@ it is done — not ticked off and left behind. Section references point at
       row) came through as the Anthropic row's already-configured key with
       no re-entry needed.
 
-- [ ] **Paperless's ClamAV wiring has been failing on every start since
-      2026-09-08 (found 2026-09-28, plan.md §725)** — `reconcilePaperlessClamav`
-      writes `apps/paperless/data/data/pre-consume-clamav.py` and the managed
-      compose fragment on every Paperless start, and gets `EACCES` every time.
-      Not a race: the backend process runs as `appuser` **uid 100/gid 101**,
-      while that directory is **uid 1000 gid 1000 mode 2775** — uid 100 is
-      neither owner nor in the group, so it falls to "other" (`r-x`) and cannot
-      write. The script on disk is dated 2026-09-08, which is when this last
-      succeeded. It fails quietly (the reconciler catches and logs), so the
-      start still reports success — meaning the pre-consume virus scan is
-      pinned to whatever host/port were correct three weeks ago and silently
-      stops matching if ClamAV moves. Same class as §703's pg_dump EACCES.
-      Fix needs the directory to be group-writable by the backend's gid, or
-      the backend to stop needing to write inside a tree the app owns; then
-      confirm the script is rewritten on a start and that a test document is
-      actually scanned.
+- [ ] **Beta-test the Paperless ClamAV relocation (plan.md §726)** — the
+      script now lives in `apps/paperless/data/clamav/` and is bind-mounted
+      read-only at `/usr/src/paperless/clamav`. On `beta`, after pulling,
+      start Paperless and confirm: `docker logs business-lab-backend` shows
+      `Paperless/ClamAV intake scan reconciled` and **no** `Failed to wire
+      Paperless to ClamAV`; the file exists on the host with a fresh mtime
+      (`ls -l apps/paperless/data/clamav/`); and inside the container
+      `docker exec paperless-paperless-ngx-1 ls -l /usr/src/paperless/clamav/`
+      lists it as executable. Then the part that matters — drop a file into
+      the `to-paperless/` share and confirm it is still consumed (a missing
+      script is fail-**closed**: every document would be rejected). If you
+      want the scan itself proven, an EICAR test file should be rejected and
+      leave `clamav pre-consume: REJECTED` in the Paperless log.
 
 - [ ] **Outline's exposure row lost its `npm_host_id` and can't re-adopt the
       live host (found 2026-09-28, plan.md §724)** — after a rename teardown

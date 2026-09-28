@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.14] — 2026-09-28
+
+### Fixed
+
+- Paperless's ClamAV pre-consume script is written to a directory the backend owns, instead of one Paperless chowns to itself — it had been failing with EACCES on every start since 2026-09-08
+
 ## [0.151.13] — 2026-09-28
 
 ### Fixed

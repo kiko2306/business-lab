@@ -136,4 +136,52 @@ describe('reconcilePaperlessClamav', () => {
     mockedGateway.mockRejectedValue(new Error('dns down'));
     await expect(reconcilePaperlessClamav('paperless', appDir)).resolves.toBeUndefined();
   });
+
+  // Regression (plan.md §725). The script used to be written into
+  // `data/data`, which is bind-mounted as PAPERLESS_DATA_DIR — and which
+  // Paperless's entrypoint `chown -R`s to its own uid. The backend (uid 100)
+  // then could not write there, so every start failed with EACCES for three
+  // weeks, quietly. Asserting "the file is where preConsumeScriptHostPath
+  // says" is tautological; what matters is that it is NOT under a directory
+  // the container owns.
+  it('keeps the script out of the directories Paperless chowns', async () => {
+    await reconcilePaperlessClamav('paperless', appDir);
+
+    const scriptPath = preConsumeScriptHostPath(appDir);
+    for (const owned of ['data', 'media', 'export', 'consume']) {
+      expect(scriptPath.startsWith(path.join(appDir, 'data', owned) + path.sep)).toBe(false);
+    }
+    expect(path.dirname(scriptPath)).toBe(path.join(appDir, 'data', 'clamav'));
+    expect(fs.existsSync(scriptPath)).toBe(true);
+  });
+
+  it('mounts the script read-only at the path the env var points into', async () => {
+    await reconcilePaperlessClamav('paperless', appDir);
+    const fragment = fs.readFileSync(managedComposeFragmentPath(appDir), 'utf8');
+
+    // The mount source must be the directory the script was actually written
+    // to, relative to the compose project dir, and read-only so the container
+    // cannot chown it back.
+    const hostDir = path.basename(path.dirname(preConsumeScriptHostPath(appDir)));
+    const containerDir = path.posix.dirname(PRE_CONSUME_SCRIPT_CONTAINER_PATH);
+    expect(fragment).toContain(`- ./data/${hostDir}:${containerDir}:ro`);
+    // …and the env var has to resolve inside that mount, or Paperless raises
+    // ConsumerError on every document (fail-closed).
+    expect(PRE_CONSUME_SCRIPT_CONTAINER_PATH.startsWith(`${containerDir}/`)).toBe(true);
+  });
+
+  it('survives a legacy script it has no permission to delete', async () => {
+    // Stand in for the real EACCES: a directory where the old file was, which
+    // rmSync refuses to remove without `recursive`. The reconcile must still
+    // write the new script and fragment.
+    const legacy = path.join(appDir, 'data', 'data', 'pre-consume-clamav.py');
+    fs.mkdirSync(legacy, { recursive: true });
+
+    await expect(reconcilePaperlessClamav('paperless', appDir)).resolves.toBeUndefined();
+
+    expect(fs.existsSync(preConsumeScriptHostPath(appDir))).toBe(true);
+    expect(fs.readFileSync(managedComposeFragmentPath(appDir), 'utf8')).toContain(
+      'PAPERLESS_PRE_CONSUME_SCRIPT'
+    );
+  });
 });
