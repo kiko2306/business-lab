@@ -394,8 +394,23 @@ it is done — not ticked off and left behind. Section references point at
       rows kept their exact `npm_host_id` and `cf_hostname_id`
       (`netbird-vpn:api` 3, `:relay` 4, `hotel:core` 43, `:checkin` 44,
       `:pulse` 45, `homepage:apex` 11) — nothing torn down and recreated. What
-      is left is the rename half, which needs the suffix edit plus a backend
-      rebuild, since `services.ts` is compiled into the image.
+      is left is the rename half. Practicalities, learned on a 2026-09-28
+      attempt that got as far as the edit before being interrupted:
+      - It needs **two** backend rebuilds, one each way —
+        `docker compose -f docker-compose.yml build backend` then
+        `up -d --no-deps --force-recreate --no-build backend`. `/app/dist` is
+        baked into the image, so editing `services.ts` alone changes nothing
+        (`VERSION` is bind-mounted and misleads here).
+      - A backend restart resets the reconciler's initial delay, so the sweep
+        that applies the rename lands ~10 min later — no dashboard click needed.
+      - The `api` entry carries `grpc: true`, so each rename also mints an NPM
+        **certificate** for the new hostname via `ensureGrpcCertificate`. Those
+        are self-signed, not Let's Encrypt, so there is no rate-limit risk — but
+        check for and clean up a leftover `netbird-vpn-mgmt` cert object after
+        reverting.
+      - Leave the checkout clean afterwards (`git checkout --
+        backend/src/config/services.ts`, then `git status --porcelain` empty) or
+        the next self-update pull conflicts.
 
 - [ ] **Beta-test that a failed start runs once (plan.md §717)** — on `beta`,
       make an app fail to start (easiest: stop a `dependsOn` dependency, or
