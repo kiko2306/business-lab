@@ -33217,3 +33217,17 @@ were already unaffected (they don't go through `localhost` the same way).
 
 Compose-only change, no rebuild needed — a self-update recreates the three
 containers. README item added to confirm `healthy` shows up on `beta`.
+
+## 709. Orphaned `homelab.tx-home-utils.com` gone; §556's README item closed
+
+Re-checked §556's finding before asking the user to act on it: the live
+`service_exposure` table (now 43 rows, up from 38) still has no row for
+`homelab` or `businesslab`, `dashboard_url` is still empty, and
+`businesslab.tx-home-utils.com` (the default) resolves and returns 200 as
+expected. New signal since §556: `homelab.tx-home-utils.com` no longer
+resolves at all from here. Asked the user to check Cloudflare Zero Trust
+directly (Tunnels → public hostnames, and DNS records) since this session
+has no Cloudflare dashboard/API access and the item was explicitly a
+human-only cleanup — confirmed absent from both. Already cleaned up, whether
+by an earlier manual pass or Cloudflare's own record lifecycle. README item
+deleted; no code change.
