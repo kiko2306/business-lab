@@ -33901,3 +33901,22 @@ died of SIGPIPE when `head` closed the pipe, and the `||` fallback read that
 as "not found". Piping to `head`/`less` is the obvious way to use the thing.
 Now the existence check happens up front with `grep -q` and the awk is left to
 exit however it likes.
+
+## 737. §730.1's memo measured: the backend suite is 43 s → 16 s
+
+§730.1 was argued, not measured — the memo landed with the reasoning that
+310k pbkdf2 rounds per call, repeated over the same handful of secrets, was
+what made `autheliaOidcClients.test.ts` 32 s of a 43 s suite. Measured now on
+`dev` at 0.151.5: that file runs in **1.53 s** (11 tests, all passing) and
+the whole 121-file suite in **15.7–20.9 s** wall, 1254 tests. So the claim
+holds — ~21× on the file, ~2.5× on the suite — and the suite's remaining
+time is transform/collect overhead, not one hot function. Nothing else to do
+here; the live-behaviour half (the rendered Authelia block is byte-identical,
+so no restart churn) is still the open README beta test, §731.
+
+Re-checked the two upstream watch items the README parks here, both unchanged:
+netbirdio/android-client#96 (Android client blocks non-NetBird traffic) is
+still open with no activity since 2025-11-05, and
+`crowdsecurity/cs-cloudflare-worker-bouncer`'s latest release is still v0.0.18
+(2026-06-02) with no issue naming the `cfut_` "Authentication error (10000)".
+Dates bumped to 2026-09-28; both items stay.
