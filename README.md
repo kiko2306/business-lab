@@ -469,18 +469,6 @@ it is done — not ticked off and left behind. Section references point at
       `docker logs business-lab-backend` should show no "gave up: the app never
       became reachable" for it.
 
-### Repo tooling and performance
-
-Planned in plan.md §730 — measured, ordered biggest-win-first.
-
-- [ ] **Compact the closed OIDC-rollout run (plan.md §730.6)** — §270–§275,
-      §278, §280, §281 into one section, keeping every cited anchor as
-      `**§N** — <conclusion>`. §276, §277 and §279 interleave the range and
-      are not part of the run; they stay. ~550 lines, ~1.6 % of `plan.md` —
-      small, and last for that reason. Own `plan:` commit, with
-      `plan-citations.py` run before and after (after §730.2 lands, so the
-      baseline is clean).
-
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 
 Names are settled (plan.md §625): **`check-in`** (guest online check-in),

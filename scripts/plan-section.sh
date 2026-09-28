@@ -19,6 +19,10 @@ cd "$(dirname "${BASH_SOURCE[0]}")/.."
 first="$1"
 last="${2:-$1}"
 
+# Checked up front, so the awk below can exit on a closed pipe (`| head`,
+# `| less`) without that being mistaken for "no such section".
+grep -qE "^## $first\." plan.md || { echo "No section §$first in plan.md" >&2; exit 1; }
+
 awk -v first="$first" -v last="$last" '
   /^## / {
     n = $2 + 0                     # "730." -> 730
@@ -27,5 +31,4 @@ awk -v first="$first" -v last="$last" '
     if (inside && n == last) { ending = 1 }
   }
   inside { print }
-  END { exit !inside }
-' plan.md || { echo "No section §$first in plan.md" >&2; exit 1; }
+' plan.md
