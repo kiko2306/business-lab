@@ -4,6 +4,7 @@ import { execFile } from 'child_process';
 import { query } from '../utils/database';
 import { schemas, validateBody } from '../middleware/validation';
 import { requireCapability } from '../middleware/requireCapability';
+import { sleep } from '../utils/wait';
 
 const router = Router();
 
@@ -28,8 +29,6 @@ function cpuSnapshot(): { idle: number; total: number } {
 // module load; the first real read falls back to a short inline sample
 // because too little time has passed for the diff to mean anything.
 let lastCpu = cpuSnapshot();
-
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Percent of CPU time spent non-idle. When reads are spaced out (the header

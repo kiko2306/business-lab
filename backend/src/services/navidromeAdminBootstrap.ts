@@ -17,6 +17,7 @@ import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services
 import { getHostGatewayIp } from '../utils/network';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { readAppEnvValue } from './appEnv';
+import { pollUntilReady } from '../utils/wait';
 
 export const NAVIDROME_SERVICE = 'navidrome';
 export const NAVIDROME_ADMIN_PASSWORD_KEY = 'NAVIDROME_ADMIN_PASSWORD';
@@ -26,7 +27,6 @@ const FALLBACK_PORT = 10570;
 const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
 const REQUEST_TIMEOUT_MS = 10_000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type SetupState = 'unreachable' | 'needs-admin' | 'already-setup';
 
@@ -74,37 +74,35 @@ export async function reconcileNavidromeFirstAdmin(serviceName: string): Promise
     const port = getPublishedUpstreamPort(NAVIDROME_SERVICE) ?? FALLBACK_PORT;
     const baseUrl = `http://${await getHostGatewayIp()}:${port}`;
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const state = await getSetupState(baseUrl);
+    const state = await pollUntilReady(
+      () => getSetupState(baseUrl),
+      (state) => state !== 'unreachable',
+      MAX_ATTEMPTS,
+      RETRY_DELAY_MS
+    );
 
-      if (state === 'unreachable') {
-        if (attempt === MAX_ATTEMPTS) {
-          logger.warn('Navidrome admin bootstrap gave up: the app never became reachable');
-          return;
-        }
-        await sleep(RETRY_DELAY_MS);
-        continue;
-      }
-
-      if (state === 'already-setup') {
-        logger.info('Navidrome already has an admin account; nothing to bootstrap');
-        return;
-      }
-
-      const response = await fetch(`${baseUrl}/auth/createAdmin`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ username, password }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        logger.warn('Navidrome admin bootstrap failed', { status: response.status, body: text.slice(0, 300) });
-        return;
-      }
-      logger.info('Navidrome admin account created', { username });
+    if (state === 'unreachable') {
+      logger.warn('Navidrome admin bootstrap gave up: the app never became reachable');
       return;
     }
+
+    if (state === 'already-setup') {
+      logger.info('Navidrome already has an admin account; nothing to bootstrap');
+      return;
+    }
+
+    const response = await fetch(`${baseUrl}/auth/createAdmin`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ username, password }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      logger.warn('Navidrome admin bootstrap failed', { status: response.status, body: text.slice(0, 300) });
+      return;
+    }
+    logger.info('Navidrome admin account created', { username });
   } catch (error) {
     logger.warn('Navidrome admin bootstrap failed', { error: (error as Error).message });
   }

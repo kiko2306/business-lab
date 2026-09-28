@@ -67,6 +67,7 @@ import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
 import { getSetupState, runSetupWizard } from './itflowClient';
 import { runItflowDbScript } from './itflowDb';
+import { pollUntilReady } from '../utils/wait';
 
 export const ITFLOW_SERVICE = 'itflow';
 export const ITFLOW_ADMIN_PASSWORD_KEY = 'ITFLOW_ADMIN_PASSWORD';
@@ -85,7 +86,6 @@ const RETRY_DELAY_MS = 3000;
 // self-contained (no other requires, no session/cookie reads), safe to pull in
 // on top of config.php's own $mysqli connection.
 const SECURITY_FUNCTIONS_PATH = '/var/www/localhost/htdocs/functions/security.php';
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Exported for itflowUserProvisioning.ts — same cross-project base URL a
 // per-user account create/update needs to sign in as the admin against.
@@ -134,44 +134,42 @@ export async function reconcileItflowFirstAdmin(serviceName: string): Promise<vo
   try {
     const baseUrl = await resolveItflowBaseUrl();
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const state = await getSetupState(baseUrl);
+    const state = await pollUntilReady(
+      () => getSetupState(baseUrl),
+      (state) => state !== 'unreachable',
+      MAX_ATTEMPTS,
+      RETRY_DELAY_MS
+    );
 
-      if (state === 'unreachable') {
-        if (attempt === MAX_ATTEMPTS) {
-          logger.warn('ITFlow admin bootstrap gave up: the app never became reachable (it downloads its source on first boot)');
-          return;
-        }
-        await sleep(RETRY_DELAY_MS);
-        continue;
-      }
-
-      if (state === 'already-setup') {
-        logger.info('ITFlow setup is already complete; syncing the admin identity');
-        await reconcileAdminIdentity(email, name);
-        await reconcileAdminPassword(password);
-        return;
-      }
-
-      const result = await runSetupWizard(baseUrl, {
-        name,
-        email,
-        password,
-        companyName: COMPANY_NAME,
-        timezone,
-        dbHost: DB_HOST,
-        dbName,
-        dbUser,
-        dbPassword,
-      });
-      if (result === 'completed') {
-        logger.info(`Ran ITFlow's setup wizard and created its admin (${email})`);
-      } else if (result === 'already-setup') {
-        logger.info('ITFlow setup is already complete; nothing to bootstrap');
-      } else {
-        logger.error('ITFlow admin bootstrap: the setup wizard did not complete — will retry next start');
-      }
+    if (state === 'unreachable') {
+      logger.warn('ITFlow admin bootstrap gave up: the app never became reachable (it downloads its source on first boot)');
       return;
+    }
+
+    if (state === 'already-setup') {
+      logger.info('ITFlow setup is already complete; syncing the admin identity');
+      await reconcileAdminIdentity(email, name);
+      await reconcileAdminPassword(password);
+      return;
+    }
+
+    const result = await runSetupWizard(baseUrl, {
+      name,
+      email,
+      password,
+      companyName: COMPANY_NAME,
+      timezone,
+      dbHost: DB_HOST,
+      dbName,
+      dbUser,
+      dbPassword,
+    });
+    if (result === 'completed') {
+      logger.info(`Ran ITFlow's setup wizard and created its admin (${email})`);
+    } else if (result === 'already-setup') {
+      logger.info('ITFlow setup is already complete; nothing to bootstrap');
+    } else {
+      logger.error('ITFlow admin bootstrap: the setup wizard did not complete — will retry next start');
     }
   } catch (error) {
     logger.error('Failed to bootstrap the ITFlow first admin', { error: (error as Error).message });

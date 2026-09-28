@@ -23,6 +23,7 @@ import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services
 import { getHostGatewayIp } from '../utils/network';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { readAppEnvValue } from './appEnv';
+import { pollUntilReady } from '../utils/wait';
 
 export const JELLYFIN_SERVICE = 'jellyfin';
 export const JELLYFIN_ADMIN_PASSWORD_KEY = 'JELLYFIN_ADMIN_PASSWORD';
@@ -33,7 +34,6 @@ const FALLBACK_PORT = 10210;
 const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
 const REQUEST_TIMEOUT_MS = 10_000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type SetupState = 'unreachable' | 'needs-wizard' | 'already-setup';
 
@@ -90,49 +90,47 @@ export async function reconcileJellyfinFirstAdmin(serviceName: string): Promise<
     const port = getPublishedUpstreamPort(JELLYFIN_SERVICE) ?? FALLBACK_PORT;
     const baseUrl = `http://${await getHostGatewayIp()}:${port}`;
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const state = await getSetupState(baseUrl);
+    const state = await pollUntilReady(
+      () => getSetupState(baseUrl),
+      (state) => state !== 'unreachable',
+      MAX_ATTEMPTS,
+      RETRY_DELAY_MS
+    );
 
-      if (state === 'unreachable') {
-        if (attempt === MAX_ATTEMPTS) {
-          logger.warn('Jellyfin wizard bootstrap gave up: the app never became reachable');
-          return;
-        }
-        await sleep(RETRY_DELAY_MS);
-        continue;
-      }
-
-      if (state === 'already-setup') {
-        logger.info('Jellyfin has already completed its startup wizard; nothing to bootstrap');
-        return;
-      }
-
-      // Two calls, in this order. /Startup/Complete is what flips
-      // StartupWizardCompleted, and Jellyfin accepts it whether or not a user
-      // was created — so completing before creating the user would lock in a
-      // server with no account and no way back through the wizard. That is
-      // exactly what a stray probe of it did while this was being written.
-      const userResponse = await post(baseUrl, '/Startup/User', { Name: username, Password: password });
-      if (!userResponse.ok) {
-        const text = await userResponse.text().catch(() => '');
-        logger.warn('Jellyfin wizard bootstrap failed creating the admin user', {
-          status: userResponse.status,
-          body: text.slice(0, 300),
-        });
-        return;
-      }
-
-      const completeResponse = await post(baseUrl, '/Startup/Complete');
-      if (!completeResponse.ok) {
-        logger.warn('Jellyfin admin user created but the wizard would not complete', {
-          status: completeResponse.status,
-        });
-        return;
-      }
-
-      logger.info('Jellyfin startup wizard completed', { username });
+    if (state === 'unreachable') {
+      logger.warn('Jellyfin wizard bootstrap gave up: the app never became reachable');
       return;
     }
+
+    if (state === 'already-setup') {
+      logger.info('Jellyfin has already completed its startup wizard; nothing to bootstrap');
+      return;
+    }
+
+    // Two calls, in this order. /Startup/Complete is what flips
+    // StartupWizardCompleted, and Jellyfin accepts it whether or not a user
+    // was created — so completing before creating the user would lock in a
+    // server with no account and no way back through the wizard. That is
+    // exactly what a stray probe of it did while this was being written.
+    const userResponse = await post(baseUrl, '/Startup/User', { Name: username, Password: password });
+    if (!userResponse.ok) {
+      const text = await userResponse.text().catch(() => '');
+      logger.warn('Jellyfin wizard bootstrap failed creating the admin user', {
+        status: userResponse.status,
+        body: text.slice(0, 300),
+      });
+      return;
+    }
+
+    const completeResponse = await post(baseUrl, '/Startup/Complete');
+    if (!completeResponse.ok) {
+      logger.warn('Jellyfin admin user created but the wizard would not complete', {
+        status: completeResponse.status,
+      });
+      return;
+    }
+
+    logger.info('Jellyfin startup wizard completed', { username });
   } catch (error) {
     logger.warn('Jellyfin wizard bootstrap failed', { error: (error as Error).message });
   }

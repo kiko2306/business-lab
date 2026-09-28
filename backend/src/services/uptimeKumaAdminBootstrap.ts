@@ -32,6 +32,7 @@ import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services
 import { getHostGatewayIp } from '../utils/network';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { readAppEnvValue } from './appEnv';
+import { pollUntilReady } from '../utils/wait';
 
 export const UPTIME_KUMA_SERVICE = 'uptime-kuma';
 export const UPTIME_KUMA_ADMIN_PASSWORD_KEY = 'UPTIME_KUMA_ADMIN_PASSWORD';
@@ -46,7 +47,6 @@ const RETRY_DELAY_MS = 3000;
 const SETUP_SIGNAL_WAIT_MS = 4000;
 const ACK_WAIT_MS = 10_000;
 const ACK_ID = 1;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 export interface DecodedFrame {
   kind: 'open' | 'connect' | 'event' | 'ack' | 'ping' | 'other';
@@ -173,28 +173,29 @@ export async function reconcileUptimeKumaFirstAdmin(serviceName: string): Promis
     const port = getPublishedUpstreamPort(UPTIME_KUMA_SERVICE) ?? FALLBACK_PORT;
     const baseWsUrl = `ws://${await getHostGatewayIp()}:${port}`;
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const outcome = await runSetup(baseWsUrl, username, password);
+    // Unlike its siblings the probe *is* the work — runSetup creates the
+    // account and reports what happened — so retrying it is the point, not
+    // just a reachability check.
+    const outcome = await pollUntilReady(
+      () => runSetup(baseWsUrl, username, password),
+      (outcome) => outcome !== 'unreachable',
+      MAX_ATTEMPTS,
+      RETRY_DELAY_MS
+    );
 
-      if (outcome === 'unreachable') {
-        if (attempt === MAX_ATTEMPTS) {
-          logger.warn('Uptime Kuma admin bootstrap gave up: the app never became reachable');
-          return;
-        }
-        await sleep(RETRY_DELAY_MS);
-        continue;
-      }
-      if (outcome === 'already-setup') {
-        logger.info('Uptime Kuma already has an admin account; nothing to bootstrap');
-        return;
-      }
-      if (outcome === 'created') {
-        logger.info('Uptime Kuma admin account created', { username });
-        return;
-      }
-      logger.warn('Uptime Kuma admin bootstrap failed: setup was rejected');
+    if (outcome === 'unreachable') {
+      logger.warn('Uptime Kuma admin bootstrap gave up: the app never became reachable');
       return;
     }
+    if (outcome === 'already-setup') {
+      logger.info('Uptime Kuma already has an admin account; nothing to bootstrap');
+      return;
+    }
+    if (outcome === 'created') {
+      logger.info('Uptime Kuma admin account created', { username });
+      return;
+    }
+    logger.warn('Uptime Kuma admin bootstrap failed: setup was rejected');
   } catch (error) {
     logger.warn('Uptime Kuma admin bootstrap failed', { error: (error as Error).message });
   }

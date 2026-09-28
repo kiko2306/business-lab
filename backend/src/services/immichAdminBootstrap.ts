@@ -26,6 +26,7 @@ import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
 import { immichAdminSignUp, immichPing } from './immichClient';
+import { sleep } from '../utils/wait';
 
 export const IMMICH_SERVICE = 'immich';
 export const IMMICH_ADMIN_PASSWORD_KEY = 'IMMICH_ADMIN_PASSWORD';
@@ -36,7 +37,6 @@ const FALLBACK_PORT = 10200;
 // returns before Immich's API is serving.
 const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function resolveImmichBaseUrl(): Promise<string> {
   const port = getPublishedUpstreamPort(IMMICH_SERVICE) ?? FALLBACK_PORT;

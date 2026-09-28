@@ -20,6 +20,7 @@ import { getHostGatewayIp } from '../utils/network';
 import { requestJson } from '../utils/httpJson';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { readAppEnvValue } from './appEnv';
+import { sleep } from '../utils/wait';
 
 export const MESHCENTRAL_SERVICE = 'meshcentral';
 export const MESHCENTRAL_ADMIN_PASSWORD_KEY = 'MESHCENTRAL_ADMIN_PASSWORD';
@@ -31,7 +32,6 @@ const FALLBACK_PORT = 10510;
 const MAX_ATTEMPTS = 40;
 const RETRY_DELAY_MS = 3000;
 const REQUEST_TIMEOUT_MS = 10_000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 type SetupState = 'unreachable' | 'needs-admin' | 'already-setup';
 

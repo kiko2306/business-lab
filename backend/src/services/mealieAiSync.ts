@@ -39,6 +39,7 @@ import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services
 import { getHostGatewayIp } from '../utils/network';
 import { getActiveProviderKey, getProviderDefinition } from '../utils/aiSettings';
 import { readAppEnvValue } from './appEnv';
+import { sleep } from '../utils/wait';
 import {
   mealieChangePassword,
   mealieCreateAiProvider,
@@ -84,7 +85,6 @@ const FALLBACK_PORT = 10230;
 // start_period is 60s). Same budget as guacamoleAdminRotate's poll.
 const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function resolveMealieBaseUrl(): Promise<string> {
   const port = getPublishedUpstreamPort(MEALIE_SERVICE) ?? FALLBACK_PORT;

@@ -28,6 +28,7 @@ import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services
 import { getHostGatewayIp } from '../utils/network';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { readAppEnvValue } from './appEnv';
+import { pollUntilReady } from '../utils/wait';
 
 export const N8N_SERVICE = 'n8n';
 export const N8N_ADMIN_PASSWORD_KEY = 'N8N_ADMIN_PASSWORD';
@@ -39,7 +40,6 @@ const FALLBACK_PORT = 10240;
 const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
 const REQUEST_TIMEOUT_MS = 10_000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /** Split an Authelia display name into first/last; fall back to Admin / User. */
 export function splitName(displayName: string | undefined): { firstName: string; lastName: string } {
@@ -98,37 +98,35 @@ export async function reconcileN8nFirstAdmin(serviceName: string): Promise<void>
     const port = getPublishedUpstreamPort(N8N_SERVICE) ?? FALLBACK_PORT;
     const baseUrl = `http://${await getHostGatewayIp()}:${port}`;
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const state = await getSetupState(baseUrl);
+    const state = await pollUntilReady(
+      () => getSetupState(baseUrl),
+      (state) => state !== 'unreachable',
+      MAX_ATTEMPTS,
+      RETRY_DELAY_MS
+    );
 
-      if (state === 'unreachable') {
-        if (attempt === MAX_ATTEMPTS) {
-          logger.warn('n8n owner bootstrap gave up: the app never became reachable');
-          return;
-        }
-        await sleep(RETRY_DELAY_MS);
-        continue;
-      }
-
-      if (state === 'already-owned') {
-        logger.info('n8n already has an owner account; nothing to bootstrap');
-        return;
-      }
-
-      const response = await fetch(`${baseUrl}/rest/owner/setup`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, firstName, lastName, password }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
-      });
-      if (!response.ok) {
-        const text = await response.text().catch(() => '');
-        logger.warn('n8n owner bootstrap failed', { status: response.status, body: text.slice(0, 300) });
-        return;
-      }
-      logger.info('n8n owner account created', { email });
+    if (state === 'unreachable') {
+      logger.warn('n8n owner bootstrap gave up: the app never became reachable');
       return;
     }
+
+    if (state === 'already-owned') {
+      logger.info('n8n already has an owner account; nothing to bootstrap');
+      return;
+    }
+
+    const response = await fetch(`${baseUrl}/rest/owner/setup`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, firstName, lastName, password }),
+      signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+    });
+    if (!response.ok) {
+      const text = await response.text().catch(() => '');
+      logger.warn('n8n owner bootstrap failed', { status: response.status, body: text.slice(0, 300) });
+      return;
+    }
+    logger.info('n8n owner account created', { email });
   } catch (error) {
     // Same reasoning as every sibling bootstrap: a failure here must never
     // block the app's start. Retried on the next one.

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.10** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.11** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -420,6 +420,16 @@ it is done — not ticked off and left behind. Section references point at
       `Post-start reconciler <name> failed` lines; if one appears, that is a
       real failure this change made visible rather than fatal, and it needs
       following up, not ignoring.
+
+- [ ] **Beta-test the shared poll helper on a first boot (plan.md §720)** —
+      nine first-admin bootstraps now wait through `pollUntilReady` instead of
+      their own loop, and that code only really runs on an app's *first* start.
+      On `beta`, stop an app with a bootstrap and remove its `data/` so it
+      boots fresh — **Navidrome** or **Jellyfin** are the cheapest — then start
+      it and confirm the admin account is created (log in as the Authelia admin)
+      rather than the app showing its own claim-the-server wizard.
+      `docker logs business-lab-backend` should show no "gave up: the app never
+      became reachable" for it.
 
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 

@@ -31,6 +31,7 @@ import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
 import { checkTwentyUserState, getTwentyAccessToken, createTwentyWorkspace } from './twentyClient';
+import { pollUntilReady } from '../utils/wait';
 
 export const TWENTY_SERVICE = 'twenty';
 export const TWENTY_ADMIN_PASSWORD_KEY = 'TWENTY_ADMIN_PASSWORD';
@@ -45,7 +46,6 @@ const WORKSPACE_DISPLAY_NAME = 'Business Lab';
 // sibling bootstrap uses, since those apps don't run migrations this long.
 const MAX_ATTEMPTS = 70;
 const RETRY_DELAY_MS = 3000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 async function resolveTwentyBaseUrl(): Promise<string> {
   const port = getPublishedUpstreamPort(TWENTY_SERVICE) ?? FALLBACK_PORT;
@@ -75,40 +75,38 @@ export async function reconcileTwentyFirstAdmin(serviceName: string): Promise<vo
   try {
     const baseUrl = await resolveTwentyBaseUrl();
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const state = await checkTwentyUserState(baseUrl, email);
+    const state = await pollUntilReady(
+      () => checkTwentyUserState(baseUrl, email),
+      (state) => state !== 'unreachable',
+      MAX_ATTEMPTS,
+      RETRY_DELAY_MS
+    );
 
-      if (state === 'unreachable') {
-        if (attempt === MAX_ATTEMPTS) {
-          logger.warn('Twenty admin bootstrap gave up: the app never became reachable');
-          return;
-        }
-        await sleep(RETRY_DELAY_MS);
-        continue;
-      }
-
-      if (state === 'already-owned') {
-        logger.info('Twenty already has a workspace owner; nothing to bootstrap');
-        return;
-      }
-
-      const tokenOp = state === 'needs-signup' ? 'signUp' : 'signIn';
-      const accessToken = await getTwentyAccessToken(baseUrl, tokenOp, email, password);
-      if (!accessToken) {
-        // SIGNUP_DISABLED lands here too: someone else's account already
-        // claimed the one workspace this instance allows (§421) between our
-        // check and this call. Safe to stop either way — never guess further.
-        logger.warn(`Twenty admin bootstrap: ${tokenOp} did not return an access token — will retry next start`);
-        return;
-      }
-
-      const created = await createTwentyWorkspace(baseUrl, accessToken, WORKSPACE_DISPLAY_NAME);
-      if (created) {
-        logger.info('Twenty workspace owner created', { email });
-      } else {
-        logger.warn('Twenty admin bootstrap: workspace creation failed — will retry next start');
-      }
+    if (state === 'unreachable') {
+      logger.warn('Twenty admin bootstrap gave up: the app never became reachable');
       return;
+    }
+
+    if (state === 'already-owned') {
+      logger.info('Twenty already has a workspace owner; nothing to bootstrap');
+      return;
+    }
+
+    const tokenOp = state === 'needs-signup' ? 'signUp' : 'signIn';
+    const accessToken = await getTwentyAccessToken(baseUrl, tokenOp, email, password);
+    if (!accessToken) {
+      // SIGNUP_DISABLED lands here too: someone else's account already
+      // claimed the one workspace this instance allows (§421) between our
+      // check and this call. Safe to stop either way — never guess further.
+      logger.warn(`Twenty admin bootstrap: ${tokenOp} did not return an access token — will retry next start`);
+      return;
+    }
+
+    const created = await createTwentyWorkspace(baseUrl, accessToken, WORKSPACE_DISPLAY_NAME);
+    if (created) {
+      logger.info('Twenty workspace owner created', { email });
+    } else {
+      logger.warn('Twenty admin bootstrap: workspace creation failed — will retry next start');
     }
   } catch (error) {
     logger.warn('Twenty admin bootstrap failed', { error: (error as Error).message });

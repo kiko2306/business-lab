@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.11] — 2026-09-28
+
+### Changed
+
+- Post-start bootstraps share one sleep/poll helper (utils/wait.ts) instead of thirteen copies and nine hand-written retry loops
+
 ## [0.151.10] — 2026-09-28
 
 ### Changed

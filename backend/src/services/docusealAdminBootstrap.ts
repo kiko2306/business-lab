@@ -47,6 +47,7 @@ import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue, saveServiceEnv } from './appEnv';
 import { createFirstAdmin, getSetupState, signIn, updateProfileEmail } from './docusealClient';
 import { reconcileDocusealAdminPassword } from './docusealDb';
+import { pollUntilReady } from '../utils/wait';
 
 export const DOCUSEAL_SERVICE = 'docuseal';
 export const DOCUSEAL_ADMIN_PASSWORD_KEY = 'DOCUSEAL_ADMIN_PASSWORD';
@@ -65,7 +66,6 @@ const ACCOUNT_NAME = 'DocuSeal';
 // returns well before DocuSeal's Puma is serving.
 const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Exported for docusealTeamProvisioning.ts — same cross-project base URL a
 // per-user account create needs to sign in as the admin against, and the
@@ -184,44 +184,42 @@ export async function reconcileDocusealFirstAdmin(serviceName: string): Promise<
   try {
     const baseUrl = await resolveDocusealBaseUrl();
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const state = await getSetupState(baseUrl);
+    const state = await pollUntilReady(
+      () => getSetupState(baseUrl),
+      (state) => state.state !== 'unreachable',
+      MAX_ATTEMPTS,
+      RETRY_DELAY_MS
+    );
 
-      if (state.state === 'unreachable') {
-        if (attempt === MAX_ATTEMPTS) {
-          logger.warn('DocuSeal admin bootstrap gave up: the app never became reachable');
-          return;
-        }
-        await sleep(RETRY_DELAY_MS);
-        continue;
-      }
-
-      if (state.state === 'already-setup') {
-        await syncAdminEmail(baseUrl, email, password, firstName, lastName);
-        await reconcileAdminPassword(password);
-        return;
-      }
-
-      const result = await createFirstAdmin(baseUrl, {
-        token: state.token,
-        cookie: state.cookie,
-        email,
-        password,
-        firstName,
-        lastName,
-        accountName: ACCOUNT_NAME,
-        appUrl,
-      });
-      if (result === 'created') {
-        logger.info(`Created DocuSeal's first admin (${email}) via the /setup wizard`);
-        await saveServiceEnv(DOCUSEAL_SERVICE, { [DOCUSEAL_ADMIN_EMAIL_KEY]: email });
-      } else if (result === 'already-setup') {
-        await syncAdminEmail(baseUrl, email, password, firstName, lastName);
-        await reconcileAdminPassword(password);
-      } else {
-        logger.error('DocuSeal admin bootstrap: the /setup POST failed (validation or CSRF) — will retry next start');
-      }
+    if (state.state === 'unreachable') {
+      logger.warn('DocuSeal admin bootstrap gave up: the app never became reachable');
       return;
+    }
+
+    if (state.state === 'already-setup') {
+      await syncAdminEmail(baseUrl, email, password, firstName, lastName);
+      await reconcileAdminPassword(password);
+      return;
+    }
+
+    const result = await createFirstAdmin(baseUrl, {
+      token: state.token,
+      cookie: state.cookie,
+      email,
+      password,
+      firstName,
+      lastName,
+      accountName: ACCOUNT_NAME,
+      appUrl,
+    });
+    if (result === 'created') {
+      logger.info(`Created DocuSeal's first admin (${email}) via the /setup wizard`);
+      await saveServiceEnv(DOCUSEAL_SERVICE, { [DOCUSEAL_ADMIN_EMAIL_KEY]: email });
+    } else if (result === 'already-setup') {
+      await syncAdminEmail(baseUrl, email, password, firstName, lastName);
+      await reconcileAdminPassword(password);
+    } else {
+      logger.error('DocuSeal admin bootstrap: the /setup POST failed (validation or CSRF) — will retry next start');
     }
   } catch (error) {
     logger.error('Failed to bootstrap the DocuSeal first admin', { error: (error as Error).message });

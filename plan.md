@@ -33596,3 +33596,40 @@ isolation can be tested without standing up the whole start path: two tests in
 `executor.test.ts` (one throwing entry does not stop the rest or reach the
 caller; entries run in order), the first verified failing when the `try` is
 removed.
+
+## 720. One `sleep`, one poll loop: `utils/wait.ts`
+
+`docker compose up` returns once the containers are *created*, well before an
+app's HTTP or database layer answers, so every post-start bootstrap polls its
+app first. Thirteen modules carried their own `const sleep = (ms: number) =>
+new Promise(...)`, and nine the same "probe, retry while unreachable, give up
+on the last attempt" loop wrapped around their real work.
+
+`backend/src/utils/wait.ts` now holds both: `sleep`, and `pollUntilReady(probe,
+isReady, attempts, delayMs)`, which returns the last result rather than
+deciding what giving up means — several callers have real work to do on a
+not-ready result (ITFlow and DocuSeal reconcile an existing admin instead), and
+each words its own warning.
+
+**Checked before converting**: the nine loops all end their body with an
+unconditional `return`, so the probe never re-runs once reachable and the loop
+is only ever a wait. Verified by extracting each body's exit paths rather than
+by eye. `attempts` counts probes, not retries — one immediately then up to
+`attempts - 1` more with a sleep before each, which is exactly what the
+hand-written loops did; `wait.test.ts` pins that, since an off-by-one here
+would quietly halve or double every bootstrap's patience.
+
+**Not converted**: `meshcentralAdminBootstrap`'s loop, which probes two URLs
+(plain HTTP, then its self-signed HTTPS) and needs the winning one afterwards
+— making its probe return a tuple is more change than the four lines it would
+save. It takes the shared `sleep` and keeps its loop.
+
+**Line count is a wash** (+241/−256 across 14 files). The estimate that opened
+this — "roughly 150 lines" — was wrong: replacing a 12-line loop wrapper with
+an 11-line call plus give-up block saves almost nothing per site, and the real
+deletion is only the thirteen `sleep` copies, most of which `wait.ts` gives
+back in doc comment. What it does buy is one definition of the wait/poll
+scaffold instead of twenty-two, one less nesting level in nine functions, and
+the probe-count semantics tested in one place rather than assumed in nine.
+Recorded here rather than quietly restated, since it is the second line-count
+estimate in this run that did not survive contact (see §719).

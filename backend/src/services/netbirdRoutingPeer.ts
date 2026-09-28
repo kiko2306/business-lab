@@ -38,6 +38,7 @@ import { getHostGatewayIp } from '../utils/network';
 import { getLanCidr } from './networkScan';
 import { readAppEnvValue, saveServiceEnv } from './appEnv';
 import { publishAlert } from '../utils/alertNotify';
+import { sleep } from '../utils/wait';
 
 const SERVICE = 'netbird-vpn';
 const API_TOKEN_ENV = 'NETBIRD_API_TOKEN';
@@ -75,7 +76,6 @@ const REQUEST_TIMEOUT_MS = 10_000;
 // management has fetched Authelia's OIDC discovery document and bound :80.
 const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 interface NbGroup {
   id: string;

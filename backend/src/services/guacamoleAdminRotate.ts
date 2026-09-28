@@ -24,6 +24,7 @@ import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services
 import { getHostGatewayIp } from '../utils/network';
 import { readAppEnvValue } from './appEnv';
 import { guacamoleLogin, guacamoleLogout, guacamoleSetPassword } from './guacamoleClient';
+import { sleep } from '../utils/wait';
 
 export const GUACAMOLE_SERVICE = 'guacamole';
 export const GUACAMOLE_ADMIN_USERNAME = 'guacadmin';
@@ -40,8 +41,6 @@ const FALLBACK_PORT = 10430;
 // yet just retries on the next one, same budget as nextcloudOcc's WAIT_FOR_OCC.
 const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
-
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
  * Guacamole's base URL as reached from any other container on this host —

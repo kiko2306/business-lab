@@ -22,6 +22,7 @@ import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
 import { createOwner, getOnboardingState } from './homeAssistantClient';
+import { pollUntilReady } from '../utils/wait';
 
 export const HA_SERVICE = 'home-assistant';
 export const HA_ADMIN_PASSWORD_KEY = 'HOMEASSISTANT_ADMIN_PASSWORD';
@@ -29,7 +30,6 @@ const FALLBACK_PORT = 8123;
 
 const MAX_ATTEMPTS = 30;
 const RETRY_DELAY_MS = 3000;
-const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
 // Exported for homeAssistantUserProvisioning.ts — same cross-project base URL
 // a per-user account create/update needs to sign in as the owner against.
@@ -72,32 +72,30 @@ export async function reconcileHomeAssistantFirstAdmin(serviceName: string): Pro
   try {
     const baseUrl = await resolveHaBaseUrl();
 
-    for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt += 1) {
-      const state = await getOnboardingState(baseUrl);
+    const state = await pollUntilReady(
+      () => getOnboardingState(baseUrl),
+      (state) => state !== 'unreachable',
+      MAX_ATTEMPTS,
+      RETRY_DELAY_MS
+    );
 
-      if (state === 'unreachable') {
-        if (attempt === MAX_ATTEMPTS) {
-          logger.warn('Home Assistant admin bootstrap gave up: onboarding never became reachable');
-          return;
-        }
-        await sleep(RETRY_DELAY_MS);
-        continue;
-      }
-
-      if (state === 'done') {
-        logger.info('Home Assistant onboarding is already complete; nothing to bootstrap');
-        return;
-      }
-
-      const result = await createOwner(baseUrl, { name, username, password, clientId, language: 'en' });
-      if (result === 'created') {
-        logger.info(`Created Home Assistant's owner account (${username}) via onboarding`);
-      } else if (result === 'already-done') {
-        logger.info('Home Assistant onboarding is already complete; nothing to bootstrap');
-      } else {
-        logger.error('Home Assistant admin bootstrap: onboarding POST failed — will retry next start');
-      }
+    if (state === 'unreachable') {
+      logger.warn('Home Assistant admin bootstrap gave up: onboarding never became reachable');
       return;
+    }
+
+    if (state === 'done') {
+      logger.info('Home Assistant onboarding is already complete; nothing to bootstrap');
+      return;
+    }
+
+    const result = await createOwner(baseUrl, { name, username, password, clientId, language: 'en' });
+    if (result === 'created') {
+      logger.info(`Created Home Assistant's owner account (${username}) via onboarding`);
+    } else if (result === 'already-done') {
+      logger.info('Home Assistant onboarding is already complete; nothing to bootstrap');
+    } else {
+      logger.error('Home Assistant admin bootstrap: onboarding POST failed — will retry next start');
     }
   } catch (error) {
     logger.error('Failed to bootstrap the Home Assistant owner', { error: (error as Error).message });
