@@ -64,7 +64,12 @@ services:
       - "homepage.href=http://localhost:${HOTEL_ADMIN_PORT:-10600}"
       - "homepage.description=Online check-in, guest feedback and property administration"
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ >/dev/null || exit 1"]
+      # 127.0.0.1, not localhost: the container's /etc/hosts resolves
+      # localhost to ::1 first, nginx here is IPv4-only, and busybox wget
+      # doesn't fall back after the refused IPv6 attempt — reported
+      # `unhealthy` forever despite serving every real request fine
+      # (plan.md §707).
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -87,7 +92,7 @@ services:
     networks:
       - hotel-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5
@@ -109,7 +114,7 @@ services:
     networks:
       - hotel-net
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:80/ >/dev/null || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:80/ >/dev/null || exit 1"]
       interval: 30s
       timeout: 5s
       retries: 5

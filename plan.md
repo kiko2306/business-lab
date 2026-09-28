@@ -33202,3 +33202,18 @@ healthchecks at `127.0.0.1` instead of `localhost` in
 
 Nothing here changed backend/frontend source, so no version bump. No README
 items closed; one added.
+
+## 708. Fix Hotel's frontend healthchecks — IPv6 localhost, IPv4-only nginx
+
+Small, mechanical fix for the bug found in §707: `check-in`, `pulse` and
+`admin`'s healthcheck (`wget -qO- http://localhost:80/`) resolved `localhost`
+to `::1` inside the container first, nginx there only `listen`s on 80 (IPv4),
+and busybox `wget` doesn't retry the other address family — so all three
+reported `unhealthy` in `docker ps` (and the dashboard) forever, despite
+serving every real request correctly. Changed all three healthchecks in
+`apps/hotel/docker-compose.yml` to `http://127.0.0.1:80/`, sidestepping the
+DNS resolution order entirely. `hotel-core` and `hotel-db`'s healthchecks
+were already unaffected (they don't go through `localhost` the same way).
+
+Compose-only change, no rebuild needed — a self-update recreates the three
+containers. README item added to confirm `healthy` shows up on `beta`.
