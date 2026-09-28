@@ -469,6 +469,49 @@ it is done — not ticked off and left behind. Section references point at
       `docker logs business-lab-backend` should show no "gave up: the app never
       became reachable" for it.
 
+### Repo tooling and performance
+
+Planned in plan.md §730 — measured, ordered biggest-win-first.
+
+- [ ] **Memoise `pbkdf2ClientSecretDigest` (plan.md §730.1)** — 310k
+      pbkdf2-sha512 iterations at ~300 ms a call, on a function whose salt is
+      derived from the secret, so it is already pure and deterministic.
+      `autheliaOidcClients.test.ts` is 32 s of the backend suite's 43 s, and
+      the ~6 h exposure reconciler re-hashes the same ~36 app secrets on
+      every sweep. A `Map` memo; no behaviour change, no new knob.
+
+- [ ] **Stop `plan-citations.py` grepping `node_modules/` (plan.md §730.2)**
+      — 13 of its 14 "dangling targets" are vendored JS under
+      `apps/hotel/*/node_modules/`, which makes the compaction rule's "adds
+      no new lines" check unreadable, and the grep takes 2.9 s instead of
+      0.03 s. Replace `grep -r` with `git grep --untracked
+      --exclude-standard`, which inherits `.gitignore` and so drops the
+      hand-rolled `--exclude-dir=data` too.
+
+- [ ] **Fix the four `§649.1` citations (plan.md §730.3)** — the guest-text
+      template store is §650, not §649.1. `apps/hotel/admin/src/app/models.ts`,
+      `apps/hotel/api/src/guestText.ts`, `apps/hotel/api/src/routes/guestText.ts`,
+      `apps/hotel/api/src/migrations/004_guest_text.sql`.
+
+- [ ] **Add `scripts/plan-section.sh <N>` (plan.md §730.4)** — print a plan
+      section directly, so looking one up stops meaning "load all 62 KB of
+      `plan-index.md` to read one `sed` range out of it". The index stays as
+      it is. Also fix `plan-index.sh`'s echoed section count, which counts
+      the table header row.
+
+- [ ] **Document the cheap step 1 in CLAUDE.md (plan.md §730.5)** — the
+      working loop's "read the README TODO list" currently means reading
+      30 KB; `grep -n '^- \[ \] \*\*' README.md` gives the same open-item
+      list in ~40 lines, with the full item read only when it is picked up.
+
+- [ ] **Compact the closed OIDC-rollout run (plan.md §730.6)** — §270–§275,
+      §278, §280, §281 into one section, keeping every cited anchor as
+      `**§N** — <conclusion>`. §276, §277 and §279 interleave the range and
+      are not part of the run; they stay. ~550 lines, ~1.6 % of `plan.md` —
+      small, and last for that reason. Own `plan:` commit, with
+      `plan-citations.py` run before and after (after §730.2 lands, so the
+      baseline is clean).
+
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 
 Names are settled (plan.md §625): **`check-in`** (guest online check-in),

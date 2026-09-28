@@ -34036,3 +34036,88 @@ host on a real domain, which is not worth doing unprompted on a box serving
 real hostnames. It is covered by unit test on both branches (a hand-written
 `advanced_config`, and a stale id pointing at a different host). The live
 evidence is the weaker-but-real form above: 42 other rows, one adoption.
+
+## 730. Plan — cut the fixed cost of a session: hashing, citations, navigation (2026-09-28)
+
+Asked for a plan compaction, a look at what makes sessions slow and expensive,
+and a bug/refactor pass. Measured rather than guessed, and the result is not
+where it was expected: the plan file itself is not the expensive part.
+
+**What the measurements say.** A backend test run is 43 s, and
+`autheliaOidcClients.test.ts` alone is 32 s of it — 75 % of the suite in one
+of 121 files. The repeat-cost of reading this repo is `CLAUDE.md` (20 KB,
+always loaded) plus README's TODO section (30 KB of a 41 KB README, read at
+step 1 of *every* loop iteration) plus `plan-index.md` (62 KB) whenever a
+plan section has to be found — roughly 28 k tokens before any work starts.
+`plan.md` is 34,038 lines but is read a section at a time, so its size costs
+nothing directly; it costs through the index that maps it.
+
+That reorders the work. Compaction is the item that was asked for first and
+yields least: the whole closed OIDC run is ~608 lines, 1.8 % of the file.
+The navigation and hashing fixes are each worth more than it, for a smaller
+diff. Doing compaction anyway, but last, and sized honestly.
+
+**§730.1 — `pbkdf2ClientSecretDigest` recomputes digests it has already
+computed.** 310,000 pbkdf2-sha512 iterations at ~300 ms a call, and the
+function is already documented as a pure deterministic function of `secret`
+(the salt is `sha256(secret)[0:16]`, deliberately, so the rendered block does
+not churn and restart Authelia on every reconcile). Tests render the same
+handful of secrets over and over; so does the ~6 h exposure reconciler, for
+the same ~36 app secrets, on every sweep and every start. A `Map` memo on the
+secret is ~4 lines, changes no behaviour at all, and is bounded by the number
+of managed OIDC clients. Rejected up front: lowering the iteration count
+behind a test-only env var — it adds a knob, and would leave the production
+sweep still re-hashing.
+
+**§730.2 — `scripts/plan-citations.py` greps `node_modules/`.** It prints 14
+dangling targets; 13 are vendored JavaScript that happens to contain `§`
+followed by digits (`ip-address`, `fast-uri`, `@jsonjoy.com/json-pack`), all
+under `apps/hotel/*/node_modules/` and `apps/tally/app/api/node_modules/`,
+which only exist since the Wintouch rebuilds vendored their dependencies.
+That matters beyond noise: the compaction rule is "the pass may add **no
+new** lines here", and a baseline of 13 false lines makes that check
+unreadable. It is also why the script takes 2.9 s. Fix is to stop hand-rolling
+the exclusions — `git grep --untracked --exclude-standard` inherits
+`.gitignore`, which already covers `node_modules/` *and* `apps/*/data/`, so
+the existing `--exclude-dir=data` special case goes with it. Measured at
+0.032 s, ~90× faster, and `apps/home-page/data/` (the one un-ignored `data/`
+directory) was checked and has no `§` hits, so nothing is lost.
+
+**§730.3 — four files cite `§649.1`, which never existed.** The guest-text
+template store landed as its own section, §650; §649 is the SMTP settings
+work. `apps/hotel/admin/src/app/models.ts`,
+`apps/hotel/api/src/guestText.ts`, `apps/hotel/api/src/routes/guestText.ts`
+and `apps/hotel/api/src/migrations/004_guest_text.sql` all point at the wrong
+one. This is the only *real* dangling citation in the repo, and it was
+invisible under §730.2's 13 false ones.
+
+**§730.4 — `scripts/plan-section.sh <N>`.** Finding one section currently
+means loading 62 KB of `plan-index.md` to read one `sed` range out of it. The
+index earns its place as a human-readable map, but a machine looking up §649
+does not need the other 652 rows. A few lines of `awk` over `plan.md`'s own
+`^## N.` headings prints the section directly, with no index round-trip and
+nothing to regenerate. `plan-index.md` stays exactly as it is.
+
+**§730.5 — step 1 of the working loop does not need all 30 KB of the TODO.**
+`grep -n '^- \[ \] \*\*' README.md` lists every open item's headline in ~40
+lines; the full item — what to check and how — is only needed for the one
+item actually being picked up. This is a documentation change to CLAUDE.md's
+working loop, not a change to the TODO's format: the verbose items are
+verbose because the detail is the point, and splitting them out of README
+would break the "single place open work is tracked" rule.
+
+**§730.6 — compact the closed OIDC-rollout run.** §270–§275, §278, §280 and
+§281: Authelia OIDC clients for the trust-the-proxy group, slice by slice, to
+a live four-app proof (§280) and the pbkdf2 secret format (§281). Closed, and
+its outcome lives in `autheliaOidcClients.ts` and `services.ts`. §276
+(Nextcloud SAML), §277 (Forgejo, an app since removed) and §279 (the LAN
+bypass) sit inside the range and are *not* part of the run — they stay where
+they are, so this is a compaction of an interleaved run, not a contiguous
+block. Every cited anchor (§270, §274, §281 at least) survives as a
+`**§N** — <conclusion>` entry. Expected saving ~550 lines, ~1.6 % of
+`plan.md` — small, and stated as small rather than dressed up. Its own
+`plan:` commit, `plan-citations.py` run before and after per the rule.
+
+Order is §730.1, §730.2, §730.3, §730.4, §730.5, §730.6 — biggest measured
+win first, the asked-for item last because it is the smallest. §730.2 lands
+before §730.6 so the compaction's before/after citation check is meaningful.
