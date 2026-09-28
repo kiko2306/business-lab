@@ -33482,3 +33482,30 @@ Both are covered by tests that fail against the pre-fix code
 plus a companion asserting an unmoved secondary is left alone — the
 regression that matters most, since a false positive here would tear down a
 working hostname on every reconciler sweep.
+
+## 717. A failed start was retried, firing the whole `compose up` a second time
+
+`ServiceStateService.runServiceAction` — the one code path behind the app
+cards' Start/Stop/Restart buttons — piped `retry({ count: 1, delay: 500 })`
+onto its **POST** to `/services/:name/:action`. Every other `retry()` in the
+frontend (`fetchServices`, and six in `settings.service.ts`) sits on a GET,
+which is what the operator is for.
+
+What that POST actually drives is not a cheap read: `startService` runs
+`docker compose up` with a 15-minute timeout (a first-run multi-image pull),
+then ~40 sequential managed-config reconcilers, then exposure provisioning.
+It can fail *after* the container is already running — anything in the
+post-`up` chain throwing unwinds into `startService`'s catch and answers 500
+with the app up. Retrying that fires the entire sequence again on top of the
+first run's side effects: a second pull, a second force-recreate of NetBird's
+sidecars, a second run at each first-admin bootstrap. A 429 from the rate
+limiter or a dropped connection had the same effect, with no user action.
+
+**Fix**: dropped the operator from that pipe, with a comment saying why it
+must not come back. `fetchServices`'s GET keeps its retry.
+
+Added `frontend/src/app/core/service-state.service.spec.ts` (the service had
+no spec at all): one test asserting a 500 start produces exactly one request
+and no second one after the 500 ms the old operator waited, plus one covering
+the success path's status refresh. Verified the first fails when the operator
+is put back.

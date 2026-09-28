@@ -294,7 +294,12 @@ export class ServiceStateService {
         { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
       )
       .pipe(
-        retry({ count: 1, delay: 500 }),
+        // Deliberately NOT retried. This POST is a start/stop/restart: the
+        // backend runs `docker compose up` with every managed-config
+        // reconciler behind it, up to 15 minutes, and a failure response can
+        // arrive long after the container is already running. Retrying it
+        // fires the whole thing a second time on top of the first one's side
+        // effects. `fetchServices` above is a GET and keeps its retry.
         tap((response) => {
           this.toast.success(response.message);
           if (action !== 'stop') {

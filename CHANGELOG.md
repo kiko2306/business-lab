@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.8] — 2026-09-28
+
+### Fixed
+
+- A failed app start is no longer retried, which used to run the whole docker compose up a second time on top of the first run's side effects
+
 ## [0.151.7] — 2026-09-28
 
 ### Fixed

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.7** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.8** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -392,6 +392,14 @@ it is done — not ticked off and left behind. Section references point at
       hostname. Also confirm the no-op path: a plain restart with nothing
       renamed must leave the secondary's NPM host id unchanged (nothing torn
       down and recreated on every sweep).
+
+- [ ] **Beta-test that a failed start runs once (plan.md §717)** — on `beta`,
+      make an app fail to start (easiest: stop a `dependsOn` dependency, or
+      point an app's port at one already in use) and press Start. The card
+      should show one failure toast, and `docker logs business-lab-backend`
+      should carry exactly **one** `Starting service: <name>` line for that
+      click, not two ~0.5s apart. A successful start must still refresh the
+      card to `running` on its own.
 
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 
