@@ -32950,3 +32950,87 @@ are explicitly `no-store` — fine. **Pantry**: plain `express.static`, no
 service worker — fine. Hotel is not running on the test host, so not proven
 live; README item added. Stays on `dev` — nothing on `beta` to test until Hotel
 is started.
+
+## 702. Six README beta-test items checked over SSH against home-srv-01; found a real bug in the subscriber form endpoint
+
+Worked through every README beta-test item that could be verified without a
+human at a keyboard (no elevated install, no live browser session, no
+external SMTP/OAuth), via `ssh home-srv-01` plus `docker exec`/`psql`/`curl`
+against the running stack (VERSION 0.151.2, `beta` HEAD 08a0073).
+
+**Passed, README item deleted:**
+- **BookStack removal (§667).** No `bookstack-*` containers, `apps/bookstack/`
+  gone, no NPM proxy-host file, no `service_exposure` row (its absence is
+  what `removedAppCleanup.ts` leaves behind, which is also what tears down
+  the Cloudflare hostname).
+- **Vikunja refresh whitelist (§675).** `cscli parsers list` on the live
+  `crowdsec-crowdsec-1` shows `homelab/vikunja-refresh-whitelist`. Rather than
+  wait for a real session to lapse, fed `cscli explain --type nginx` a
+  synthetic NPM-access-log line shaped exactly like the real one
+  (`POST /api/v1/user/token/refresh` on `vikunja.` returning 401) — same
+  parser pipeline a real one would hit — and it ends "ignored by whitelist
+  (Vikunja token refresh after session expiry)".
+- **Banned-client whitelist (§691).** `cscli parsers list` shows
+  `homelab/banned-client-whitelist`. Fed a **real** 403 line pulled from
+  NPM's own access log (`mesh.tx-home-utils.com`, today's date) through
+  `cscli explain` — "ignored by whitelist (403 served by the bouncer/proxy
+  without reaching an upstream)". For "the real thing": every
+  `http-generic-403-bf` alert in `cscli alerts list` predates the CrowdSec
+  container's last recreate (2026-09-25T11:05, when the whitelist config was
+  rendered in); none since, despite continuing 403 traffic on other hosts.
+  Also checked ban enforcement is still live at NPM (a different §609 item,
+  below): `cscli bouncers list` shows the NPM Lua bouncer's last API pull
+  minutes old, and an active decision (`Ip:93.123.109.55`, `http-admin-
+  interface-probing`, created 2026-09-27T18:17:01Z) is the one it would have
+  pulled.
+
+**Passed live, but surfaced a second real bug — README item rewritten, not
+deleted.** **Tally starts on the live stack (§630, §631).** `/api/health`
+returns 200 on :10610; `service_exposure` row is `enabled`/`provisioned`;
+`TALLY_DB_PASSWORD` was generated into `apps/tally/.env`. The Authelia gate:
+an anonymous request to `https://tally.tx-home-utils.com/` 302s to Authelia's
+login; `/agent/ping` (matching `autheliaBypassPaths`) gets a plain 404 with
+no redirect, i.e. it never hit the `auth_request`. Confirmed the
+`Remote-User`/`Remote-Groups`/etc. forwarding is live infrastructure
+(`/snippets/authelia-authrequest.conf`, shared by every gated proxy host, not
+Tally-specific) rather than re-proving it per app. But the one piece left
+unchecked in the original item — "the scheduled `pg_dump` picks `tally-db`
+up" — is actually broken: `docker logs business-lab-backend-1` shows both the
+2026-09-26 and 2026-09-28 scheduled dumps failing `ok: 32, failed: 2`, with
+`tally` (and `outline`) erroring `EACCES: permission denied, mkdir
+'.../apps/tally/data/_dump'` every night since either app was installed.
+Neither app's Postgres data has ever actually been backed up. Filed as its
+own README item rather than fixed here — needs `appDumps.ts` looked at
+(likely the same class of thing as Outline's own `outline-init` chown: the
+app container's data is owned by a UID the backend can't `mkdir` under from
+its own filesystem view).
+
+**Partially verified, README item left as-is** — **ntfy panel regrouping
+(§609/§615).** All four categories resolve to a real topic: `settings` has
+`ntfy_topic_{crowdsec,critical-service,backup,netbird}` all set to
+`homelab-alerts` (the pre-migration shared default — correctly backfilled,
+not silently reset, since `getAlertNotifyConfig()` in
+`backend/src/utils/alertNotify.ts` falls back to `DEFAULT_ALERT_TOPIC` only
+for a genuinely missing row) and `crowdsec_alerts_enabled=true` (explicit
+opt-in, since its default is `false`). CrowdSec-ban enforcement at NPM
+confirmed live above. Not checked: the Settings-page "Test" button greying
+out when a category's switch is off — that's a browser interaction, left for
+whoever does the light/dark-mode beta walk (same page).
+
+**Failed — a real bug, not a beta-test gap.** **Subscriber list endpoints
+(§616).** `POST /api/subscribers` with a JSON body works end to end: row
+lands in `advert_subscribers` with an `unsubscribe_token`, a `redirect` field
+303s the caller there, `/api/subscribers/unsubscribe/:token` returns 204,
+sets `unsubscribed_at`, and a second hit is still a no-op 204. But the
+route's own comment says it's "meant to be called as a plain HTML `<form
+method="post">`" — and a real HTML form's default enctype is
+`application/x-www-form-urlencoded`, which this backend cannot parse at all:
+`backend/src/app.ts` registers only `express.json()`, no
+`express.urlencoded()`. A urlencoded POST comes back `422 "email" is
+required` because `req.body` is empty — the one call shape the endpoint was
+actually built for is broken. Test subscriber rows cleaned up from the live
+DB afterward. Left the README item in place (its own curl-based checklist
+happens to use `-d '{"email":...}'`-shaped JSON, which is why CI/manual
+`curl -d` checks never caught this) and will fix
+`express.urlencoded()` support as the next task rather than folding it in
+here.

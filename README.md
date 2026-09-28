@@ -247,11 +247,6 @@ it is done — not ticked off and left behind. Section references point at
       backend": no red "Something went wrong" / "Unable to reach the backend"
       toasts should appear (from the status poll or the resource strip), and
       the panel should end on the "up to date" success toast.
-- [ ] **Beta-test BookStack's removal (plan.md §667)** — on `beta`, after
-      pulling and restarting the backend, confirm no `bookstack-*` containers
-      remain (`docker ps -a`), `apps/bookstack/` is gone, its NPM proxy host
-      and Cloudflare hostname are dropped, and no BookStack card appears on
-      the Apps page or Home Page.
 - [ ] **Beta-test the new Outline app (plan.md §666)** — on `beta`, after
       pulling, start Outline from the Apps page (it needs Authelia running
       and the app exposed — Outline has no local login). Confirm: the
@@ -494,18 +489,6 @@ before anything is built.
       (`apps/tally/app`, `apps/hotel/api`) so the unreadable `data/db` is no
       longer inside them — if `hotel` is installed, its update must rebuild
       `hotel-core` too rather than fail with "can't stat".
-- [ ] **Beta-test the Vikunja refresh whitelist (plan.md §675)** — after the
-      update recreates `crowdsec`, `cscli parsers list` should list
-      `homelab/vikunja-refresh-whitelist`. Then let a Vikunja session lapse
-      (leave a tab open past expiry, or clear its cookies and reload) — its
-      401 refresh retries must no longer raise an alert or a ban
-      (`cscli alerts list` stays empty for your address).
-- [ ] **Beta-test the banned-client whitelist (plan.md §691)** — on `beta`, after
-      pulling (CrowdSec is recreated): `docker exec crowdsec-crowdsec-1 cscli
-      parsers list` shows `homelab/banned-client-whitelist`, and `cscli explain
-      --type nginx --log '<a "- - 403" line from an NPM access log>'` ends with
-      "ignored by whitelist". Then the real thing: the next real ban should stop
-      raising an `http-generic-403-bf` alert every minute or two.
 - [ ] **Show the running day's figures from the new agent (plan.md §677)** —
       after installing the new setup exe, the shop page must say "Business day
       27/07/2026" (this box's demo day) and show invoiced €9,640.16 and the
@@ -581,13 +564,18 @@ before anything is built.
       unit's `birthday_is_active` + `promo_is_active` on, seed a reservation
       spanning today with a guest whose `birth_date` matches today, and
       confirm both the birthday email and the promo email arrive.
-- [ ] **Verify `tally` starts on the live stack** — plan.md §630 registered the
-      app and proved the schema against a real `postgres:17-alpine` in CI, but
-      nothing has run it on `beta` yet. Check: the app starts from the
-      dashboard, `TALLY_DB_PASSWORD` is generated into `apps/tally/.env` on
-      first start, `/api/health` returns ok through its own hostname, the
-      Authelia gate holds on admin paths while `/agent` bypasses it, and the
-      scheduled `pg_dump` picks `tally-db` up. Now also: that Authelia's
-      forwarded `Remote-User` / `Remote-Groups` headers actually arrive at the
-      app through NPM — every admin route depends on them (plan.md §631), and
-      nothing off the live stack can prove they are forwarded.
+- [ ] **Fix Tally's (and Outline's) scheduled pg_dump: `EACCES` on
+      `data/_dump`, every run since install (plan.md §702)** — confirmed live
+      on `beta`: `docker logs business-lab-backend-1` shows the 2026-09-26
+      and 2026-09-28 scheduled dumps both failing with `EACCES: permission
+      denied, mkdir '.../apps/tally/data/_dump'` (and the same for
+      `outline`) — `ok: 32, failed: 2` every night. Everything else about
+      §630/§631 passed live (app health, `TALLY_DB_PASSWORD` generated,
+      Authelia gate holds on admin paths, `/agent` bypasses it, forwarded
+      `Remote-User`/`Remote-Groups` headers confirmed as shared proxy-host
+      infrastructure) — only the backup path is broken. Almost certainly the
+      same class of issue as Outline's own `outline-init` chown (its
+      container's data is owned by a UID the backend's dump step can't write
+      under) — check whether `appDumps.ts` needs to run its `mkdir` as the
+      app's own container (like the existing `pg_dump`-via-`--entrypoint`
+      trick) rather than from the backend's own filesystem view.
