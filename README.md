@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.14** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.15** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -379,19 +379,18 @@ it is done — not ticked off and left behind. Section references point at
       row) came through as the Anthropic row's already-configured key with
       no re-entry needed.
 
-- [ ] **Outline's exposure row lost its `npm_host_id` and can't re-adopt the
-      live host (found 2026-09-28, plan.md §724)** — after a rename teardown
-      the row is left with `npm_host_id = NULL`, so the next provision finds
-      the NPM host serving that hostname, has no id to match it against, and
-      refuses it with "already exists and is not managed by this service"
-      (the §99.1 guard against clobbering a hand-made host). Outline itself is
-      **fine** — `wiki.<domain>` still answers 302 — but the row reads
-      `failed` and the ~6 h sweep re-logs the same error forever. Decide
-      whether `ensureProxyHost` should adopt a host when the hostname matches
-      one the registry says we own and we simply have no id for it, or whether
-      that weakens the guard too much; if adoption is wrong, the row needs
-      some other way back. Reproduce by renaming an app's `exposureSubdomain`
-      away and back.
+- [ ] **Beta-test the NPM host adoption fix (plan.md §728)** — Outline's row
+      on `beta` is the live reproduction: `status = failed`,
+      `npm_host_id = NULL`, while NPM host 48 still serves
+      `wiki.<domain>`. After pulling, either start Outline or wait for the
+      ~6 h sweep, then confirm the row heals —
+      `SELECT service_name, npm_host_id, status, last_error FROM
+      service_exposure WHERE service_name = 'outline';` should read
+      `48 | provisioned | NULL` — with `Adopting an existing Nginx Proxy
+      Manager host we generated but had lost the id for` in the backend log,
+      and `wiki.<domain>` still answering 302 (adoption must not rewrite a
+      host that is already correct). Then confirm the guard still bites: it
+      must **not** adopt a host whose config it did not generate.
 
 - [ ] **Beta-test the secondary-hostname rename teardown (plan.md §716)** —
       the same exercise §714 passed for a primary hostname (plan.md §724), but

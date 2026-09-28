@@ -11,6 +11,7 @@ import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { promisify } from 'node:util';
 import { requestJson } from '../utils/httpJson';
+import logger from '../utils/logger';
 
 const execFileAsync = promisify(execFile);
 
@@ -703,13 +704,6 @@ export async function ensureProxyHost({
     return { id: created.id, created: true, updated: false };
   }
 
-  // Existing hosts must have been created by a previous provisioning run.
-  // This prevents a service setting from silently overwriting an administrator's
-  // manually maintained NPM host that uses the same domain.
-  if (!expectedHostId || existing.id !== expectedHostId) {
-    throw new Error(`Nginx Proxy Manager host for ${hostname} already exists and is not managed by this service.`);
-  }
-
   const expectedAdvancedConfig = computeAdvancedConfig({
     autheliaProtected,
     grpc,
@@ -719,6 +713,36 @@ export async function ensureProxyHost({
     dashboardUrl,
     oidcAutoRedirect,
   });
+
+  // Existing hosts must have been created by a previous provisioning run.
+  // This prevents a service setting from silently overwriting an administrator's
+  // manually maintained NPM host that uses the same domain.
+  //
+  // One narrow exception (§728): we hold **no** id for this hostname, and the
+  // host we found carries byte-for-byte the advanced_config we would write for
+  // it. Nothing else generates that block — the `/snippets/` includes and the
+  // dashboard's own access-denied/app-unavailable pages come from
+  // computeAdvancedConfig and nowhere else — so the host is ours and the only
+  // thing missing is our record of its id. That happens whenever bookkeeping
+  // and NPM drift: a rename teardown that nulls the id while an older host for
+  // the new name survives (how §724 was found), or a provision that created
+  // the host and then failed before recording it. Refusing there leaves the
+  // hostname permanently `failed`, re-logging every 6 h sweep, with no way
+  // back that isn't a hand edit in NPM — the console step §0.2 forbids.
+  //
+  // A *stale* id pointing at some other host is still refused: adopting the
+  // one we found would orphan the one we thought we owned, which is the
+  // failure this guard exists to prevent, just one level up.
+  const adoptable = !expectedHostId && (existing.advanced_config ?? '') === expectedAdvancedConfig;
+  if (!adoptable && (!expectedHostId || existing.id !== expectedHostId)) {
+    throw new Error(`Nginx Proxy Manager host for ${hostname} already exists and is not managed by this service.`);
+  }
+  if (adoptable) {
+    logger.info('Adopting an existing Nginx Proxy Manager host we generated but had lost the id for', {
+      hostname,
+      hostId: existing.id,
+    });
+  }
   const needsUpdate =
     existing.forward_scheme !== forwardScheme ||
     existing.forward_host !== forwardHost ||

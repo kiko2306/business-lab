@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.15] — 2026-09-28
+
+### Fixed
+
+- An exposure whose NPM host id was lost can re-adopt the host it generated, instead of staying permanently failed
+
 ## [0.151.14] — 2026-09-28
 
 ### Fixed

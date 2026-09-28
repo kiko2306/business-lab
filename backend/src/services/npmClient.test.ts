@@ -358,6 +358,86 @@ describe('ensureProxyHost', () => {
     await expect(ensureProxyHost({ ...baseOptions, expectedHostId: null })).rejects.toThrow(/already exists and is not managed/);
   });
 
+  // §728. A rename teardown nulls npm_host_id, and a provision that created a
+  // host but failed before recording it leaves the same gap — meanwhile a host
+  // we generated is still serving the name. Refusing it left the hostname
+  // permanently `failed`, re-logged every 6 h sweep, fixable only by hand in
+  // NPM (the console step §0.2 forbids). Found live as §724.
+  it('adopts a host it has no id for when the config is byte-for-byte what it would write', async () => {
+    // Derived from the production generator, not copied: the claim under test
+    // is "a host carrying OUR generated config is ours".
+    const ourConfig = buildProxyHostPayload({ ...baseOptions, certificateId: 0 }).advanced_config;
+    mockLogin();
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: [
+        {
+          id: 48,
+          domain_names: ['paperless.example.com'],
+          forward_scheme: 'http',
+          forward_host: '172.17.0.1',
+          forward_port: 8000,
+          advanced_config: ourConfig,
+        },
+      ],
+      raw: '',
+    });
+
+    const result = await ensureProxyHost({ ...baseOptions, expectedHostId: null });
+
+    // Adopted and already correct, so nothing is rewritten — just the id, which
+    // the caller records to heal the row.
+    expect(result).toEqual({ id: 48, created: false, updated: false });
+  });
+
+  it("refuses a host it has no id for when the config is not one it generated", async () => {
+    mockLogin();
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: [
+        {
+          id: 9,
+          domain_names: ['paperless.example.com'],
+          forward_scheme: 'http',
+          forward_host: '10.0.0.9',
+          forward_port: 3000,
+          advanced_config: '# hand-written by the administrator\nlocation / { proxy_pass http://elsewhere; }',
+        },
+      ],
+      raw: '',
+    });
+
+    await expect(ensureProxyHost({ ...baseOptions, expectedHostId: null })).rejects.toThrow(
+      /already exists and is not managed/
+    );
+  });
+
+  it('refuses to adopt when it holds a stale id pointing at a different host', async () => {
+    // Adopting here would orphan the host we believe we own — the same class
+    // of leak the guard exists to prevent, one level up. So even our own
+    // config does not earn adoption while an id is on record.
+    const ourConfig = buildProxyHostPayload({ ...baseOptions, certificateId: 0 }).advanced_config;
+    mockLogin();
+    mockedRequestJson.mockResolvedValueOnce({
+      statusCode: 200,
+      body: [
+        {
+          id: 48,
+          domain_names: ['paperless.example.com'],
+          forward_scheme: 'http',
+          forward_host: '172.17.0.1',
+          forward_port: 8000,
+          advanced_config: ourConfig,
+        },
+      ],
+      raw: '',
+    });
+
+    await expect(ensureProxyHost({ ...baseOptions, expectedHostId: 12 })).rejects.toThrow(
+      /already exists and is not managed/
+    );
+  });
+
   it('updates an owned host whose upstream has drifted', async () => {
     mockLogin();
     mockedRequestJson.mockResolvedValueOnce({

@@ -33942,3 +33942,58 @@ failed with the same EACCES that caused the bug, as the code comment predicts.
 It is inert: nothing references it. And the test document (`document_id 3`)
 stays in Paperless; the box is a no-guarantees dev/test box and the item asked
 for a real drop.
+
+## 728. Fixed: a hostname whose NPM host id we lost could never be re-adopted
+
+§724 found `outline`'s row stuck at `status = failed`, `npm_host_id = NULL`,
+re-logging `Nginx Proxy Manager host for wiki.tx-home-utils.com already exists
+and is not managed by this service.` on every 6 h sweep — while NPM host 48
+quietly went on serving that hostname perfectly well.
+
+`ensureProxyHost`'s guard refused it:
+
+```ts
+if (!expectedHostId || existing.id !== expectedHostId) { throw … }
+```
+
+That conflates two different situations. `existing.id !== expectedHostId` is a
+real conflict — we believe we own a different host. `!expectedHostId` only
+means *we have no record*, which is equally true of an administrator's
+hand-made host and of our own host whose id our bookkeeping dropped. The
+second happens on its own: a rename teardown nulls `npm_host_id` (§714), and a
+provision that created the host but failed before recording it leaves the same
+gap (the case §99.1 already half-handles). With no way back, the row stays
+`failed` forever and the only repair is a hand edit in NPM — the console step
+§0.2 forbids.
+
+**Fix**: adopt, but only on proof. When there is no id on record *and* the
+host's `advanced_config` is byte-for-byte what `computeAdvancedConfig` would
+write for it, the host is ours and only the id is missing. Nothing else
+generates that block — the `/snippets/` includes, and the dashboard's own
+`@access_denied` / `@app_unavailable` pages carrying our dashboard URL. The
+function then falls through to its normal update path and returns the id,
+which `provisionHostname` records, healing the row.
+
+A **stale** id pointing at a different host is still refused, deliberately:
+adopting the one we found would orphan the one we thought we owned — the same
+leak this guard exists to prevent, one level up.
+
+**Why byte-comparison rather than a marker comment.** A marker would be
+cleaner going forward but would not recognise any host generated before it
+existed — including host 48, the one that prompted this. Comparing against
+what we would generate needs no migration and is self-verifying: checked
+against the live `48.conf` first, whose rendered block is exactly
+`buildAutheliaAdvancedConfig('https://businesslab.tx-home-utils.com', false)`.
+If our generator later changes shape, a pre-existing host simply stops being
+adoptable and we are back to today's refusal — fails safe, not open.
+
+Three tests: adoption on a matching config (verified failing without the
+change), refusal of a hand-written config, and refusal while a stale id is on
+record. The matching config in the test is built from `buildProxyHostPayload`
+rather than pasted, so it cannot drift from the generator it is asserting
+about.
+
+**Prediction for the beta test**: on the next Outline start or 6 h sweep, the
+row should go `failed` → `provisioned` with `npm_host_id = 48`, with an
+`Adopting an existing Nginx Proxy Manager host…` line in the backend log, and
+no change to what `wiki.tx-home-utils.com` serves.
