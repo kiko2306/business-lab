@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.15** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.16** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -472,13 +472,6 @@ it is done — not ticked off and left behind. Section references point at
 ### Repo tooling and performance
 
 Planned in plan.md §730 — measured, ordered biggest-win-first.
-
-- [ ] **Memoise `pbkdf2ClientSecretDigest` (plan.md §730.1)** — 310k
-      pbkdf2-sha512 iterations at ~300 ms a call, on a function whose salt is
-      derived from the secret, so it is already pure and deterministic.
-      `autheliaOidcClients.test.ts` is 32 s of the backend suite's 43 s, and
-      the ~6 h exposure reconciler re-hashes the same ~36 app secrets on
-      every sweep. A `Map` memo; no behaviour change, no new knob.
 
 - [ ] **Stop `plan-citations.py` grepping `node_modules/` (plan.md §730.2)**
       — 13 of its 14 "dangling targets" are vendored JS under

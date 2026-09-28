@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.16] — 2026-09-28
+
+### Performance
+
+- Memoise the Authelia OIDC client-secret pbkdf2 digest — the exposure reconciler and the test suite stop re-hashing the same secrets (backend tests: 50.9s of test time to 19.4s).
+
 ## [0.151.15] — 2026-09-28
 
 ### Fixed

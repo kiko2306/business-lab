@@ -34121,3 +34121,33 @@ block. Every cited anchor (§270, §274, §281 at least) survives as a
 Order is §730.1, §730.2, §730.3, §730.4, §730.5, §730.6 — biggest measured
 win first, the asked-for item last because it is the smallest. §730.2 lands
 before §730.6 so the compaction's before/after citation check is meaningful.
+
+## 731. Implemented: the OIDC client-secret digest is memoised (§730.1)
+
+`pbkdf2ClientSecretDigest` runs 310,000 sha512 rounds — ~300 ms — and was
+recomputing digests it had already computed. A `Map` keyed on the secret,
+seven lines including the guard.
+
+Safe because the function was *already* pure by design: §281's salt is
+`sha256(secret)[0:16]`, chosen deliberately so the rendered block does not
+churn and restart Authelia on every reconcile. "Same secret ⇒ same digest" is
+the existing contract; the cache only stops paying for it twice. Bounded by
+the number of managed OIDC clients (~36 here); a rotated secret leaves one
+dead entry of a few hundred bytes, which is not worth an LRU.
+
+**Measured**, before → after, same 121 files / 1254 tests, all passing:
+
+| | before | after |
+|---|---|---|
+| `autheliaOidcClients.test.ts` | 32.25 s | **2.57 s** |
+| suite test time | 50.92 s | **19.44 s** |
+| wall clock | 43.41 s | 37.23 s |
+
+Wall clock moves least because what is left is vitest's own
+transform/collect/prepare, not test execution — worth knowing before anyone
+chases the next second.
+
+Rejected: putting the iteration count behind a test-only env var. It adds a
+knob to production code to make tests fast, and it would have left the ~6 h
+exposure reconciler re-hashing the same ~36 secrets on every sweep — the
+cache fixes both callers, the knob only one.

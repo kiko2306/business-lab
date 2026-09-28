@@ -68,6 +68,16 @@ function ab64(buf: Buffer): string {
 }
 
 /**
+ * 310,000 sha512 rounds is ~300 ms a call, and this function is pure — the
+ * salt is derived from the secret, so a given secret always maps to a
+ * given digest. Both callers repeat themselves: the exposure reconciler
+ * re-renders the same ~36 app secrets on every start and every ~6 h sweep,
+ * and the tests render a handful of fixtures over and over (32 s of a 43 s
+ * suite before this cache). Bounded by the number of managed OIDC clients.
+ */
+const digestCache = new Map<string, string>();
+
+/**
  * A `$pbkdf2-sha512$<iterations>$<salt>$<key>` digest of `secret`, byte-for-byte
  * in the format `authelia crypto hash generate pbkdf2` produces (verified live,
  * plan.md §281) — so Authelia accepts it as a hashed `client_secret`.
@@ -82,9 +92,13 @@ function ab64(buf: Buffer): string {
  *   to a random salt cached in the app's .env.
  */
 export function pbkdf2ClientSecretDigest(secret: string): string {
+  const memoised = digestCache.get(secret);
+  if (memoised !== undefined) return memoised;
   const salt = crypto.createHash('sha256').update(secret).digest().subarray(0, 16);
   const key = crypto.pbkdf2Sync(secret, salt, PBKDF2_ITERATIONS, 64, 'sha512');
-  return `$pbkdf2-sha512$${PBKDF2_ITERATIONS}$${ab64(salt)}$${ab64(key)}`;
+  const digest = `$pbkdf2-sha512$${PBKDF2_ITERATIONS}$${ab64(salt)}$${ab64(key)}`;
+  digestCache.set(secret, digest);
+  return digest;
 }
 
 /** Render the marker-delimited managed client entries (6-space list indent). */
