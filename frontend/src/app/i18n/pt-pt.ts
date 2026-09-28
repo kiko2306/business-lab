@@ -459,7 +459,7 @@ export const ptPT: Record<string, string> = {
   'selfUpdate.progress.checking': 'A verificar atualizações…',
   'selfUpdate.progress.pulling': 'A obter o código mais recente…',
   'selfUpdate.progress.building': 'A construir as imagens alteradas…',
-  'selfUpdate.progress.updating_apps': 'A obter e recriar as aplicações alteradas…',
+  'selfUpdate.progress.updating_apps': 'A obter todas as aplicações, recriando as alteradas…',
   'selfUpdate.progress.restarting_frontend': 'A reiniciar o frontend…',
   'selfUpdate.progress.restarting_backend': 'A reiniciar o backend — o painel volta a ligar-se automaticamente…',
   'selfUpdate.progress.done': 'Atualizado.',

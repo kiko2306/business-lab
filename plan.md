@@ -34010,3 +34010,67 @@ does *not* cover is the same trap §440 hit: an app that has ever been through
 a self-update carries `docker-compose.override.yml` pinning a digest, which
 wins over this tag edit — the README item says to clear it with the
 dashboard's Unpin action.
+
+## 740. A self-update pulls every app, and recreates the ones a pull moved
+
+The gap the user named: apps on `:latest` "will never be updated". True, and
+by construction. §343's `classifyDeploy` scopes a self-update's app phase to
+the apps whose `apps/<name>/**` shows up in the deploy's `git diff` — an app
+pinned to a version tag gets that for free when the tag moves, but a
+`:latest` app's compose file never changes, so it sat outside every sweep
+forever. §449's answer was a "Last checked for a newer image" date comment a
+human bumps to manufacture a diff. That works, and it is still the only thing
+that propagates a *deliberate* image move to other machines, but it means an
+app only ever updates when someone remembers it exists.
+
+Three options were put up; the chosen one is the laziest of the three.
+Rejected: **pinning every `:latest` app to its installed version** — §449
+already rejected the digest-to-tag hunt (mis-identification, registry
+dependency), and it makes every future security fix a manual bump, which
+today's Navidrome hop (§738) shows the cost of. Rejected: **a read-only
+"newer image available" check** — that is `imageUpdates.ts`, which §209
+deleted on purpose (registry client, anonymous tokens, a cache table, a daily
+sweep, and ~60 manifest HEADs per check against Docker Hub's 100-per-6h
+anonymous budget), and it still leaves the image sitting there unpulled.
+
+What landed instead needs no registry client at all, because `docker compose
+pull` already *is* the version check: it contacts the registry, compares
+digests and downloads only what moved. So the self-update now pulls **every**
+installed app, and `scope.apps` changes meaning — from "the only apps to
+touch" to "the apps to recreate **regardless**" (their compose file changed,
+so they must come back up on it even if no image moved). Every other app is
+recreated only if its pull actually brought a newer image.
+
+`pullAndRecreateService` gained `skipRecreateWhenUnchanged`. After the pull
+and any source build, and before anything is recreated, it compares each
+running container's image ID against the ID its `repo:tag` now resolves to
+locally (`imagesMoved`, unit-tested; `resolveLocalImageIds` runs one
+`docker image inspect` per ref — a combined call drops the line for a ref that
+is absent locally and the results stop lining up). `false` → return without
+recreating. `null` (either side unreadable) → recreate, the same rule
+`describeUpdate` follows: "cannot tell" must never read as "nothing changed".
+A skipped app writes no audit row either — ~40 no-op `SERVICE_UPDATE` rows per
+self-update would bury the ones that did something.
+
+One ordering change fell out of it: `clearImagePins()` used to run before the
+pull, and now runs just before the recreate. Both the pull and the `up` use
+`baseArgs` (the base compose file only), so the override file was never in
+play for either — but a *skipped* app must not be left with its pins deleted
+and its containers untouched, which is exactly what the old position would
+have done.
+
+Costs, stated rather than buried: a self-update now spends a pull and a
+2 s pause (`BETWEEN_APPS_MS`, registry politeness) on all ~43 installed apps
+rather than the handful that changed — a few minutes of mostly-waiting on a
+deploy that already rebuilds the dashboard. A version/docs-only deploy still
+short-circuits before any of it (§343's pull-only path), so a bare version
+bump is still a bare `git pull`. And a `:latest` app will now actually move
+when the user clicks Update, majors included — which is the point, and is
+safer than the alternative of falling years behind: Nextcloud's 34→35
+(§711) went fine precisely because it was one hop.
+
+§449's date comment is no longer *needed* to get a `:latest` app its updates;
+it is now only for forcing a specific app's recreate on every machine that
+pulls a commit. Left in place, along with `require-image-date-bump.sh` — that
+is a convention the user set (and a hook), not something to retire as a side
+effect of this change.

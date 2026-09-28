@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.17** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.152.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -211,6 +211,22 @@ it is done — not ticked off and left behind. Section references point at
 
 
 ### Exposure and platform
+
+- [ ] **Beta-test the pull-every-app self-update (plan.md §740)** — the app
+      phase of a self-update now pulls **every** installed app and recreates
+      only the ones whose own files changed in the deploy plus the ones whose
+      pull actually moved an image. On `beta`, run an update from the Update
+      page and watch it: the progress detail should count through every
+      installed app (`name (i/N)`, N = all of them, not just the changed
+      ones), and the run should still finish rather than time out — it is now
+      a few minutes longer. Then check the backend log: apps that did not move
+      say "is already on the latest images" and must **not** have been
+      recreated (their container `Created`/`StartedAt` timestamps unchanged,
+      and their `docker-compose.override.yml` still present with its old
+      pins — the skip path must not clear pins it never re-wrote). At least
+      one app that did move should show a new container and a rewritten pin.
+      Also confirm a version/docs-only deploy still short-circuits as
+      `pull-only` with no app sweep at all.
 
 - [ ] **Beta-test Navidrome 0.63.2 → 0.64.2 (plan.md §738)** — the bump is a
       security update (0.64.1 fixes five advisories, incl. Subsonic auth and

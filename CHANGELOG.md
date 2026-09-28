@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.152.0] — 2026-09-28
+
+### Changed
+
+- A self-update now pulls every installed app and recreates the ones whose image actually moved, so an app on a floating tag stops missing upstream releases
+
 ## [0.151.17] — 2026-09-28
 
 ### Changed
