@@ -1,5 +1,6 @@
 
-# Last checked for a newer image: 2026-09-16 - bump this date (even with
+# Last checked for a newer image: 2026-09-28 (0.63.2 -> 0.64.2; 0.64.1 is a
+# five-CVE security release, §738) - bump this date (even with
 # no other change) to force a re-pull on every machine that pulls this
 # commit; self-update only recreates an app whose apps/<name>/** changed
 # since its last deploy, so this is what moves a `latest`-tagged image
@@ -11,7 +12,10 @@ services:
     # ceiling mostly covers an ffmpeg transcode or two during a library scan.
     mem_limit: 256m
     mem_reservation: 64m
-    image: deluan/navidrome:0.63.2
+    # 0.64.0's migration re-encodes every internal ID (upstream says back up
+    # first); taken anyway because 0.64.1 fixes five advisories, including
+    # Subsonic auth and per-user library filtering, on a publicly exposed app.
+    image: deluan/navidrome:0.64.2
     restart: unless-stopped
     ports:
       - "${NAVIDROME_PORT:-10570}:4533"

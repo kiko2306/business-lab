@@ -33920,3 +33920,43 @@ still open with no activity since 2025-11-05, and
 `crowdsecurity/cs-cloudflare-worker-bouncer`'s latest release is still v0.0.18
 (2026-06-02) with no issue naming the `cfut_` "Authentication error (10000)".
 Dates bumped to 2026-09-28; both items stay.
+
+## 738. Image sweep, 12 days after §440: only Navidrome moved
+
+Re-ran §440's audit of every pinned (non-`latest`/`stable`/`release`) tag.
+`guacamole` 1.6.0, `it-tools` 2024.10.22-7ca5933 and `scrutiny`
+v0.9.4-omnibus are all still the newest upstream release — unchanged since
+§440, nothing to do. The floating tags (`postgres:1[67]-alpine`,
+`mariadb:11.4`, `valkey:9-alpine`, `uptime-kuma:1`,
+`immich-server:release`) move within their series on any recreate and were
+left as they are.
+
+**Navidrome 0.63.2 → 0.64.2, bumped.** §440 left this exact hop alone
+because 0.64.0's migration re-encodes every internal ID and upstream says to
+back the database up first. What changed the calculus is 0.64.1
+(2026-09-21): a security release fixing five privately-reported advisories —
+Subsonic authentication, artwork fetching, playlist cover images, player
+ownership and per-user library filtering. Navidrome is publicly exposed, and
+its Subsonic path carries an Authelia bypass so native clients can
+authenticate, so "auth bugs in the Subsonic layer" is not a theoretical
+risk here. 0.64.2 adds a scan fix on top. The ID migration is still the
+cost, and it is why this needs a real look after the update rather than a
+green container: the README item spells out what to check.
+
+**Twenty left pinned at v2.39.5, now 4 minors behind (v2.43.0).** Upstream's
+upgrade guide answers the question §440 didn't: from ≥v1.23 you can jump
+straight to the latest, migrations run automatically on boot, and v2.34+
+wants Postgres ≥15 (this app runs `pgautoupgrade:16-alpine`, fine). So the
+database side is no longer the blocker — the blocker is ours:
+`twentyClient.ts` and `twentyAdminBootstrap.ts` were written by reading
+`twenty/v2.39.5`'s own source because that version disables GraphQL
+introspection (§438), and nothing proves those field and
+config-variable names survived four minors. That audit is the task, not the
+tag edit; added as its own README item rather than smuggled into a sweep.
+
+**Not mass-bumping the `:latest` date comments.** §449's comment exists so a
+`:latest` app can be forced back into self-update's scope; bumping all ~40 at
+once would queue a recreate of the entire fleet on the next update — the
+15-minute sweep §343's diff-scoping was built to avoid — and from here there
+is no way to tell which of those images would make a safe hop. A fleet-wide
+pull stays a deliberate, asked-for action.

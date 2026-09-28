@@ -212,6 +212,33 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Beta-test Navidrome 0.63.2 → 0.64.2 (plan.md §738)** — the bump is a
+      security update (0.64.1 fixes five advisories, incl. Subsonic auth and
+      per-user library filtering), but 0.64.0's migration **re-encodes every
+      internal ID** and upstream says to back up first. On `beta`: take a
+      Navidrome backup before the update, then check
+      `apps/navidrome/docker-compose.override.yml` is gone — if the app has
+      ever been through a self-update it carries a digest pin that silently
+      masks the tag edit (§440); use the dashboard's per-app **Unpin** action,
+      not a hand-edit. After the update: `docker inspect` shows
+      `deluan/navidrome:0.64.2`, the container is healthy, the web UI lists
+      the same albums as before (the ID migration ran, nothing vanished), and
+      a native Subsonic client still authenticates through its bypass path.
+      Clients that cache item IDs may need a re-sync — expected, not a failure.
+
+- [ ] **Audit the dashboard's Twenty integration against v2.43, then unpin
+      (plan.md §738, §438)** — `apps/twenty/` is pinned at v2.39.5 and is now
+      four minors behind. Upstream says the jump itself is fine (any version
+      ≥v1.23 can go straight to latest, migrations run on boot, Postgres ≥15
+      and we run 16). What is unproven is our side: `twentyClient.ts` and
+      `twentyAdminBootstrap.ts` were written by reading `twenty/v2.39.5`'s
+      source because that release disables GraphQL introspection, so every
+      field name, REST path and config-variable name in them is a
+      version-specific guess. Diff those against `twenty/v2.43.0`'s source
+      first; only then bump `TWENTY_TAG`'s default, and verify on `beta` that
+      the admin bootstrap still creates its workspace and the app's card
+      still reports healthy.
+
 - [ ] **Beta-test Nextcloud's 34→35 major upgrade (plan.md §711)** — the
       upgrade itself is **confirmed** (2026-09-28, over SSH at 0.151.5): the
       image pulled, the container is healthy, and `/status.php` reports
