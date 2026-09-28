@@ -33231,3 +33231,29 @@ has no Cloudflare dashboard/API access and the item was explicitly a
 human-only cleanup — confirmed absent from both. Already cleaned up, whether
 by an earlier manual pass or Cloudflare's own record lifecycle. README item
 deleted; no code change.
+
+## 710. Incident: CrowdSec banned the user's own IP via Outline's login burst
+
+User reported being locked out and asked why. Diagnosed over SSH on
+home-srv-01 (`cscli alerts inspect`, NPM's access log): their real IP
+(`2001:8a0:e3bb:9500:11fc:4faf:3c:12d9`, a Portuguese ISP) tripped
+`LePresidente/http-generic-401-bf` at 08:33 UTC — 6 POSTs returning 401
+against Outline's API (`/api/stars.list`, `userMemberships.list`,
+`collections.list`, `groupMemberships.list`, `notifications.list`,
+`documents.drafts`) in one window, which the scenario's heuristic reads as a
+password-brute-force attempt. It's really just Outline's SPA firing its
+normal batch of data calls before the browser's session was fully
+authenticated — a false positive on first sign-in, not an attack. Ties into
+the still-open Outline beta-test item (§666); worth knowing if it recurs
+during that walk.
+
+Also noted, not chased further: `cscli decisions list` showed no active
+decision for that IP even while NPM's Lua bouncer was still actively
+`denied` logging fresh 403s against it minutes later — the bouncer's local
+`lua_shared_dict crowdsec_cache` lagging behind LAPI's own state rather than
+the two staying in lockstep. User lifted the ban themselves (dashboard's
+ban-list UI, §540); confirmed clear afterward — no active decision, no
+fresh denial in the NPM log since. No code change; nothing to add to the
+README unless this recurs and turns into something worth tuning (e.g.
+excluding Outline's own hostname from that scenario, or shortening its
+bantime) — one incident isn't enough signal to build around yet.
