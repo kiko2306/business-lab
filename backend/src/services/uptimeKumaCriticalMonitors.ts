@@ -36,6 +36,7 @@ import WebSocket from 'ws';
 import logger from '../utils/logger';
 import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
 import { getHostGatewayIp } from '../utils/network';
+import { appBaseUrl } from '../utils/appUrl';
 import { getExposureConfig } from '../utils/exposureSettings';
 import { getAlertNotifyConfig } from '../utils/alertNotify';
 import { getSignalHostname } from './criticalServiceHealth';
@@ -438,8 +439,7 @@ export async function ensureCriticalServiceMonitors(serviceName: string): Promis
   };
 
   try {
-    const port = getPublishedUpstreamPort(SERVICE) ?? FALLBACK_PORT;
-    const baseWsUrl = `ws://${await getHostGatewayIp()}:${port}`;
+    const baseWsUrl = await appBaseUrl(SERVICE, FALLBACK_PORT, 'ws');
     const outcome = await runSession(baseWsUrl, notification, await desiredMonitors());
 
     if (outcome === 'done') {

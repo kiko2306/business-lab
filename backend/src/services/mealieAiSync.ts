@@ -35,8 +35,8 @@
 
 import logger from '../utils/logger';
 import { writeAuditLog } from '../utils/audit';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { resolveComposeFile } from '../config/services';
+import { appBaseUrl } from '../utils/appUrl';
 import { getActiveProviderKey, getProviderDefinition } from '../utils/aiSettings';
 import { readAppEnvValue } from './appEnv';
 import { sleep } from '../utils/wait';
@@ -87,9 +87,7 @@ const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
 
 async function resolveMealieBaseUrl(): Promise<string> {
-  const port = getPublishedUpstreamPort(MEALIE_SERVICE) ?? FALLBACK_PORT;
-  const host = await getHostGatewayIp();
-  return `http://${host}:${port}`;
+  return appBaseUrl(MEALIE_SERVICE, FALLBACK_PORT);
 }
 
 /**

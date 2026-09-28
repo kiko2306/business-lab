@@ -28,8 +28,8 @@
 
 import WebSocket from 'ws';
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { resolveComposeFile } from '../config/services';
+import { appBaseUrl } from '../utils/appUrl';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { readAppEnvValue } from './appEnv';
 import { pollUntilReady } from '../utils/wait';
@@ -170,8 +170,7 @@ export async function reconcileUptimeKumaFirstAdmin(serviceName: string): Promis
   }
 
   try {
-    const port = getPublishedUpstreamPort(UPTIME_KUMA_SERVICE) ?? FALLBACK_PORT;
-    const baseWsUrl = `ws://${await getHostGatewayIp()}:${port}`;
+    const baseWsUrl = await appBaseUrl(UPTIME_KUMA_SERVICE, FALLBACK_PORT, 'ws');
 
     // Unlike its siblings the probe *is* the work — runSetup creates the
     // account and reports what happened — so retrying it is the point, not

@@ -20,3 +20,4 @@ export async function getHostGatewayIp(): Promise<string> {
   cachedHostGatewayIp = address;
   return address;
 }
+

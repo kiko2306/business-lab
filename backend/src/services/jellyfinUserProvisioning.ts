@@ -24,8 +24,7 @@
  */
 
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { appBaseUrl } from '../utils/appUrl';
 import { readAppEnvValue } from './appEnv';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { createUser, findUserByName, setDisabled, setPassword, signIn } from './jellyfinClient';
@@ -51,8 +50,7 @@ async function signInAsJellyfinAdmin(): Promise<JellyfinAdminSession> {
   if (!adminUsername || !adminPassword) {
     return { state: 'admin-not-configured' };
   }
-  const port = getPublishedUpstreamPort(JELLYFIN_SERVICE) ?? FALLBACK_PORT;
-  const baseUrl = `http://${await getHostGatewayIp()}:${port}`;
+  const baseUrl = await appBaseUrl(JELLYFIN_SERVICE, FALLBACK_PORT);
   const token = await signIn(baseUrl, adminUsername, adminPassword);
   if (!token) {
     return { state: 'admin-sign-in-failed' };

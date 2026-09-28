@@ -25,8 +25,8 @@
  */
 
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { resolveComposeFile } from '../config/services';
+import { appBaseUrl } from '../utils/appUrl';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
@@ -48,9 +48,7 @@ const MAX_ATTEMPTS = 70;
 const RETRY_DELAY_MS = 3000;
 
 async function resolveTwentyBaseUrl(): Promise<string> {
-  const port = getPublishedUpstreamPort(TWENTY_SERVICE) ?? FALLBACK_PORT;
-  const host = await getHostGatewayIp();
-  return `http://${host}:${port}`;
+  return appBaseUrl(TWENTY_SERVICE, FALLBACK_PORT);
 }
 
 export async function reconcileTwentyFirstAdmin(serviceName: string): Promise<void> {

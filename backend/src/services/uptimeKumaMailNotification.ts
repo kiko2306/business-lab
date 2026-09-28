@@ -22,8 +22,8 @@
 
 import WebSocket from 'ws';
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { resolveComposeFile } from '../config/services';
+import { appBaseUrl } from '../utils/appUrl';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { getMailConfig } from '../utils/mailSettings';
 import { decodeFrame, isAckOk } from './uptimeKumaAdminBootstrap';
@@ -170,8 +170,7 @@ export async function reconcileUptimeKumaMailNotification(serviceName: string): 
   }
 
   try {
-    const port = getPublishedUpstreamPort(SERVICE) ?? FALLBACK_PORT;
-    const baseWsUrl = `ws://${await getHostGatewayIp()}:${port}`;
+    const baseWsUrl = await appBaseUrl(SERVICE, FALLBACK_PORT, 'ws');
     const outcome = await send(baseWsUrl, buildSmtpNotification(mail, recipient));
 
     if (outcome === 'created' || outcome === 'updated') {

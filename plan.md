@@ -33633,3 +33633,36 @@ scaffold instead of twenty-two, one less nesting level in nine functions, and
 the probe-count semantics tested in one place rather than assumed in nine.
 Recorded here rather than quietly restated, since it is the second line-count
 estimate in this run that did not survive contact (see §719).
+
+## 721. One `appBaseUrl` for reaching an app from the backend container
+
+Seven modules carried an identical private helper —
+
+```ts
+const port = getPublishedUpstreamPort(X_SERVICE) ?? FALLBACK_PORT;
+const host = await getHostGatewayIp();
+return `http://${host}:${port}`;
+```
+
+— and seven more built the same string inline. `utils/appUrl.ts`'s
+`appBaseUrl(serviceName, fallbackPort, scheme)` replaces all fourteen; the
+`scheme` parameter earns its place on the three Uptime Kuma call sites that
+need `ws://`.
+
+**Three lookalikes deliberately left alone**: Home Assistant is host-networked,
+so its port comes from the registry's `hostNetworkPort` rather than a published
+one; NetBird's management port needs a `portEnvVar` argument, and adding a
+fourth parameter for one caller is worse than the two lines it saves; and
+`uptimeKumaCriticalMonitors`' `hostPortUrl`/`ntfyServerUrl` return **null** for
+a missing port instead of falling back, which is the opposite contract.
+
+**Where it lives is the interesting part.** It went into `utils/network.ts`
+first, next to `getHostGatewayIp` — and broke 47 tests across 8 files. The
+bootstrap suites all do `vi.mock('../utils/network', () => ({ getHostGatewayIp:
+vi.fn() }))`, so the new export vanished with the rest of the module. The fix
+was not to patch eight mock blocks: moving it to its own `utils/appUrl.ts`
+means the mocked `getHostGatewayIp` still applies to it (vitest mocks by
+module, for all importers), and every existing test passes **untouched**. It
+also keeps `utils/network.ts` a DNS-only leaf instead of making it import the
+service registry, which was an inversion this had been uneasy about anyway.
+Worth recording: the test breakage was what surfaced the layering problem.

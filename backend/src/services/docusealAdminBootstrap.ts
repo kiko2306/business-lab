@@ -40,8 +40,8 @@
  */
 
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { resolveComposeFile } from '../config/services';
+import { appBaseUrl } from '../utils/appUrl';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue, saveServiceEnv } from './appEnv';
@@ -71,9 +71,7 @@ const RETRY_DELAY_MS = 3000;
 // per-user account create needs to sign in as the admin against, and the
 // same name-splitting rule for whatever display name the grantee has.
 export async function resolveDocusealBaseUrl(): Promise<string> {
-  const port = getPublishedUpstreamPort(DOCUSEAL_SERVICE) ?? FALLBACK_PORT;
-  const host = await getHostGatewayIp();
-  return `http://${host}:${port}`;
+  return appBaseUrl(DOCUSEAL_SERVICE, FALLBACK_PORT);
 }
 
 /** Split a display name into first/last; fall back to Admin / User. */

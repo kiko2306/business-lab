@@ -27,8 +27,7 @@
 
 import { randomBytes } from 'crypto';
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { appBaseUrl } from '../utils/appUrl';
 import { readAppEnvValue } from './appEnv';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { findUserId, getAppSettings, inviteUser, saveAppSettings, setPassword, signIn } from './nocodbClient';
@@ -52,9 +51,7 @@ export interface NocodbUserInput {
 }
 
 async function resolveNocodbBaseUrl(): Promise<string> {
-  const port = getPublishedUpstreamPort(NOCODB_SERVICE) ?? FALLBACK_PORT;
-  const host = await getHostGatewayIp();
-  return `http://${host}:${port}`;
+  return appBaseUrl(NOCODB_SERVICE, FALLBACK_PORT);
 }
 
 type NocodbAdminSession =

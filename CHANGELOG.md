@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.12] — 2026-09-28
+
+### Changed
+
+- One appBaseUrl helper replaces fourteen copies of the host-gateway URL an app is reached at from the backend container
+
 ## [0.151.11] — 2026-09-28
 
 ### Changed

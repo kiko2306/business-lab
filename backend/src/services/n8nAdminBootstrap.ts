@@ -24,8 +24,8 @@
  */
 
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { resolveComposeFile } from '../config/services';
+import { appBaseUrl } from '../utils/appUrl';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { readAppEnvValue } from './appEnv';
 import { pollUntilReady } from '../utils/wait';
@@ -95,8 +95,7 @@ export async function reconcileN8nFirstAdmin(serviceName: string): Promise<void>
   const { firstName, lastName } = splitName(adminUser?.displayName);
 
   try {
-    const port = getPublishedUpstreamPort(N8N_SERVICE) ?? FALLBACK_PORT;
-    const baseUrl = `http://${await getHostGatewayIp()}:${port}`;
+    const baseUrl = await appBaseUrl(N8N_SERVICE, FALLBACK_PORT);
 
     const state = await pollUntilReady(
       () => getSetupState(baseUrl),

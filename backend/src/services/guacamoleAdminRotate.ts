@@ -20,8 +20,8 @@
  */
 
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { resolveComposeFile } from '../config/services';
+import { appBaseUrl } from '../utils/appUrl';
 import { readAppEnvValue } from './appEnv';
 import { guacamoleLogin, guacamoleLogout, guacamoleSetPassword } from './guacamoleClient';
 import { sleep } from '../utils/wait';
@@ -49,9 +49,7 @@ const RETRY_DELAY_MS = 3000;
  * REST API as an authenticated admin.
  */
 export async function resolveGuacamoleBaseUrl(): Promise<string> {
-  const port = getPublishedUpstreamPort(GUACAMOLE_SERVICE) ?? FALLBACK_PORT;
-  const host = await getHostGatewayIp();
-  return `http://${host}:${port}`;
+  return appBaseUrl(GUACAMOLE_SERVICE, FALLBACK_PORT);
 }
 
 export async function reconcileGuacamoleAdminPassword(serviceName: string): Promise<void> {

@@ -20,8 +20,8 @@
  */
 
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { resolveComposeFile } from '../config/services';
+import { appBaseUrl } from '../utils/appUrl';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { getServiceExposureRow } from './exposure';
 import { readAppEnvValue } from './appEnv';
@@ -39,9 +39,7 @@ const MAX_ATTEMPTS = 20;
 const RETRY_DELAY_MS = 3000;
 
 async function resolveImmichBaseUrl(): Promise<string> {
-  const port = getPublishedUpstreamPort(IMMICH_SERVICE) ?? FALLBACK_PORT;
-  const host = await getHostGatewayIp();
-  return `http://${host}:${port}`;
+  return appBaseUrl(IMMICH_SERVICE, FALLBACK_PORT);
 }
 
 export async function reconcileImmichFirstAdmin(serviceName: string): Promise<void> {

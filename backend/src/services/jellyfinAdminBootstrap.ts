@@ -19,8 +19,8 @@
  */
 
 import logger from '../utils/logger';
-import { getPublishedUpstreamPort, resolveComposeFile } from '../config/services';
-import { getHostGatewayIp } from '../utils/network';
+import { resolveComposeFile } from '../config/services';
+import { appBaseUrl } from '../utils/appUrl';
 import { getAutheliaAdminUser } from './autheliaUsers';
 import { readAppEnvValue } from './appEnv';
 import { pollUntilReady } from '../utils/wait';
@@ -87,8 +87,7 @@ export async function reconcileJellyfinFirstAdmin(serviceName: string): Promise<
   }
 
   try {
-    const port = getPublishedUpstreamPort(JELLYFIN_SERVICE) ?? FALLBACK_PORT;
-    const baseUrl = `http://${await getHostGatewayIp()}:${port}`;
+    const baseUrl = await appBaseUrl(JELLYFIN_SERVICE, FALLBACK_PORT);
 
     const state = await pollUntilReady(
       () => getSetupState(baseUrl),
