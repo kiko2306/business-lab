@@ -379,19 +379,6 @@ it is done — not ticked off and left behind. Section references point at
       row) came through as the Anthropic row's already-configured key with
       no re-entry needed.
 
-- [ ] **Beta-test the NPM host adoption fix (plan.md §728)** — Outline's row
-      on `beta` is the live reproduction: `status = failed`,
-      `npm_host_id = NULL`, while NPM host 48 still serves
-      `wiki.<domain>`. After pulling, either start Outline or wait for the
-      ~6 h sweep, then confirm the row heals —
-      `SELECT service_name, npm_host_id, status, last_error FROM
-      service_exposure WHERE service_name = 'outline';` should read
-      `48 | provisioned | NULL` — with `Adopting an existing Nginx Proxy
-      Manager host we generated but had lost the id for` in the backend log,
-      and `wiki.<domain>` still answering 302 (adoption must not rewrite a
-      host that is already correct). Then confirm the guard still bites: it
-      must **not** adopt a host whose config it did not generate.
-
 - [ ] **Beta-test the secondary-hostname rename teardown (plan.md §716)** —
       the same exercise §714 passed for a primary hostname (plan.md §724), but
       for an `additionalExposures` entry. Temporarily change NetBird VPN's `api`

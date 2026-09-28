@@ -33997,3 +33997,42 @@ about.
 row should go `failed` → `provisioned` with `npm_host_id = 48`, with an
 `Adopting an existing Nginx Proxy Manager host…` line in the backend log, and
 no change to what `wiki.tx-home-utils.com` serves.
+
+## 729. §728 passed its beta test: the row healed, and the sweep adopted nothing else
+
+Outline started on `beta` at 0.151.15, then the 10-minute exposure sweep ran on
+top of it. The §728 prediction held exactly.
+
+**The adoption**, at 14:59:21Z:
+
+```
+Adopting an existing Nginx Proxy Manager host we generated but had lost the id for
+  hostname=wiki.tx-home-utils.com hostId=48
+```
+
+and the row went `NULL | failed | "…already exists and is not managed by this
+service."` → `48 | provisioned | (none)`, with `cf_hostname_id` repopulated too,
+so the Cloudflare route came back with it rather than the row merely carrying an
+id again.
+
+**It did not rewrite the host.** `48.conf`'s mtime is `11:23:11Z`, hours before
+the adoption — so `ensureProxyHost` took the `updated: false` branch and left an
+already-correct host alone, which is what the unit test asserts and what "adopt"
+should mean. A rewrite would have produced the same visible outcome, so this is
+the check that separates "worked" from "worked for the right reason".
+
+**It fired once, across the whole estate.** Diffing all 43 exposure rows before
+and after (start *and* sweep), the only change in the table is Outline's. The
+three other rows carrying a NULL `npm_host_id` — `jellyfin`, `kopia`, `n8n` —
+are untouched. Exactly one `Adopting…` line exists in the log.
+
+**The sweep is now clean.** It had been reporting `checked 34, reconciled 33,
+failed: [outline]` every six hours since §724. At 15:09:40Z: `checked 34,
+reconciled 34`, no `failed` array at all.
+
+**Not proven live, deliberately**: the negative half — that a host whose config
+we did *not* generate is still refused. Proving it means creating a rogue proxy
+host on a real domain, which is not worth doing unprompted on a box serving
+real hostnames. It is covered by unit test on both branches (a hand-written
+`advanced_config`, and a stale id pointing at a different host). The live
+evidence is the weaker-but-real form above: 42 other rows, one adoption.
