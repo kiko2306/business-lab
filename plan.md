@@ -33666,3 +33666,11 @@ module, for all importers), and every existing test passes **untouched**. It
 also keeps `utils/network.ts` a DNS-only leaf instead of making it import the
 service registry, which was an inversion this had been uneasy about anyway.
 Worth recording: the test breakage was what surfaced the layering problem.
+
+## 722. Dead assignment in `startPolling()`
+
+`ServiceStateService.startPolling()` set `this.stopped = false`, called
+`stopPolling()` — which immediately sets it back to `true` — and then set it
+`false` again. The first assignment never had an effect. Removed, with a
+comment on the surviving one saying why it has to come after the teardown
+rather than before it, so it doesn't get "tidied" back to the top.

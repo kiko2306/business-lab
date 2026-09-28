@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.13] — 2026-09-28
+
+### Fixed
+
+- Removed a dead assignment in the dashboard's polling start-up
+
 ## [0.151.12] — 2026-09-28
 
 ### Changed

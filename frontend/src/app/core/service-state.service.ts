@@ -78,7 +78,8 @@ export class ServiceStateService {
   readonly startupEvents$ = this.startupEventsSubject.asObservable();
 
   startPolling(): void {
-    this.stopped = false;
+    // Tear down any previous stream first; stopPolling sets `stopped`, so the
+    // reset has to come after it, not before.
     this.stopPolling();
     this.stopped = false;
     this.connectionStatusSubject.next('connecting');
