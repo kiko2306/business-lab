@@ -473,14 +473,6 @@ it is done — not ticked off and left behind. Section references point at
 
 Planned in plan.md §730 — measured, ordered biggest-win-first.
 
-- [ ] **Stop `plan-citations.py` grepping `node_modules/` (plan.md §730.2)**
-      — 13 of its 14 "dangling targets" are vendored JS under
-      `apps/hotel/*/node_modules/`, which makes the compaction rule's "adds
-      no new lines" check unreadable, and the grep takes 2.9 s instead of
-      0.03 s. Replace `grep -r` with `git grep --untracked
-      --exclude-standard`, which inherits `.gitignore` and so drops the
-      hand-rolled `--exclude-dir=data` too.
-
 - [ ] **Fix the four `§649.1` citations (plan.md §730.3)** — the guest-text
       template store is §650, not §649.1. `apps/hotel/admin/src/app/models.ts`,
       `apps/hotel/api/src/guestText.ts`, `apps/hotel/api/src/routes/guestText.ts`,

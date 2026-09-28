@@ -34151,3 +34151,37 @@ Rejected: putting the iteration count behind a test-only env var. It adds a
 knob to production code to make tests fast, and it would have left the ~6 h
 exposure reconciler re-hashing the same ~36 secrets on every sweep — the
 cache fixes both callers, the knob only one.
+
+## 732. Implemented: `plan-citations.py` stops grepping `node_modules/` (§730.2)
+
+The checker printed **14 dangling targets; 13 were false** — `§` followed by
+digits inside vendored JavaScript (`ip-address`, `fast-uri`,
+`@jsonjoy.com/json-pack`) under `apps/hotel/*/node_modules/` and
+`apps/tally/app/api/node_modules/`, which only exist since the Wintouch
+rebuilds vendored their dependencies.
+
+That is worse than noise. The compaction rule in CLAUDE.md is "the pass may
+add **no new** lines here", and a 13-line false baseline makes that
+before/after diff unreadable — which is exactly the check §730.6 depends on.
+It also hid the one real dangling citation (§649.1, §730.3), which had been
+invisible the whole time.
+
+The fix is to stop hand-rolling exclusions. The previous `grep -rnoE
+--exclude-dir=data` special-cased `apps/*/data/` and knew nothing about
+`node_modules/`; `git grep --untracked --exclude-standard` inherits
+`.gitignore`, which already covers both, so the `--exclude-dir` hack was
+deleted rather than extended. `--untracked` keeps a just-written,
+not-yet-committed file in scope. `apps/home-page/data/` — the one `data/`
+directory deliberately *un*-ignored — was checked for `§` hits and has none,
+so nothing is lost by dropping the blanket exclusion.
+
+Two things the switch needed that the shell version did not:
+
+- **`-I`.** `git grep` reports a binary match as `Binary file … matches`,
+  with no `:` to split on, and `apps/price-compare/app/public/icon-512.png`
+  contains the byte sequence. It crashed the parse on the first run.
+- **An exit-code guard.** `git grep` exits 128 outside a git repository and
+  leaves stdout empty, which would have printed a cheerful "0 dangling
+  targets" and passed the compaction check for the wrong reason.
+
+**14 dangling → 1** (the real one), and **2.9 s → 0.18 s**.

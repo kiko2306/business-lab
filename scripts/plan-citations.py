@@ -22,12 +22,28 @@ targets = set(re.findall(r'^##+\s+(\d+(?:\.\d+)?)[a-z]?[.\s]', plan, re.M))
 # A label may run on into its text: `**§436.1 — old host retired.**`.
 targets |= set(re.findall(r'\*\*§(\d+(?:\.\d+)?)(?=\*\*|\s)', plan))
 
-# `apps/*/data/` is gitignored app state — vendored JS sourcemaps and SQL
-# dumps that happen to contain a `§` followed by digits. Eight of the ten
-# "dangling" targets this used to print came from there, none of them real.
-hits = subprocess.run(
-    f"grep -rnoE --exclude-dir=data '§[0-9]+(\\.[0-9]+)?' {SOURCES} 2>/dev/null",
-    shell=True, capture_output=True, text=True).stdout.splitlines()
+# `git grep` rather than `grep -r`, so .gitignore does the excluding: both
+# `apps/*/data/` (app state, SQL dumps) and `apps/*/node_modules/` (vendored
+# JS — ip-address, fast-uri, json-pack all contain a `§` followed by digits)
+# drop out for free. Hand-rolled --exclude-dir did the first but not the
+# second, and once the Wintouch rebuilds vendored their dependencies that was
+# 13 of the 14 "dangling" targets printed here, none of them real — which
+# made the compaction rule's "adds no new lines" check unreadable. 0.03s
+# against 2.9s, too. --untracked so a file written but not yet committed
+# still counts; --exclude-standard keeps .gitignore applying to it; -I skips
+# binaries, which git grep otherwise reports as an unparseable
+# "Binary file ... matches" line (a PNG in price-compare hits this).
+grep = subprocess.run(
+    ['git', 'grep', '--untracked', '--exclude-standard', '-I', '-noE',
+     '§[0-9]+(\\.[0-9]+)?', '--', *SOURCES.split()],
+    capture_output=True, text=True)
+# git grep exits 1 for "no matches" and 128 for "not a git repository" (a
+# tarball copy with no .git). The latter leaves stdout empty, which would
+# print a cheerful "0 dangling targets" and pass the compaction check for
+# the wrong reason, so fail loudly instead.
+if grep.returncode > 1:
+    sys.exit(f"git grep failed: {grep.stderr.strip()}")
+hits = grep.stdout.splitlines()
 
 # A compacted section's own heading names the sections it replaced,
 # "(former §X–§Y, compacted <date>)"; those are a record, not citations.
