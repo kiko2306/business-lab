@@ -284,6 +284,8 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     description: 'Team wiki and knowledge base',
     icon: 'book',
     category: 'Productivity',
+    // "Outline" is the product name, but "wiki" is what a person looks for.
+    exposureSubdomain: 'wiki',
     composePath: 'apps/outline/docker-compose.yml',
     healthCheck: {
       enabled: true,

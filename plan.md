@@ -33352,3 +33352,14 @@ designed. Narrowed and closed the README item on that basis; if Vikunja
 fixes the client-side race upstream (or the "redirectToProvider" contract
 changes) a future version bump might make the cold-load case fully silent
 for free, but there's no code in this repo waiting on that.
+
+## 713. Outline exposed at wiki.<domain> instead of outline.<domain>
+
+User asked for the friendlier hostname. Used the existing
+`exposureSubdomain` override (added for wetty's `ssh.<domain>` case,
+`services.ts` around line 1817) rather than anything new — set
+`exposureSubdomain: 'wiki'` on the `outline` entry. `OUTLINE_URL` is
+generated from the exposure hostname via `exposureEnvKeys`, so nothing else
+needed to change; no hardcoded `outline.<domain>` existed elsewhere in
+backend, docs or compose. Backend typecheck and full test suite (120 files)
+pass unchanged.
