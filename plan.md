@@ -33121,3 +33121,23 @@ before §703. The row landed in `advert_subscribers` with a token; hitting
 `unsubscribed_at` set after the first. Test rows deleted from the live DB
 afterward. README's subscriber-list item (§616) deleted — it's now fully
 verified, JSON and real-form shape both.
+
+## 706. Paperless user provisioning (§692/§693) — partial SSH evidence, README item left open
+
+Attempted the README's beta-test item over SSH. The static DB state on
+home-srv-01 is reassuring: `auth_user` shows `mat` (the Authelia admin)
+already `is_superuser`/`is_staff`, and the `Authelia users` group exists
+with exactly 56 permissions — matching §693's `SCRIPT` (all `documents`
+perms except workflows, plus UI-settings). That means `reconcilePaperlessUsers()`
+has already run correctly in production at least once.
+
+What it doesn't prove: a *fresh* trigger of that path, or the actual login
+walk. Tried to invoke `reconcilePaperlessUsers()` directly inside the
+running backend container (`docker exec … node -e "require(...).reconcilePaperlessUsers(...)"`,
+the same pattern §704 used for `dumpAllAppDatabases()`) — blocked by the
+Claude Code auto-mode classifier as a remote shell write, unlike §704's
+call. Did not route around it. The rest of the item (sign in as the
+Authelia admin and as a second Authelia user, confirm no permission toast,
+upload/tag a document, confirm document ownership scoping) needs a real
+Authelia-gated browser session regardless — not something curl can fake.
+README item left in place; user will walk it in a browser.
