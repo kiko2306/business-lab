@@ -33725,3 +33725,71 @@ version it was checked at, and state plainly that what remains needs a browser
 the Paperless shell and mistaking a green database for a passing item. §692's
 annotation says this explicitly: the bug it fixed was a UI symptom (a 403
 toast), so correct rows are necessary but not sufficient evidence.
+
+## 724. Beta test of the six new items at 0.151.13: §714 passes live, §716's no-op half passes, one new bug
+
+The box pulled `e5b5de1`/`0.151.13` (`GET /version` agrees; backend restarted
+13:30:37Z). Four of the six items need a dashboard click or a rebuild and are
+still open; two produced real results, and the reconciler sweep turned up a
+bug.
+
+**§714 — passes, and it fired for real.** The audit trail tells the story
+better than any contrived test could. Every 6-hourly sweep up to 12:23Z
+succeeded for `outline`. The first sweep on the new code, 13:41:04Z, logged
+`exposure_deprovision` → `outline (renamed from
+outline-verify714.tx-home-utils.com)` → success, then a provision failure.
+So: the §714 item had been set up by hand on the box (`exposureSubdomain` =
+`outline-verify714`) **while the box was still on the unfixed c2c2057**, which
+is precisely the §714 bug — it created a host for the test hostname and
+orphaned the `wiki` one. On the revert plus this pull, the new teardown saw
+`row.hostname !== hostname` and tore the test hostname down. Verified live:
+`outline-verify714.tx-home-utils.com` → `000` (no route), no NPM conf left for
+it, and `wiki.tx-home-utils.com` still answers `302`. Exactly one proxy-host
+conf mentions the app. That is the item's stated check, so it is deleted.
+
+**§716 — the no-op half passes.** Across a full 34-service sweep, every one of
+the six secondary rows kept its exact `npm_host_id` and `cf_hostname_id`
+(`netbird-vpn:api` 3, `:relay` 4, `hotel:core` 43, `:checkin` 44, `:pulse` 45,
+`homepage:apex` 11). This was the regression that mattered — a rename teardown
+that mis-fires would tear down and recreate a working hostname on every sweep,
+every six hours, forever. It does not. The rename half still needs the suffix
+edit **plus a backend rebuild**, since `services.ts` is compiled into the image,
+not bind-mounted like `VERSION`.
+
+**New bug, found by the sweep (README item added).** After that teardown,
+`outline`'s row has `npm_host_id = NULL` while NPM host 48 still serves
+`wiki.tx-home-utils.com` (left from the §713 move, orphaned by the pre-fix
+code). `ensureProxyHost` finds the host by domain, has no `expectedHostId` to
+match, and refuses it with §99.1's "already exists and is not managed by this
+service" guard. Outline is **unaffected** — it still answers — but the row
+reads `failed` and every sweep will re-log it. The open question is whether
+`ensureProxyHost` should adopt a host when the hostname matches one the
+registry says we own and we merely lack the id, or whether that weakens the
+guard against clobbering a hand-made host too much. Not fixed unilaterally.
+
+**§718 — the mechanism is verified live; the outcome is not yet observable.**
+The root cause is confirmed on the box: the backend container has `TZ=` empty
+and `date` reports UTC. Settings hold `app_timezone = Europe/Lisbon` and
+`backup_schedule_run_at_time = 03:00`, and the last run stamp is
+`2026-09-28T03:42:45Z` — 04:42 Lisbon, the bug in the data. The deployed image
+is Node v20.20.2 with **full-icu**, so the fix's mechanism works there:
+`Europe/Lisbon` resolves to UTC+1, `America/New_York` to UTC−4, and a bogus
+zone throws (taking the UTC fallback). Next run should land ~02:4xZ, which is
+tomorrow — so the item stays open for that observation.
+
+**Correction to §718's own reasoning**: the stated justification for
+`hourCycle: 'h23'` over `hour12: false` was that some ICU builds render
+midnight as "24". On *this* build both return `"00"`. The guard is still
+correct defensively — the behaviour does vary by ICU version — but it did not
+avoid a bug on this box, and the plan section should not be read as saying it
+did.
+
+**§719 — nothing failed, but the evidence is weak.** Zero `Post-start
+reconciler … failed` lines since the restart. That is because there have been
+**zero app starts** since the restart: the reconcilers only run on a start, so
+this proves nothing yet. It needs Nextcloud, ITFlow and Paperless started from
+the dashboard.
+
+**§717 and §720 not run at all** — both need the dashboard to drive a start
+(a deliberately failing one, and a first boot after wiping `data/`), and this
+pass had SSH only, no dashboard credentials.

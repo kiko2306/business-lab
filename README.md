@@ -379,20 +379,23 @@ it is done — not ticked off and left behind. Section references point at
       row) came through as the Anthropic row's already-configured key with
       no re-entry needed.
 
-- [ ] **Beta-test the §714 rename-teardown fix itself (plan.md §713/§714)** —
-      the `wiki.<domain>` move and the orphaned `outline.<domain>` cleanup are
-      both done and verified on `tx-home-utils.com` (curl: `outline.` now
-      `000`/no route, `wiki.` still `302`). What's still unverified is the fix
-      working *live* for a fresh rename: temporarily change `outline`'s
-      `exposureSubdomain` in `services.ts` to something else, restart Outline
-      or wait for the ~6h reconciler sweep, and confirm the previous hostname
-      stops resolving (its NPM proxy host and Cloudflare DNS record are gone)
-      instead of being left running and Authelia-gated. Revert the subdomain
-      back to `wiki` afterward.
+- [ ] **Outline's exposure row lost its `npm_host_id` and can't re-adopt the
+      live host (found 2026-09-28, plan.md §724)** — after a rename teardown
+      the row is left with `npm_host_id = NULL`, so the next provision finds
+      the NPM host serving that hostname, has no id to match it against, and
+      refuses it with "already exists and is not managed by this service"
+      (the §99.1 guard against clobbering a hand-made host). Outline itself is
+      **fine** — `wiki.<domain>` still answers 302 — but the row reads
+      `failed` and the ~6 h sweep re-logs the same error forever. Decide
+      whether `ensureProxyHost` should adopt a host when the hostname matches
+      one the registry says we own and we simply have no id for it, or whether
+      that weakens the guard too much; if adoption is wrong, the row needs
+      some other way back. Reproduce by renaming an app's `exposureSubdomain`
+      away and back.
 
 - [ ] **Beta-test the secondary-hostname rename teardown (plan.md §716)** —
-      on `beta`, the same exercise as the item above but for an
-      `additionalExposures` entry. Temporarily change NetBird VPN's `api`
+      the same exercise §714 passed for a primary hostname (plan.md §724), but
+      for an `additionalExposures` entry. Temporarily change NetBird VPN's `api`
       suffix in `services.ts` (e.g. to `mgmt`), restart NetBird or wait for
       the ~6h reconciler sweep, and confirm the old
       `netbird-vpn-api.<domain>` stops resolving — its NPM proxy host gone
@@ -400,9 +403,13 @@ it is done — not ticked off and left behind. Section references point at
       /data/nginx/proxy_host/*.conf` and its Cloudflare DNS record gone —
       while the new `netbird-vpn-mgmt.<domain>` answers. Then revert the
       suffix and confirm it swaps back cleanly, leaving exactly one host per
-      hostname. Also confirm the no-op path: a plain restart with nothing
-      renamed must leave the secondary's NPM host id unchanged (nothing torn
-      down and recreated on every sweep).
+      hostname. The **no-op path is already confirmed** (2026-09-28, at
+      0.151.13): across a full 34-service reconciler sweep all six secondary
+      rows kept their exact `npm_host_id` and `cf_hostname_id`
+      (`netbird-vpn:api` 3, `:relay` 4, `hotel:core` 43, `:checkin` 44,
+      `:pulse` 45, `homepage:apex` 11) — nothing torn down and recreated. What
+      is left is the rename half, which needs the suffix edit plus a backend
+      rebuild, since `services.ts` is compiled into the image.
 
 - [ ] **Beta-test that a failed start runs once (plan.md §717)** — on `beta`,
       make an app fail to start (easiest: stop a `dependsOn` dependency, or
