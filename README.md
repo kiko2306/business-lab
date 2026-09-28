@@ -564,14 +564,3 @@ before anything is built.
       unit's `birthday_is_active` + `promo_is_active` on, seed a reservation
       spanning today with a guest whose `birth_date` matches today, and
       confirm both the birthday email and the promo email arrive.
-- [ ] **Beta-test the Tally/Outline pg_dump EACCES fix (plan.md §703)** — on
-      `beta` (rebuilds the backend — `docker-entrypoint.sh` changed), after
-      the backend restarts confirm `stat -c '%U:%G %a' apps/tally/data
-      apps/outline/data` shows `appuser:appgroup` (not `root:root`), then
-      either wait for the next scheduled dump or trigger one and confirm
-      `docker logs business-lab-backend-1` shows `App database dump
-      finished` with `failed` down from 2 to 0, and
-      `apps/tally/data/_dump/tally.sql` (and Outline's) actually exists.
-      Also confirm `apps/tally/data/db` (Postgres's own PGDATA) is
-      untouched — still its own strict owner/mode, Postgres still starts
-      clean.

@@ -33090,3 +33090,20 @@ new `selfUpdate.test.ts` case). `sh -n` on the edited entrypoint. Not run
 against the real stack — `docker-entrypoint.sh` only executes inside a
 built image, so nothing short of a `beta` rebuild proves the chown actually
 lands; README item added.
+
+## 704. §703's pg_dump fix passed its beta test
+
+Confirmed on home-srv-01 after the user pulled `beta` (808b1ee → VERSION
+0.151.4, backend rebuilt): `apps/tally/data` and `apps/outline/data` flipped
+from `root:root` to the backend's own `appuser:appgroup` (shown as
+`usbmux:lxd` from the host, since those numeric IDs have no name mapping
+there), while `apps/tally/data/db` and `apps/outline/data/db` — Postgres's
+own PGDATA — stayed exactly `UNKNOWN:root 700`, and both Postgres containers
+stayed healthy throughout the backend's restart. Triggered
+`dumpAllAppDatabases()` directly inside the running backend container
+(`docker exec business-lab-backend-1 node -e "require('./dist/services/
+appDumps.js')...`, the same compiled function the scheduler calls): `ok: 36,
+failed: 0`, down from the prior `failed: 2` every night, with real
+`pg_dump`-header `.sql` files landing at `apps/tally/data/_dump/tally.sql`
+(7.5 KB) and `apps/outline/data/_dump/outline.sql` (3.6 MB). README item
+deleted.
