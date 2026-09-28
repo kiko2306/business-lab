@@ -6,7 +6,7 @@ import { param } from './units';
 import { text } from '../util';
 
 /**
- * Admin CRUD for the guest-text template store (plan.md §649.1, closing the
+ * Admin CRUD for the guest-text template store (plan.md §650, closing the
  * §629 decision #6 README item). Rows are seeded, fixed by key+locale — no
  * POST/DELETE, only editing a value, same shape as `smtp.ts`'s single row but
  * keyed on (key, locale) instead of a fixed id.

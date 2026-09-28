@@ -90,7 +90,7 @@ export interface Checkout {
   lines: CheckoutLine[];
 }
 
-/** One guest-text template row (plan.md §649.1). Fixed key set, no add/delete. */
+/** One guest-text template row (plan.md §650). Fixed key set, no add/delete. */
 export interface GuestTextTemplate {
   key: string;
   locale: 'en' | 'pt-pt';

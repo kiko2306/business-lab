@@ -1,5 +1,5 @@
 /**
- * The fixed set of guest-text template keys (plan.md §649.1) — rows are
+ * The fixed set of guest-text template keys (plan.md §650) — rows are
  * seeded by 004_guest_text.sql and never added to or removed from by the
  * admin UI, only edited, so this list is what both the route and the seed
  * validate against rather than a value read out of the table itself.

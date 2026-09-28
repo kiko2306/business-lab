@@ -473,11 +473,6 @@ it is done — not ticked off and left behind. Section references point at
 
 Planned in plan.md §730 — measured, ordered biggest-win-first.
 
-- [ ] **Fix the four `§649.1` citations (plan.md §730.3)** — the guest-text
-      template store is §650, not §649.1. `apps/hotel/admin/src/app/models.ts`,
-      `apps/hotel/api/src/guestText.ts`, `apps/hotel/api/src/routes/guestText.ts`,
-      `apps/hotel/api/src/migrations/004_guest_text.sql`.
-
 - [ ] **Compact the closed OIDC-rollout run (plan.md §730.6)** — §270–§275,
       §278, §280, §281 into one section, keeping every cited anchor as
       `**§N** — <conclusion>`. §276, §277 and §279 interleave the range and

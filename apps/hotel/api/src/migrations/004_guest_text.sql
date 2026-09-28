@@ -1,4 +1,4 @@
--- Guest-text template store (plan.md §649.1, closing the §629 decision #6
+-- Guest-text template store (plan.md §650, closing the §629 decision #6
 -- README item). The legacy `hu_translations` table held both real guest-facing
 -- content (email subjects/bodies, page intro/thank-you text, legal
 -- declarations) and a long tail of plain UI field labels (NAME, ADDRESS,

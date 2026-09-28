@@ -34232,3 +34232,30 @@ beta test repeatable weeks later — and splitting them out would break the
 "README's TODO section is the **only** place open work is tracked" rule, which
 exists so there is never a second list to fall out of step. The read is what
 was expensive, not the content, so the read is what changed.
+
+## 735. Fixed: four citations pointed at §649.1, which never existed (§730.3)
+
+The guest-text template store is **§650**; §649 is the per-app SMTP settings
+work, and it has no subsections. Four files cited `§649.1`:
+`apps/hotel/admin/src/app/models.ts`, `apps/hotel/api/src/guestText.ts`,
+`apps/hotel/api/src/routes/guestText.ts` and
+`apps/hotel/api/src/migrations/004_guest_text.sql` — all four describe the
+guest-text store and all four now point at §650, which opens "Closes the
+README item from §629 decision #6", exactly what they claim.
+
+Worth noting how it surfaced. This was the *only* real dangling citation in
+the repo and it had been there since §650 landed, invisible because
+`plan-citations.py` was also printing 13 false ones from `node_modules/`
+(§732) — a signal buried in its own noise. `plan-citations.py` now reports
+zero.
+
+Documenting a dead citation makes the document itself cite it, so the three
+paragraphs above (§730.3, §732, here) dangled the moment they were written.
+Rather than contorting the prose to avoid typing the number, this keeps it
+resolving the way CLAUDE.md already sanctions for compaction — a labelled
+anchor. It is not a fiction: what a reader of that number needs to know is
+precisely that it is not a section.
+
+**§649.1** — never existed. §649 is the per-app SMTP settings and has no
+subsections; the guest-text template store is §650. Kept as an anchor because
+git history, and any branch predating this, still carries the citation.
