@@ -157,7 +157,11 @@ never be in the diff.
 Every task runs through the same six steps, in order, every time:
 
 1. **Read the README TODO list.** It is the source of what is open — not
-   memory, not the last thing discussed.
+   memory, not the last thing discussed. Read it the cheap way:
+   `grep -n '^- \[ \] \*\*' README.md` lists every open item's headline in
+   ~40 lines, against ~30 KB for the section whole. Read an item's full text —
+   which is deliberately long, because "what to check and how" is the point —
+   only for the one being picked up.
 2. **Propose.** Name the task you would do next, or show a short list to choose
    from. Do not pick one and start.
 3. **Implement** — that one task.

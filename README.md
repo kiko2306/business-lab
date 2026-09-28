@@ -478,11 +478,6 @@ Planned in plan.md §730 — measured, ordered biggest-win-first.
       `apps/hotel/api/src/guestText.ts`, `apps/hotel/api/src/routes/guestText.ts`,
       `apps/hotel/api/src/migrations/004_guest_text.sql`.
 
-- [ ] **Document the cheap step 1 in CLAUDE.md (plan.md §730.5)** — the
-      working loop's "read the README TODO list" currently means reading
-      30 KB; `grep -n '^- \[ \] \*\*' README.md` gives the same open-item
-      list in ~40 lines, with the full item read only when it is picked up.
-
 - [ ] **Compact the closed OIDC-rollout run (plan.md §730.6)** — §270–§275,
       §278, §280, §281 into one section, keeping every cited anchor as
       `**§N** — <conclusion>`. §276, §277 and §279 interleave the range and

@@ -34214,3 +34214,21 @@ Folded in a one-character fix to `plan-index.sh` while there: its closing
 summary counted with `grep -c '^| .'`, which matches the table's own
 `| Range | Section |` header, so it had been reporting one section more than
 the file contains.
+
+## 734. Step 1 of the working loop no longer reads 30 KB (§730.5)
+
+The loop's step 1 is "read the README TODO list", and README's TODO section is
+30 KB of a 41 KB file — read at the start of *every* iteration, mostly to
+answer "what is open?", which is 37 headlines.
+
+`grep -n '^- \[ \] \*\*' README.md` answers exactly that in ~40 lines. The
+full text of an item is only needed for the one actually being picked up.
+CLAUDE.md's step 1 now says so.
+
+Deliberately **not** done: reformatting the TODO items to be shorter, or
+moving the long beta-test items into a separate file. The items are long
+because what to check and how *is* the item — that detail is what makes a
+beta test repeatable weeks later — and splitting them out would break the
+"README's TODO section is the **only** place open work is tracked" rule, which
+exists so there is never a second list to fall out of step. The read is what
+was expensive, not the content, so the read is what changed.
