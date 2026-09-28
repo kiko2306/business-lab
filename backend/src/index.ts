@@ -154,6 +154,9 @@ app.use(
 );
 app.use(cors(corsOptionsDelegate));
 app.use(express.json({ limit: process.env.REQUEST_BODY_LIMIT || '32kb' }));
+// subscribers.ts's POST is meant to be called as a plain HTML
+// <form method="post">, whose default enctype is urlencoded, not JSON.
+app.use(express.urlencoded({ extended: false, limit: process.env.REQUEST_BODY_LIMIT || '32kb' }));
 app.use(mutationLimiter);
 
 // Health check — always available

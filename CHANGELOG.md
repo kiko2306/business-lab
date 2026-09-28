@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.3] — 2026-09-28
+
+### Fixed
+
+- Subscribing via a real HTML form now works: the backend only parsed JSON bodies, so a plain <form method="post"> submit (the endpoint's own intended use) was rejected as missing the email field
+
 ## [0.151.2] — 2026-09-25
 
 ### Fixed
