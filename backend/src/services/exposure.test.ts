@@ -413,6 +413,102 @@ describe('provisionServiceIfEnabled', () => {
     expect(result).toEqual({ attempted: true, success: true, hostname: 'netbird-vpn.example.com' });
     expect(mockedEnsureProxyHost).toHaveBeenCalledTimes(1);
   });
+
+  it('tears down a secondary hostname that was renamed, instead of orphaning it', async () => {
+    // Same hole §714 closed for the primary, one layer down:
+    // ensureSecondaryExposureRow's upsert overwrites `hostname`, and
+    // ensureProxyHost finds its NPM host *by domain* — so without this the
+    // renamed secondary got a fresh NPM host while the old host, ingress
+    // rule and DNS record stayed live and unreferenced.
+    mockedQuery.mockImplementation(async (text: unknown, params?: unknown) => {
+      const sql = String(text);
+      const key = (params as unknown[] | undefined)?.[0];
+      if (sql.includes('SELECT * FROM service_exposure WHERE service_name = $1')) {
+        return {
+          rows: [
+            key === 'netbird-vpn'
+              ? exposureRow({ service_name: 'netbird-vpn', hostname: 'netbird-vpn.example.com', npm_host_id: 1 })
+              : exposureRow({ service_name: 'netbird-vpn:api', hostname: 'netbird-vpn-api.old-domain.com', npm_host_id: 2 }),
+          ],
+        } as never;
+      }
+      if (sql.includes('INSERT INTO service_exposure')) {
+        return {
+          rows: [exposureRow({ service_name: 'netbird-vpn:api', hostname: 'netbird-vpn-api.example.com', npm_host_id: null })],
+        } as never;
+      }
+      return { rows: [] } as never;
+    });
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedGetService.mockReturnValue({
+      name: 'netbird-vpn',
+      label: 'NetBird VPN',
+      description: '',
+      icon: '',
+      category: 'Networking & Security',
+      composePath: '',
+      healthCheck: { enabled: false },
+      additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT' }],
+    } as never);
+    mockedGetPublishedUpstreamPort.mockReturnValue(8081);
+    mockedGetHostGatewayIp.mockResolvedValue('172.17.0.1');
+    mockedEnsureProxyHost.mockResolvedValue({ id: 9, created: true, updated: false });
+    mockedEnsureIngressRoute.mockResolvedValue({ dnsRecordId: 'dns-1', created: true, updated: false } as never);
+
+    await provisionServiceIfEnabled('netbird-vpn', 1);
+
+    expect(mockedRemoveIngressRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'netbird-vpn-api.old-domain.com' })
+    );
+    expect(mockedDeleteProxyHost).toHaveBeenCalledWith(
+      globalConfig.npmApiUrl,
+      globalConfig.npmEmail,
+      globalConfig.npmPassword,
+      2
+    );
+  });
+
+  it('leaves a secondary hostname alone when it has not moved', async () => {
+    mockedQuery.mockImplementation(async (text: unknown, params?: unknown) => {
+      const sql = String(text);
+      const key = (params as unknown[] | undefined)?.[0];
+      if (sql.includes('SELECT * FROM service_exposure WHERE service_name = $1')) {
+        return {
+          rows: [
+            key === 'netbird-vpn'
+              ? exposureRow({ service_name: 'netbird-vpn', hostname: 'netbird-vpn.example.com', npm_host_id: 1 })
+              : exposureRow({ service_name: 'netbird-vpn:api', hostname: 'netbird-vpn-api.example.com', npm_host_id: 2 }),
+          ],
+        } as never;
+      }
+      if (sql.includes('INSERT INTO service_exposure')) {
+        return {
+          rows: [exposureRow({ service_name: 'netbird-vpn:api', hostname: 'netbird-vpn-api.example.com', npm_host_id: 2 })],
+        } as never;
+      }
+      return { rows: [] } as never;
+    });
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedGetService.mockReturnValue({
+      name: 'netbird-vpn',
+      label: 'NetBird VPN',
+      description: '',
+      icon: '',
+      category: 'Networking & Security',
+      composePath: '',
+      healthCheck: { enabled: false },
+      additionalExposures: [{ suffix: 'api', label: 'Management API', portEnvVar: 'NETBIRD_MGMT_PORT' }],
+    } as never);
+    mockedGetPublishedUpstreamPort.mockReturnValue(8081);
+    mockedGetHostGatewayIp.mockResolvedValue('172.17.0.1');
+    mockedEnsureProxyHost.mockResolvedValue({ id: 2, created: false, updated: true });
+    mockedEnsureIngressRoute.mockResolvedValue({ dnsRecordId: 'dns-1', created: false, updated: true } as never);
+
+    await provisionServiceIfEnabled('netbird-vpn', 1);
+
+    expect(mockedRemoveIngressRoute).not.toHaveBeenCalled();
+    expect(mockedDeleteProxyHost).not.toHaveBeenCalled();
+  });
 });
 
 describe('ensureAutoExposure (§331)', () => {
@@ -485,6 +581,24 @@ describe('ensureAutoExposure (§331)', () => {
     const upsert = mockedQuery.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO service_exposure'));
     expect(upsert).toBeDefined();
     expect(upsert![1]).toEqual(['paperless', 'paperless.example.com', 'http', true]);
+  });
+
+  it('leaves the row untouched when global exposure settings are incomplete', async () => {
+    // Regression: this used to fall through to the upsert with a null
+    // hostname, erasing the only record of what was live in NPM/Cloudflare.
+    // The next pass (once settings were complete) then saw no old hostname
+    // to compare against, skipped the teardown above, and orphaned the live
+    // host + ingress rule + DNS record.
+    mockedGetPublishedUpstreamPort.mockReturnValue(8000);
+    mockedGetExposureConfig.mockResolvedValue(null);
+    mockedQuery.mockResolvedValueOnce({
+      rows: [exposureRow({ enabled: true, hostname: 'paperless.example.com', npm_host_id: 3 })],
+    } as never);
+
+    expect(await ensureAutoExposure('paperless', 1)).toBe(false);
+
+    expect(mockedQuery.mock.calls.some(([sql]) => String(sql).includes('INSERT INTO service_exposure'))).toBe(false);
+    expect(mockedRemoveIngressRoute).not.toHaveBeenCalled();
   });
 });
 

@@ -33436,3 +33436,49 @@ The script itself was scratch, not committed — it duplicates what
 for any future rename; this only cleared the one instance that predated the
 fix. README's §714 beta-test item narrowed to just what's left: proving the
 fix fires on a *live* rename, which this cleanup didn't exercise.
+
+## 716. §714's rename teardown, finished: secondary hostnames had the same hole
+
+A read-through of `exposure.ts` after §714/§715 found the fix was only half
+applied. `ensureAutoExposure` now tears the old hostname down for a service's
+**primary** exposure, but `additionalExposures` — the secondary hostnames
+keyed `<service>:<suffix>` (NetBird's Management API, the Home Page's apex)
+— still go through `ensureSecondaryExposureRow`, whose
+`ON CONFLICT DO UPDATE SET hostname = EXCLUDED.hostname` overwrites the old
+value with nothing watching. Downstream, `ensureProxyHost` looks its NPM host
+up **by domain** (`findProxyHostByDomain(hostname)`), so a renamed secondary
+doesn't get its existing host updated — it gets a brand-new one, while the
+old proxy host, its Cloudflare ingress rule and its DNS record stay live and
+unreferenced. Byte-for-byte §714, one layer down.
+
+Not hypothetical: `exposureReconciler.ts`'s ~6 h sweep runs
+`ensureAutoExposure` + `provisionServiceIfEnabled` across every service
+unattended, so a changed base domain, a changed `suffix`, or an `apex` flag
+flipped in `services.ts` orphans on its own with nobody watching.
+
+**Fix**: read the row before the upsert, in `provisionServiceIfEnabled`'s
+`additionalExposures` loop — the last moment the old hostname is still known,
+same argument as §714 — and `deprovisionHostname` it when it has moved.
+`deleteRow: false`, so the row survives to be re-pointed; it also nulls
+`npm_host_id`, which is what makes the following `provisionHostname` create
+the replacement cleanly rather than passing a stale `expectedHostId`.
+
+**Second, smaller hole in the same function**: when `getExposureConfig()`
+returns null (pre-setup, or a cleared token), `ensureAutoExposure` derived
+`hostname = null` and then **still ran the upsert**, writing `hostname =
+NULL` over a live value. That erases the only record of what is published in
+NPM/Cloudflare, so the next pass — once settings are complete again — finds
+no old hostname to compare against, skips the teardown §714 added, and
+orphans the live host exactly as before. It now returns early instead: a row
+with a null hostname contributes nothing anywhere (every consumer —
+`autheliaAccessControl`, `autheliaOidcClients`, `homepageConfig`,
+`status.ts` — filters on a truthy hostname plus `status = 'provisioned'`), so
+there was never anything to gain by writing it. The `&& globalConfig` guard
+on the teardown condition went with it, being unreachable-false now.
+
+Both are covered by tests that fail against the pre-fix code
+(`exposure.test.ts`: "tears down a secondary hostname that was renamed",
+"leaves the row untouched when global exposure settings are incomplete"),
+plus a companion asserting an unmoved secondary is left alone — the
+regression that matters most, since a false positive here would tear down a
+working hostname on every reconciler sweep.

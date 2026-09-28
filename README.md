@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.6** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.7** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -378,6 +378,20 @@ it is done — not ticked off and left behind. Section references point at
       stops resolving (its NPM proxy host and Cloudflare DNS record are gone)
       instead of being left running and Authelia-gated. Revert the subdomain
       back to `wiki` afterward.
+
+- [ ] **Beta-test the secondary-hostname rename teardown (plan.md §716)** —
+      on `beta`, the same exercise as the item above but for an
+      `additionalExposures` entry. Temporarily change NetBird VPN's `api`
+      suffix in `services.ts` (e.g. to `mgmt`), restart NetBird or wait for
+      the ~6h reconciler sweep, and confirm the old
+      `netbird-vpn-api.<domain>` stops resolving — its NPM proxy host gone
+      from `docker exec nginx-proxy-manager grep -l server_name
+      /data/nginx/proxy_host/*.conf` and its Cloudflare DNS record gone —
+      while the new `netbird-vpn-mgmt.<domain>` answers. Then revert the
+      suffix and confirm it swaps back cleanly, leaving exactly one host per
+      hostname. Also confirm the no-op path: a plain restart with nothing
+      renamed must leave the secondary's NPM host id unchanged (nothing torn
+      down and recreated on every sweep).
 
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 

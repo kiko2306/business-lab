@@ -121,7 +121,18 @@ export async function ensureAutoExposure(serviceName: string, userId: number | n
 
     if (exposable) {
       const globalConfig = await getExposureConfig();
-      const hostname = globalConfig ? buildExposureHostname(serviceName, globalConfig.baseDomain) : null;
+      // Nothing to derive a hostname from yet (pre-setup, or a cleared
+      // token). The upsert below used to run anyway and write `hostname =
+      // NULL`, erasing the only record of what is live in NPM/Cloudflare —
+      // so once settings came back there was no old hostname left to compare
+      // against, the teardown below never fired, and the live host + ingress
+      // route + DNS record were orphaned. Leave the row exactly as it is: a
+      // null hostname contributes nothing downstream anyway (every consumer
+      // filters on hostname + status = 'provisioned').
+      if (!globalConfig) {
+        return false;
+      }
+      const hostname = buildExposureHostname(serviceName, globalConfig.baseDomain);
       if (!row || !row.enabled || row.hostname !== hostname) {
         // This function is the only writer of the `hostname` column, and it
         // always runs immediately before provisionServiceIfEnabled (both
@@ -131,7 +142,7 @@ export async function ensureAutoExposure(serviceName: string, userId: number | n
         // while the old value is still known, or a hostname rename (e.g. a
         // service gaining/changing exposureSubdomain) strands the old one
         // live and Authelia-gated forever instead of being replaced.
-        if (row?.enabled && row.hostname && row.hostname !== hostname && globalConfig) {
+        if (row?.enabled && row.hostname && row.hostname !== hostname) {
           await deprovisionHostname({
             exposureKey: serviceName,
             hostname: row.hostname,
@@ -692,6 +703,27 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
     const extraHostname = buildExposureHostname(serviceName, globalConfig.baseDomain, extra.suffix, {
       apex: extra.apex,
     });
+    // The same rename hole ensureAutoExposure closes for the primary
+    // (plan.md §714), one layer down: ensureSecondaryExposureRow's upsert
+    // overwrites `hostname`, and ensureProxyHost looks its NPM host up *by
+    // domain* — so a renamed secondary (a changed base domain, a changed
+    // `suffix`, an `apex` flag flipped) silently gets a brand-new NPM host
+    // while the old one, its tunnel ingress rule and its DNS record stay
+    // live and unreferenced. Tear the old hostname down here, the last
+    // moment it is still known.
+    const previousRow = await getServiceExposureRow(exposureKey);
+    if (previousRow?.hostname && previousRow.hostname !== extraHostname) {
+      await deprovisionHostname({
+        exposureKey,
+        hostname: previousRow.hostname,
+        npmHostId: previousRow.npm_host_id,
+        globalConfig,
+        userId,
+        auditResource: `${serviceName} (${extra.label}, renamed from ${previousRow.hostname})`,
+        deleteRow: false,
+      });
+    }
+
     const extraRow = await ensureSecondaryExposureRow(exposureKey, extraHostname);
     const grpc = Boolean(extra.grpc);
 
