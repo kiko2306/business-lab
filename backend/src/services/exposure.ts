@@ -123,6 +123,25 @@ export async function ensureAutoExposure(serviceName: string, userId: number | n
       const globalConfig = await getExposureConfig();
       const hostname = globalConfig ? buildExposureHostname(serviceName, globalConfig.baseDomain) : null;
       if (!row || !row.enabled || row.hostname !== hostname) {
+        // This function is the only writer of the `hostname` column, and it
+        // always runs immediately before provisionServiceIfEnabled (both
+        // call sites call them back to back) — so by the time that function
+        // reads the row, `hostname` already matches and it can never detect
+        // a rename. Tear the old NPM/Cloudflare resources down here instead,
+        // while the old value is still known, or a hostname rename (e.g. a
+        // service gaining/changing exposureSubdomain) strands the old one
+        // live and Authelia-gated forever instead of being replaced.
+        if (row?.enabled && row.hostname && row.hostname !== hostname && globalConfig) {
+          await deprovisionHostname({
+            exposureKey: serviceName,
+            hostname: row.hostname,
+            npmHostId: row.npm_host_id,
+            globalConfig,
+            userId,
+            auditResource: `${serviceName} (renamed from ${row.hostname})`,
+            deleteRow: false,
+          });
+        }
         await query(
           `INSERT INTO service_exposure (service_name, enabled, hostname, upstream_scheme, websocket, status, updated_at)
            VALUES ($1, true, $2, $3, $4, 'not_provisioned', NOW())
@@ -645,21 +664,11 @@ export async function provisionServiceIfEnabled(serviceName: string, userId: num
   const originUrl = getNpmOriginUrl(globalConfig.npmApiUrl);
   const serviceDef = getService(serviceName);
 
-  // A hostname rename (e.g. a service gaining exposureSubdomain) would
-  // otherwise strand the old one: ensureProxyHost matches on hostname, so it
-  // creates a second NPM host and leaves the first serving traffic.
-  if (exposureRow.hostname && exposureRow.hostname !== hostname) {
-    await deprovisionHostname({
-      exposureKey: serviceName,
-      hostname: exposureRow.hostname,
-      npmHostId: exposureRow.npm_host_id,
-      globalConfig,
-      userId,
-      auditResource: `${serviceName} (renamed from ${exposureRow.hostname})`,
-      deleteRow: false,
-    });
-    exposureRow.npm_host_id = null;
-  }
+  // Hostname-rename teardown lives in ensureAutoExposure now (see its
+  // comment) — it always runs first and is the only place the old hostname
+  // is still visible; by the time this function reads the row, `hostname`
+  // has already been updated to match, so a comparison here would never
+  // fire.
 
   const primaryResult = await provisionHostname({
     exposureKey: serviceName,

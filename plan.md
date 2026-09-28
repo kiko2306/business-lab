@@ -33363,3 +33363,53 @@ generated from the exposure hostname via `exposureEnvKeys`, so nothing else
 needed to change; no hardcoded `outline.<domain>` existed elsewhere in
 backend, docs or compose. Backend typecheck and full test suite (120 files)
 pass unchanged.
+
+## 714. Auto-exposure rename teardown was dead code: §713's live test left an orphaned NPM host
+
+Live-tested §713's `wiki.<domain>` change on `tx-home-utils.com` (already on
+`beta` at `c2c2057`/`0.151.5`, confirmed over SSH). The Home Page tile had
+already regenerated to `https://wiki.tx-home-utils.com` correctly. But a
+stale bookmark to `outline.tx-home-utils.com` still resolved — not a 404,
+Authelia's own access-denied page, meaning the old hostname was still live
+and gated, not torn down.
+
+Checked NPM directly (`docker exec nginx-proxy-manager… grep server_name
+/data/nginx/proxy_host/*.conf`, read-only): two separate proxy hosts existed
+for the outline service — `47.conf` for `outline.tx-home-utils.com` and
+`48.conf` for `wiki.tx-home-utils.com`. The old one was never removed.
+
+`provisionServiceIfEnabled` (`exposure.ts`) has an explicit, commented
+rename-teardown block: `if (exposureRow.hostname && exposureRow.hostname !==
+hostname) { deprovisionHostname(...) }`. It never fires. `ensureAutoExposure`
+is the **only** writer of the `hostname` column, and both real call paths
+(`executor.ts`'s `settleAutoExposure` inside `startService`, and
+`exposureReconciler.ts`'s sweep) call `ensureAutoExposure` immediately before
+`provisionServiceIfEnabled` in the same function, with no gap. By the time
+`provisionServiceIfEnabled` re-reads the row from the DB, `ensureAutoExposure`
+has already overwritten `hostname` to the new value — so the comparison it
+relies on is always false. The teardown code was correct in isolation and
+covered by a unit test (`exposure.test.ts`, "removes the old hostname when a
+service is renamed") that called `provisionServiceIfEnabled` directly with a
+hand-built stale row — which passes because it never exercises the real
+call order where `ensureAutoExposure` runs first and destroys the evidence.
+
+**Fix**: moved the rename-teardown into `ensureAutoExposure` itself, which
+already has everything `deprovisionHostname` needs (`globalConfig`, the
+row's old `hostname` and `npm_host_id`) before it overwrites them — it's the
+only place in the real call order where the old value is still visible.
+Removed the now-truly-dead block from `provisionServiceIfEnabled` (with a
+comment pointing at the new location, so nobody re-adds it there expecting
+it to fire). Moved the covering unit test from exercising
+`provisionServiceIfEnabled` directly to exercising `ensureAutoExposure`,
+since that's the only path that can actually be tested against real call
+order without a live DB.
+
+**Left open**: the orphaned `47.conf` (NPM proxy host) and its Cloudflare
+ingress route/DNS record for the old `outline.tx-home-utils.com` on
+`tx-home-utils.com` are not cleaned up by this fix — the bug already erased
+`service_exposure`'s only record of that old hostname before this patch
+landed, so there is nothing left in our own bookkeeping for the fixed code
+to find and tear down. This is debris from a bug that no longer exists, not
+config drift a fresh clone would reproduce, so hand-cleanup on this
+no-guarantees dev/test box is reasonable — flagged to the user rather than
+done unilaterally, since it touches live Cloudflare/NPM state.

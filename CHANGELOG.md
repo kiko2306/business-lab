@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.6] — 2026-09-28
+
+### Fixed
+
+- Auto-exposure hostname renames left the old NPM/Cloudflare host orphaned instead of tearing it down
+
 ## [0.151.5] — 2026-09-28
 
 ### Changed

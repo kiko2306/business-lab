@@ -458,6 +458,34 @@ describe('ensureAutoExposure (§331)', () => {
     expect(await ensureAutoExposure('netbird-vpn:api', 0)).toBe(false);
     expect(mockedQuery).not.toHaveBeenCalled();
   });
+
+  it('tears down the old NPM/Cloudflare resources when the derived hostname changes (a rename)', async () => {
+    // This function is the only writer of the `hostname` column and always
+    // runs before provisionServiceIfEnabled, so the teardown has to happen
+    // here — by the time provisionServiceIfEnabled reads the row, the old
+    // hostname is already gone and it can't detect the rename itself.
+    mockedGetPublishedUpstreamPort.mockReturnValue(8000);
+    mockedGetExposureConfig.mockResolvedValue(globalConfig);
+    mockedQuery.mockResolvedValueOnce({
+      rows: [exposureRow({ enabled: true, hostname: 'old-name.example.com', npm_host_id: 7 })],
+    } as never);
+
+    expect(await ensureAutoExposure('paperless', 1)).toBe(true);
+
+    expect(mockedRemoveIngressRoute).toHaveBeenCalledWith(
+      expect.objectContaining({ hostname: 'old-name.example.com' })
+    );
+    expect(mockedDeleteProxyHost).toHaveBeenCalledWith(
+      globalConfig.npmApiUrl,
+      globalConfig.npmEmail,
+      globalConfig.npmPassword,
+      7
+    );
+
+    const upsert = mockedQuery.mock.calls.find(([sql]) => String(sql).includes('INSERT INTO service_exposure'));
+    expect(upsert).toBeDefined();
+    expect(upsert![1]).toEqual(['paperless', 'paperless.example.com', 'http', true]);
+  });
 });
 
 describe('getExposability', () => {
@@ -491,41 +519,10 @@ describe('getExposability', () => {
 });
 
 describe('exposure teardown', () => {
-  it('removes the old hostname when a service is renamed, instead of stranding it', async () => {
-    // ensureProxyHost matches on hostname, so without this the rename leaves
-    // the previous NPM host in place, still serving the old hostname.
-    mockedQuery.mockImplementation(async (text: unknown) => {
-      const sql = String(text);
-      if (sql.includes('SELECT * FROM service_exposure')) {
-        return {
-          rows: [exposureRow({ service_name: 'paperless', hostname: 'old-name.example.com', npm_host_id: 7 })],
-        } as never;
-      }
-      return { rows: [] } as never;
-    });
-    mockedGetExposureConfig.mockResolvedValue(globalConfig);
-    mockedGetService.mockReturnValue(undefined as never);
-    mockedGetPublishedUpstreamPort.mockReturnValue(8000);
-    mockedGetHostGatewayIp.mockResolvedValue('172.17.0.1');
-    mockedEnsureProxyHost.mockResolvedValue({ id: 9, created: true, updated: false });
-    mockedEnsureIngressRoute.mockResolvedValue({ updated: true, dnsRecordId: 'dns-9' });
-
-    await provisionServiceIfEnabled('paperless', 1);
-
-    expect(mockedRemoveIngressRoute).toHaveBeenCalledWith(
-      expect.objectContaining({ hostname: 'old-name.example.com' })
-    );
-    expect(mockedDeleteProxyHost).toHaveBeenCalledWith(
-      globalConfig.npmApiUrl,
-      globalConfig.npmEmail,
-      globalConfig.npmPassword,
-      7
-    );
-    // ...and the new hostname is still provisioned afterwards.
-    expect(mockedEnsureProxyHost).toHaveBeenCalledWith(
-      expect.objectContaining({ hostname: 'paperless.example.com' })
-    );
-  });
+  // The rename-teardown case (removing the old hostname's NPM/Cloudflare
+  // resources instead of stranding it) lives in the `ensureAutoExposure`
+  // describe block above now — see its "tears down the old NPM/Cloudflare
+  // resources when the derived hostname changes" test and comment for why.
 
   it('deprovisionServiceExposure tears down the primary and every secondary', async () => {
     mockedQuery.mockImplementation(async (text: unknown) => {
