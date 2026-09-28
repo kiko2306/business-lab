@@ -46,4 +46,4 @@ TOTAL=$(wc -l < plan.md)
     }'
 } > plan-index.md
 
-echo "plan-index.md: $(grep -c '^| .' plan-index.md) sections, plan.md is ${TOTAL} lines"
+echo "plan-index.md: $(grep -c '^| `' plan-index.md) sections, plan.md is ${TOTAL} lines"

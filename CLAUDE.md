@@ -68,8 +68,12 @@ it before and after, and the pass may add **no new** lines. §172 rejected an
 earlier form of this, which kept whole subsections and so saved little.
 Keeping only each anchor's conclusion is what makes it worth doing.
 
-It is read **a section at a time, never whole**. `plan-index.md` lists every
-section with the `sed` range that reads it; regenerate it with
+It is read **a section at a time, never whole**. To read one, use
+`./scripts/plan-section.sh <N>` (or `<first> <last>` for a run) — it finds the
+section from `plan.md`'s own headings, so looking up §649 does not mean
+loading all 62 KB of `plan-index.md` to get one `sed` range out of it.
+`plan-index.md` is still the map to *browse* when you don't know the number:
+it lists every section with its `sed` range, and is regenerated with
 `./scripts/plan-index.sh` after appending or compacting. The record of what was
 tried and rejected is the half that keeps turning out to matter (§75.7) — a
 compaction keeps that, it just drops the iteration detail once the code is the

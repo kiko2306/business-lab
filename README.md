@@ -478,12 +478,6 @@ Planned in plan.md §730 — measured, ordered biggest-win-first.
       `apps/hotel/api/src/guestText.ts`, `apps/hotel/api/src/routes/guestText.ts`,
       `apps/hotel/api/src/migrations/004_guest_text.sql`.
 
-- [ ] **Add `scripts/plan-section.sh <N>` (plan.md §730.4)** — print a plan
-      section directly, so looking one up stops meaning "load all 62 KB of
-      `plan-index.md` to read one `sed` range out of it". The index stays as
-      it is. Also fix `plan-index.sh`'s echoed section count, which counts
-      the table header row.
-
 - [ ] **Document the cheap step 1 in CLAUDE.md (plan.md §730.5)** — the
       working loop's "read the README TODO list" currently means reading
       30 KB; `grep -n '^- \[ \] \*\*' README.md` gives the same open-item

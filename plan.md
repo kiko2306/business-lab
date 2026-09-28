@@ -34185,3 +34185,32 @@ Two things the switch needed that the shell version did not:
   targets" and passed the compaction check for the wrong reason.
 
 **14 dangling → 1** (the real one), and **2.9 s → 0.18 s**.
+
+## 733. Implemented: `scripts/plan-section.sh`, so a lookup stops loading the index (§730.4)
+
+`plan.md` is read a section at a time, but *finding* the section meant reading
+all 62 KB of `plan-index.md` to extract one `sed` range from it — 656 rows to
+get one. The index earns its place as a map to browse when the section number
+is unknown; it is the wrong tool for "read §649".
+
+`./scripts/plan-section.sh 649` prints the section; `./scripts/plan-section.sh
+730 732` prints a run. It reads `plan.md`'s own `## N.` headings, so there is
+nothing generated, nothing to regenerate, and no way for it to drift out of
+step with the file the way the index can between appends.
+
+The one subtlety is the end condition. Sections are in **file order, which is
+not always numeric order** (work appended later can carry an earlier number
+when it closes out an earlier plan), so a section ends at *the next heading in
+the file*, never at "the heading numbered N+1". The awk sets a flag on the
+`last` heading and exits on the following one, which is also what makes the
+final section in the file work without a special case.
+
+Verified against the index rather than by eye: for §649,
+`diff <(sed -n "30800,30869p" plan.md) <(./scripts/plan-section.sh 649)` is
+empty. Also checked a range, the last section in the file, and a missing
+section (exit 1, message on stderr).
+
+Folded in a one-character fix to `plan-index.sh` while there: its closing
+summary counted with `grep -c '^| .'`, which matches the table's own
+`| Range | Section |` header, so it had been reporting one section more than
+the file contains.
