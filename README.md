@@ -212,16 +212,19 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Beta-test Nextcloud's 34→35 major upgrade (plan.md §711)** — on
-      `beta`, after the next self-update pulls the new `nextcloud:latest`
-      (34.0.3.2 → 35.0.0), confirm the container comes up healthy and
-      `/status.php` reports `"version":"35...` rather than sitting in
-      maintenance mode. Then spot-check: the shared-storage mount other apps
-      read from is still readable (browse a folder in the Nextcloud UI),
-      opening a document still launches the OnlyOffice editor, and SAML
-      login still works if it's enabled. If it lands in maintenance mode,
-      that needs a real fix (an incompatible app, most likely), not just
-      waiting it out.
+- [ ] **Beta-test Nextcloud's 34→35 major upgrade (plan.md §711)** — the
+      upgrade itself is **confirmed** (2026-09-28, over SSH at 0.151.5): the
+      image pulled, the container is healthy, and `/status.php` reports
+      `"version":"35.0.1.1"` with `maintenance:false` and
+      `needsDbUpgrade:false` — so it did not stick in maintenance mode, which
+      was this item's real risk. Also confirmed as far as `occ` proves it:
+      `files_external:verify` on the `/Shared` mount returns `status: ok` and
+      `/shared` lists inside the container; `onlyoffice 10.2.1` and
+      `user_saml 8.4.0` are both **Enabled** and the OnlyOffice container is
+      healthy. What is left needs a browser — that state being right does not
+      prove the UI works: browse a folder under `/Shared` in the Nextcloud
+      web UI, open a document and confirm the OnlyOffice editor actually
+      launches, and complete one SAML login.
 
 - [ ] **Beta-test light/dark mode (plan.md §696)** — on `beta`, after pulling
       (dashboard and Tally rebuild), open the dashboard and `tally.<domain>`
@@ -241,18 +244,22 @@ it is done — not ticked off and left behind. Section references point at
       sold tabs, dates as dd/MM, money as `4 582,18 €`) and the Manage panel
       (access list, Issue enrolment code) should have no English left except
       shop/staff/item names from Wintouch.
-- [ ] **Beta-test Paperless user provisioning (plan.md §692, §693)** — on `beta`,
-      after pulling, restart Paperless from the dashboard, then open
-      `paperless.<domain>` signed in as the Authelia admin: the app should load
-      documents/dashboard with no "You do not have permission" toast, and the
-      backend log should show either "promoted the Authelia admin" or nothing
-      (already superuser). For a fresh-clone check, stop Paperless, delete the
-      Authelia admin's row from its `auth_user` (or wipe `apps/paperless/data`)
-      and start again — the login must come back as a superuser.
-      Non-admin (§693): add a second Authelia user with Paperless access, and
-      with Paperless running check its `auth_user` row exists in the "Authelia
-      users" group *before* it logs in; then sign in as it — the app must load,
-      upload/tag a document, and show none of the admin's owned documents.
+- [ ] **Beta-test Paperless user provisioning (plan.md §692, §693)** — the
+      database half is **confirmed** (2026-09-28, over SSH at 0.151.5, and
+      the same half §706 reached): `mat` — the Authelia admin, checked
+      against `users_database.yml` — is `is_superuser=True, is_staff=True`,
+      and the two non-admin Authelia users (`frias`, `miguel`) are both in
+      the `Authelia users` group, which carries 56 permissions. (`admin` is
+      Paperless's own seeded superuser, expected.) That is the provisioning
+      working; it is **not** the item, because the bug §692 fixed was a UI
+      symptom. What is left needs a browser: open `paperless.<domain>` as the
+      Authelia admin and confirm the dashboard loads with no "You do not have
+      permission" toast; sign in as a non-admin and confirm the app loads,
+      that it can upload and tag a document, and that it sees none of the
+      admin's owned documents. For a fresh-clone check, stop Paperless,
+      delete the Authelia admin's row from its `auth_user` (or wipe
+      `apps/paperless/data`) and start again — the login must come back as a
+      superuser.
 - [ ] **Beta-test the restart-noise fix (plan.md §668)** — on `beta`, trigger
       an update from the Update page and watch through "Restarting the
       backend": no red "Something went wrong" / "Unable to reach the backend"

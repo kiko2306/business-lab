@@ -33718,3 +33718,10 @@ health display for those three cards". There is one `hotel` entry in
 not three. The three healthy *containers* are a `docker ps` fact. The item has
 been reworded to say what is actually confirmed and what is left, so the
 remaining work is a single card on the Apps page.
+
+All three items now carry their confirmed half inline, with the date and the
+version it was checked at, and state plainly that what remains needs a browser
+— so the next pass starts from the UI checks instead of re-running `occ` and
+the Paperless shell and mistaking a green database for a passing item. §692's
+annotation says this explicitly: the bug it fixed was a UI symptom (a 403
+toast), so correct rows are necessary but not sufficient evidence.
