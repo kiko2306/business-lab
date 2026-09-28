@@ -379,6 +379,23 @@ it is done — not ticked off and left behind. Section references point at
       row) came through as the Anthropic row's already-configured key with
       no re-entry needed.
 
+- [ ] **Paperless's ClamAV wiring has been failing on every start since
+      2026-09-08 (found 2026-09-28, plan.md §725)** — `reconcilePaperlessClamav`
+      writes `apps/paperless/data/data/pre-consume-clamav.py` and the managed
+      compose fragment on every Paperless start, and gets `EACCES` every time.
+      Not a race: the backend process runs as `appuser` **uid 100/gid 101**,
+      while that directory is **uid 1000 gid 1000 mode 2775** — uid 100 is
+      neither owner nor in the group, so it falls to "other" (`r-x`) and cannot
+      write. The script on disk is dated 2026-09-08, which is when this last
+      succeeded. It fails quietly (the reconciler catches and logs), so the
+      start still reports success — meaning the pre-consume virus scan is
+      pinned to whatever host/port were correct three weeks ago and silently
+      stops matching if ClamAV moves. Same class as §703's pg_dump EACCES.
+      Fix needs the directory to be group-writable by the backend's gid, or
+      the backend to stop needing to write inside a tree the app owns; then
+      confirm the script is rewritten on a start and that a test document is
+      actually scanned.
+
 - [ ] **Outline's exposure row lost its `npm_host_id` and can't re-adopt the
       live host (found 2026-09-28, plan.md §724)** — after a rename teardown
       the row is left with `npm_host_id = NULL`, so the next provision finds
@@ -434,10 +451,17 @@ it is done — not ticked off and left behind. Section references point at
       `occ` wiring still applies — open a document, confirm the editor
       loads), **ITFlow** (its mail/cron settings still get written — the
       master cron switch is still on in its admin), and one ordinary app
-      like **Paperless**. `docker logs business-lab-backend` should carry no
-      `Post-start reconciler <name> failed` lines; if one appears, that is a
-      real failure this change made visible rather than fatal, and it needs
-      following up, not ignoring.
+      like **Paperless**. The backend half is **confirmed** (2026-09-28 at
+      0.151.13): all three started, zero `Post-start reconciler … failed`
+      lines, and — the check that actually matters, since a silently *skipped*
+      reconciler would also produce zero failures — every reconciler logged
+      `ok:true`. Nextcloud ran all six (OnlyOffice connector, ClamAV,
+      `user_saml` incl. promoting `mat`, `/shared`, mail, maintenance window);
+      ITFlow ran admin identity → password → **mail/cron (`hlm: cron enabled`)**
+      → billing, i.e. in the order §719 flagged as load-bearing; Paperless
+      logged `Authelia users provisioned`. What is left is the two browser
+      confirmations: open a Nextcloud document and see the OnlyOffice editor
+      load, and see the master cron switch on in ITFlow's own admin UI.
 
 - [ ] **Beta-test the shared poll helper on a first boot (plan.md §720)** —
       nine first-admin bootstraps now wait through `pollUntilReady` instead of

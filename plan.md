@@ -33793,3 +33793,50 @@ the dashboard.
 **§717 and §720 not run at all** — both need the dashboard to drive a start
 (a deliberately failing one, and a first boot after wiping `data/`), and this
 pass had SSH only, no dashboard credentials.
+
+## 725. §719 verified on beta with positive evidence, and a three-week-old Paperless bug surfaced
+
+Nextcloud, ITFlow and Paperless started from the dashboard at 0.151.13.
+
+**§719 passes the backend half, and on the right evidence.** "No
+`Post-start reconciler … failed` lines" is necessary but not sufficient — a
+refactor that silently *skipped* the array would look identical. So this
+checked that each reconciler actually ran:
+
+- Nextcloud: all six, each `ok:true` — OnlyOffice connector, ClamAV antivirus,
+  `user_saml` (including `mat promoted to the Nextcloud admin group`),
+  `/shared` external storage, mail settings, maintenance window + mimetypes.
+- ITFlow: admin identity → admin password → mail/cron (`hlm: cron enabled`,
+  SMTP + IMAP copied) → billing module. That is the ordering §719 called
+  load-bearing — the mail/cron and billing entries need the `settings` row the
+  first-admin wizard creates — observed intact in the real sequence.
+- Paperless: `Authelia users provisioned, admin: mat`.
+
+Left open: the two browser confirmations (OnlyOffice editor actually loading,
+the cron switch visible in ITFlow's admin).
+
+**Incidental §717 evidence**: each of the three starts produced exactly **one**
+`Starting service:` line — no duplicate ~0.5 s later. That is §717's
+success-path half. The failure path still needs a deliberately failing start.
+
+**New bug: Paperless's ClamAV wiring has been broken since 2026-09-08.** The
+start logged `Failed to wire Paperless to ClamAV — EACCES … pre-consume-clamav.py`.
+First read of this was "a race against the container's own chown during
+stop/start", which was wrong, and two misleading tests fed it: `docker exec`
+defaults to **root**, and `-u node` maps to a different uid than the backend
+actually uses. The backend process runs as **`appuser` uid 100 / gid 101**;
+`apps/paperless/data/data/` is **uid 1000 gid 1000 mode 2775**. uid 100 is
+neither the owner nor in the group, so it falls through to "other" (`r-x`) and
+cannot write — every time, not occasionally. The script on disk is dated
+2026-09-08, which is exactly when this last worked.
+
+Impact is quiet, which is why it survived three weeks: `reconcilePaperlessClamav`
+catches its own error, so the start still reports success, and the stale script
+keeps whatever host/port were right in early September. If ClamAV's address
+ever moves, pre-consume scanning silently stops matching. Same class as §703's
+pg_dump EACCES on `data/` owned by `nobody`.
+
+**Not caused by §719.** `reconcilePaperlessClamav` is a **pre-`up`** step, and
+§719 deliberately left every pre-`up` step as a bare `await` — only the
+post-`up` array was touched. What §719 did do is make the log readable enough
+that a three-week-old failure was noticed on the first pass over it.
