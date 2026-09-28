@@ -379,20 +379,6 @@ it is done — not ticked off and left behind. Section references point at
       row) came through as the Anthropic row's already-configured key with
       no re-entry needed.
 
-- [ ] **Beta-test the Paperless ClamAV relocation (plan.md §726)** — the
-      script now lives in `apps/paperless/data/clamav/` and is bind-mounted
-      read-only at `/usr/src/paperless/clamav`. On `beta`, after pulling,
-      start Paperless and confirm: `docker logs business-lab-backend` shows
-      `Paperless/ClamAV intake scan reconciled` and **no** `Failed to wire
-      Paperless to ClamAV`; the file exists on the host with a fresh mtime
-      (`ls -l apps/paperless/data/clamav/`); and inside the container
-      `docker exec paperless-paperless-ngx-1 ls -l /usr/src/paperless/clamav/`
-      lists it as executable. Then the part that matters — drop a file into
-      the `to-paperless/` share and confirm it is still consumed (a missing
-      script is fail-**closed**: every document would be rejected). If you
-      want the scan itself proven, an EICAR test file should be rejected and
-      leave `clamav pre-consume: REJECTED` in the Paperless log.
-
 - [ ] **Outline's exposure row lost its `npm_host_id` and can't re-adopt the
       live host (found 2026-09-28, plan.md §724)** — after a rename teardown
       the row is left with `npm_host_id = NULL`, so the next provision finds

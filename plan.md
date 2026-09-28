@@ -33896,3 +33896,49 @@ block comment ends the comment early — the `*/` terminates it — which broke
 the parse three definitions later with a misleading "unterminated regular
 expression literal". `paperlessDropbox.ts` already works around this by
 writing `` `apps/*, /data/` ``, which is why nobody had noticed the trap.
+
+## 727. §726 passed its beta test: Paperless runs the relocated script and rejects EICAR
+
+Restarted Paperless on `beta` at 0.151.14. Every part of the item passes, and
+the strongest evidence came from Paperless's own log rather than ours:
+
+```
+[paperless.consumer] Executing pre-consume script /usr/src/paperless/clamav/pre-consume-clamav.py
+[paperless.consumer] /usr/src/paperless/clamav/pre-consume-clamav.py exited 0
+[paperless.consumer] Document 2026-09-28 hlm-clamav-test-726 consumption finished
+```
+
+That is the real intake path invoking the script at the **new** location and
+consuming the document — which also settles the fail-closed worry, since a
+missing script would have rejected it instead.
+
+The rest, in order:
+
+- `Paperless/ClamAV intake scan reconciled` with the new script path, and **no**
+  `Failed to wire Paperless to ClamAV` — the first clean reconcile since
+  2026-09-08.
+- Host side: `apps/paperless/data/clamav/pre-consume-clamav.py`, fresh mtime,
+  mode `0755`, owned by uid 100/gid 101 (the backend's `appuser:appgroup`,
+  which the host's passwd renders as `usbmux lxd`).
+- Container side: mounted at `/usr/src/paperless/clamav` with `rw=false`, the
+  env var resolving inside it, and the file listed `-rwxr-xr-x 1 100 101`. A
+  write attempt into the mount gets `Read-only file system`, so the container
+  cannot chown it back — the property `:ro` was added for.
+- **Scanner proven, not just wired**: run against an EICAR fixture it printed
+  `REJECTED … stream: Eicar-Test-Signature FOUND` and exited **1**; against a
+  clean file, exit 0. So clamd really is reachable at `10.201.0.1:10450` from
+  the Paperless container and a hit really does abort consumption.
+
+**Method note worth keeping.** `docker exec` defaults to **root**, and testing
+`-x` as root says nothing about the uid that actually runs the script — that
+is exactly what produced §725's wrong first diagnosis ("a race"). Every
+permission check here was re-run with `-u 1000`, and the script was executed
+as that uid rather than merely stat-ed. The habit to keep: when a finding is
+about permissions, name the uid and test as it.
+
+**Two leftovers, both deliberate.** The legacy script is still at
+`data/data/pre-consume-clamav.py`, dated 2026-09-08 — the best-effort removal
+failed with the same EACCES that caused the bug, as the code comment predicts.
+It is inert: nothing references it. And the test document (`document_id 3`)
+stays in Paperless; the box is a no-guarantees dev/test box and the item asked
+for a real drop.
