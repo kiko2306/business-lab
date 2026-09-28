@@ -3,6 +3,7 @@ import { publishAlert } from '../utils/alertNotify';
 import { dumpAllAppDatabases } from './appDumps';
 import { snapshotAppData as snapshotKopiaAppDataNow } from './kopiaClient';
 import { readAppEnvValue } from './appEnv';
+import { getAppTimezone } from '../utils/generalSettings';
 import { withMaintenanceLock } from './maintenanceLock';
 import { startBackupProgress, reportBackupStep, setBackupPhase, finishBackupProgress } from './backupProgress';
 import logger from '../utils/logger';
@@ -44,15 +45,37 @@ export interface LastRunState {
 }
 
 /**
+ * The hour `now` reads as in `timezone`.
+ *
+ * This used to be `now.getHours()`, i.e. the *container's* local hour — and
+ * the backend container is given no `TZ` at all (docker-compose.yml), so
+ * that is UTC. A user picking "03:00" in the Backups panel got their backup
+ * at 04:00 or 05:00 wall-clock in the summer, silently, with nothing in the
+ * UI saying which zone the field meant. The dashboard's own timezone setting
+ * is the one they chose and the one every managed app already runs on, so
+ * the schedule follows it.
+ */
+function hourIn(now: Date, timezone: string): number {
+  try {
+    // hourCycle 'h23' rather than `hour12: false`, which renders midnight as
+    // "24" under some ICU versions.
+    return Number(new Intl.DateTimeFormat('en-GB', { timeZone: timezone, hour: '2-digit', hourCycle: 'h23' }).format(now));
+  } catch {
+    // An unknown zone must not stop backups running at all.
+    return now.getUTCHours();
+  }
+}
+
+/**
  * The check is hourly, so `runAtTime` ("HH:mm") is honoured to the hour, not
  * the minute — the poll only ever wakes up on the hour anyway.
  */
-function matchesRunAtHour(now: Date, runAtTime: string | null | undefined): boolean {
+function matchesRunAtHour(now: Date, runAtTime: string | null | undefined, timezone: string): boolean {
   if (!runAtTime) {
     return true;
   }
   const hour = Number.parseInt(runAtTime.slice(0, 2), 10);
-  return Number.isFinite(hour) && now.getHours() === hour;
+  return Number.isFinite(hour) && hourIn(now, timezone) === hour;
 }
 
 export function shouldRunScheduledBackup(
@@ -60,12 +83,13 @@ export function shouldRunScheduledBackup(
   lastRunAt: string | null,
   frequency: BackupScheduleFrequency,
   lastRun: LastRunState = { outcome: null, consecutiveFailures: 0 },
-  runAtTime: string | null = null
+  runAtTime: string | null = null,
+  timezone = 'UTC'
 ): boolean {
   const retrying = lastRun.outcome === 'failed' && lastRun.consecutiveFailures <= MAX_FAST_RETRIES;
   // A fast retry after a failure ignores the configured hour — waiting up to a
   // day for the next matching hour would defeat the point of retrying fast.
-  if (!retrying && !matchesRunAtHour(now, runAtTime)) {
+  if (!retrying && !matchesRunAtHour(now, runAtTime, timezone)) {
     return false;
   }
   if (!lastRunAt) {
@@ -89,7 +113,8 @@ export async function runScheduledBackupCheck(): Promise<void> {
       config.lastRunAt,
       config.frequency,
       { outcome: config.lastOutcome, consecutiveFailures: config.consecutiveFailures },
-      config.runAtTime
+      config.runAtTime,
+      await getAppTimezone()
     )
   ) {
     // Still enforce retention on a check with nothing due: a lowered "keep

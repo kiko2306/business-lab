@@ -33509,3 +33509,36 @@ no spec at all): one test asserting a 500 start produces exactly one request
 and no second one after the 500 ms the old operator waited, plus one covering
 the success path's status refresh. Verified the first fails when the operator
 is put back.
+
+## 718. Scheduled backups ran on UTC hours, not the configured timezone
+
+`matchesRunAtHour` compared the configured "HH:mm" against `now.getHours()` —
+the *container's* local hour. The backend container is given no `TZ` at all
+(`docker-compose.yml`'s backend service sets `NODE_ENV`, `PORT`, `DATABASE_URL`
+… and no timezone), so Node falls back to UTC. The dashboard's timezone
+setting reaches managed apps (executor.ts's `resolveTimezoneOverride`) and the
+host (the host-timezone-sync sidecar, §661/§698) — never the backend itself.
+
+Net effect: a user picking "03:00" in the Backups panel got their backup at
+04:00 wall-clock in Lisbon in summer, 05:00 in Berlin, with nothing in the UI
+saying which zone the field meant — it is a bare `<input type="time">`.
+
+**Fix**: `hourIn(now, timezone)` via `Intl.DateTimeFormat`, and
+`shouldRunScheduledBackup` takes the timezone as a sixth parameter (defaulting
+to `'UTC'`, which is what every existing test assumed);
+`runScheduledBackupCheck` passes `await getAppTimezone()`. Two details worth
+the lines they cost: `hourCycle: 'h23'` rather than `hour12: false`, because
+some ICU builds render midnight as "24" under the latter; and an unknown zone
+falls back to UTC rather than throwing, since a bad timezone string must not
+stop backups running at all.
+
+**Rejected**: setting `TZ` on the backend container. The timezone lives in the
+`settings` table, chosen through the dashboard, so compose has no access to it
+— pinning it in `docker-compose.yml` would mean a second place to change it
+and a restart to apply, which is exactly the hand-configuration §0.2 rules out.
+
+**Not done**: the Backups panel still labels the field a bare "At" with no
+timezone shown. It is now correct by construction (the field means the hour in
+the timezone the user set in Settings), so a hint is cosmetic — noted rather
+than built, since plumbing general settings into that component is more change
+than the label is worth.

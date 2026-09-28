@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.9] — 2026-09-28
+
+### Fixed
+
+- Scheduled backups ran at the configured hour in UTC instead of the timezone set in Settings
+
 ## [0.151.8] — 2026-09-28
 
 ### Fixed

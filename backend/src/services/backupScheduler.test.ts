@@ -35,6 +35,7 @@ vi.mock('./kopiaClient', () => kopia);
 vi.mock('./appEnv', () => appEnv);
 vi.mock('../utils/audit', () => audit);
 vi.mock('../utils/alertNotify', () => ({ publishAlert: vi.fn() }));
+vi.mock('../utils/generalSettings', () => ({ getAppTimezone: vi.fn(async () => 'UTC') }));
 vi.mock('../utils/logger', () => ({
   default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
@@ -98,6 +99,37 @@ describe('shouldRunScheduledBackup', () => {
     const now = new Date('2026-08-27T15:00:01Z'); // not 03:00, but a retry is due
     expect(
       shouldRunScheduledBackup(now, lastRunAt, 'daily', { outcome: 'failed', consecutiveFailures: 1 }, '03:00')
+    ).toBe(true);
+  });
+
+  // Regression: this compared against the *container's* local hour, and the
+  // backend container is given no TZ at all — so "03:00" meant 03:00 UTC,
+  // i.e. 04:00 wall-clock in Lisbon in summer and 05:00 in Berlin.
+  it('matches the configured hour in the configured timezone, not UTC', () => {
+    const lastRunAt = '2026-08-26T00:00:00Z';
+    const now = new Date('2026-08-27T02:00:01Z'); // 03:00 in Lisbon (WEST, UTC+1)
+    const due = { outcome: null, consecutiveFailures: 0 } as const;
+
+    expect(shouldRunScheduledBackup(now, lastRunAt, 'daily', due, '03:00', 'Europe/Lisbon')).toBe(true);
+    expect(shouldRunScheduledBackup(now, lastRunAt, 'daily', due, '03:00', 'UTC')).toBe(false);
+    expect(shouldRunScheduledBackup(now, lastRunAt, 'daily', due, '04:00', 'Europe/Berlin')).toBe(true);
+  });
+
+  it('handles midnight, which some ICU builds render as hour 24', () => {
+    const lastRunAt = '2026-08-26T00:00:00Z';
+    const now = new Date('2026-08-27T23:00:01Z'); // 00:00 in Lisbon (WEST, UTC+1)
+
+    expect(
+      shouldRunScheduledBackup(now, lastRunAt, 'daily', { outcome: null, consecutiveFailures: 0 }, '00:00', 'Europe/Lisbon')
+    ).toBe(true);
+  });
+
+  it('falls back to UTC rather than never running when the timezone is unknown', () => {
+    const lastRunAt = '2026-08-26T00:00:00Z';
+    const now = new Date('2026-08-27T03:00:01Z');
+
+    expect(
+      shouldRunScheduledBackup(now, lastRunAt, 'daily', { outcome: null, consecutiveFailures: 0 }, '03:00', 'Mars/Olympus')
     ).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.8** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.9** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -400,6 +400,15 @@ it is done — not ticked off and left behind. Section references point at
       should carry exactly **one** `Starting service: <name>` line for that
       click, not two ~0.5s apart. A successful start must still refresh the
       card to `running` on its own.
+
+- [ ] **Beta-test the backup schedule's timezone (plan.md §718)** — on
+      `beta`, set Settings' timezone to something well off UTC (Europe/Lisbon
+      is +1 in summer; America/New_York is a clearer -4/-5), set the Backups
+      schedule to the hour that is ~1h away in *that* zone, and confirm the
+      run fires then — `docker logs business-lab-backend | grep -i backup`,
+      or the Backups page's "last run" stamp. Before this fix it fired at
+      that hour **UTC**. Also confirm a schedule set to `00:00` still runs
+      (the midnight/hour-24 path).
 
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 
