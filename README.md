@@ -212,6 +212,17 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
+- [ ] **Beta-test Nextcloud's 34→35 major upgrade (plan.md §711)** — on
+      `beta`, after the next self-update pulls the new `nextcloud:latest`
+      (34.0.3.2 → 35.0.0), confirm the container comes up healthy and
+      `/status.php` reports `"version":"35...` rather than sitting in
+      maintenance mode. Then spot-check: the shared-storage mount other apps
+      read from is still readable (browse a folder in the Nextcloud UI),
+      opening a document still launches the OnlyOffice editor, and SAML
+      login still works if it's enabled. If it lands in maintenance mode,
+      that needs a real fix (an incompatible app, most likely), not just
+      waiting it out.
+
 - [ ] **Beta-test light/dark mode (plan.md §696)** — on `beta`, after pulling
       (dashboard and Tally rebuild), open the dashboard and `tally.<domain>`
       with the OS set to light: both should load light with no dark flash, and

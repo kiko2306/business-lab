@@ -33257,3 +33257,34 @@ fresh denial in the NPM log since. No code change; nothing to add to the
 README unless this recurs and turns into something worth tuning (e.g.
 excluding Outline's own hostname from that scenario, or shortening its
 bantime) — one incident isn't enough signal to build around yet.
+
+## 711. Checked OnlyOffice and Nextcloud for updates; Nextcloud 34→35 queued
+
+**OnlyOffice DocumentServer**: running `9.4.0-129` (confirmed via `dpkg -l`
+inside the container on home-srv-01). Upstream's own changelog and the
+DocumentServer GitHub releases page both put 9.4.0 (May 2026) as the latest
+release — already current. Bumped the date comment to record the check;
+no image behaviour changes.
+
+**Nextcloud**: running `34.0.3.2` (`/status.php`), but Nextcloud 35.0.0
+shipped 2026-09-15 — a major version, not a patch. `image: nextcloud:latest`
+has no version string to change, so there's nothing to "bump" beyond the
+date comment; doing that is what forces the next self-update to actually
+re-pull and land on 35. Nextcloud's docker image supports a single-major
+version jump like this natively (auto-runs `occ upgrade` on start), so this
+isn't expected to require any manual step, but it is genuinely more prone to
+breaking a bundled app (the OnlyOffice connector, SAML if enabled) than a
+patch bump — and if `occ upgrade` doesn't finish cleanly, Nextcloud sits in
+maintenance mode until someone finishes it by hand. Asked the user before
+queuing it rather than bumping silently, given Nextcloud also owns the
+shared-storage mount other apps (Paperless, Samba) read from; they said to
+go ahead — acceptable risk for a no-guarantees dev/test box (§0). Bumped the
+date comment to queue the pull.
+
+Neither `image:` line itself changed (both stay `:latest`), so
+`require-image-date-bump.sh` doesn't fire either way — the date-only bump is
+what the top-of-file comment on every managed compose file describes as the
+normal path for a `latest`-tagged image. README item added: confirm
+Nextcloud lands on 35 cleanly (no maintenance-mode stall) next time it's
+started on `beta`, and spot-check the OnlyOffice-in-Nextcloud editor still
+opens a document afterward.
