@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.16** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.17** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -226,18 +226,21 @@ it is done — not ticked off and left behind. Section references point at
       a native Subsonic client still authenticates through its bypass path.
       Clients that cache item IDs may need a re-sync — expected, not a failure.
 
-- [ ] **Audit the dashboard's Twenty integration against v2.43, then unpin
-      (plan.md §738, §438)** — `apps/twenty/` is pinned at v2.39.5 and is now
-      four minors behind. Upstream says the jump itself is fine (any version
-      ≥v1.23 can go straight to latest, migrations run on boot, Postgres ≥15
-      and we run 16). What is unproven is our side: `twentyClient.ts` and
-      `twentyAdminBootstrap.ts` were written by reading `twenty/v2.39.5`'s
-      source because that release disables GraphQL introspection, so every
-      field name, REST path and config-variable name in them is a
-      version-specific guess. Diff those against `twenty/v2.43.0`'s source
-      first; only then bump `TWENTY_TAG`'s default, and verify on `beta` that
-      the admin bootstrap still creates its workspace and the app's card
-      still reports healthy.
+- [ ] **Beta-test Twenty v2.39.5 → v2.43.0 (plan.md §739, §738)** — the auth
+      chain the dashboard's admin bootstrap drives was re-read against
+      `twenty/v2.43.0`'s source and every operation still matches, but source
+      reading is exactly what §421 proved insufficient on its own. On `beta`,
+      before the update, check `apps/twenty/docker-compose.override.yml`: if
+      the app has ever been through a self-update it pins a digest that
+      silently wins over the new tag (§440) — clear it with the dashboard's
+      per-app **Unpin**, not a hand-edit. Then update and give it time — four
+      minors of TypeORM migrations run on boot and the healthcheck allows
+      180 s. Confirm: `docker inspect` shows `twentycrm/twenty:v2.43.0`, the
+      card goes healthy, the existing workspace and its records are still
+      there (the migrations are one-way — no downgrade), a login with the
+      dashboard-generated admin password still works, and the backend log
+      shows the bootstrap saying "Twenty already has a workspace owner"
+      rather than trying to sign up again.
 
 - [ ] **Beta-test Nextcloud's 34→35 major upgrade (plan.md §711)** — the
       upgrade itself is **confirmed** (2026-09-28, over SSH at 0.151.5): the

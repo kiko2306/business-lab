@@ -1,4 +1,5 @@
-# Last checked for a newer image: 2026-09-16 - bump this date (even with
+# Last checked for a newer image: 2026-09-28 (v2.39.5 -> v2.43.0, auth chain
+# re-audited against that tag's source, §739) - bump this date (even with
 # no other change) to force a re-pull on every machine that pulls this
 # commit; self-update only recreates an app whose apps/<name>/** changed
 # since its last deploy, so this is what moves a `latest`-tagged image
@@ -8,7 +9,7 @@ services:
     # Pinned, not floated: Twenty runs DB migrations on boot with no
     # downgrade path, so a surprise major jump on `latest` can strand the
     # database. The self-update panel (§209) bumps this deliberately.
-    image: twentycrm/twenty:${TWENTY_TAG:-v2.39.5}
+    image: twentycrm/twenty:${TWENTY_TAG:-v2.43.0}
     mem_limit: 1200m
     mem_reservation: 512m
     restart: unless-stopped
@@ -56,7 +57,7 @@ services:
   twenty-worker:
     # Same image, background queue processor (emails, record imports, cron).
     # No published port; shares the server's local-storage tree.
-    image: twentycrm/twenty:${TWENTY_TAG:-v2.39.5}
+    image: twentycrm/twenty:${TWENTY_TAG:-v2.43.0}
     mem_limit: 900m
     mem_reservation: 384m
     restart: unless-stopped

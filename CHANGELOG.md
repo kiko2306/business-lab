@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.17] — 2026-09-28
+
+### Changed
+
+- Twenty pinned at v2.43.0 (was v2.39.5) after re-auditing the dashboard's admin-bootstrap GraphQL chain against that tag's source
+
 ## [0.151.16] — 2026-09-28
 
 ### Performance

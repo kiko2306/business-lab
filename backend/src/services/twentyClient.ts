@@ -1,8 +1,9 @@
 /**
  * Twenty GraphQL client — only what twentyAdminBootstrap.ts needs.
  *
- * Twenty v2.39.5 disables GraphQL introspection, so this was built by reading
- * the pinned tag's own source (`twentyhq/twenty` @ `twenty/v2.39.5`) — but the
+ * Twenty disables GraphQL introspection, so this was built by reading the
+ * pinned tag's own source (`twentyhq/twenty`, first @ `twenty/v2.39.5`, then
+ * re-audited against `twenty/v2.43.0` when the pin moved, §739) — but the
  * source read alone was not enough and got the endpoint wrong: `AuthResolver`
  * is `@MetadataResolver()`-scoped (`resolver-schema-scope.type.ts`: `'core' |
  * 'metadata' | 'admin'`), which `app.module.ts` mounts at `ApiPath.Metadata`
@@ -18,18 +19,21 @@
  * The auth surface is small and stable enough that the exact operations
  * below are worth pinning as source-verified:
  *
- * - `checkUserExists(email)` — public query, auth.resolver.ts:169-175 — DOES
+ * - `checkUserExists(email)` — public query, auth.resolver.ts:178-186 — DOES
  *   exist in this version (an earlier investigation, §421, concluded it and
  *   `clientConfig` were both gone; a re-check of the actual source shows only
  *   `clientConfig` is — `checkUserExists` still answers `{ exists,
  *   availableWorkspacesCount }` with no auth required).
- * - `signUp(email, password)` — public mutation, auth.resolver.ts:440-472 —
+ * - `signUp(email, password)` — public mutation, auth.resolver.ts:456-480 —
  *   creates a **user with no workspace yet** and returns a "workspace
  *   agnostic" access token (`tokens.accessOrWorkspaceAgnosticToken`), gated
  *   by `assertSignUpEnabled()`: allowed while `IS_MULTIWORKSPACE_ENABLED` is
  *   true or `workspaceRepository.count() === 0`
- *   (sign-in-up.service.ts:472-479). `IS_MULTIWORKSPACE_ENABLED` defaults to
- *   `false` (config-variables.ts:1960) for a self-hosted single-workspace
+ *   (`isSignUpEnabled`, sign-in-up.service.ts:474-481, plus
+ *   `getSignUpWithoutWorkspaceDecision`, which returns `allowed` on a
+ *   zero-workspace instance and `refused` once one exists with
+ *   multi-workspace off). `IS_MULTIWORKSPACE_ENABLED` defaults to
+ *   `false` (config-variables.ts:2084) for a self-hosted single-workspace
  *   instance, so **this is the actual, self-closing safety net**: once the
  *   first workspace exists, `signUp` throws `SIGNUP_DISABLED` for everyone,
  *   including us. Nothing about Authelia is involved — Twenty is exposed
@@ -40,8 +44,10 @@
  *   the resume path if a prior run created the user but not the workspace
  *   (bootstrap interrupted between the two steps).
  * - `signUpInNewWorkspace(input: {displayName, subdomain})` — auth.resolver.ts
- *   :596-632 — requires `UserAuthGuard` (the workspace-agnostic token as a
- *   Bearer header), creates the workspace, and grants the creating user
+ *   :614-650 — requires `UserAuthGuard` **and, since v2.4x,
+ *   `RequireUserSessionGuard`**, which accepts a `WORKSPACE_AGNOSTIC` token
+ *   type (`is-user-session-principal.util.ts`) — so the token `signUp`/
+ *   `signIn` hands back still passes. Creates the workspace, and grants the creating user
  *   `canAccessFullAdminPanel` when no server admin exists yet
  *   (sign-in-up.service.ts `shouldGrantServerAdmin`) — i.e. workspace owner.
  *   `subdomain` is optional; omitted here, Twenty derives one.
@@ -49,9 +55,10 @@
  * A separate, real finding from the same read: `IS_SIGN_UP_ENABLED` — the
  * env var apps/twenty/docker-compose.yml sets and docs/app-credentials.md
  * tells the operator to flip off from the admin panel — is not a config
- * variable Twenty v2.39.5 reads at all (zero matches in
+ * variable Twenty reads at all (zero matches in
  * twenty-config/config-variables.ts, the exhaustive list of real ones, and
- * zero in a GitHub code search of the whole repo). It's a no-op left over
+ * zero in a GitHub code search of the whole repo — still zero at v2.43.0).
+ * It's a no-op left over
  * from stale documentation. The workspace-count gate above is what actually
  * closes the door, automatically, with no toggle needed.
  */

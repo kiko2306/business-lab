@@ -33960,3 +33960,53 @@ once would queue a recreate of the entire fleet on the next update — the
 15-minute sweep §343's diff-scoping was built to avoid — and from here there
 is no way to tell which of those images would make a safe hop. A fleet-wide
 pull stays a deliberate, asked-for action.
+
+## 739. Twenty's auth chain re-audited against v2.43.0, and the pin moved
+
+§738 held the v2.39.5 → v2.43.0 bump back for one reason: `twentyClient.ts`
+was written by reading `twenty/v2.39.5`'s own source, because Twenty disables
+GraphQL introspection, so every operation, field and guard in it is a
+version-specific reading with nothing to re-derive it from at runtime. Four
+minors later that reading needed re-checking before the tag could move. Read
+the same files at `twenty/v2.43.0` (via the contents API — the repo is far
+too big to clone for this).
+
+What survived unchanged: `AuthResolver` is still `@MetadataResolver()`-scoped
+and `ApiPath.Metadata` is still `'metadata'`, so `/metadata` remains the right
+endpoint (the §421 trap that only a live request caught). `checkUserExists`
+still takes a spread `@Args()` email and still returns `exists` +
+`availableWorkspacesCount` (it gained `isEmailVerified`, additive).
+`signUp`/`signIn` still take spread `UserCredentialsInput` and still return
+`tokens { accessOrWorkspaceAgnosticToken { token } }`. `signUpInNewWorkspace`
+still takes `input: SignUpInNewWorkspaceInput` and still returns a
+`workspace { id }`. Every env var `apps/twenty/docker-compose.yml` sets is
+still a real config variable, `STORAGE_LOCAL_PATH` is still `.local-storage`
+(so `twentyStorage.ts`'s bind path holds), `ApiPath.Health` is still
+`healthz`, and `IS_SIGN_UP_ENABLED` is *still* not a config variable at all —
+§421's finding re-confirmed four minors on.
+
+The one real change: `signUpInNewWorkspace` now carries
+`RequireUserSessionGuard` on top of `UserAuthGuard`. It looked like the thing
+that would break the bootstrap — our Bearer token is the workspace-agnostic
+one `signUp` hands back, not a browser session. It doesn't:
+`is-user-session-principal.util.ts` lists `WORKSPACE_AGNOSTIC` among the
+accepted token types, and `signUp`/`signIn` now call
+`issueSessionForTokenPair` themselves. Passing.
+
+The self-closing gate also survived a refactor and still closes the same way:
+`isSignUpEnabled()` is `IS_MULTIWORKSPACE_ENABLED || workspaceCount === 0`,
+and the new `getSignUpWithoutWorkspaceDecision` returns `allowed` at zero
+workspaces, `refused` once one exists with multi-workspace off (default
+`false`, unchanged). `IS_EMAIL_VERIFICATION_REQUIRED` still defaults `false`,
+so `signUp`'s verification email is a side effect, not a gate. A new
+`IS_WORKSPACE_CREATION_LIMITED_TO_SERVER_ADMINS` only matters once a workspace
+exists — never on the first-boot path the bootstrap runs.
+
+So the pin moved to v2.43.0 with no code change beyond the header comment's
+line references. Upstream's upgrade guide (§738) covers the database side:
+any version ≥v1.23 can jump straight to the latest, migrations run on boot,
+Postgres ≥15 required and this app runs `pgautoupgrade:16-alpine`. What that
+does *not* cover is the same trap §440 hit: an app that has ever been through
+a self-update carries `docker-compose.override.yml` pinning a digest, which
+wins over this tag edit — the README item says to clear it with the
+dashboard's Unpin action.
