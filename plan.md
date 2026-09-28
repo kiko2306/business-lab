@@ -33674,3 +33674,47 @@ Worth recording: the test breakage was what surfaced the layering problem.
 `false` again. The first assignment never had an effect. Removed, with a
 comment on the surviving one saying why it has to come after the teardown
 rather than before it, so it doesn't get "tidied" back to the top.
+
+## 723. Beta test 2026-09-28: three items part-confirmed over SSH, six blocked on the pull
+
+Asked to test `beta`. The box was on `c2c2057`/`0.151.5`, eight commits behind
+`beta`'s `e5b5de1`/`0.151.13` — so the six items from this run (§714, §716,
+§717, §718, §719, §720) could not be exercised at all: the code was not there.
+Pulling is the user's action from the Update page, so this stopped and said so
+rather than pulling. **No merge to `main`.**
+
+Of the older items, three have halves SSH can prove, and all three passed:
+
+**§711 (Nextcloud 34→35)** — `/status.php`: `"version":"35.0.1.1"`,
+`maintenance:false`, `needsDbUpgrade:false`, container healthy. So the major
+upgrade landed and did not stick in maintenance mode, which was the risk the
+item was written for. Spot-checks as far as `occ` proves them: the `/Shared`
+external-storage mount reports `files_external:verify` → `status: ok` and
+`/shared` lists inside the container; `onlyoffice 10.2.1` and `user_saml 8.4.0`
+are both under **Enabled**, and the OnlyOffice container is healthy.
+
+**§708 (Hotel healthchecks)** — `admin`, `check-in` and `pulse` all `healthy`,
+last probe exit code 0; hotel-core's `/api/health` answers
+`200 {"status":"ok"}` and all three frontends answer 200 on their published
+ports.
+
+**§692/§693 (Paperless provisioning)** — `mat` (the Authelia admin, confirmed
+against `users_database.yml`: in `admins`, matching email) is
+`is_superuser=True, is_staff=True`; `frias` and `miguel` are both in the
+`Authelia users` group, which carries 56 permissions. `admin` is Paperless's
+own seeded superuser, as expected. Same half §706 reached — the database state
+is right; the browser pass is still what the item needs.
+
+**What SSH cannot reach**, and why these stay open: there is no browser on this
+path, so the UI halves are unproven — whether opening a document actually
+launches the OnlyOffice editor, whether a SAML login round-trips, whether
+Paperless loads without a permission toast and hides the admin's documents from
+a non-admin. Recorded so the next pass does not re-run the database half
+believing it is the whole item.
+
+**Found while running §708**: the item asked to confirm "the dashboard's own
+health display for those three cards". There is one `hotel` entry in
+`services.ts`, health-checked by a single HTTP probe to hotel-core — one card,
+not three. The three healthy *containers* are a `docker ps` fact. The item has
+been reworded to say what is actually confirmed and what is left, so the
+remaining work is a single card on the Apps page.

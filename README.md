@@ -322,11 +322,15 @@ it is done — not ticked off and left behind. Section references point at
       `Cache-Control: no-cache`. Then push a visible change and confirm a phone
       that already opened the guest link shows it on the next open.
 
-- [ ] **Beta-test the Hotel healthcheck fix (plan.md §708)** — on `beta`,
-      after Hotel next recreates (a compose-only change, no rebuild), confirm
-      `docker ps` shows `check-in`, `pulse` and `admin` as `healthy` rather
-      than `unhealthy`, and that the dashboard's own health display for those
-      three cards agrees.
+- [ ] **Beta-test the Hotel healthcheck fix (plan.md §708)** — the container
+      half is **confirmed** (2026-09-28, over SSH at 0.151.5): `docker ps`
+      shows `admin`, `check-in` and `pulse` all `healthy`, last probe exit
+      code 0, and the HTTP probe the dashboard uses — hotel-core's
+      `/api/health` — answers `200 {"status":"ok"}`. What is left is looking
+      at the dashboard itself: Hotel is **one** card in the registry (there
+      is a single `hotel` entry in `services.ts`, health-checked by that one
+      probe — not three cards, as this item used to say), so confirm that
+      card reads healthy on the Apps page rather than showing an error.
 
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — one grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic
