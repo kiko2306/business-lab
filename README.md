@@ -381,15 +381,27 @@ it is done — not ticked off and left behind. Section references point at
 
 - [ ] **Beta-test the secondary-hostname rename teardown (plan.md §716)** —
       the same exercise §714 passed for a primary hostname (plan.md §724), but
-      for an `additionalExposures` entry. Temporarily change NetBird VPN's `api`
-      suffix in `services.ts` (e.g. to `mgmt`), restart NetBird or wait for
-      the ~6h reconciler sweep, and confirm the old
-      `netbird-vpn-api.<domain>` stops resolving — its NPM proxy host gone
-      from `docker exec nginx-proxy-manager grep -l server_name
-      /data/nginx/proxy_host/*.conf` and its Cloudflare DNS record gone —
-      while the new `netbird-vpn-mgmt.<domain>` answers. Then revert the
-      suffix and confirm it swaps back cleanly, leaving exactly one host per
-      hostname. The **no-op path is already confirmed** (2026-09-28, at
+      for an `additionalExposures` entry.
+
+      **Use `exposureSubdomain`, not the `suffix`.** Changing a suffix renames
+      the exposure *key* (`netbird-vpn:api` → `:mgmt`), which takes the
+      pre-existing "secondary no longer declared" cleanup path — not §716's
+      fix, which fires when the key stays put and only the hostname moves.
+      `buildExposureHostname` stems secondaries from
+      `exposureSubdomain ?? serviceName`, so adding
+      `exposureSubdomain: 'nb'` to `netbird-vpn` moves all three hostnames
+      (`netbird-vpn.<domain>` → `nb.<domain>`, `netbird-vpn-api` → `nb-api`,
+      `netbird-vpn-relay` → `nb-relay`) while every key is unchanged. That is
+      the §716 path, and it covers §714's primary path in the same pass.
+
+      Add it, rebuild, wait for the sweep, then confirm: each old hostname
+      stops resolving with its NPM proxy host gone (`docker exec
+      nginx-proxy-manager grep -l server_name /data/nginx/proxy_host/*.conf`)
+      and its Cloudflare DNS record gone; each new hostname answers; the
+      `netbird-vpn:api` and `:relay` rows still **exist** (keys unchanged)
+      carrying the new hostnames and fresh `npm_host_id`s. Then remove
+      `exposureSubdomain`, rebuild, and confirm it swaps back leaving exactly
+      one proxy host per hostname. The **no-op path is already confirmed** (2026-09-28, at
       0.151.13): across a full 34-service reconciler sweep all six secondary
       rows kept their exact `npm_host_id` and `cf_hostname_id`
       (`netbird-vpn:api` 3, `:relay` 4, `hotel:core` 43, `:checkin` 44,
