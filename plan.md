@@ -33107,3 +33107,17 @@ failed: 0`, down from the prior `failed: 2` every night, with real
 `pg_dump`-header `.sql` files landing at `apps/tally/data/_dump/tally.sql`
 (7.5 KB) and `apps/outline/data/_dump/outline.sql` (3.6 MB). README item
 deleted.
+
+## 705. §703's urlencoded-form fix verified on beta; the §616 subscriber-list README item closed
+
+The other half of §703 (the `express.urlencoded()` fix, already on beta at
+`808b1ee` per §704) hadn't itself been re-checked live — only the pg_dump fix
+alongside it had. Confirmed on home-srv-01 via `curl -d 'email=...'` (real
+form-shaped urlencoded body, no JSON) against the live backend on
+`127.0.0.1:10000`: with a `redirect` field, a 303 to it; without one, the
+built-in 200 HTML confirmation page — both used to 422 "email is required"
+before §703. The row landed in `advert_subscribers` with a token; hitting
+`/api/subscribers/unsubscribe/:token` twice returned 204 both times, with
+`unsubscribed_at` set after the first. Test rows deleted from the live DB
+afterward. README's subscriber-list item (§616) deleted — it's now fully
+verified, JSON and real-form shape both.

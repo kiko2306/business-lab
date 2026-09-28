@@ -344,15 +344,6 @@ it is done — not ticked off and left behind. Section references point at
       banned IP still gets a 403) even though its switch is gone from
       Settings.
 
-- [ ] **Beta-test the new subscriber list endpoints (plan.md §616)** — on
-      `beta`: submit a real email to `POST /api/subscribers` (a plain form
-      POST, e.g. via curl `-d`) and confirm a row lands in
-      `advert_subscribers` with a token; confirm a `redirect` field bounces
-      the response there, and its absence serves the built-in confirmation
-      HTML; open `/unsubscribe/<that token>` in a browser and confirm it
-      shows success and the row's `unsubscribed_at` is set; hit the same
-      link again and confirm it still succeeds instead of erroring.
-
 - [ ] **Beta-test the social-drafts publish path (plan.md §660)** — on
       `beta`: configure the shared mailbox and Dashboard URL in Settings,
       subscribe a real address via `POST /api/subscribers`, generate a
