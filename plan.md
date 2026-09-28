@@ -33413,3 +33413,26 @@ to find and tear down. This is debris from a bug that no longer exists, not
 config drift a fresh clone would reproduce, so hand-cleanup on this
 no-guarantees dev/test box is reasonable — flagged to the user rather than
 done unilaterally, since it touches live Cloudflare/NPM state.
+
+## 715. Cleared §714's orphaned outline.tx-home-utils.com debris
+
+Ran the one-off cleanup script from §714's "Left open" note against
+`tx-home-utils.com`: `node`, invoked inside the running
+`business-lab-backend-1` container (so it reused the backend's own
+already-authenticated `getExposureConfig()` — NPM's admin password is
+write-only and nobody has it in plaintext, per `docs/app-credentials.md`),
+calling `removeIngressRoute()` for `outline.tx-home-utils.com` and
+`deleteProxyHost(..., 47)`.
+
+Output: `Cloudflare teardown: {"ingressRemoved":true,"dnsRemoved":true}`,
+`NPM proxy host 47 deleted.` Verified after: NPM's `proxy_host/` directory
+now has only `48.conf` (`wiki.tx-home-utils.com`); `curl
+https://outline.tx-home-utils.com/` returns `000` (no route — Cloudflare has
+nothing to send it to); `curl https://wiki.tx-home-utils.com/` still returns
+`302` (the normal Authelia redirect) unaffected.
+
+The script itself was scratch, not committed — it duplicates what
+`ensureAutoExposure`'s now-fixed rename-teardown already does going forward
+for any future rename; this only cleared the one instance that predated the
+fix. README's §714 beta-test item narrowed to just what's left: proving the
+fix fires on a *live* rename, which this cleanup didn't exercise.

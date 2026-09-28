@@ -368,23 +368,16 @@ it is done — not ticked off and left behind. Section references point at
       row) came through as the Anthropic row's already-configured key with
       no re-entry needed.
 
-- [ ] **Beta-test Outline's new `wiki.<domain>` hostname, and the rename-teardown
-      fix (plan.md §713/§714)** — on `beta`, after pulling, confirm Outline is
-      reachable at `https://wiki.<domain>` (not `outline.<domain>`) and that a
-      fresh Authelia OIDC login still lands inside the app with no broken
-      redirect. Then confirm the §714 fix itself, which needs a *second*
-      rename to actually exercise (the first one, §713, already happened
-      before the fix landed): temporarily change `outline`'s
+- [ ] **Beta-test the §714 rename-teardown fix itself (plan.md §713/§714)** —
+      the `wiki.<domain>` move and the orphaned `outline.<domain>` cleanup are
+      both done and verified on `tx-home-utils.com` (curl: `outline.` now
+      `000`/no route, `wiki.` still `302`). What's still unverified is the fix
+      working *live* for a fresh rename: temporarily change `outline`'s
       `exposureSubdomain` in `services.ts` to something else, restart Outline
       or wait for the ~6h reconciler sweep, and confirm the previous hostname
       stops resolving (its NPM proxy host and Cloudflare DNS record are gone)
       instead of being left running and Authelia-gated. Revert the subdomain
-      back to `wiki` afterward. Also, on `tx-home-utils.com` specifically:
-      `outline.tx-home-utils.com`'s NPM proxy host and Cloudflare ingress
-      route/DNS record are orphaned debris from before this fix (plan.md
-      §714's "Left open") — remove them by hand via the NPM admin UI and
-      Cloudflare dashboard; nothing in this repo's own bookkeeping can find
-      them any more.
+      back to `wiki` afterward.
 
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 
