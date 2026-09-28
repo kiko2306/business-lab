@@ -333,6 +333,16 @@ it is done — not ticked off and left behind. Section references point at
       `Cache-Control: no-cache`. Then push a visible change and confirm a phone
       that already opened the guest link shows it on the next open.
 
+- [ ] **Fix Hotel's frontend healthchecks — `unhealthy` despite serving fine
+      (plan.md §707)** — `check-in`, `pulse` and `admin`'s compose healthcheck
+      is `wget -qO- http://localhost:80/`; each container's `/etc/hosts`
+      resolves `localhost` to `::1` before `127.0.0.1`, nginx inside the image
+      is IPv4-only (`listen 80;`), and busybox `wget` doesn't fall back after
+      the IPv6 connection refusal — so `docker ps` and the dashboard's health
+      display show all three as unhealthy even though every real request
+      succeeds. Point the three healthchecks at `127.0.0.1` instead of
+      `localhost` in `apps/hotel/docker-compose.yml`.
+
 - [ ] **Beta-test the ntfy panel regrouping (§609/§615)** — one grouped row
       per category (switch + topic + Test) replaced the old shared-default-topic
       + single CrowdSec switch + separate Enforcement switch. On `beta`: open

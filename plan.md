@@ -33141,3 +33141,64 @@ Authelia admin and as a second Authelia user, confirm no permission toast,
 upload/tag a document, confirm document ownership scoping) needs a real
 Authelia-gated browser session regardless — not something curl can fake.
 README item left in place; user will walk it in a browser.
+
+## 707. SSH-provable slices of three open beta-test items checked; one new bug found (Hotel healthcheck)
+
+Went after the parts of the remaining README beta-test items that curl/SSH can
+prove, same pattern as §704–§706, leaving the browser-only parts (which stay
+in the README) for the user.
+
+**Hotel no-cache index.html (§701) — server contract confirmed.** `curl -sI`
+against all three Hotel frontends on home-srv-01 (check-in `:10601`, pulse
+`:10602`, admin `:10600`), both `/` and a fake deep-link path (SPA fallback):
+every response carries `Cache-Control: no-cache`. That's the actual fix
+(§701's nginx config); the header contract is proven. What's left is only the
+client-observable half the item itself names — a phone that already opened a
+guest link seeing a pushed change on next open — which is standard `no-cache`
+browser behaviour, not something curl can additionally prove. Item left in
+the README; nothing to add on the server side.
+
+**Outline (§666) — more partial evidence, still short of a login.** Container
+logs show Postgres migrations completing and `Listening on
+http://localhost:3000 / https://outline.tx-home-utils.com`, confirming the
+first-boot migration run from §666 finished cleanly. `apps/outline/data/storage`
+is owned `1001:1001` (not root), confirming `outline-init`'s chown ran. But
+`storage/` has zero files — no image has ever been uploaded — so the
+"upload persists" claim from the README item is still unproven, and the
+Authelia OIDC sign-in itself needs a real browser regardless. Item left in
+the README.
+
+**CrowdSec enforcement at NPM (§609/§615's carried-over claim) — wiring
+confirmed live.** `apps/nginx-proxy-manager/data/app/nginx/custom/http_top.conf`
+on home-srv-01 has the `crowdsec bouncer` managed block rendered (so
+"Enforce CrowdSec bans at NPM" is currently on), and NPM's own container log
+shows `[Crowdsec] Initialisation done` at every worker's `init_by_lua_block`
+— the Lua bouncer module loads successfully against the live LAPI on every
+NPM start/reload (the accompanying `[error] ... no recaptcha site key
+provided` is the vendored library's own benign log level for a feature this
+stack doesn't use, not a real error). That proves the enforcement path is
+wired and loading; it doesn't prove a banned IP actually gets 403, which
+would mean deliberately banning a real client — not done here. The rest of
+the ntfy item (four rows show a real topic, switch/Test UI behaviour) is
+explicitly a Settings-page walk, not curl-provable. Item left in the README.
+
+**New bug found, not fixed in passing: Hotel's three frontend containers
+report `unhealthy` even though they serve correctly.** `docker ps` shows
+`hotel-hotel-checkin-1`, `-pulse-1` and `-admin-1` all `unhealthy` with a
+`FailingStreak` matching their uptime, while external `curl` to their
+published ports returns 200 every time. Root cause, confirmed with a
+`wget` run from inside `hotel-hotel-checkin-1`: the compose healthcheck is
+`wget -qO- http://localhost:80/`, and the container's `/etc/hosts` resolves
+`localhost` to `::1` before `127.0.0.1`; nginx inside the image is
+`listen 80;` (IPv4-only, confirmed via `nginx -T`), so busybox `wget`
+resolves `localhost` to `::1` first, gets refused, and never falls back to
+the working IPv4 address. `hotel-hotel-core-1`'s own healthcheck targets
+`:3000/api/health` directly and is unaffected. Not fixed here — it's a
+new, self-contained finding unrelated to the no-cache item this pass set out
+to check, so per the working-loop rule it goes in as its own README item
+instead of a drive-by edit. The fix is mechanical (point the three
+healthchecks at `127.0.0.1` instead of `localhost` in
+`apps/hotel/docker-compose.yml`) but is its own commit.
+
+Nothing here changed backend/frontend source, so no version bump. No README
+items closed; one added.
