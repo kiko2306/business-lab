@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { describeUpdate, parseComposeImages, servicesWithBuild } from './executor';
+import { describe, expect, it, vi } from 'vitest';
+import { describeUpdate, parseComposeImages, runPostUpReconcilers, servicesWithBuild } from './executor';
+
+vi.mock('../utils/logger', () => ({ default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
 describe('describeUpdate', () => {
   // The message is the only feedback an update gives when nothing goes wrong,
@@ -61,5 +63,35 @@ describe('servicesWithBuild', () => {
   it('is empty for an app with only pulled images, and for unreadable output', () => {
     expect(servicesWithBuild(JSON.stringify({ services: { a: { image: 'x' } } }))).toEqual([]);
     expect(servicesWithBuild('not json')).toEqual([]);
+  });
+});
+
+describe('runPostUpReconcilers', () => {
+  // Regression: these used to be ~27 bare `await`s in composeUpWithManagedConfig.
+  // By the time they run `docker compose up` has already succeeded and the
+  // container is up, so one of them throwing unwound into startService's
+  // catch and answered 500 "Failed to start" for an app that was running —
+  // and skipped exposure provisioning and the Home Page regeneration with it,
+  // leaving the app up with no NPM host, no tunnel route and no tile.
+  it('runs every reconciler even when one throws, and does not rethrow', async () => {
+    const calls: string[] = [];
+    const ok = async (name: string) => void calls.push(`first:${name}`);
+    const boom = async () => {
+      throw new Error('reconciler exploded');
+    };
+    const after = async (name: string) => void calls.push(`third:${name}`);
+
+    await expect(runPostUpReconcilers('paperless', [ok, boom, after])).resolves.toBeUndefined();
+
+    expect(calls).toEqual(['first:paperless', 'third:paperless']);
+  });
+
+  it('runs them in order', async () => {
+    const order: number[] = [];
+    const step = (n: number) => async () => void order.push(n);
+
+    await runPostUpReconcilers('itflow', [step(1), step(2), step(3)]);
+
+    expect(order).toEqual([1, 2, 3]);
   });
 });

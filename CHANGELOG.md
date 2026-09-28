@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.10] — 2026-09-28
+
+### Changed
+
+- Post-start app reconcilers run from one ordered table with per-entry error isolation, so one failing no longer reports a running app as a failed start
+
 ## [0.151.9] — 2026-09-28
 
 ### Fixed

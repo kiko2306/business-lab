@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.9** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.10** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -409,6 +409,17 @@ it is done — not ticked off and left behind. Section references point at
       or the Backups page's "last run" stamp. Before this fix it fired at
       that hour **UTC**. Also confirm a schedule set to `00:00` still runs
       (the midnight/hour-24 path).
+
+- [ ] **Beta-test the post-start reconciler refactor (plan.md §719)** — on
+      `beta`, this touches every app's start path, so check a few apps whose
+      post-`up` wiring is visible: start **Nextcloud** (its OnlyOffice/SAML
+      `occ` wiring still applies — open a document, confirm the editor
+      loads), **ITFlow** (its mail/cron settings still get written — the
+      master cron switch is still on in its admin), and one ordinary app
+      like **Paperless**. `docker logs business-lab-backend` should carry no
+      `Post-start reconciler <name> failed` lines; if one appears, that is a
+      real failure this change made visible rather than fatal, and it needs
+      following up, not ignoring.
 
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 

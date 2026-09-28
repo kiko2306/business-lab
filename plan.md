@@ -33542,3 +33542,57 @@ timezone shown. It is now correct by construction (the field means the hour in
 the timezone the user set in Settings), so a hint is cosmetic — noted rather
 than built, since plumbing general settings into that component is more change
 than the label is worth.
+
+## 719. Post-`up` reconcilers: a table, and one `try` each
+
+`composeUpWithManagedConfig` ended in 27 hand-written `await reconcileX(serviceName)`
+calls, ~135 lines of them, each with its own explanatory comment. Two problems,
+one real and one structural.
+
+**The real one**: those 27 run *after* `docker compose up` has succeeded. Any
+one of them throwing unwound into `startService`'s catch, which answers
+`500 Failed to start service <name>` — for an app that is running. It also
+skipped everything after the call: `provisionServiceIfEnabled` and
+`regenerateHomepageServices`, so the app came up with no NPM proxy host, no
+tunnel route and no Home Page tile until someone started it again. And until
+§717 the frontend then *retried* that 500, running the whole sequence a second
+time.
+
+Latent rather than live: all 27 were checked and each routes its failures
+through a guarded helper today — the three with no `try`/`catch` of their own
+(`reconcilePaperlessUsers`, `reconcileKimaiAdminAccount`,
+`ensureNocodbInviteOnlySignup`) happen to call things that resolve rather than
+throw. That is a property of today's 27 implementations, not of the start path,
+and it is one careless reconciler away from being live.
+
+**Fix**: `POST_UP_RECONCILERS`, a plain array of the functions in the same
+order, every comment carried across verbatim, and `runPostUpReconcilers`
+looping it with a `try`/`catch` per entry that logs and continues. No labels to
+keep in sync — the log line uses `fn.name`. The NetBird routing-peer block
+stays outside the array (it reports back whether it wrote anything, and the
+caller recreates two sidecars on that), but got the same wrapper for the same
+reason.
+
+Order is preserved exactly — verified mechanically by extracting the call
+sequence from the pre-refactor file and diffing it against the table (27
+entries, identical). Worth doing: the ITFlow mail/cron and billing entries need
+the `settings` row `reconcileItflowFirstAdmin` creates, and the Uptime Kuma
+notification needs its admin, so a reordering would break silently on a fresh
+deployment only.
+
+**Deliberately scoped to the post-`up` half.** The ~20 pre-`up` steps
+(`applySambaConfig`, `applyWebdavConfig`, `ensureKopiaRepoDir`, …) stay bare
+`await`s: they are load-bearing, a failure there means the container will not
+come up correctly, and a start that cannot render its config *should* fail
+loudly. Isolating those would have converted real failures into log lines.
+
+**Line count is roughly flat** (+188/−128), so this is not a deletion win —
+the array plus its doc comment and the runner cost about what the inline
+sequence did. What it buys is the error isolation above and one place to
+register a new app's post-start wiring.
+
+`runPostUpReconcilers` is exported with the list injectable purely so the
+isolation can be tested without standing up the whole start path: two tests in
+`executor.test.ts` (one throwing entry does not stop the rest or reach the
+caller; entries run in order), the first verified failing when the `try` is
+removed.
