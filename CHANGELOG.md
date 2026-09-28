@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.151.4] — 2026-09-28
+
+### Fixed
+
+- An app installed after the host's first boot (Tally, Outline) never got its data/ directory owned by the backend, so its scheduled Postgres dump failed EACCES every run; the fix itself was also missed by the backend-rebuild-trigger regex, so it's fixed in the same commit
+
 ## [0.151.3] — 2026-09-28
 
 ### Fixed

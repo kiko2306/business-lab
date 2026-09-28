@@ -332,8 +332,10 @@ interface DeployScope {
 
 // A changed path under one of these needs the corresponding image rebuilt.
 // tsconfig / angular.json / the root compose file all change what a build
-// produces; the lockfiles change what `npm ci` installs.
-const BACKEND_BUILD_RE = /^backend\/(src\/|Dockerfile|package\.json|package-lock\.json|tsconfig)/;
+// produces; the lockfiles change what `npm ci` installs. docker-entrypoint.sh
+// is COPYed into the image (plan.md §702, same bug class as §700's missed
+// frontend files below) — a change to only it must still rebuild.
+const BACKEND_BUILD_RE = /^backend\/(src\/|Dockerfile|docker-entrypoint\.sh|package\.json|package-lock\.json|tsconfig)/;
 // nginx.conf, the entrypoint script and public/ (sw.js, manifest, theme-init.js)
 // are all COPYed into the image, so a change to only one of them still needs a rebuild.
 const FRONTEND_BUILD_RE = /^frontend\/(src\/|public\/|Dockerfile|nginx\.conf|40-|package\.json|package-lock\.json|angular\.json|tsconfig)/;

@@ -23,12 +23,23 @@ fi
 # and its .env / .env.example here, as root — but NOT recursively: the data/
 # subdirs belong to the individual app containers (and Postgres is strict
 # about its data-dir mode), so only the app dir shell and its env files.
+#
+# The one exception is the top-level apps/<name>/data/ directory itself
+# (never its contents): Docker auto-creates a missing bind-mount host path as
+# root when a container first starts, and only `start.sh`'s one-time chgrp
+# (apps present at first boot) or this loop fixes it after — an app added
+# later via the dashboard never gets it, so appDumps.ts's mkdir of
+# data/_dump/ (a sibling of data/db, never touched here) failed EACCES for
+# every app installed after first boot (Tally, Outline — plan.md §702). Each
+# app's own data subdirectory (data/db etc.) is a distinct filesystem entry
+# with its own ownership/mode, so chowning data/ itself never touches it.
 if [ -n "${APPS_DIR:-}" ] && [ -d "$APPS_DIR" ]; then
   for d in "$APPS_DIR"/*/; do
     [ -d "$d" ] || continue
     chown appuser:appgroup "$d" 2>/dev/null || true
     find "$d" -maxdepth 1 -type f \( -name '.env' -o -name '.env.example' \) \
       -exec chown appuser:appgroup {} + 2>/dev/null || true
+    [ -d "${d}data" ] && chown appuser:appgroup "${d}data" 2>/dev/null || true
   done
 fi
 

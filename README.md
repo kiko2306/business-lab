@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.151.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.151.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -564,18 +564,14 @@ before anything is built.
       unit's `birthday_is_active` + `promo_is_active` on, seed a reservation
       spanning today with a guest whose `birth_date` matches today, and
       confirm both the birthday email and the promo email arrive.
-- [ ] **Fix Tally's (and Outline's) scheduled pg_dump: `EACCES` on
-      `data/_dump`, every run since install (plan.md §702)** — confirmed live
-      on `beta`: `docker logs business-lab-backend-1` shows the 2026-09-26
-      and 2026-09-28 scheduled dumps both failing with `EACCES: permission
-      denied, mkdir '.../apps/tally/data/_dump'` (and the same for
-      `outline`) — `ok: 32, failed: 2` every night. Everything else about
-      §630/§631 passed live (app health, `TALLY_DB_PASSWORD` generated,
-      Authelia gate holds on admin paths, `/agent` bypasses it, forwarded
-      `Remote-User`/`Remote-Groups` headers confirmed as shared proxy-host
-      infrastructure) — only the backup path is broken. Almost certainly the
-      same class of issue as Outline's own `outline-init` chown (its
-      container's data is owned by a UID the backend's dump step can't write
-      under) — check whether `appDumps.ts` needs to run its `mkdir` as the
-      app's own container (like the existing `pg_dump`-via-`--entrypoint`
-      trick) rather than from the backend's own filesystem view.
+- [ ] **Beta-test the Tally/Outline pg_dump EACCES fix (plan.md §703)** — on
+      `beta` (rebuilds the backend — `docker-entrypoint.sh` changed), after
+      the backend restarts confirm `stat -c '%U:%G %a' apps/tally/data
+      apps/outline/data` shows `appuser:appgroup` (not `root:root`), then
+      either wait for the next scheduled dump or trigger one and confirm
+      `docker logs business-lab-backend-1` shows `App database dump
+      finished` with `failed` down from 2 to 0, and
+      `apps/tally/data/_dump/tally.sql` (and Outline's) actually exists.
+      Also confirm `apps/tally/data/db` (Postgres's own PGDATA) is
+      untouched — still its own strict owner/mode, Postgres still starts
+      clean.

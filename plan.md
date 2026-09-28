@@ -33034,3 +33034,59 @@ happens to use `-d '{"email":...}'`-shaped JSON, which is why CI/manual
 `curl -d` checks never caught this) and will fix
 `express.urlencoded()` support as the next task rather than folding it in
 here.
+
+## 703. Both §702 bugs fixed: urlencoded form bodies, and Tally/Outline's EACCES'd pg_dump
+
+**Subscriber form bug.** `index.ts` now registers `express.urlencoded({
+extended: false })` alongside the existing `express.json()`, so a real HTML
+`<form method="post">` — the shape `subscribers.ts` was actually built for —
+parses correctly instead of 422ing "email is required". Added
+`subscribers.test.ts`: boots a throwaway Express app with the same two body
+parsers plus the real router, POSTs an actual urlencoded body over a real
+HTTP socket, and asserts `subscribe()` gets called with the parsed email —
+this fails against the pre-fix code (proved it locally before the fix, by
+re-running the test against the old `index.ts` wiring). No existing test
+infra for this repo does an HTTP-level check like this; everything else
+mocks Express request objects directly, which is exactly how this bug went
+unnoticed.
+
+**pg_dump EACCES bug.** Root cause: `start.sh`'s one-time `chgrp -R
+$DOCKER_GID apps/*/` (and the whole-repo `chgrp` + `find -exec chmod g+s`)
+only runs at host bootstrap — a human is told to run `start.sh` exactly
+once, never again, per this project's own console-configuration rule. An app
+installed later through the dashboard gets its `apps/<name>/data/` directory
+created by Docker itself on first bind-mount, owned `root:root`, and nothing
+afterward ever fixes that. `backend/docker-entrypoint.sh` already runs, as
+root, on every backend start, and already `chown`s each `apps/<name>/` shell
+dir + its `.env`/`.env.example` to `appuser:appgroup` for exactly this
+reason (a comment there cites the pattern) — it just never extended one
+level deeper to `data/` itself. `appDumps.ts`'s `ensureDumpDir()` (`mkdir
+apps/<name>/data/_dump`) inherits whatever `data/`'s permissions are, so
+this shows up first there, but is really about `data/` being unwritable by
+the backend at all, not the dump specifically.
+
+Fix: entrypoint's existing per-app loop now also `chown`s `apps/<name>/data`
+itself (still non-recursive — the exact same restraint as the existing `.env`
+chown, and for the same reason: `data/db` is Postgres's own PGDATA with its
+own strict owner/mode, a sibling entry the parent chown never touches).
+Confirmed safe against the one app that already has this working by
+accident (Twenty, present at the host's last `start.sh` run): its
+`data/db` stayed `UNKNOWN:root 700` throughout, untouched by whatever set
+the parent `data/` to `root:docker 2775` — a directory's own permissions are
+independent of its parent's.
+
+Second bug found while fixing the first: `docker-entrypoint.sh` is `COPY`ed
+into the backend image (`Dockerfile`), but `selfUpdate.ts`'s
+`BACKEND_BUILD_RE` — the regex that decides whether a pulled commit needs
+`docker compose build backend` — only matched `backend/(src/|Dockerfile|
+package.json|package-lock.json|tsconfig)`. A commit touching only
+`docker-entrypoint.sh` would pull onto `beta`/`main` and never rebuild,
+silently no-op-ing this very fix on deploy. Same bug class as §700 (frontend
+missed `nginx.conf`/the entrypoint/`public/`). Added `docker-entrypoint\.sh`
+to the regex, plus a test mirroring §700's per-file frontend cases.
+
+Verified: backend typecheck + full test suite (1236 tests, was 1235 — the
+new `selfUpdate.test.ts` case). `sh -n` on the edited entrypoint. Not run
+against the real stack — `docker-entrypoint.sh` only executes inside a
+built image, so nothing short of a `beta` rebuild proves the chown actually
+lands; README item added.
