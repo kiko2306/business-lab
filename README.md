@@ -469,6 +469,18 @@ it is done — not ticked off and left behind. Section references point at
       `docker logs business-lab-backend` should show no "gave up: the app never
       became reachable" for it.
 
+- [ ] **Beta-test the memoised OIDC client-secret digest (plan.md §731)** —
+      the cache sits in the exposure sync path, which rewrites Authelia's
+      managed `clients:` block and restarts Authelia when the block moves. A
+      wrong digest would not fail loudly; it would reject every OIDC login.
+      On `beta`, after pulling: toggle one OIDC app's exposure off and on
+      (Vikunja, Mealie or Immich), confirm Authelia restarts at most once and
+      that `apps/authelia/config/configuration.yml`'s managed block still
+      carries a `$pbkdf2-sha512$` digest per client, then complete one real
+      sign-in through that app's "Login with Authelia" button. Toggle a second
+      app and confirm the first app's digest is byte-identical afterwards —
+      that is the property the cache must preserve.
+
 ### Wintouch rebuilds — `check-in`, `pulse`, `tally`
 
 Names are settled (plan.md §625): **`check-in`** (guest online check-in),
