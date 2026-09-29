@@ -34258,9 +34258,47 @@ call — the dashboard's existing, already-persisted source of truth for that
 one account, so re-writing the same value each time is a no-op, not a new
 secret this file has to remember on its own. `regenerateSambaFiles` now
 always writes at least one line; the empty-vs-populated-file branch that
-would have needed to exist is avoided entirely rather than added. Confirmed
-live: `smbclient //127.0.0.1/share` connect and a `put` both succeeded
-against the granted account's own username/password afterward, and the
-legacy account still works unchanged.
+would have needed to exist is avoided entirely rather than added.
 
 Patch bump 0.153.1 → 0.153.2.
+
+**Correction (§742.3 below): the "confirmed live" claim that used to close
+this subsection was premature.** Redeploying 0.153.2 and re-running the
+grant got past `NT_STATUS_NO_SUCH_USER`, but the very next `smbclient`
+connect test surfaced a third, worse bug — the container itself was
+crash-looping. Left in place above rather than edited out, per plan.md's own
+rule: the record of what was tried and what turned out to still be wrong is
+what makes this section worth reading later.
+
+### 742.3 A third bug, found by actually trying to connect: shared UIDs crash the container
+
+`smbclient //127.0.0.1/share -U samba-test-admin%<pw> -c 'put ...'` failed
+`NT_STATUS_CONNECTION_REFUSED` — not an auth error, the container wasn't
+listening at all. `docker compose ps` showed it `Restarting (1)`, and its
+logs were one line repeated: `adduser: uid '1000' in use` / `Failed to
+create user samba-test-admin`.
+
+Root cause: every granted user was deliberately given the *same* UID/GID as
+the legacy account (§741's shared-folder design — "a login, not a private
+folder"). That reasoning conflated two different things `force user`/`force
+group` in smb.conf already fully separate: which Unix identity *owns files
+on disk* (that's what `force user` pins, correctly, to the legacy account
+regardless of who connects) versus which UID a login *account itself* is
+created with. BusyBox `adduser` — unlike `usermod`, which the same script
+uses with `-o` to fix up an *existing* account's UID — has no non-unique
+override for creating a *new* one, so the first `add_user` call for a second
+account sharing UID 1000 fails outright, and `samba.sh` treats that as fatal
+(`|| { ...; exit 1; }`) — every single container start from then on hit the
+identical failure and crash-looped.
+
+Fix: `buildSambaUserEntries` now gives every granted user their own UID —
+`GRANTED_UID_BASE (30000) + their dashboard id` — while the legacy account
+keeps whatever `SAMBA_UID` resolves to. `force user`/`force group` are
+untouched, so file ownership on disk is exactly as uniform as before; only
+the *login* identities are distinct now, which is all BusyBox actually
+required. `SambaUsersConfEntry` gained a per-entry `uid` field (`buildUsersConf`
+no longer takes one shared UID for every line — GID still is shared, since
+unlike a UID many Unix accounts sharing one group is completely normal).
+
+Patch bump 0.153.2 → 0.153.3. Redeploying to `home-srv-01` and re-running the
+full connect/write/read-back test against this fix next.

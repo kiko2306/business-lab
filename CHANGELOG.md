@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.3] — 2026-09-29
+
+### Fixed
+
+- Samba: giving every granted user the legacy account's UID crash-looped the container
+
 ## [0.153.2] — 2026-09-29
 
 ### Fixed

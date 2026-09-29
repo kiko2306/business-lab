@@ -97,11 +97,19 @@ export function buildSmbConf({ shareName, user, validUsers }: SambaSettings & { 
 
 export interface SambaUsersConfEntry {
   username: string;
+  // Each account needs its own UID — BusyBox `adduser` (unlike `usermod`,
+  // used only to fix up an *existing* account) has no `-o`/non-unique
+  // override, so creating a second brand-new account with a UID already in
+  // use fails outright and crash-loops the container (found live, plan.md
+  // §742.3: every granted user shared the legacy account's UID on purpose,
+  // to keep file ownership uniform — but that's `force user`/`force
+  // group`'s job in smb.conf, not something the login account's own UID
+  // needs to match too).
+  uid: string;
   password: string;
 }
 
 export interface SambaUsersConfShared {
-  uid: string;
   gid: string;
   group: string;
   homedir: string;
@@ -109,11 +117,12 @@ export interface SambaUsersConfShared {
 
 /**
  * Renders dockur/samba's `users.conf` (readme.md: "How do I configure
- * multiple users?"). Every entry shares the same UID/GID/homedir — see the
- * module doc comment — only username and password vary per line. A `*`
- * password tells dockur/samba's own entrypoint to leave that account's
- * existing password alone (its `set_password`/`CLEAR` check treats `*`/`!`
- * as "no value"), which is how a full re-render can cover every granted user
+ * multiple users?"). Every entry shares the same GID/homedir — see the
+ * module doc comment — GID is a group, which (unlike a UID) many accounts
+ * can share normally. Username/password/UID vary per line. A `*` password
+ * tells dockur/samba's own entrypoint to leave that account's existing
+ * password alone (its `set_password`/`CLEAR` check treats `*`/`!` as "no
+ * value"), which is how a full re-render can cover every granted user
  * without the dashboard ever holding onto more than one plaintext password
  * at a time — see sambaUserProvisioning.ts.
  */
@@ -124,7 +133,7 @@ export function buildUsersConf(entries: SambaUsersConfEntry[], shared: SambaUser
 # username:UID:groupname:GID:password:homedir
 `;
   const lines = entries.map(
-    (entry) => `${entry.username}:${shared.uid}:${shared.group}:${shared.gid}:${entry.password}:${shared.homedir}`
+    (entry) => `${entry.username}:${entry.uid}:${shared.group}:${shared.gid}:${entry.password}:${shared.homedir}`
   );
   return header + lines.join('\n') + (lines.length ? '\n' : '');
 }
@@ -179,7 +188,20 @@ export function resolveGrantedSambaUsernames(users: { id: number; username: stri
  * grants-list-only version of this file would have silently flipped
  * dockur/samba into multi-user mode (dropping the legacy account) on this
  * feature's very first deploy, before anyone had granted anything.
+ *
+ * Every granted user's UID is `GRANTED_UID_BASE + their dashboard id` — never
+ * the legacy account's own UID, however that's configured. `force
+ * user`/`force group` in smb.conf already make file ownership uniform
+ * regardless of who authenticated (the module doc comment's "a login, not a
+ * private folder" model); giving every login the *same* UID on top of that
+ * was never needed for it, and BusyBox `adduser` has no way to create a
+ * second account on a UID already in use — only `usermod -o`, used to fix up
+ * an *existing* one, allows that. Found live (plan.md §742.3): the container
+ * crash-looped on `adduser: uid '1000' in use` the moment a second account
+ * shared the legacy one's UID.
  */
+export const GRANTED_UID_BASE = 30000;
+
 export function buildSambaUserEntries(
   legacy: SambaUsersConfEntry,
   granted: { id: number; username: string }[],
@@ -190,6 +212,7 @@ export function buildSambaUserEntries(
     legacy,
     ...granted.map((user) => ({
       username: usernames.get(user.id)!,
+      uid: String(GRANTED_UID_BASE + user.id),
       password: override?.userId === user.id ? override.password : '*',
     })),
   ];
@@ -242,7 +265,7 @@ export async function regenerateSambaFiles(
   const legacyPassword = (env.SAMBA_PASSWORD ?? '').trim() || '*';
 
   const entries = buildSambaUserEntries(
-    { username: settings.user, password: legacyPassword },
+    { username: settings.user, uid, password: legacyPassword },
     granted,
     usernames,
     override
@@ -251,7 +274,7 @@ export async function regenerateSambaFiles(
   const dataDir = path.join(appDir, 'data');
   await fs.writeFile(
     path.join(dataDir, 'users.conf'),
-    buildUsersConf(entries, { uid, gid, group: 'smb', homedir: SHARE_PATH }),
+    buildUsersConf(entries, { gid, group: 'smb', homedir: SHARE_PATH }),
     'utf8'
   );
   await fs.writeFile(

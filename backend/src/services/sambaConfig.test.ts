@@ -4,6 +4,7 @@ import {
   buildSambaUserEntries,
   buildSmbConf,
   buildUsersConf,
+  GRANTED_UID_BASE,
   resolveGrantedSambaUsernames,
   resolveSambaSettings,
   sambaUsernameFor,
@@ -105,17 +106,17 @@ describe('resolveGrantedSambaUsernames', () => {
 
 describe('buildSambaUserEntries', () => {
   it('always puts the legacy account first, even with nobody granted', () => {
-    const entries = buildSambaUserEntries({ username: 'labshare', password: 'legacy-pw' }, [], new Map());
-    expect(entries).toEqual([{ username: 'labshare', password: 'legacy-pw' }]);
+    const entries = buildSambaUserEntries({ username: 'labshare', uid: '1000', password: 'legacy-pw' }, [], new Map());
+    expect(entries).toEqual([{ username: 'labshare', uid: '1000', password: 'legacy-pw' }]);
   });
 
-  it('appends every granted user with * unless they are the override', () => {
+  it('appends every granted user with * unless they are the override, each on their own UID', () => {
     const usernames = new Map([
       [1, 'bob'],
       [2, 'alice'],
     ]);
     const entries = buildSambaUserEntries(
-      { username: 'labshare', password: 'legacy-pw' },
+      { username: 'labshare', uid: '1000', password: 'legacy-pw' },
       [
         { id: 1, username: 'Bob' },
         { id: 2, username: 'Alice' },
@@ -124,10 +125,22 @@ describe('buildSambaUserEntries', () => {
       { userId: 2, password: 'fresh-pw' }
     );
     expect(entries).toEqual([
-      { username: 'labshare', password: 'legacy-pw' },
-      { username: 'bob', password: '*' },
-      { username: 'alice', password: 'fresh-pw' },
+      { username: 'labshare', uid: '1000', password: 'legacy-pw' },
+      { username: 'bob', uid: String(GRANTED_UID_BASE + 1), password: '*' },
+      { username: 'alice', uid: String(GRANTED_UID_BASE + 2), password: 'fresh-pw' },
     ]);
+  });
+
+  it('never gives a granted user the legacy account\'s own UID', () => {
+    // Regression: BusyBox `adduser` has no way to create a second account on
+    // a UID already in use — reusing the legacy UID crash-loops the
+    // container (plan.md §742.3).
+    const entries = buildSambaUserEntries(
+      { username: 'labshare', uid: '1000', password: 'legacy-pw' },
+      [{ id: 1, username: 'bob' }],
+      new Map([[1, 'bob']])
+    );
+    expect(entries[1].uid).not.toBe('1000');
   });
 
   it('never rewrites the legacy account\'s password just because someone else was granted', () => {
@@ -135,30 +148,30 @@ describe('buildSambaUserEntries', () => {
     // subject to the same "leave alone unless overridden" rule granted
     // users are, its real password always comes straight from .env.
     const entries = buildSambaUserEntries(
-      { username: 'labshare', password: 'legacy-pw' },
+      { username: 'labshare', uid: '1000', password: 'legacy-pw' },
       [{ id: 1, username: 'bob' }],
       new Map([[1, 'bob']]),
       { userId: 1, password: 'bobs-fresh-pw' }
     );
-    expect(entries[0]).toEqual({ username: 'labshare', password: 'legacy-pw' });
+    expect(entries[0]).toEqual({ username: 'labshare', uid: '1000', password: 'legacy-pw' });
   });
 });
 
 describe('buildUsersConf', () => {
-  it('renders one username:UID:groupname:GID:password:homedir line per entry', () => {
+  it('renders one username:UID:groupname:GID:password:homedir line per entry, each keeping its own UID', () => {
     const conf = buildUsersConf(
       [
-        { username: 'bob', password: 'secret' },
-        { username: 'alice', password: '*' },
+        { username: 'bob', uid: '30001', password: 'secret' },
+        { username: 'alice', uid: '30002', password: '*' },
       ],
-      { uid: '1000', gid: '1000', group: 'smb', homedir: '/storage' }
+      { gid: '1000', group: 'smb', homedir: '/storage' }
     );
-    expect(conf).toContain('bob:1000:smb:1000:secret:/storage');
-    expect(conf).toContain('alice:1000:smb:1000:*:/storage');
+    expect(conf).toContain('bob:30001:smb:1000:secret:/storage');
+    expect(conf).toContain('alice:30002:smb:1000:*:/storage');
   });
 
   it('renders just the header with no entries', () => {
-    const conf = buildUsersConf([], { uid: '1000', gid: '1000', group: 'smb', homedir: '/storage' });
+    const conf = buildUsersConf([], { gid: '1000', group: 'smb', homedir: '/storage' });
     expect(conf).toContain('username:UID:groupname:GID:password:homedir');
     expect(conf).not.toContain(':1000:');
   });
