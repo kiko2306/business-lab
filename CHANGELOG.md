@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.8] — 2026-09-29
+
+### Changed
+
+- Self-update: comment records that only vetted, date-bumped apps move (test deploy for §750)
+
 ## [0.153.7] — 2026-09-29
 
 ### Changed

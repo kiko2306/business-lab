@@ -530,7 +530,8 @@ async function runSelfUpdateSequence(
     }
 
     // Only the apps whose own files changed in the pull (or all, on the
-    // fallback). Best-effort: updateAllInstalledApps never throws, it logs a
+    // fallback) — a :latest app moves when its image-check date is bumped
+    // after vetting, never as a side effect of a code deploy (§750). Best-effort: updateAllInstalledApps never throws, it logs a
     // per-app failure and moves on.
     let appResults: Awaited<ReturnType<typeof updateAllInstalledApps>> = [];
     if (willTouchApps) {
