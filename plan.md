@@ -34338,3 +34338,18 @@ could not be self-deleted (the API refuses deleting the account a session is
 signed in as, and no other admin session was available) — left for the user
 to delete from Users & Roles. One leftover test file, `beta-test.txt`, sits
 in the shared folder for the same reason.
+
+## 743. §742.4's leftover cleanup, partly done
+
+`beta-test.txt` removed from `apps/nextcloud/data/shared` on `home-srv-01`
+(that's the actual bind mount behind the Samba share's `/storage`, per
+`apps/samba/docker-compose.yml` — not `apps/samba/data/share`, which is
+unused).
+
+The `samba-test-admin` dashboard account (id 6) is left in place. Deleting it
+needs an admin session other than its own, and the only accounts that
+qualify are the real logins (`mat`, `miguel`, `frias`) — this session has no
+credentials for them and isn't resetting one to manufacture a session, nor
+creating another throwaway admin to do it, since that just relocates the
+same leftover-account problem to a new id. README item narrowed to that one
+remaining step.

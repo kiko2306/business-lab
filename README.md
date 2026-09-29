@@ -213,10 +213,11 @@ it is done — not ticked off and left behind. Section references point at
 ### Exposure and platform
 
 - [ ] **Delete the leftover `samba-test-admin` dashboard account (plan.md
-      §742.4)** — created via `./start.sh recover create-admin` to drive the
-      Samba beta test through the real API; couldn't self-delete (the API
-      refuses deleting the account a session is signed in as). Delete it
-      from Users & Roles, and delete `beta-test.txt` from the Samba share.
+      §742.4, §743)** — created via `./start.sh recover create-admin` to drive
+      the Samba beta test through the real API. `beta-test.txt` is already
+      removed from the Samba share. The account itself needs one of your own
+      admin logins (`mat`, `miguel` or `frias`) in Users & Roles — it can't
+      self-delete, and no other session was available during the test.
 
 - [ ] **Beta-test the pull-every-app self-update (plan.md §740)** — the app
       phase of a self-update now pulls **every** installed app and recreates
