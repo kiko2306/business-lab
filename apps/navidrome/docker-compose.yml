@@ -33,6 +33,15 @@ services:
       # the root of a hostname needs no host/URL setting. ND_BASEURL is only for
       # serving under a sub-path, which the dashboard never does.
       ND_BASEURL: ""
+      # Sign in through Authelia (plan.md §749): NPM's authelia-authrequest.conf
+      # overwrites Remote-User on every request — empty on the /rest bypass, so
+      # a client-sent copy never survives it — and Navidrome trusts it only from
+      # these Docker bridge ranges (setup_server.sh's 10.201.0.0/16 pool plus the
+      # stock ones; NPM reaches the published port via the bridge gateway).
+      # A LAN client hitting the port directly keeps its own source address, is
+      # not whitelisted, and gets Navidrome's normal login instead.
+      ND_REVERSEPROXYUSERHEADER: Remote-User
+      ND_REVERSEPROXYWHITELIST: 10.201.0.0/16,172.17.0.0/16,172.31.0.0/16
     labels:
       - "homepage.group=Media & Files"
       - "homepage.name=Navidrome"

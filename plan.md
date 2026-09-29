@@ -34499,3 +34499,26 @@ Not a timing issue. Both messages now map to `already-exists`; new
 runs on every exposed start, so the false error was logged on each one, not
 only after image updates. The `failed` log still carries no status/body;
 left alone — the probe made it unnecessary here.
+
+## 749. Navidrome signs in through Authelia (closes the item after §746)
+
+Behind Authelia a user still met Navidrome's own login (no OIDC), against
+principle 3. Navidrome's reverse-proxy auth fixes it: `ND_REVERSEPROXYUSERHEADER=
+Remote-User` plus the mandatory `ND_REVERSEPROXYWHITELIST`. Compose-only.
+
+The spoofing worry (§746 bypasses `/rest`) was checked against the live NPM:
+`authelia-authrequest.conf` does `proxy_set_header Remote-User $user` from
+`auth_request_set`, and the bypass is enforced *inside* Authelia, so the
+subrequest still runs and returns no user — nginx drops a header set to an
+empty value, so a client-sent `Remote-User` never reaches Navidrome through
+NPM on any path. The only other route is the published port. NPM reaches it
+via the bridge gateway (`10.201.0.1:10570`), which Navidrome sees as
+`10.201.30.1` (its own log, `remoteAddr`), so the whitelist is the Docker
+bridge ranges (`10.201.0.0/16`, the pool `setup_server.sh` writes, plus
+`172.17/16` and `172.31/16`, same list as `crowdsecConfig.ts`). A LAN client
+on the port directly keeps its own source address and is not whitelisted.
+Residual, accepted: another container on the host can reach the port as a
+bridge address and forge the header — the same trust Paperless (§247) already
+places in any peer that can reach it. Rejected: whitelisting only
+`10.201.30.1/32` — the per-app subnet is allocated by Docker and not stable
+across a fresh clone. Not proven live; see the README item.

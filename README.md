@@ -227,19 +227,17 @@ it is done — not ticked off and left behind. Section references point at
       must still 302 to Authelia. A real Subsonic client (e.g. Symfonium,
       DSub) logging in with a Navidrome user is the full proof.
 
-- [ ] **Navidrome: sign in through Authelia instead of a second login (found
-      after plan.md §746)** — behind Authelia a user still hits Navidrome's own
-      login screen (username = Authelia admin's, password = generated
-      `NAVIDROME_ADMIN_PASSWORD`), because Navidrome has no OIDC. Its
-      reverse-proxy auth (`ND_REVERSEPROXYWHITELIST` + `ND_REVERSEPROXYUSERHEADER`)
-      would take Authelia's `Remote-User` instead, so principle 3 says to use it —
-      but only after settling the spoofing hole: `/rest` bypasses Authelia (§746),
-      so a request there carries no Authelia-set header, and a client could send its
-      own `Remote-User` unless NPM overwrites/strips it on that host (and the
-      whitelist admits only NPM's address). Also decide how non-admin Authelia users
-      get Navidrome accounts (it auto-creates on first proxy login). Prove on `beta`
-      that a forged `Remote-User` on `/rest` is ignored and an Authelia login lands
-      straight in the library.
+- [ ] **Beta-test Navidrome's Authelia sign-in (plan.md §749)** — on `beta`,
+      pull and restart Navidrome (the compose change needs a recreate). Then:
+      (1) in a browser, an Authelia login lands **straight in the library** with
+      no Navidrome login screen, as the Authelia admin; (2) from a LAN machine,
+      `curl -s -H 'Remote-User: mat' http://192.168.1.236:10570/api/album` (or
+      any authed route) must be **401**, not data — the whitelist must not admit
+      a LAN peer; (3) the public
+      `curl -H 'Remote-User: mat' 'https://navidrome.tx-home-utils.com/rest/getAlbumList2.view?u=x&p=x&v=1.16.1&c=t&type=newest&f=json'`
+      must still be the "Wrong username or password" error — a forged header on
+      the bypassed path is ignored. Also sign in as a non-admin Authelia user
+      and confirm Navidrome auto-created it as a non-admin.
 
 - [ ] **Beta-test Twenty v2.39.5 → v2.43.0 (plan.md §739, §738)** — the auth
       chain the dashboard's admin bootstrap drives was re-read against
