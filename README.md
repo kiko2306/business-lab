@@ -212,18 +212,11 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Beta-test granting a dashboard user their own Samba login (plan.md
-      §741)** — in Users & Roles, grant a test account access to Samba, then
-      on `beta` map the share from a Windows/macOS/Linux client using that
-      account's own dashboard username/password (not the legacy
-      `SAMBA_USER`) and confirm it connects and can read/write the shared
-      folder. Revoke access and confirm that same login now fails. Re-grant
-      it and confirm it works again (checks the re-enable path, not just
-      first grant). Also confirm the legacy `SAMBA_USER`/`SAMBA_PASSWORD`
-      account still works throughout — it must keep working unchanged.
-      Restart the Samba app from the dashboard mid-test and confirm a
-      previously-granted user's password/access survives (checks the new
-      `./data/private` persistent mount).
+- [ ] **Delete the leftover `samba-test-admin` dashboard account (plan.md
+      §742.4)** — created via `./start.sh recover create-admin` to drive the
+      Samba beta test through the real API; couldn't self-delete (the API
+      refuses deleting the account a session is signed in as). Delete it
+      from Users & Roles, and delete `beta-test.txt` from the Samba share.
 
 - [ ] **Beta-test the pull-every-app self-update (plan.md §740)** — the app
       phase of a self-update now pulls **every** installed app and recreates

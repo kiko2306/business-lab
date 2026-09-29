@@ -34300,5 +34300,41 @@ required. `SambaUsersConfEntry` gained a per-entry `uid` field (`buildUsersConf`
 no longer takes one shared UID for every line — GID still is shared, since
 unlike a UID many Unix accounts sharing one group is completely normal).
 
-Patch bump 0.153.2 → 0.153.3. Redeploying to `home-srv-01` and re-running the
-full connect/write/read-back test against this fix next.
+Patch bump 0.153.2 → 0.153.3.
+
+### 742.4 Redeployed 0.153.3 — the full README checklist passes
+
+Redeployed to `home-srv-01`, re-ran the grant. Container came up clean, no
+restart loop. Ran the rest of the README item's checklist end to end:
+
+- `smbclient //127.0.0.1/share -U samba-test-admin%<pw> -c 'put; ls; get'` —
+  connect, write and read-back all succeeded, round-tripped file matched.
+- Revoke (`appAccess: []`): same login then failed
+  `NT_STATUS_ACCOUNT_DISABLED` — no restart needed, the passdb flag flip
+  from sambaExec.ts's throwaway container takes effect immediately.
+- Re-grant + a forced password reset (to trigger fan-out immediately rather
+  than wait for the account's own next login): login worked again — the
+  `smbpasswd -e` re-enable path holds.
+- `POST .../stop` then `POST .../start` (equivalent to a restart, and a
+  stronger test than a bare restart): the granted account's password and
+  access survived — confirms the `./data/private` persistent mount.
+- Legacy account: confirmed **structurally**, not by an actual login — its
+  own real password lives only in `.env`, which the dashboard's own guard
+  rails (and this session's tooling) correctly refuse to read. The
+  container logs showed a silent, error-free creation for it (the same
+  `add_user` path that failed loudly and specifically for every one of
+  §742–§742.3's bugs), and the stack stayed healthy throughout every cycle
+  above. Strong evidence, not a literal auth test — noted rather than
+  silently upgraded to "confirmed."
+
+Three real bugs, each only surfaced by actually trying to connect — none of
+them would have failed typecheck or the unit suite, which is exactly the
+gap beta-testing against the real stack exists to close.
+
+Test fixtures cleaned up: the throwaway grantee/admin account's Samba access
+was revoked before finishing; the account itself (`samba-test-admin`,
+created via the sanctioned `./start.sh recover create-admin` path, id 6)
+could not be self-deleted (the API refuses deleting the account a session is
+signed in as, and no other admin session was available) — left for the user
+to delete from Users & Roles. One leftover test file, `beta-test.txt`, sits
+in the shared folder for the same reason.
