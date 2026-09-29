@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.2] — 2026-09-29
+
+### Fixed
+
+- Samba: the legacy account stopped being created the moment any user was granted access (or even before)
+
 ## [0.153.1] — 2026-09-29
 
 ### Fixed

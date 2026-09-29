@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSmbConf, buildUsersConf, resolveGrantedSambaUsernames, resolveSambaSettings, sambaUsernameFor } from './sambaConfig';
+import {
+  buildSambaUserEntries,
+  buildSmbConf,
+  buildUsersConf,
+  resolveGrantedSambaUsernames,
+  resolveSambaSettings,
+  sambaUsernameFor,
+} from './sambaConfig';
 
 describe('resolveSambaSettings', () => {
   it('takes the share name and user from the env', () => {
@@ -93,6 +100,47 @@ describe('resolveGrantedSambaUsernames', () => {
     ]);
     expect(result.get(1)).toBe('bob');
     expect(result.get(2)).toBe('bob-2');
+  });
+});
+
+describe('buildSambaUserEntries', () => {
+  it('always puts the legacy account first, even with nobody granted', () => {
+    const entries = buildSambaUserEntries({ username: 'labshare', password: 'legacy-pw' }, [], new Map());
+    expect(entries).toEqual([{ username: 'labshare', password: 'legacy-pw' }]);
+  });
+
+  it('appends every granted user with * unless they are the override', () => {
+    const usernames = new Map([
+      [1, 'bob'],
+      [2, 'alice'],
+    ]);
+    const entries = buildSambaUserEntries(
+      { username: 'labshare', password: 'legacy-pw' },
+      [
+        { id: 1, username: 'Bob' },
+        { id: 2, username: 'Alice' },
+      ],
+      usernames,
+      { userId: 2, password: 'fresh-pw' }
+    );
+    expect(entries).toEqual([
+      { username: 'labshare', password: 'legacy-pw' },
+      { username: 'bob', password: '*' },
+      { username: 'alice', password: 'fresh-pw' },
+    ]);
+  });
+
+  it('never rewrites the legacy account\'s password just because someone else was granted', () => {
+    // Regression: this account must never come back as '*' — it isn't
+    // subject to the same "leave alone unless overridden" rule granted
+    // users are, its real password always comes straight from .env.
+    const entries = buildSambaUserEntries(
+      { username: 'labshare', password: 'legacy-pw' },
+      [{ id: 1, username: 'bob' }],
+      new Map([[1, 'bob']]),
+      { userId: 1, password: 'bobs-fresh-pw' }
+    );
+    expect(entries[0]).toEqual({ username: 'labshare', password: 'legacy-pw' });
   });
 });
 

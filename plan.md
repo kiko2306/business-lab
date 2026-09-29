@@ -34228,3 +34228,39 @@ Patch bump 0.153.0 → 0.153.1.
 
 Full grant/revoke/re-grant/restart-persistence checklist from the README
 item continues on `home-srv-01` against this fix.
+
+### 742.2 A second, worse bug: the legacy account stopped existing at all
+
+Redeployed 742's fix and re-ran the grant. `users.conf` now correctly showed
+the real password — but `smbclient` connecting to the share (not just
+listing it) failed `NT_STATUS_NO_SUCH_USER` for the *granted* account, and
+would have for the *legacy* one too.
+
+Root cause, one layer deeper than 742's: `samba.sh` only creates the legacy
+`USER`/`PASS` account through its own top-level `add_user` call when
+`users.conf` is empty (`if [ ! -s "$users" ]; then add_user "$USER" ...;
+else <loop over the file>; fi`) — the `else` branch is taken *instead of*,
+not *in addition to*, the top-level one. §741's `regenerateSambaFiles` only
+ever wrote granted users into that file, so the moment `user_app_access` had
+even one Samba row, the legacy account was never created in the container at
+all — and `force user = labshare` in `smb.conf` then named a Unix account
+that didn't exist, breaking the share for everyone, legacy account included.
+Worse: this didn't need anyone to be granted to misfire. `buildUsersConf`'s
+header comment alone makes the file's byte count non-zero, so `[ -s ]` was
+already true from the very first deploy of this feature — the legacy
+account would have silently stopped being created the first time Samba
+started under 0.153.0, before a single dashboard user was ever granted
+access.
+
+Fix: `buildSambaUserEntries` (sambaConfig.ts) always puts the legacy account
+first in the list, sourced from `.env`'s `SAMBA_PASSWORD` fresh on every
+call — the dashboard's existing, already-persisted source of truth for that
+one account, so re-writing the same value each time is a no-op, not a new
+secret this file has to remember on its own. `regenerateSambaFiles` now
+always writes at least one line; the empty-vs-populated-file branch that
+would have needed to exist is avoided entirely rather than added. Confirmed
+live: `smbclient //127.0.0.1/share` connect and a `put` both succeeded
+against the granted account's own username/password afterward, and the
+legacy account still works unchanged.
+
+Patch bump 0.153.1 → 0.153.2.
