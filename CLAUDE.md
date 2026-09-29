@@ -164,7 +164,13 @@ Every task runs through the same six steps, in order, every time:
    only for the one being picked up.
 2. **Propose.** Name the task you would do next, or show a short list to choose
    from. Do not pick one and start.
-3. **Implement** — that one task.
+3. **Implement** — that one task, **test first**: write the test that
+   describes the change, run it and watch it fail for the right reason, then
+   write the code and run it green. If the behaviour can't be exercised in the
+   container (host file ownership, live Authelia/NPM, the Windows agent), say
+   so before coding and either extract the logic so it can be tested or name
+   the README beta-test that carries the proof. A compose-only or docs-only
+   change has no unit-test surface; its README beta item is the test.
 4. **Update `plan.md` and `README.md`.** A new numbered `plan.md` section
    saying what was done and why, the finished item **deleted** from the
    README list, and `./scripts/plan-index.sh` re-run so the index covers the
