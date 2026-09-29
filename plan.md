@@ -34458,3 +34458,17 @@ login can't be completed by a client that only speaks Subsonic's query-string
 auth. README item rewritten to describe the actual gap (add the bypass, or
 stop claiming it works) rather than re-asking for a beta-test that can't
 pass as worded.
+
+## 746. Navidrome gets an Authelia bypass for `/rest` (closes §745's open item)
+
+§745 found Navidrome's public hostname gated `one_factor` on every path, so no
+native Subsonic client could ever log in (§313 never added a bypass). Added
+`autheliaBypassPaths: ['^/rest($|[/?])']` to Navidrome in `services.ts`, same
+class as Vikunja (§554), Vaultwarden (§415) and ntfy (§425). Navidrome still
+authenticates each `/rest` call itself (Subsonic token/salt or password); the
+web UI at `/` and its native `/api` stay behind Authelia. The pattern includes
+`?` in the terminator because Authelia matches path plus query. The other
+option in the README item — dropping the claim that clients work — was moot:
+no doc made it. Registry test extended (declaring-services list, matches for
+`/rest/...`, non-matches for `/`, `/api/user`, `/restore`). Live proof is a
+README beta-test item, since it needs Authelia's regenerated config.

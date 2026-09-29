@@ -1299,6 +1299,11 @@ export const SERVICES: Record<string, ServiceDefinition> = {
     // No exposure env keys: Navidrome derives its public base URL from the
     // X-Forwarded-* headers NPM sends and does no Host allowlisting, so it
     // needs nothing rewritten when exposure flips on (same as Jellyfin).
+    // Native Subsonic clients (phone/desktop players) speak only Subsonic's
+    // own query-string credentials on /rest/* and can't complete Authelia's
+    // login redirect, so they never connected (plan.md §745). Navidrome still
+    // authenticates every /rest call itself; the web UI at `/` stays gated.
+    autheliaBypassPaths: ['^/rest($|[/?])'],
   },
   'vikunja': {
     name: 'vikunja',

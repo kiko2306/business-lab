@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.4] — 2026-09-29
+
+### Fixed
+
+- Navidrome: native Subsonic clients can now authenticate through the public hostname (Authelia bypass for /rest)
+
 ## [0.153.3] — 2026-09-29
 
 ### Fixed

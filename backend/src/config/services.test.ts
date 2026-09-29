@@ -729,7 +729,7 @@ describe('autheliaBypassPaths', () => {
   const withBypass = Object.values(SERVICES).filter((s) => s.autheliaBypassPaths?.length);
 
   it('is declared by at least the services that need it', () => {
-    expect(withBypass.map((s) => s.name).sort()).toEqual(['hotel', 'ntfy', 'tally', 'vaultwarden', 'vikunja']);
+    expect(withBypass.map((s) => s.name).sort()).toEqual(['hotel', 'navidrome', 'ntfy', 'tally', 'vaultwarden', 'vikunja']);
   });
 
   it('compiles as a regex — a lost backslash makes Authelia refuse to start', () => {
@@ -784,6 +784,14 @@ describe('autheliaBypassPaths', () => {
     const vikunja = SERVICES.vikunja.autheliaBypassPaths ?? [];
     expect(matchesAny(vikunja, '/api/v1/login')).toBe(true);
     expect(matchesAny(vikunja, '/api/v1/tasks/1?filter=done')).toBe(true);
+
+    const navidrome = SERVICES.navidrome.autheliaBypassPaths ?? [];
+    expect(matchesAny(navidrome, '/rest/ping.view?u=a&t=b&s=c&v=1.16.1&c=x')).toBe(true);
+    expect(matchesAny(navidrome, '/rest/stream?id=1')).toBe(true);
+    // The web UI, the native API and lookalike prefixes stay gated.
+    expect(matchesAny(navidrome, '/')).toBe(false);
+    expect(matchesAny(navidrome, '/api/user')).toBe(false);
+    expect(matchesAny(navidrome, '/restore')).toBe(false);
   });
 
   it('does not admit what must stay behind Authelia', () => {

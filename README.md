@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.3** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.4** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -219,17 +219,13 @@ it is done — not ticked off and left behind. Section references point at
       admin logins (`mat`, `miguel` or `frias`) in Users & Roles — it can't
       self-delete, and no other session was available during the test.
 
-- [ ] **Give Navidrome's Subsonic API an Authelia bypass, or drop the claim
-      that one exists (found during plan.md §745)** — `navidrome.tx-home-utils.com`
-      has no bypass at all: every path, including `/rest/*` and even the
-      unauthenticated `/ping`, gets Authelia's `one_factor` gate (confirmed
-      live — a `curl` for `/rest/ping.view` 302s to the Authelia login page).
-      That means no native Subsonic client (mobile app, desktop player) can
-      authenticate through the public hostname today, and — per §313 — never
-      could; this isn't a 0.64.2 regression. Either add an `autheliaBypassPaths`
-      entry for Navidrome (`ntfy`'s and others' entries in `services.ts` are
-      the precedent) scoped to `/rest($|/)`, or update any docs/assumptions
-      that currently claim Subsonic clients work through this exposure.
+- [ ] **Beta-test Navidrome's Subsonic bypass (plan.md §746)** — on `beta`,
+      after pulling and restarting Navidrome (so Authelia's config
+      regenerates), `curl -sI 'https://navidrome.tx-home-utils.com/rest/ping.view?u=x&p=x&v=1.16.1&c=t'`
+      must return Navidrome's own response (a Subsonic XML/JSON error for the
+      bad credentials), not a 302 to `authelia.tx-home-utils.com`; and `/`
+      must still 302 to Authelia. A real Subsonic client (e.g. Symfonium,
+      DSub) logging in with a Navidrome user is the full proof.
 
 - [ ] **Beta-test Twenty v2.39.5 → v2.43.0 (plan.md §739, §738)** — the auth
       chain the dashboard's admin bootstrap drives was re-read against
