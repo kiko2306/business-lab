@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.4** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.5** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -318,13 +318,13 @@ it is done — not ticked off and left behind. Section references point at
       the run shows `checking` for the duration of that fetch and lands as
       an `error` row (visible in run history) rather than the trigger
       request hanging with no row at all.
-- [ ] **n8n's managed CrowdSec workflow file can't be rewritten (found during
-      plan.md §744)** — `apps/n8n/workflows/homelabCrowdsecAlertRelay.json` on
-      `home-srv-01` is owned `root:docker` mode 644; `n8nWorkflows.ts` writes
-      it as `appuser` and gets `EACCES` (logged as a warning, not fatal — the
-      stale copy is left in place). Find why it ended up root-owned and fix
-      the write path (or the ownership source) rather than `chown`ing it by
-      hand on the host.
+- [ ] **Beta-test n8n's workflow rewrite over a root-owned file (plan.md §747)**
+      — on `beta`, restart n8n and check the backend log has no
+      "n8n: could not render managed workflows" warning and that
+      `apps/n8n/workflows/homelabCrowdsecAlertRelay.json` on `home-srv-01` now
+      has a fresh mtime (it is currently the root-owned Sep 21 copy). Still
+      open underneath: what created it as root in the first place.
+
 - [ ] **Immich admin bootstrap logged "admin-sign-up call failed" after an
       image update (found during plan.md §744)** — `immichAdminBootstrap.ts`
       got a response that was neither `created` nor `already-exists` right

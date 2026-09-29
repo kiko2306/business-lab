@@ -228,7 +228,13 @@ export async function applyN8nWorkflows(serviceName: string, appDir: string): Pr
       // relay's "banned Xh" wording matches whether NPM is actually enforcing.
       enforced: isNpmBouncerKeyReady(),
     });
-    await fs.writeFile(target, `${JSON.stringify(workflow, null, 2)}\n`, 'utf8');
+    // Write-then-rename, not an in-place write: a copy left root-owned on the
+    // host (0644) can't be opened for writing by the backend's appuser, but
+    // rename only needs write access to the directory, so it replaces it
+    // (plan.md §744 — EACCES left the stale relay in place).
+    const tmp = `${target}.tmp`;
+    await fs.writeFile(tmp, `${JSON.stringify(workflow, null, 2)}\n`, 'utf8');
+    await fs.rename(tmp, target);
     logger.info('n8n: rendered managed workflow', { id: CROWDSEC_ALERT_WORKFLOW_ID });
   } catch (error) {
     logger.warn('n8n: could not render managed workflows', { error: (error as Error).message });

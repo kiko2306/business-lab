@@ -34472,3 +34472,17 @@ option in the README item — dropping the claim that clients work — was moot:
 no doc made it. Registry test extended (declaring-services list, matches for
 `/rest/...`, non-matches for `/`, `/api/user`, `/restore`). Live proof is a
 README beta-test item, since it needs Authelia's regenerated config.
+
+## 747. n8n's managed workflow file: replace by rename, not overwrite in place
+
+§744 found `apps/n8n/workflows/homelabCrowdsecAlertRelay.json` root-owned 0644
+on `home-srv-01`, so `applyN8nWorkflows` (running as `appuser`) got `EACCES`
+from `writeFile` and the stale copy stayed. The directory is `mat:docker`
+setgid, group-writable, no sticky bit — so `appuser` can't open the file but
+can replace it. `writeFile` now goes to `<target>.tmp` and `rename`s over the
+target, which needs only directory write access. Rejected: `chown`/`chmod` on
+the host (evaporates on a fresh clone, §0 principle 2) and rm-then-write (a
+window with no file for `n8n-workflows-init`). No unit test: the failure needs
+a non-root process against a root-owned file, which the test container can't
+reproduce. Not established: what made the file root-owned (likely an earlier
+root-run writer); kept in the README item.
