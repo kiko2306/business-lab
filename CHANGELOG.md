@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.7] — 2026-09-29
+
+### Changed
+
+- Self-update: apps are pulled and recreated only when their own files changed in the deploy again — a :latest app updates when a new version has been vetted and its image-check date bumped, not on every update
+
 ## [0.153.6] — 2026-09-29
 
 ### Fixed

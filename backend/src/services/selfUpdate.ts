@@ -473,8 +473,6 @@ async function runSelfUpdateSequence(
       ...(scope.frontend ? ['frontend'] : []),
       ...(scope.backend ? ['backend'] : []),
     ];
-    // Only decides whether this deploy is a pull-only one (below). Every other
-    // deploy now sweeps *all* installed apps, not just these (§740).
     const willTouchApps = scope.apps === null || scope.apps.size > 0;
     logger.info('Self-update scope', {
       runId,
@@ -531,14 +529,11 @@ async function runSelfUpdateSequence(
       await pruneDockerCruft('building');
     }
 
-    // Every installed app is pulled, not just the ones the diff scoped (§740):
-    // an app on `:latest` never appears in a diff, so diff-only scoping meant
-    // it never saw an upstream release at all. `scope.apps` now decides which
-    // apps are recreated *regardless* — the rest are recreated only if their
-    // pull actually moved an image. Best-effort: updateAllInstalledApps never
-    // throws, it logs a per-app failure and moves on.
+    // Only the apps whose own files changed in the pull (or all, on the
+    // fallback). Best-effort: updateAllInstalledApps never throws, it logs a
+    // per-app failure and moves on.
     let appResults: Awaited<ReturnType<typeof updateAllInstalledApps>> = [];
-    {
+    if (willTouchApps) {
       await updateRun(runId, { state: 'updating_apps' });
       appResults = await updateAllInstalledApps(userId, scope.apps, (label) => updateRun(runId, { detail: label }));
       await updateRun(runId, { detail: null });

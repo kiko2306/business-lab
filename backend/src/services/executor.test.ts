@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { describeUpdate, imagesMoved, parseComposeImages, runPostUpReconcilers, servicesWithBuild } from './executor';
+import { describeUpdate, parseComposeImages, runPostUpReconcilers, servicesWithBuild } from './executor';
 
 vi.mock('../utils/logger', () => ({ default: { debug: vi.fn(), info: vi.fn(), warn: vi.fn(), error: vi.fn() } }));
 
@@ -46,53 +46,6 @@ describe('parseComposeImages', () => {
   });
 });
 
-
-describe('imagesMoved', () => {
-  const running = (entries: Array<[string, string, string]>) =>
-    new Map(entries.map(([container, id, name]) => [container, { id, name }]));
-
-  it('is false when every container is already on the image its tag resolves to', () => {
-    expect(
-      imagesMoved(
-        running([['navidrome-1', 'abc123def456', 'deluan/navidrome:0.64.2']]),
-        new Map([['deluan/navidrome:0.64.2', 'sha256:abc123def456789']])
-      )
-    ).toBe(false);
-  });
-
-  it('is true when the pull left a different image under the same tag', () => {
-    expect(
-      imagesMoved(
-        running([['navidrome-1', 'abc123def456', 'deluan/navidrome:latest']]),
-        new Map([['deluan/navidrome:latest', 'sha256:999999999999']])
-      )
-    ).toBe(true);
-  });
-
-  it('is true when only one container of a multi-container app moved', () => {
-    expect(
-      imagesMoved(
-        running([
-          ['outline-app-1', 'aaaaaaaaaaaa', 'outlinewiki/outline:latest'],
-          ['outline-redis-1', 'bbbbbbbbbbbb', 'valkey/valkey:9-alpine'],
-        ]),
-        new Map([
-          ['outlinewiki/outline:latest', 'sha256:aaaaaaaaaaaa0000'],
-          ['valkey/valkey:9-alpine', 'sha256:cccccccccccc0000'],
-        ])
-      )
-    ).toBe(true);
-  });
-
-  // "Cannot tell" must never read as "nothing changed": the caller recreates
-  // on null, same rule describeUpdate follows for its message.
-  it('is null when either side could not be read, or a ref is missing', () => {
-    expect(imagesMoved(null, new Map([['x:1', 'sha256:a']]))).toBeNull();
-    expect(imagesMoved(running([['c', 'a', 'x:1']]), null)).toBeNull();
-    expect(imagesMoved(running([['c', 'a', 'x:1']]), new Map())).toBeNull();
-    expect(imagesMoved(new Map(), new Map([['x:1', 'sha256:a']]))).toBeNull();
-  });
-});
 
 describe('servicesWithBuild', () => {
   // The update path rebuilds only when this is non-empty, so a miss here means

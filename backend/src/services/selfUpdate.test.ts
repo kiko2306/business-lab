@@ -317,7 +317,7 @@ describe('triggerSelfUpdate', () => {
     );
   });
 
-  it('a backend-only diff rebuilds + restarts backend and still sweeps apps, forcing none', async () => {
+  it('a backend-only diff rebuilds + restarts backend, leaves frontend and apps alone', async () => {
     mockAnUpdateFrom('old111', 'new222', 1, ['backend/src/routes/services.ts']);
 
     await triggerSelfUpdate(7);
@@ -325,10 +325,7 @@ describe('triggerSelfUpdate', () => {
 
     const status = await getSelfUpdateStatus();
     expect(status.latestRun).toMatchObject({ state: 'restarting_backend' });
-    // §740: the sweep runs on every non-pull-only deploy so a `:latest` app
-    // can pick up an upstream release, but with an empty force-recreate set —
-    // only an app whose pull actually moved an image is recreated.
-    expect(executor.updateAllInstalledApps).toHaveBeenCalledWith(7, new Set(), expect.any(Function));
+    expect(executor.updateAllInstalledApps).not.toHaveBeenCalled();
     const built = backup.runCommand.mock.calls.find(([cmd, a]) => cmd === 'docker' && (a as string[]).includes('build'));
     expect(built?.[1]).toEqual(expect.arrayContaining(['build', 'backend']));
     expect(built?.[1]).not.toContain('frontend');

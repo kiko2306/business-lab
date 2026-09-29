@@ -34522,3 +34522,24 @@ bridge address and forge the header — the same trust Paperless (§247) already
 places in any peer that can reach it. Rejected: whitelisting only
 `10.201.30.1/32` — the per-app subnet is allocated by Docker and not stable
 across a fresh clone. Not proven live; see the README item.
+
+## 750. Reverted §740: `:latest` apps update only when we vet them
+
+§740 made every self-update pull all ~44 installed apps (14 min in §744's run)
+and recreate whichever moved, so a `:latest` app could jump versions — majors
+included — on any code deploy, unvetted. The intended model is the opposite:
+an app moves when a session has checked that its new image is safe, and that
+decision is the §449 image-check date comment bumped in its compose file (with
+the tag, if pinned). The deploy's `git diff` then scopes exactly that app in
+(`classifyDeploy`), `pullAndRecreateService` pulls the tag's current image and
+recreates it, and the per-app Update button does the same on demand. Nothing
+else is touched, and a code-only deploy pulls and recreates zero apps again.
+
+Done as a code revert of 27e5172 (executor, selfUpdate, their tests, the two
+progress strings); `imagesMoved`, `resolveLocalImageIds` and
+`skipRecreateWhenUnchanged` go with it since nothing else used them. §740's
+own section stays as the record; §744's beta result (the sweep worked live)
+stays true of the code it tested. Rejected: keeping the sweep but making it
+opt-in — dead code with no caller, and the vetted-bump path already exists.
+Costs: an app nobody bumps never updates; that is now the deliberate state,
+not a gap, and "check if X can update" is how it moves.

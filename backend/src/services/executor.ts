@@ -699,10 +699,6 @@ export async function startService(serviceName: string, userId: number): Promise
 /**
  * Stop a service using docker compose down
  */
-// Distinct from `[]` ("recreated, nothing moved") and `null` ("recreated,
-// could not tell"): the recreate never happened.
-const UNCHANGED = Symbol('unchanged');
-
 /**
  * Pull newer images for a service and recreate it on them.
  *
@@ -729,20 +725,10 @@ const UNCHANGED = Symbol('unchanged');
  *  - Afterwards the digest of each image it pulled is pinned into the
  *    dashboard-managed `docker-compose.override.yml` (composeOverride.ts), so a
  *    fresh clone recreates the same containers instead of whatever the tags
- *    point at that day. Both the pull and the `up` run against the base
- *    compose file alone, so a pin never constrains either; the old pins are
- *    cleared once the recreate is certain, immediately before it (§740 — a
- *    run that skips the recreate must leave them describing what is running).
- *
- * `skipRecreateWhenUnchanged` is what a self-update passes for an app the
- * deploy's diff did not name: pull it like any other, but only recreate it if
- * the pull actually moved an image (§740).
+ *    point at that day. The pins are cleared first, so the pull always fetches
+ *    the tags in the base compose file rather than re-fetching a pinned digest.
  */
-export async function pullAndRecreateService(
-  serviceName: string,
-  userId: number | null,
-  options: { skipRecreateWhenUnchanged?: boolean } = {}
-): Promise<ServiceActionResult> {
+export async function pullAndRecreateService(serviceName: string, userId: number | null): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
     throw { statusCode: 400, message: `Invalid service name: ${serviceName}` } as HttpError;
   }
@@ -771,10 +757,11 @@ export async function pullAndRecreateService(
   const baseArgs = `-f ${composeFile}`;
   const startTime = new Date();
   try {
-    const updated = await withMaintenanceLock<string[] | null | typeof UNCHANGED>(`update:${serviceName}`, async () => {
+    const updated = await withMaintenanceLock(`update:${serviceName}`, async () => {
       logger.info(`Updating service: ${serviceName}`, { userId, service: serviceName });
 
       const before = await getServiceImageIds(projectName, composeArgs);
+      clearImagePins(appDir);
       await executeCommand(`docker compose -p ${projectName} ${baseArgs} pull`, COMPOSE_UP_TIMEOUT_MS);
 
       // `pull` skips an image built from source and `up` only builds one that is
@@ -792,26 +779,6 @@ export async function pullAndRecreateService(
           DOCKER_BUILDKIT: '0',
         });
       }
-
-      // The pull (and any build above) is done; nothing has been recreated yet,
-      // so this is the point where "would a recreate actually change anything?"
-      // can still be answered cheaply — the local image each container's
-      // repo:tag now resolves to, against the image the container is running.
-      // §740: a self-update pulls every installed app, but only recreates the
-      // ones whose own files changed in the deploy plus the ones a pull moved.
-      if (options.skipRecreateWhenUnchanged) {
-        const resolved = await resolveLocalImageIds(before);
-        if (imagesMoved(before, resolved) === false) {
-          logger.info(`Update skipped: ${serviceName} is already on the latest images`, { service: serviceName });
-          return UNCHANGED;
-        }
-      }
-
-      // Cleared here rather than before the pull: until the recreate is
-      // certain, the existing pins still describe what is running, and a
-      // skipped app must not be left with none. The pull and the up both run
-      // against `baseArgs`, so the override file is out of play either way.
-      clearImagePins(appDir);
 
       // forceRecreate: `up -d` alone leaves a running container on its old image
       // when the compose config has not changed, so the pull would look like it
@@ -836,18 +803,6 @@ export async function pullAndRecreateService(
           ]
         : null;
     });
-
-    // A skipped app was not touched at all: no recreate, no new pins, no
-    // exposure to republish. Auditing it would put ~40 no-op SERVICE_UPDATE
-    // rows in the log on every self-update and bury the ones that did something.
-    if (updated === UNCHANGED) {
-      return {
-        success: true,
-        service: serviceName,
-        message: 'Already on the latest images; not recreated.',
-        timestamp: new Date(),
-      };
-    }
 
     await writeAuditLog({
       userId,
@@ -923,17 +878,11 @@ export interface AppUpdateResult {
  * (`resolveComposeFile` finds no compose file) just means "skip it", not an
  * error.
  *
- * `only` no longer scopes *what gets pulled* — every installed app is pulled,
- * every time (§740). It scopes what gets **recreated regardless**: the apps
- * whose `apps/<name>/**` changed in the `git pull`, which have to come back
- * up on the new compose file even if no image moved. Everything else is
- * recreated only if its pull actually brought a newer image
- * (`skipRecreateWhenUnchanged`). That is what gets a `:latest` app its
- * upstream updates at all: its compose file never changes, so under the old
- * diff-only scoping it sat outside every sweep forever, and §449's
- * "bump the date comment" was the only way to force it back in.
- * Omitted / `null` = recreate every installed app, the fallback when the diff
- * can't be computed.
+ * `only` scopes the sweep to a set of service names — the self-update passes
+ * the apps whose `apps/<name>/**` actually changed in the `git pull`, so a
+ * deploy that touched no app (a version bump, backend-only code) does zero
+ * pulls and zero recreates (§343 C). Omitted / `null` = every installed app,
+ * the fallback when the diff can't be computed.
  */
 export async function updateAllInstalledApps(
   userId: number | null,
@@ -941,16 +890,16 @@ export async function updateAllInstalledApps(
   onProgress?: (label: string) => Promise<void> | void
 ): Promise<AppUpdateResult[]> {
   const results: AppUpdateResult[] = [];
-  const targets = getAllServices().filter((service) => resolveComposeFile(service.name)?.composeFile);
+  const targets = getAllServices().filter(
+    (service) => (!only || only.has(service.name)) && resolveComposeFile(service.name)?.composeFile
+  );
 
   for (const [index, service] of targets.entries()) {
     if (onProgress) {
       await onProgress(`${service.name} (${index + 1}/${targets.length})`);
     }
     try {
-      const result = await pullAndRecreateService(service.name, userId, {
-        skipRecreateWhenUnchanged: Boolean(only) && !only?.has(service.name),
-      });
+      const result = await pullAndRecreateService(service.name, userId);
       results.push({ serviceName: service.name, ok: true, message: result.message });
     } catch (error) {
       const message = (error as HttpError).message || (error as Error).message;
@@ -1026,79 +975,6 @@ export function parseComposeImages(stdout: string): Map<string, ComposeImage> | 
   } catch {
     return null;
   }
-}
-
-/**
- * `docker compose images` reports a short ID, `docker image inspect` the full
- * `sha256:…` one. Same image either way.
- */
-function idsMatch(a: string, b: string): boolean {
-  const strip = (id: string) => id.replace(/^sha256:/, '');
-  const [x, y] = [strip(a), strip(b)];
-  return x.startsWith(y) || y.startsWith(x);
-}
-
-/**
- * Would recreating this app put it on a different image than it is running?
- *
- * `running` is container -> the image it is on; `resolved` is repo:tag -> the
- * image ID that ref points at locally *after* a pull. `null` for either means
- * the question can't be answered, and the caller must recreate rather than
- * claim nothing moved — the same rule describeUpdate follows for its message.
- */
-export function imagesMoved(
-  running: Map<string, ComposeImage> | null,
-  resolved: Map<string, string> | null
-): boolean | null {
-  if (!running || !resolved || !running.size) {
-    return null;
-  }
-  for (const image of running.values()) {
-    const id = resolved.get(image.name);
-    if (!id) {
-      return null;
-    }
-    if (!idsMatch(id, image.id)) {
-      return true;
-    }
-  }
-  return false;
-}
-
-// Image refs come from Docker's own output, but they end up in a shell
-// command, so anything outside a legal ref's character set is refused.
-const IMAGE_REF_RE = /^[A-Za-z0-9._:/@-]+$/;
-
-/**
- * repo:tag -> the image ID it resolves to locally right now.
- *
- * One inspect per ref rather than one call listing all of them: a ref that is
- * not present locally makes the combined call exit non-zero and drop that
- * line, so the remaining output no longer lines up with the refs asked for.
- */
-async function resolveLocalImageIds(
-  running: Map<string, ComposeImage> | null
-): Promise<Map<string, string> | null> {
-  if (!running) {
-    return null;
-  }
-  const ids = new Map<string, string>();
-  for (const name of new Set([...running.values()].map((image) => image.name))) {
-    if (!IMAGE_REF_RE.test(name)) {
-      return null;
-    }
-    try {
-      const { stdout } = await executeCommand(`docker image inspect --format '{{.Id}}' ${name}`, 15_000);
-      const id = stdout.trim();
-      if (!id) {
-        return null;
-      }
-      ids.set(name, id);
-    } catch {
-      return null;
-    }
-  }
-  return ids;
 }
 
 /**

@@ -459,7 +459,7 @@ export const en: Record<string, string> = {
   'selfUpdate.progress.checking': 'Checking for updates…',
   'selfUpdate.progress.pulling': 'Pulling the latest code…',
   'selfUpdate.progress.building': 'Building the images that changed…',
-  'selfUpdate.progress.updating_apps': 'Pulling every app, recreating the ones that changed…',
+  'selfUpdate.progress.updating_apps': 'Pulling and recreating the apps that changed…',
   'selfUpdate.progress.restarting_frontend': 'Restarting the frontend…',
   'selfUpdate.progress.restarting_backend': 'Restarting the backend — the dashboard will reconnect on its own…',
   'selfUpdate.progress.done': 'Up to date.',

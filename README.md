@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.6** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.7** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -226,6 +226,14 @@ it is done — not ticked off and left behind. Section references point at
       bad credentials), not a 302 to `authelia.tx-home-utils.com`; and `/`
       must still 302 to Authelia. A real Subsonic client (e.g. Symfonium,
       DSub) logging in with a Navidrome user is the full proof.
+
+- [ ] **Beta-test that a self-update no longer sweeps every app (plan.md §750)**
+      — on `beta`, after pulling, trigger an Update for a deploy that touches
+      backend code only: the progress should not show "updating N apps" and
+      the log should carry no `Updating service:` lines (`docker logs
+      business-lab-backend-1 | grep 'Updating service'`). Then bump one app's
+      image-check date comment on `dev`, merge to `beta`, update, and confirm
+      only that app is pulled and recreated.
 
 - [ ] **Beta-test Navidrome's Authelia sign-in (plan.md §749)** — on `beta`,
       pull and restart Navidrome (the compose change needs a recreate). Then:
