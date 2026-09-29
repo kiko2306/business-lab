@@ -212,13 +212,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Delete the leftover `samba-test-admin` dashboard account (plan.md
-      §742.4, §743)** — created via `./start.sh recover create-admin` to drive
-      the Samba beta test through the real API. `beta-test.txt` is already
-      removed from the Samba share. The account itself needs one of your own
-      admin logins (`mat`, `miguel` or `frias`) in Users & Roles — it can't
-      self-delete, and no other session was available during the test.
-
 - [ ] **Beta-test Navidrome's Subsonic bypass (plan.md §746)** — on `beta`,
       after pulling and restarting Navidrome (so Authelia's config
       regenerates), `curl -sI 'https://navidrome.tx-home-utils.com/rest/ping.view?u=x&p=x&v=1.16.1&c=t'`
