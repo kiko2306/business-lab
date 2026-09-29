@@ -34555,3 +34555,13 @@ backend log could not be grepped for `Updating service:` because the backend
 restarts at the end of an update and its log starts fresh; the audit table and
 the duration are the evidence instead. The positive case (a date bump moving
 exactly one app) stays a README item; nothing was bumped here on purpose.
+
+## 752. §747's beta test: the n8n workflow rewrite works over a root-owned file
+
+After run 113 installed the rename fix, restarting n8n on `home-srv-01` logged
+`n8n: rendered managed workflow` with no `EACCES` warning (the old code logged
+one on every start). `homelabCrowdsecAlertRelay.json` went from the root-owned
+Sep 21 copy to a fresh mtime owned by the backend's own uid, with no `.tmp`
+left behind — rename replaced it as predicted. Why it was root-owned in the
+first place stays unknown; with the file now backend-owned it can't recur on
+this box, so §747's "still open underneath" is dropped rather than tracked.

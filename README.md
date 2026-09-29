@@ -339,13 +339,6 @@ it is done — not ticked off and left behind. Section references point at
       the run shows `checking` for the duration of that fetch and lands as
       an `error` row (visible in run history) rather than the trigger
       request hanging with no row at all.
-- [ ] **Beta-test n8n's workflow rewrite over a root-owned file (plan.md §747)**
-      — on `beta`, restart n8n and check the backend log has no
-      "n8n: could not render managed workflows" warning and that
-      `apps/n8n/workflows/homelabCrowdsecAlertRelay.json` on `home-srv-01` now
-      has a fresh mtime (it is currently the root-owned Sep 21 copy). Still
-      open underneath: what created it as root in the first place.
-
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),
