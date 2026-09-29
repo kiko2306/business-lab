@@ -273,9 +273,9 @@
                       [(ngModel)]="accessApps[option.serviceName]"
                       [ngModelOptions]="{ standalone: true }"
                     />
-                    <label class="form-check-label small" [for]="'access-app-' + user.id + '-' + option.serviceName">
+                    <label class="form-check-label" [for]="'access-app-' + user.id + '-' + option.serviceName">
                       {{ option.label }}
-                      <span class="text-body-secondary" *ngIf="option.hostname"> · {{ option.hostname }}</span>
+                      <span class="text-body-secondary small" *ngIf="option.hostname"> · {{ option.hostname }}</span>
                       <span class="badge text-bg-secondary ms-1" *ngFor="let group of option.requiredGroups">{{ group }}</span>
                     </label>
                   </div>

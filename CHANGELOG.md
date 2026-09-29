@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.10] — 2026-09-29
+
+### Fixed
+
+- Users page: the per-user access editor's app chips match the create form's layout
+
 ## [0.153.9] — 2026-09-29
 
 ### Fixed

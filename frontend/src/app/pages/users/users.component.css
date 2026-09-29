@@ -29,3 +29,8 @@
   border-color: var(--bs-primary);
   background-color: var(--bs-primary-bg-subtle);
 }
+
+/* The "no apps match" note is a grid child too; span the row, not one chip cell. */
+.app-access-grid > .form-text {
+  grid-column: 1 / -1;
+}
