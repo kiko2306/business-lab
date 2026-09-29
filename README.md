@@ -227,6 +227,20 @@ it is done — not ticked off and left behind. Section references point at
       must still 302 to Authelia. A real Subsonic client (e.g. Symfonium,
       DSub) logging in with a Navidrome user is the full proof.
 
+- [ ] **Navidrome: sign in through Authelia instead of a second login (found
+      after plan.md §746)** — behind Authelia a user still hits Navidrome's own
+      login screen (username = Authelia admin's, password = generated
+      `NAVIDROME_ADMIN_PASSWORD`), because Navidrome has no OIDC. Its
+      reverse-proxy auth (`ND_REVERSEPROXYWHITELIST` + `ND_REVERSEPROXYUSERHEADER`)
+      would take Authelia's `Remote-User` instead, so principle 3 says to use it —
+      but only after settling the spoofing hole: `/rest` bypasses Authelia (§746),
+      so a request there carries no Authelia-set header, and a client could send its
+      own `Remote-User` unless NPM overwrites/strips it on that host (and the
+      whitelist admits only NPM's address). Also decide how non-admin Authelia users
+      get Navidrome accounts (it auto-creates on first proxy login). Prove on `beta`
+      that a forged `Remote-User` on `/rest` is ignored and an Authelia login lands
+      straight in the library.
+
 - [ ] **Beta-test Twenty v2.39.5 → v2.43.0 (plan.md §739, §738)** — the auth
       chain the dashboard's admin bootstrap drives was re-read against
       `twenty/v2.43.0`'s source and every operation still matches, but source
