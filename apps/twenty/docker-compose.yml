@@ -58,7 +58,14 @@ services:
     # Same image, background queue processor (emails, record imports, cron).
     # No published port; shares the server's local-storage tree.
     image: twentycrm/twenty:${TWENTY_TAG:-v2.43.0}
-    mem_limit: 900m
+    # 900m was enough for v2.39.5 but v2.43.0's on-boot migrations pushed the
+    # worker into a crash-restart loop: Node auto-sizes its heap from the
+    # cgroup limit (≈498MB old-space at 900m, confirmed via
+    # `v8.getHeapStatistics()` in the live container), and running four
+    # minors of TypeORM migrations exceeded that. Raised past twenty-server's
+    # 1200m since the worker runs its own migration pass independently and
+    # needs at least as much headroom (plan.md §746).
+    mem_limit: 1536m
     mem_reservation: 384m
     restart: unless-stopped
     command: ["yarn", "worker:prod"]
