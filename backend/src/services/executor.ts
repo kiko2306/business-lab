@@ -1280,7 +1280,7 @@ export async function stopService(serviceName: string, userId: number): Promise<
  * enabling exposure would otherwise keep the old localhost values. A no-op —
  * reported as success — when the service isn't currently running.
  */
-export async function restartService(serviceName: string, userId: number): Promise<ServiceActionResult> {
+export async function restartService(serviceName: string, userId: number | null): Promise<ServiceActionResult> {
   if (!isValidServiceName(serviceName)) {
     throw {
       statusCode: 400,

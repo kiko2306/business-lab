@@ -68,3 +68,13 @@ services:
       # `compose up` — dockur/samba's entrypoint aborts if this bind maps to a
       # directory, which is what Docker creates for a missing bind source.
       - ./data/smb.conf:/etc/samba/smb.conf:ro
+      # Multi-user accounts — dockur/samba's own users.conf mechanism, one
+      # dashboard-granted login per line, rewritten by the same sambaConfig.ts
+      # call above. Same "must exist as a file" requirement as smb.conf.
+      - ./data/users.conf:/etc/samba/users.conf:ro
+      # Samba's own password database. Bind-mounted so it survives the
+      # `--force-recreate` the dashboard's Restart action does (executor.ts)
+      # — without this, every restart would forget every granted user's
+      # password and disabled-state, since dockur/samba's container layer
+      # isn't what `restartService` preserves.
+      - ./data/private:/var/lib/samba/private

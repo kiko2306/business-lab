@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildSmbConf, resolveSambaSettings } from './sambaConfig';
+import { buildSmbConf, buildUsersConf, resolveGrantedSambaUsernames, resolveSambaSettings, sambaUsernameFor } from './sambaConfig';
 
 describe('resolveSambaSettings', () => {
   it('takes the share name and user from the env', () => {
@@ -42,5 +42,76 @@ describe('buildSmbConf', () => {
     const conf = buildSmbConf({ shareName: 'share', user: 'labshare' });
     expect(conf).toContain('server min protocol = SMB2');
     expect(conf).toContain('map to guest = never');
+  });
+
+  it('defaults valid users to just the legacy account when no one else is granted', () => {
+    const conf = buildSmbConf({ shareName: 'share', user: 'labshare' });
+    expect(conf).toContain('valid users = labshare');
+  });
+
+  it('lists every granted user in valid users, but keeps force user/group on the legacy account', () => {
+    const conf = buildSmbConf({ shareName: 'share', user: 'labshare', validUsers: ['labshare', 'bob', 'alice'] });
+    expect(conf).toContain('valid users = labshare bob alice');
+    expect(conf).toContain('force user = labshare');
+    expect(conf).toContain('force group = smb');
+  });
+});
+
+describe('sambaUsernameFor', () => {
+  it('lowercases and strips characters BusyBox adduser rejects', () => {
+    expect(sambaUsernameFor('Bob.Smith@example.com')).toBe('bob-smith-example-com');
+  });
+
+  it('falls back to a placeholder when nothing safe survives', () => {
+    expect(sambaUsernameFor('@@@')).toBe('user');
+  });
+
+  it('truncates to 32 characters', () => {
+    const long = 'a'.repeat(50);
+    expect(sambaUsernameFor(long)).toHaveLength(32);
+  });
+});
+
+describe('resolveGrantedSambaUsernames', () => {
+  it('maps each user to a sanitized, stable username', () => {
+    const result = resolveGrantedSambaUsernames([
+      { id: 1, username: 'bob' },
+      { id: 2, username: 'alice' },
+    ]);
+    expect(result).toEqual(
+      new Map([
+        [1, 'bob'],
+        [2, 'alice'],
+      ])
+    );
+  });
+
+  it('disambiguates a collision by suffixing the dashboard user id', () => {
+    const result = resolveGrantedSambaUsernames([
+      { id: 1, username: 'bob' },
+      { id: 2, username: 'Bob' },
+    ]);
+    expect(result.get(1)).toBe('bob');
+    expect(result.get(2)).toBe('bob-2');
+  });
+});
+
+describe('buildUsersConf', () => {
+  it('renders one username:UID:groupname:GID:password:homedir line per entry', () => {
+    const conf = buildUsersConf(
+      [
+        { username: 'bob', password: 'secret' },
+        { username: 'alice', password: '*' },
+      ],
+      { uid: '1000', gid: '1000', group: 'smb', homedir: '/storage' }
+    );
+    expect(conf).toContain('bob:1000:smb:1000:secret:/storage');
+    expect(conf).toContain('alice:1000:smb:1000:*:/storage');
+  });
+
+  it('renders just the header with no entries', () => {
+    const conf = buildUsersConf([], { uid: '1000', gid: '1000', group: 'smb', homedir: '/storage' });
+    expect(conf).toContain('username:UID:groupname:GID:password:homedir');
+    expect(conf).not.toContain(':1000:');
   });
 });

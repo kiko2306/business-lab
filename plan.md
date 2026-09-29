@@ -34074,3 +34074,97 @@ it is now only for forcing a specific app's recreate on every machine that
 pulls a commit. Left in place, along with `require-image-date-bump.sh` — that
 is a convention the user set (and a hook), not something to retire as a side
 effect of this change.
+
+## 741. Samba joins the no-SSO credential fan-out (Users & Roles)
+
+The user asked whether Samba could work "the same as Authelia" — a dashboard
+user added in Users & Roles, granted access, no console step. Samba can never
+be *Authelia* SSO (SMB isn't HTTP, so it can't sit behind the tunnel), but it
+fits the existing no-SSO fan-out model (§480) used for Jellyfin/DocuSeal/
+NocoDB/Kimai/ITFlow/Home Assistant: grant a dashboard user access to an app,
+their real username/password gets pushed into that app's own account.
+
+### What was found
+
+`dockurr/samba`'s own entrypoint (`samba.sh`, read from upstream — not
+previously vendored or excerpted here) already supports multiple accounts via
+a bind-mounted `users.conf` (`username:UID:groupname:GID:password:homedir`,
+one line per user), applied on every container start alongside the existing
+single `USER`/`PASS` account. Two mechanics decided the design:
+
+- The entrypoint only creates/updates accounts at container start — no live
+  `docker exec` (the socket-proxy blocks it, same constraint kimaiDb.ts/
+  itflowDb.ts already work around). Applying a change means rewriting
+  `users.conf` and recreating the container.
+- A password field of `*` or `!` is an explicit "leave this account's
+  password alone" signal in the script — the escape hatch that lets a full
+  re-render of `users.conf` cover every granted user without the dashboard
+  ever holding more than one plaintext password at a time (the same "one
+  moment the plaintext exists" shape every other §480 provider already
+  relies on).
+
+What `users.conf` *cannot* do: touch an existing account's disabled flag. A
+plain password change never clears it, and dropping a user's line doesn't
+revoke their old password either (Samba's own passdb still has it). So
+revoke/re-grant needed a second mechanism: `smbpasswd -e`/`-d` run in a
+throwaway `docker compose run --rm --entrypoint /bin/sh samba` container
+(sambaExec.ts) against the same bind-mounted `/var/lib/samba/private` the
+live container reads — the persisted-passdb requirement also meant that
+directory had to become a real bind mount (`./data/private`), since
+`restartService`'s `--force-recreate` would otherwise wipe the container's
+own writable layer, and with it every granted password, on every unrelated
+restart.
+
+Also fixed in the same pass: the existing `smb.conf` template pinned
+`valid users` to the single legacy account unconditionally. Left alone, a
+newly-granted user's account could exist in the passdb and still never be
+allowed to connect at the protocol level — `valid users` now lists the legacy
+account plus every currently-granted Samba username; `force user`/`force
+group` stay pinned to the legacy account's UID/GID, since this grants a
+login to the one shared folder, not per-person permissions (confirmed with
+the user before implementing — separate per-user folders would need a much
+bigger change: their own `smb.conf` share sections, plausibly their own UID).
+
+### What landed
+
+- **`sambaConfig.ts`** — `sambaUsernameFor`/`resolveGrantedSambaUsernames`
+  derive a Samba-safe handle from the dashboard username (not email: BusyBox
+  `adduser` rejects `@`/`.`/uppercase, and Joi's username pattern allows all
+  three); `buildUsersConf` renders the file; `regenerateSambaFiles` queries
+  every `user_app_access` row for `samba` and rewrites both `users.conf` and
+  `smb.conf`, taking an optional `{userId, password}` override for whoever's
+  plaintext this call actually has. `applySambaConfig` (already called just
+  before every `compose up`) now calls it with no override, so ordinary
+  starts never touch existing passwords. Queries `user_app_access`/`users`
+  directly with `query()` rather than importing userAppAccess.ts — that
+  module imports noSsoCredentialFanout.ts, which imports
+  sambaUserProvisioning.ts, which imports executor.ts (`restartService`),
+  which imports sambaConfig.ts (`applySambaConfig`); closing that loop from
+  here would have made it circular.
+- **`sambaUserProvisioning.ts`** — `provisionSambaUser`/`disableSambaUser`,
+  registered in `noSsoCredentialFanout.ts`'s provisioner maps. Provision
+  regenerates the files with the fresh password, recreates the container
+  (`restartService('samba', null)` — widened to accept a null userId for a
+  system-triggered restart, no admin click behind it), then re-enables the
+  account (a re-grant after a revoke must not stay locked out, same as every
+  other provider's re-grant path). Disable only flips the passdb flag via
+  sambaExec.ts — no config rewrite needed, since a stale disabled entry in
+  `users.conf` is harmless and matches every other app's disable-not-delete
+  shape (§493).
+- **`apps/samba/docker-compose.yml`** — added `./data/users.conf` and
+  `./data/private` bind mounts.
+- Tests: `sambaConfig.test.ts` (username sanitizing/collision, `users.conf`/
+  `smb.conf` rendering), `sambaExec.test.ts`, `sambaUserProvisioning.test.ts`,
+  plus `noSsoCredentialFanout.test.ts` updated for the seventh provider (its
+  own mock, since unlike Jellyfin's light deps, `sambaUserProvisioning.ts`
+  pulls in executor.ts's whole transitive chain — left unmocked there and it
+  would have dragged that into an unrelated test file).
+
+Minor bump 0.152.0 → 0.153.0.
+
+### 741.1 Not done here
+
+No frontend change — Users & Roles' app-access picker is already fully
+generic (confirmed no per-app frontend code exists for any of the other six
+no-SSO apps either). Per-user folders/permissions was raised and explicitly
+declined by the user in favour of the shared-folder model above.

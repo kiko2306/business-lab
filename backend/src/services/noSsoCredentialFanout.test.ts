@@ -4,6 +4,7 @@ import { disableHomeAssistantUser, provisionHomeAssistantUser } from './homeAssi
 import { disableItflowUser, provisionItflowUser } from './itflowUserProvisioning';
 import { disableKimaiUser, provisionKimaiUser } from './kimaiUserProvisioning';
 import { disableNocodbUser, provisionNocodbUser } from './nocodbUserProvisioning';
+import { disableSambaUser, provisionSambaUser } from './sambaUserProvisioning';
 import { deprovisionNoSsoCredentials, fanOutNoSsoCredentials, getNoSsoCredentialAppNames } from './noSsoCredentialFanout';
 
 vi.mock('./docusealTeamProvisioning', () => ({ provisionDocusealTeamMember: vi.fn(), disableDocusealTeamMember: vi.fn() }));
@@ -11,6 +12,10 @@ vi.mock('./nocodbUserProvisioning', () => ({ provisionNocodbUser: vi.fn(), disab
 vi.mock('./itflowUserProvisioning', () => ({ provisionItflowUser: vi.fn(), disableItflowUser: vi.fn() }));
 vi.mock('./kimaiUserProvisioning', () => ({ provisionKimaiUser: vi.fn(), disableKimaiUser: vi.fn() }));
 vi.mock('./homeAssistantUserProvisioning', () => ({ provisionHomeAssistantUser: vi.fn(), disableHomeAssistantUser: vi.fn() }));
+// Unlike jellyfinUserProvisioning.ts (light deps), sambaUserProvisioning.ts
+// pulls in executor.ts's whole transitive import chain for restartService —
+// mocked here so this unrelated test doesn't drag that in.
+vi.mock('./sambaUserProvisioning', () => ({ provisionSambaUser: vi.fn(), disableSambaUser: vi.fn() }));
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
 const mockedProvision = vi.mocked(provisionDocusealTeamMember);
@@ -18,11 +23,13 @@ const mockedProvisionNocodb = vi.mocked(provisionNocodbUser);
 const mockedProvisionItflow = vi.mocked(provisionItflowUser);
 const mockedProvisionKimai = vi.mocked(provisionKimaiUser);
 const mockedProvisionHa = vi.mocked(provisionHomeAssistantUser);
+const mockedProvisionSamba = vi.mocked(provisionSambaUser);
 const mockedDisableDocuseal = vi.mocked(disableDocusealTeamMember);
 const mockedDisableNocodb = vi.mocked(disableNocodbUser);
 const mockedDisableItflow = vi.mocked(disableItflowUser);
 const mockedDisableKimai = vi.mocked(disableKimaiUser);
 const mockedDisableHa = vi.mocked(disableHomeAssistantUser);
+const mockedDisableSamba = vi.mocked(disableSambaUser);
 
 beforeEach(() => {
   vi.clearAllMocks();
@@ -31,16 +38,26 @@ beforeEach(() => {
   mockedProvisionItflow.mockResolvedValue('created');
   mockedProvisionKimai.mockResolvedValue('created');
   mockedProvisionHa.mockResolvedValue('created');
+  mockedProvisionSamba.mockResolvedValue('updated');
   mockedDisableDocuseal.mockResolvedValue('disabled');
   mockedDisableNocodb.mockResolvedValue('disabled');
   mockedDisableItflow.mockResolvedValue('disabled');
   mockedDisableKimai.mockResolvedValue('disabled');
   mockedDisableHa.mockResolvedValue('disabled');
+  mockedDisableSamba.mockResolvedValue('disabled');
 });
 
 describe('getNoSsoCredentialAppNames', () => {
   it('lists every app with a provisioner today', () => {
-    expect(getNoSsoCredentialAppNames()).toEqual(['docuseal', 'nocodb', 'itflow', 'kimai', 'home-assistant', 'jellyfin']);
+    expect(getNoSsoCredentialAppNames()).toEqual([
+      'docuseal',
+      'nocodb',
+      'itflow',
+      'kimai',
+      'home-assistant',
+      'jellyfin',
+      'samba',
+    ]);
   });
 });
 
@@ -82,6 +99,7 @@ describe('deprovisionNoSsoCredentials', () => {
     expect(mockedDisableItflow).not.toHaveBeenCalled();
     expect(mockedDisableKimai).not.toHaveBeenCalled();
     expect(mockedDisableHa).not.toHaveBeenCalled();
+    expect(mockedDisableSamba).not.toHaveBeenCalled();
   });
 
   it('does not throw when a deprovisioner rejects, and still processes the rest', async () => {
@@ -90,12 +108,13 @@ describe('deprovisionNoSsoCredentials', () => {
     expect(mockedDisableNocodb).toHaveBeenCalledWith('bob@example.com');
   });
 
-  it('calls each of the five deprovisioners for their own app', async () => {
-    await deprovisionNoSsoCredentials(['docuseal', 'nocodb', 'itflow', 'kimai', 'home-assistant'], 'bob@example.com');
+  it('calls each of the six deprovisioners for their own app', async () => {
+    await deprovisionNoSsoCredentials(['docuseal', 'nocodb', 'itflow', 'kimai', 'home-assistant', 'samba'], 'bob@example.com');
     expect(mockedDisableDocuseal).toHaveBeenCalledWith('bob@example.com');
     expect(mockedDisableNocodb).toHaveBeenCalledWith('bob@example.com');
     expect(mockedDisableItflow).toHaveBeenCalledWith('bob@example.com');
     expect(mockedDisableKimai).toHaveBeenCalledWith('bob@example.com');
     expect(mockedDisableHa).toHaveBeenCalledWith('bob@example.com');
+    expect(mockedDisableSamba).toHaveBeenCalledWith('bob@example.com');
   });
 });

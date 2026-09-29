@@ -60,13 +60,22 @@
  * access token from HA's own username/password OAuth2 flow rather than a
  * stored one. See `homeAssistantUserProvisioning.ts`'s doc comment.
  *
- * Jellyfin is the last one on the README's list, and the odd one out:
- * `lanOnly`, so it never has a `service_exposure` row at all —
- * `getGrantableAppOptions` (userAppAccess.ts) was widened to list a no-SSO
- * provisioner app even with no exposure row, specifically so this one can
- * be granted. Otherwise the simplest of the bunch: `jellyfinUserProvisioning.ts`
- * drives Jellyfin's own full REST API directly, no DB script or scraped
- * session required.
+ * Jellyfin is the odd one out: `lanOnly`, so it never has a
+ * `service_exposure` row at all — `getGrantableAppOptions` (userAppAccess.ts)
+ * was widened to list a no-SSO provisioner app even with no exposure row,
+ * specifically so this one can be granted. Otherwise the simplest of the
+ * bunch: `jellyfinUserProvisioning.ts` drives Jellyfin's own full REST API
+ * directly, no DB script or scraped session required.
+ *
+ * Samba (also `lanOnly`, same exposure carve-out as Jellyfin above) is the
+ * one with no HTTP surface at all: `sambaUserProvisioning.ts` instead
+ * rewrites dockur/samba's own `users.conf` (sambaConfig.ts) and recreates
+ * the container so the change applies immediately, then flips the account's
+ * enabled flag through a throwaway-container `smbpasswd -e`/`-d`
+ * (sambaExec.ts) — `users.conf` alone has no way to touch that flag, so
+ * revoke and re-grant both need it. Every granted user shares the one
+ * legacy account's UID/GID and lands in the same shared folder — this
+ * grants a login, not a private folder per person.
  */
 
 import logger from '../utils/logger';
@@ -76,6 +85,7 @@ import { disableItflowUser, provisionItflowUser } from './itflowUserProvisioning
 import { disableJellyfinUser, provisionJellyfinUser } from './jellyfinUserProvisioning';
 import { disableKimaiUser, provisionKimaiUser } from './kimaiUserProvisioning';
 import { disableNocodbUser, provisionNocodbUser } from './nocodbUserProvisioning';
+import { disableSambaUser, provisionSambaUser } from './sambaUserProvisioning';
 
 export interface NoSsoCredentialInput {
   email: string;
@@ -93,6 +103,7 @@ const PROVISIONERS: Record<string, Provisioner> = {
   kimai: provisionKimaiUser,
   'home-assistant': provisionHomeAssistantUser,
   jellyfin: provisionJellyfinUser,
+  samba: provisionSambaUser,
 };
 
 const DEPROVISIONERS: Record<string, Deprovisioner> = {
@@ -102,6 +113,7 @@ const DEPROVISIONERS: Record<string, Deprovisioner> = {
   kimai: disableKimaiUser,
   'home-assistant': disableHomeAssistantUser,
   jellyfin: disableJellyfinUser,
+  samba: disableSambaUser,
 };
 
 /** Apps that can accept a fanned-out credential today. */

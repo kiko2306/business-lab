@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.152.0** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -211,6 +211,19 @@ it is done — not ticked off and left behind. Section references point at
 
 
 ### Exposure and platform
+
+- [ ] **Beta-test granting a dashboard user their own Samba login (plan.md
+      §741)** — in Users & Roles, grant a test account access to Samba, then
+      on `beta` map the share from a Windows/macOS/Linux client using that
+      account's own dashboard username/password (not the legacy
+      `SAMBA_USER`) and confirm it connects and can read/write the shared
+      folder. Revoke access and confirm that same login now fails. Re-grant
+      it and confirm it works again (checks the re-enable path, not just
+      first grant). Also confirm the legacy `SAMBA_USER`/`SAMBA_PASSWORD`
+      account still works throughout — it must keep working unchanged.
+      Restart the Samba app from the dashboard mid-test and confirm a
+      previously-granted user's password/access survives (checks the new
+      `./data/private` persistent mount).
 
 - [ ] **Beta-test the pull-every-app self-update (plan.md §740)** — the app
       phase of a self-update now pulls **every** installed app and recreates
