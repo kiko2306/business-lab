@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { exec } from 'child_process';
 import { resolveComposeFile } from '../config/services';
-import { setSambaAccountEnabled } from './sambaExec';
+import { recreateSambaContainer, setSambaAccountEnabled } from './sambaExec';
 
 vi.mock('child_process', () => ({ exec: vi.fn() }));
 vi.mock('../config/services', () => ({ resolveComposeFile: vi.fn() }));
@@ -59,6 +59,33 @@ describe('setSambaAccountEnabled', () => {
       cb(new Error('boom'), '', 'no such service: samba');
     }) as unknown as typeof exec);
     const result = await setSambaAccountEnabled('bob', true);
+    expect(result).toBe(false);
+  });
+});
+
+describe('recreateSambaContainer', () => {
+  it('is not installed → fails without touching docker', async () => {
+    mockedResolve.mockReturnValue({ projectName: 'samba', appDir: '/apps/samba', composeFile: null, composeArgs: '' } as ReturnType<
+      typeof resolveComposeFile
+    >);
+    const result = await recreateSambaContainer();
+    expect(result).toBe(false);
+    expect(mockedExec).not.toHaveBeenCalled();
+  });
+
+  it('force-recreates just the samba service, without its deps', async () => {
+    const result = await recreateSambaContainer();
+    expect(result).toBe(true);
+    const command = mockedExec.mock.calls[0][0] as string;
+    expect(command).toContain('docker compose -p samba');
+    expect(command).toContain('up -d --no-deps --force-recreate --no-build samba');
+  });
+
+  it('reports false when the container command fails', async () => {
+    mockedExec.mockImplementation(((_c: string, _o: unknown, cb: (...a: unknown[]) => void) => {
+      cb(new Error('boom'), '', 'no such service: samba');
+    }) as unknown as typeof exec);
+    const result = await recreateSambaContainer();
     expect(result).toBe(false);
   });
 });

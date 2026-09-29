@@ -6,17 +6,17 @@ vi.mock('../utils/database', () => ({ query }));
 const { resolveComposeFile } = vi.hoisted(() => ({ resolveComposeFile: vi.fn() }));
 vi.mock('../config/services', () => ({ resolveComposeFile }));
 
-const { restartService } = vi.hoisted(() => ({ restartService: vi.fn() }));
-vi.mock('./executor', () => ({ restartService }));
-
 const { regenerateSambaFiles, sambaUsernameFor } = vi.hoisted(() => ({
   regenerateSambaFiles: vi.fn(),
   sambaUsernameFor: vi.fn((name: string) => name.toLowerCase()),
 }));
 vi.mock('./sambaConfig', () => ({ SAMBA_SERVICE: 'samba', regenerateSambaFiles, sambaUsernameFor }));
 
-const { setSambaAccountEnabled } = vi.hoisted(() => ({ setSambaAccountEnabled: vi.fn() }));
-vi.mock('./sambaExec', () => ({ setSambaAccountEnabled }));
+const { recreateSambaContainer, setSambaAccountEnabled } = vi.hoisted(() => ({
+  recreateSambaContainer: vi.fn(),
+  setSambaAccountEnabled: vi.fn(),
+}));
+vi.mock('./sambaExec', () => ({ recreateSambaContainer, setSambaAccountEnabled }));
 
 vi.mock('../utils/logger', () => ({ default: { error: vi.fn(), info: vi.fn(), warn: vi.fn() } }));
 
@@ -32,7 +32,7 @@ beforeEach(() => {
   });
   query.mockResolvedValue({ rows: [{ id: 7, username: 'Bob' }] });
   regenerateSambaFiles.mockResolvedValue(new Map([[7, 'bob']]));
-  restartService.mockResolvedValue({ success: true });
+  recreateSambaContainer.mockResolvedValue(true);
   setSambaAccountEnabled.mockResolvedValue(true);
 });
 
@@ -51,11 +51,16 @@ describe('provisionSambaUser', () => {
     expect(regenerateSambaFiles).not.toHaveBeenCalled();
   });
 
-  it('regenerates users.conf/smb.conf with this user\'s fresh password, restarts, and re-enables', async () => {
+  it('writes users.conf/smb.conf with this user\'s fresh password *before* recreating the container, and re-enables', async () => {
     const result = await provisionSambaUser({ email: 'bob@example.com', password: 'new-pw' });
 
     expect(regenerateSambaFiles).toHaveBeenCalledWith('/apps/samba', { userId: 7, password: 'new-pw' });
-    expect(restartService).toHaveBeenCalledWith('samba', null);
+    expect(recreateSambaContainer).toHaveBeenCalled();
+    // Order matters: recreating via the generic restart path would re-run
+    // config generation with no override and clobber the password that was
+    // just written (the bug this shape exists to avoid) — regenerate must
+    // still have run strictly before the recreate.
+    expect(regenerateSambaFiles.mock.invocationCallOrder[0]).toBeLessThan(recreateSambaContainer.mock.invocationCallOrder[0]);
     expect(setSambaAccountEnabled).toHaveBeenCalledWith('bob', true);
     expect(result).toBe('updated');
   });
@@ -64,7 +69,7 @@ describe('provisionSambaUser', () => {
     regenerateSambaFiles.mockResolvedValue(new Map());
     const result = await provisionSambaUser({ email: 'bob@example.com', password: 'pw' });
     expect(result).toBe('failed');
-    expect(restartService).not.toHaveBeenCalled();
+    expect(recreateSambaContainer).not.toHaveBeenCalled();
   });
 });
 

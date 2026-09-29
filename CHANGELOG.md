@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.1] — 2026-09-29
+
+### Fixed
+
+- Samba: a fresh grant's password no longer gets clobbered by the restart that applies it
+
 ## [0.153.0] — 2026-09-29
 
 ### Added

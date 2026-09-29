@@ -26,9 +26,8 @@
 import logger from '../utils/logger';
 import { query } from '../utils/database';
 import { resolveComposeFile } from '../config/services';
-import { restartService } from './executor';
 import { SAMBA_SERVICE, regenerateSambaFiles, sambaUsernameFor } from './sambaConfig';
-import { setSambaAccountEnabled } from './sambaExec';
+import { recreateSambaContainer, setSambaAccountEnabled } from './sambaExec';
 
 export interface SambaUserInput {
   email: string;
@@ -64,7 +63,7 @@ export async function provisionSambaUser(input: SambaUserInput): Promise<Provisi
     return 'failed';
   }
 
-  await restartService(SAMBA_SERVICE, null);
+  await recreateSambaContainer();
   // A re-grant after a prior revoke should work again — the password change
   // above never clears the disabled flag `disableSambaUser`'s `-d` set.
   await setSambaAccountEnabled(sambaUsername, true);

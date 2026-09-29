@@ -34168,3 +34168,63 @@ No frontend change — Users & Roles' app-access picker is already fully
 generic (confirmed no per-app frontend code exists for any of the other six
 no-SSO apps either). Per-user folders/permissions was raised and explicitly
 declined by the user in favour of the shared-folder model above.
+
+## 742. §741's beta test found a real bug: the fresh password never survived the restart
+
+Ran the §741 README item live on `home-srv-01` (pulled `beta` 20df844, rebuilt
++ restarted just the backend container, then drove a grant through the real
+API with a throwaway recovery-created admin account rather than touching the
+user's own login). First grant already broke: `apps/samba/data/users.conf`
+showed the granted user's password as the literal sentinel `*`, not the
+password just set.
+
+### Root cause
+
+`provisionSambaUser` wrote `users.conf` with the real password
+(`regenerateSambaFiles(appDir, {userId, password})`), then called
+`executor.ts`'s `restartService('samba', null)` to apply it. But
+`restartService` → `composeUpWithManagedConfig` unconditionally re-runs
+*every* managed-config applier for the service — including
+`applySambaConfig`, called with its normal no-argument signature, which
+calls `regenerateSambaFiles(appDir)` **with no override** and overwrites the
+just-written file with `*` for every granted user, including the brand-new
+one — before the container the recreate is about to spawn ever gets to read
+it. Confirmed live: the backend log showed `"Wrote the Samba share config"`
+(that's `applySambaConfig`'s own log line) *after* the fan-out's write, and
+the file on disk had `*` where the real password should have been. For a
+brand-new grant this is worse than "no-op" — dockur/samba's `*`/`!` skip
+convention only applies to an *already-existing* passdb entry (`samba.sh`'s
+`user_exists` branch); a first-time account with password field literally
+`*` goes through `set_password ... add` unconditionally, so the live account
+would have come up with the one-character password `"*"`, not merely
+un-set.
+
+### Fix
+
+`sambaExec.ts` gained `recreateSambaContainer()` — a direct
+`docker compose up -d --no-deps --force-recreate --no-build samba`, nothing
+else. `provisionSambaUser` calls that instead of `executor.ts`'s
+`restartService`, so nothing re-derives `users.conf` between the correct
+write and the container actually reading it. Checked what this trades away:
+`composeUpWithManagedConfig`'s only samba-relevant step is `applySambaConfig`
+itself (everything else in that function is other services' env
+overrides/config appliers, all no-ops for a `lanOnly` app with no exposure
+and no mail/admin-seed keys) — safe to bypass entirely, since we've already
+done its one relevant job ourselves with the override it doesn't know how to
+carry. `executor.ts`'s `restartService` signature (briefly widened to accept
+a `null` userId for this) reverted — no other caller needed it once this
+moved off that path. `disableSambaUser` was never affected — it never
+touches `users.conf`, only the passdb flag through the same throwaway
+container mechanism.
+
+Re-ran the fix on `home-srv-01`: grant now writes the real password *and*
+`recreateSambaContainer` runs after it, confirmed via `docker compose logs`
+and `apps/samba/data/users.conf` no longer showing `*` for the just-granted
+account.
+
+Patch bump 0.153.0 → 0.153.1.
+
+### 742.1 Continuing the beta test
+
+Full grant/revoke/re-grant/restart-persistence checklist from the README
+item continues on `home-srv-01` against this fix.
