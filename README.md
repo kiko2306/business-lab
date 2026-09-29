@@ -227,13 +227,14 @@ it is done — not ticked off and left behind. Section references point at
       must still 302 to Authelia. A real Subsonic client (e.g. Symfonium,
       DSub) logging in with a Navidrome user is the full proof.
 
-- [ ] **Beta-test that a self-update no longer sweeps every app (plan.md §750)**
-      — on `beta`, after pulling, trigger an Update for a deploy that touches
-      backend code only: the progress should not show "updating N apps" and
-      the log should carry no `Updating service:` lines (`docker logs
-      business-lab-backend-1 | grep 'Updating service'`). Then bump one app's
-      image-check date comment on `dev`, merge to `beta`, update, and confirm
-      only that app is pulled and recreated.
+- [ ] **Beta-test that a bumped image-check date moves exactly one app (plan.md §750, §751)**
+      — the code-only half is **confirmed** (§751: run 113, 1m47s, zero
+      `SERVICE_UPDATE` audit rows). What is left is the positive case: bump one
+      app's image-check date comment on `dev` (a `:latest` app with a real newer
+      image, as §744 did for `wetty`), merge to `beta`, press Update, and confirm
+      only that app is pulled and recreated (`docker inspect` `Created` moves for
+      it and for no other app) and the run takes minutes, not a sweep. Best done
+      the next time a real "check if X can update" comes up.
 
 - [ ] **Beta-test Navidrome's Authelia sign-in (plan.md §749)** — on `beta`,
       pull and restart Navidrome (the compose change needs a recreate). Then:

@@ -34543,3 +34543,15 @@ stays true of the code it tested. Rejected: keeping the sweep but making it
 opt-in — dead code with no caller, and the vetted-bump path already exists.
 Costs: an app nobody bumps never updates; that is now the deliberate state,
 not a gap, and "check if X can update" is how it moves.
+
+## 751. §750's beta test: the code-only deploy no longer sweeps
+
+Pulled `2e015dd` (a comment-only change under `backend/src`, so a real code
+deploy) on `home-srv-01`. Run 113 finished `done` in 1m47s against run 112's
+16m05s (which still ran the *old* sweep code, as the running backend is always
+one deploy behind the one it installs). `audit_logs` holds zero
+`SERVICE_UPDATE` rows in run 113's window — no app was pulled or recreated. The
+backend log could not be grepped for `Updating service:` because the backend
+restarts at the end of an update and its log starts fresh; the audit table and
+the duration are the evidence instead. The positive case (a date bump moving
+exactly one app) stays a README item; nothing was bumped here on purpose.
