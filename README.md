@@ -212,12 +212,6 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Beta-test Navidrome's Subsonic bypass (plan.md §746)** — the curl half
-      is **confirmed** (2026-09-29, at 0.153.8): `/rest/ping.view` with bad
-      credentials returns Navidrome's own Subsonic error 40, and `/` still
-      302s to Authelia. What is left is a real Subsonic client (e.g.
-      Symfonium, DSub) logging in with a Navidrome user.
-
 - [ ] **Beta-test that a bumped image-check date moves exactly one app (plan.md §750, §751)**
       — the code-only half is **confirmed** (§751: run 113, 1m47s, zero
       `SERVICE_UPDATE` audit rows). What is left is the positive case: bump one

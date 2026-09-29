@@ -34574,3 +34574,11 @@ no-cache headers (§701); Authelia's managed block carries `$pbkdf2-sha512$`
 digests (§731, half only). Every item still has a browser/phone/client half, so
 none was deleted and nothing went to `main`; the README items now name only
 their unproven half.
+
+## 754. §746's beta test: a real Subsonic client works through the public hostname
+
+A Subsonic client (the user's, on their phone) connected to Navidrome's public
+hostname with a Navidrome user, listed the library and played a track — so the
+`/rest` Authelia bypass holds for `/rest/stream` as well as `/rest/ping`, the
+half the curl checks (§753) could not reach. Nothing to change in code; the
+README item is deleted.
