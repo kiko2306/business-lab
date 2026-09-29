@@ -36,7 +36,13 @@ export async function immichAdminSignUp(
   if (response.statusCode >= 200 && response.statusCode < 300) {
     return 'created';
   }
-  if (response.statusCode === 400 && /already has an admin/i.test(response.body?.message ?? response.raw)) {
+  // Immich v3 reworded this to "Admin setup is not available" (seen live on
+  // v3.2.4); older versions say "already has an admin". Matching only the old
+  // text made every restart of an already-bootstrapped Immich log a failure.
+  if (
+    response.statusCode === 400 &&
+    /already has an admin|admin setup is not available/i.test(response.body?.message ?? response.raw)
+  ) {
     return 'already-exists';
   }
   return 'failed';

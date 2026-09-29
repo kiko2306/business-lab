@@ -34486,3 +34486,16 @@ window with no file for `n8n-workflows-init`). No unit test: the failure needs
 a non-root process against a root-owned file, which the test container can't
 reproduce. Not established: what made the file root-owned (likely an earlier
 root-run writer); kept in the README item.
+
+## 748. Immich admin bootstrap: v3 reworded "already has an admin" (closes §744's item)
+
+§744 saw `admin-sign-up call failed` after Immich updated. Instead of
+reproducing a recreate, probed the live endpoint on `home-srv-01` (Immich
+v3.2.4, admin already present): `POST /api/auth/admin-sign-up` → `400
+{"message":"Admin setup is not available"}`. `immichAdminSignUp` only matched
+the old "already has an admin" text, so the idempotent case fell to `failed`.
+Not a timing issue. Both messages now map to `already-exists`; new
+`immichClient.test.ts` covers both texts plus created/failed. The bootstrap
+runs on every exposed start, so the false error was logged on each one, not
+only after image updates. The `failed` log still carries no status/body;
+left alone — the probe made it unnecessary here.

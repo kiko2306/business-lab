@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.5** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.153.6** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -325,13 +325,6 @@ it is done — not ticked off and left behind. Section references point at
       has a fresh mtime (it is currently the root-owned Sep 21 copy). Still
       open underneath: what created it as root in the first place.
 
-- [ ] **Immich admin bootstrap logged "admin-sign-up call failed" after an
-      image update (found during plan.md §744)** — `immichAdminBootstrap.ts`
-      got a response that was neither `created` nor `already-exists` right
-      after Immich's container was recreated with a newer image during a
-      self-update. Reproduce (redeploy/recreate Immich on `beta` and watch
-      the backend log) and find out whether it's a timing issue (API not
-      ready yet post-recreate) or an actual API response change.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),

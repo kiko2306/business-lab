@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.153.6] — 2026-09-29
+
+### Fixed
+
+- Immich: the admin bootstrap no longer logs a failure on every restart — v3 reworded its 'admin already exists' reply
+
 ## [0.153.5] — 2026-09-29
 
 ### Fixed
