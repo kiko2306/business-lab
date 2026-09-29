@@ -34406,3 +34406,55 @@ README items rather than fixed in passing:
   container came back up on a newer image during the sweep. Could be a
   timing issue (API not ready yet right after recreate) or an actual
   response-shape change; not yet reproduced in isolation.
+
+## 745. §738's Navidrome beta test: the upgrade is clean, the Subsonic-bypass claim was never true
+
+Ran the §738 README item on `home-srv-01`. The upgrade itself had already
+happened: Navidrome was one of the 9 apps run 108 (§744) recreated during
+the pull-every-app sweep, since its `:latest`-equivalent version tag pull
+found 0.64.2 already sitting in the compose file from `c76973a`. That means
+the "take a backup first" step in the README item never happened in the
+prescribed order — the migration ran a day before this dedicated check did,
+as a side effect of testing something else. Worth recording plainly rather
+than glossing over, even though the outcome was fine: this box has no
+data-durability guarantee, but the sequencing gap is real and would matter
+on a production deployment. No Navidrome-specific backup exists on
+`home-srv-01` either before or after — the scheduled nightly archive only
+covers the dashboard's own Postgres DB (`settings.json`/`users.json`/
+`database.sql`), and no per-app snapshot was ever taken for Navidrome (only
+`ntfy` has one, from 2026-09-22).
+
+### What verified clean
+
+- `docker inspect` → `deluan/navidrome:0.64.2`; container `Up 13h (healthy)`.
+- `docker-compose.override.yml` correctly pins `0.64.2@sha256:38dc...` — the
+  tag and the pinned digest agree, so §440's "digest pin masks a tag edit"
+  failure mode did not happen here.
+- Navidrome's own log: `"goose: no migrations to run. current version:
+  20260922230428"` — the 0.64.0 ID-re-encode migration completed with no
+  errors (grepped the full container log for `error|panic`: nothing).
+- The library-intact check (`web UI lists the same albums as before`) is
+  vacuous on this box: `apps/navidrome/data/music/` is empty and both the
+  pre-migration dump (`_dump/navidrome.sqlite`, captured 2026-09-28 08:55,
+  hours before the 20:14 migration) and the live DB show 0 albums/artists/
+  tracks. Confirms the migration didn't error against real rows, but proves
+  nothing about ID continuity — there was nothing to lose.
+
+### What didn't verify: no bypass exists for Subsonic clients
+
+The README item's last check — "a native Subsonic client still
+authenticates through its bypass path" — assumed a bypass that was never
+built. `services.ts`'s Navidrome entry has no `autheliaBypassPaths` (unlike
+`ntfy`, `crowdsec`'s two agent entries, or the entry at line 1343), and
+`apps/authelia/config/configuration.yml` gates `navidrome.tx-home-utils.com`
+with a single `policy: one_factor` rule and no per-path bypass. Confirmed
+live: `curl -H 'Host: navidrome.tx-home-utils.com' http://127.0.0.1/rest/ping.view?...`
+302s to `authelia.tx-home-utils.com`'s login page — as does even the
+unauthenticated `/ping`. §313 (Navidrome's original addition) never
+mentioned a bypass either; it went in gated exactly like every other app.
+So this isn't something 0.64.2 broke — Navidrome's public exposure has never
+let a native Subsonic client authenticate, since Authelia's interactive
+login can't be completed by a client that only speaks Subsonic's query-string
+auth. README item rewritten to describe the actual gap (add the bypass, or
+stop claiming it works) rather than re-asking for a beta-test that can't
+pass as worded.

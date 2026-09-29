@@ -219,19 +219,17 @@ it is done — not ticked off and left behind. Section references point at
       admin logins (`mat`, `miguel` or `frias`) in Users & Roles — it can't
       self-delete, and no other session was available during the test.
 
-- [ ] **Beta-test Navidrome 0.63.2 → 0.64.2 (plan.md §738)** — the bump is a
-      security update (0.64.1 fixes five advisories, incl. Subsonic auth and
-      per-user library filtering), but 0.64.0's migration **re-encodes every
-      internal ID** and upstream says to back up first. On `beta`: take a
-      Navidrome backup before the update, then check
-      `apps/navidrome/docker-compose.override.yml` is gone — if the app has
-      ever been through a self-update it carries a digest pin that silently
-      masks the tag edit (§440); use the dashboard's per-app **Unpin** action,
-      not a hand-edit. After the update: `docker inspect` shows
-      `deluan/navidrome:0.64.2`, the container is healthy, the web UI lists
-      the same albums as before (the ID migration ran, nothing vanished), and
-      a native Subsonic client still authenticates through its bypass path.
-      Clients that cache item IDs may need a re-sync — expected, not a failure.
+- [ ] **Give Navidrome's Subsonic API an Authelia bypass, or drop the claim
+      that one exists (found during plan.md §745)** — `navidrome.tx-home-utils.com`
+      has no bypass at all: every path, including `/rest/*` and even the
+      unauthenticated `/ping`, gets Authelia's `one_factor` gate (confirmed
+      live — a `curl` for `/rest/ping.view` 302s to the Authelia login page).
+      That means no native Subsonic client (mobile app, desktop player) can
+      authenticate through the public hostname today, and — per §313 — never
+      could; this isn't a 0.64.2 regression. Either add an `autheliaBypassPaths`
+      entry for Navidrome (`ntfy`'s and others' entries in `services.ts` are
+      the precedent) scoped to `/rest($|/)`, or update any docs/assumptions
+      that currently claim Subsonic clients work through this exposure.
 
 - [ ] **Beta-test Twenty v2.39.5 → v2.43.0 (plan.md §739, §738)** — the auth
       chain the dashboard's admin bootstrap drives was re-read against
