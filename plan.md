@@ -34565,3 +34565,12 @@ Sep 21 copy to a fresh mtime owned by the backend's own uid, with no `.tmp`
 left behind — rename replaced it as predicted. Why it was root-owned in the
 first place stays unknown; with the file now backend-owned it can't recur on
 this box, so §747's "still open underneath" is dropped rather than tracked.
+
+## 753. A `beta` test pass: what scripts could prove, and what is left
+
+At 0.153.8 (beta tip `2e015dd`) the curl-able halves passed over SSH: Navidrome's
+Subsonic bypass (§746) and forged-header/LAN checks (§749), and the Hotel
+no-cache headers (§701); Authelia's managed block carries `$pbkdf2-sha512$`
+digests (§731, half only). Every item still has a browser/phone/client half, so
+none was deleted and nothing went to `main`; the README items now name only
+their unproven half.

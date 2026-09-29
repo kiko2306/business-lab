@@ -212,13 +212,11 @@ it is done — not ticked off and left behind. Section references point at
 
 ### Exposure and platform
 
-- [ ] **Beta-test Navidrome's Subsonic bypass (plan.md §746)** — on `beta`,
-      after pulling and restarting Navidrome (so Authelia's config
-      regenerates), `curl -sI 'https://navidrome.tx-home-utils.com/rest/ping.view?u=x&p=x&v=1.16.1&c=t'`
-      must return Navidrome's own response (a Subsonic XML/JSON error for the
-      bad credentials), not a 302 to `authelia.tx-home-utils.com`; and `/`
-      must still 302 to Authelia. A real Subsonic client (e.g. Symfonium,
-      DSub) logging in with a Navidrome user is the full proof.
+- [ ] **Beta-test Navidrome's Subsonic bypass (plan.md §746)** — the curl half
+      is **confirmed** (2026-09-29, at 0.153.8): `/rest/ping.view` with bad
+      credentials returns Navidrome's own Subsonic error 40, and `/` still
+      302s to Authelia. What is left is a real Subsonic client (e.g.
+      Symfonium, DSub) logging in with a Navidrome user.
 
 - [ ] **Beta-test that a bumped image-check date moves exactly one app (plan.md §750, §751)**
       — the code-only half is **confirmed** (§751: run 113, 1m47s, zero
@@ -229,17 +227,14 @@ it is done — not ticked off and left behind. Section references point at
       it and for no other app) and the run takes minutes, not a sweep. Best done
       the next time a real "check if X can update" comes up.
 
-- [ ] **Beta-test Navidrome's Authelia sign-in (plan.md §749)** — on `beta`,
-      pull and restart Navidrome (the compose change needs a recreate). Then:
-      (1) in a browser, an Authelia login lands **straight in the library** with
-      no Navidrome login screen, as the Authelia admin; (2) from a LAN machine,
-      `curl -s -H 'Remote-User: mat' http://192.168.1.236:10570/api/album` (or
-      any authed route) must be **401**, not data — the whitelist must not admit
-      a LAN peer; (3) the public
-      `curl -H 'Remote-User: mat' 'https://navidrome.tx-home-utils.com/rest/getAlbumList2.view?u=x&p=x&v=1.16.1&c=t&type=newest&f=json'`
-      must still be the "Wrong username or password" error — a forged header on
-      the bypassed path is ignored. Also sign in as a non-admin Authelia user
-      and confirm Navidrome auto-created it as a non-admin.
+- [ ] **Beta-test Navidrome's Authelia sign-in (plan.md §749)** — checks (2)
+      and (3) are **confirmed** (2026-09-29, at 0.153.8): the LAN
+      `Remote-User` request to `:10570/api/album` is 401, and a forged header
+      on the public `getAlbumList2.view` still gets "Wrong username or
+      password". What is left needs a browser: (1) an Authelia login lands
+      **straight in the library** with no Navidrome login screen, as the
+      Authelia admin; and a non-admin Authelia user is auto-created in
+      Navidrome as a non-admin.
 
 - [ ] **Beta-test Twenty v2.39.5 → v2.43.0 (plan.md §739, §738)** — the auth
       chain the dashboard's admin bootstrap drives was re-read against
@@ -369,10 +364,10 @@ it is done — not ticked off and left behind. Section references point at
       dashboard host alone.
 
 
-- [ ] **Beta-test the Hotel apps' no-cache index.html (plan.md §701)** — when
-      Hotel is next started on `beta` (it rebuilds admin, check-in and pulse),
-      `curl -sI` each app's `/` and a deep link (e.g. a check-in `/<token>`):
-      `Cache-Control: no-cache`. Then push a visible change and confirm a phone
+- [ ] **Beta-test the Hotel apps' no-cache index.html (plan.md §701)** — the
+      `curl` half is **confirmed** (2026-09-29, at 0.153.8): admin, check-in
+      and pulse each return `Cache-Control: no-cache` on `/` and on a deep
+      link. What is left is a phone: push a visible change and confirm a phone
       that already opened the guest link shows it on the next open.
 
 - [ ] **Beta-test the Hotel healthcheck fix (plan.md §708)** — the container
