@@ -219,22 +219,6 @@ it is done — not ticked off and left behind. Section references point at
       admin logins (`mat`, `miguel` or `frias`) in Users & Roles — it can't
       self-delete, and no other session was available during the test.
 
-- [ ] **Beta-test the pull-every-app self-update (plan.md §740)** — the app
-      phase of a self-update now pulls **every** installed app and recreates
-      only the ones whose own files changed in the deploy plus the ones whose
-      pull actually moved an image. On `beta`, run an update from the Update
-      page and watch it: the progress detail should count through every
-      installed app (`name (i/N)`, N = all of them, not just the changed
-      ones), and the run should still finish rather than time out — it is now
-      a few minutes longer. Then check the backend log: apps that did not move
-      say "is already on the latest images" and must **not** have been
-      recreated (their container `Created`/`StartedAt` timestamps unchanged,
-      and their `docker-compose.override.yml` still present with its old
-      pins — the skip path must not clear pins it never re-wrote). At least
-      one app that did move should show a new container and a rewritten pin.
-      Also confirm a version/docs-only deploy still short-circuits as
-      `pull-only` with no app sweep at all.
-
 - [ ] **Beta-test Navidrome 0.63.2 → 0.64.2 (plan.md §738)** — the bump is a
       security update (0.64.1 fixes five advisories, incl. Subsonic auth and
       per-user library filtering), but 0.64.0's migration **re-encodes every
@@ -340,6 +324,20 @@ it is done — not ticked off and left behind. Section references point at
       the run shows `checking` for the duration of that fetch and lands as
       an `error` row (visible in run history) rather than the trigger
       request hanging with no row at all.
+- [ ] **n8n's managed CrowdSec workflow file can't be rewritten (found during
+      plan.md §744)** — `apps/n8n/workflows/homelabCrowdsecAlertRelay.json` on
+      `home-srv-01` is owned `root:docker` mode 644; `n8nWorkflows.ts` writes
+      it as `appuser` and gets `EACCES` (logged as a warning, not fatal — the
+      stale copy is left in place). Find why it ended up root-owned and fix
+      the write path (or the ownership source) rather than `chown`ing it by
+      hand on the host.
+- [ ] **Immich admin bootstrap logged "admin-sign-up call failed" after an
+      image update (found during plan.md §744)** — `immichAdminBootstrap.ts`
+      got a response that was neither `created` nor `already-exists` right
+      after Immich's container was recreated with a newer image during a
+      self-update. Reproduce (redeploy/recreate Immich on `beta` and watch
+      the backend log) and find out whether it's a timing issue (API not
+      ready yet post-recreate) or an actual API response change.
 - [ ] **NetBird Android client blocks all non-NetBird traffic once connected**
       — matches upstream
       [netbirdio/android-client#96](https://github.com/netbirdio/android-client/issues/96),

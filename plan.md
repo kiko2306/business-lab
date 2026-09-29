@@ -34353,3 +34353,56 @@ credentials for them and isn't resetting one to manufacture a session, nor
 creating another throwaway admin to do it, since that just relocates the
 same leftover-account problem to a new id. README item narrowed to that one
 remaining step.
+
+## 744. §740's beta test: pull-every-app confirmed live, two unrelated bugs surfaced
+
+Ran the §740 README item on `home-srv-01`. The pull-every-app code (27e5172)
+was already on the box from an earlier manual deploy, so the first click
+(run 107, `a4b6f56` — a plan.md-only commit) just proved the *other* half of
+§740: `classifyDeploy` saw `apps: []`, logged `"Self-update: pull-only,
+nothing to rebuild or restart"`, and finished in 1.4s with no app sweep.
+
+To exercise the actual sweep, `wetty`'s image-check date comment was bumped
+(a real newer `wettyoss/wetty:latest` was sitting unpulled — confirmed via
+`docker pull` on the host before touching anything) and pushed through
+`dev` → `beta`. Run 108 (`b3311c2`) took 14m19s across all 44 installed
+apps and finished `state=done`, `failed=[]`:
+
+- 44 `"Updating service: X"` log lines — one per installed app, matching
+  what the Update page's progress bar showed the user live ("updating 44
+  apps").
+- 35 apps logged `"is already on the latest images"` and were skipped.
+  Verified on `nginx-proxy-manager`: container `Created`/`StartedAt` both
+  from run 106 (2026-09-28), untouched by today's run, and its
+  `docker-compose.override.yml` pins carry yesterday's mtime — the skip
+  path did not touch what it didn't rewrite.
+- 9 apps actually moved and were recreated: `wetty`, `n8n`, `samba`,
+  `hotel` (4 images), `tally`, `twenty`, `immich`, `pantry`,
+  `price-compare` — only `wetty` was in `scope.apps` (its compose file's
+  date comment changed); the other 8 moved purely because their pull
+  brought a newer digest, which is the entire point of §740 (a `:latest`
+  app updates without anyone bumping anything). Verified on `wetty`:
+  container `Created` timestamp inside run 108's window, and the override
+  file's pin now carries the new digest that was confirmed unpulled
+  beforehand.
+
+README item deleted — both halves (pull-only short-circuit, and the
+sweep/skip/recreate split) are now confirmed against the real stack, not
+just typechecked.
+
+### 744.1 Two bugs the sweep surfaced, not fixed here
+
+Neither is part of §740 — both are pre-existing and just never got
+exercised until every app started pulling on every update. Logged as new
+README items rather than fixed in passing:
+
+- `n8n`'s managed workflow file
+  (`apps/n8n/workflows/homelabCrowdsecAlertRelay.json`) is owned
+  `root:docker` mode 644 on the host; `n8nWorkflows.ts` writes it as
+  `appuser` and hits `EACCES` (`logger.warn`, non-fatal — stale copy left in
+  place). Cause not yet investigated.
+- `immichAdminBootstrap.ts` logged `"admin-sign-up call failed"` — neither
+  the `created` nor `already-exists` branch — immediately after Immich's
+  container came back up on a newer image during the sweep. Could be a
+  timing issue (API not ready yet right after recreate) or an actual
+  response-shape change; not yet reproduced in isolation.
