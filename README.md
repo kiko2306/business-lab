@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.153.19** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.154.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -228,10 +228,10 @@ it is done — not ticked off and left behind. Section references point at
       Settings opens with the version, phone-app and secondary/app URLs at the top. Check
       on an app that has them (Nextcloud or Vaultwarden). Delete once seen.
 
-- [ ] **Apps page: "Start with what it needs" (P2, plan.md §769)** — decided: when Start
-      is blocked by `dependsOn`, offer one button that starts the missing `dependsOn` apps
-      in dependency order, then the app. `requires` stays optional and is never started.
-      Test first: a pure ordering function over the registry (cycles, already-running).
+- [ ] **Beta-test "Start it with what it needs" (plan.md §770)** — on `beta`, stop
+      Authelia, then on an app that `dependsOn` it (e.g. Paperless) press the link next to
+      "Start Authelia first": Authelia starts, then the app; both end running. Also force
+      the dependency to fail and confirm the app is not attempted. Delete once seen.
 
 - [ ] **Apps page: remove the Running apps table (P2, plan.md §769)** — decided: fold it
       into the list. Add a Running tile filter like Issues/Stopped; keep each app's public

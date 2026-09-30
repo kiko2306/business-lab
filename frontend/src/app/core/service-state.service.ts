@@ -14,6 +14,7 @@ import {
 } from './models';
 import { ToastService } from './toast.service';
 import { AuthService } from './auth.service';
+import { startChain } from './start-chain';
 
 /**
  * Pull the most detailed text out of a failed start response — the backend
@@ -105,12 +106,25 @@ export class ServiceStateService {
     this.fetchServices(true).subscribe();
   }
 
-  startService(serviceName: string): void {
-    this.runServiceAction(serviceName, 'start');
+  startService(serviceName: string): Promise<boolean> {
+    return this.runServiceAction(serviceName, 'start');
+  }
+
+  /**
+   * Starts what `serviceName` depends on, one at a time and in order (each POST
+   * only returns once compose is up), then the app. A failed dependency ends the
+   * chain: starting the app anyway would just earn a 409.
+   */
+  async startWithDependencies(serviceName: string, services: ServiceStatus[]): Promise<void> {
+    for (const dep of [...startChain(serviceName, services), serviceName]) {
+      if (!(await this.startService(dep))) {
+        return;
+      }
+    }
   }
 
   stopService(serviceName: string): void {
-    this.runServiceAction(serviceName, 'stop');
+    void this.runServiceAction(serviceName, 'stop');
   }
 
   /**
@@ -282,54 +296,58 @@ export class ServiceStateService {
     }
   }
 
-  private runServiceAction(serviceName: string, action: ServiceAction): void {
+  private runServiceAction(serviceName: string, action: ServiceAction): Promise<boolean> {
+    let ok = true;
     this.operatingSubject.next({
       ...this.operatingSubject.value,
       [serviceName]: action,
     });
 
-    this.http
-      .post<ServiceActionResponse>(
-        `${API_BASE_URL}/services/${serviceName}/${action}`,
-        {},
-        { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
-      )
-      .pipe(
-        // Deliberately NOT retried. This POST is a start/stop/restart: the
-        // backend runs `docker compose up` with every managed-config
-        // reconciler behind it, up to 15 minutes, and a failure response can
-        // arrive long after the container is already running. Retrying it
-        // fires the whole thing a second time on top of the first one's side
-        // effects. `fetchServices` above is a GET and keeps its retry.
-        tap((response) => {
-          this.toast.success(response.message);
-          if (action !== 'stop') {
-            this.startupEventsSubject.next({ serviceName, ok: true, message: response.message });
-          }
-          if (response.exposure?.attempted && !response.exposure.success && response.exposure.warning) {
-            this.toast.error(response.exposure.warning);
-          }
-        }),
-        switchMap(() => this.fetchServices(false)),
-        finalize(() => {
-          this.operatingSubject.next({
-            ...this.operatingSubject.value,
-            [serviceName]: null,
-          });
-        }),
-        catchError((error) => {
-          const message = extractErrorMessage(error, `Unable to ${action} ${serviceName}.`);
-          this.toast.error(message);
-          if (action !== 'stop') {
-            this.startupEventsSubject.next({
-              serviceName,
-              ok: false,
-              message: extractStartFailureDetail(error) ?? message,
+    return new Promise<boolean>((resolve) => {
+      this.http
+        .post<ServiceActionResponse>(
+          `${API_BASE_URL}/services/${serviceName}/${action}`,
+          {},
+          { context: new HttpContext().set(SKIP_GLOBAL_ERROR_HANDLING, true) }
+        )
+        .pipe(
+          // Deliberately NOT retried. This POST is a start/stop/restart: the
+          // backend runs `docker compose up` with every managed-config
+          // reconciler behind it, up to 15 minutes, and a failure response can
+          // arrive long after the container is already running. Retrying it
+          // fires the whole thing a second time on top of the first one's side
+          // effects. `fetchServices` above is a GET and keeps its retry.
+          tap((response) => {
+            this.toast.success(response.message);
+            if (action !== 'stop') {
+              this.startupEventsSubject.next({ serviceName, ok: true, message: response.message });
+            }
+            if (response.exposure?.attempted && !response.exposure.success && response.exposure.warning) {
+              this.toast.error(response.exposure.warning);
+            }
+          }),
+          switchMap(() => this.fetchServices(false)),
+          finalize(() => {
+            this.operatingSubject.next({
+              ...this.operatingSubject.value,
+              [serviceName]: null,
             });
-          }
-          return EMPTY;
-        })
-      )
-      .subscribe();
+          }),
+          catchError((error) => {
+            const message = extractErrorMessage(error, `Unable to ${action} ${serviceName}.`);
+            this.toast.error(message);
+            if (action !== 'stop') {
+              this.startupEventsSubject.next({
+                serviceName,
+                ok: false,
+                message: extractStartFailureDetail(error) ?? message,
+              });
+            }
+            ok = false;
+            return EMPTY;
+          })
+        )
+        .subscribe({ complete: () => resolve(ok) });
+    });
   }
 }

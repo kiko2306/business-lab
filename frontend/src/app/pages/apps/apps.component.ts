@@ -1,4 +1,5 @@
 import { AsyncPipe, CommonModule } from '@angular/common';
+import { firstValueFrom } from 'rxjs';
 import { Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ServiceStateService } from '../../core/service-state.service';
@@ -179,11 +180,16 @@ export class AppsComponent implements OnInit, OnDestroy {
 
   handleAction(serviceName: string, action: ServiceAction): void {
     if (action === 'start') {
-      this.serviceState.startService(serviceName);
+      void this.serviceState.startService(serviceName);
       return;
     }
 
     this.serviceState.stopService(serviceName);
+  }
+
+  async startWithNeeds(serviceName: string): Promise<void> {
+    const services = (await firstValueFrom(this.serviceState.services$)) ?? [];
+    await this.serviceState.startWithDependencies(serviceName, services);
   }
 
   trackByService(_index: number, service: { name: string }): string {

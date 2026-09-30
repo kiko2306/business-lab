@@ -830,6 +830,7 @@ export const en: Record<string, string> = {
   'serviceCard.dependency.titleNeeded': '{{label}} — {{state}}. Needed for this app to work, not to start.',
   'serviceCard.dependency.proxyNote': '{{hostname}} is served through it — the app itself keeps working without it.',
   'serviceCard.startBlocked': 'Start {{names}} first',
+  'serviceCard.startWithNeeds': 'Start it with what it needs',
   'serviceCard.degraded': 'Runs, but needs {{names}} to work properly',
   'serviceCard.state.running': 'running',
   'serviceCard.state.stopped': 'stopped',

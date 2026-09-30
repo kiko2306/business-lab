@@ -466,6 +466,21 @@ describe('ServiceCardComponent recovery states', () => {
     expect(emitted).toEqual(['stop']);
   });
 
+  it('offers to start what a blocked app needs, and only then', () => {
+    let asked = 0;
+    component.startWithNeedsRequested.subscribe(() => asked++);
+    const el = render(service('itflow', 'stopped', { dependsOn: ['authelia'] }));
+    component.allServices = [component.service, service('authelia', 'stopped')];
+    fixture.detectChanges();
+    const link = Array.from(el.querySelectorAll('button')).find((b) => b.textContent?.includes('what it needs'));
+    link!.click();
+    expect(asked).toBe(1);
+
+    component.allServices = [component.service, service('authelia', 'running')];
+    fixture.detectChanges();
+    expect(el.textContent).not.toContain('what it needs');
+  });
+
   it('stops an ordinary app without asking', async () => {
     component.service = service('jellyfin', 'running');
     await component.requestAction('stop');

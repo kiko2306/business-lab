@@ -34755,3 +34755,16 @@ replaced by a Running tile filter, with URL and ports kept on the rows/Settings;
 "Start with what it needs" starts the `dependsOn` chain only, never `requires`. Both are
 README items. The six Apps page changes (§763–§768) were merged dev → beta; their README
 beta items still need running on the box before `main`.
+
+## 770. "Start it with what it needs" (§769 decision 2)
+
+A blocked app's sub-line gets a link that starts its stopped `dependsOn` apps in order,
+then itself. `startChain` (pure, `core/start-chain.ts`) does the DFS: dependencies first,
+running apps skipped, cycles and unknown names harmless, `requires` never started.
+`ServiceStateService.startService` now returns `Promise<boolean>` (resolves when the POST
+and status refresh finish, false on failure) so `startWithDependencies` can sequence
+and abort on the first failure. Rejected: a backend chain endpoint — the API already
+refuses a blocked start with 409, the UI only needed sequencing, and the client sees the
+same registry. Known limit: dependencies' startup-log dialogs are not opened (toasts and
+row spinners show progress); only the target's opens. Tests: `startChain` cases, two
+sequencing specs (order, abort on failure), the card link; all red first.

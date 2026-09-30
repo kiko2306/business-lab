@@ -31,6 +31,7 @@
       <span class="text-truncate">{{ service.description }}</span>
       <span *ngIf="!dependenciesSatisfied()" class="text-warning-emphasis">
         · {{ startBlockedTitle() }}
+        <button *ngIf="service.state !== 'running' && service.state !== 'starting'" type="button" class="btn btn-link btn-sm p-0 align-baseline" [disabled]="loadingAction !== null" (click)="startWithNeedsRequested.emit()">{{ 'serviceCard.startWithNeeds' | t }}</button>
       </span>
       <span *ngIf="dependenciesSatisfied() && degradedBy().length" class="text-warning-emphasis">
         · {{ degradedTitle() }}

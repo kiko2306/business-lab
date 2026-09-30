@@ -830,6 +830,7 @@ export const ptPT: Record<string, string> = {
   'serviceCard.dependency.titleNeeded': '{{label}} — {{state}}. Necessário para esta aplicação funcionar, não para iniciar.',
   'serviceCard.dependency.proxyNote': '{{hostname}} é servido através dele — a aplicação continua a funcionar sem ele.',
   'serviceCard.startBlocked': 'Inicie primeiro {{names}}',
+  'serviceCard.startWithNeeds': 'Iniciar com o que precisa',
   'serviceCard.degraded': 'Está em execução, mas precisa de {{names}} para funcionar corretamente',
   'serviceCard.state.running': 'em execução',
   'serviceCard.state.stopped': 'parado',

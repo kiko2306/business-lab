@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.154.0] — 2026-09-30
+
+### Added
+
+- Apps page: a blocked app offers 'Start it with what it needs', which starts its required apps in order and then the app
+
 ## [0.153.19] — 2026-09-30
 
 ### Changed

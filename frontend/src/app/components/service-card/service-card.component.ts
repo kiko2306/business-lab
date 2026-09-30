@@ -88,6 +88,7 @@ export class ServiceCardComponent implements OnDestroy, AfterViewChecked {
   // only if the backend hasn't resolved one yet.
   @Input() hostLanIp: string | null = null;
 
+  @Output() startWithNeedsRequested = new EventEmitter<void>();
   @Output() actionRequested = new EventEmitter<ServiceAction>();
 
   // All per-service setup (configuration, admin account) lives in a single

@@ -61,4 +61,38 @@ describe('ServiceStateService', () => {
 
     expect(toast.success).toHaveBeenCalledWith('Service started');
   }));
+
+  const emptyStatus = () => ({
+    services: [],
+    summary: { total: 0, running: 0, stopped: 0, error: 0, starting: 0 },
+    timestamp: new Date().toISOString(),
+  });
+
+  // plan.md §769: dependencies start one at a time, in order, and the app itself
+  // only after they all came up.
+  it('starts a dependency chain in order, then the app', fakeAsync(() => {
+    const svc = (name: string, state: 'running' | 'stopped', dependsOn?: string[]) =>
+      ({ name, label: name, state, dependsOn }) as never;
+    void service.startWithDependencies('app', [svc('app', 'stopped', ['auth']), svc('auth', 'stopped')]);
+
+    httpMock.expectOne(`${API_BASE_URL}/services/auth/start`).flush({ message: 'ok' });
+    tick();
+    httpMock.expectNone(`${API_BASE_URL}/services/app/start`);
+    httpMock.expectOne(`${API_BASE_URL}/services/status`).flush(emptyStatus());
+    tick();
+    httpMock.expectOne(`${API_BASE_URL}/services/app/start`).flush({ message: 'ok' });
+    tick();
+    httpMock.expectOne(`${API_BASE_URL}/services/status`).flush(emptyStatus());
+    tick();
+  }));
+
+  it('stops the chain at the first failure and never starts the app', fakeAsync(() => {
+    const svc = (name: string, state: 'running' | 'stopped', dependsOn?: string[]) =>
+      ({ name, label: name, state, dependsOn }) as never;
+    void service.startWithDependencies('app', [svc('app', 'stopped', ['auth']), svc('auth', 'stopped')]);
+
+    httpMock.expectOne(`${API_BASE_URL}/services/auth/start`).flush({ message: 'boom' }, { status: 500, statusText: 'x' });
+    tick(1000);
+    httpMock.expectNone(`${API_BASE_URL}/services/app/start`);
+  }));
 });

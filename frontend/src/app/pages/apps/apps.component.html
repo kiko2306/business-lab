@@ -146,6 +146,7 @@
                 [loadingAction]="(serviceState.operating$ | async)?.[service.name] ?? null"
                 [hostLanIp]="serviceState.hostLanIp$ | async"
                 (actionRequested)="handleAction(service.name, $event)"
+                (startWithNeedsRequested)="startWithNeeds(service.name)"
               ></app-service-card>
             </div>
           </div>
