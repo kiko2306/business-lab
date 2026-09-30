@@ -60,11 +60,6 @@
   overflow: hidden;
 }
 
-/* Keep the wrapping title clear of the top-right badge. */
-.menu-tile--pending .card-body h2 {
-  padding-right: 6rem;
-}
-
 .menu-tile__desc {
   font-size: 0.95rem;
   display: -webkit-box;
@@ -73,13 +68,20 @@
   overflow: hidden;
 }
 
-/* Top-right, out of the text flow — a short description no longer leaves a
-   void where a bottom-aligned badge used to sit. */
-.menu-tile__badge {
-  position: absolute;
-  top: 1rem;
-  right: 1rem;
-  font-weight: 500;
+/* The box's state sits where the subtitle was: calm by default, red only when an app needs the owner. */
+.home-status__link {
+  color: inherit;
+  text-decoration: none;
+}
+
+.home-status__link:hover,
+.home-status__link:focus-visible {
+  text-decoration: underline;
+}
+
+.home-status__link--issue {
+  color: var(--bs-danger-text-emphasis);
+  font-weight: 600;
 }
 
 .menu-tile:hover,
@@ -87,4 +89,11 @@
   border-color: var(--bs-primary, #0d6efd);
   box-shadow: 0 8px 18px rgba(2, 6, 23, calc(0.3 * var(--app-shadow-k, 1))), 0 34px 60px -24px rgba(2, 6, 23, calc(0.7 * var(--app-shadow-k, 1)));
   transform: translateY(-3px);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .menu-tile:hover,
+  .menu-tile:focus-visible {
+    transform: none;
+  }
 }

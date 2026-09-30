@@ -13,6 +13,12 @@ The version string shown in the dashboard footer lives in the repo-root
 this file, and the README line together; the `package.json` version fields
 are frozen and unused.
 
+## [0.156.0] — 2026-09-30
+
+### Frontend
+
+- Home says how the box is doing ("All 36 apps are fine" / "3 of 36 apps need you"), the Updates tile opens the Updates page, and the duplicate Networking tile is gone
+
 ## [0.155.6] — 2026-09-30
 
 ### Frontend

@@ -15,7 +15,7 @@ const PAGES: { link: string; url: string; heading: string }[] = [
 
 test.beforeEach(async ({ page }) => {
   await page.goto('/home');
-  await expect(page.getByRole('heading', { name: 'Menu', level: 1 })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Home', level: 1 })).toBeVisible();
 });
 
 for (const { link, url, heading } of PAGES) {

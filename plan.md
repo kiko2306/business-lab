@@ -34909,3 +34909,27 @@ Networking lands on the Cloudflare panel; base domain and tunnel IDs are in the 
 panel just below it. Left open: the checklist's own `label` and `detail` come from the backend
 in English only, and two details tell the user to "run start.sh" and "open /setup", which
 breaks the no-console principle — a README item.
+
+## 781. Home: status first (§776 item 4)
+
+Home opened with "Menu / Pick an area to manage" and said nothing about the box. For a role
+that can control apps it now leads with the same headline the Apps page uses ("All 36 apps
+are fine." / "3 of 36 apps need you."), as a link to `/apps`, red-emphasis only when
+something needs the owner. It polls only while on screen and only for that role
+(`ServiceStateService.startPolling`/`stopPolling`, as Apps does); before the first response
+(`total` 0) the old subtitle shows rather than "All 0 apps are fine". Tiles: the "Updates"
+tile was a `pending` stub deep-linking to `/apps` under "Opens in Apps", but `/updates`
+(self-update, `system:update`) has existed for a while, so it now links there instead of
+being removed (this departs from §776's "drop the stub tile"; the stub was stale, not
+missing). The Networking tile went to the same `/settings` page as Settings, so it is merged
+into Settings, gated by any-of `settings:manage`/`exposure:settings` like the route (a
+new `anyCapability` on the tile). Eight tiles: four wide plus four single in the order
+that makes each row of three one wide and one single, so the bento still divides evenly.
+Copy: title "Menu" became "Home"/"Início"; descriptions dropped "service registry",
+"Cloudflare Tunnel token", "first-start provisioning", "ntfy", "snapshot", "image updates"
+(en and pt-PT). The hover lift has a reduced-motion guard. Tests: `home.component.spec.ts`
+(status from the summary, no status/poll for a role without `apps:control`, poll lifecycle,
+unique real destinations, the exposure-only role, copy guard); `e2e/tests/nav.spec.ts`
+asserts the new heading and the browser E2E suite passes. Left out: backup age and
+"update available" in the strip, which need APIs Home does not call yet; the fixed-height
+icon-less tiles (§776 P2) stay for `layout`. Not rendered by hand.

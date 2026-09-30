@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.155.6** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.156.0** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -219,8 +219,10 @@ item is deleted.
       the rows' label and detail come from `deploymentStatus.ts` in English only, and the
       tunnel row says "run start.sh with the token set", the admin row "open /setup". Key
       the text by check id in the frontend (en and pt-PT) and say what to do in the UI.
-- [ ] **Home: status first** — summary strip above the menu, remove the stub "Updates" tile
-      and the duplicate `/settings` tile, plain tile copy, reduced-motion guard.
+- [ ] **Home: backup age and "update available" in the status strip (plan.md §781)** — the
+      strip shows app state only; add the last successful backup and a pending update once
+      Home can read them cheaply. Also `layout`: compact tiles with icons instead of fixed
+      12rem cards.
 - [ ] **Apps: confirm Stop on an exposed app** — inline confirm naming what goes offline
       (PRODUCT.md: outward-facing actions are confirmed); one page-level live region.
 - [ ] **Backups: dialog focus and Escape** — trap, initial focus and Escape on the three
