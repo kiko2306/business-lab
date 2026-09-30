@@ -252,7 +252,7 @@
       },
       {
         "name": "The Both-Themes Rule",
-        "body": "Every colour lives as a token with light and dark values kept in step; component CSS never hard-codes a theme colour, and reads the primary through --bs-primary-rgb.",
+        "body": "Every colour lives as a token with light and dark values kept in step; component CSS reads theme colours from Bootstrap's --bs-* variables or --app-* tokens rather than repeating a hex. Known exceptions today: the service-row icon tile's primary tint, the dialog backdrop, and the startup-log popup's fixed dark palette.",
         "section": "colors"
       },
       {
@@ -267,7 +267,7 @@
       }
     ],
     "dos": [
-      "Do express every colour through a token with light and dark values, and read the primary via --bs-primary-rgb.",
+      "Do express new colours through a token with light and dark values, and read the primary via --bs-primary or --bs-primary-rgb.",
       "Do put the reason next to a disabled control.",
       "Do route every visible string through the translate service, with en and pt-PT keys together.",
       "Do give every dialog role=\"dialog\", aria-modal and a name from its heading."

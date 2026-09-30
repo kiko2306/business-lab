@@ -117,7 +117,7 @@ A cool, desaturated slate ground with Bootstrap's stock semantic hues on top.
 
 ### Named Rules
 **The Meaning-Only Colour Rule.** Green, red and amber mean state and nothing else. A decorative use of them makes a healthy box look broken.
-**The Both-Themes Rule.** Every colour lives as a token with light and dark values kept in step (`styles.css`); component CSS never hard-codes a theme colour, and reads the primary through `--bs-primary-rgb`.
+**The Both-Themes Rule.** Every colour lives as a token with light and dark values kept in step (`styles.css`); component CSS reads theme colours from Bootstrap's `--bs-*` variables or `--app-*` tokens rather than repeating a hex. Known exceptions today: the service-row icon tile's primary tint, the dialog backdrop, and the startup-log popup's fixed dark palette.
 
 ## Typography
 
@@ -185,7 +185,7 @@ Generous, friendly radii scaled to size: rows 0.6rem, summary tiles 0.9rem, card
 ## Do's and Don'ts
 
 ### Do:
-- **Do** express every colour through a token with light and dark values, and read the primary via `--bs-primary-rgb`.
+- **Do** express new colours through a token with light and dark values, and read the primary via `--bs-primary` or `--bs-primary-rgb` (the search-pill focus halo does).
 - **Do** put the reason next to a disabled control (blocked start names the dependency).
 - **Do** route every visible string through the translate service, with en and pt-PT keys together.
 - **Do** keep counts and versions in tabular numerals.
@@ -195,5 +195,5 @@ Generous, friendly radii scaled to size: rows 0.6rem, summary tiles 0.9rem, card
 - **Don't** use green, red or amber for anything but state.
 - **Don't** add hard offset shadows, gradient text, or glass and blur as decoration.
 - **Don't** nest cards inside cards; rows sit in panels, nothing sits in a row but its own content.
-- **Don't** hard-code a theme colour or a Bootstrap default hex in component CSS.
+- **Don't** hard-code a new theme colour or Bootstrap default hex in component CSS.
 - **Don't** put layout in inline `style` attributes; use a class.
