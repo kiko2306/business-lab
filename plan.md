@@ -35248,3 +35248,76 @@ just the "already advanced" case §789 happened to screenshot. Confirmed the lab
 spacing fix with a fresh screenshot. 173 tests unaffected (HTML/class-only change).
 No `critique-storage` snapshot existed for these files to close (exit 2 — the settings
 page's last recorded critique predates this session's edits to it).
+
+## 790. Auditing the other 12 routes: a real Joi-leak found and fixed, plus a global icon fragility
+
+§789 only covered Home/Apps/Backups/Settings (the README's §777 scope). Asked to extend
+the same real-render audit to the other 12: login, setup, recovery, set-password,
+access-denied, unsubscribe, content, utils, audit-logs, users, updates, account. Same
+harness — built, brought up `docker-compose.test.yml`, screenshotted each at desktop
+and mobile, `/setup` specifically **before** creating the test admin (its guard
+redirects to `/login` once one exists, so the only way to see its actual form is on a
+still-fresh database) — and one dark-mode pass across a representative sample.
+
+**Found and fixed, not just reported** — this one surfaced through direct interaction
+(a deliberately too-short token), not the screenshot pass, and was live-verified before
+compiling the rest of this section: `/set-password?token=dummy` and
+`/unsubscribe/dummy-token` both showed Joi's raw validation string verbatim —
+`"token" with value "dummy" fails to match the required pattern:
+/^[A-Za-z0-9_-]{20,256}$/` — to an anonymous visitor who is, by definition, not signed
+in and has no dashboard context for that sentence to mean anything. Root cause:
+`validateParams`'s generic error path (`validation.ts`) sends Joi's `detail.message`
+straight to the client, which is exactly right for the app's many *authenticated*
+forms (a real admin benefits from "email must be a valid email"), but these are the
+only two params schemas reached by a cold click from an outside email with zero
+session — `invitationToken` and `subscriberToken`. The backend's own 410 path for a
+*genuinely* expired/unknown token already had good copy
+("This invitation link is no longer valid. Ask for a new one.") — only a
+*malformed* token (too short, wrong charset — truncated by an email client, an old
+link format, anything) skipped that path and hit the generic validator instead. Fixed
+at the narrowest correct point: `.messages({ 'string.pattern.base': … })` on both
+schemas' `token` field, reusing the invitation route's existing 410 wording for
+`invitationToken` and matching copy for `subscriberToken`, so every "this link doesn't
+work" case now reads the same regardless of which of the two ways it can fail.
+Test-first: new `backend/src/middleware/validation.test.ts` (no prior test file for
+this module existed) asserts both schemas' pattern-mismatch message on a too-short
+token; verified live via a direct `curl` against both routes on the rebuilt backend,
+both after the stack was already up. 1295 backend tests total, typecheck clean.
+
+**Reported, not fixed — the rest is audit output, not a fix pass:**
+
+- **[P1, global] The header's dark/light theme toggle uses two bare Unicode symbols
+  (`☀`/`☾`) that don't both render.** `shell.component.html`: `{{ theme() === 'dark' ?
+  '☀' : '☾' }}`. Confirmed live: `☾` (light mode, U+263E) renders correctly across every
+  screenshot; `☀` (dark mode, U+2600) rendered as a generic asterisk-like fallback glyph
+  in this same Chromium build that also failed §789's tile emoji — the identical
+  fragility class (a codepoint outside what the available font actually covers), just a
+  different symbol block, not emoji. This is on the shared shell header, so it's present
+  on all 18 routes, not one page — the widest-reaching finding either audit pass has
+  found. Same fix shape as §789's emoji-to-initials swap: replace with something that
+  doesn't depend on font glyph coverage (plain text "Light"/"Dark", or the inline SVG
+  the codebase already uses for `.panel__toggle`'s chevron — `stroke="currentColor"`,
+  no font dependency at all).
+- **[P2] Jargon leaks on Utils and Updates, the two pages §780 never touched.**
+  `utils.subtitle`: "**Stack** health checks…", `utils.health.dockerStorage`: "**Docker**
+  storage". `self-update.title`/subtitle (Updates page): "…this is also the only way
+  managed apps' images update, so the **whole stack** moves together" and "**Pull the
+  latest code from main, rebuild** the dashboard, pull and **recreate** every managed
+  app on its **pinned images**, then restart" — raw git/deploy vocabulary, not the
+  plain-language rewrite §780 gave Settings' equivalent checklist copy. `CrowdSec`/
+  `Nginx Proxy Manager` named on Account's Banned IPs panel weighed and set aside as
+  lower severity — those are apps the owner installed and sees named elsewhere (the Apps
+  page), not leaked internal machinery the way "pull main"/"pinned images" is.
+- **Considered and set aside:** Access Denied's "Ask for access" form renders fine
+  without its `?host=` query param (just doesn't show which app was denied) — that's an
+  untested query-param variant, not a defect; Recovery's disabled-state "Reset password"
+  button reads washed-out red — confirmed in code as Bootstrap's own default disabled-
+  button opacity (`[disabled]="!enabled"`), not a broken style.
+
+All 12 routes otherwise responsive and theme-consistent, no overflow found at either
+viewport. `/setup`'s pre-admin form, `/login`, `/recovery`, `/access-denied` and
+`/unsubscribe` (after this section's fix) all read cleanly to an anonymous visitor —
+plain language, no console/shell references, matching Home/Apps/Backups/Settings' bar
+from §787–§789. Not a full README backlog item for the two Reported findings above;
+recorded here so they're not lost, left for the user to prioritize the same way §789's
+list was.

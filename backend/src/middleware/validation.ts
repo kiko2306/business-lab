@@ -242,9 +242,17 @@ export const schemas = {
     email: emailSchema.required(),
     appAccess: appAccessSchema.required(),
   }),
-  // Redeem a set-password invitation (plan.md §158).
+  // Redeem a set-password invitation (plan.md §158). A malformed token (not
+  // just an unknown one — that's the 410 in routes/auth.ts) used to reach the
+  // set-password page as Joi's raw pattern-mismatch string; same wording as
+  // the 410 so every "this link doesn't work" case reads the same way to a
+  // non-technical visitor, found live during an audit (plan.md §790).
   invitationToken: Joi.object({
-    token: Joi.string().trim().pattern(/^[A-Za-z0-9_-]{20,256}$/).required(),
+    token: Joi.string()
+      .trim()
+      .pattern(/^[A-Za-z0-9_-]{20,256}$/)
+      .required()
+      .messages({ 'string.pattern.base': 'This invitation link is no longer valid. Ask for a new one.' }),
   }),
   invitationAccept: Joi.object({
     password: passwordSchema.required(),
@@ -269,9 +277,14 @@ export const schemas = {
     email: emailSchema.required(),
     redirect: Joi.string().trim().uri({ scheme: ['http', 'https'] }).max(2000).optional(),
   }),
-  // The unsubscribe-link token (plan.md §612) — same shape as invitationToken.
+  // The unsubscribe-link token (plan.md §612) — same shape as invitationToken,
+  // and the same raw-Joi-message leak on a malformed one (plan.md §790).
   subscriberToken: Joi.object({
-    token: Joi.string().trim().pattern(/^[A-Za-z0-9_-]{20,256}$/).required(),
+    token: Joi.string()
+      .trim()
+      .pattern(/^[A-Za-z0-9_-]{20,256}$/)
+      .required()
+      .messages({ 'string.pattern.base': 'This link is invalid or has expired.' }),
   }),
   auditQuery: Joi.object({
     page: Joi.number().integer().min(1).max(100000).optional(),

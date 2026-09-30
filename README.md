@@ -1,6 +1,6 @@
 # Business Lab
 
-**Version 0.157.2** — full history in the [changelog](/CHANGELOG.md).
+**Version 0.157.3** — full history in the [changelog](/CHANGELOG.md).
 
 Business Lab (repository `business-lab`) is a Dockerized Angular + Node.js (TypeScript)/PostgreSQL system for operating homelab services with authenticated start/stop controls, audit logs, health checks, backup/restore, and recovery mode.
 
@@ -230,12 +230,30 @@ item is deleted.
       with no Cloudflare token stored yet and confirm the error is the plain
       "save the token first" message, not a raw exception.
 
-- [ ] **Audit Home, Apps, Backups and Settings on a real render (plan.md §777)** — after the
-      items above: `/impeccable audit` for contrast (the 0.68-0.78rem uppercase labels),
-      focus order, live regions and perf. New findings become new items here.
 - [ ] **Adapt the same four pages to phone and tablet (plan.md §777)** — `/impeccable adapt`:
       widths from 360px up, and pt-PT string lengths in the Apps row, Backups forms and
       Settings panels. New findings become new items here.
+
+### Audit findings, the other 12 pages (plan.md §790)
+
+`/impeccable audit` extended past the original four (login, setup, recovery,
+set-password, access-denied, unsubscribe, content, utils, audit-logs, users, updates,
+account). A raw Joi validation leak on set-password/unsubscribe was fixed live in that
+same pass; these two are reported, not yet fixed.
+
+- [ ] **Shell header's theme toggle uses two bare Unicode symbols that don't both
+      render (plan.md §790)** — `shell.component.html`: `{{ theme() === 'dark' ? '☀' :
+      '☾' }}`. `☀` (dark mode) renders as a generic fallback glyph in a Chromium build
+      missing that codepoint's font coverage — the same fragility class as §789's Home
+      tile icons, on the shared header, so present on all 18 routes. Replace with plain
+      text ("Light"/"Dark") or an inline SVG (matching `.panel__toggle`'s existing
+      chevron, `stroke="currentColor"`, no font dependency).
+- [ ] **Utils and Updates still have the git/Docker jargon §780 removed from Settings
+      (plan.md §790)** — Utils: "Stack health checks", "Docker storage". Updates: "the
+      whole stack moves together", "Pull the latest code from main, rebuild the
+      dashboard, pull and recreate every managed app on its pinned images, then
+      restart". Rewrite in plain language, both en and pt-PT, following §780's own
+      before/after as the template.
 
 ### Apps page (impeccable critique, plan.md §761)
 
